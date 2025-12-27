@@ -27,7 +27,7 @@ from gametune.core.exceptions import (
     BackupRestoreError,
     BackupNotFoundError,
     BackupCorruptedError,
-    PermissionError,
+    ElevationRequiredError,
     AdminRequiredError,
     ExternalToolError,
     NvidiaSmiError,
@@ -38,7 +38,7 @@ from gametune.core.exceptions import (
     ConfigLoadError,
     ConfigSaveError,
     ConfigValidationError,
-    TimeoutError,
+    OperationTimeoutError,
     CommandTimeoutError,
 )
 
@@ -117,8 +117,8 @@ class TestExceptionHierarchy:
 
     def test_permission_errors(self):
         """Test permission error hierarchy."""
-        assert issubclass(PermissionError, GameTuneError)
-        assert issubclass(AdminRequiredError, PermissionError)
+        assert issubclass(ElevationRequiredError, GameTuneError)
+        assert issubclass(AdminRequiredError, ElevationRequiredError)
 
     def test_external_tool_errors(self):
         """Test external tool error hierarchy."""
@@ -137,8 +137,8 @@ class TestExceptionHierarchy:
 
     def test_timeout_errors(self):
         """Test timeout error hierarchy."""
-        assert issubclass(TimeoutError, GameTuneError)
-        assert issubclass(CommandTimeoutError, TimeoutError)
+        assert issubclass(OperationTimeoutError, GameTuneError)
+        assert issubclass(CommandTimeoutError, OperationTimeoutError)
 
 
 class TestSpecificExceptions:

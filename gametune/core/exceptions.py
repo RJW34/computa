@@ -132,12 +132,12 @@ class BackupCorruptedError(BackupError):
 
 
 # Permission Errors
-class PermissionError(GameTuneError):
+class ElevationRequiredError(GameTuneError):
     """Operation requires elevated privileges."""
     pass
 
 
-class AdminRequiredError(PermissionError):
+class AdminRequiredError(ElevationRequiredError):
     """Operation requires administrator privileges."""
     pass
 
@@ -190,11 +190,11 @@ class ConfigValidationError(ConfigurationError):
 
 
 # Timeout Errors
-class TimeoutError(GameTuneError):
+class OperationTimeoutError(GameTuneError):
     """Operation timed out."""
     pass
 
 
-class CommandTimeoutError(TimeoutError):
+class CommandTimeoutError(OperationTimeoutError):
     """External command timed out."""
     pass

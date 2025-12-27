@@ -77,10 +77,10 @@ class ConfigManager:
     """Manages GameTune configuration files."""
 
     # Valid log levels
-    VALID_LOG_LEVELS = {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}
+    VALID_LOG_LEVELS: set[str] = {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}
 
     # Known handler names
-    KNOWN_HANDLERS = {
+    KNOWN_HANDLERS: set[str] = {
         "WindowsSettingsHandler",
         "PowerSettingsHandler",
         "RegistrySettingsHandler",

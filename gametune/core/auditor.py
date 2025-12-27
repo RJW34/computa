@@ -57,6 +57,8 @@ def _get_handlers() -> list[SettingsHandler]:
 class ConfigurationAuditor:
     """Audits system configuration for gaming optimization issues."""
 
+    _handlers: list[SettingsHandler]
+
     def __init__(self) -> None:
         self._handlers = _get_handlers()
 
