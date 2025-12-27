@@ -9,13 +9,34 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## [Unreleased]
 
 ### Added
-- NPI installation instructions in README
-- CCD API documentation in TECHNICAL_REFERENCE.md
-- Rivals of Aether 2 profile documentation
-- CHANGELOG.md
+- Game detection system - detects games from Steam, Epic, Battle.net, standalone
+- `abso games` command to list detected games and suggest profiles
+- `abso timer` command with `--resolution` and `--keep-alive` options
+- `abso config` command to create/manage `abso.yaml` configuration
+- Profile customization via `abso.yaml` (override settings without editing code)
+- Handler disabling via `disabled_handlers` config option
+- G-Sync/VRR detection improvements:
+  - Known G-Sync monitor database matching
+  - EDID FreeSync range parsing
+  - NVIDIA registry queries
+  - High refresh rate heuristics
+- GitHub Actions CI pipeline (`ci.yml`)
+- Pre-commit hooks (Black, Ruff, pytest)
+- `pyproject.toml` for modern Python packaging
+- Type checking with mypy (30+ type annotations added)
+- Handler unit tests (graphics, memory, mouse, network, power, services, timer)
+- CLI smoke tests for all commands
+- Test count: 274 -> 359 tests
 
 ### Changed
-- Updated TECHNICAL_REFERENCE.md with correct NPI CLI flags
+- Refactored `nvidia.py` (822 lines) into `abso/settings/nvidia/` package:
+  - `__init__.py` - Main handler
+  - `npi.py` - NPI executable operations
+  - `profiles.py` - NIP file generation
+  - `presets.py` - Setting IDs and presets
+  - `parsing.py` - XML parsing utilities
+- Game Detection and Profile Customization documentation in TECHNICAL_REFERENCE.md
+- Timer CLI documentation in TECHNICAL_REFERENCE.md
 
 ---
 

@@ -67,6 +67,28 @@ from ctypes import wintypes
 - Works correctly with DSC (Display Stream Compression) modes
 - Handles VRR displays properly
 
+### G-Sync / VRR Detection
+A.B.S.O. uses multiple methods to detect VRR (Variable Refresh Rate) support:
+
+1. **Known G-Sync Monitor Database** - Matches monitor names against known G-Sync Ultimate and native G-Sync monitors
+2. **EDID Parsing** - Reads FreeSync range from EDID extension blocks (0x47 data block)
+3. **NVIDIA Registry** - Queries `HKLM\SYSTEM\CurrentControlSet\Services\nvlddmkm` for G-Sync enable flags
+4. **Heuristics** - High refresh rate monitors (144Hz+) likely support VRR
+
+```python
+# Example: Check if monitor likely has VRR
+from abso.core.detector import HardwareDetector
+
+detector = HardwareDetector()
+hardware = detector.detect_all()
+
+for monitor in hardware.get("monitors", []):
+    vrr = monitor.get("vrr_supported")
+    vrr_type = monitor.get("vrr_type")  # "gsync", "freesync", or None
+    vrr_range = monitor.get("vrr_range")  # e.g., "48-144Hz"
+    print(f"{monitor['name']}: VRR={vrr}, Type={vrr_type}, Range={vrr_range}")
+```
+
 ### CPU / RAM
 ```python
 import wmi
@@ -257,6 +279,19 @@ ntdll = ctypes.WinDLL('ntdll')
 current = ctypes.c_ulong()
 ntdll.NtSetTimerResolution(5000, True, ctypes.byref(current))
 ```
+
+**A.B.S.O. Timer CLI:**
+```bash
+# Set timer resolution (default 0.5ms)
+python -m abso timer
+
+# Custom resolution
+python -m abso timer --resolution 1.0
+
+# Keep-alive mode (maintains resolution until Ctrl+C)
+python -m abso timer --keep-alive
+```
+Note: Timer resolution only persists while the process runs. Use `--keep-alive` to maintain continuously.
 
 ### Nagle's Algorithm (Network Latency)
 ```python
@@ -536,6 +571,89 @@ If you experience issues after applying optimizations:
 | Driver crashes | NPI profile incompatibility | Restore NPI backup |
 
 **Use `python -m abso restore latest` to quickly revert all changes.**
+
+---
+
+## Game Detection
+
+A.B.S.O. can automatically detect installed games and suggest matching profiles.
+
+### Supported Platforms
+- **Steam** - Scans library folders from registry and `libraryfolders.vdf`
+- **Epic Games** - Common install paths (`Program Files\Epic Games`, etc.)
+- **Battle.net** - Registry paths for Blizzard games
+- **Standalone** - Common locations (Slippi Launcher, etc.)
+
+### Usage
+```bash
+# Detect installed games and show matching profiles
+python -m abso games
+```
+
+### Implementation
+```python
+from abso.core.game_detector import detect_installed_games, get_profile_suggestions
+
+# Get all detected games
+games = detect_installed_games()
+for game in games:
+    print(f"{game.name} ({game.platform}) -> {game.install_path}")
+
+# Get profile suggestions based on installed games
+suggestions = get_profile_suggestions()
+for profile_name, matched_games in suggestions.items():
+    print(f"{profile_name}: {[g.name for g in matched_games]}")
+```
+
+Games are matched to profiles via `executable_hints` defined in each profile class.
+
+---
+
+## Profile Customization
+
+Users can customize profile settings via `abso.yaml` without modifying source code.
+
+### Configuration File
+Create `abso.yaml` in the working directory:
+```yaml
+# A.B.S.O. Configuration
+
+# Override profile settings
+profile_overrides:
+  slippi-melee:
+    nvidia:
+      preset: balanced  # Override from minimum_latency
+    timer:
+      resolution_ms: 1.0  # Override from 0.5
+  cod-bo7:
+    windows:
+      hags: false  # Disable HAGS for this profile
+
+# Skip specific handlers during apply
+disabled_handlers:
+  - ServicesSettingsHandler
+  - UpdatesSettingsHandler
+
+# Other settings
+backup_dir: backups
+auto_backup: true
+log_level: INFO
+```
+
+### CLI Commands
+```bash
+# Create default config file
+python -m abso config --init
+
+# Show current configuration
+python -m abso config --show
+```
+
+### How Overrides Work
+1. Base settings come from the profile class (e.g., `SlippiMeleeProfile`)
+2. User overrides from `abso.yaml` are merged on top
+3. Override values take precedence over base settings
+4. Disabled handlers are skipped entirely during `apply`
 
 ---
 
