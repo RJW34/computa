@@ -17,7 +17,8 @@ def is_admin() -> bool:
     """
     try:
         return ctypes.windll.shell32.IsUserAnAdmin() != 0
-    except Exception:
+    except (AttributeError, OSError) as e:
+        logger.debug(f"Failed to check admin status: {e}")
         return False
 
 

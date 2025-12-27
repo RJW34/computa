@@ -412,8 +412,8 @@ class HardwareDetector:
                             parts = monitor.DeviceID.split("\\")
                             if len(parts) >= 2:
                                 monitor_id = parts[1]
-                    except Exception:
-                        pass
+                    except (AttributeError, OSError) as e:
+                        logger.debug(f"Failed to get monitor details for device {device_index}: {e}")
 
                     # Get current settings
                     settings = win32api.EnumDisplaySettings(
@@ -451,7 +451,9 @@ class HardwareDetector:
                     })
 
                     device_index += 1
-                except Exception:
+                except (AttributeError, OSError) as e:
+                    # No more display devices to enumerate
+                    logger.debug(f"Finished enumerating displays at index {device_index}: {e}")
                     break
 
         except ImportError:

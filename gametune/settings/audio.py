@@ -104,13 +104,87 @@ class AudioSettingsHandler(SettingsHandler):
     # Private helper methods
 
     def _get_audio_enhancements_disabled(self) -> bool | None:
-        """Check if audio enhancements are disabled globally.
+        """Check if audio enhancements are disabled on the default audio device.
 
-        Note: This is a simplified check. Per-device settings are in:
+        Checks the default render (playback) device's FxProperties for the
+        DisableAllEnhancements flag.
+
+        Registry path:
         HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\MMDevices\\Audio\\Render\\{GUID}\\FxProperties
+        - DisableAllEnhancements (DWORD): 1 = disabled, 0 or missing = enabled
+
+        Returns:
+            True if enhancements are disabled on default device.
+            False if enhancements are enabled.
+            None if unable to determine (device not found, access denied, etc.).
         """
-        # Global disable is not straightforward in registry
-        # This is primarily managed per-device through Sound control panel
+        mmdevices_key = r"SOFTWARE\Microsoft\Windows\CurrentVersion\MMDevices\Audio\Render"
+
+        try:
+            render_key = winreg.OpenKey(
+                winreg.HKEY_LOCAL_MACHINE,
+                mmdevices_key,
+                0,
+                winreg.KEY_READ
+            )
+        except (FileNotFoundError, PermissionError, OSError) as e:
+            logger.debug(f"Cannot access audio devices registry: {e}")
+            return None
+
+        try:
+            # Find the default device by looking for DeviceState = 1 (active)
+            i = 0
+            while True:
+                try:
+                    device_guid = winreg.EnumKey(render_key, i)
+                    device_path = f"{mmdevices_key}\\{device_guid}"
+
+                    try:
+                        device_key = winreg.OpenKey(
+                            winreg.HKEY_LOCAL_MACHINE,
+                            device_path,
+                            0,
+                            winreg.KEY_READ
+                        )
+                        try:
+                            # Check if device is active (DeviceState = 1)
+                            state = winreg.QueryValueEx(device_key, "DeviceState")[0]
+                            if state == 1:  # Active device
+                                # Check FxProperties for DisableAllEnhancements
+                                try:
+                                    fx_key = winreg.OpenKey(
+                                        winreg.HKEY_LOCAL_MACHINE,
+                                        f"{device_path}\\FxProperties",
+                                        0,
+                                        winreg.KEY_READ
+                                    )
+                                    try:
+                                        disabled = winreg.QueryValueEx(
+                                            fx_key, "{1da5d803-d492-4edd-8c23-e0c0ffee7f0e},5"
+                                        )[0]
+                                        # Value of 1 means enhancements are disabled
+                                        return disabled == 1
+                                    except FileNotFoundError:
+                                        # Key exists but value doesn't - enhancements are enabled
+                                        return False
+                                    finally:
+                                        winreg.CloseKey(fx_key)
+                                except FileNotFoundError:
+                                    # No FxProperties key - enhancements are enabled (default)
+                                    return False
+                        finally:
+                            winreg.CloseKey(device_key)
+                    except (FileNotFoundError, PermissionError, OSError):
+                        pass  # Skip inaccessible devices
+
+                    i += 1
+                except OSError:
+                    # No more subkeys
+                    break
+        finally:
+            winreg.CloseKey(render_key)
+
+        # Could not find an active device
         return None
 
     def _get_audio_priority(self) -> str | None:

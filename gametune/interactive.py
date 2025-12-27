@@ -432,12 +432,12 @@ def run_restore_backup() -> None:
         backup_id = backup_path.name.replace("backup_", "")
         backup_ids.append(backup_id)
 
-        # Parse timestamp
+        # Parse timestamp from backup ID format: YYYYMMDD_HHMMSS
         try:
             date_str = f"{backup_id[:4]}-{backup_id[4:6]}-{backup_id[6:8]}"
             time_str = f"{backup_id[9:11]}:{backup_id[11:13]}:{backup_id[13:15]}"
             display_time = f"{date_str} {time_str}"
-        except:
+        except (IndexError, ValueError):
             display_time = backup_id
 
         table.add_row(f"[{i}]", backup_id, display_time)

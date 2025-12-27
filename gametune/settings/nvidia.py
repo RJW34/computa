@@ -429,7 +429,7 @@ class NvidiaSettingsHandler(SettingsHandler):
                     self.NPI_PATH = path
                     logger.debug(f"Found NPI at: {path}")
                     return
-            except Exception:
+            except (OSError, PermissionError):
                 continue
 
     def _check_npi_available(self) -> bool:
@@ -544,12 +544,14 @@ class NvidiaSettingsHandler(SettingsHandler):
                             if value_elem is not None and value_elem.text:
                                 try:
                                     settings[name] = parser(value_elem.text)
-                                except Exception:
-                                    pass
+                                except ValueError:
+                                    logger.debug(f"Failed to parse setting {name}: {value_elem.text}")
                     break  # Only need the base profile
 
-        except Exception as e:
-            logger.debug(f"Failed to parse NIP file: {e}")
+        except ET.ParseError as e:
+            logger.debug(f"Failed to parse NIP file (XML error): {e}")
+        except (OSError, IOError) as e:
+            logger.debug(f"Failed to read NIP file: {e}")
 
         return settings
 
@@ -563,7 +565,7 @@ class NvidiaSettingsHandler(SettingsHandler):
                 return "on"
             elif int_val == NvidiaSettingValues.LOW_LATENCY_ULTRA:
                 return "ultra"
-        except Exception:
+        except ValueError:
             pass
         return "unknown"
 
@@ -577,7 +579,7 @@ class NvidiaSettingsHandler(SettingsHandler):
                 return "prefer_max_performance"
             elif int_val == NvidiaSettingValues.POWER_OPTIMAL:
                 return "optimal"
-        except Exception:
+        except ValueError:
             pass
         return "unknown"
 
@@ -593,7 +595,7 @@ class NvidiaSettingsHandler(SettingsHandler):
                 return "adaptive"
             elif int_val == NvidiaSettingValues.VSYNC_ADAPTIVE_HALF:
                 return "adaptive_half"
-        except Exception:
+        except ValueError:
             pass
         return "unknown"
 
@@ -604,7 +606,7 @@ class NvidiaSettingsHandler(SettingsHandler):
             if int_val == 0:
                 return "off"
             return str(int_val)
-        except Exception:
+        except ValueError:
             pass
         return "unknown"
 
@@ -617,7 +619,7 @@ class NvidiaSettingsHandler(SettingsHandler):
             elif int_val == 0xFFFFFFFF:
                 return "unlimited"
             return f"{int_val}MB"
-        except Exception:
+        except ValueError:
             pass
         return "unknown"
 
@@ -631,7 +633,7 @@ class NvidiaSettingsHandler(SettingsHandler):
                 return "on"
             elif int_val == NvidiaSettingValues.THREADED_OPT_OFF:
                 return "off"
-        except Exception:
+        except ValueError:
             pass
         return "unknown"
 
