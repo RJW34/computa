@@ -6,13 +6,11 @@ import json
 import logging
 from datetime import datetime
 from pathlib import Path
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from abso.core.exceptions import (
-    BackupCreateError,
-    BackupRestoreError,
-    BackupNotFoundError,
     BackupCorruptedError,
+    BackupNotFoundError,
 )
 
 if TYPE_CHECKING:
@@ -26,11 +24,11 @@ def _get_backup_handlers() -> list[SettingsHandler]:
 
     This avoids circular import issues between core and settings modules.
     """
-    from abso.settings.windows import WindowsSettingsHandler
+    from abso.settings.nvidia import NvidiaSettingsHandler
     from abso.settings.power import PowerSettingsHandler
     from abso.settings.registry import RegistrySettingsHandler
-    from abso.settings.nvidia import NvidiaSettingsHandler
     from abso.settings.timer import TimerSettingsHandler
+    from abso.settings.windows import WindowsSettingsHandler
 
     return [
         WindowsSettingsHandler(),

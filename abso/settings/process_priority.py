@@ -6,11 +6,10 @@ import logging
 import winreg
 from typing import Any
 
-from abso.settings.base import SettingsHandler
-from abso.core.models import Issue
 from abso.core.exceptions import RegistryWriteError
+from abso.core.models import Issue
+from abso.settings.base import SettingsHandler
 from abso.utils.validation import (
-    ValidationError,
     validate_executable_name,
     validate_priority_value,
 )

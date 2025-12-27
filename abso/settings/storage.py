@@ -6,8 +6,8 @@ import logging
 import subprocess
 from typing import Any
 
-from abso.settings.base import SettingsHandler
 from abso.core.models import Issue
+from abso.settings.base import SettingsHandler
 
 logger = logging.getLogger(__name__)
 

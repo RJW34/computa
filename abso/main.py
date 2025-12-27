@@ -7,11 +7,11 @@ import click
 from rich.console import Console
 from rich.panel import Panel
 
-from abso.utils.admin import ensure_admin, is_admin
-from abso.core.detector import HardwareDetector
-from abso.core.auditor import ConfigurationAuditor
 from abso.core.applier import ProfileApplier
+from abso.core.auditor import ConfigurationAuditor
 from abso.core.backup import BackupManager
+from abso.core.detector import HardwareDetector
+from abso.utils.admin import is_admin
 
 console = Console()
 

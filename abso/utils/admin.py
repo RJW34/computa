@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import ctypes
-import sys
 import logging
+import sys
 
 logger = logging.getLogger(__name__)
 

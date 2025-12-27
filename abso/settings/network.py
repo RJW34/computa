@@ -7,14 +7,8 @@ import subprocess
 import winreg
 from typing import Any
 
-from abso.settings.base import SettingsHandler
 from abso.core.models import Issue
-from abso.core.exceptions import (
-    RegistryReadError,
-    RegistryWriteError,
-    NetshError,
-    CommandTimeoutError,
-)
+from abso.settings.base import SettingsHandler
 
 logger = logging.getLogger(__name__)
 

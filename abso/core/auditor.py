@@ -6,7 +6,6 @@ import logging
 from typing import TYPE_CHECKING
 
 from abso.core.models import Issue
-from abso.core.exceptions import SettingsAuditError
 
 if TYPE_CHECKING:
     from abso.settings.base import SettingsHandler
@@ -19,21 +18,21 @@ def _get_handlers() -> list[SettingsHandler]:
 
     This avoids circular import issues between core and settings modules.
     """
-    from abso.settings.windows import WindowsSettingsHandler
+    from abso.settings.audio import AudioSettingsHandler
+    from abso.settings.graphics import GraphicsSettingsHandler
+    from abso.settings.memory import MemorySettingsHandler
+    from abso.settings.mouse import MouseSettingsHandler
+    from abso.settings.network import NetworkSettingsHandler
+    from abso.settings.nvidia import NvidiaSettingsHandler
     from abso.settings.power import PowerSettingsHandler
     from abso.settings.registry import RegistrySettingsHandler
-    from abso.settings.nvidia import NvidiaSettingsHandler
-    from abso.settings.timer import TimerSettingsHandler
-    from abso.settings.mouse import MouseSettingsHandler
-    from abso.settings.graphics import GraphicsSettingsHandler
     from abso.settings.services import ServicesSettingsHandler
-    from abso.settings.tasks import TasksSettingsHandler
-    from abso.settings.memory import MemorySettingsHandler
-    from abso.settings.network import NetworkSettingsHandler
-    from abso.settings.visual import VisualSettingsHandler
     from abso.settings.storage import StorageSettingsHandler
-    from abso.settings.audio import AudioSettingsHandler
+    from abso.settings.tasks import TasksSettingsHandler
+    from abso.settings.timer import TimerSettingsHandler
     from abso.settings.updates import UpdatesSettingsHandler
+    from abso.settings.visual import VisualSettingsHandler
+    from abso.settings.windows import WindowsSettingsHandler
 
     return [
         WindowsSettingsHandler(),
@@ -122,21 +121,21 @@ class ConfigurationAuditor:
         Returns:
             List of issues found in the category.
         """
-        from abso.settings.windows import WindowsSettingsHandler
+        from abso.settings.audio import AudioSettingsHandler
+        from abso.settings.graphics import GraphicsSettingsHandler
+        from abso.settings.memory import MemorySettingsHandler
+        from abso.settings.mouse import MouseSettingsHandler
+        from abso.settings.network import NetworkSettingsHandler
+        from abso.settings.nvidia import NvidiaSettingsHandler
         from abso.settings.power import PowerSettingsHandler
         from abso.settings.registry import RegistrySettingsHandler
-        from abso.settings.nvidia import NvidiaSettingsHandler
-        from abso.settings.timer import TimerSettingsHandler
-        from abso.settings.mouse import MouseSettingsHandler
-        from abso.settings.graphics import GraphicsSettingsHandler
         from abso.settings.services import ServicesSettingsHandler
-        from abso.settings.tasks import TasksSettingsHandler
-        from abso.settings.memory import MemorySettingsHandler
-        from abso.settings.network import NetworkSettingsHandler
-        from abso.settings.visual import VisualSettingsHandler
         from abso.settings.storage import StorageSettingsHandler
-        from abso.settings.audio import AudioSettingsHandler
+        from abso.settings.tasks import TasksSettingsHandler
+        from abso.settings.timer import TimerSettingsHandler
         from abso.settings.updates import UpdatesSettingsHandler
+        from abso.settings.visual import VisualSettingsHandler
+        from abso.settings.windows import WindowsSettingsHandler
 
         handler_map = {
             "windows": WindowsSettingsHandler,

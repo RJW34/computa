@@ -6,7 +6,6 @@ magic values used throughout the codebase.
 
 from __future__ import annotations
 
-
 # =============================================================================
 # Registry Root Constants
 # =============================================================================

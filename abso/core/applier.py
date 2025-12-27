@@ -7,16 +7,14 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from abso.core.exceptions import (
+    ProfileNotFoundError,
+)
 from abso.profiles.base import BaseProfile
-from abso.profiles.slippi_melee import SlippiMeleeProfile
 from abso.profiles.cod_bo7 import CodBo7Profile
 from abso.profiles.diablo4 import Diablo4Profile
 from abso.profiles.rivals2 import Rivals2Profile
-from abso.core.exceptions import (
-    ProfileNotFoundError,
-    ProfileApplyError,
-    SettingsApplyError,
-)
+from abso.profiles.slippi_melee import SlippiMeleeProfile
 
 logger = logging.getLogger(__name__)
 

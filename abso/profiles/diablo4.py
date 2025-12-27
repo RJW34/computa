@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from abso.profiles.base import BaseProfile
 
@@ -37,13 +37,13 @@ class Diablo4Profile(BaseProfile):
         return ["Diablo IV.exe"]
 
     def get_handlers(self) -> list[SettingsHandler]:
-        from abso.settings.windows import WindowsSettingsHandler
-        from abso.settings.power import PowerSettingsHandler
-        from abso.settings.registry import RegistrySettingsHandler
         from abso.settings.nvidia import NvidiaSettingsHandler
-        from abso.settings.timer import TimerSettingsHandler
-        from abso.settings.services import ServicesSettingsHandler
+        from abso.settings.power import PowerSettingsHandler
         from abso.settings.process_priority import ProcessPriorityHandler
+        from abso.settings.registry import RegistrySettingsHandler
+        from abso.settings.services import ServicesSettingsHandler
+        from abso.settings.timer import TimerSettingsHandler
+        from abso.settings.windows import WindowsSettingsHandler
 
         return [
             WindowsSettingsHandler(),

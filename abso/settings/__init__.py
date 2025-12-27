@@ -1,12 +1,12 @@
 """Settings handler modules."""
 
 from abso.settings.base import SettingsHandler
-from abso.settings.windows import WindowsSettingsHandler
+from abso.settings.network import NetworkSettingsHandler
+from abso.settings.nvidia import NvidiaSettingsHandler
 from abso.settings.power import PowerSettingsHandler
 from abso.settings.registry import RegistrySettingsHandler
-from abso.settings.nvidia import NvidiaSettingsHandler
-from abso.settings.network import NetworkSettingsHandler
 from abso.settings.timer import TimerSettingsHandler
+from abso.settings.windows import WindowsSettingsHandler
 
 __all__ = [
     "SettingsHandler",

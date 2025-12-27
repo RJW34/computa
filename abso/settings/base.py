@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from abso.core.models import Issue
@@ -26,7 +26,7 @@ class SettingsHandler(ABC):
         pass
 
     @abstractmethod
-    def audit(self) -> list["Issue"]:
+    def audit(self) -> list[Issue]:
         """Audit settings for optimization issues.
 
         Returns:

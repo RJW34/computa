@@ -10,15 +10,6 @@ from ctypes import wintypes
 from dataclasses import dataclass
 from typing import Any
 
-from abso.core.exceptions import (
-    GPUDetectionError,
-    CPUDetectionError,
-    MonitorDetectionError,
-    WMIError,
-    NvidiaSmiError,
-    CommandTimeoutError,
-)
-
 logger = logging.getLogger(__name__)
 
 
@@ -624,8 +615,8 @@ class HardwareDetector:
         ccd_refresh_rates = _get_refresh_rates_ccd()
 
         try:
-            import win32api
             import pywintypes
+            import win32api
 
             # Track which CCD source ID we're on (for active displays only)
             active_display_index = 0

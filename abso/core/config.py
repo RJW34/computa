@@ -7,7 +7,7 @@ for A.B.S.O. (Adaptive Battle Station Optimizer) user preferences and custom set
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass, field, asdict
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -162,7 +162,7 @@ class ConfigManager:
 
         except yaml.YAMLError as e:
             raise ConfigLoadError(
-                f"Failed to parse configuration file",
+                "Failed to parse configuration file",
                 details=str(e)
             )
         except TypeError as e:
@@ -172,7 +172,7 @@ class ConfigManager:
             )
         except OSError as e:
             raise ConfigLoadError(
-                f"Failed to read configuration file",
+                "Failed to read configuration file",
                 details=str(e)
             )
 

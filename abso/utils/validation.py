@@ -10,7 +10,7 @@ This module provides validation functions to prevent:
 from __future__ import annotations
 
 import re
-from pathlib import Path, PureWindowsPath
+from pathlib import PureWindowsPath
 
 
 class ValidationError(ValueError):

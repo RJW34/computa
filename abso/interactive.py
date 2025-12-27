@@ -4,22 +4,21 @@ from __future__ import annotations
 
 import sys
 import time
-from typing import Callable
+from pathlib import Path
 
+from rich import box
 from rich.console import Console
 from rich.panel import Panel
+from rich.progress import Progress, SpinnerColumn, TextColumn
+from rich.prompt import Confirm, Prompt
 from rich.table import Table
-from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn
-from rich.prompt import Prompt, Confirm
 from rich.text import Text
-from rich import box
 
-from abso.utils.admin import is_admin, ensure_admin
-from abso.core.detector import HardwareDetector
-from abso.core.auditor import ConfigurationAuditor
 from abso.core.applier import ProfileApplier
+from abso.core.auditor import ConfigurationAuditor
 from abso.core.backup import BackupManager
-from pathlib import Path
+from abso.core.detector import HardwareDetector
+from abso.utils.admin import ensure_admin, is_admin
 
 console = Console()
 
@@ -389,9 +388,9 @@ def run_detect_hardware() -> None:
                 vrr_label = vrr_type.upper() if vrr_type else "VRR"
                 console.print(f"      G-Sync/VRR:   [green]{vrr_label}[/green]")
             elif vrr == "likely":
-                console.print(f"      G-Sync/VRR:   [yellow]Likely (high refresh)[/yellow]")
+                console.print("      G-Sync/VRR:   [yellow]Likely (high refresh)[/yellow]")
             else:
-                console.print(f"      G-Sync/VRR:   [dim]Unknown[/dim]")
+                console.print("      G-Sync/VRR:   [dim]Unknown[/dim]")
             console.print()
     else:
         console.print("  [red]Not detected[/red]")

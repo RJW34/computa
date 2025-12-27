@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from abso.profiles.base import BaseProfile
 
@@ -38,17 +38,17 @@ class Rivals2Profile(BaseProfile):
         return ["RivalsofAether2.exe", "Rivals2.exe", "RivalsOfAether2-Win64-Shipping.exe"]
 
     def get_handlers(self) -> list[SettingsHandler]:
-        from abso.settings.windows import WindowsSettingsHandler
-        from abso.settings.power import PowerSettingsHandler
-        from abso.settings.registry import RegistrySettingsHandler
-        from abso.settings.nvidia import NvidiaSettingsHandler
-        from abso.settings.network import NetworkSettingsHandler
-        from abso.settings.timer import TimerSettingsHandler
-        from abso.settings.mouse import MouseSettingsHandler
         from abso.settings.graphics import GraphicsSettingsHandler
-        from abso.settings.services import ServicesSettingsHandler
         from abso.settings.memory import MemorySettingsHandler
+        from abso.settings.mouse import MouseSettingsHandler
+        from abso.settings.network import NetworkSettingsHandler
+        from abso.settings.nvidia import NvidiaSettingsHandler
+        from abso.settings.power import PowerSettingsHandler
         from abso.settings.process_priority import ProcessPriorityHandler
+        from abso.settings.registry import RegistrySettingsHandler
+        from abso.settings.services import ServicesSettingsHandler
+        from abso.settings.timer import TimerSettingsHandler
+        from abso.settings.windows import WindowsSettingsHandler
 
         return [
             WindowsSettingsHandler(),
