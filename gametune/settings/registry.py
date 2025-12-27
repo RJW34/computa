@@ -36,16 +36,20 @@ class RegistrySettingsHandler(SettingsHandler):
     PRIORITY_CONTROL_KEY = r"SYSTEM\CurrentControlSet\Control\PriorityControl"
 
     # Win32PrioritySeparation values
-    # Format: 0x00AABBCC where:
-    #   AA = Length (0=variable, 1=variable, 2=short fixed, 3=long fixed)
-    #   BB = Interval (0=variable, 1=variable, 2=short, 3=long)
-    #   CC = Foreground boost (0=none, 1=min, 2=max)
+    # Format: 0xAABBCC where (6-bit value):
+    #   Bits 5-4 (AA): Quantum length (0/1=default, 2=short, 3=long)
+    #   Bits 3-2 (BB): Quantum type (0/1=default, 2=variable, 3=fixed)
+    #   Bits 1-0 (CC): Foreground boost (0=none, 1=minimum, 2=maximum)
     #
-    # Optimal for gaming: 0x26 or 0x28
-    # 0x26 = Short fixed quantum, foreground max boost (default for desktop)
-    # 0x28 = Short variable quantum, foreground max boost (slightly better for games)
+    # Common values:
+    # 0x26 (38) = Short, variable, max boost (Windows desktop default)
+    # 0x28 (40) = Short, variable, no boost
+    # 0x2A (42) = Short, fixed, max boost (recommended for gaming)
+    #
+    # Short fixed quantum with max foreground boost gives games more responsive
+    # CPU scheduling while prioritizing the active window.
     WIN32_PRIORITY_DEFAULT = 0x26  # Windows default for desktop
-    WIN32_PRIORITY_GAMING = 0x28   # Short quantum, variable, max foreground boost
+    WIN32_PRIORITY_GAMING = 0x2A   # Short fixed quantum, max foreground boost
 
     def detect(self) -> dict[str, Any]:
         """Detect current registry gaming settings."""

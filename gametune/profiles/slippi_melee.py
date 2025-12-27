@@ -81,7 +81,7 @@ class SlippiMeleeProfile(BaseProfile):
             "RegistrySettingsHandler": {
                 "system_responsiveness": 0,
                 "network_throttling": 0xFFFFFFFF,
-                "win32_priority_separation": 0x28,  # Short quantum, max foreground boost
+                "win32_priority_separation": 0x2A,  # Short fixed quantum, max foreground boost
                 "game_priority": {
                     "gpu_priority": 8,
                     "priority": 6,
@@ -148,7 +148,7 @@ class SlippiMeleeProfile(BaseProfile):
                 "category": "Graphics",
                 "setting": "Backend",
                 "value": "Vulkan",
-                "reason": "Lowest latency on most systems. Test vs D3D12 on your hardware.",
+                "reason": "Lowest latency on most systems. OpenGL is a fallback if Vulkan has issues.",
             },
             {
                 "category": "Graphics",

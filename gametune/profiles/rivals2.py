@@ -86,7 +86,7 @@ class Rivals2Profile(BaseProfile):
             "RegistrySettingsHandler": {
                 "system_responsiveness": 0,
                 "network_throttling": 0xFFFFFFFF,
-                "win32_priority_separation": 0x28,  # Short quantum, max foreground boost
+                "win32_priority_separation": 0x2A,  # Short fixed quantum, max foreground boost
                 "game_priority": {
                     "gpu_priority": 8,
                     "priority": 6,
