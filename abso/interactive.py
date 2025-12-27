@@ -374,7 +374,14 @@ def run_detect_hardware() -> None:
             primary = " [green](Primary)[/green]" if monitor.get('is_primary') else ""
             console.print(f"  [{i}] [bold]{monitor.get('name', 'Unknown')}[/bold]{primary}")
             console.print(f"      Resolution:   {monitor.get('resolution', 'Unknown')}")
-            console.print(f"      Refresh Rate: {monitor.get('refresh_rate', 'Unknown')} Hz")
+            refresh_str = f"{monitor.get('refresh_rate', 'Unknown')} Hz"
+            max_refresh = monitor.get('max_refresh_rate')
+            max_capability = monitor.get('max_refresh_capability')
+            if max_refresh:
+                refresh_str += f" [yellow](Max @ res: {max_refresh} Hz)[/yellow]"
+            elif max_capability:
+                refresh_str += f" [yellow](Supports up to {max_capability} Hz)[/yellow]"
+            console.print(f"      Refresh Rate: {refresh_str}")
 
             vrr = monitor.get('vrr_supported')
             vrr_type = monitor.get('vrr_type')

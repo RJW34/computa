@@ -422,6 +422,31 @@ class HardwareDetector:
                     )
 
                     refresh_rate = settings.DisplayFrequency
+                    current_width = settings.PelsWidth
+                    current_height = settings.PelsHeight
+
+                    # Find maximum supported refresh rate
+                    max_refresh_rate = refresh_rate
+                    max_refresh_any_res = refresh_rate
+                    try:
+                        mode_index = 0
+                        while mode_index < 500:  # Safety limit
+                            try:
+                                mode = win32api.EnumDisplaySettings(adapter.DeviceName, mode_index)
+                                if mode is None:
+                                    break
+                                # Track max at any resolution (monitor capability)
+                                if mode.DisplayFrequency > max_refresh_any_res:
+                                    max_refresh_any_res = mode.DisplayFrequency
+                                # Check if this mode matches current resolution
+                                if mode.PelsWidth == current_width and mode.PelsHeight == current_height:
+                                    if mode.DisplayFrequency > max_refresh_rate:
+                                        max_refresh_rate = mode.DisplayFrequency
+                                mode_index += 1
+                            except pywintypes.error:
+                                break
+                    except Exception as e:
+                        logger.debug(f"Failed to enumerate display modes: {e}")
 
                     # Detect VRR/G-Sync capability
                     vrr_info = {"vrr_supported": None, "vrr_type": None}
@@ -431,7 +456,8 @@ class HardwareDetector:
                     # If EDID detection failed, use heuristics
                     if vrr_info.get("vrr_supported") is None:
                         # High refresh rate monitors are typically VRR-capable
-                        if refresh_rate > 60:
+                        # Use max_refresh_rate for better heuristic
+                        if max_refresh_rate > 60:
                             vrr_info["vrr_supported"] = "likely"  # Probable but not confirmed
                         else:
                             vrr_info["vrr_supported"] = "unknown"
@@ -441,6 +467,8 @@ class HardwareDetector:
                         "adapter": adapter.DeviceString or "Unknown",
                         "resolution": f"{settings.PelsWidth}x{settings.PelsHeight}",
                         "refresh_rate": refresh_rate,
+                        "max_refresh_rate": max_refresh_rate if max_refresh_rate > refresh_rate else None,
+                        "max_refresh_capability": max_refresh_any_res if max_refresh_any_res > refresh_rate else None,
                         "is_primary": bool(adapter.StateFlags & 0x4),  # DISPLAY_DEVICE_PRIMARY_DEVICE
                         "vrr_supported": vrr_info.get("vrr_supported"),
                         "vrr_type": vrr_info.get("vrr_type"),
