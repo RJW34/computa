@@ -7,6 +7,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from abso.core.config import ConfigManager
 from abso.core.exceptions import (
     ProfileNotFoundError,
 )
@@ -83,16 +84,36 @@ class ProfileApplier:
         except ProfileNotFoundError as e:
             return ApplyResult(success=False, error=str(e))
 
+        # Load configuration for overrides and disabled handlers
+        config_manager = ConfigManager()
+        profile_overrides = config_manager.get_profile_overrides(profile_name)
+
         applied: list[str] = []
         failed: list[str] = []
+        skipped: list[str] = []
         requires_reboot = False
 
         # Apply each settings category
         for handler in profile.get_handlers():
             handler_name = handler.__class__.__name__
 
+            # Skip disabled handlers
+            if config_manager.is_handler_disabled(handler_name):
+                logger.info(f"Skipping disabled handler: {handler_name}")
+                skipped.append(handler_name)
+                continue
+
             try:
-                result = handler.apply(profile.get_settings(handler_name))
+                # Get base settings from profile
+                settings = profile.get_settings(handler_name)
+
+                # Merge with user overrides from config
+                if profile_overrides:
+                    settings = self._merge_overrides(
+                        settings, handler_name, profile_overrides
+                    )
+
+                result = handler.apply(settings)
 
                 if result.get("success", False):
                     applied.append(handler_name)
@@ -114,6 +135,9 @@ class ProfileApplier:
         success = len(failed) == 0
         error = "; ".join(failed) if failed else None
 
+        if skipped:
+            logger.info(f"Skipped handlers (disabled in config): {', '.join(skipped)}")
+
         return ApplyResult(
             success=success,
             error=error,
@@ -122,6 +146,48 @@ class ProfileApplier:
             applied_settings=applied,
             failed_settings=failed,
         )
+
+    def _merge_overrides(
+        self,
+        settings: dict[str, Any],
+        handler_name: str,
+        overrides: Any,
+    ) -> dict[str, Any]:
+        """Merge profile settings with user overrides from config.
+
+        Args:
+            settings: Base settings from profile.
+            handler_name: Name of the handler class.
+            overrides: ProfileOverrides object from config.
+
+        Returns:
+            Merged settings dictionary.
+        """
+        # Map handler names to override attribute names
+        handler_to_attr = {
+            "NvidiaSettingsHandler": "nvidia",
+            "WindowsSettingsHandler": "windows",
+            "NetworkSettingsHandler": "network",
+            "PowerSettingsHandler": "power",
+            "TimerSettingsHandler": "timer",
+            "MouseSettingsHandler": "mouse",
+        }
+
+        attr_name = handler_to_attr.get(handler_name)
+        if not attr_name:
+            return settings
+
+        # Get handler-specific overrides
+        handler_overrides = getattr(overrides, attr_name, {})
+        if not handler_overrides:
+            return settings
+
+        # Deep merge: overrides take precedence
+        merged = settings.copy()
+        merged.update(handler_overrides)
+        logger.debug(f"Applied overrides for {handler_name}: {handler_overrides}")
+
+        return merged
 
     def generate_report(self, profile_name: str, output_dir: Path) -> Path:
         """Generate in-game settings report for a profile.

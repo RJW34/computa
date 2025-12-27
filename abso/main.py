@@ -175,6 +175,51 @@ def profiles() -> None:
 
 
 @cli.command()
+def games() -> None:
+    """Detect installed games and suggest matching profiles."""
+    from abso.core.game_detector import detect_installed_games, get_profile_suggestions
+
+    console.print(Panel("Game Detection", style="bold blue"))
+    console.print("[dim]Scanning for installed games...[/dim]\n")
+
+    games = detect_installed_games()
+
+    if not games:
+        console.print("[yellow]No supported games detected.[/yellow]")
+        console.print("\nSupported games:")
+        console.print("  - Super Smash Bros. Melee (Slippi)")
+        console.print("  - Rivals of Aether 2")
+        console.print("  - Call of Duty: Black Ops 7")
+        console.print("  - Diablo IV")
+        return
+
+    console.print(f"[green]Found {len(games)} game(s):[/green]\n")
+
+    for game in games:
+        platform_icon = {
+            "steam": "[blue]Steam[/blue]",
+            "epic": "[dim]Epic[/dim]",
+            "battle_net": "[cyan]Battle.net[/cyan]",
+            "standalone": "[yellow]Standalone[/yellow]",
+        }.get(game.platform, game.platform)
+
+        console.print(f"[bold]{game.name}[/bold]")
+        console.print(f"  Platform: {platform_icon}")
+        console.print(f"  Executable: {game.executable}")
+        console.print(f"  Path: [dim]{game.install_path}[/dim]")
+        console.print()
+
+    # Show profile suggestions
+    suggestions = get_profile_suggestions()
+    if suggestions:
+        console.print("[bold cyan]Suggested profiles:[/bold cyan]")
+        for profile_name, matched_games in suggestions.items():
+            game_names = ", ".join(g.name for g in matched_games)
+            console.print(f"  [green]{profile_name}[/green] -> {game_names}")
+        console.print(f"\nRun [bold]abso apply <profile>[/bold] to optimize.")
+
+
+@cli.command()
 @click.argument("profile_name")
 @click.option("--no-backup", is_flag=True, help="Skip automatic backup (not recommended)")
 def apply(profile_name: str, no_backup: bool) -> None:
@@ -250,6 +295,59 @@ def restore(backup_id: str) -> None:
 
 
 @cli.command()
+@click.option("--resolution", "-r", type=float, default=0.5,
+              help="Timer resolution in milliseconds (default: 0.5)")
+@click.option("--keep-alive", "-k", is_flag=True,
+              help="Keep running to maintain timer resolution")
+def timer(resolution: float, keep_alive: bool) -> None:
+    """Set system timer resolution for gaming.
+
+    Timer resolution affects frame pacing and scheduling precision.
+    Lower values (0.5ms) improve consistency. This is NOT input latency.
+
+    Note: Timer resolution only persists while this process runs.
+    Use --keep-alive to maintain the resolution continuously.
+    """
+    from abso.settings.timer import TimerSettingsHandler
+
+    handler = TimerSettingsHandler()
+    current = handler.detect()
+
+    if not current.get("available"):
+        console.print("[red]Error: Timer resolution API not available.[/red]")
+        sys.exit(1)
+
+    console.print(Panel("Timer Resolution", style="bold blue"))
+    console.print(f"Current: {current.get('current_resolution_ms', 'Unknown'):.3f}ms")
+    console.print(f"Minimum: {current.get('maximum_resolution_ms', 'Unknown'):.3f}ms")
+    console.print()
+
+    # Set the resolution
+    result = handler.apply({"resolution_ms": resolution})
+
+    if result.get("success"):
+        console.print(f"[green]Timer resolution set to {resolution}ms[/green]")
+
+        if keep_alive:
+            console.print("\n[yellow]Keep-alive mode active. Press Ctrl+C to exit.[/yellow]")
+            console.print("[dim]Timer resolution will revert when this process exits.[/dim]")
+            try:
+                import time
+                while True:
+                    time.sleep(60)  # Sleep and check periodically
+            except KeyboardInterrupt:
+                console.print("\n[yellow]Releasing timer resolution...[/yellow]")
+                handler.release_resolution()
+                console.print("[green]Timer resolution released.[/green]")
+        else:
+            console.print("[dim]Note: Resolution will revert when this process exits.[/dim]")
+            console.print("[dim]Use --keep-alive to maintain continuously.[/dim]")
+    else:
+        console.print(f"[red]Failed to set timer resolution: {result.get('error')}[/red]")
+        sys.exit(1)
+
+
+@cli.command()
 @click.argument("profile_name")
 def report(profile_name: str) -> None:
     """Generate in-game settings report for a profile.
@@ -266,6 +364,67 @@ def report(profile_name: str) -> None:
     except ValueError as e:
         console.print(f"[red]Error: {e}[/red]")
         sys.exit(1)
+
+
+@cli.command()
+@click.option("--init", is_flag=True, help="Create default configuration file")
+@click.option("--show", is_flag=True, help="Show current configuration")
+def config(init: bool, show: bool) -> None:
+    """Manage ABSO configuration file.
+
+    Configuration is stored in abso.yaml in the current directory.
+    Use profile_overrides to customize settings per game profile.
+    """
+    from abso.core.config import ConfigManager
+
+    config_manager = ConfigManager()
+
+    if init:
+        if config_manager.config_path.exists():
+            console.print(f"[yellow]Configuration already exists: {config_manager.config_path}[/yellow]")
+            console.print("Delete it first to create a new one.")
+            return
+
+        config_manager.create_default()
+        console.print(f"[green]Created default config: {config_manager.config_path}[/green]")
+        console.print("\nEdit this file to:")
+        console.print("  - Override profile settings (profile_overrides)")
+        console.print("  - Disable specific handlers (disabled_handlers)")
+        console.print("  - Set logging verbosity (log_level)")
+        return
+
+    if show:
+        if not config_manager.config_path.exists():
+            console.print("[yellow]No configuration file found.[/yellow]")
+            console.print(f"Run [bold]abso config --init[/bold] to create one.")
+            return
+
+        console.print(Panel("Current Configuration", style="bold blue"))
+        cfg = config_manager.config
+        console.print(f"  backup_dir: {cfg.backup_dir}")
+        console.print(f"  auto_backup: {cfg.auto_backup}")
+        console.print(f"  log_level: {cfg.log_level}")
+        console.print(f"  default_profile: {cfg.default_profile or '(none)'}")
+        console.print(f"  confirm_destructive: {cfg.confirm_destructive}")
+
+        if cfg.disabled_handlers:
+            console.print(f"  disabled_handlers: {', '.join(cfg.disabled_handlers)}")
+        else:
+            console.print("  disabled_handlers: (none)")
+
+        if cfg.profile_overrides:
+            console.print("\n[bold]Profile Overrides:[/bold]")
+            for profile_id, overrides in cfg.profile_overrides.items():
+                console.print(f"  [cyan]{profile_id}[/cyan]:")
+                for attr in ["nvidia", "windows", "network", "power", "timer", "mouse"]:
+                    override_val = getattr(overrides, attr, {})
+                    if override_val:
+                        console.print(f"    {attr}: {override_val}")
+        return
+
+    # Default: show help
+    console.print("Use [bold]abso config --init[/bold] to create a configuration file.")
+    console.print("Use [bold]abso config --show[/bold] to view current settings.")
 
 
 def main() -> None:

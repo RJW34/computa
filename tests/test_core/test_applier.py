@@ -291,3 +291,142 @@ class TestRealProfiles:
         profile = applier._get_profile("rivals2")
 
         assert profile.profile_id == "rivals2"
+
+
+class TestProfileOverrides:
+    """Tests for profile override functionality via config."""
+
+    def test_merge_overrides_nvidia(self):
+        """Test _merge_overrides with NVIDIA overrides."""
+        from abso.core.config import ProfileOverrides
+
+        applier = ProfileApplier()
+        base_settings = {"preset": "balanced", "vsync": False}
+        overrides = ProfileOverrides(nvidia={"preset": "minimum_latency"})
+
+        result = applier._merge_overrides(
+            base_settings, "NvidiaSettingsHandler", overrides
+        )
+
+        assert result["preset"] == "minimum_latency"  # Override applied
+        assert result["vsync"] is False  # Base setting preserved
+
+    def test_merge_overrides_windows(self):
+        """Test _merge_overrides with Windows overrides."""
+        from abso.core.config import ProfileOverrides
+
+        applier = ProfileApplier()
+        base_settings = {"game_mode": True, "game_bar": False}
+        overrides = ProfileOverrides(windows={"game_bar": True})
+
+        result = applier._merge_overrides(
+            base_settings, "WindowsSettingsHandler", overrides
+        )
+
+        assert result["game_mode"] is True  # Base setting preserved
+        assert result["game_bar"] is True  # Override applied
+
+    def test_merge_overrides_no_handler_match(self):
+        """Test _merge_overrides returns original settings for unknown handler."""
+        from abso.core.config import ProfileOverrides
+
+        applier = ProfileApplier()
+        base_settings = {"some_setting": True}
+        overrides = ProfileOverrides(nvidia={"preset": "minimum_latency"})
+
+        result = applier._merge_overrides(
+            base_settings, "UnknownHandler", overrides
+        )
+
+        # Should return original settings unchanged
+        assert result == base_settings
+
+    def test_merge_overrides_empty_overrides(self):
+        """Test _merge_overrides with empty overrides returns original."""
+        from abso.core.config import ProfileOverrides
+
+        applier = ProfileApplier()
+        base_settings = {"preset": "balanced"}
+        overrides = ProfileOverrides()
+
+        result = applier._merge_overrides(
+            base_settings, "NvidiaSettingsHandler", overrides
+        )
+
+        assert result == base_settings
+
+    def test_apply_with_disabled_handler(self, tmp_path):
+        """Test profile application skips disabled handlers."""
+        mock_handler = MagicMock()
+        mock_handler.__class__.__name__ = "WindowsSettingsHandler"
+        mock_handler.apply.return_value = {"success": True}
+
+        mock_profile = MagicMock()
+        mock_profile.get_handlers.return_value = [mock_handler]
+        mock_profile.get_settings.return_value = {}
+        mock_profile.has_in_game_settings.return_value = False
+
+        applier = ProfileApplier()
+        applier._profiles["test-profile"] = mock_profile
+        ProfileApplier.PROFILES["test-profile"] = type(mock_profile)
+
+        # Create a config that disables WindowsSettingsHandler
+        config_yaml = tmp_path / "abso.yaml"
+        config_yaml.write_text("""
+disabled_handlers:
+  - WindowsSettingsHandler
+""")
+
+        try:
+            with patch("abso.core.applier.ConfigManager") as mock_config_manager:
+                mock_config = MagicMock()
+                mock_config.disabled_handlers = ["WindowsSettingsHandler"]
+                mock_config_manager.return_value.config = mock_config
+                mock_config_manager.return_value.is_handler_disabled.return_value = True
+                mock_config_manager.return_value.get_profile_overrides.return_value = None
+
+                result = applier.apply_profile("test-profile")
+
+                # Handler should not have been called
+                mock_handler.apply.assert_not_called()
+                assert result.success is True
+                assert "WindowsSettingsHandler" not in result.applied_settings
+        finally:
+            del ProfileApplier.PROFILES["test-profile"]
+
+    def test_apply_with_profile_overrides(self):
+        """Test profile application applies overrides from config."""
+        from abso.core.config import ProfileOverrides
+
+        mock_handler = MagicMock()
+        mock_handler.__class__.__name__ = "NvidiaSettingsHandler"
+        mock_handler.apply.return_value = {"success": True}
+
+        mock_profile = MagicMock()
+        mock_profile.get_handlers.return_value = [mock_handler]
+        mock_profile.get_settings.return_value = {"preset": "balanced"}
+        mock_profile.has_in_game_settings.return_value = False
+
+        applier = ProfileApplier()
+        applier._profiles["test-profile"] = mock_profile
+        ProfileApplier.PROFILES["test-profile"] = type(mock_profile)
+
+        try:
+            with patch("abso.core.applier.ConfigManager") as mock_config_manager:
+                mock_config = MagicMock()
+                mock_config.disabled_handlers = []
+                mock_config_manager.return_value.config = mock_config
+                mock_config_manager.return_value.is_handler_disabled.return_value = False
+                mock_config_manager.return_value.get_profile_overrides.return_value = ProfileOverrides(
+                    nvidia={"preset": "minimum_latency"}
+                )
+
+                result = applier.apply_profile("test-profile")
+
+                # Handler should have been called with merged settings
+                mock_handler.apply.assert_called_once()
+                called_settings = mock_handler.apply.call_args[0][0]
+                assert called_settings["preset"] == "minimum_latency"
+                assert result.success is True
+        finally:
+            del ProfileApplier.PROFILES["test-profile"]

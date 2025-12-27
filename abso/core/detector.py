@@ -407,6 +407,114 @@ def _parse_edid_for_vrr(edid: bytes) -> dict[str, Any]:
     return result
 
 
+def _detect_gsync_from_nvidia_registry() -> dict[str, Any]:
+    """Detect G-Sync settings from NVIDIA driver registry.
+
+    The NVIDIA driver stores G-Sync/VRR settings in the registry.
+    This function queries those settings to determine G-Sync status.
+
+    Returns:
+        Dictionary with G-Sync detection results per monitor.
+    """
+    result: dict[str, Any] = {
+        "gsync_enabled_globally": False,
+        "gsync_monitors": [],
+    }
+
+    try:
+        # NVIDIA stores display settings in the driver registry
+        # Path: HKLM\SYSTEM\CurrentControlSet\Services\nvlddmkm\...
+        nvidia_path = r"SYSTEM\CurrentControlSet\Services\nvlddmkm"
+
+        try:
+            nvidia_key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, nvidia_path)
+            winreg.CloseKey(nvidia_key)
+        except FileNotFoundError:
+            logger.debug("NVIDIA driver registry not found")
+            return result
+
+        # Check for G-Sync compatible mode in NVIDIA profile settings
+        # NVIDIA Control Panel stores VRR settings in the user's profile
+        nv_profile_paths = [
+            r"SOFTWARE\NVIDIA Corporation\Global\FTS",
+            r"SOFTWARE\NVIDIA Corporation\Global\GSync",
+        ]
+
+        for path in nv_profile_paths:
+            try:
+                key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, path)
+                try:
+                    # Check for G-Sync enable flag
+                    value, _ = winreg.QueryValueEx(key, "EnableGSync")
+                    if value == 1:
+                        result["gsync_enabled_globally"] = True
+                except FileNotFoundError:
+                    pass
+                winreg.CloseKey(key)
+            except FileNotFoundError:
+                continue
+
+        # Also check user-specific NVIDIA settings
+        user_nv_paths = [
+            r"SOFTWARE\NVIDIA Corporation\Global\FTS",
+        ]
+
+        for path in user_nv_paths:
+            try:
+                key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, path)
+                try:
+                    value, _ = winreg.QueryValueEx(key, "EnableGSync")
+                    if value == 1:
+                        result["gsync_enabled_globally"] = True
+                except FileNotFoundError:
+                    pass
+                winreg.CloseKey(key)
+            except FileNotFoundError:
+                continue
+
+    except OSError as e:
+        logger.debug(f"G-Sync registry detection failed: {e}")
+
+    return result
+
+
+def _is_known_gsync_monitor(monitor_name: str) -> tuple[bool, str | None]:
+    """Check if monitor name matches known G-Sync monitor patterns.
+
+    Args:
+        monitor_name: The monitor name/model string.
+
+    Returns:
+        Tuple of (is_gsync, gsync_type) where gsync_type is
+        'gsync_native', 'gsync_ultimate', or None.
+    """
+    name_upper = monitor_name.upper()
+
+    # Known G-Sync Ultimate monitors (native module)
+    gsync_ultimate_patterns = [
+        "PG27UQ", "PG65UQ", "X27", "X35",  # ASUS ROG Swift
+        "27GN950", "38GN950",  # LG UltraGear
+        "AW5520QF", "AW2721D",  # Alienware
+    ]
+
+    # Known G-Sync (native module) monitors
+    gsync_native_patterns = [
+        "PG279Q", "PG278Q", "PG248Q", "PG258Q",  # ASUS ROG Swift
+        "XB271HU", "XB270HU", "XB280HK",  # Acer Predator
+        "27GK750F",  # LG
+    ]
+
+    for pattern in gsync_ultimate_patterns:
+        if pattern in name_upper:
+            return True, "gsync_ultimate"
+
+    for pattern in gsync_native_patterns:
+        if pattern in name_upper:
+            return True, "gsync_native"
+
+    return False, None
+
+
 @dataclass
 class GPUInfo:
     """GPU hardware information."""
@@ -693,17 +801,39 @@ class HardwareDetector:
 
                     active_display_index += 1
 
-                    # Detect VRR/G-Sync capability
+                    # Detect VRR/G-Sync capability using multiple methods
                     vrr_info: dict[str, Any] = {"vrr_supported": None, "vrr_type": None}
-                    if monitor_id:
-                        vrr_info = _detect_vrr_from_edid(monitor_id)
 
-                    # If EDID detection failed, use heuristics
+                    # Method 1: Check if this is a known G-Sync monitor by name
+                    is_known_gsync, gsync_type = _is_known_gsync_monitor(monitor_name)
+                    if is_known_gsync:
+                        vrr_info["vrr_supported"] = True
+                        vrr_info["vrr_type"] = gsync_type
+
+                    # Method 2: Try EDID parsing for FreeSync/Adaptive-Sync
+                    if not vrr_info.get("vrr_supported") and monitor_id:
+                        edid_vrr = _detect_vrr_from_edid(monitor_id)
+                        if edid_vrr.get("vrr_supported"):
+                            vrr_info.update(edid_vrr)
+
+                    # Method 3: Check NVIDIA registry for G-Sync compatible status
+                    if not vrr_info.get("vrr_supported"):
+                        gsync_registry = _detect_gsync_from_nvidia_registry()
+                        if gsync_registry.get("gsync_enabled_globally"):
+                            # G-Sync compatible mode is enabled system-wide
+                            # This suggests the monitor supports VRR
+                            if max_refresh_rate > 60:
+                                vrr_info["vrr_supported"] = True
+                                vrr_info["vrr_type"] = "gsync_compatible"
+
+                    # Method 4: Fall back to heuristics
                     if vrr_info.get("vrr_supported") is None:
                         # High refresh rate monitors are typically VRR-capable
-                        # Use max_refresh_rate for better heuristic
-                        if max_refresh_rate > 60:
-                            vrr_info["vrr_supported"] = "likely"  # Probable but not confirmed
+                        if max_refresh_rate >= 120:
+                            vrr_info["vrr_supported"] = "likely"
+                            vrr_info["vrr_type"] = "adaptive_sync"
+                        elif max_refresh_rate > 60:
+                            vrr_info["vrr_supported"] = "possible"
                         else:
                             vrr_info["vrr_supported"] = "unknown"
 
