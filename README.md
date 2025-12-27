@@ -21,6 +21,18 @@ A.B.S.O. is a CLI-first Windows 11 gaming optimization tool that automatically d
 - Administrator privileges (required for system changes)
 - NVIDIA GPU (optional, for GPU-specific optimizations)
 
+### Optional: NVIDIA Profile Inspector
+
+For full NVIDIA GPU optimization (Low Latency Mode, Power Management, etc.), install NVIDIA Profile Inspector:
+
+1. Download the latest release from [GitHub](https://github.com/Orbmu2k/nvidiaProfileInspector/releases)
+2. Extract to one of these locations (auto-detected):
+   - `tools/npi/nvidiaProfileInspector.exe` (project directory)
+   - `%USERPROFILE%\nvidiaProfileInspector\nvidiaProfileInspector.exe`
+   - Any location in your PATH
+
+A.B.S.O. will automatically detect NPI and use it for advanced NVIDIA settings. Without NPI, basic NVIDIA optimizations via the driver will still work.
+
 ## Installation
 
 1. Clone or download this repository

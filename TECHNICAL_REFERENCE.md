@@ -36,12 +36,36 @@ from ctypes import wintypes
 # - WMI WmiMonitorID class
 # - Direct EDID parsing from registry
 
-# Refresh rate:
+# Refresh rate (legacy API - may report incorrect for high refresh/VRR):
 import win32api
 device = win32api.EnumDisplayDevices(None, 0)
 settings = win32api.EnumDisplaySettings(device.DeviceName, -1)  # ENUM_CURRENT_SETTINGS
 print(f"Refresh rate: {settings.DisplayFrequency}Hz")
 ```
+
+### CCD API for Accurate Refresh Rate
+The legacy `EnumDisplaySettings` API often reports incorrect refresh rates for:
+- High refresh rate monitors (240Hz+)
+- VRR/G-Sync displays (may report base rate like 60Hz)
+- Custom resolution modes
+
+Use the CCD (Connecting and Configuring Displays) API instead:
+```python
+import ctypes
+from ctypes import wintypes
+
+# Key structures: DISPLAYCONFIG_PATH_INFO, DISPLAYCONFIG_MODE_INFO
+# Calculate actual Hz from pixel clock:
+#   refresh_rate = pixelRate / (totalSize.cx * totalSize.cy)
+
+# See abso/core/detector.py _get_refresh_rates_ccd() for full implementation
+```
+
+**Why CCD is more accurate:**
+- Reads directly from the display driver's active configuration
+- Reports actual pixel clock timing, not just enumerated modes
+- Works correctly with DSC (Display Stream Compression) modes
+- Handles VRR displays properly
 
 ### CPU / RAM
 ```python
@@ -61,13 +85,29 @@ total_ram = sum(int(mem.Capacity) for mem in c.Win32_PhysicalMemory())
 ## Nvidia Control Panel Settings
 
 ### Option 1: Nvidia Profile Inspector CLI
-The `nvidiaProfileInspector.exe` tool can export/import profiles:
+The `nvidiaProfileInspector.exe` tool can import profiles silently:
 ```bash
-# Export current profile
-nvidiaProfileInspector.exe /export "backup.nip"
+# Silent import (no GUI)
+nvidiaProfileInspector.exe -silent "optimized.nip"
 
-# Import profile
-nvidiaProfileInspector.exe /import "optimized.nip"
+# Note: Export requires GUI interaction - use File > Export in the application
+```
+
+**NIP file format:** UTF-16 XML with decimal setting IDs:
+```xml
+<?xml version="1.0" encoding="utf-16"?>
+<ArrayOfProfile>
+  <Profile>
+    <ProfileName>Base Profile</ProfileName>
+    <Executeables />
+    <Settings>
+      <ProfileSetting>
+        <SettingID>17322171</SettingID>  <!-- Low Latency Mode -->
+        <SettingValue>2</SettingValue>    <!-- 0=Off, 1=On, 2=Ultra -->
+      </ProfileSetting>
+    </Settings>
+  </Profile>
+</ArrayOfProfile>
 ```
 
 ### Option 2: Direct Registry Manipulation
@@ -366,6 +406,51 @@ class BackupManager:
 ### Controller
 - Ensure adapter is in Wii U / Switch mode (not PC mode)
 - Background Input: On (if alt-tabbing during matches)
+```
+
+---
+
+### Rivals of Aether 2
+
+**Executable hints:** `RivalsofAether2.exe`, `Rivals2.exe`, `RivalsOfAether2-Win64-Shipping.exe`
+
+**Priority:** Ultra-low latency for competitive platform fighting (similar to Melee)
+
+**Nvidia profile:**
+- Low Latency Mode: Ultra (test for stuttering)
+- VSync: Off
+- Power Management: Prefer Maximum Performance
+- Shader Cache: Unlimited (UE5 uses many shaders)
+- Threaded Optimization: On
+
+**Windows:**
+- HAGS: On (UE5 generally benefits)
+- Fullscreen optimizations: Test with/without
+- Game Mode: On
+- MPO: Off (UE5 can have issues with Multi-Plane Overlay)
+
+**In-game recommendations:**
+```markdown
+## Rivals of Aether 2 Settings
+
+### Display
+- Display Mode: Fullscreen (exclusive preferred)
+- VSync: Off
+- Nvidia Reflex: On + Boost (if available)
+- Frame Rate Limit: Unlimited or match monitor Hz
+
+### Graphics
+- Resolution Scale: 100% (Native)
+- Graphics Quality: Medium-High (prioritize stable FPS)
+- Motion Blur: Off
+- Anti-Aliasing: TAA or DLAA (disable if ghosting)
+
+### Audio
+- Audio Latency: Lowest stable setting
+
+### Controller
+- Use wired connection (not Bluetooth)
+- Enable background input if alt-tabbing
 ```
 
 ---
