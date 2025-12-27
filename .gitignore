@@ -45,9 +45,13 @@ Thumbs.db
 
 # Project specific
 backups/
+reports/
+tools/
 *.log
-nul
-=8.0.0
+
+# Session files
+SESSION_BOOKMARK.md
+IMPROVEMENT_PLAN.md
 
 # Claude
 .claude/

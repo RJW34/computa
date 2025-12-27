@@ -638,14 +638,18 @@ class NvidiaSettingsHandler(SettingsHandler):
         return "unknown"
 
     def _import_profile(self, profile_path: Path) -> None:
-        """Import a Nvidia profile file using NPI."""
+        """Import a Nvidia profile file using NPI.
+
+        Uses the -silent flag for headless profile application.
+        """
         if not self.NPI_PATH:
             raise RuntimeError("NPI path not configured")
 
         logger.info(f"Importing Nvidia profile: {profile_path}")
 
+        # NPI uses -silent flag for headless profile import
         result = subprocess.run(
-            [str(self.NPI_PATH), "-import", str(profile_path)],
+            [str(self.NPI_PATH), "-silent", str(profile_path)],
             capture_output=True,
             text=True,
             timeout=30,
@@ -655,18 +659,32 @@ class NvidiaSettingsHandler(SettingsHandler):
             raise RuntimeError(f"NPI import failed: {result.stderr or result.stdout}")
 
     def _export_profile(self, output_path: Path) -> None:
-        """Export current Nvidia profile using NPI."""
+        """Export current Nvidia profile using NPI.
+
+        Note: NPI may not support headless export. This attempts the export
+        but may fail if NPI requires GUI interaction for exports.
+        """
         if not self.NPI_PATH:
             raise RuntimeError("NPI path not configured")
 
         logger.info(f"Exporting Nvidia profile to: {output_path}")
 
+        # NPI export behavior is not well-documented for CLI
+        # This may open a GUI window - export may need to be done manually
         result = subprocess.run(
             [str(self.NPI_PATH), "-export", str(output_path)],
             capture_output=True,
             text=True,
             timeout=30,
         )
+
+        # NPI may return 0 even if it opened GUI instead of exporting
+        # Check if file was actually created
+        if not output_path.exists():
+            raise RuntimeError(
+                "NPI export did not create file. Export may require GUI interaction. "
+                "Run NPI manually and use File > Export to create a backup."
+            )
 
         if result.returncode != 0:
             raise RuntimeError(f"NPI export failed: {result.stderr or result.stdout}")
@@ -679,6 +697,8 @@ class NvidiaSettingsHandler(SettingsHandler):
     def _generate_custom_profile(self, settings: dict[str, Any], profile_name: str = "abso_custom") -> Path:
         """Generate a minimal .nip profile with specified settings.
 
+        NPI .nip files use UTF-16 XML with decimal setting IDs and values.
+
         Args:
             settings: Dictionary of setting names to values.
             profile_name: Name for the profile.
@@ -686,36 +706,43 @@ class NvidiaSettingsHandler(SettingsHandler):
         Returns:
             Path to the generated .nip file.
         """
-        # Build XML for the profile
+        # Build XML for the profile - NPI uses decimal IDs and values
         xml_settings = []
 
-        # Map human-readable setting names to NPI format
+        # Nvidia setting IDs (decimal equivalents of hex IDs)
+        # 0x10834BB = 17322171 (Low Latency Mode)
+        # 0x10834E4 = 17322212 (Power Management)
+        # 0x10834F8 = 17322232 (VSync)
+        # 0x10835F7 = 17322487 (Max Frame Rate)
+        # 0x10835FE = 17322494 (Shader Cache)
+        # 0x10835E8 = 17322472 (Threaded Optimization)
+
         if "low_latency_mode" in settings:
-            value = self._get_low_latency_hex(settings["low_latency_mode"])
-            xml_settings.append(self._make_setting_xml("0x10834BB", value))
+            value = self._get_setting_value(settings["low_latency_mode"], "low_latency")
+            xml_settings.append(self._make_setting_xml(17322171, value))
 
         if "power_management" in settings:
-            value = self._get_power_management_hex(settings["power_management"])
-            xml_settings.append(self._make_setting_xml("0x10834E4", value))
+            value = self._get_setting_value(settings["power_management"], "power")
+            xml_settings.append(self._make_setting_xml(17322212, value))
 
         if "vsync" in settings:
-            value = self._get_vsync_hex(settings["vsync"])
-            xml_settings.append(self._make_setting_xml("0x10834F8", value))
+            value = self._get_setting_value(settings["vsync"], "vsync")
+            xml_settings.append(self._make_setting_xml(17322232, value))
 
         if "max_frame_rate" in settings:
-            value = self._get_frame_rate_hex(settings["max_frame_rate"])
-            xml_settings.append(self._make_setting_xml("0x10835F7", value))
+            value = self._get_setting_value(settings["max_frame_rate"], "framerate")
+            xml_settings.append(self._make_setting_xml(17322487, value))
 
         if "shader_cache" in settings:
-            value = self._get_shader_cache_hex(settings["shader_cache"])
-            xml_settings.append(self._make_setting_xml("0x10835FE", value))
+            value = self._get_setting_value(settings["shader_cache"], "shader_cache")
+            xml_settings.append(self._make_setting_xml(17322494, value))
 
         if "threaded_optimization" in settings:
-            value = self._get_threaded_opt_hex(settings["threaded_optimization"])
-            xml_settings.append(self._make_setting_xml("0x10835E8", value))
+            value = self._get_setting_value(settings["threaded_optimization"], "threaded")
+            xml_settings.append(self._make_setting_xml(17322472, value))
 
-        # Construct minimal NIP XML
-        settings_xml = "\n        ".join(xml_settings)
+        # Construct NIP XML matching real NPI format
+        settings_xml = "\n      ".join(xml_settings)
 
         nip_content = f'''<?xml version="1.0" encoding="utf-16"?>
 <ArrayOfProfile>
@@ -723,13 +750,13 @@ class NvidiaSettingsHandler(SettingsHandler):
     <ProfileName>Base Profile</ProfileName>
     <Executeables />
     <Settings>
-        {settings_xml}
+      {settings_xml}
     </Settings>
   </Profile>
 </ArrayOfProfile>
 '''
 
-        # Write to temp file
+        # Write to temp file with UTF-16 encoding (with BOM)
         temp_dir = Path(tempfile.gettempdir()) / "abso_nvidia"
         temp_dir.mkdir(parents=True, exist_ok=True)
 
@@ -739,72 +766,57 @@ class NvidiaSettingsHandler(SettingsHandler):
         logger.debug(f"Generated NIP profile at: {profile_path}")
         return profile_path
 
-    def _make_setting_xml(self, setting_id: str, value: str) -> str:
-        """Create XML for a single setting."""
+    def _make_setting_xml(self, setting_id: int, value: int) -> str:
+        """Create XML for a single setting using decimal format."""
         return f'''<ProfileSetting>
-            <SettingNameInfo>{setting_id}</SettingNameInfo>
-            <SettingID>{setting_id}</SettingID>
-            <SettingValue>{value}</SettingValue>
-            <ValueType>Dword</ValueType>
-        </ProfileSetting>'''
+        <SettingID>{setting_id}</SettingID>
+        <SettingValue>{value}</SettingValue>
+      </ProfileSetting>'''
 
-    def _get_low_latency_hex(self, value: str) -> str:
-        """Convert low latency mode string to hex value."""
-        mapping = {
-            "off": "0x00000000",
-            "on": "0x00000001",
-            "ultra": "0x00000002",
-        }
-        return mapping.get(value.lower(), "0x00000000")
+    def _get_setting_value(self, value: str, setting_type: str) -> int:
+        """Convert setting string to decimal value.
 
-    def _get_power_management_hex(self, value: str) -> str:
-        """Convert power management string to hex value."""
-        mapping = {
-            "adaptive": "0x00000000",
-            "prefer_max_performance": "0x00000001",
-            "optimal": "0x00000002",
-        }
-        return mapping.get(value.lower(), "0x00000001")
+        Args:
+            value: Human-readable setting value.
+            setting_type: Type of setting for value mapping.
 
-    def _get_vsync_hex(self, value: str) -> str:
-        """Convert VSync string to hex value."""
-        mapping = {
-            "off": "0x00000000",
-            "on": "0x00000001",
-            "adaptive": "0x00000002",
-            "adaptive_half": "0x00000003",
-        }
-        return mapping.get(value.lower(), "0x00000000")
+        Returns:
+            Decimal value for the setting.
+        """
+        if setting_type == "low_latency":
+            mapping = {"off": 0, "on": 1, "ultra": 2}
+            return mapping.get(value.lower(), 0)
 
-    def _get_frame_rate_hex(self, value: str) -> str:
-        """Convert frame rate limit to hex value."""
-        if value.lower() == "off":
-            return "0x00000000"
-        try:
-            fps = int(value)
-            return f"0x{fps:08X}"
-        except ValueError:
-            return "0x00000000"
+        elif setting_type == "power":
+            mapping = {"adaptive": 0, "prefer_max_performance": 1, "optimal": 2}
+            return mapping.get(value.lower(), 1)
 
-    def _get_shader_cache_hex(self, value: str) -> str:
-        """Convert shader cache setting to hex value."""
-        if value.lower() == "off":
-            return "0x00000000"
-        elif value.lower() in ("unlimited", "max"):
-            return "0xFFFFFFFF"
-        elif value.lower() == "default":
-            return "0x00000000"
-        try:
-            size_mb = int(value)
-            return f"0x{size_mb:08X}"
-        except ValueError:
-            return "0x00000000"
+        elif setting_type == "vsync":
+            mapping = {"off": 0, "on": 1, "adaptive": 2, "adaptive_half": 3}
+            return mapping.get(value.lower(), 0)
 
-    def _get_threaded_opt_hex(self, value: str) -> str:
-        """Convert threaded optimization string to hex value."""
-        mapping = {
-            "auto": "0x00000000",
-            "on": "0x00000001",
-            "off": "0x00000002",
-        }
-        return mapping.get(value.lower(), "0x00000000")
+        elif setting_type == "framerate":
+            if value.lower() == "off":
+                return 0
+            try:
+                return int(value)
+            except ValueError:
+                return 0
+
+        elif setting_type == "shader_cache":
+            if value.lower() == "off":
+                return 0
+            elif value.lower() in ("unlimited", "max"):
+                return 4294967295  # 0xFFFFFFFF
+            elif value.lower() == "default":
+                return 0
+            try:
+                return int(value)
+            except ValueError:
+                return 0
+
+        elif setting_type == "threaded":
+            mapping = {"auto": 0, "on": 1, "off": 2}
+            return mapping.get(value.lower(), 0)
+
+        return 0

@@ -36,26 +36,45 @@ class TestNvidiaSettingsHandler:
         assert handler._parse_low_latency_value("0x99999999") == "unknown"
         assert handler._parse_low_latency_value("invalid") == "unknown"
 
-    def test_get_low_latency_hex_off(self):
-        """Test getting hex value for 'off'."""
+    def test_get_setting_value_low_latency_off(self):
+        """Test getting decimal value for low latency 'off'."""
         handler = NvidiaSettingsHandler()
-        # _get_low_latency_hex returns a hex string format
-        assert handler._get_low_latency_hex("off") == "0x00000000"
+        assert handler._get_setting_value("off", "low_latency") == 0
 
-    def test_get_low_latency_hex_on(self):
-        """Test getting hex value for 'on'."""
+    def test_get_setting_value_low_latency_on(self):
+        """Test getting decimal value for low latency 'on'."""
         handler = NvidiaSettingsHandler()
-        assert handler._get_low_latency_hex("on") == "0x00000001"
+        assert handler._get_setting_value("on", "low_latency") == 1
 
-    def test_get_low_latency_hex_ultra(self):
-        """Test getting hex value for 'ultra'."""
+    def test_get_setting_value_low_latency_ultra(self):
+        """Test getting decimal value for low latency 'ultra'."""
         handler = NvidiaSettingsHandler()
-        assert handler._get_low_latency_hex("ultra") == "0x00000002"
+        assert handler._get_setting_value("ultra", "low_latency") == 2
 
-    def test_get_low_latency_hex_invalid(self):
-        """Test getting hex value for invalid input defaults to off."""
+    def test_get_setting_value_low_latency_invalid(self):
+        """Test getting decimal value for invalid input defaults to 0."""
         handler = NvidiaSettingsHandler()
-        assert handler._get_low_latency_hex("invalid") == "0x00000000"
+        assert handler._get_setting_value("invalid", "low_latency") == 0
+
+    def test_get_setting_value_power_management(self):
+        """Test getting decimal values for power management settings."""
+        handler = NvidiaSettingsHandler()
+        assert handler._get_setting_value("adaptive", "power") == 0
+        assert handler._get_setting_value("prefer_max_performance", "power") == 1
+        assert handler._get_setting_value("optimal", "power") == 2
+
+    def test_get_setting_value_vsync(self):
+        """Test getting decimal values for vsync settings."""
+        handler = NvidiaSettingsHandler()
+        assert handler._get_setting_value("off", "vsync") == 0
+        assert handler._get_setting_value("on", "vsync") == 1
+        assert handler._get_setting_value("adaptive", "vsync") == 2
+
+    def test_get_setting_value_shader_cache(self):
+        """Test getting decimal values for shader cache settings."""
+        handler = NvidiaSettingsHandler()
+        assert handler._get_setting_value("off", "shader_cache") == 0
+        assert handler._get_setting_value("unlimited", "shader_cache") == 4294967295
 
     def test_presets_exist(self):
         """Test that all expected presets exist."""
