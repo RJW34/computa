@@ -60,7 +60,7 @@ class ProcessPriorityHandler(SettingsHandler):
 
     def detect(self) -> dict[str, Any]:
         """Detect current per-process priority settings."""
-        result = {
+        result: dict[str, Any] = {
             "processes": {},
             "configured_count": 0,
         }
@@ -321,7 +321,7 @@ class ProcessPriorityHandler(SettingsHandler):
                 valid_values={0, 1, 2, 3, 4, 5}
             )
 
-        errors = []
+        errors: list[str] = []
 
         try:
             # Create the executable key if it doesn't exist

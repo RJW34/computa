@@ -161,7 +161,7 @@ def _get_refresh_rates_ccd() -> dict[int, float]:
     Returns:
         Dictionary mapping source ID to refresh rate in Hz.
     """
-    refresh_rates = {}
+    refresh_rates: dict[int, float] = {}
 
     try:
         user32 = ctypes.windll.user32
@@ -329,7 +329,7 @@ def _parse_edid_for_vrr(edid: bytes) -> dict[str, Any]:
     Returns:
         Dictionary with VRR info if detected.
     """
-    result = {
+    result: dict[str, Any] = {
         "vrr_supported": False,
         "vrr_type": None,
         "vrr_min_hz": None,
@@ -694,7 +694,7 @@ class HardwareDetector:
                     active_display_index += 1
 
                     # Detect VRR/G-Sync capability
-                    vrr_info = {"vrr_supported": None, "vrr_type": None}
+                    vrr_info: dict[str, Any] = {"vrr_supported": None, "vrr_type": None}
                     if monitor_id:
                         vrr_info = _detect_vrr_from_edid(monitor_id)
 

@@ -195,7 +195,7 @@ class BackupManager:
         Returns:
             List of backup info dicts, newest first.
         """
-        backups = []
+        backups: list[dict[str, Any]] = []
 
         if not self.backup_dir.exists():
             return backups

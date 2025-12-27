@@ -83,7 +83,7 @@ class ServicesSettingsHandler(SettingsHandler):
 
     def detect(self) -> dict[str, Any]:
         """Detect current service states."""
-        result = {
+        result: dict[str, Any] = {
             "services": {},
         }
 
@@ -195,7 +195,7 @@ class ServicesSettingsHandler(SettingsHandler):
 
     def _get_service_info(self, service_name: str) -> dict[str, Any]:
         """Get information about a service."""
-        result = {
+        result: dict[str, Any] = {
             "exists": False,
             "start_type": None,
             "state": None,

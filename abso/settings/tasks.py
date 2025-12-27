@@ -72,7 +72,7 @@ class TasksSettingsHandler(SettingsHandler):
 
     def detect(self) -> dict[str, Any]:
         """Detect current scheduled task states."""
-        result = {
+        result: dict[str, Any] = {
             "tasks": {},
         }
 

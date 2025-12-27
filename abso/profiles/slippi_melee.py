@@ -64,7 +64,7 @@ class SlippiMeleeProfile(BaseProfile):
         ]
 
     def get_settings(self, handler_name: str) -> dict[str, Any]:
-        settings_map = {
+        settings_map: dict[str, dict[str, Any]] = {
             "WindowsSettingsHandler": {
                 "game_mode": True,
                 "game_bar": False,
