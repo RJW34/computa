@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import ctypes
 import logging
 import subprocess
 import winreg
+from ctypes import wintypes
 from dataclasses import dataclass
 from typing import Any
 
@@ -18,6 +20,238 @@ from abso.core.exceptions import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+# CCD API structures for accurate refresh rate detection
+# See: https://docs.microsoft.com/en-us/windows/win32/api/wingdi/
+
+class LUID(ctypes.Structure):
+    """Locally Unique Identifier for display adapter."""
+    _fields_ = [
+        ("LowPart", wintypes.DWORD),
+        ("HighPart", wintypes.LONG),
+    ]
+
+
+class DISPLAYCONFIG_RATIONAL(ctypes.Structure):
+    """Rational number for refresh rate (numerator/denominator)."""
+    _fields_ = [
+        ("Numerator", wintypes.UINT),
+        ("Denominator", wintypes.UINT),
+    ]
+
+
+class DISPLAYCONFIG_PATH_SOURCE_INFO(ctypes.Structure):
+    """Source info for a display path."""
+    _fields_ = [
+        ("adapterId", LUID),
+        ("id", wintypes.UINT),
+        ("modeInfoIdx", wintypes.UINT),
+        ("statusFlags", wintypes.UINT),
+    ]
+
+
+class DISPLAYCONFIG_PATH_TARGET_INFO(ctypes.Structure):
+    """Target info for a display path including refresh rate."""
+    _fields_ = [
+        ("adapterId", LUID),
+        ("id", wintypes.UINT),
+        ("modeInfoIdx", wintypes.UINT),
+        ("outputTechnology", wintypes.UINT),
+        ("rotation", wintypes.UINT),
+        ("scaling", wintypes.UINT),
+        ("refreshRate", DISPLAYCONFIG_RATIONAL),
+        ("scanLineOrdering", wintypes.UINT),
+        ("targetAvailable", wintypes.BOOL),
+        ("statusFlags", wintypes.UINT),
+    ]
+
+
+class DISPLAYCONFIG_PATH_INFO(ctypes.Structure):
+    """Display path info containing source and target."""
+    _fields_ = [
+        ("sourceInfo", DISPLAYCONFIG_PATH_SOURCE_INFO),
+        ("targetInfo", DISPLAYCONFIG_PATH_TARGET_INFO),
+        ("flags", wintypes.UINT),
+    ]
+
+
+class DISPLAYCONFIG_2DREGION(ctypes.Structure):
+    """2D region for display mode."""
+    _fields_ = [
+        ("cx", wintypes.UINT),
+        ("cy", wintypes.UINT),
+    ]
+
+
+class DISPLAYCONFIG_VIDEO_SIGNAL_INFO(ctypes.Structure):
+    """Video signal info including pixel rate and resolution."""
+    _fields_ = [
+        ("pixelRate", ctypes.c_uint64),
+        ("hSyncFreq", DISPLAYCONFIG_RATIONAL),
+        ("vSyncFreq", DISPLAYCONFIG_RATIONAL),
+        ("activeSize", DISPLAYCONFIG_2DREGION),
+        ("totalSize", DISPLAYCONFIG_2DREGION),
+        ("videoStandard", wintypes.UINT),
+        ("scanLineOrdering", wintypes.UINT),
+    ]
+
+
+class DISPLAYCONFIG_TARGET_MODE(ctypes.Structure):
+    """Target mode with video signal info."""
+    _fields_ = [
+        ("targetVideoSignalInfo", DISPLAYCONFIG_VIDEO_SIGNAL_INFO),
+    ]
+
+
+class POINTL(ctypes.Structure):
+    """Point structure for position."""
+    _fields_ = [
+        ("x", wintypes.LONG),
+        ("y", wintypes.LONG),
+    ]
+
+
+class DISPLAYCONFIG_SOURCE_MODE(ctypes.Structure):
+    """Source mode with resolution and position."""
+    _fields_ = [
+        ("width", wintypes.UINT),
+        ("height", wintypes.UINT),
+        ("pixelFormat", wintypes.UINT),
+        ("position", POINTL),
+    ]
+
+
+class DISPLAYCONFIG_DESKTOP_IMAGE_INFO(ctypes.Structure):
+    """Desktop image info (for completeness of union)."""
+    _fields_ = [
+        ("PathSourceSize", POINTL),
+        ("DesktopImageRegion", ctypes.c_byte * 16),
+        ("DesktopImageClip", ctypes.c_byte * 16),
+    ]
+
+
+class DISPLAYCONFIG_MODE_INFO_UNION(ctypes.Union):
+    """Union for target or source mode."""
+    _fields_ = [
+        ("targetMode", DISPLAYCONFIG_TARGET_MODE),
+        ("sourceMode", DISPLAYCONFIG_SOURCE_MODE),
+        ("desktopImageInfo", DISPLAYCONFIG_DESKTOP_IMAGE_INFO),
+    ]
+
+
+class DISPLAYCONFIG_MODE_INFO(ctypes.Structure):
+    """Mode info structure."""
+    _fields_ = [
+        ("infoType", wintypes.UINT),
+        ("id", wintypes.UINT),
+        ("adapterId", LUID),
+        ("info", DISPLAYCONFIG_MODE_INFO_UNION),
+    ]
+
+
+# CCD API constants
+QDC_ONLY_ACTIVE_PATHS = 0x00000002
+DISPLAYCONFIG_MODE_INFO_TYPE_SOURCE = 1
+DISPLAYCONFIG_MODE_INFO_TYPE_TARGET = 2
+
+
+def _get_refresh_rates_ccd() -> dict[int, float]:
+    """Get refresh rates for all active displays using CCD API.
+
+    The CCD (Connecting and Configuring Displays) API provides accurate
+    refresh rate information including for custom resolutions and DSC modes
+    that the legacy EnumDisplaySettings API doesn't report correctly.
+
+    For VRR/G-Sync displays, the vSyncFreq reports the base rate (e.g., 60 Hz).
+    To get the actual target refresh rate, we calculate it from:
+        pixelRate / (totalSize.cx * totalSize.cy)
+
+    Returns:
+        Dictionary mapping source ID to refresh rate in Hz.
+    """
+    refresh_rates = {}
+
+    try:
+        user32 = ctypes.windll.user32
+
+        # Get buffer sizes
+        num_paths = wintypes.UINT()
+        num_modes = wintypes.UINT()
+
+        result = user32.GetDisplayConfigBufferSizes(
+            QDC_ONLY_ACTIVE_PATHS,
+            ctypes.byref(num_paths),
+            ctypes.byref(num_modes)
+        )
+
+        if result != 0:
+            logger.debug(f"GetDisplayConfigBufferSizes failed with error {result}")
+            return refresh_rates
+
+        if num_paths.value == 0:
+            return refresh_rates
+
+        # Allocate arrays
+        paths = (DISPLAYCONFIG_PATH_INFO * num_paths.value)()
+        modes = (DISPLAYCONFIG_MODE_INFO * num_modes.value)()
+
+        # Query display config
+        result = user32.QueryDisplayConfig(
+            QDC_ONLY_ACTIVE_PATHS,
+            ctypes.byref(num_paths),
+            paths,
+            ctypes.byref(num_modes),
+            modes,
+            None  # currentTopologyId
+        )
+
+        if result != 0:
+            logger.debug(f"QueryDisplayConfig failed with error {result}")
+            return refresh_rates
+
+        # Build a map of target ID to mode info for pixel rate calculation
+        target_modes = {}
+        for i in range(num_modes.value):
+            mode = modes[i]
+            if mode.infoType == DISPLAYCONFIG_MODE_INFO_TYPE_TARGET:
+                target_modes[mode.id] = mode.info.targetMode.targetVideoSignalInfo
+
+        # Extract refresh rates from active paths
+        for i in range(num_paths.value):
+            path = paths[i]
+            target = path.targetInfo
+            source = path.sourceInfo
+
+            # Try to get accurate refresh rate from pixel clock calculation
+            # This works correctly even when VRR reports a base rate
+            vsig = target_modes.get(target.id)
+            if vsig and vsig.totalSize.cx > 0 and vsig.totalSize.cy > 0:
+                total_pixels = vsig.totalSize.cx * vsig.totalSize.cy
+                if vsig.pixelRate > 0 and total_pixels > 0:
+                    hz = vsig.pixelRate / total_pixels
+                    refresh_rates[source.id] = round(hz, 2)
+                    logger.debug(
+                        f"CCD: Source {source.id} -> {hz:.2f} Hz "
+                        f"(from pixel clock: {vsig.pixelRate} / {total_pixels})"
+                    )
+                    continue
+
+            # Fallback to vSyncFreq if pixel calculation not available
+            if target.refreshRate.Denominator > 0:
+                hz = target.refreshRate.Numerator / target.refreshRate.Denominator
+                refresh_rates[source.id] = round(hz, 2)
+                logger.debug(
+                    f"CCD: Source {source.id} -> {hz:.2f} Hz "
+                    f"(from vSync: {target.refreshRate.Numerator}/{target.refreshRate.Denominator})"
+                )
+
+    except OSError as e:
+        logger.debug(f"CCD API failed: {e}")
+    except Exception as e:
+        logger.debug(f"CCD API unexpected error: {e}")
+
+    return refresh_rates
 
 
 def _detect_vrr_from_edid(monitor_id: str) -> dict[str, Any]:
@@ -385,9 +619,16 @@ class HardwareDetector:
         """
         monitors = []
 
+        # Get accurate refresh rates from CCD API first
+        # This properly reports custom resolutions and DSC modes
+        ccd_refresh_rates = _get_refresh_rates_ccd()
+
         try:
             import win32api
             import pywintypes
+
+            # Track which CCD source ID we're on (for active displays only)
+            active_display_index = 0
 
             device_index = 0
             while True:
@@ -416,16 +657,27 @@ class HardwareDetector:
                     except (AttributeError, OSError, pywintypes.error) as e:
                         logger.debug(f"Failed to get monitor details for device {device_index}: {e}")
 
-                    # Get current settings
+                    # Get current settings from legacy API
                     settings = win32api.EnumDisplaySettings(
                         adapter.DeviceName, -1  # ENUM_CURRENT_SETTINGS
                     )
 
-                    refresh_rate = settings.DisplayFrequency
+                    legacy_refresh_rate = settings.DisplayFrequency
                     current_width = settings.PelsWidth
                     current_height = settings.PelsHeight
 
-                    # Find maximum supported refresh rate
+                    # Use CCD API refresh rate if available (more accurate)
+                    # CCD source IDs correspond to active display order
+                    if active_display_index in ccd_refresh_rates:
+                        refresh_rate = ccd_refresh_rates[active_display_index]
+                        logger.debug(
+                            f"Using CCD refresh rate {refresh_rate} Hz for display {active_display_index} "
+                            f"(legacy reported {legacy_refresh_rate} Hz)"
+                        )
+                    else:
+                        refresh_rate = legacy_refresh_rate
+
+                    # Find maximum supported refresh rate from legacy API
                     max_refresh_rate = refresh_rate
                     max_refresh_any_res = refresh_rate
                     try:
@@ -447,6 +699,8 @@ class HardwareDetector:
                                 break
                     except Exception as e:
                         logger.debug(f"Failed to enumerate display modes: {e}")
+
+                    active_display_index += 1
 
                     # Detect VRR/G-Sync capability
                     vrr_info = {"vrr_supported": None, "vrr_type": None}
