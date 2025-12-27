@@ -387,6 +387,7 @@ class HardwareDetector:
 
         try:
             import win32api
+            import pywintypes
 
             device_index = 0
             while True:
@@ -412,7 +413,7 @@ class HardwareDetector:
                             parts = monitor.DeviceID.split("\\")
                             if len(parts) >= 2:
                                 monitor_id = parts[1]
-                    except (AttributeError, OSError) as e:
+                    except (AttributeError, OSError, pywintypes.error) as e:
                         logger.debug(f"Failed to get monitor details for device {device_index}: {e}")
 
                     # Get current settings
@@ -451,17 +452,16 @@ class HardwareDetector:
                     })
 
                     device_index += 1
-                except (AttributeError, OSError) as e:
+                except (AttributeError, OSError, pywintypes.error) as e:
                     # No more display devices to enumerate
                     logger.debug(f"Finished enumerating displays at index {device_index}: {e}")
                     break
 
         except ImportError:
             logger.warning("win32api not available for monitor detection")
-        except AttributeError as e:
-            logger.error(f"Monitor detection failed (attribute error): {e}")
-        except OSError as e:
-            logger.error(f"Monitor detection failed (OS error): {e}")
+        except Exception as e:
+            # Catch any remaining pywin32 or OS errors
+            logger.error(f"Monitor detection failed: {e}")
 
         return monitors
 
