@@ -1,12 +1,12 @@
 # Product Requirements Document: Windows Gaming Optimization Tool
 
-## Project Codename: **GameTune**
+## Project Name: **A.B.S.O.** (Adaptive Battle Station Optimizer)
 
 ---
 
 ## 1. Overview
 
-GameTune is a Windows 11 diagnostic and optimization tool designed to cut through the fragmented chaos of gaming configuration across multiple system layers. It consolidates settings from Windows, Nvidia Control Panel, registry, and more into a single intelligent interface that applies game-specific optimization profiles.
+A.B.S.O. is a Windows 11 diagnostic and optimization tool designed to cut through the fragmented chaos of gaming configuration across multiple system layers. It consolidates settings from Windows, Nvidia Control Panel, registry, and more into a single intelligent interface that applies game-specific optimization profiles.
 
 ---
 
@@ -260,14 +260,14 @@ Before applying any changes:
 ### 7.1 Phase 1: CLI
 
 ```
-gametune detect              # Run hardware detection
-gametune audit               # Audit current configuration
-gametune audit --verbose     # Detailed audit
-gametune profiles            # List available game profiles
-gametune apply <profile>     # Apply a game profile
-gametune backup              # Create manual backup
-gametune restore <backup_id> # Restore from backup
-gametune report <profile>    # Generate in-game settings markdown
+abso detect              # Run hardware detection
+abso audit               # Audit current configuration
+abso audit --verbose     # Detailed audit
+abso profiles            # List available game profiles
+abso apply <profile>     # Apply a game profile
+abso backup              # Create manual backup
+abso restore <backup_id> # Restore from backup
+abso report <profile>    # Generate in-game settings markdown
 ```
 
 ### 7.2 Phase 2 (Future): GUI
