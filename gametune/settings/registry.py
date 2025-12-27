@@ -1,0 +1,343 @@
+"""Registry settings handler."""
+
+from __future__ import annotations
+
+import logging
+import winreg
+from typing import Any
+
+from gametune.settings.base import SettingsHandler
+from gametune.core.models import Issue
+
+logger = logging.getLogger(__name__)
+
+
+class RegistrySettingsHandler(SettingsHandler):
+    """Handles registry-based gaming optimizations.
+
+    Manages:
+    - Multimedia scheduling / Game priority
+    - Fullscreen optimizations
+    - System responsiveness
+    - Windows scheduler (Win32PrioritySeparation)
+    """
+
+    # Registry paths
+    MULTIMEDIA_KEY = r"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Multimedia\SystemProfile"
+    GAMES_TASK_KEY = r"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Multimedia\SystemProfile\Tasks\Games"
+    APPCOMPAT_KEY = r"Software\Microsoft\Windows NT\CurrentVersion\AppCompatFlags\Layers"
+    PRIORITY_CONTROL_KEY = r"SYSTEM\CurrentControlSet\Control\PriorityControl"
+
+    # Win32PrioritySeparation values
+    # Format: 0x00AABBCC where:
+    #   AA = Length (0=variable, 1=variable, 2=short fixed, 3=long fixed)
+    #   BB = Interval (0=variable, 1=variable, 2=short, 3=long)
+    #   CC = Foreground boost (0=none, 1=min, 2=max)
+    #
+    # Optimal for gaming: 0x26 or 0x28
+    # 0x26 = Short fixed quantum, foreground max boost (default for desktop)
+    # 0x28 = Short variable quantum, foreground max boost (slightly better for games)
+    WIN32_PRIORITY_DEFAULT = 0x26  # Windows default for desktop
+    WIN32_PRIORITY_GAMING = 0x28   # Short quantum, variable, max foreground boost
+
+    def detect(self) -> dict[str, Any]:
+        """Detect current registry gaming settings."""
+        return {
+            "system_responsiveness": self._get_system_responsiveness(),
+            "network_throttling": self._get_network_throttling(),
+            "game_priority": self._get_game_priority(),
+            "win32_priority_separation": self._get_win32_priority_separation(),
+        }
+
+    def audit(self) -> list[Issue]:
+        """Audit registry settings for gaming optimization issues."""
+        issues: list[Issue] = []
+        current = self.detect()
+
+        # System Responsiveness (0 = games get maximum CPU priority)
+        responsiveness = current.get("system_responsiveness")
+        if responsiveness is not None and responsiveness != 0:
+            issues.append(Issue(
+                title="System Responsiveness not optimized for gaming",
+                severity="warning",
+                current_value=str(responsiveness),
+                optimal_value="0",
+                explanation=(
+                    "Controls CPU % reserved for background tasks. Setting to 0 gives games maximum priority. "
+                    "May cause audio buffer issues in rare cases - revert if you notice crackling."
+                ),
+                category="registry",
+            ))
+
+        # Network Throttling
+        throttling = current.get("network_throttling")
+        if throttling is not None and throttling != 0xFFFFFFFF:
+            issues.append(Issue(
+                title="Network throttling is enabled",
+                severity="warning",
+                current_value=f"0x{throttling:08X}" if throttling else "Unknown",
+                optimal_value="0xFFFFFFFF (disabled)",
+                explanation=(
+                    "Controls multimedia streaming throttling. Disabling removes any network-related throttling. "
+                    "Primary benefit is for streaming/recording while gaming."
+                ),
+                category="registry",
+            ))
+
+        # Game priority settings
+        game_priority = current.get("game_priority", {})
+        if game_priority.get("priority") != 6:
+            issues.append(Issue(
+                title="Game process priority not optimized",
+                severity="info",
+                current_value=str(game_priority.get("priority", "Unknown")),
+                optimal_value="6",
+                explanation="Higher priority value gives games more CPU scheduling preference.",
+                category="registry",
+            ))
+
+        # Win32PrioritySeparation (scheduler quantum)
+        priority_sep = current.get("win32_priority_separation")
+        if priority_sep is not None and priority_sep != self.WIN32_PRIORITY_GAMING:
+            issues.append(Issue(
+                title="Windows scheduler not optimized for gaming",
+                severity="info",
+                current_value=f"0x{priority_sep:02X}" if priority_sep else "Unknown",
+                optimal_value=f"0x{self.WIN32_PRIORITY_GAMING:02X}",
+                explanation=(
+                    "Win32PrioritySeparation controls CPU time slice allocation. "
+                    "0x28 uses short variable quantum with max foreground boost, "
+                    "giving the active game more responsive CPU scheduling."
+                ),
+                category="registry",
+            ))
+
+        return issues
+
+    def apply(self, settings: dict[str, Any]) -> dict[str, Any]:
+        """Apply registry gaming settings."""
+        errors: list[str] = []
+
+        try:
+            if "system_responsiveness" in settings:
+                self._set_system_responsiveness(settings["system_responsiveness"])
+
+            if "network_throttling" in settings:
+                self._set_network_throttling(settings["network_throttling"])
+
+            if "game_priority" in settings:
+                self._set_game_priority(settings["game_priority"])
+
+            if "fullscreen_optimizations" in settings:
+                for exe_path, disabled in settings["fullscreen_optimizations"].items():
+                    self._set_fullscreen_optimization(exe_path, disabled)
+
+            if "win32_priority_separation" in settings:
+                self._set_win32_priority_separation(settings["win32_priority_separation"])
+
+        except Exception as e:
+            errors.append(str(e))
+
+        return {
+            "success": len(errors) == 0,
+            "error": "; ".join(errors) if errors else None,
+            "requires_reboot": False,
+        }
+
+    def backup(self) -> dict[str, Any]:
+        """Backup current registry gaming settings."""
+        return self.detect()
+
+    def restore(self, data: dict[str, Any]) -> bool:
+        """Restore registry gaming settings from backup."""
+        try:
+            if "system_responsiveness" in data:
+                self._set_system_responsiveness(data["system_responsiveness"])
+            if "network_throttling" in data:
+                self._set_network_throttling(data["network_throttling"])
+            if "game_priority" in data:
+                self._set_game_priority(data["game_priority"])
+            if "win32_priority_separation" in data:
+                self._set_win32_priority_separation(data["win32_priority_separation"])
+            return True
+        except Exception as e:
+            logger.error(f"Failed to restore registry settings: {e}")
+            return False
+
+    # Private helper methods
+
+    def _get_system_responsiveness(self) -> int | None:
+        """Get SystemResponsiveness value."""
+        try:
+            key = winreg.OpenKey(
+                winreg.HKEY_LOCAL_MACHINE,
+                self.MULTIMEDIA_KEY,
+                0,
+                winreg.KEY_READ
+            )
+            try:
+                value = winreg.QueryValueEx(key, "SystemResponsiveness")[0]
+                return value
+            except FileNotFoundError:
+                return None
+            finally:
+                winreg.CloseKey(key)
+        except Exception as e:
+            logger.debug(f"Failed to get SystemResponsiveness: {e}")
+            return None
+
+    def _set_system_responsiveness(self, value: int) -> None:
+        """Set SystemResponsiveness value."""
+        key = winreg.OpenKey(
+            winreg.HKEY_LOCAL_MACHINE,
+            self.MULTIMEDIA_KEY,
+            0,
+            winreg.KEY_ALL_ACCESS
+        )
+        try:
+            winreg.SetValueEx(key, "SystemResponsiveness", 0, winreg.REG_DWORD, value)
+        finally:
+            winreg.CloseKey(key)
+
+    def _get_network_throttling(self) -> int | None:
+        """Get NetworkThrottlingIndex value."""
+        try:
+            key = winreg.OpenKey(
+                winreg.HKEY_LOCAL_MACHINE,
+                self.MULTIMEDIA_KEY,
+                0,
+                winreg.KEY_READ
+            )
+            try:
+                value = winreg.QueryValueEx(key, "NetworkThrottlingIndex")[0]
+                return value
+            except FileNotFoundError:
+                return None
+            finally:
+                winreg.CloseKey(key)
+        except Exception as e:
+            logger.debug(f"Failed to get NetworkThrottlingIndex: {e}")
+            return None
+
+    def _set_network_throttling(self, value: int) -> None:
+        """Set NetworkThrottlingIndex value."""
+        key = winreg.OpenKey(
+            winreg.HKEY_LOCAL_MACHINE,
+            self.MULTIMEDIA_KEY,
+            0,
+            winreg.KEY_ALL_ACCESS
+        )
+        try:
+            winreg.SetValueEx(key, "NetworkThrottlingIndex", 0, winreg.REG_DWORD, value)
+        finally:
+            winreg.CloseKey(key)
+
+    def _get_game_priority(self) -> dict[str, Any]:
+        """Get game task priority settings."""
+        result = {}
+
+        try:
+            key = winreg.OpenKey(
+                winreg.HKEY_LOCAL_MACHINE,
+                self.GAMES_TASK_KEY,
+                0,
+                winreg.KEY_READ
+            )
+            try:
+                result["gpu_priority"] = winreg.QueryValueEx(key, "GPU Priority")[0]
+            except FileNotFoundError:
+                pass
+
+            try:
+                result["priority"] = winreg.QueryValueEx(key, "Priority")[0]
+            except FileNotFoundError:
+                pass
+
+            try:
+                result["scheduling_category"] = winreg.QueryValueEx(key, "Scheduling Category")[0]
+            except FileNotFoundError:
+                pass
+
+            winreg.CloseKey(key)
+        except Exception as e:
+            logger.debug(f"Failed to get game priority: {e}")
+
+        return result
+
+    def _set_game_priority(self, settings: dict[str, Any]) -> None:
+        """Set game task priority settings."""
+        key = winreg.OpenKey(
+            winreg.HKEY_LOCAL_MACHINE,
+            self.GAMES_TASK_KEY,
+            0,
+            winreg.KEY_ALL_ACCESS
+        )
+        try:
+            if "gpu_priority" in settings:
+                winreg.SetValueEx(key, "GPU Priority", 0, winreg.REG_DWORD, settings["gpu_priority"])
+            if "priority" in settings:
+                winreg.SetValueEx(key, "Priority", 0, winreg.REG_DWORD, settings["priority"])
+            if "scheduling_category" in settings:
+                winreg.SetValueEx(key, "Scheduling Category", 0, winreg.REG_SZ, settings["scheduling_category"])
+            if "sfio_priority" in settings:
+                winreg.SetValueEx(key, "SFIO Priority", 0, winreg.REG_SZ, settings["sfio_priority"])
+        finally:
+            winreg.CloseKey(key)
+
+    def _set_fullscreen_optimization(self, exe_path: str, disabled: bool) -> None:
+        """Set fullscreen optimization for an executable."""
+        key = winreg.OpenKey(
+            winreg.HKEY_CURRENT_USER,
+            self.APPCOMPAT_KEY,
+            0,
+            winreg.KEY_ALL_ACCESS
+        )
+        try:
+            if disabled:
+                winreg.SetValueEx(
+                    key,
+                    exe_path,
+                    0,
+                    winreg.REG_SZ,
+                    "~ DISABLEDXMAXIMIZEDWINDOWEDMODE"
+                )
+            else:
+                try:
+                    winreg.DeleteValue(key, exe_path)
+                except FileNotFoundError:
+                    pass
+        finally:
+            winreg.CloseKey(key)
+
+    def _get_win32_priority_separation(self) -> int | None:
+        """Get Win32PrioritySeparation value (scheduler quantum settings)."""
+        try:
+            key = winreg.OpenKey(
+                winreg.HKEY_LOCAL_MACHINE,
+                self.PRIORITY_CONTROL_KEY,
+                0,
+                winreg.KEY_READ
+            )
+            try:
+                value = winreg.QueryValueEx(key, "Win32PrioritySeparation")[0]
+                return value
+            except FileNotFoundError:
+                return None
+            finally:
+                winreg.CloseKey(key)
+        except Exception as e:
+            logger.debug(f"Failed to get Win32PrioritySeparation: {e}")
+            return None
+
+    def _set_win32_priority_separation(self, value: int) -> None:
+        """Set Win32PrioritySeparation value."""
+        key = winreg.OpenKey(
+            winreg.HKEY_LOCAL_MACHINE,
+            self.PRIORITY_CONTROL_KEY,
+            0,
+            winreg.KEY_ALL_ACCESS
+        )
+        try:
+            winreg.SetValueEx(key, "Win32PrioritySeparation", 0, winreg.REG_DWORD, value)
+        finally:
+            winreg.CloseKey(key)
