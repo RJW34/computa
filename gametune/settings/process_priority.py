@@ -8,6 +8,12 @@ from typing import Any
 
 from gametune.settings.base import SettingsHandler
 from gametune.core.models import Issue
+from gametune.core.exceptions import RegistryWriteError
+from gametune.utils.validation import (
+    ValidationError,
+    validate_executable_name,
+    validate_priority_value,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -173,7 +179,15 @@ class ProcessPriorityHandler(SettingsHandler):
             return False
 
     def add_executable(self, exe_name: str) -> None:
-        """Add an executable to the managed list."""
+        """Add an executable to the managed list.
+
+        Args:
+            exe_name: Executable name (e.g., "game.exe").
+
+        Raises:
+            ValidationError: If the executable name is invalid.
+        """
+        validate_executable_name(exe_name)
         if exe_name not in self.executables:
             self.executables.append(exe_name)
 
@@ -181,7 +195,17 @@ class ProcessPriorityHandler(SettingsHandler):
         """Set optimal gaming priorities for an executable.
 
         This is a convenience method that applies recommended settings.
+
+        Args:
+            exe_name: Executable name (e.g., "game.exe").
+
+        Returns:
+            Result dictionary with success status.
+
+        Raises:
+            ValidationError: If the executable name is invalid.
         """
+        validate_executable_name(exe_name)
         settings = {
             "gpu_priority": self.GPU_PRIORITY_MAX,
             "cpu_priority": self.CPU_PRIORITY_HIGH,
@@ -192,7 +216,20 @@ class ProcessPriorityHandler(SettingsHandler):
     # Private helper methods
 
     def _get_process_settings(self, exe_name: str) -> dict[str, Any]:
-        """Get priority settings for a specific executable."""
+        """Get priority settings for a specific executable.
+
+        Args:
+            exe_name: Executable name (e.g., "game.exe").
+
+        Returns:
+            Dictionary with priority settings.
+
+        Raises:
+            ValidationError: If the executable name is invalid.
+        """
+        # Validate to prevent path traversal in registry queries
+        validate_executable_name(exe_name)
+
         result = {
             "gpu_priority": None,
             "cpu_priority": None,
@@ -241,7 +278,50 @@ class ProcessPriorityHandler(SettingsHandler):
         return result
 
     def _set_process_settings(self, exe_name: str, settings: dict[str, Any]) -> dict[str, Any]:
-        """Set priority settings for a specific executable."""
+        """Set priority settings for a specific executable.
+
+        Args:
+            exe_name: Executable name (e.g., "game.exe").
+            settings: Dictionary with priority settings.
+
+        Returns:
+            Result dictionary with success status.
+
+        Raises:
+            ValidationError: If exe_name or settings values are invalid.
+            RegistryWriteError: If registry write fails.
+        """
+        # Validate executable name to prevent registry injection
+        validate_executable_name(exe_name)
+
+        # Validate priority values
+        if "gpu_priority" in settings and settings["gpu_priority"] is not None:
+            validate_priority_value(
+                settings["gpu_priority"],
+                "GpuPriority",
+                valid_values={0, 1, 2, 3, 4, 5, 6, 7, 8}
+            )
+        if "cpu_priority" in settings and settings["cpu_priority"] is not None:
+            validate_priority_value(
+                settings["cpu_priority"],
+                "CpuPriorityClass",
+                valid_values={self.CPU_PRIORITY_IDLE, self.CPU_PRIORITY_NORMAL,
+                              self.CPU_PRIORITY_HIGH, self.CPU_PRIORITY_REALTIME}
+            )
+        if "io_priority" in settings and settings["io_priority"] is not None:
+            validate_priority_value(
+                settings["io_priority"],
+                "IoPriority",
+                valid_values={self.IO_PRIORITY_VERY_LOW, self.IO_PRIORITY_LOW,
+                              self.IO_PRIORITY_NORMAL, self.IO_PRIORITY_HIGH}
+            )
+        if "page_priority" in settings and settings["page_priority"] is not None:
+            validate_priority_value(
+                settings["page_priority"],
+                "PagePriority",
+                valid_values={0, 1, 2, 3, 4, 5}
+            )
+
         errors = []
 
         try:
@@ -282,20 +362,37 @@ class ProcessPriorityHandler(SettingsHandler):
             finally:
                 winreg.CloseKey(exe_key)
 
-        except PermissionError:
-            errors.append(f"Permission denied for {exe_name}")
-            raise
-        except Exception as e:
-            errors.append(str(e))
-            logger.error(f"Failed to set process settings for {exe_name}: {e}")
+        except PermissionError as e:
+            raise RegistryWriteError(
+                f"Failed to set process settings for {exe_name}",
+                details=f"Permission denied. Run as administrator. ({e})"
+            )
+        except OSError as e:
+            raise RegistryWriteError(
+                f"Failed to set process settings for {exe_name}",
+                details=str(e)
+            )
 
         return {
-            "success": len(errors) == 0,
-            "error": "; ".join(errors) if errors else None,
+            "success": True,
+            "error": None,
         }
 
     def _remove_process_settings(self, exe_name: str) -> bool:
-        """Remove priority settings for a specific executable."""
+        """Remove priority settings for a specific executable.
+
+        Args:
+            exe_name: Executable name (e.g., "game.exe").
+
+        Returns:
+            True if settings were removed or didn't exist.
+
+        Raises:
+            ValidationError: If the executable name is invalid.
+        """
+        # Validate to prevent path traversal in registry operations
+        validate_executable_name(exe_name)
+
         try:
             perf_options_path = f"{self.IFEO_KEY}\\{exe_name}\\PerfOptions"
             winreg.DeleteKey(winreg.HKEY_LOCAL_MACHINE, perf_options_path)

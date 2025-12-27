@@ -8,6 +8,13 @@ from typing import Any
 
 from gametune.settings.base import SettingsHandler
 from gametune.core.models import Issue
+from gametune.core.exceptions import RegistryWriteError
+from gametune.utils.validation import (
+    ValidationError,
+    validate_executable_path,
+    validate_dword_value,
+    validate_priority_value,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -187,17 +194,38 @@ class RegistrySettingsHandler(SettingsHandler):
             return None
 
     def _set_system_responsiveness(self, value: int) -> None:
-        """Set SystemResponsiveness value."""
-        key = winreg.OpenKey(
-            winreg.HKEY_LOCAL_MACHINE,
-            self.MULTIMEDIA_KEY,
-            0,
-            winreg.KEY_ALL_ACCESS
-        )
+        """Set SystemResponsiveness value.
+
+        Args:
+            value: SystemResponsiveness value (0-100). 0 = games get max priority.
+
+        Raises:
+            ValidationError: If value is out of range.
+            RegistryWriteError: If registry write fails.
+        """
+        validate_dword_value(value, "SystemResponsiveness", min_val=0, max_val=100)
+
         try:
-            winreg.SetValueEx(key, "SystemResponsiveness", 0, winreg.REG_DWORD, value)
-        finally:
-            winreg.CloseKey(key)
+            key = winreg.OpenKey(
+                winreg.HKEY_LOCAL_MACHINE,
+                self.MULTIMEDIA_KEY,
+                0,
+                winreg.KEY_ALL_ACCESS
+            )
+            try:
+                winreg.SetValueEx(key, "SystemResponsiveness", 0, winreg.REG_DWORD, value)
+            finally:
+                winreg.CloseKey(key)
+        except PermissionError as e:
+            raise RegistryWriteError(
+                "Failed to set SystemResponsiveness",
+                details=f"Permission denied. Run as administrator. ({e})"
+            )
+        except OSError as e:
+            raise RegistryWriteError(
+                "Failed to set SystemResponsiveness",
+                details=str(e)
+            )
 
     def _get_network_throttling(self) -> int | None:
         """Get NetworkThrottlingIndex value."""
@@ -220,17 +248,38 @@ class RegistrySettingsHandler(SettingsHandler):
             return None
 
     def _set_network_throttling(self, value: int) -> None:
-        """Set NetworkThrottlingIndex value."""
-        key = winreg.OpenKey(
-            winreg.HKEY_LOCAL_MACHINE,
-            self.MULTIMEDIA_KEY,
-            0,
-            winreg.KEY_ALL_ACCESS
-        )
+        """Set NetworkThrottlingIndex value.
+
+        Args:
+            value: Network throttling index. 0xFFFFFFFF disables throttling.
+
+        Raises:
+            ValidationError: If value is out of DWORD range.
+            RegistryWriteError: If registry write fails.
+        """
+        validate_dword_value(value, "NetworkThrottlingIndex")
+
         try:
-            winreg.SetValueEx(key, "NetworkThrottlingIndex", 0, winreg.REG_DWORD, value)
-        finally:
-            winreg.CloseKey(key)
+            key = winreg.OpenKey(
+                winreg.HKEY_LOCAL_MACHINE,
+                self.MULTIMEDIA_KEY,
+                0,
+                winreg.KEY_ALL_ACCESS
+            )
+            try:
+                winreg.SetValueEx(key, "NetworkThrottlingIndex", 0, winreg.REG_DWORD, value)
+            finally:
+                winreg.CloseKey(key)
+        except PermissionError as e:
+            raise RegistryWriteError(
+                "Failed to set NetworkThrottlingIndex",
+                details=f"Permission denied. Run as administrator. ({e})"
+            )
+        except OSError as e:
+            raise RegistryWriteError(
+                "Failed to set NetworkThrottlingIndex",
+                details=str(e)
+            )
 
     def _get_game_priority(self) -> dict[str, Any]:
         """Get game task priority settings."""
@@ -265,49 +314,97 @@ class RegistrySettingsHandler(SettingsHandler):
         return result
 
     def _set_game_priority(self, settings: dict[str, Any]) -> None:
-        """Set game task priority settings."""
-        key = winreg.OpenKey(
-            winreg.HKEY_LOCAL_MACHINE,
-            self.GAMES_TASK_KEY,
-            0,
-            winreg.KEY_ALL_ACCESS
-        )
+        """Set game task priority settings.
+
+        Args:
+            settings: Dictionary with gpu_priority, priority, scheduling_category, sfio_priority.
+
+        Raises:
+            ValidationError: If values are invalid.
+            RegistryWriteError: If registry write fails.
+        """
+        # Validate priority values before writing
+        if "gpu_priority" in settings:
+            validate_priority_value(settings["gpu_priority"], "GPU Priority", valid_values={0, 1, 2, 3, 4, 5, 6, 7, 8})
+        if "priority" in settings:
+            validate_priority_value(settings["priority"], "Priority", valid_values={1, 2, 3, 4, 5, 6, 7, 8})
+
         try:
-            if "gpu_priority" in settings:
-                winreg.SetValueEx(key, "GPU Priority", 0, winreg.REG_DWORD, settings["gpu_priority"])
-            if "priority" in settings:
-                winreg.SetValueEx(key, "Priority", 0, winreg.REG_DWORD, settings["priority"])
-            if "scheduling_category" in settings:
-                winreg.SetValueEx(key, "Scheduling Category", 0, winreg.REG_SZ, settings["scheduling_category"])
-            if "sfio_priority" in settings:
-                winreg.SetValueEx(key, "SFIO Priority", 0, winreg.REG_SZ, settings["sfio_priority"])
-        finally:
-            winreg.CloseKey(key)
+            key = winreg.OpenKey(
+                winreg.HKEY_LOCAL_MACHINE,
+                self.GAMES_TASK_KEY,
+                0,
+                winreg.KEY_ALL_ACCESS
+            )
+            try:
+                if "gpu_priority" in settings:
+                    winreg.SetValueEx(key, "GPU Priority", 0, winreg.REG_DWORD, settings["gpu_priority"])
+                if "priority" in settings:
+                    winreg.SetValueEx(key, "Priority", 0, winreg.REG_DWORD, settings["priority"])
+                if "scheduling_category" in settings:
+                    winreg.SetValueEx(key, "Scheduling Category", 0, winreg.REG_SZ, settings["scheduling_category"])
+                if "sfio_priority" in settings:
+                    winreg.SetValueEx(key, "SFIO Priority", 0, winreg.REG_SZ, settings["sfio_priority"])
+            finally:
+                winreg.CloseKey(key)
+        except PermissionError as e:
+            raise RegistryWriteError(
+                "Failed to set game priority",
+                details=f"Permission denied. Run as administrator. ({e})"
+            )
+        except OSError as e:
+            raise RegistryWriteError(
+                "Failed to set game priority",
+                details=str(e)
+            )
 
     def _set_fullscreen_optimization(self, exe_path: str, disabled: bool) -> None:
-        """Set fullscreen optimization for an executable."""
-        key = winreg.OpenKey(
-            winreg.HKEY_CURRENT_USER,
-            self.APPCOMPAT_KEY,
-            0,
-            winreg.KEY_ALL_ACCESS
-        )
+        """Set fullscreen optimization for an executable.
+
+        Args:
+            exe_path: Full path to the executable (e.g., "C:\\Games\\game.exe").
+            disabled: True to disable fullscreen optimizations.
+
+        Raises:
+            ValidationError: If exe_path is invalid or contains dangerous characters.
+            RegistryWriteError: If registry write fails.
+        """
+        # Validate the executable path to prevent registry injection
+        validate_executable_path(exe_path)
+
         try:
-            if disabled:
-                winreg.SetValueEx(
-                    key,
-                    exe_path,
-                    0,
-                    winreg.REG_SZ,
-                    "~ DISABLEDXMAXIMIZEDWINDOWEDMODE"
-                )
-            else:
-                try:
-                    winreg.DeleteValue(key, exe_path)
-                except FileNotFoundError:
-                    pass
-        finally:
-            winreg.CloseKey(key)
+            key = winreg.OpenKey(
+                winreg.HKEY_CURRENT_USER,
+                self.APPCOMPAT_KEY,
+                0,
+                winreg.KEY_ALL_ACCESS
+            )
+            try:
+                if disabled:
+                    winreg.SetValueEx(
+                        key,
+                        exe_path,
+                        0,
+                        winreg.REG_SZ,
+                        "~ DISABLEDXMAXIMIZEDWINDOWEDMODE"
+                    )
+                else:
+                    try:
+                        winreg.DeleteValue(key, exe_path)
+                    except FileNotFoundError:
+                        pass
+            finally:
+                winreg.CloseKey(key)
+        except PermissionError as e:
+            raise RegistryWriteError(
+                f"Failed to set fullscreen optimization for {exe_path}",
+                details=f"Permission denied. ({e})"
+            )
+        except OSError as e:
+            raise RegistryWriteError(
+                f"Failed to set fullscreen optimization for {exe_path}",
+                details=str(e)
+            )
 
     def _get_win32_priority_separation(self) -> int | None:
         """Get Win32PrioritySeparation value (scheduler quantum settings)."""
@@ -330,14 +427,36 @@ class RegistrySettingsHandler(SettingsHandler):
             return None
 
     def _set_win32_priority_separation(self, value: int) -> None:
-        """Set Win32PrioritySeparation value."""
-        key = winreg.OpenKey(
-            winreg.HKEY_LOCAL_MACHINE,
-            self.PRIORITY_CONTROL_KEY,
-            0,
-            winreg.KEY_ALL_ACCESS
-        )
+        """Set Win32PrioritySeparation value.
+
+        Args:
+            value: Scheduler quantum value (typically 0x26 or 0x28 for gaming).
+
+        Raises:
+            ValidationError: If value is out of DWORD range.
+            RegistryWriteError: If registry write fails.
+        """
+        # Valid values are 0x00-0x3F, but we allow full DWORD range for flexibility
+        validate_dword_value(value, "Win32PrioritySeparation", min_val=0, max_val=0x3F)
+
         try:
-            winreg.SetValueEx(key, "Win32PrioritySeparation", 0, winreg.REG_DWORD, value)
-        finally:
-            winreg.CloseKey(key)
+            key = winreg.OpenKey(
+                winreg.HKEY_LOCAL_MACHINE,
+                self.PRIORITY_CONTROL_KEY,
+                0,
+                winreg.KEY_ALL_ACCESS
+            )
+            try:
+                winreg.SetValueEx(key, "Win32PrioritySeparation", 0, winreg.REG_DWORD, value)
+            finally:
+                winreg.CloseKey(key)
+        except PermissionError as e:
+            raise RegistryWriteError(
+                "Failed to set Win32PrioritySeparation",
+                details=f"Permission denied. Run as administrator. ({e})"
+            )
+        except OSError as e:
+            raise RegistryWriteError(
+                "Failed to set Win32PrioritySeparation",
+                details=str(e)
+            )

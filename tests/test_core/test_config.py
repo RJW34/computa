@@ -214,7 +214,7 @@ disabled_handlers:
         content = config_path.read_text()
         assert "backup_dir: backups" in content
         assert "auto_backup: true" in content
-        assert "# GameTune Configuration" in content
+        assert "# A.B.S.O. Configuration" in content
 
     def test_validate_valid_config(self, tmp_path):
         """Test validation of valid configuration."""
