@@ -26,14 +26,14 @@ This document provides detailed API documentation for A.B.S.O.'s core modules an
 
 ### HardwareDetector
 
-**Module:** `gametune.core.detector`
+**Module:** `abso.core.detector`
 
 Detects gaming hardware components including GPU, CPU, RAM, monitors, and Windows version.
 
 #### Class: `HardwareDetector`
 
 ```python
-from gametune.core.detector import HardwareDetector
+from abso.core.detector import HardwareDetector
 
 detector = HardwareDetector()
 ```
@@ -110,14 +110,14 @@ Detects Windows version information.
 
 ### ConfigurationAuditor
 
-**Module:** `gametune.core.auditor`
+**Module:** `abso.core.auditor`
 
 Audits system configuration for gaming optimization issues.
 
 #### Class: `ConfigurationAuditor`
 
 ```python
-from gametune.core.auditor import ConfigurationAuditor
+from abso.core.auditor import ConfigurationAuditor
 
 auditor = ConfigurationAuditor()
 ```
@@ -154,14 +154,14 @@ Runs audit for a specific category.
 
 ### ProfileApplier
 
-**Module:** `gametune.core.applier`
+**Module:** `abso.core.applier`
 
 Applies game optimization profiles to the system.
 
 #### Class: `ProfileApplier`
 
 ```python
-from gametune.core.applier import ProfileApplier
+from abso.core.applier import ProfileApplier
 
 applier = ProfileApplier()
 ```
@@ -222,14 +222,14 @@ Lists all available profiles.
 
 ### BackupManager
 
-**Module:** `gametune.core.backup`
+**Module:** `abso.core.backup`
 
 Manages backup and restore of system settings.
 
 #### Class: `BackupManager`
 
 ```python
-from gametune.core.backup import BackupManager
+from abso.core.backup import BackupManager
 from pathlib import Path
 
 manager = BackupManager(Path("./backups"))
@@ -284,13 +284,13 @@ Deletes a backup.
 
 ### SettingsHandler Interface
 
-**Module:** `gametune.settings.base`
+**Module:** `abso.settings.base`
 
 Abstract base class that all settings handlers must implement.
 
 ```python
 from abc import ABC, abstractmethod
-from gametune.settings.base import SettingsHandler
+from abso.settings.base import SettingsHandler
 
 class CustomHandler(SettingsHandler):
     def detect(self) -> dict[str, Any]:
@@ -318,21 +318,21 @@ class CustomHandler(SettingsHandler):
 
 | Handler | Module | Description |
 |---------|--------|-------------|
-| `WindowsSettingsHandler` | `gametune.settings.windows` | Game Mode, Game Bar, HAGS, VBS |
-| `PowerSettingsHandler` | `gametune.settings.power` | Power plan management |
-| `RegistrySettingsHandler` | `gametune.settings.registry` | Game priority, scheduling |
-| `NvidiaSettingsHandler` | `gametune.settings.nvidia` | Nvidia Profile Inspector |
-| `TimerSettingsHandler` | `gametune.settings.timer` | Windows timer resolution |
-| `MouseSettingsHandler` | `gametune.settings.mouse` | Mouse acceleration, raw input |
-| `GraphicsSettingsHandler` | `gametune.settings.graphics` | Fullscreen optimizations |
-| `ServicesSettingsHandler` | `gametune.settings.services` | Background services |
-| `TasksSettingsHandler` | `gametune.settings.tasks` | Scheduled tasks |
-| `MemorySettingsHandler` | `gametune.settings.memory` | Virtual memory, paging |
-| `NetworkSettingsHandler` | `gametune.settings.network` | Nagle, TCP settings |
-| `VisualSettingsHandler` | `gametune.settings.visual` | Visual effects |
-| `StorageSettingsHandler` | `gametune.settings.storage` | Disk optimization |
-| `AudioSettingsHandler` | `gametune.settings.audio` | Audio latency |
-| `UpdatesSettingsHandler` | `gametune.settings.updates` | Windows Update |
+| `WindowsSettingsHandler` | `abso.settings.windows` | Game Mode, Game Bar, HAGS, VBS |
+| `PowerSettingsHandler` | `abso.settings.power` | Power plan management |
+| `RegistrySettingsHandler` | `abso.settings.registry` | Game priority, scheduling |
+| `NvidiaSettingsHandler` | `abso.settings.nvidia` | Nvidia Profile Inspector |
+| `TimerSettingsHandler` | `abso.settings.timer` | Windows timer resolution |
+| `MouseSettingsHandler` | `abso.settings.mouse` | Mouse acceleration, raw input |
+| `GraphicsSettingsHandler` | `abso.settings.graphics` | Fullscreen optimizations |
+| `ServicesSettingsHandler` | `abso.settings.services` | Background services |
+| `TasksSettingsHandler` | `abso.settings.tasks` | Scheduled tasks |
+| `MemorySettingsHandler` | `abso.settings.memory` | Virtual memory, paging |
+| `NetworkSettingsHandler` | `abso.settings.network` | Nagle, TCP settings |
+| `VisualSettingsHandler` | `abso.settings.visual` | Visual effects |
+| `StorageSettingsHandler` | `abso.settings.storage` | Disk optimization |
+| `AudioSettingsHandler` | `abso.settings.audio` | Audio latency |
+| `UpdatesSettingsHandler` | `abso.settings.updates` | Windows Update |
 
 ---
 
@@ -340,7 +340,7 @@ class CustomHandler(SettingsHandler):
 
 ### BaseProfile
 
-**Module:** `gametune.profiles.base`
+**Module:** `abso.profiles.base`
 
 Abstract base class for game profiles.
 
@@ -379,12 +379,12 @@ Generates markdown report of in-game settings.
 
 ## Exceptions
 
-**Module:** `gametune.core.exceptions`
+**Module:** `abso.core.exceptions`
 
 ### Exception Hierarchy
 
 ```
-GameTuneError (base)
+ABSOError (base)
 ├── DetectionError
 │   ├── GPUDetectionError
 │   ├── CPUDetectionError
@@ -424,7 +424,7 @@ GameTuneError (base)
 ### Usage Example
 
 ```python
-from gametune.core.exceptions import ProfileNotFoundError, BackupError
+from abso.core.exceptions import ProfileNotFoundError, BackupError
 
 try:
     applier.apply_profile("unknown-game")
@@ -441,7 +441,7 @@ except BackupError as e:
 
 ### Issue
 
-**Module:** `gametune.core.models`
+**Module:** `abso.core.models`
 
 Represents a configuration issue found during audit.
 
@@ -458,7 +458,7 @@ class Issue:
 
 ### ApplyResult
 
-**Module:** `gametune.core.applier`
+**Module:** `abso.core.applier`
 
 Result of applying a profile.
 
@@ -477,30 +477,30 @@ class ApplyResult:
 
 ## CLI Commands
 
-GameTune provides a command-line interface:
+ABSO provides a command-line interface:
 
 ```bash
 # Hardware detection
-python -m gametune detect
+python -m abso detect
 
 # Configuration audit
-python -m gametune audit
-python -m gametune audit --verbose
+python -m abso audit
+python -m abso audit --verbose
 
 # List profiles
-python -m gametune profiles
+python -m abso profiles
 
 # Apply a profile
-python -m gametune apply slippi-melee
-python -m gametune apply cod-bo7 --no-backup
+python -m abso apply slippi-melee
+python -m abso apply cod-bo7 --no-backup
 
 # Restore from backup
-python -m gametune restore latest
-python -m gametune restore 2024-01-15_143052
+python -m abso restore latest
+python -m abso restore 2024-01-15_143052
 
 # Generate in-game settings report
-python -m gametune report slippi-melee
+python -m abso report slippi-melee
 
 # Interactive mode
-python -m gametune
+python -m abso
 ```

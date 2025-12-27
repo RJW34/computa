@@ -2,7 +2,7 @@
 
 import pytest
 
-from gametune.utils.validation import (
+from abso.utils.validation import (
     ValidationError,
     validate_executable_name,
     validate_executable_path,

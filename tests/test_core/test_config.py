@@ -8,27 +8,27 @@ from unittest.mock import patch
 import pytest
 import yaml
 
-from gametune.core.config import (
-    GameTuneConfig,
+from abso.core.config import (
+    ABSOConfig,
     ProfileOverrides,
     ConfigManager,
     get_config,
     load_config,
     DEFAULT_CONFIG_NAME,
 )
-from gametune.core.exceptions import (
+from abso.core.exceptions import (
     ConfigLoadError,
     ConfigSaveError,
     ConfigValidationError,
 )
 
 
-class TestGameTuneConfig:
-    """Tests for GameTuneConfig dataclass."""
+class TestABSOConfig:
+    """Tests for ABSOConfig dataclass."""
 
     def test_default_values(self):
         """Test default configuration values."""
-        config = GameTuneConfig()
+        config = ABSOConfig()
 
         assert config.backup_dir == "backups"
         assert config.auto_backup is True
@@ -41,7 +41,7 @@ class TestGameTuneConfig:
 
     def test_custom_values(self):
         """Test configuration with custom values."""
-        config = GameTuneConfig(
+        config = ABSOConfig(
             backup_dir="my_backups",
             auto_backup=False,
             log_level="DEBUG",
@@ -57,7 +57,7 @@ class TestGameTuneConfig:
 
     def test_profile_overrides_conversion(self):
         """Test that dict profile_overrides are converted to ProfileOverrides."""
-        config = GameTuneConfig(
+        config = ABSOConfig(
             profile_overrides={
                 "slippi-melee": {
                     "nvidia": {"preset": "minimum_latency"},
@@ -176,7 +176,7 @@ disabled_handlers:
         config_path = tmp_path / "config.yaml"
         manager = ConfigManager(config_path)
 
-        config = GameTuneConfig(backup_dir="saved_backups")
+        config = ABSOConfig(backup_dir="saved_backups")
         manager.save(config)
 
         assert config_path.exists()
@@ -188,7 +188,7 @@ disabled_handlers:
         config_path = tmp_path / "config.yaml"
         manager = ConfigManager(config_path)
 
-        original = GameTuneConfig(
+        original = ABSOConfig(
             backup_dir="my_backups",
             auto_backup=False,
             log_level="WARNING",
@@ -219,7 +219,7 @@ disabled_handlers:
     def test_validate_valid_config(self, tmp_path):
         """Test validation of valid configuration."""
         manager = ConfigManager(tmp_path / "config.yaml")
-        config = GameTuneConfig()
+        config = ABSOConfig()
 
         warnings = manager.validate(config)
 
@@ -228,7 +228,7 @@ disabled_handlers:
     def test_validate_invalid_log_level(self, tmp_path):
         """Test validation rejects invalid log level."""
         manager = ConfigManager(tmp_path / "config.yaml")
-        config = GameTuneConfig(log_level="INVALID")
+        config = ABSOConfig(log_level="INVALID")
 
         with pytest.raises(ConfigValidationError) as exc_info:
             manager.validate(config)
@@ -238,7 +238,7 @@ disabled_handlers:
     def test_validate_unknown_handler_warning(self, tmp_path):
         """Test validation warns about unknown handlers."""
         manager = ConfigManager(tmp_path / "config.yaml")
-        config = GameTuneConfig(disabled_handlers=["UnknownHandler"])
+        config = ABSOConfig(disabled_handlers=["UnknownHandler"])
 
         warnings = manager.validate(config)
 
@@ -248,7 +248,7 @@ disabled_handlers:
     def test_validate_unknown_profile_warning(self, tmp_path):
         """Test validation warns about unknown default profile."""
         manager = ConfigManager(tmp_path / "config.yaml")
-        config = GameTuneConfig(default_profile="unknown-game")
+        config = ABSOConfig(default_profile="unknown-game")
 
         warnings = manager.validate(config)
 

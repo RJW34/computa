@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, patch, PropertyMock
 
 import pytest
 
-from gametune.core.detector import HardwareDetector, _parse_edid_for_vrr
+from abso.core.detector import HardwareDetector, _parse_edid_for_vrr
 
 
 class TestHardwareDetectorInit:
@@ -79,7 +79,7 @@ class TestDetectAll:
 class TestDetectGpu:
     """Tests for GPU detection."""
 
-    @patch("gametune.core.detector.subprocess.run")
+    @patch("abso.core.detector.subprocess.run")
     def test_detect_gpu_nvidia_smi_success(self, mock_run):
         """Test GPU detection with nvidia-smi success."""
         mock_run.return_value = MagicMock(
@@ -95,7 +95,7 @@ class TestDetectGpu:
         assert result["driver_version"] == "546.33"
         assert result["vram_mb"] == 24564
 
-    @patch("gametune.core.detector.subprocess.run")
+    @patch("abso.core.detector.subprocess.run")
     def test_detect_gpu_nvidia_smi_not_found(self, mock_run):
         """Test GPU detection falls back when nvidia-smi not found."""
         mock_run.side_effect = FileNotFoundError("nvidia-smi not found")
@@ -107,7 +107,7 @@ class TestDetectGpu:
 
         assert result is None
 
-    @patch("gametune.core.detector.subprocess.run")
+    @patch("abso.core.detector.subprocess.run")
     def test_detect_gpu_nvidia_smi_timeout(self, mock_run):
         """Test GPU detection handles timeout."""
         mock_run.side_effect = subprocess.TimeoutExpired("nvidia-smi", 5)
@@ -118,7 +118,7 @@ class TestDetectGpu:
 
         assert result is None
 
-    @patch("gametune.core.detector.subprocess.run")
+    @patch("abso.core.detector.subprocess.run")
     def test_detect_gpu_nvidia_smi_parse_error(self, mock_run):
         """Test GPU detection handles malformed output."""
         mock_run.return_value = MagicMock(
@@ -132,7 +132,7 @@ class TestDetectGpu:
 
         assert result is None
 
-    @patch("gametune.core.detector.subprocess.run")
+    @patch("abso.core.detector.subprocess.run")
     def test_detect_gpu_fallback_to_wmi(self, mock_run):
         """Test GPU detection falls back to WMI."""
         mock_run.side_effect = FileNotFoundError()
@@ -218,7 +218,7 @@ class TestDetectRam:
 class TestDetectMonitors:
     """Tests for monitor detection."""
 
-    @patch("gametune.core.detector.win32api", create=True)
+    @patch("abso.core.detector.win32api", create=True)
     def test_detect_monitors_import_error(self, mock_win32api):
         """Test monitor detection handles ImportError gracefully."""
         detector = HardwareDetector()
@@ -234,9 +234,9 @@ class TestDetectMonitors:
 class TestDetectWindowsVersion:
     """Tests for Windows version detection."""
 
-    @patch("gametune.core.detector.winreg.OpenKey")
-    @patch("gametune.core.detector.winreg.QueryValueEx")
-    @patch("gametune.core.detector.winreg.CloseKey")
+    @patch("abso.core.detector.winreg.OpenKey")
+    @patch("abso.core.detector.winreg.QueryValueEx")
+    @patch("abso.core.detector.winreg.CloseKey")
     def test_detect_windows_version_success(
         self, mock_close, mock_query, mock_open
     ):
@@ -253,7 +253,7 @@ class TestDetectWindowsVersion:
         assert result["display_version"] == "23H2"
         assert result["build"] == "22631"
 
-    @patch("gametune.core.detector.winreg.OpenKey")
+    @patch("abso.core.detector.winreg.OpenKey")
     def test_detect_windows_version_registry_error(self, mock_open):
         """Test Windows version detection handles registry errors."""
         mock_open.side_effect = OSError("Access denied")
@@ -328,7 +328,7 @@ class TestExceptionHandling:
 
         assert result is None
 
-    @patch("gametune.core.detector.subprocess.run")
+    @patch("abso.core.detector.subprocess.run")
     def test_detector_handles_subprocess_error(self, mock_run):
         """Test detector handles subprocess errors gracefully."""
         mock_run.side_effect = subprocess.SubprocessError("Failed to execute")

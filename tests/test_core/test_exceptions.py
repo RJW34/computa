@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import pytest
 
-from gametune.core.exceptions import (
-    GameTuneError,
+from abso.core.exceptions import (
+    ABSOError,
     DetectionError,
     GPUDetectionError,
     CPUDetectionError,
@@ -43,12 +43,12 @@ from gametune.core.exceptions import (
 )
 
 
-class TestGameTuneError:
-    """Tests for base GameTuneError."""
+class TestABSOError:
+    """Tests for base ABSOError."""
 
     def test_basic_message(self):
         """Test error with basic message."""
-        error = GameTuneError("Something went wrong")
+        error = ABSOError("Something went wrong")
 
         assert str(error) == "Something went wrong"
         assert error.message == "Something went wrong"
@@ -56,22 +56,22 @@ class TestGameTuneError:
 
     def test_message_with_details(self):
         """Test error with message and details."""
-        error = GameTuneError("Something went wrong", details="More info here")
+        error = ABSOError("Something went wrong", details="More info here")
 
         assert str(error) == "Something went wrong: More info here"
         assert error.message == "Something went wrong"
         assert error.details == "More info here"
 
     def test_inheritance(self):
-        """Test GameTuneError inherits from Exception."""
-        error = GameTuneError("test")
+        """Test ABSOError inherits from Exception."""
+        error = ABSOError("test")
 
         assert isinstance(error, Exception)
 
     def test_raise_and_catch(self):
         """Test error can be raised and caught."""
-        with pytest.raises(GameTuneError) as exc_info:
-            raise GameTuneError("Test error")
+        with pytest.raises(ABSOError) as exc_info:
+            raise ABSOError("Test error")
 
         assert "Test error" in str(exc_info.value)
 
@@ -81,7 +81,7 @@ class TestExceptionHierarchy:
 
     def test_detection_errors(self):
         """Test detection error hierarchy."""
-        assert issubclass(DetectionError, GameTuneError)
+        assert issubclass(DetectionError, ABSOError)
         assert issubclass(GPUDetectionError, DetectionError)
         assert issubclass(CPUDetectionError, DetectionError)
         assert issubclass(MonitorDetectionError, DetectionError)
@@ -89,27 +89,27 @@ class TestExceptionHierarchy:
 
     def test_registry_errors(self):
         """Test registry error hierarchy."""
-        assert issubclass(RegistryError, GameTuneError)
+        assert issubclass(RegistryError, ABSOError)
         assert issubclass(RegistryReadError, RegistryError)
         assert issubclass(RegistryWriteError, RegistryError)
         assert issubclass(RegistryKeyNotFoundError, RegistryError)
 
     def test_settings_errors(self):
         """Test settings error hierarchy."""
-        assert issubclass(SettingsError, GameTuneError)
+        assert issubclass(SettingsError, ABSOError)
         assert issubclass(SettingsApplyError, SettingsError)
         assert issubclass(SettingsDetectError, SettingsError)
         assert issubclass(SettingsAuditError, SettingsError)
 
     def test_profile_errors(self):
         """Test profile error hierarchy."""
-        assert issubclass(ProfileError, GameTuneError)
+        assert issubclass(ProfileError, ABSOError)
         assert issubclass(ProfileNotFoundError, ProfileError)
         assert issubclass(ProfileApplyError, ProfileError)
 
     def test_backup_errors(self):
         """Test backup error hierarchy."""
-        assert issubclass(BackupError, GameTuneError)
+        assert issubclass(BackupError, ABSOError)
         assert issubclass(BackupCreateError, BackupError)
         assert issubclass(BackupRestoreError, BackupError)
         assert issubclass(BackupNotFoundError, BackupError)
@@ -117,12 +117,12 @@ class TestExceptionHierarchy:
 
     def test_permission_errors(self):
         """Test permission error hierarchy."""
-        assert issubclass(ElevationRequiredError, GameTuneError)
+        assert issubclass(ElevationRequiredError, ABSOError)
         assert issubclass(AdminRequiredError, ElevationRequiredError)
 
     def test_external_tool_errors(self):
         """Test external tool error hierarchy."""
-        assert issubclass(ExternalToolError, GameTuneError)
+        assert issubclass(ExternalToolError, ABSOError)
         assert issubclass(NvidiaSmiError, ExternalToolError)
         assert issubclass(NvidiaProfileInspectorError, ExternalToolError)
         assert issubclass(PowerCfgError, ExternalToolError)
@@ -130,14 +130,14 @@ class TestExceptionHierarchy:
 
     def test_configuration_errors(self):
         """Test configuration error hierarchy."""
-        assert issubclass(ConfigurationError, GameTuneError)
+        assert issubclass(ConfigurationError, ABSOError)
         assert issubclass(ConfigLoadError, ConfigurationError)
         assert issubclass(ConfigSaveError, ConfigurationError)
         assert issubclass(ConfigValidationError, ConfigurationError)
 
     def test_timeout_errors(self):
         """Test timeout error hierarchy."""
-        assert issubclass(OperationTimeoutError, GameTuneError)
+        assert issubclass(OperationTimeoutError, ABSOError)
         assert issubclass(CommandTimeoutError, OperationTimeoutError)
 
 
@@ -208,8 +208,8 @@ class TestCatchingParentExceptions:
             with pytest.raises(DetectionError):
                 raise error
 
-    def test_catch_gametune_errors(self):
-        """Test catching all custom errors as GameTuneError."""
+    def test_catch_abso_errors(self):
+        """Test catching all custom errors as ABSOError."""
         errors = [
             ProfileNotFoundError("test"),
             BackupCorruptedError("test"),
@@ -218,7 +218,7 @@ class TestCatchingParentExceptions:
         ]
 
         for error in errors:
-            with pytest.raises(GameTuneError):
+            with pytest.raises(ABSOError):
                 raise error
 
     def test_catch_backup_errors(self):

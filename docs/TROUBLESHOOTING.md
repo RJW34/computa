@@ -161,7 +161,7 @@ pip install -r requirements.txt
 **Solution:**
 List available profiles:
 ```bash
-python -m gametune profiles
+python -m abso profiles
 ```
 
 Use the exact profile ID (e.g., `slippi-melee`, not `Slippi Melee`).
@@ -224,11 +224,11 @@ print(f"Failed: {result.failed_settings}")
 **Solutions:**
 1. List available backups:
    ```bash
-   python -m gametune restore list
+   python -m abso restore list
    ```
 2. Use `latest` to restore most recent:
    ```bash
-   python -m gametune restore latest
+   python -m abso restore latest
    ```
 3. Check backup directory exists
 
@@ -255,7 +255,7 @@ print(f"Failed: {result.failed_settings}")
 2. Check if application cached old settings
 3. Verify restore succeeded:
    ```bash
-   python -m gametune audit
+   python -m abso audit
    ```
 
 ---
@@ -274,7 +274,7 @@ print(f"Failed: {result.failed_settings}")
 **Solutions:**
 1. Audit specific category:
    ```bash
-   python -m gametune audit --category network
+   python -m abso audit --category network
    ```
 2. Disable real-time antivirus scanning temporarily
 
@@ -296,7 +296,7 @@ If A.B.S.O. caused issues:
 
 1. **From Backup:**
    ```bash
-   python -m gametune restore latest
+   python -m abso restore latest
    ```
 
 2. **Manual Reset (if backups unavailable):**
@@ -360,7 +360,7 @@ If Windows is unstable after applying settings:
 ### Enable Verbose Logging
 
 ```bash
-python -m gametune audit --verbose
+python -m abso audit --verbose
 ```
 
 ### View Debug Logs
@@ -419,13 +419,13 @@ Include:
 python -c "import ctypes; print('Admin' if ctypes.windll.shell32.IsUserAnAdmin() else 'Not Admin')"
 
 # List all backups
-python -c "from gametune.core.backup import BackupManager; from pathlib import Path; print(BackupManager(Path('backups')).list_backups())"
+python -c "from abso.core.backup import BackupManager; from pathlib import Path; print(BackupManager(Path('backups')).list_backups())"
 
 # Quick audit
-python -m gametune audit
+python -m abso audit
 
 # Restore last backup
-python -m gametune restore latest
+python -m abso restore latest
 ```
 
 ### File Locations

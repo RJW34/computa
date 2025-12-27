@@ -9,8 +9,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from gametune.core.backup import BackupManager
-from gametune.core.exceptions import BackupNotFoundError, BackupCorruptedError
+from abso.core.backup import BackupManager
+from abso.core.exceptions import BackupNotFoundError, BackupCorruptedError
 
 
 class TestBackupManagerInit:
@@ -18,7 +18,7 @@ class TestBackupManagerInit:
 
     def test_init_creates_instance(self, tmp_path):
         """Test BackupManager can be instantiated."""
-        with patch("gametune.core.backup._get_backup_handlers", return_value=[]):
+        with patch("abso.core.backup._get_backup_handlers", return_value=[]):
             manager = BackupManager(tmp_path)
             assert manager is not None
             assert manager.backup_dir == tmp_path
@@ -27,7 +27,7 @@ class TestBackupManagerInit:
         """Test BackupManager loads handlers on init."""
         mock_handler = MagicMock()
 
-        with patch("gametune.core.backup._get_backup_handlers", return_value=[mock_handler]):
+        with patch("abso.core.backup._get_backup_handlers", return_value=[mock_handler]):
             manager = BackupManager(tmp_path)
             assert len(manager._handlers) == 1
 
@@ -41,7 +41,7 @@ class TestCreateBackup:
         mock_handler.__class__.__name__ = "TestHandler"
         mock_handler.backup.return_value = {"setting": "value"}
 
-        with patch("gametune.core.backup._get_backup_handlers", return_value=[mock_handler]):
+        with patch("abso.core.backup._get_backup_handlers", return_value=[mock_handler]):
             manager = BackupManager(tmp_path)
             backup_id = manager.create_backup()
 
@@ -55,7 +55,7 @@ class TestCreateBackup:
         mock_handler.__class__.__name__ = "TestHandler"
         mock_handler.backup.return_value = {"setting": "value"}
 
-        with patch("gametune.core.backup._get_backup_handlers", return_value=[mock_handler]):
+        with patch("abso.core.backup._get_backup_handlers", return_value=[mock_handler]):
             manager = BackupManager(tmp_path)
             backup_id = manager.create_backup()
 
@@ -73,7 +73,7 @@ class TestCreateBackup:
         mock_handler.__class__.__name__ = "TestHandler"
         mock_handler.backup.return_value = {"setting": "value", "nested": {"key": 123}}
 
-        with patch("gametune.core.backup._get_backup_handlers", return_value=[mock_handler]):
+        with patch("abso.core.backup._get_backup_handlers", return_value=[mock_handler]):
             manager = BackupManager(tmp_path)
             backup_id = manager.create_backup()
 
@@ -94,7 +94,7 @@ class TestCreateBackup:
         handler2.__class__.__name__ = "Handler2"
         handler2.backup.side_effect = PermissionError("Access denied")
 
-        with patch("gametune.core.backup._get_backup_handlers", return_value=[handler1, handler2]):
+        with patch("abso.core.backup._get_backup_handlers", return_value=[handler1, handler2]):
             manager = BackupManager(tmp_path)
             backup_id = manager.create_backup()
 
@@ -107,7 +107,7 @@ class TestCreateBackup:
 
     def test_create_backup_returns_timestamp_id(self, tmp_path):
         """Test create_backup returns timestamp-based ID."""
-        with patch("gametune.core.backup._get_backup_handlers", return_value=[]):
+        with patch("abso.core.backup._get_backup_handlers", return_value=[]):
             manager = BackupManager(tmp_path)
             backup_id = manager.create_backup()
 
@@ -123,7 +123,7 @@ class TestRestoreBackup:
 
     def test_restore_backup_not_found(self, tmp_path):
         """Test restore_backup raises for non-existent backup."""
-        with patch("gametune.core.backup._get_backup_handlers", return_value=[]):
+        with patch("abso.core.backup._get_backup_handlers", return_value=[]):
             manager = BackupManager(tmp_path)
 
             with pytest.raises(BackupNotFoundError) as exc_info:
@@ -138,7 +138,7 @@ class TestRestoreBackup:
         backup_dir.mkdir()
         (backup_dir / "manifest.json").write_text("invalid json{{{")
 
-        with patch("gametune.core.backup._get_backup_handlers", return_value=[]):
+        with patch("abso.core.backup._get_backup_handlers", return_value=[]):
             manager = BackupManager(tmp_path)
 
             with pytest.raises(BackupCorruptedError) as exc_info:
@@ -151,7 +151,7 @@ class TestRestoreBackup:
         backup_dir = tmp_path / "2024-01-01_120000"
         backup_dir.mkdir()
 
-        with patch("gametune.core.backup._get_backup_handlers", return_value=[]):
+        with patch("abso.core.backup._get_backup_handlers", return_value=[]):
             manager = BackupManager(tmp_path)
 
             with pytest.raises(BackupCorruptedError) as exc_info:
@@ -166,7 +166,7 @@ class TestRestoreBackup:
         mock_handler.backup.return_value = {"setting": "original"}
         mock_handler.restore.return_value = True
 
-        with patch("gametune.core.backup._get_backup_handlers", return_value=[mock_handler]):
+        with patch("abso.core.backup._get_backup_handlers", return_value=[mock_handler]):
             manager = BackupManager(tmp_path)
 
             # Create backup
@@ -186,7 +186,7 @@ class TestRestoreBackup:
         mock_handler.backup.return_value = {"version": 1}
         mock_handler.restore.return_value = True
 
-        with patch("gametune.core.backup._get_backup_handlers", return_value=[mock_handler]):
+        with patch("abso.core.backup._get_backup_handlers", return_value=[mock_handler]):
             manager = BackupManager(tmp_path)
 
             # Create two backups
@@ -210,14 +210,14 @@ class TestRestoreBackup:
         mock_handler.__class__.__name__ = "TestHandler"
         mock_handler.backup.side_effect = PermissionError("Failed")
 
-        with patch("gametune.core.backup._get_backup_handlers", return_value=[mock_handler]):
+        with patch("abso.core.backup._get_backup_handlers", return_value=[mock_handler]):
             manager = BackupManager(tmp_path)
             backup_id = manager.create_backup()
 
         # Reset mock for restore
         mock_handler.restore.reset_mock()
 
-        with patch("gametune.core.backup._get_backup_handlers", return_value=[mock_handler]):
+        with patch("abso.core.backup._get_backup_handlers", return_value=[mock_handler]):
             manager = BackupManager(tmp_path)
             manager.restore_backup(backup_id)
 
@@ -230,7 +230,7 @@ class TestListBackups:
 
     def test_list_backups_empty(self, tmp_path):
         """Test list_backups with no backups."""
-        with patch("gametune.core.backup._get_backup_handlers", return_value=[]):
+        with patch("abso.core.backup._get_backup_handlers", return_value=[]):
             manager = BackupManager(tmp_path)
             backups = manager.list_backups()
 
@@ -239,7 +239,7 @@ class TestListBackups:
     def test_list_backups_returns_all(self, tmp_path):
         """Test list_backups returns all backups."""
         import time
-        with patch("gametune.core.backup._get_backup_handlers", return_value=[]):
+        with patch("abso.core.backup._get_backup_handlers", return_value=[]):
             manager = BackupManager(tmp_path)
 
             manager.create_backup()
@@ -253,7 +253,7 @@ class TestListBackups:
     def test_list_backups_sorted_newest_first(self, tmp_path):
         """Test list_backups returns newest first."""
         import time
-        with patch("gametune.core.backup._get_backup_handlers", return_value=[]):
+        with patch("abso.core.backup._get_backup_handlers", return_value=[]):
             manager = BackupManager(tmp_path)
 
             id1 = manager.create_backup()
@@ -271,7 +271,7 @@ class TestListBackups:
         mock_handler.__class__.__name__ = "TestHandler"
         mock_handler.backup.return_value = {}
 
-        with patch("gametune.core.backup._get_backup_handlers", return_value=[mock_handler]):
+        with patch("abso.core.backup._get_backup_handlers", return_value=[mock_handler]):
             manager = BackupManager(tmp_path)
             manager.create_backup()
             backups = manager.list_backups()
@@ -286,7 +286,7 @@ class TestListBackups:
     def test_list_backups_skips_invalid(self, tmp_path):
         """Test list_backups skips directories without valid manifest."""
         # Create valid backup
-        with patch("gametune.core.backup._get_backup_handlers", return_value=[]):
+        with patch("abso.core.backup._get_backup_handlers", return_value=[]):
             manager = BackupManager(tmp_path)
             valid_id = manager.create_backup()
 
@@ -295,7 +295,7 @@ class TestListBackups:
         invalid_dir.mkdir()
         (invalid_dir / "manifest.json").write_text("not json")
 
-        with patch("gametune.core.backup._get_backup_handlers", return_value=[]):
+        with patch("abso.core.backup._get_backup_handlers", return_value=[]):
             manager = BackupManager(tmp_path)
             backups = manager.list_backups()
 
@@ -309,7 +309,7 @@ class TestDeleteBackup:
 
     def test_delete_backup_removes_directory(self, tmp_path):
         """Test delete_backup removes backup directory."""
-        with patch("gametune.core.backup._get_backup_handlers", return_value=[]):
+        with patch("abso.core.backup._get_backup_handlers", return_value=[]):
             manager = BackupManager(tmp_path)
             backup_id = manager.create_backup()
 
@@ -322,7 +322,7 @@ class TestDeleteBackup:
 
     def test_delete_backup_not_found(self, tmp_path):
         """Test delete_backup raises for non-existent backup."""
-        with patch("gametune.core.backup._get_backup_handlers", return_value=[]):
+        with patch("abso.core.backup._get_backup_handlers", return_value=[]):
             manager = BackupManager(tmp_path)
 
             with pytest.raises(BackupNotFoundError):
@@ -330,7 +330,7 @@ class TestDeleteBackup:
 
     def test_delete_backup_removes_from_list(self, tmp_path):
         """Test deleted backup is removed from list."""
-        with patch("gametune.core.backup._get_backup_handlers", return_value=[]):
+        with patch("abso.core.backup._get_backup_handlers", return_value=[]):
             manager = BackupManager(tmp_path)
 
             backup_id = manager.create_backup()
@@ -345,7 +345,7 @@ class TestGetLatestBackup:
 
     def test_get_latest_backup_none(self, tmp_path):
         """Test _get_latest_backup returns None when no backups."""
-        with patch("gametune.core.backup._get_backup_handlers", return_value=[]):
+        with patch("abso.core.backup._get_backup_handlers", return_value=[]):
             manager = BackupManager(tmp_path)
             result = manager._get_latest_backup()
 
@@ -353,7 +353,7 @@ class TestGetLatestBackup:
 
     def test_get_latest_backup_returns_newest(self, tmp_path):
         """Test _get_latest_backup returns newest backup."""
-        with patch("gametune.core.backup._get_backup_handlers", return_value=[]):
+        with patch("abso.core.backup._get_backup_handlers", return_value=[]):
             manager = BackupManager(tmp_path)
 
             manager.create_backup()

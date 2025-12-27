@@ -1,1 +1,1 @@
-"""GameTune test suite."""
+"""ABSO test suite."""

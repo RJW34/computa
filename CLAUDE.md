@@ -21,11 +21,11 @@ venv\Scripts\activate
 pip install -r requirements.txt
 
 # CLI commands (requires admin elevation)
-python -m gametune detect              # Hardware detection
-python -m gametune audit               # Configuration audit
-python -m gametune audit --verbose     # Detailed audit
-python -m gametune apply <profile>     # Apply game profile
-python -m gametune restore latest      # Restore last backup
+python -m abso detect              # Hardware detection
+python -m abso audit               # Configuration audit
+python -m abso audit --verbose     # Detailed audit
+python -m abso apply <profile>     # Apply game profile
+python -m abso restore latest      # Restore last backup
 
 # Run tests
 pytest tests/
@@ -35,7 +35,7 @@ pytest tests/test_detector.py -v      # Single test file
 ## Architecture
 
 ```
-gametune/
+abso/
 ├── main.py              # CLI entry (Click-based)
 ├── core/
 │   ├── detector.py      # Hardware detection (WMI, nvidia-smi, pynvml)

@@ -6,8 +6,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from gametune.core.auditor import ConfigurationAuditor
-from gametune.core.models import Issue
+from abso.core.auditor import ConfigurationAuditor
+from abso.core.models import Issue
 
 
 class TestConfigurationAuditorInit:
@@ -15,7 +15,7 @@ class TestConfigurationAuditorInit:
 
     def test_init_creates_instance(self):
         """Test ConfigurationAuditor can be instantiated."""
-        with patch("gametune.core.auditor._get_handlers", return_value=[]):
+        with patch("abso.core.auditor._get_handlers", return_value=[]):
             auditor = ConfigurationAuditor()
             assert auditor is not None
 
@@ -23,7 +23,7 @@ class TestConfigurationAuditorInit:
         """Test ConfigurationAuditor loads handlers on init."""
         mock_handler = MagicMock()
 
-        with patch("gametune.core.auditor._get_handlers", return_value=[mock_handler]):
+        with patch("abso.core.auditor._get_handlers", return_value=[mock_handler]):
             auditor = ConfigurationAuditor()
             assert len(auditor._handlers) == 1
 
@@ -45,7 +45,7 @@ class TestAuditAll:
             )
         ]
 
-        with patch("gametune.core.auditor._get_handlers", return_value=[mock_handler]):
+        with patch("abso.core.auditor._get_handlers", return_value=[mock_handler]):
             auditor = ConfigurationAuditor()
             issues = auditor.audit_all()
 
@@ -76,7 +76,7 @@ class TestAuditAll:
             )
         ]
 
-        with patch("gametune.core.auditor._get_handlers", return_value=[handler1, handler2]):
+        with patch("abso.core.auditor._get_handlers", return_value=[handler1, handler2]):
             auditor = ConfigurationAuditor()
             issues = auditor.audit_all()
 
@@ -109,7 +109,7 @@ class TestAuditAll:
             ),
         ]
 
-        with patch("gametune.core.auditor._get_handlers", return_value=[handler]):
+        with patch("abso.core.auditor._get_handlers", return_value=[handler]):
             auditor = ConfigurationAuditor()
             issues = auditor.audit_all()
 
@@ -123,7 +123,7 @@ class TestAuditAll:
         handler.__class__.__name__ = "TestHandler"
         handler.audit.side_effect = PermissionError("Access denied")
 
-        with patch("gametune.core.auditor._get_handlers", return_value=[handler]):
+        with patch("abso.core.auditor._get_handlers", return_value=[handler]):
             auditor = ConfigurationAuditor()
             issues = auditor.audit_all()
 
@@ -136,7 +136,7 @@ class TestAuditAll:
         handler.__class__.__name__ = "TestHandler"
         handler.audit.side_effect = OSError("Registry error")
 
-        with patch("gametune.core.auditor._get_handlers", return_value=[handler]):
+        with patch("abso.core.auditor._get_handlers", return_value=[handler]):
             auditor = ConfigurationAuditor()
             issues = auditor.audit_all()
 
@@ -149,7 +149,7 @@ class TestAuditAll:
         handler.__class__.__name__ = "TestHandler"
         handler.audit.side_effect = ValueError("Invalid value")
 
-        with patch("gametune.core.auditor._get_handlers", return_value=[handler]):
+        with patch("abso.core.auditor._get_handlers", return_value=[handler]):
             auditor = ConfigurationAuditor()
             issues = auditor.audit_all()
 
@@ -158,7 +158,7 @@ class TestAuditAll:
 
     def test_audit_all_empty_handlers(self):
         """Test audit_all with no handlers returns empty list."""
-        with patch("gametune.core.auditor._get_handlers", return_value=[]):
+        with patch("abso.core.auditor._get_handlers", return_value=[]):
             auditor = ConfigurationAuditor()
             issues = auditor.audit_all()
 
@@ -170,7 +170,7 @@ class TestAuditCategory:
 
     def test_audit_category_unknown_raises(self):
         """Test audit_category raises ValueError for unknown category."""
-        with patch("gametune.core.auditor._get_handlers", return_value=[]):
+        with patch("abso.core.auditor._get_handlers", return_value=[]):
             auditor = ConfigurationAuditor()
 
             with pytest.raises(ValueError) as exc_info:
@@ -191,8 +191,8 @@ class TestAuditCategory:
             )
         ]
 
-        with patch("gametune.core.auditor._get_handlers", return_value=[]):
-            with patch("gametune.settings.windows.WindowsSettingsHandler", return_value=mock_handler):
+        with patch("abso.core.auditor._get_handlers", return_value=[]):
+            with patch("abso.settings.windows.WindowsSettingsHandler", return_value=mock_handler):
                 auditor = ConfigurationAuditor()
                 issues = auditor.audit_category("windows")
 
@@ -204,12 +204,12 @@ class TestAuditCategory:
         mock_handler = MagicMock()
         mock_handler.audit.return_value = []
 
-        with patch("gametune.core.auditor._get_handlers", return_value=[]):
+        with patch("abso.core.auditor._get_handlers", return_value=[]):
             auditor = ConfigurationAuditor()
 
             # These should all work (not raise)
             for category in ["WINDOWS", "Windows", "windows"]:
-                with patch("gametune.settings.windows.WindowsSettingsHandler", return_value=mock_handler):
+                with patch("abso.settings.windows.WindowsSettingsHandler", return_value=mock_handler):
                     try:
                         auditor.audit_category(category)
                     except ValueError:

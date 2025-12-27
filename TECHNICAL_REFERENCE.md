@@ -1,6 +1,6 @@
-# TECHNICAL_REFERENCE.md — GameTune Implementation Guide
+# TECHNICAL_REFERENCE.md — ABSO Implementation Guide
 
-This document provides detailed technical reference for implementing the GameTune Windows gaming optimization tool.
+This document provides detailed technical reference for implementing the ABSO Windows gaming optimization tool.
 
 ---
 
@@ -450,7 +450,7 @@ If you experience issues after applying optimizations:
 | System feels sluggish | Aggressive CPU settings | Restore backup |
 | Driver crashes | NPI profile incompatibility | Restore NPI backup |
 
-**Use `python -m gametune restore latest` to quickly revert all changes.**
+**Use `python -m abso restore latest` to quickly revert all changes.**
 
 ---
 

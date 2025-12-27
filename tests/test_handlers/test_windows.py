@@ -4,14 +4,14 @@ import pytest
 from unittest.mock import patch, MagicMock
 import winreg
 
-from gametune.settings.windows import WindowsSettingsHandler
-from gametune.core.models import Issue
+from abso.settings.windows import WindowsSettingsHandler
+from abso.core.models import Issue
 
 
 class TestWindowsDetect:
     """Tests for WindowsSettingsHandler.detect()."""
 
-    @patch("gametune.settings.windows.winreg")
+    @patch("abso.settings.windows.winreg")
     def test_detect_returns_expected_keys(self, mock_winreg):
         """Test detect returns dictionary with all expected keys."""
         mock_key = MagicMock()
@@ -30,7 +30,7 @@ class TestWindowsDetect:
         assert "hags" in result
         assert "vbs" in result
 
-    @patch("gametune.settings.windows.winreg")
+    @patch("abso.settings.windows.winreg")
     def test_detect_game_mode_enabled(self, mock_winreg):
         """Test detecting game mode when enabled."""
         mock_key = MagicMock()
@@ -45,7 +45,7 @@ class TestWindowsDetect:
 
         assert result["game_mode"] is True
 
-    @patch("gametune.settings.windows.winreg")
+    @patch("abso.settings.windows.winreg")
     def test_detect_handles_missing_keys(self, mock_winreg):
         """Test detect handles missing registry keys gracefully."""
         mock_winreg.OpenKey.side_effect = FileNotFoundError()
@@ -155,7 +155,7 @@ class TestWindowsAudit:
 class TestWindowsApply:
     """Tests for WindowsSettingsHandler.apply()."""
 
-    @patch("gametune.settings.windows.winreg")
+    @patch("abso.settings.windows.winreg")
     def test_apply_game_mode(self, mock_winreg):
         """Test applying game mode setting."""
         mock_key = MagicMock()
@@ -171,7 +171,7 @@ class TestWindowsApply:
         assert result["success"] is True
         mock_winreg.SetValueEx.assert_called()
 
-    @patch("gametune.settings.windows.winreg")
+    @patch("abso.settings.windows.winreg")
     def test_apply_multiple_settings(self, mock_winreg):
         """Test applying multiple settings at once."""
         mock_key = MagicMock()
@@ -191,7 +191,7 @@ class TestWindowsApply:
 
         assert result["success"] is True
 
-    @patch("gametune.settings.windows.winreg")
+    @patch("abso.settings.windows.winreg")
     def test_apply_permission_error(self, mock_winreg):
         """Test apply handles permission errors."""
         mock_winreg.OpenKey.side_effect = PermissionError("Access denied")
@@ -204,7 +204,7 @@ class TestWindowsApply:
         assert result["success"] is False
         assert "Permission" in result["error"] or "denied" in result["error"].lower()
 
-    @patch("gametune.settings.windows.winreg")
+    @patch("abso.settings.windows.winreg")
     def test_apply_vbs_requires_reboot(self, mock_winreg):
         """Test that VBS changes require reboot."""
         mock_key = MagicMock()

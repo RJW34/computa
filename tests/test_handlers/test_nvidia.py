@@ -6,7 +6,7 @@ import pytest
 from unittest.mock import MagicMock, patch
 from pathlib import Path
 
-from gametune.settings.nvidia import NvidiaSettingsHandler, NvidiaSettingValues
+from abso.settings.nvidia import NvidiaSettingsHandler, NvidiaSettingValues
 
 
 class TestNvidiaSettingsHandler:
@@ -59,7 +59,7 @@ class TestNvidiaSettingsHandler:
 
     def test_presets_exist(self):
         """Test that all expected presets exist."""
-        from gametune.settings.nvidia import NVIDIA_PRESETS
+        from abso.settings.nvidia import NVIDIA_PRESETS
 
         assert "minimum_latency" in NVIDIA_PRESETS
         assert "low_latency_high_fps" in NVIDIA_PRESETS
@@ -67,7 +67,7 @@ class TestNvidiaSettingsHandler:
 
     def test_preset_minimum_latency_settings(self):
         """Test minimum_latency preset has expected settings."""
-        from gametune.settings.nvidia import NVIDIA_PRESETS
+        from abso.settings.nvidia import NVIDIA_PRESETS
 
         preset = NVIDIA_PRESETS["minimum_latency"]
         settings = preset.get("settings", {})
@@ -77,7 +77,7 @@ class TestNvidiaSettingsHandler:
 
     def test_preset_balanced_settings(self):
         """Test balanced preset has expected settings."""
-        from gametune.settings.nvidia import NVIDIA_PRESETS
+        from abso.settings.nvidia import NVIDIA_PRESETS
 
         preset = NVIDIA_PRESETS["balanced"]
         settings = preset.get("settings", {})
@@ -102,7 +102,7 @@ class TestNvidiaDetect:
         assert "npi_available" in result
         assert "current_settings" in result
 
-    @patch("gametune.settings.nvidia.subprocess.run")
+    @patch("abso.settings.nvidia.subprocess.run")
     def test_detect_gpu_info_parses_nvidia_smi(self, mock_run):
         """Test _detect_gpu_info parses nvidia-smi output."""
         mock_run.return_value = MagicMock(
@@ -117,7 +117,7 @@ class TestNvidiaDetect:
         assert result.get("driver_version") == "536.23"
         assert result.get("vram_total_mb") == 24564
 
-    @patch("gametune.settings.nvidia.subprocess.run")
+    @patch("abso.settings.nvidia.subprocess.run")
     def test_detect_gpu_info_handles_missing_nvidia_smi(self, mock_run):
         """Test _detect_gpu_info handles missing nvidia-smi."""
         mock_run.side_effect = FileNotFoundError("nvidia-smi not found")

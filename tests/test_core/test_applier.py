@@ -7,8 +7,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from gametune.core.applier import ProfileApplier, ApplyResult
-from gametune.core.exceptions import ProfileNotFoundError
+from abso.core.applier import ProfileApplier, ApplyResult
+from abso.core.exceptions import ProfileNotFoundError
 
 
 class TestApplyResultDataclass:

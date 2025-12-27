@@ -40,7 +40,7 @@ pip install -r requirements.txt
 Simply run A.B.S.O. without arguments to launch the interactive menu:
 
 ```powershell
-python -m gametune
+python -m abso
 ```
 
 You'll see a menu with options to:
@@ -56,24 +56,24 @@ For scripting or advanced users:
 
 ```powershell
 # Detect hardware
-python -m gametune detect
+python -m abso detect
 
 # Audit system configuration
-python -m gametune audit
-python -m gametune audit --verbose  # With detailed explanations
+python -m abso audit
+python -m abso audit --verbose  # With detailed explanations
 
 # List available profiles
-python -m gametune profiles
+python -m abso profiles
 
 # Apply a game profile
-python -m gametune apply slippi-melee
-python -m gametune apply rivals2
-python -m gametune apply cod-bo7
-python -m gametune apply diablo4
+python -m abso apply slippi-melee
+python -m abso apply rivals2
+python -m abso apply cod-bo7
+python -m abso apply diablo4
 
 # Restore from backup
-python -m gametune restore latest
-python -m gametune restore 20240115_143022  # Specific backup
+python -m abso restore latest
+python -m abso restore 20240115_143022  # Specific backup
 ```
 
 ## Available Game Profiles
@@ -141,14 +141,14 @@ Before applying any profile, A.B.S.O. automatically creates a backup of all sett
 If something doesn't work as expected, restore your previous settings:
 
 ```powershell
-python -m gametune restore latest
+python -m abso restore latest
 ```
 
 Or list and restore a specific backup:
 
 ```powershell
 # Backups are named by timestamp: YYYYMMDD_HHMMSS
-python -m gametune restore 20240115_143022
+python -m abso restore 20240115_143022
 ```
 
 ### Skip Backup (Not Recommended)
@@ -156,7 +156,7 @@ python -m gametune restore 20240115_143022
 If you really need to skip the backup:
 
 ```powershell
-python -m gametune apply slippi-melee --no-backup
+python -m abso apply slippi-melee --no-backup
 ```
 
 ## In-Game Settings
@@ -207,7 +207,7 @@ If automatic restore fails:
 ## Project Structure
 
 ```
-gametune/
+abso/
 ├── main.py              # CLI entry point
 ├── interactive.py       # Interactive menu system
 ├── core/

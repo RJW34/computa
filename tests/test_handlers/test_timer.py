@@ -6,7 +6,7 @@ import pytest
 from unittest.mock import MagicMock, patch, PropertyMock
 import ctypes
 
-from gametune.settings.timer import TimerSettingsHandler
+from abso.settings.timer import TimerSettingsHandler
 
 
 class TestTimerConversions:

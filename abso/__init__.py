@@ -1,0 +1,3 @@
+"""ABSO - Windows Gaming Optimization Tool."""
+
+__version__ = "0.1.0"

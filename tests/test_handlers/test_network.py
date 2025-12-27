@@ -6,7 +6,7 @@ import pytest
 from unittest.mock import MagicMock, patch, call
 import winreg
 
-from gametune.settings.network import NetworkSettingsHandler
+from abso.settings.network import NetworkSettingsHandler
 
 
 class TestNetworkRestore:
@@ -26,9 +26,9 @@ class TestNetworkRestore:
         result = handler.restore({"other_key": "value"})
         assert result is True
 
-    @patch("gametune.settings.network.winreg.OpenKey")
-    @patch("gametune.settings.network.winreg.SetValueEx")
-    @patch("gametune.settings.network.winreg.CloseKey")
+    @patch("abso.settings.network.winreg.OpenKey")
+    @patch("abso.settings.network.winreg.SetValueEx")
+    @patch("abso.settings.network.winreg.CloseKey")
     def test_restore_sets_values(self, mock_close, mock_set, mock_open):
         """Test restore sets registry values correctly."""
         mock_key = MagicMock()
@@ -51,10 +51,10 @@ class TestNetworkRestore:
         assert mock_set.call_count == 2
         mock_close.assert_called_once_with(mock_key)
 
-    @patch("gametune.settings.network.winreg.OpenKey")
-    @patch("gametune.settings.network.winreg.SetValueEx")
-    @patch("gametune.settings.network.winreg.DeleteValue")
-    @patch("gametune.settings.network.winreg.CloseKey")
+    @patch("abso.settings.network.winreg.OpenKey")
+    @patch("abso.settings.network.winreg.SetValueEx")
+    @patch("abso.settings.network.winreg.DeleteValue")
+    @patch("abso.settings.network.winreg.CloseKey")
     def test_restore_deletes_none_values(self, mock_close, mock_delete, mock_set, mock_open):
         """Test restore deletes values that were None in backup."""
         mock_key = MagicMock()
@@ -75,7 +75,7 @@ class TestNetworkRestore:
         assert result is True
         assert mock_delete.call_count == 2
 
-    @patch("gametune.settings.network.winreg.OpenKey")
+    @patch("abso.settings.network.winreg.OpenKey")
     def test_restore_handles_permission_error(self, mock_open):
         """Test restore handles PermissionError gracefully."""
         mock_open.side_effect = PermissionError("Access denied")
@@ -91,7 +91,7 @@ class TestNetworkRestore:
 
         assert result is False
 
-    @patch("gametune.settings.network.winreg.OpenKey")
+    @patch("abso.settings.network.winreg.OpenKey")
     def test_restore_handles_missing_interface(self, mock_open):
         """Test restore handles FileNotFoundError for missing interface."""
         mock_open.side_effect = FileNotFoundError("Interface not found")
