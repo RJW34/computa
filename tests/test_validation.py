@@ -4,9 +4,9 @@ import pytest
 
 from abso.utils.validation import (
     ValidationError,
+    validate_dword_value,
     validate_executable_name,
     validate_executable_path,
-    validate_dword_value,
     validate_priority_value,
     validate_registry_string,
 )

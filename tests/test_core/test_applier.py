@@ -2,12 +2,11 @@
 
 from __future__ import annotations
 
-from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
 
-from abso.core.applier import ProfileApplier, ApplyResult
+from abso.core.applier import ApplyResult, ProfileApplier
 from abso.core.exceptions import ProfileNotFoundError
 
 

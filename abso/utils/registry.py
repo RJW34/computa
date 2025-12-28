@@ -50,12 +50,12 @@ def read_registry_value(
         raise RegistryReadError(
             f"Permission denied reading {key_path}\\{value_name}",
             details=str(e)
-        )
+        ) from e
     except OSError as e:
         raise RegistryReadError(
             f"Failed to read {key_path}\\{value_name}",
             details=str(e)
-        )
+        ) from e
 
 
 def write_registry_value(
@@ -94,17 +94,17 @@ def write_registry_value(
         raise RegistryWriteError(
             f"Registry key not found: {key_path}",
             details=str(e)
-        )
+        ) from e
     except PermissionError as e:
         raise RegistryWriteError(
             f"Permission denied writing to {key_path}\\{value_name}",
             details=f"Run as administrator. ({e})"
-        )
+        ) from e
     except OSError as e:
         raise RegistryWriteError(
             f"Failed to write {key_path}\\{value_name}",
             details=str(e)
-        )
+        ) from e
 
 
 def delete_registry_value(
@@ -137,23 +137,23 @@ def delete_registry_value(
                 return False
             raise RegistryWriteError(
                 f"Value not found: {key_path}\\{value_name}"
-            )
+            ) from None
         finally:
             winreg.CloseKey(key)
     except FileNotFoundError:
         if ignore_missing:
             return False
-        raise RegistryWriteError(f"Key not found: {key_path}")
+        raise RegistryWriteError(f"Key not found: {key_path}") from None
     except PermissionError as e:
         raise RegistryWriteError(
             f"Permission denied deleting {key_path}\\{value_name}",
             details=f"Run as administrator. ({e})"
-        )
+        ) from e
     except OSError as e:
         raise RegistryWriteError(
             f"Failed to delete {key_path}\\{value_name}",
             details=str(e)
-        )
+        ) from e
 
 
 def key_exists(hive: int, key_path: str) -> bool:

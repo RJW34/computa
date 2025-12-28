@@ -39,7 +39,7 @@ class TimerSettingsHandler(SettingsHandler):
 
     def __init__(self) -> None:
         """Initialize timer settings handler."""
-        self._ntdll = None
+        self._ntdll: ctypes.WinDLL | None = None
         self._original_resolution: int | None = None
         self._load_ntdll()
 

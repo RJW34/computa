@@ -152,7 +152,7 @@ class BackupManager:
             raise BackupCorruptedError(
                 f"Backup manifest is corrupted: {backup_id}",
                 details=str(e)
-            )
+            ) from e
 
         # Create handler lookup
         handler_map = {

@@ -6,19 +6,17 @@ from pathlib import Path
 from unittest.mock import patch
 
 import pytest
-import yaml
 
 from abso.core.config import (
+    DEFAULT_CONFIG_NAME,
     ABSOConfig,
-    ProfileOverrides,
     ConfigManager,
+    ProfileOverrides,
     get_config,
     load_config,
-    DEFAULT_CONFIG_NAME,
 )
 from abso.core.exceptions import (
     ConfigLoadError,
-    ConfigSaveError,
     ConfigValidationError,
 )
 

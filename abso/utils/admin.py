@@ -46,7 +46,7 @@ def ensure_admin() -> None:
         sys.exit(0)
     except Exception as e:
         logger.error(f"Failed to elevate: {e}")
-        raise RuntimeError("Admin privileges required but elevation failed")
+        raise RuntimeError("Admin privileges required but elevation failed") from e
 
 
 def run_elevated(command: str) -> int:

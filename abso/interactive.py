@@ -254,7 +254,7 @@ def run_apply_profile(profile_id: str) -> None:
         progress.stop_task(backup_task)
 
         # Apply each handler
-        results = []
+        results: list[tuple[str, bool, str | None]] = []
         for handler in handlers:
             handler_name = handler.__class__.__name__.replace("SettingsHandler", "").replace("Handler", "")
             settings = profile.get_settings(handler.__class__.__name__)

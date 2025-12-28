@@ -223,12 +223,12 @@ class RegistrySettingsHandler(SettingsHandler):
             raise RegistryWriteError(
                 "Failed to set SystemResponsiveness",
                 details=f"Permission denied. Run as administrator. ({e})"
-            )
+            ) from e
         except OSError as e:
             raise RegistryWriteError(
                 "Failed to set SystemResponsiveness",
                 details=str(e)
-            )
+            ) from e
 
     def _get_network_throttling(self) -> int | None:
         """Get NetworkThrottlingIndex value."""
@@ -277,12 +277,12 @@ class RegistrySettingsHandler(SettingsHandler):
             raise RegistryWriteError(
                 "Failed to set NetworkThrottlingIndex",
                 details=f"Permission denied. Run as administrator. ({e})"
-            )
+            ) from e
         except OSError as e:
             raise RegistryWriteError(
                 "Failed to set NetworkThrottlingIndex",
                 details=str(e)
-            )
+            ) from e
 
     def _get_game_priority(self) -> dict[str, Any]:
         """Get game task priority settings."""
@@ -354,12 +354,12 @@ class RegistrySettingsHandler(SettingsHandler):
             raise RegistryWriteError(
                 "Failed to set game priority",
                 details=f"Permission denied. Run as administrator. ({e})"
-            )
+            ) from e
         except OSError as e:
             raise RegistryWriteError(
                 "Failed to set game priority",
                 details=str(e)
-            )
+            ) from e
 
     def _set_fullscreen_optimization(self, exe_path: str, disabled: bool) -> None:
         """Set fullscreen optimization for an executable.
@@ -402,12 +402,12 @@ class RegistrySettingsHandler(SettingsHandler):
             raise RegistryWriteError(
                 f"Failed to set fullscreen optimization for {exe_path}",
                 details=f"Permission denied. ({e})"
-            )
+            ) from e
         except OSError as e:
             raise RegistryWriteError(
                 f"Failed to set fullscreen optimization for {exe_path}",
                 details=str(e)
-            )
+            ) from e
 
     def _get_win32_priority_separation(self) -> int | None:
         """Get Win32PrioritySeparation value (scheduler quantum settings)."""
@@ -457,9 +457,9 @@ class RegistrySettingsHandler(SettingsHandler):
             raise RegistryWriteError(
                 "Failed to set Win32PrioritySeparation",
                 details=f"Permission denied. Run as administrator. ({e})"
-            )
+            ) from e
         except OSError as e:
             raise RegistryWriteError(
                 "Failed to set Win32PrioritySeparation",
                 details=str(e)
-            )
+            ) from e

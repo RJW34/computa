@@ -2,16 +2,11 @@
 
 from __future__ import annotations
 
-import pytest
 from unittest.mock import MagicMock, patch
-from pathlib import Path
 
-from abso.settings.nvidia import NvidiaSettingsHandler, NvidiaSettingValues
+from abso.settings.nvidia import NvidiaSettingsHandler
 from abso.settings.nvidia.parsing import (
     parse_low_latency_value,
-    parse_power_management_value,
-    parse_vsync_value,
-    parse_shader_cache_value,
 )
 from abso.settings.nvidia.profiles import get_setting_value
 

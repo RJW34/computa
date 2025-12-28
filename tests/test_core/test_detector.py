@@ -3,9 +3,7 @@
 from __future__ import annotations
 
 import subprocess
-from unittest.mock import MagicMock, patch, PropertyMock
-
-import pytest
+from unittest.mock import MagicMock, patch
 
 from abso.core.detector import HardwareDetector, _parse_edid_for_vrr
 

@@ -1,11 +1,9 @@
 """Tests for MemorySettingsHandler."""
 
-import pytest
-from unittest.mock import patch, MagicMock
 import winreg
+from unittest.mock import MagicMock, patch
 
 from abso.settings.memory import MemorySettingsHandler
-from abso.core.models import Issue
 
 
 class TestMemoryDetect:

@@ -365,12 +365,12 @@ class ProcessPriorityHandler(SettingsHandler):
             raise RegistryWriteError(
                 f"Failed to set process settings for {exe_name}",
                 details=f"Permission denied. Run as administrator. ({e})"
-            )
+            ) from e
         except OSError as e:
             raise RegistryWriteError(
                 f"Failed to set process settings for {exe_name}",
                 details=str(e)
-            )
+            ) from e
 
         return {
             "success": True,

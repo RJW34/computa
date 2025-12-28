@@ -2,9 +2,7 @@
 
 from __future__ import annotations
 
-import pytest
-from unittest.mock import MagicMock, patch, PropertyMock
-import ctypes
+from unittest.mock import patch
 
 from abso.settings.timer import TimerSettingsHandler
 

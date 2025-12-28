@@ -1,10 +1,8 @@
 """Tests for PowerSettingsHandler."""
 
-import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 from abso.settings.power import PowerSettingsHandler
-from abso.core.models import Issue
 
 
 class TestPowerDetect:

@@ -1,11 +1,9 @@
 """Tests for MouseSettingsHandler."""
 
-import pytest
-from unittest.mock import patch, MagicMock
 import winreg
+from unittest.mock import MagicMock, patch
 
 from abso.settings.mouse import MouseSettingsHandler
-from abso.core.models import Issue
 
 
 class TestMouseDetect:

@@ -3,14 +3,12 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime
-from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
 
 from abso.core.backup import BackupManager
-from abso.core.exceptions import BackupNotFoundError, BackupCorruptedError
+from abso.core.exceptions import BackupCorruptedError, BackupNotFoundError
 
 
 class TestBackupManagerInit:

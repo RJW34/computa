@@ -216,7 +216,7 @@ def games() -> None:
         for profile_name, matched_games in suggestions.items():
             game_names = ", ".join(g.name for g in matched_games)
             console.print(f"  [green]{profile_name}[/green] -> {game_names}")
-        console.print(f"\nRun [bold]abso apply <profile>[/bold] to optimize.")
+        console.print("\nRun [bold]abso apply <profile>[/bold] to optimize.")
 
 
 @cli.command()
@@ -396,7 +396,7 @@ def config(init: bool, show: bool) -> None:
     if show:
         if not config_manager.config_path.exists():
             console.print("[yellow]No configuration file found.[/yellow]")
-            console.print(f"Run [bold]abso config --init[/bold] to create one.")
+            console.print("Run [bold]abso config --init[/bold] to create one.")
             return
 
         console.print(Panel("Current Configuration", style="bold blue"))

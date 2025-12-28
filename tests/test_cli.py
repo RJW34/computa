@@ -1,8 +1,8 @@
 """CLI smoke tests for A.B.S.O."""
 
-import pytest
+from unittest.mock import MagicMock, patch
+
 from click.testing import CliRunner
-from unittest.mock import patch, MagicMock
 
 from abso.main import cli
 

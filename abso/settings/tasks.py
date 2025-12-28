@@ -4,10 +4,13 @@ from __future__ import annotations
 
 import logging
 import subprocess
-from typing import Any
+from typing import Any, Literal, cast
 
 from abso.core.models import Issue
 from abso.settings.base import SettingsHandler
+
+# Type alias for severity levels
+SeverityType = Literal["critical", "warning", "info"]
 
 logger = logging.getLogger(__name__)
 
@@ -100,10 +103,10 @@ class TasksSettingsHandler(SettingsHandler):
             if state == "Ready" and optimal_state == "Disabled":
                 issues.append(Issue(
                     title=f"{config['display_name']} is enabled",
-                    severity=config["severity"],
+                    severity=cast(SeverityType, config["severity"]),
                     current_value="Enabled",
                     optimal_value="Disabled",
-                    explanation=config["description"],
+                    explanation=str(config["description"]),
                     category="tasks",
                 ))
 
@@ -178,7 +181,7 @@ class TasksSettingsHandler(SettingsHandler):
 
     def _get_task_info(self, task_path: str) -> dict[str, Any]:
         """Get information about a scheduled task."""
-        result = {
+        result: dict[str, Any] = {
             "exists": False,
             "state": None,
             "last_run": None,

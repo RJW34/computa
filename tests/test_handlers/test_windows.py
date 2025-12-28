@@ -1,11 +1,9 @@
 """Tests for WindowsSettingsHandler."""
 
-import pytest
-from unittest.mock import patch, MagicMock
 import winreg
+from unittest.mock import MagicMock, patch
 
 from abso.settings.windows import WindowsSettingsHandler
-from abso.core.models import Issue
 
 
 class TestWindowsDetect:

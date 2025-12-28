@@ -127,7 +127,7 @@ def validate_executable_path(exe_path: str) -> str:
     try:
         path = PureWindowsPath(exe_path)
     except Exception as e:
-        raise ValidationError(f"Invalid path format: {e}")
+        raise ValidationError(f"Invalid path format: {e}") from e
 
     # Must be an absolute path or just a filename
     # Relative paths with .. are suspicious

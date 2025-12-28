@@ -1,19 +1,20 @@
 """Tests for registry utility functions."""
 
-import pytest
-from unittest.mock import patch, MagicMock
 import winreg
+from unittest.mock import MagicMock, patch
 
+import pytest
+
+from abso.core.exceptions import RegistryReadError, RegistryWriteError
 from abso.utils.registry import (
-    read_registry_value,
-    write_registry_value,
     delete_registry_value,
     key_exists,
-    value_exists,
     read_registry_dword,
     read_registry_string,
+    read_registry_value,
+    value_exists,
+    write_registry_value,
 )
-from abso.core.exceptions import RegistryReadError, RegistryWriteError
 
 
 class TestReadRegistryValue:

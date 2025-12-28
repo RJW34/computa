@@ -1,11 +1,9 @@
 """Tests for GraphicsSettingsHandler."""
 
-import pytest
-from unittest.mock import patch, MagicMock
 import winreg
+from unittest.mock import MagicMock, patch
 
 from abso.settings.graphics import GraphicsSettingsHandler
-from abso.core.models import Issue
 
 
 class TestGraphicsDetect:

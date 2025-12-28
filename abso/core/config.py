@@ -164,17 +164,17 @@ class ConfigManager:
             raise ConfigLoadError(
                 "Failed to parse configuration file",
                 details=str(e)
-            )
+            ) from e
         except TypeError as e:
             raise ConfigValidationError(
                 "Invalid configuration structure",
                 details=str(e)
-            )
+            ) from e
         except OSError as e:
             raise ConfigLoadError(
                 "Failed to read configuration file",
                 details=str(e)
-            )
+            ) from e
 
     def save(self, config: ABSOConfig | None = None) -> None:
         """Save configuration to file.
@@ -215,7 +215,7 @@ class ConfigManager:
             raise ConfigSaveError(
                 "Failed to write configuration file",
                 details=str(e)
-            )
+            ) from e
 
     def create_default(self) -> None:
         """Create a default configuration file with comments."""
@@ -271,7 +271,7 @@ confirm_destructive: true
             raise ConfigSaveError(
                 "Failed to create default configuration",
                 details=str(e)
-            )
+            ) from e
 
     def validate(self, config: ABSOConfig | None = None) -> list[str]:
         """Validate configuration and return list of warnings.

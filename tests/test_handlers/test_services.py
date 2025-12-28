@@ -1,10 +1,8 @@
 """Tests for ServicesSettingsHandler."""
 
-import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 from abso.settings.services import ServicesSettingsHandler
-from abso.core.models import Issue
 
 
 class TestServicesDetect:

@@ -4,10 +4,13 @@ from __future__ import annotations
 
 import logging
 import subprocess
-from typing import Any
+from typing import Any, Literal, cast
 
 from abso.core.models import Issue
 from abso.settings.base import SettingsHandler
+
+# Type alias for severity levels
+SeverityType = Literal["critical", "warning", "info"]
 
 logger = logging.getLogger(__name__)
 
@@ -109,15 +112,15 @@ class ServicesSettingsHandler(SettingsHandler):
 
             # Check if service is running or set to auto-start when it shouldn't be
             if start_type is not None and start_type < optimal_start_type:
-                current_state = self._start_type_to_string(start_type)
-                optimal_state = self._start_type_to_string(optimal_start_type)
+                current_state = self._start_type_to_string(cast(int, start_type))
+                optimal_state = self._start_type_to_string(cast(int, optimal_start_type))
 
                 issues.append(Issue(
                     title=f"{config['display_name']} is {current_state}",
-                    severity=config["severity"],
+                    severity=cast(SeverityType, config["severity"]),
                     current_value=current_state,
                     optimal_value=optimal_state,
-                    explanation=config["description"],
+                    explanation=str(config["description"]),
                     category="services",
                 ))
 
@@ -146,12 +149,13 @@ class ServicesSettingsHandler(SettingsHandler):
             if settings.get("preset") == "gaming":
                 # Apply optimal settings for all gaming services
                 for service_name, config in self.GAMING_SERVICES.items():
-                    result = self._set_service_start_type(service_name, config["optimal_start_type"])
+                    optimal_start = cast(int, config["optimal_start_type"])
+                    result = self._set_service_start_type(service_name, optimal_start)
                     if not result["success"]:
                         errors.append(result.get("error", f"Failed to configure {service_name}"))
                     else:
                         # Stop the service if we're disabling it
-                        if config["optimal_start_type"] == self.START_DISABLED:
+                        if optimal_start == self.START_DISABLED:
                             self._stop_service(service_name)
 
             elif "services" in settings:
