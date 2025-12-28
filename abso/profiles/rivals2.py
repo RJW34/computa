@@ -143,6 +143,32 @@ class Rivals2Profile(BaseProfile):
 
     def get_in_game_settings(self) -> list[dict[str, str]]:
         return [
+            # Nvidia Control Panel settings (must be set manually)
+            {
+                "category": "Nvidia Control Panel",
+                "setting": "Monitor Technology",
+                "value": "Fixed Refresh",
+                "reason": "Set in Display > Change resolution. Fixed refresh for lowest latency in competitive play.",
+            },
+            {
+                "category": "Nvidia Control Panel",
+                "setting": "G-SYNC",
+                "value": "Off (for competitive)",
+                "reason": "Set in Display > Set up G-SYNC. Disable for minimum input lag in fighting games.",
+            },
+            {
+                "category": "Nvidia Control Panel",
+                "setting": "Preferred refresh rate",
+                "value": "Highest available",
+                "reason": "Set in Display > Change resolution. Use your monitor's max refresh rate.",
+            },
+            {
+                "category": "Nvidia Control Panel",
+                "setting": "Vertical sync (per-game)",
+                "value": "Off",
+                "reason": "Manage 3D settings > Program Settings > Add RivalsOfAether2-Win64-Shipping.exe > VSync Off.",
+            },
+            # In-game video settings
             {
                 "category": "Video",
                 "setting": "Display Mode",
