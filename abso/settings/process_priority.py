@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import logging
 import winreg
 from typing import Any
@@ -245,25 +246,17 @@ class ProcessPriorityHandler(SettingsHandler):
                 winreg.KEY_READ
             )
             try:
-                try:
+                with contextlib.suppress(FileNotFoundError):
                     result["gpu_priority"] = winreg.QueryValueEx(key, "GpuPriority")[0]
-                except FileNotFoundError:
-                    pass
 
-                try:
+                with contextlib.suppress(FileNotFoundError):
                     result["cpu_priority"] = winreg.QueryValueEx(key, "CpuPriorityClass")[0]
-                except FileNotFoundError:
-                    pass
 
-                try:
+                with contextlib.suppress(FileNotFoundError):
                     result["io_priority"] = winreg.QueryValueEx(key, "IoPriority")[0]
-                except FileNotFoundError:
-                    pass
 
-                try:
+                with contextlib.suppress(FileNotFoundError):
                     result["page_priority"] = winreg.QueryValueEx(key, "PagePriority")[0]
-                except FileNotFoundError:
-                    pass
 
             finally:
                 winreg.CloseKey(key)
@@ -320,8 +313,6 @@ class ProcessPriorityHandler(SettingsHandler):
                 "PagePriority",
                 valid_values={0, 1, 2, 3, 4, 5}
             )
-
-        errors: list[str] = []
 
         try:
             # Create the executable key if it doesn't exist

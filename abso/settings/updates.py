@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import logging
 import winreg
 from typing import Any
@@ -190,14 +191,10 @@ class UpdatesSettingsHandler(SettingsHandler):
                 0,
                 winreg.KEY_READ
             )
-            try:
+            with contextlib.suppress(FileNotFoundError):
                 result["start"] = winreg.QueryValueEx(key, "ActiveHoursStart")[0]
-            except FileNotFoundError:
-                pass
-            try:
+            with contextlib.suppress(FileNotFoundError):
                 result["end"] = winreg.QueryValueEx(key, "ActiveHoursEnd")[0]
-            except FileNotFoundError:
-                pass
             winreg.CloseKey(key)
         except FileNotFoundError:
             pass

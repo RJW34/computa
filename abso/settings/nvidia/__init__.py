@@ -13,6 +13,7 @@ Example usage:
 
 from __future__ import annotations
 
+import contextlib
 import logging
 import subprocess
 import tempfile
@@ -275,10 +276,8 @@ class NvidiaSettingsHandler(SettingsHandler):
 
             # Get current settings for metadata
             current_settings = {}
-            try:
+            with contextlib.suppress(Exception):
                 current_settings = self._npi.read_current_settings()
-            except Exception:
-                pass
 
             logger.info(f"Nvidia profile backed up to: {backup_path}")
 
@@ -343,10 +342,8 @@ class NvidiaSettingsHandler(SettingsHandler):
                 result["gpu_name"] = parts[0] if len(parts) > 0 else None
                 result["driver_version"] = parts[1] if len(parts) > 1 else None
                 if len(parts) > 2:
-                    try:
+                    with contextlib.suppress(ValueError):
                         result["vram_total_mb"] = int(float(parts[2]))
-                    except ValueError:
-                        pass
         except FileNotFoundError:
             logger.debug("nvidia-smi not found - Nvidia GPU may not be present")
         except subprocess.TimeoutExpired:

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import logging
 import winreg
 from typing import Any
@@ -160,10 +161,8 @@ class GraphicsSettingsHandler(SettingsHandler):
                 winreg.SetValueEx(key, "OverlayTestMode", 0, winreg.REG_DWORD, 5)
             else:
                 # Remove the key to re-enable MPO
-                try:
+                with contextlib.suppress(FileNotFoundError):
                     winreg.DeleteValue(key, "OverlayTestMode")
-                except FileNotFoundError:
-                    pass
         finally:
             winreg.CloseKey(key)
 

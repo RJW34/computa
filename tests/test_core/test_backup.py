@@ -191,7 +191,7 @@ class TestRestoreBackup:
             manager.create_backup()
             import time
             time.sleep(0.1)  # Ensure different timestamp
-            backup_id2 = manager.create_backup()
+            manager.create_backup()  # Second backup
 
             # Update handler backup data
             mock_handler.backup.return_value = {"version": 2}

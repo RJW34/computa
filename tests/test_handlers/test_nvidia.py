@@ -111,9 +111,9 @@ class TestNvidiaDetect:
         """Test detect returns dict with expected keys."""
         handler = NvidiaSettingsHandler()
 
-        with patch.object(handler, "_detect_gpu_info", return_value={"gpu_name": None}):
-            with patch.object(handler, "_check_npi_available", return_value=False):
-                result = handler.detect()
+        with (patch.object(handler, "_detect_gpu_info", return_value={"gpu_name": None}),
+              patch.object(handler, "_check_npi_available", return_value=False)):
+            result = handler.detect()
 
         assert "driver_version" in result
         assert "gpu_name" in result

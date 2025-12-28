@@ -135,18 +135,17 @@ class TasksSettingsHandler(SettingsHandler):
                 for task_path, config in self.GAMING_TASKS.items():
                     if config["optimal_state"] == "Disabled":
                         result = self._set_task_enabled(task_path, False)
-                        if not result["success"]:
-                            # Don't treat missing tasks as errors
-                            if "does not exist" not in result.get("error", "").lower():
-                                errors.append(result.get("error", f"Failed to disable {task_path}"))
+                        if (not result["success"]
+                                and "does not exist" not in result.get("error", "").lower()):
+                            errors.append(result.get("error", f"Failed to disable {task_path}"))
 
             elif "tasks" in settings:
                 for task_path, task_settings in settings["tasks"].items():
                     if "enabled" in task_settings:
                         result = self._set_task_enabled(task_path, task_settings["enabled"])
-                        if not result["success"]:
-                            if "does not exist" not in result.get("error", "").lower():
-                                errors.append(result.get("error", f"Failed to configure {task_path}"))
+                        if (not result["success"]
+                                and "does not exist" not in result.get("error", "").lower()):
+                            errors.append(result.get("error", f"Failed to configure {task_path}"))
 
         except PermissionError as e:
             errors.append(f"Permission denied (requires admin): {e}")

@@ -210,10 +210,10 @@ class MouseSettingsHandler(SettingsHandler):
         thresh2 = self._get_mouse_threshold(2)
 
         # EPP is enabled if speed >= 1 and thresholds are non-zero
-        if speed is not None and speed >= 1:
-            if (thresh1 is not None and thresh1 > 0) or (thresh2 is not None and thresh2 > 0):
-                return True
-        return False
+        return bool(
+            speed is not None and speed >= 1
+            and ((thresh1 is not None and thresh1 > 0) or (thresh2 is not None and thresh2 > 0))
+        )
 
     def _get_smooth_curve(self, curve_name: str) -> list[int] | None:
         """Get SmoothMouseXCurve or SmoothMouseYCurve as list of bytes."""
@@ -241,9 +241,7 @@ class MouseSettingsHandler(SettingsHandler):
         # - MouseSpeed = 1 but both thresholds are 0
         if speed == 0:
             return True
-        if speed == 1 and thresh1 == 0 and thresh2 == 0:
-            return True
-        return False
+        return bool(speed == 1 and thresh1 == 0 and thresh2 == 0)
 
     def _is_curve_linear(self, curve: list[int] | None) -> bool:
         """Check if a curve is linear (matches our linear curve)."""

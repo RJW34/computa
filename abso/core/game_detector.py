@@ -177,8 +177,8 @@ def _detect_epic_games() -> list[InstalledGame]:
 
     # Epic Games default install locations
     epic_paths = [
-        Path(os.environ.get("ProgramFiles", "C:\\Program Files")) / "Epic Games",
-        Path(os.environ.get("ProgramFiles(x86)", "C:\\Program Files (x86)")) / "Epic Games",
+        Path(os.environ.get("PROGRAMFILES", "C:\\Program Files")) / "Epic Games",
+        Path(os.environ.get("PROGRAMFILES(X86)", "C:\\Program Files (x86)")) / "Epic Games",
         Path("D:\\Epic Games"),
         Path("E:\\Epic Games"),
     ]

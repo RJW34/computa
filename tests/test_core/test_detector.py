@@ -221,9 +221,9 @@ class TestDetectMonitors:
         """Test monitor detection handles ImportError gracefully."""
         detector = HardwareDetector()
 
-        with patch.dict("sys.modules", {"win32api": None}):
-            with patch("builtins.__import__", side_effect=ImportError):
-                result = detector.detect_monitors()
+        with (patch.dict("sys.modules", {"win32api": None}),
+              patch("builtins.__import__", side_effect=ImportError)):
+            result = detector.detect_monitors()
 
         # Should return empty list, not raise
         assert isinstance(result, list)

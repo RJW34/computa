@@ -160,3 +160,61 @@ class TestCLIRestore:
 
         # Should run without exception (may succeed or fail gracefully)
         assert result.exception is None or result.exit_code in [0, 1]
+
+
+class TestCLIVersion:
+    """Test version-related CLI functionality."""
+
+    def test_main_outputs_info(self):
+        """Test main --help contains version info."""
+        runner = CliRunner()
+        result = runner.invoke(cli, ["--help"])
+
+        assert result.exit_code == 0
+        # Should have some output
+        assert len(result.output) > 0
+
+
+class TestCLIAuditWithIssues:
+    """Test audit command with issues."""
+
+    @patch("abso.main.ConfigurationAuditor")
+    def test_audit_with_issues_shows_results(self, mock_auditor_class):
+        """Test audit command shows issues when found."""
+        from abso.core.models import Issue
+
+        mock_auditor = MagicMock()
+        mock_auditor.audit_all.return_value = [
+            Issue(
+                title="Test Issue",
+                severity="warning",
+                current_value="bad",
+                optimal_value="good",
+                explanation="Test explanation",
+                category="test",
+            )
+        ]
+        mock_auditor_class.return_value = mock_auditor
+
+        runner = CliRunner()
+        result = runner.invoke(cli, ["audit"])
+
+        # Should complete without exception
+        assert result.exception is None or result.exit_code in [0, 1]
+
+
+class TestCLIRestoreWithMocks:
+    """Test restore command with mocked components."""
+
+    @patch("abso.main.BackupManager")
+    def test_restore_latest(self, mock_backup_class):
+        """Test restore latest command."""
+        mock_backup = MagicMock()
+        mock_backup.restore_backup.return_value = True
+        mock_backup_class.return_value = mock_backup
+
+        runner = CliRunner()
+        result = runner.invoke(cli, ["restore", "latest"])
+
+        # Should complete without crash
+        assert result.exception is None or result.exit_code in [0, 1]

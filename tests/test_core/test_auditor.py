@@ -191,10 +191,10 @@ class TestAuditCategory:
             )
         ]
 
-        with patch("abso.core.auditor._get_handlers", return_value=[]):
-            with patch("abso.settings.windows.WindowsSettingsHandler", return_value=mock_handler):
-                auditor = ConfigurationAuditor()
-                issues = auditor.audit_category("windows")
+        with (patch("abso.core.auditor._get_handlers", return_value=[]),
+              patch("abso.settings.windows.WindowsSettingsHandler", return_value=mock_handler)):
+            auditor = ConfigurationAuditor()
+            issues = auditor.audit_category("windows")
 
         assert len(issues) == 1
         assert issues[0].category == "windows"

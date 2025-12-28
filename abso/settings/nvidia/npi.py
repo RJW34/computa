@@ -141,8 +141,8 @@ class NPIManager:
             Path.home() / "nvidiaProfileInspector" / "nvidiaProfileInspector.exe",
             Path.home() / "Tools" / "nvidiaProfileInspector" / "nvidiaProfileInspector.exe",
             # Program Files
-            Path(os.environ.get("ProgramFiles", "C:\\Program Files")) / "nvidiaProfileInspector" / "nvidiaProfileInspector.exe",
-            Path(os.environ.get("ProgramFiles(x86)", "C:\\Program Files (x86)")) / "nvidiaProfileInspector" / "nvidiaProfileInspector.exe",
+            Path(os.environ.get("PROGRAMFILES", "C:\\Program Files")) / "nvidiaProfileInspector" / "nvidiaProfileInspector.exe",
+            Path(os.environ.get("PROGRAMFILES(X86)", "C:\\Program Files (x86)")) / "nvidiaProfileInspector" / "nvidiaProfileInspector.exe",
             # Local AppData
             Path(os.environ.get("LOCALAPPDATA", "")) / "nvidiaProfileInspector" / "nvidiaProfileInspector.exe",
         ]

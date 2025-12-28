@@ -1,8 +1,6 @@
 """Tests for ProcessPriorityHandler."""
 
-from unittest.mock import patch, MagicMock
-
-import pytest
+from unittest.mock import patch
 
 from abso.settings.process_priority import ProcessPriorityHandler
 

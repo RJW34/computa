@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import logging
 import subprocess
 import winreg
@@ -70,7 +71,7 @@ class NetworkSettingsHandler(SettingsHandler):
 
         # Check each interface for Nagle settings
         nagle_enabled = False
-        for iface_guid, settings in interfaces.items():
+        for _iface_guid, settings in interfaces.items():
             if settings.get("tcp_no_delay") != 1:
                 nagle_enabled = True
                 break
@@ -211,10 +212,8 @@ class NetworkSettingsHandler(SettingsHandler):
                         winreg.SetValueEx(key, "TcpAckFrequency", 0, winreg.REG_DWORD, tcp_ack)
                     else:
                         # Value was not set originally, try to delete if it exists
-                        try:
+                        with contextlib.suppress(FileNotFoundError):
                             winreg.DeleteValue(key, "TcpAckFrequency")
-                        except FileNotFoundError:
-                            pass
 
                     # Restore TCPNoDelay
                     tcp_no_delay = settings.get("tcp_no_delay")
@@ -222,10 +221,8 @@ class NetworkSettingsHandler(SettingsHandler):
                         winreg.SetValueEx(key, "TCPNoDelay", 0, winreg.REG_DWORD, tcp_no_delay)
                     else:
                         # Value was not set originally, try to delete if it exists
-                        try:
+                        with contextlib.suppress(FileNotFoundError):
                             winreg.DeleteValue(key, "TCPNoDelay")
-                        except FileNotFoundError:
-                            pass
 
                     logger.debug(f"Restored network settings for interface {guid}")
                 finally:

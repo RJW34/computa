@@ -29,7 +29,7 @@ class TestServicesDetect:
         mock_get_info.return_value = {"exists": True, "start_type": 2}
 
         handler = ServicesSettingsHandler()
-        result = handler.detect()
+        handler.detect()
 
         # Should have queried each service in GAMING_SERVICES
         assert mock_get_info.call_count == len(handler.GAMING_SERVICES)

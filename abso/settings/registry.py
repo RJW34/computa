@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import logging
 import winreg
 from typing import Any
@@ -295,20 +296,14 @@ class RegistrySettingsHandler(SettingsHandler):
                 0,
                 winreg.KEY_READ
             )
-            try:
+            with contextlib.suppress(FileNotFoundError):
                 result["gpu_priority"] = winreg.QueryValueEx(key, "GPU Priority")[0]
-            except FileNotFoundError:
-                pass
 
-            try:
+            with contextlib.suppress(FileNotFoundError):
                 result["priority"] = winreg.QueryValueEx(key, "Priority")[0]
-            except FileNotFoundError:
-                pass
 
-            try:
+            with contextlib.suppress(FileNotFoundError):
                 result["scheduling_category"] = winreg.QueryValueEx(key, "Scheduling Category")[0]
-            except FileNotFoundError:
-                pass
 
             winreg.CloseKey(key)
         except Exception as e:
@@ -392,10 +387,8 @@ class RegistrySettingsHandler(SettingsHandler):
                         "~ DISABLEDXMAXIMIZEDWINDOWEDMODE"
                     )
                 else:
-                    try:
+                    with contextlib.suppress(FileNotFoundError):
                         winreg.DeleteValue(key, exe_path)
-                    except FileNotFoundError:
-                        pass
             finally:
                 winreg.CloseKey(key)
         except PermissionError as e:

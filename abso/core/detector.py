@@ -353,7 +353,7 @@ def _parse_edid_for_vrr(edid: bytes) -> dict[str, Any]:
 
         # CTA-861 extension (0x02) - contains VRR/FreeSync data blocks
         if ext_tag == 0x02:
-            revision = edid[offset + 1]
+            _revision = edid[offset + 1]  # noqa: F841 - reserved for future use
             dtd_offset = edid[offset + 2]
 
             if dtd_offset < 4:
@@ -391,7 +391,7 @@ def _parse_edid_for_vrr(edid: bytes) -> dict[str, Any]:
 
                 # Extended tag block (tag 7)
                 if tag == 7 and length >= 1 and db_offset + 1 < len(edid):
-                    ext_code = edid[db_offset + 1]
+                    _ext_code = edid[db_offset + 1]  # noqa: F841 - reserved for future use
                     # Various VRR-related extended tags could be here
 
                 db_offset += length + 1
@@ -790,9 +790,10 @@ class HardwareDetector:
                                 if mode.DisplayFrequency > max_refresh_any_res:
                                     max_refresh_any_res = mode.DisplayFrequency
                                 # Check if this mode matches current resolution
-                                if mode.PelsWidth == current_width and mode.PelsHeight == current_height:
-                                    if mode.DisplayFrequency > max_refresh_rate:
-                                        max_refresh_rate = mode.DisplayFrequency
+                                if (mode.PelsWidth == current_width
+                                    and mode.PelsHeight == current_height
+                                    and mode.DisplayFrequency > max_refresh_rate):
+                                    max_refresh_rate = mode.DisplayFrequency
                                 mode_index += 1
                             except pywintypes.error:
                                 break
@@ -819,12 +820,10 @@ class HardwareDetector:
                     # Method 3: Check NVIDIA registry for G-Sync compatible status
                     if not vrr_info.get("vrr_supported"):
                         gsync_registry = _detect_gsync_from_nvidia_registry()
-                        if gsync_registry.get("gsync_enabled_globally"):
-                            # G-Sync compatible mode is enabled system-wide
-                            # This suggests the monitor supports VRR
-                            if max_refresh_rate > 60:
-                                vrr_info["vrr_supported"] = True
-                                vrr_info["vrr_type"] = "gsync_compatible"
+                        # G-Sync compatible mode enabled system-wide suggests VRR support
+                        if gsync_registry.get("gsync_enabled_globally") and max_refresh_rate > 60:
+                            vrr_info["vrr_supported"] = True
+                            vrr_info["vrr_type"] = "gsync_compatible"
 
                     # Method 4: Fall back to heuristics
                     if vrr_info.get("vrr_supported") is None:

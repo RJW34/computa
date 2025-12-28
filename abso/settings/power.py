@@ -58,17 +58,16 @@ class PowerSettingsHandler(SettingsHandler):
             self.ULTIMATE_PERFORMANCE_GUID.lower(),
         ]
 
-        if active_guid not in performance_guids:
-            # Check for custom high performance plans
-            if "performance" not in active_plan.get("name", "").lower():
-                issues.append(Issue(
-                    title="Not using a performance power plan",
-                    severity="warning",
-                    current_value=active_plan.get("name", "Unknown"),
-                    optimal_value="Ultimate Performance or High Performance",
-                    explanation="Performance power plans prevent CPU throttling and power-saving delays.",
-                    category="power",
-                ))
+        if (active_guid not in performance_guids
+                and "performance" not in active_plan.get("name", "").lower()):
+            issues.append(Issue(
+                title="Not using a performance power plan",
+                severity="warning",
+                current_value=active_plan.get("name", "Unknown"),
+                optimal_value="Ultimate Performance or High Performance",
+                explanation="Performance power plans prevent CPU throttling and power-saving delays.",
+                category="power",
+            ))
 
         # Check if Ultimate Performance is available
         if not current.get("has_ultimate_performance"):
@@ -89,9 +88,8 @@ class PowerSettingsHandler(SettingsHandler):
 
         try:
             # Create Ultimate Performance if requested and not present
-            if settings.get("ensure_ultimate_performance"):
-                if not self._has_ultimate_performance():
-                    self._create_ultimate_performance()
+            if settings.get("ensure_ultimate_performance") and not self._has_ultimate_performance():
+                self._create_ultimate_performance()
 
             # Set active plan
             if "active_plan" in settings:
