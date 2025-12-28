@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from abso.profiles.cod_bo7 import CodBo7Profile
 from abso.profiles.diablo4 import Diablo4Profile
+from abso.profiles.pokemon_auto_chess import PokemonAutoChessProfile
 from abso.profiles.slippi_melee import SlippiMeleeProfile
 
 
@@ -27,6 +28,12 @@ class TestProfileLoading:
         profile = Diablo4Profile()
         assert profile.profile_id == "diablo4"
         assert profile.display_name == "Diablo 4"
+
+    def test_pokemon_auto_chess_profile_loads(self):
+        """Test PokemonAutoChessProfile can be instantiated."""
+        profile = PokemonAutoChessProfile()
+        assert profile.profile_id == "pokemon-auto-chess"
+        assert profile.display_name == "Pokemon Auto Chess"
 
 
 class TestProfileHandlers:
@@ -62,6 +69,19 @@ class TestProfileHandlers:
         assert isinstance(handlers, list)
         assert len(handlers) > 0
 
+    def test_pokemon_auto_chess_get_handlers_returns_list(self):
+        """Test PokemonAutoChessProfile.get_handlers returns handlers."""
+        profile = PokemonAutoChessProfile()
+        handlers = profile.get_handlers()
+
+        assert isinstance(handlers, list)
+        assert len(handlers) > 0
+
+        handler_names = [h.__class__.__name__ for h in handlers]
+        assert "WindowsSettingsHandler" in handler_names
+        assert "NvidiaSettingsHandler" in handler_names
+        assert "NetworkSettingsHandler" in handler_names
+
 
 class TestProfileSettings:
     """Test profile settings retrieval."""
@@ -96,6 +116,30 @@ class TestProfileSettings:
 
         assert settings["preset"] == "balanced"
 
+    def test_pokemon_auto_chess_nvidia_settings(self):
+        """Test PokemonAutoChessProfile returns Nvidia settings with balanced preset."""
+        profile = PokemonAutoChessProfile()
+        settings = profile.get_settings("NvidiaSettingsHandler")
+
+        assert settings["preset"] == "balanced"
+
+    def test_pokemon_auto_chess_windows_settings(self):
+        """Test PokemonAutoChessProfile returns Windows settings."""
+        profile = PokemonAutoChessProfile()
+        settings = profile.get_settings("WindowsSettingsHandler")
+
+        assert settings["game_mode"] is True
+        assert settings["game_bar"] is False
+        assert settings["game_dvr"] is False
+
+    def test_pokemon_auto_chess_network_settings(self):
+        """Test PokemonAutoChessProfile returns Network settings for online play."""
+        profile = PokemonAutoChessProfile()
+        settings = profile.get_settings("NetworkSettingsHandler")
+
+        assert settings["disable_nagle"] is True
+        assert settings["preset"] == "gaming"
+
     def test_unknown_handler_returns_empty(self):
         """Test that unknown handler name returns empty dict."""
         profile = SlippiMeleeProfile()
@@ -129,3 +173,94 @@ class TestProfileInGameSettings:
 
         reflex_settings = [s for s in settings if "Reflex" in s.get("setting", "")]
         assert len(reflex_settings) > 0
+
+    def test_pokemon_auto_chess_in_game_settings(self):
+        """Test PokemonAutoChessProfile returns Chrome-specific settings."""
+        profile = PokemonAutoChessProfile()
+        settings = profile.get_in_game_settings()
+
+        assert isinstance(settings, list)
+        assert len(settings) > 0
+
+        # Should have Chrome settings category
+        chrome_settings = [s for s in settings if "Chrome" in s.get("category", "")]
+        assert len(chrome_settings) > 0
+
+        # Check hardware acceleration recommendation
+        hw_accel = [s for s in settings if "Hardware Acceleration" in s.get("setting", "")]
+        assert len(hw_accel) > 0
+        assert hw_accel[0]["value"] == "Enabled"
+
+    def test_pokemon_auto_chess_has_browser_optimization(self):
+        """Test PokemonAutoChessProfile includes browser optimization tips."""
+        profile = PokemonAutoChessProfile()
+        settings = profile.get_in_game_settings()
+
+        browser_opts = [s for s in settings if "Browser" in s.get("category", "")]
+        assert len(browser_opts) > 0
+
+
+class TestBaseProfileImplementation:
+    """Test BaseProfile abstract class through concrete implementations."""
+
+    def test_has_in_game_settings_true(self):
+        """Test has_in_game_settings returns True when settings exist."""
+        profile = SlippiMeleeProfile()
+        assert profile.has_in_game_settings() is True
+
+    def test_executable_hints_contains_expected(self):
+        """Test executable_hints property returns list."""
+        profile = SlippiMeleeProfile()
+        hints = profile.executable_hints
+
+        assert isinstance(hints, list)
+        assert len(hints) > 0
+        assert any("Dolphin" in hint for hint in hints)
+
+    def test_pokemon_auto_chess_executable_hints_browsers(self):
+        """Test PokemonAutoChessProfile executable hints include browsers."""
+        profile = PokemonAutoChessProfile()
+        hints = profile.executable_hints
+
+        assert isinstance(hints, list)
+        assert "chrome.exe" in hints
+        assert "msedge.exe" in hints
+        assert "firefox.exe" in hints
+
+    def test_pokemon_auto_chess_optimization_target(self):
+        """Test PokemonAutoChessProfile has balanced optimization target."""
+        profile = PokemonAutoChessProfile()
+        assert profile.optimization_target == "balanced"
+
+    def test_optimization_target_is_string(self):
+        """Test optimization_target returns valid string."""
+        profile = SlippiMeleeProfile()
+        assert isinstance(profile.optimization_target, str)
+        assert profile.optimization_target == "minimum_latency"
+
+    def test_generate_in_game_report_has_header(self):
+        """Test generate_in_game_report includes header."""
+        profile = SlippiMeleeProfile()
+        report = profile.generate_in_game_report()
+
+        assert profile.display_name in report
+        assert "Optimization Target" in report
+
+    def test_generate_in_game_report_has_settings(self):
+        """Test generate_in_game_report includes settings."""
+        profile = SlippiMeleeProfile()
+        report = profile.generate_in_game_report()
+
+        # Should have category headers
+        assert "##" in report
+
+    def test_cod_profile_description(self):
+        """Test CodBo7Profile has description."""
+        profile = CodBo7Profile()
+        assert isinstance(profile.description, str)
+        assert len(profile.description) > 0
+
+    def test_diablo4_profile_target(self):
+        """Test Diablo4Profile has balanced optimization target."""
+        profile = Diablo4Profile()
+        assert profile.optimization_target == "balanced"

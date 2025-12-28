@@ -3,6 +3,7 @@
 from abso.profiles.base import BaseProfile
 from abso.profiles.cod_bo7 import CodBo7Profile
 from abso.profiles.diablo4 import Diablo4Profile
+from abso.profiles.pokemon_auto_chess import PokemonAutoChessProfile
 from abso.profiles.rivals2 import Rivals2Profile
 from abso.profiles.slippi_melee import SlippiMeleeProfile
 
@@ -12,6 +13,7 @@ __all__ = [
     "Rivals2Profile",
     "CodBo7Profile",
     "Diablo4Profile",
+    "PokemonAutoChessProfile",
     "get_all_profiles",
 ]
 
@@ -27,4 +29,5 @@ def get_all_profiles() -> dict[str, BaseProfile]:
         "rivals2": Rivals2Profile(),
         "cod-bo7": CodBo7Profile(),
         "diablo4": Diablo4Profile(),
+        "pokemon-auto-chess": PokemonAutoChessProfile(),
     }
