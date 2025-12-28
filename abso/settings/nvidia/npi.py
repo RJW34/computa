@@ -73,8 +73,9 @@ class NPIManager:
     def export_profile(self, output_path: Path) -> None:
         """Export current Nvidia profile using NPI.
 
-        Note: NPI may not support headless export. This attempts the export
-        but may fail if NPI requires GUI interaction for exports.
+        Note: NPI does not support headless export - the -export flag opens the GUI.
+        This method attempts export with a short timeout and kills the process if
+        it spawns a GUI window.
 
         Args:
             output_path: Path to save the exported .nip file.
@@ -87,22 +88,65 @@ class NPIManager:
 
         logger.info(f"Exporting Nvidia profile to: {output_path}")
 
-        result = subprocess.run(
-            [str(self.npi_path), "-export", str(output_path)],
-            capture_output=True,
-            text=True,
-            timeout=30,
-        )
-
-        # NPI may return 0 even if it opened GUI instead of exporting
-        if not output_path.exists():
-            raise RuntimeError(
-                "NPI export did not create file. Export may require GUI interaction. "
-                "Run NPI manually and use File > Export to create a backup."
+        process = None
+        try:
+            # Use Popen for better process control
+            process = subprocess.Popen(
+                [str(self.npi_path), "-export", str(output_path)],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
             )
 
-        if result.returncode != 0:
-            raise RuntimeError(f"NPI export failed: {result.stderr or result.stdout}")
+            # Short timeout - NPI export opens GUI, so it will hang
+            # If it completes quickly, great. If not, assume GUI spawned.
+            try:
+                stdout, stderr = process.communicate(timeout=5)
+            except subprocess.TimeoutExpired:
+                # NPI opened GUI window - kill it
+                logger.warning("NPI export spawned GUI window, terminating process")
+                self._kill_npi_process(process)
+                raise RuntimeError(
+                    "NPI does not support headless export (GUI was spawned). "
+                    "Use nvidia-smi or manual backup. Nvidia profile backup skipped."
+                )
+
+            # NPI may return 0 even if it opened GUI instead of exporting
+            if not output_path.exists():
+                raise RuntimeError(
+                    "NPI export did not create file. Export may require GUI interaction. "
+                    "Run NPI manually and use File > Export to create a backup."
+                )
+
+            if process.returncode != 0:
+                raise RuntimeError(f"NPI export failed: {stderr or stdout}")
+
+        except subprocess.TimeoutExpired:
+            if process:
+                self._kill_npi_process(process)
+            raise
+        except Exception:
+            if process and process.poll() is None:
+                self._kill_npi_process(process)
+            raise
+
+    def _kill_npi_process(self, process: subprocess.Popen) -> None:
+        """Kill an NPI process and any spawned GUI windows."""
+        try:
+            process.kill()
+            process.wait(timeout=2)
+        except Exception:
+            pass
+
+        # Also kill any lingering NPI processes by name
+        try:
+            subprocess.run(
+                ["taskkill", "/F", "/IM", "nvidiaProfileInspector.exe"],
+                capture_output=True,
+                timeout=5,
+            )
+        except Exception as e:
+            logger.debug(f"Failed to taskkill NPI: {e}")
 
     def read_current_settings(self) -> dict[str, Any]:
         """Read current Nvidia 3D settings by exporting and parsing a profile.

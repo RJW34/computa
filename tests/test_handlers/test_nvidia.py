@@ -238,18 +238,23 @@ class TestNvidiaAudit:
         """Test audit returns no issues when settings are optimal."""
         handler = NvidiaSettingsHandler()
 
+        # VRR-optimal settings: VSync ON is correct with G-SYNC (acts as safety net)
+        # See: abso/core/vrr.py for VRR knowledge base
         with patch.object(handler, "detect", return_value={
             "npi_available": True,
             "current_settings": {
                 "power_management": "prefer_max_performance",
-                "low_latency_mode": "ultra",
-                "vsync": "off",
+                "low_latency_mode": "on",  # "on" not "ultra" - ultra overrides FPS caps
+                "vsync": "on",  # VRR safety net - doesn't add latency with proper FPS cap
                 "shader_cache": "unlimited"
             }
         }):
             issues = handler.audit()
 
-        assert len(issues) == 0
+        # VSync "on" still produces an info issue (reminder about FPS cap)
+        # but no warnings/criticals - that's the expected optimal state
+        warnings_or_higher = [i for i in issues if i.severity in ("warning", "critical")]
+        assert len(warnings_or_higher) == 0
 
 
 class TestNvidiaApply:
@@ -335,14 +340,16 @@ class TestNvidiaBackupRestore:
     """Tests for backup() and restore() methods."""
 
     def test_backup_when_npi_unavailable(self):
-        """Test backup returns error when NPI unavailable."""
+        """Test backup succeeds with note when NPI unavailable."""
         handler = NvidiaSettingsHandler()
 
         with patch.object(handler._npi, "is_available", return_value=False):
             result = handler.backup()
 
-        assert result["success"] is False
-        assert "not available" in result["error"]
+        # Backup always succeeds - NPI unavailable just means nothing to backup
+        assert result["success"] is True
+        assert result["profile_path"] is None
+        assert "not available" in result["note"]
 
     def test_backup_creates_file(self, tmp_path):
         """Test backup creates .nip file."""
@@ -359,15 +366,18 @@ class TestNvidiaBackupRestore:
         assert "nvidia_backup_" in result["profile_path"]
 
     def test_backup_handles_exception(self):
-        """Test backup handles exceptions."""
+        """Test backup succeeds with note when export fails (NPI doesn't support headless export)."""
         handler = NvidiaSettingsHandler()
 
         with (patch.object(handler._npi, "is_available", return_value=True),
               patch.object(handler._npi, "export_profile", side_effect=Exception("Export failed"))):
             result = handler.backup()
 
-        assert result["success"] is False
-        assert "Export failed" in result["error"]
+        # Backup always succeeds - export failure just means we note it
+        # Nvidia settings can be restored by re-applying the game profile
+        assert result["success"] is True
+        assert result["profile_path"] is None
+        assert result["note"] is not None
 
     def test_restore_without_profile_path(self):
         """Test restore with no profile_path returns True."""
