@@ -32,6 +32,8 @@ def generate_custom_profile(settings: dict[str, Any], profile_name: str = "abso_
     """Generate a minimal .nip profile with specified settings.
 
     NPI .nip files use UTF-16 XML with decimal setting IDs and values.
+    This targets the global "Base Profile" - use generate_game_profile()
+    for per-game profiles.
 
     Args:
         settings: Dictionary of setting names to values.
@@ -40,6 +42,89 @@ def generate_custom_profile(settings: dict[str, Any], profile_name: str = "abso_
     Returns:
         Path to the generated .nip file.
     """
+    # Build settings XML using shared helper
+    settings_xml = _build_settings_xml(settings)
+
+    nip_content = f'''<?xml version="1.0" encoding="utf-16"?>
+<ArrayOfProfile>
+  <Profile>
+    <ProfileName>Base Profile</ProfileName>
+    <Executeables />
+    <Settings>
+      {settings_xml}
+    </Settings>
+  </Profile>
+</ArrayOfProfile>
+'''
+
+    # Write to temp file with UTF-16 encoding (with BOM)
+    temp_dir = Path(tempfile.gettempdir()) / "abso_nvidia"
+    temp_dir.mkdir(parents=True, exist_ok=True)
+
+    profile_path = temp_dir / f"{profile_name}.nip"
+    profile_path.write_text(nip_content, encoding="utf-16")
+
+    logger.debug(f"Generated NIP profile at: {profile_path}")
+    return profile_path
+
+
+def generate_game_profile(
+    settings: dict[str, Any],
+    executables: list[str],
+    game_name: str = "ABSO Game"
+) -> Path:
+    """Generate a per-game .nip profile with specific executables.
+
+    Unlike generate_custom_profile which targets the global "Base Profile",
+    this function creates a profile that applies only to specified executables.
+
+    Args:
+        settings: Dictionary of Nvidia settings to apply.
+        executables: List of executable names (e.g., ["Game.exe", "Game-Shipping.exe"]).
+        game_name: Human-readable game name for the profile.
+
+    Returns:
+        Path to the generated .nip file.
+    """
+    # Build settings XML (reuse existing logic)
+    xml_settings = _build_settings_xml(settings)
+
+    # Build executables XML
+    executables_xml = _build_executables_xml(executables)
+
+    # Use game-specific profile name
+    profile_name = f"ABSO - {game_name}"
+    safe_filename = game_name.lower().replace(" ", "_").replace(":", "")
+
+    # Construct NIP XML with executables
+    nip_content = f'''<?xml version="1.0" encoding="utf-16"?>
+<ArrayOfProfile>
+  <Profile>
+    <ProfileName>{profile_name}</ProfileName>
+    <Executeables>
+      {executables_xml}
+    </Executeables>
+    <Settings>
+      {xml_settings}
+    </Settings>
+  </Profile>
+</ArrayOfProfile>
+'''
+
+    # Write to temp file with UTF-16 encoding (with BOM)
+    temp_dir = Path(tempfile.gettempdir()) / "abso_nvidia"
+    temp_dir.mkdir(parents=True, exist_ok=True)
+
+    profile_path = temp_dir / f"abso_game_{safe_filename}.nip"
+    profile_path.write_text(nip_content, encoding="utf-16")
+
+    logger.debug(f"Generated per-game NIP profile at: {profile_path}")
+    logger.debug(f"Profile targets executables: {executables}")
+    return profile_path
+
+
+def _build_settings_xml(settings: dict[str, Any]) -> str:
+    """Build XML string for settings list."""
     xml_settings = []
 
     if "low_latency_mode" in settings:
@@ -66,30 +151,14 @@ def generate_custom_profile(settings: dict[str, Any], profile_name: str = "abso_
         value = get_setting_value(settings["threaded_optimization"], "threaded")
         xml_settings.append(_make_setting_xml(NvidiaSettingDecimalIDs.THREADED_OPTIMIZATION, value))
 
-    # Construct NIP XML matching real NPI format
-    settings_xml = "\n      ".join(xml_settings)
+    return "\n      ".join(xml_settings)
 
-    nip_content = f'''<?xml version="1.0" encoding="utf-16"?>
-<ArrayOfProfile>
-  <Profile>
-    <ProfileName>Base Profile</ProfileName>
-    <Executeables />
-    <Settings>
-      {settings_xml}
-    </Settings>
-  </Profile>
-</ArrayOfProfile>
-'''
 
-    # Write to temp file with UTF-16 encoding (with BOM)
-    temp_dir = Path(tempfile.gettempdir()) / "abso_nvidia"
-    temp_dir.mkdir(parents=True, exist_ok=True)
-
-    profile_path = temp_dir / f"{profile_name}.nip"
-    profile_path.write_text(nip_content, encoding="utf-16")
-
-    logger.debug(f"Generated NIP profile at: {profile_path}")
-    return profile_path
+def _build_executables_xml(executables: list[str]) -> str:
+    """Build XML string for executables list."""
+    if not executables:
+        return ""
+    return "\n      ".join(f"<string>{exe}</string>" for exe in executables)
 
 
 def _make_setting_xml(setting_id: int, value: int) -> str:

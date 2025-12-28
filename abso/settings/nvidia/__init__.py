@@ -26,7 +26,7 @@ from abso.settings.base import SettingsHandler
 
 from .npi import NPIManager
 from .presets import NVIDIA_PRESETS, NvidiaSettingIDs, NvidiaSettingValues
-from .profiles import generate_custom_profile, generate_preset_profile
+from .profiles import generate_custom_profile, generate_game_profile, generate_preset_profile
 
 logger = logging.getLogger(__name__)
 
@@ -186,7 +186,12 @@ class NvidiaSettingsHandler(SettingsHandler):
         Supports:
         - 'profile_path': Import a .nip profile file
         - 'preset': Apply a named preset (minimum_latency, low_latency_high_fps, balanced)
+        - 'executables': List of game executables for per-game profile
+        - 'game_name': Display name for the game profile
         - Individual settings: low_latency_mode, power_management, vsync, etc.
+
+        When 'executables' is provided, settings are applied to a per-game profile
+        instead of the global "Base Profile".
 
         Args:
             settings: Dictionary of settings to apply.
@@ -201,6 +206,10 @@ class NvidiaSettingsHandler(SettingsHandler):
                 "requires_reboot": False,
                 "applied": [],
             }
+
+        # Extract per-game configuration (remove from settings dict)
+        executables = settings.pop("executables", None)
+        game_name = settings.pop("game_name", "Game")
 
         try:
             # Option 1: Apply from .nip profile file
@@ -217,9 +226,22 @@ class NvidiaSettingsHandler(SettingsHandler):
                 preset_name = settings["preset"]
                 if preset_name in NVIDIA_PRESETS:
                     preset = NVIDIA_PRESETS[preset_name]
-                    profile_path = generate_preset_profile(preset_name, preset)
+                    preset_settings = preset.get("settings", {})
+
+                    # Generate per-game profile if executables provided
+                    if executables:
+                        profile_path = generate_game_profile(
+                            preset_settings,
+                            executables,
+                            game_name
+                        )
+                        applied.append(f"Applied preset: {preset_name} for {game_name}")
+                        applied.append(f"Targeting executables: {', '.join(executables)}")
+                    else:
+                        profile_path = generate_preset_profile(preset_name, preset)
+                        applied.append(f"Applied preset: {preset_name} (global)")
+
                     self._npi.import_profile(profile_path)
-                    applied.append(f"Applied preset: {preset_name}")
                 else:
                     errors.append(f"Unknown preset: {preset_name}. Available: {list(NVIDIA_PRESETS.keys())}")
 
@@ -232,9 +254,20 @@ class NvidiaSettingsHandler(SettingsHandler):
                 }
 
                 if individual_settings:
-                    profile_path = generate_custom_profile(individual_settings)
+                    # Generate per-game profile if executables provided
+                    if executables:
+                        profile_path = generate_game_profile(
+                            individual_settings,
+                            executables,
+                            game_name
+                        )
+                        applied.append(f"Applied settings for {game_name}: {list(individual_settings.keys())}")
+                        applied.append(f"Targeting executables: {', '.join(executables)}")
+                    else:
+                        profile_path = generate_custom_profile(individual_settings)
+                        applied.append(f"Applied settings: {list(individual_settings.keys())}")
+
                     self._npi.import_profile(profile_path)
-                    applied.append(f"Applied settings: {list(individual_settings.keys())}")
 
         except Exception as e:
             errors.append(str(e))

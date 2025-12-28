@@ -113,6 +113,11 @@ class ProfileApplier:
                         settings, handler_name, profile_overrides
                     )
 
+                # Inject game info for per-game Nvidia profiles
+                if handler_name == "NvidiaSettingsHandler":
+                    settings["executables"] = profile.executable_hints
+                    settings["game_name"] = profile.display_name
+
                 result = handler.apply(settings)
 
                 if result.get("success", False):

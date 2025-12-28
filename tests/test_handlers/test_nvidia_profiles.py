@@ -4,8 +4,11 @@ from pathlib import Path
 
 from abso.settings.nvidia.presets import NVIDIA_PRESETS
 from abso.settings.nvidia.profiles import (
+    _build_executables_xml,
+    _build_settings_xml,
     _make_setting_xml,
     generate_custom_profile,
+    generate_game_profile,
     generate_preset_profile,
     get_setting_value,
 )
@@ -274,3 +277,163 @@ class TestGeneratePresetProfile:
         assert "abso_custom" in path.name
         # vsync on = 1
         assert "17322232" in content  # VSYNC ID
+
+
+class TestBuildExecutablesXml:
+    """Tests for _build_executables_xml function."""
+
+    def test_single_executable(self):
+        """Test single executable generates correct XML."""
+        xml = _build_executables_xml(["Game.exe"])
+        assert "<string>Game.exe</string>" in xml
+
+    def test_multiple_executables(self):
+        """Test multiple executables generates correct XML."""
+        xml = _build_executables_xml(["Game.exe", "Game-Shipping.exe", "launcher.exe"])
+        assert "<string>Game.exe</string>" in xml
+        assert "<string>Game-Shipping.exe</string>" in xml
+        assert "<string>launcher.exe</string>" in xml
+
+    def test_empty_list_returns_empty_string(self):
+        """Test empty list returns empty string."""
+        xml = _build_executables_xml([])
+        assert xml == ""
+
+    def test_executables_on_separate_lines(self):
+        """Test executables are on separate lines."""
+        xml = _build_executables_xml(["a.exe", "b.exe"])
+        # Should have newlines between entries
+        assert "\n" in xml
+
+
+class TestBuildSettingsXml:
+    """Tests for _build_settings_xml function."""
+
+    def test_single_setting(self):
+        """Test single setting generates correct XML."""
+        xml = _build_settings_xml({"low_latency_mode": "ultra"})
+        assert "17322171" in xml  # LOW_LATENCY_MODE decimal ID
+        assert "<SettingValue>2</SettingValue>" in xml
+
+    def test_multiple_settings(self):
+        """Test multiple settings generates correct XML."""
+        xml = _build_settings_xml({
+            "low_latency_mode": "ultra",
+            "vsync": "off",
+            "power_management": "prefer_max_performance",
+        })
+        assert "17322171" in xml  # LOW_LATENCY_MODE
+        assert "17322232" in xml  # VSYNC
+        assert "17322212" in xml  # POWER_MANAGEMENT
+
+    def test_empty_settings_returns_empty_string(self):
+        """Test empty settings returns empty string."""
+        xml = _build_settings_xml({})
+        assert xml == ""
+
+
+class TestGenerateGameProfile:
+    """Tests for generate_game_profile function."""
+
+    def test_generates_file(self):
+        """Test generates a .nip file."""
+        path = generate_game_profile(
+            {"low_latency_mode": "ultra"},
+            ["Game.exe"],
+            "Test Game"
+        )
+        assert path.exists()
+        assert path.suffix == ".nip"
+        assert "abso_game_" in path.name
+
+    def test_includes_game_name_in_profile(self):
+        """Test includes game name in profile name."""
+        path = generate_game_profile(
+            {"vsync": "off"},
+            ["Game.exe"],
+            "Rivals of Aether 2"
+        )
+        content = path.read_text(encoding="utf-16")
+        assert "<ProfileName>ABSO - Rivals of Aether 2</ProfileName>" in content
+
+    def test_includes_executables(self):
+        """Test includes executables in XML."""
+        path = generate_game_profile(
+            {"vsync": "off"},
+            ["RivalsofAether2.exe", "RivalsOfAether2-Win64-Shipping.exe"],
+            "Rivals 2"
+        )
+        content = path.read_text(encoding="utf-16")
+        assert "<string>RivalsofAether2.exe</string>" in content
+        assert "<string>RivalsOfAether2-Win64-Shipping.exe</string>" in content
+
+    def test_includes_settings(self):
+        """Test includes settings in XML."""
+        path = generate_game_profile(
+            {"low_latency_mode": "ultra", "vsync": "off"},
+            ["Game.exe"],
+            "Test"
+        )
+        content = path.read_text(encoding="utf-16")
+        assert "17322171" in content  # LOW_LATENCY_MODE
+        assert "17322232" in content  # VSYNC
+
+    def test_file_is_utf16_encoded(self):
+        """Test file is UTF-16 encoded."""
+        path = generate_game_profile(
+            {"vsync": "off"},
+            ["Game.exe"],
+            "Test"
+        )
+        # Should be able to read as UTF-16
+        content = path.read_text(encoding="utf-16")
+        assert "<?xml version=" in content
+
+    def test_safe_filename_generation(self):
+        """Test creates safe filename from game name."""
+        path = generate_game_profile(
+            {"vsync": "off"},
+            ["Game.exe"],
+            "Call of Duty: Black Ops 7"
+        )
+        assert "call_of_duty_black_ops_7" in path.name.lower()
+        assert ":" not in path.name
+
+    def test_multiple_executables_in_file(self):
+        """Test multiple executables are all included."""
+        executables = [
+            "chrome.exe",
+            "msedge.exe",
+            "firefox.exe",
+            "brave.exe",
+        ]
+        path = generate_game_profile(
+            {"vsync": "adaptive"},
+            executables,
+            "Browser Game"
+        )
+        content = path.read_text(encoding="utf-16")
+        for exe in executables:
+            assert f"<string>{exe}</string>" in content
+
+    def test_executeables_element_present(self):
+        """Test Executeables element is present (NPI spelling)."""
+        path = generate_game_profile(
+            {"vsync": "off"},
+            ["Game.exe"],
+            "Test"
+        )
+        content = path.read_text(encoding="utf-16")
+        assert "<Executeables>" in content
+        assert "</Executeables>" in content
+
+    def test_not_base_profile(self):
+        """Test does not use Base Profile name."""
+        path = generate_game_profile(
+            {"vsync": "off"},
+            ["Game.exe"],
+            "My Game"
+        )
+        content = path.read_text(encoding="utf-16")
+        assert "Base Profile" not in content
+        assert "ABSO - My Game" in content
