@@ -25,7 +25,8 @@ class PowerSettingsHandler(SettingsHandler):
     # Known power plan GUIDs
     BALANCED_GUID = "381b4222-f694-41f0-9685-ff5bb260df2e"
     HIGH_PERFORMANCE_GUID = "8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c"
-    ULTIMATE_PERFORMANCE_GUID = "e9a42b02-d5df-448d-aa00-03f14749eb61"
+    # This is the hidden template GUID used to create Ultimate Performance
+    ULTIMATE_PERFORMANCE_TEMPLATE_GUID = "e9a42b02-d5df-448d-aa00-03f14749eb61"
 
     # Power subgroup GUIDs
     USB_SUBGROUP = "2a737441-1930-4402-8d77-b2bebba308a3"
@@ -50,16 +51,9 @@ class PowerSettingsHandler(SettingsHandler):
         current = self.detect()
 
         active_plan = current.get("active_plan", {})
-        active_guid = active_plan.get("guid", "").lower()
 
-        # Check if using a performance plan
-        performance_guids = [
-            self.HIGH_PERFORMANCE_GUID.lower(),
-            self.ULTIMATE_PERFORMANCE_GUID.lower(),
-        ]
-
-        if (active_guid not in performance_guids
-                and "performance" not in active_plan.get("name", "").lower()):
+        # Check if using a performance plan (by name or known GUID)
+        if not self._is_performance_plan(active_plan):
             issues.append(Issue(
                 title="Not using a performance power plan",
                 severity="warning",
@@ -97,7 +91,13 @@ class PowerSettingsHandler(SettingsHandler):
 
                 # Handle special names
                 if plan_id == "ultimate_performance":
-                    plan_id = self.ULTIMATE_PERFORMANCE_GUID
+                    # Find the actual GUID on this system
+                    found_guid = self._find_ultimate_performance_guid()
+                    if found_guid:
+                        plan_id = found_guid
+                    else:
+                        # Create it if not found
+                        plan_id = self._create_ultimate_performance()
                 elif plan_id == "high_performance":
                     plan_id = self.HIGH_PERFORMANCE_GUID
 
@@ -215,20 +215,60 @@ class PowerSettingsHandler(SettingsHandler):
 
     def _has_ultimate_performance(self) -> bool:
         """Check if Ultimate Performance plan is available."""
-        plans = self._list_plans()
-        return any(
-            p["guid"].lower() == self.ULTIMATE_PERFORMANCE_GUID.lower()
-            for p in plans
-        )
+        return self._find_ultimate_performance_guid() is not None
 
-    def _create_ultimate_performance(self) -> None:
-        """Create Ultimate Performance power plan."""
+    def _find_ultimate_performance_guid(self) -> str | None:
+        """Find the GUID of Ultimate Performance plan by name.
+
+        The template GUID is hidden and when duplicated creates a new GUID,
+        so we must search by name instead of relying on a fixed GUID.
+        """
+        plans = self._list_plans()
+        for p in plans:
+            if "ultimate performance" in p["name"].lower():
+                return p["guid"]
+        return None
+
+    def _is_performance_plan(self, plan: dict[str, str]) -> bool:
+        """Check if a plan is a performance-oriented plan."""
+        name = plan.get("name", "").lower()
+        guid = plan.get("guid", "").lower()
+
+        # Check by name
+        if "performance" in name:
+            return True
+
+        # Check by known GUIDs
+        known_perf_guids = [
+            self.HIGH_PERFORMANCE_GUID.lower(),
+            self.ULTIMATE_PERFORMANCE_TEMPLATE_GUID.lower(),
+        ]
+        return guid in known_perf_guids
+
+    def _create_ultimate_performance(self) -> str:
+        """Create Ultimate Performance power plan.
+
+        Returns:
+            The GUID of the newly created plan.
+        """
         result = self._run_powercfg(
             "/duplicatescheme",
-            self.ULTIMATE_PERFORMANCE_GUID
+            self.ULTIMATE_PERFORMANCE_TEMPLATE_GUID
         )
         if result.returncode != 0:
             raise RuntimeError(f"Failed to create Ultimate Performance: {result.stderr}")
+
+        # Parse the new GUID from output like "Power Scheme GUID: xxx"
+        match = re.search(r"GUID:\s*([a-f0-9-]+)", result.stdout, re.IGNORECASE)
+        if match:
+            return match.group(1)
+
+        # Fallback: find it by name
+        guid = self._find_ultimate_performance_guid()
+        if guid:
+            return guid
+
+        raise RuntimeError("Created Ultimate Performance but could not find its GUID")
 
     def _set_active_plan(self, guid: str) -> None:
         """Set the active power plan."""
