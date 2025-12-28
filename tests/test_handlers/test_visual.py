@@ -152,3 +152,118 @@ class TestVisualBackupRestore:
         assert result is True
         mock_trans.assert_called()
         mock_anim.assert_called()
+
+    def test_restore_handles_empty_data(self):
+        """Test restore handles empty backup data."""
+        handler = VisualSettingsHandler()
+        result = handler.restore({})
+
+        assert result is True
+
+    @patch.object(VisualSettingsHandler, "_set_transparency_enabled")
+    def test_restore_handles_exception(self, mock_set):
+        """Test restore handles exceptions gracefully."""
+        mock_set.side_effect = Exception("Failed")
+
+        handler = VisualSettingsHandler()
+        result = handler.restore({"transparency": True})
+
+        assert result is False
+
+
+class TestVisualApplyPreset:
+    """Tests for preset application."""
+
+    @patch.object(VisualSettingsHandler, "_set_transparency_enabled")
+    @patch.object(VisualSettingsHandler, "_set_animations_enabled")
+    @patch.object(VisualSettingsHandler, "_set_menu_animation")
+    def test_apply_gaming_preset(self, mock_menu, mock_anim, mock_trans):
+        """Test apply gaming preset optimizes all settings."""
+        handler = VisualSettingsHandler()
+        result = handler.apply({"preset": "gaming"})
+
+        assert result["success"] is True
+
+    @patch.object(VisualSettingsHandler, "_set_transparency_enabled")
+    @patch.object(VisualSettingsHandler, "_set_animations_enabled")
+    def test_apply_multiple_settings(self, mock_anim, mock_trans):
+        """Test apply can set multiple visual settings."""
+        handler = VisualSettingsHandler()
+        result = handler.apply({
+            "disable_transparency": True,
+            "disable_animations": True,
+        })
+
+        assert result["success"] is True
+
+
+class TestVisualConstants:
+    """Tests for visual constants and configuration."""
+
+    def test_registry_paths_defined(self):
+        """Test registry paths are defined."""
+        handler = VisualSettingsHandler()
+        assert hasattr(handler, "DESKTOP_KEY") or hasattr(handler, "VISUAL_EFFECTS_KEY")
+
+
+class TestVisualPrivateMethods:
+    """Tests for private methods."""
+
+    @patch("abso.settings.visual.winreg.CloseKey")
+    @patch("abso.settings.visual.winreg.QueryValueEx")
+    @patch("abso.settings.visual.winreg.OpenKey")
+    def test_get_transparency_enabled(self, mock_open, mock_query, mock_close):
+        """Test _get_transparency_enabled returns boolean."""
+        mock_query.return_value = (1, 1)
+
+        handler = VisualSettingsHandler()
+        result = handler._get_transparency_enabled()
+
+        assert isinstance(result, bool)
+
+    @patch("abso.settings.visual.winreg.OpenKey", side_effect=FileNotFoundError)
+    def test_get_transparency_handles_missing_key(self, mock_open):
+        """Test _get_transparency_enabled handles missing key."""
+        handler = VisualSettingsHandler()
+        result = handler._get_transparency_enabled()
+
+        assert result is None
+
+    @patch("abso.settings.visual.winreg.CloseKey")
+    @patch("abso.settings.visual.winreg.QueryValueEx")
+    @patch("abso.settings.visual.winreg.OpenKey")
+    def test_get_animations_enabled(self, mock_open, mock_query, mock_close):
+        """Test _get_animations_enabled returns boolean."""
+        mock_query.return_value = ("1", 1)
+
+        handler = VisualSettingsHandler()
+        result = handler._get_animations_enabled()
+
+        assert isinstance(result, (bool, type(None)))
+
+    @patch("abso.settings.visual.winreg.OpenKey", side_effect=FileNotFoundError)
+    def test_get_animations_handles_missing_key(self, mock_open):
+        """Test _get_animations_enabled handles missing key."""
+        handler = VisualSettingsHandler()
+        result = handler._get_animations_enabled()
+
+        assert result is None
+
+    @patch("abso.settings.visual.winreg.CloseKey")
+    @patch("abso.settings.visual.winreg.SetValueEx")
+    @patch("abso.settings.visual.winreg.OpenKey")
+    def test_set_transparency_enabled(self, mock_open, mock_set, mock_close):
+        """Test _set_transparency_enabled writes to registry."""
+        handler = VisualSettingsHandler()
+        handler._set_transparency_enabled(False)
+
+        mock_set.assert_called()
+
+    @patch("abso.settings.visual.winreg.OpenKey", side_effect=PermissionError)
+    def test_set_transparency_raises_on_permission_error(self, mock_open):
+        """Test _set_transparency_enabled raises on permission error."""
+        import pytest
+        handler = VisualSettingsHandler()
+
+        with pytest.raises(PermissionError):
+            handler._set_transparency_enabled(False)

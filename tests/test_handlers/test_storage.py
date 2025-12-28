@@ -162,3 +162,285 @@ class TestStorageBackupRestore:
         })
 
         assert result is True
+
+    @patch.object(StorageSettingsHandler, "_set_last_access_disabled")
+    def test_restore_handles_exception(self, mock_set):
+        """Test restore handles exceptions gracefully."""
+        mock_set.side_effect = Exception("Error")
+
+        handler = StorageSettingsHandler()
+        result = handler.restore({"last_access_disabled": True})
+
+        assert result is False
+
+
+class TestStoragePrivateMethods:
+    """Tests for private helper methods."""
+
+    @patch("subprocess.run")
+    def test_get_last_access_disabled_true(self, mock_run):
+        """Test _get_last_access_disabled returns True for value 1."""
+        from unittest.mock import MagicMock
+        mock_run.return_value = MagicMock(
+            returncode=0,
+            stdout="DisableLastAccess = 1"
+        )
+
+        handler = StorageSettingsHandler()
+        result = handler._get_last_access_disabled()
+
+        assert result is True
+
+    @patch("subprocess.run")
+    def test_get_last_access_disabled_true_value_3(self, mock_run):
+        """Test _get_last_access_disabled returns True for value 3."""
+        from unittest.mock import MagicMock
+        mock_run.return_value = MagicMock(
+            returncode=0,
+            stdout="DisableLastAccess = 3"
+        )
+
+        handler = StorageSettingsHandler()
+        result = handler._get_last_access_disabled()
+
+        assert result is True
+
+    @patch("subprocess.run")
+    def test_get_last_access_disabled_false(self, mock_run):
+        """Test _get_last_access_disabled returns False for value 0."""
+        from unittest.mock import MagicMock
+        mock_run.return_value = MagicMock(
+            returncode=0,
+            stdout="DisableLastAccess = 0"
+        )
+
+        handler = StorageSettingsHandler()
+        result = handler._get_last_access_disabled()
+
+        assert result is False
+
+    @patch("subprocess.run")
+    def test_get_last_access_disabled_handles_set_to_format(self, mock_run):
+        """Test _get_last_access_disabled handles 'set to' format."""
+        from unittest.mock import MagicMock
+        mock_run.return_value = MagicMock(
+            returncode=0,
+            stdout="DisableLastAccess is set to 1"
+        )
+
+        handler = StorageSettingsHandler()
+        result = handler._get_last_access_disabled()
+
+        assert result is True
+
+    @patch("subprocess.run")
+    def test_get_last_access_disabled_handles_failure(self, mock_run):
+        """Test _get_last_access_disabled returns None on failure."""
+        from unittest.mock import MagicMock
+        mock_run.return_value = MagicMock(returncode=1)
+
+        handler = StorageSettingsHandler()
+        result = handler._get_last_access_disabled()
+
+        assert result is None
+
+    @patch("subprocess.run")
+    def test_get_last_access_disabled_handles_timeout(self, mock_run):
+        """Test _get_last_access_disabled handles timeout."""
+        import subprocess
+        mock_run.side_effect = subprocess.TimeoutExpired("cmd", 10)
+
+        handler = StorageSettingsHandler()
+        result = handler._get_last_access_disabled()
+
+        assert result is None
+
+    @patch("subprocess.run")
+    def test_set_last_access_disabled_success(self, mock_run):
+        """Test _set_last_access_disabled succeeds."""
+        from unittest.mock import MagicMock
+        mock_run.return_value = MagicMock(returncode=0)
+
+        handler = StorageSettingsHandler()
+        result = handler._set_last_access_disabled(True)
+
+        assert result["success"] is True
+
+    @patch("subprocess.run")
+    def test_set_last_access_disabled_failure(self, mock_run):
+        """Test _set_last_access_disabled handles failure."""
+        from unittest.mock import MagicMock
+        mock_run.return_value = MagicMock(
+            returncode=1,
+            stderr="Access denied",
+            stdout=""
+        )
+
+        handler = StorageSettingsHandler()
+        result = handler._set_last_access_disabled(True)
+
+        assert result["success"] is False
+        assert "Access denied" in result["error"]
+
+    @patch("subprocess.run")
+    def test_set_last_access_disabled_timeout(self, mock_run):
+        """Test _set_last_access_disabled handles timeout."""
+        import subprocess
+        mock_run.side_effect = subprocess.TimeoutExpired("cmd", 10)
+
+        handler = StorageSettingsHandler()
+        result = handler._set_last_access_disabled(True)
+
+        assert result["success"] is False
+        assert "Timeout" in result["error"]
+
+    @patch("subprocess.run")
+    def test_get_8dot3_disabled_true(self, mock_run):
+        """Test _get_8dot3_disabled returns True."""
+        from unittest.mock import MagicMock
+        mock_run.return_value = MagicMock(
+            returncode=0,
+            stdout="Disable8dot3 = 1"
+        )
+
+        handler = StorageSettingsHandler()
+        result = handler._get_8dot3_disabled()
+
+        assert result is True
+
+    @patch("subprocess.run")
+    def test_get_8dot3_disabled_false(self, mock_run):
+        """Test _get_8dot3_disabled returns False."""
+        from unittest.mock import MagicMock
+        mock_run.return_value = MagicMock(
+            returncode=0,
+            stdout="Disable8dot3 = 0"
+        )
+
+        handler = StorageSettingsHandler()
+        result = handler._get_8dot3_disabled()
+
+        assert result is False
+
+    @patch("subprocess.run")
+    def test_get_8dot3_disabled_handles_timeout(self, mock_run):
+        """Test _get_8dot3_disabled handles timeout."""
+        import subprocess
+        mock_run.side_effect = subprocess.TimeoutExpired("cmd", 10)
+
+        handler = StorageSettingsHandler()
+        result = handler._get_8dot3_disabled()
+
+        assert result is None
+
+    @patch("subprocess.run")
+    def test_set_8dot3_disabled_success(self, mock_run):
+        """Test _set_8dot3_disabled succeeds."""
+        from unittest.mock import MagicMock
+        mock_run.return_value = MagicMock(returncode=0)
+
+        handler = StorageSettingsHandler()
+        result = handler._set_8dot3_disabled(True)
+
+        assert result["success"] is True
+
+    @patch("subprocess.run")
+    def test_set_8dot3_disabled_timeout(self, mock_run):
+        """Test _set_8dot3_disabled handles timeout."""
+        import subprocess
+        mock_run.side_effect = subprocess.TimeoutExpired("cmd", 10)
+
+        handler = StorageSettingsHandler()
+        result = handler._set_8dot3_disabled(True)
+
+        assert result["success"] is False
+        assert "Timeout" in result["error"]
+
+    @patch("subprocess.run")
+    def test_get_trim_enabled_true(self, mock_run):
+        """Test _get_trim_enabled returns True when TRIM is enabled."""
+        from unittest.mock import MagicMock
+        # disabledeletenotify = 0 means TRIM is ENABLED
+        mock_run.return_value = MagicMock(
+            returncode=0,
+            stdout="DisableDeleteNotify = 0"
+        )
+
+        handler = StorageSettingsHandler()
+        result = handler._get_trim_enabled()
+
+        assert result is True
+
+    @patch("subprocess.run")
+    def test_get_trim_enabled_false(self, mock_run):
+        """Test _get_trim_enabled returns False when TRIM is disabled."""
+        from unittest.mock import MagicMock
+        mock_run.return_value = MagicMock(
+            returncode=0,
+            stdout="DisableDeleteNotify = 1"
+        )
+
+        handler = StorageSettingsHandler()
+        result = handler._get_trim_enabled()
+
+        assert result is False
+
+    @patch("subprocess.run")
+    def test_get_trim_enabled_handles_timeout(self, mock_run):
+        """Test _get_trim_enabled handles timeout."""
+        import subprocess
+        mock_run.side_effect = subprocess.TimeoutExpired("cmd", 10)
+
+        handler = StorageSettingsHandler()
+        result = handler._get_trim_enabled()
+
+        assert result is None
+
+    @patch("subprocess.run")
+    def test_set_trim_enabled_success(self, mock_run):
+        """Test _set_trim_enabled succeeds."""
+        from unittest.mock import MagicMock
+        mock_run.return_value = MagicMock(returncode=0)
+
+        handler = StorageSettingsHandler()
+        result = handler._set_trim_enabled(True)
+
+        assert result["success"] is True
+
+    @patch("subprocess.run")
+    def test_set_trim_enabled_timeout(self, mock_run):
+        """Test _set_trim_enabled handles timeout."""
+        import subprocess
+        mock_run.side_effect = subprocess.TimeoutExpired("cmd", 10)
+
+        handler = StorageSettingsHandler()
+        result = handler._set_trim_enabled(True)
+
+        assert result["success"] is False
+        assert "Timeout" in result["error"]
+
+    @patch("subprocess.run")
+    def test_set_trim_enabled_uses_correct_value(self, mock_run):
+        """Test _set_trim_enabled uses correct value (0 for enabled)."""
+        from unittest.mock import MagicMock
+        mock_run.return_value = MagicMock(returncode=0)
+
+        handler = StorageSettingsHandler()
+        handler._set_trim_enabled(True)
+
+        # Enable TRIM means disabledeletenotify = 0
+        call_args = mock_run.call_args[0][0]
+        assert "0" in call_args
+
+    @patch("subprocess.run")
+    def test_set_last_access_uses_value_3(self, mock_run):
+        """Test _set_last_access_disabled uses value 3 for disabled."""
+        from unittest.mock import MagicMock
+        mock_run.return_value = MagicMock(returncode=0)
+
+        handler = StorageSettingsHandler()
+        handler._set_last_access_disabled(True)
+
+        # Should use value "3" for disabled (both user and system)
+        call_args = mock_run.call_args[0][0]
+        assert "3" in call_args

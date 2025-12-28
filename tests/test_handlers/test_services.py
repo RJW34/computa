@@ -201,3 +201,133 @@ class TestServicesBackupRestore:
 
         assert result is True
         mock_set_type.assert_called()
+
+    def test_restore_handles_empty_data(self):
+        """Test restore handles empty backup data."""
+        handler = ServicesSettingsHandler()
+        result = handler.restore({})
+
+        assert result is True
+
+    @patch.object(ServicesSettingsHandler, "_set_service_start_type")
+    def test_restore_handles_exception(self, mock_set_type):
+        """Test restore handles exceptions gracefully."""
+        mock_set_type.side_effect = Exception("Failed")
+
+        handler = ServicesSettingsHandler()
+        result = handler.restore({
+            "services": {"SysMain": {"exists": True, "start_type": 2}}
+        })
+
+        assert result is False
+
+
+class TestServicesConstants:
+    """Tests for service configuration constants."""
+
+    def test_gaming_services_defined(self):
+        """Test GAMING_SERVICES dict is defined."""
+        handler = ServicesSettingsHandler()
+        assert hasattr(handler, "GAMING_SERVICES")
+        assert len(handler.GAMING_SERVICES) > 0
+
+    def test_sysmain_config(self):
+        """Test SysMain service configuration."""
+        handler = ServicesSettingsHandler()
+        assert "SysMain" in handler.GAMING_SERVICES
+        config = handler.GAMING_SERVICES["SysMain"]
+        assert "display_name" in config
+        assert "optimal_start_type" in config
+        assert "severity" in config
+
+    def test_start_type_constants(self):
+        """Test start type constants are correct."""
+        handler = ServicesSettingsHandler()
+        assert handler.START_AUTOMATIC == 2
+        assert handler.START_MANUAL == 3
+        assert handler.START_DISABLED == 4
+
+
+class TestServicesPrivateMethods:
+    """Tests for private service methods."""
+
+    @patch("subprocess.run")
+    def test_get_service_info_success(self, mock_run):
+        """Test _get_service_info returns service info."""
+        from unittest.mock import MagicMock
+        mock_run.return_value = MagicMock(
+            returncode=0,
+            stdout="SERVICE_NAME: SysMain\nSTART_TYPE: 2 AUTO_START\nSTATE: 4 RUNNING\n"
+        )
+
+        handler = ServicesSettingsHandler()
+        result = handler._get_service_info("SysMain")
+
+        assert result is not None
+        assert isinstance(result, dict)
+
+    @patch("subprocess.run")
+    def test_get_service_info_not_found(self, mock_run):
+        """Test _get_service_info handles missing service."""
+        from unittest.mock import MagicMock
+        mock_run.return_value = MagicMock(returncode=1, stdout="", stderr="not found")
+
+        handler = ServicesSettingsHandler()
+        result = handler._get_service_info("NonExistentService")
+
+        assert result is not None
+        assert result.get("exists") is False
+
+    @patch("subprocess.run")
+    def test_stop_service_success(self, mock_run):
+        """Test _stop_service stops a service."""
+        from unittest.mock import MagicMock
+        mock_run.return_value = MagicMock(returncode=0)
+
+        handler = ServicesSettingsHandler()
+        result = handler._stop_service("SysMain")
+
+        assert result is True
+        mock_run.assert_called()
+
+    @patch("subprocess.run")
+    def test_stop_service_failure(self, mock_run):
+        """Test _stop_service handles failure."""
+        from unittest.mock import MagicMock
+        mock_run.return_value = MagicMock(returncode=1)
+
+        handler = ServicesSettingsHandler()
+        result = handler._stop_service("SysMain")
+
+        assert result is False
+
+    @patch("subprocess.run")
+    def test_set_service_start_type_success(self, mock_run):
+        """Test _set_service_start_type succeeds."""
+        from unittest.mock import MagicMock
+        mock_run.return_value = MagicMock(returncode=0)
+
+        handler = ServicesSettingsHandler()
+        handler._set_service_start_type("SysMain", 4)
+
+        mock_run.assert_called()
+
+    @patch("subprocess.run")
+    def test_set_service_start_type_failure_returns_error(self, mock_run):
+        """Test _set_service_start_type returns error on failure."""
+        from unittest.mock import MagicMock
+        mock_run.return_value = MagicMock(returncode=1, stderr="Access denied", stdout="")
+
+        handler = ServicesSettingsHandler()
+        result = handler._set_service_start_type("SysMain", 4)
+
+        assert result["success"] is False
+        assert "Access denied" in result["error"]
+
+    def test_set_service_start_type_invalid_type(self):
+        """Test _set_service_start_type handles invalid start type."""
+        handler = ServicesSettingsHandler()
+        result = handler._set_service_start_type("SysMain", 999)
+
+        assert result["success"] is False
+        assert "Invalid start type" in result["error"]

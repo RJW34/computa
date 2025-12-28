@@ -145,3 +145,294 @@ class TestNvidiaDetect:
 
         assert result.get("gpu_name") is None
         assert result.get("driver_version") is None
+
+    @patch("abso.settings.nvidia.subprocess.run")
+    def test_detect_gpu_info_handles_timeout(self, mock_run):
+        """Test _detect_gpu_info handles timeout."""
+        import subprocess
+        mock_run.side_effect = subprocess.TimeoutExpired("cmd", 5)
+
+        handler = NvidiaSettingsHandler()
+        result = handler._detect_gpu_info()
+
+        assert result.get("gpu_name") is None
+
+    @patch("abso.settings.nvidia.subprocess.run")
+    def test_detect_gpu_info_handles_empty_output(self, mock_run):
+        """Test _detect_gpu_info handles empty output."""
+        mock_run.return_value = MagicMock(returncode=0, stdout="")
+
+        handler = NvidiaSettingsHandler()
+        result = handler._detect_gpu_info()
+
+        assert result.get("gpu_name") is None
+
+
+class TestNvidiaAudit:
+    """Tests for audit() method."""
+
+    def test_audit_returns_npi_not_found_issue(self):
+        """Test audit returns issue when NPI not available."""
+        handler = NvidiaSettingsHandler()
+
+        with patch.object(handler, "detect", return_value={"npi_available": False}):
+            issues = handler.audit()
+
+        npi_issues = [i for i in issues if "Profile Inspector not found" in i.title]
+        assert len(npi_issues) == 1
+
+    def test_audit_detects_non_max_power(self):
+        """Test audit detects non-maximum power management."""
+        handler = NvidiaSettingsHandler()
+
+        with patch.object(handler, "detect", return_value={
+            "npi_available": True,
+            "current_settings": {"power_management": "adaptive"}
+        }):
+            issues = handler.audit()
+
+        power_issues = [i for i in issues if "Power Management" in i.title]
+        assert len(power_issues) == 1
+        assert power_issues[0].severity == "warning"
+
+    def test_audit_detects_low_latency_off(self):
+        """Test audit detects low latency mode off."""
+        handler = NvidiaSettingsHandler()
+
+        with patch.object(handler, "detect", return_value={
+            "npi_available": True,
+            "current_settings": {"low_latency_mode": "off"}
+        }):
+            issues = handler.audit()
+
+        latency_issues = [i for i in issues if "Low Latency" in i.title]
+        assert len(latency_issues) == 1
+
+    def test_audit_detects_vsync_on(self):
+        """Test audit detects VSync enabled."""
+        handler = NvidiaSettingsHandler()
+
+        with patch.object(handler, "detect", return_value={
+            "npi_available": True,
+            "current_settings": {"vsync": "on"}
+        }):
+            issues = handler.audit()
+
+        vsync_issues = [i for i in issues if "VSync" in i.title]
+        assert len(vsync_issues) == 1
+
+    def test_audit_detects_limited_shader_cache(self):
+        """Test audit detects limited shader cache."""
+        handler = NvidiaSettingsHandler()
+
+        with patch.object(handler, "detect", return_value={
+            "npi_available": True,
+            "current_settings": {"shader_cache": "1024MB"}
+        }):
+            issues = handler.audit()
+
+        cache_issues = [i for i in issues if "Shader Cache" in i.title]
+        assert len(cache_issues) == 1
+
+    def test_audit_no_issues_when_optimal(self):
+        """Test audit returns no issues when settings are optimal."""
+        handler = NvidiaSettingsHandler()
+
+        with patch.object(handler, "detect", return_value={
+            "npi_available": True,
+            "current_settings": {
+                "power_management": "prefer_max_performance",
+                "low_latency_mode": "ultra",
+                "vsync": "off",
+                "shader_cache": "unlimited"
+            }
+        }):
+            issues = handler.audit()
+
+        assert len(issues) == 0
+
+
+class TestNvidiaApply:
+    """Tests for apply() method."""
+
+    def test_apply_returns_error_when_npi_unavailable(self):
+        """Test apply returns error when NPI is not available."""
+        handler = NvidiaSettingsHandler()
+
+        with patch.object(handler._npi, "is_available", return_value=False):
+            result = handler.apply({"preset": "minimum_latency"})
+
+        assert result["success"] is False
+        assert "not configured" in result["error"]
+
+    def test_apply_unknown_preset_returns_error(self):
+        """Test apply returns error for unknown preset."""
+        handler = NvidiaSettingsHandler()
+
+        with patch.object(handler._npi, "is_available", return_value=True):
+            result = handler.apply({"preset": "nonexistent_preset"})
+
+        assert result["success"] is False
+        assert "Unknown preset" in result["error"]
+
+    def test_apply_preset_success(self):
+        """Test apply preset succeeds."""
+        handler = NvidiaSettingsHandler()
+
+        with (patch.object(handler._npi, "is_available", return_value=True),
+              patch.object(handler._npi, "import_profile")):
+            result = handler.apply({"preset": "minimum_latency"})
+
+        assert result["success"] is True
+        assert "minimum_latency" in result["applied"][0]
+
+    def test_apply_profile_path_success(self, tmp_path):
+        """Test apply from profile path succeeds."""
+        profile_file = tmp_path / "test.nip"
+        profile_file.write_text("test", encoding="utf-8")
+
+        handler = NvidiaSettingsHandler()
+
+        with (patch.object(handler._npi, "is_available", return_value=True),
+              patch.object(handler._npi, "import_profile")):
+            result = handler.apply({"profile_path": str(profile_file)})
+
+        assert result["success"] is True
+
+    def test_apply_profile_path_not_found(self, tmp_path):
+        """Test apply from missing profile path fails."""
+        handler = NvidiaSettingsHandler()
+
+        with patch.object(handler._npi, "is_available", return_value=True):
+            result = handler.apply({"profile_path": str(tmp_path / "nonexistent.nip")})
+
+        assert result["success"] is False
+        assert "not found" in result["error"]
+
+    def test_apply_individual_settings(self):
+        """Test apply individual settings."""
+        handler = NvidiaSettingsHandler()
+
+        with (patch.object(handler._npi, "is_available", return_value=True),
+              patch.object(handler._npi, "import_profile")):
+            result = handler.apply({"low_latency_mode": "ultra", "vsync": "off"})
+
+        assert result["success"] is True
+
+    def test_apply_handles_exception(self):
+        """Test apply handles exceptions."""
+        handler = NvidiaSettingsHandler()
+
+        with (patch.object(handler._npi, "is_available", return_value=True),
+              patch.object(handler._npi, "import_profile", side_effect=Exception("NPI error"))):
+            result = handler.apply({"preset": "minimum_latency"})
+
+        assert result["success"] is False
+        assert "NPI error" in result["error"]
+
+
+class TestNvidiaBackupRestore:
+    """Tests for backup() and restore() methods."""
+
+    def test_backup_when_npi_unavailable(self):
+        """Test backup returns error when NPI unavailable."""
+        handler = NvidiaSettingsHandler()
+
+        with patch.object(handler._npi, "is_available", return_value=False):
+            result = handler.backup()
+
+        assert result["success"] is False
+        assert "not available" in result["error"]
+
+    def test_backup_creates_file(self, tmp_path):
+        """Test backup creates .nip file."""
+        handler = NvidiaSettingsHandler()
+        handler.BACKUP_DIR = tmp_path
+
+        with (patch.object(handler._npi, "is_available", return_value=True),
+              patch.object(handler._npi, "export_profile"),
+              patch.object(handler._npi, "read_current_settings", return_value={})):
+            result = handler.backup()
+
+        assert result["success"] is True
+        assert result["profile_path"] is not None
+        assert "nvidia_backup_" in result["profile_path"]
+
+    def test_backup_handles_exception(self):
+        """Test backup handles exceptions."""
+        handler = NvidiaSettingsHandler()
+
+        with (patch.object(handler._npi, "is_available", return_value=True),
+              patch.object(handler._npi, "export_profile", side_effect=Exception("Export failed"))):
+            result = handler.backup()
+
+        assert result["success"] is False
+        assert "Export failed" in result["error"]
+
+    def test_restore_without_profile_path(self):
+        """Test restore with no profile_path returns True."""
+        handler = NvidiaSettingsHandler()
+        result = handler.restore({})
+
+        assert result is True
+
+    def test_restore_missing_file_returns_false(self, tmp_path):
+        """Test restore with missing file returns False."""
+        handler = NvidiaSettingsHandler()
+        result = handler.restore({"profile_path": str(tmp_path / "nonexistent.nip")})
+
+        assert result is False
+
+    def test_restore_applies_profile(self, tmp_path):
+        """Test restore applies backup profile."""
+        profile_file = tmp_path / "backup.nip"
+        profile_file.write_text("test", encoding="utf-8")
+
+        handler = NvidiaSettingsHandler()
+
+        with (patch.object(handler._npi, "is_available", return_value=True),
+              patch.object(handler._npi, "import_profile")):
+            result = handler.restore({"profile_path": str(profile_file)})
+
+        assert result is True
+
+
+class TestNvidiaBackwardsCompatibility:
+    """Tests for backwards compatibility methods."""
+
+    def test_npi_path_property(self):
+        """Test NPI_PATH property returns path."""
+        handler = NvidiaSettingsHandler()
+
+        with patch.object(handler._npi, "get_path", return_value=None):
+            assert handler.NPI_PATH is None
+
+    def test_check_npi_available(self):
+        """Test _check_npi_available returns boolean."""
+        handler = NvidiaSettingsHandler()
+
+        with patch.object(handler._npi, "is_available", return_value=True):
+            assert handler._check_npi_available() is True
+
+    def test_get_setting_value_method(self):
+        """Test _get_setting_value method works."""
+        handler = NvidiaSettingsHandler()
+        assert handler._get_setting_value("ultra", "low_latency") == 2
+
+    def test_import_profile_method(self):
+        """Test _import_profile method works."""
+        handler = NvidiaSettingsHandler()
+
+        with patch.object(handler._npi, "import_profile") as mock:
+            from pathlib import Path
+            handler._import_profile(Path("test.nip"))
+            mock.assert_called_once()
+
+    def test_export_profile_method(self):
+        """Test _export_profile method works."""
+        handler = NvidiaSettingsHandler()
+
+        with patch.object(handler._npi, "export_profile") as mock:
+            from pathlib import Path
+            handler._export_profile(Path("test.nip"))
+            mock.assert_called_once()
