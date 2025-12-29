@@ -1,4 +1,3 @@
-import * as React from 'react';
 import { Moon, Sun, Settings, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAppStore } from '@/stores/appStore';
@@ -10,7 +9,7 @@ interface HeaderProps {
 }
 
 export function Header({ showBack, title }: HeaderProps) {
-  const { theme, setTheme, currentPage, setPage } = useAppStore();
+  const { theme, setTheme, setPage } = useAppStore();
 
   const cycleTheme = () => {
     const themes: Theme[] = ['light', 'dark', 'system'];

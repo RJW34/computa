@@ -103,18 +103,31 @@ def copy_cli_to_gui() -> bool:
     GUI_BINARIES_DIR.mkdir(parents=True, exist_ok=True)
 
     # Tauri expects: abso-{target_triple}.exe
-    target_name = "abso-x86_64-pc-windows-msvc.exe"
-    target_path = GUI_BINARIES_DIR / target_name
+    # Copy for both MSVC and GNU targets to support different build environments
+    targets = [
+        "abso-x86_64-pc-windows-msvc.exe",
+        "abso-x86_64-pc-windows-gnu.exe",
+        "abso.exe",  # Development fallback
+    ]
 
-    shutil.copy2(cli_exe, target_path)
-    print(f"  Copied to: {target_path}")
-
-    # Also copy as abso.exe for development fallback
-    dev_path = GUI_BINARIES_DIR / "abso.exe"
-    shutil.copy2(cli_exe, dev_path)
-    print(f"  Copied to: {dev_path}")
+    for target_name in targets:
+        target_path = GUI_BINARIES_DIR / target_name
+        shutil.copy2(cli_exe, target_path)
+        print(f"  Copied to: {target_path}")
 
     return True
+
+
+def get_gui_build_env() -> dict:
+    """Get environment with Node.js, Cargo, and MinGW in PATH."""
+    env = os.environ.copy()
+    extra_paths = [
+        r"C:\Program Files\nodejs",
+        os.path.expanduser(r"~\.cargo\bin"),
+        r"C:\msys64\mingw64\bin",
+    ]
+    env["PATH"] = ";".join(extra_paths) + ";" + env.get("PATH", "")
+    return env
 
 
 def build_gui() -> bool:
@@ -132,17 +145,20 @@ def build_gui() -> bool:
         if not copy_cli_to_gui():
             return False
 
+    # Get environment with proper PATH
+    env = get_gui_build_env()
+
     # Check for node_modules
     if not (GUI_DIR / "node_modules").exists():
         print("Installing npm dependencies...")
-        result = subprocess.run(["npm", "install"], cwd=GUI_DIR, shell=True)
+        result = subprocess.run(["npm", "install"], cwd=GUI_DIR, shell=True, env=env)
         if result.returncode != 0:
             print("ERROR: npm install failed!")
             return False
 
     # Build with Tauri
     print("\nRunning Tauri build...")
-    result = subprocess.run(["npm", "run", "tauri", "build"], cwd=GUI_DIR, shell=True)
+    result = subprocess.run(["npm", "run", "tauri", "build"], cwd=GUI_DIR, shell=True, env=env)
 
     if result.returncode != 0:
         print("ERROR: Tauri build failed!")

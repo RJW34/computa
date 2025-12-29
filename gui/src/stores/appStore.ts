@@ -43,6 +43,7 @@ interface AppState {
   // Backups
   backups: Backup[];
   backupsLoading: boolean;
+  backupsError: string | null;
   loadBackups: () => Promise<void>;
 
   // Settings mode
@@ -59,7 +60,7 @@ interface AppState {
 
 export const useAppStore = create<AppState>()(
   persist(
-    (set, get) => ({
+    (set, _get) => ({
       // Navigation
       currentPage: 'home',
       setPage: (page) => set({ currentPage: page }),
@@ -133,13 +134,18 @@ export const useAppStore = create<AppState>()(
       // Backups
       backups: [],
       backupsLoading: false,
+      backupsError: null as string | null,
       loadBackups: async () => {
-        set({ backupsLoading: true });
+        set({ backupsLoading: true, backupsError: null });
         try {
           const backups = await api.getBackups();
           set({ backups, backupsLoading: false });
-        } catch {
-          set({ backupsLoading: false });
+        } catch (error) {
+          console.error('Failed to load backups:', error);
+          set({
+            backupsLoading: false,
+            backupsError: error instanceof Error ? error.message : 'Failed to load backups'
+          });
         }
       },
 

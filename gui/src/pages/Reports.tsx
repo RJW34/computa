@@ -3,7 +3,6 @@ import { Header } from '@/components/Header';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Copy, FileDown, Gamepad2 } from 'lucide-react';
-import { cn } from '@/lib/utils';
 
 const PROFILES = [
   { id: 'slippi-melee', name: 'Slippi Melee' },

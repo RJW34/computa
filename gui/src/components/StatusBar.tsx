@@ -1,6 +1,5 @@
 import * as React from 'react';
-import { Shield, ShieldOff, Clock, CheckCircle, XCircle } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { Shield, ShieldOff, Clock, CheckCircle } from 'lucide-react';
 import { useAppStore } from '@/stores/appStore';
 import { formatRelativeTime } from '@/lib/utils';
 

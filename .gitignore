@@ -10,8 +10,10 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
-lib64/
+/lib/
+/lib64/
+# But don't ignore GUI's lib directory
+!gui/src/lib/
 parts/
 sdist/
 var/
