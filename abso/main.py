@@ -19,8 +19,26 @@ from abso.utils.admin import is_admin
 
 console = Console()
 
-# Paths
-ROOT_DIR = Path(__file__).parent.parent
+# Paths - handle both development and PyInstaller bundled modes
+def get_data_dir() -> Path:
+    """Get the data directory for backups and reports.
+
+    In development: uses project root
+    When bundled: uses user's AppData/Local/ABSO
+    """
+    import sys
+
+    # Check if running as PyInstaller bundle
+    if getattr(sys, 'frozen', False):
+        # Running as bundled exe - use AppData
+        app_data = Path.home() / "AppData" / "Local" / "ABSO"
+        app_data.mkdir(parents=True, exist_ok=True)
+        return app_data
+    else:
+        # Development mode - use project root
+        return Path(__file__).parent.parent
+
+ROOT_DIR = get_data_dir()
 BACKUPS_DIR = ROOT_DIR / "backups"
 REPORTS_DIR = ROOT_DIR / "reports"
 

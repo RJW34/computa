@@ -34,22 +34,32 @@ fn get_sidecar_path(app_handle: Option<&tauri::AppHandle>) -> PathBuf {
     PathBuf::from("abso.exe")
 }
 
-/// Check if the bundled CLI exists, otherwise fall back to Python
+/// Check if we should use Python (development) or bundled exe (production)
 fn should_use_python() -> bool {
-    let dev_paths = [
-        PathBuf::from("../../dist/abso.exe"),
-        PathBuf::from("../dist/abso.exe"),
-        PathBuf::from("dist/abso.exe"),
-    ];
-
-    for path in &dev_paths {
-        if path.exists() {
-            return false;
-        }
+    // In debug builds, always use Python for consistent data paths
+    #[cfg(debug_assertions)]
+    {
+        return true;
     }
 
-    // No bundled exe found, use Python
-    true
+    // In release builds, check for bundled sidecar
+    #[cfg(not(debug_assertions))]
+    {
+        let dev_paths = [
+            PathBuf::from("../../dist/abso.exe"),
+            PathBuf::from("../dist/abso.exe"),
+            PathBuf::from("dist/abso.exe"),
+        ];
+
+        for path in &dev_paths {
+            if path.exists() {
+                return false;
+            }
+        }
+
+        // No bundled exe found, use Python
+        true
+    }
 }
 
 /// Run an ABSO CLI command and return the output
