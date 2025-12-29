@@ -70,12 +70,13 @@ export function getSeverityIcon(severity: 'critical' | 'warning' | 'info') {
 
 /**
  * Format hardware summary line
+ * Shows: GPU @ RefreshHz · CPU · RAM · VRR type (if available)
  */
 export function formatHardwareSummary(hardware: {
   gpu: { name: string };
   cpu: { name: string };
   ram_gb: number;
-  monitors: { refresh_rate: number; vrr_type: string | null }[];
+  monitors: { refresh_rate: number; vrr_type: string | null; is_primary?: boolean }[];
 }): string {
   const gpuShort = hardware.gpu.name
     .replace('NVIDIA GeForce ', '')
@@ -86,10 +87,17 @@ export function formatHardwareSummary(hardware: {
     .replace(' Processor', '')
     .split('@')[0]
     .trim();
-  const primaryMonitor = hardware.monitors.find((m) => m) || hardware.monitors[0];
-  const monitorInfo = primaryMonitor
-    ? `${primaryMonitor.refresh_rate}Hz${primaryMonitor.vrr_type ? ` ${primaryMonitor.vrr_type}` : ''}`
-    : '';
 
-  return `${gpuShort} · ${cpuShort} · ${hardware.ram_gb}GB${monitorInfo ? ` · ${monitorInfo}` : ''}`;
+  // Use the PRIMARY monitor for Hz display (not just first in list)
+  const primaryMonitor = hardware.monitors.find((m: { is_primary?: boolean }) => m.is_primary) || hardware.monitors[0];
+  const refreshHz = primaryMonitor?.refresh_rate ? `@ ${primaryMonitor.refresh_rate}Hz` : '';
+  const vrrType = primaryMonitor?.vrr_type || '';
+
+  // Format: GPU @ Hz · CPU · RAM · VRR
+  let summary = `${gpuShort} ${refreshHz} · ${cpuShort} · ${hardware.ram_gb}GB`;
+  if (vrrType) {
+    summary += ` · ${vrrType}`;
+  }
+
+  return summary;
 }

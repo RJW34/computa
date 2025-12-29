@@ -765,16 +765,24 @@ class HardwareDetector:
                     current_width = settings.PelsWidth
                     current_height = settings.PelsHeight
 
-                    # Use CCD API refresh rate if available (more accurate)
-                    # CCD source IDs correspond to active display order
+                    # Use legacy API as primary source - it reports actual current refresh rate
+                    # CCD API can report incorrect vSyncFreq (base rate ~60Hz) for VRR monitors
+                    refresh_rate = legacy_refresh_rate
+
+                    # Only use CCD if it reports a HIGHER value (catches DSC modes)
                     if active_display_index in ccd_refresh_rates:
-                        refresh_rate = ccd_refresh_rates[active_display_index]
-                        logger.debug(
-                            f"Using CCD refresh rate {refresh_rate} Hz for display {active_display_index} "
-                            f"(legacy reported {legacy_refresh_rate} Hz)"
-                        )
-                    else:
-                        refresh_rate = legacy_refresh_rate
+                        ccd_rate = ccd_refresh_rates[active_display_index]
+                        if ccd_rate > legacy_refresh_rate:
+                            refresh_rate = ccd_rate
+                            logger.debug(
+                                f"Using CCD refresh rate {ccd_rate} Hz for display {active_display_index} "
+                                f"(legacy reported lower: {legacy_refresh_rate} Hz)"
+                            )
+                        else:
+                            logger.debug(
+                                f"Using legacy refresh rate {legacy_refresh_rate} Hz for display {active_display_index} "
+                                f"(CCD reported {ccd_rate} Hz - likely VRR base rate)"
+                            )
 
                     # Find maximum supported refresh rate from legacy API
                     max_refresh_rate = refresh_rate

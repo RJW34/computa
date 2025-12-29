@@ -70,7 +70,8 @@ class NvidiaSettingsHandler(SettingsHandler):
     def detect(self) -> dict[str, Any]:
         """Detect current Nvidia settings.
 
-        Returns GPU info via nvidia-smi and current 3D settings via NPI export.
+        Returns GPU info via nvidia-smi. Does NOT read current 3D settings
+        to avoid triggering NPI GUI (which doesn't support headless export).
         """
         result: dict[str, Any] = {
             "driver_version": None,
@@ -78,25 +79,20 @@ class NvidiaSettingsHandler(SettingsHandler):
             "vram_total_mb": None,
             "npi_available": self._npi.is_available(),
             "npi_path": str(self._npi.get_path()) if self._npi.get_path() else None,
-            "current_settings": {},
         }
 
-        # Get basic info from nvidia-smi
+        # Get basic info from nvidia-smi (headless, no GUI)
         gpu_info = self._detect_gpu_info()
         result.update(gpu_info)
-
-        # Get current 3D settings if NPI is available
-        if result["npi_available"]:
-            try:
-                settings = self._npi.read_current_settings()
-                result["current_settings"] = settings
-            except Exception as e:
-                logger.debug(f"Failed to read current Nvidia settings: {e}")
 
         return result
 
     def audit(self) -> list[Issue]:
-        """Audit Nvidia settings for gaming optimization issues."""
+        """Audit Nvidia settings for gaming optimization issues.
+
+        Note: Cannot read current 3D settings without triggering NPI GUI.
+        This audit only checks NPI availability and provides general guidance.
+        """
         issues: list[Issue] = []
         current = self.detect()
 
@@ -115,8 +111,14 @@ class NvidiaSettingsHandler(SettingsHandler):
             ))
             return issues
 
+        # Note: We cannot read current Nvidia 3D settings without triggering NPI GUI
+        # (NPI doesn't support headless export). Skip detailed settings audit.
+        # Users should apply a profile to ensure optimal settings.
+        return issues
+
+        # DISABLED: The code below requires NPI export which opens GUI
         # Check current settings against optimal for gaming
-        current_settings = current.get("current_settings", {})
+        current_settings = {}
 
         # Check Power Management Mode
         power_mode = current_settings.get("power_management")
