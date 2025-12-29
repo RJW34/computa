@@ -1,5 +1,16 @@
 # -*- mode: python ; coding: utf-8 -*-
 
+# Exclude unused modules to reduce binary size
+EXCLUDES = [
+    'tkinter', '_tkinter', 'tcl', 'tk',
+    'matplotlib', 'numpy', 'pandas', 'scipy',
+    'PIL', 'cv2', 'opencv',
+    'pytest', 'unittest', 'doctest',
+    'IPython', 'jupyter', 'notebook',
+    'sphinx', 'docutils',
+    'http.server', 'xmlrpc',
+    'lib2to3', 'distutils', 'setuptools', 'pip',
+]
 
 a = Analysis(
     ['abso\\__main__.py'],
@@ -10,9 +21,9 @@ a = Analysis(
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=[],
+    excludes=EXCLUDES,
     noarchive=False,
-    optimize=0,
+    optimize=2,  # Optimize bytecode
 )
 pyz = PYZ(a.pure)
 
@@ -25,7 +36,7 @@ exe = EXE(
     name='abso',
     debug=False,
     bootloader_ignore_signals=False,
-    strip=False,
+    strip=True,  # Strip debug symbols
     upx=True,
     upx_exclude=[],
     runtime_tmpdir=None,
