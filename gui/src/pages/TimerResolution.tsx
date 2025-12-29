@@ -83,7 +83,7 @@ export function TimerResolution() {
             <div className="flex items-center justify-between">
               <div>
                 <label htmlFor="keep-alive" className="font-medium">
-                  Keep resolution while ABSO is running
+                  Keep resolution while A.B.S.O. is running
                 </label>
                 <p className="text-sm text-muted-foreground">
                   Timer resolution resets when the process that set it exits

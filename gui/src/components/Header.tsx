@@ -34,7 +34,7 @@ export function Header({ showBack, title }: HeaderProps) {
             </Button>
           )}
           <h1 className="text-xl font-bold">
-            {title || 'ABSO'}
+            {title || 'A.B.S.O.'}
           </h1>
         </div>
 

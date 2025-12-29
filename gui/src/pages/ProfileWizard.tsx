@@ -205,7 +205,7 @@ export function ProfileWizard() {
         {wizardStep === 2 && (
           <div className="space-y-4">
             <p className="text-muted-foreground mb-4">
-              Before applying changes, ABSO can create a backup so you can
+              Before applying changes, A.B.S.O. can create a backup so you can
               restore your previous settings if needed.
             </p>
 
