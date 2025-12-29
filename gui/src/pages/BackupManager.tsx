@@ -61,11 +61,11 @@ export function BackupManager() {
                         {formatTimestamp(backup.created_at)}
                       </h4>
                       <p className="text-sm text-muted-foreground mt-1">
-                        {backup.description || `Before profile application`}
+                        Backup ID: {backup.id}
                       </p>
                       <p className="text-xs text-muted-foreground mt-2">
                         Components:{' '}
-                        {Object.keys(backup.components)
+                        {backup.components
                           .map((c) => c.replace('SettingsHandler', ''))
                           .join(', ')}
                       </p>
