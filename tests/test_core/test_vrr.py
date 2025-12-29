@@ -1,0 +1,200 @@
+"""Tests for VRR optimization knowledge base."""
+
+from __future__ import annotations
+
+import pytest
+
+from abso.core.vrr import (
+    FrameLimiterType,
+    GraphicsAPI,
+    VRR_FPS_CAPS,
+    get_best_ingame_preset,
+    get_fighting_game_config,
+    get_high_refresh_benefit,
+    get_limiter_recommendation,
+    get_llm_recommendation,
+    get_vrr_fps_cap,
+)
+
+
+class TestVRRFPSCap:
+    """Tests for VRR FPS cap calculations."""
+
+    def test_get_vrr_fps_cap_common_refresh_rates(self):
+        """Test FPS cap for common refresh rates."""
+        assert get_vrr_fps_cap(60) == 57
+        assert get_vrr_fps_cap(120) == 117
+        assert get_vrr_fps_cap(144) == 141
+        assert get_vrr_fps_cap(165) == 162
+        assert get_vrr_fps_cap(240) == 237
+        assert get_vrr_fps_cap(300) == 297
+        assert get_vrr_fps_cap(360) == 357
+
+    def test_get_vrr_fps_cap_fallback_calculation(self):
+        """Test FPS cap calculation for non-preset refresh rates."""
+        # Non-preset values should use refresh - 3
+        assert get_vrr_fps_cap(85) == 82
+        assert get_vrr_fps_cap(155) == 152
+
+    def test_vrr_fps_caps_dict_has_common_values(self):
+        """Test that VRR_FPS_CAPS contains expected presets."""
+        assert 60 in VRR_FPS_CAPS
+        assert 144 in VRR_FPS_CAPS
+        assert 240 in VRR_FPS_CAPS
+        assert 360 in VRR_FPS_CAPS
+
+
+class TestBestInGamePreset:
+    """Tests for in-game FPS preset selection."""
+
+    def test_get_best_ingame_preset_exact_match(self):
+        """Test when refresh rate matches a preset exactly."""
+        # 144Hz monitor, 141 is optimal, 120 is best preset
+        assert get_best_ingame_preset(144) == 120  # 141 optimal, presets are 60,120,144
+
+    def test_get_best_ingame_preset_custom_presets(self):
+        """Test with custom game presets."""
+        # Rivals 2 presets
+        rivals_presets = [60, 120, 144, 165, 240]
+
+        # 300Hz monitor -> 297 optimal -> 240 is best preset
+        assert get_best_ingame_preset(300, rivals_presets) == 240
+
+        # 165Hz monitor -> 162 optimal -> 144 is best preset
+        assert get_best_ingame_preset(165, rivals_presets) == 144
+
+    def test_get_best_ingame_preset_no_valid_preset(self):
+        """Test when no preset is below optimal."""
+        # If minimum preset is 60 and refresh is 50Hz
+        assert get_best_ingame_preset(50, [60, 120]) is None
+
+
+class TestLimiterRecommendation:
+    """Tests for frame limiter recommendations."""
+
+    def test_ingame_custom_values_preferred(self):
+        """Test in-game limiter with custom values is recommended."""
+        result = get_limiter_recommendation(
+            has_ingame_limiter=True,
+            ingame_allows_custom=True,
+            has_reflex=False,
+            refresh_rate=144,
+        )
+        assert result["limiter"] == FrameLimiterType.IN_GAME
+        assert result["fps_cap"] == 141
+
+    def test_ingame_preset_when_close_to_optimal(self):
+        """Test in-game preset used when within 10 FPS of optimal."""
+        result = get_limiter_recommendation(
+            has_ingame_limiter=True,
+            ingame_allows_custom=False,
+            has_reflex=False,
+            refresh_rate=144,
+            available_presets=[60, 120, 135, 144],  # 135 is within 10 of 141
+        )
+        # 141 is optimal, 135 is within 10 of that (141-135=6)
+        assert result["limiter"] == FrameLimiterType.IN_GAME
+        assert result["fps_cap"] == 135
+
+    def test_rtss_when_preset_too_far(self):
+        """Test RTSS recommended when in-game presets are too far from optimal."""
+        result = get_limiter_recommendation(
+            has_ingame_limiter=True,
+            ingame_allows_custom=False,
+            has_reflex=False,
+            refresh_rate=300,
+            available_presets=[60, 120],  # 120 is far from 297
+        )
+        assert result["limiter"] == FrameLimiterType.RTSS
+        assert result["fps_cap"] == 297
+
+    def test_reflex_when_no_ingame_limiter(self):
+        """Test Reflex recommended when no in-game limiter but Reflex available."""
+        result = get_limiter_recommendation(
+            has_ingame_limiter=False,
+            ingame_allows_custom=False,
+            has_reflex=True,
+            refresh_rate=144,
+        )
+        assert result["limiter"] == FrameLimiterType.REFLEX
+        assert result["fps_cap"] is None  # Reflex auto-caps
+
+    def test_rtss_fallback(self):
+        """Test RTSS as fallback when no in-game limiter or Reflex."""
+        result = get_limiter_recommendation(
+            has_ingame_limiter=False,
+            ingame_allows_custom=False,
+            has_reflex=False,
+            refresh_rate=144,
+        )
+        assert result["limiter"] == FrameLimiterType.RTSS
+        assert result["fps_cap"] == 141
+
+
+class TestLLMRecommendation:
+    """Tests for Low Latency Mode recommendations."""
+
+    def test_llm_supported_in_dx11(self):
+        """Test LLM is recommended for DX11."""
+        result = get_llm_recommendation(GraphicsAPI.DX11, has_reflex=False)
+        assert result["low_latency_mode"] == "on"
+
+    def test_llm_supported_in_dx9(self):
+        """Test LLM is recommended for DX9."""
+        result = get_llm_recommendation(GraphicsAPI.DX9, has_reflex=False)
+        assert result["low_latency_mode"] == "on"
+
+    def test_reflex_preferred_for_dx12(self):
+        """Test Reflex is preferred over LLM for DX12."""
+        result = get_llm_recommendation(GraphicsAPI.DX12, has_reflex=True)
+        assert result["low_latency_mode"] == "off"
+        assert result.get("use_reflex") is True
+
+    def test_reflex_preferred_for_vulkan(self):
+        """Test Reflex is preferred over LLM for Vulkan."""
+        result = get_llm_recommendation(GraphicsAPI.VULKAN, has_reflex=True)
+        assert result["low_latency_mode"] == "off"
+        assert result.get("use_reflex") is True
+
+    def test_no_llm_for_dx12_without_reflex(self):
+        """Test LLM off for DX12 without Reflex (no alternative)."""
+        result = get_llm_recommendation(GraphicsAPI.DX12, has_reflex=False)
+        assert result["low_latency_mode"] == "off"
+        assert "use_reflex" not in result or result.get("use_reflex") is not True
+
+
+class TestFightingGameConfig:
+    """Tests for fighting game VRR configuration."""
+
+    def test_vrr_config_default(self):
+        """Test default VRR config for fighting games."""
+        config = get_fighting_game_config(144)
+        assert config["gsync"] is True
+        assert config["vsync_nvcp"] is True
+        assert config["vsync_ingame"] is False
+        assert config["low_latency_mode"] == "on"
+        assert config["fps_cap"] == 141
+
+    def test_competitive_tearing_config(self):
+        """Test competitive config that accepts tearing."""
+        config = get_fighting_game_config(144, accept_tearing=True)
+        assert config["gsync"] is False
+        assert config["vsync_nvcp"] is False
+        assert config["fps_cap"] is None
+
+
+class TestHighRefreshBenefit:
+    """Tests for high refresh rate benefit calculations."""
+
+    def test_scanout_reduction(self):
+        """Test scanout time reduction calculation."""
+        result = get_high_refresh_benefit(60, 240)
+        assert result["base_scanout_ms"] == 16.6
+        assert result["target_scanout_ms"] == 4.2
+        assert result["scanout_reduction_ms"] == pytest.approx(12.4, rel=0.01)
+
+    def test_percentage_reduction(self):
+        """Test percentage reduction is calculated."""
+        result = get_high_refresh_benefit(60, 240)
+        # (16.6 - 4.2) / 16.6 * 100 ≈ 74.7%
+        assert result["scanout_reduction_percent"] > 70

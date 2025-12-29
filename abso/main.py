@@ -1,7 +1,11 @@
 """CLI entry point for ABSO."""
 
+import json
 import sys
+from dataclasses import asdict
+from datetime import datetime
 from pathlib import Path
+from typing import Any
 
 import click
 from rich.console import Console
@@ -19,6 +23,32 @@ console = Console()
 ROOT_DIR = Path(__file__).parent.parent
 BACKUPS_DIR = ROOT_DIR / "backups"
 REPORTS_DIR = ROOT_DIR / "reports"
+
+
+def json_serial(obj: Any) -> Any:
+    """JSON serializer for objects not serializable by default."""
+    if isinstance(obj, datetime):
+        return obj.isoformat()
+    if isinstance(obj, Path):
+        return str(obj)
+    if hasattr(obj, "__dict__"):
+        return obj.__dict__
+    raise TypeError(f"Type {type(obj)} not serializable")
+
+
+def output_json(data: Any, success: bool = True, error: str | None = None) -> None:
+    """Output data as JSON to stdout."""
+    if error:
+        result = {"success": False, "error": error, "data": None}
+    else:
+        result = {"success": success, "data": data}
+    click.echo(json.dumps(result, default=json_serial, indent=2))
+
+
+def json_error(message: str, exit_code: int = 1) -> None:
+    """Output an error as JSON and exit."""
+    output_json(None, success=False, error=message)
+    sys.exit(exit_code)
 
 
 @click.group(invoke_without_command=True)
@@ -46,15 +76,30 @@ def interactive() -> None:
 
 
 @cli.command()
-def detect() -> None:
+@click.option("--json", "json_output", is_flag=True, help="Output as JSON for GUI integration")
+def detect(json_output: bool) -> None:
     """Detect and report gaming hardware."""
-    if not is_admin():
+    if not json_output and not is_admin():
         console.print("[yellow]Warning: Running without admin privileges. Some detection may be limited.[/yellow]")
-
-    console.print(Panel("Hardware Detection", style="bold blue"))
 
     detector = HardwareDetector()
     hardware = detector.detect_all()
+
+    # JSON output mode
+    if json_output:
+        # Flatten for GUI consumption
+        output_data = {
+            "gpu": hardware.get("gpu"),
+            "cpu": hardware.get("cpu"),
+            "ram_gb": hardware.get("ram", {}).get("total_gb"),
+            "monitors": hardware.get("monitors", []),
+            "is_admin": is_admin(),
+        }
+        output_json(output_data)
+        return
+
+    # Rich console output
+    console.print(Panel("Hardware Detection", style="bold blue"))
 
     console.print("\n[bold]GPU:[/bold]")
     if hardware.get("gpu"):
@@ -121,17 +166,37 @@ def detect() -> None:
 
 @cli.command()
 @click.option("--verbose", "-v", is_flag=True, help="Show detailed explanations")
-def audit(verbose: bool) -> None:
+@click.option("--json", "json_output", is_flag=True, help="Output as JSON for GUI integration")
+def audit(verbose: bool, json_output: bool) -> None:
     """Audit current system configuration for gaming optimization."""
     if not is_admin():
+        if json_output:
+            json_error("Admin privileges required for full audit")
         console.print("[red]Error: Admin privileges required for full audit.[/red]")
         console.print("Please run as administrator.")
         sys.exit(1)
 
-    console.print(Panel("Configuration Audit", style="bold blue"))
-
     auditor = ConfigurationAuditor()
     issues = auditor.audit_all()
+
+    # JSON output mode
+    if json_output:
+        issues_data = [
+            {
+                "title": issue.title,
+                "severity": issue.severity,
+                "current_value": issue.current_value,
+                "optimal_value": issue.optimal_value,
+                "explanation": issue.explanation,
+                "category": getattr(issue, "category", "general"),
+            }
+            for issue in issues
+        ]
+        output_json(issues_data)
+        return
+
+    # Rich console output
+    console.print(Panel("Configuration Audit", style="bold blue"))
 
     if not issues:
         console.print("[green]No issues found! Your system appears optimally configured.[/green]")
@@ -157,34 +222,82 @@ def audit(verbose: bool) -> None:
 
 
 @cli.command()
-def profiles() -> None:
+@click.option("--json", "json_output", is_flag=True, help="Output as JSON for GUI integration")
+def profiles(json_output: bool) -> None:
     """List available game optimization profiles."""
-    console.print(Panel("Available Profiles", style="bold blue"))
-
     available_profiles = [
-        ("slippi-melee", "Super Smash Bros. Melee (Slippi)", "Ultra-low latency"),
-        ("rivals2", "Rivals of Aether 2", "Ultra-low latency"),
-        ("cod-bo7", "Call of Duty: Black Ops 7", "Low latency, stable FPS"),
-        ("diablo4", "Diablo 4", "Balanced performance"),
+        {
+            "id": "slippi-melee",
+            "display_name": "Super Smash Bros. Melee (Slippi)",
+            "description": "Ultra-low latency for competitive SSBM",
+            "optimization_target": "minimum_latency",
+            "executables": ["Slippi Dolphin.exe", "Dolphin.exe"],
+        },
+        {
+            "id": "rivals2",
+            "display_name": "Rivals of Aether 2",
+            "description": "VRR-optimized for UE5 fighting game",
+            "optimization_target": "vrr_fighting_game",
+            "executables": ["RivalsofAether2.exe", "Rivals2.exe"],
+        },
+        {
+            "id": "cod-bo7",
+            "display_name": "Call of Duty: Black Ops 7",
+            "description": "Low latency with Nvidia Reflex",
+            "optimization_target": "low_latency_high_fps",
+            "executables": ["cod.exe", "BlackOps7.exe"],
+        },
+        {
+            "id": "diablo4",
+            "display_name": "Diablo 4",
+            "description": "Balanced performance for ARPG",
+            "optimization_target": "balanced",
+            "executables": ["Diablo IV.exe"],
+        },
     ]
 
-    for profile_id, name, focus in available_profiles:
-        console.print(f"\n[bold cyan]{profile_id}[/bold cyan]")
-        console.print(f"  {name}")
-        console.print(f"  [dim]Focus: {focus}[/dim]")
+    if json_output:
+        output_json(available_profiles)
+        return
+
+    console.print(Panel("Available Profiles", style="bold blue"))
+
+    for profile in available_profiles:
+        console.print(f"\n[bold cyan]{profile['id']}[/bold cyan]")
+        console.print(f"  {profile['display_name']}")
+        console.print(f"  [dim]Focus: {profile['description']}[/dim]")
 
 
 @cli.command()
-def games() -> None:
+@click.option("--json", "json_output", is_flag=True, help="Output as JSON for GUI integration")
+def games(json_output: bool) -> None:
     """Detect installed games and suggest matching profiles."""
     from abso.core.game_detector import detect_installed_games, get_profile_suggestions
+
+    detected_games = detect_installed_games()
+
+    if json_output:
+        games_data = [
+            {
+                "name": game.name,
+                "platform": game.platform,
+                "executable": game.executable,
+                "install_path": str(game.install_path),
+            }
+            for game in detected_games
+        ]
+        suggestions = get_profile_suggestions()
+        suggestions_data = {
+            profile: [g.name for g in matched]
+            for profile, matched in suggestions.items()
+        }
+        output_json({"games": games_data, "suggestions": suggestions_data})
+        return
 
     console.print(Panel("Game Detection", style="bold blue"))
     console.print("[dim]Scanning for installed games...[/dim]\n")
 
-    games = detect_installed_games()
-
-    if not games:
+    if not detected_games:
         console.print("[yellow]No supported games detected.[/yellow]")
         console.print("\nSupported games:")
         console.print("  - Super Smash Bros. Melee (Slippi)")
@@ -193,9 +306,9 @@ def games() -> None:
         console.print("  - Diablo IV")
         return
 
-    console.print(f"[green]Found {len(games)} game(s):[/green]\n")
+    console.print(f"[green]Found {len(detected_games)} game(s):[/green]\n")
 
-    for game in games:
+    for game in detected_games:
         platform_icon = {
             "steam": "[blue]Steam[/blue]",
             "epic": "[dim]Epic[/dim]",
@@ -222,32 +335,52 @@ def games() -> None:
 @cli.command()
 @click.argument("profile_name")
 @click.option("--no-backup", is_flag=True, help="Skip automatic backup (not recommended)")
-def apply(profile_name: str, no_backup: bool) -> None:
+@click.option("--json", "json_output", is_flag=True, help="Output as JSON for GUI integration")
+def apply(profile_name: str, no_backup: bool, json_output: bool) -> None:
     """Apply a game optimization profile.
 
     PROFILE_NAME is the profile to apply (e.g., slippi-melee, cod-bo7, diablo4).
     """
     if not is_admin():
+        if json_output:
+            json_error("Admin privileges required to apply profiles")
         console.print("[red]Error: Admin privileges required to apply profiles.[/red]")
         console.print("Please run as administrator.")
         sys.exit(1)
 
-    console.print(Panel(f"Applying Profile: {profile_name}", style="bold blue"))
+    backup_id = None
+
+    if not json_output:
+        console.print(Panel(f"Applying Profile: {profile_name}", style="bold blue"))
 
     # Create backup first (unless explicitly skipped)
     if not no_backup:
-        console.print("[yellow]Creating backup before applying changes...[/yellow]")
+        if not json_output:
+            console.print("[yellow]Creating backup before applying changes...[/yellow]")
         BACKUPS_DIR.mkdir(parents=True, exist_ok=True)
         backup_manager = BackupManager(BACKUPS_DIR)
         backup_id = backup_manager.create_backup()
-        console.print(f"[green]Backup created: {backup_id}[/green]\n")
+        if not json_output:
+            console.print(f"[green]Backup created: {backup_id}[/green]\n")
     else:
-        console.print("[yellow]Warning: Skipping backup as requested.[/yellow]\n")
+        if not json_output:
+            console.print("[yellow]Warning: Skipping backup as requested.[/yellow]\n")
 
     applier = ProfileApplier()
 
     try:
         result = applier.apply_profile(profile_name)
+
+        if json_output:
+            output_json({
+                "success": result.success,
+                "profile": profile_name,
+                "backup_id": backup_id,
+                "requires_reboot": result.requires_reboot,
+                "in_game_settings": result.in_game_settings if hasattr(result, "in_game_settings") else [],
+                "error": result.error if not result.success else None,
+            })
+            return
 
         if result.success:
             console.print(f"\n[green]Profile '{profile_name}' applied successfully![/green]")
@@ -262,36 +395,78 @@ def apply(profile_name: str, no_backup: bool) -> None:
             sys.exit(1)
 
     except ValueError as e:
+        if json_output:
+            json_error(str(e))
         console.print(f"[red]Error: {e}[/red]")
         sys.exit(1)
 
 
 @cli.command()
 @click.argument("backup_id", default="latest")
-def restore(backup_id: str) -> None:
+@click.option("--json", "json_output", is_flag=True, help="Output as JSON for GUI integration")
+def restore(backup_id: str, json_output: bool) -> None:
     """Restore system settings from a backup.
 
     BACKUP_ID is the backup timestamp or 'latest' for most recent.
     """
     if not is_admin():
+        if json_output:
+            json_error("Admin privileges required to restore settings")
         console.print("[red]Error: Admin privileges required to restore settings.[/red]")
         console.print("Please run as administrator.")
         sys.exit(1)
 
-    console.print(Panel(f"Restoring Backup: {backup_id}", style="bold blue"))
+    if not json_output:
+        console.print(Panel(f"Restoring Backup: {backup_id}", style="bold blue"))
 
     backup_manager = BackupManager(BACKUPS_DIR)
 
     try:
         backup_manager.restore_backup(backup_id)
+        if json_output:
+            output_json({"success": True, "backup_id": backup_id, "message": "Backup restored successfully"})
+            return
         console.print(f"\n[green]Backup '{backup_id}' restored successfully![/green]")
         console.print("[yellow]Note: Some changes may require a reboot to take effect.[/yellow]")
     except FileNotFoundError:
+        if json_output:
+            json_error(f"Backup '{backup_id}' not found")
         console.print(f"[red]Error: Backup '{backup_id}' not found.[/red]")
         sys.exit(1)
     except Exception as e:
+        if json_output:
+            json_error(f"Error restoring backup: {e}")
         console.print(f"[red]Error restoring backup: {e}[/red]")
         sys.exit(1)
+
+
+@cli.command()
+@click.option("--json", "json_output", is_flag=True, help="Output as JSON for GUI integration")
+def backups(json_output: bool) -> None:
+    """List available backups."""
+    BACKUPS_DIR.mkdir(parents=True, exist_ok=True)
+    backup_manager = BackupManager(BACKUPS_DIR)
+
+    backup_list = backup_manager.list_backups()
+
+    if json_output:
+        # list_backups() returns dicts with id, created_at, components
+        output_json(backup_list)
+        return
+
+    console.print(Panel("Available Backups", style="bold blue"))
+
+    if not backup_list:
+        console.print("[yellow]No backups found.[/yellow]")
+        console.print("\nBackups are created automatically when you apply a profile.")
+        return
+
+    for backup in backup_list:
+        console.print(f"\n[bold cyan]{backup['id']}[/bold cyan]")
+        console.print(f"  Created: {backup['created_at']}")
+        if backup.get("components"):
+            components = ", ".join(backup["components"])
+            console.print(f"  [dim]Components: {components}[/dim]")
 
 
 @cli.command()
@@ -299,7 +474,9 @@ def restore(backup_id: str) -> None:
               help="Timer resolution in milliseconds (default: 0.5)")
 @click.option("--keep-alive", "-k", is_flag=True,
               help="Keep running to maintain timer resolution")
-def timer(resolution: float, keep_alive: bool) -> None:
+@click.option("--status", is_flag=True, help="Show current timer status only")
+@click.option("--json", "json_output", is_flag=True, help="Output as JSON for GUI integration")
+def timer(resolution: float, keep_alive: bool, status: bool, json_output: bool) -> None:
     """Set system timer resolution for gaming.
 
     Timer resolution affects frame pacing and scheduling precision.
@@ -314,18 +491,39 @@ def timer(resolution: float, keep_alive: bool) -> None:
     current = handler.detect()
 
     if not current.get("available"):
+        if json_output:
+            json_error("Timer resolution API not available")
         console.print("[red]Error: Timer resolution API not available.[/red]")
         sys.exit(1)
 
-    console.print(Panel("Timer Resolution", style="bold blue"))
-    console.print(f"Current: {current.get('current_resolution_ms', 'Unknown'):.3f}ms")
-    console.print(f"Minimum: {current.get('maximum_resolution_ms', 'Unknown'):.3f}ms")
-    console.print()
+    # Status-only mode
+    if status or (json_output and not keep_alive):
+        if json_output:
+            output_json({
+                "current": current.get("current_resolution_ms"),
+                "minimum": current.get("maximum_resolution_ms"),  # "maximum" is actually minimum possible
+                "maximum": current.get("minimum_resolution_ms", 15.625),  # Default is actually max
+            })
+            return
+        console.print(Panel("Timer Resolution", style="bold blue"))
+        console.print(f"Current: {current.get('current_resolution_ms', 'Unknown'):.3f}ms")
+        console.print(f"Minimum: {current.get('maximum_resolution_ms', 'Unknown'):.3f}ms")
+        return
+
+    if not json_output:
+        console.print(Panel("Timer Resolution", style="bold blue"))
+        console.print(f"Current: {current.get('current_resolution_ms', 'Unknown'):.3f}ms")
+        console.print(f"Minimum: {current.get('maximum_resolution_ms', 'Unknown'):.3f}ms")
+        console.print()
 
     # Set the resolution
     result = handler.apply({"resolution_ms": resolution})
 
     if result.get("success"):
+        if json_output:
+            output_json({"success": True, "resolution_ms": resolution})
+            return
+
         console.print(f"[green]Timer resolution set to {resolution}ms[/green]")
 
         if keep_alive:
@@ -343,13 +541,16 @@ def timer(resolution: float, keep_alive: bool) -> None:
             console.print("[dim]Note: Resolution will revert when this process exits.[/dim]")
             console.print("[dim]Use --keep-alive to maintain continuously.[/dim]")
     else:
+        if json_output:
+            json_error(f"Failed to set timer resolution: {result.get('error')}")
         console.print(f"[red]Failed to set timer resolution: {result.get('error')}[/red]")
         sys.exit(1)
 
 
 @cli.command()
 @click.argument("profile_name")
-def report(profile_name: str) -> None:
+@click.option("--json", "json_output", is_flag=True, help="Output as JSON for GUI integration")
+def report(profile_name: str, json_output: bool) -> None:
     """Generate in-game settings report for a profile.
 
     PROFILE_NAME is the profile to generate report for.
@@ -360,8 +561,19 @@ def report(profile_name: str) -> None:
 
     try:
         report_path = applier.generate_report(profile_name, REPORTS_DIR)
+
+        if json_output:
+            # Read the report content
+            content = ""
+            if report_path.exists():
+                content = report_path.read_text(encoding="utf-8")
+            output_json({"path": str(report_path), "content": content})
+            return
+
         console.print(f"[green]Report generated: {report_path}[/green]")
     except ValueError as e:
+        if json_output:
+            json_error(str(e))
         console.print(f"[red]Error: {e}[/red]")
         sys.exit(1)
 

@@ -314,8 +314,8 @@ class WindowsSettingsHandler(SettingsHandler):
     def _get_hdr(self) -> dict[str, bool] | bool | None:
         """Get Windows HDR status for all monitors.
 
-        HDR is per-monitor via AdvancedColorEnabled in MonitorDataStore.
-        Returns dict of monitor_id -> enabled status, or None if unavailable.
+        HDR is per-monitor via HDREnabled (primary) in MonitorDataStore.
+        Returns True if ANY monitor has HDR enabled, False if all off, None if unavailable.
         """
         monitor_hdr: dict[str, bool] = {}
         try:
@@ -331,10 +331,11 @@ class WindowsSettingsHandler(SettingsHandler):
                     subkey_name = winreg.EnumKey(key, i)
                     subkey = winreg.OpenKey(key, subkey_name, 0, winreg.KEY_READ)
                     try:
-                        value = winreg.QueryValueEx(subkey, "AdvancedColorEnabled")[0]
+                        # HDREnabled is the primary toggle
+                        value = winreg.QueryValueEx(subkey, "HDREnabled")[0]
                         monitor_hdr[subkey_name] = bool(value)
                     except FileNotFoundError:
-                        # Not set means using system default (could be on or off)
+                        # HDREnabled not set - monitor likely doesn't support HDR
                         pass
                     winreg.CloseKey(subkey)
                     i += 1
@@ -353,7 +354,8 @@ class WindowsSettingsHandler(SettingsHandler):
     def _set_hdr(self, enabled: bool) -> None:
         """Set Windows HDR status for all monitors.
 
-        Sets AdvancedColorEnabled=0/1 for ALL monitors in MonitorDataStore.
+        Sets both HDREnabled and AdvancedColorEnabled for ALL monitors in MonitorDataStore.
+        HDREnabled is the primary toggle, AdvancedColorEnabled is for advanced color features.
         Requires admin privileges.
         """
         try:
@@ -374,7 +376,8 @@ class WindowsSettingsHandler(SettingsHandler):
                     break
             winreg.CloseKey(key)
 
-            # Set AdvancedColorEnabled for each monitor
+            # Set HDR values for each monitor
+            value = 1 if enabled else 0
             for monitor_id in monitor_keys:
                 try:
                     subkey = winreg.OpenKey(
@@ -383,7 +386,9 @@ class WindowsSettingsHandler(SettingsHandler):
                         0,
                         winreg.KEY_ALL_ACCESS
                     )
-                    winreg.SetValueEx(subkey, "AdvancedColorEnabled", 0, winreg.REG_DWORD, 1 if enabled else 0)
+                    # Set both HDREnabled (primary toggle) and AdvancedColorEnabled
+                    winreg.SetValueEx(subkey, "HDREnabled", 0, winreg.REG_DWORD, value)
+                    winreg.SetValueEx(subkey, "AdvancedColorEnabled", 0, winreg.REG_DWORD, value)
                     winreg.CloseKey(subkey)
                     logger.info(f"Set HDR {'enabled' if enabled else 'disabled'} for monitor: {monitor_id}")
                 except PermissionError:

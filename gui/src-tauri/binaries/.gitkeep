@@ -1,0 +1,6 @@
+# Sidecar binaries go here
+#
+# During build, the CLI is copied here as:
+#   abso-x86_64-pc-windows-msvc.exe
+#
+# This is automatically handled by: python build.py all

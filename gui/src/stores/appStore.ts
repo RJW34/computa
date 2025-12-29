@@ -1,0 +1,205 @@
+import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
+import type {
+  HardwareInfo,
+  Issue,
+  Profile,
+  Backup,
+  Page,
+  Theme,
+} from '@/lib/types';
+import * as api from '@/lib/api';
+
+interface AppState {
+  // Navigation
+  currentPage: Page;
+  setPage: (page: Page) => void;
+
+  // Theme
+  theme: Theme;
+  setTheme: (theme: Theme) => void;
+
+  // Admin status
+  isAdmin: boolean;
+  checkAdmin: () => Promise<void>;
+
+  // Hardware
+  hardware: HardwareInfo | null;
+  hardwareLoading: boolean;
+  hardwareError: string | null;
+  detectHardware: () => Promise<void>;
+
+  // Audit
+  auditResults: Issue[];
+  auditLoading: boolean;
+  auditError: string | null;
+  runAudit: () => Promise<void>;
+
+  // Profiles
+  profiles: Profile[];
+  profilesLoading: boolean;
+  loadProfiles: () => Promise<void>;
+
+  // Backups
+  backups: Backup[];
+  backupsLoading: boolean;
+  loadBackups: () => Promise<void>;
+
+  // Settings mode
+  settingsMode: 'simple' | 'advanced';
+  setSettingsMode: (mode: 'simple' | 'advanced') => void;
+
+  // Profile wizard state
+  wizardProfile: string | null;
+  wizardStep: number;
+  setWizardProfile: (profileId: string | null) => void;
+  setWizardStep: (step: number) => void;
+  resetWizard: () => void;
+}
+
+export const useAppStore = create<AppState>()(
+  persist(
+    (set, get) => ({
+      // Navigation
+      currentPage: 'home',
+      setPage: (page) => set({ currentPage: page }),
+
+      // Theme
+      theme: 'system',
+      setTheme: (theme) => {
+        set({ theme });
+        applyTheme(theme);
+      },
+
+      // Admin status
+      isAdmin: false,
+      checkAdmin: async () => {
+        try {
+          const isAdmin = await api.isAdmin();
+          set({ isAdmin });
+        } catch {
+          set({ isAdmin: false });
+        }
+      },
+
+      // Hardware
+      hardware: null,
+      hardwareLoading: false,
+      hardwareError: null,
+      detectHardware: async () => {
+        set({ hardwareLoading: true, hardwareError: null });
+        try {
+          const hardware = await api.detectHardware();
+          set({ hardware, hardwareLoading: false });
+        } catch (error) {
+          set({
+            hardwareError:
+              error instanceof Error ? error.message : 'Detection failed',
+            hardwareLoading: false,
+          });
+        }
+      },
+
+      // Audit
+      auditResults: [],
+      auditLoading: false,
+      auditError: null,
+      runAudit: async () => {
+        set({ auditLoading: true, auditError: null });
+        try {
+          const results = await api.runAudit();
+          set({ auditResults: results, auditLoading: false });
+        } catch (error) {
+          set({
+            auditError: error instanceof Error ? error.message : 'Audit failed',
+            auditLoading: false,
+          });
+        }
+      },
+
+      // Profiles
+      profiles: [],
+      profilesLoading: false,
+      loadProfiles: async () => {
+        set({ profilesLoading: true });
+        try {
+          const profiles = await api.getProfiles();
+          set({ profiles, profilesLoading: false });
+        } catch {
+          set({ profilesLoading: false });
+        }
+      },
+
+      // Backups
+      backups: [],
+      backupsLoading: false,
+      loadBackups: async () => {
+        set({ backupsLoading: true });
+        try {
+          const backups = await api.getBackups();
+          set({ backups, backupsLoading: false });
+        } catch {
+          set({ backupsLoading: false });
+        }
+      },
+
+      // Settings mode
+      settingsMode: 'simple',
+      setSettingsMode: (mode) => set({ settingsMode: mode }),
+
+      // Profile wizard
+      wizardProfile: null,
+      wizardStep: 0,
+      setWizardProfile: (profileId) => set({ wizardProfile: profileId }),
+      setWizardStep: (step) => set({ wizardStep: step }),
+      resetWizard: () => set({ wizardProfile: null, wizardStep: 0 }),
+    }),
+    {
+      name: 'abso-storage',
+      partialize: (state) => ({
+        theme: state.theme,
+        settingsMode: state.settingsMode,
+      }),
+    }
+  )
+);
+
+/**
+ * Apply theme to document
+ */
+function applyTheme(theme: Theme) {
+  const root = document.documentElement;
+  root.classList.remove('light', 'dark');
+
+  if (theme === 'system') {
+    const systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    root.classList.add(systemDark ? 'dark' : 'light');
+  } else {
+    root.classList.add(theme);
+  }
+}
+
+// Initialize theme on load
+if (typeof window !== 'undefined') {
+  const stored = localStorage.getItem('abso-storage');
+  if (stored) {
+    try {
+      const { state } = JSON.parse(stored);
+      if (state?.theme) {
+        applyTheme(state.theme);
+      }
+    } catch {
+      // Ignore parse errors
+    }
+  }
+
+  // Listen for system theme changes
+  window
+    .matchMedia('(prefers-color-scheme: dark)')
+    .addEventListener('change', () => {
+      const { theme } = useAppStore.getState();
+      if (theme === 'system') {
+        applyTheme('system');
+      }
+    });
+}
