@@ -70,6 +70,9 @@ class SlippiMeleeProfile(BaseProfile):
                 "game_bar": False,
                 "game_dvr": False,
                 # HAGS: Mixed reports for Dolphin, leave as user preference
+                # HDR disabled for competitive - adds processing overhead
+                "hdr": False,
+                "auto_hdr": False,
             },
             "PowerSettingsHandler": {
                 "ensure_ultimate_performance": True,

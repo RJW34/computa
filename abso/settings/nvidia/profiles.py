@@ -151,6 +151,10 @@ def _build_settings_xml(settings: dict[str, Any]) -> str:
         value = get_setting_value(settings["threaded_optimization"], "threaded")
         xml_settings.append(_make_setting_xml(NvidiaSettingDecimalIDs.THREADED_OPTIMIZATION, value))
 
+    if "vrr_app_override" in settings:
+        value = get_setting_value(settings["vrr_app_override"], "vrr_app_override")
+        xml_settings.append(_make_setting_xml(NvidiaSettingDecimalIDs.VRR_APP_OVERRIDE, value))
+
     return "\n      ".join(xml_settings)
 
 
@@ -213,6 +217,17 @@ def get_setting_value(value: str, setting_type: str) -> int:
 
     elif setting_type == "threaded":
         mapping = {"auto": 0, "on": 1, "off": 2}
+        return mapping.get(value.lower(), 0)
+
+    elif setting_type == "vrr_app_override":
+        # G-Sync per-application override
+        mapping = {
+            "allow": 0,           # Enable G-Sync (default)
+            "force_off": 1,       # Force G-Sync OFF
+            "disallow": 2,        # Disallow VRR
+            "ulmb": 3,            # Use ULMB instead
+            "fixed_refresh": 4,   # Fixed refresh rate
+        }
         return mapping.get(value.lower(), 0)
 
     return 0

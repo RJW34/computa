@@ -20,6 +20,7 @@ class WindowsSettingsHandler(SettingsHandler):
     - Game Bar / Game DVR
     - Hardware-Accelerated GPU Scheduling (HAGS)
     - VBS / Memory Integrity
+    - HDR / Auto HDR
     """
 
     # Registry paths
@@ -27,6 +28,8 @@ class WindowsSettingsHandler(SettingsHandler):
     GAME_DVR_KEY = r"Software\Microsoft\Windows\CurrentVersion\GameDVR"
     GRAPHICS_DRIVERS_KEY = r"SYSTEM\CurrentControlSet\Control\GraphicsDrivers"
     VBS_KEY = r"SYSTEM\CurrentControlSet\Control\DeviceGuard\Scenarios\HypervisorEnforcedCodeIntegrity"
+    # HDR registry path (per-monitor, but this is the global toggle)
+    DISPLAY_KEY = r"SOFTWARE\Microsoft\Windows\CurrentVersion\VideoSettings"
 
     def detect(self) -> dict[str, Any]:
         """Detect current Windows gaming settings."""
@@ -36,6 +39,8 @@ class WindowsSettingsHandler(SettingsHandler):
             "game_dvr": self._get_game_dvr(),
             "hags": self._get_hags(),
             "vbs": self._get_vbs(),
+            "hdr": self._get_hdr(),
+            "auto_hdr": self._get_auto_hdr(),
         }
 
     def audit(self) -> list[Issue]:
@@ -113,6 +118,12 @@ class WindowsSettingsHandler(SettingsHandler):
             if "vbs" in settings:
                 self._set_vbs(settings["vbs"])
                 requires_reboot = True
+
+            if "hdr" in settings:
+                self._set_hdr(settings["hdr"])
+
+            if "auto_hdr" in settings:
+                self._set_auto_hdr(settings["auto_hdr"])
 
         except Exception as e:
             errors.append(str(e))
@@ -299,3 +310,161 @@ class WindowsSettingsHandler(SettingsHandler):
             winreg.SetValueEx(key, "Enabled", 0, winreg.REG_DWORD, 1 if enabled else 0)
         finally:
             winreg.CloseKey(key)
+
+    def _get_hdr(self) -> dict[str, bool] | bool | None:
+        """Get Windows HDR status for all monitors.
+
+        HDR is per-monitor via AdvancedColorEnabled in MonitorDataStore.
+        Returns dict of monitor_id -> enabled status, or None if unavailable.
+        """
+        monitor_hdr: dict[str, bool] = {}
+        try:
+            key = winreg.OpenKey(
+                winreg.HKEY_LOCAL_MACHINE,
+                r"SYSTEM\CurrentControlSet\Control\GraphicsDrivers\MonitorDataStore",
+                0,
+                winreg.KEY_READ
+            )
+            i = 0
+            while True:
+                try:
+                    subkey_name = winreg.EnumKey(key, i)
+                    subkey = winreg.OpenKey(key, subkey_name, 0, winreg.KEY_READ)
+                    try:
+                        value = winreg.QueryValueEx(subkey, "AdvancedColorEnabled")[0]
+                        monitor_hdr[subkey_name] = bool(value)
+                    except FileNotFoundError:
+                        # Not set means using system default (could be on or off)
+                        pass
+                    winreg.CloseKey(subkey)
+                    i += 1
+                except OSError:
+                    break
+            winreg.CloseKey(key)
+
+            # Return True if ANY monitor has HDR enabled
+            if monitor_hdr:
+                return any(monitor_hdr.values())
+            return None
+        except Exception as e:
+            logger.debug(f"Failed to get HDR status: {e}")
+            return None
+
+    def _set_hdr(self, enabled: bool) -> None:
+        """Set Windows HDR status for all monitors.
+
+        Sets AdvancedColorEnabled=0/1 for ALL monitors in MonitorDataStore.
+        Requires admin privileges.
+        """
+        try:
+            key = winreg.OpenKey(
+                winreg.HKEY_LOCAL_MACHINE,
+                r"SYSTEM\CurrentControlSet\Control\GraphicsDrivers\MonitorDataStore",
+                0,
+                winreg.KEY_READ
+            )
+            monitor_keys: list[str] = []
+            i = 0
+            while True:
+                try:
+                    subkey_name = winreg.EnumKey(key, i)
+                    monitor_keys.append(subkey_name)
+                    i += 1
+                except OSError:
+                    break
+            winreg.CloseKey(key)
+
+            # Set AdvancedColorEnabled for each monitor
+            for monitor_id in monitor_keys:
+                try:
+                    subkey = winreg.OpenKey(
+                        winreg.HKEY_LOCAL_MACHINE,
+                        rf"SYSTEM\CurrentControlSet\Control\GraphicsDrivers\MonitorDataStore\{monitor_id}",
+                        0,
+                        winreg.KEY_ALL_ACCESS
+                    )
+                    winreg.SetValueEx(subkey, "AdvancedColorEnabled", 0, winreg.REG_DWORD, 1 if enabled else 0)
+                    winreg.CloseKey(subkey)
+                    logger.info(f"Set HDR {'enabled' if enabled else 'disabled'} for monitor: {monitor_id}")
+                except PermissionError:
+                    logger.warning(f"Permission denied setting HDR for monitor: {monitor_id}")
+                except Exception as e:
+                    logger.debug(f"Failed to set HDR for monitor {monitor_id}: {e}")
+
+        except Exception as e:
+            logger.error(f"Failed to set HDR: {e}")
+            raise
+
+    def _get_auto_hdr(self) -> bool | None:
+        """Get Windows Auto HDR status (Windows 11 only)."""
+        try:
+            key = winreg.OpenKey(
+                winreg.HKEY_CURRENT_USER,
+                r"Software\Microsoft\DirectX\UserGpuPreferences",
+                0,
+                winreg.KEY_READ
+            )
+            try:
+                value = winreg.QueryValueEx(key, "DirectXUserGlobalSettings")[0]
+                # Auto HDR is enabled if SwapEffectUpgradeEnable=1 in the string
+                return "SwapEffectUpgradeEnable=1" in str(value)
+            except FileNotFoundError:
+                return None
+            finally:
+                winreg.CloseKey(key)
+        except Exception as e:
+            logger.debug(f"Failed to get Auto HDR status: {e}")
+            return None
+
+    def _set_auto_hdr(self, enabled: bool) -> None:
+        """Set Windows Auto HDR status (Windows 11 only).
+
+        Auto HDR converts SDR games to HDR automatically.
+        For competitive gaming, this should typically be disabled.
+        """
+        try:
+            key = winreg.OpenKey(
+                winreg.HKEY_CURRENT_USER,
+                r"Software\Microsoft\DirectX\UserGpuPreferences",
+                0,
+                winreg.KEY_ALL_ACCESS
+            )
+            try:
+                current = winreg.QueryValueEx(key, "DirectXUserGlobalSettings")[0]
+                # Parse and update the SwapEffectUpgradeEnable setting
+                if "SwapEffectUpgradeEnable=" in current:
+                    new_value = current.replace(
+                        "SwapEffectUpgradeEnable=1" if not enabled else "SwapEffectUpgradeEnable=0",
+                        "SwapEffectUpgradeEnable=1" if enabled else "SwapEffectUpgradeEnable=0"
+                    )
+                else:
+                    # Add the setting
+                    new_value = current + f";SwapEffectUpgradeEnable={'1' if enabled else '0'}"
+                winreg.SetValueEx(key, "DirectXUserGlobalSettings", 0, winreg.REG_SZ, new_value)
+            except FileNotFoundError:
+                # Create default value
+                winreg.SetValueEx(
+                    key,
+                    "DirectXUserGlobalSettings",
+                    0,
+                    winreg.REG_SZ,
+                    f"SwapEffectUpgradeEnable={'1' if enabled else '0'}"
+                )
+            finally:
+                winreg.CloseKey(key)
+        except FileNotFoundError:
+            # Key doesn't exist, create it
+            key = winreg.CreateKey(
+                winreg.HKEY_CURRENT_USER,
+                r"Software\Microsoft\DirectX\UserGpuPreferences"
+            )
+            try:
+                winreg.SetValueEx(
+                    key,
+                    "DirectXUserGlobalSettings",
+                    0,
+                    winreg.REG_SZ,
+                    f"SwapEffectUpgradeEnable={'1' if enabled else '0'}"
+                )
+            finally:
+                winreg.CloseKey(key)
