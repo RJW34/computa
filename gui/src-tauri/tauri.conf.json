@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2.0.0",
-  "productName": "A.B.S.O.",
+  "productName": "AdaptiveBattleStationOptimizer",
   "version": "0.1.0",
   "identifier": "com.abso.optimizer",
   "build": {
@@ -42,7 +42,13 @@
     "windows": {
       "certificateThumbprint": null,
       "digestAlgorithm": "sha256",
-      "timestampUrl": ""
+      "timestampUrl": "",
+      "nsis": {
+        "installMode": "currentUser",
+        "installerIcon": "icons/icon.ico",
+        "headerImage": null,
+        "sidebarImage": null
+      }
     }
   },
   "plugins": {

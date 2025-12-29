@@ -24,14 +24,14 @@ def get_data_dir() -> Path:
     """Get the data directory for backups and reports.
 
     In development: uses project root
-    When bundled: uses user's AppData/Local/ABSO
+    When bundled: uses user's AppData/Local/AdaptiveBattleStationOptimizer
     """
     import sys
 
     # Check if running as PyInstaller bundle
     if getattr(sys, 'frozen', False):
         # Running as bundled exe - use AppData
-        app_data = Path.home() / "AppData" / "Local" / "ABSO"
+        app_data = Path.home() / "AppData" / "Local" / "AdaptiveBattleStationOptimizer"
         app_data.mkdir(parents=True, exist_ok=True)
         return app_data
     else:
