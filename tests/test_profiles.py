@@ -96,10 +96,11 @@ class TestProfileSettings:
         assert settings["game_dvr"] is False
 
     def test_slippi_nvidia_settings(self):
-        """Test SlippiMeleeProfile returns Nvidia settings with preset."""
+        """Test SlippiMeleeProfile returns Nvidia settings with minimum latency preset."""
         profile = SlippiMeleeProfile()
         settings = profile.get_settings("NvidiaSettingsHandler")
 
+        # Minimum latency preset - no sync for competitive Melee
         assert settings["preset"] == "minimum_latency"
 
     def test_cod_nvidia_settings(self):

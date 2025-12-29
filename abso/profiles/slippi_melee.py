@@ -93,15 +93,19 @@ class SlippiMeleeProfile(BaseProfile):
                 },
             },
             "NvidiaSettingsHandler": {
-                # Ultra-low latency preset for competitive gaming
+                # Absolute minimum latency - no sync overhead
+                # Dolphin uses Vulkan/OpenGL - LLM doesn't apply, but VSync OFF matters
                 "preset": "minimum_latency",
-                # Individual overrides (applied via preset):
-                # - Low Latency Mode: Ultra
-                # - VSync: Off
+                # Settings applied:
+                # - Low Latency Mode: Ultra (no effect on Vulkan, but doesn't hurt)
+                # - VSync: OFF (critical - removes sync latency entirely)
                 # - Power Management: Prefer Maximum Performance
-                # - Max Frame Rate: Off
                 # - Shader Cache: Unlimited
                 # - Threaded Optimization: On
+                #
+                # Melee outputs at fixed 60fps - G-Sync adds overhead for constant rate.
+                # High refresh still helps via reduced scanout latency even without VRR.
+                # May cause tearing, but competitive players prioritize latency.
             },
             "NetworkSettingsHandler": {
                 "disable_nagle": True,
@@ -143,7 +147,40 @@ class SlippiMeleeProfile(BaseProfile):
         return settings_map.get(handler_name, {})
 
     def get_in_game_settings(self) -> list[dict[str, str]]:
+        """Get recommended Dolphin and NVCP settings.
+
+        Optimized for absolute minimum latency in competitive Melee.
+        G-Sync/VSync disabled - fixed 60fps games don't benefit from VRR.
+        """
         return [
+            # === NVIDIA CONTROL PANEL SETTINGS ===
+            {
+                "category": "Nvidia Control Panel",
+                "setting": "G-SYNC",
+                "value": "Off",
+                "reason": (
+                    "Melee runs at fixed 60fps - G-SYNC adds overhead syncing to a constant rate. "
+                    "Disabling removes ~1-2ms+ of sync latency. High refresh still helps via "
+                    "reduced scanout latency even without VRR."
+                ),
+            },
+            {
+                "category": "Nvidia Control Panel",
+                "setting": "V-SYNC (global/per-game)",
+                "value": "Off",
+                "reason": (
+                    "Disabling V-SYNC eliminates frame queue latency entirely. "
+                    "May cause tearing, but competitive players prioritize input latency."
+                ),
+            },
+            {
+                "category": "Nvidia Control Panel",
+                "setting": "Low Latency Mode",
+                "value": "Ultra (no effect on Vulkan)",
+                "reason": "LLM only works in DX9/DX11. Dolphin uses Vulkan/OpenGL, so no actual effect.",
+            },
+
+            # === DOLPHIN GRAPHICS SETTINGS ===
             {
                 "category": "Graphics",
                 "setting": "Backend",
@@ -154,7 +191,7 @@ class SlippiMeleeProfile(BaseProfile):
                 "category": "Graphics",
                 "setting": "VSync",
                 "value": "Off",
-                "reason": "Eliminates VSync input delay.",
+                "reason": "Disable Dolphin's V-SYNC. NVCP V-SYNC handles sync as VRR safety net.",
             },
             {
                 "category": "Graphics",
@@ -168,6 +205,8 @@ class SlippiMeleeProfile(BaseProfile):
                 "value": "Native (1x) or 2x",
                 "reason": "Higher resolutions don't add latency but use more GPU.",
             },
+
+            # === AUDIO SETTINGS ===
             {
                 "category": "Audio",
                 "setting": "Backend",
@@ -180,6 +219,8 @@ class SlippiMeleeProfile(BaseProfile):
                 "value": "Lowest stable setting",
                 "reason": "Lower is better, but too low causes crackling.",
             },
+
+            # === CONTROLLER SETTINGS ===
             {
                 "category": "Controller",
                 "setting": "Adapter Mode",
@@ -191,5 +232,26 @@ class SlippiMeleeProfile(BaseProfile):
                 "setting": "Background Input",
                 "value": "On",
                 "reason": "Allows input when alt-tabbed.",
+            },
+
+            # === WHY HIGH REFRESH HELPS WITHOUT VRR ===
+            {
+                "category": "Display Info",
+                "setting": "High refresh benefit",
+                "value": "Reduced scanout latency (no G-Sync needed)",
+                "reason": (
+                    "60fps @ 60Hz = ~17ms scanout, 60fps @ 240Hz = ~4ms scanout. "
+                    "This benefit is from faster pixel refresh, NOT from VRR. "
+                    "Use your monitor's max refresh rate with G-Sync/VSync OFF for minimum latency."
+                ),
+            },
+            {
+                "category": "Display Info",
+                "setting": "Tearing",
+                "value": "May occur but minimal impact",
+                "reason": (
+                    "With 60fps on a high refresh display, tears are small and fast-moving. "
+                    "The latency reduction far outweighs the visual artifact for competitive play."
+                ),
             },
         ]
