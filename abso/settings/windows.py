@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ctypes
 import logging
 import winreg
 from typing import Any
@@ -10,6 +11,51 @@ from abso.core.models import Issue
 from abso.settings.base import SettingsHandler
 
 logger = logging.getLogger(__name__)
+
+# Windows display mode constants
+DM_PELSWIDTH = 0x00080000
+DM_PELSHEIGHT = 0x00100000
+DM_DISPLAYFREQUENCY = 0x00400000
+ENUM_CURRENT_SETTINGS = -1
+DISP_CHANGE_SUCCESSFUL = 0
+CDS_UPDATEREGISTRY = 0x00000001
+CDS_TEST = 0x00000002
+
+
+class DEVMODE(ctypes.Structure):
+    """Windows DEVMODE structure for display settings."""
+    _fields_ = [
+        ("dmDeviceName", ctypes.c_wchar * 32),
+        ("dmSpecVersion", ctypes.c_ushort),
+        ("dmDriverVersion", ctypes.c_ushort),
+        ("dmSize", ctypes.c_ushort),
+        ("dmDriverExtra", ctypes.c_ushort),
+        ("dmFields", ctypes.c_ulong),
+        ("dmPositionX", ctypes.c_long),
+        ("dmPositionY", ctypes.c_long),
+        ("dmDisplayOrientation", ctypes.c_ulong),
+        ("dmDisplayFixedOutput", ctypes.c_ulong),
+        ("dmColor", ctypes.c_short),
+        ("dmDuplex", ctypes.c_short),
+        ("dmYResolution", ctypes.c_short),
+        ("dmTTOption", ctypes.c_short),
+        ("dmCollate", ctypes.c_short),
+        ("dmFormName", ctypes.c_wchar * 32),
+        ("dmLogPixels", ctypes.c_ushort),
+        ("dmBitsPerPel", ctypes.c_ulong),
+        ("dmPelsWidth", ctypes.c_ulong),
+        ("dmPelsHeight", ctypes.c_ulong),
+        ("dmDisplayFlags", ctypes.c_ulong),
+        ("dmDisplayFrequency", ctypes.c_ulong),
+        ("dmICMMethod", ctypes.c_ulong),
+        ("dmICMIntent", ctypes.c_ulong),
+        ("dmMediaType", ctypes.c_ulong),
+        ("dmDitherType", ctypes.c_ulong),
+        ("dmReserved1", ctypes.c_ulong),
+        ("dmReserved2", ctypes.c_ulong),
+        ("dmPanningWidth", ctypes.c_ulong),
+        ("dmPanningHeight", ctypes.c_ulong),
+    ]
 
 
 class WindowsSettingsHandler(SettingsHandler):
@@ -21,6 +67,7 @@ class WindowsSettingsHandler(SettingsHandler):
     - Hardware-Accelerated GPU Scheduling (HAGS)
     - VBS / Memory Integrity
     - HDR / Auto HDR
+    - Display refresh rate optimization
     """
 
     # Registry paths
@@ -33,6 +80,7 @@ class WindowsSettingsHandler(SettingsHandler):
 
     def detect(self) -> dict[str, Any]:
         """Detect current Windows gaming settings."""
+        refresh_info = self._get_refresh_rate_info()
         return {
             "game_mode": self._get_game_mode(),
             "game_bar": self._get_game_bar(),
@@ -41,6 +89,9 @@ class WindowsSettingsHandler(SettingsHandler):
             "vbs": self._get_vbs(),
             "hdr": self._get_hdr(),
             "auto_hdr": self._get_auto_hdr(),
+            "refresh_rate": refresh_info.get("current"),
+            "max_refresh_rate": refresh_info.get("max"),
+            "available_refresh_rates": refresh_info.get("available"),
         }
 
     def audit(self) -> list[Issue]:
@@ -94,6 +145,22 @@ class WindowsSettingsHandler(SettingsHandler):
                 category="windows",
             ))
 
+        # Refresh rate check
+        current_hz = current.get("refresh_rate")
+        max_hz = current.get("max_refresh_rate")
+        if current_hz and max_hz and current_hz < max_hz:
+            issues.append(Issue(
+                title="Display not running at maximum refresh rate",
+                severity="warning",
+                current_value=f"{current_hz} Hz",
+                optimal_value=f"{max_hz} Hz",
+                explanation=(
+                    f"Your monitor supports up to {max_hz} Hz but is currently set to {current_hz} Hz. "
+                    "Higher refresh rates provide smoother gameplay and lower input latency."
+                ),
+                category="windows",
+            ))
+
         return issues
 
     def apply(self, settings: dict[str, Any]) -> dict[str, Any]:
@@ -124,6 +191,13 @@ class WindowsSettingsHandler(SettingsHandler):
 
             if "auto_hdr" in settings:
                 self._set_auto_hdr(settings["auto_hdr"])
+
+            if "refresh_rate" in settings:
+                self._set_refresh_rate(settings["refresh_rate"])
+
+            if settings.get("max_refresh_rate") is True:
+                # Special flag to set maximum available refresh rate
+                self._set_max_refresh_rate()
 
         except Exception as e:
             errors.append(str(e))
@@ -473,3 +547,276 @@ class WindowsSettingsHandler(SettingsHandler):
                 )
             finally:
                 winreg.CloseKey(key)
+
+    def _get_refresh_rate_info(self) -> dict[str, Any]:
+        """Get current and available refresh rates for the primary display.
+
+        Returns:
+            Dictionary with 'current', 'max', and 'available' refresh rates.
+        """
+        result: dict[str, Any] = {
+            "current": None,
+            "max": None,
+            "available": [],
+        }
+
+        try:
+            user32 = ctypes.windll.user32
+
+            # Get current display settings
+            devmode = DEVMODE()
+            devmode.dmSize = ctypes.sizeof(DEVMODE)
+
+            if user32.EnumDisplaySettingsW(None, ENUM_CURRENT_SETTINGS, ctypes.byref(devmode)):
+                result["current"] = devmode.dmDisplayFrequency
+                current_width = devmode.dmPelsWidth
+                current_height = devmode.dmPelsHeight
+
+                # Enumerate all available modes at current resolution
+                available_rates: set[int] = set()
+                mode_num = 0
+                enum_devmode = DEVMODE()
+                enum_devmode.dmSize = ctypes.sizeof(DEVMODE)
+
+                while user32.EnumDisplaySettingsW(None, mode_num, ctypes.byref(enum_devmode)):
+                    # Only consider modes at current resolution
+                    if (enum_devmode.dmPelsWidth == current_width and
+                        enum_devmode.dmPelsHeight == current_height and
+                        enum_devmode.dmDisplayFrequency > 0):
+                        available_rates.add(enum_devmode.dmDisplayFrequency)
+                    mode_num += 1
+
+                if available_rates:
+                    result["available"] = sorted(available_rates)
+                    result["max"] = max(available_rates)
+
+        except Exception as e:
+            logger.debug(f"Failed to get refresh rate info: {e}")
+
+        return result
+
+    def _set_refresh_rate(self, target_hz: int) -> None:
+        """Set the display refresh rate.
+
+        Args:
+            target_hz: Target refresh rate in Hz.
+        """
+        try:
+            user32 = ctypes.windll.user32
+
+            # Get current settings
+            devmode = DEVMODE()
+            devmode.dmSize = ctypes.sizeof(DEVMODE)
+
+            if not user32.EnumDisplaySettingsW(None, ENUM_CURRENT_SETTINGS, ctypes.byref(devmode)):
+                raise RuntimeError("Failed to get current display settings")
+
+            # Check if already at target rate
+            if devmode.dmDisplayFrequency == target_hz:
+                logger.info(f"Display already at {target_hz} Hz")
+                return
+
+            # Set new refresh rate
+            devmode.dmDisplayFrequency = target_hz
+            devmode.dmFields = DM_DISPLAYFREQUENCY
+
+            # Test if the mode is valid
+            result = user32.ChangeDisplaySettingsW(ctypes.byref(devmode), CDS_TEST)
+            if result != DISP_CHANGE_SUCCESSFUL:
+                raise RuntimeError(f"Display mode {target_hz} Hz is not supported (error: {result})")
+
+            # Apply the change
+            result = user32.ChangeDisplaySettingsW(ctypes.byref(devmode), CDS_UPDATEREGISTRY)
+            if result != DISP_CHANGE_SUCCESSFUL:
+                raise RuntimeError(f"Failed to set display to {target_hz} Hz (error: {result})")
+
+            logger.info(f"Display refresh rate set to {target_hz} Hz")
+
+        except Exception as e:
+            logger.error(f"Failed to set refresh rate: {e}")
+            raise
+
+    def _set_max_refresh_rate(self) -> None:
+        """Set the display to its maximum supported refresh rate."""
+        info = self._get_refresh_rate_info()
+        max_hz = info.get("max")
+        current_hz = info.get("current")
+
+        if not max_hz:
+            logger.warning("Could not determine maximum refresh rate")
+            return
+
+        if current_hz == max_hz:
+            logger.info(f"Display already at maximum refresh rate ({max_hz} Hz)")
+            return
+
+        logger.info(f"Setting display to maximum refresh rate: {max_hz} Hz (was {current_hz} Hz)")
+        self._set_refresh_rate(max_hz)
+
+    def optimize_for_gaming(self, primary_max: bool = True, secondary_low: bool = True) -> dict[str, Any]:
+        """Optimize multi-monitor setup for gaming.
+
+        Strategy:
+        - Primary monitor: Set to maximum refresh rate for best gaming experience
+        - Secondary monitors: Lower to 60Hz to reduce GPU compositor load
+
+        This reduces the GPU work for rendering the Windows desktop on secondary
+        monitors, freeing up resources for gaming on the primary display.
+
+        Args:
+            primary_max: Set primary monitor to max refresh rate (default True)
+            secondary_low: Set secondary monitors to 60Hz (default True)
+
+        Returns:
+            Dictionary with results for each display.
+        """
+        results: dict[str, Any] = {}
+
+        try:
+            user32 = ctypes.windll.user32
+
+            # Enumerate all display devices
+            display_num = 0
+            while True:
+                try:
+                    # DISPLAY_DEVICE structure
+                    display_device = (ctypes.c_wchar * 32)()
+                    flags = ctypes.c_ulong()
+
+                    # Get display device name
+                    class DISPLAY_DEVICE(ctypes.Structure):
+                        _fields_ = [
+                            ("cb", ctypes.c_ulong),
+                            ("DeviceName", ctypes.c_wchar * 32),
+                            ("DeviceString", ctypes.c_wchar * 128),
+                            ("StateFlags", ctypes.c_ulong),
+                            ("DeviceID", ctypes.c_wchar * 128),
+                            ("DeviceKey", ctypes.c_wchar * 128),
+                        ]
+
+                    dd = DISPLAY_DEVICE()
+                    dd.cb = ctypes.sizeof(DISPLAY_DEVICE)
+
+                    if not user32.EnumDisplayDevicesW(None, display_num, ctypes.byref(dd), 0):
+                        break
+
+                    # Check if this is an active display
+                    DISPLAY_DEVICE_ACTIVE = 0x00000001
+                    DISPLAY_DEVICE_PRIMARY_DEVICE = 0x00000004
+
+                    if dd.StateFlags & DISPLAY_DEVICE_ACTIVE:
+                        is_primary = bool(dd.StateFlags & DISPLAY_DEVICE_PRIMARY_DEVICE)
+                        device_name = dd.DeviceName
+
+                        # Get current settings for this display
+                        devmode = DEVMODE()
+                        devmode.dmSize = ctypes.sizeof(DEVMODE)
+
+                        if user32.EnumDisplaySettingsW(device_name, ENUM_CURRENT_SETTINGS, ctypes.byref(devmode)):
+                            current_hz = devmode.dmDisplayFrequency
+                            current_width = devmode.dmPelsWidth
+                            current_height = devmode.dmPelsHeight
+
+                            # Find available refresh rates at current resolution
+                            available_rates: set[int] = set()
+                            mode_num = 0
+                            enum_devmode = DEVMODE()
+                            enum_devmode.dmSize = ctypes.sizeof(DEVMODE)
+
+                            while user32.EnumDisplaySettingsW(device_name, mode_num, ctypes.byref(enum_devmode)):
+                                if (enum_devmode.dmPelsWidth == current_width and
+                                    enum_devmode.dmPelsHeight == current_height and
+                                    enum_devmode.dmDisplayFrequency > 0):
+                                    available_rates.add(enum_devmode.dmDisplayFrequency)
+                                mode_num += 1
+
+                            if available_rates:
+                                max_hz = max(available_rates)
+                                min_hz = min(available_rates)
+
+                                if is_primary and primary_max:
+                                    # Primary: set to max
+                                    if current_hz < max_hz:
+                                        target_hz = max_hz
+                                        self._set_display_refresh_rate(device_name, target_hz)
+                                        results[device_name] = {
+                                            "is_primary": True,
+                                            "previous": current_hz,
+                                            "new": target_hz,
+                                            "action": "maximized",
+                                        }
+                                    else:
+                                        results[device_name] = {
+                                            "is_primary": True,
+                                            "current": current_hz,
+                                            "action": "already_max",
+                                        }
+
+                                elif not is_primary and secondary_low:
+                                    # Secondary: set to 60Hz (or closest available)
+                                    target_hz = 60 if 60 in available_rates else min_hz
+                                    if current_hz != target_hz:
+                                        self._set_display_refresh_rate(device_name, target_hz)
+                                        results[device_name] = {
+                                            "is_primary": False,
+                                            "previous": current_hz,
+                                            "new": target_hz,
+                                            "action": "lowered",
+                                        }
+                                    else:
+                                        results[device_name] = {
+                                            "is_primary": False,
+                                            "current": current_hz,
+                                            "action": "already_low",
+                                        }
+
+                    display_num += 1
+
+                except Exception as e:
+                    logger.debug(f"Error processing display {display_num}: {e}")
+                    display_num += 1
+
+        except Exception as e:
+            logger.error(f"Failed to optimize displays: {e}")
+            results["error"] = str(e)
+
+        return results
+
+    def _set_display_refresh_rate(self, device_name: str, target_hz: int) -> None:
+        """Set refresh rate for a specific display.
+
+        Args:
+            device_name: Display device name (e.g., '\\\\.\\DISPLAY1')
+            target_hz: Target refresh rate in Hz.
+        """
+        try:
+            user32 = ctypes.windll.user32
+
+            devmode = DEVMODE()
+            devmode.dmSize = ctypes.sizeof(DEVMODE)
+
+            if not user32.EnumDisplaySettingsW(device_name, ENUM_CURRENT_SETTINGS, ctypes.byref(devmode)):
+                raise RuntimeError(f"Failed to get settings for {device_name}")
+
+            devmode.dmDisplayFrequency = target_hz
+            devmode.dmFields = DM_DISPLAYFREQUENCY
+
+            # Test the mode
+            result = user32.ChangeDisplaySettingsExW(
+                device_name, ctypes.byref(devmode), None, CDS_TEST, None
+            )
+            if result != DISP_CHANGE_SUCCESSFUL:
+                raise RuntimeError(f"Mode {target_hz} Hz not supported for {device_name}")
+
+            # Apply the change
+            result = user32.ChangeDisplaySettingsExW(
+                device_name, ctypes.byref(devmode), None, CDS_UPDATEREGISTRY, None
+            )
+            if result != DISP_CHANGE_SUCCESSFUL:
+                raise RuntimeError(f"Failed to set {device_name} to {target_hz} Hz")
+
+            logger.info(f"Set {device_name} to {target_hz} Hz")
+
+        except Exception as e:
+            logger.error(f"Failed to set refresh rate for {device_name}: {e}")
+            raise
