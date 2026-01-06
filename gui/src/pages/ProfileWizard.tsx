@@ -11,11 +11,25 @@ import {
   ChevronLeft,
   Copy,
   Undo2,
+  AlertCircle,
 } from 'lucide-react';
 import { useAppStore } from '@/stores/appStore';
 import { cn } from '@/lib/utils';
+import * as api from '@/lib/api';
 
 const PROFILES = [
+  {
+    id: 'rivals2',
+    name: 'Rivals of Aether 2',
+    description: 'Ultra-low latency for competitive play with HDR',
+    target: 'minimum_latency',
+  },
+  {
+    id: 'rivals2-oled',
+    name: 'Rivals of Aether 2 (OLED)',
+    description: 'Ultra-low latency with HDR optimized for OLED',
+    target: 'minimum_latency',
+  },
   {
     id: 'slippi-melee',
     name: 'Slippi Melee',
@@ -23,10 +37,10 @@ const PROFILES = [
     target: 'minimum_latency',
   },
   {
-    id: 'rivals2',
-    name: 'Rivals of Aether 2',
-    description: 'VRR-optimized for UE5 fighting game',
-    target: 'vrr_fighting_game',
+    id: 'slippi-melee-oled',
+    name: 'Slippi Melee (OLED)',
+    description: 'Ultra-low latency for competitive SSBM on OLED',
+    target: 'minimum_latency',
   },
   {
     id: 'cod-bo7',
@@ -35,9 +49,33 @@ const PROFILES = [
     target: 'low_latency_high_fps',
   },
   {
+    id: 'cod-bo7-oled',
+    name: 'Call of Duty: Black Ops 7 (OLED)',
+    description: 'Low latency with Nvidia Reflex for OLED',
+    target: 'low_latency_high_fps',
+  },
+  {
     id: 'diablo4',
     name: 'Diablo 4',
     description: 'Balanced performance for ARPG',
+    target: 'balanced',
+  },
+  {
+    id: 'diablo4-oled',
+    name: 'Diablo 4 (OLED)',
+    description: 'Balanced performance with HDR for OLED',
+    target: 'balanced',
+  },
+  {
+    id: 'pacdeluxe',
+    name: 'PAC Deluxe',
+    description: 'Optimized for PAC Deluxe',
+    target: 'balanced',
+  },
+  {
+    id: 'pacdeluxe-oled',
+    name: 'PAC Deluxe (OLED)',
+    description: 'Optimized for PAC Deluxe on OLED',
     target: 'balanced',
   },
 ];
@@ -52,12 +90,26 @@ export function ProfileWizard() {
     setWizardProfile,
     setWizardStep,
     resetWizard,
+    setActiveProfile,
   } = useAppStore();
 
   const [createBackup, setCreateBackup] = React.useState(true);
   const [applying, setApplying] = React.useState(false);
   const [applyProgress, setApplyProgress] = React.useState(0);
   const [applyComplete, setApplyComplete] = React.useState(false);
+  const [applyError, setApplyError] = React.useState<string | null>(null);
+
+  // Track interval for cleanup on unmount
+  const progressIntervalRef = React.useRef<number | null>(null);
+
+  // Cleanup interval on unmount to prevent memory leak
+  React.useEffect(() => {
+    return () => {
+      if (progressIntervalRef.current !== null) {
+        clearInterval(progressIntervalRef.current);
+      }
+    };
+  }, []);
 
   const selectedProfile = PROFILES.find((p) => p.id === wizardProfile);
 
@@ -77,18 +129,53 @@ export function ProfileWizard() {
   };
 
   const handleApply = async () => {
+    if (!wizardProfile) return;
+
     setApplying(true);
     setApplyProgress(0);
+    setApplyError(null);
 
-    // Simulate apply progress
-    const steps = ['Backup', 'Windows', 'Nvidia', 'Power', 'Registry', 'Mouse'];
-    for (let i = 0; i < steps.length; i++) {
-      await new Promise((resolve) => setTimeout(resolve, 500));
-      setApplyProgress(((i + 1) / steps.length) * 100);
+    try {
+      // Show progress animation while API call runs
+      // Store in ref so it can be cleaned up on unmount
+      progressIntervalRef.current = window.setInterval(() => {
+        setApplyProgress((prev) => Math.min(prev + 10, 90));
+      }, 200);
+
+      // Actually call the API
+      const result = await api.applyProfile(wizardProfile, createBackup);
+
+      // Clear interval and reset ref
+      if (progressIntervalRef.current !== null) {
+        clearInterval(progressIntervalRef.current);
+        progressIntervalRef.current = null;
+      }
+      setApplyProgress(100);
+
+      if (result.success) {
+        // Track the active profile in frontend store
+        setActiveProfile(wizardProfile);
+
+        // Sync with backend for tray menu
+        try {
+          await api.setActiveProfileBackend(wizardProfile);
+        } catch (e) {
+          console.warn('Failed to sync active profile with backend:', e);
+        }
+
+        setApplyComplete(true);
+      } else {
+        // Use errors array if available, otherwise generic message
+        const errorMsg = result.errors?.length > 0
+          ? result.errors.join('; ')
+          : 'Failed to apply profile';
+        setApplyError(errorMsg);
+      }
+    } catch (error) {
+      setApplyError(error instanceof Error ? error.message : 'Failed to apply profile');
+    } finally {
+      setApplying(false);
     }
-
-    setApplying(false);
-    setApplyComplete(true);
   };
 
   const handleDone = () => {
@@ -283,8 +370,15 @@ export function ProfileWizard() {
         {wizardStep === 3 && !applyComplete && (
           <div className="space-y-6 text-center py-12">
             <h2 className="text-xl font-semibold">
-              {applying ? `Applying ${selectedProfile?.name}` : 'Ready to Apply'}
+              {applying ? `Applying ${selectedProfile?.name}` : applyError ? 'Apply Failed' : 'Ready to Apply'}
             </h2>
+
+            {applyError && (
+              <div className="flex items-center justify-center gap-2 text-destructive">
+                <AlertCircle className="h-5 w-5" />
+                <span>{applyError}</span>
+              </div>
+            )}
 
             {applying ? (
               <>
@@ -330,7 +424,7 @@ export function ProfileWizard() {
                   </div>
                 </div>
               </>
-            ) : (
+            ) : !applyError && (
               <p className="text-muted-foreground">
                 Click Apply to optimize your system for {selectedProfile?.name}
               </p>

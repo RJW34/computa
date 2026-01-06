@@ -211,29 +211,36 @@ class AudioSettingsHandler(SettingsHandler):
 
     def _set_audio_priority(self, priority: str) -> None:
         """Set audio service scheduling priority."""
+        key = None
         try:
-            key = winreg.OpenKey(
-                winreg.HKEY_LOCAL_MACHINE,
-                f"{self.MMCSS_KEY}\\Tasks\\Audio",
-                0,
-                winreg.KEY_ALL_ACCESS
-            )
-        except FileNotFoundError:
-            # Create the Audio task key if it doesn't exist
-            tasks_key = winreg.OpenKey(
-                winreg.HKEY_LOCAL_MACHINE,
-                f"{self.MMCSS_KEY}\\Tasks",
-                0,
-                winreg.KEY_ALL_ACCESS
-            )
-            key = winreg.CreateKey(tasks_key, "Audio")
-            winreg.CloseKey(tasks_key)
+            try:
+                key = winreg.OpenKey(
+                    winreg.HKEY_LOCAL_MACHINE,
+                    f"{self.MMCSS_KEY}\\Tasks\\Audio",
+                    0,
+                    winreg.KEY_ALL_ACCESS
+                )
+            except FileNotFoundError:
+                # Create the Audio task key if it doesn't exist
+                tasks_key = None
+                try:
+                    tasks_key = winreg.OpenKey(
+                        winreg.HKEY_LOCAL_MACHINE,
+                        f"{self.MMCSS_KEY}\\Tasks",
+                        0,
+                        winreg.KEY_ALL_ACCESS
+                    )
+                    key = winreg.CreateKey(tasks_key, "Audio")
+                finally:
+                    if tasks_key is not None:
+                        winreg.CloseKey(tasks_key)
 
-        try:
-            winreg.SetValueEx(key, "Scheduling Category", 0, winreg.REG_SZ, priority)
-            # Also set other audio optimization values
-            winreg.SetValueEx(key, "SFIO Priority", 0, winreg.REG_SZ, priority)
-            winreg.SetValueEx(key, "Priority", 0, winreg.REG_DWORD, 2)  # High priority
-            winreg.SetValueEx(key, "Background Only", 0, winreg.REG_SZ, "False")
+            if key is not None:
+                winreg.SetValueEx(key, "Scheduling Category", 0, winreg.REG_SZ, priority)
+                # Also set other audio optimization values
+                winreg.SetValueEx(key, "SFIO Priority", 0, winreg.REG_SZ, priority)
+                winreg.SetValueEx(key, "Priority", 0, winreg.REG_DWORD, 2)  # High priority
+                winreg.SetValueEx(key, "Background Only", 0, winreg.REG_SZ, "False")
         finally:
-            winreg.CloseKey(key)
+            if key is not None:
+                winreg.CloseKey(key)

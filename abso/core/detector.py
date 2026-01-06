@@ -557,6 +557,20 @@ class HardwareDetector:
     def __init__(self) -> None:
         self._wmi = None
 
+    def __del__(self) -> None:
+        """Clean up WMI connection on garbage collection."""
+        self.cleanup()
+
+    def cleanup(self) -> None:
+        """Explicitly release WMI connection resources."""
+        if self._wmi is not None:
+            try:
+                # WMI connections don't have explicit close, but setting to None
+                # allows garbage collection of COM objects
+                self._wmi = None
+            except Exception:
+                pass
+
     def _get_wmi(self):
         """Lazy-load WMI connection."""
         if self._wmi is None:

@@ -6,18 +6,41 @@ import {
   Archive,
   FileText,
   Timer,
+  CheckCircle2,
 } from 'lucide-react';
 import { ActionCard } from '@/components/cards/ActionCard';
 import { HardwareSummary } from '@/components/HardwareSummary';
 import { Header } from '@/components/Header';
-import { StatusBar } from '@/components/StatusBar';
 import { useAppStore } from '@/stores/appStore';
+import { Badge } from '@/components/ui/badge';
+
+// Profile ID to display name mapping
+const PROFILE_NAMES: Record<string, string> = {
+  'rivals2': 'Rivals of Aether 2',
+  'rivals2-oled': 'Rivals 2 (OLED)',
+  'slippi-melee': 'Slippi Melee',
+  'slippi-melee-oled': 'Slippi Melee (OLED)',
+  'cod-bo7': 'CoD: Black Ops 7',
+  'cod-bo7-oled': 'CoD: BO7 (OLED)',
+  'diablo4': 'Diablo 4',
+  'diablo4-oled': 'Diablo 4 (OLED)',
+  'pacdeluxe': 'PAC Deluxe',
+  'pacdeluxe-oled': 'PAC Deluxe (OLED)',
+  'pokemon-auto-chess': 'Pokemon Auto Chess',
+  'pokemon-auto-chess-oled': 'Pokemon AC (OLED)',
+};
 
 export function Home() {
-  const { setPage, auditResults, runAudit, loadBackups, backups } = useAppStore();
+  const { setPage, auditResults, runAudit, loadBackups, backups, activeProfile, activeProfileAppliedAt } = useAppStore();
+
+  // Track if initial load has been done to prevent duplicate calls
+  const initialLoadDone = React.useRef(false);
 
   React.useEffect(() => {
-    // Load initial data
+    // Only load data once on initial mount
+    if (initialLoadDone.current) return;
+    initialLoadDone.current = true;
+
     runAudit();
     loadBackups();
   }, [runAudit, loadBackups]);
@@ -26,6 +49,24 @@ export function Home() {
   const warningCount = auditResults.filter((i) => i.severity === 'warning').length;
   const totalIssues = criticalCount + warningCount;
 
+  // Format the active profile applied time
+  const getAppliedTimeAgo = () => {
+    if (!activeProfileAppliedAt) return '';
+    const appliedDate = new Date(activeProfileAppliedAt);
+    const now = new Date();
+    const diffMs = now.getTime() - appliedDate.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMins / 60);
+    const diffDays = Math.floor(diffHours / 24);
+
+    if (diffDays > 0) return `${diffDays}d ago`;
+    if (diffHours > 0) return `${diffHours}h ago`;
+    if (diffMins > 0) return `${diffMins}m ago`;
+    return 'just now';
+  };
+
+  const activeProfileName = activeProfile ? (PROFILE_NAMES[activeProfile] || activeProfile) : null;
+
   return (
     <div className="min-h-screen pb-12">
       <Header />
@@ -33,11 +74,32 @@ export function Home() {
       <main className="container mx-auto px-6 py-6">
         <HardwareSummary />
 
+        {/* Active Profile Banner */}
+        {activeProfile && (
+          <div className="mb-4 p-3 rounded-lg border border-success/30 bg-success/5 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="h-5 w-5 text-success" />
+              <span className="text-sm">
+                Active Profile: <strong>{activeProfileName}</strong>
+              </span>
+              <Badge variant="outline" className="text-xs">
+                {getAppliedTimeAgo()}
+              </Badge>
+            </div>
+            <button
+              onClick={() => setPage('profile-wizard')}
+              className="text-sm text-muted-foreground hover:text-foreground"
+            >
+              Change
+            </button>
+          </div>
+        )}
+
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           <ActionCard
             icon={Gamepad2}
             title="Apply Profile"
-            subtitle="Optimize for a specific game"
+            subtitle={activeProfile ? `Active: ${activeProfileName}` : 'Optimize for a specific game'}
             onClick={() => setPage('profile-wizard')}
           />
 
@@ -90,8 +152,6 @@ export function Home() {
           />
         </div>
       </main>
-
-      <StatusBar />
     </div>
   );
 }

@@ -11,6 +11,9 @@ import type {
 import * as api from '@/lib/api';
 
 interface AppState {
+  // Hydration state
+  _hasHydrated: boolean;
+  setHasHydrated: (state: boolean) => void;
   // Navigation
   currentPage: Page;
   setPage: (page: Page) => void;
@@ -40,6 +43,11 @@ interface AppState {
   profilesLoading: boolean;
   loadProfiles: () => Promise<void>;
 
+  // Active profile tracking
+  activeProfile: string | null;  // Profile ID of currently applied profile
+  activeProfileAppliedAt: string | null;  // ISO timestamp when profile was applied
+  setActiveProfile: (profileId: string | null, appliedAt?: string) => void;
+
   // Backups
   backups: Backup[];
   backupsLoading: boolean;
@@ -61,6 +69,10 @@ interface AppState {
 export const useAppStore = create<AppState>()(
   persist(
     (set, _get) => ({
+      // Hydration state - tracks when localStorage data has been loaded
+      _hasHydrated: false,
+      setHasHydrated: (state) => set({ _hasHydrated: state }),
+
       // Navigation
       currentPage: 'home',
       setPage: (page) => set({ currentPage: page }),
@@ -131,6 +143,14 @@ export const useAppStore = create<AppState>()(
         }
       },
 
+      // Active profile tracking
+      activeProfile: null,
+      activeProfileAppliedAt: null,
+      setActiveProfile: (profileId, appliedAt) => set({
+        activeProfile: profileId,
+        activeProfileAppliedAt: appliedAt || new Date().toISOString(),
+      }),
+
       // Backups
       backups: [],
       backupsLoading: false,
@@ -165,7 +185,12 @@ export const useAppStore = create<AppState>()(
       partialize: (state) => ({
         theme: state.theme,
         settingsMode: state.settingsMode,
+        activeProfile: state.activeProfile,
+        activeProfileAppliedAt: state.activeProfileAppliedAt,
       }),
+      onRehydrateStorage: () => (state) => {
+        state?.setHasHydrated(true);
+      },
     }
   )
 );

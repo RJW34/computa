@@ -193,3 +193,17 @@ export async function previewProfile(
     profileId,
   ]);
 }
+
+/**
+ * Get the currently active profile (from backend state)
+ */
+export async function getActiveProfile(): Promise<string | null> {
+  return invoke<string | null>('get_active_profile');
+}
+
+/**
+ * Set the active profile in backend state (for tray menu sync)
+ */
+export async function setActiveProfileBackend(profileId: string | null): Promise<void> {
+  return invoke<void>('set_active_profile', { profileId });
+}

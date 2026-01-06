@@ -38,6 +38,7 @@ class Rivals2Profile(BaseProfile):
         return ["RivalsofAether2.exe", "Rivals2.exe", "RivalsOfAether2-Win64-Shipping.exe"]
 
     def get_handlers(self) -> list[SettingsHandler]:
+        from abso.settings.cnm import CNMSettingsHandler
         from abso.settings.graphics import GraphicsSettingsHandler
         from abso.settings.memory import MemorySettingsHandler
         from abso.settings.mouse import MouseSettingsHandler
@@ -47,7 +48,6 @@ class Rivals2Profile(BaseProfile):
         from abso.settings.process_priority import ProcessPriorityHandler
         from abso.settings.registry import RegistrySettingsHandler
         from abso.settings.services import ServicesSettingsHandler
-        from abso.settings.timer import TimerSettingsHandler
         from abso.settings.windows import WindowsSettingsHandler
 
         return [
@@ -56,7 +56,6 @@ class Rivals2Profile(BaseProfile):
             RegistrySettingsHandler(),
             NvidiaSettingsHandler(),
             NetworkSettingsHandler(),
-            TimerSettingsHandler(),
             MouseSettingsHandler(),
             GraphicsSettingsHandler(),
             ServicesSettingsHandler(),
@@ -66,6 +65,7 @@ class Rivals2Profile(BaseProfile):
                 "Rivals2.exe",
                 "RivalsOfAether2-Win64-Shipping.exe",
             ]),
+            CNMSettingsHandler(),  # Stop CNM during gaming for power optimization
         ]
 
     def get_settings(self, handler_name: str) -> dict[str, Any]:
@@ -75,6 +75,10 @@ class Rivals2Profile(BaseProfile):
                 "game_bar": False,
                 "game_dvr": False,
                 "hags": True,  # UE5 generally benefits from HAGS
+                # HDR enabled - negligible latency impact on OLED panels
+                # OLED has no backlight processing, HDR tone mapping is GPU-side
+                "hdr": True,
+                "auto_hdr": False,  # Keep Auto HDR off - game native HDR is preferred
             },
             "PowerSettingsHandler": {
                 "ensure_ultimate_performance": True,
@@ -95,26 +99,33 @@ class Rivals2Profile(BaseProfile):
                 },
             },
             "NvidiaSettingsHandler": {
-                # VRR-optimized for fighting games
-                # See: abso/core/vrr.py for VRR knowledge base
-                "preset": "vrr_fighting_game",
+                # NO-SYNC for absolute minimum latency (Default for Rivals 2)
+                # See: rivals2-300hz-lowest-latency-guide.md for detailed rationale
+                "preset": "no_sync_fighting_game",
                 # Settings applied:
-                # - Low Latency Mode: On (limited effect - UE5 uses DX12, LLM only works in DX9/DX11)
-                # - VSync: On (safety net for VRR - zero latency with proper FPS cap)
+                # - G-SYNC: Force OFF (via vrr_app_override)
+                # - VSync: OFF (no sync = no sync latency)
+                # - Low Latency Mode: On
+                # - Max Frame Rate: OFF (uncapped or use in-game cap)
                 # - Power Management: Prefer Maximum Performance
                 # - Shader Cache: Unlimited
-                # - Threaded Optimization: On
+                # - Triple Buffering: Off
                 #
-                # NOTE: Rivals 2 does NOT support NVIDIA Reflex, and LLM doesn't work in DX12.
-                # Primary latency reduction comes from: proper FPS cap + G-SYNC + system optimizations.
+                # WHY NO-SYNC FOR RIVALS 2:
+                # - Fighting games prioritize minimum latency over visual polish
+                # - At 300Hz, tearing is barely visible (~3.33ms tear lines)
+                # - No sync overhead = absolute minimum click-to-pixel latency
+                # - Rivals 2 lacks NVIDIA Reflex, and LLM has limited effect in DX12/UE5
+                #
+                # For 300Hz monitors: Keep at 300Hz for fastest scanout (3.33ms).
+                # In-game FPS cap: Use 240 (highest preset) or uncapped if available.
+                #
+                # ALTERNATIVE for tear-free experience:
+                # Change to "preset": "vrr_fighting_game" if tearing bothers you.
             },
             "NetworkSettingsHandler": {
                 "disable_nagle": True,
                 "preset": "gaming",  # TCP global optimizations
-            },
-            "TimerSettingsHandler": {
-                # Precise scheduling for consistent frame pacing
-                "resolution_ms": 0.5,
             },
             "MouseSettingsHandler": {
                 # Disable acceleration for consistent muscle memory
@@ -142,6 +153,11 @@ class Rivals2Profile(BaseProfile):
                 "cpu_priority": 3,  # High
                 "io_priority": 3,   # High
             },
+            "CNMSettingsHandler": {
+                # Stop CNM during gaming to allow power optimizations
+                # CNM's SetThreadExecutionState interferes with power management
+                "action": "stop",
+            },
         }
 
         return settings_map.get(handler_name, {})
@@ -149,149 +165,322 @@ class Rivals2Profile(BaseProfile):
     def get_in_game_settings(self) -> list[dict[str, str]]:
         """Get recommended in-game and NVCP settings.
 
-        VRR/G-SYNC guidance based on Blur Busters G-SYNC 101 research.
-        Fighting games benefit from high refresh even with 60Hz game logic.
+        Two configurations provided based on rivals2-300hz-lowest-latency-guide.md:
+        - DEFAULT: No sync (G-SYNC OFF, V-SYNC OFF) - absolute minimum latency
+        - ALTERNATIVE: VRR setup for tear-free experience
+
+        Key insight: Rivals 2 has 60Hz game logic - you receive new gameplay
+        information 60 times per second regardless of render FPS. Higher FPS
+        provides: faster frame delivery, reduced display latency, smoother motion.
+
+        For fighting games, minimum latency takes priority over visual polish.
+        At 300Hz, tearing is barely visible (~3.33ms tear lines).
         """
         return [
-            # === WINDOWS SETTINGS ===
+            # =========================================================================
+            # DEFAULT: NO-SYNC SETUP (Absolute Minimum Latency)
+            # =========================================================================
             {
-                "category": "Windows Settings",
-                "setting": "Variable refresh rate",
-                "value": "On",
+                "category": "=== DEFAULT: NO-SYNC (Minimum Latency) ===",
+                "setting": "Overview",
+                "value": "G-SYNC OFF, V-SYNC OFF, 300Hz, Uncapped/240 FPS",
                 "reason": (
-                    "Settings > System > Display > Graphics > Change default graphics settings. "
-                    "Required for VRR to work in borderless windowed mode. Already enabled on this PC."
+                    "Absolute minimum click-to-pixel latency. No sync = no sync overhead. "
+                    "At 300Hz, tearing is barely visible. This is the competitive standard for fighting games."
                 ),
             },
 
-            # === NVIDIA CONTROL PANEL SETTINGS ===
-            # VRR-optimized configuration (recommended for most players)
+            # --- NVIDIA Control Panel (No-Sync) ---
             {
                 "category": "Nvidia Control Panel",
-                "setting": "G-SYNC",
-                "value": "On (recommended)",
+                "setting": "Set up G-SYNC",
+                "value": "UNCHECKED (Disabled)",
                 "reason": (
-                    "Set in Display > Set up G-SYNC. G-SYNC ON with proper FPS cap provides "
-                    "tear-free gameplay with minimal latency. Only disable if you accept tearing "
-                    "for absolute minimum latency in tournament settings."
+                    "Display > Set up G-SYNC. Uncheck 'Enable G-SYNC, G-SYNC Compatible'. "
+                    "Eliminates all VRR overhead. Frames display immediately when ready."
                 ),
             },
             {
                 "category": "Nvidia Control Panel",
-                "setting": "V-SYNC (global/per-game)",
-                "value": "On",
+                "setting": "Vertical sync",
+                "value": "Off",
                 "reason": (
-                    "Manage 3D settings > V-SYNC On. With G-SYNC, this acts as a SAFETY NET only. "
-                    "With FPS capped below refresh rate, V-SYNC never activates and adds zero latency. "
-                    "Prevents tearing if FPS momentarily exceeds refresh rate."
+                    "Manage 3D Settings > Program Settings > Rivals2.exe. "
+                    "No sync = frames render and display with zero sync latency."
                 ),
             },
             {
                 "category": "Nvidia Control Panel",
                 "setting": "Low Latency Mode",
-                "value": "On (limited effect)",
+                "value": "On (or Off if stuttering)",
                 "reason": (
-                    "Manage 3D settings > Low Latency Mode. Note: LLM only works in DX9/DX11. "
-                    "Rivals 2 uses UE5/DX12, so LLM has minimal effect. Reflex is not available "
-                    "in this game. Primary latency reduction comes from proper FPS cap + G-SYNC."
+                    "Manage 3D Settings. Reduces render queue depth from ~3 frames to ~1-2. "
+                    "Note: Limited effect in DX12/UE5 games. CAN cause stuttering on some systems - "
+                    "if you experience micro-stutter, try 'Off' or use Nvidia Profile Inspector to set "
+                    "Max Pre-Rendered Frames to 2 (middle ground between latency and smoothness)."
                 ),
             },
             {
                 "category": "Nvidia Control Panel",
-                "setting": "Preferred refresh rate",
-                "value": "Highest available",
+                "setting": "Max Frame Rate",
+                "value": "Off",
                 "reason": (
-                    "Set in Display > Change resolution. Higher refresh = lower scanout latency, "
-                    "even for 60Hz-logic fighting games (60fps @ 240Hz has ~4ms scanout vs ~17ms @ 60Hz)."
+                    "Manage 3D Settings. Let GPU render as fast as possible. "
+                    "Use in-game cap if needed, not NVCP (in-game has lower limiter latency)."
+                ),
+            },
+            {
+                "category": "Nvidia Control Panel",
+                "setting": "Power management mode",
+                "value": "Prefer maximum performance",
+                "reason": "Manage 3D Settings. Prevents GPU downclocking for consistent frametimes.",
+            },
+            {
+                "category": "Nvidia Control Panel",
+                "setting": "Triple buffering",
+                "value": "Off",
+                "reason": "Manage 3D Settings. Only relevant with V-SYNC on (which we disable).",
+            },
+            {
+                "category": "Nvidia Control Panel",
+                "setting": "Preferred refresh rate",
+                "value": "Highest available (300Hz)",
+                "reason": (
+                    "Display > Change resolution. CRITICAL for no-sync setup: "
+                    "300Hz = 3.33ms scanout vs 240Hz = 4.17ms. Monitor refresh rate directly determines scanout speed."
                 ),
             },
 
-            # === IN-GAME VIDEO SETTINGS ===
+            # --- Windows Settings (No-Sync) ---
             {
-                "category": "Video",
-                "setting": "Display Mode",
-                "value": "Borderless Windowed (recommended for DX12)",
+                "category": "Windows Settings",
+                "setting": "Refresh Rate",
+                "value": "300Hz (MUST be at max)",
                 "reason": (
-                    "UE5/DX12 uses flip model in borderless, giving near-identical latency to exclusive. "
-                    "With Windows VRR enabled, G-SYNC works in borderless. Faster alt-tab, more stable. "
-                    "Exclusive fullscreen is fine too, but offers no real advantage in DX12."
+                    "Settings > System > Display > Advanced display. "
+                    "WITHOUT G-SYNC, monitor refresh rate DIRECTLY determines scanout time. "
+                    "300Hz = 3.33ms scanout. 240Hz = 4.17ms scanout. Always use max refresh."
                 ),
             },
             {
-                "category": "Video",
-                "setting": "VSync (in-game)",
+                "category": "Windows Settings",
+                "setting": "Variable refresh rate",
                 "value": "Off",
-                "reason": "Always disable in-game V-SYNC when using G-SYNC. NVCP V-SYNC handles sync as safety net.",
+                "reason": (
+                    "Settings > System > Display > Graphics > Change default graphics settings. "
+                    "Not needed with G-SYNC disabled. Turn off to be explicit."
+                ),
+            },
+
+            # --- In-Game Settings (No-Sync) ---
+            {
+                "category": "In-Game Video",
+                "setting": "V-SYNC",
+                "value": "Off",
+                "reason": "No sync of any kind. Frames display immediately when ready.",
             },
             {
-                "category": "Video",
-                "setting": "Frame Rate Limit",
-                "value": "Highest in-game preset below your refresh rate (e.g., 240 for 300Hz)",
+                "category": "In-Game Video",
+                "setting": "Frame Rate Cap",
+                "value": "Uncapped or 240 (highest preset)",
                 "reason": (
-                    "Rivals 2 only offers preset FPS caps (60, 120, 144, 165, 240). "
-                    "For 60Hz-logic fighting games, the in-game limiter's lower latency "
-                    "outweighs the marginal scanout benefit of RTSS at refresh-3. "
-                    "Example: On a 300Hz monitor, use the 240 preset - the ~0.5-1 frame "
-                    "latency saved by in-game limiter matters more than 240→297 scanout difference."
+                    "Rivals 2 presets: 60, 120, 144, 165, 240. If uncapped exists, use it. "
+                    "Otherwise use 240 for lowest limiter overhead (~2-4ms vs ~8-17ms at 60fps). "
+                    "FPS will exceed 300 if GPU capable - this is intended for minimum latency."
                 ),
             },
             {
-                "category": "Video",
-                "setting": "Nvidia Reflex",
-                "value": "Not available",
+                "category": "In-Game Video",
+                "setting": "Display Mode",
+                "value": "Exclusive Fullscreen",
+                "reason": "Required for no-sync. Borderless windowed adds compositor latency.",
+            },
+
+            # =========================================================================
+            # ALTERNATIVE: VRR SETUP (Tear-Free, Slightly Higher Latency)
+            # =========================================================================
+            {
+                "category": "=== ALTERNATIVE: VRR (Tear-Free) ===",
+                "setting": "Overview",
+                "value": "G-SYNC ON, V-SYNC ON (NVCP), 240 FPS in-game cap",
                 "reason": (
-                    "Rivals 2 does not implement NVIDIA Reflex. Combined with UE5/DX12 (where LLM "
-                    "doesn't work), there's no driver-level latency reduction for this game. "
-                    "Focus on: proper FPS cap, G-SYNC enabled, and system-level optimizations."
+                    "Use this if tearing bothers you. Adds ~2-5ms latency vs no-sync. "
+                    "V-SYNC acts as safety net only - never activates with FPS capped below refresh."
                 ),
             },
             {
-                "category": "Video",
+                "category": "Nvidia Control Panel (VRR Alternative)",
+                "setting": "Set up G-SYNC",
+                "value": "Enable G-SYNC, G-SYNC Compatible: ON",
+                "reason": "Display > Set up G-SYNC. Check 'Enable G-SYNC' and 'Enable for full screen mode'.",
+            },
+            {
+                "category": "Nvidia Control Panel (VRR Alternative)",
+                "setting": "Vertical sync",
+                "value": "On",
+                "reason": (
+                    "Manage 3D Settings. Acts as SAFETY NET only with G-SYNC. "
+                    "With FPS capped at 240 on 300Hz monitor, V-SYNC never engages."
+                ),
+            },
+            {
+                "category": "Nvidia Control Panel (VRR Alternative)",
+                "setting": "Low Latency Mode",
+                "value": "On (or Off if stuttering)",
+                "reason": (
+                    "Reduces render queue. 'Ultra' overrides manual FPS caps - avoid with G-SYNC. "
+                    "'On' may cause micro-stutter on some systems. If stuttering occurs, try 'Off' or "
+                    "use Nvidia Profile Inspector to manually set Pre-Rendered Frames to 2-3."
+                ),
+            },
+            {
+                "category": "In-Game Video (VRR Alternative)",
+                "setting": "V-SYNC",
+                "value": "Off (CRITICAL)",
+                "reason": "ALWAYS disable in-game V-SYNC with G-SYNC. NVCP V-SYNC handles sync.",
+            },
+            {
+                "category": "In-Game Video (VRR Alternative)",
+                "setting": "Frame Rate Cap",
+                "value": "240",
+                "reason": (
+                    "Must cap below refresh for G-SYNC to work properly. "
+                    "Note: With G-SYNC at 240fps, scanout is 4.17ms regardless of 300Hz or 240Hz monitor setting."
+                ),
+            },
+
+            # =========================================================================
+            # COMMON SETTINGS (Both Configurations)
+            # =========================================================================
+            {
+                "category": "In-Game Video (Both)",
                 "setting": "Resolution Scale",
                 "value": "100% (Native)",
                 "reason": "Native resolution for sharpest visuals. Lower only if GPU-limited and can't maintain FPS cap.",
             },
             {
-                "category": "Video",
+                "category": "In-Game Video (Both)",
                 "setting": "Graphics Quality",
-                "value": "Medium-High",
-                "reason": "Prioritize stable FPS at your cap over visual fidelity. Reduce if dropping below cap.",
+                "value": "Medium-High (prioritize stable FPS)",
+                "reason": (
+                    "Stable frametimes matter more than visual fidelity. Reduce settings if dropping below "
+                    "your FPS cap. Fighting games are about consistent frame delivery."
+                ),
             },
             {
-                "category": "Video",
+                "category": "In-Game Video (Both)",
                 "setting": "Motion Blur",
                 "value": "Off",
                 "reason": "Obscures visual clarity in fast-paced combat. Always disable for competitive play.",
             },
             {
-                "category": "Video",
+                "category": "In-Game Video (Both)",
                 "setting": "Anti-Aliasing",
-                "value": "TAA or DLAA",
+                "value": "TAA (or disable if ghosting)",
                 "reason": "UE5 uses TAA-based AA. Disable if it causes ghosting on fast-moving characters.",
             },
-
-            # === AUDIO & INPUT ===
             {
-                "category": "Audio",
+                "category": "In-Game Video (Both)",
+                "setting": "NVIDIA Reflex",
+                "value": "Not available",
+                "reason": (
+                    "Rivals 2 does not implement NVIDIA Reflex. Combined with UE5/DX12 (where LLM has limited effect), "
+                    "there's no driver-level latency reduction for this game. Focus on proper FPS cap + system optimization."
+                ),
+            },
+
+            # --- Audio & Input (Both) ---
+            {
+                "category": "Audio (Both)",
                 "setting": "Audio Latency",
                 "value": "Lowest stable setting",
-                "reason": "Audio cues are important for reactions. Lower is better but may cause crackling.",
+                "reason": "Audio cues are important for reactions. Lower is better but may cause crackling if too aggressive.",
             },
             {
-                "category": "Controller",
+                "category": "Controller (Both)",
                 "setting": "Input Method",
-                "value": "Wired or 2.4GHz dongle",
-                "reason": "Wired/USB dongle has 1-4ms latency. Bluetooth adds 10-20ms+ latency.",
+                "value": "Wired or 2.4GHz wireless dongle",
+                "reason": "Wired/USB dongle: 1-4ms latency. Bluetooth: 10-20ms+ latency. Never use Bluetooth for competitive play.",
             },
 
-            # === ALTERNATIVE: COMPETITIVE (ACCEPT TEARING) ===
+            # =========================================================================
+            # LATENCY COMPARISON SUMMARY
+            # =========================================================================
             {
-                "category": "Alternative Setup",
-                "setting": "No-sync competitive mode",
-                "value": "G-SYNC Off, V-SYNC Off, Uncapped FPS",
+                "category": "Latency Comparison",
+                "setting": "Expected results at 300Hz monitor",
+                "value": "See table below",
                 "reason": (
-                    "For tournament/LAN settings where absolute minimum latency is required "
-                    "and tearing is acceptable. Most players should use the VRR setup above."
+                    "| Configuration           | Scanout | Limiter | Tearing | Total Relative |\n"
+                    "|-------------------------|---------|---------|---------|----------------|\n"
+                    "| No sync, uncapped 300Hz | ~3.3ms  | 0ms     | Yes     | LOWEST (DEFAULT)|\n"
+                    "| No sync, 240 cap 300Hz  | ~3.3ms  | ~2-4ms  | Yes     | Very Low       |\n"
+                    "| G-SYNC+VSYNC, 240 cap   | ~4.2ms  | ~2-4ms  | No      | Low (+2-5ms)   |\n\n"
+                    "WITHOUT G-SYNC: Monitor refresh rate (300Hz vs 240Hz) DIRECTLY affects scanout. "
+                    "300Hz = 3.33ms, 240Hz = 4.17ms. Always use 300Hz for no-sync setup."
+                ),
+            },
+            {
+                "category": "Latency Comparison",
+                "setting": "In-game cap latency by preset",
+                "value": "Higher caps = lower latency (or uncapped)",
+                "reason": (
+                    "| FPS Cap   | Frame Time | Limiter Overhead | Recommendation            |\n"
+                    "|-----------|------------|------------------|---------------------------|\n"
+                    "| Uncapped  | Variable   | 0ms              | BEST if available         |\n"
+                    "| 240       | 4.17ms     | ~2-4ms           | Best preset option        |\n"
+                    "| 165       | 6.06ms     | ~3-6ms           | Avoid                     |\n"
+                    "| 144       | 6.94ms     | ~3.5-7ms         | Avoid                     |\n"
+                    "| 120       | 8.33ms     | ~4-8ms           | Avoid                     |\n"
+                    "| 60        | 16.67ms    | ~8-17ms          | Only if GPU-limited       |\n\n"
+                    "Uncapped = no limiter overhead. If must cap, use 240 (lowest overhead)."
+                ),
+            },
+            {
+                "category": "Latency Comparison",
+                "setting": "Why 300Hz matters for no-sync",
+                "value": "Scanout time is fixed by refresh rate",
+                "reason": (
+                    "WITHOUT G-SYNC, scanout time = 1000ms / refresh rate:\n"
+                    "- 300Hz: 3.33ms scanout (faster)\n"
+                    "- 240Hz: 4.17ms scanout (slower)\n\n"
+                    "This is different from G-SYNC where scanout matches FPS. "
+                    "For no-sync, monitor MUST be at 300Hz for minimum latency."
+                ),
+            },
+
+            # =========================================================================
+            # TROUBLESHOOTING
+            # =========================================================================
+            {
+                "category": "Troubleshooting",
+                "setting": "If experiencing micro-stuttering",
+                "value": "Adjust Low Latency Mode / Pre-Rendered Frames",
+                "reason": (
+                    "Low Latency Mode reduces the render queue, which CAN cause stuttering on some "
+                    "hardware/game combinations - especially if CPU-bound or with variable frame times. "
+                    "Try these in order:\n"
+                    "1. Set Low Latency Mode to 'Off' in NVCP\n"
+                    "2. Use Nvidia Profile Inspector to set 'Maximum Pre-Rendered Frames' to 2 "
+                    "(provides buffer against frame time variance while keeping latency reasonable)\n"
+                    "3. If still stuttering, try Pre-Rendered Frames = 3 (driver default)\n\n"
+                    "These settings are hardware-dependent. Test and find what works for YOUR system."
+                ),
+            },
+
+            # =========================================================================
+            # RECOMMENDATION
+            # =========================================================================
+            {
+                "category": "Final Recommendation",
+                "setting": "Default configuration",
+                "value": "No-Sync (G-SYNC OFF, V-SYNC OFF, 300Hz)",
+                "reason": (
+                    "Fighting games prioritize minimum latency. At 300Hz, tearing is barely visible "
+                    "(~3.33ms tear lines). The no-sync setup provides absolute minimum click-to-pixel latency. "
+                    "Use VRR alternative only if tearing genuinely bothers you - it adds ~2-5ms. "
+                    "NOTE: These recommendations are based on common setups but may not be optimal for all hardware. "
+                    "If you experience stuttering, see the Troubleshooting section above."
                 ),
             },
         ]
