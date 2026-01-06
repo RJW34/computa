@@ -27,12 +27,21 @@ class GraphicsSettingsHandler(SettingsHandler):
       Can cause issues with G-Sync, overlays, and some games
     - FSO (GameDVR_FSEBehavior) controls whether games get true exclusive fullscreen
     - DWM cannot be disabled on Windows 10/11 but some settings can be tuned
+
+    Reboot behavior:
+    - MPO changes (OverlayTestMode registry key) require a reboot to take effect
+    - HOWEVER, if MPO is already disabled from a previous profile application,
+      no reboot is needed when switching to another profile that also disables MPO
+    - FSO changes take effect immediately on next game launch (no reboot needed)
+    - Switching between profiles that share the same MPO setting won't require a reboot
     """
 
     # Registry paths
     DWM_KEY = r"SOFTWARE\Microsoft\Windows\Dwm"
     GAME_CONFIG_KEY = r"System\GameConfigStore"
     EXPLORER_ADVANCED_KEY = r"Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced"
+    COLOR_MANAGEMENT_KEY = r"Software\Microsoft\Windows\CurrentVersion\ColorManagement"
+    MONITOR_DATA_STORE_KEY = r"SYSTEM\CurrentControlSet\Control\GraphicsDrivers\MonitorDataStore"
 
     def detect(self) -> dict[str, Any]:
         """Detect current graphics settings."""
@@ -41,6 +50,7 @@ class GraphicsSettingsHandler(SettingsHandler):
             "global_fso_disabled": self._get_global_fso_disabled(),
             "game_dvr_behavior": self._get_game_dvr_behavior(),
             "hardware_cursor": self._get_hardware_cursor(),
+            "auto_color_management": self._get_auto_color_management(),
         }
 
     def audit(self) -> list[Issue]:
@@ -79,17 +89,48 @@ class GraphicsSettingsHandler(SettingsHandler):
                 category="graphics",
             ))
 
+        # Check Auto Color Management (ACM) status
+        acm_status = current.get("auto_color_management", {})
+        acm_enabled_monitors = []
+        for monitor_id, enabled in acm_status.get("per_monitor", {}).items():
+            if enabled:
+                acm_enabled_monitors.append(monitor_id)
+
+        if acm_enabled_monitors:
+            issues.append(Issue(
+                title="Auto Color Management (ACM) is enabled",
+                severity="warning",
+                current_value=f"Enabled on {len(acm_enabled_monitors)} monitor(s)",
+                optimal_value="Disabled",
+                explanation=(
+                    "Auto Color Management adds color profile processing to the display "
+                    "pipeline, which can introduce latency and color inconsistencies in "
+                    "games. Disable via Settings > Display > Advanced display for each "
+                    "monitor. This is mainly useful for color-accurate creative work."
+                ),
+                category="graphics",
+            ))
+
         return issues
 
     def apply(self, settings: dict[str, Any]) -> dict[str, Any]:
-        """Apply graphics optimization settings."""
+        """Apply graphics optimization settings.
+
+        Only sets requires_reboot=True if we actually change MPO state.
+        If MPO is already in the desired state, no reboot is needed.
+        """
         errors: list[str] = []
         requires_reboot = False
 
+        # Get current values to check if we're actually changing anything
+        current = self.detect()
+
         try:
             if "disable_mpo" in settings:
-                self._set_mpo_disabled(settings["disable_mpo"])
-                requires_reboot = True  # MPO changes require reboot
+                target = settings["disable_mpo"]
+                if current.get("mpo_disabled") != target:
+                    self._set_mpo_disabled(target)
+                    requires_reboot = True  # Actually changed MPO state
 
             if "disable_global_fso" in settings:
                 self._set_global_fso_disabled(settings["disable_global_fso"])
@@ -107,6 +148,30 @@ class GraphicsSettingsHandler(SettingsHandler):
             "error": "; ".join(errors) if errors else None,
             "requires_reboot": requires_reboot,
         }
+
+    def verify_active(self, settings: dict[str, Any]) -> dict[str, Any]:
+        """Verify that reboot-requiring settings are already active.
+
+        Use this to check if MPO setting is actually in effect.
+
+        Returns:
+            Dict with 'all_active' bool and details for each setting.
+        """
+        current = self.detect()
+        results = {"all_active": True, "settings": {}}
+
+        if "disable_mpo" in settings:
+            target = settings["disable_mpo"]
+            is_active = current.get("mpo_disabled") == target
+            results["settings"]["mpo_disabled"] = {
+                "target": target,
+                "current": current.get("mpo_disabled"),
+                "active": is_active,
+            }
+            if not is_active:
+                results["all_active"] = False
+
+        return results
 
     def backup(self) -> dict[str, Any]:
         """Backup current graphics settings."""
@@ -242,3 +307,79 @@ class GraphicsSettingsHandler(SettingsHandler):
         except Exception as e:
             logger.debug(f"Failed to get hardware cursor status: {e}")
             return None
+
+    def _get_auto_color_management(self) -> dict[str, Any]:
+        """Check Auto Color Management (ACM) status.
+
+        ACM is a Windows 11 feature that applies color profiles automatically.
+        For gaming, ACM adds processing overhead and should generally be disabled.
+
+        Returns:
+            Dict with 'global' (bool or None) and 'per_monitor' (dict of monitor_id: bool)
+        """
+        result: dict[str, Any] = {
+            "global": None,
+            "per_monitor": {},
+        }
+
+        # Check global ACM setting (HKCU)
+        try:
+            key = winreg.OpenKey(
+                winreg.HKEY_CURRENT_USER,
+                self.COLOR_MANAGEMENT_KEY,
+                0,
+                winreg.KEY_READ
+            )
+            try:
+                value = winreg.QueryValueEx(key, "AutoColorManagement")[0]
+                result["global"] = value != 0
+            except FileNotFoundError:
+                result["global"] = None  # Not set
+            finally:
+                winreg.CloseKey(key)
+        except Exception as e:
+            logger.debug(f"Failed to get global ACM status: {e}")
+
+        # Check per-monitor ACM settings
+        try:
+            key = winreg.OpenKey(
+                winreg.HKEY_LOCAL_MACHINE,
+                self.MONITOR_DATA_STORE_KEY,
+                0,
+                winreg.KEY_READ
+            )
+            try:
+                # Enumerate all monitor subkeys
+                i = 0
+                while True:
+                    try:
+                        monitor_id = winreg.EnumKey(key, i)
+                        i += 1
+                        # Check this monitor's ACM setting
+                        try:
+                            monitor_key = winreg.OpenKey(
+                                key,
+                                monitor_id,
+                                0,
+                                winreg.KEY_READ
+                            )
+                            try:
+                                value = winreg.QueryValueEx(
+                                    monitor_key, "AutoColorManagementEnabled"
+                                )[0]
+                                result["per_monitor"][monitor_id] = value != 0
+                            except FileNotFoundError:
+                                # Not set = disabled by default
+                                result["per_monitor"][monitor_id] = False
+                            finally:
+                                winreg.CloseKey(monitor_key)
+                        except Exception as e:
+                            logger.debug(f"Failed to read ACM for monitor {monitor_id}: {e}")
+                    except OSError:
+                        break  # No more subkeys
+            finally:
+                winreg.CloseKey(key)
+        except Exception as e:
+            logger.debug(f"Failed to enumerate monitors for ACM: {e}")
+
+        return result
