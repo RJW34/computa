@@ -164,9 +164,16 @@ class WindowsSettingsHandler(SettingsHandler):
         return issues
 
     def apply(self, settings: dict[str, Any]) -> dict[str, Any]:
-        """Apply Windows gaming settings."""
+        """Apply Windows gaming settings.
+
+        Only sets requires_reboot=True if we actually change HAGS or VBS.
+        If values already match, no reboot is needed.
+        """
         requires_reboot = False
         errors: list[str] = []
+
+        # Get current values to check if we're actually changing anything
+        current = self.detect()
 
         try:
             if "game_mode" in settings:
@@ -179,12 +186,21 @@ class WindowsSettingsHandler(SettingsHandler):
                 self._set_game_dvr(settings["game_dvr"])
 
             if "hags" in settings:
-                self._set_hags(settings["hags"])
-                requires_reboot = True
+                target = settings["hags"]
+                current_hags = current.get("hags_enabled")
+                # Only set requires_reboot if we can detect current value AND it differs
+                # If current is None (undetectable), we still apply but don't force reboot
+                if current_hags is not None and current_hags != target:
+                    requires_reboot = True  # Actually changing HAGS
+                self._set_hags(target)
 
             if "vbs" in settings:
-                self._set_vbs(settings["vbs"])
-                requires_reboot = True
+                target = settings["vbs"]
+                current_vbs = current.get("vbs_enabled")
+                # Only set requires_reboot if we can detect current value AND it differs
+                if current_vbs is not None and current_vbs != target:
+                    requires_reboot = True  # Actually changing VBS
+                self._set_vbs(target)
 
             if "hdr" in settings:
                 self._set_hdr(settings["hdr"])
@@ -207,6 +223,45 @@ class WindowsSettingsHandler(SettingsHandler):
             "error": "; ".join(errors) if errors else None,
             "requires_reboot": requires_reboot,
         }
+
+    def verify_active(self, settings: dict[str, Any]) -> dict[str, Any]:
+        """Verify that reboot-requiring settings are already active.
+
+        Checks HAGS and VBS settings.
+
+        Returns:
+            Dict with 'all_active' bool and details for each setting.
+        """
+        current = self.detect()
+        results = {"all_active": True, "settings": {}}
+
+        if "hags" in settings:
+            target = settings["hags"]
+            current_val = current.get("hags_enabled")
+            # If we can't detect, assume it's active (can't prove otherwise)
+            is_active = current_val is None or current_val == target
+            results["settings"]["hags"] = {
+                "target": target,
+                "current": current_val if current_val is not None else "undetectable",
+                "active": is_active,
+            }
+            if not is_active:
+                results["all_active"] = False
+
+        if "vbs" in settings:
+            target = settings["vbs"]
+            current_val = current.get("vbs_enabled")
+            # If we can't detect, assume it's active (can't prove otherwise)
+            is_active = current_val is None or current_val == target
+            results["settings"]["vbs"] = {
+                "target": target,
+                "current": current_val if current_val is not None else "undetectable",
+                "active": is_active,
+            }
+            if not is_active:
+                results["all_active"] = False
+
+        return results
 
     def backup(self) -> dict[str, Any]:
         """Backup current Windows gaming settings."""
@@ -425,11 +480,70 @@ class WindowsSettingsHandler(SettingsHandler):
             logger.debug(f"Failed to get HDR status: {e}")
             return None
 
-    def _set_hdr(self, enabled: bool) -> None:
-        """Set Windows HDR status for all monitors.
+    def _is_monitor_hdr_capable(self, monitor_id: str) -> bool:
+        """Check if a monitor supports HDR.
 
-        Sets both HDREnabled and AdvancedColorEnabled for ALL monitors in MonitorDataStore.
-        HDREnabled is the primary toggle, AdvancedColorEnabled is for advanced color features.
+        Detection methods:
+        1. Check for known OLED/HDR model codes
+        2. Check for AdvancedColorSupported registry value
+        3. Fall back to conservative defaults (don't enable HDR on unknown monitors)
+
+        Args:
+            monitor_id: The monitor ID from MonitorDataStore
+
+        Returns:
+            True if monitor appears to be HDR-capable
+        """
+        # Known HDR-capable monitor model prefixes
+        # Format: (prefix, description)
+        # LG OLED models have model codes starting with 78xx (e.g., 784C = 27GS95QE)
+        # NOT all LG monitors (GSM) are HDR - only OLEDs in 78xx range
+        hdr_capable_patterns = [
+            "GSM784",   # LG UltraGear OLED 27" (27GS95QE, 27GR95QE, etc.)
+            "GSM788",   # LG UltraGear OLED 32"/45" models
+            "GSM789",   # LG UltraGear OLED variants
+            # Add more patterns as needed for other known HDR monitors
+        ]
+
+        # Check for known HDR model patterns
+        for pattern in hdr_capable_patterns:
+            if monitor_id.startswith(pattern):
+                logger.debug(f"Monitor {monitor_id} detected as HDR-capable (OLED model pattern)")
+                return True
+
+        # Check registry for HDR capability markers
+        try:
+            subkey = winreg.OpenKey(
+                winreg.HKEY_LOCAL_MACHINE,
+                rf"SYSTEM\CurrentControlSet\Control\GraphicsDrivers\MonitorDataStore\{monitor_id}",
+                0,
+                winreg.KEY_READ
+            )
+            try:
+                # Check for AdvancedColorSupported flag
+                value = winreg.QueryValueEx(subkey, "AdvancedColorSupported")[0]
+                if value:
+                    logger.debug(f"Monitor {monitor_id} has AdvancedColorSupported=1")
+                    return True
+            except FileNotFoundError:
+                pass
+            winreg.CloseKey(subkey)
+        except Exception:
+            pass
+
+        logger.debug(f"Monitor {monitor_id} treated as SDR (no HDR capability detected)")
+        return False
+
+    def _set_hdr(self, enabled: bool) -> None:
+        """Set Windows HDR status intelligently per-monitor.
+
+        For HDR enable requests:
+        - Only enables HDR on monitors detected as HDR-capable
+        - Leaves SDR monitors unchanged (HDR disabled)
+
+        For HDR disable requests:
+        - Disables HDR on all monitors
+
         Requires admin privileges.
         """
         try:
@@ -450,21 +564,33 @@ class WindowsSettingsHandler(SettingsHandler):
                     break
             winreg.CloseKey(key)
 
-            # Set HDR values for each monitor
-            value = 1 if enabled else 0
+            # Set HDR values per-monitor based on capability
             for monitor_id in monitor_keys:
                 try:
+                    # Determine what value to set for this monitor
+                    if enabled:
+                        # Only enable HDR on capable monitors
+                        if self._is_monitor_hdr_capable(monitor_id):
+                            value = 1
+                            action = "enabled (HDR-capable)"
+                        else:
+                            value = 0
+                            action = "kept disabled (SDR monitor)"
+                    else:
+                        # Disable HDR on all monitors
+                        value = 0
+                        action = "disabled"
+
                     subkey = winreg.OpenKey(
                         winreg.HKEY_LOCAL_MACHINE,
                         rf"SYSTEM\CurrentControlSet\Control\GraphicsDrivers\MonitorDataStore\{monitor_id}",
                         0,
                         winreg.KEY_ALL_ACCESS
                     )
-                    # Set both HDREnabled (primary toggle) and AdvancedColorEnabled
                     winreg.SetValueEx(subkey, "HDREnabled", 0, winreg.REG_DWORD, value)
                     winreg.SetValueEx(subkey, "AdvancedColorEnabled", 0, winreg.REG_DWORD, value)
                     winreg.CloseKey(subkey)
-                    logger.info(f"Set HDR {'enabled' if enabled else 'disabled'} for monitor: {monitor_id}")
+                    logger.info(f"HDR {action} for monitor: {monitor_id}")
                 except PermissionError:
                     logger.warning(f"Permission denied setting HDR for monitor: {monitor_id}")
                 except Exception as e:

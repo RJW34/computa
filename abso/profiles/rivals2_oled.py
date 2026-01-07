@@ -42,6 +42,7 @@ class Rivals2OLEDProfile(Rivals2Profile):
         if handler_name == "WindowsSettingsHandler":
             settings = settings.copy()
             settings["hdr"] = True
-            settings["auto_hdr"] = True
+            # Auto HDR OFF - game has native HDR, Auto HDR not needed
+            settings["auto_hdr"] = False
 
         return settings

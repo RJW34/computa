@@ -42,6 +42,7 @@ class SlippiMeleeOLEDProfile(SlippiMeleeProfile):
         if handler_name == "WindowsSettingsHandler":
             settings = settings.copy()
             settings["hdr"] = True
-            settings["auto_hdr"] = True
+            # Auto HDR OFF - Slippi is SDR content, Auto HDR causes washed-out colors
+            settings["auto_hdr"] = False
 
         return settings
