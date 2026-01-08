@@ -104,11 +104,12 @@ class TestProfileSettings:
         assert settings["preset"] == "minimum_latency"
 
     def test_cod_nvidia_settings(self):
-        """Test CodBo7Profile returns Nvidia settings with preset."""
+        """Test CodBo7Profile returns Nvidia settings with reflex_game preset."""
         profile = CodBo7Profile()
         settings = profile.get_settings("NvidiaSettingsHandler")
 
-        assert settings["preset"] == "low_latency_high_fps"
+        # CoD has built-in NVIDIA Reflex - uses reflex_game preset (LLM OFF)
+        assert settings["preset"] == "reflex_game"
 
     def test_diablo4_nvidia_settings(self):
         """Test Diablo4Profile returns Nvidia settings with preset."""
@@ -118,11 +119,12 @@ class TestProfileSettings:
         assert settings["preset"] == "balanced"
 
     def test_pokemon_auto_chess_nvidia_settings(self):
-        """Test PokemonAutoChessProfile returns Nvidia settings with balanced preset."""
+        """Test PokemonAutoChessProfile returns Nvidia settings with low_latency preset."""
         profile = PokemonAutoChessProfile()
         settings = profile.get_settings("NvidiaSettingsHandler")
 
-        assert settings["preset"] == "balanced"
+        # WebGL benefits from low latency settings with VSync disabled
+        assert settings["preset"] == "low_latency_high_fps"
 
     def test_pokemon_auto_chess_windows_settings(self):
         """Test PokemonAutoChessProfile returns Windows settings."""
