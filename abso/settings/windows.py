@@ -168,60 +168,105 @@ class WindowsSettingsHandler(SettingsHandler):
 
         Only sets requires_reboot=True if we actually change HAGS or VBS.
         If values already match, no reboot is needed.
+
+        Returns detailed per-setting success/failure information.
         """
         requires_reboot = False
         errors: list[str] = []
+        applied: list[str] = []
 
         # Get current values to check if we're actually changing anything
         current = self.detect()
 
-        try:
-            if "game_mode" in settings:
+        # Apply each setting individually with error tracking
+        if "game_mode" in settings:
+            try:
                 self._set_game_mode(settings["game_mode"])
+                applied.append(f"Game Mode: {'enabled' if settings['game_mode'] else 'disabled'}")
+            except Exception as e:
+                errors.append(f"Game Mode: {e}")
 
-            if "game_bar" in settings:
+        if "game_bar" in settings:
+            try:
                 self._set_game_bar(settings["game_bar"])
+                applied.append(f"Game Bar: {'enabled' if settings['game_bar'] else 'disabled'}")
+            except Exception as e:
+                errors.append(f"Game Bar: {e}")
 
-            if "game_dvr" in settings:
+        if "game_dvr" in settings:
+            try:
                 self._set_game_dvr(settings["game_dvr"])
+                applied.append(f"Game DVR: {'enabled' if settings['game_dvr'] else 'disabled'}")
+            except Exception as e:
+                errors.append(f"Game DVR: {e}")
 
-            if "hags" in settings:
+        if "hags" in settings:
+            try:
                 target = settings["hags"]
                 current_hags = current.get("hags_enabled")
                 # Only set requires_reboot if we can detect current value AND it differs
-                # If current is None (undetectable), we still apply but don't force reboot
                 if current_hags is not None and current_hags != target:
-                    requires_reboot = True  # Actually changing HAGS
+                    requires_reboot = True
                 self._set_hags(target)
+                applied.append(f"HAGS: {'enabled' if target else 'disabled'}")
+            except Exception as e:
+                errors.append(f"HAGS: {e}")
 
-            if "vbs" in settings:
+        if "vbs" in settings:
+            try:
                 target = settings["vbs"]
                 current_vbs = current.get("vbs_enabled")
-                # Only set requires_reboot if we can detect current value AND it differs
                 if current_vbs is not None and current_vbs != target:
-                    requires_reboot = True  # Actually changing VBS
+                    requires_reboot = True
                 self._set_vbs(target)
+                applied.append(f"VBS: {'enabled' if target else 'disabled'}")
+            except Exception as e:
+                errors.append(f"VBS: {e}")
 
-            if "hdr" in settings:
-                self._set_hdr(settings["hdr"])
+        if "hdr" in settings:
+            hdr_result = self._set_hdr(settings["hdr"])
+            if hdr_result["success"]:
+                if settings["hdr"]:
+                    applied.append(f"HDR: enabled on {hdr_result['hdr_enabled_count']} monitor(s)")
+                else:
+                    applied.append("HDR: disabled on all monitors")
+            else:
+                for err in hdr_result.get("errors", []):
+                    errors.append(f"HDR: {err}")
 
-            if "auto_hdr" in settings:
-                self._set_auto_hdr(settings["auto_hdr"])
+        if "auto_hdr" in settings:
+            auto_hdr_result = self._set_auto_hdr(settings["auto_hdr"])
+            if auto_hdr_result["success"]:
+                applied.append(f"Auto HDR: {'enabled' if settings['auto_hdr'] else 'disabled'}")
+            else:
+                errors.append(f"Auto HDR: {auto_hdr_result.get('error', 'Unknown error')}")
 
-            if "refresh_rate" in settings:
+        if "refresh_rate" in settings:
+            try:
                 self._set_refresh_rate(settings["refresh_rate"])
+                applied.append(f"Refresh Rate: {settings['refresh_rate']} Hz")
+            except Exception as e:
+                errors.append(f"Refresh Rate: {e}")
 
-            if settings.get("max_refresh_rate") is True:
-                # Special flag to set maximum available refresh rate
+        if settings.get("max_refresh_rate") is True:
+            try:
                 self._set_max_refresh_rate()
+                applied.append("Refresh Rate: set to maximum")
+            except Exception as e:
+                errors.append(f"Max Refresh Rate: {e}")
 
-        except Exception as e:
-            errors.append(str(e))
+        # Log summary
+        if applied:
+            logger.info(f"Windows settings applied: {', '.join(applied)}")
+        if errors:
+            logger.warning(f"Windows settings errors: {', '.join(errors)}")
 
         return {
             "success": len(errors) == 0,
             "error": "; ".join(errors) if errors else None,
             "requires_reboot": requires_reboot,
+            "applied": applied,
+            "failed": errors,
         }
 
     def verify_active(self, settings: dict[str, Any]) -> dict[str, Any]:
@@ -534,7 +579,7 @@ class WindowsSettingsHandler(SettingsHandler):
         logger.debug(f"Monitor {monitor_id} treated as SDR (no HDR capability detected)")
         return False
 
-    def _set_hdr(self, enabled: bool) -> None:
+    def _set_hdr(self, enabled: bool) -> dict[str, Any]:
         """Set Windows HDR status intelligently per-monitor.
 
         For HDR enable requests:
@@ -545,7 +590,17 @@ class WindowsSettingsHandler(SettingsHandler):
         - Disables HDR on all monitors
 
         Requires admin privileges.
+
+        Returns:
+            Dict with 'success', 'hdr_capable_count', 'hdr_enabled_count', and 'errors'.
         """
+        result: dict[str, Any] = {
+            "success": True,
+            "hdr_capable_count": 0,
+            "hdr_enabled_count": 0,
+            "errors": [],
+        }
+
         try:
             key = winreg.OpenKey(
                 winreg.HKEY_LOCAL_MACHINE,
@@ -573,6 +628,7 @@ class WindowsSettingsHandler(SettingsHandler):
                         if self._is_monitor_hdr_capable(monitor_id):
                             value = 1
                             action = "enabled (HDR-capable)"
+                            result["hdr_capable_count"] += 1
                         else:
                             value = 0
                             action = "kept disabled (SDR monitor)"
@@ -591,14 +647,33 @@ class WindowsSettingsHandler(SettingsHandler):
                     winreg.SetValueEx(subkey, "AdvancedColorEnabled", 0, winreg.REG_DWORD, value)
                     winreg.CloseKey(subkey)
                     logger.info(f"HDR {action} for monitor: {monitor_id}")
+
+                    if value == 1:
+                        result["hdr_enabled_count"] += 1
+
                 except PermissionError:
-                    logger.warning(f"Permission denied setting HDR for monitor: {monitor_id}")
+                    error_msg = f"Permission denied setting HDR for monitor: {monitor_id}"
+                    logger.warning(error_msg)
+                    result["errors"].append(error_msg)
+                    result["success"] = False
                 except Exception as e:
-                    logger.debug(f"Failed to set HDR for monitor {monitor_id}: {e}")
+                    error_msg = f"Failed to set HDR for monitor {monitor_id}: {e}"
+                    logger.error(error_msg)
+                    result["errors"].append(error_msg)
+                    result["success"] = False
+
+            # If HDR was requested but no capable monitors found, that's not an error
+            # but we should note it
+            if enabled and result["hdr_capable_count"] == 0:
+                logger.info("No HDR-capable monitors detected")
 
         except Exception as e:
-            logger.error(f"Failed to set HDR: {e}")
-            raise
+            error_msg = f"Failed to set HDR: {e}"
+            logger.error(error_msg)
+            result["errors"].append(error_msg)
+            result["success"] = False
+
+        return result
 
     def _get_auto_hdr(self) -> bool | None:
         """Get Windows Auto HDR status (Windows 11 only)."""
@@ -621,12 +696,17 @@ class WindowsSettingsHandler(SettingsHandler):
             logger.debug(f"Failed to get Auto HDR status: {e}")
             return None
 
-    def _set_auto_hdr(self, enabled: bool) -> None:
+    def _set_auto_hdr(self, enabled: bool) -> dict[str, Any]:
         """Set Windows Auto HDR status (Windows 11 only).
 
         Auto HDR converts SDR games to HDR automatically.
         For competitive gaming, this should typically be disabled.
+
+        Returns:
+            Dict with 'success' and optional 'error'.
         """
+        result: dict[str, Any] = {"success": True, "error": None}
+
         try:
             key = winreg.OpenKey(
                 winreg.HKEY_CURRENT_USER,
@@ -646,6 +726,7 @@ class WindowsSettingsHandler(SettingsHandler):
                     # Add the setting
                     new_value = current + f";SwapEffectUpgradeEnable={'1' if enabled else '0'}"
                 winreg.SetValueEx(key, "DirectXUserGlobalSettings", 0, winreg.REG_SZ, new_value)
+                logger.info(f"Auto HDR set to {'enabled' if enabled else 'disabled'}")
             except FileNotFoundError:
                 # Create default value
                 winreg.SetValueEx(
@@ -655,24 +736,44 @@ class WindowsSettingsHandler(SettingsHandler):
                     winreg.REG_SZ,
                     f"SwapEffectUpgradeEnable={'1' if enabled else '0'}"
                 )
+                logger.info(f"Auto HDR set to {'enabled' if enabled else 'disabled'} (created new key)")
             finally:
                 winreg.CloseKey(key)
         except FileNotFoundError:
             # Key doesn't exist, create it
-            key = winreg.CreateKey(
-                winreg.HKEY_CURRENT_USER,
-                r"Software\Microsoft\DirectX\UserGpuPreferences"
-            )
             try:
-                winreg.SetValueEx(
-                    key,
-                    "DirectXUserGlobalSettings",
-                    0,
-                    winreg.REG_SZ,
-                    f"SwapEffectUpgradeEnable={'1' if enabled else '0'}"
+                key = winreg.CreateKey(
+                    winreg.HKEY_CURRENT_USER,
+                    r"Software\Microsoft\DirectX\UserGpuPreferences"
                 )
-            finally:
-                winreg.CloseKey(key)
+                try:
+                    winreg.SetValueEx(
+                        key,
+                        "DirectXUserGlobalSettings",
+                        0,
+                        winreg.REG_SZ,
+                        f"SwapEffectUpgradeEnable={'1' if enabled else '0'}"
+                    )
+                    logger.info(f"Auto HDR set to {'enabled' if enabled else 'disabled'} (created registry path)")
+                finally:
+                    winreg.CloseKey(key)
+            except Exception as e:
+                error_msg = f"Failed to create Auto HDR registry key: {e}"
+                logger.error(error_msg)
+                result["success"] = False
+                result["error"] = error_msg
+        except PermissionError as e:
+            error_msg = f"Permission denied setting Auto HDR: {e}"
+            logger.error(error_msg)
+            result["success"] = False
+            result["error"] = error_msg
+        except Exception as e:
+            error_msg = f"Failed to set Auto HDR: {e}"
+            logger.error(error_msg)
+            result["success"] = False
+            result["error"] = error_msg
+
+        return result
 
     def _get_refresh_rate_info(self) -> dict[str, Any]:
         """Get current and available refresh rates for the primary display.
