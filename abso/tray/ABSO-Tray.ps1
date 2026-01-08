@@ -36,8 +36,11 @@ Add-Type -AssemblyName System.Drawing
 # ============================================================================
 # NOTIFICATION SYSTEM
 # ============================================================================
-# Simple notification wrapper that uses balloon tips.
-# The title parameter becomes the notification header.
+# Notifications disabled - Windows shows ugly "Windows PowerShell" attribution
+# for script-based apps. Instead, we update the tray tooltip with status.
+# Set to $true to re-enable balloon notifications if desired.
+
+$script:EnableBalloonNotifications = $false
 
 function Show-Notification {
     param(
@@ -47,14 +50,17 @@ function Show-Notification {
         [string]$Type = "Info"
     )
 
-    $icon = switch ($Type) {
-        "Warning" { [System.Windows.Forms.ToolTipIcon]::Warning }
-        "Error" { [System.Windows.Forms.ToolTipIcon]::Error }
-        default { [System.Windows.Forms.ToolTipIcon]::Info }
-    }
+    # Update tray tooltip with the message
+    $script:notifyIcon.Text = "$Title - $Message".Substring(0, [Math]::Min(63, "$Title - $Message".Length))
 
-    # BalloonTip: timeout (ms), title, message, icon
-    $script:notifyIcon.ShowBalloonTip(3000, $Title, $Message, $icon)
+    if ($script:EnableBalloonNotifications) {
+        $icon = switch ($Type) {
+            "Warning" { [System.Windows.Forms.ToolTipIcon]::Warning }
+            "Error" { [System.Windows.Forms.ToolTipIcon]::Error }
+            default { [System.Windows.Forms.ToolTipIcon]::Info }
+        }
+        $script:notifyIcon.ShowBalloonTip(3000, $Title, $Message, $icon)
+    }
 }
 
 # ============================================================================
