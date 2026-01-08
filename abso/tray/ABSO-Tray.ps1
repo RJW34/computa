@@ -34,27 +34,179 @@ Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 
 # ============================================================================
-# SET APP IDENTITY FOR NOTIFICATIONS
+# TOAST NOTIFICATION SYSTEM
 # ============================================================================
-# Sets AppUserModelId so Windows notifications show "A.B.S.O." instead of
-# "Microsoft.Explorer.Notification..." or "Windows PowerShell"
+# Uses Windows.UI.Notifications API for proper app branding in notifications.
+# Creates a Start Menu shortcut with custom AppUserModelId for proper header display.
 
-$appIdCode = @"
+$script:UseModernToast = $false
+$script:AppId = "ABSO.Tray"
+
+# C# code to create shortcut with custom AppUserModelId
+$shortcutHelperCode = @"
 using System;
 using System.Runtime.InteropServices;
+using System.Runtime.InteropServices.ComTypes;
 
-public class AppId {
-    [DllImport("shell32.dll", SetLastError = true)]
-    public static extern void SetCurrentProcessExplicitAppUserModelID(
-        [MarshalAs(UnmanagedType.LPWStr)] string AppID);
+public class ShortcutHelper {
+    [ComImport]
+    [Guid("00021401-0000-0000-C000-000000000046")]
+    private class ShellLink { }
+
+    [ComImport]
+    [InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    [Guid("000214F9-0000-0000-C000-000000000046")]
+    private interface IShellLink {
+        void GetPath([Out, MarshalAs(UnmanagedType.LPWStr)] System.Text.StringBuilder pszFile, int cchMaxPath, IntPtr pfd, int fFlags);
+        void GetIDList(out IntPtr ppidl);
+        void SetIDList(IntPtr pidl);
+        void GetDescription([Out, MarshalAs(UnmanagedType.LPWStr)] System.Text.StringBuilder pszName, int cchMaxName);
+        void SetDescription([MarshalAs(UnmanagedType.LPWStr)] string pszName);
+        void GetWorkingDirectory([Out, MarshalAs(UnmanagedType.LPWStr)] System.Text.StringBuilder pszDir, int cchMaxPath);
+        void SetWorkingDirectory([MarshalAs(UnmanagedType.LPWStr)] string pszDir);
+        void GetArguments([Out, MarshalAs(UnmanagedType.LPWStr)] System.Text.StringBuilder pszArgs, int cchMaxPath);
+        void SetArguments([MarshalAs(UnmanagedType.LPWStr)] string pszArgs);
+        void GetHotkey(out short pwHotkey);
+        void SetHotkey(short wHotkey);
+        void GetShowCmd(out int piShowCmd);
+        void SetShowCmd(int iShowCmd);
+        void GetIconLocation([Out, MarshalAs(UnmanagedType.LPWStr)] System.Text.StringBuilder pszIconPath, int cchIconPath, out int piIcon);
+        void SetIconLocation([MarshalAs(UnmanagedType.LPWStr)] string pszIconPath, int iIcon);
+        void SetRelativePath([MarshalAs(UnmanagedType.LPWStr)] string pszPathRel, int dwReserved);
+        void Resolve(IntPtr hwnd, int fFlags);
+        void SetPath([MarshalAs(UnmanagedType.LPWStr)] string pszFile);
+    }
+
+    [ComImport]
+    [Guid("886D8EEB-8CF2-4446-8D02-CDBA1DBDCF99")]
+    [InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    private interface IPropertyStore {
+        int GetCount(out uint cProps);
+        int GetAt(uint iProp, out PropertyKey pkey);
+        int GetValue(ref PropertyKey key, out PropVariant pv);
+        int SetValue(ref PropertyKey key, ref PropVariant pv);
+        int Commit();
+    }
+
+    [StructLayout(LayoutKind.Sequential, Pack = 4)]
+    private struct PropertyKey {
+        public Guid fmtid;
+        public uint pid;
+        public PropertyKey(Guid guid, uint id) { fmtid = guid; pid = id; }
+    }
+
+    [StructLayout(LayoutKind.Explicit)]
+    private struct PropVariant {
+        [FieldOffset(0)] public ushort vt;
+        [FieldOffset(8)] public IntPtr pwszVal;
+
+        public static PropVariant FromString(string str) {
+            var pv = new PropVariant { vt = 31 }; // VT_LPWSTR
+            pv.pwszVal = Marshal.StringToCoTaskMemUni(str);
+            return pv;
+        }
+    }
+
+    private static readonly PropertyKey AppUserModelId = new PropertyKey(
+        new Guid("9F4C2855-9F79-4B39-A8D0-E1D42DE1D5F3"), 5);
+
+    public static void CreateShortcut(string path, string target, string args, string workDir, string description, string appId) {
+        IShellLink link = (IShellLink)new ShellLink();
+        link.SetPath(target);
+        link.SetArguments(args);
+        link.SetWorkingDirectory(workDir);
+        link.SetDescription(description);
+
+        IPropertyStore store = (IPropertyStore)link;
+        PropVariant pv = PropVariant.FromString(appId);
+        store.SetValue(ref AppUserModelId, ref pv);
+        store.Commit();
+
+        IPersistFile file = (IPersistFile)link;
+        file.Save(path, false);
+    }
 }
 "@
 
+# Register app identity via Start Menu shortcut with custom AUMID
+function Register-AppIdentity {
+    $shortcutPath = "$env:APPDATA\Microsoft\Windows\Start Menu\Programs\A.B.S.O. Tray.lnk"
+
+    try {
+        # Only create if missing or needs update
+        if (-not (Test-Path $shortcutPath)) {
+            Add-Type -TypeDefinition $shortcutHelperCode -Language CSharp -ErrorAction Stop
+
+            [ShortcutHelper]::CreateShortcut(
+                $shortcutPath,
+                "powershell.exe",
+                "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$PSCommandPath`"",
+                $PSScriptRoot,
+                "A.B.S.O. System Tray",
+                $script:AppId
+            )
+        }
+        return $true
+    } catch {
+        # Shortcut creation failed - notifications will work but may show generic name
+        return $false
+    }
+}
+
 try {
-    Add-Type -TypeDefinition $appIdCode -Language CSharp -ErrorAction SilentlyContinue
-    [AppId]::SetCurrentProcessExplicitAppUserModelID("ABSO.Tray.1")
+    # Load WinRT assemblies for modern toast notifications
+    [Windows.UI.Notifications.ToastNotificationManager, Windows.UI.Notifications, ContentType = WindowsRuntime] | Out-Null
+    [Windows.Data.Xml.Dom.XmlDocument, Windows.Data.Xml.Dom.XmlDocument, ContentType = WindowsRuntime] | Out-Null
+
+    # Register app identity for proper notification headers
+    Register-AppIdentity | Out-Null
+
+    $script:UseModernToast = $true
 } catch {
-    # Ignore if it fails - notifications will still work, just with generic name
+    # WinRT not available - will use legacy balloon tips
+}
+
+function Show-Notification {
+    param(
+        [string]$Title,
+        [string]$Message,
+        [ValidateSet("Info", "Warning", "Error")]
+        [string]$Type = "Info"
+    )
+
+    if ($script:UseModernToast) {
+        try {
+            # Build toast XML - Title appears as header, Message as body
+            $toastXml = @"
+<toast>
+    <visual>
+        <binding template="ToastGeneric">
+            <text>$([System.Security.SecurityElement]::Escape($Title))</text>
+            <text>$([System.Security.SecurityElement]::Escape($Message))</text>
+        </binding>
+    </visual>
+    <audio silent="true"/>
+</toast>
+"@
+            $xml = New-Object Windows.Data.Xml.Dom.XmlDocument
+            $xml.LoadXml($toastXml)
+
+            $toast = New-Object Windows.UI.Notifications.ToastNotification $xml
+            $notifier = [Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier($script:AppId)
+            $notifier.Show($toast)
+            return
+        } catch {
+            # Fall through to balloon tip
+        }
+    }
+
+    # Fallback: legacy balloon tip
+    $icon = switch ($Type) {
+        "Warning" { [System.Windows.Forms.ToolTipIcon]::Warning }
+        "Error" { [System.Windows.Forms.ToolTipIcon]::Error }
+        default { [System.Windows.Forms.ToolTipIcon]::Info }
+    }
+    $script:notifyIcon.ShowBalloonTip(2500, $Title, $Message, $icon)
 }
 
 # ============================================================================
@@ -236,12 +388,7 @@ function Apply-Profile {
                 $message += "`n" + ($actions -join ", ")
             }
 
-            $script:notifyIcon.ShowBalloonTip(
-                2500,
-                "A.B.S.O.",
-                $message,
-                [System.Windows.Forms.ToolTipIcon]::Info
-            )
+            Show-Notification -Title "A.B.S.O." -Message $message -Type "Info"
 
             # Start game watcher
             Start-GameWatcher -ProfileId $ProfileId -Executables $profile.Executables
@@ -252,23 +399,13 @@ function Apply-Profile {
 
         } else {
             $errMsg = if ($json.error) { $json.error } else { "Unknown error" }
-            $script:notifyIcon.ShowBalloonTip(
-                2500,
-                "A.B.S.O. Error",
-                "Failed: $errMsg",
-                [System.Windows.Forms.ToolTipIcon]::Error
-            )
+            Show-Notification -Title "A.B.S.O. Error" -Message "Failed: $errMsg" -Type "Error"
             $script:notifyIcon.Text = "A.B.S.O."
         }
     } catch {
         $errText = $_.Exception.Message
         if ($errText.Length -gt 100) { $errText = $errText.Substring(0, 100) + "..." }
-        $script:notifyIcon.ShowBalloonTip(
-            2500,
-            "A.B.S.O. Error",
-            "Failed: $errText",
-            [System.Windows.Forms.ToolTipIcon]::Error
-        )
+        Show-Notification -Title "A.B.S.O. Error" -Message "Failed: $errText" -Type "Error"
         $script:notifyIcon.Text = "A.B.S.O."
     }
 }
@@ -295,33 +432,18 @@ function Restore-Settings {
         $json = $rawOutput | ConvertFrom-Json
 
         if ($json.success) {
-            $script:notifyIcon.ShowBalloonTip(
-                2500,
-                "A.B.S.O.",
-                "Settings restored to previous state",
-                [System.Windows.Forms.ToolTipIcon]::Info
-            )
+            Show-Notification -Title "A.B.S.O." -Message "Settings restored to previous state" -Type "Info"
             Stop-ExistingWatcher
             $script:activeProfile = $null
             $script:notifyIcon.Text = "A.B.S.O."
             Update-MenuState
         } else {
-            $script:notifyIcon.ShowBalloonTip(
-                2500,
-                "A.B.S.O.",
-                "Restore failed: $($json.error)",
-                [System.Windows.Forms.ToolTipIcon]::Warning
-            )
+            Show-Notification -Title "A.B.S.O." -Message "Restore failed: $($json.error)" -Type "Warning"
         }
     } catch {
         $errText = $_.Exception.Message
         if ($errText.Length -gt 100) { $errText = $errText.Substring(0, 100) + "..." }
-        $script:notifyIcon.ShowBalloonTip(
-            2500,
-            "A.B.S.O.",
-            "Restore failed: $errText",
-            [System.Windows.Forms.ToolTipIcon]::Warning
-        )
+        Show-Notification -Title "A.B.S.O." -Message "Restore failed: $errText" -Type "Warning"
     }
     $script:notifyIcon.Text = "A.B.S.O."
 }
