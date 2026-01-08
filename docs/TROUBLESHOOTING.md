@@ -9,6 +9,7 @@ This guide helps diagnose and resolve common issues with A.B.S.O.
 - [Installation Issues](#installation-issues)
 - [Permission Errors](#permission-errors)
 - [Detection Problems](#detection-problems)
+- [Reboot Requirements When Switching Profiles](#reboot-requirements-when-switching-profiles)
 - [Profile Application Failures](#profile-application-failures)
 - [Backup and Restore Issues](#backup-and-restore-issues)
 - [Performance Issues](#performance-issues)
@@ -149,6 +150,49 @@ pip install -r requirements.txt
    ```bash
    net stop winmgmt && net start winmgmt
    ```
+
+---
+
+## Reboot Requirements When Switching Profiles
+
+### Understanding When Reboots Are Actually Needed
+
+A.B.S.O. may report "reboot required" after applying a profile, but **you don't always need to reboot**. Here's when you actually need to:
+
+**Reboot IS required:**
+- First time applying a profile that includes Memory or MPO settings
+- After Windows updates that reset registry values
+- When switching FROM a profile that doesn't use certain handlers TO one that does
+
+**Reboot is NOT required:**
+- Re-applying the same profile (values already correct)
+- Switching between profiles that share the same reboot-requiring settings
+- Switching from Diablo 4 → Rivals 2 (if you've applied Rivals 2 before and rebooted)
+
+### Why This Works
+
+Settings like Memory Management (DisablePagingExecutive) and MPO are stored in the registry. Once set and rebooted:
+- The kernel reads the values at boot time
+- Writing the same value again doesn't change kernel behavior
+- No reboot needed because the settings are already active
+
+### Profile Comparison
+
+| Switching From | Switching To | Reboot Needed? |
+|----------------|--------------|----------------|
+| Fresh Windows | Rivals 2 | **Yes** (first time) |
+| Rivals 2 | Diablo 4 | No (Diablo 4 doesn't use Memory/MPO) |
+| Diablo 4 | Rivals 2 | No (if Rivals 2 was applied before) |
+| Rivals 2 | Rivals 2 | No (same settings) |
+| Slippi Melee | Rivals 2 | No (both use similar settings) |
+
+### What If I'm Unsure?
+
+If you're uncertain whether a reboot is needed:
+1. Apply the profile
+2. Run the game and test
+3. If optimizations don't seem active, then reboot
+4. After that first reboot, subsequent profile switches won't need rebooting
 
 ---
 

@@ -60,11 +60,49 @@ class NPIManager:
 
         logger.info(f"Importing Nvidia profile: {profile_path}")
 
+        # Ensure absolute paths
+        npi_abs = self.npi_path.resolve()
+        profile_abs = Path(profile_path).resolve()
+
+        # NPI ignores all hiding flags - use Windows API to hide window after launch
+        # This script: starts NPI, finds its window, hides it, waits for exit
+        ps_script = f'''
+Add-Type @"
+using System;
+using System.Runtime.InteropServices;
+public class Win32 {{
+    [DllImport("user32.dll")]
+    public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+    public const int SW_HIDE = 0;
+}}
+"@
+
+$p = Start-Process -FilePath "{npi_abs}" -ArgumentList '-silent', '"{profile_abs}"' -WorkingDirectory "{npi_abs.parent}" -PassThru
+Start-Sleep -Milliseconds 100
+
+# Hide the window as soon as it appears
+for ($i = 0; $i -lt 20; $i++) {{
+    if ($p.MainWindowHandle -ne [IntPtr]::Zero) {{
+        [Win32]::ShowWindow($p.MainWindowHandle, 0) | Out-Null
+        break
+    }}
+    Start-Sleep -Milliseconds 50
+}}
+
+$p.WaitForExit(25000)
+exit $p.ExitCode
+'''
+        startupinfo = subprocess.STARTUPINFO()
+        startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+        startupinfo.wShowWindow = 0
+
         result = subprocess.run(
-            [str(self.npi_path), "-silent", str(profile_path)],
+            ["powershell", "-NoProfile", "-NonInteractive", "-Command", ps_script],
             capture_output=True,
             text=True,
             timeout=30,
+            startupinfo=startupinfo,
+            creationflags=subprocess.CREATE_NO_WINDOW,
         )
 
         if result.returncode != 0:
@@ -90,12 +128,19 @@ class NPIManager:
 
         process = None
         try:
+            # Hide the window using Windows-specific flags
+            startupinfo = subprocess.STARTUPINFO()
+            startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+            startupinfo.wShowWindow = 0  # SW_HIDE
+
             # Use Popen for better process control
             process = subprocess.Popen(
                 [str(self.npi_path), "-export", str(output_path)],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,
+                startupinfo=startupinfo,
+                creationflags=subprocess.CREATE_NO_WINDOW,
             )
 
             # Short timeout - NPI export opens GUI, so it will hang
@@ -149,30 +194,17 @@ class NPIManager:
             logger.debug(f"Failed to taskkill NPI: {e}")
 
     def read_current_settings(self) -> dict[str, Any]:
-        """Read current Nvidia 3D settings by exporting and parsing a profile.
+        """Read current Nvidia 3D settings.
+
+        Note: NPI cannot export headlessly (opens GUI), so this method
+        returns empty dict. Use nvidia-smi for reading current settings instead.
 
         Returns:
-            Dictionary of current settings.
+            Empty dictionary (NPI export not supported headlessly).
         """
-        if not self.is_available():
-            return {}
-
-        temp_path = Path(tempfile.gettempdir()) / "abso_nvidia_current.nip"
-
-        try:
-            self.export_profile(temp_path)
-            settings = parse_nip_file(temp_path)
-            return settings
-
-        except Exception as e:
-            logger.debug(f"Failed to read current settings: {e}")
-            return {}
-        finally:
-            try:
-                if temp_path.exists():
-                    temp_path.unlink()
-            except Exception:
-                pass
+        # NPI export opens GUI, so skip entirely to avoid window flash
+        logger.debug("Skipping NPI read_current_settings - export opens GUI")
+        return {}
 
     def _find_npi(self) -> None:
         """Try to find Nvidia Profile Inspector in common locations."""

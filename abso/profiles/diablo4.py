@@ -37,12 +37,16 @@ class Diablo4Profile(BaseProfile):
         return ["Diablo IV.exe"]
 
     def get_handlers(self) -> list[SettingsHandler]:
+        from abso.settings.cnm import CNMSettingsHandler
+        from abso.settings.graphics import GraphicsSettingsHandler
+        from abso.settings.memory import MemorySettingsHandler
+        from abso.settings.mouse import MouseSettingsHandler
+        from abso.settings.network import NetworkSettingsHandler
         from abso.settings.nvidia import NvidiaSettingsHandler
         from abso.settings.power import PowerSettingsHandler
         from abso.settings.process_priority import ProcessPriorityHandler
         from abso.settings.registry import RegistrySettingsHandler
         from abso.settings.services import ServicesSettingsHandler
-        from abso.settings.timer import TimerSettingsHandler
         from abso.settings.windows import WindowsSettingsHandler
 
         return [
@@ -50,9 +54,13 @@ class Diablo4Profile(BaseProfile):
             PowerSettingsHandler(),
             RegistrySettingsHandler(),
             NvidiaSettingsHandler(),
-            TimerSettingsHandler(),
+            NetworkSettingsHandler(),  # Online ARPG benefits from network optimization
+            MouseSettingsHandler(),     # Mouse settings benefit all games
+            GraphicsSettingsHandler(),
             ServicesSettingsHandler(),
+            MemorySettingsHandler(),
             ProcessPriorityHandler(["Diablo IV.exe"]),
+            CNMSettingsHandler(),
         ]
 
     def get_settings(self, handler_name: str) -> dict[str, Any]:
@@ -87,10 +95,29 @@ class Diablo4Profile(BaseProfile):
                 # - Shader Cache: Unlimited
                 # - Threaded Optimization: Auto
             },
-            "TimerSettingsHandler": {
-                # 1ms sufficient for frame pacing in ARPGs
-                # Note: Not input latency - Diablo likely sets this automatically
-                "resolution_ms": 1.0,
+            "NetworkSettingsHandler": {
+                # Online ARPG - network latency affects gameplay
+                "disable_nagle": True,
+                "preset": "gaming",
+            },
+            "MouseSettingsHandler": {
+                # Consistent mouse behavior helps with targeting
+                "disable_acceleration": True,
+                "set_linear_curve": True,
+            },
+            "GraphicsSettingsHandler": {
+                # Balanced: Keep FSO enabled (works well with modern games)
+                # MPO can stay enabled for balanced profile
+                "disable_global_fso": False,
+            },
+            "MemorySettingsHandler": {
+                # Optimize for application performance
+                "large_system_cache": 0,
+                "disable_paging_executive": 1,
+            },
+            "CNMSettingsHandler": {
+                # Stop CNM during gaming to allow power optimizations
+                "action": "stop",
             },
             "ServicesSettingsHandler": {
                 # Less aggressive - only disable high-impact services

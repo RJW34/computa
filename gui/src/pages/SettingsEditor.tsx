@@ -45,10 +45,10 @@ const SIMPLE_SETTINGS = [
   },
 ];
 
-// Additional advanced settings
+// Additional advanced settings (Windows settings merged into SIMPLE_SETTINGS when advanced)
 const ADVANCED_SETTINGS = [
   {
-    category: 'Windows',
+    category: 'Windows (Advanced)',
     settings: [
       {
         id: 'game_dvr',

@@ -37,6 +37,7 @@ class CodBo7Profile(BaseProfile):
         return ["cod.exe", "BlackOps7.exe"]
 
     def get_handlers(self) -> list[SettingsHandler]:
+        from abso.settings.cnm import CNMSettingsHandler
         from abso.settings.graphics import GraphicsSettingsHandler
         from abso.settings.memory import MemorySettingsHandler
         from abso.settings.mouse import MouseSettingsHandler
@@ -46,7 +47,6 @@ class CodBo7Profile(BaseProfile):
         from abso.settings.process_priority import ProcessPriorityHandler
         from abso.settings.registry import RegistrySettingsHandler
         from abso.settings.services import ServicesSettingsHandler
-        from abso.settings.timer import TimerSettingsHandler
         from abso.settings.windows import WindowsSettingsHandler
 
         return [
@@ -55,12 +55,12 @@ class CodBo7Profile(BaseProfile):
             RegistrySettingsHandler(),
             NvidiaSettingsHandler(),
             NetworkSettingsHandler(),
-            TimerSettingsHandler(),
             MouseSettingsHandler(),
             GraphicsSettingsHandler(),
             ServicesSettingsHandler(),
             MemorySettingsHandler(),
             ProcessPriorityHandler(["cod.exe", "BlackOps7.exe"]),
+            CNMSettingsHandler(),  # Stop CNM during gaming for power optimization
         ]
 
     def get_settings(self, handler_name: str) -> dict[str, Any]:
@@ -70,6 +70,9 @@ class CodBo7Profile(BaseProfile):
                 "game_bar": False,
                 "game_dvr": False,
                 "hags": True,  # Generally beneficial for modern games
+                # Disable HDR for competitive play - adds processing overhead
+                "hdr": False,
+                "auto_hdr": False,
             },
             "PowerSettingsHandler": {
                 "ensure_ultimate_performance": True,
@@ -90,23 +93,22 @@ class CodBo7Profile(BaseProfile):
                 },
             },
             "NvidiaSettingsHandler": {
-                # Low latency with stable FPS preset
-                "preset": "low_latency_high_fps",
-                # Individual overrides (applied via preset):
-                # - Low Latency Mode: On (not Ultra - may cause issues with Reflex)
+                # Reflex-enabled game preset - LLM OFF, let Reflex handle latency
+                "preset": "reflex_game",
+                # CRITICAL: CoD has NVIDIA Reflex built-in. Driver Low Latency Mode
+                # conflicts with Reflex and can cause stuttering/increased latency.
+                # Settings applied via preset:
+                # - Low Latency Mode: OFF (Reflex handles this better)
                 # - VSync: Off
                 # - Power Management: Prefer Maximum Performance
                 # - Shader Cache: Unlimited
                 # - Threaded Optimization: On
+                #
+                # In-game: Enable "NVIDIA Reflex Low Latency: On + Boost"
             },
             "NetworkSettingsHandler": {
                 "disable_nagle": True,
                 "preset": "gaming",
-            },
-            "TimerSettingsHandler": {
-                # Precise scheduling for consistent frame pacing
-                # Note: Not input latency - CoD likely sets this automatically
-                "resolution_ms": 0.5,
             },
             "MouseSettingsHandler": {
                 "disable_acceleration": True,
@@ -126,6 +128,11 @@ class CodBo7Profile(BaseProfile):
                 "gpu_priority": 8,
                 "cpu_priority": 3,
                 "io_priority": 3,
+            },
+            "CNMSettingsHandler": {
+                # Stop CNM during gaming to allow power optimizations
+                # CNM's SetThreadExecutionState interferes with power management
+                "action": "stop",
             },
         }
 

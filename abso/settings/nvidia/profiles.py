@@ -155,6 +155,10 @@ def _build_settings_xml(settings: dict[str, Any]) -> str:
         value = get_setting_value(settings["vrr_app_override"], "vrr_app_override")
         xml_settings.append(_make_setting_xml(NvidiaSettingDecimalIDs.VRR_APP_OVERRIDE, value))
 
+    if "triple_buffering" in settings:
+        value = get_setting_value(settings["triple_buffering"], "triple_buffering")
+        xml_settings.append(_make_setting_xml(NvidiaSettingDecimalIDs.TRIPLE_BUFFERING, value))
+
     return "\n      ".join(xml_settings)
 
 
@@ -228,6 +232,10 @@ def get_setting_value(value: str, setting_type: str) -> int:
             "ulmb": 3,            # Use ULMB instead
             "fixed_refresh": 4,   # Fixed refresh rate
         }
+        return mapping.get(value.lower(), 0)
+
+    elif setting_type == "triple_buffering":
+        mapping = {"off": 0, "on": 1}
         return mapping.get(value.lower(), 0)
 
     return 0

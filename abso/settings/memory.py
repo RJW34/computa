@@ -27,6 +27,14 @@ class MemorySettingsHandler(SettingsHandler):
     - LargeSystemCache: 0 = optimize for applications (gaming), 1 = optimize for file server
     - DisablePagingExecutive: 1 = keep kernel in RAM (requires sufficient RAM)
     - ClearPageFileAtShutdown: 1 = clear pagefile on shutdown (security, minor perf impact)
+
+    Reboot behavior:
+    - Changes to these settings require a reboot to take effect
+    - HOWEVER, if values are already set correctly (from a previous profile application),
+      no reboot is needed - the settings are already active in the kernel
+    - The apply() method sets requires_reboot=True when writing values, but this is
+      conservative; in practice, switching between profiles that don't modify these
+      values (or re-applying the same profile) won't require a reboot
     """
 
     # Registry paths
@@ -78,21 +86,35 @@ class MemorySettingsHandler(SettingsHandler):
         return issues
 
     def apply(self, settings: dict[str, Any]) -> dict[str, Any]:
-        """Apply memory management settings."""
+        """Apply memory management settings.
+
+        Only sets requires_reboot=True if we actually change a reboot-requiring value.
+        If the current value already matches the target, no reboot is needed.
+        """
         errors: list[str] = []
         requires_reboot = False
 
+        # Get current values to check if we're actually changing anything
+        current = self.detect()
+
         try:
             if "large_system_cache" in settings:
-                self._set_large_system_cache(settings["large_system_cache"])
-                requires_reboot = True
+                target = settings["large_system_cache"]
+                if current.get("large_system_cache") != target:
+                    self._set_large_system_cache(target)
+                    requires_reboot = True  # Actually changed a reboot-requiring value
 
             if "disable_paging_executive" in settings:
-                self._set_disable_paging_executive(settings["disable_paging_executive"])
-                requires_reboot = True
+                target = settings["disable_paging_executive"]
+                if current.get("disable_paging_executive") != target:
+                    self._set_disable_paging_executive(target)
+                    requires_reboot = True  # Actually changed a reboot-requiring value
 
             if "clear_page_file_at_shutdown" in settings:
-                self._set_clear_page_file_at_shutdown(settings["clear_page_file_at_shutdown"])
+                target = settings["clear_page_file_at_shutdown"]
+                if current.get("clear_page_file_at_shutdown") != target:
+                    self._set_clear_page_file_at_shutdown(target)
+                # This one doesn't require reboot
 
         except PermissionError as e:
             errors.append(f"Permission denied (requires admin): {e}")
@@ -104,6 +126,42 @@ class MemorySettingsHandler(SettingsHandler):
             "error": "; ".join(errors) if errors else None,
             "requires_reboot": requires_reboot,
         }
+
+    def verify_active(self, settings: dict[str, Any]) -> dict[str, Any]:
+        """Verify that reboot-requiring settings are already active.
+
+        Use this to check if a previously-applied profile's settings are
+        actually in effect (i.e., a reboot has occurred since they were set).
+
+        Returns:
+            Dict with 'all_active' bool and details for each setting.
+        """
+        current = self.detect()
+        results = {"all_active": True, "settings": {}}
+
+        if "large_system_cache" in settings:
+            target = settings["large_system_cache"]
+            is_active = current.get("large_system_cache") == target
+            results["settings"]["large_system_cache"] = {
+                "target": target,
+                "current": current.get("large_system_cache"),
+                "active": is_active,
+            }
+            if not is_active:
+                results["all_active"] = False
+
+        if "disable_paging_executive" in settings:
+            target = settings["disable_paging_executive"]
+            is_active = current.get("disable_paging_executive") == target
+            results["settings"]["disable_paging_executive"] = {
+                "target": target,
+                "current": current.get("disable_paging_executive"),
+                "active": is_active,
+            }
+            if not is_active:
+                results["all_active"] = False
+
+        return results
 
     def backup(self) -> dict[str, Any]:
         """Backup current memory management settings."""

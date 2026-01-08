@@ -37,6 +37,7 @@ class SlippiMeleeProfile(BaseProfile):
         return ["Slippi Dolphin.exe", "Dolphin.exe"]
 
     def get_handlers(self) -> list[SettingsHandler]:
+        from abso.settings.cnm import CNMSettingsHandler
         from abso.settings.graphics import GraphicsSettingsHandler
         from abso.settings.memory import MemorySettingsHandler
         from abso.settings.mouse import MouseSettingsHandler
@@ -46,7 +47,6 @@ class SlippiMeleeProfile(BaseProfile):
         from abso.settings.process_priority import ProcessPriorityHandler
         from abso.settings.registry import RegistrySettingsHandler
         from abso.settings.services import ServicesSettingsHandler
-        from abso.settings.timer import TimerSettingsHandler
         from abso.settings.windows import WindowsSettingsHandler
 
         return [
@@ -55,12 +55,12 @@ class SlippiMeleeProfile(BaseProfile):
             RegistrySettingsHandler(),
             NvidiaSettingsHandler(),
             NetworkSettingsHandler(),
-            TimerSettingsHandler(),
             MouseSettingsHandler(),
             GraphicsSettingsHandler(),
             ServicesSettingsHandler(),
             MemorySettingsHandler(),
             ProcessPriorityHandler(["Slippi Dolphin.exe", "Dolphin.exe"]),
+            CNMSettingsHandler(),  # Stop CNM during gaming for power optimization
         ]
 
     def get_settings(self, handler_name: str) -> dict[str, Any]:
@@ -69,7 +69,10 @@ class SlippiMeleeProfile(BaseProfile):
                 "game_mode": True,
                 "game_bar": False,
                 "game_dvr": False,
-                # HAGS: Mixed reports for Dolphin, leave as user preference
+                # HAGS: Testing shows mixed results for Dolphin emulator.
+                # Disabled by default for consistency - emulators often work better without.
+                # Users can override via config if they see benefit on their system.
+                "hags": False,
                 # HDR disabled for competitive - adds processing overhead
                 "hdr": False,
                 "auto_hdr": False,
@@ -114,11 +117,6 @@ class SlippiMeleeProfile(BaseProfile):
                 "disable_nagle": True,
                 "preset": "gaming",  # Also optimizes TCP global settings
             },
-            "TimerSettingsHandler": {
-                # Precise scheduling for consistent frame pacing
-                # Note: Not input latency - most games set this automatically
-                "resolution_ms": 0.5,
-            },
             "MouseSettingsHandler": {
                 # Disable acceleration for consistent muscle memory
                 "disable_acceleration": True,
@@ -127,8 +125,9 @@ class SlippiMeleeProfile(BaseProfile):
             "GraphicsSettingsHandler": {
                 # Disable FSO globally for true exclusive fullscreen
                 "disable_global_fso": True,
-                # MPO can cause issues with emulators, disable if stutter occurs
-                # "disable_mpo": True,  # Uncomment if experiencing stutter
+                # MPO (Multi-Plane Overlay) can cause stutter with emulators.
+                # Disabled by default for minimum latency profile.
+                "disable_mpo": True,
             },
             "ServicesSettingsHandler": {
                 # Disable background services that can cause hitches
@@ -144,6 +143,11 @@ class SlippiMeleeProfile(BaseProfile):
                 "gpu_priority": 8,
                 "cpu_priority": 3,  # High
                 "io_priority": 3,   # High
+            },
+            "CNMSettingsHandler": {
+                # Stop CNM during gaming to allow power optimizations
+                # CNM's SetThreadExecutionState interferes with power management
+                "action": "stop",
             },
         }
 
@@ -194,7 +198,7 @@ class SlippiMeleeProfile(BaseProfile):
                 "category": "Graphics",
                 "setting": "VSync",
                 "value": "Off",
-                "reason": "Disable Dolphin's V-SYNC. NVCP V-SYNC handles sync as VRR safety net.",
+                "reason": "Disable Dolphin's V-SYNC. No sync anywhere for minimum latency (tearing acceptable).",
             },
             {
                 "category": "Graphics",

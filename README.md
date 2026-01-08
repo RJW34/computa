@@ -196,12 +196,14 @@ A.B.S.O. needs administrator access to modify system settings. Right-click your 
 
 ### Changes not taking effect
 
-Some optimizations require a system reboot:
+Some optimizations require a system reboot **the first time they're applied**:
 - HAGS changes
-- Memory management settings
-- Some power plan settings
+- Memory management settings (DisablePagingExecutive)
+- MPO (Multi-Plane Overlay) changes
 
-A.B.S.O. will notify you if a reboot is required.
+**Important:** Once you've applied a profile and rebooted, switching between profiles typically does NOT require another reboot. The kernel-level settings persist in the registry, so subsequent profile switches are instant.
+
+A.B.S.O. will notify you if a reboot may be required, but if you've previously applied the same profile and rebooted, you can skip the reboot.
 
 ### Restoring doesn't work
 

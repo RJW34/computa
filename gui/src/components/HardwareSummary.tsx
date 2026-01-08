@@ -9,9 +9,15 @@ export function HardwareSummary() {
   const { hardware, hardwareLoading, hardwareError, detectHardware } =
     useAppStore();
 
+  // Track in-flight request to prevent race conditions
+  const isDetecting = React.useRef(false);
+
   React.useEffect(() => {
-    if (!hardware && !hardwareLoading) {
-      detectHardware();
+    if (!hardware && !hardwareLoading && !isDetecting.current) {
+      isDetecting.current = true;
+      detectHardware().finally(() => {
+        isDetecting.current = false;
+      });
     }
   }, [hardware, hardwareLoading, detectHardware]);
 

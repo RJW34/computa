@@ -13,9 +13,17 @@ from abso.core.exceptions import (
 )
 from abso.profiles.base import BaseProfile
 from abso.profiles.cod_bo7 import CodBo7Profile
+from abso.profiles.cod_bo7_oled import CodBo7OLEDProfile
 from abso.profiles.diablo4 import Diablo4Profile
+from abso.profiles.diablo4_oled import Diablo4OLEDProfile
+from abso.profiles.pacdeluxe import PACDeluxeProfile
+from abso.profiles.pacdeluxe_oled import PACDeluxeOLEDProfile
+from abso.profiles.pokemon_auto_chess import PokemonAutoChessProfile
+from abso.profiles.pokemon_auto_chess_oled import PokemonAutoChessOLEDProfile
 from abso.profiles.rivals2 import Rivals2Profile
+from abso.profiles.rivals2_oled import Rivals2OLEDProfile
 from abso.profiles.slippi_melee import SlippiMeleeProfile
+from abso.profiles.slippi_melee_oled import SlippiMeleeOLEDProfile
 
 logger = logging.getLogger(__name__)
 
@@ -38,9 +46,17 @@ class ProfileApplier:
     # Registry of available profiles
     PROFILES: dict[str, type[BaseProfile]] = {
         "slippi-melee": SlippiMeleeProfile,
-        "cod-bo7": CodBo7Profile,
-        "diablo4": Diablo4Profile,
+        "slippi-melee-oled": SlippiMeleeOLEDProfile,
         "rivals2": Rivals2Profile,
+        "rivals2-oled": Rivals2OLEDProfile,
+        "cod-bo7": CodBo7Profile,
+        "cod-bo7-oled": CodBo7OLEDProfile,
+        "diablo4": Diablo4Profile,
+        "diablo4-oled": Diablo4OLEDProfile,
+        "pokemon-auto-chess": PokemonAutoChessProfile,
+        "pokemon-auto-chess-oled": PokemonAutoChessOLEDProfile,
+        "pacdeluxe": PACDeluxeProfile,
+        "pacdeluxe-oled": PACDeluxeOLEDProfile,
     }
 
     def __init__(self) -> None:
@@ -215,6 +231,56 @@ class ProfileApplier:
         report_path.write_text(report_content, encoding="utf-8")
 
         return report_path
+
+    def verify_profile(self, profile_name: str) -> dict[str, Any]:
+        """Verify that a profile's reboot-requiring settings are active.
+
+        This checks if settings that normally require a reboot are already
+        in effect. Useful for determining if a reboot is actually needed
+        after applying a profile.
+
+        Args:
+            profile_name: Name of the profile to verify.
+
+        Returns:
+            Dict with 'all_active' bool and per-handler verification results.
+        """
+        profile = self._get_profile(profile_name)
+
+        results: dict[str, Any] = {
+            "profile": profile_name,
+            "all_active": True,
+            "handlers": {},
+        }
+
+        # Check handlers that have reboot-requiring settings
+        for handler in profile.get_handlers():
+            handler_name = handler.__class__.__name__
+
+            # Only check handlers that have verify_active method
+            if not hasattr(handler, "verify_active"):
+                continue
+
+            settings = profile.get_settings(handler_name)
+            if not settings:
+                continue
+
+            try:
+                handler_result = handler.verify_active(settings)
+                results["handlers"][handler_name] = handler_result
+
+                if not handler_result.get("all_active", True):
+                    results["all_active"] = False
+
+            except Exception as e:
+                logger.error(f"Error verifying {handler_name}: {e}")
+                results["handlers"][handler_name] = {
+                    "error": str(e),
+                    "all_active": False,
+                }
+                results["all_active"] = False
+
+        return results
 
     def list_profiles(self) -> list[dict[str, Any]]:
         """List all available profiles.

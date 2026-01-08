@@ -6,7 +6,12 @@ import { formatRelativeTime } from '@/lib/utils';
 export function StatusBar() {
   const { isAdmin, backups, checkAdmin } = useAppStore();
 
+  // Track if admin check has been done to prevent duplicate calls
+  const adminCheckDone = React.useRef(false);
+
   React.useEffect(() => {
+    if (adminCheckDone.current) return;
+    adminCheckDone.current = true;
     checkAdmin();
   }, [checkAdmin]);
 

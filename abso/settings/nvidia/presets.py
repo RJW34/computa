@@ -32,6 +32,7 @@ class NvidiaSettingDecimalIDs:
     MAX_FRAME_RATE = 17322487  # 0x10835F7
     SHADER_CACHE_SIZE = 17322494  # 0x10835FE
     THREADED_OPTIMIZATION = 17322472  # 0x10835E8
+    TRIPLE_BUFFERING = 17322236  # 0x10834FC
     # VRR / G-Sync settings
     VRR_APP_OVERRIDE = 279542223  # 0x10A879CF - Per-app G-Sync control
     VRR_APP_OVERRIDE_REQUEST_STATE = 279542188  # 0x10A879AC
@@ -69,6 +70,10 @@ class NvidiaSettingValues:
     THREADED_OPT_ON = 0x00000001
     THREADED_OPT_OFF = 0x00000002
 
+    # Triple Buffering
+    TRIPLE_BUFFERING_OFF = 0x00000000
+    TRIPLE_BUFFERING_ON = 0x00000001
+
     # VRR / G-Sync App Override
     # Controls per-application G-Sync behavior
     VRR_APP_OVERRIDE_ALLOW = 0x00000000  # Enable G-Sync (default)
@@ -83,6 +88,13 @@ class NvidiaSettingValues:
 # IMPORTANT: Low Latency Mode (LLM) only works in DX9/DX11.
 # For DX12/Vulkan games, use NVIDIA Reflex instead.
 # LLM "Ultra" auto-caps FPS and overrides manual caps - use "On" with manual cap.
+#
+# NOTE ON STUTTERING: LLM reduces the render queue (pre-rendered frames).
+# This CAN cause micro-stuttering on some systems, especially if CPU-bound or
+# with variable frame times. If stuttering occurs:
+# - Try LLM "Off" in NVCP
+# - Or use NPI to set Max Pre-Rendered Frames to 2-3 (more granular control)
+# These settings are hardware-dependent - test and adjust for your system.
 #
 # V-SYNC with G-SYNC: NVCP V-SYNC "On" acts as a safety net, not active latency.
 # With FPS capped at refresh_rate - 3, V-SYNC never engages.
@@ -106,19 +118,86 @@ NVIDIA_PRESETS: dict[str, dict[str, Any]] = {
         },
     },
     "vrr_fighting_game": {
-        "description": "Optimized for fighting games with VRR - 60Hz logic benefits from high refresh",
+        "description": "Optimized for fighting games with VRR - tear-free, near-minimum latency",
         "settings": {
-            "low_latency_mode": "on",
+            "low_latency_mode": "on",  # NOT Ultra - Ultra overrides manual FPS caps
             "power_management": "prefer_max_performance",
-            "vsync": "on",  # Safety net
-            "max_frame_rate": "off",
+            "vsync": "on",  # Safety net - never activates with proper FPS cap
+            "max_frame_rate": "off",  # Use in-game limiter (lower latency than NVCP/RTSS)
+            "shader_cache": "unlimited",
+            "threaded_optimization": "on",
+            "triple_buffering": "off",  # Reduces latency - not needed with G-SYNC
+        },
+        "notes": {
+            "fps_cap": (
+                "Use in-game limiter at highest preset below refresh rate. "
+                "For 300Hz: use 240 in-game cap. In-game limiters have ~0.5-1 frame "
+                "lower latency than RTSS/NVCP, which outweighs scanout benefits."
+            ),
+            "fighting_games": (
+                "60Hz-logic games still benefit from high refresh (reduced scanout latency). "
+                "300Hz and 240Hz both divide evenly into 60fps - no cadence judder."
+            ),
+            "api_support": "Most modern fighting games use DX12/UE5 - LLM has limited effect, Reflex unavailable in Rivals 2.",
+            "stuttering": (
+                "If experiencing micro-stutter, try low_latency_mode='off' or use NPI "
+                "to set Max Pre-Rendered Frames to 2-3. Hardware-dependent - test both."
+            ),
+        },
+    },
+    "no_sync_fighting_game": {
+        "description": "Absolute minimum latency for fighting games - accepts tearing",
+        "settings": {
+            "low_latency_mode": "on",  # 'On' by default - see stuttering note below
+            "power_management": "prefer_max_performance",
+            "vsync": "off",  # No sync = no sync latency
+            "max_frame_rate": "off",  # Uncapped FPS
+            "shader_cache": "unlimited",
+            "threaded_optimization": "on",
+            "triple_buffering": "off",
+            "vrr_app_override": "force_off",  # Disable G-Sync for this profile
+        },
+        "notes": {
+            "warning": (
+                "Causes screen tearing. At 300Hz+, tearing is less perceptible "
+                "(tear lines move faster). Use for tournament/LAN settings only."
+            ),
+            "fighting_games": (
+                "Absolute minimum click-to-pixel latency. Saves ~1-3ms over VRR setup. "
+                "Worth it only if you can tolerate tearing and need every millisecond."
+            ),
+            "stuttering": (
+                "If experiencing micro-stutter, try low_latency_mode='off' or use NPI "
+                "to set Max Pre-Rendered Frames to 2. LLM reduces queue depth which "
+                "can starve the GPU on some systems. Hardware-dependent - test both."
+            ),
+        },
+    },
+
+    # === REFLEX-ENABLED GAMES ===
+    "reflex_game": {
+        "description": "For games with NVIDIA Reflex - let Reflex handle latency",
+        "settings": {
+            "low_latency_mode": "off",  # CRITICAL: Reflex replaces driver LLM
+            "power_management": "prefer_max_performance",
+            "vsync": "off",  # Game/Reflex handles sync
+            "max_frame_rate": "off",  # Use in-game limiter
             "shader_cache": "unlimited",
             "threaded_optimization": "on",
         },
         "notes": {
-            "fps_cap": "Use in-game preset closest to (but below) refresh rate, or RTSS at refresh - 3",
-            "fighting_games": "Even 60Hz-logic games benefit from high refresh (reduced scanout latency)",
-            "api_support": "Most modern fighting games use DX12/UE5 - prefer Reflex over LLM",
+            "reflex": (
+                "NVIDIA Reflex is more effective than driver Low Latency Mode. "
+                "Enable Reflex 'On + Boost' in-game. Do NOT combine with driver LLM."
+            ),
+            "games": (
+                "CoD, Apex Legends, Valorant, Fortnite, Overwatch 2, and many others. "
+                "Check in-game settings for 'NVIDIA Reflex Low Latency' option."
+            ),
+            "conflict_warning": (
+                "Using LLM with Reflex can cause stuttering and actually increase "
+                "latency. Always use Reflex alone when available."
+            ),
         },
     },
 

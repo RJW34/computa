@@ -321,27 +321,14 @@ class NvidiaSettingsHandler(SettingsHandler):
 
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
-        # Try export, but don't fail if it doesn't work (NPI doesn't support headless export)
+        # NPI cannot export headlessly (opens GUI), so skip export entirely
+        # Settings can be restored by re-applying the profile
         backup_path = None
-        export_note = None
-
-        try:
-            self.BACKUP_DIR.mkdir(parents=True, exist_ok=True)
-            backup_filename = f"nvidia_backup_{timestamp}.nip"
-            backup_path = self.BACKUP_DIR / backup_filename
-
-            self._npi.export_profile(backup_path)
-            logger.info(f"Nvidia profile backed up to: {backup_path}")
-
-        except Exception as e:
-            # Export failed (expected - NPI opens GUI for export)
-            # This is not a critical failure - settings can be restored via preset
-            export_note = (
-                "NPI export not supported headlessly. "
-                "To restore Nvidia settings, re-apply the game profile."
-            )
-            logger.info(f"Nvidia backup skipped (expected): {e}")
-            backup_path = None
+        export_note = (
+            "NPI export skipped (opens GUI). "
+            "To restore Nvidia settings, re-apply the game profile."
+        )
+        logger.debug(f"Nvidia profile export skipped - NPI requires GUI")
 
         return {
             "success": True,  # Always succeed - we can restore via preset

@@ -41,6 +41,24 @@ def get_data_dir() -> Path:
 ROOT_DIR = get_data_dir()
 BACKUPS_DIR = ROOT_DIR / "backups"
 REPORTS_DIR = ROOT_DIR / "reports"
+STATE_FILE = ROOT_DIR / ".abso_state.json"
+
+
+def get_current_profile() -> str | None:
+    """Get the currently active profile from state file."""
+    if STATE_FILE.exists():
+        try:
+            state = json.loads(STATE_FILE.read_text())
+            return state.get("current_profile")
+        except (json.JSONDecodeError, OSError):
+            return None
+    return None
+
+
+def set_current_profile(profile_name: str) -> None:
+    """Save the current profile to state file."""
+    state = {"current_profile": profile_name, "applied_at": datetime.now().isoformat()}
+    STATE_FILE.write_text(json.dumps(state, indent=2))
 
 
 def json_serial(obj: Any) -> Any:
@@ -252,10 +270,24 @@ def profiles(json_output: bool) -> None:
             "executables": ["Slippi Dolphin.exe", "Dolphin.exe"],
         },
         {
+            "id": "slippi-melee-oled",
+            "display_name": "Super Smash Bros. Melee - Slippi (OLED)",
+            "description": "Ultra-low latency for OLED monitors with HDR preserved",
+            "optimization_target": "minimum_latency",
+            "executables": ["Slippi Dolphin.exe", "Dolphin.exe"],
+        },
+        {
             "id": "rivals2",
             "display_name": "Rivals of Aether 2",
             "description": "VRR-optimized for UE5 fighting game",
             "optimization_target": "vrr_fighting_game",
+            "executables": ["RivalsofAether2.exe", "Rivals2.exe"],
+        },
+        {
+            "id": "rivals2-oled",
+            "display_name": "Rivals of Aether 2 (OLED)",
+            "description": "Ultra-low latency for OLED monitors with HDR preserved",
+            "optimization_target": "minimum_latency",
             "executables": ["RivalsofAether2.exe", "Rivals2.exe"],
         },
         {
@@ -266,11 +298,53 @@ def profiles(json_output: bool) -> None:
             "executables": ["cod.exe", "BlackOps7.exe"],
         },
         {
+            "id": "cod-bo7-oled",
+            "display_name": "Call of Duty: Black Ops 7 (OLED)",
+            "description": "Low latency for OLED monitors with HDR preserved",
+            "optimization_target": "low_latency_high_fps",
+            "executables": ["cod.exe", "BlackOps7.exe"],
+        },
+        {
             "id": "diablo4",
             "display_name": "Diablo 4",
             "description": "Balanced performance for ARPG",
             "optimization_target": "balanced",
             "executables": ["Diablo IV.exe"],
+        },
+        {
+            "id": "diablo4-oled",
+            "display_name": "Diablo 4 (OLED)",
+            "description": "Balanced performance for OLED monitors with HDR preserved",
+            "optimization_target": "balanced",
+            "executables": ["Diablo IV.exe"],
+        },
+        {
+            "id": "pokemon-auto-chess",
+            "display_name": "Pokemon Auto Chess",
+            "description": "WebGL browser game optimization",
+            "optimization_target": "balanced",
+            "executables": ["chrome.exe", "msedge.exe", "firefox.exe"],
+        },
+        {
+            "id": "pokemon-auto-chess-oled",
+            "display_name": "Pokemon Auto Chess (OLED)",
+            "description": "WebGL optimization for OLED monitors with HDR preserved",
+            "optimization_target": "balanced",
+            "executables": ["chrome.exe", "msedge.exe", "firefox.exe"],
+        },
+        {
+            "id": "pacdeluxe",
+            "display_name": "PACDeluxe",
+            "description": "Native Tauri client optimization",
+            "optimization_target": "smooth_framerate",
+            "executables": ["PACDeluxe.exe"],
+        },
+        {
+            "id": "pacdeluxe-oled",
+            "display_name": "PACDeluxe (OLED)",
+            "description": "Tauri client for OLED monitors with HDR preserved",
+            "optimization_target": "smooth_framerate",
+            "executables": ["PACDeluxe.exe"],
         },
     ]
 
@@ -401,16 +475,122 @@ def apply(profile_name: str, no_backup: bool, json_output: bool) -> None:
             return
 
         if result.success:
+            set_current_profile(profile_name)
             console.print(f"\n[green]Profile '{profile_name}' applied successfully![/green]")
 
             if result.requires_reboot:
-                console.print("[yellow]Note: Some changes require a reboot to take effect.[/yellow]")
+                console.print("[yellow]Note: Some changes may require a reboot to take effect.[/yellow]")
+                console.print("[dim]If you've previously applied this profile and rebooted, no new reboot is needed.[/dim]")
 
             if result.in_game_settings:
-                console.print(f"\n[cyan]In-game settings saved to: {REPORTS_DIR / f'{profile_name}_settings.md'}[/cyan]")
+                # Actually generate the report file
+                REPORTS_DIR.mkdir(parents=True, exist_ok=True)
+                report_path = applier.generate_report(profile_name, REPORTS_DIR)
+                console.print(f"\n[cyan]In-game settings saved to: {report_path}[/cyan]")
         else:
             console.print(f"\n[red]Failed to apply profile: {result.error}[/red]")
             sys.exit(1)
+
+    except ValueError as e:
+        if json_output:
+            json_error(str(e))
+        console.print(f"[red]Error: {e}[/red]")
+        sys.exit(1)
+
+
+@cli.command()
+@click.option("--json", "json_output", is_flag=True, help="Output as JSON for GUI integration")
+def reapply(json_output: bool) -> None:
+    """Re-apply the current profile without creating a backup.
+
+    Use this when Windows reverts settings (e.g., after display mode change).
+    Faster than 'apply' since it skips backup creation.
+    """
+    if not is_admin():
+        if json_output:
+            json_error("Admin privileges required to apply profiles")
+        console.print("[red]Error: Admin privileges required to apply profiles.[/red]")
+        console.print("Please run as administrator.")
+        sys.exit(1)
+
+    current_profile = get_current_profile()
+    if not current_profile:
+        if json_output:
+            json_error("No profile has been applied yet. Use 'abso apply <profile>' first.")
+        console.print("[red]Error: No profile has been applied yet.[/red]")
+        console.print("Use [bold]abso apply <profile>[/bold] first.")
+        sys.exit(1)
+
+    if not json_output:
+        console.print(Panel(f"Re-applying Profile: {current_profile}", style="bold blue"))
+        console.print("[dim]Skipping backup (use 'apply' for full backup)[/dim]\n")
+
+    applier = ProfileApplier()
+
+    try:
+        result = applier.apply_profile(current_profile)
+
+        if json_output:
+            output_json({
+                "success": result.success,
+                "profile": current_profile,
+                "error": result.error if not result.success else None,
+            })
+            return
+
+        if result.success:
+            console.print(f"\n[green]Profile '{current_profile}' re-applied successfully![/green]")
+        else:
+            console.print(f"\n[red]Failed to re-apply profile: {result.error}[/red]")
+            sys.exit(1)
+
+    except ValueError as e:
+        if json_output:
+            json_error(str(e))
+        console.print(f"[red]Error: {e}[/red]")
+        sys.exit(1)
+
+
+@cli.command()
+@click.argument("profile_name")
+@click.option("--json", "json_output", is_flag=True, help="Output as JSON for GUI integration")
+def verify(profile_name: str, json_output: bool) -> None:
+    """Verify that a profile's reboot-requiring settings are active.
+
+    PROFILE_NAME is the profile to verify (e.g., slippi-melee, cod-bo7, rivals2).
+
+    This checks if settings that normally require a reboot are already in effect.
+    Use after applying a profile to confirm no reboot is actually needed.
+    """
+    applier = ProfileApplier()
+
+    try:
+        result = applier.verify_profile(profile_name)
+
+        if json_output:
+            output_json(result)
+            return
+
+        console.print(Panel(f"Verifying Profile: {profile_name}", style="bold blue"))
+
+        all_active = result.get("all_active", False)
+        handlers = result.get("handlers", {})
+
+        if all_active:
+            console.print("\n[green]All reboot-requiring settings are already active![/green]")
+            console.print("[dim]No reboot needed - settings are in effect.[/dim]")
+        else:
+            console.print("\n[yellow]Some settings may need a reboot:[/yellow]")
+
+        for handler_name, handler_result in handlers.items():
+            if not handler_result.get("settings"):
+                continue
+
+            console.print(f"\n[bold]{handler_name}:[/bold]")
+            for setting_name, setting_info in handler_result.get("settings", {}).items():
+                status = "[green]Active[/green]" if setting_info.get("active") else "[yellow]Pending reboot[/yellow]"
+                console.print(f"  {setting_name}: {status}")
+                console.print(f"    Target: {setting_info.get('target')}, Current: {setting_info.get('current')}")
 
     except ValueError as e:
         if json_output:
@@ -446,6 +626,7 @@ def restore(backup_id: str, json_output: bool) -> None:
             return
         console.print(f"\n[green]Backup '{backup_id}' restored successfully![/green]")
         console.print("[yellow]Note: Some changes may require a reboot to take effect.[/yellow]")
+        console.print("[dim]If restoring to previously-active settings, no reboot is needed.[/dim]")
     except FileNotFoundError:
         if json_output:
             json_error(f"Backup '{backup_id}' not found")
@@ -594,6 +775,25 @@ def report(profile_name: str, json_output: bool) -> None:
             json_error(str(e))
         console.print(f"[red]Error: {e}[/red]")
         sys.exit(1)
+
+
+@cli.command()
+@click.option("--install-startup", is_flag=True, help="Add tray to Windows startup")
+@click.option("--uninstall-startup", is_flag=True, help="Remove tray from Windows startup")
+def tray(install_startup: bool, uninstall_startup: bool) -> None:
+    """Launch the A.B.S.O. system tray application.
+
+    The tray provides quick access to profile switching via left-click menu.
+    It automatically pauses during gaming and restarts when the game exits.
+    """
+    from abso.tray import start_tray, install_startup as do_install
+
+    if install_startup:
+        do_install(uninstall=False)
+    elif uninstall_startup:
+        do_install(uninstall=True)
+    else:
+        start_tray()
 
 
 @cli.command()

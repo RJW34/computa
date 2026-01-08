@@ -125,11 +125,13 @@ export function AuditDetails() {
           ) : (
             filteredIssues.map((issue, index) => {
               const config = SEVERITY_CONFIG[issue.severity];
-              const isExpanded = expandedIssue === `${issue.title}-${index}`;
+              // Use a stable unique key combining category, title, and index
+              const issueKey = `${issue.category}-${issue.title}-${index}`;
+              const isExpanded = expandedIssue === issueKey;
 
               return (
                 <Card
-                  key={`${issue.title}-${index}`}
+                  key={issueKey}
                   className={cn(
                     'border-l-4',
                     issue.severity === 'critical' && 'border-l-critical',
@@ -166,9 +168,7 @@ export function AuditDetails() {
                             <button
                               className="text-sm text-muted-foreground flex items-center gap-1 hover:text-foreground"
                               onClick={() =>
-                                setExpandedIssue(
-                                  isExpanded ? null : `${issue.title}-${index}`
-                                )
+                                setExpandedIssue(isExpanded ? null : issueKey)
                               }
                             >
                               {isExpanded ? (

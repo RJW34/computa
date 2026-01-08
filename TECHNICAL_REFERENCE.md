@@ -657,6 +657,39 @@ python -m abso config --show
 
 ---
 
+## Reboot Behavior When Switching Profiles
+
+### Understanding When Reboots Are Required
+
+A.B.S.O. reports `requires_reboot=True` conservatively when writing certain registry values, but actual reboots are only needed when values **change**.
+
+**Settings that require reboot (first time only):**
+- Memory Management: `DisablePagingExecutive`, `LargeSystemCache`
+- Graphics: MPO (`OverlayTestMode`)
+- Windows: HAGS (`HwSchMode`), VBS (`Enabled`)
+
+**Key insight:** Registry values persist across profile switches. If Profile A sets `DisablePagingExecutive=1` and you reboot, then Profile B also sets `DisablePagingExecutive=1`, no reboot is needed—the kernel already has that setting active.
+
+### Profile Switching Scenarios
+
+| Scenario | Reboot Needed? | Reason |
+|----------|----------------|--------|
+| First time applying any profile with Memory/MPO | **Yes** | Kernel hasn't read new values |
+| Re-applying same profile | No | Values already set |
+| Switching Diablo 4 → Rivals 2 | No | Diablo 4 doesn't touch Memory/MPO settings |
+| Switching Rivals 2 → Diablo 4 | No | Values remain from Rivals 2 |
+| Switching Rivals 2 → Slippi Melee | No | Both use same Memory/MPO settings |
+| After Windows Update resets registry | **Yes** | Values were reset to defaults |
+
+### Practical Guidance for Users
+
+1. Apply your most aggressive profile (e.g., Rivals 2) first
+2. Reboot once to activate kernel-level settings
+3. After that, freely switch between any profiles without rebooting
+4. Game-specific Nvidia and power settings apply immediately
+
+---
+
 ## Common Pitfalls
 
 1. **UAC elevation** — Many operations silently fail without admin. Always check and elevate.
@@ -676,6 +709,8 @@ python -m abso config --show
 8. **Game updates change optimal settings** — Profiles may need updates after game patches.
 
 9. **Reflex vs Low Latency Mode** — If a game has Nvidia Reflex, use that instead of driver Low Latency Mode. They can conflict.
+
+10. **Reboot warnings are conservative** — A.B.S.O. may report "reboot required" even when values haven't changed. If you've previously applied the profile and rebooted, you can safely skip the reboot.
 
 ---
 

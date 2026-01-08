@@ -1,6 +1,7 @@
 """Settings handler modules."""
 
 from abso.settings.base import SettingsHandler
+from abso.settings.cnm import CNMSettingsHandler
 from abso.settings.network import NetworkSettingsHandler
 from abso.settings.nvidia import NvidiaSettingsHandler
 from abso.settings.power import PowerSettingsHandler
@@ -16,4 +17,5 @@ __all__ = [
     "NvidiaSettingsHandler",
     "NetworkSettingsHandler",
     "TimerSettingsHandler",
+    "CNMSettingsHandler",
 ]

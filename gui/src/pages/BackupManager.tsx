@@ -10,9 +10,17 @@ export function BackupManager() {
   const { backups, backupsLoading, loadBackups } = useAppStore();
   const [restoring, setRestoring] = React.useState<string | null>(null);
 
+  // Track if load has been triggered to prevent duplicate calls
+  const loadTriggered = React.useRef(false);
+
   React.useEffect(() => {
+    // Only load if not already loaded and not currently loading
+    if (loadTriggered.current || backupsLoading) return;
+    if (backups.length > 0) return; // Already have data
+
+    loadTriggered.current = true;
     loadBackups();
-  }, [loadBackups]);
+  }, [backups.length, backupsLoading, loadBackups]);
 
   const handleRestore = async (backupId: string) => {
     setRestoring(backupId);
