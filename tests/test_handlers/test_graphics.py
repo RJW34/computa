@@ -128,9 +128,13 @@ class TestGraphicsAudit:
 class TestGraphicsApply:
     """Tests for GraphicsSettingsHandler.apply()."""
 
+    @patch.object(GraphicsSettingsHandler, "detect")
     @patch.object(GraphicsSettingsHandler, "_set_mpo_disabled")
-    def test_apply_disable_mpo(self, mock_set_mpo):
+    def test_apply_disable_mpo(self, mock_set_mpo, mock_detect):
         """Test apply disables MPO."""
+        # detect() returns mpo_disabled=False (different from target=True)
+        mock_detect.return_value = {"mpo_disabled": False}
+
         handler = GraphicsSettingsHandler()
         result = handler.apply({"disable_mpo": True})
 
@@ -138,27 +142,35 @@ class TestGraphicsApply:
         assert result["requires_reboot"] is True
         mock_set_mpo.assert_called_once_with(True)
 
+    @patch.object(GraphicsSettingsHandler, "detect")
     @patch.object(GraphicsSettingsHandler, "_set_global_fso_disabled")
-    def test_apply_disable_fso(self, mock_set_fso):
+    def test_apply_disable_fso(self, mock_set_fso, mock_detect):
         """Test apply disables global FSO."""
+        mock_detect.return_value = {"mpo_disabled": True}
+
         handler = GraphicsSettingsHandler()
         result = handler.apply({"disable_global_fso": True})
 
         assert result["success"] is True
         mock_set_fso.assert_called_once_with(True)
 
+    @patch.object(GraphicsSettingsHandler, "detect")
     @patch.object(GraphicsSettingsHandler, "_set_game_dvr_behavior")
-    def test_apply_game_dvr_behavior(self, mock_set_dvr):
+    def test_apply_game_dvr_behavior(self, mock_set_dvr, mock_detect):
         """Test apply sets GameDVR behavior."""
+        mock_detect.return_value = {"mpo_disabled": True}
+
         handler = GraphicsSettingsHandler()
         result = handler.apply({"game_dvr_behavior": 2})
 
         assert result["success"] is True
         mock_set_dvr.assert_called_once_with(2)
 
+    @patch.object(GraphicsSettingsHandler, "detect")
     @patch.object(GraphicsSettingsHandler, "_set_mpo_disabled")
-    def test_apply_handles_permission_error(self, mock_set_mpo):
+    def test_apply_handles_permission_error(self, mock_set_mpo, mock_detect):
         """Test apply handles permission errors."""
+        mock_detect.return_value = {"mpo_disabled": False}
         mock_set_mpo.side_effect = PermissionError("Access denied")
 
         handler = GraphicsSettingsHandler()

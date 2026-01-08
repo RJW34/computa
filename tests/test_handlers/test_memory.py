@@ -94,27 +94,37 @@ class TestMemoryAudit:
 class TestMemoryApply:
     """Tests for MemorySettingsHandler.apply()."""
 
+    @patch.object(MemorySettingsHandler, "detect")
     @patch.object(MemorySettingsHandler, "_set_large_system_cache")
-    def test_apply_disables_large_cache(self, mock_set_cache):
+    def test_apply_disables_large_cache(self, mock_set_cache, mock_detect):
         """Test apply can disable Large System Cache."""
+        # detect() returns different value so setter is called
+        mock_detect.return_value = {"large_system_cache": 1, "disable_paging_executive": 1}
+
         handler = MemorySettingsHandler()
         result = handler.apply({"large_system_cache": 0})
 
         assert result["success"] is True
         mock_set_cache.assert_called_once_with(0)
 
+    @patch.object(MemorySettingsHandler, "detect")
     @patch.object(MemorySettingsHandler, "_set_disable_paging_executive")
-    def test_apply_disables_paging(self, mock_set_paging):
+    def test_apply_disables_paging(self, mock_set_paging, mock_detect):
         """Test apply can disable kernel paging."""
+        # detect() returns different value so setter is called
+        mock_detect.return_value = {"large_system_cache": 0, "disable_paging_executive": 0}
+
         handler = MemorySettingsHandler()
         result = handler.apply({"disable_paging_executive": 1})
 
         assert result["success"] is True
         mock_set_paging.assert_called_once_with(1)
 
+    @patch.object(MemorySettingsHandler, "detect")
     @patch.object(MemorySettingsHandler, "_set_large_system_cache")
-    def test_apply_handles_permission_error(self, mock_set_cache):
+    def test_apply_handles_permission_error(self, mock_set_cache, mock_detect):
         """Test apply handles permission errors."""
+        mock_detect.return_value = {"large_system_cache": 1, "disable_paging_executive": 1}
         mock_set_cache.side_effect = PermissionError("Access denied")
 
         handler = MemorySettingsHandler()
@@ -123,9 +133,13 @@ class TestMemoryApply:
         assert result["success"] is False
         assert "Permission" in result["error"]
 
+    @patch.object(MemorySettingsHandler, "detect")
     @patch.object(MemorySettingsHandler, "_set_large_system_cache")
-    def test_apply_requires_reboot(self, mock_set_cache):
+    def test_apply_requires_reboot(self, mock_set_cache, mock_detect):
         """Test apply indicates reboot is required."""
+        # detect() returns different value so reboot is required
+        mock_detect.return_value = {"large_system_cache": 1, "disable_paging_executive": 1}
+
         handler = MemorySettingsHandler()
         result = handler.apply({"large_system_cache": 0})
 

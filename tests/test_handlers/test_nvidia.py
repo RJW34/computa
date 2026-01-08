@@ -118,7 +118,7 @@ class TestNvidiaDetect:
         assert "driver_version" in result
         assert "gpu_name" in result
         assert "npi_available" in result
-        assert "current_settings" in result
+        # Note: current_settings removed - NPI doesn't support headless export
 
     @patch("abso.settings.nvidia.subprocess.run")
     def test_detect_gpu_info_parses_nvidia_smi(self, mock_run):
@@ -181,58 +181,44 @@ class TestNvidiaAudit:
         npi_issues = [i for i in issues if "Profile Inspector not found" in i.title]
         assert len(npi_issues) == 1
 
-    def test_audit_detects_non_max_power(self):
-        """Test audit detects non-maximum power management."""
+    def test_audit_npi_available_no_issues(self):
+        """Test audit returns no issues when NPI is available.
+
+        Note: Nvidia audit cannot check current settings because NPI doesn't
+        support headless export (opens GUI). When NPI is available, we return
+        no issues - users should apply a profile to ensure optimal settings.
+        """
         handler = NvidiaSettingsHandler()
 
+        with patch.object(handler, "detect", return_value={"npi_available": True}):
+            issues = handler.audit()
+
+        # No issues returned when NPI is available (can't read settings headlessly)
+        assert len(issues) == 0
+
+    def test_audit_no_detailed_checks_without_headless_support(self):
+        """Test that audit doesn't check individual settings.
+
+        NPI doesn't support headless export, so we can't read current 3D settings.
+        The audit only checks NPI availability and provides general guidance.
+        """
+        handler = NvidiaSettingsHandler()
+
+        # Even with suboptimal "current_settings" mocked, no issues are created
+        # because the code that checks them is disabled (unreachable)
         with patch.object(handler, "detect", return_value={
             "npi_available": True,
-            "current_settings": {"power_management": "adaptive"}
+            "current_settings": {
+                "power_management": "adaptive",
+                "low_latency_mode": "off",
+                "vsync": "on",
+                "shader_cache": "1024MB",
+            }
         }):
             issues = handler.audit()
 
-        power_issues = [i for i in issues if "Power Management" in i.title]
-        assert len(power_issues) == 1
-        assert power_issues[0].severity == "warning"
-
-    def test_audit_detects_low_latency_off(self):
-        """Test audit detects low latency mode off."""
-        handler = NvidiaSettingsHandler()
-
-        with patch.object(handler, "detect", return_value={
-            "npi_available": True,
-            "current_settings": {"low_latency_mode": "off"}
-        }):
-            issues = handler.audit()
-
-        latency_issues = [i for i in issues if "Low Latency" in i.title]
-        assert len(latency_issues) == 1
-
-    def test_audit_detects_vsync_on(self):
-        """Test audit detects VSync enabled."""
-        handler = NvidiaSettingsHandler()
-
-        with patch.object(handler, "detect", return_value={
-            "npi_available": True,
-            "current_settings": {"vsync": "on"}
-        }):
-            issues = handler.audit()
-
-        vsync_issues = [i for i in issues if "VSync" in i.title]
-        assert len(vsync_issues) == 1
-
-    def test_audit_detects_limited_shader_cache(self):
-        """Test audit detects limited shader cache."""
-        handler = NvidiaSettingsHandler()
-
-        with patch.object(handler, "detect", return_value={
-            "npi_available": True,
-            "current_settings": {"shader_cache": "1024MB"}
-        }):
-            issues = handler.audit()
-
-        cache_issues = [i for i in issues if "Shader Cache" in i.title]
-        assert len(cache_issues) == 1
+        # All detailed checks are disabled - only NPI availability is checked
+        assert len(issues) == 0
 
     def test_audit_no_issues_when_optimal(self):
         """Test audit returns no issues when settings are optimal."""
@@ -351,19 +337,24 @@ class TestNvidiaBackupRestore:
         assert result["profile_path"] is None
         assert "not available" in result["note"]
 
-    def test_backup_creates_file(self, tmp_path):
-        """Test backup creates .nip file."""
+    def test_backup_skips_export_npi_gui_limitation(self, tmp_path):
+        """Test backup succeeds but skips file creation.
+
+        NPI doesn't support headless export (opens GUI), so backup skips
+        the export step entirely. Settings can be restored by re-applying
+        the game profile.
+        """
         handler = NvidiaSettingsHandler()
         handler.BACKUP_DIR = tmp_path
 
-        with (patch.object(handler._npi, "is_available", return_value=True),
-              patch.object(handler._npi, "export_profile"),
-              patch.object(handler._npi, "read_current_settings", return_value={})):
+        with patch.object(handler._npi, "is_available", return_value=True):
             result = handler.backup()
 
         assert result["success"] is True
-        assert result["profile_path"] is not None
-        assert "nvidia_backup_" in result["profile_path"]
+        # profile_path is None - export skipped due to NPI GUI limitation
+        assert result["profile_path"] is None
+        assert "note" in result
+        assert "GUI" in result["note"] or "skipped" in result["note"].lower()
 
     def test_backup_handles_exception(self):
         """Test backup succeeds with note when export fails (NPI doesn't support headless export)."""
