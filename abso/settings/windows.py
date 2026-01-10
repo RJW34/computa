@@ -89,6 +89,7 @@ class WindowsSettingsHandler(SettingsHandler):
             "vbs": self._get_vbs(),
             "hdr": self._get_hdr(),
             "auto_hdr": self._get_auto_hdr(),
+            "vrr_optimize": self._get_vrr_optimize(),
             "refresh_rate": refresh_info.get("current"),
             "max_refresh_rate": refresh_info.get("max"),
             "available_refresh_rates": refresh_info.get("available"),
@@ -240,6 +241,13 @@ class WindowsSettingsHandler(SettingsHandler):
                 applied.append(f"Auto HDR: {'enabled' if settings['auto_hdr'] else 'disabled'}")
             else:
                 errors.append(f"Auto HDR: {auto_hdr_result.get('error', 'Unknown error')}")
+
+        if "vrr_optimize" in settings:
+            vrr_result = self._set_vrr_optimize(settings["vrr_optimize"])
+            if vrr_result["success"]:
+                applied.append(f"VRR Optimize: {'enabled' if settings['vrr_optimize'] else 'disabled'}")
+            else:
+                errors.append(f"VRR Optimize: {vrr_result.get('error', 'Unknown error')}")
 
         if "refresh_rate" in settings:
             try:
@@ -769,6 +777,111 @@ class WindowsSettingsHandler(SettingsHandler):
             result["error"] = error_msg
         except Exception as e:
             error_msg = f"Failed to set Auto HDR: {e}"
+            logger.error(error_msg)
+            result["success"] = False
+            result["error"] = error_msg
+
+        return result
+
+    def _get_vrr_optimize(self) -> bool | None:
+        """Get VRR Optimize for windowed games status (Windows 11).
+
+        VRROptimizeEnable controls whether Windows applies VRR compositor
+        optimizations. Counterintuitively, this can ADD latency even in
+        exclusive fullscreen by keeping compositor logic in the path.
+        """
+        try:
+            key = winreg.OpenKey(
+                winreg.HKEY_CURRENT_USER,
+                r"Software\Microsoft\DirectX\UserGpuPreferences",
+                0,
+                winreg.KEY_READ
+            )
+            try:
+                value = winreg.QueryValueEx(key, "DirectXUserGlobalSettings")[0]
+                return "VRROptimizeEnable=1" in str(value)
+            except FileNotFoundError:
+                return None
+            finally:
+                winreg.CloseKey(key)
+        except Exception as e:
+            logger.debug(f"Failed to get VRR Optimize status: {e}")
+            return None
+
+    def _set_vrr_optimize(self, enabled: bool) -> dict[str, Any]:
+        """Set VRR Optimize for windowed games (Windows 11).
+
+        IMPORTANT: For minimum latency, this should be DISABLED.
+        Even in exclusive fullscreen, VRROptimizeEnable=1 keeps compositor
+        logic active that adds measurable latency (~0.1ms).
+
+        Returns:
+            Dict with 'success' and optional 'error'.
+        """
+        result: dict[str, Any] = {"success": True, "error": None}
+
+        try:
+            key = winreg.OpenKey(
+                winreg.HKEY_CURRENT_USER,
+                r"Software\Microsoft\DirectX\UserGpuPreferences",
+                0,
+                winreg.KEY_ALL_ACCESS
+            )
+            try:
+                current = winreg.QueryValueEx(key, "DirectXUserGlobalSettings")[0]
+                # Parse and update the VRROptimizeEnable setting
+                if "VRROptimizeEnable=" in current:
+                    new_value = current.replace(
+                        "VRROptimizeEnable=1" if not enabled else "VRROptimizeEnable=0",
+                        "VRROptimizeEnable=1" if enabled else "VRROptimizeEnable=0"
+                    )
+                else:
+                    # Add the setting
+                    new_value = current.rstrip(";") + f";VRROptimizeEnable={'1' if enabled else '0'};"
+                winreg.SetValueEx(key, "DirectXUserGlobalSettings", 0, winreg.REG_SZ, new_value)
+                logger.info(f"VRR Optimize set to {'enabled' if enabled else 'disabled'}")
+            except FileNotFoundError:
+                # Create default value with all relevant settings disabled for latency
+                winreg.SetValueEx(
+                    key,
+                    "DirectXUserGlobalSettings",
+                    0,
+                    winreg.REG_SZ,
+                    f"SwapEffectUpgradeEnable=0;AutoHDREnable=0;VRROptimizeEnable={'1' if enabled else '0'};"
+                )
+                logger.info(f"VRR Optimize set to {'enabled' if enabled else 'disabled'} (created new key)")
+            finally:
+                winreg.CloseKey(key)
+        except FileNotFoundError:
+            # Key doesn't exist, create it
+            try:
+                key = winreg.CreateKey(
+                    winreg.HKEY_CURRENT_USER,
+                    r"Software\Microsoft\DirectX\UserGpuPreferences"
+                )
+                try:
+                    winreg.SetValueEx(
+                        key,
+                        "DirectXUserGlobalSettings",
+                        0,
+                        winreg.REG_SZ,
+                        f"SwapEffectUpgradeEnable=0;AutoHDREnable=0;VRROptimizeEnable={'1' if enabled else '0'};"
+                    )
+                    logger.info(f"VRR Optimize set to {'enabled' if enabled else 'disabled'} (created registry path)")
+                finally:
+                    winreg.CloseKey(key)
+            except Exception as e:
+                error_msg = f"Failed to create VRR Optimize registry key: {e}"
+                logger.error(error_msg)
+                result["success"] = False
+                result["error"] = error_msg
+        except PermissionError as e:
+            error_msg = f"Permission denied setting VRR Optimize: {e}"
+            logger.error(error_msg)
+            result["success"] = False
+            result["error"] = error_msg
+        except Exception as e:
+            error_msg = f"Failed to set VRR Optimize: {e}"
             logger.error(error_msg)
             result["success"] = False
             result["error"] = error_msg
