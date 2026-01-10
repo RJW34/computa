@@ -10,16 +10,12 @@ from abso.profiles.slippi_melee import SlippiMeleeProfile
 class SlippiMeleeOLEDProfile(SlippiMeleeProfile):
     """Optimization profile for Slippi Melee on OLED monitors.
 
-    Identical to the standard Slippi profile but keeps HDR enabled.
+    Melee (via Dolphin/Slippi) is SDR content - it does NOT support HDR natively.
+    Enabling Windows HDR with SDR content causes washed-out colors.
 
-    OLED rationale:
-    - OLED panels have no backlight processing overhead for HDR
-    - HDR tone mapping happens in GPU, not the panel
-    - Input lag difference between SDR/HDR is negligible on OLED (~0-1ms)
-    - HDR provides better colors and peak brightness on capable panels
-
-    Use this profile if you have an OLED monitor (LG UltraGear, Alienware, etc.)
-    and prefer HDR visual quality without meaningful latency penalty.
+    This OLED profile keeps HDR DISABLED for accurate colors.
+    OLED panels still benefit from the other optimizations (low latency,
+    instant pixel response, true blacks) without the HDR color issues.
     """
 
     @property
@@ -32,17 +28,16 @@ class SlippiMeleeOLEDProfile(SlippiMeleeProfile):
 
     @property
     def description(self) -> str:
-        return "Ultra-low latency for OLED monitors with HDR preserved"
+        return "Ultra-low latency for OLED monitors (HDR disabled - game is SDR)"
 
     def get_settings(self, handler_name: str) -> dict[str, Any]:
-        """Get settings, overriding HDR to stay enabled for OLED."""
+        """Get settings with HDR disabled since Melee is SDR only."""
         settings = super().get_settings(handler_name)
 
-        # Override HDR settings for OLED - keep HDR enabled
+        # Melee is SDR - disable HDR to prevent washed-out colors
         if handler_name == "WindowsSettingsHandler":
             settings = settings.copy()
-            settings["hdr"] = True
-            # Auto HDR OFF - Slippi is SDR content, Auto HDR causes washed-out colors
+            settings["hdr"] = False
             settings["auto_hdr"] = False
 
         return settings
