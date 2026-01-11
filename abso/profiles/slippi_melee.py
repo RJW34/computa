@@ -38,6 +38,7 @@ class SlippiMeleeProfile(BaseProfile):
 
     def get_handlers(self) -> list[SettingsHandler]:
         from abso.settings.cnm import CNMSettingsHandler
+        from abso.settings.dolphin import DolphinConfigHandler
         from abso.settings.graphics import GraphicsSettingsHandler
         from abso.settings.memory import MemorySettingsHandler
         from abso.settings.mouse import MouseSettingsHandler
@@ -61,6 +62,7 @@ class SlippiMeleeProfile(BaseProfile):
             MemorySettingsHandler(),
             ProcessPriorityHandler(["Slippi Dolphin.exe", "Dolphin.exe"]),
             CNMSettingsHandler(),  # Stop CNM during gaming for power optimization
+            DolphinConfigHandler(),  # Fix Slippi Dolphin configs (Slippi Launcher overwrites these)
         ]
 
     def get_settings(self, handler_name: str) -> dict[str, Any]:
@@ -157,6 +159,15 @@ class SlippiMeleeProfile(BaseProfile):
                 # Stop CNM during gaming to allow power optimizations
                 # CNM's SetThreadExecutionState interferes with power management
                 "action": "stop",
+            },
+            "DolphinConfigHandler": {
+                # Fix Slippi Dolphin configs that get overwritten by Slippi Launcher
+                # These are applied every time the profile is activated
+                "efb_scale": "1",  # Native resolution for lowest latency
+                "texture_scaling_factor": "1",  # No texture upscaling
+                "use_scaling_filter": "False",  # No scaling filter
+                "use_deposterize": "False",  # No post-processing
+                "reduce_timing_dispersion": "True",  # Ishiiruka-specific: tighter frame timing
             },
         }
 
