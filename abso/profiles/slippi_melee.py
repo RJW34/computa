@@ -104,17 +104,21 @@ class SlippiMeleeProfile(BaseProfile):
             },
             "NvidiaSettingsHandler": {
                 # Absolute minimum latency - no sync overhead
-                # Use D3D11 backend in Dolphin to enable LLM Ultra (Vulkan doesn't support it)
+                # Use D3D11 backend in Dolphin for best compatibility
                 "preset": "minimum_latency",
                 # Settings applied:
-                # - Low Latency Mode: Ultra (WORKS with D3D11 backend - use it!)
+                # - Low Latency Mode: On (safer than Ultra - Ultra can add CPU sync overhead)
+                #   Ultra reduces pre-render queue to near-zero but adds CPU synchronization.
+                #   For locked 60fps, "On" (1 frame queue) is more stable.
+                #   Test Ultra if chasing 0.0ms - it may work on powerful GPUs (RTX 4070+)
                 # - VSync: OFF (critical - removes sync latency entirely)
                 # - Power Management: Prefer Maximum Performance
                 # - Shader Cache: Unlimited
-                # - Threaded Optimization: On
-                # - G-Sync: Force OFF per-app (vrr_app_override)
+                # - Threaded Optimization: OFF (reduces threading overhead for emulation)
+                # - Triple Buffering: OFF
+                # - Max Frame Rate: OFF
+                # - G-Sync: OFF (Melee is fixed 60fps - VRR adds overhead for constant rate)
                 #
-                # Melee outputs at fixed 60fps - G-Sync adds overhead for constant rate.
                 # High refresh still helps via reduced scanout latency even without VRR.
                 # May cause tearing, but competitive players prioritize latency.
             },
@@ -191,11 +195,30 @@ class SlippiMeleeProfile(BaseProfile):
             {
                 "category": "Nvidia Control Panel",
                 "setting": "Low Latency Mode",
-                "value": "Ultra",
+                "value": "On (test Ultra if chasing 0.0ms)",
                 "reason": (
-                    "LLM Ultra WORKS with D3D11 backend - reduces render queue to 1 frame. "
-                    "Tested: measurable latency reduction vs Vulkan. Requires D3D11 in Dolphin."
+                    "'On' limits pre-render queue to 1 frame - stable for locked 60fps. "
+                    "'Ultra' adds CPU sync overhead that can backfire. Test Ultra on RTX 4070+ "
+                    "if trying to achieve consistent 0.0ms render latency."
                 ),
+            },
+            {
+                "category": "Nvidia Control Panel",
+                "setting": "Threaded Optimization",
+                "value": "Off",
+                "reason": "Reduces driver threading overhead for emulation workloads.",
+            },
+            {
+                "category": "Nvidia Control Panel",
+                "setting": "Triple Buffering",
+                "value": "Off",
+                "reason": "Only works with VSync and adds latency.",
+            },
+            {
+                "category": "Nvidia Control Panel",
+                "setting": "Max Frame Rate",
+                "value": "Off",
+                "reason": "No artificial frame limiting.",
             },
 
             # === DOLPHIN GRAPHICS SETTINGS ===
@@ -232,12 +255,96 @@ class SlippiMeleeProfile(BaseProfile):
                 ),
             },
 
+            # === DOLPHIN CONFIG FILES (Ishiiruka/Stable) ===
+            # These settings are in GFX.ini and Dolphin.ini
+            {
+                "category": "GFX.ini [Settings]",
+                "setting": "EFBScale",
+                "value": "1 (Native)",
+                "reason": (
+                    "Native resolution = lowest render latency. Higher res adds GPU work. "
+                    "Tested: EFBScale 2 added measurable latency vs EFBScale 1."
+                ),
+            },
+            {
+                "category": "GFX.ini [Settings]",
+                "setting": "BackendMultithreading",
+                "value": "False",
+                "reason": "Reduces driver threading overhead.",
+            },
+            {
+                "category": "GFX.ini [Enhancements]",
+                "setting": "UseScalingFilter",
+                "value": "False",
+                "reason": "Scaling adds GPU overhead.",
+            },
+            {
+                "category": "GFX.ini [Enhancements]",
+                "setting": "UseDePosterize",
+                "value": "False",
+                "reason": "Post-processing adds GPU overhead.",
+            },
+            {
+                "category": "GFX.ini [Enhancements]",
+                "setting": "TextureScalingFactor",
+                "value": "1",
+                "reason": "Texture upscaling adds GPU overhead.",
+            },
+            {
+                "category": "GFX.ini [Hacks]",
+                "setting": "EFBAccessEnable",
+                "value": "False",
+                "reason": "EFB access is slow - disable for performance.",
+            },
+            {
+                "category": "GFX.ini [Hacks]",
+                "setting": "EnableGPUTextureDecoding",
+                "value": "True",
+                "reason": "Offloads texture decoding to GPU.",
+            },
+            {
+                "category": "Dolphin.ini [Core]",
+                "setting": "TimingVariance",
+                "value": "8",
+                "reason": "Ishiiruka-specific: reduces frame timing variance.",
+            },
+            {
+                "category": "Dolphin.ini [Core]",
+                "setting": "ReduceTimingDispersion",
+                "value": "True",
+                "reason": "Ishiiruka-specific: tighter frame timing.",
+            },
+            {
+                "category": "Dolphin.ini [Core]",
+                "setting": "SyncGPU",
+                "value": "False",
+                "reason": "GPU sync adds latency - disable.",
+            },
+            {
+                "category": "Dolphin.ini [Core]",
+                "setting": "TimeStretching",
+                "value": "False",
+                "reason": "Audio time stretching adds processing overhead.",
+            },
+            {
+                "category": "Game Settings (GALE01.ini)",
+                "setting": "MMU",
+                "value": "False",
+                "reason": "Memory Management Unit emulation adds overhead - not needed for Melee.",
+            },
+            {
+                "category": "Game Settings (GALE01.ini)",
+                "setting": "FPRF",
+                "value": "False",
+                "reason": "Floating point result flags add CPU overhead - not needed for Melee.",
+            },
+
             # === AUDIO SETTINGS ===
             {
                 "category": "Audio",
                 "setting": "Backend",
-                "value": "Cubeb or XAudio2",
-                "reason": "Both are low-latency options.",
+                "value": "Exclusive WASAPI (Ishiiruka) / Cubeb (Mainline)",
+                "reason": "Exclusive mode bypasses Windows audio mixer for lowest latency.",
             },
             {
                 "category": "Audio",
