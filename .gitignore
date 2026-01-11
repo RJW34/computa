@@ -55,5 +55,10 @@ tools/
 SESSION_BOOKMARK.md
 IMPROVEMENT_PLAN.md
 
+# Environment files
+.env
+.env.local
+.env.*.local
+
 # Claude
 .claude/
