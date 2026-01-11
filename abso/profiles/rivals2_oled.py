@@ -10,16 +10,12 @@ from abso.profiles.rivals2 import Rivals2Profile
 class Rivals2OLEDProfile(Rivals2Profile):
     """Optimization profile for Rivals of Aether 2 on OLED monitors.
 
-    Identical to the standard Rivals 2 profile but keeps HDR enabled.
+    Rivals 2 is an SDR game - it does NOT support HDR natively.
+    Enabling Windows HDR with SDR content causes washed-out colors.
 
-    OLED rationale:
-    - OLED panels have no backlight processing overhead for HDR
-    - HDR tone mapping happens in GPU, not the panel
-    - Input lag difference between SDR/HDR is negligible on OLED (~0-1ms)
-    - HDR provides better colors and peak brightness on capable panels
-
-    Use this profile if you have an OLED monitor (LG UltraGear, Alienware, etc.)
-    and prefer HDR visual quality without meaningful latency penalty.
+    This OLED profile keeps HDR DISABLED for accurate colors.
+    OLED panels still benefit from the other optimizations (low latency,
+    fullscreen exclusive, etc.) without the HDR color issues.
     """
 
     @property
@@ -32,17 +28,16 @@ class Rivals2OLEDProfile(Rivals2Profile):
 
     @property
     def description(self) -> str:
-        return "Ultra-low latency for OLED monitors with HDR preserved"
+        return "Ultra-low latency for OLED monitors (HDR disabled - game is SDR)"
 
     def get_settings(self, handler_name: str) -> dict[str, Any]:
-        """Get settings, overriding HDR to stay enabled for OLED."""
+        """Get settings with HDR disabled since Rivals 2 is SDR only."""
         settings = super().get_settings(handler_name)
 
-        # Override HDR settings for OLED - keep HDR enabled
+        # Rivals 2 is SDR - disable HDR to prevent washed-out colors
         if handler_name == "WindowsSettingsHandler":
             settings = settings.copy()
-            settings["hdr"] = True
-            # Auto HDR OFF - game has native HDR, Auto HDR not needed
+            settings["hdr"] = False
             settings["auto_hdr"] = False
 
         return settings
