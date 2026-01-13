@@ -118,6 +118,11 @@ $script:Profiles = @{
         Short = "Rivals 2"
         Executables = @("RivalsofAether2.exe", "Rivals2.exe", "RivalsOfAether2-Win64-Shipping.exe")
     }
+    "rivals2-oled-vrr" = @{
+        Name = "Rivals of Aether 2 (OLED + G-Sync)"
+        Short = "Rivals 2 VRR"
+        Executables = @("RivalsofAether2.exe", "Rivals2.exe", "RivalsOfAether2-Win64-Shipping.exe")
+    }
     "slippi-melee-oled" = @{
         Name = "Super Smash Bros. Melee (Slippi) (OLED)"
         Short = "Slippi Melee"
@@ -340,7 +345,7 @@ function Start-TrayApp {
     $menu.Items.Add((New-Object System.Windows.Forms.ToolStripSeparator)) | Out-Null
 
     # Profile items (OLED editions where available)
-    foreach ($id in @("pacdeluxe-oled", "rivals2-oled", "slippi-melee-oled", "cod-bo7")) {
+    foreach ($id in @("pacdeluxe-oled", "rivals2-oled", "rivals2-oled-vrr", "slippi-melee-oled", "cod-bo7")) {
         $profile = $script:Profiles[$id]
         $item = New-Object System.Windows.Forms.ToolStripMenuItem
         $item.Text = $profile.Name

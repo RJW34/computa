@@ -6,7 +6,10 @@ import { Copy, FileDown, Gamepad2 } from 'lucide-react';
 
 const PROFILES = [
   { id: 'slippi-melee', name: 'Slippi Melee' },
+  { id: 'slippi-melee-oled', name: 'Slippi (OLED)' },
   { id: 'rivals2', name: 'Rivals 2' },
+  { id: 'rivals2-oled', name: 'Rivals 2 (OLED)' },
+  { id: 'rivals2-oled-vrr', name: 'Rivals 2 (OLED + G-Sync)' },
   { id: 'cod-bo7', name: 'CoD BO7' },
 ];
 

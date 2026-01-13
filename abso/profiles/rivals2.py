@@ -282,11 +282,11 @@ class Rivals2Profile(BaseProfile):
             {
                 "category": "In-Game Video",
                 "setting": "Frame Rate Cap",
-                "value": "Uncapped or 240 (highest preset)",
+                "value": "999 (uncapped) or highest your GPU sustains",
                 "reason": (
-                    "Rivals 2 presets: 60, 120, 144, 165, 240. If uncapped exists, use it. "
-                    "Otherwise use 240 for lowest limiter overhead (~2-4ms vs ~8-17ms at 60fps). "
-                    "FPS will exceed 300 if GPU capable - this is intended for minimum latency."
+                    "Rivals 2 now supports custom FPS caps (1-999). For no-sync, set 999 for "
+                    "effectively uncapped. No limiter = no limiter latency. FPS will exceed 300 "
+                    "if GPU capable - this is intended for minimum latency with no-sync setup."
                 ),
             },
             {
@@ -302,10 +302,11 @@ class Rivals2Profile(BaseProfile):
             {
                 "category": "=== ALTERNATIVE: VRR (Tear-Free) ===",
                 "setting": "Overview",
-                "value": "G-SYNC ON, V-SYNC ON (NVCP), 240 FPS in-game cap",
+                "value": "G-SYNC ON, V-SYNC ON (NVCP), in-game cap at refresh-3",
                 "reason": (
                     "Use this if tearing bothers you. Adds ~2-5ms latency vs no-sync. "
-                    "V-SYNC acts as safety net only - never activates with FPS capped below refresh."
+                    "V-SYNC acts as safety net only - never activates with FPS capped below refresh. "
+                    "For 300Hz: cap at 297. For 240Hz: cap at 237. For 144Hz: cap at 141."
                 ),
             },
             {
@@ -342,10 +343,11 @@ class Rivals2Profile(BaseProfile):
             {
                 "category": "In-Game Video (VRR Alternative)",
                 "setting": "Frame Rate Cap",
-                "value": "240",
+                "value": "Refresh rate - 3 (e.g., 297 for 300Hz)",
                 "reason": (
                     "Must cap below refresh for G-SYNC to work properly. "
-                    "Note: With G-SYNC at 240fps, scanout is 4.17ms regardless of 300Hz or 240Hz monitor setting."
+                    "With custom cap support (1-999), set exactly 3 below your refresh rate. "
+                    "In-game limiter has lower latency than NVCP/RTSS limiters."
                 ),
             },
 
@@ -413,27 +415,25 @@ class Rivals2Profile(BaseProfile):
                 "reason": (
                     "| Configuration           | Scanout | Limiter | Tearing | Total Relative |\n"
                     "|-------------------------|---------|---------|---------|----------------|\n"
-                    "| No sync, uncapped 300Hz | ~3.3ms  | 0ms     | Yes     | LOWEST (DEFAULT)|\n"
-                    "| No sync, 240 cap 300Hz  | ~3.3ms  | ~2-4ms  | Yes     | Very Low       |\n"
-                    "| G-SYNC+VSYNC, 240 cap   | ~4.2ms  | ~2-4ms  | No      | Low (+2-5ms)   |\n\n"
-                    "WITHOUT G-SYNC: Monitor refresh rate (300Hz vs 240Hz) DIRECTLY affects scanout. "
-                    "300Hz = 3.33ms, 240Hz = 4.17ms. Always use 300Hz for no-sync setup."
+                    "| No sync, 999 cap 300Hz  | ~3.3ms  | ~0ms    | Yes     | LOWEST (DEFAULT)|\n"
+                    "| G-SYNC+VSYNC, 297 cap   | ~3.4ms  | ~0.5ms  | No      | +2-3ms (VRR)   |\n\n"
+                    "WITHOUT G-SYNC: Monitor refresh rate DIRECTLY affects scanout. 300Hz = 3.33ms. "
+                    "WITH G-SYNC: Scanout matches FPS. 297fps = 3.37ms scanout."
                 ),
             },
             {
                 "category": "Latency Comparison",
-                "setting": "In-game cap latency by preset",
-                "value": "Higher caps = lower latency (or uncapped)",
+                "setting": "Custom FPS cap recommendations",
+                "value": "Set based on your monitor and sync mode",
                 "reason": (
-                    "| FPS Cap   | Frame Time | Limiter Overhead | Recommendation            |\n"
-                    "|-----------|------------|------------------|---------------------------|\n"
-                    "| Uncapped  | Variable   | 0ms              | BEST if available         |\n"
-                    "| 240       | 4.17ms     | ~2-4ms           | Best preset option        |\n"
-                    "| 165       | 6.06ms     | ~3-6ms           | Avoid                     |\n"
-                    "| 144       | 6.94ms     | ~3.5-7ms         | Avoid                     |\n"
-                    "| 120       | 8.33ms     | ~4-8ms           | Avoid                     |\n"
-                    "| 60        | 16.67ms    | ~8-17ms          | Only if GPU-limited       |\n\n"
-                    "Uncapped = no limiter overhead. If must cap, use 240 (lowest overhead)."
+                    "Rivals 2 now supports custom FPS caps (1-999).\n\n"
+                    "| Setup | Recommended Cap | Why |\n"
+                    "|-------|-----------------|-----|\n"
+                    "| No-sync 300Hz | 999 | Uncapped = no limiter latency |\n"
+                    "| G-Sync 300Hz | 297 | Refresh - 3 for G-Sync headroom |\n"
+                    "| G-Sync 240Hz | 237 | Refresh - 3 for G-Sync headroom |\n"
+                    "| G-Sync 144Hz | 141 | Refresh - 3 for G-Sync headroom |\n\n"
+                    "In-game limiter (~0.5ms overhead) is faster than NVCP/RTSS (~2-4ms overhead)."
                 ),
             },
             {

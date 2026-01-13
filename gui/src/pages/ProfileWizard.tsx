@@ -27,7 +27,13 @@ const PROFILES = [
   {
     id: 'rivals2-oled',
     name: 'Rivals of Aether 2 (OLED)',
-    description: 'Ultra-low latency with HDR optimized for OLED',
+    description: 'Ultra-low latency for OLED (no-sync, HDR disabled)',
+    target: 'minimum_latency',
+  },
+  {
+    id: 'rivals2-oled-vrr',
+    name: 'Rivals of Aether 2 (OLED + G-Sync)',
+    description: 'Tear-free VRR gaming with near-minimum latency',
     target: 'minimum_latency',
   },
   {

@@ -22,6 +22,7 @@ from abso.profiles.pokemon_auto_chess import PokemonAutoChessProfile
 from abso.profiles.pokemon_auto_chess_oled import PokemonAutoChessOLEDProfile
 from abso.profiles.rivals2 import Rivals2Profile
 from abso.profiles.rivals2_oled import Rivals2OLEDProfile
+from abso.profiles.rivals2_oled_vrr import Rivals2OLEDVRRProfile
 from abso.profiles.slippi_melee import SlippiMeleeProfile
 from abso.profiles.slippi_melee_oled import SlippiMeleeOLEDProfile
 
@@ -49,6 +50,7 @@ class ProfileApplier:
         "slippi-melee-oled": SlippiMeleeOLEDProfile,
         "rivals2": Rivals2Profile,
         "rivals2-oled": Rivals2OLEDProfile,
+        "rivals2-oled-vrr": Rivals2OLEDVRRProfile,
         "cod-bo7": CodBo7Profile,
         "cod-bo7-oled": CodBo7OLEDProfile,
         "diablo4": Diablo4Profile,

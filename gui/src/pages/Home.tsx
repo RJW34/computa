@@ -18,6 +18,7 @@ import { Badge } from '@/components/ui/badge';
 const PROFILE_NAMES: Record<string, string> = {
   'rivals2': 'Rivals of Aether 2',
   'rivals2-oled': 'Rivals 2 (OLED)',
+  'rivals2-oled-vrr': 'Rivals 2 (OLED + G-Sync)',
   'slippi-melee': 'Slippi Melee',
   'slippi-melee-oled': 'Slippi Melee (OLED)',
   'cod-bo7': 'CoD: Black Ops 7',
