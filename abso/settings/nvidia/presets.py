@@ -145,6 +145,33 @@ NVIDIA_PRESETS: dict[str, dict[str, Any]] = {
             ),
         },
     },
+    "vrr_ue5_fighting_game": {
+        "description": "VRR for UE5 fighting games (Rivals 2) - uses VSync Fast for better frame pacing",
+        "settings": {
+            "low_latency_mode": "on",  # NOT Ultra - Ultra overrides manual FPS caps
+            "power_management": "prefer_max_performance",
+            "vsync": "fast",  # FAST instead of ON - fixes FPS cap issues in UE5/Rivals 2
+            "max_frame_rate": "off",  # Use in-game limiter (297 for 300Hz)
+            "shader_cache": "unlimited",
+            "threaded_optimization": "on",
+            "triple_buffering": "off",  # Reduces latency - not needed with G-SYNC
+        },
+        "notes": {
+            "fps_cap": (
+                "Use in-game custom FPS cap at refresh_rate - 3 (e.g., 297 for 300Hz). "
+                "Rivals 2 supports custom caps from 1-999. Enable bUseFrameRateLimit in config."
+            ),
+            "vsync_fast": (
+                "VSync 'Fast' works better than 'On' for Rivals 2 / UE5. "
+                "Testing showed VSync 'On' caused FPS to cap ~20fps below target. "
+                "VSync 'Fast' with G-Sync achieves full target FPS (297fps on 300Hz)."
+            ),
+            "ue5_note": (
+                "UE5 games can be single-thread bottlenecked even at low GPU/CPU usage. "
+                "If FPS is still below target, this is an engine limitation, not driver."
+            ),
+        },
+    },
     "no_sync_fighting_game": {
         "description": "Absolute minimum latency for fighting games - accepts tearing",
         "settings": {

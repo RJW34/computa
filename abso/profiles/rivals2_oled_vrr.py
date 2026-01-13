@@ -11,7 +11,11 @@ class Rivals2OLEDVRRProfile(Rivals2OLEDProfile):
     """Optimization profile for Rivals of Aether 2 on OLED with G-Sync/VRR.
 
     This profile prioritizes tear-free visuals with near-minimum latency.
-    Uses G-Sync + VSync (NVCP) + 240 FPS cap for the optimal VRR experience.
+    Uses G-Sync + VSync Fast (NVCP) + 297 FPS in-game cap for optimal VRR.
+
+    KEY FINDING: VSync "Fast" works better than "On" for Rivals 2 / UE5.
+    Testing showed VSync "On" caused FPS to cap ~20fps below target (270fps).
+    VSync "Fast" with G-Sync achieves full target FPS (297fps on 300Hz).
 
     Tradeoff vs no-sync profile:
     - Adds ~2-5ms latency
@@ -39,9 +43,9 @@ class Rivals2OLEDVRRProfile(Rivals2OLEDProfile):
 
         if handler_name == "NvidiaSettingsHandler":
             settings = settings.copy()
-            # Switch to VRR preset instead of no-sync
-            # This enables: G-Sync allowed, VSync ON (safety net), LLM On
-            settings["preset"] = "vrr_fighting_game"
+            # Switch to UE5 VRR preset - uses VSync Fast instead of On
+            # Testing showed VSync "On" caused ~20fps drop; "Fast" achieves full target
+            settings["preset"] = "vrr_ue5_fighting_game"
 
         return settings
 
@@ -57,11 +61,11 @@ class Rivals2OLEDVRRProfile(Rivals2OLEDProfile):
             {
                 "category": "=== VRR/G-SYNC SETUP ===",
                 "setting": "Overview",
-                "value": "G-SYNC ON, V-SYNC ON (NVCP), 240 FPS in-game cap",
+                "value": "G-SYNC ON, V-SYNC FAST (NVCP), 297 FPS in-game cap",
                 "reason": (
                     "Tear-free gaming with near-minimum latency. Adds ~2-5ms vs no-sync "
-                    "but eliminates all tearing. V-SYNC acts as safety net only - never "
-                    "activates with FPS properly capped below refresh rate."
+                    "but eliminates all tearing. KEY: VSync 'Fast' works better than 'On' "
+                    "for Rivals 2 / UE5 - testing showed 'On' caused ~20fps drop."
                 ),
             },
 
