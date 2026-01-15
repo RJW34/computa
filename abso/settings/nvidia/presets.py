@@ -146,9 +146,9 @@ NVIDIA_PRESETS: dict[str, dict[str, Any]] = {
         },
     },
     "vrr_ue5_fighting_game": {
-        "description": "VRR for UE5 fighting games (Rivals 2) - uses VSync Fast for better frame pacing",
+        "description": "VRR for UE5 fighting games (Rivals 2) - uses VSync Fast + Ultra LLM",
         "settings": {
-            "low_latency_mode": "on",  # NOT Ultra - Ultra overrides manual FPS caps
+            "low_latency_mode": "ultra",  # Ultra works with VSync Fast (no FPS cap conflict)
             "power_management": "prefer_max_performance",
             "vsync": "fast",  # FAST instead of ON - fixes FPS cap issues in UE5/Rivals 2
             "max_frame_rate": "off",  # Use in-game limiter (297 for 300Hz)
@@ -161,14 +161,14 @@ NVIDIA_PRESETS: dict[str, dict[str, Any]] = {
                 "Use in-game custom FPS cap at refresh_rate - 3 (e.g., 297 for 300Hz). "
                 "Rivals 2 supports custom caps from 1-999. Enable bUseFrameRateLimit in config."
             ),
-            "vsync_fast": (
-                "VSync 'Fast' works better than 'On' for Rivals 2 / UE5. "
-                "Testing showed VSync 'On' caused FPS to cap ~20fps below target. "
-                "VSync 'Fast' with G-Sync achieves full target FPS (297fps on 300Hz)."
+            "vsync_fast_ultra": (
+                "VSync 'Fast' + Low Latency Mode 'Ultra' is optimal for G-Sync setups. "
+                "VSync Fast doesn't have the same FPS cap interaction as VSync On, "
+                "so Ultra's aggressive frame queuing works without conflict."
             ),
-            "ue5_note": (
-                "UE5 games can be single-thread bottlenecked even at low GPU/CPU usage. "
-                "If FPS is still below target, this is an engine limitation, not driver."
+            "windowed_optimizations": (
+                "Keep Windows Fullscreen Optimizations ENABLED for this setup. "
+                "With G-Sync + VSync Fast, the compositor integration helps performance."
             ),
         },
     },

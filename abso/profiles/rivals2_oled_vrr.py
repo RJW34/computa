@@ -11,11 +11,13 @@ class Rivals2OLEDVRRProfile(Rivals2OLEDProfile):
     """Optimization profile for Rivals of Aether 2 on OLED with G-Sync/VRR.
 
     This profile prioritizes tear-free visuals with near-minimum latency.
-    Uses G-Sync + VSync Fast (NVCP) + 297 FPS in-game cap for optimal VRR.
+    Uses G-Sync + VSync Fast + Low Latency Mode Ultra for optimal VRR.
 
-    KEY FINDING: VSync "Fast" works better than "On" for Rivals 2 / UE5.
-    Testing showed VSync "On" caused FPS to cap ~20fps below target (270fps).
-    VSync "Fast" with G-Sync achieves full target FPS (297fps on 300Hz).
+    KEY FINDINGS for G-Sync + VSync Fast setup:
+    - VSync "Fast" works better than "On" (On caused ~20fps drop)
+    - Low Latency Mode "Ultra" works with VSync Fast (no FPS cap conflict)
+    - Fullscreen Optimizations should be ENABLED (helps performance)
+    - In-game FPS cap at refresh_rate - 3 (297 for 300Hz)
 
     Tradeoff vs no-sync profile:
     - Adds ~2-5ms latency
@@ -43,9 +45,17 @@ class Rivals2OLEDVRRProfile(Rivals2OLEDProfile):
 
         if handler_name == "NvidiaSettingsHandler":
             settings = settings.copy()
-            # Switch to UE5 VRR preset - uses VSync Fast instead of On
-            # Testing showed VSync "On" caused ~20fps drop; "Fast" achieves full target
+            # Switch to UE5 VRR preset - uses VSync Fast + Ultra LLM
+            # VSync Fast doesn't conflict with Ultra like VSync On does
             settings["preset"] = "vrr_ue5_fighting_game"
+
+        elif handler_name == "GraphicsSettingsHandler":
+            settings = settings.copy()
+            # For G-Sync + VSync Fast, keep Fullscreen Optimizations ENABLED
+            # The compositor integration helps performance in this setup
+            settings["disable_global_fso"] = False
+            # MPO can stay disabled - it can cause issues in UE5
+            settings["disable_mpo"] = True
 
         return settings
 
@@ -104,11 +114,11 @@ class Rivals2OLEDVRRProfile(Rivals2OLEDProfile):
             {
                 "category": "Nvidia Control Panel (Auto)",
                 "setting": "Low Latency Mode",
-                "value": "On",
+                "value": "Ultra",
                 "reason": (
                     "Manage 3D Settings. Applied automatically by profile. "
-                    "Reduces render queue depth. 'On' (not Ultra) to respect FPS caps. "
-                    "If stuttering occurs, see Troubleshooting section."
+                    "Ultra works with VSync Fast (no FPS cap conflict like with VSync On). "
+                    "Provides most aggressive frame queue reduction for minimum latency."
                 ),
             },
             {
