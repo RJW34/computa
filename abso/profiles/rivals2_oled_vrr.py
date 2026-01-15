@@ -94,11 +94,11 @@ class Rivals2OLEDVRRProfile(Rivals2OLEDProfile):
             {
                 "category": "Nvidia Control Panel (Auto)",
                 "setting": "Vertical sync",
-                "value": "On",
+                "value": "Fast",
                 "reason": (
                     "Manage 3D Settings > Program Settings > Rivals2.exe. "
-                    "Applied automatically by profile. Acts as SAFETY NET only with G-SYNC. "
-                    "With FPS capped at 240 on 300Hz monitor, V-SYNC never engages."
+                    "Applied automatically by profile. VSync 'Fast' works better than 'On' "
+                    "for Rivals 2 / UE5 - testing showed 'On' caused ~20fps drop below target."
                 ),
             },
             {
