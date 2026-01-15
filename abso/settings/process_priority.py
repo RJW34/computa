@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import contextlib
 import logging
+import subprocess
 import winreg
 from typing import Any
 
@@ -135,8 +136,14 @@ class ProcessPriorityHandler(SettingsHandler):
             "cpu_priority": 3,
             "io_priority": 3,
         }
+
+        This method:
+        1. Sets IFEO registry settings for future launches
+        2. Also sets priority on any currently running matching processes
+           (since IFEO may be overridden by Steam/UE5 launchers)
         """
         errors: list[str] = []
+        cpu_priority = settings.get("cpu_priority", self.CPU_PRIORITY_HIGH)
 
         try:
             if "processes" in settings:
@@ -147,6 +154,9 @@ class ProcessPriorityHandler(SettingsHandler):
                 # Apply same settings to all managed executables
                 for exe in self.executables:
                     self._set_process_settings(exe, settings)
+
+            # Also set priority on running processes (IFEO may not work with Steam/UE5)
+            self._set_running_processes_priority(cpu_priority)
 
         except PermissionError as e:
             errors.append(f"Permission denied (requires admin): {e}")
@@ -392,3 +402,49 @@ class ProcessPriorityHandler(SettingsHandler):
         except Exception as e:
             logger.error(f"Failed to remove process settings for {exe_name}: {e}")
             return False
+
+    def _set_running_processes_priority(self, cpu_priority: int) -> None:
+        """Set priority on currently running processes matching managed executables.
+
+        This is needed because IFEO registry settings may be overridden by
+        Steam, UE5, or other launchers that set their own process priority.
+
+        Args:
+            cpu_priority: CPU priority class (1=Idle, 2=Normal, 3=High, 4=Realtime)
+        """
+        # Map our priority constants to PowerShell priority class names
+        priority_map = {
+            self.CPU_PRIORITY_IDLE: "Idle",
+            self.CPU_PRIORITY_NORMAL: "Normal",
+            self.CPU_PRIORITY_HIGH: "High",
+            self.CPU_PRIORITY_REALTIME: "RealTime",
+        }
+        priority_name = priority_map.get(cpu_priority, "High")
+
+        for exe in self.executables:
+            # Remove .exe extension for process name matching
+            process_name = exe.replace(".exe", "").replace(".EXE", "")
+
+            # Use PowerShell to find and set priority on matching processes
+            # This handles cases where IFEO doesn't work (Steam/UE5 override)
+            ps_script = f"""
+                $procs = Get-Process -Name '{process_name}' -ErrorAction SilentlyContinue
+                foreach ($proc in $procs) {{
+                    try {{
+                        $proc.PriorityClass = '{priority_name}'
+                    }} catch {{
+                        # Process may have exited or access denied
+                    }}
+                }}
+            """
+            try:
+                subprocess.run(
+                    ["powershell", "-NoProfile", "-Command", ps_script],
+                    capture_output=True,
+                    timeout=5,
+                )
+                logger.debug(f"Set {priority_name} priority on running {exe} processes")
+            except subprocess.TimeoutExpired:
+                logger.warning(f"Timeout setting priority for {exe}")
+            except Exception as e:
+                logger.debug(f"Could not set priority for {exe}: {e}")
