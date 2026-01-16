@@ -1,4 +1,9 @@
-"""Rivals of Aether 2 profile - OLED with VRR/G-Sync variant."""
+"""Rivals of Aether 2 profile - OLED with VRR/G-Sync variant.
+
+CRITICAL: This profile REQUIRES SpecialK injection via SKIF for optimal latency.
+Without SpecialK, UE5/Rivals 2 forces borderless windowed mode during gameplay,
+which adds 2-7ms latency. SpecialK forces true exclusive fullscreen.
+"""
 
 from __future__ import annotations
 
@@ -10,19 +15,20 @@ from abso.profiles.rivals2_oled import Rivals2OLEDProfile
 class Rivals2OLEDVRRProfile(Rivals2OLEDProfile):
     """Optimization profile for Rivals of Aether 2 on OLED with G-Sync/VRR.
 
-    This profile prioritizes tear-free visuals with near-minimum latency.
-    Uses G-Sync + VSync Fast + Low Latency Mode Ultra for optimal VRR.
+    REQUIRES: SpecialK injection via SKIF for 0ms input latency.
 
-    KEY FINDINGS for G-Sync + VSync Fast setup:
-    - VSync "Fast" works better than "On" (On caused ~20fps drop)
-    - Low Latency Mode "Ultra" works with VSync Fast (no FPS cap conflict)
-    - Fullscreen Optimizations should be ENABLED (helps performance)
-    - In-game FPS cap at refresh_rate - 3 (297 for 300Hz)
+    GOLDEN CONFIG (tested ~1.0ms render / 0ms input latency):
+    - SpecialK: Reflex On+Boost, Frame Limiter OFF, FlipDiscard=true
+    - NVCP: VSync OFF, Threaded Optimization OFF, Low Latency Mode ON
+    - Windows: HAGS ON, VBS OFF, Windows VRR OFF, MPO ENABLED
+    - System: GeForce Experience UNINSTALLED, NVIDIA Shield DISABLED
+    - Game: 297 FPS cap, VSync OFF, Exclusive Fullscreen
 
-    Tradeoff vs no-sync profile:
-    - Adds ~2-5ms latency
-    - Eliminates all tearing
-    - Smoother visual experience
+    Why SpecialK is required:
+    - UE5/Rivals 2 forces borderless windowed (0x14000000) during gameplay
+    - SpecialK overrides this to maintain exclusive fullscreen (0x94000000)
+    - SpecialK's Reflex On+Boost handles frame queue better than driver LLM
+    - SpecialK handles process priority boosting (no external watcher needed)
 
     Still keeps HDR DISABLED since Rivals 2 is an SDR game.
     """
@@ -40,216 +46,195 @@ class Rivals2OLEDVRRProfile(Rivals2OLEDProfile):
         return "Tear-free VRR gaming with near-minimum latency (HDR disabled - game is SDR)"
 
     def get_settings(self, handler_name: str) -> dict[str, Any]:
-        """Get settings with VRR/G-Sync optimizations."""
+        """Get settings with VRR/G-Sync optimizations.
+
+        REQUIRES SpecialK injection via SKIF for optimal latency.
+        """
         settings = super().get_settings(handler_name)
 
         if handler_name == "NvidiaSettingsHandler":
             settings = settings.copy()
-            # Switch to UE5 VRR preset - uses VSync Fast + Ultra LLM
-            # VSync Fast doesn't conflict with Ultra like VSync On does
+            # VSync OFF, Threaded Optimization OFF - SpecialK handles latency
             settings["preset"] = "vrr_ue5_fighting_game"
 
         elif handler_name == "GraphicsSettingsHandler":
             settings = settings.copy()
-            # For G-Sync + VSync Fast, keep Fullscreen Optimizations ENABLED
-            # The compositor integration helps performance in this setup
-            settings["disable_global_fso"] = False
-            # MPO can stay disabled - it can cause issues in UE5
-            settings["disable_mpo"] = True
+            # Disable FSO for true exclusive fullscreen
+            settings["disable_global_fso"] = True
+            # MPO must be ENABLED - required for VRR to work with SpecialK
+            settings["disable_mpo"] = False
+
+        elif handler_name == "WindowsSettingsHandler":
+            settings = settings.copy()
+            # Windows VRR MUST be OFF - it adds latency
+            settings["vrr_optimize"] = False
+            # HAGS MUST be ON - helps with latency when GFE is removed
+            settings["hags_enabled"] = True
+
+        elif handler_name == "Rivals2ConfigHandler":
+            settings = settings.copy()
+            # For VRR/G-Sync: cap at refresh_rate - 3 for G-Sync headroom
+            settings["frame_rate_limit"] = 297.0  # 300Hz - 3
 
         return settings
 
     def get_in_game_settings(self) -> list[dict[str, str]]:
         """Get recommended in-game settings for VRR/G-Sync setup.
 
-        This profile uses VRR as the PRIMARY configuration.
+        REQUIRES SpecialK injection via SKIF for optimal latency.
         """
         return [
             # =========================================================================
-            # VRR SETUP (Primary for this profile)
+            # SPECIALK REQUIREMENT (CRITICAL)
             # =========================================================================
             {
-                "category": "=== VRR/G-SYNC SETUP ===",
-                "setting": "Overview",
-                "value": "G-SYNC ON, V-SYNC FAST (NVCP), 297 FPS in-game cap",
+                "category": "=== SPECIALK REQUIRED ===",
+                "setting": "Install SpecialK",
+                "value": "Download from special-k.info, launch via SKIF",
                 "reason": (
-                    "Tear-free gaming with near-minimum latency. Adds ~2-5ms vs no-sync "
-                    "but eliminates all tearing. KEY: VSync 'Fast' works better than 'On' "
-                    "for Rivals 2 / UE5 - testing showed 'On' caused ~20fps drop."
+                    "CRITICAL: SpecialK is REQUIRED for 0ms input latency. Without it, "
+                    "UE5/Rivals 2 forces borderless windowed during gameplay (adds 2-7ms). "
+                    "SpecialK forces true exclusive fullscreen and provides Reflex On+Boost."
                 ),
+            },
+            {
+                "category": "SpecialK Settings",
+                "setting": "Reflex",
+                "value": "On + Boost",
+                "reason": "SpecialK's Reflex implementation handles frame queue better than driver LLM.",
+            },
+            {
+                "category": "SpecialK Settings",
+                "setting": "Frame Limiter",
+                "value": "Disabled",
+                "reason": "Let the game's 297 FPS cap handle limiting - lower latency than SK limiter.",
+            },
+            {
+                "category": "SpecialK Settings",
+                "setting": "Key settings in SpecialK.ini",
+                "value": "FlipDiscard=true, AllowTearingInDWM=true",
+                "reason": "Enables optimal flip model presentation and VRR tearing support.",
             },
 
-            # --- MANUAL SETUP REQUIRED ---
+            # =========================================================================
+            # SYSTEM REQUIREMENTS
+            # =========================================================================
             {
-                "category": "MANUAL: NVIDIA Control Panel",
-                "setting": "Set up G-SYNC (MUST DO MANUALLY)",
-                "value": "Enable G-SYNC, G-SYNC Compatible: ON",
-                "reason": (
-                    "Display > Set up G-SYNC. Check 'Enable G-SYNC, G-SYNC Compatible' "
-                    "and select 'Enable for full screen mode'. This is a GLOBAL setting "
-                    "that cannot be automated per-game."
-                ),
+                "category": "=== SYSTEM SETUP ===",
+                "setting": "GeForce Experience",
+                "value": "UNINSTALL",
+                "reason": "GFE adds latency overhead. Completely uninstall, not just disable.",
             },
             {
-                "category": "MANUAL: Windows Settings",
-                "setting": "Variable refresh rate",
-                "value": "On",
-                "reason": (
-                    "Settings > System > Display > Graphics > Change default graphics settings. "
-                    "Enable 'Variable refresh rate' for Windows VRR support."
-                ),
+                "category": "System Setup",
+                "setting": "NVIDIA Shield/Broadcast",
+                "value": "DISABLE",
+                "reason": "Stop and disable NvBroadcast.ContainerLocalSystem service.",
+            },
+            {
+                "category": "System Setup",
+                "setting": "HAGS (Hardware Accelerated GPU Scheduling)",
+                "value": "ON",
+                "reason": "Enable in Windows Graphics Settings. Helps latency when GFE removed.",
+            },
+            {
+                "category": "System Setup",
+                "setting": "VBS / Memory Integrity",
+                "value": "OFF",
+                "reason": "Disable in Windows Security > Device Security. Reduces kernel overhead.",
+            },
+            {
+                "category": "System Setup",
+                "setting": "Windows VRR (Variable refresh rate)",
+                "value": "OFF",
+                "reason": "DISABLE in Windows Graphics Settings. It adds latency, not reduces it.",
             },
 
-            # --- Automated by Profile ---
+            # =========================================================================
+            # NVIDIA CONTROL PANEL
+            # =========================================================================
             {
-                "category": "Nvidia Control Panel (Auto)",
+                "category": "=== NVIDIA CONTROL PANEL ===",
+                "setting": "Set up G-SYNC",
+                "value": "Enable for windowed and full screen mode",
+                "reason": "Display > Set up G-SYNC. Enable for both modes in case game falls back.",
+            },
+            {
+                "category": "NVCP (Auto)",
                 "setting": "Vertical sync",
-                "value": "Fast",
-                "reason": (
-                    "Manage 3D Settings > Program Settings > Rivals2.exe. "
-                    "Applied automatically by profile. VSync 'Fast' works better than 'On' "
-                    "for Rivals 2 / UE5 - testing showed 'On' caused ~20fps drop below target."
-                ),
+                "value": "Off",
+                "reason": "SpecialK + G-Sync handles sync. VSync OFF for lowest latency.",
             },
             {
-                "category": "Nvidia Control Panel (Auto)",
+                "category": "NVCP (Auto)",
+                "setting": "Threaded Optimization",
+                "value": "Off",
+                "reason": "CRITICAL: Must be OFF. Reduces render latency significantly.",
+            },
+            {
+                "category": "NVCP (Auto)",
                 "setting": "Low Latency Mode",
-                "value": "Ultra",
-                "reason": (
-                    "Manage 3D Settings. Applied automatically by profile. "
-                    "Ultra works with VSync Fast (no FPS cap conflict like with VSync On). "
-                    "Provides most aggressive frame queue reduction for minimum latency."
-                ),
+                "value": "On",
+                "reason": "On, not Ultra. SpecialK Reflex On+Boost handles aggressive latency.",
             },
             {
-                "category": "Nvidia Control Panel (Auto)",
-                "setting": "Power management mode",
-                "value": "Prefer maximum performance",
-                "reason": "Applied automatically. Prevents GPU downclocking.",
-            },
-            {
-                "category": "Nvidia Control Panel (Auto)",
+                "category": "NVCP (Auto)",
                 "setting": "Triple buffering",
                 "value": "Off",
-                "reason": "Applied automatically. Not needed with G-SYNC.",
+                "reason": "Adds frame queue latency. Not needed with G-Sync.",
+            },
+            {
+                "category": "NVCP (Auto)",
+                "setting": "Power management mode",
+                "value": "Prefer maximum performance",
+                "reason": "Prevents GPU downclocking during gameplay.",
             },
 
-            # --- In-Game Settings ---
+            # =========================================================================
+            # IN-GAME SETTINGS
+            # =========================================================================
             {
-                "category": "In-Game Video",
+                "category": "=== IN-GAME SETTINGS ===",
                 "setting": "V-SYNC",
-                "value": "Off (CRITICAL)",
-                "reason": (
-                    "ALWAYS disable in-game V-SYNC with G-SYNC. "
-                    "NVCP V-SYNC handles sync as a safety net."
-                ),
+                "value": "Off",
+                "reason": "ALWAYS disable in-game V-SYNC. G-Sync + SpecialK handles sync.",
             },
             {
                 "category": "In-Game Video",
                 "setting": "Frame Rate Cap",
                 "value": "297 (refresh rate - 3)",
                 "reason": (
-                    "MUST cap below refresh rate for G-SYNC to work properly. "
-                    "For 300Hz monitor: set 297. For 240Hz: set 237. For 144Hz: set 141. "
-                    "In-game limiters throttle at engine-level BEFORE frame calculation "
-                    "(~0.5ms penalty vs ~2-4ms for NVCP/RTSS). Combined with faster scanout "
-                    "at 297fps (3.37ms) vs 240fps (4.17ms), in-game 297 is optimal."
+                    "Cap 3 below refresh for G-Sync headroom. "
+                    "In-game limiter has lowest latency (~0.5ms vs 2-4ms for NVCP/RTSS)."
                 ),
             },
             {
                 "category": "In-Game Video",
                 "setting": "Display Mode",
-                "value": "Exclusive Fullscreen (preferred) or Borderless",
-                "reason": (
-                    "G-SYNC works in both modes on Windows 10/11 with recent drivers. "
-                    "Exclusive fullscreen has slightly lower latency."
-                ),
+                "value": "Exclusive Fullscreen",
+                "reason": "Set to Exclusive. SpecialK ensures it stays exclusive during gameplay.",
             },
 
-            # --- Common Settings ---
+            # =========================================================================
+            # EXPECTED RESULTS
+            # =========================================================================
             {
-                "category": "In-Game Video",
-                "setting": "Resolution Scale",
-                "value": "100% (Native)",
-                "reason": "Native resolution for sharpest visuals.",
-            },
-            {
-                "category": "In-Game Video",
-                "setting": "Motion Blur",
-                "value": "Off",
-                "reason": "Disable for competitive play - obscures visual clarity.",
-            },
-            {
-                "category": "In-Game Video",
-                "setting": "Anti-Aliasing",
-                "value": "TAA (or disable if ghosting)",
-                "reason": "UE5 uses TAA. Disable if it causes ghosting on fast movement.",
-            },
-
-            # --- Windows Settings ---
-            {
-                "category": "Windows Settings",
-                "setting": "Refresh Rate",
-                "value": "300Hz",
+                "category": "=== EXPECTED RESULTS ===",
+                "setting": "With SpecialK + all settings correct",
+                "value": "~1.0ms render / 0ms input latency",
                 "reason": (
-                    "Settings > System > Display > Advanced display. "
-                    "Keep at max refresh. With G-SYNC, scanout matches FPS (4.17ms at 240fps) "
-                    "but higher refresh = lower minimum latency if FPS spikes."
-                ),
-            },
-
-            # --- Troubleshooting ---
-            {
-                "category": "Troubleshooting",
-                "setting": "If experiencing micro-stuttering",
-                "value": "Adjust Low Latency Mode",
-                "reason": (
-                    "Low Latency Mode reduces the render queue, which CAN cause stuttering "
-                    "on some systems. Try:\n"
-                    "1. Set Low Latency Mode to 'Off' in NVCP\n"
-                    "2. Use NPI to set 'Maximum Pre-Rendered Frames' to 2-3\n"
-                    "These settings are hardware-dependent."
+                    "NVIDIA overlay should show ~1.0ms render latency and 0ms input latency. "
+                    "Window style will be 0x94000000 (true exclusive). "
+                    "Presentation mode: Hardware Independent Flip."
                 ),
             },
             {
-                "category": "Troubleshooting",
-                "setting": "If G-SYNC not engaging",
-                "value": "Check G-SYNC indicator",
+                "category": "Expected Results",
+                "setting": "Without SpecialK",
+                "value": "~2-7ms render / elevated input latency",
                 "reason": (
-                    "NVCP > Display > Set up G-SYNC > 'Enable G-SYNC indicator'. "
-                    "Verify indicator shows when game is running. If not:\n"
-                    "1. Ensure FPS cap is BELOW refresh rate\n"
-                    "2. Try Exclusive Fullscreen mode\n"
-                    "3. Check that G-SYNC is enabled globally"
-                ),
-            },
-
-            # --- Latency Comparison ---
-            {
-                "category": "Latency Info",
-                "setting": "Expected latency vs no-sync",
-                "value": "+2-5ms",
-                "reason": (
-                    "VRR setup adds ~2-5ms vs no-sync:\n"
-                    "- G-SYNC processing: ~1-2ms\n"
-                    "- Scanout at 240fps: 4.17ms vs 3.33ms at 300Hz no-sync\n\n"
-                    "Trade-off: Completely tear-free visuals for slightly higher latency. "
-                    "Many players prefer this for the smoother experience."
-                ),
-            },
-            {
-                "category": "Latency Info",
-                "setting": "Why in-game 297 is optimal for 300Hz",
-                "value": "Best of both worlds",
-                "reason": (
-                    "Per BlurBusters: In-game limiters throttle at ENGINE-LEVEL before frame "
-                    "calculation, while NVCP/RTSS throttle AFTER frames are calculated.\n\n"
-                    "| Method | Limiter Latency | Scanout | Net Result |\n"
-                    "|--------|-----------------|---------|------------|\n"
-                    "| In-game 297 | ~0.5ms | 3.37ms | LOWEST |\n"
-                    "| In-game 240 | ~0.5ms | 4.17ms | +0.8ms |\n"
-                    "| NVCP 297 | ~2-4ms | 3.37ms | +1.5-3.5ms |\n\n"
-                    "Custom FPS cap (1-999) lets you use the fast in-game limiter at optimal 297fps."
+                    "UE5 forces borderless windowed (0x14000000) which adds compositor overhead. "
+                    "This is unavoidable without SpecialK injection."
                 ),
             },
         ]

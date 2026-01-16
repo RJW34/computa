@@ -40,7 +40,7 @@ Add-Type -AssemblyName System.Drawing
 # for script-based apps. Instead, we update the tray tooltip with status.
 # Set to $true to re-enable balloon notifications if desired.
 
-$script:EnableBalloonNotifications = $false
+$script:EnableBalloonNotifications = $true
 
 function Show-Notification {
     param(
@@ -116,12 +116,12 @@ $script:Profiles = @{
     "rivals2-oled" = @{
         Name = "Rivals of Aether 2 (OLED)"
         Short = "Rivals 2"
-        Executables = @("RivalsofAether2.exe", "Rivals2.exe", "RivalsOfAether2-Win64-Shipping.exe")
+        Executables = @("Rivals2-Win64-Shipping.exe", "RivalsofAether2.exe", "Rivals2.exe")
     }
     "rivals2-oled-vrr" = @{
         Name = "Rivals of Aether 2 (OLED + G-Sync)"
         Short = "Rivals 2 VRR"
-        Executables = @("RivalsofAether2.exe", "Rivals2.exe", "RivalsOfAether2-Win64-Shipping.exe")
+        Executables = @("Rivals2-Win64-Shipping.exe", "RivalsofAether2.exe", "Rivals2.exe")
     }
     "slippi-melee-oled" = @{
         Name = "Super Smash Bros. Melee (Slippi) (OLED)"
@@ -205,6 +205,9 @@ function Start-GameWatcher {
         ConvertTo-Json | Out-File $script:ActiveProfileFile -Force
 }
 
+# NOTE: Priority boosting removed - SpecialK handles this for Rivals 2
+# See rivals2_oled_vrr.py for SpecialK configuration details
+
 # Apply profile via CLI
 function Apply-Profile {
     param([string]$ProfileId)
@@ -251,6 +254,9 @@ function Apply-Profile {
 
             # Start game watcher
             Start-GameWatcher -ProfileId $ProfileId -Executables $profile.Executables
+
+            # Note: For Rivals 2, SpecialK handles priority boosting
+            # Launch via SKIF for optimal latency (see rivals2_oled_vrr profile docs)
 
             $script:notifyIcon.Text = "A.B.S.O. - $($profile.Short) active"
             $script:activeProfile = $ProfileId
@@ -368,6 +374,8 @@ function Start-TrayApp {
     $menu.Items.Add($script:restoreItem) | Out-Null
 
     $menu.Items.Add((New-Object System.Windows.Forms.ToolStripSeparator)) | Out-Null
+
+    # Note: Boost Priority removed - SpecialK handles priority for Rivals 2
 
     # Restart tray
     $restartItem = New-Object System.Windows.Forms.ToolStripMenuItem
