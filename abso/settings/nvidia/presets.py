@@ -176,6 +176,36 @@ NVIDIA_PRESETS: dict[str, dict[str, Any]] = {
             ),
         },
     },
+    "vrr_diablo4": {
+        "description": "VRR for Diablo 4 with native Reflex - ultra low latency ARPG",
+        "settings": {
+            "low_latency_mode": "off",  # OFF - Diablo 4 has native Reflex, don't conflict
+            "power_management": "prefer_max_performance",
+            "vsync": "off",  # OFF - G-Sync handles sync
+            "max_frame_rate": "off",  # Use in-game limiter (297 for 300Hz)
+            "shader_cache": "unlimited",
+            "threaded_optimization": "off",  # OFF - reduces render latency
+            "triple_buffering": "off",  # OFF - reduces latency
+        },
+        "notes": {
+            "reflex": (
+                "Enable NVIDIA Reflex 'On + Boost' in Diablo 4 graphics settings. "
+                "Native Reflex is more effective than driver Low Latency Mode."
+            ),
+            "fps_cap": (
+                "Set in-game Max Foreground FPS to refresh_rate - 3 (e.g., 297 for 300Hz). "
+                "In-game limiter has lower latency than NVCP/RTSS limiters."
+            ),
+            "system_requirements": (
+                "HAGS=ON, VBS=OFF, Windows VRR=OFF, MPO=ENABLED. "
+                "Uninstall GeForce Experience for lowest overhead."
+            ),
+            "hdr": (
+                "Diablo 4 has excellent native HDR. Keep HDR enabled on OLED. "
+                "Set HDR Paper White Nits and Max Nits appropriately for your display."
+            ),
+        },
+    },
     "no_sync_fighting_game": {
         "description": "Absolute minimum latency for fighting games - accepts tearing",
         "settings": {

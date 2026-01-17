@@ -5,6 +5,7 @@ from abso.profiles.cod_bo7 import CodBo7Profile
 from abso.profiles.cod_bo7_oled import CodBo7OLEDProfile
 from abso.profiles.diablo4 import Diablo4Profile
 from abso.profiles.diablo4_oled import Diablo4OLEDProfile
+from abso.profiles.diablo4_oled_vrr import Diablo4OLEDVRRProfile
 from abso.profiles.pacdeluxe import PACDeluxeProfile
 from abso.profiles.pacdeluxe_oled import PACDeluxeOLEDProfile
 from abso.profiles.pokemon_auto_chess import PokemonAutoChessProfile
@@ -26,6 +27,7 @@ __all__ = [
     "CodBo7OLEDProfile",
     "Diablo4Profile",
     "Diablo4OLEDProfile",
+    "Diablo4OLEDVRRProfile",
     "PokemonAutoChessProfile",
     "PokemonAutoChessOLEDProfile",
     "PACDeluxeProfile",
@@ -50,6 +52,7 @@ def get_all_profiles() -> dict[str, BaseProfile]:
         "cod-bo7-oled": CodBo7OLEDProfile(),
         "diablo4": Diablo4Profile(),
         "diablo4-oled": Diablo4OLEDProfile(),
+        "diablo4-oled-vrr": Diablo4OLEDVRRProfile(),
         "pokemon-auto-chess": PokemonAutoChessProfile(),
         "pokemon-auto-chess-oled": PokemonAutoChessOLEDProfile(),
         "pacdeluxe": PACDeluxeProfile(),
