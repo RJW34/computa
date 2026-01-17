@@ -106,15 +106,15 @@ class SlippiMeleeProfile(BaseProfile):
                 },
             },
             "NvidiaSettingsHandler": {
-                # No-sync for absolute minimum latency
+                # Absolute minimum latency - no sync overhead
                 # Use DX12 backend in Dolphin for HAGS compatibility
-                "preset": "no_sync_fighting_game",
+                "preset": "minimum_latency",
                 # Settings applied:
-                # - Low Latency Mode: On (NOT Ultra - Ultra doesn't work with DX12)
+                # - Low Latency Mode: On (stable for locked 60fps)
                 # - VSync: OFF (critical - removes sync latency entirely)
                 # - Power Management: Prefer Maximum Performance
                 # - Shader Cache: Unlimited
-                # - Threaded Optimization: On (different from native games - helps emulation)
+                # - Threaded Optimization: OFF (reduces driver threading overhead)
                 # - Triple Buffering: OFF
                 # - Max Frame Rate: OFF
                 # - G-Sync: OFF (Melee is fixed 60fps - VRR adds overhead for constant rate)
@@ -135,10 +135,9 @@ class SlippiMeleeProfile(BaseProfile):
             "GraphicsSettingsHandler": {
                 # Disable FSO globally for true exclusive fullscreen
                 "disable_global_fso": True,
-                # MPO: Leave enabled (default) - disabling breaks VRR/G-Sync
-                # While this profile doesn't use VRR, we don't force disable
-                # to avoid issues if user later switches to VRR-enabled profile
-                "disable_mpo": False,
+                # MPO (Multi-Plane Overlay) can cause stutter with emulators.
+                # Safe to disable since Melee doesn't use G-Sync/VRR (fixed 60fps).
+                "disable_mpo": True,
             },
             "ServicesSettingsHandler": {
                 # Disable background services that can cause hitches
