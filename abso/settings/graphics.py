@@ -59,16 +59,18 @@ class GraphicsSettingsHandler(SettingsHandler):
         current = self.detect()
 
         # Check MPO status
+        # NOTE: MPO being enabled is usually CORRECT for VRR/G-Sync setups
+        # Only flag as issue if user reports stuttering
         if not current.get("mpo_disabled"):
             issues.append(Issue(
                 title="Multi-Plane Overlay (MPO) is enabled",
                 severity="info",
                 current_value="Enabled (default)",
-                optimal_value="Disabled (if experiencing stutter)",
+                optimal_value="Keep enabled for VRR/G-Sync",
                 explanation=(
-                    "MPO allows hardware compositing of overlays but can cause stuttering "
-                    "with G-Sync, screen recording, and certain games. Disable if you "
-                    "experience micro-stutter, especially with multiple monitors or overlays."
+                    "MPO is REQUIRED for VRR/G-Sync to work properly. Disabling MPO breaks "
+                    "variable refresh rate. Only disable if you experience severe stuttering "
+                    "AND don't use G-Sync/VRR. Most users should leave MPO enabled."
                 ),
                 category="graphics",
             ))

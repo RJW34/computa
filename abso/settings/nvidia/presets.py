@@ -214,7 +214,7 @@ NVIDIA_PRESETS: dict[str, dict[str, Any]] = {
             "vsync": "off",  # No sync = no sync latency
             "max_frame_rate": "off",  # Uncapped FPS
             "shader_cache": "unlimited",
-            "threaded_optimization": "on",
+            "threaded_optimization": "on",  # On for no-sync; VRR profiles override to Off
             "triple_buffering": "off",
             "vrr_app_override": "force_off",  # Disable G-Sync for this profile
         },
@@ -231,6 +231,11 @@ NVIDIA_PRESETS: dict[str, dict[str, Any]] = {
                 "If experiencing micro-stutter, try low_latency_mode='off' or use NPI "
                 "to set Max Pre-Rendered Frames to 2. LLM reduces queue depth which "
                 "can starve the GPU on some systems. Hardware-dependent - test both."
+            ),
+            "threaded_opt": (
+                "Threaded Optimization ON is default for this preset. For VRR/G-Sync "
+                "setups (vrr_ue5_fighting_game, vrr_diablo4), it's set to OFF for "
+                "lower render latency. Test both settings for your hardware."
             ),
         },
     },

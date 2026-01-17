@@ -69,10 +69,12 @@ class CodBo7Profile(BaseProfile):
                 "game_mode": True,
                 "game_bar": False,
                 "game_dvr": False,
-                "hags": True,  # Generally beneficial for modern games
+                "hags": True,  # HAGS helps latency when GFE is removed
                 # Disable HDR for competitive play - adds processing overhead
                 "hdr": False,
                 "auto_hdr": False,
+                # Windows VRR should be OFF - it adds latency even in fullscreen
+                "vrr_optimize": False,
             },
             "PowerSettingsHandler": {
                 "ensure_ultimate_performance": True,

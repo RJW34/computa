@@ -35,7 +35,7 @@ class Rivals2Profile(BaseProfile):
 
     @property
     def executable_hints(self) -> list[str]:
-        return ["RivalsofAether2.exe", "Rivals2.exe", "RivalsOfAether2-Win64-Shipping.exe"]
+        return ["Rivals2-Win64-Shipping.exe", "RivalsofAether2.exe", "Rivals2.exe"]
 
     def get_handlers(self) -> list[SettingsHandler]:
         from abso.settings.cnm import CNMSettingsHandler
@@ -44,9 +44,11 @@ class Rivals2Profile(BaseProfile):
         from abso.settings.mouse import MouseSettingsHandler
         from abso.settings.network import NetworkSettingsHandler
         from abso.settings.nvidia import NvidiaSettingsHandler
+        from abso.settings.nvidia_notifications import NvidiaNotificationHandler
         from abso.settings.power import PowerSettingsHandler
         from abso.settings.process_priority import ProcessPriorityHandler
         from abso.settings.registry import RegistrySettingsHandler
+        from abso.settings.rivals2_config import Rivals2ConfigHandler
         from abso.settings.services import ServicesSettingsHandler
         from abso.settings.windows import WindowsSettingsHandler
 
@@ -55,16 +57,18 @@ class Rivals2Profile(BaseProfile):
             PowerSettingsHandler(),
             RegistrySettingsHandler(),
             NvidiaSettingsHandler(),
+            NvidiaNotificationHandler(),  # Disable NVIDIA notifications that break fullscreen
             NetworkSettingsHandler(),
             MouseSettingsHandler(),
             GraphicsSettingsHandler(),
             ServicesSettingsHandler(),
             MemorySettingsHandler(),
             ProcessPriorityHandler([
+                "Rivals2-Win64-Shipping.exe",  # Actual UE5 shipping exe
                 "RivalsofAether2.exe",
                 "Rivals2.exe",
-                "RivalsOfAether2-Win64-Shipping.exe",
             ]),
+            Rivals2ConfigHandler(),  # Enforce game config (fullscreen mode, etc.)
             CNMSettingsHandler(),  # Stop CNM during gaming for power optimization
         ]
 
@@ -74,11 +78,13 @@ class Rivals2Profile(BaseProfile):
                 "game_mode": True,
                 "game_bar": False,
                 "game_dvr": False,
-                "hags": True,  # UE5 generally benefits from HAGS
-                # HDR enabled - negligible latency impact on OLED panels
-                # OLED has no backlight processing, HDR tone mapping is GPU-side
-                "hdr": True,
-                "auto_hdr": False,  # Keep Auto HDR off - game native HDR is preferred
+                "hags": True,  # UE5 generally benefits from HAGS when GFE removed
+                # HDR disabled - Rivals 2 is an SDR game (no native HDR support)
+                # Enabling Windows HDR with SDR content causes washed-out colors
+                "hdr": False,
+                "auto_hdr": False,  # Keep Auto HDR off - game is SDR
+                # Windows VRR setting should be OFF - it adds latency even in fullscreen
+                "vrr_optimize": False,
             },
             "PowerSettingsHandler": {
                 "ensure_ultimate_performance": True,
@@ -135,8 +141,10 @@ class Rivals2Profile(BaseProfile):
             "GraphicsSettingsHandler": {
                 # Disable FSO for true exclusive fullscreen
                 "disable_global_fso": True,
-                # UE5 can have MPO issues
-                "disable_mpo": True,
+                # MPO: Leave enabled (default) - disabling breaks VRR/G-Sync
+                # The no-sync profile doesn't use VRR, but we don't force disable
+                # to avoid issues if user later switches to VRR profile
+                "disable_mpo": False,
             },
             "ServicesSettingsHandler": {
                 # Disable background services for minimum hitches
@@ -157,6 +165,19 @@ class Rivals2Profile(BaseProfile):
                 # Stop CNM during gaming to allow power optimizations
                 # CNM's SetThreadExecutionState interferes with power management
                 "action": "stop",
+            },
+            "Rivals2ConfigHandler": {
+                # Enforce game config settings that may be reset by the game
+                # FullscreenMode: 0=Exclusive, 1=Borderless, 2=Windowed
+                "fullscreen_mode": 0,  # CRITICAL: Exclusive fullscreen for lowest latency
+                "vsync": False,  # Let NVCP handle sync
+                "raw_input": True,  # Best input latency
+                # Note: frame_rate_limit is set in VRR profile override
+            },
+            "NvidiaNotificationHandler": {
+                # Disable NVIDIA notifications that can break exclusive fullscreen
+                # The performance overlay (Alt+R) will still work
+                "disable_notifications": True,
             },
         }
 
