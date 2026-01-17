@@ -87,17 +87,8 @@ if (-not $script:createdNew) {
     exit 0
 }
 
-# Also kill any orphaned PowerShell processes running this script
-# (handles edge cases where mutex wasn't properly released)
-$currentPID = $PID
-$scriptName = "ABSO-Tray.ps1"
-Get-Process -Name "powershell" -ErrorAction SilentlyContinue | Where-Object {
-    $_.Id -ne $currentPID -and
-    $_.MainWindowTitle -eq "" -and
-    (Get-WmiObject Win32_Process -Filter "ProcessId=$($_.Id)" -ErrorAction SilentlyContinue).CommandLine -like "*$scriptName*"
-} | ForEach-Object {
-    Stop-Process -Id $_.Id -Force -ErrorAction SilentlyContinue
-}
+# Note: Orphan cleanup removed - expensive WMI calls hurt startup time
+# Mutex enforcement is sufficient for single-instance guarantee
 
 # Paths
 $script:ScriptDir = $PSScriptRoot
@@ -106,44 +97,81 @@ $script:WatcherPIDFile = Join-Path $env:TEMP "abso_watcher.pid"
 $script:ActiveProfileFile = Join-Path $env:TEMP "abso_active_profile.json"
 
 # Profile definitions (minimal - just what tray needs)
-# Using OLED editions for monitors with OLED displays
-$script:Profiles = @{
-    "pacdeluxe-oled" = @{
-        Name = "PACDeluxe - Pokemon Auto Chess (OLED)"
-        Short = "PAC"
-        Executables = @("PACDeluxe.exe", "pac-deluxe.exe")
-    }
-    "rivals2-oled" = @{
-        Name = "Rivals of Aether 2 (OLED)"
-        Short = "Rivals 2"
+# Organized by game with OLED/VRR variants
+$script:Profiles = [ordered]@{
+    # --- Fighting Games (Ultra Low Latency) ---
+    "rivals2-oled-vrr" = @{
+        Name = "Rivals 2 (OLED + G-Sync)"
+        Short = "Rivals 2 VRR"
+        Category = "Fighting"
+        Note = "Requires SpecialK"
         Executables = @("Rivals2-Win64-Shipping.exe", "RivalsofAether2.exe", "Rivals2.exe")
     }
-    "rivals2-oled-vrr" = @{
-        Name = "Rivals of Aether 2 (OLED + G-Sync)"
-        Short = "Rivals 2 VRR"
+    "rivals2-oled" = @{
+        Name = "Rivals 2 (OLED No-Sync)"
+        Short = "Rivals 2"
+        Category = "Fighting"
+        Note = "Tearing OK"
         Executables = @("Rivals2-Win64-Shipping.exe", "RivalsofAether2.exe", "Rivals2.exe")
     }
     "slippi-melee-oled" = @{
-        Name = "Super Smash Bros. Melee (Slippi) (OLED)"
-        Short = "Slippi Melee"
+        Name = "Slippi Melee (OLED)"
+        Short = "Slippi"
+        Category = "Fighting"
+        Note = "Fixed 60fps"
         Executables = @("Slippi Dolphin.exe", "Dolphin.exe")
     }
+    # --- Action RPGs ---
+    "diablo4-oled-vrr" = @{
+        Name = "Diablo 4 (OLED + G-Sync)"
+        Short = "D4 VRR"
+        Category = "ARPG"
+        Note = "HDR + Reflex"
+        Executables = @("Diablo IV.exe")
+    }
+    "diablo4-oled" = @{
+        Name = "Diablo 4 (OLED)"
+        Short = "D4"
+        Category = "ARPG"
+        Note = "HDR enabled"
+        Executables = @("Diablo IV.exe")
+    }
+    # --- Shooters ---
     "cod-bo7" = @{
-        Name = "Call of Duty: Black Ops 7"
-        Short = "CoD BO7"
+        Name = "CoD: Black Ops 7"
+        Short = "BO7"
+        Category = "Shooter"
+        Note = "Reflex native"
         Executables = @("cod.exe", "BlackOps7.exe")
+    }
+    # --- Other ---
+    "pacdeluxe-oled" = @{
+        Name = "PACDeluxe (OLED)"
+        Short = "PAC"
+        Category = "Other"
+        Note = ""
+        Executables = @("PACDeluxe.exe", "pac-deluxe.exe")
     }
 }
 
 # Create A.B.S.O. icon (16x16 lightning bolt - represents optimization)
+# Color: Gold = idle, Green = profile active
 function New-ABSOIcon {
+    param([switch]$Active)
+
     $bmp = New-Object System.Drawing.Bitmap(16, 16)
     $g = [System.Drawing.Graphics]::FromImage($bmp)
     $g.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
     $g.Clear([System.Drawing.Color]::Transparent)
 
-    # Lightning bolt shape (gold/yellow for "optimization power")
-    $brush = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::FromArgb(255, 200, 50))
+    # Lightning bolt - green when active, gold when idle
+    $color = if ($Active) {
+        [System.Drawing.Color]::FromArgb(100, 220, 100)  # Green
+    } else {
+        [System.Drawing.Color]::FromArgb(255, 200, 50)   # Gold
+    }
+    $brush = New-Object System.Drawing.SolidBrush($color)
+
     $points = @(
         [System.Drawing.Point]::new(10, 1),
         [System.Drawing.Point]::new(4, 8),
@@ -154,8 +182,13 @@ function New-ABSOIcon {
     )
     $g.FillPolygon($brush, $points)
 
-    # Dark outline for visibility
-    $pen = New-Object System.Drawing.Pen([System.Drawing.Color]::FromArgb(100, 50, 0), 1)
+    # Outline - darker shade of main color
+    $outlineColor = if ($Active) {
+        [System.Drawing.Color]::FromArgb(40, 100, 40)
+    } else {
+        [System.Drawing.Color]::FromArgb(100, 50, 0)
+    }
+    $pen = New-Object System.Drawing.Pen($outlineColor, 1)
     $g.DrawPolygon($pen, $points)
 
     $g.Dispose()
@@ -313,19 +346,21 @@ function Restore-Settings {
     $script:notifyIcon.Text = "A.B.S.O."
 }
 
-# Update menu checkmarks and tooltip
+# Update menu checkmarks, tooltip, and icon color
 function Update-MenuState {
     foreach ($item in $script:profileMenuItems) {
         $item.Checked = ($item.Tag -eq $script:activeProfile)
     }
-    $script:restoreItem.Enabled = ($script:activeProfile -ne $null)
+    $script:restoreItem.Enabled = ($null -ne $script:activeProfile)
 
-    # Update tooltip with active profile
+    # Update icon color and tooltip
     if ($script:activeProfile) {
-        $profileName = $script:Profiles[$script:activeProfile].Short
-        $script:notifyIcon.Text = "A.B.S.O. - $profileName"
+        $profile = $script:Profiles[$script:activeProfile]
+        $script:notifyIcon.Icon = New-ABSOIcon -Active
+        $script:notifyIcon.Text = "A.B.S.O. - $($profile.Short) active"
     } else {
-        $script:notifyIcon.Text = "A.B.S.O."
+        $script:notifyIcon.Icon = New-ABSOIcon
+        $script:notifyIcon.Text = "A.B.S.O. - Ready"
     }
 }
 
@@ -333,7 +368,7 @@ function Update-MenuState {
 function Start-TrayApp {
     $script:notifyIcon = New-Object System.Windows.Forms.NotifyIcon
     $script:notifyIcon.Icon = New-ABSOIcon
-    $script:notifyIcon.Text = "A.B.S.O."
+    $script:notifyIcon.Text = "A.B.S.O. - Ready"
     $script:notifyIcon.Visible = $true
 
     $script:activeProfile = $null
@@ -341,41 +376,72 @@ function Start-TrayApp {
 
     # Context menu
     $menu = New-Object System.Windows.Forms.ContextMenuStrip
+    $menu.RenderMode = [System.Windows.Forms.ToolStripRenderMode]::System
 
-    # Header (disabled, just label)
+    # Header
     $header = New-Object System.Windows.Forms.ToolStripMenuItem
-    $header.Text = "Select Profile"
+    $header.Text = "A.B.S.O. Profiles"
     $header.Enabled = $false
+    $header.Font = New-Object System.Drawing.Font($header.Font, [System.Drawing.FontStyle]::Bold)
     $menu.Items.Add($header) | Out-Null
-
     $menu.Items.Add((New-Object System.Windows.Forms.ToolStripSeparator)) | Out-Null
 
-    # Profile items (OLED editions where available)
-    foreach ($id in @("pacdeluxe-oled", "rivals2-oled", "rivals2-oled-vrr", "slippi-melee-oled", "cod-bo7")) {
+    # Group profiles by category
+    $categories = @{}
+    foreach ($id in $script:Profiles.Keys) {
         $profile = $script:Profiles[$id]
-        $item = New-Object System.Windows.Forms.ToolStripMenuItem
-        $item.Text = $profile.Name
-        $item.Tag = $id
-        $item.Add_Click({
-            param($sender, $e)
-            Apply-Profile $sender.Tag
-        }.GetNewClosure())
-        $menu.Items.Add($item) | Out-Null
-        $script:profileMenuItems += $item
+        $cat = $profile.Category
+        if (-not $categories.ContainsKey($cat)) {
+            $categories[$cat] = @()
+        }
+        $categories[$cat] += @{ Id = $id; Profile = $profile }
+    }
+
+    # Add profiles organized by category
+    $catOrder = @("Fighting", "ARPG", "Shooter", "Other")
+    foreach ($cat in $catOrder) {
+        if ($categories.ContainsKey($cat)) {
+            # Category label
+            $catLabel = New-Object System.Windows.Forms.ToolStripMenuItem
+            $catLabel.Text = "── $cat ──"
+            $catLabel.Enabled = $false
+            $catLabel.ForeColor = [System.Drawing.Color]::Gray
+            $menu.Items.Add($catLabel) | Out-Null
+
+            # Profiles in this category
+            foreach ($entry in $categories[$cat]) {
+                $id = $entry.Id
+                $profile = $entry.Profile
+                $item = New-Object System.Windows.Forms.ToolStripMenuItem
+
+                # Show note in parentheses if present
+                $displayName = $profile.Name
+                if ($profile.Note) {
+                    $item.ToolTipText = $profile.Note
+                }
+
+                $item.Text = "   $displayName"
+                $item.Tag = $id
+                $item.Add_Click({
+                    param($sender, $e)
+                    Apply-Profile $sender.Tag
+                }.GetNewClosure())
+                $menu.Items.Add($item) | Out-Null
+                $script:profileMenuItems += $item
+            }
+        }
     }
 
     $menu.Items.Add((New-Object System.Windows.Forms.ToolStripSeparator)) | Out-Null
 
     # Restore option
     $script:restoreItem = New-Object System.Windows.Forms.ToolStripMenuItem
-    $script:restoreItem.Text = "Restore Previous Settings"
+    $script:restoreItem.Text = "Restore Previous"
     $script:restoreItem.Enabled = $false
     $script:restoreItem.Add_Click({ Restore-Settings })
     $menu.Items.Add($script:restoreItem) | Out-Null
 
     $menu.Items.Add((New-Object System.Windows.Forms.ToolStripSeparator)) | Out-Null
-
-    # Note: Boost Priority removed - SpecialK handles priority for Rivals 2
 
     # Restart tray
     $restartItem = New-Object System.Windows.Forms.ToolStripMenuItem

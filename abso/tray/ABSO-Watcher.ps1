@@ -1,5 +1,5 @@
 # ABSO-Watcher.ps1 - Ultra-lightweight game process monitor
-# Memory: ~15-20MB | CPU: Near-zero (adaptive polling)
+# Memory: ~12-15MB | CPU: Near-zero (optimized polling)
 #
 # Monitors for game process start/stop:
 # - When game starts: kills tray to free resources
@@ -16,30 +16,48 @@ param(
     [string]$TrayScript
 )
 
-# Parse executable list
+# Parse executable list into HashSet for O(1) lookups
 $executables = $ExeList -split ','
-$processNames = $executables | ForEach-Object {
-    [System.IO.Path]::GetFileNameWithoutExtension($_)
+$processNameSet = [System.Collections.Generic.HashSet[string]]::new(
+    [System.StringComparer]::OrdinalIgnoreCase
+)
+foreach ($exe in $executables) {
+    $name = [System.IO.Path]::GetFileNameWithoutExtension($exe)
+    [void]$processNameSet.Add($name)
 }
 
 $gameRunning = $false
 $trayKilled = $false
+$checkCounter = 0
 
-# Check if any game process is running
+# Check if any game process is running (optimized)
 function Test-GameRunning {
-    foreach ($name in $processNames) {
-        if (Get-Process -Name $name -ErrorAction SilentlyContinue) {
-            return $true
+    # Get all processes once, then filter - more efficient than multiple Get-Process calls
+    try {
+        $procs = [System.Diagnostics.Process]::GetProcesses()
+        foreach ($p in $procs) {
+            try {
+                if ($processNameSet.Contains($p.ProcessName)) {
+                    return $true
+                }
+            } catch {
+                # Process may have exited - ignore
+            }
         }
+    } catch {
+        # Fallback if GetProcesses fails
     }
     return $false
 }
 
-# Check if tray is still alive
+# Check if tray is still alive (cached process handle)
+$script:trayProcess = $null
 function Test-TrayAlive {
     try {
-        $proc = Get-Process -Id $TrayPID -ErrorAction SilentlyContinue
-        return ($null -ne $proc)
+        if ($null -eq $script:trayProcess) {
+            $script:trayProcess = [System.Diagnostics.Process]::GetProcessById($TrayPID)
+        }
+        return -not $script:trayProcess.HasExited
     } catch {
         return $false
     }
@@ -54,19 +72,16 @@ while ($true) {
         $gameRunning = $true
         $trayKilled = $true
 
-        Stop-Process -Id $TrayPID -Force -ErrorAction SilentlyContinue
-
-        # Optional: show brief notification that tray is paused
-        # (commented out to minimize overhead during gaming)
-        # Add-Type -AssemblyName System.Windows.Forms
-        # [System.Windows.Forms.MessageBox]::Show("A.B.S.O. paused during gaming", "A.B.S.O.", "OK", "Information")
+        try {
+            Stop-Process -Id $TrayPID -Force -ErrorAction SilentlyContinue
+        } catch {}
     }
     elseif (-not $gameNowRunning -and $gameRunning) {
         # Game just exited - restart tray and exit watcher
         $gameRunning = $false
 
         # Small delay to ensure mutex is released from killed tray
-        Start-Sleep -Milliseconds 500
+        Start-Sleep -Milliseconds 300
 
         # Start tray (single-instance check in tray will prevent duplicates)
         $vbsLauncher = Join-Path (Split-Path $TrayScript) "ABSO-Tray.vbs"
@@ -79,20 +94,23 @@ while ($true) {
             ) -WindowStyle Hidden
         }
 
-        # Clean exit - our job is done
+        # Clean exit
         exit 0
     }
     elseif (-not $gameRunning -and -not $trayKilled) {
-        # Game hasn't started yet - check if tray is still alive
-        # If user closed tray manually, no point in watching
-        if (-not (Test-TrayAlive)) {
-            exit 0
+        # Check tray alive only every 3rd iteration (15s) to reduce overhead
+        $checkCounter++
+        if ($checkCounter -ge 3) {
+            $checkCounter = 0
+            if (-not (Test-TrayAlive)) {
+                exit 0
+            }
         }
     }
 
     # Adaptive sleep:
-    # - 5s when waiting for game to start (low urgency)
-    # - 2s when game is running (need to detect exit quickly)
+    # - 5s when waiting for game to start
+    # - 2s when game is running (detect exit quickly)
     $sleepMs = if ($gameRunning) { 2000 } else { 5000 }
     Start-Sleep -Milliseconds $sleepMs
 }
