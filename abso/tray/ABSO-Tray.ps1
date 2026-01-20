@@ -17,7 +17,8 @@ if (-not $isAdmin) {
     $scriptPath = $PSCommandPath
     try {
         Start-Process powershell.exe -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File `"$scriptPath`" -Hidden" -Verb RunAs -WindowStyle Hidden
-    } catch {
+    }
+    catch {
         # User declined UAC or other error - show message and exit
         Add-Type -AssemblyName System.Windows.Forms
         [System.Windows.Forms.MessageBox]::Show(
@@ -73,7 +74,8 @@ $script:mutexName = "Global\ABSO_Tray_SingleInstance_v1"
 $script:createdNew = $false
 try {
     $script:mutex = New-Object System.Threading.Mutex($true, $script:mutexName, [ref]$script:createdNew)
-} catch {
+}
+catch {
     # Mutex creation failed - another instance likely holds it
     exit 0
 }
@@ -99,57 +101,72 @@ $script:ActiveProfileFile = Join-Path $env:TEMP "abso_active_profile.json"
 # Profile definitions (minimal - just what tray needs)
 # Organized by game with OLED/VRR variants
 $script:Profiles = [ordered]@{
+    # --- Productivity ---
+    "productivity-oled" = @{
+        Name        = "Productivity (OLED + HDR)"
+        Short       = "Productivity"
+        Category    = "Productivity"
+        Note        = "Browsing/Coding"
+        Executables = @("Code.exe", "devenv.exe", "chrome.exe", "firefox.exe", "msedge.exe")
+    }
     # --- Fighting Games (Ultra Low Latency) ---
-    "rivals2-oled-vrr" = @{
-        Name = "Rivals 2 (OLED + G-Sync)"
-        Short = "Rivals 2 VRR"
-        Category = "Fighting"
-        Note = "Requires SpecialK"
+    "rivals2-oled-vrr"  = @{
+        Name        = "Rivals 2 (OLED + G-Sync)"
+        Short       = "Rivals 2 VRR"
+        Category    = "Fighting"
+        Note        = "Requires SpecialK"
         Executables = @("Rivals2-Win64-Shipping.exe", "RivalsofAether2.exe", "Rivals2.exe")
     }
-    "rivals2-oled" = @{
-        Name = "Rivals 2 (OLED No-Sync)"
-        Short = "Rivals 2"
-        Category = "Fighting"
-        Note = "Tearing OK"
+    "rivals2-oled"      = @{
+        Name        = "Rivals 2 (OLED No-Sync)"
+        Short       = "Rivals 2"
+        Category    = "Fighting"
+        Note        = "Tearing OK"
         Executables = @("Rivals2-Win64-Shipping.exe", "RivalsofAether2.exe", "Rivals2.exe")
     }
     "slippi-melee-oled" = @{
-        Name = "Slippi Melee (OLED)"
-        Short = "Slippi"
-        Category = "Fighting"
-        Note = "Fixed 60fps"
+        Name        = "Slippi Melee (OLED)"
+        Short       = "Slippi"
+        Category    = "Fighting"
+        Note        = "Fixed 60fps"
+        Executables = @("Slippi Dolphin.exe", "Dolphin.exe")
+    }
+    "slippi-melee-vrr"  = @{
+        Name        = "Slippi Melee (G-Sync)"
+        Short       = "Slippi G-Sync"
+        Category    = "Fighting"
+        Note        = "VSync+G-Sync"
         Executables = @("Slippi Dolphin.exe", "Dolphin.exe")
     }
     # --- Action RPGs ---
-    "diablo4-oled-vrr" = @{
-        Name = "Diablo 4 (OLED + G-Sync)"
-        Short = "D4 VRR"
-        Category = "ARPG"
-        Note = "HDR + Reflex"
+    "diablo4-oled-vrr"  = @{
+        Name        = "Diablo 4 (OLED + G-Sync)"
+        Short       = "D4 VRR"
+        Category    = "ARPG"
+        Note        = "HDR + Reflex"
         Executables = @("Diablo IV.exe")
     }
-    "diablo4-oled" = @{
-        Name = "Diablo 4 (OLED)"
-        Short = "D4"
-        Category = "ARPG"
-        Note = "HDR enabled"
+    "diablo4-oled"      = @{
+        Name        = "Diablo 4 (OLED)"
+        Short       = "D4"
+        Category    = "ARPG"
+        Note        = "HDR enabled"
         Executables = @("Diablo IV.exe")
     }
     # --- Shooters ---
-    "cod-bo7" = @{
-        Name = "CoD: Black Ops 7"
-        Short = "BO7"
-        Category = "Shooter"
-        Note = "Reflex native"
+    "cod-bo7"           = @{
+        Name        = "CoD: Black Ops 7"
+        Short       = "BO7"
+        Category    = "Shooter"
+        Note        = "Reflex native"
         Executables = @("cod.exe", "BlackOps7.exe")
     }
     # --- Other ---
-    "pacdeluxe-oled" = @{
-        Name = "PACDeluxe (OLED)"
-        Short = "PAC"
-        Category = "Other"
-        Note = ""
+    "pacdeluxe-oled"    = @{
+        Name        = "PACDeluxe (OLED)"
+        Short       = "PAC"
+        Category    = "Other"
+        Note        = ""
         Executables = @("PACDeluxe.exe", "pac-deluxe.exe")
     }
 }
@@ -167,7 +184,8 @@ function New-ABSOIcon {
     # Lightning bolt - green when active, gold when idle
     $color = if ($Active) {
         [System.Drawing.Color]::FromArgb(100, 220, 100)  # Green
-    } else {
+    }
+    else {
         [System.Drawing.Color]::FromArgb(255, 200, 50)   # Gold
     }
     $brush = New-Object System.Drawing.SolidBrush($color)
@@ -185,7 +203,8 @@ function New-ABSOIcon {
     # Outline - darker shade of main color
     $outlineColor = if ($Active) {
         [System.Drawing.Color]::FromArgb(40, 100, 40)
-    } else {
+    }
+    else {
         [System.Drawing.Color]::FromArgb(100, 50, 0)
     }
     $pen = New-Object System.Drawing.Pen($outlineColor, 1)
@@ -206,7 +225,8 @@ function Stop-ExistingWatcher {
             if ($pid -gt 0) {
                 Stop-Process -Id $pid -Force -ErrorAction SilentlyContinue
             }
-        } catch {}
+        }
+        catch {}
         Remove-Item $script:WatcherPIDFile -Force -ErrorAction SilentlyContinue
     }
 }
@@ -235,7 +255,7 @@ function Start-GameWatcher {
 
     # Save active profile for reference
     @{ ProfileId = $ProfileId; Executables = $Executables } |
-        ConvertTo-Json | Out-File $script:ActiveProfileFile -Force
+    ConvertTo-Json | Out-File $script:ActiveProfileFile -Force
 }
 
 # NOTE: Priority boosting removed - SpecialK handles this for Rivals 2
@@ -295,12 +315,14 @@ function Apply-Profile {
             $script:activeProfile = $ProfileId
             Update-MenuState
 
-        } else {
+        }
+        else {
             $errMsg = if ($json.error) { $json.error } else { "Unknown error" }
             Show-Notification -Title "A.B.S.O. Error" -Message "Failed: $errMsg" -Type "Error"
             $script:notifyIcon.Text = "A.B.S.O."
         }
-    } catch {
+    }
+    catch {
         $errText = $_.Exception.Message
         if ($errText.Length -gt 100) { $errText = $errText.Substring(0, 100) + "..." }
         Show-Notification -Title "A.B.S.O. Error" -Message "Failed: $errText" -Type "Error"
@@ -335,10 +357,12 @@ function Restore-Settings {
             $script:activeProfile = $null
             $script:notifyIcon.Text = "A.B.S.O."
             Update-MenuState
-        } else {
+        }
+        else {
             Show-Notification -Title "A.B.S.O." -Message "Restore failed: $($json.error)" -Type "Warning"
         }
-    } catch {
+    }
+    catch {
         $errText = $_.Exception.Message
         if ($errText.Length -gt 100) { $errText = $errText.Substring(0, 100) + "..." }
         Show-Notification -Title "A.B.S.O." -Message "Restore failed: $errText" -Type "Warning"
@@ -358,7 +382,8 @@ function Update-MenuState {
         $profile = $script:Profiles[$script:activeProfile]
         $script:notifyIcon.Icon = New-ABSOIcon -Active
         $script:notifyIcon.Text = "A.B.S.O. - $($profile.Short) active"
-    } else {
+    }
+    else {
         $script:notifyIcon.Icon = New-ABSOIcon
         $script:notifyIcon.Text = "A.B.S.O. - Ready"
     }
@@ -398,12 +423,12 @@ function Start-TrayApp {
     }
 
     # Add profiles organized by category
-    $catOrder = @("Fighting", "ARPG", "Shooter", "Other")
+    $catOrder = @("Productivity", "Fighting", "ARPG", "Shooter", "Other")
     foreach ($cat in $catOrder) {
         if ($categories.ContainsKey($cat)) {
             # Category label
             $catLabel = New-Object System.Windows.Forms.ToolStripMenuItem
-            $catLabel.Text = "── $cat ──"
+            $catLabel.Text = "-- $cat --"
             $catLabel.Enabled = $false
             $catLabel.ForeColor = [System.Drawing.Color]::Gray
             $menu.Items.Add($catLabel) | Out-Null
@@ -423,9 +448,9 @@ function Start-TrayApp {
                 $item.Text = "   $displayName"
                 $item.Tag = $id
                 $item.Add_Click({
-                    param($sender, $e)
-                    Apply-Profile $sender.Tag
-                }.GetNewClosure())
+                        param($sender, $e)
+                        Apply-Profile $sender.Tag
+                    }.GetNewClosure())
                 $menu.Items.Add($item) | Out-Null
                 $script:profileMenuItems += $item
             }
@@ -447,46 +472,46 @@ function Start-TrayApp {
     $restartItem = New-Object System.Windows.Forms.ToolStripMenuItem
     $restartItem.Text = "Restart Tray"
     $restartItem.Add_Click({
-        # Release mutex FIRST so new instance can acquire it
-        if ($script:mutex) {
-            try { $script:mutex.ReleaseMutex() } catch {}
-            $script:mutex.Close()
-            $script:mutex = $null
-        }
-        # Now launch new instance
-        $trayPath = Join-Path $script:ScriptDir "ABSO-Tray.vbs"
-        Start-Process "wscript.exe" -ArgumentList "`"$trayPath`"" -WindowStyle Hidden
-        # Exit current instance
-        Stop-ExistingWatcher
-        $script:notifyIcon.Visible = $false
-        [System.Windows.Forms.Application]::Exit()
-    })
+            # Release mutex FIRST so new instance can acquire it
+            if ($script:mutex) {
+                try { $script:mutex.ReleaseMutex() } catch {}
+                $script:mutex.Close()
+                $script:mutex = $null
+            }
+            # Now launch new instance
+            $trayPath = Join-Path $script:ScriptDir "ABSO-Tray.vbs"
+            Start-Process "wscript.exe" -ArgumentList "`"$trayPath`"" -WindowStyle Hidden
+            # Exit current instance
+            Stop-ExistingWatcher
+            $script:notifyIcon.Visible = $false
+            [System.Windows.Forms.Application]::Exit()
+        })
     $menu.Items.Add($restartItem) | Out-Null
 
     # Exit
     $exitItem = New-Object System.Windows.Forms.ToolStripMenuItem
     $exitItem.Text = "Exit"
     $exitItem.Add_Click({
-        Stop-ExistingWatcher
-        $script:notifyIcon.Visible = $false
-        [System.Windows.Forms.Application]::Exit()
-    })
+            Stop-ExistingWatcher
+            $script:notifyIcon.Visible = $false
+            [System.Windows.Forms.Application]::Exit()
+        })
     $menu.Items.Add($exitItem) | Out-Null
 
     $script:notifyIcon.ContextMenuStrip = $menu
 
     # Left-click shows menu at cursor
     $script:notifyIcon.Add_Click({
-        param($sender, $e)
-        if ($e.Button -eq [System.Windows.Forms.MouseButtons]::Left) {
-            # Use reflection to invoke private ShowContextMenu method
-            $mi = $script:notifyIcon.GetType().GetMethod(
-                "ShowContextMenu",
-                [System.Reflection.BindingFlags]::Instance -bor [System.Reflection.BindingFlags]::NonPublic
-            )
-            $mi.Invoke($script:notifyIcon, $null)
-        }
-    })
+            param($sender, $e)
+            if ($e.Button -eq [System.Windows.Forms.MouseButtons]::Left) {
+                # Use reflection to invoke private ShowContextMenu method
+                $mi = $script:notifyIcon.GetType().GetMethod(
+                    "ShowContextMenu",
+                    [System.Reflection.BindingFlags]::Instance -bor [System.Reflection.BindingFlags]::NonPublic
+                )
+                $mi.Invoke($script:notifyIcon, $null)
+            }
+        })
 
     # Check if we had an active profile (for restart scenarios)
     if (Test-Path $script:ActiveProfileFile) {
@@ -497,7 +522,8 @@ function Start-TrayApp {
                 $script:notifyIcon.Text = "A.B.S.O. - $($script:Profiles[$saved.ProfileId].Short) active"
                 Update-MenuState
             }
-        } catch {}
+        }
+        catch {}
     }
 
     [System.Windows.Forms.Application]::Run()
@@ -509,12 +535,14 @@ function Start-TrayApp {
 # Run
 try {
     Start-TrayApp
-} finally {
+}
+finally {
     # Release mutex so new instances can start
     if ($script:mutex) {
         try {
             $script:mutex.ReleaseMutex()
-        } catch {
+        }
+        catch {
             # May fail if we didn't own it - that's ok
         }
         $script:mutex.Close()

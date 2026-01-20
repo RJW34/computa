@@ -10,6 +10,7 @@ from abso.profiles.pacdeluxe import PACDeluxeProfile
 from abso.profiles.pacdeluxe_oled import PACDeluxeOLEDProfile
 from abso.profiles.pokemon_auto_chess import PokemonAutoChessProfile
 from abso.profiles.pokemon_auto_chess_oled import PokemonAutoChessOLEDProfile
+from abso.profiles.productivity_oled import ProductivityOLEDProfile
 from abso.profiles.rivals2 import Rivals2Profile
 from abso.profiles.rivals2_oled import Rivals2OLEDProfile
 from abso.profiles.rivals2_oled_vrr import Rivals2OLEDVRRProfile
@@ -32,6 +33,7 @@ __all__ = [
     "PokemonAutoChessOLEDProfile",
     "PACDeluxeProfile",
     "PACDeluxeOLEDProfile",
+    "ProductivityOLEDProfile",
     "get_all_profiles",
 ]
 
@@ -57,4 +59,5 @@ def get_all_profiles() -> dict[str, BaseProfile]:
         "pokemon-auto-chess-oled": PokemonAutoChessOLEDProfile(),
         "pacdeluxe": PACDeluxeProfile(),
         "pacdeluxe-oled": PACDeluxeOLEDProfile(),
+        "productivity-oled": ProductivityOLEDProfile(),
     }
