@@ -25,6 +25,7 @@ from abso.profiles.rivals2_oled import Rivals2OLEDProfile
 from abso.profiles.rivals2_oled_vrr import Rivals2OLEDVRRProfile
 from abso.profiles.slippi_melee import SlippiMeleeProfile
 from abso.profiles.slippi_melee_oled import SlippiMeleeOLEDProfile
+from abso.profiles.slippi_melee_vrr import SlippiMeleeVRRProfile
 
 logger = logging.getLogger(__name__)
 
@@ -48,6 +49,7 @@ class ProfileApplier:
     PROFILES: dict[str, type[BaseProfile]] = {
         "slippi-melee": SlippiMeleeProfile,
         "slippi-melee-oled": SlippiMeleeOLEDProfile,
+        "slippi-melee-vrr": SlippiMeleeVRRProfile,
         "rivals2": Rivals2Profile,
         "rivals2-oled": Rivals2OLEDProfile,
         "rivals2-oled-vrr": Rivals2OLEDVRRProfile,
