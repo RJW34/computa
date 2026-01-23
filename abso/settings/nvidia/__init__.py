@@ -202,101 +202,59 @@ class NvidiaSettingsHandler(SettingsHandler):
         return issues
 
     def apply(self, settings: dict[str, Any]) -> dict[str, Any]:
-        """Apply Nvidia settings as a per-game profile.
+        """Log NVIDIA settings that should be applied manually.
 
-        IMPORTANT: Settings are applied as PER-GAME profiles to avoid nuking
-        the user's carefully tuned global Base Profile settings. NPI's import
-        replaces entire profiles, so modifying Base Profile would reset all
-        settings not explicitly specified.
+        WARNING: NPI's import command REPLACES the entire NVIDIA profile database,
+        wiping all existing per-game profiles. Until we have proper NVAPI integration
+        that can merge profiles safely, NVIDIA settings are NOT auto-applied.
 
-        Supports:
-        - 'profile_path': Import a .nip profile file
-        - 'preset': Apply a named preset (minimum_latency, low_latency_high_fps, balanced)
-        - 'executables': List of game executables for per-game profile (REQUIRED)
-        - 'game_name': Display name for the profile
-        - Individual settings: low_latency_mode, power_management, vsync, etc.
+        Instead, this logs the recommended settings so users can apply manually.
 
         Args:
             settings: Dictionary of settings to apply.
         """
-        errors: list[str] = []
         applied: list[str] = []
 
-        if not self._npi.is_available():
-            return {
-                "success": False,
-                "error": "Nvidia Profile Inspector not configured or not found",
-                "requires_reboot": False,
-                "applied": [],
-            }
-
-        # Extract game info for per-game profile
+        # Extract game info
         executables = settings.pop("executables", [])
         game_name = settings.pop("game_name", "Game")
 
-        if not executables:
-            logger.warning(f"No executables specified for {game_name} - NVIDIA profile will not be applied")
-            return {
-                "success": True,  # Not a failure, just nothing to do
-                "error": None,
-                "requires_reboot": False,
-                "applied": [],
-                "note": "No executables specified - skipped per-game NVIDIA profile creation",
+        # Determine what settings would be applied
+        preset_name = settings.get("preset")
+        if preset_name and preset_name in NVIDIA_PRESETS:
+            preset = NVIDIA_PRESETS[preset_name]
+            nvidia_settings = preset.get("settings", {})
+        else:
+            nvidia_settings = {
+                k: v for k, v in settings.items()
+                if k in ("low_latency_mode", "power_management", "vsync",
+                         "max_frame_rate", "shader_cache", "threaded_optimization",
+                         "triple_buffering", "vrr_app_override")
             }
 
-        try:
-            # Option 1: Apply from .nip profile file
-            if "profile_path" in settings:
-                profile_path = Path(settings["profile_path"])
-                if profile_path.exists():
-                    self._npi.import_profile(profile_path)
-                    applied.append(f"Imported profile: {profile_path.name}")
-                else:
-                    errors.append(f"Profile file not found: {profile_path}")
+        if nvidia_settings:
+            # Log the settings for manual application
+            applied.append(f"NVIDIA settings for {game_name} (apply manually in NVCP):")
+            for key, value in nvidia_settings.items():
+                setting_name = key.replace("_", " ").title()
+                applied.append(f"  - {setting_name}: {value}")
+            if executables:
+                applied.append(f"  Program: {executables[0]}")
 
-            # Option 2: Apply a preset as per-game profile
-            elif "preset" in settings:
-                preset_name = settings["preset"]
-                if preset_name in NVIDIA_PRESETS:
-                    preset = NVIDIA_PRESETS[preset_name]
-                    preset_settings = preset.get("settings", {})
+            logger.info(f"NVIDIA settings logged for {game_name}: {nvidia_settings}")
+            logger.warning(
+                "NVIDIA settings NOT auto-applied. NPI import wipes all profiles. "
+                "Please apply these settings manually in NVIDIA Control Panel."
+            )
 
-                    # Create per-game profile (does NOT touch Base Profile)
-                    profile_path = generate_game_profile(
-                        settings=preset_settings,
-                        executables=executables,
-                        game_name=game_name,
-                    )
-                    self._npi.import_profile(profile_path)
-                    applied.append(f"Applied preset: {preset_name} for {game_name}")
-                    applied.append(f"  Executables: {', '.join(executables)}")
-                    logger.info(f"Applied NVIDIA preset '{preset_name}' as per-game profile for {game_name}")
-                else:
-                    errors.append(f"Unknown preset: {preset_name}. Available: {list(NVIDIA_PRESETS.keys())}")
-
-            # Option 3: Apply individual settings as per-game profile
-            else:
-                individual_settings = {
-                    k: v for k, v in settings.items()
-                    if k in ("low_latency_mode", "power_management", "vsync",
-                             "max_frame_rate", "shader_cache", "threaded_optimization",
-                             "triple_buffering", "vrr_app_override")
-                }
-
-                if individual_settings:
-                    # Create per-game profile (does NOT touch Base Profile)
-                    profile_path = generate_game_profile(
-                        settings=individual_settings,
-                        executables=executables,
-                        game_name=game_name,
-                    )
-                    self._npi.import_profile(profile_path)
-                    applied.append(f"Applied settings for {game_name}: {list(individual_settings.keys())}")
-                    applied.append(f"  Executables: {', '.join(executables)}")
-
-        except Exception as e:
-            errors.append(str(e))
-            logger.error(f"Failed to apply Nvidia settings: {e}")
+        # Always succeed - we just log, don't actually apply
+        return {
+            "success": True,
+            "error": None,
+            "requires_reboot": False,
+            "applied": applied,
+            "note": "NVIDIA settings logged only - apply manually in NVCP (NPI disabled to prevent profile wipe)",
+        }
 
         return {
             "success": len(errors) == 0,

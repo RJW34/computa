@@ -244,112 +244,64 @@ class TestNvidiaAudit:
 
 
 class TestNvidiaApply:
-    """Tests for apply() method."""
+    """Tests for apply() method.
 
-    def test_apply_returns_error_when_npi_unavailable(self):
-        """Test apply returns error when NPI is not available."""
+    Note: NPI import is DISABLED because it wipes all existing profiles.
+    Apply now logs settings for manual application instead.
+    """
+
+    def test_apply_logs_preset_settings(self):
+        """Test apply logs preset settings for manual application."""
         handler = NvidiaSettingsHandler()
 
-        with patch.object(handler._npi, "is_available", return_value=False):
-            result = handler.apply({"preset": "minimum_latency"})
-
-        assert result["success"] is False
-        assert "not configured" in result["error"]
-
-    def test_apply_unknown_preset_returns_error(self):
-        """Test apply returns error for unknown preset."""
-        handler = NvidiaSettingsHandler()
-
-        with patch.object(handler._npi, "is_available", return_value=True):
-            result = handler.apply({
-                "preset": "nonexistent_preset",
-                "executables": ["Game.exe"],
-            })
-
-        assert result["success"] is False
-        assert "Unknown preset" in result["error"]
-
-    def test_apply_preset_success(self):
-        """Test apply preset succeeds."""
-        handler = NvidiaSettingsHandler()
-
-        with (patch.object(handler._npi, "is_available", return_value=True),
-              patch.object(handler._npi, "import_profile")):
-            result = handler.apply({
-                "preset": "minimum_latency",
-                "executables": ["Game.exe"],
-            })
-
-        assert result["success"] is True
-        assert "minimum_latency" in result["applied"][0]
-
-    def test_apply_profile_path_success(self, tmp_path):
-        """Test apply from profile path succeeds."""
-        profile_file = tmp_path / "test.nip"
-        profile_file.write_text("test", encoding="utf-8")
-
-        handler = NvidiaSettingsHandler()
-
-        with (patch.object(handler._npi, "is_available", return_value=True),
-              patch.object(handler._npi, "import_profile")):
-            result = handler.apply({
-                "profile_path": str(profile_file),
-                "executables": ["Game.exe"],
-            })
-
-        assert result["success"] is True
-
-    def test_apply_profile_path_not_found(self, tmp_path):
-        """Test apply from missing profile path fails."""
-        handler = NvidiaSettingsHandler()
-
-        with patch.object(handler._npi, "is_available", return_value=True):
-            result = handler.apply({
-                "profile_path": str(tmp_path / "nonexistent.nip"),
-                "executables": ["Game.exe"],
-            })
-
-        assert result["success"] is False
-        assert "not found" in result["error"]
-
-    def test_apply_individual_settings(self):
-        """Test apply individual settings."""
-        handler = NvidiaSettingsHandler()
-
-        with (patch.object(handler._npi, "is_available", return_value=True),
-              patch.object(handler._npi, "import_profile")):
-            result = handler.apply({
-                "low_latency_mode": "ultra",
-                "vsync": "off",
-                "executables": ["Game.exe"],
-            })
-
-        assert result["success"] is True
-
-    def test_apply_handles_exception(self):
-        """Test apply handles exceptions."""
-        handler = NvidiaSettingsHandler()
-
-        with (patch.object(handler._npi, "is_available", return_value=True),
-              patch.object(handler._npi, "import_profile", side_effect=Exception("NPI error"))):
-            result = handler.apply({
-                "preset": "minimum_latency",
-                "executables": ["Game.exe"],
-            })
-
-        assert result["success"] is False
-        assert "NPI error" in result["error"]
-
-    def test_apply_without_executables_skips_nvidia(self):
-        """Test apply without executables skips NVIDIA profile creation."""
-        handler = NvidiaSettingsHandler()
-
-        with patch.object(handler._npi, "is_available", return_value=True):
-            result = handler.apply({"preset": "minimum_latency"})
+        result = handler.apply({
+            "preset": "minimum_latency",
+            "executables": ["Game.exe"],
+            "game_name": "Test Game",
+        })
 
         assert result["success"] is True
         assert "note" in result
-        assert "No executables" in result["note"]
+        assert "NPI disabled" in result["note"]
+        assert any("Test Game" in line for line in result["applied"])
+
+    def test_apply_logs_individual_settings(self):
+        """Test apply logs individual settings for manual application."""
+        handler = NvidiaSettingsHandler()
+
+        result = handler.apply({
+            "low_latency_mode": "ultra",
+            "vsync": "off",
+            "executables": ["Game.exe"],
+            "game_name": "Test Game",
+        })
+
+        assert result["success"] is True
+        assert any("Low Latency Mode" in line for line in result["applied"])
+        assert any("ultra" in line for line in result["applied"])
+
+    def test_apply_without_settings_succeeds(self):
+        """Test apply with no NVIDIA settings succeeds."""
+        handler = NvidiaSettingsHandler()
+
+        result = handler.apply({
+            "executables": ["Game.exe"],
+            "game_name": "Test Game",
+        })
+
+        assert result["success"] is True
+
+    def test_apply_unknown_preset_still_succeeds(self):
+        """Test apply with unknown preset succeeds (logs nothing)."""
+        handler = NvidiaSettingsHandler()
+
+        result = handler.apply({
+            "preset": "nonexistent_preset",
+            "executables": ["Game.exe"],
+        })
+
+        # Unknown preset means no settings to log, but still succeeds
+        assert result["success"] is True
 
 
 class TestNvidiaBackupRestore:
