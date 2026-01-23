@@ -1,26 +1,37 @@
-"""Nvidia Profile Inspector (NPI) integration."""
+"""Nvidia Profile Inspector (NPI) integration.
+
+WARNING: NPI IMPORT IS PERMANENTLY DISABLED.
+
+NPI's -silent import command REPLACES the entire NVIDIA profile database,
+wiping ALL existing per-game profiles. This caused catastrophic data loss
+for users who had carefully configured their NVIDIA settings.
+
+Until proper NVAPI integration is implemented that can safely merge profiles,
+all NPI import functionality is disabled. The import_profile method will
+raise an error if called.
+"""
 
 from __future__ import annotations
 
 import logging
 import os
 import subprocess
-import tempfile
 from pathlib import Path
 from typing import Any
 
-from .parsing import parse_nip_file
-
 logger = logging.getLogger(__name__)
+
+# SAFETY FLAG: Set to True to completely disable NPI imports
+NPI_IMPORTS_DISABLED = True
 
 
 class NPIManager:
     """Manages Nvidia Profile Inspector operations.
 
-    Handles:
-    - NPI executable discovery
-    - Profile import/export
-    - Current settings reading
+    WARNING: IMPORT FUNCTIONALITY IS DISABLED.
+
+    NPI import wipes all existing profiles. Do not re-enable without
+    implementing proper NVAPI-based profile merging.
     """
 
     def __init__(self, npi_path: Path | str | None = None) -> None:
@@ -45,16 +56,31 @@ class NPIManager:
         return self.npi_path
 
     def import_profile(self, profile_path: Path) -> None:
-        """Import a Nvidia profile file using NPI.
+        """DISABLED: Import a Nvidia profile file using NPI.
 
-        Uses the -silent flag for headless profile application.
+        WARNING: THIS METHOD IS PERMANENTLY DISABLED.
+
+        NPI's -silent import REPLACES the entire NVIDIA profile database,
+        wiping all existing per-game profiles. This caused catastrophic
+        data loss and is now blocked.
 
         Args:
             profile_path: Path to the .nip file to import.
 
         Raises:
-            RuntimeError: If NPI is not configured or import fails.
+            RuntimeError: Always - NPI imports are disabled.
         """
+        if NPI_IMPORTS_DISABLED:
+            logger.error(
+                "NPI import is PERMANENTLY DISABLED. "
+                "NPI wipes all existing profiles when importing. "
+                "Use NVIDIA Control Panel to configure settings manually."
+            )
+            raise RuntimeError(
+                "NPI import disabled - it wipes all existing NVIDIA profiles. "
+                "Configure NVIDIA settings manually in NVCP."
+            )
+
         if not self.npi_path:
             raise RuntimeError("NPI path not configured")
 
@@ -154,7 +180,7 @@ exit $p.ExitCode
                 raise RuntimeError(
                     "NPI does not support headless export (GUI was spawned). "
                     "Use nvidia-smi or manual backup. Nvidia profile backup skipped."
-                )
+                ) from None
 
             # NPI may return 0 even if it opened GUI instead of exporting
             if not output_path.exists():
