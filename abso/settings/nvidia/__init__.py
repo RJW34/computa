@@ -202,17 +202,19 @@ class NvidiaSettingsHandler(SettingsHandler):
         return issues
 
     def apply(self, settings: dict[str, Any]) -> dict[str, Any]:
-        """Apply Nvidia settings.
+        """Apply Nvidia settings as a per-game profile.
+
+        IMPORTANT: Settings are applied as PER-GAME profiles to avoid nuking
+        the user's carefully tuned global Base Profile settings. NPI's import
+        replaces entire profiles, so modifying Base Profile would reset all
+        settings not explicitly specified.
 
         Supports:
         - 'profile_path': Import a .nip profile file
         - 'preset': Apply a named preset (minimum_latency, low_latency_high_fps, balanced)
-        - 'executables': List of game executables for per-game profile
-        - 'game_name': Display name for the game profile
+        - 'executables': List of game executables for per-game profile (REQUIRED)
+        - 'game_name': Display name for the profile
         - Individual settings: low_latency_mode, power_management, vsync, etc.
-
-        When 'executables' is provided, settings are applied to a per-game profile
-        instead of the global "Base Profile".
 
         Args:
             settings: Dictionary of settings to apply.
@@ -228,9 +230,19 @@ class NvidiaSettingsHandler(SettingsHandler):
                 "applied": [],
             }
 
-        # Extract per-game configuration (remove from settings dict)
-        executables = settings.pop("executables", None)
+        # Extract game info for per-game profile
+        executables = settings.pop("executables", [])
         game_name = settings.pop("game_name", "Game")
+
+        if not executables:
+            logger.warning(f"No executables specified for {game_name} - NVIDIA profile will not be applied")
+            return {
+                "success": True,  # Not a failure, just nothing to do
+                "error": None,
+                "requires_reboot": False,
+                "applied": [],
+                "note": "No executables specified - skipped per-game NVIDIA profile creation",
+            }
 
         try:
             # Option 1: Apply from .nip profile file
@@ -242,53 +254,45 @@ class NvidiaSettingsHandler(SettingsHandler):
                 else:
                     errors.append(f"Profile file not found: {profile_path}")
 
-            # Option 2: Apply a preset
+            # Option 2: Apply a preset as per-game profile
             elif "preset" in settings:
                 preset_name = settings["preset"]
                 if preset_name in NVIDIA_PRESETS:
                     preset = NVIDIA_PRESETS[preset_name]
                     preset_settings = preset.get("settings", {})
 
-                    # Generate per-game profile if executables provided
-                    if executables:
-                        profile_path = generate_game_profile(
-                            preset_settings,
-                            executables,
-                            game_name
-                        )
-                        applied.append(f"Applied preset: {preset_name} for {game_name}")
-                        applied.append(f"Targeting executables: {', '.join(executables)}")
-                    else:
-                        profile_path = generate_preset_profile(preset_name, preset)
-                        applied.append(f"Applied preset: {preset_name} (global)")
-
+                    # Create per-game profile (does NOT touch Base Profile)
+                    profile_path = generate_game_profile(
+                        settings=preset_settings,
+                        executables=executables,
+                        game_name=game_name,
+                    )
                     self._npi.import_profile(profile_path)
+                    applied.append(f"Applied preset: {preset_name} for {game_name}")
+                    applied.append(f"  Executables: {', '.join(executables)}")
+                    logger.info(f"Applied NVIDIA preset '{preset_name}' as per-game profile for {game_name}")
                 else:
                     errors.append(f"Unknown preset: {preset_name}. Available: {list(NVIDIA_PRESETS.keys())}")
 
-            # Option 3: Apply individual settings
+            # Option 3: Apply individual settings as per-game profile
             else:
                 individual_settings = {
                     k: v for k, v in settings.items()
                     if k in ("low_latency_mode", "power_management", "vsync",
-                             "max_frame_rate", "shader_cache", "threaded_optimization")
+                             "max_frame_rate", "shader_cache", "threaded_optimization",
+                             "triple_buffering", "vrr_app_override")
                 }
 
                 if individual_settings:
-                    # Generate per-game profile if executables provided
-                    if executables:
-                        profile_path = generate_game_profile(
-                            individual_settings,
-                            executables,
-                            game_name
-                        )
-                        applied.append(f"Applied settings for {game_name}: {list(individual_settings.keys())}")
-                        applied.append(f"Targeting executables: {', '.join(executables)}")
-                    else:
-                        profile_path = generate_custom_profile(individual_settings)
-                        applied.append(f"Applied settings: {list(individual_settings.keys())}")
-
+                    # Create per-game profile (does NOT touch Base Profile)
+                    profile_path = generate_game_profile(
+                        settings=individual_settings,
+                        executables=executables,
+                        game_name=game_name,
+                    )
                     self._npi.import_profile(profile_path)
+                    applied.append(f"Applied settings for {game_name}: {list(individual_settings.keys())}")
+                    applied.append(f"  Executables: {', '.join(executables)}")
 
         except Exception as e:
             errors.append(str(e))
@@ -328,7 +332,7 @@ class NvidiaSettingsHandler(SettingsHandler):
             "NPI export skipped (opens GUI). "
             "To restore Nvidia settings, re-apply the game profile."
         )
-        logger.debug(f"Nvidia profile export skipped - NPI requires GUI")
+        logger.debug("Nvidia profile export skipped - NPI requires GUI")
 
         return {
             "success": True,  # Always succeed - we can restore via preset

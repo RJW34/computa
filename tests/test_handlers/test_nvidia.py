@@ -261,7 +261,10 @@ class TestNvidiaApply:
         handler = NvidiaSettingsHandler()
 
         with patch.object(handler._npi, "is_available", return_value=True):
-            result = handler.apply({"preset": "nonexistent_preset"})
+            result = handler.apply({
+                "preset": "nonexistent_preset",
+                "executables": ["Game.exe"],
+            })
 
         assert result["success"] is False
         assert "Unknown preset" in result["error"]
@@ -272,7 +275,10 @@ class TestNvidiaApply:
 
         with (patch.object(handler._npi, "is_available", return_value=True),
               patch.object(handler._npi, "import_profile")):
-            result = handler.apply({"preset": "minimum_latency"})
+            result = handler.apply({
+                "preset": "minimum_latency",
+                "executables": ["Game.exe"],
+            })
 
         assert result["success"] is True
         assert "minimum_latency" in result["applied"][0]
@@ -286,7 +292,10 @@ class TestNvidiaApply:
 
         with (patch.object(handler._npi, "is_available", return_value=True),
               patch.object(handler._npi, "import_profile")):
-            result = handler.apply({"profile_path": str(profile_file)})
+            result = handler.apply({
+                "profile_path": str(profile_file),
+                "executables": ["Game.exe"],
+            })
 
         assert result["success"] is True
 
@@ -295,7 +304,10 @@ class TestNvidiaApply:
         handler = NvidiaSettingsHandler()
 
         with patch.object(handler._npi, "is_available", return_value=True):
-            result = handler.apply({"profile_path": str(tmp_path / "nonexistent.nip")})
+            result = handler.apply({
+                "profile_path": str(tmp_path / "nonexistent.nip"),
+                "executables": ["Game.exe"],
+            })
 
         assert result["success"] is False
         assert "not found" in result["error"]
@@ -306,7 +318,11 @@ class TestNvidiaApply:
 
         with (patch.object(handler._npi, "is_available", return_value=True),
               patch.object(handler._npi, "import_profile")):
-            result = handler.apply({"low_latency_mode": "ultra", "vsync": "off"})
+            result = handler.apply({
+                "low_latency_mode": "ultra",
+                "vsync": "off",
+                "executables": ["Game.exe"],
+            })
 
         assert result["success"] is True
 
@@ -316,10 +332,24 @@ class TestNvidiaApply:
 
         with (patch.object(handler._npi, "is_available", return_value=True),
               patch.object(handler._npi, "import_profile", side_effect=Exception("NPI error"))):
-            result = handler.apply({"preset": "minimum_latency"})
+            result = handler.apply({
+                "preset": "minimum_latency",
+                "executables": ["Game.exe"],
+            })
 
         assert result["success"] is False
         assert "NPI error" in result["error"]
+
+    def test_apply_without_executables_skips_nvidia(self):
+        """Test apply without executables skips NVIDIA profile creation."""
+        handler = NvidiaSettingsHandler()
+
+        with patch.object(handler._npi, "is_available", return_value=True):
+            result = handler.apply({"preset": "minimum_latency"})
+
+        assert result["success"] is True
+        assert "note" in result
+        assert "No executables" in result["note"]
 
 
 class TestNvidiaBackupRestore:

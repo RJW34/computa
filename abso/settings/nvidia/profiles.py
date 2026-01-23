@@ -94,7 +94,14 @@ def generate_game_profile(
 
     # Use game-specific profile name
     profile_name = f"ABSO - {game_name}"
-    safe_filename = game_name.lower().replace(" ", "_").replace(":", "")
+    # Sanitize filename: remove/replace characters that are invalid in filenames
+    safe_filename = game_name.lower()
+    for char in [" ", ":", "/", "\\", "<", ">", "|", "?", "*", "\"", "'"]:
+        safe_filename = safe_filename.replace(char, "_")
+    # Collapse multiple underscores
+    while "__" in safe_filename:
+        safe_filename = safe_filename.replace("__", "_")
+    safe_filename = safe_filename.strip("_")
 
     # Construct NIP XML with executables
     nip_content = f'''<?xml version="1.0" encoding="utf-16"?>
@@ -196,7 +203,7 @@ def get_setting_value(value: str, setting_type: str) -> int:
         return mapping.get(value.lower(), 1)
 
     elif setting_type == "vsync":
-        mapping = {"off": 0, "on": 1, "adaptive": 2, "adaptive_half": 3}
+        mapping = {"off": 0, "on": 1, "adaptive": 2, "adaptive_half": 3, "fast": 4}
         return mapping.get(value.lower(), 0)
 
     elif setting_type == "framerate":
