@@ -85,8 +85,9 @@ class ProfileLinter:
     # Fixed framerate emulator profiles (VRR adds overhead)
     EMULATOR_TARGETS = {"minimum_latency"}  # optimization_target values
 
-    # Rollback-sensitive optimization targets
-    ROLLBACK_TARGETS = {"stable_online", "minimum_latency_offline"}
+    # Rollback-sensitive optimization targets (ONLINE only - need consistent timing)
+    # Note: minimum_latency_offline is NOT in this set - offline profiles can use Fast Sync
+    ROLLBACK_TARGETS = {"stable_online"}
 
     # DX12/Vulkan games where LLM Ultra has limited effect
     DX12_VULKAN_INDICATORS = {"ue5", "vulkan", "dx12", "unreal"}
@@ -196,19 +197,25 @@ class ProfileLinter:
             ))
 
         # Check 2: LLM Ultra + explicit FPS cap
+        # Note: LLM Ultra and FPS cap CAN work together (Ultra handles queue, cap limits rate)
+        # But for online profiles, LLM Ultra's timing isn't ideal for rollback netcode
         if (llm == "ultra" or preset in self.LLM_ULTRA_PRESETS):
             if max_fps and max_fps != "off":
-                result.add_issue(LintIssue(
-                    code="NVIDIA_LLM_ULTRA_FPS_CAP",
-                    severity=LintSeverity.ERROR,
-                    message="LLM Ultra overrides manual FPS caps",
-                    details=(
-                        "Low Latency Mode 'Ultra' auto-caps FPS and overrides any manual "
-                        "frame rate limit. Either use LLM='On' with your FPS cap, or "
-                        "use LLM='Ultra' without a cap."
-                    ),
-                    setting_path="NvidiaSettingsHandler.max_frame_rate",
-                ))
+                # Only warn for online profiles - offline can use aggressive settings
+                allows_aggressive = getattr(profile, "allows_aggressive_settings", False)
+                if not allows_aggressive:
+                    result.add_issue(LintIssue(
+                        code="NVIDIA_LLM_ULTRA_FPS_CAP",
+                        severity=LintSeverity.WARNING,
+                        message="LLM Ultra with FPS cap may have frame pacing quirks",
+                        details=(
+                            "Low Latency Mode 'Ultra' uses Just-In-Time frame submission "
+                            "which may interact unexpectedly with explicit FPS caps. "
+                            "For consistent online timing, use LLM='On' with your FPS cap. "
+                            "For offline/training, this combination is acceptable."
+                        ),
+                        setting_path="NvidiaSettingsHandler.max_frame_rate",
+                    ))
 
         # Check 3: Fast Sync + rollback profile
         if vsync == "fast" and profile.optimization_target in self.ROLLBACK_TARGETS:

@@ -1056,10 +1056,13 @@ class DRSProfileManager:
                 if drs._app_binding_failures:
                     results["app_bound"] = False
                     results["app_binding_note"] = (
-                        f"Profile '{profile_name}' created with settings, but automatic "
-                        f"application binding failed. Please add '{app_executable}' to this "
-                        f"profile manually in NVIDIA Control Panel (Manage 3D Settings > "
-                        f"Program Settings) or NVIDIA Profile Inspector."
+                        f"Profile '{profile_name}' created with all settings configured. "
+                        f"Automatic app binding unavailable on this driver version. "
+                        f"To activate: NVCP > Manage 3D Settings > Program Settings > "
+                        f"Add '{app_executable}' > Select '{profile_name}'"
+                    )
+                    results["manual_instructions"] = self.get_manual_binding_instructions(
+                        profile_name, app_executable
                     )
                 else:
                     results["app_bound"] = True
@@ -1246,6 +1249,78 @@ class DRSProfileManager:
             app_executable,
             {"low_latency_mode": mode}
         )
+
+    @staticmethod
+    def open_nvidia_control_panel() -> bool:
+        """Open NVIDIA Control Panel to the 3D settings page.
+
+        Returns:
+            True if NVCP was launched, False if not available.
+        """
+        import subprocess
+        import os
+
+        # Try different methods to open NVCP
+        nvcp_commands = [
+            # Modern Windows - ms-settings URI (opens to NVCP if installed)
+            ["cmd", "/c", "start", "ms-settings:display-advancedgraphics"],
+            # Direct NVCP launch via control panel
+            ["control", "desk.cpl,,3"],
+            # Try nvcplui.exe directly
+            [os.path.join(os.environ.get("ProgramFiles", "C:\\Program Files"),
+                          "NVIDIA Corporation", "Control Panel Client", "nvcplui.exe")],
+        ]
+
+        for cmd in nvcp_commands:
+            try:
+                subprocess.Popen(cmd, shell=False)
+                logger.info(f"Launched NVIDIA Control Panel via: {cmd[0]}")
+                return True
+            except (FileNotFoundError, OSError):
+                continue
+
+        logger.warning("Could not find NVIDIA Control Panel")
+        return False
+
+    @staticmethod
+    def get_manual_binding_instructions(profile_name: str, app_executable: str) -> str:
+        """Get instructions for manually binding an app to an NVIDIA profile.
+
+        Args:
+            profile_name: The name of the ABSO profile.
+            app_executable: The executable to bind.
+
+        Returns:
+            Formatted instructions string.
+        """
+        return f"""
+NVIDIA Profile Manual Binding Instructions
+==========================================
+
+Your NVIDIA profile '{profile_name}' has been created with all settings configured.
+However, automatic application binding failed due to driver compatibility.
+
+To complete the setup, please add '{app_executable}' to the profile manually:
+
+Option 1: NVIDIA Control Panel
+------------------------------
+1. Right-click desktop > NVIDIA Control Panel
+2. Go to: Manage 3D Settings > Program Settings
+3. Click "Add" and browse to select '{app_executable}'
+4. Under "Use the settings for this program:", select '{profile_name}'
+5. Click "Apply"
+
+Option 2: NVIDIA Profile Inspector (Recommended)
+------------------------------------------------
+1. Download NPI from: https://github.com/Orbmu2k/nvidiaProfileInspector
+2. Launch nvidiaProfileInspector.exe
+3. Find '{profile_name}' in the profile dropdown
+4. In the "Application name" section, click the green + button
+5. Enter: {app_executable}
+6. Click "Apply changes"
+
+The profile settings are already configured - you just need to link the executable.
+"""
 
 
 # =============================================================================

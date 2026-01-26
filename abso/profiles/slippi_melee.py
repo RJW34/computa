@@ -129,16 +129,17 @@ class SlippiMeleeProfile(BaseProfile):
             },
             "NvidiaSettingsHandler": {
                 # Absolute minimum latency - no sync overhead
+                # Per rollback.md canonical spec for Slippi/SSBM
                 # Use DX12 backend in Dolphin for HAGS compatibility
-                "preset": "minimum_latency",
-                # Settings applied by minimum_latency preset:
-                # - Low Latency Mode: ULTRA (just-in-time frame submission)
-                # - VSync: OFF (critical - removes sync latency entirely)
-                # - Power Management: Prefer Maximum Performance
-                # - Shader Cache: Unlimited
-                # - Threaded Optimization: ON
-                # - Max Frame Rate: OFF
-                # - G-Sync: OFF (force disabled - Melee is fixed 60fps)
+                "low_latency_mode": "ultra",  # ULTRA - safe for decoupled rollback (emulator)
+                "vsync": "off",  # OFF - removes sync latency entirely
+                "gsync": "off",  # OFF - Melee is fixed 60fps, no VRR benefit
+                "power_management": "prefer_max_performance",
+                "shader_cache": "unlimited",
+                "threaded_optimization": "off",  # OFF - emulator stability (per canonical spec)
+                "max_frame_rate": "off",  # OFF - no artificial limiting
+                "triple_buffering": "off",  # OFF - only works with VSync
+                "game_name": "Slippi Melee",
                 #
                 # IMPORTANT: Use DX12 backend with HAGS ON for 0.0ms render latency.
                 # DX11 + HAGS causes micro-stutters. DX12 + HAGS works as designed.

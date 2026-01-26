@@ -3,31 +3,36 @@
 Target: Ranked matchmaking, unranked online play, any rollback-enabled session.
 Rollback netcode behavior is AUTHORITATIVE for this profile.
 
+Per rollback.md canonical spec:
+- Optimization Class: Rollback-Safe Low Latency
+- Priority: Frame pacing stability > absolute latency
+
 Goals:
-- Deterministic stability
-- VRR coherence during rollback stalls
+- Deterministic stability for rollback netcode
 - Prevent timing contention
 - Preserve rollback recovery elasticity
 
 NVCP Settings (per-game for Rivals2.exe):
-- V-Sync: ON (NOT Fast!)
+- V-Sync: OFF (rollback is timing-sensitive, not tear-sensitive)
+- G-SYNC / VRR: OFF (no VRR for online)
 - Low Latency Mode: ON (NOT Ultra!)
-- Max Frame Rate: DISABLED
+- Max Frame Rate: OFF (no external limiters)
+- Threaded Optimization: OFF (UE5 driver contention)
 - Power Management: Prefer Maximum Performance
-- Threaded Optimization: Auto
 
 External Tools: RTSS, SpecialK, frame pacing hooks DISABLED.
 
-EXPLICIT PROHIBITIONS:
-- LLM = Ultra
-- V-Sync = Fast
+EXPLICIT PROHIBITIONS (per canonical spec):
+- LLM = Ultra (causes rollback contention)
+- Fast Sync (incompatible with rollback)
+- G-SYNC / VRR (timing variance)
 - External FPS caps
-- Refresh - 3 logic
-- Forced zero-buffer pipelines
+- Refresh-minus-X logic
+- Ultimate Performance plan (need scheduler headroom)
+- Injection tools (SK / RTSS)
 
-A 300 Hz display has insufficient timing margin for refresh-3 logic online.
-297 FPS is EXPECTED to fail under rollback conditions.
-Stability is prioritized over theoretical latency online.
+Canonical one-line definition:
+> Exclusive fullscreen + no sync + unlimited FPS + NV LLM ON (not Ultra) + HAGS ON + High Performance plan + no overlays
 """
 
 from __future__ import annotations
@@ -164,13 +169,15 @@ class Rivals2OnlineProfile(BaseProfile):
             },
             "NvidiaSettingsHandler": {
                 # ONLINE profile: Conservative settings for rollback stability
-                "low_latency_mode": "on",  # ON, NOT Ultra!
+                # Per rollback.md canonical spec - frame pacing stability > absolute latency
+                "low_latency_mode": "on",  # ON, NOT Ultra! (Ultra causes rollback contention)
                 "power_management": "prefer_max_performance",
-                "vsync": "on",  # ON, NOT Fast!
-                "max_frame_rate": "off",  # DISABLED for online
+                "vsync": "off",  # OFF - rollback netcode is timing-sensitive, not tear-sensitive
+                "gsync": "off",  # OFF - No VRR for online (per canonical spec)
+                "max_frame_rate": "off",  # DISABLED - no external limiters for online
                 "shader_cache": "unlimited",
-                "threaded_optimization": "auto",
-                "triple_buffering": "off",
+                "threaded_optimization": "off",  # OFF - UE5 driver contention (per canonical spec)
+                "triple_buffering": "off",  # OFF - irrelevant without VSync
                 "game_name": "Rivals 2 Online",
             },
             "NetworkSettingsHandler": {
@@ -221,15 +228,21 @@ class Rivals2OnlineProfile(BaseProfile):
             },
             {
                 "category": "NVIDIA Control Panel",
-                "setting": "Monitor Technology",
-                "value": "G-SYNC",
-                "reason": "Enable G-Sync for VRR coherence during rollback stalls.",
+                "setting": "G-SYNC / VRR",
+                "value": "OFF",
+                "reason": "VRR OFF for online - rollback netcode needs consistent timing, not VRR.",
             },
             {
                 "category": "NVIDIA Control Panel",
                 "setting": "Vertical Sync",
-                "value": "On",
-                "reason": "ON (not Fast) - provides deterministic frame pacing for rollback.",
+                "value": "OFF",
+                "reason": "OFF - rollback netcode is timing-sensitive, high-refresh tearing is negligible.",
+            },
+            {
+                "category": "NVIDIA Control Panel",
+                "setting": "Threaded Optimization",
+                "value": "OFF",
+                "reason": "OFF - prevents UE5 driver contention issues.",
             },
             {
                 "category": "NVIDIA Control Panel",
