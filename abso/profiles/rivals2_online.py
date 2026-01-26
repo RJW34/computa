@@ -32,7 +32,7 @@ EXPLICIT PROHIBITIONS (per canonical spec):
 - Injection tools (RTSS)
 
 Canonical one-line definition:
-> Exclusive fullscreen + no sync + unlimited FPS + NV LLM ON (not Ultra) + HAGS ON + High Performance plan + no overlays
+> Exclusive fullscreen + no sync + 240 FPS cap + NV LLM ON (not Ultra) + HAGS ON + High Performance plan + no overlays
 """
 
 from __future__ import annotations
@@ -174,7 +174,7 @@ class Rivals2OnlineProfile(BaseProfile):
                 "power_management": "prefer_max_performance",
                 "vsync": "off",  # OFF - rollback netcode is timing-sensitive, not tear-sensitive
                 "gsync": "off",  # OFF - No VRR for online (per canonical spec)
-                "max_frame_rate": "off",  # DISABLED - no external limiters for online
+                "max_frame_rate": 240,  # 240 FPS cap for stable online play
                 "shader_cache": "unlimited",
                 "threaded_optimization": "off",  # OFF - UE5 driver contention (per canonical spec)
                 "triple_buffering": "off",  # OFF - irrelevant without VSync
@@ -254,7 +254,7 @@ class Rivals2OnlineProfile(BaseProfile):
                 "category": "NVIDIA Control Panel",
                 "setting": "Max Frame Rate",
                 "value": "DISABLED",
-                "reason": "No frame cap - let the game and VRR handle timing naturally.",
+                "reason": "240 FPS cap for stable frame pacing at 240Hz online.",
             },
             {
                 "category": "In-Game Settings",

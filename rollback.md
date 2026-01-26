@@ -51,12 +51,10 @@ High-refresh tearing is visually negligible and latency-optimal.
 | Setting | Value |
 |----|----|
 | In-Game FPS Cap | Unlimited / Engine Max |
-| External Limiters (RTSS, NVCP, SK) | DISABLED |
+| NVCP Frame Rate Limit | 240 FPS |
+| External Limiters (RTSS) | DISABLED |
 
-**Explicit Prohibition:**  
-- No refresh-minus-X logic  
-- No driver FPS caps  
-- No external frame pacing tools  
+**Note:** 240 FPS cap via NVCP provides stable frame pacing for online play.  
 
 ---
 
@@ -144,7 +142,7 @@ The optimizer MUST block these when `rivals2-online` is active:
 
 ### Canonical One-Line Definition (Rivals 2 Online)
 
-> **Exclusive fullscreen + no sync + unlimited FPS + NV LLM ON (not Ultra) + HAGS ON + High Performance plan + no overlays**
+> **Exclusive fullscreen + no sync + 240 FPS cap + NV LLM ON (not Ultra) + HAGS ON + High Performance plan + no overlays**
 
 ---
 
@@ -256,7 +254,7 @@ If SK / RTSS / overlays are detected:
 | VRR | OFF | OFF |
 | LLM | ON | ULTRA |
 | HAGS | ON | ON |
-| FPS Cap | NONE | NONE |
+| FPS Cap | 240 | NONE |
 | Priority Aggression | LOW | HIGH |
 | Frame Pacing Priority | HIGH | LOW |
 | Raw Latency Priority | MEDIUM | MAX |
