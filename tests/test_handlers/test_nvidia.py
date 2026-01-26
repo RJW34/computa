@@ -261,12 +261,13 @@ class TestNvidiaApply:
         })
 
         assert result["success"] is True
-        assert "note" in result
-        assert "NPI disabled" in result["note"]
-        assert any("Test Game" in line for line in result["applied"])
+        # With NVAPI integration, settings are applied directly
+        # The result should contain the profile name or settings applied
+        assert len(result["applied"]) > 0
+        assert any("Test Game" in line or "low_latency_mode" in line for line in result["applied"])
 
     def test_apply_logs_individual_settings(self):
-        """Test apply logs individual settings for manual application."""
+        """Test apply individual settings via NVAPI."""
         handler = NvidiaSettingsHandler()
 
         result = handler.apply({
@@ -277,8 +278,10 @@ class TestNvidiaApply:
         })
 
         assert result["success"] is True
-        assert any("Low Latency Mode" in line for line in result["applied"])
-        assert any("ultra" in line for line in result["applied"])
+        # With NVAPI integration, settings are applied and reported
+        # The format is now "setting_name: value" instead of "Setting Name: value"
+        assert any("low_latency_mode" in line.lower() for line in result["applied"])
+        assert any("ultra" in line.lower() for line in result["applied"])
 
     def test_apply_without_settings_succeeds(self):
         """Test apply with no NVIDIA settings succeeds."""

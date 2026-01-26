@@ -202,28 +202,26 @@ class NvidiaSettingsHandler(SettingsHandler):
         return issues
 
     def apply(self, settings: dict[str, Any]) -> dict[str, Any]:
-        """Log NVIDIA settings that should be applied manually.
+        """Apply NVIDIA settings using direct NVAPI DRS integration.
 
-        WARNING: NPI's import command REPLACES the entire NVIDIA profile database,
-        wiping all existing per-game profiles. Until we have proper NVAPI integration
-        that can merge profiles safely, NVIDIA settings are NOT auto-applied.
-
-        Instead, this logs the recommended settings so users can apply manually.
+        This uses NVAPI's DRS (Driver Settings) API directly, allowing safe
+        per-game profile modification without wiping the entire profile database.
 
         Args:
             settings: Dictionary of settings to apply.
         """
         applied: list[str] = []
+        errors: list[str] = []
 
         # Extract game info
         executables = settings.pop("executables", [])
         game_name = settings.pop("game_name", "Game")
 
-        # Determine what settings would be applied
+        # Determine what settings to apply
         preset_name = settings.get("preset")
         if preset_name and preset_name in NVIDIA_PRESETS:
             preset = NVIDIA_PRESETS[preset_name]
-            nvidia_settings = preset.get("settings", {})
+            nvidia_settings = preset.get("settings", {}).copy()
         else:
             nvidia_settings = {
                 k: v for k, v in settings.items()
@@ -232,36 +230,94 @@ class NvidiaSettingsHandler(SettingsHandler):
                          "triple_buffering", "vrr_app_override")
             }
 
-        if nvidia_settings:
-            # Log the settings for manual application
+        if not nvidia_settings:
+            return {
+                "success": True,
+                "error": None,
+                "requires_reboot": False,
+                "applied": ["No NVIDIA settings to apply"],
+            }
+
+        # Try to apply using NVAPI DRS
+        try:
+            from abso.settings.nvidia.nvapi_drs import DRSProfileManager, NVAPIError
+
+            manager = DRSProfileManager()
+
+            # Use first executable if available
+            if executables:
+                executable = executables[0]
+                profile_name = game_name
+
+                result = manager.apply_settings_to_app(
+                    executable,
+                    nvidia_settings,
+                    profile_name=profile_name,
+                )
+
+                # Report results
+                if result.get("settings_applied"):
+                    for setting, value in result["settings_applied"].items():
+                        applied.append(f"{setting}: {value}")
+                    applied.insert(0, f"NVIDIA profile '{profile_name}' configured:")
+
+                if result.get("errors"):
+                    for err in result["errors"]:
+                        errors.append(f"{err['setting']}: {err['error']}")
+
+                # Note about app binding
+                if not result.get("app_bound", True):
+                    note = result.get("app_binding_note", "")
+                    if note:
+                        applied.append(f"NOTE: {note}")
+
+                logger.info(f"NVIDIA settings applied for {game_name}: {nvidia_settings}")
+
+                return {
+                    "success": len(errors) == 0,
+                    "error": "; ".join(errors) if errors else None,
+                    "requires_reboot": False,
+                    "applied": applied,
+                    "app_bound": result.get("app_bound", False),
+                }
+            else:
+                # No executable - apply to global profile
+                logger.warning(f"No executable specified for {game_name}, settings not applied")
+                return {
+                    "success": True,
+                    "error": None,
+                    "requires_reboot": False,
+                    "applied": ["No executable specified - NVIDIA settings not applied"],
+                }
+
+        except ImportError as e:
+            logger.warning(f"NVAPI DRS module not available: {e}")
+            # Fall back to logging only
             applied.append(f"NVIDIA settings for {game_name} (apply manually in NVCP):")
             for key, value in nvidia_settings.items():
                 setting_name = key.replace("_", " ").title()
                 applied.append(f"  - {setting_name}: {value}")
-            if executables:
-                applied.append(f"  Program: {executables[0]}")
-
-            logger.info(f"NVIDIA settings logged for {game_name}: {nvidia_settings}")
-            logger.warning(
-                "NVIDIA settings NOT auto-applied. NPI import wipes all profiles. "
-                "Please apply these settings manually in NVIDIA Control Panel."
-            )
-
-        # Always succeed - we just log, don't actually apply
-        return {
-            "success": True,
-            "error": None,
-            "requires_reboot": False,
-            "applied": applied,
-            "note": "NVIDIA settings logged only - apply manually in NVCP (NPI disabled to prevent profile wipe)",
-        }
-
-        return {
-            "success": len(errors) == 0,
-            "error": "; ".join(errors) if errors else None,
-            "requires_reboot": False,
-            "applied": applied,
-        }
+            return {
+                "success": True,
+                "error": None,
+                "requires_reboot": False,
+                "applied": applied,
+                "note": "NVAPI module unavailable - settings logged for manual application",
+            }
+        except Exception as e:
+            logger.error(f"NVAPI DRS error: {e}")
+            # Fall back to logging only
+            applied.append(f"NVIDIA settings for {game_name} (apply manually in NVCP):")
+            for key, value in nvidia_settings.items():
+                setting_name = key.replace("_", " ").title()
+                applied.append(f"  - {setting_name}: {value}")
+            return {
+                "success": True,
+                "error": None,
+                "requires_reboot": False,
+                "applied": applied,
+                "note": f"NVAPI error ({e}) - settings logged for manual application",
+            }
 
     def backup(self) -> dict[str, Any]:
         """Backup current Nvidia profile settings.
