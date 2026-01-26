@@ -516,6 +516,22 @@ def _is_known_gsync_monitor(monitor_name: str) -> tuple[bool, str | None]:
 
 
 @dataclass
+class SystemInfo:
+    """System/PC information (OEM or motherboard-based)."""
+
+    manufacturer: str
+    model: str
+    system_family: str | None
+    system_sku: str | None
+    motherboard_manufacturer: str | None
+    motherboard_model: str | None
+    bios_vendor: str | None
+    bios_version: str | None
+    chassis_type: str | None
+    is_prebuilt: bool  # True if likely OEM pre-built, False if custom build
+
+
+@dataclass
 class GPUInfo:
     """GPU hardware information."""
 
@@ -592,12 +608,289 @@ class HardwareDetector:
             Dictionary containing detected hardware information.
         """
         return {
+            "system": self.detect_system(),
             "gpu": self.detect_gpu(),
             "cpu": self.detect_cpu(),
             "ram": self.detect_ram(),
             "monitors": self.detect_monitors(),
             "windows_version": self.detect_windows_version(),
         }
+
+    def detect_system(self) -> dict[str, Any] | None:
+        """Detect system/PC information (OEM pre-built or custom build).
+
+        Uses WMI to query:
+        - Win32_ComputerSystem: Manufacturer, Model, SystemFamily, SystemSKUNumber
+        - Win32_BaseBoard: Motherboard manufacturer and model
+        - Win32_BIOS: BIOS vendor and version
+        - Win32_SystemEnclosure: Chassis type
+
+        For pre-built systems (Dell, HP, Lenovo, etc.), this returns the OEM
+        branding. For custom builds, it returns motherboard information.
+
+        Returns:
+            System information dict or None if detection fails.
+        """
+        wmi_conn = self._get_wmi()
+        if not wmi_conn:
+            return None
+
+        result: dict[str, Any] = {
+            "manufacturer": None,
+            "model": None,
+            "system_family": None,
+            "system_sku": None,
+            "motherboard_manufacturer": None,
+            "motherboard_model": None,
+            "bios_vendor": None,
+            "bios_version": None,
+            "chassis_type": None,
+            "is_prebuilt": False,
+            "prebuilt_name": None,  # Friendly name if identified
+        }
+
+        # Known OEM manufacturers (pre-built systems)
+        oem_manufacturers = {
+            "dell", "dell inc.", "dell inc",
+            "hp", "hewlett-packard", "hewlett packard",
+            "lenovo",
+            "acer", "acer inc.",
+            "asus", "asustek computer inc.", "asustek",
+            "msi", "micro-star international",
+            "alienware",
+            "razer", "razer inc.",
+            "samsung", "samsung electronics",
+            "lg", "lg electronics",
+            "microsoft", "microsoft corporation",
+            "apple", "apple inc.",
+            "intel", "intel corporation",
+            "nzxt",
+            "corsair",
+            "ibuypower", "ibuypower inc",
+            "cyberpower", "cyberpowerpc",
+            "origin pc", "origin",
+            "maingear",
+            "digital storm",
+            "falcon northwest",
+        }
+
+        # Chassis type mapping (from SMBIOS spec)
+        chassis_types = {
+            1: "Other",
+            2: "Unknown",
+            3: "Desktop",
+            4: "Low Profile Desktop",
+            5: "Pizza Box",
+            6: "Mini Tower",
+            7: "Tower",
+            8: "Portable",
+            9: "Laptop",
+            10: "Notebook",
+            11: "Hand Held",
+            12: "Docking Station",
+            13: "All in One",
+            14: "Sub Notebook",
+            15: "Space-saving",
+            16: "Lunch Box",
+            17: "Main Server Chassis",
+            18: "Expansion Chassis",
+            19: "SubChassis",
+            20: "Bus Expansion Chassis",
+            21: "Peripheral Chassis",
+            22: "RAID Chassis",
+            23: "Rack Mount Chassis",
+            24: "Sealed-case PC",
+            25: "Multi-system chassis",
+            26: "Compact PCI",
+            27: "Advanced TCA",
+            28: "Blade",
+            29: "Blade Enclosure",
+            30: "Tablet",
+            31: "Convertible",
+            32: "Detachable",
+            33: "IoT Gateway",
+            34: "Embedded PC",
+            35: "Mini PC",
+            36: "Stick PC",
+        }
+
+        try:
+            # Query Win32_ComputerSystem for main system info
+            for system in wmi_conn.Win32_ComputerSystem():
+                result["manufacturer"] = (system.Manufacturer or "").strip()
+                result["model"] = (system.Model or "").strip()
+
+                # SystemFamily and SystemSKUNumber may not exist on all systems
+                try:
+                    result["system_family"] = (system.SystemFamily or "").strip() or None
+                except AttributeError:
+                    pass
+                try:
+                    result["system_sku"] = (system.SystemSKUNumber or "").strip() or None
+                except AttributeError:
+                    pass
+                break
+
+        except AttributeError as e:
+            logger.debug(f"Win32_ComputerSystem query failed: {e}")
+        except RuntimeError as e:
+            logger.error(f"Win32_ComputerSystem query failed: {e}")
+
+        try:
+            # Query Win32_BaseBoard for motherboard info
+            for board in wmi_conn.Win32_BaseBoard():
+                result["motherboard_manufacturer"] = (board.Manufacturer or "").strip() or None
+                result["motherboard_model"] = (board.Product or "").strip() or None
+                break
+
+        except AttributeError as e:
+            logger.debug(f"Win32_BaseBoard query failed: {e}")
+        except RuntimeError as e:
+            logger.error(f"Win32_BaseBoard query failed: {e}")
+
+        try:
+            # Query Win32_BIOS for BIOS info
+            for bios in wmi_conn.Win32_BIOS():
+                result["bios_vendor"] = (bios.Manufacturer or "").strip() or None
+                result["bios_version"] = (bios.SMBIOSBIOSVersion or "").strip() or None
+                break
+
+        except AttributeError as e:
+            logger.debug(f"Win32_BIOS query failed: {e}")
+        except RuntimeError as e:
+            logger.error(f"Win32_BIOS query failed: {e}")
+
+        try:
+            # Query Win32_SystemEnclosure for chassis type
+            for enclosure in wmi_conn.Win32_SystemEnclosure():
+                if enclosure.ChassisTypes:
+                    # ChassisTypes is an array, take the first value
+                    chassis_code = enclosure.ChassisTypes[0]
+                    result["chassis_type"] = chassis_types.get(chassis_code, f"Unknown ({chassis_code})")
+                break
+
+        except AttributeError as e:
+            logger.debug(f"Win32_SystemEnclosure query failed: {e}")
+        except RuntimeError as e:
+            logger.error(f"Win32_SystemEnclosure query failed: {e}")
+
+        # Known OEM motherboard models that map to specific pre-built systems
+        # Format: (motherboard_pattern, manufacturer, prebuilt_name)
+        # Patterns are matched case-insensitively against motherboard_model
+        oem_motherboard_lookup = [
+            # MSI Aegis series
+            ("pro b760-vc wifi 7 bulk", "MSI", "MSI Aegis R2 14th"),
+            ("pro b760-vc wifi bulk", "MSI", "MSI Aegis R2"),
+            ("pro b760m-vc wifi bulk", "MSI", "MSI Aegis R2 (Micro-ATX)"),
+            ("pro b660-vc wifi bulk", "MSI", "MSI Aegis R"),
+            ("pro z790-vc wifi bulk", "MSI", "MSI Aegis RS 14th"),
+            ("pro z690-vc wifi bulk", "MSI", "MSI Aegis RS"),
+            # MSI Trident series
+            ("pro b760-vc wifi 7 trident", "MSI", "MSI Trident"),
+            # MSI Infinite series
+            ("pro b760 infinite", "MSI", "MSI Infinite"),
+            # Dell (often use internal codenames)
+            ("0crh6c", "Dell", "Dell Desktop"),
+            ("optiplex", "Dell", "Dell OptiPlex"),
+            ("xps", "Dell", "Dell XPS"),
+            ("alienware", "Dell", "Alienware"),
+            # HP
+            ("omen", "HP", "HP OMEN"),
+            ("pavilion", "HP", "HP Pavilion"),
+            ("envy", "HP", "HP ENVY"),
+            # Lenovo
+            ("legion", "Lenovo", "Lenovo Legion"),
+            ("ideacentre", "Lenovo", "Lenovo IdeaCentre"),
+            ("thinkcentre", "Lenovo", "Lenovo ThinkCentre"),
+            # ASUS ROG pre-builts
+            ("rog strix ga", "ASUS", "ASUS ROG Strix GA"),
+            ("rog strix gt", "ASUS", "ASUS ROG Strix GT"),
+            # Generic OEM indicator - any "BULK" suffix motherboard
+            ("bulk", None, None),  # Generic OEM, no specific name
+        ]
+
+        # Check motherboard against known OEM lookup table
+        mobo_model_lower = (result["motherboard_model"] or "").lower()
+        prebuilt_from_mobo = None
+        prebuilt_name_from_mobo = None
+
+        for pattern, mfr, name in oem_motherboard_lookup:
+            if pattern in mobo_model_lower:
+                prebuilt_from_mobo = mfr or result["manufacturer"]
+                prebuilt_name_from_mobo = name
+                break
+
+        # If we found a match in the OEM motherboard lookup, it's a pre-built
+        if prebuilt_from_mobo:
+            result["is_prebuilt"] = True
+            result["prebuilt_name"] = prebuilt_name_from_mobo
+            # Clean up empty strings to None
+            for key in ["manufacturer", "model"]:
+                if result[key] == "":
+                    result[key] = None
+            return result
+
+        # Otherwise, fall back to heuristic detection
+        manufacturer_lower = (result["manufacturer"] or "").lower()
+        model_lower = (result["model"] or "").lower()
+        system_family_lower = (result["system_family"] or "").lower()
+        system_sku_lower = (result["system_sku"] or "").lower()
+
+        # Check against known OEM list
+        is_known_oem = any(oem in manufacturer_lower for oem in oem_manufacturers)
+
+        # Check for generic/custom build indicators in model
+        generic_indicators = [
+            "to be filled",
+            "default string",
+            "system manufacturer",
+            "system product name",
+            "not applicable",
+            "n/a",
+            "oem",
+            "o.e.m.",
+        ]
+        has_generic_model = any(ind in model_lower for ind in generic_indicators)
+        has_generic_family = any(ind in system_family_lower for ind in generic_indicators)
+        has_generic_sku = any(ind in system_sku_lower for ind in generic_indicators)
+
+        # Motherboard model patterns (indicates custom build, not pre-built)
+        # These are internal motherboard codes, not consumer product names
+        motherboard_model_patterns = [
+            "ms-",  # MSI motherboard codes (MS-7D98, etc.)
+            "rog ", "rog-", "prime ", "tuf ", "proart ",  # ASUS lines
+            "meg ", "mpg ", "mag ", "pro ",  # MSI lines
+            "aorus", "gaming x", "eagle",  # Gigabyte lines
+            "-cf", "-f", "-e", "-a", "-i", "-p",  # Common motherboard suffixes
+        ]
+
+        # Check if the system model looks like a motherboard model
+        model_is_motherboard = (
+            # Model matches or contains the motherboard model
+            (mobo_model_lower and model_lower and
+             (model_lower in mobo_model_lower or mobo_model_lower in model_lower)) or
+            # Model matches motherboard patterns
+            any(pattern in model_lower for pattern in motherboard_model_patterns)
+        )
+
+        # It's a pre-built if:
+        # 1. Manufacturer is a known OEM AND
+        # 2. Model is not a generic placeholder AND
+        # 3. Model doesn't look like a motherboard model AND
+        # 4. System family/SKU are not generic (pre-builts usually have real values)
+        result["is_prebuilt"] = (
+            is_known_oem and
+            not has_generic_model and
+            not model_is_motherboard and
+            not (has_generic_family and has_generic_sku)
+        )
+
+        # Clean up empty strings to None
+        for key in ["manufacturer", "model"]:
+            if result[key] == "":
+                result[key] = None
+
+        return result
 
     def detect_gpu(self) -> dict[str, Any] | None:
         """Detect GPU information.

@@ -125,6 +125,7 @@ def detect(json_output: bool) -> None:
     if json_output:
         # Flatten for GUI consumption
         output_data = {
+            "system": hardware.get("system"),
             "gpu": hardware.get("gpu"),
             "cpu": hardware.get("cpu"),
             "ram_gb": hardware.get("ram", {}).get("total_gb"),
@@ -136,6 +137,43 @@ def detect(json_output: bool) -> None:
 
     # Rich console output
     console.print(Panel("Hardware Detection", style="bold blue"))
+
+    # System info (manufacturer/model)
+    console.print("\n[bold]System:[/bold]")
+    if hardware.get("system"):
+        sys_info = hardware["system"]
+        manufacturer = sys_info.get("manufacturer") or "Unknown"
+        model = sys_info.get("model") or "Unknown"
+
+        if sys_info.get("is_prebuilt"):
+            # Pre-built PC - show identified name or OEM branding
+            prebuilt_name = sys_info.get("prebuilt_name")
+            if prebuilt_name:
+                console.print(f"  [green bold]{prebuilt_name}[/green bold]")
+            else:
+                # Fall back to SMBIOS data
+                system_family = sys_info.get("system_family")
+                if system_family and system_family.lower() not in ["default string", "to be filled"]:
+                    console.print(f"  [green]{manufacturer} {system_family}[/green]")
+                else:
+                    console.print(f"  [green]{manufacturer} {model}[/green]")
+            console.print(f"  Type: [cyan]Pre-built[/cyan]")
+            # Show motherboard for reference
+            mobo_model = sys_info.get("motherboard_model")
+            if mobo_model:
+                console.print(f"  Motherboard: [dim]{mobo_model}[/dim]")
+        else:
+            # Custom build - show motherboard info
+            mobo_mfr = sys_info.get("motherboard_manufacturer") or manufacturer
+            mobo_model = sys_info.get("motherboard_model") or model
+            console.print(f"  Motherboard: {mobo_mfr}")
+            console.print(f"  Model: {mobo_model}")
+            console.print(f"  Type: [yellow]Custom Build[/yellow]")
+
+        if sys_info.get("chassis_type"):
+            console.print(f"  Chassis: {sys_info.get('chassis_type')}")
+    else:
+        console.print("  [red]Not detected[/red]")
 
     console.print("\n[bold]GPU:[/bold]")
     if hardware.get("gpu"):
