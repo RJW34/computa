@@ -1,4 +1,13 @@
-"""Profile application engine."""
+"""Profile application engine.
+
+Integrates validation subsystems:
+- ProfileLinter: Static validation before apply
+- RollbackGuard: Online netcode protection
+- StabilityGate: Conditional aggressive settings
+- NetworkScopeManager: Per-game network tuning
+- MultiMonitorDetector: Compositor edge cases
+- FallbackController: Failure persistence
+"""
 
 from __future__ import annotations
 
@@ -9,8 +18,16 @@ from typing import Any
 
 from abso.core.config import ConfigManager
 from abso.core.exceptions import (
+    LintFailedError,
     ProfileNotFoundError,
+    RollbackViolationError,
 )
+from abso.core.fallback_controller import FallbackController
+from abso.core.linter import LintResult, LintSeverity, ProfileLinter
+from abso.core.multimon_detector import MultiMonitorDetector, MultiMonitorResult
+from abso.core.network_scope import NetworkScopeManager, NetworkScopeResult
+from abso.core.rollback_guard import RollbackGuard, RollbackGuardResult
+from abso.core.stability_gate import StabilityGate, StabilityGateResult
 from abso.profiles.base import BaseProfile
 from abso.profiles.cod_bo7 import CodBo7Profile
 from abso.profiles.cod_bo7_oled import CodBo7OLEDProfile
@@ -49,6 +66,18 @@ class ApplyResult:
     applied_settings: list[str] = field(default_factory=list)
     failed_settings: list[str] = field(default_factory=list)
 
+    # Validation subsystem results
+    lint_result: LintResult | None = None
+    rollback_guard_result: RollbackGuardResult | None = None
+    stability_gate_result: StabilityGateResult | None = None
+    network_scope_result: NetworkScopeResult | None = None
+    multimon_result: MultiMonitorResult | None = None
+
+    # Validation summary
+    lint_warnings: int = 0
+    gated_settings_blocked: int = 0
+    rollback_overrides_applied: int = 0
+
 
 class ProfileApplier:
     """Applies game optimization profiles to the system."""
@@ -79,8 +108,46 @@ class ProfileApplier:
         "ryujinx-ssbu-vrr": RyujinxSSBUVRRProfile,
     }
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        skip_linting: bool = False,
+        skip_rollback_guard: bool = False,
+        skip_stability_gate: bool = False,
+        skip_network_scope: bool = False,
+        skip_multimon_detection: bool = False,
+        rollback_guard_mode: str = "block",
+        force_aggressive: bool = False,
+    ) -> None:
+        """Initialize ProfileApplier with validation subsystems.
+
+        Args:
+            skip_linting: Skip ProfileLinter validation.
+            skip_rollback_guard: Skip RollbackGuard checks.
+            skip_stability_gate: Skip StabilityGate processing.
+            skip_network_scope: Skip NetworkScopeManager.
+            skip_multimon_detection: Skip MultiMonitorDetector.
+            rollback_guard_mode: "block" or "override" for RollbackGuard.
+            force_aggressive: Force aggressive settings even if gated.
+        """
         self._profiles: dict[str, BaseProfile] = {}
+
+        # Configuration
+        self.skip_linting = skip_linting
+        self.skip_rollback_guard = skip_rollback_guard
+        self.skip_stability_gate = skip_stability_gate
+        self.skip_network_scope = skip_network_scope
+        self.skip_multimon_detection = skip_multimon_detection
+        self.force_aggressive = force_aggressive
+
+        # Initialize subsystems
+        self._fallback_controller = FallbackController()
+        self._linter = ProfileLinter()
+        self._rollback_guard = RollbackGuard(mode=rollback_guard_mode)
+        self._stability_gate = StabilityGate(
+            fallback_controller=self._fallback_controller
+        )
+        self._network_scope = NetworkScopeManager()
+        self._multimon_detector = MultiMonitorDetector()
 
     def _get_profile(self, profile_name: str) -> BaseProfile:
         """Get or create a profile instance.
@@ -107,20 +174,100 @@ class ProfileApplier:
         return self._profiles[profile_name]
 
     def apply_profile(self, profile_name: str) -> ApplyResult:
-        """Apply a game optimization profile.
+        """Apply a game optimization profile with full validation.
+
+        Validation pipeline:
+        1. ProfileLinter - Static validation (abort on hard errors)
+        2. MultiMonitorDetector - Environment detection
+        3. RollbackGuard - Online netcode protection
+        4. StabilityGate - Gate aggressive settings
+        5. NetworkScopeManager - Scope network settings
+        6. Apply handlers
 
         Args:
             profile_name: Name of the profile to apply.
 
         Returns:
-            ApplyResult with status and details.
+            ApplyResult with status and validation details.
         """
         try:
             profile = self._get_profile(profile_name)
         except ProfileNotFoundError as e:
             return ApplyResult(success=False, error=str(e))
 
-        # Load configuration for overrides and disabled handlers
+        # Initialize result
+        result = ApplyResult(
+            success=True,
+            in_game_settings=profile.has_in_game_settings(),
+        )
+
+        # Collect all settings from profile
+        settings_map = self._collect_settings(profile)
+
+        # === PHASE 1: Profile Linting ===
+        if not self.skip_linting:
+            lint_result = self._linter.lint(profile)
+            result.lint_result = lint_result
+            result.lint_warnings = len(lint_result.warnings)
+
+            if lint_result.has_errors and not self.force_aggressive:
+                error_codes = [e.code for e in lint_result.errors]
+                logger.error(
+                    f"Profile '{profile_name}' failed linting: {error_codes}"
+                )
+                result.success = False
+                result.error = f"Lint failed: {', '.join(error_codes)}"
+                return result
+
+        # === PHASE 2: Multi-Monitor Detection ===
+        if not self.skip_multimon_detection:
+            multimon_result = self._multimon_detector.detect()
+            result.multimon_result = multimon_result
+
+            if multimon_result.warnings:
+                for warning in multimon_result.warnings:
+                    logger.warning(f"MultiMon: {warning.message}")
+
+        # === PHASE 3: RollbackGuard ===
+        if not self.skip_rollback_guard:
+            rollback_result = self._rollback_guard.check(profile, settings_map)
+            result.rollback_guard_result = rollback_result
+
+            if rollback_result.violations:
+                if self._rollback_guard.mode == "block" and not self.force_aggressive:
+                    violation_codes = [v.code for v in rollback_result.violations]
+                    logger.error(
+                        f"RollbackGuard blocked profile: {violation_codes}"
+                    )
+                    result.success = False
+                    result.error = f"Rollback violations: {', '.join(violation_codes)}"
+                    return result
+                else:
+                    # Override mode: apply safe settings
+                    settings_map = self._rollback_guard.apply_overrides(
+                        settings_map, rollback_result
+                    )
+                    result.rollback_overrides_applied = len(
+                        rollback_result.enforced_overrides
+                    )
+
+        # === PHASE 4: StabilityGate ===
+        if not self.skip_stability_gate and not self.force_aggressive:
+            settings_map, gate_result = self._stability_gate.process(
+                profile, settings_map, result.lint_result
+            )
+            result.stability_gate_result = gate_result
+            result.gated_settings_blocked = gate_result.blocked_count
+
+        # === PHASE 5: NetworkScopeManager ===
+        if not self.skip_network_scope:
+            network_result = self._network_scope.apply_scope(profile, settings_map)
+            result.network_scope_result = network_result
+            settings_map = self._network_scope.get_scoped_settings(
+                settings_map, network_result
+            )
+
+        # === PHASE 6: Apply Handlers ===
         config_manager = ConfigManager()
         profile_overrides = config_manager.get_profile_overrides(profile_name)
 
@@ -129,7 +276,6 @@ class ProfileApplier:
         skipped: list[str] = []
         requires_reboot = False
 
-        # Apply each settings category
         for handler in profile.get_handlers():
             handler_name = handler.__class__.__name__
 
@@ -140,8 +286,12 @@ class ProfileApplier:
                 continue
 
             try:
-                # Get base settings from profile
-                settings = profile.get_settings(handler_name)
+                # Get processed settings from our settings_map
+                settings = settings_map.get(handler_name, {})
+
+                # If not in our map, get from profile directly
+                if not settings:
+                    settings = profile.get_settings(handler_name)
 
                 # Merge with user overrides from config
                 if profile_overrides:
@@ -154,14 +304,16 @@ class ProfileApplier:
                     settings["executables"] = profile.executable_hints
                     settings["game_name"] = profile.display_name
 
-                result = handler.apply(settings)
+                handler_result = handler.apply(settings)
 
-                if result.get("success", False):
+                if handler_result.get("success", False):
                     applied.append(handler_name)
-                    if result.get("requires_reboot", False):
+                    if handler_result.get("requires_reboot", False):
                         requires_reboot = True
                 else:
-                    failed.append(f"{handler_name}: {result.get('error', 'Unknown error')}")
+                    failed.append(
+                        f"{handler_name}: {handler_result.get('error', 'Unknown error')}"
+                    )
 
             except PermissionError as e:
                 logger.error(f"Permission denied applying {handler_name}: {e}")
@@ -173,20 +325,45 @@ class ProfileApplier:
                 logger.error(f"Configuration error applying {handler_name}: {e}")
                 failed.append(f"{handler_name}: Configuration error - {e}")
 
-        success = len(failed) == 0
-        error = "; ".join(failed) if failed else None
+        result.applied_settings = applied
+        result.failed_settings = failed
+        result.requires_reboot = requires_reboot
+
+        if failed:
+            result.success = False
+            result.error = "; ".join(failed)
 
         if skipped:
             logger.info(f"Skipped handlers (disabled in config): {', '.join(skipped)}")
 
-        return ApplyResult(
-            success=success,
-            error=error,
-            requires_reboot=requires_reboot,
-            in_game_settings=profile.has_in_game_settings(),
-            applied_settings=applied,
-            failed_settings=failed,
+        # Log summary
+        logger.info(
+            f"Profile '{profile_name}' applied: "
+            f"{len(applied)} succeeded, {len(failed)} failed, "
+            f"{result.lint_warnings} lint warnings, "
+            f"{result.gated_settings_blocked} gated settings blocked"
         )
+
+        return result
+
+    def _collect_settings(self, profile: BaseProfile) -> dict[str, dict[str, Any]]:
+        """Collect all settings from a profile's handlers.
+
+        Args:
+            profile: The profile to collect settings from.
+
+        Returns:
+            Dict mapping handler names to their settings.
+        """
+        settings_map: dict[str, dict[str, Any]] = {}
+
+        for handler in profile.get_handlers():
+            handler_name = handler.__class__.__name__
+            settings = profile.get_settings(handler_name)
+            if settings:
+                settings_map[handler_name] = settings.copy()
+
+        return settings_map
 
     def _merge_overrides(
         self,

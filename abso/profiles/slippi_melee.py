@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
 
 from abso.profiles.base import BaseProfile
 
@@ -35,6 +35,28 @@ class SlippiMeleeProfile(BaseProfile):
     @property
     def executable_hints(self) -> list[str]:
         return ["Slippi Dolphin.exe", "Dolphin.exe"]
+
+    # === Validation Metadata Overrides ===
+
+    @property
+    def is_emulator_profile(self) -> bool:
+        """This is a Dolphin emulator profile (fixed 60fps)."""
+        return True
+
+    @property
+    def is_sdr_only(self) -> bool:
+        """Melee (GameCube) is SDR-only content."""
+        return True
+
+    @property
+    def graphics_api(self) -> Literal["dx11", "dx12", "vulkan", "opengl", "unknown"]:
+        """Recommended backend is DX12 for HAGS compatibility."""
+        return "dx12"
+
+    @property
+    def allows_aggressive_settings(self) -> bool:
+        """Emulator profiles benefit from aggressive latency settings."""
+        return True
 
     def get_handlers(self) -> list[SettingsHandler]:
         from abso.settings.cnm import CNMSettingsHandler
@@ -109,15 +131,14 @@ class SlippiMeleeProfile(BaseProfile):
                 # Absolute minimum latency - no sync overhead
                 # Use DX12 backend in Dolphin for HAGS compatibility
                 "preset": "minimum_latency",
-                # Settings applied:
-                # - Low Latency Mode: On (stable for locked 60fps)
+                # Settings applied by minimum_latency preset:
+                # - Low Latency Mode: ULTRA (just-in-time frame submission)
                 # - VSync: OFF (critical - removes sync latency entirely)
                 # - Power Management: Prefer Maximum Performance
                 # - Shader Cache: Unlimited
-                # - Threaded Optimization: OFF (reduces driver threading overhead)
-                # - Triple Buffering: OFF
+                # - Threaded Optimization: ON
                 # - Max Frame Rate: OFF
-                # - G-Sync: OFF (Melee is fixed 60fps - VRR adds overhead for constant rate)
+                # - G-Sync: OFF (force disabled - Melee is fixed 60fps)
                 #
                 # IMPORTANT: Use DX12 backend with HAGS ON for 0.0ms render latency.
                 # DX11 + HAGS causes micro-stutters. DX12 + HAGS works as designed.
@@ -227,11 +248,11 @@ class SlippiMeleeProfile(BaseProfile):
             {
                 "category": "Nvidia Control Panel",
                 "setting": "Low Latency Mode",
-                "value": "On (test Ultra if chasing 0.0ms)",
+                "value": "Ultra",
                 "reason": (
-                    "'On' limits pre-render queue to 1 frame - stable for locked 60fps. "
-                    "'Ultra' adds CPU sync overhead that can backfire. Test Ultra on RTX 4070+ "
-                    "if trying to achieve consistent 0.0ms render latency."
+                    "Ultra provides just-in-time frame submission for minimum latency. "
+                    "For locked 60fps games like Melee, Ultra is optimal since there's no "
+                    "risk of frame rate instability causing stutter."
                 ),
             },
             {

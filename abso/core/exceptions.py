@@ -198,3 +198,39 @@ class OperationTimeoutError(ABSOError):
 class CommandTimeoutError(OperationTimeoutError):
     """External command timed out."""
     pass
+
+
+# Linting Errors
+class LintError(ABSOError):
+    """Base error for profile linting operations."""
+    pass
+
+
+class LintFailedError(LintError):
+    """Profile failed lint validation with hard errors."""
+    pass
+
+
+class RollbackGuardError(ABSOError):
+    """Base error for rollback guard operations."""
+    pass
+
+
+class RollbackViolationError(RollbackGuardError):
+    """Profile violates rollback safety rules."""
+    pass
+
+
+class StabilityGateError(ABSOError):
+    """Base error for stability gate operations."""
+    pass
+
+
+class FallbackError(ABSOError):
+    """Base error for fallback controller operations."""
+    pass
+
+
+class FallbackStateError(FallbackError):
+    """Failed to load or save fallback state."""
+    pass

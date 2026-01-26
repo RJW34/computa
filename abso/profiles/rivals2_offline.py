@@ -20,7 +20,7 @@ External Tools: RTSS, SpecialK, frame pacing hooks ALLOWED.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
 
 from abso.profiles.base import BaseProfile
 
@@ -63,6 +63,28 @@ class Rivals2OfflineProfile(BaseProfile):
             "RivalsofAether2.exe",
             "Rivals2.exe",
         ]
+
+    # === Validation Metadata Overrides ===
+
+    @property
+    def is_online_profile(self) -> bool:
+        """This is explicitly an OFFLINE profile - no rollback protection needed."""
+        return False
+
+    @property
+    def is_sdr_only(self) -> bool:
+        """Rivals 2 is SDR-only."""
+        return True
+
+    @property
+    def graphics_api(self) -> Literal["dx11", "dx12", "vulkan", "opengl", "unknown"]:
+        """Rivals 2 uses DirectX 12 (UE5)."""
+        return "dx12"
+
+    @property
+    def allows_aggressive_settings(self) -> bool:
+        """Offline profiles allow aggressive latency settings."""
+        return True
 
     def get_handlers(self) -> list[SettingsHandler]:
         from abso.settings.cnm import CNMSettingsHandler

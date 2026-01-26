@@ -160,96 +160,122 @@ $script:ActiveProfileFile = Join-Path $env:TEMP "abso_active_profile.json"
 # PROFILE DEFINITIONS
 # ============================================================================
 
+$script:AppVersion = "1.2.0"
+
 $script:Profiles = [ordered]@{
+    # --- Productivity ---
     "productivity-oled" = @{
-        Name     = "Productivity"
-        Sub      = "OLED + HDR"
+        Name     = "Desktop / Productivity"
+        Sub      = "HDR + 120Hz VRR"
         Cat      = "Productivity"
-        Note     = "Browsing, Coding"
+        Desc     = "Optimal for browsing, coding, and general desktop use. VRR on, HDR enabled, power saver GPU profile."
+        Note     = "Browsing, VS Code, Office"
         Exes     = @("Code.exe", "devenv.exe", "chrome.exe", "firefox.exe", "msedge.exe")
     }
+
+    # --- Fighting Games: Rivals of Aether 2 ---
     "rivals2-offline"   = @{
-        Name     = "Rivals 2"
-        Sub      = "OFFLINE / Training"
+        Name     = "Rivals 2 Training Mode"
+        Sub      = "No-Sync | Min Latency | VRR Off"
         Cat      = "Fighting"
-        Note     = "Max latency reduction"
+        Desc     = "Maximum latency reduction for solo training/combo practice. No V-Sync, no framerate cap, disables VRR for lowest input lag."
+        Note     = "Training, Combos, Solo"
         Exes     = @("Rivals2-Win64-Shipping.exe", "RivalsofAether2.exe", "Rivals2.exe")
     }
     "rivals2-online"    = @{
-        Name     = "Rivals 2"
-        Sub      = "ONLINE / Matchmaking"
+        Name     = "Rivals 2 Online Ranked"
+        Sub      = "Reflex + Rollback-Safe | 300fps Cap"
         Cat      = "Fighting"
-        Note     = "Rollback-safe"
+        Desc     = "Optimized for online play with rollback netcode. Nvidia Reflex enabled, stable framepacing for consistent rollback."
+        Note     = "Ranked, Online, Netplay"
         Exes     = @("Rivals2-Win64-Shipping.exe", "RivalsofAether2.exe", "Rivals2.exe")
     }
     "rivals2-oled-vrr"  = @{
-        Name     = "Rivals 2"
-        Sub      = "G-Sync + SpecialK"
+        Name     = "Rivals 2 G-Sync Exclusive"
+        Sub      = "VRR + SpecialK Framegen"
         Cat      = "Fighting"
-        Note     = "Requires SpecialK"
+        Desc     = "G-Sync VRR with SpecialK frame generation for tear-free gameplay. Requires SpecialK injection configured."
+        Note     = "Requires SpecialK installed"
         Exes     = @("Rivals2-Win64-Shipping.exe", "RivalsofAether2.exe", "Rivals2.exe")
     }
     "rivals2-oled-vrr-multimon" = @{
-        Name     = "Rivals 2"
-        Sub      = "G-Sync MultiMon"
+        Name     = "Rivals 2 Multi-Monitor"
+        Sub      = "Borderless + G-Sync Compatible"
         Cat      = "Fighting"
-        Note     = "Borderless windowed"
+        Desc     = "Borderless windowed mode for multi-monitor setups. G-Sync compatible mode, allows alt-tabbing without display mode changes."
+        Note     = "Borderless, Multi-mon"
         Exes     = @("Rivals2-Win64-Shipping.exe", "RivalsofAether2.exe", "Rivals2.exe")
     }
     "rivals2-oled"      = @{
-        Name     = "Rivals 2"
-        Sub      = "No-Sync"
+        Name     = "Rivals 2 Ultra Low Latency"
+        Sub      = "No-Sync | Uncapped | OLED ABL"
         Cat      = "Fighting"
-        Note     = "Minimum latency"
+        Desc     = "Absolute minimum latency mode. No sync, no VRR, no frame cap. OLED brightness limiter to prevent ABL issues."
+        Note     = "Tournament mode"
         Exes     = @("Rivals2-Win64-Shipping.exe", "RivalsofAether2.exe", "Rivals2.exe")
     }
+
+    # --- Fighting Games: Melee ---
     "slippi-melee-vrr"  = @{
-        Name     = "Slippi Melee"
-        Sub      = "G-Sync"
+        Name     = "Slippi Melee G-Sync"
+        Sub      = "VRR 60fps | Tear-Free | Low Lag"
         Cat      = "Fighting"
-        Note     = "Tear-free 60fps"
+        Desc     = "G-Sync VRR locked to 60fps for tear-free Melee. Optimal balance of visual quality and input latency."
+        Note     = "Tear-free, VRR"
         Exes     = @("Slippi Dolphin.exe", "Dolphin.exe")
     }
     "slippi-melee-oled" = @{
-        Name     = "Slippi Melee"
-        Sub      = "No-Sync"
+        Name     = "Slippi Melee No-Sync"
+        Sub      = "Fixed 60fps | Min Latency"
         Cat      = "Fighting"
-        Note     = "Fixed 60fps"
+        Desc     = "No V-Sync mode for absolute minimum input latency. May have minor tearing but lowest possible lag."
+        Note     = "Tournament mode"
         Exes     = @("Slippi Dolphin.exe", "Dolphin.exe")
     }
+
+    # --- Fighting Games: Smash Ultimate ---
     "ryujinx-ssbu-vrr"  = @{
-        Name     = "SSBU / HDR"
-        Sub      = "G-Sync"
+        Name     = "SSBU (Ryujinx) G-Sync"
+        Sub      = "VRR | HDR Mod Compatible"
         Cat      = "Fighting"
-        Note     = "Ryujinx emulator"
+        Desc     = "Smash Ultimate via Ryujinx with G-Sync VRR. Compatible with HDR mod. Optimized Vulkan settings."
+        Note     = "Ryujinx emulator, HDR mod"
         Exes     = @("Ryujinx.exe", "Ryujinx.Ava.exe", "Ryujinx.Headless.SDL2.exe")
     }
     "ryujinx-ssbu-oled" = @{
-        Name     = "SSBU / HDR"
-        Sub      = "OLED"
+        Name     = "SSBU (Ryujinx) OLED"
+        Sub      = "No-Sync | Low Latency"
         Cat      = "Fighting"
-        Note     = "Ryujinx emulator"
+        Desc     = "Smash Ultimate via Ryujinx optimized for OLED. No V-Sync for minimum latency, OLED-specific color profile."
+        Note     = "Ryujinx, Min latency"
         Exes     = @("Ryujinx.exe", "Ryujinx.Ava.exe", "Ryujinx.Headless.SDL2.exe")
     }
+
+    # --- ARPG ---
     "diablo4-oled-vrr"  = @{
-        Name     = "Diablo 4"
-        Sub      = "G-Sync"
+        Name     = "Diablo 4 G-Sync"
+        Sub      = "VRR + Native Reflex"
         Cat      = "ARPG"
-        Note     = "Native Reflex"
+        Desc     = "Diablo 4 with native Nvidia Reflex enabled. G-Sync VRR for smooth gameplay during intense combat."
+        Note     = "Native Reflex support"
         Exes     = @("Diablo IV.exe")
     }
     "diablo4-oled"      = @{
-        Name     = "Diablo 4"
-        Sub      = "OLED"
+        Name     = "Diablo 4 Low Latency"
+        Sub      = "No-Sync | Ultra Reflex"
         Cat      = "ARPG"
-        Note     = "Low latency"
+        Desc     = "Maximum responsiveness mode for Diablo 4. No V-Sync with Reflex boost for lowest input latency."
+        Note     = "Uncapped framerate"
         Exes     = @("Diablo IV.exe")
     }
+
+    # --- Other ---
     "pacdeluxe-oled"    = @{
-        Name     = "PACDeluxe"
-        Sub      = "OLED"
+        Name     = "PAC Deluxe"
+        Sub      = "OLED Optimized"
         Cat      = "Other"
-        Note     = ""
+        Desc     = "PAC platformer with OLED-optimized settings. Low latency profile for precise platforming."
+        Note     = "Platformer"
         Exes     = @("PACDeluxe.exe", "pac-deluxe.exe")
     }
 }
@@ -457,12 +483,14 @@ function Update-MenuState {
         # Update text with visual indicator
         $p = $script:Profiles[$item.Tag]
         if ($isActive) {
-            $item.Text = "  >>  $($p.Name)  -  $($p.Sub)  <<"
+            $item.Text = "  >>  $($p.Name)"
             $item.ForeColor = $script:Colors.AccentGreen
+            $item.Font = New-Object System.Drawing.Font("Segoe UI", 9, [System.Drawing.FontStyle]::Bold)
         }
         else {
-            $item.Text = "      $($p.Name)  -  $($p.Sub)"
+            $item.Text = "      $($p.Name)"
             $item.ForeColor = $script:Colors.Text
+            $item.Font = New-Object System.Drawing.Font("Segoe UI", 9)
         }
     }
     $script:restoreItem.Enabled = ($null -ne $script:activeProfile)
@@ -470,11 +498,27 @@ function Update-MenuState {
     if ($script:activeProfile) {
         $p = $script:Profiles[$script:activeProfile]
         $script:notifyIcon.Icon = New-ABSOIcon -Active
-        $script:notifyIcon.Text = "A.B.S.O. - $($p.Name) active"
+        # Truncate for tooltip limit
+        $tooltipText = "A.B.S.O. - $($p.Name)"
+        if ($tooltipText.Length -gt 63) {
+            $tooltipText = $tooltipText.Substring(0, 60) + "..."
+        }
+        $script:notifyIcon.Text = $tooltipText
+
+        # Update status in menu
+        if ($script:statusItem) {
+            $script:statusItem.Text = "      Active: $($p.Name)"
+            $script:statusItem.ForeColor = $script:Colors.AccentGreen
+        }
     }
     else {
         $script:notifyIcon.Icon = New-ABSOIcon
         $script:notifyIcon.Text = "A.B.S.O. - Ready"
+
+        if ($script:statusItem) {
+            $script:statusItem.Text = "      Status: Ready"
+            $script:statusItem.ForeColor = $script:Colors.AccentGreen
+        }
     }
 }
 
@@ -569,6 +613,180 @@ function Handle-MeasureItem {
 }
 
 # ============================================================================
+# SYSTEM INFO
+# ============================================================================
+
+function Get-SystemInfo {
+    <#
+    .SYNOPSIS
+    Gets basic system info for display in the tray menu.
+    #>
+    $info = @{
+        GPU = "Unknown GPU"
+        Monitor = "Unknown"
+        RefreshRate = "?"
+    }
+
+    try {
+        # GPU - filter out virtual display adapters
+        $virtualAdapters = @(
+            "Parsec",
+            "Virtual",
+            "Microsoft Basic",
+            "Microsoft Remote",
+            "VNC",
+            "TeamViewer",
+            "AnyDesk",
+            "Citrix",
+            "VMware",
+            "VirtualBox",
+            "Hyper-V"
+        )
+
+        $gpus = Get-CimInstance Win32_VideoController -ErrorAction SilentlyContinue
+        $realGpu = $gpus | Where-Object {
+            $name = $_.Name
+            $isVirtual = $false
+            foreach ($v in $virtualAdapters) {
+                if ($name -like "*$v*") {
+                    $isVirtual = $true
+                    break
+                }
+            }
+            -not $isVirtual
+        } | Select-Object -First 1
+
+        # Fallback to first GPU if no real GPU found
+        if (-not $realGpu) {
+            $realGpu = $gpus | Select-Object -First 1
+        }
+
+        if ($realGpu) {
+            $gpuName = $realGpu.Name -replace "NVIDIA ", "" -replace "GeForce ", "" -replace "AMD ", "" -replace "Radeon ", ""
+            $info.GPU = $gpuName.Trim()
+        }
+
+        # Monitor - try to get from registry or WMI
+        $monitor = Get-CimInstance WmiMonitorID -Namespace root/wmi -ErrorAction SilentlyContinue | Select-Object -First 1
+        if ($monitor -and $monitor.UserFriendlyName) {
+            $name = [System.Text.Encoding]::ASCII.GetString($monitor.UserFriendlyName).Trim([char]0)
+            $info.Monitor = $name
+        }
+
+        # Refresh rate - use the real GPU we already found
+        if ($realGpu -and $realGpu.CurrentRefreshRate) {
+            $info.RefreshRate = "$($realGpu.CurrentRefreshRate)Hz"
+        }
+    }
+    catch {
+        Write-TrayLog "Failed to get system info: $($_.Exception.Message)" -Level "WARN"
+    }
+
+    return $info
+}
+
+# ============================================================================
+# ACTIONS
+# ============================================================================
+
+function Run-Audit {
+    Write-TrayLog "Running audit..."
+    $script:notifyIcon.Text = "A.B.S.O. - Running Audit..."
+
+    try {
+        $tempFile = [System.IO.Path]::GetTempFileName()
+        Start-Process -FilePath "python" -ArgumentList "-m", "abso", "audit", "--json" `
+            -NoNewWindow -Wait -WorkingDirectory $script:ProjectRoot `
+            -RedirectStandardOutput $tempFile
+
+        $rawOutput = Get-Content $tempFile -Raw -ErrorAction SilentlyContinue
+        Remove-Item $tempFile -Force -ErrorAction SilentlyContinue
+
+        if ($rawOutput) {
+            $json = $rawOutput | ConvertFrom-Json
+            if ($json.success -and $json.data) {
+                $issues = $json.data.issues
+                $issueCount = if ($issues) { $issues.Count } else { 0 }
+                if ($issueCount -eq 0) {
+                    Show-Notification -Title "A.B.S.O. Audit" -Message "No issues found - system optimized!" -Type "Info"
+                }
+                else {
+                    Show-Notification -Title "A.B.S.O. Audit" -Message "$issueCount issue(s) found. Run 'abso audit' for details." -Type "Warning"
+                }
+            }
+        }
+    }
+    catch {
+        Write-TrayLog "Audit failed: $($_.Exception.Message)" -Level "ERROR"
+        Show-Notification -Title "A.B.S.O." -Message "Audit failed: $($_.Exception.Message)" -Type "Error"
+    }
+
+    Update-MenuState
+}
+
+function Open-BackupsFolder {
+    $backupsPath = Join-Path $script:ProjectRoot "backups"
+    if (Test-Path $backupsPath) {
+        Start-Process "explorer.exe" -ArgumentList $backupsPath
+    }
+    else {
+        Show-Notification -Title "A.B.S.O." -Message "No backups folder found" -Type "Warning"
+    }
+}
+
+function Open-LogFile {
+    if (Test-Path $script:LogFile) {
+        Start-Process "notepad.exe" -ArgumentList $script:LogFile
+    }
+}
+
+function Toggle-Startup {
+    $startupPath = [System.IO.Path]::Combine(
+        [Environment]::GetFolderPath("Startup"),
+        "ABSO-Tray.lnk"
+    )
+
+    if (Test-Path $startupPath) {
+        # Remove from startup
+        Remove-Item $startupPath -Force -ErrorAction SilentlyContinue
+        Show-Notification -Title "A.B.S.O." -Message "Removed from Windows startup" -Type "Info"
+        $script:startupItem.Text = "      Enable Auto-Start"
+        $script:startupItem.Checked = $false
+    }
+    else {
+        # Add to startup
+        $installScript = Join-Path $script:ScriptDir "Install-Startup.ps1"
+        if (Test-Path $installScript) {
+            & $installScript
+            Show-Notification -Title "A.B.S.O." -Message "Added to Windows startup" -Type "Info"
+            $script:startupItem.Text = "      Disable Auto-Start"
+            $script:startupItem.Checked = $true
+        }
+    }
+}
+
+function Get-LastBackupTime {
+    $backupsPath = Join-Path $script:ProjectRoot "backups"
+    if (Test-Path $backupsPath) {
+        $latest = Get-ChildItem $backupsPath -Directory -ErrorAction SilentlyContinue |
+            Sort-Object CreationTime -Descending | Select-Object -First 1
+        if ($latest) {
+            $age = (Get-Date) - $latest.CreationTime
+            if ($age.TotalMinutes -lt 60) {
+                return "$([int]$age.TotalMinutes)m ago"
+            }
+            elseif ($age.TotalHours -lt 24) {
+                return "$([int]$age.TotalHours)h ago"
+            }
+            else {
+                return "$([int]$age.TotalDays)d ago"
+            }
+        }
+    }
+    return "Never"
+}
+
+# ============================================================================
 # MAIN
 # ============================================================================
 
@@ -581,6 +799,9 @@ function Start-TrayApp {
     $script:activeProfile = $null
     $script:profileMenuItems = @()
 
+    # Get system info
+    $sysInfo = Get-SystemInfo
+
     # Context menu
     $menu = New-Object System.Windows.Forms.ContextMenuStrip
     $menu.BackColor = $script:Colors.Background
@@ -588,13 +809,14 @@ function Start-TrayApp {
     $menu.ShowImageMargin = $false
     $menu.ShowCheckMargin = $false
     $menu.Renderer = New-Object System.Windows.Forms.ToolStripProfessionalRenderer
-
-    # Override renderer colors
     $menu.Renderer.RoundedEdges = $false
 
-    # Header
+    # ═══════════════════════════════════════════════════════════════════════
+    # HEADER SECTION
+    # ═══════════════════════════════════════════════════════════════════════
+
     $header = New-Object System.Windows.Forms.ToolStripMenuItem
-    $header.Text = "A.B.S.O."
+    $header.Text = "A.B.S.O.  v$($script:AppVersion)"
     $header.Enabled = $false
     $header.BackColor = $script:Colors.Background
     $header.ForeColor = $script:Colors.AccentGold
@@ -609,11 +831,61 @@ function Start-TrayApp {
     $subheader.Font = New-Object System.Drawing.Font("Segoe UI", 8)
     $menu.Items.Add($subheader) | Out-Null
 
+    # ═══════════════════════════════════════════════════════════════════════
+    # SYSTEM INFO SECTION
+    # ═══════════════════════════════════════════════════════════════════════
+
+    $sep0 = New-Object System.Windows.Forms.ToolStripSeparator
+    $menu.Items.Add($sep0) | Out-Null
+
+    $sysLabel = New-Object System.Windows.Forms.ToolStripMenuItem
+    $sysLabel.Text = "  SYSTEM"
+    $sysLabel.Enabled = $false
+    $sysLabel.BackColor = $script:Colors.Background
+    $sysLabel.ForeColor = $script:Colors.TextDim
+    $sysLabel.Font = New-Object System.Drawing.Font("Segoe UI", 7.5, [System.Drawing.FontStyle]::Bold)
+    $menu.Items.Add($sysLabel) | Out-Null
+
+    $gpuInfo = New-Object System.Windows.Forms.ToolStripMenuItem
+    $gpuInfo.Text = "      GPU: $($sysInfo.GPU)"
+    $gpuInfo.Enabled = $false
+    $gpuInfo.BackColor = $script:Colors.Background
+    $gpuInfo.ForeColor = $script:Colors.Text
+    $gpuInfo.Font = New-Object System.Drawing.Font("Consolas", 8)
+    $menu.Items.Add($gpuInfo) | Out-Null
+
+    $monInfo = New-Object System.Windows.Forms.ToolStripMenuItem
+    $monInfo.Text = "      Display: $($sysInfo.Monitor) @ $($sysInfo.RefreshRate)"
+    $monInfo.Enabled = $false
+    $monInfo.BackColor = $script:Colors.Background
+    $monInfo.ForeColor = $script:Colors.Text
+    $monInfo.Font = New-Object System.Drawing.Font("Consolas", 8)
+    $menu.Items.Add($monInfo) | Out-Null
+
+    $script:statusItem = New-Object System.Windows.Forms.ToolStripMenuItem
+    $script:statusItem.Text = "      Status: Ready"
+    $script:statusItem.Enabled = $false
+    $script:statusItem.BackColor = $script:Colors.Background
+    $script:statusItem.ForeColor = $script:Colors.AccentGreen
+    $script:statusItem.Font = New-Object System.Drawing.Font("Consolas", 8)
+    $menu.Items.Add($script:statusItem) | Out-Null
+
+    # ═══════════════════════════════════════════════════════════════════════
+    # PROFILES SECTION
+    # ═══════════════════════════════════════════════════════════════════════
+
     $sep = New-Object System.Windows.Forms.ToolStripSeparator
-    $sep.BackColor = $script:Colors.Separator
     $menu.Items.Add($sep) | Out-Null
 
-    # Group profiles
+    $profilesLabel = New-Object System.Windows.Forms.ToolStripMenuItem
+    $profilesLabel.Text = "  PROFILES"
+    $profilesLabel.Enabled = $false
+    $profilesLabel.BackColor = $script:Colors.Background
+    $profilesLabel.ForeColor = $script:Colors.TextDim
+    $profilesLabel.Font = New-Object System.Drawing.Font("Segoe UI", 7.5, [System.Drawing.FontStyle]::Bold)
+    $menu.Items.Add($profilesLabel) | Out-Null
+
+    # Group profiles by category
     $catProfiles = @{}
     foreach ($id in $script:Profiles.Keys) {
         $p = $script:Profiles[$id]
@@ -623,33 +895,39 @@ function Start-TrayApp {
         $catProfiles[$p.Cat] += @{ Id = $id; Profile = $p }
     }
 
-    # Add by category
+    # Add profiles by category
     foreach ($cat in $script:CategoryOrder) {
         if ($catProfiles.ContainsKey($cat)) {
-            # Category label
+            # Category header
             $catItem = New-Object System.Windows.Forms.ToolStripMenuItem
-            $catItem.Text = "  $cat"
+            $catItem.Text = "    $cat"
             $catItem.Enabled = $false
             $catItem.BackColor = $script:Colors.Background
             $catItem.ForeColor = $script:CategoryColors[$cat]
             $catItem.Font = New-Object System.Drawing.Font("Segoe UI", 8.5, [System.Drawing.FontStyle]::Bold)
             $menu.Items.Add($catItem) | Out-Null
 
-            # Profiles
+            # Profile entries
             foreach ($entry in $catProfiles[$cat]) {
                 $id = $entry.Id
                 $p = $entry.Profile
 
                 $item = New-Object System.Windows.Forms.ToolStripMenuItem
-                $item.Text = "      $($p.Name)  -  $($p.Sub)"
+                $item.Text = "      $($p.Name)"
                 $item.Tag = $id
                 $item.BackColor = $script:Colors.Background
                 $item.ForeColor = $script:Colors.Text
                 $item.Font = New-Object System.Drawing.Font("Segoe UI", 9)
 
-                if ($p.Note) {
-                    $item.ToolTipText = $p.Note
+                # Build rich tooltip with description
+                $tooltipText = "$($p.Sub)`n"
+                if ($p.Desc) {
+                    $tooltipText += "`n$($p.Desc)"
                 }
+                if ($p.Note) {
+                    $tooltipText += "`n`n[$($p.Note)]"
+                }
+                $item.ToolTipText = $tooltipText.Trim()
 
                 $item.Add_Click({
                     param($s, $ev)
@@ -662,23 +940,114 @@ function Start-TrayApp {
         }
     }
 
+    # ═══════════════════════════════════════════════════════════════════════
+    # ACTIONS SECTION
+    # ═══════════════════════════════════════════════════════════════════════
+
     $sep2 = New-Object System.Windows.Forms.ToolStripSeparator
-    $sep2.BackColor = $script:Colors.Separator
     $menu.Items.Add($sep2) | Out-Null
 
-    # Restore
+    $actionsLabel = New-Object System.Windows.Forms.ToolStripMenuItem
+    $actionsLabel.Text = "  ACTIONS"
+    $actionsLabel.Enabled = $false
+    $actionsLabel.BackColor = $script:Colors.Background
+    $actionsLabel.ForeColor = $script:Colors.TextDim
+    $actionsLabel.Font = New-Object System.Drawing.Font("Segoe UI", 7.5, [System.Drawing.FontStyle]::Bold)
+    $menu.Items.Add($actionsLabel) | Out-Null
+
+    # Restore Previous
     $script:restoreItem = New-Object System.Windows.Forms.ToolStripMenuItem
-    $script:restoreItem.Text = "  Restore Previous"
+    $script:restoreItem.Text = "      Restore Previous Settings"
     $script:restoreItem.Enabled = $false
     $script:restoreItem.BackColor = $script:Colors.Background
     $script:restoreItem.ForeColor = $script:Colors.Text
     $script:restoreItem.Font = New-Object System.Drawing.Font("Segoe UI", 9)
+    $script:restoreItem.ToolTipText = "Restore the last backup before profile was applied"
     $script:restoreItem.Add_Click({ Restore-Settings })
     $menu.Items.Add($script:restoreItem) | Out-Null
 
+    # Run Audit
+    $auditItem = New-Object System.Windows.Forms.ToolStripMenuItem
+    $auditItem.Text = "      Run System Audit"
+    $auditItem.BackColor = $script:Colors.Background
+    $auditItem.ForeColor = $script:Colors.Text
+    $auditItem.Font = New-Object System.Drawing.Font("Segoe UI", 9)
+    $auditItem.ToolTipText = "Scan system for optimization issues"
+    $auditItem.Add_Click({ Run-Audit })
+    $menu.Items.Add($auditItem) | Out-Null
+
+    # Open Backups
+    $backupTime = Get-LastBackupTime
+    $backupsItem = New-Object System.Windows.Forms.ToolStripMenuItem
+    $backupsItem.Text = "      Open Backups Folder"
+    $backupsItem.BackColor = $script:Colors.Background
+    $backupsItem.ForeColor = $script:Colors.Text
+    $backupsItem.Font = New-Object System.Drawing.Font("Segoe UI", 9)
+    $backupsItem.ToolTipText = "Last backup: $backupTime"
+    $backupsItem.Add_Click({ Open-BackupsFolder })
+    $menu.Items.Add($backupsItem) | Out-Null
+
+    # ═══════════════════════════════════════════════════════════════════════
+    # SETTINGS SECTION
+    # ═══════════════════════════════════════════════════════════════════════
+
     $sep3 = New-Object System.Windows.Forms.ToolStripSeparator
-    $sep3.BackColor = $script:Colors.Separator
     $menu.Items.Add($sep3) | Out-Null
+
+    $settingsLabel = New-Object System.Windows.Forms.ToolStripMenuItem
+    $settingsLabel.Text = "  SETTINGS"
+    $settingsLabel.Enabled = $false
+    $settingsLabel.BackColor = $script:Colors.Background
+    $settingsLabel.ForeColor = $script:Colors.TextDim
+    $settingsLabel.Font = New-Object System.Drawing.Font("Segoe UI", 7.5, [System.Drawing.FontStyle]::Bold)
+    $menu.Items.Add($settingsLabel) | Out-Null
+
+    # Auto-Start toggle
+    $startupPath = [System.IO.Path]::Combine([Environment]::GetFolderPath("Startup"), "ABSO-Tray.lnk")
+    $isStartupEnabled = Test-Path $startupPath
+
+    $script:startupItem = New-Object System.Windows.Forms.ToolStripMenuItem
+    $script:startupItem.Text = if ($isStartupEnabled) { "      Disable Auto-Start" } else { "      Enable Auto-Start" }
+    $script:startupItem.Checked = $isStartupEnabled
+    $script:startupItem.BackColor = $script:Colors.Background
+    $script:startupItem.ForeColor = $script:Colors.Text
+    $script:startupItem.Font = New-Object System.Drawing.Font("Segoe UI", 9)
+    $script:startupItem.ToolTipText = "Start A.B.S.O. Tray when Windows starts"
+    $script:startupItem.Add_Click({ Toggle-Startup })
+    $menu.Items.Add($script:startupItem) | Out-Null
+
+    # Notifications toggle
+    $script:notifyToggle = New-Object System.Windows.Forms.ToolStripMenuItem
+    $script:notifyToggle.Text = "      Notifications"
+    $script:notifyToggle.Checked = $script:EnableBalloonNotifications
+    $script:notifyToggle.BackColor = $script:Colors.Background
+    $script:notifyToggle.ForeColor = $script:Colors.Text
+    $script:notifyToggle.Font = New-Object System.Drawing.Font("Segoe UI", 9)
+    $script:notifyToggle.ToolTipText = "Toggle balloon notifications"
+    $script:notifyToggle.Add_Click({
+        $script:EnableBalloonNotifications = -not $script:EnableBalloonNotifications
+        $script:notifyToggle.Checked = $script:EnableBalloonNotifications
+        $state = if ($script:EnableBalloonNotifications) { "enabled" } else { "disabled" }
+        Write-TrayLog "Notifications $state"
+    })
+    $menu.Items.Add($script:notifyToggle) | Out-Null
+
+    # View Log
+    $logItem = New-Object System.Windows.Forms.ToolStripMenuItem
+    $logItem.Text = "      View Log File"
+    $logItem.BackColor = $script:Colors.Background
+    $logItem.ForeColor = $script:Colors.TextDim
+    $logItem.Font = New-Object System.Drawing.Font("Segoe UI", 9)
+    $logItem.ToolTipText = $script:LogFile
+    $logItem.Add_Click({ Open-LogFile })
+    $menu.Items.Add($logItem) | Out-Null
+
+    # ═══════════════════════════════════════════════════════════════════════
+    # EXIT SECTION
+    # ═══════════════════════════════════════════════════════════════════════
+
+    $sep4 = New-Object System.Windows.Forms.ToolStripSeparator
+    $menu.Items.Add($sep4) | Out-Null
 
     # Restart
     $restartItem = New-Object System.Windows.Forms.ToolStripMenuItem
@@ -732,7 +1101,7 @@ function Start-TrayApp {
         }
     })
 
-    # Restore state
+    # Restore state from previous session
     if (Test-Path $script:ActiveProfileFile) {
         try {
             $saved = Get-Content $script:ActiveProfileFile | ConvertFrom-Json

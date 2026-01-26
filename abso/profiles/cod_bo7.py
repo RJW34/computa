@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
 
 from abso.profiles.base import BaseProfile
 
@@ -35,6 +35,18 @@ class CodBo7Profile(BaseProfile):
     @property
     def executable_hints(self) -> list[str]:
         return ["cod.exe", "BlackOps7.exe"]
+
+    # === Validation Metadata Overrides ===
+
+    @property
+    def requires_reflex(self) -> bool:
+        """CoD has native NVIDIA Reflex - driver LLM should be OFF."""
+        return True
+
+    @property
+    def graphics_api(self) -> Literal["dx11", "dx12", "vulkan", "opengl", "unknown"]:
+        """CoD uses DirectX 12."""
+        return "dx12"
 
     def get_handlers(self) -> list[SettingsHandler]:
         from abso.settings.cnm import CNMSettingsHandler
