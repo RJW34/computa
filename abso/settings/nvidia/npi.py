@@ -232,6 +232,43 @@ exit $p.ExitCode
         logger.debug("Skipping NPI read_current_settings - export opens GUI")
         return {}
 
+    def launch_for_app_binding(
+        self,
+        profile_name: str,
+        app_executable: str,
+        auto_close: bool = False,
+    ) -> bool:
+        """Launch NPI so user can easily add an app to a profile.
+
+        Opens NPI's GUI. The user needs to:
+        1. Select the profile from the dropdown
+        2. Add the application executable
+        3. Click Apply
+
+        Args:
+            profile_name: The profile name to bind to (shown to user).
+            app_executable: The executable to add (shown to user).
+            auto_close: If True, close NPI after launch (not useful here).
+
+        Returns:
+            True if NPI was launched successfully.
+        """
+        if not self.is_available():
+            logger.warning("NPI not available for app binding")
+            return False
+
+        try:
+            # Launch NPI (it will open to the GUI)
+            logger.info(f"Launching NPI for app binding: {app_executable} -> {profile_name}")
+            subprocess.Popen(
+                [str(self.npi_path.resolve())],
+                creationflags=subprocess.DETACHED_PROCESS,
+            )
+            return True
+        except Exception as e:
+            logger.error(f"Failed to launch NPI: {e}")
+            return False
+
     def _find_npi(self) -> None:
         """Try to find Nvidia Profile Inspector in common locations."""
         common_paths = [

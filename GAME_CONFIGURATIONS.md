@@ -87,16 +87,6 @@ Profiles use predefined NVIDIA presets that configure multiple driver settings:
 - Triple Buffering: **Off**
 - *Note: FPS cap at refresh_rate - 3 required*
 
-### `vrr_ue5_fighting_game`
-**Use:** UE5 fighting games (Rivals 2) with G-Sync - **REQUIRES SpecialK**
-- Low Latency Mode: **On**
-- VSync: **Off** (SpecialK handles sync)
-- Power Management: **Prefer Maximum Performance**
-- Shader Cache: **Unlimited**
-- Threaded Optimization: **Off** (critical for latency)
-- Triple Buffering: **Off**
-- *Requires SpecialK injection for 0ms input latency*
-
 ### `vrr_diablo4`
 **Use:** Diablo 4 with native NVIDIA Reflex
 - Low Latency Mode: **Off** (Reflex handles this)
@@ -310,7 +300,7 @@ If experiencing micro-stuttering:
 | NVCP | Max Frame Rate | 297 (refresh - 3) |
 | Power Plan | Ultimate Performance | With core parking disabled |
 
-**External Tools:** RTSS, SpecialK, frame pacing hooks **ALLOWED**
+**External Tools:** RTSS, frame pacing hooks **ALLOWED**
 
 ---
 
@@ -338,41 +328,7 @@ If experiencing micro-stuttering:
 | Power Plan | High Performance | Not Ultimate - preserve scheduler elasticity |
 | CPU Priority | Normal-High | Not aggressive |
 
-**External Tools:** RTSS, SpecialK, frame limiters **DISABLED**
-
----
-
-### 2c. Rivals 2: OLED + G-Sync (SpecialK Required)
-
-**Profile ID:** `rivals2-oled-vrr`
-**CRITICAL:** Requires SpecialK injection via SKIF for optimal latency
-
-#### Why SpecialK is Required
-- UE5/Rivals 2 forces borderless windowed (0x14000000) during gameplay
-- SpecialK overrides this to maintain exclusive fullscreen (0x94000000)
-- SpecialK's Reflex On+Boost handles frame queue better than driver LLM
-- Without SpecialK: ~2-7ms render latency
-- With SpecialK: ~1.0ms render / 0ms input latency
-
-#### Golden Configuration (Tested)
-
-| Component | Setting | Value |
-|-----------|---------|-------|
-| SpecialK | Reflex | On + Boost |
-| SpecialK | Frame Limiter | Disabled |
-| SpecialK.ini | FlipDiscard | true |
-| SpecialK.ini | AllowTearingInDWM | true |
-| NVCP | VSync | Off |
-| NVCP | Threaded Optimization | **Off (critical)** |
-| NVCP | Low Latency Mode | On |
-| Windows | HAGS | On |
-| Windows | VBS/Memory Integrity | Off |
-| Windows | VRR | Off |
-| System | GeForce Experience | **Uninstall** |
-| System | NVIDIA Shield/Broadcast | Disable |
-| In-Game | Frame Rate Cap | 297 |
-| In-Game | V-SYNC | Off |
-| In-Game | Display Mode | Exclusive Fullscreen |
+**External Tools:** RTSS, frame limiters **DISABLED**
 
 ---
 
@@ -752,8 +708,6 @@ ABSO creates timestamped backups before any changes:
 | Game | Profile | Key Setting |
 |------|---------|-------------|
 | Slippi Melee | `slippi-melee` | DX12 + HAGS ON |
-| Rivals 2 (competitive) | `rivals2` | No-sync default |
-| Rivals 2 (tear-free) | `rivals2-oled-vrr` | Requires SpecialK |
 | Rivals 2 (training) | `rivals2-offline` | LLM Ultra allowed |
 | Rivals 2 (ranked) | `rivals2-online` | Conservative/stable |
 | CoD BO7 | `cod-bo7` | Use in-game Reflex |

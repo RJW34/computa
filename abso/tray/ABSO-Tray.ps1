@@ -36,6 +36,7 @@ Add-Type -AssemblyName presentationCore
 # ============================================================================
 
 $script:SoundFile = Join-Path $PSScriptRoot "pokemon-red_blue_yellow-save-game-sound-effect.mp3"
+$script:FailSoundFile = Join-Path $PSScriptRoot "hit-weak-not-very-effective.mp3"
 
 function Play-SuccessSound {
     <#
@@ -59,6 +60,28 @@ function Play-SuccessSound {
     }
     catch {
         Write-TrayLog "Failed to play sound: $($_.Exception.Message)" -Level "WARN"
+    }
+}
+
+function Play-FailSound {
+    <#
+    .SYNOPSIS
+    Plays the fail sound effect at 20% volume when a profile apply fails.
+    #>
+    try {
+        if (Test-Path $script:FailSoundFile) {
+            $mediaPlayer = New-Object System.Windows.Media.MediaPlayer
+            $mediaPlayer.Open([Uri]$script:FailSoundFile)
+            $mediaPlayer.Volume = 0.20  # 20% volume
+            $mediaPlayer.Play()
+            Write-TrayLog "Playing fail sound"
+        }
+        else {
+            Write-TrayLog "Fail sound file not found: $($script:FailSoundFile)" -Level "WARN"
+        }
+    }
+    catch {
+        Write-TrayLog "Failed to play fail sound: $($_.Exception.Message)" -Level "WARN"
     }
 }
 
@@ -176,107 +199,51 @@ $script:Profiles = [ordered]@{
     # --- Fighting Games: Rivals of Aether 2 ---
     "rivals2-offline"   = @{
         Name     = "Rivals 2 Training Mode"
-        Sub      = "No-Sync | Min Latency | VRR Off"
+        Sub      = "LLM Ultra | No-Sync | Uncapped"
         Cat      = "Fighting"
-        Desc     = "Maximum latency reduction for solo training/combo practice. No V-Sync, no framerate cap, disables VRR for lowest input lag."
+        Desc     = "Maximum latency reduction for solo training/combo practice. LLM Ultra safe for offline. No V-Sync, no VRR, no frame cap."
         Note     = "Training, Combos, Solo"
         Exes     = @("Rivals2-Win64-Shipping.exe", "RivalsofAether2.exe", "Rivals2.exe")
     }
     "rivals2-online"    = @{
         Name     = "Rivals 2 Online Ranked"
-        Sub      = "Reflex + Rollback-Safe | 300fps Cap"
+        Sub      = "LLM ON | No-Sync | Uncapped | Rollback-Safe"
         Cat      = "Fighting"
-        Desc     = "Optimized for online play with rollback netcode. Nvidia Reflex enabled, stable framepacing for consistent rollback."
+        Desc     = "Rollback-safe settings for online play. LLM ON (not Ultra), no V-Sync, no VRR, unlimited FPS. Frame pacing stability prioritized."
         Note     = "Ranked, Online, Netplay"
-        Exes     = @("Rivals2-Win64-Shipping.exe", "RivalsofAether2.exe", "Rivals2.exe")
-    }
-    "rivals2-oled-vrr"  = @{
-        Name     = "Rivals 2 G-Sync Exclusive"
-        Sub      = "VRR + SpecialK Framegen"
-        Cat      = "Fighting"
-        Desc     = "G-Sync VRR with SpecialK frame generation for tear-free gameplay. Requires SpecialK injection configured."
-        Note     = "Requires SpecialK installed"
-        Exes     = @("Rivals2-Win64-Shipping.exe", "RivalsofAether2.exe", "Rivals2.exe")
-    }
-    "rivals2-oled-vrr-multimon" = @{
-        Name     = "Rivals 2 Multi-Monitor"
-        Sub      = "Borderless + G-Sync Compatible"
-        Cat      = "Fighting"
-        Desc     = "Borderless windowed mode for multi-monitor setups. G-Sync compatible mode, allows alt-tabbing without display mode changes."
-        Note     = "Borderless, Multi-mon"
-        Exes     = @("Rivals2-Win64-Shipping.exe", "RivalsofAether2.exe", "Rivals2.exe")
-    }
-    "rivals2-oled"      = @{
-        Name     = "Rivals 2 Ultra Low Latency"
-        Sub      = "No-Sync | Uncapped | OLED ABL"
-        Cat      = "Fighting"
-        Desc     = "Absolute minimum latency mode. No sync, no VRR, no frame cap. OLED brightness limiter to prevent ABL issues."
-        Note     = "Tournament mode"
         Exes     = @("Rivals2-Win64-Shipping.exe", "RivalsofAether2.exe", "Rivals2.exe")
     }
 
     # --- Fighting Games: Melee ---
-    "slippi-melee-vrr"  = @{
-        Name     = "Slippi Melee G-Sync"
-        Sub      = "VRR 60fps | Tear-Free | Low Lag"
+    # Per rollback.md canonical spec: Slippi uses NO VRR, LLM Ultra, absolute minimum latency
+    "slippi-melee"      = @{
+        Name     = "Slippi Melee"
+        Sub      = "LLM Ultra | No-Sync | DX12 + HAGS"
         Cat      = "Fighting"
-        Desc     = "G-Sync VRR locked to 60fps for tear-free Melee. Optimal balance of visual quality and input latency."
-        Note     = "Tear-free, VRR"
-        Exes     = @("Slippi Dolphin.exe", "Dolphin.exe")
-    }
-    "slippi-melee-oled" = @{
-        Name     = "Slippi Melee No-Sync"
-        Sub      = "Fixed 60fps | Min Latency"
-        Cat      = "Fighting"
-        Desc     = "No V-Sync mode for absolute minimum input latency. May have minor tearing but lowest possible lag."
-        Note     = "Tournament mode"
+        Desc     = "Absolute minimum latency for competitive Melee. LLM Ultra, no V-Sync, no VRR. Use DX12 backend with HAGS ON for 0.0ms render latency."
+        Note     = "Tournament mode, Online, Offline"
         Exes     = @("Slippi Dolphin.exe", "Dolphin.exe")
     }
 
     # --- Fighting Games: Smash Ultimate ---
-    "ryujinx-ssbu-vrr"  = @{
-        Name     = "SSBU (Ryujinx) G-Sync"
-        Sub      = "VRR | HDR Mod Compatible"
+    # Note: SSBU is 60fps like Melee - similar optimization principles apply
+    "ryujinx-ssbu"      = @{
+        Name     = "SSBU (Ryujinx)"
+        Sub      = "LLM Ultra | No-Sync | Vulkan"
         Cat      = "Fighting"
-        Desc     = "Smash Ultimate via Ryujinx with G-Sync VRR. Compatible with HDR mod. Optimized Vulkan settings."
-        Note     = "Ryujinx emulator, HDR mod"
-        Exes     = @("Ryujinx.exe", "Ryujinx.Ava.exe", "Ryujinx.Headless.SDL2.exe")
-    }
-    "ryujinx-ssbu-oled" = @{
-        Name     = "SSBU (Ryujinx) OLED"
-        Sub      = "No-Sync | Low Latency"
-        Cat      = "Fighting"
-        Desc     = "Smash Ultimate via Ryujinx optimized for OLED. No V-Sync for minimum latency, OLED-specific color profile."
-        Note     = "Ryujinx, Min latency"
+        Desc     = "Smash Ultimate via Ryujinx for competitive play. LLM Ultra, no V-Sync, no VRR. Fixed 60fps emulator - latency-first optimization."
+        Note     = "Ryujinx emulator, Tournament/Online"
         Exes     = @("Ryujinx.exe", "Ryujinx.Ava.exe", "Ryujinx.Headless.SDL2.exe")
     }
 
     # --- ARPG ---
-    "diablo4-oled-vrr"  = @{
-        Name     = "Diablo 4 G-Sync"
-        Sub      = "VRR + Native Reflex"
+    "diablo4"           = @{
+        Name     = "Diablo 4"
+        Sub      = "Balanced | Native Reflex"
         Cat      = "ARPG"
-        Desc     = "Diablo 4 with native Nvidia Reflex enabled. G-Sync VRR for smooth gameplay during intense combat."
-        Note     = "Native Reflex support"
+        Desc     = "Diablo 4 with native Nvidia Reflex (LLM OFF in driver). Balanced preset for variable framerate gameplay."
+        Note     = "Reflex-enabled game"
         Exes     = @("Diablo IV.exe")
-    }
-    "diablo4-oled"      = @{
-        Name     = "Diablo 4 Low Latency"
-        Sub      = "No-Sync | Ultra Reflex"
-        Cat      = "ARPG"
-        Desc     = "Maximum responsiveness mode for Diablo 4. No V-Sync with Reflex boost for lowest input latency."
-        Note     = "Uncapped framerate"
-        Exes     = @("Diablo IV.exe")
-    }
-
-    # --- Other ---
-    "pacdeluxe-oled"    = @{
-        Name     = "PAC Deluxe"
-        Sub      = "OLED Optimized"
-        Cat      = "Other"
-        Desc     = "PAC platformer with OLED-optimized settings. Low latency profile for precise platforming."
-        Note     = "Platformer"
-        Exes     = @("PACDeluxe.exe", "pac-deluxe.exe")
     }
 }
 
@@ -389,6 +356,17 @@ function Apply-Profile {
 
     Write-TrayLog "Apply-Profile called with: $ProfileId"
     $profile = $script:Profiles[$ProfileId]
+
+    # Validate profile exists
+    if (-not $profile) {
+        Write-TrayLog "Profile not found: $ProfileId" -Level "ERROR"
+        Play-FailSound
+        Show-Notification -Title "A.B.S.O." -Message "Profile not found: $ProfileId" -Type "Error"
+        return
+    }
+
+    # Show inactive icon while applying
+    $script:notifyIcon.Icon = New-ABSOIcon
     $script:notifyIcon.Text = "A.B.S.O. - Applying..."
 
     try {
@@ -427,16 +405,22 @@ function Apply-Profile {
         else {
             $err = if ($json.error) { $json.error } else { "Unknown error" }
             Write-TrayLog "Profile apply failed: $err" -Level "ERROR"
+            Play-FailSound
             Show-Notification -Title "A.B.S.O." -Message "Failed: $err" -Type "Error"
+            Update-MenuState  # Restore icon state
         }
     }
     catch {
         Write-TrayLog "Apply-Profile exception: $($_.Exception.Message)" -Level "ERROR"
+        Play-FailSound
         Show-Notification -Title "A.B.S.O." -Message "Error: $($_.Exception.Message)" -Type "Error"
+        Update-MenuState  # Restore icon state
     }
 }
 
 function Restore-Settings {
+    # Show inactive icon while restoring
+    $script:notifyIcon.Icon = New-ABSOIcon
     $script:notifyIcon.Text = "A.B.S.O. - Restoring..."
 
     try {

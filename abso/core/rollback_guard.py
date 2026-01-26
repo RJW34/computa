@@ -52,7 +52,7 @@ class RollbackGuard:
     Hard Prohibitions (enforced for online profiles):
     - LLM Ultra
     - Fast Sync
-    - External FPS limiters (RTSS, SpecialK) - detected via config
+    - External FPS limiters (RTSS) - detected via config
     - Refresh-3 FPS logic with aggressive caps
     - Forced zero-buffer pipelines
 
@@ -275,12 +275,12 @@ class RollbackGuard:
         We can't directly detect running software, but we can warn about
         config settings that suggest external limiters are in use.
         """
-        # Check for RTSS/SpecialK indicators in any settings
+        # Check for RTSS indicators in any settings
         # This is mostly informational since we can't enforce it
 
         # Log warning about external limiters
         logger.info(
-            "RollbackGuard reminder: External FPS limiters (RTSS, SpecialK) should "
+            "RollbackGuard reminder: External FPS limiters (RTSS) should "
             "be DISABLED for online play. They cause timing contention with rollback."
         )
 

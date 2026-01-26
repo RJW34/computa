@@ -90,7 +90,6 @@ class MultiMonitorDetector:
         "gamingservices.exe": "Xbox Gaming Services",
         "discord.exe": "Discord Overlay",
         "rtss.exe": "RivaTuner Statistics Server",
-        "skif.exe": "SpecialK Injection Frontend",
         "steam.exe": "Steam Overlay",
         "obs64.exe": "OBS Studio",
     }

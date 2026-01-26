@@ -627,6 +627,98 @@ class NVAPIDRS:
 
         return profile_handle
 
+    def enumerate_profiles(self) -> list[dict[str, Any]]:
+        """Enumerate all profiles in the system.
+
+        Returns:
+            List of profile info dicts with 'name', 'handle', 'is_predefined', 'num_apps'.
+        """
+        if not self._session:
+            self.create_session()
+            self.load_settings()
+
+        # NvAPI_DRS_EnumProfiles - interface ID 0xBC371EE0
+        enum_profiles = self._get_function(
+            "NvAPI_DRS_EnumProfiles",
+            0xBC371EE0,
+            c_int,
+            [NvDRSSessionHandle, c_uint32, POINTER(NvDRSProfileHandle)]
+        )
+
+        # NvAPI_DRS_GetProfileInfo - interface ID 0x61CD6FD6
+        get_profile_info = self._get_function(
+            "NvAPI_DRS_GetProfileInfo",
+            0x61CD6FD6,
+            c_int,
+            [NvDRSSessionHandle, NvDRSProfileHandle, POINTER(NVDRS_PROFILE)]
+        )
+
+        profiles = []
+        index = 0
+
+        while True:
+            profile_handle = NvDRSProfileHandle()
+            status = enum_profiles(self._session, index, byref(profile_handle))
+
+            if status == NvAPIStatus.END_ENUMERATION:
+                break
+            elif status != NvAPIStatus.OK:
+                logger.debug(f"Profile enumeration stopped at index {index}: status {status}")
+                break
+
+            # Get profile info
+            profile_info = NVDRS_PROFILE()
+            profile_info.version = NVDRS_PROFILE_VER
+            info_status = get_profile_info(self._session, profile_handle, byref(profile_info))
+
+            if info_status == NvAPIStatus.OK:
+                name = _nvapi_unicode_to_str(profile_info.profileName)
+                profiles.append({
+                    "name": name,
+                    "handle": profile_handle,
+                    "is_predefined": bool(profile_info.isPredefined),
+                    "num_apps": profile_info.numOfApps,
+                })
+
+            index += 1
+
+        return profiles
+
+    def delete_profile(self, profile_handle: NvDRSProfileHandle) -> bool:
+        """Delete a profile.
+
+        Args:
+            profile_handle: Handle to the profile to delete.
+
+        Returns:
+            True if deleted successfully.
+
+        Note:
+            Cannot delete predefined (NVIDIA system) profiles.
+        """
+        if not self._session:
+            self.create_session()
+            self.load_settings()
+
+        # NvAPI_DRS_DeleteProfile - interface ID 0x17093206
+        delete_profile = self._get_function(
+            "NvAPI_DRS_DeleteProfile",
+            0x17093206,
+            c_int,
+            [NvDRSSessionHandle, NvDRSProfileHandle]
+        )
+
+        status = delete_profile(self._session, profile_handle)
+
+        if status == NvAPIStatus.OK:
+            return True
+        elif status == NvAPIStatus.PROFILE_NOT_FOUND:
+            logger.warning("Profile not found for deletion")
+            return False
+        else:
+            logger.error(f"Failed to delete profile: status {status}")
+            return False
+
     def create_profile(self, profile_name: str) -> NvDRSProfileHandle:
         """Create a new profile.
 
@@ -734,12 +826,10 @@ class NVAPIDRS:
                 raise NVAPIError(f"Failed to add application '{app_name}'", status)
 
         # All versions failed - this can happen with newer drivers
-        # Log a warning but don't fail - the profile still works, just needs manual app binding
-        logger.warning(
-            f"Could not automatically bind application '{app_name}' to profile "
-            f"(driver struct version mismatch). The profile settings are saved. "
-            f"Please add the application to the profile manually using NVIDIA Control Panel "
-            f"or NVIDIA Profile Inspector."
+        # Log at debug level - the higher-level code handles the fallback
+        logger.debug(
+            f"NVAPI app binding failed for '{app_name}' (driver struct version mismatch). "
+            f"Falling back to NPI or manual instructions."
         )
         # Store the failure for reporting
         if not hasattr(self, '_app_binding_failures'):
@@ -1055,15 +1145,26 @@ class DRSProfileManager:
                 # Check if app binding succeeded
                 if drs._app_binding_failures:
                     results["app_bound"] = False
-                    results["app_binding_note"] = (
-                        f"Profile '{profile_name}' created with all settings configured. "
-                        f"Automatic app binding unavailable on this driver version. "
-                        f"To activate: NVCP > Manage 3D Settings > Program Settings > "
-                        f"Add '{app_executable}' > Select '{profile_name}'"
-                    )
-                    results["manual_instructions"] = self.get_manual_binding_instructions(
-                        profile_name, app_executable
-                    )
+
+                    # Try to launch NPI for easy app binding
+                    npi_launched = self._try_npi_for_app_binding(profile_name, app_executable)
+
+                    if npi_launched:
+                        results["app_binding_note"] = (
+                            f"Profile '{profile_name}' created with all settings. "
+                            f"NPI launched - please add '{app_executable}' to the profile and click Apply."
+                        )
+                        results["npi_launched"] = True
+                    else:
+                        results["app_binding_note"] = (
+                            f"Profile '{profile_name}' created with all settings configured. "
+                            f"Automatic app binding unavailable on this driver version. "
+                            f"To activate: NVCP > Manage 3D Settings > Program Settings > "
+                            f"Add '{app_executable}' > Select '{profile_name}'"
+                        )
+                        results["manual_instructions"] = self.get_manual_binding_instructions(
+                            profile_name, app_executable
+                        )
                 else:
                     results["app_bound"] = True
 
@@ -1249,6 +1350,198 @@ class DRSProfileManager:
             app_executable,
             {"low_latency_mode": mode}
         )
+
+    def list_profiles(
+        self,
+        include_predefined: bool = False,
+        include_empty: bool = True,
+    ) -> list[dict[str, Any]]:
+        """List all NVIDIA profiles.
+
+        Args:
+            include_predefined: Include NVIDIA's predefined system profiles.
+            include_empty: Include profiles with no applications assigned.
+
+        Returns:
+            List of profile info dicts.
+        """
+        with self._drs as drs:
+            all_profiles = drs.enumerate_profiles()
+
+        # Filter
+        result = []
+        for p in all_profiles:
+            if not include_predefined and p.get("is_predefined"):
+                continue
+            if not include_empty and p.get("num_apps", 0) == 0:
+                continue
+            result.append(p)
+
+        return result
+
+    def delete_profiles_by_name(
+        self,
+        names: list[str],
+        dry_run: bool = False,
+    ) -> dict[str, Any]:
+        """Delete profiles by name.
+
+        Args:
+            names: List of profile names to delete.
+            dry_run: If True, don't actually delete, just report what would be deleted.
+
+        Returns:
+            Dict with 'deleted', 'skipped', 'errors' lists.
+        """
+        result = {
+            "deleted": [],
+            "skipped": [],
+            "errors": [],
+            "dry_run": dry_run,
+        }
+
+        # Protected profiles that should never be deleted
+        protected_prefixes = [
+            "Base Profile",
+            "NVIDIA",
+            "_GLOBAL_DRIVER_PROFILE",
+        ]
+
+        with self._drs as drs:
+            for name in names:
+                # Check if protected
+                is_protected = any(name.startswith(p) for p in protected_prefixes)
+                if is_protected:
+                    result["skipped"].append({"name": name, "reason": "protected system profile"})
+                    continue
+
+                # Find the profile
+                try:
+                    profile = drs.find_profile_by_name(name)
+                    if not profile:
+                        result["errors"].append({"name": name, "error": "not found"})
+                        continue
+
+                    if dry_run:
+                        result["deleted"].append(name)
+                    else:
+                        if drs.delete_profile(profile):
+                            result["deleted"].append(name)
+                            logger.info(f"Deleted profile: {name}")
+                        else:
+                            result["errors"].append({"name": name, "error": "delete failed"})
+
+                except Exception as e:
+                    result["errors"].append({"name": name, "error": str(e)})
+
+            # Save if we actually deleted anything
+            if not dry_run and result["deleted"]:
+                drs.save_settings()
+
+        return result
+
+    def cleanup_unused_profiles(
+        self,
+        keep_patterns: list[str] | None = None,
+        dry_run: bool = True,
+    ) -> dict[str, Any]:
+        """Clean up unused/unknown game profiles.
+
+        Removes profiles for games that aren't in our known list, keeping
+        only ABSO profiles and user-specified patterns.
+
+        Args:
+            keep_patterns: List of name patterns to keep (case-insensitive substring match).
+            dry_run: If True, just report what would be deleted without deleting.
+
+        Returns:
+            Dict with cleanup results.
+        """
+        keep_patterns = keep_patterns or []
+
+        # Always keep these
+        always_keep = [
+            "Base Profile",
+            "NVIDIA",
+            "_GLOBAL",
+            "ABSO",
+            # Games the user might care about
+            "Rivals",
+            "Slippi",
+            "Dolphin",
+            "Melee",
+            "Diablo",
+            "Ryujinx",
+        ]
+        keep_patterns.extend(always_keep)
+
+        with self._drs as drs:
+            all_profiles = drs.enumerate_profiles()
+
+        to_delete = []
+        to_keep = []
+
+        for p in all_profiles:
+            name = p.get("name", "")
+
+            # Skip predefined NVIDIA profiles
+            if p.get("is_predefined"):
+                to_keep.append({"name": name, "reason": "predefined"})
+                continue
+
+            # Check if matches any keep pattern
+            should_keep = False
+            for pattern in keep_patterns:
+                if pattern.lower() in name.lower():
+                    should_keep = True
+                    to_keep.append({"name": name, "reason": f"matches '{pattern}'"})
+                    break
+
+            if not should_keep:
+                to_delete.append(name)
+
+        result = {
+            "total_profiles": len(all_profiles),
+            "to_delete": len(to_delete),
+            "to_keep": len(to_keep),
+            "dry_run": dry_run,
+            "delete_list": to_delete[:50],  # First 50 for preview
+            "delete_list_truncated": len(to_delete) > 50,
+        }
+
+        if not dry_run and to_delete:
+            delete_result = self.delete_profiles_by_name(to_delete, dry_run=False)
+            result["deleted"] = delete_result["deleted"]
+            result["errors"] = delete_result["errors"]
+
+        return result
+
+    def _try_npi_for_app_binding(self, profile_name: str, app_executable: str) -> bool:
+        """Try to launch NPI for easy app binding.
+
+        When NVAPI app binding fails, this launches NPI so the user can
+        easily add the application to the profile manually.
+
+        Args:
+            profile_name: The profile to bind to.
+            app_executable: The executable to add.
+
+        Returns:
+            True if NPI was launched successfully.
+        """
+        try:
+            from abso.settings.nvidia.npi import NPIManager
+
+            npi = NPIManager()
+            if npi.is_available():
+                logger.info(f"Launching NPI for app binding: {app_executable} -> {profile_name}")
+                return npi.launch_for_app_binding(profile_name, app_executable)
+            else:
+                logger.debug("NPI not available for app binding fallback")
+                return False
+        except Exception as e:
+            logger.warning(f"Failed to launch NPI for app binding: {e}")
+            return False
 
     @staticmethod
     def open_nvidia_control_panel() -> bool:

@@ -145,37 +145,6 @@ NVIDIA_PRESETS: dict[str, dict[str, Any]] = {
             ),
         },
     },
-    "vrr_ue5_fighting_game": {
-        "description": "VRR for UE5 fighting games (Rivals 2) - REQUIRES SpecialK for 0ms input latency",
-        "settings": {
-            "low_latency_mode": "on",  # On, not Ultra - SpecialK Reflex On+Boost handles latency
-            "power_management": "prefer_max_performance",
-            "vsync": "off",  # OFF - SpecialK + G-Sync handles sync
-            "max_frame_rate": "off",  # Use in-game limiter (297 for 300Hz)
-            "shader_cache": "unlimited",
-            "threaded_optimization": "off",  # OFF - critical for low latency
-            "triple_buffering": "off",  # OFF - reduces latency
-        },
-        "notes": {
-            "specialk_required": (
-                "CRITICAL: SpecialK injection via SKIF is REQUIRED for 0ms input latency. "
-                "UE5/Rivals 2 forces borderless windowed during gameplay - SpecialK overrides "
-                "this to maintain true exclusive fullscreen (window style 0x94000000)."
-            ),
-            "specialk_settings": (
-                "SpecialK config: Reflex=On+Boost, Frame Limiter=Disabled, FlipDiscard=true, "
-                "AllowTearingInDWM=true, DisableBloatWare_NVIDIA=true. SK handles priority boost."
-            ),
-            "fps_cap": (
-                "Use in-game custom FPS cap at refresh_rate - 3 (e.g., 297 for 300Hz). "
-                "Rivals 2 supports custom caps from 1-999. Enable bUseFrameRateLimit in config."
-            ),
-            "system_requirements": (
-                "HAGS=ON, VBS=OFF, Windows VRR=OFF, MPO=ENABLED. "
-                "Uninstall GeForce Experience, disable NVIDIA Shield/Broadcast."
-            ),
-        },
-    },
     "vrr_diablo4": {
         "description": "VRR for Diablo 4 with native Reflex - ultra low latency ARPG",
         "settings": {

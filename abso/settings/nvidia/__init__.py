@@ -271,6 +271,10 @@ class NvidiaSettingsHandler(SettingsHandler):
                     if note:
                         applied.append(f"NOTE: {note}")
 
+                    # If NPI was launched, add a clear message
+                    if result.get("npi_launched"):
+                        applied.append("ACTION REQUIRED: NPI opened - add the app to the profile and click Apply")
+
                 logger.info(f"NVIDIA settings applied for {game_name}: {nvidia_settings}")
 
                 return {
@@ -279,6 +283,7 @@ class NvidiaSettingsHandler(SettingsHandler):
                     "requires_reboot": False,
                     "applied": applied,
                     "app_bound": result.get("app_bound", False),
+                    "npi_launched": result.get("npi_launched", False),
                 }
             else:
                 # No executable - apply to global profile

@@ -15,7 +15,7 @@ NVCP Settings (per-game for Rivals2.exe):
 - Power Management: Prefer Maximum Performance
 - Threaded Optimization: Auto
 
-External Tools: RTSS, SpecialK, frame pacing hooks ALLOWED.
+External Tools: RTSS, frame pacing hooks ALLOWED.
 """
 
 from __future__ import annotations
@@ -228,7 +228,7 @@ class Rivals2OfflineProfile(BaseProfile):
             },
             {
                 "category": "External Tools",
-                "setting": "RTSS / SpecialK",
+                "setting": "RTSS",
                 "value": "ALLOWED",
                 "reason": "External limiters and frame pacing hooks are permitted for offline.",
             },

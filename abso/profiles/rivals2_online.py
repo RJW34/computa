@@ -20,7 +20,7 @@ NVCP Settings (per-game for Rivals2.exe):
 - Threaded Optimization: OFF (UE5 driver contention)
 - Power Management: Prefer Maximum Performance
 
-External Tools: RTSS, SpecialK, frame pacing hooks DISABLED.
+External Tools: RTSS, frame pacing hooks DISABLED.
 
 EXPLICIT PROHIBITIONS (per canonical spec):
 - LLM = Ultra (causes rollback contention)
@@ -29,7 +29,7 @@ EXPLICIT PROHIBITIONS (per canonical spec):
 - External FPS caps
 - Refresh-minus-X logic
 - Ultimate Performance plan (need scheduler headroom)
-- Injection tools (SK / RTSS)
+- Injection tools (RTSS)
 
 Canonical one-line definition:
 > Exclusive fullscreen + no sync + unlimited FPS + NV LLM ON (not Ultra) + HAGS ON + High Performance plan + no overlays
@@ -264,7 +264,7 @@ class Rivals2OnlineProfile(BaseProfile):
             },
             {
                 "category": "External Tools",
-                "setting": "RTSS / SpecialK / Frame Limiters",
+                "setting": "RTSS / Frame Limiters",
                 "value": "DISABLED",
                 "reason": "External limiters cause limiter contention with rollback. Disable all.",
             },
