@@ -37,6 +37,21 @@ class Rivals2Profile(BaseProfile):
     def executable_hints(self) -> list[str]:
         return ["Rivals2-Win64-Shipping.exe", "RivalsofAether2.exe", "Rivals2.exe"]
 
+    # === Validation Metadata Overrides ===
+
+    @property
+    def is_online_profile(self) -> bool:
+        """NOT for online play - uses LLM Ultra which causes rollback contention.
+
+        For online/ranked play, use rivals2-online profile instead.
+        """
+        return False
+
+    @property
+    def is_sdr_only(self) -> bool:
+        """Rivals 2 is SDR-only."""
+        return True
+
     def get_handlers(self) -> list[SettingsHandler]:
         from abso.settings.cnm import CNMSettingsHandler
         from abso.settings.graphics import GraphicsSettingsHandler
@@ -85,6 +100,7 @@ class Rivals2Profile(BaseProfile):
                 "auto_hdr": False,  # Keep Auto HDR off - game is SDR
                 # Windows VRR setting should be OFF - it adds latency even in fullscreen
                 "vrr_optimize": False,
+                "max_refresh_rate": True,  # Set display to max refresh rate for minimum scanout
             },
             "PowerSettingsHandler": {
                 "ensure_ultimate_performance": True,
@@ -108,6 +124,7 @@ class Rivals2Profile(BaseProfile):
                 # NO-SYNC for absolute minimum latency (Default for Rivals 2)
                 # See: rivals2-300hz-lowest-latency-guide.md for detailed rationale
                 "preset": "no_sync_fighting_game",
+                "threaded_optimization": "auto",  # Auto for Rivals 2
                 # Settings applied:
                 # - G-SYNC: Force OFF (via vrr_app_override)
                 # - VSync: OFF (no sync = no sync latency)

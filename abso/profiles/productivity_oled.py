@@ -29,11 +29,11 @@ class ProductivityOLEDProfile(BaseProfile):
 
     @property
     def profile_id(self) -> str:
-        return "productivity-oled"
+        return "productivity"
 
     @property
     def display_name(self) -> str:
-        return "Productivity (OLED + HDR)"
+        return "Desktop / Productivity"
 
     @property
     def description(self) -> str:

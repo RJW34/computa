@@ -70,6 +70,9 @@ class Diablo4Profile(BaseProfile):
                 "game_bar": False,
                 "game_dvr": False,
                 "hags": True,
+                "hdr": True,  # Diablo 4 has native HDR support
+                "auto_hdr": False,  # Native HDR, no Auto HDR needed
+                "max_refresh_rate": True,
             },
             "PowerSettingsHandler": {
                 "ensure_ultimate_performance": True,

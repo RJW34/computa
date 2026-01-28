@@ -126,32 +126,76 @@ class RegistrySettingsHandler(SettingsHandler):
         return issues
 
     def apply(self, settings: dict[str, Any]) -> dict[str, Any]:
-        """Apply registry gaming settings."""
+        """Apply registry gaming settings.
+
+        Each setting is applied independently so partial failures don't
+        prevent other settings from being applied. All errors are collected
+        and reported.
+        """
         errors: list[str] = []
+        applied: list[str] = []
 
-        try:
-            if "system_responsiveness" in settings:
+        # System Responsiveness
+        if "system_responsiveness" in settings:
+            try:
                 self._set_system_responsiveness(settings["system_responsiveness"])
+                applied.append("SystemResponsiveness")
+                logger.info(f"Set SystemResponsiveness = {settings['system_responsiveness']}")
+            except Exception as e:
+                errors.append(f"SystemResponsiveness: {e}")
+                logger.error(f"Failed to set SystemResponsiveness: {e}")
 
-            if "network_throttling" in settings:
+        # Network Throttling
+        if "network_throttling" in settings:
+            try:
                 self._set_network_throttling(settings["network_throttling"])
+                applied.append("NetworkThrottling")
+                logger.info(f"Set NetworkThrottlingIndex = 0x{settings['network_throttling']:08X}")
+            except Exception as e:
+                errors.append(f"NetworkThrottling: {e}")
+                logger.error(f"Failed to set NetworkThrottling: {e}")
 
-            if "game_priority" in settings:
+        # Game Priority
+        if "game_priority" in settings:
+            try:
                 self._set_game_priority(settings["game_priority"])
+                applied.append("GamePriority")
+                logger.info(f"Set GamePriority = {settings['game_priority']}")
+            except Exception as e:
+                errors.append(f"GamePriority: {e}")
+                logger.error(f"Failed to set GamePriority: {e}")
 
-            if "fullscreen_optimizations" in settings:
-                for exe_path, disabled in settings["fullscreen_optimizations"].items():
+        # Fullscreen Optimizations (per-exe)
+        if "fullscreen_optimizations" in settings:
+            for exe_path, disabled in settings["fullscreen_optimizations"].items():
+                try:
                     self._set_fullscreen_optimization(exe_path, disabled)
+                    applied.append(f"FSO:{exe_path}")
+                    logger.info(f"Set FullscreenOptimization for {exe_path} = {'disabled' if disabled else 'enabled'}")
+                except Exception as e:
+                    errors.append(f"FSO({exe_path}): {e}")
+                    logger.error(f"Failed to set FSO for {exe_path}: {e}")
 
-            if "win32_priority_separation" in settings:
+        # Win32PrioritySeparation (scheduler quantum)
+        if "win32_priority_separation" in settings:
+            try:
                 self._set_win32_priority_separation(settings["win32_priority_separation"])
+                applied.append("Win32PrioritySeparation")
+                logger.info(f"Set Win32PrioritySeparation = 0x{settings['win32_priority_separation']:02X}")
+            except Exception as e:
+                errors.append(f"Win32PrioritySeparation: {e}")
+                logger.error(f"Failed to set Win32PrioritySeparation: {e}")
 
-        except Exception as e:
-            errors.append(str(e))
+        # Log summary
+        if applied:
+            logger.info(f"Registry: Applied {len(applied)} settings: {', '.join(applied)}")
+        if errors:
+            logger.warning(f"Registry: {len(errors)} errors: {'; '.join(errors)}")
 
         return {
             "success": len(errors) == 0,
             "error": "; ".join(errors) if errors else None,
+            "applied": applied,
             "requires_reboot": False,
         }
 

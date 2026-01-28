@@ -29,6 +29,8 @@ foreach ($exe in $executables) {
 $gameRunning = $false
 $trayKilled = $false
 $checkCounter = 0
+$maxWaitIterations = 360  # 30 minutes at 5s intervals before giving up
+$waitIterations = 0
 
 # Check if any game process is running (optimized)
 function Test-GameRunning {
@@ -98,6 +100,15 @@ while ($true) {
         exit 0
     }
     elseif (-not $gameRunning -and -not $trayKilled) {
+        # Increment wait counter when game hasn't started yet
+        $waitIterations++
+
+        # Timeout: exit after 30 minutes of waiting for game to start
+        if ($waitIterations -ge $maxWaitIterations) {
+            # Game never started - exit quietly
+            exit 0
+        }
+
         # Check tray alive only every 3rd iteration (15s) to reduce overhead
         $checkCounter++
         if ($checkCounter -ge 3) {

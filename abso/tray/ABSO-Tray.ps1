@@ -38,6 +38,25 @@ Add-Type -AssemblyName presentationCore
 $script:SoundFile = Join-Path $PSScriptRoot "pokemon-red_blue_yellow-save-game-sound-effect.mp3"
 $script:FailSoundFile = Join-Path $PSScriptRoot "hit-weak-not-very-effective.mp3"
 
+# Reusable MediaPlayer instance to avoid memory leaks from creating new instances
+$script:MediaPlayer = $null
+
+function Get-MediaPlayer {
+    <#
+    .SYNOPSIS
+    Gets or creates a reusable MediaPlayer instance.
+    #>
+    if ($null -eq $script:MediaPlayer) {
+        $script:MediaPlayer = New-Object System.Windows.Media.MediaPlayer
+
+        # Register MediaEnded event to close the media and free resources
+        Register-ObjectEvent -InputObject $script:MediaPlayer -EventName MediaEnded -Action {
+            $script:MediaPlayer.Close()
+        } | Out-Null
+    }
+    return $script:MediaPlayer
+}
+
 function Play-SuccessSound {
     <#
     .SYNOPSIS
@@ -45,14 +64,12 @@ function Play-SuccessSound {
     #>
     try {
         if (Test-Path $script:SoundFile) {
-            $mediaPlayer = New-Object System.Windows.Media.MediaPlayer
-            $mediaPlayer.Open([Uri]$script:SoundFile)
-            $mediaPlayer.Volume = 0.20  # 20% volume
-            $mediaPlayer.Play()
+            $player = Get-MediaPlayer
+            $player.Close()  # Close any previous media
+            $player.Open([Uri]$script:SoundFile)
+            $player.Volume = 0.20  # 20% volume
+            $player.Play()
             Write-TrayLog "Playing success sound"
-
-            # Don't block - let it play in background
-            # MediaPlayer will be garbage collected after playback
         }
         else {
             Write-TrayLog "Sound file not found: $($script:SoundFile)" -Level "WARN"
@@ -66,14 +83,15 @@ function Play-SuccessSound {
 function Play-FailSound {
     <#
     .SYNOPSIS
-    Plays the fail sound effect at 20% volume when a profile apply fails.
+    Plays the fail sound effect at 100% volume when a profile apply fails.
     #>
     try {
         if (Test-Path $script:FailSoundFile) {
-            $mediaPlayer = New-Object System.Windows.Media.MediaPlayer
-            $mediaPlayer.Open([Uri]$script:FailSoundFile)
-            $mediaPlayer.Volume = 0.20  # 20% volume
-            $mediaPlayer.Play()
+            $player = Get-MediaPlayer
+            $player.Close()  # Close any previous media
+            $player.Open([Uri]$script:FailSoundFile)
+            $player.Volume = 1.0  # 100% volume
+            $player.Play()
             Write-TrayLog "Playing fail sound"
         }
         else {
@@ -83,6 +101,33 @@ function Play-FailSound {
     catch {
         Write-TrayLog "Failed to play fail sound: $($_.Exception.Message)" -Level "WARN"
     }
+}
+
+function Test-SoundFilesExist {
+    <#
+    .SYNOPSIS
+    Validates that sound effect files exist at startup and logs warnings if missing.
+    Returns true if all files exist, false otherwise.
+    #>
+    $allPresent = $true
+
+    if (-not (Test-Path $script:SoundFile)) {
+        Write-TrayLog "SUCCESS SOUND FILE MISSING: $($script:SoundFile)" -Level "WARN"
+        Write-TrayLog "Profile apply will still work, but no success sound will play." -Level "WARN"
+        $allPresent = $false
+    }
+
+    if (-not (Test-Path $script:FailSoundFile)) {
+        Write-TrayLog "FAIL SOUND FILE MISSING: $($script:FailSoundFile)" -Level "WARN"
+        Write-TrayLog "Profile apply will still work, but no fail sound will play." -Level "WARN"
+        $allPresent = $false
+    }
+
+    if ($allPresent) {
+        Write-TrayLog "Sound files validated successfully"
+    }
+
+    return $allPresent
 }
 
 # ============================================================================
@@ -187,63 +232,78 @@ $script:AppVersion = "1.2.0"
 
 $script:Profiles = [ordered]@{
     # --- Productivity ---
-    "productivity-oled" = @{
+    "productivity" = @{
         Name     = "Desktop / Productivity"
-        Sub      = "HDR + 120Hz VRR"
+        Sub      = "HDR + VRR + Balanced"
         Cat      = "Productivity"
-        Desc     = "Optimal for browsing, coding, and general desktop use. VRR on, HDR enabled, power saver GPU profile."
-        Note     = "Browsing, VS Code, Office"
+        Desc     = "Browsing, coding, general desktop. VRR on, HDR enabled."
         Exes     = @("Code.exe", "devenv.exe", "chrome.exe", "firefox.exe", "msedge.exe")
     }
 
-    # --- Fighting Games: Rivals of Aether 2 ---
+    # --- Fighting Games: Rivals 2 ---
     "rivals2-offline"   = @{
-        Name     = "Rivals 2 Training Mode"
-        Sub      = "LLM Ultra | No-Sync | Uncapped"
+        Name     = "Rivals 2: Training"
+        Sub      = "LLM Ultra | Uncapped"
         Cat      = "Fighting"
-        Desc     = "Maximum latency reduction for solo training/combo practice. LLM Ultra safe for offline. No V-Sync, no VRR, no frame cap."
-        Note     = "Training, Combos, Solo"
+        Desc     = "Training/combos. LLM Ultra, no sync, max refresh."
         Exes     = @("Rivals2-Win64-Shipping.exe", "RivalsofAether2.exe", "Rivals2.exe")
     }
     "rivals2-online"    = @{
-        Name     = "Rivals 2 Online Ranked"
-        Sub      = "LLM ON | No-Sync | Uncapped | Rollback-Safe"
+        Name     = "Rivals 2: Online"
+        Sub      = "LLM ON | 240fps | Rollback-Safe"
         Cat      = "Fighting"
-        Desc     = "Rollback-safe settings for online play. LLM ON (not Ultra), no V-Sync, no VRR, unlimited FPS. Frame pacing stability prioritized."
-        Note     = "Ranked, Online, Netplay"
+        Desc     = "Ranked/online. LLM ON (not Ultra), 240fps cap, 240Hz."
+        Exes     = @("Rivals2-Win64-Shipping.exe", "RivalsofAether2.exe", "Rivals2.exe")
+    }
+    "rivals2-tournament-sim-144hz" = @{
+        Name     = "Rivals 2: Tournament Sim"
+        Sub      = "LLM ON | 144Hz | Practice Transfer"
+        Cat      = "Fighting"
+        Desc     = "Simulates tournament PCs (144Hz). Practice transfer focus."
+        Exes     = @("Rivals2-Win64-Shipping.exe", "RivalsofAether2.exe", "Rivals2.exe")
+    }
+    "rivals2-300hz-max" = @{
+        Name     = "Rivals 2: 300Hz MAX"
+        Sub      = "LLM Ultra | 300Hz | No Compromises"
+        Cat      = "Fighting"
+        Desc     = "Maximum performance. 300Hz, LLM Ultra, Ultimate Performance."
         Exes     = @("Rivals2-Win64-Shipping.exe", "RivalsofAether2.exe", "Rivals2.exe")
     }
 
     # --- Fighting Games: Melee ---
-    # Per rollback.md canonical spec: Slippi uses NO VRR, LLM Ultra, absolute minimum latency
     "slippi-melee"      = @{
         Name     = "Slippi Melee"
-        Sub      = "LLM Ultra | No-Sync | DX12 + HAGS"
+        Sub      = "LLM Ultra | DX12 + HAGS"
         Cat      = "Fighting"
-        Desc     = "Absolute minimum latency for competitive Melee. LLM Ultra, no V-Sync, no VRR. Use DX12 backend with HAGS ON for 0.0ms render latency."
-        Note     = "Tournament mode, Online, Offline"
+        Desc     = "Competitive Melee. LLM Ultra, no sync, max refresh."
         Exes     = @("Slippi Dolphin.exe", "Dolphin.exe")
     }
 
-    # --- Fighting Games: Smash Ultimate ---
-    # Note: SSBU is 60fps like Melee - similar optimization principles apply
+    # --- Fighting Games: SSBU ---
     "ryujinx-ssbu"      = @{
         Name     = "SSBU (Ryujinx)"
-        Sub      = "LLM Ultra | No-Sync | Vulkan"
+        Sub      = "LLM Ultra | Vulkan"
         Cat      = "Fighting"
-        Desc     = "Smash Ultimate via Ryujinx for competitive play. LLM Ultra, no V-Sync, no VRR. Fixed 60fps emulator - latency-first optimization."
-        Note     = "Ryujinx emulator, Tournament/Online"
+        Desc     = "Smash Ultimate via Ryujinx. Fixed 60fps, latency-first."
         Exes     = @("Ryujinx.exe", "Ryujinx.Ava.exe", "Ryujinx.Headless.SDL2.exe")
     }
 
     # --- ARPG ---
     "diablo4"           = @{
         Name     = "Diablo 4"
-        Sub      = "Balanced | Native Reflex"
+        Sub      = "HDR + Reflex | Balanced"
         Cat      = "ARPG"
-        Desc     = "Diablo 4 with native Nvidia Reflex (LLM OFF in driver). Balanced preset for variable framerate gameplay."
-        Note     = "Reflex-enabled game"
+        Desc     = "Native HDR + Reflex. Balanced for variable FPS."
         Exes     = @("Diablo IV.exe")
+    }
+
+    # --- Shooter ---
+    "cod-bo7"           = @{
+        Name     = "CoD: Black Ops 7"
+        Sub      = "HDR + Reflex | Low Latency"
+        Cat      = "Shooter"
+        Desc     = "Native HDR + Reflex. Competitive FPS settings."
+        Exes     = @("cod.exe", "BlackOps7.exe")
     }
 }
 
@@ -775,6 +835,9 @@ function Get-LastBackupTime {
 # ============================================================================
 
 function Start-TrayApp {
+    # Validate sound files at startup
+    Test-SoundFilesExist | Out-Null
+
     $script:notifyIcon = New-Object System.Windows.Forms.NotifyIcon
     $script:notifyIcon.Icon = New-ABSOIcon
     $script:notifyIcon.Text = "A.B.S.O. - Ready"

@@ -23,19 +23,43 @@ def _get_backup_handlers() -> list[SettingsHandler]:
     """Lazily import and instantiate settings handlers for backup.
 
     This avoids circular import issues between core and settings modules.
+    All handlers that are used for audit are also backed up to ensure
+    complete restore capability.
     """
+    from abso.settings.audio import AudioSettingsHandler
+    from abso.settings.graphics import GraphicsSettingsHandler
+    from abso.settings.memory import MemorySettingsHandler
+    from abso.settings.mouse import MouseSettingsHandler
+    from abso.settings.network import NetworkSettingsHandler
     from abso.settings.nvidia import NvidiaSettingsHandler
     from abso.settings.power import PowerSettingsHandler
     from abso.settings.registry import RegistrySettingsHandler
+    from abso.settings.services import ServicesSettingsHandler
+    from abso.settings.storage import StorageSettingsHandler
+    from abso.settings.tasks import TasksSettingsHandler
     from abso.settings.timer import TimerSettingsHandler
+    from abso.settings.updates import UpdatesSettingsHandler
+    from abso.settings.visual import VisualSettingsHandler
     from abso.settings.windows import WindowsSettingsHandler
 
     return [
+        # Core handlers (always needed)
         WindowsSettingsHandler(),
         PowerSettingsHandler(),
         RegistrySettingsHandler(),
         NvidiaSettingsHandler(),
         TimerSettingsHandler(),
+        # Additional handlers for complete backup coverage
+        MouseSettingsHandler(),
+        GraphicsSettingsHandler(),
+        ServicesSettingsHandler(),
+        TasksSettingsHandler(),
+        MemorySettingsHandler(),
+        NetworkSettingsHandler(),
+        VisualSettingsHandler(),
+        StorageSettingsHandler(),
+        AudioSettingsHandler(),
+        UpdatesSettingsHandler(),
     ]
 
 

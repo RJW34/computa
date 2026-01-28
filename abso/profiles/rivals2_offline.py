@@ -124,6 +124,7 @@ class Rivals2OfflineProfile(BaseProfile):
                 "hdr": False,  # Rivals 2 is SDR
                 "auto_hdr": False,
                 "vrr_optimize": False,  # Windows VRR OFF - adds latency
+                "max_refresh_rate": True,  # Set display to max refresh rate
             },
             "PowerSettingsHandler": {
                 "ensure_ultimate_performance": True,
@@ -152,7 +153,7 @@ class Rivals2OfflineProfile(BaseProfile):
                 "vsync": "fast",  # FAST V-Sync for offline
                 "max_frame_rate": "297",  # Refresh - 3 (for 300Hz)
                 "shader_cache": "unlimited",
-                "threaded_optimization": "auto",
+                "threaded_optimization": "auto",  # Auto for Rivals 2
                 "triple_buffering": "off",
                 "game_name": "Rivals 2 Offline",
             },

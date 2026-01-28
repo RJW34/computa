@@ -144,6 +144,7 @@ class Rivals2OnlineProfile(BaseProfile):
                 "hdr": False,  # Rivals 2 is SDR
                 "auto_hdr": False,
                 "vrr_optimize": False,  # Windows VRR OFF
+                "refresh_rate": 240,  # Set refresh rate for online play
             },
             "PowerSettingsHandler": {
                 # High performance but not "ultimate" - preserve scheduler elasticity
@@ -176,7 +177,7 @@ class Rivals2OnlineProfile(BaseProfile):
                 "gsync": "off",  # OFF - No VRR for online (per canonical spec)
                 "max_frame_rate": 240,  # 240 FPS cap for stable online play
                 "shader_cache": "unlimited",
-                "threaded_optimization": "off",  # OFF - UE5 driver contention (per canonical spec)
+                "threaded_optimization": "auto",  # Auto for Rivals 2
                 "triple_buffering": "off",  # OFF - irrelevant without VSync
                 "game_name": "Rivals 2 Online",
             },

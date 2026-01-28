@@ -105,6 +105,8 @@ class SlippiMeleeProfile(BaseProfile):
                 # Even in exclusive fullscreen, VRROptimizeEnable=1 keeps Windows compositor
                 # logic active, adding ~0.1ms latency. Disabling achieves true 0.0ms render.
                 "vrr_optimize": False,
+                # Use max refresh rate for minimum scanout latency
+                "max_refresh_rate": True,
             },
             "PowerSettingsHandler": {
                 "ensure_ultimate_performance": True,

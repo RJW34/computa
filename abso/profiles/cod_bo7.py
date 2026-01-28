@@ -82,11 +82,12 @@ class CodBo7Profile(BaseProfile):
                 "game_bar": False,
                 "game_dvr": False,
                 "hags": True,  # HAGS helps latency when GFE is removed
-                # Disable HDR for competitive play - adds processing overhead
-                "hdr": False,
-                "auto_hdr": False,
+                # HDR enabled - OLED has negligible overhead, CoD has native HDR
+                "hdr": True,
+                "auto_hdr": False,  # Native HDR, no Auto HDR needed
                 # Windows VRR should be OFF - it adds latency even in fullscreen
                 "vrr_optimize": False,
+                "max_refresh_rate": True,
             },
             "PowerSettingsHandler": {
                 "ensure_ultimate_performance": True,

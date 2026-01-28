@@ -299,92 +299,19 @@ def audit(verbose: bool, json_output: bool) -> None:
 @click.option("--json", "json_output", is_flag=True, help="Output as JSON for GUI integration")
 def profiles(json_output: bool) -> None:
     """List available game optimization profiles."""
-    available_profiles = [
-        {
-            "id": "slippi-melee",
-            "display_name": "Super Smash Bros. Melee (Slippi)",
-            "description": "Ultra-low latency for competitive SSBM",
-            "optimization_target": "minimum_latency",
-            "executables": ["Slippi Dolphin.exe", "Dolphin.exe"],
-        },
-        {
-            "id": "slippi-melee-oled",
-            "display_name": "Super Smash Bros. Melee - Slippi (OLED)",
-            "description": "Ultra-low latency for OLED monitors with HDR preserved",
-            "optimization_target": "minimum_latency",
-            "executables": ["Slippi Dolphin.exe", "Dolphin.exe"],
-        },
-        {
-            "id": "rivals2",
-            "display_name": "Rivals of Aether 2",
-            "description": "VRR-optimized for UE5 fighting game",
-            "optimization_target": "vrr_fighting_game",
-            "executables": ["RivalsofAether2.exe", "Rivals2.exe"],
-        },
-        {
-            "id": "rivals2-oled",
-            "display_name": "Rivals of Aether 2 (OLED)",
-            "description": "Ultra-low latency for OLED monitors with HDR preserved",
-            "optimization_target": "minimum_latency",
-            "executables": ["RivalsofAether2.exe", "Rivals2.exe"],
-        },
-        {
-            "id": "cod-bo7",
-            "display_name": "Call of Duty: Black Ops 7",
-            "description": "Low latency with Nvidia Reflex",
-            "optimization_target": "low_latency_high_fps",
-            "executables": ["cod.exe", "BlackOps7.exe"],
-        },
-        {
-            "id": "cod-bo7-oled",
-            "display_name": "Call of Duty: Black Ops 7 (OLED)",
-            "description": "Low latency for OLED monitors with HDR preserved",
-            "optimization_target": "low_latency_high_fps",
-            "executables": ["cod.exe", "BlackOps7.exe"],
-        },
-        {
-            "id": "diablo4",
-            "display_name": "Diablo 4",
-            "description": "Balanced performance for ARPG",
-            "optimization_target": "balanced",
-            "executables": ["Diablo IV.exe"],
-        },
-        {
-            "id": "diablo4-oled",
-            "display_name": "Diablo 4 (OLED)",
-            "description": "Balanced performance for OLED monitors with HDR preserved",
-            "optimization_target": "balanced",
-            "executables": ["Diablo IV.exe"],
-        },
-        {
-            "id": "pokemon-auto-chess",
-            "display_name": "Pokemon Auto Chess",
-            "description": "WebGL browser game optimization",
-            "optimization_target": "balanced",
-            "executables": ["chrome.exe", "msedge.exe", "firefox.exe"],
-        },
-        {
-            "id": "pokemon-auto-chess-oled",
-            "display_name": "Pokemon Auto Chess (OLED)",
-            "description": "WebGL optimization for OLED monitors with HDR preserved",
-            "optimization_target": "balanced",
-            "executables": ["chrome.exe", "msedge.exe", "firefox.exe"],
-        },
-        {
-            "id": "pacdeluxe",
-            "display_name": "PACDeluxe",
-            "description": "Native Tauri client optimization",
-            "optimization_target": "smooth_framerate",
-            "executables": ["PACDeluxe.exe"],
-        },
-        {
-            "id": "pacdeluxe-oled",
-            "display_name": "PACDeluxe (OLED)",
-            "description": "Tauri client for OLED monitors with HDR preserved",
-            "optimization_target": "smooth_framerate",
-            "executables": ["PACDeluxe.exe"],
-        },
-    ]
+    # Dynamically generate profile list from ProfileApplier.PROFILES
+    applier = ProfileApplier()
+    available_profiles = []
+
+    for profile_id, profile_class in ProfileApplier.PROFILES.items():
+        profile = profile_class()
+        available_profiles.append({
+            "id": profile_id,
+            "display_name": profile.display_name,
+            "description": profile.description,
+            "optimization_target": profile.optimization_target,
+            "executables": profile.executable_hints,
+        })
 
     if json_output:
         output_json(available_profiles)
