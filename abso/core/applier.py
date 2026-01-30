@@ -318,6 +318,9 @@ class ProfileApplier:
             except (ValueError, TypeError, KeyError) as e:
                 logger.error(f"Configuration error applying {handler_name}: {e}")
                 failed.append(f"{handler_name}: Configuration error - {e}")
+            except Exception as e:
+                logger.error(f"Unexpected error applying {handler_name}: {e}")
+                failed.append(f"{handler_name}: Unexpected error - {e}")
 
         result.applied_settings = applied
         result.failed_settings = failed

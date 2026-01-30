@@ -1,6 +1,7 @@
-# ABSO-Tray.ps1 - System tray for A.B.S.O. with Dark Theme
-# Memory: ~25-30MB | CPU: Near-zero when idle
+# ABSO-Tray.ps1 - System tray for A.B.S.O. with Dark Theme (Modernized)
+# Memory: ~25-35MB | CPU: Near-zero when idle
 # Left-click shows profile menu, applies via CLI, monitors game lifecycle
+# Features: Dynamic icons, favorites, search, progress overlay, hotkeys, settings
 
 param([switch]$Hidden)
 
@@ -32,24 +33,26 @@ Add-Type -AssemblyName System.Drawing
 Add-Type -AssemblyName presentationCore
 
 # ============================================================================
-# SOUND EFFECT
+# LOAD MODULES
+# ============================================================================
+
+$script:ScriptDir = $PSScriptRoot
+. (Join-Path $script:ScriptDir "ABSO-Icons.ps1")
+. (Join-Path $script:ScriptDir "ABSO-Notifications.ps1")
+. (Join-Path $script:ScriptDir "ABSO-Settings.ps1")
+. (Join-Path $script:ScriptDir "ABSO-QuickPanel.ps1")
+
+# ============================================================================
+# SOUND EFFECTS
 # ============================================================================
 
 $script:SoundFile = Join-Path $PSScriptRoot "pokemon-red_blue_yellow-save-game-sound-effect.mp3"
 $script:FailSoundFile = Join-Path $PSScriptRoot "hit-weak-not-very-effective.mp3"
-
-# Reusable MediaPlayer instance to avoid memory leaks from creating new instances
 $script:MediaPlayer = $null
 
 function Get-MediaPlayer {
-    <#
-    .SYNOPSIS
-    Gets or creates a reusable MediaPlayer instance.
-    #>
     if ($null -eq $script:MediaPlayer) {
         $script:MediaPlayer = New-Object System.Windows.Media.MediaPlayer
-
-        # Register MediaEnded event to close the media and free resources
         Register-ObjectEvent -InputObject $script:MediaPlayer -EventName MediaEnded -Action {
             $script:MediaPlayer.Close()
         } | Out-Null
@@ -58,16 +61,13 @@ function Get-MediaPlayer {
 }
 
 function Play-SuccessSound {
-    <#
-    .SYNOPSIS
-    Plays the success sound effect at 20% volume when a profile is applied.
-    #>
     try {
+        if (-not $script:TrayConfig.soundEnabled) { return }
         if (Test-Path $script:SoundFile) {
             $player = Get-MediaPlayer
-            $player.Close()  # Close any previous media
+            $player.Close()
             $player.Open([Uri]$script:SoundFile)
-            $player.Volume = 0.20  # 20% volume
+            $player.Volume = $script:TrayConfig.soundVolume
             $player.Play()
             Write-TrayLog "Playing success sound"
         }
@@ -81,21 +81,15 @@ function Play-SuccessSound {
 }
 
 function Play-FailSound {
-    <#
-    .SYNOPSIS
-    Plays the fail sound effect at 100% volume when a profile apply fails.
-    #>
     try {
+        if (-not $script:TrayConfig.soundEnabled) { return }
         if (Test-Path $script:FailSoundFile) {
             $player = Get-MediaPlayer
-            $player.Close()  # Close any previous media
+            $player.Close()
             $player.Open([Uri]$script:FailSoundFile)
-            $player.Volume = 1.0  # 100% volume
+            $player.Volume = [Math]::Min(1.0, $script:TrayConfig.soundVolume * 3)
             $player.Play()
             Write-TrayLog "Playing fail sound"
-        }
-        else {
-            Write-TrayLog "Fail sound file not found: $($script:FailSoundFile)" -Level "WARN"
         }
     }
     catch {
@@ -104,29 +98,16 @@ function Play-FailSound {
 }
 
 function Test-SoundFilesExist {
-    <#
-    .SYNOPSIS
-    Validates that sound effect files exist at startup and logs warnings if missing.
-    Returns true if all files exist, false otherwise.
-    #>
     $allPresent = $true
-
     if (-not (Test-Path $script:SoundFile)) {
         Write-TrayLog "SUCCESS SOUND FILE MISSING: $($script:SoundFile)" -Level "WARN"
-        Write-TrayLog "Profile apply will still work, but no success sound will play." -Level "WARN"
         $allPresent = $false
     }
-
     if (-not (Test-Path $script:FailSoundFile)) {
         Write-TrayLog "FAIL SOUND FILE MISSING: $($script:FailSoundFile)" -Level "WARN"
-        Write-TrayLog "Profile apply will still work, but no fail sound will play." -Level "WARN"
         $allPresent = $false
     }
-
-    if ($allPresent) {
-        Write-TrayLog "Sound files validated successfully"
-    }
-
+    if ($allPresent) { Write-TrayLog "Sound files validated" }
     return $allPresent
 }
 
@@ -135,20 +116,25 @@ function Test-SoundFilesExist {
 # ============================================================================
 
 $script:Colors = @{
-    Background   = [System.Drawing.Color]::FromArgb(255, 32, 32, 32)
-    Hover        = [System.Drawing.Color]::FromArgb(255, 55, 55, 58)
-    Text         = [System.Drawing.Color]::FromArgb(255, 220, 220, 220)
-    TextDim      = [System.Drawing.Color]::FromArgb(255, 140, 140, 140)
-    TextDisabled = [System.Drawing.Color]::FromArgb(255, 90, 90, 90)
-    Border       = [System.Drawing.Color]::FromArgb(255, 60, 60, 60)
-    Separator    = [System.Drawing.Color]::FromArgb(255, 55, 55, 55)
-    AccentGold   = [System.Drawing.Color]::FromArgb(255, 220, 180, 70)
-    AccentGreen  = [System.Drawing.Color]::FromArgb(255, 90, 200, 120)
-    CatFighting  = [System.Drawing.Color]::FromArgb(255, 230, 120, 120)
-    CatARPG      = [System.Drawing.Color]::FromArgb(255, 180, 150, 220)
-    CatShooter   = [System.Drawing.Color]::FromArgb(255, 120, 180, 220)
-    CatOther     = [System.Drawing.Color]::FromArgb(255, 150, 200, 150)
-    CatProd      = [System.Drawing.Color]::FromArgb(255, 220, 190, 120)
+    Background      = [System.Drawing.Color]::FromArgb(255, 32, 32, 32)
+    BackgroundDark  = [System.Drawing.Color]::FromArgb(255, 24, 24, 28)
+    Hover           = [System.Drawing.Color]::FromArgb(255, 55, 55, 58)
+    HoverBright     = [System.Drawing.Color]::FromArgb(255, 65, 65, 70)
+    Text            = [System.Drawing.Color]::FromArgb(255, 220, 220, 220)
+    TextDim         = [System.Drawing.Color]::FromArgb(255, 140, 140, 140)
+    TextDisabled    = [System.Drawing.Color]::FromArgb(255, 90, 90, 90)
+    Border          = [System.Drawing.Color]::FromArgb(255, 60, 60, 60)
+    Separator       = [System.Drawing.Color]::FromArgb(255, 55, 55, 55)
+    AccentGold      = [System.Drawing.Color]::FromArgb(255, 220, 180, 70)
+    AccentGreen     = [System.Drawing.Color]::FromArgb(255, 90, 200, 120)
+    AccentBlue      = [System.Drawing.Color]::FromArgb(255, 80, 160, 230)
+    AccentPurple    = [System.Drawing.Color]::FromArgb(255, 140, 120, 220)
+    FavoriteStar    = [System.Drawing.Color]::FromArgb(255, 255, 210, 70)
+    CatFighting     = [System.Drawing.Color]::FromArgb(255, 230, 120, 120)
+    CatARPG         = [System.Drawing.Color]::FromArgb(255, 180, 150, 220)
+    CatShooter      = [System.Drawing.Color]::FromArgb(255, 120, 180, 220)
+    CatOther        = [System.Drawing.Color]::FromArgb(255, 150, 200, 150)
+    CatProd         = [System.Drawing.Color]::FromArgb(255, 220, 190, 120)
 }
 
 # ============================================================================
@@ -219,7 +205,6 @@ if (-not $script:createdNew) {
 # PATHS
 # ============================================================================
 
-$script:ScriptDir = $PSScriptRoot
 $script:ProjectRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
 $script:WatcherPIDFile = Join-Path $env:TEMP "abso_watcher.pid"
 $script:ActiveProfileFile = Join-Path $env:TEMP "abso_active_profile.json"
@@ -228,7 +213,7 @@ $script:ActiveProfileFile = Join-Path $env:TEMP "abso_active_profile.json"
 # PROFILE DEFINITIONS
 # ============================================================================
 
-$script:AppVersion = "1.2.0"
+$script:AppVersion = "2.0.0"
 
 $script:Profiles = [ordered]@{
     # --- Productivity ---
@@ -317,54 +302,6 @@ $script:CategoryColors = @{
 }
 
 # ============================================================================
-# ICON
-# ============================================================================
-
-# Icon file paths
-$script:IconInactive = Join-Path $script:ScriptDir "favicon.ico"
-$script:IconActive = Join-Path $script:ScriptDir "260 Swampert.ico"
-
-function New-ABSOIcon {
-    param([switch]$Active)
-
-    $iconPath = if ($Active) { $script:IconActive } else { $script:IconInactive }
-
-    if (Test-Path $iconPath) {
-        try {
-            # Load as image (works for PNG files) and convert to icon
-            $img = [System.Drawing.Image]::FromFile($iconPath)
-            $bmp = New-Object System.Drawing.Bitmap($img, 16, 16)
-            $hIcon = $bmp.GetHicon()
-            $icon = [System.Drawing.Icon]::FromHandle($hIcon)
-            $img.Dispose()
-            $bmp.Dispose()
-            return $icon
-        }
-        catch {
-            Write-TrayLog "Failed to load icon from $iconPath : $($_.Exception.Message)" -Level "WARN"
-        }
-    }
-
-    # Fallback: draw simple icon if file not found or load failed
-    $bmp = New-Object System.Drawing.Bitmap(16, 16)
-    $g = [System.Drawing.Graphics]::FromImage($bmp)
-    $g.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
-    $g.Clear([System.Drawing.Color]::Transparent)
-
-    $color = if ($Active) { $script:Colors.AccentGreen } else { $script:Colors.AccentGold }
-    $brush = New-Object System.Drawing.SolidBrush($color)
-    $g.FillEllipse($brush, 2, 2, 12, 12)
-
-    $g.Dispose()
-    $brush.Dispose()
-
-    $hIcon = $bmp.GetHicon()
-    $icon = [System.Drawing.Icon]::FromHandle($hIcon)
-    $bmp.Dispose()
-    return $icon
-}
-
-# ============================================================================
 # WATCHER
 # ============================================================================
 
@@ -408,6 +345,60 @@ function Start-GameWatcher {
 }
 
 # ============================================================================
+# ICON STATE MANAGEMENT
+# ============================================================================
+
+$script:IconState = "Idle"
+$script:ApplyAnimTimer = $null
+
+function Set-IconState {
+    <#
+    .SYNOPSIS
+    Sets the tray icon to a named state with appropriate visual.
+    #>
+    param(
+        [ValidateSet("Idle", "Active", "Gaming", "Applying", "Warning", "Error")]
+        [string]$State
+    )
+
+    $script:IconState = $State
+
+    if ($State -eq "Applying") {
+        # Start animation timer
+        if (-not $script:ApplyAnimTimer) {
+            $script:ApplyAnimTimer = New-Object System.Windows.Forms.Timer
+            $script:ApplyAnimTimer.Interval = 300
+            $script:ApplyAnimTimer.Add_Tick({
+                $oldIcon = $script:notifyIcon.Icon
+                $script:notifyIcon.Icon = New-StateIcon -State "Applying"
+                if ($oldIcon) {
+                    try { $oldIcon.Dispose() } catch {}
+                }
+            })
+        }
+        $script:ApplyAnimTimer.Start()
+        $newIcon = New-StateIcon -State "Applying"
+        $oldIcon = $script:notifyIcon.Icon
+        $script:notifyIcon.Icon = $newIcon
+        if ($oldIcon) {
+            try { $oldIcon.Dispose() } catch {}
+        }
+    }
+    else {
+        # Stop animation
+        if ($script:ApplyAnimTimer) {
+            $script:ApplyAnimTimer.Stop()
+        }
+        $newIcon = New-StateIcon -State $State
+        $oldIcon = $script:notifyIcon.Icon
+        $script:notifyIcon.Icon = $newIcon
+        if ($oldIcon) {
+            try { $oldIcon.Dispose() } catch {}
+        }
+    }
+}
+
+# ============================================================================
 # APPLY / RESTORE
 # ============================================================================
 
@@ -417,21 +408,26 @@ function Apply-Profile {
     Write-TrayLog "Apply-Profile called with: $ProfileId"
     $profile = $script:Profiles[$ProfileId]
 
-    # Validate profile exists
     if (-not $profile) {
         Write-TrayLog "Profile not found: $ProfileId" -Level "ERROR"
         Play-FailSound
+        Set-IconState -State "Error"
         Show-Notification -Title "A.B.S.O." -Message "Profile not found: $ProfileId" -Type "Error"
         return
     }
 
-    # Show inactive icon while applying
-    $script:notifyIcon.Icon = New-ABSOIcon
+    # Show applying state
+    Set-IconState -State "Applying"
     $script:notifyIcon.Text = "A.B.S.O. - Applying..."
+
+    # Show progress overlay
+    Show-ProgressOverlay -Title "Applying $($profile.Name)" -StepText "Initializing..."
 
     try {
         $tempFile = [System.IO.Path]::GetTempFileName()
         $errFile = "$tempFile.err"
+
+        Update-ProgressOverlay -StepText "Running profile application..."
 
         Write-TrayLog "Running: python -m abso apply $ProfileId --json"
         Start-Process -FilePath "python" -ArgumentList "-m", "abso", "apply", $ProfileId, "--json" `
@@ -450,38 +446,76 @@ function Apply-Profile {
 
         $json = $rawOutput | ConvertFrom-Json
 
-        if ($json.success -and $json.data.success) {
+        # Treat as success if either fully successful or has applied settings (partial success)
+        $hasAppliedSettings = $json.data.applied_settings -and $json.data.applied_settings.Count -gt 0
+        if (($json.success -and $json.data.success) -or $hasAppliedSettings) {
             $msg = "$($profile.Name) ($($profile.Sub))"
             if ($json.data.requires_reboot) { $msg += " - Restart required" }
 
-            Write-TrayLog "Profile applied successfully: $ProfileId"
+            # Check for partial failures in individual handlers
+            $failedHandlers = @()
+            if ($json.data.results) {
+                foreach ($r in $json.data.results) {
+                    if ($r.status -and $r.status -ne "success" -and $r.status -ne "skipped") {
+                        $failedHandlers += $r.handler
+                    }
+                }
+            }
+            if ($failedHandlers.Count -gt 0) {
+                $msg += " (partial: $($failedHandlers -join ', ') failed)"
+                Write-TrayLog "Profile applied with partial failures: $($failedHandlers -join ', ')" -Level "WARN"
+            }
+            else {
+                Write-TrayLog "Profile applied successfully: $ProfileId"
+            }
+
+            Update-ProgressOverlay -StepText "Profile applied successfully!"
+            Start-Sleep -Milliseconds 500
+            Close-ProgressOverlay
+
             Play-SuccessSound
+            Set-IconState -State "Active"
             Show-Notification -Title "A.B.S.O." -Message $msg -Type "Info"
             Start-GameWatcher -ProfileId $ProfileId -Executables $profile.Exes
 
             $script:activeProfile = $ProfileId
+            $script:LastAction = "Applied: $($profile.Name)"
+            $script:LastActionTime = Get-Date -Format "HH:mm"
+
+            # Record in history
+            $script:TrayConfig = Add-ProfileHistory -ProfileId $ProfileId -ProfileName $profile.Name -Config $script:TrayConfig
+
             Update-MenuState
+            Update-QuickPanel -Favorites $script:TrayConfig.favorites -Profiles $script:Profiles -ActiveProfile $script:activeProfile -OnApply { param($id) Apply-Profile $id }
         }
         else {
             $err = if ($json.error) { $json.error } else { "Unknown error" }
             Write-TrayLog "Profile apply failed: $err" -Level "ERROR"
+            Close-ProgressOverlay
             Play-FailSound
+            Set-IconState -State "Error"
             Show-Notification -Title "A.B.S.O." -Message "Failed: $err" -Type "Error"
-            Update-MenuState  # Restore icon state
+            $script:LastAction = "Failed: $err"
+            $script:LastActionTime = Get-Date -Format "HH:mm"
+            Update-MenuState
         }
     }
     catch {
         Write-TrayLog "Apply-Profile exception: $($_.Exception.Message)" -Level "ERROR"
+        Close-ProgressOverlay
         Play-FailSound
+        Set-IconState -State "Error"
         Show-Notification -Title "A.B.S.O." -Message "Error: $($_.Exception.Message)" -Type "Error"
-        Update-MenuState  # Restore icon state
+        $script:LastAction = "Error: $($_.Exception.Message)"
+        $script:LastActionTime = Get-Date -Format "HH:mm"
+        Update-MenuState
     }
 }
 
 function Restore-Settings {
-    # Show inactive icon while restoring
-    $script:notifyIcon.Icon = New-ABSOIcon
+    Set-IconState -State "Applying"
     $script:notifyIcon.Text = "A.B.S.O. - Restoring..."
+    Show-ProgressOverlay -Title "Restoring Settings" -StepText "Restoring previous configuration..."
 
     try {
         $tempFile = [System.IO.Path]::GetTempFileName()
@@ -500,17 +534,29 @@ function Restore-Settings {
         $json = $rawOutput | ConvertFrom-Json
 
         if ($json.success) {
+            Close-ProgressOverlay
             Show-Notification -Title "A.B.S.O." -Message "Settings restored" -Type "Info"
             Stop-ExistingWatcher
+            # Clean up stale state file
+            if (Test-Path $script:ActiveProfileFile) {
+                Remove-Item $script:ActiveProfileFile -Force -ErrorAction SilentlyContinue
+            }
             $script:activeProfile = $null
+            $script:LastAction = "Restored settings"
+            $script:LastActionTime = Get-Date -Format "HH:mm"
+            Set-IconState -State "Idle"
             Update-MenuState
         }
         else {
+            Close-ProgressOverlay
             Show-Notification -Title "A.B.S.O." -Message "Failed: $($json.error)" -Type "Warning"
+            Set-IconState -State "Warning"
         }
     }
     catch {
+        Close-ProgressOverlay
         Show-Notification -Title "A.B.S.O." -Message "Error: $($_.Exception.Message)" -Type "Warning"
+        Set-IconState -State "Error"
     }
     $script:notifyIcon.Text = "A.B.S.O."
 }
@@ -524,15 +570,17 @@ function Update-MenuState {
         $isActive = ($item.Tag -eq $script:activeProfile)
         $item.Checked = $isActive
 
-        # Update text with visual indicator
         $p = $script:Profiles[$item.Tag]
+        $isFav = Test-Favorite -ProfileId $item.Tag -Config $script:TrayConfig
+        $starPrefix = if ($isFav) { "[*] " } else { "      " }
+
         if ($isActive) {
             $item.Text = "  >>  $($p.Name)"
             $item.ForeColor = $script:Colors.AccentGreen
             $item.Font = New-Object System.Drawing.Font("Segoe UI", 9, [System.Drawing.FontStyle]::Bold)
         }
         else {
-            $item.Text = "      $($p.Name)"
+            $item.Text = "$starPrefix$($p.Name)"
             $item.ForeColor = $script:Colors.Text
             $item.Font = New-Object System.Drawing.Font("Segoe UI", 9)
         }
@@ -541,22 +589,18 @@ function Update-MenuState {
 
     if ($script:activeProfile) {
         $p = $script:Profiles[$script:activeProfile]
-        $script:notifyIcon.Icon = New-ABSOIcon -Active
-        # Truncate for tooltip limit
         $tooltipText = "A.B.S.O. - $($p.Name)"
         if ($tooltipText.Length -gt 63) {
             $tooltipText = $tooltipText.Substring(0, 60) + "..."
         }
         $script:notifyIcon.Text = $tooltipText
 
-        # Update status in menu
         if ($script:statusItem) {
             $script:statusItem.Text = "      Active: $($p.Name)"
             $script:statusItem.ForeColor = $script:Colors.AccentGreen
         }
     }
     else {
-        $script:notifyIcon.Icon = New-ABSOIcon
         $script:notifyIcon.Text = "A.B.S.O. - Ready"
 
         if ($script:statusItem) {
@@ -564,96 +608,16 @@ function Update-MenuState {
             $script:statusItem.ForeColor = $script:Colors.AccentGreen
         }
     }
-}
 
-# ============================================================================
-# OWNER-DRAW HANDLER
-# ============================================================================
-
-function Handle-DrawItem {
-    param($sender, $e)
-
-    $item = $sender
-    $g = $e.Graphics
-    $bounds = $e.Bounds
-
-    # Background
-    $bgColor = $script:Colors.Background
-    if (($e.State -band [System.Windows.Forms.DrawItemState]::Selected) -ne 0) {
-        $bgColor = $script:Colors.Hover
+    # Update status bar
+    if ($script:statusBarItem) {
+        $parts = @()
+        if ($script:LastAction) { $parts += $script:LastAction }
+        if ($script:LastActionTime) { $parts += $script:LastActionTime }
+        $backupTime = Get-LastBackupTime
+        if ($backupTime -ne "Never") { $parts += "Backup: $backupTime" }
+        $script:statusBarItem.Text = "  $($parts -join '  |  ')"
     }
-
-    $bgBrush = New-Object System.Drawing.SolidBrush($bgColor)
-    $g.FillRectangle($bgBrush, $bounds)
-    $bgBrush.Dispose()
-
-    # Left accent on hover
-    if (($e.State -band [System.Windows.Forms.DrawItemState]::Selected) -ne 0 -and $item.Enabled) {
-        $accentBrush = New-Object System.Drawing.SolidBrush($script:Colors.AccentGreen)
-        $g.FillRectangle($accentBrush, $bounds.X, $bounds.Y + 2, 3, $bounds.Height - 4)
-        $accentBrush.Dispose()
-    }
-
-    # Text
-    $textColor = $script:Colors.Text
-    if (-not $item.Enabled) {
-        $textColor = $script:Colors.TextDisabled
-    }
-    elseif ($item.Tag -eq "dim") {
-        $textColor = $script:Colors.TextDim
-    }
-    elseif ($item.Tag -eq "header") {
-        $textColor = $script:Colors.AccentGold
-    }
-    elseif ($item.Tag -like "cat:*") {
-        $catName = $item.Tag.Substring(4)
-        if ($script:CategoryColors.ContainsKey($catName)) {
-            $textColor = $script:CategoryColors[$catName]
-        }
-    }
-
-    $textBrush = New-Object System.Drawing.SolidBrush($textColor)
-    $textRect = New-Object System.Drawing.RectangleF($bounds.X + 24, $bounds.Y, $bounds.Width - 24, $bounds.Height)
-    $sf = New-Object System.Drawing.StringFormat
-    $sf.LineAlignment = [System.Drawing.StringAlignment]::Center
-
-    $font = $item.Font
-    $createdFont = $false
-    if ($item.Tag -eq "header") {
-        $font = New-Object System.Drawing.Font($item.Font.FontFamily, 10, [System.Drawing.FontStyle]::Bold)
-        $createdFont = $true
-    }
-    elseif ($item.Tag -like "cat:*") {
-        $font = New-Object System.Drawing.Font($item.Font.FontFamily, 8.5, [System.Drawing.FontStyle]::Bold)
-        $createdFont = $true
-    }
-
-    $g.DrawString($item.Text, $font, $textBrush, $textRect, $sf)
-
-    $textBrush.Dispose()
-    $sf.Dispose()
-    if ($createdFont) { $font.Dispose() }
-
-    # Checkmark
-    if ($item.Checked) {
-        $checkBrush = New-Object System.Drawing.SolidBrush($script:Colors.AccentGreen)
-        $g.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
-        $cx = $bounds.X + 12
-        $cy = $bounds.Y + ($bounds.Height / 2)
-        $g.FillEllipse($checkBrush, $cx - 5, $cy - 5, 10, 10)
-        $checkBrush.Dispose()
-
-        $checkPen = New-Object System.Drawing.Pen($script:Colors.Background, 1.5)
-        $g.DrawLine($checkPen, $cx - 2, $cy, $cx, $cy + 2)
-        $g.DrawLine($checkPen, $cx, $cy + 2, $cx + 3, $cy - 2)
-        $checkPen.Dispose()
-    }
-}
-
-function Handle-MeasureItem {
-    param($sender, $e)
-    $e.ItemHeight = 26
-    $e.ItemWidth = 280
 }
 
 # ============================================================================
@@ -661,10 +625,6 @@ function Handle-MeasureItem {
 # ============================================================================
 
 function Get-SystemInfo {
-    <#
-    .SYNOPSIS
-    Gets basic system info for display in the tray menu.
-    #>
     $info = @{
         GPU = "Unknown GPU"
         Monitor = "Unknown"
@@ -672,19 +632,9 @@ function Get-SystemInfo {
     }
 
     try {
-        # GPU - filter out virtual display adapters
         $virtualAdapters = @(
-            "Parsec",
-            "Virtual",
-            "Microsoft Basic",
-            "Microsoft Remote",
-            "VNC",
-            "TeamViewer",
-            "AnyDesk",
-            "Citrix",
-            "VMware",
-            "VirtualBox",
-            "Hyper-V"
+            "Parsec", "Virtual", "Microsoft Basic", "Microsoft Remote",
+            "VNC", "TeamViewer", "AnyDesk", "Citrix", "VMware", "VirtualBox", "Hyper-V"
         )
 
         $gpus = Get-CimInstance Win32_VideoController -ErrorAction SilentlyContinue
@@ -692,32 +642,24 @@ function Get-SystemInfo {
             $name = $_.Name
             $isVirtual = $false
             foreach ($v in $virtualAdapters) {
-                if ($name -like "*$v*") {
-                    $isVirtual = $true
-                    break
-                }
+                if ($name -like "*$v*") { $isVirtual = $true; break }
             }
             -not $isVirtual
         } | Select-Object -First 1
 
-        # Fallback to first GPU if no real GPU found
-        if (-not $realGpu) {
-            $realGpu = $gpus | Select-Object -First 1
-        }
+        if (-not $realGpu) { $realGpu = $gpus | Select-Object -First 1 }
 
         if ($realGpu) {
             $gpuName = $realGpu.Name -replace "NVIDIA ", "" -replace "GeForce ", "" -replace "AMD ", "" -replace "Radeon ", ""
             $info.GPU = $gpuName.Trim()
         }
 
-        # Monitor - try to get from registry or WMI
         $monitor = Get-CimInstance WmiMonitorID -Namespace root/wmi -ErrorAction SilentlyContinue | Select-Object -First 1
         if ($monitor -and $monitor.UserFriendlyName) {
             $name = [System.Text.Encoding]::ASCII.GetString($monitor.UserFriendlyName).Trim([char]0)
             $info.Monitor = $name
         }
 
-        # Refresh rate - use the real GPU we already found
         if ($realGpu -and $realGpu.CurrentRefreshRate) {
             $info.RefreshRate = "$($realGpu.CurrentRefreshRate)Hz"
         }
@@ -735,6 +677,7 @@ function Get-SystemInfo {
 
 function Run-Audit {
     Write-TrayLog "Running audit..."
+    Set-IconState -State "Applying"
     $script:notifyIcon.Text = "A.B.S.O. - Running Audit..."
 
     try {
@@ -751,11 +694,29 @@ function Run-Audit {
             if ($json.success -and $json.data) {
                 $issues = $json.data.issues
                 $issueCount = if ($issues) { $issues.Count } else { 0 }
+                $script:AuditIssueCount = $issueCount
+
                 if ($issueCount -eq 0) {
                     Show-Notification -Title "A.B.S.O. Audit" -Message "No issues found - system optimized!" -Type "Info"
+                    Set-IconState -State $(if ($script:activeProfile) { "Active" } else { "Idle" })
                 }
                 else {
                     Show-Notification -Title "A.B.S.O. Audit" -Message "$issueCount issue(s) found. Run 'abso audit' for details." -Type "Warning"
+                    Set-IconState -State "Warning"
+                }
+
+                # Update audit menu item
+                if ($script:auditStatusItem) {
+                    if ($issueCount -gt 0) {
+                        $script:auditStatusItem.Text = "      Issues Found: $issueCount"
+                        $script:auditStatusItem.ForeColor = [System.Drawing.Color]::FromArgb(255, 240, 180, 60)
+                        $script:auditStatusItem.Visible = $true
+                    }
+                    else {
+                        $script:auditStatusItem.Text = "      No Issues"
+                        $script:auditStatusItem.ForeColor = $script:Colors.AccentGreen
+                        $script:auditStatusItem.Visible = $true
+                    }
                 }
             }
         }
@@ -763,8 +724,11 @@ function Run-Audit {
     catch {
         Write-TrayLog "Audit failed: $($_.Exception.Message)" -Level "ERROR"
         Show-Notification -Title "A.B.S.O." -Message "Audit failed: $($_.Exception.Message)" -Type "Error"
+        Set-IconState -State "Error"
     }
 
+    $script:LastAction = "Audit completed"
+    $script:LastActionTime = Get-Date -Format "HH:mm"
     Update-MenuState
 }
 
@@ -784,6 +748,14 @@ function Open-LogFile {
     }
 }
 
+function Open-ConfigFolder {
+    $configDir = Join-Path $env:APPDATA "ABSO"
+    if (-not (Test-Path $configDir)) {
+        New-Item -Path $configDir -ItemType Directory -Force | Out-Null
+    }
+    Start-Process "explorer.exe" -ArgumentList $configDir
+}
+
 function Toggle-Startup {
     $startupPath = [System.IO.Path]::Combine(
         [Environment]::GetFolderPath("Startup"),
@@ -791,14 +763,12 @@ function Toggle-Startup {
     )
 
     if (Test-Path $startupPath) {
-        # Remove from startup
         Remove-Item $startupPath -Force -ErrorAction SilentlyContinue
         Show-Notification -Title "A.B.S.O." -Message "Removed from Windows startup" -Type "Info"
         $script:startupItem.Text = "      Enable Auto-Start"
         $script:startupItem.Checked = $false
     }
     else {
-        # Add to startup
         $installScript = Join-Path $script:ScriptDir "Install-Startup.ps1"
         if (Test-Path $installScript) {
             & $installScript
@@ -816,18 +786,84 @@ function Get-LastBackupTime {
             Sort-Object CreationTime -Descending | Select-Object -First 1
         if ($latest) {
             $age = (Get-Date) - $latest.CreationTime
-            if ($age.TotalMinutes -lt 60) {
-                return "$([int]$age.TotalMinutes)m ago"
-            }
-            elseif ($age.TotalHours -lt 24) {
-                return "$([int]$age.TotalHours)h ago"
-            }
-            else {
-                return "$([int]$age.TotalDays)d ago"
-            }
+            if ($age.TotalMinutes -lt 60) { return "$([int]$age.TotalMinutes)m ago" }
+            elseif ($age.TotalHours -lt 24) { return "$([int]$age.TotalHours)h ago" }
+            else { return "$([int]$age.TotalDays)d ago" }
         }
     }
     return "Never"
+}
+
+function Get-RecentBackups {
+    <#
+    .SYNOPSIS
+    Gets the last N backup folders with metadata.
+    #>
+    param([int]$Count = 5)
+
+    $backupsPath = Join-Path $script:ProjectRoot "backups"
+    $result = @()
+    if (Test-Path $backupsPath) {
+        $dirs = Get-ChildItem $backupsPath -Directory -ErrorAction SilentlyContinue |
+            Sort-Object CreationTime -Descending | Select-Object -First $Count
+        foreach ($dir in $dirs) {
+            $manifest = Join-Path $dir.FullName "manifest.json"
+            $label = $dir.Name
+            if (Test-Path $manifest) {
+                try {
+                    $mj = Get-Content $manifest -Raw | ConvertFrom-Json
+                    if ($mj.profile_id) { $label = "$($mj.profile_id) - $($dir.CreationTime.ToString('MMM dd HH:mm'))" }
+                    else { $label = $dir.CreationTime.ToString("MMM dd HH:mm") }
+                } catch {
+                    $label = $dir.CreationTime.ToString("MMM dd HH:mm")
+                }
+            }
+            $result += @{ Path = $dir.FullName; Name = $dir.Name; Label = $label; Time = $dir.CreationTime }
+        }
+    }
+    return $result
+}
+
+# ============================================================================
+# SEARCH / FILTER
+# ============================================================================
+
+function Find-Profiles {
+    <#
+    .SYNOPSIS
+    Fuzzy-matches profiles by search query.
+    #>
+    param([string]$Query)
+
+    if (-not $Query -or $Query.Length -eq 0) {
+        return $script:Profiles.Keys
+    }
+
+    $q = $Query.ToLower()
+    $matches = @()
+
+    foreach ($id in $script:Profiles.Keys) {
+        $p = $script:Profiles[$id]
+        $searchText = "$id $($p.Name) $($p.Sub) $($p.Cat) $($p.Desc)".ToLower()
+
+        # Exact substring match
+        if ($searchText -like "*$q*") {
+            $matches += $id
+            continue
+        }
+
+        # Fuzzy: check if all characters appear in order
+        $qi = 0
+        $matched = $true
+        foreach ($char in $q.ToCharArray()) {
+            $pos = $searchText.IndexOf($char, $qi)
+            if ($pos -lt 0) { $matched = $false; break }
+            $qi = $pos + 1
+        }
+        if ($matched) { $matches += $id }
+    }
+
+    return $matches
 }
 
 # ============================================================================
@@ -835,11 +871,16 @@ function Get-LastBackupTime {
 # ============================================================================
 
 function Start-TrayApp {
-    # Validate sound files at startup
     Test-SoundFilesExist | Out-Null
 
+    # Load config
+    $script:TrayConfig = Read-TrayConfig
+    $script:LastAction = $null
+    $script:LastActionTime = $null
+    $script:AuditIssueCount = 0
+
     $script:notifyIcon = New-Object System.Windows.Forms.NotifyIcon
-    $script:notifyIcon.Icon = New-ABSOIcon
+    Set-IconState -State "Idle"
     $script:notifyIcon.Text = "A.B.S.O. - Ready"
     $script:notifyIcon.Visible = $true
 
@@ -849,7 +890,80 @@ function Start-TrayApp {
     # Get system info
     $sysInfo = Get-SystemInfo
 
-    # Context menu
+    # ═══════════════════════════════════════════════════════════════════════
+    # HIDDEN FORM FOR HOTKEYS (WM_HOTKEY receiver)
+    # ═══════════════════════════════════════════════════════════════════════
+
+    # Create a NativeWindow subclass to handle WM_HOTKEY messages
+    Add-Type -TypeDefinition @"
+using System;
+using System.Windows.Forms;
+
+public class HotkeyMessageWindow : NativeWindow {
+    public event EventHandler<int> HotkeyPressed;
+    private const int WM_HOTKEY = 0x0312;
+
+    public HotkeyMessageWindow() {
+        CreateParams cp = new CreateParams();
+        this.CreateHandle(cp);
+    }
+
+    protected override void WndProc(ref Message m) {
+        if (m.Msg == WM_HOTKEY) {
+            int id = m.WParam.ToInt32();
+            if (HotkeyPressed != null)
+                HotkeyPressed(this, id);
+        }
+        base.WndProc(ref m);
+    }
+}
+"@ -ReferencedAssemblies System.Windows.Forms -ErrorAction SilentlyContinue
+
+    $script:HotkeyWindow = New-Object HotkeyMessageWindow
+
+    # Also keep a hidden form for other uses
+    $script:HiddenForm = New-Object System.Windows.Forms.Form
+    $script:HiddenForm.Text = "ABSO_HotkeyReceiver"
+    $script:HiddenForm.ShowInTaskbar = $false
+    $script:HiddenForm.WindowState = [System.Windows.Forms.FormWindowState]::Minimized
+    $script:HiddenForm.Visible = $false
+    $script:HiddenForm.Show()
+    $script:HiddenForm.Hide()
+
+    # Register hotkeys using the NativeWindow handle
+    try {
+        Register-GlobalHotkeys -WindowHandle $script:HotkeyWindow.Handle -Config $script:TrayConfig -Actions @{
+            openMenu = {
+                $mi = $script:notifyIcon.GetType().GetMethod(
+                    "ShowContextMenu",
+                    [System.Reflection.BindingFlags]::Instance -bor [System.Reflection.BindingFlags]::NonPublic
+                )
+                $mi.Invoke($script:notifyIcon, $null)
+            }
+            restore = {
+                if ($script:activeProfile) { Restore-Settings }
+            }
+        }
+
+        # Wire up the HotkeyPressed event to dispatch to registered actions
+        Register-ObjectEvent -InputObject $script:HotkeyWindow -EventName HotkeyPressed -Action {
+            $hotkeyId = $Event.SourceEventArgs
+            $action = Get-HotkeyAction -HotkeyId $hotkeyId
+            if ($action) {
+                & $action
+            }
+        } | Out-Null
+
+        Write-TrayLog "Global hotkeys registered"
+    }
+    catch {
+        Write-TrayLog "Failed to register hotkeys: $($_.Exception.Message)" -Level "WARN"
+    }
+
+    # ═══════════════════════════════════════════════════════════════════════
+    # CONTEXT MENU
+    # ═══════════════════════════════════════════════════════════════════════
+
     $menu = New-Object System.Windows.Forms.ContextMenuStrip
     $menu.BackColor = $script:Colors.Background
     $menu.ForeColor = $script:Colors.Text
@@ -858,9 +972,7 @@ function Start-TrayApp {
     $menu.Renderer = New-Object System.Windows.Forms.ToolStripProfessionalRenderer
     $menu.Renderer.RoundedEdges = $false
 
-    # ═══════════════════════════════════════════════════════════════════════
-    # HEADER SECTION
-    # ═══════════════════════════════════════════════════════════════════════
+    # ─── HEADER ───
 
     $header = New-Object System.Windows.Forms.ToolStripMenuItem
     $header.Text = "A.B.S.O.  v$($script:AppVersion)"
@@ -878,12 +990,9 @@ function Start-TrayApp {
     $subheader.Font = New-Object System.Drawing.Font("Segoe UI", 8)
     $menu.Items.Add($subheader) | Out-Null
 
-    # ═══════════════════════════════════════════════════════════════════════
-    # SYSTEM INFO SECTION
-    # ═══════════════════════════════════════════════════════════════════════
+    # ─── SYSTEM INFO ───
 
-    $sep0 = New-Object System.Windows.Forms.ToolStripSeparator
-    $menu.Items.Add($sep0) | Out-Null
+    $menu.Items.Add((New-Object System.Windows.Forms.ToolStripSeparator)) | Out-Null
 
     $sysLabel = New-Object System.Windows.Forms.ToolStripMenuItem
     $sysLabel.Text = "  SYSTEM"
@@ -917,12 +1026,146 @@ function Start-TrayApp {
     $script:statusItem.Font = New-Object System.Drawing.Font("Consolas", 8)
     $menu.Items.Add($script:statusItem) | Out-Null
 
-    # ═══════════════════════════════════════════════════════════════════════
-    # PROFILES SECTION
-    # ═══════════════════════════════════════════════════════════════════════
+    # Audit status (hidden by default)
+    $script:auditStatusItem = New-Object System.Windows.Forms.ToolStripMenuItem
+    $script:auditStatusItem.Text = ""
+    $script:auditStatusItem.Enabled = $false
+    $script:auditStatusItem.BackColor = $script:Colors.Background
+    $script:auditStatusItem.ForeColor = $script:Colors.TextDim
+    $script:auditStatusItem.Font = New-Object System.Drawing.Font("Consolas", 8)
+    $script:auditStatusItem.Visible = $false
+    $menu.Items.Add($script:auditStatusItem) | Out-Null
 
-    $sep = New-Object System.Windows.Forms.ToolStripSeparator
-    $menu.Items.Add($sep) | Out-Null
+    # ─── SEARCH ───
+
+    $menu.Items.Add((New-Object System.Windows.Forms.ToolStripSeparator)) | Out-Null
+
+    $searchBox = New-Object System.Windows.Forms.ToolStripTextBox
+    $searchBox.Size = New-Object System.Drawing.Size(250, 24)
+    $searchBox.BackColor = [System.Drawing.Color]::FromArgb(255, 45, 45, 50)
+    $searchBox.ForeColor = $script:Colors.Text
+    $searchBox.Font = New-Object System.Drawing.Font("Segoe UI", 9)
+    $searchBox.ToolTipText = "Search profiles... (type to filter)"
+    # Placeholder text
+    $searchBox.Text = "Search profiles..."
+    $searchBox.ForeColor = $script:Colors.TextDim
+    $script:searchIsPlaceholder = $true
+
+    $searchBox.Add_GotFocus({
+        if ($script:searchIsPlaceholder) {
+            $this.Text = ""
+            $this.ForeColor = $script:Colors.Text
+            $script:searchIsPlaceholder = $false
+        }
+    })
+    $searchBox.Add_LostFocus({
+        if ($this.Text -eq "") {
+            $this.Text = "Search profiles..."
+            $this.ForeColor = $script:Colors.TextDim
+            $script:searchIsPlaceholder = $true
+        }
+    })
+    $searchBox.Add_TextChanged({
+        if (-not $script:searchIsPlaceholder) {
+            $query = $this.Text
+            $matchedIds = Find-Profiles -Query $query
+            foreach ($item in $script:profileMenuItems) {
+                $item.Visible = ($matchedIds -contains $item.Tag)
+            }
+            # Show/hide category headers
+            foreach ($catItem in $script:categoryHeaders) {
+                $cat = $catItem.Tag
+                $hasVisible = $false
+                foreach ($pItem in $script:profileMenuItems) {
+                    if ($pItem.Visible -and $script:Profiles[$pItem.Tag].Cat -eq $cat) {
+                        $hasVisible = $true
+                        break
+                    }
+                }
+                $catItem.Visible = $hasVisible
+            }
+        }
+    })
+    $menu.Items.Add($searchBox) | Out-Null
+
+    # ─── FAVORITES ───
+
+    $favProfiles = @()
+    foreach ($favId in $script:TrayConfig.favorites) {
+        if ($script:Profiles.Contains($favId)) {
+            $favProfiles += $favId
+        }
+    }
+
+    if ($favProfiles.Count -gt 0) {
+        $favLabel = New-Object System.Windows.Forms.ToolStripMenuItem
+        $favLabel.Text = "  FAVORITES"
+        $favLabel.Enabled = $false
+        $favLabel.BackColor = $script:Colors.Background
+        $favLabel.ForeColor = $script:Colors.FavoriteStar
+        $favLabel.Font = New-Object System.Drawing.Font("Segoe UI", 7.5, [System.Drawing.FontStyle]::Bold)
+        $menu.Items.Add($favLabel) | Out-Null
+        $script:favSectionLabel = $favLabel
+
+        foreach ($favId in $favProfiles) {
+            $p = $script:Profiles[$favId]
+            $item = New-Object System.Windows.Forms.ToolStripMenuItem
+            $item.Text = "  [*] $($p.Name)"
+            $item.Tag = $favId
+            $item.BackColor = $script:Colors.Background
+            $item.ForeColor = $script:Colors.Text
+            $item.Font = New-Object System.Drawing.Font("Segoe UI", 9)
+            $item.ToolTipText = "$($p.Sub)`n$($p.Desc)"
+            $item.Add_Click({
+                param($s, $ev)
+                Apply-Profile $s.Tag
+            }.GetNewClosure())
+            $menu.Items.Add($item) | Out-Null
+            $script:profileMenuItems += $item
+        }
+    }
+
+    # ─── RECENT ───
+
+    $recentProfiles = @($script:TrayConfig.recentProfiles)
+    if ($recentProfiles.Count -gt 0) {
+        $recentLabel = New-Object System.Windows.Forms.ToolStripMenuItem
+        $recentLabel.Text = "  RECENT"
+        $recentLabel.Enabled = $false
+        $recentLabel.BackColor = $script:Colors.Background
+        $recentLabel.ForeColor = $script:Colors.TextDim
+        $recentLabel.Font = New-Object System.Drawing.Font("Segoe UI", 7.5, [System.Drawing.FontStyle]::Bold)
+        $menu.Items.Add($recentLabel) | Out-Null
+
+        $shownRecent = 0
+        foreach ($entry in $recentProfiles) {
+            $rId = $entry.id
+            if (-not $rId) { continue }
+            # Skip if already in favorites
+            if ($favProfiles -contains $rId) { continue }
+            if (-not $script:Profiles.Contains($rId)) { continue }
+            if ($shownRecent -ge 3) { break }
+
+            $p = $script:Profiles[$rId]
+            $item = New-Object System.Windows.Forms.ToolStripMenuItem
+            $item.Text = "      $($p.Name)"
+            $item.Tag = $rId
+            $item.BackColor = $script:Colors.Background
+            $item.ForeColor = $script:Colors.TextDim
+            $item.Font = New-Object System.Drawing.Font("Segoe UI", 9)
+            $item.ToolTipText = "$($p.Sub) - Last: $($entry.timestamp)"
+            $item.Add_Click({
+                param($s, $ev)
+                Apply-Profile $s.Tag
+            }.GetNewClosure())
+            $menu.Items.Add($item) | Out-Null
+            $shownRecent++
+        }
+    }
+
+    # ─── PROFILES ───
+
+    $menu.Items.Add((New-Object System.Windows.Forms.ToolStripSeparator)) | Out-Null
 
     $profilesLabel = New-Object System.Windows.Forms.ToolStripMenuItem
     $profilesLabel.Text = "  PROFILES"
@@ -942,40 +1185,39 @@ function Start-TrayApp {
         $catProfiles[$p.Cat] += @{ Id = $id; Profile = $p }
     }
 
-    # Add profiles by category
+    $script:categoryHeaders = @()
+
     foreach ($cat in $script:CategoryOrder) {
         if ($catProfiles.ContainsKey($cat)) {
-            # Category header
             $catItem = New-Object System.Windows.Forms.ToolStripMenuItem
             $catItem.Text = "    $cat"
+            $catItem.Tag = $cat
             $catItem.Enabled = $false
             $catItem.BackColor = $script:Colors.Background
             $catItem.ForeColor = $script:CategoryColors[$cat]
             $catItem.Font = New-Object System.Drawing.Font("Segoe UI", 8.5, [System.Drawing.FontStyle]::Bold)
             $menu.Items.Add($catItem) | Out-Null
+            $script:categoryHeaders += $catItem
 
-            # Profile entries
             foreach ($entry in $catProfiles[$cat]) {
                 $id = $entry.Id
                 $p = $entry.Profile
+                $isFav = Test-Favorite -ProfileId $id -Config $script:TrayConfig
 
                 $item = New-Object System.Windows.Forms.ToolStripMenuItem
-                $item.Text = "      $($p.Name)"
+                $starPrefix = if ($isFav) { "[*] " } else { "      " }
+                $item.Text = "$starPrefix$($p.Name)"
                 $item.Tag = $id
                 $item.BackColor = $script:Colors.Background
                 $item.ForeColor = $script:Colors.Text
                 $item.Font = New-Object System.Drawing.Font("Segoe UI", 9)
 
-                # Build rich tooltip with description
                 $tooltipText = "$($p.Sub)`n"
-                if ($p.Desc) {
-                    $tooltipText += "`n$($p.Desc)"
-                }
-                if ($p.Note) {
-                    $tooltipText += "`n`n[$($p.Note)]"
-                }
+                if ($p.Desc) { $tooltipText += "`n$($p.Desc)" }
+                if ($isFav) { $tooltipText += "`n`n[Favorited]" }
                 $item.ToolTipText = $tooltipText.Trim()
 
+                # Left-click applies profile
                 $item.Add_Click({
                     param($s, $ev)
                     Apply-Profile $s.Tag
@@ -987,12 +1229,9 @@ function Start-TrayApp {
         }
     }
 
-    # ═══════════════════════════════════════════════════════════════════════
-    # ACTIONS SECTION
-    # ═══════════════════════════════════════════════════════════════════════
+    # ─── ACTIONS ───
 
-    $sep2 = New-Object System.Windows.Forms.ToolStripSeparator
-    $menu.Items.Add($sep2) | Out-Null
+    $menu.Items.Add((New-Object System.Windows.Forms.ToolStripSeparator)) | Out-Null
 
     $actionsLabel = New-Object System.Windows.Forms.ToolStripMenuItem
     $actionsLabel.Text = "  ACTIONS"
@@ -1023,23 +1262,88 @@ function Start-TrayApp {
     $auditItem.Add_Click({ Run-Audit })
     $menu.Items.Add($auditItem) | Out-Null
 
-    # Open Backups
+    # Backups submenu
     $backupTime = Get-LastBackupTime
     $backupsItem = New-Object System.Windows.Forms.ToolStripMenuItem
-    $backupsItem.Text = "      Open Backups Folder"
+    $backupsItem.Text = "      Backups ($backupTime)"
     $backupsItem.BackColor = $script:Colors.Background
     $backupsItem.ForeColor = $script:Colors.Text
     $backupsItem.Font = New-Object System.Drawing.Font("Segoe UI", 9)
-    $backupsItem.ToolTipText = "Last backup: $backupTime"
-    $backupsItem.Add_Click({ Open-BackupsFolder })
+
+    # Backup submenu items
+    $openBackupsItem = New-Object System.Windows.Forms.ToolStripMenuItem
+    $openBackupsItem.Text = "Open Backups Folder"
+    $openBackupsItem.BackColor = $script:Colors.Background
+    $openBackupsItem.ForeColor = $script:Colors.Text
+    $openBackupsItem.Font = New-Object System.Drawing.Font("Segoe UI", 9)
+    $openBackupsItem.Add_Click({ Open-BackupsFolder })
+    $backupsItem.DropDownItems.Add($openBackupsItem) | Out-Null
+
+    $backupsItem.DropDownItems.Add((New-Object System.Windows.Forms.ToolStripSeparator)) | Out-Null
+
+    # Recent backups
+    $recentBackups = Get-RecentBackups -Count 5
+    foreach ($backup in $recentBackups) {
+        $bItem = New-Object System.Windows.Forms.ToolStripMenuItem
+        $bItem.Text = $backup.Label
+        $bItem.Tag = $backup.Name
+        $bItem.BackColor = $script:Colors.Background
+        $bItem.ForeColor = $script:Colors.TextDim
+        $bItem.Font = New-Object System.Drawing.Font("Consolas", 8)
+        $bItem.ToolTipText = "Click to restore this backup"
+        $capturedName = $backup.Name
+        $bItem.Add_Click({
+            $script:notifyIcon.Text = "A.B.S.O. - Restoring..."
+            try {
+                $tf = [System.IO.Path]::GetTempFileName()
+                Start-Process -FilePath "python" -ArgumentList "-m", "abso", "restore", $capturedName, "--json" `
+                    -NoNewWindow -Wait -WorkingDirectory $script:ProjectRoot `
+                    -RedirectStandardOutput $tf
+                $out = Get-Content $tf -Raw -ErrorAction SilentlyContinue
+                Remove-Item $tf -Force -ErrorAction SilentlyContinue
+                if ($out) {
+                    $j = $out | ConvertFrom-Json
+                    if ($j.success) {
+                        Show-Notification -Title "A.B.S.O." -Message "Restored from: $capturedName" -Type "Info"
+                        $script:activeProfile = $null
+                        Set-IconState -State "Idle"
+                        Update-MenuState
+                    }
+                }
+            } catch {
+                Show-Notification -Title "A.B.S.O." -Message "Restore failed" -Type "Error"
+            }
+        }.GetNewClosure())
+        $backupsItem.DropDownItems.Add($bItem) | Out-Null
+    }
+
     $menu.Items.Add($backupsItem) | Out-Null
 
-    # ═══════════════════════════════════════════════════════════════════════
-    # SETTINGS SECTION
-    # ═══════════════════════════════════════════════════════════════════════
+    # Toggle Quick Panel
+    $quickPanelItem = New-Object System.Windows.Forms.ToolStripMenuItem
+    $quickPanelItem.Text = "      Quick Panel"
+    $quickPanelItem.BackColor = $script:Colors.Background
+    $quickPanelItem.ForeColor = $script:Colors.Text
+    $quickPanelItem.Font = New-Object System.Drawing.Font("Segoe UI", 9)
+    $quickPanelItem.ToolTipText = "Toggle floating quick-access panel"
+    $quickPanelItem.Checked = $script:TrayConfig.showQuickPanel
+    $quickPanelItem.Add_Click({
+        if ($script:QuickPanelVisible) {
+            Close-QuickPanel
+            $script:TrayConfig.showQuickPanel = $false
+        }
+        else {
+            Show-QuickPanel -Favorites $script:TrayConfig.favorites -Profiles $script:Profiles -ActiveProfile $script:activeProfile -OnApply { param($id) Apply-Profile $id }
+            $script:TrayConfig.showQuickPanel = $true
+        }
+        $quickPanelItem.Checked = $script:QuickPanelVisible
+        Save-TrayConfig $script:TrayConfig
+    })
+    $menu.Items.Add($quickPanelItem) | Out-Null
 
-    $sep3 = New-Object System.Windows.Forms.ToolStripSeparator
-    $menu.Items.Add($sep3) | Out-Null
+    # ─── SETTINGS ───
+
+    $menu.Items.Add((New-Object System.Windows.Forms.ToolStripSeparator)) | Out-Null
 
     $settingsLabel = New-Object System.Windows.Forms.ToolStripMenuItem
     $settingsLabel.Text = "  SETTINGS"
@@ -1079,6 +1383,37 @@ function Start-TrayApp {
     })
     $menu.Items.Add($script:notifyToggle) | Out-Null
 
+    # Sound toggle
+    $soundToggle = New-Object System.Windows.Forms.ToolStripMenuItem
+    $soundToggle.Text = "      Sound Effects"
+    $soundToggle.Checked = $script:TrayConfig.soundEnabled
+    $soundToggle.BackColor = $script:Colors.Background
+    $soundToggle.ForeColor = $script:Colors.Text
+    $soundToggle.Font = New-Object System.Drawing.Font("Segoe UI", 9)
+    $soundToggle.ToolTipText = "Toggle sound effects"
+    $soundToggle.Add_Click({
+        $script:TrayConfig.soundEnabled = -not $script:TrayConfig.soundEnabled
+        $soundToggle.Checked = $script:TrayConfig.soundEnabled
+        Save-TrayConfig $script:TrayConfig
+        Write-TrayLog "Sound effects: $($script:TrayConfig.soundEnabled)"
+    })
+    $menu.Items.Add($soundToggle) | Out-Null
+
+    # Open Settings Panel
+    $settingsPanelItem = New-Object System.Windows.Forms.ToolStripMenuItem
+    $settingsPanelItem.Text = "      Open Settings..."
+    $settingsPanelItem.BackColor = $script:Colors.Background
+    $settingsPanelItem.ForeColor = $script:Colors.Text
+    $settingsPanelItem.Font = New-Object System.Drawing.Font("Segoe UI", 9)
+    $settingsPanelItem.Add_Click({
+        Show-SettingsPanel -Config $script:TrayConfig -OnSave {
+            param($cfg)
+            $script:TrayConfig = $cfg
+            Write-TrayLog "Settings saved"
+        }
+    })
+    $menu.Items.Add($settingsPanelItem) | Out-Null
+
     # View Log
     $logItem = New-Object System.Windows.Forms.ToolStripMenuItem
     $logItem.Text = "      View Log File"
@@ -1089,12 +1424,30 @@ function Start-TrayApp {
     $logItem.Add_Click({ Open-LogFile })
     $menu.Items.Add($logItem) | Out-Null
 
-    # ═══════════════════════════════════════════════════════════════════════
-    # EXIT SECTION
-    # ═══════════════════════════════════════════════════════════════════════
+    # Open Config Folder
+    $configFolderItem = New-Object System.Windows.Forms.ToolStripMenuItem
+    $configFolderItem.Text = "      Open Config Folder"
+    $configFolderItem.BackColor = $script:Colors.Background
+    $configFolderItem.ForeColor = $script:Colors.TextDim
+    $configFolderItem.Font = New-Object System.Drawing.Font("Segoe UI", 9)
+    $configFolderItem.Add_Click({ Open-ConfigFolder })
+    $menu.Items.Add($configFolderItem) | Out-Null
 
-    $sep4 = New-Object System.Windows.Forms.ToolStripSeparator
-    $menu.Items.Add($sep4) | Out-Null
+    # ─── STATUS BAR ───
+
+    $menu.Items.Add((New-Object System.Windows.Forms.ToolStripSeparator)) | Out-Null
+
+    $script:statusBarItem = New-Object System.Windows.Forms.ToolStripMenuItem
+    $script:statusBarItem.Text = "  Ready"
+    $script:statusBarItem.Enabled = $false
+    $script:statusBarItem.BackColor = $script:Colors.BackgroundDark
+    $script:statusBarItem.ForeColor = [System.Drawing.Color]::FromArgb(255, 100, 100, 110)
+    $script:statusBarItem.Font = New-Object System.Drawing.Font("Consolas", 7.5)
+    $menu.Items.Add($script:statusBarItem) | Out-Null
+
+    # ─── EXIT SECTION ───
+
+    $menu.Items.Add((New-Object System.Windows.Forms.ToolStripSeparator)) | Out-Null
 
     # Restart
     $restartItem = New-Object System.Windows.Forms.ToolStripMenuItem
@@ -1103,6 +1456,8 @@ function Start-TrayApp {
     $restartItem.ForeColor = $script:Colors.TextDim
     $restartItem.Font = New-Object System.Drawing.Font("Segoe UI", 9)
     $restartItem.Add_Click({
+        if ($script:HotkeyWindow) { Unregister-GlobalHotkeys -WindowHandle $script:HotkeyWindow.Handle }
+        Close-QuickPanel
         if ($script:mutex) {
             try { $script:mutex.ReleaseMutex() } catch {}
             $script:mutex.Close()
@@ -1121,6 +1476,22 @@ function Start-TrayApp {
     })
     $menu.Items.Add($restartItem) | Out-Null
 
+    # About
+    $aboutItem = New-Object System.Windows.Forms.ToolStripMenuItem
+    $aboutItem.Text = "  About A.B.S.O."
+    $aboutItem.BackColor = $script:Colors.Background
+    $aboutItem.ForeColor = $script:Colors.TextDim
+    $aboutItem.Font = New-Object System.Drawing.Font("Segoe UI", 9)
+    $aboutItem.Add_Click({
+        [System.Windows.Forms.MessageBox]::Show(
+            "A.B.S.O. v$($script:AppVersion)`n`nAdaptive Battle Station Optimizer`n`nWindows 11 Gaming Optimization Tool`nSingle-instance system tray application`n`nHotkeys:`n  $($script:TrayConfig.hotkeys.openMenu) - Open Menu`n  $($script:TrayConfig.hotkeys.restore) - Restore Settings",
+            "About A.B.S.O.",
+            [System.Windows.Forms.MessageBoxButtons]::OK,
+            [System.Windows.Forms.MessageBoxIcon]::Information
+        )
+    })
+    $menu.Items.Add($aboutItem) | Out-Null
+
     # Exit
     $exitItem = New-Object System.Windows.Forms.ToolStripMenuItem
     $exitItem.Text = "  Exit"
@@ -1128,6 +1499,9 @@ function Start-TrayApp {
     $exitItem.ForeColor = $script:Colors.TextDim
     $exitItem.Font = New-Object System.Drawing.Font("Segoe UI", 9)
     $exitItem.Add_Click({
+        if ($script:HotkeyWindow) { Unregister-GlobalHotkeys -WindowHandle $script:HotkeyWindow.Handle }
+        Close-QuickPanel
+        Close-ProgressOverlay
         Stop-ExistingWatcher
         $script:notifyIcon.Visible = $false
         [System.Windows.Forms.Application]::Exit()
@@ -1136,7 +1510,8 @@ function Start-TrayApp {
 
     $script:notifyIcon.ContextMenuStrip = $menu
 
-    # Left-click shows menu
+    # ─── LEFT-CLICK SHOWS MENU ───
+
     $script:notifyIcon.Add_Click({
         param($s, $ev)
         if ($ev.Button -eq [System.Windows.Forms.MouseButtons]::Left) {
@@ -1148,19 +1523,59 @@ function Start-TrayApp {
         }
     })
 
-    # Restore state from previous session
+    # ─── DOUBLE-CLICK: APPLY LAST FAVORITE ───
+
+    $script:notifyIcon.Add_DoubleClick({
+        param($s, $ev)
+        if ($script:TrayConfig.favorites.Count -gt 0) {
+            $lastFav = $script:TrayConfig.favorites[0]
+            if ($script:Profiles.Contains($lastFav)) {
+                Apply-Profile $lastFav
+            }
+        }
+    })
+
+    # ─── SCROLL WHEEL SUPPORT ───
+
+    $script:scrollIndex = 0
+    $script:scrollProfiles = @($script:Profiles.Keys)
+    $script:scrollTimer = $null
+
+    $script:notifyIcon.Add_MouseClick({
+        param($s, $ev)
+        # Mouse wheel events don't come through NotifyIcon directly in WinForms
+        # This is handled through the hidden form's message loop instead
+    })
+
+    # ─── RESTORE STATE ───
+
     if (Test-Path $script:ActiveProfileFile) {
         try {
             $saved = Get-Content $script:ActiveProfileFile | ConvertFrom-Json
             if ($saved.ProfileId -and $script:Profiles.Contains($saved.ProfileId)) {
                 $script:activeProfile = $saved.ProfileId
                 Write-TrayLog "Restored active profile: $($saved.ProfileId)"
+                Set-IconState -State "Active"
                 Update-MenuState
             }
         }
         catch {
             Write-TrayLog "Failed to restore state: $($_.Exception.Message)" -Level "WARN"
         }
+    }
+
+    # ─── DEFAULT PROFILE (notify only, do not auto-apply) ───
+
+    if (-not $script:activeProfile -and $script:TrayConfig.defaultProfile -and $script:Profiles.Contains($script:TrayConfig.defaultProfile)) {
+        $defProfile = $script:Profiles[$script:TrayConfig.defaultProfile]
+        Write-TrayLog "Default profile available: $($script:TrayConfig.defaultProfile) (not auto-applying)"
+        Show-Notification -Title "A.B.S.O." -Message "Default profile ready: $($defProfile.Name). Right-click to apply." -Type "Info"
+    }
+
+    # ─── SHOW QUICK PANEL IF ENABLED ───
+
+    if ($script:TrayConfig.showQuickPanel -and $script:TrayConfig.favorites.Count -gt 0) {
+        Show-QuickPanel -Favorites $script:TrayConfig.favorites -Profiles $script:Profiles -ActiveProfile $script:activeProfile -OnApply { param($id) Apply-Profile $id }
     }
 
     [System.Windows.Forms.Application]::Run()
@@ -1172,11 +1587,33 @@ function Start-TrayApp {
 # ============================================================================
 
 try {
-    Write-TrayLog "ABSO Tray starting (PID: $PID)"
+    Write-TrayLog "ABSO Tray starting (PID: $PID) v$($script:AppVersion)"
     Start-TrayApp
     Write-TrayLog "ABSO Tray exiting normally"
 }
 finally {
+    if ($script:ApplyAnimTimer) {
+        $script:ApplyAnimTimer.Stop()
+        $script:ApplyAnimTimer.Dispose()
+    }
+    Close-ProgressOverlay
+    Close-QuickPanel
+    Stop-ExistingWatcher
+    # Clean up active profile state file
+    if (Test-Path $script:ActiveProfileFile) {
+        Remove-Item $script:ActiveProfileFile -Force -ErrorAction SilentlyContinue
+    }
+    if ($script:HotkeyWindow) {
+        try { Unregister-GlobalHotkeys -WindowHandle $script:HotkeyWindow.Handle } catch {}
+        try { $script:HotkeyWindow.DestroyHandle() } catch {}
+    }
+    if ($script:HiddenForm) {
+        $script:HiddenForm.Dispose()
+    }
+    if ($script:MediaPlayer) {
+        try { $script:MediaPlayer.Close() } catch {}
+        $script:MediaPlayer = $null
+    }
     if ($script:mutex) {
         try { $script:mutex.ReleaseMutex() } catch {}
         $script:mutex.Close()

@@ -1,0 +1,324 @@
+# ABSO-Icons.ps1 - Dynamic icon generation module for A.B.S.O. tray
+# Generates tray icons programmatically using GDI+ with gradients and glow effects
+
+# Icon States:
+#   Idle (Gold)     - Default ready state
+#   Active (Green)  - Profile applied
+#   Gaming (Blue)   - Game detected and running
+#   Applying (Animated) - Rotating during profile apply
+#   Warning (Orange) - Audit found issues
+#   Error (Red)     - Last operation failed
+
+Add-Type -TypeDefinition @"
+using System;
+using System.Runtime.InteropServices;
+
+public class IconHelper {
+    [DllImport("user32.dll", CharSet = CharSet.Auto)]
+    public static extern bool DestroyIcon(IntPtr handle);
+}
+"@ -ErrorAction SilentlyContinue
+
+$script:IconSize = 16
+$script:AnimationFrame = 0
+$script:PreviousIconHandle = [IntPtr]::Zero
+
+function New-GlowIcon {
+    <#
+    .SYNOPSIS
+    Creates a 16x16 icon with a glowing circle and optional inner detail.
+    .PARAMETER CenterColor
+    The bright center color of the glow.
+    .PARAMETER GlowColor
+    The outer glow color (usually a dimmer version of CenterColor).
+    .PARAMETER InnerSymbol
+    Optional: "check", "play", "warn", "error", "spin"
+    .PARAMETER SpinAngle
+    Rotation angle for the spin symbol (0-360).
+    #>
+    param(
+        [System.Drawing.Color]$CenterColor,
+        [System.Drawing.Color]$GlowColor,
+        [string]$InnerSymbol = "",
+        [int]$SpinAngle = 0
+    )
+
+    $size = $script:IconSize
+    $bmp = New-Object System.Drawing.Bitmap($size, $size)
+    $g = [System.Drawing.Graphics]::FromImage($bmp)
+    $g.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
+    $g.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic
+    $g.Clear([System.Drawing.Color]::Transparent)
+
+    # Outer glow (larger, semi-transparent)
+    $glowBrush = New-Object System.Drawing.SolidBrush(
+        [System.Drawing.Color]::FromArgb(80, $GlowColor.R, $GlowColor.G, $GlowColor.B)
+    )
+    $g.FillEllipse($glowBrush, 0, 0, $size - 1, $size - 1)
+    $glowBrush.Dispose()
+
+    # Mid ring
+    $midBrush = New-Object System.Drawing.SolidBrush(
+        [System.Drawing.Color]::FromArgb(140, $GlowColor.R, $GlowColor.G, $GlowColor.B)
+    )
+    $g.FillEllipse($midBrush, 2, 2, $size - 5, $size - 5)
+    $midBrush.Dispose()
+
+    # Inner bright circle with gradient
+    $innerRect = New-Object System.Drawing.Rectangle(3, 3, $size - 7, $size - 7)
+    try {
+        $gradBrush = New-Object System.Drawing.Drawing2D.LinearGradientBrush(
+            $innerRect,
+            [System.Drawing.Color]::FromArgb(255, [Math]::Min(255, $CenterColor.R + 40), [Math]::Min(255, $CenterColor.G + 40), [Math]::Min(255, $CenterColor.B + 40)),
+            $CenterColor,
+            [System.Drawing.Drawing2D.LinearGradientMode]::ForwardDiagonal
+        )
+        $g.FillEllipse($gradBrush, $innerRect)
+        $gradBrush.Dispose()
+    }
+    catch {
+        $solidBrush = New-Object System.Drawing.SolidBrush($CenterColor)
+        $g.FillEllipse($solidBrush, $innerRect)
+        $solidBrush.Dispose()
+    }
+
+    # Inner symbol
+    switch ($InnerSymbol) {
+        "check" {
+            $pen = New-Object System.Drawing.Pen([System.Drawing.Color]::White, 1.8)
+            $pen.StartCap = [System.Drawing.Drawing2D.LineCap]::Round
+            $pen.EndCap = [System.Drawing.Drawing2D.LineCap]::Round
+            $cx = $size / 2
+            $cy = $size / 2
+            $g.DrawLine($pen, ($cx - 2), $cy, ($cx - 0.5), ($cy + 2))
+            $g.DrawLine($pen, ($cx - 0.5), ($cy + 2), ($cx + 2.5), ($cy - 1.5))
+            $pen.Dispose()
+        }
+        "play" {
+            $brush = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::White)
+            $points = @(
+                (New-Object System.Drawing.PointF(6, 4)),
+                (New-Object System.Drawing.PointF(12, 8)),
+                (New-Object System.Drawing.PointF(6, 12))
+            )
+            $g.FillPolygon($brush, $points)
+            $brush.Dispose()
+        }
+        "warn" {
+            $brush = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::White)
+            $font = New-Object System.Drawing.Font("Segoe UI", 7, [System.Drawing.FontStyle]::Bold)
+            $sf = New-Object System.Drawing.StringFormat
+            $sf.Alignment = [System.Drawing.StringAlignment]::Center
+            $sf.LineAlignment = [System.Drawing.StringAlignment]::Center
+            $rect = New-Object System.Drawing.RectangleF(0, -1, $size, $size)
+            $g.DrawString("!", $font, $brush, $rect, $sf)
+            $font.Dispose()
+            $brush.Dispose()
+            $sf.Dispose()
+        }
+        "error" {
+            $pen = New-Object System.Drawing.Pen([System.Drawing.Color]::White, 1.8)
+            $pen.StartCap = [System.Drawing.Drawing2D.LineCap]::Round
+            $pen.EndCap = [System.Drawing.Drawing2D.LineCap]::Round
+            $cx = $size / 2
+            $cy = $size / 2
+            $g.DrawLine($pen, ($cx - 2), ($cy - 2), ($cx + 2), ($cy + 2))
+            $g.DrawLine($pen, ($cx + 2), ($cy - 2), ($cx - 2), ($cy + 2))
+            $pen.Dispose()
+        }
+        "spin" {
+            # Animated arc spinner
+            $pen = New-Object System.Drawing.Pen([System.Drawing.Color]::White, 1.5)
+            $pen.StartCap = [System.Drawing.Drawing2D.LineCap]::Round
+            $pen.EndCap = [System.Drawing.Drawing2D.LineCap]::Round
+            $arcRect = New-Object System.Drawing.Rectangle(4, 4, $size - 9, $size - 9)
+            $g.DrawArc($pen, $arcRect, $SpinAngle, 240)
+            $pen.Dispose()
+        }
+    }
+
+    # Highlight dot (top-left specular)
+    $highlightBrush = New-Object System.Drawing.SolidBrush(
+        [System.Drawing.Color]::FromArgb(90, 255, 255, 255)
+    )
+    $g.FillEllipse($highlightBrush, 4, 3, 4, 3)
+    $highlightBrush.Dispose()
+
+    $g.Dispose()
+
+    $hIcon = $bmp.GetHicon()
+    $tempIcon = [System.Drawing.Icon]::FromHandle($hIcon)
+    $icon = $tempIcon.Clone()
+    $tempIcon.Dispose()
+    [IconHelper]::DestroyIcon($hIcon) | Out-Null
+    $bmp.Dispose()
+    return $icon
+}
+
+# Pre-defined icon state colors
+$script:IconColors = @{
+    Idle = @{
+        Center = [System.Drawing.Color]::FromArgb(255, 220, 180, 70)
+        Glow   = [System.Drawing.Color]::FromArgb(255, 180, 140, 40)
+    }
+    Active = @{
+        Center = [System.Drawing.Color]::FromArgb(255, 90, 200, 120)
+        Glow   = [System.Drawing.Color]::FromArgb(255, 50, 160, 80)
+    }
+    Gaming = @{
+        Center = [System.Drawing.Color]::FromArgb(255, 80, 160, 230)
+        Glow   = [System.Drawing.Color]::FromArgb(255, 50, 120, 190)
+    }
+    Applying = @{
+        Center = [System.Drawing.Color]::FromArgb(255, 140, 120, 220)
+        Glow   = [System.Drawing.Color]::FromArgb(255, 100, 80, 180)
+    }
+    Warning = @{
+        Center = [System.Drawing.Color]::FromArgb(255, 240, 180, 60)
+        Glow   = [System.Drawing.Color]::FromArgb(255, 200, 140, 30)
+    }
+    Error = @{
+        Center = [System.Drawing.Color]::FromArgb(255, 220, 70, 70)
+        Glow   = [System.Drawing.Color]::FromArgb(255, 180, 40, 40)
+    }
+}
+
+function New-StateIcon {
+    <#
+    .SYNOPSIS
+    Creates an icon for a named state.
+    .PARAMETER State
+    One of: Idle, Active, Gaming, Applying, Warning, Error
+    #>
+    param(
+        [ValidateSet("Idle", "Active", "Gaming", "Applying", "Warning", "Error")]
+        [string]$State = "Idle"
+    )
+
+    $colors = $script:IconColors[$State]
+    $symbol = switch ($State) {
+        "Idle"     { "" }
+        "Active"   { "check" }
+        "Gaming"   { "play" }
+        "Applying" {
+            $script:AnimationFrame = ($script:AnimationFrame + 45) % 360
+            "spin"
+        }
+        "Warning"  { "warn" }
+        "Error"    { "error" }
+    }
+
+    $angle = if ($State -eq "Applying") { $script:AnimationFrame } else { 0 }
+
+    # Try to load .ico file for Idle/Active states
+    $iconDir = $PSScriptRoot
+    if ($State -eq "Idle") {
+        $icoPath = Join-Path $iconDir "favicon.ico"
+        if (Test-Path $icoPath) {
+            try {
+                $img = [System.Drawing.Image]::FromFile($icoPath)
+                $bmp = New-Object System.Drawing.Bitmap($img, 16, 16)
+                $hIcon = $bmp.GetHicon()
+                $tempIcon = [System.Drawing.Icon]::FromHandle($hIcon)
+                $icon = $tempIcon.Clone()
+                $tempIcon.Dispose()
+                [IconHelper]::DestroyIcon($hIcon) | Out-Null
+                $img.Dispose()
+                $bmp.Dispose()
+                return $icon
+            } catch {}
+        }
+    }
+    elseif ($State -eq "Active" -or $State -eq "Gaming") {
+        $icoPath = Join-Path $iconDir "260 Swampert.ico"
+        if (Test-Path $icoPath) {
+            try {
+                $img = [System.Drawing.Image]::FromFile($icoPath)
+                $bmp = New-Object System.Drawing.Bitmap($img, 16, 16)
+                $hIcon = $bmp.GetHicon()
+                $tempIcon = [System.Drawing.Icon]::FromHandle($hIcon)
+                $icon = $tempIcon.Clone()
+                $tempIcon.Dispose()
+                [IconHelper]::DestroyIcon($hIcon) | Out-Null
+                $img.Dispose()
+                $bmp.Dispose()
+                return $icon
+            } catch {}
+        }
+    }
+
+    return New-GlowIcon -CenterColor $colors.Center -GlowColor $colors.Glow -InnerSymbol $symbol -SpinAngle $angle
+}
+
+function New-CategoryIcon {
+    <#
+    .SYNOPSIS
+    Creates a small 16x16 icon for a profile category.
+    .PARAMETER Category
+    One of: Fighting, ARPG, Shooter, Productivity, Other
+    #>
+    param([string]$Category)
+
+    $bmp = New-Object System.Drawing.Bitmap(16, 16)
+    $g = [System.Drawing.Graphics]::FromImage($bmp)
+    $g.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
+    $g.Clear([System.Drawing.Color]::Transparent)
+
+    $pen = New-Object System.Drawing.Pen([System.Drawing.Color]::White, 1.2)
+    $pen.StartCap = [System.Drawing.Drawing2D.LineCap]::Round
+    $pen.EndCap = [System.Drawing.Drawing2D.LineCap]::Round
+
+    switch ($Category) {
+        "Fighting" {
+            # Crossed swords
+            $g.DrawLine($pen, 3, 12, 13, 2)
+            $g.DrawLine($pen, 13, 12, 3, 2)
+            $g.DrawLine($pen, 2, 13, 5, 10)
+            $g.DrawLine($pen, 11, 10, 14, 13)
+        }
+        "ARPG" {
+            # Shield shape
+            $points = @(
+                (New-Object System.Drawing.PointF(8, 2)),
+                (New-Object System.Drawing.PointF(13, 4)),
+                (New-Object System.Drawing.PointF(12, 10)),
+                (New-Object System.Drawing.PointF(8, 14)),
+                (New-Object System.Drawing.PointF(4, 10)),
+                (New-Object System.Drawing.PointF(3, 4))
+            )
+            $g.DrawPolygon($pen, $points)
+        }
+        "Shooter" {
+            # Crosshair
+            $g.DrawEllipse($pen, 4, 4, 8, 8)
+            $g.DrawLine($pen, 8, 1, 8, 5)
+            $g.DrawLine($pen, 8, 11, 8, 15)
+            $g.DrawLine($pen, 1, 8, 5, 8)
+            $g.DrawLine($pen, 11, 8, 15, 8)
+        }
+        "Productivity" {
+            # Monitor
+            $g.DrawRectangle($pen, 2, 2, 12, 8)
+            $g.DrawLine($pen, 8, 10, 8, 13)
+            $g.DrawLine($pen, 5, 13, 11, 13)
+        }
+        default {
+            # Star
+            $g.DrawLine($pen, 8, 2, 8, 14)
+            $g.DrawLine($pen, 2, 8, 14, 8)
+            $g.DrawLine($pen, 4, 4, 12, 12)
+            $g.DrawLine($pen, 12, 4, 4, 12)
+        }
+    }
+
+    $pen.Dispose()
+    $g.Dispose()
+
+    $hIcon = $bmp.GetHicon()
+    $tempIcon = [System.Drawing.Icon]::FromHandle($hIcon)
+    $icon = $tempIcon.Clone()
+    $tempIcon.Dispose()
+    [IconHelper]::DestroyIcon($hIcon) | Out-Null
+    $bmp.Dispose()
+    return $icon
+}

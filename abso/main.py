@@ -436,6 +436,14 @@ def apply(profile_name: str, no_backup: bool, json_output: bool) -> None:
                 "requires_reboot": result.requires_reboot,
                 "in_game_settings": result.in_game_settings if hasattr(result, "in_game_settings") else [],
                 "error": result.error if not result.success else None,
+                "applied_settings": result.applied_settings,
+                "failed_settings": result.failed_settings,
+                "results": [
+                    {"handler": h, "status": "success"} for h in result.applied_settings
+                ] + [
+                    {"handler": f.split(":")[0].strip(), "status": "failed", "error": f}
+                    for f in result.failed_settings
+                ],
             })
             return
 

@@ -1,0 +1,14 @@
+{
+  "favorites": [],
+  "defaultProfile": null,
+  "soundVolume": 0.2,
+  "soundEnabled": true,
+  "hotkeys": {
+    "openMenu": "Ctrl+Shift+A",
+    "restore": "Ctrl+Shift+R"
+  },
+  "showQuickPanel": false,
+  "animationSpeed": "normal",
+  "recentProfiles": [],
+  "profileHistory": []
+}
