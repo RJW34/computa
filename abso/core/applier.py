@@ -284,7 +284,7 @@ class ProfileApplier:
                 settings = settings_map.get(handler_name, {})
 
                 # If not in our map, get from profile directly
-                if not settings:
+                if settings is None:
                     settings = profile.get_settings(handler_name)
 
                 # Merge with user overrides from config
@@ -329,6 +329,10 @@ class ProfileApplier:
         if failed:
             result.success = False
             result.error = "; ".join(failed)
+            logger.warning(
+                f"Profile '{profile_name}' partially failed ({len(failed)}/{len(applied) + len(failed)} handlers). "
+                f"Run 'python -m abso restore latest' to revert."
+            )
 
         if skipped:
             logger.info(f"Skipped handlers (disabled in config): {', '.join(skipped)}")

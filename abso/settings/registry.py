@@ -65,17 +65,17 @@ class RegistrySettingsHandler(SettingsHandler):
         issues: list[Issue] = []
         current = self.detect()
 
-        # System Responsiveness (0 = games get maximum CPU priority)
+        # System Responsiveness (10 = games get near-max CPU priority while keeping audio stable)
         responsiveness = current.get("system_responsiveness")
-        if responsiveness is not None and responsiveness != 0:
+        if responsiveness is not None and responsiveness != 10:
             issues.append(Issue(
                 title="System Responsiveness not optimized for gaming",
                 severity="warning",
                 current_value=str(responsiveness),
-                optimal_value="0",
+                optimal_value="10",
                 explanation=(
-                    "Controls CPU % reserved for background tasks. Setting to 0 gives games maximum priority. "
-                    "May cause audio buffer issues in rare cases - revert if you notice crackling."
+                    "Controls CPU % reserved for background tasks. Setting to 10 gives games near-maximum "
+                    "priority while reserving minimal CPU for audio/USB, preventing crackling and dropouts."
                 ),
                 category="registry",
             ))

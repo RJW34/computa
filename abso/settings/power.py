@@ -122,7 +122,7 @@ class PowerSettingsHandler(SettingsHandler):
                 self._set_power_setting(
                     self.PROCESSOR_SUBGROUP,
                     self.PROCESSOR_MIN_STATE,
-                    100
+                    settings.get("processor_min_state", 5)
                 )
                 self._set_power_setting(
                     self.PROCESSOR_SUBGROUP,
@@ -143,22 +143,55 @@ class PowerSettingsHandler(SettingsHandler):
         """Backup current power settings."""
         current = self.detect()
 
-        # Export active plan to file would be done here
-        # For now, just save the active plan GUID
-        return {
+        backup_data: dict[str, Any] = {
             "active_plan": current.get("active_plan", {}).get("guid"),
         }
 
+        # Backup power sub-settings via powercfg /query
+        backup_data["processor_min_state"] = self._get_power_setting(
+            self.PROCESSOR_SUBGROUP, self.PROCESSOR_MIN_STATE
+        )
+        backup_data["processor_max_state"] = self._get_power_setting(
+            self.PROCESSOR_SUBGROUP, self.PROCESSOR_MAX_STATE
+        )
+        backup_data["usb_selective_suspend"] = self._get_power_setting(
+            self.USB_SUBGROUP, self.USB_SELECTIVE_SUSPEND
+        )
+        backup_data["pcie_link_state"] = self._get_power_setting(
+            self.PCIE_SUBGROUP, self.PCIE_LINK_STATE
+        )
+
+        return backup_data
+
     def restore(self, data: dict[str, Any]) -> bool:
         """Restore power settings from backup."""
+        success = True
+
         if "active_plan" in data and data["active_plan"]:
             try:
                 self._set_active_plan(data["active_plan"])
-                return True
             except Exception as e:
                 logger.error(f"Failed to restore power plan: {e}")
-                return False
-        return True
+                success = False
+
+        # Restore power sub-settings
+        setting_map = {
+            "processor_min_state": (self.PROCESSOR_SUBGROUP, self.PROCESSOR_MIN_STATE),
+            "processor_max_state": (self.PROCESSOR_SUBGROUP, self.PROCESSOR_MAX_STATE),
+            "usb_selective_suspend": (self.USB_SUBGROUP, self.USB_SELECTIVE_SUSPEND),
+            "pcie_link_state": (self.PCIE_SUBGROUP, self.PCIE_LINK_STATE),
+        }
+
+        for key, (subgroup, setting) in setting_map.items():
+            value = data.get(key)
+            if value is not None:
+                try:
+                    self._set_power_setting(subgroup, setting, value)
+                except Exception as e:
+                    logger.error(f"Failed to restore {key}: {e}")
+                    success = False
+
+        return success
 
     # Private helper methods
 
@@ -290,3 +323,21 @@ class PowerSettingsHandler(SettingsHandler):
 
         # Apply changes
         self._run_powercfg("/setactive", "SCHEME_CURRENT")
+
+    def _get_power_setting(self, subgroup: str, setting: str) -> int | None:
+        """Get a power setting value for the current scheme via powercfg /query."""
+        try:
+            result = self._run_powercfg(
+                "/query", "SCHEME_CURRENT", subgroup, setting
+            )
+            if result.returncode == 0:
+                # Parse "Current AC Power Setting Index: 0x000000nn"
+                match = re.search(
+                    r"Current AC Power Setting Index:\s*0x([0-9a-fA-F]+)",
+                    result.stdout
+                )
+                if match:
+                    return int(match.group(1), 16)
+        except Exception as e:
+            logger.debug(f"Failed to get power setting {setting}: {e}")
+        return None

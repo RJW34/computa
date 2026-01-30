@@ -35,6 +35,7 @@ $waitIterations = 0
 # Check if any game process is running (optimized)
 function Test-GameRunning {
     # Get all processes once, then filter - more efficient than multiple Get-Process calls
+    $procs = $null
     try {
         $procs = [System.Diagnostics.Process]::GetProcesses()
         foreach ($p in $procs) {
@@ -44,10 +45,19 @@ function Test-GameRunning {
                 }
             } catch {
                 # Process may have exited - ignore
+            } finally {
+                $p.Dispose()
             }
         }
     } catch {
         # Fallback if GetProcesses fails
+    } finally {
+        # Dispose any remaining process objects if early return didn't happen
+        if ($procs) {
+            foreach ($p in $procs) {
+                try { $p.Dispose() } catch {}
+            }
+        }
     }
     return $false
 }
@@ -75,7 +85,26 @@ while ($true) {
         $trayKilled = $true
 
         try {
-            Stop-Process -Id $TrayPID -Force -ErrorAction SilentlyContinue
+            # Signal tray to shut down gracefully via named event
+            $shutdownEvent = $null
+            try {
+                $shutdownEvent = [System.Threading.EventWaitHandle]::OpenExisting("Global\ABSO_Tray_Shutdown")
+                $shutdownEvent.Set()
+                # Wait up to 3 seconds for graceful exit
+                $trayExited = $false
+                for ($i = 0; $i -lt 6; $i++) {
+                    Start-Sleep -Milliseconds 500
+                    if (-not (Test-TrayAlive)) { $trayExited = $true; break }
+                }
+                if (-not $trayExited) {
+                    Stop-Process -Id $TrayPID -Force -ErrorAction SilentlyContinue
+                }
+            } catch {
+                # Named event doesn't exist yet or tray already gone - force kill
+                Stop-Process -Id $TrayPID -Force -ErrorAction SilentlyContinue
+            } finally {
+                if ($shutdownEvent) { $shutdownEvent.Dispose() }
+            }
         } catch {}
     }
     elseif (-not $gameNowRunning -and $gameRunning) {
@@ -125,3 +154,8 @@ while ($true) {
     $sleepMs = if ($gameRunning) { 2000 } else { 5000 }
     Start-Sleep -Milliseconds $sleepMs
 }
+
+# Cleanup
+try {
+    if ($script:trayProcess) { $script:trayProcess.Dispose() }
+} catch {}

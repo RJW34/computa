@@ -53,9 +53,9 @@ $script:MediaPlayer = $null
 function Get-MediaPlayer {
     if ($null -eq $script:MediaPlayer) {
         $script:MediaPlayer = New-Object System.Windows.Media.MediaPlayer
-        Register-ObjectEvent -InputObject $script:MediaPlayer -EventName MediaEnded -Action {
+        $script:MediaEndedSub = Register-ObjectEvent -InputObject $script:MediaPlayer -EventName MediaEnded -Action {
             $script:MediaPlayer.Close()
-        } | Out-Null
+        }
     }
     return $script:MediaPlayer
 }
@@ -946,13 +946,13 @@ public class HotkeyMessageWindow : NativeWindow {
         }
 
         # Wire up the HotkeyPressed event to dispatch to registered actions
-        Register-ObjectEvent -InputObject $script:HotkeyWindow -EventName HotkeyPressed -Action {
+        $script:HotkeyPressedSub = Register-ObjectEvent -InputObject $script:HotkeyWindow -EventName HotkeyPressed -Action {
             $hotkeyId = $Event.SourceEventArgs
             $action = Get-HotkeyAction -HotkeyId $hotkeyId
             if ($action) {
                 & $action
             }
-        } | Out-Null
+        }
 
         Write-TrayLog "Global hotkeys registered"
     }
@@ -1578,7 +1578,24 @@ public class HotkeyMessageWindow : NativeWindow {
         Show-QuickPanel -Favorites $script:TrayConfig.favorites -Profiles $script:Profiles -ActiveProfile $script:activeProfile -OnApply { param($id) Apply-Profile $id }
     }
 
+    # Create named event for graceful shutdown from watcher
+    $script:ShutdownEvent = New-Object System.Threading.EventWaitHandle(
+        $false, [System.Threading.EventResetMode]::ManualReset, "Global\ABSO_Tray_Shutdown"
+    )
+    $script:ShutdownTimer = New-Object System.Windows.Forms.Timer
+    $script:ShutdownTimer.Interval = 500
+    $script:ShutdownTimer.Add_Tick({
+        if ($script:ShutdownEvent.WaitOne(0)) {
+            Write-TrayLog "Shutdown signal received from watcher"
+            $script:ShutdownTimer.Stop()
+            $script:notifyIcon.Visible = $false
+            [System.Windows.Forms.Application]::Exit()
+        }
+    })
+    $script:ShutdownTimer.Start()
+
     [System.Windows.Forms.Application]::Run()
+    $script:notifyIcon.Visible = $false
     $script:notifyIcon.Dispose()
 }
 
@@ -1596,12 +1613,30 @@ finally {
         $script:ApplyAnimTimer.Stop()
         $script:ApplyAnimTimer.Dispose()
     }
+    if ($script:ShutdownTimer) {
+        $script:ShutdownTimer.Stop()
+        $script:ShutdownTimer.Dispose()
+    }
+    if ($script:ShutdownEvent) {
+        try { $script:ShutdownEvent.Dispose() } catch {}
+    }
+    # Unregister event subscriptions
+    if ($script:MediaEndedSub) {
+        try { Unregister-Event -SubscriptionId $script:MediaEndedSub.Id -ErrorAction SilentlyContinue } catch {}
+    }
+    if ($script:HotkeyPressedSub) {
+        try { Unregister-Event -SubscriptionId $script:HotkeyPressedSub.Id -ErrorAction SilentlyContinue } catch {}
+    }
     Close-ProgressOverlay
     Close-QuickPanel
     Stop-ExistingWatcher
     # Clean up active profile state file
     if (Test-Path $script:ActiveProfileFile) {
         Remove-Item $script:ActiveProfileFile -Force -ErrorAction SilentlyContinue
+    }
+    if ($script:notifyIcon) {
+        $script:notifyIcon.Visible = $false
+        try { $script:notifyIcon.Dispose() } catch {}
     }
     if ($script:HotkeyWindow) {
         try { Unregister-GlobalHotkeys -WindowHandle $script:HotkeyWindow.Handle } catch {}

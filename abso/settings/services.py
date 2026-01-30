@@ -50,7 +50,7 @@ class ServicesSettingsHandler(SettingsHandler):
         "WSearch": {
             "display_name": "Windows Search",
             "description": "Indexes files for search. Can cause disk I/O spikes.",
-            "optimal_start_type": 4,  # Disabled
+            "optimal_start_type": 3,  # Manual (preserves Start menu search)
             "severity": "info",
         },
         "XblAuthManager": {

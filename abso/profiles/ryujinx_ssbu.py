@@ -96,7 +96,7 @@ class RyujinxSSBUProfile(BaseProfile):
                 "processor_max_performance": True,
             },
             "RegistrySettingsHandler": {
-                "system_responsiveness": 0,
+                "system_responsiveness": 10,
                 "network_throttling": 0xFFFFFFFF,
                 "win32_priority_separation": 0x2A,  # Short fixed quantum, max foreground boost
                 "game_priority": {

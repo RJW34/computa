@@ -304,9 +304,41 @@ class NetworkSettingsHandler(SettingsHandler):
 
         return interfaces
 
-    def _apply_to_all_interfaces(self, settings: dict[str, int]) -> None:
-        """Apply settings to all network interfaces."""
+    def _get_active_interface_guids(self) -> list[str]:
+        """Get GUIDs of active network interfaces (those with a default gateway)."""
+        active_guids = []
+
         for guid in self._get_interface_guids():
+            try:
+                key = winreg.OpenKey(
+                    winreg.HKEY_LOCAL_MACHINE,
+                    f"{self.INTERFACES_KEY}\\{guid}",
+                    0,
+                    winreg.KEY_READ
+                )
+                try:
+                    gateway = winreg.QueryValueEx(key, "DefaultGateway")[0]
+                    # DefaultGateway is REG_MULTI_SZ (list of strings)
+                    if gateway and any(g.strip() for g in gateway if g):
+                        active_guids.append(guid)
+                except FileNotFoundError:
+                    pass
+                finally:
+                    winreg.CloseKey(key)
+            except OSError:
+                pass
+
+        if not active_guids:
+            # Fallback: if no active interfaces found, use all (safety net)
+            logger.debug("No active interfaces found via DefaultGateway, falling back to all")
+            return self._get_interface_guids()
+
+        logger.debug(f"Found {len(active_guids)} active interface(s)")
+        return active_guids
+
+    def _apply_to_all_interfaces(self, settings: dict[str, int]) -> None:
+        """Apply settings to active network interfaces only."""
+        for guid in self._get_active_interface_guids():
             try:
                 key = winreg.OpenKey(
                     winreg.HKEY_LOCAL_MACHINE,

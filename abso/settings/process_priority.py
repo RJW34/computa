@@ -145,23 +145,30 @@ class ProcessPriorityHandler(SettingsHandler):
         errors: list[str] = []
         cpu_priority = settings.get("cpu_priority", self.CPU_PRIORITY_HIGH)
 
-        try:
-            if "processes" in settings:
-                # Apply per-process settings
-                for exe, exe_settings in settings["processes"].items():
+        if "processes" in settings:
+            # Apply per-process settings
+            for exe, exe_settings in settings["processes"].items():
+                try:
                     self._set_process_settings(exe, exe_settings)
-            else:
-                # Apply same settings to all managed executables
-                for exe in self.executables:
+                except PermissionError as e:
+                    errors.append(f"{exe}: Permission denied (requires admin): {e}")
+                except Exception as e:
+                    errors.append(f"{exe}: {e}")
+        else:
+            # Apply same settings to all managed executables
+            for exe in self.executables:
+                try:
                     self._set_process_settings(exe, settings)
+                except PermissionError as e:
+                    errors.append(f"{exe}: Permission denied (requires admin): {e}")
+                except Exception as e:
+                    errors.append(f"{exe}: {e}")
 
-            # Also set priority on running processes (IFEO may not work with Steam/UE5)
+        # Also set priority on running processes (IFEO may not work with Steam/UE5)
+        try:
             self._set_running_processes_priority(cpu_priority)
-
-        except PermissionError as e:
-            errors.append(f"Permission denied (requires admin): {e}")
         except Exception as e:
-            errors.append(str(e))
+            errors.append(f"Running process priority: {e}")
 
         return {
             "success": len(errors) == 0,

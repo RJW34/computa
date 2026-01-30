@@ -117,7 +117,7 @@ class Rivals2_300HzMaxProfile(BaseProfile):
                 "disable_core_parking": True,
             },
             "RegistrySettingsHandler": {
-                "system_responsiveness": 0,
+                "system_responsiveness": 10,
                 "network_throttling": 0xFFFFFFFF,
                 "win32_priority_separation": 0x2A,
                 "game_priority": {

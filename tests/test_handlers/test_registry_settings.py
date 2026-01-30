@@ -63,7 +63,7 @@ class TestRegistrySettingsHandlerAudit:
     def test_audit_no_issues_when_optimal(self, mock_detect):
         """Test audit returns no issues when all settings are optimal."""
         mock_detect.return_value = {
-            "system_responsiveness": 0,
+            "system_responsiveness": 10,
             "network_throttling": 0xFFFFFFFF,
             "game_priority": {"priority": 6},
             "win32_priority_separation": 0x2A,
