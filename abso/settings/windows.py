@@ -918,7 +918,7 @@ class WindowsSettingsHandler(SettingsHandler):
                 enum_devmode = DEVMODE()
                 enum_devmode.dmSize = ctypes.sizeof(DEVMODE)
 
-                while user32.EnumDisplaySettingsW(None, mode_num, ctypes.byref(enum_devmode)):
+                while mode_num < 500 and user32.EnumDisplaySettingsW(None, mode_num, ctypes.byref(enum_devmode)):
                     # Only consider modes at current resolution
                     if (enum_devmode.dmPelsWidth == current_width and
                         enum_devmode.dmPelsHeight == current_height and
@@ -1063,7 +1063,7 @@ class WindowsSettingsHandler(SettingsHandler):
                             enum_devmode = DEVMODE()
                             enum_devmode.dmSize = ctypes.sizeof(DEVMODE)
 
-                            while user32.EnumDisplaySettingsW(device_name, mode_num, ctypes.byref(enum_devmode)):
+                            while mode_num < 500 and user32.EnumDisplaySettingsW(device_name, mode_num, ctypes.byref(enum_devmode)):
                                 if (enum_devmode.dmPelsWidth == current_width and
                                     enum_devmode.dmPelsHeight == current_height and
                                     enum_devmode.dmDisplayFrequency > 0):

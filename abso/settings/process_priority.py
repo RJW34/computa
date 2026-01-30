@@ -431,6 +431,8 @@ class ProcessPriorityHandler(SettingsHandler):
         for exe in self.executables:
             # Remove .exe extension for process name matching
             process_name = exe.replace(".exe", "").replace(".EXE", "")
+            # Escape single quotes to prevent PowerShell injection
+            process_name = process_name.replace("'", "''")
 
             # Use PowerShell to find and set priority on matching processes
             # This handles cases where IFEO doesn't work (Steam/UE5 override)

@@ -197,6 +197,9 @@ class BackupManager:
 
             try:
                 component_path = backup_path / component_info["file"]
+                if not component_path.exists():
+                    logger.error(f"Backup file missing for {handler_name}: {component_path}")
+                    continue
                 data = json.loads(component_path.read_text(encoding="utf-8"))
 
                 handler.restore(data)

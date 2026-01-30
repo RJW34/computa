@@ -376,6 +376,7 @@ function Show-SettingsPanel {
     $form.Controls.Add($closeBtn)
 
     $script:SettingsForm = $form
+    $form.Add_FormClosed({ $form.Dispose() })
     $form.Show()
 }
 

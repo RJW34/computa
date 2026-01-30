@@ -322,7 +322,9 @@ class PowerSettingsHandler(SettingsHandler):
             raise RuntimeError(f"Failed to set power setting: {result.stderr}")
 
         # Apply changes
-        self._run_powercfg("/setactive", "SCHEME_CURRENT")
+        apply_result = self._run_powercfg("/setactive", "SCHEME_CURRENT")
+        if apply_result.returncode != 0:
+            logger.warning(f"Failed to apply power setting changes: {apply_result.stderr}")
 
     def _get_power_setting(self, subgroup: str, setting: str) -> int | None:
         """Get a power setting value for the current scheme via powercfg /query."""

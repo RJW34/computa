@@ -93,6 +93,7 @@ function Show-ProgressOverlay {
 
     # Animated indeterminate progress
     $timer = New-Object System.Windows.Forms.Timer
+    $script:ProgressTimer = $timer
     $timer.Interval = 100
     $script:ProgressAngle = 0
     $timer.Add_Tick({
@@ -123,7 +124,6 @@ function Show-ProgressOverlay {
     $script:ProgressForm = $form
     $script:ProgressLabel = $stepLabel
     $script:ProgressBar = $progressFill
-    $script:ProgressTimer = $timer
 
     $form.Show()
 }

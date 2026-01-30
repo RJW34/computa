@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import pytest
+
+from abso.profiles import get_all_profiles
 from abso.profiles.cod_bo7 import CodBo7Profile
 from abso.profiles.diablo4 import Diablo4Profile
 from abso.profiles.pokemon_auto_chess import PokemonAutoChessProfile
@@ -270,3 +273,39 @@ class TestBaseProfileImplementation:
         """Test Diablo4Profile has balanced optimization target."""
         profile = Diablo4Profile()
         assert profile.optimization_target == "balanced"
+
+
+class TestAllProfilesLoad:
+    """Parametrized test that loads every profile and validates metadata."""
+
+    @pytest.fixture(params=list(get_all_profiles().items()), ids=lambda p: p[0])
+    def profile_entry(self, request):
+        return request.param
+
+    def test_required_metadata(self, profile_entry):
+        """Every profile must have required metadata fields."""
+        profile_id, profile = profile_entry
+        assert profile.profile_id == profile_id
+        assert isinstance(profile.display_name, str) and len(profile.display_name) > 0
+        assert isinstance(profile.description, str) and len(profile.description) > 0
+        assert isinstance(profile.optimization_target, str) and len(profile.optimization_target) > 0
+        assert isinstance(profile.executable_hints, list) and len(profile.executable_hints) > 0
+        assert isinstance(profile.is_online_profile, bool)
+        assert isinstance(profile.is_emulator_profile, bool)
+        assert isinstance(profile.requires_reflex, bool)
+        assert isinstance(profile.is_sdr_only, bool)
+        assert profile.network_scope in {"full", "limited", "none"}
+        assert profile.graphics_api in {"dx11", "dx12", "vulkan", "opengl", "unknown"}
+
+    def test_get_handlers(self, profile_entry):
+        """get_handlers() must return a non-empty list without exception."""
+        _, profile = profile_entry
+        handlers = profile.get_handlers()
+        assert isinstance(handlers, list) and len(handlers) > 0
+
+    def test_get_settings(self, profile_entry):
+        """get_settings() must return a dict for each handler without exception."""
+        _, profile = profile_entry
+        for handler in profile.get_handlers():
+            settings = profile.get_settings(handler.__class__.__name__)
+            assert isinstance(settings, dict)

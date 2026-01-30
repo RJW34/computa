@@ -206,8 +206,15 @@ if (-not $script:createdNew) {
 # ============================================================================
 
 $script:ProjectRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
-$script:WatcherPIDFile = Join-Path $env:TEMP "abso_watcher.pid"
-$script:ActiveProfileFile = Join-Path $env:TEMP "abso_active_profile.json"
+
+# Resolve full python path at startup (elevated admin may lose user PATH entries)
+$script:PythonExe = (Get-Command python -ErrorAction SilentlyContinue).Source
+if (-not $script:PythonExe) {
+    # Fallback: check common user-local install path
+    $fallback = Join-Path $env:LOCALAPPDATA "Programs\Python\Python312\python.exe"
+    if (Test-Path $fallback) { $script:PythonExe = $fallback }
+    else { $script:PythonExe = "python" }  # last resort
+}
 
 # ============================================================================
 # PROFILE DEFINITIONS
@@ -302,51 +309,12 @@ $script:CategoryColors = @{
 }
 
 # ============================================================================
-# WATCHER
-# ============================================================================
-
-function Stop-ExistingWatcher {
-    if (Test-Path $script:WatcherPIDFile) {
-        try {
-            $watcherPid = [int](Get-Content $script:WatcherPIDFile -ErrorAction SilentlyContinue)
-            if ($watcherPid -gt 0) {
-                Write-TrayLog "Stopping existing watcher PID: $watcherPid"
-                Stop-Process -Id $watcherPid -Force -ErrorAction SilentlyContinue
-            }
-        }
-        catch {
-            Write-TrayLog "Failed to stop watcher: $($_.Exception.Message)" -Level "WARN"
-        }
-        Remove-Item $script:WatcherPIDFile -Force -ErrorAction SilentlyContinue
-    }
-}
-
-function Start-GameWatcher {
-    param([string]$ProfileId, [string[]]$Executables)
-
-    Stop-ExistingWatcher
-
-    $exeList = $Executables -join ','
-    $watcherPath = Join-Path $script:ScriptDir "ABSO-Watcher.ps1"
-    $trayPath = Join-Path $script:ScriptDir "ABSO-Tray.ps1"
-
-    $proc = Start-Process powershell -ArgumentList @(
-        "-NoProfile", "-WindowStyle", "Hidden", "-ExecutionPolicy", "Bypass",
-        "-File", "`"$watcherPath`"",
-        "-ExeList", "`"$exeList`"",
-        "-TrayPID", $PID,
-        "-TrayScript", "`"$trayPath`""
-    ) -WindowStyle Hidden -PassThru
-
-    $proc.Id | Out-File $script:WatcherPIDFile -Force
-
-    @{ ProfileId = $ProfileId; Executables = $Executables } |
-    ConvertTo-Json | Out-File $script:ActiveProfileFile -Force
-}
-
-# ============================================================================
 # ICON STATE MANAGEMENT
 # ============================================================================
+
+# Cached shared fonts (disposed in finally block)
+$script:FontNormal = New-Object System.Drawing.Font("Segoe UI", 9)
+$script:FontBold = New-Object System.Drawing.Font("Segoe UI", 9, [System.Drawing.FontStyle]::Bold)
 
 $script:IconState = "Idle"
 $script:ApplyAnimTimer = $null
@@ -429,8 +397,8 @@ function Apply-Profile {
 
         Update-ProgressOverlay -StepText "Running profile application..."
 
-        Write-TrayLog "Running: python -m abso apply $ProfileId --json"
-        Start-Process -FilePath "python" -ArgumentList "-m", "abso", "apply", $ProfileId, "--json" `
+        Write-TrayLog "Running: $($script:PythonExe) -m abso apply $ProfileId --json"
+        Start-Process -FilePath $script:PythonExe -ArgumentList "-m", "abso", "apply", $ProfileId, "--json" `
             -NoNewWindow -Wait -WorkingDirectory $script:ProjectRoot `
             -RedirectStandardOutput $tempFile -RedirectStandardError $errFile
 
@@ -476,7 +444,6 @@ function Apply-Profile {
             Play-SuccessSound
             Set-IconState -State "Active"
             Show-Notification -Title "A.B.S.O." -Message $msg -Type "Info"
-            Start-GameWatcher -ProfileId $ProfileId -Executables $profile.Exes
 
             $script:activeProfile = $ProfileId
             $script:LastAction = "Applied: $($profile.Name)"
@@ -521,7 +488,7 @@ function Restore-Settings {
         $tempFile = [System.IO.Path]::GetTempFileName()
         $errFile = "$tempFile.err"
 
-        Start-Process -FilePath "python" -ArgumentList "-m", "abso", "restore", "latest", "--json" `
+        Start-Process -FilePath $script:PythonExe -ArgumentList "-m", "abso", "restore", "latest", "--json" `
             -NoNewWindow -Wait -WorkingDirectory $script:ProjectRoot `
             -RedirectStandardOutput $tempFile -RedirectStandardError $errFile
 
@@ -536,11 +503,6 @@ function Restore-Settings {
         if ($json.success) {
             Close-ProgressOverlay
             Show-Notification -Title "A.B.S.O." -Message "Settings restored" -Type "Info"
-            Stop-ExistingWatcher
-            # Clean up stale state file
-            if (Test-Path $script:ActiveProfileFile) {
-                Remove-Item $script:ActiveProfileFile -Force -ErrorAction SilentlyContinue
-            }
             $script:activeProfile = $null
             $script:LastAction = "Restored settings"
             $script:LastActionTime = Get-Date -Format "HH:mm"
@@ -577,12 +539,12 @@ function Update-MenuState {
         if ($isActive) {
             $item.Text = "  >>  $($p.Name)"
             $item.ForeColor = $script:Colors.AccentGreen
-            $item.Font = New-Object System.Drawing.Font("Segoe UI", 9, [System.Drawing.FontStyle]::Bold)
+            $item.Font = $script:FontBold
         }
         else {
             $item.Text = "$starPrefix$($p.Name)"
             $item.ForeColor = $script:Colors.Text
-            $item.Font = New-Object System.Drawing.Font("Segoe UI", 9)
+            $item.Font = $script:FontNormal
         }
     }
     $script:restoreItem.Enabled = ($null -ne $script:activeProfile)
@@ -682,7 +644,7 @@ function Run-Audit {
 
     try {
         $tempFile = [System.IO.Path]::GetTempFileName()
-        Start-Process -FilePath "python" -ArgumentList "-m", "abso", "audit", "--json" `
+        Start-Process -FilePath $script:PythonExe -ArgumentList "-m", "abso", "audit", "--json" `
             -NoNewWindow -Wait -WorkingDirectory $script:ProjectRoot `
             -RedirectStandardOutput $tempFile
 
@@ -1296,7 +1258,7 @@ public class HotkeyMessageWindow : NativeWindow {
             $script:notifyIcon.Text = "A.B.S.O. - Restoring..."
             try {
                 $tf = [System.IO.Path]::GetTempFileName()
-                Start-Process -FilePath "python" -ArgumentList "-m", "abso", "restore", $capturedName, "--json" `
+                Start-Process -FilePath $script:PythonExe -ArgumentList "-m", "abso", "restore", $capturedName, "--json" `
                     -NoNewWindow -Wait -WorkingDirectory $script:ProjectRoot `
                     -RedirectStandardOutput $tf
                 $out = Get-Content $tf -Raw -ErrorAction SilentlyContinue
@@ -1470,7 +1432,6 @@ public class HotkeyMessageWindow : NativeWindow {
         else {
             Start-Process powershell.exe -ArgumentList "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$PSCommandPath`"" -WindowStyle Hidden
         }
-        Stop-ExistingWatcher
         $script:notifyIcon.Visible = $false
         [System.Windows.Forms.Application]::Exit()
     })
@@ -1502,7 +1463,6 @@ public class HotkeyMessageWindow : NativeWindow {
         if ($script:HotkeyWindow) { Unregister-GlobalHotkeys -WindowHandle $script:HotkeyWindow.Handle }
         Close-QuickPanel
         Close-ProgressOverlay
-        Stop-ExistingWatcher
         $script:notifyIcon.Visible = $false
         [System.Windows.Forms.Application]::Exit()
     })
@@ -1547,23 +1507,6 @@ public class HotkeyMessageWindow : NativeWindow {
         # This is handled through the hidden form's message loop instead
     })
 
-    # ─── RESTORE STATE ───
-
-    if (Test-Path $script:ActiveProfileFile) {
-        try {
-            $saved = Get-Content $script:ActiveProfileFile | ConvertFrom-Json
-            if ($saved.ProfileId -and $script:Profiles.Contains($saved.ProfileId)) {
-                $script:activeProfile = $saved.ProfileId
-                Write-TrayLog "Restored active profile: $($saved.ProfileId)"
-                Set-IconState -State "Active"
-                Update-MenuState
-            }
-        }
-        catch {
-            Write-TrayLog "Failed to restore state: $($_.Exception.Message)" -Level "WARN"
-        }
-    }
-
     # ─── DEFAULT PROFILE (notify only, do not auto-apply) ───
 
     if (-not $script:activeProfile -and $script:TrayConfig.defaultProfile -and $script:Profiles.Contains($script:TrayConfig.defaultProfile)) {
@@ -1577,22 +1520,6 @@ public class HotkeyMessageWindow : NativeWindow {
     if ($script:TrayConfig.showQuickPanel -and $script:TrayConfig.favorites.Count -gt 0) {
         Show-QuickPanel -Favorites $script:TrayConfig.favorites -Profiles $script:Profiles -ActiveProfile $script:activeProfile -OnApply { param($id) Apply-Profile $id }
     }
-
-    # Create named event for graceful shutdown from watcher
-    $script:ShutdownEvent = New-Object System.Threading.EventWaitHandle(
-        $false, [System.Threading.EventResetMode]::ManualReset, "Global\ABSO_Tray_Shutdown"
-    )
-    $script:ShutdownTimer = New-Object System.Windows.Forms.Timer
-    $script:ShutdownTimer.Interval = 500
-    $script:ShutdownTimer.Add_Tick({
-        if ($script:ShutdownEvent.WaitOne(0)) {
-            Write-TrayLog "Shutdown signal received from watcher"
-            $script:ShutdownTimer.Stop()
-            $script:notifyIcon.Visible = $false
-            [System.Windows.Forms.Application]::Exit()
-        }
-    })
-    $script:ShutdownTimer.Start()
 
     [System.Windows.Forms.Application]::Run()
     $script:notifyIcon.Visible = $false
@@ -1613,13 +1540,6 @@ finally {
         $script:ApplyAnimTimer.Stop()
         $script:ApplyAnimTimer.Dispose()
     }
-    if ($script:ShutdownTimer) {
-        $script:ShutdownTimer.Stop()
-        $script:ShutdownTimer.Dispose()
-    }
-    if ($script:ShutdownEvent) {
-        try { $script:ShutdownEvent.Dispose() } catch {}
-    }
     # Unregister event subscriptions
     if ($script:MediaEndedSub) {
         try { Unregister-Event -SubscriptionId $script:MediaEndedSub.Id -ErrorAction SilentlyContinue } catch {}
@@ -1629,11 +1549,6 @@ finally {
     }
     Close-ProgressOverlay
     Close-QuickPanel
-    Stop-ExistingWatcher
-    # Clean up active profile state file
-    if (Test-Path $script:ActiveProfileFile) {
-        Remove-Item $script:ActiveProfileFile -Force -ErrorAction SilentlyContinue
-    }
     if ($script:notifyIcon) {
         $script:notifyIcon.Visible = $false
         try { $script:notifyIcon.Dispose() } catch {}
@@ -1648,6 +1563,12 @@ finally {
     if ($script:MediaPlayer) {
         try { $script:MediaPlayer.Close() } catch {}
         $script:MediaPlayer = $null
+    }
+    if ($script:FontNormal) {
+        try { $script:FontNormal.Dispose() } catch {}
+    }
+    if ($script:FontBold) {
+        try { $script:FontBold.Dispose() } catch {}
     }
     if ($script:mutex) {
         try { $script:mutex.ReleaseMutex() } catch {}

@@ -5,12 +5,9 @@ Ultra-lightweight PowerShell-based tray for quick profile switching.
 Features:
 - Left-click shows profile menu
 - Apply profile via CLI (JSON mode)
-- Automatic game process monitoring
-- Tray auto-hides during gaming, restarts when game exits
 
 Files:
 - ABSO-Tray.ps1: Main tray application (~25-30MB RAM)
-- ABSO-Watcher.ps1: Game process monitor (~15-20MB RAM)
 - ABSO-Tray.vbs: Hidden launcher (no console flash)
 - Install-Startup.ps1: Add/remove from Windows startup
 

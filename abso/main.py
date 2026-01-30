@@ -1,6 +1,7 @@
 """CLI entry point for ABSO."""
 
 import json
+import os
 import sys
 from dataclasses import asdict
 from datetime import datetime
@@ -56,9 +57,11 @@ def get_current_profile() -> str | None:
 
 
 def set_current_profile(profile_name: str) -> None:
-    """Save the current profile to state file."""
+    """Save the current profile to state file (atomic write)."""
     state = {"current_profile": profile_name, "applied_at": datetime.now().isoformat()}
-    STATE_FILE.write_text(json.dumps(state, indent=2))
+    tmp = STATE_FILE.with_suffix(".tmp")
+    tmp.write_text(json.dumps(state, indent=2))
+    os.replace(tmp, STATE_FILE)
 
 
 def json_serial(obj: Any) -> Any:

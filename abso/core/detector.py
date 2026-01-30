@@ -261,52 +261,52 @@ def _detect_vrr_from_edid(monitor_id: str) -> dict[str, Any]:
         "vrr_max_hz": None,
     }
 
+    MAX_ENUM = 1000  # Guard against malformed registry
+
     try:
         # Find EDID in registry
         edid_path = r"SYSTEM\CurrentControlSet\Enum\DISPLAY"
         display_key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, edid_path)
+        try:
+            i = 0
+            while i < MAX_ENUM:
+                try:
+                    reg_monitor_id = winreg.EnumKey(display_key, i)
 
-        i = 0
-        while True:
-            try:
-                reg_monitor_id = winreg.EnumKey(display_key, i)
+                    # Check if this matches our monitor
+                    if monitor_id.upper() not in reg_monitor_id.upper():
+                        i += 1
+                        continue
 
-                # Check if this matches our monitor
-                if monitor_id.upper() not in reg_monitor_id.upper():
-                    i += 1
-                    continue
-
-                monitor_key = winreg.OpenKey(display_key, reg_monitor_id)
-
-                j = 0
-                while True:
+                    monitor_key = winreg.OpenKey(display_key, reg_monitor_id)
                     try:
-                        instance = winreg.EnumKey(monitor_key, j)
-                        device_params = winreg.OpenKey(
-                            monitor_key, f"{instance}\\Device Parameters"
-                        )
-                        try:
-                            edid, _ = winreg.QueryValueEx(device_params, "EDID")
-                            vrr_info = _parse_edid_for_vrr(bytes(edid))
-                            if vrr_info.get("vrr_supported"):
-                                result.update(vrr_info)
-                                winreg.CloseKey(device_params)
-                                winreg.CloseKey(monitor_key)
-                                winreg.CloseKey(display_key)
-                                return result
-                        except FileNotFoundError:
-                            pass
-                        winreg.CloseKey(device_params)
-                        j += 1
-                    except OSError:
-                        break
-
-                winreg.CloseKey(monitor_key)
-                i += 1
-            except OSError:
-                break
-
-        winreg.CloseKey(display_key)
+                        j = 0
+                        while j < MAX_ENUM:
+                            try:
+                                instance = winreg.EnumKey(monitor_key, j)
+                                device_params = winreg.OpenKey(
+                                    monitor_key, f"{instance}\\Device Parameters"
+                                )
+                                try:
+                                    edid, _ = winreg.QueryValueEx(device_params, "EDID")
+                                    vrr_info = _parse_edid_for_vrr(bytes(edid))
+                                    if vrr_info.get("vrr_supported"):
+                                        result.update(vrr_info)
+                                        return result
+                                except FileNotFoundError:
+                                    pass
+                                finally:
+                                    winreg.CloseKey(device_params)
+                                j += 1
+                            except OSError:
+                                break
+                    finally:
+                        winreg.CloseKey(monitor_key)
+                    i += 1
+                except OSError:
+                    break
+        finally:
+            winreg.CloseKey(display_key)
     except OSError as e:
         logger.debug(f"EDID VRR detection failed (registry access): {e}")
     except ValueError as e:

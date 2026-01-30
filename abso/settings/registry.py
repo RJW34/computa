@@ -205,19 +205,21 @@ class RegistrySettingsHandler(SettingsHandler):
 
     def restore(self, data: dict[str, Any]) -> bool:
         """Restore registry gaming settings from backup."""
-        try:
-            if "system_responsiveness" in data:
-                self._set_system_responsiveness(data["system_responsiveness"])
-            if "network_throttling" in data:
-                self._set_network_throttling(data["network_throttling"])
-            if "game_priority" in data:
-                self._set_game_priority(data["game_priority"])
-            if "win32_priority_separation" in data:
-                self._set_win32_priority_separation(data["win32_priority_separation"])
-            return True
-        except Exception as e:
-            logger.error(f"Failed to restore registry settings: {e}")
-            return False
+        success = True
+        restore_map = {
+            "system_responsiveness": self._set_system_responsiveness,
+            "network_throttling": self._set_network_throttling,
+            "game_priority": self._set_game_priority,
+            "win32_priority_separation": self._set_win32_priority_separation,
+        }
+        for key, setter in restore_map.items():
+            if key in data:
+                try:
+                    setter(data[key])
+                except Exception as e:
+                    logger.error(f"Failed to restore registry setting '{key}': {e}")
+                    success = False
+        return success
 
     # Private helper methods
 

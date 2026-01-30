@@ -45,6 +45,8 @@ if ($Install) {
     $Shortcut.WorkingDirectory = $PSScriptRoot
     $Shortcut.Description = "A.B.S.O. System Tray"
     $Shortcut.Save()
+    [System.Runtime.InteropServices.Marshal]::ReleaseComObject($Shortcut) | Out-Null
+    [System.Runtime.InteropServices.Marshal]::ReleaseComObject($WshShell) | Out-Null
 
     Write-Host "A.B.S.O. Tray added to Windows startup" -ForegroundColor Green
     Write-Host "Location: $ShortcutPath"
