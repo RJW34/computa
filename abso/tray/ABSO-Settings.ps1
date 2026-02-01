@@ -70,6 +70,15 @@ function Read-TrayConfig {
         }
         catch {
             # Corrupt config - back up corrupt file, then reset to defaults
+            # Clean old corrupt backups first (keep at most 3)
+            try {
+                $corruptFiles = Get-ChildItem -Path $script:ConfigDir -Filter "tray-config.json.corrupt.*" -ErrorAction SilentlyContinue |
+                    Sort-Object LastWriteTime -Descending |
+                    Select-Object -Skip 2
+                foreach ($old in $corruptFiles) {
+                    Remove-Item $old.FullName -Force -ErrorAction SilentlyContinue
+                }
+            } catch {}
             $backupPath = "$($script:ConfigFile).corrupt.$(Get-Date -Format 'yyyyMMdd-HHmmss')"
             try {
                 Copy-Item $script:ConfigFile $backupPath -Force -ErrorAction SilentlyContinue
@@ -98,7 +107,12 @@ function Save-TrayConfig {
         $Config | ConvertTo-Json -Depth 4 | Set-Content $script:ConfigFile -Force -ErrorAction Stop
     }
     catch {
-        Write-Warning "ABSO: Failed to save config: $($_.Exception.Message)"
+        $errMsg = "Failed to save config: $($_.Exception.Message)"
+        Write-Warning "ABSO: $errMsg"
+        # Write to log if available (function may be called before log is set up)
+        if (Get-Command Write-TrayLog -ErrorAction SilentlyContinue) {
+            Write-TrayLog $errMsg -Level "ERROR"
+        }
     }
 }
 
@@ -376,7 +390,10 @@ function Show-SettingsPanel {
     $form.Controls.Add($closeBtn)
 
     $script:SettingsForm = $form
-    $form.Add_FormClosed({ $form.Dispose() })
+    $form.Add_FormClosed({
+        $form.Dispose()
+        $script:SettingsForm = $null
+    })
     $form.Show()
 }
 

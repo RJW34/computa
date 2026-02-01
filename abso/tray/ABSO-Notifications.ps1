@@ -98,12 +98,16 @@ function Show-ProgressOverlay {
     $script:ProgressAngle = 0
     $timer.Add_Tick({
         $script:ProgressAngle = ($script:ProgressAngle + 3) % 288
-        if ($script:ProgressForm -and $script:ProgressBar) {
-            $script:ProgressBar.Location = New-Object System.Drawing.Point($script:ProgressAngle, 0)
-            $script:ProgressBar.Size = New-Object System.Drawing.Size(80, 6)
-            if (($script:ProgressAngle + 80) -gt 288) {
-                $script:ProgressBar.Size = New-Object System.Drawing.Size((288 - $script:ProgressAngle), 6)
+        if ($script:ProgressForm -and $script:ProgressBar -and -not $script:ProgressForm.IsDisposed) {
+            $barWidth = 80
+            $maxX = 288
+            $x = $script:ProgressAngle
+            # Clamp width when approaching the end so the bar wraps cleanly
+            if (($x + $barWidth) -gt $maxX) {
+                $barWidth = $maxX - $x
             }
+            $script:ProgressBar.Location = New-Object System.Drawing.Point($x, 0)
+            $script:ProgressBar.Size = New-Object System.Drawing.Size($barWidth, 6)
         }
     })
     $timer.Start()

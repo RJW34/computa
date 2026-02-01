@@ -60,15 +60,26 @@ function Get-MediaPlayer {
     return $script:MediaPlayer
 }
 
+function Play-SoundFile {
+    <#
+    .SYNOPSIS
+    Plays a sound file via the shared MediaPlayer. Stops any current playback first.
+    #>
+    param([string]$FilePath, [double]$Volume = 0.2)
+
+    $player = Get-MediaPlayer
+    # Stop current playback before opening new file
+    $player.Stop()
+    $player.Open([Uri]$FilePath)
+    $player.Volume = $Volume
+    $player.Play()
+}
+
 function Play-SuccessSound {
     try {
         if (-not $script:TrayConfig.soundEnabled) { return }
         if (Test-Path $script:SoundFile) {
-            $player = Get-MediaPlayer
-            $player.Close()
-            $player.Open([Uri]$script:SoundFile)
-            $player.Volume = $script:TrayConfig.soundVolume
-            $player.Play()
+            Play-SoundFile -FilePath $script:SoundFile -Volume $script:TrayConfig.soundVolume
             Write-TrayLog "Playing success sound"
         }
         else {
@@ -84,11 +95,7 @@ function Play-FailSound {
     try {
         if (-not $script:TrayConfig.soundEnabled) { return }
         if (Test-Path $script:FailSoundFile) {
-            $player = Get-MediaPlayer
-            $player.Close()
-            $player.Open([Uri]$script:FailSoundFile)
-            $player.Volume = [Math]::Min(1.0, $script:TrayConfig.soundVolume * 3)
-            $player.Play()
+            Play-SoundFile -FilePath $script:FailSoundFile -Volume ([Math]::Min(1.0, $script:TrayConfig.soundVolume * 3))
             Write-TrayLog "Playing fail sound"
         }
     }
@@ -97,18 +104,24 @@ function Play-FailSound {
     }
 }
 
+$script:SoundFilesChecked = $false
+
 function Test-SoundFilesExist {
-    $allPresent = $true
+    # Only log warnings once per session
+    if ($script:SoundFilesChecked) { return ($script:SoundFilesValid) }
+    $script:SoundFilesChecked = $true
+    $script:SoundFilesValid = $true
+
     if (-not (Test-Path $script:SoundFile)) {
         Write-TrayLog "SUCCESS SOUND FILE MISSING: $($script:SoundFile)" -Level "WARN"
-        $allPresent = $false
+        $script:SoundFilesValid = $false
     }
     if (-not (Test-Path $script:FailSoundFile)) {
         Write-TrayLog "FAIL SOUND FILE MISSING: $($script:FailSoundFile)" -Level "WARN"
-        $allPresent = $false
+        $script:SoundFilesValid = $false
     }
-    if ($allPresent) { Write-TrayLog "Sound files validated" }
-    return $allPresent
+    if ($script:SoundFilesValid) { Write-TrayLog "Sound files validated" }
+    return $script:SoundFilesValid
 }
 
 # ============================================================================
@@ -142,12 +155,30 @@ $script:Colors = @{
 # ============================================================================
 
 $script:LogFile = Join-Path $env:TEMP "abso_tray.log"
+$script:LogMaxBytes = 2 * 1024 * 1024  # 2 MB max log size
+$script:LogCheckedSize = $false
 
 function Write-TrayLog {
     param([string]$Message, [string]$Level = "INFO")
     $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
     $line = "[$timestamp] [$Level] $Message"
     try {
+        # Rotate log if too large (check once per session, then every ~100 writes)
+        if (-not $script:LogCheckedSize) {
+            $script:LogCheckedSize = $true
+            $script:LogWriteCount = 0
+            if (Test-Path $script:LogFile) {
+                $fileInfo = Get-Item $script:LogFile -ErrorAction SilentlyContinue
+                if ($fileInfo -and $fileInfo.Length -gt $script:LogMaxBytes) {
+                    $backupLog = "$($script:LogFile).old"
+                    Move-Item $script:LogFile $backupLog -Force -ErrorAction SilentlyContinue
+                }
+            }
+        }
+        $script:LogWriteCount++
+        if ($script:LogWriteCount -ge 100) {
+            $script:LogCheckedSize = $false  # Re-check on next write
+        }
         Add-Content -Path $script:LogFile -Value $line -ErrorAction SilentlyContinue
     }
     catch {}
@@ -210,10 +241,33 @@ $script:ProjectRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
 # Resolve full python path at startup (elevated admin may lose user PATH entries)
 $script:PythonExe = (Get-Command python -ErrorAction SilentlyContinue).Source
 if (-not $script:PythonExe) {
-    # Fallback: check common user-local install path
-    $fallback = Join-Path $env:LOCALAPPDATA "Programs\Python\Python312\python.exe"
-    if (Test-Path $fallback) { $script:PythonExe = $fallback }
-    else { $script:PythonExe = "python" }  # last resort
+    # Fallback: search common Python install paths across versions
+    $found = $false
+    foreach ($ver in @("Python313", "Python312", "Python311", "Python310", "Python39")) {
+        $candidate = Join-Path $env:LOCALAPPDATA "Programs\Python\$ver\python.exe"
+        if (Test-Path $candidate) {
+            $script:PythonExe = $candidate
+            $found = $true
+            break
+        }
+    }
+    if (-not $found) {
+        # Also check user PATH from registry (admin sessions lose inherited user PATH)
+        try {
+            $userPath = [Environment]::GetEnvironmentVariable("Path", "User")
+            if ($userPath) {
+                foreach ($dir in ($userPath -split ';')) {
+                    $candidate = Join-Path $dir "python.exe"
+                    if ($dir -and (Test-Path $candidate)) {
+                        $script:PythonExe = $candidate
+                        $found = $true
+                        break
+                    }
+                }
+            }
+        } catch {}
+    }
+    if (-not $found) { $script:PythonExe = "python" }  # last resort
 }
 
 # ============================================================================
@@ -242,7 +296,7 @@ $script:Profiles = [ordered]@{
     }
     "rivals2-online"    = @{
         Name     = "Rivals 2: Online"
-        Sub      = "LLM ON | 240fps | Rollback-Safe"
+        Sub      = "LLM ON | Uncapped | Rollback-Safe"
         Cat      = "Fighting"
         Desc     = "Ranked/online. LLM ON (not Ultra), 240fps cap, 240Hz."
         Exes     = @("Rivals2-Win64-Shipping.exe", "RivalsofAether2.exe", "Rivals2.exe")
@@ -319,6 +373,22 @@ $script:FontBold = New-Object System.Drawing.Font("Segoe UI", 9, [System.Drawing
 $script:IconState = "Idle"
 $script:ApplyAnimTimer = $null
 
+function Set-IconSafe {
+    <#
+    .SYNOPSIS
+    Safely swaps the tray icon, disposing the old one only after the new one is assigned.
+    #>
+    param([System.Drawing.Icon]$NewIcon)
+
+    if (-not $script:notifyIcon -or -not $NewIcon) { return }
+    $oldIcon = $script:notifyIcon.Icon
+    $script:notifyIcon.Icon = $NewIcon
+    # Dispose old icon AFTER new one is assigned — prevents race with animation timer
+    if ($oldIcon -and $oldIcon -ne $NewIcon) {
+        try { $oldIcon.Dispose() } catch {}
+    }
+}
+
 function Set-IconState {
     <#
     .SYNOPSIS
@@ -332,37 +402,32 @@ function Set-IconState {
     $script:IconState = $State
 
     if ($State -eq "Applying") {
-        # Start animation timer
+        # Create animation timer once, start it
         if (-not $script:ApplyAnimTimer) {
             $script:ApplyAnimTimer = New-Object System.Windows.Forms.Timer
             $script:ApplyAnimTimer.Interval = 300
             $script:ApplyAnimTimer.Add_Tick({
-                $oldIcon = $script:notifyIcon.Icon
-                $script:notifyIcon.Icon = New-StateIcon -State "Applying"
-                if ($oldIcon) {
-                    try { $oldIcon.Dispose() } catch {}
+                if ($script:IconState -ne "Applying") {
+                    # State changed out from under us — stop
+                    $script:ApplyAnimTimer.Stop()
+                    return
                 }
+                $newIcon = New-StateIcon -State "Applying"
+                Set-IconSafe -NewIcon $newIcon
             })
         }
-        $script:ApplyAnimTimer.Start()
+        # Set initial icon THEN start timer (so first frame is visible immediately)
         $newIcon = New-StateIcon -State "Applying"
-        $oldIcon = $script:notifyIcon.Icon
-        $script:notifyIcon.Icon = $newIcon
-        if ($oldIcon) {
-            try { $oldIcon.Dispose() } catch {}
-        }
+        Set-IconSafe -NewIcon $newIcon
+        $script:ApplyAnimTimer.Start()
     }
     else {
-        # Stop animation
+        # Stop animation first to prevent timer tick racing
         if ($script:ApplyAnimTimer) {
             $script:ApplyAnimTimer.Stop()
         }
         $newIcon = New-StateIcon -State $State
-        $oldIcon = $script:notifyIcon.Icon
-        $script:notifyIcon.Icon = $newIcon
-        if ($oldIcon) {
-            try { $oldIcon.Dispose() } catch {}
-        }
+        Set-IconSafe -NewIcon $newIcon
     }
 }
 
@@ -644,12 +709,16 @@ function Run-Audit {
 
     try {
         $tempFile = [System.IO.Path]::GetTempFileName()
+        $errFile = "$tempFile.err"
         Start-Process -FilePath $script:PythonExe -ArgumentList "-m", "abso", "audit", "--json" `
             -NoNewWindow -Wait -WorkingDirectory $script:ProjectRoot `
-            -RedirectStandardOutput $tempFile
+            -RedirectStandardOutput $tempFile -RedirectStandardError $errFile
 
         $rawOutput = Get-Content $tempFile -Raw -ErrorAction SilentlyContinue
+        $errOutput = Get-Content $errFile -Raw -ErrorAction SilentlyContinue
         Remove-Item $tempFile -Force -ErrorAction SilentlyContinue
+        Remove-Item $errFile -Force -ErrorAction SilentlyContinue
+        if ($errOutput) { Write-TrayLog "Audit CLI stderr: $errOutput" -Level "WARN" }
 
         if ($rawOutput) {
             $json = $rawOutput | ConvertFrom-Json
@@ -697,7 +766,13 @@ function Run-Audit {
 function Open-BackupsFolder {
     $backupsPath = Join-Path $script:ProjectRoot "backups"
     if (Test-Path $backupsPath) {
-        Start-Process "explorer.exe" -ArgumentList $backupsPath
+        try {
+            Start-Process "explorer.exe" -ArgumentList $backupsPath -ErrorAction Stop
+        }
+        catch {
+            Write-TrayLog "Failed to open backups folder: $($_.Exception.Message)" -Level "ERROR"
+            Show-Notification -Title "A.B.S.O." -Message "Failed to open folder: $($_.Exception.Message)" -Type "Error"
+        }
     }
     else {
         Show-Notification -Title "A.B.S.O." -Message "No backups folder found" -Type "Warning"
@@ -846,7 +921,15 @@ function Start-TrayApp {
     $script:notifyIcon.Text = "A.B.S.O. - Ready"
     $script:notifyIcon.Visible = $true
 
+    # Restore last active profile from recent history (if any)
     $script:activeProfile = $null
+    if ($script:TrayConfig.recentProfiles -and $script:TrayConfig.recentProfiles.Count -gt 0) {
+        $lastId = $script:TrayConfig.recentProfiles[0].id
+        if ($lastId -and $script:Profiles.Contains($lastId)) {
+            $script:activeProfile = $lastId
+            Write-TrayLog "Restored active profile from history: $lastId"
+        }
+    }
     $script:profileMenuItems = @()
 
     # Get system info
@@ -1298,7 +1381,8 @@ public class HotkeyMessageWindow : NativeWindow {
             Show-QuickPanel -Favorites $script:TrayConfig.favorites -Profiles $script:Profiles -ActiveProfile $script:activeProfile -OnApply { param($id) Apply-Profile $id }
             $script:TrayConfig.showQuickPanel = $true
         }
-        $quickPanelItem.Checked = $script:QuickPanelVisible
+        # Use config value (authoritative) rather than $QuickPanelVisible which may lag
+        $quickPanelItem.Checked = $script:TrayConfig.showQuickPanel
         Save-TrayConfig $script:TrayConfig
     })
     $menu.Items.Add($quickPanelItem) | Out-Null
@@ -1420,11 +1504,15 @@ public class HotkeyMessageWindow : NativeWindow {
     $restartItem.Add_Click({
         if ($script:HotkeyWindow) { Unregister-GlobalHotkeys -WindowHandle $script:HotkeyWindow.Handle }
         Close-QuickPanel
+        Close-ProgressOverlay
+        $script:notifyIcon.Visible = $false
         if ($script:mutex) {
             try { $script:mutex.ReleaseMutex() } catch {}
             $script:mutex.Close()
             $script:mutex = $null
         }
+        # Brief delay to ensure mutex is fully released before new instance acquires it
+        Start-Sleep -Milliseconds 300
         $vbsPath = Join-Path $script:ScriptDir "ABSO-Tray.vbs"
         if (Test-Path $vbsPath) {
             Start-Process "wscript.exe" -ArgumentList "`"$vbsPath`"" -WindowStyle Hidden
@@ -1432,7 +1520,6 @@ public class HotkeyMessageWindow : NativeWindow {
         else {
             Start-Process powershell.exe -ArgumentList "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$PSCommandPath`"" -WindowStyle Hidden
         }
-        $script:notifyIcon.Visible = $false
         [System.Windows.Forms.Application]::Exit()
     })
     $menu.Items.Add($restartItem) | Out-Null
@@ -1493,18 +1580,6 @@ public class HotkeyMessageWindow : NativeWindow {
                 Apply-Profile $lastFav
             }
         }
-    })
-
-    # ─── SCROLL WHEEL SUPPORT ───
-
-    $script:scrollIndex = 0
-    $script:scrollProfiles = @($script:Profiles.Keys)
-    $script:scrollTimer = $null
-
-    $script:notifyIcon.Add_MouseClick({
-        param($s, $ev)
-        # Mouse wheel events don't come through NotifyIcon directly in WinForms
-        # This is handled through the hidden form's message loop instead
     })
 
     # ─── DEFAULT PROFILE (notify only, do not auto-apply) ───

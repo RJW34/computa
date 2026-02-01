@@ -58,7 +58,7 @@ if ($Install) {
 
 if ($Uninstall) {
     if (Test-Path $ShortcutPath) {
-        Remove-Item $ShortcutPath -Force
+        Remove-Item $ShortcutPath -Force -ErrorAction Stop
         Write-Host "A.B.S.O. Tray removed from Windows startup" -ForegroundColor Green
     } else {
         Write-Host "A.B.S.O. Tray was not in startup" -ForegroundColor Yellow

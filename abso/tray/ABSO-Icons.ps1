@@ -43,43 +43,52 @@ function New-GlowIcon {
         [int]$SpinAngle = 0
     )
 
-    $size = $script:IconSize
+    [int]$size = $script:IconSize
     $bmp = New-Object System.Drawing.Bitmap($size, $size)
     $g = [System.Drawing.Graphics]::FromImage($bmp)
     $g.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
     $g.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic
     $g.Clear([System.Drawing.Color]::Transparent)
 
+    # Pre-compute sizes to avoid PowerShell arithmetic issues in method calls
+    [int]$sizeM1 = $size - 1
+    [int]$sizeM5 = $size - 5
+    [int]$sizeM7 = $size - 7
+    [int]$sizeM9 = $size - 9
+
     # Outer glow (larger, semi-transparent)
     $glowBrush = New-Object System.Drawing.SolidBrush(
         [System.Drawing.Color]::FromArgb(80, $GlowColor.R, $GlowColor.G, $GlowColor.B)
     )
-    $g.FillEllipse($glowBrush, 0, 0, $size - 1, $size - 1)
+    $g.FillEllipse($glowBrush, 0, 0, $sizeM1, $sizeM1)
     $glowBrush.Dispose()
 
     # Mid ring
     $midBrush = New-Object System.Drawing.SolidBrush(
         [System.Drawing.Color]::FromArgb(140, $GlowColor.R, $GlowColor.G, $GlowColor.B)
     )
-    $g.FillEllipse($midBrush, 2, 2, $size - 5, $size - 5)
+    $g.FillEllipse($midBrush, 2, 2, $sizeM5, $sizeM5)
     $midBrush.Dispose()
 
     # Inner bright circle with gradient
-    $innerRect = New-Object System.Drawing.Rectangle(3, 3, $size - 7, $size - 7)
+    $innerRect = New-Object System.Drawing.Rectangle(3, 3, $sizeM7, $sizeM7)
+    $innerBrush = $null
     try {
-        $gradBrush = New-Object System.Drawing.Drawing2D.LinearGradientBrush(
+        $innerBrush = New-Object System.Drawing.Drawing2D.LinearGradientBrush(
             $innerRect,
             [System.Drawing.Color]::FromArgb(255, [Math]::Min(255, $CenterColor.R + 40), [Math]::Min(255, $CenterColor.G + 40), [Math]::Min(255, $CenterColor.B + 40)),
             $CenterColor,
             [System.Drawing.Drawing2D.LinearGradientMode]::ForwardDiagonal
         )
-        $g.FillEllipse($gradBrush, $innerRect)
-        $gradBrush.Dispose()
     }
     catch {
-        $solidBrush = New-Object System.Drawing.SolidBrush($CenterColor)
-        $g.FillEllipse($solidBrush, $innerRect)
-        $solidBrush.Dispose()
+        $innerBrush = New-Object System.Drawing.SolidBrush($CenterColor)
+    }
+    try {
+        $g.FillEllipse($innerBrush, $innerRect)
+    }
+    finally {
+        if ($innerBrush) { $innerBrush.Dispose() }
     }
 
     # Inner symbol
@@ -131,7 +140,7 @@ function New-GlowIcon {
             $pen = New-Object System.Drawing.Pen([System.Drawing.Color]::White, 1.5)
             $pen.StartCap = [System.Drawing.Drawing2D.LineCap]::Round
             $pen.EndCap = [System.Drawing.Drawing2D.LineCap]::Round
-            $arcRect = New-Object System.Drawing.Rectangle(4, 4, $size - 9, $size - 9)
+            $arcRect = New-Object System.Drawing.Rectangle(4, 4, $sizeM9, $sizeM9)
             $g.DrawArc($pen, $arcRect, $SpinAngle, 240)
             $pen.Dispose()
         }
@@ -212,38 +221,34 @@ function New-StateIcon {
 
     # Try to load .ico file for Idle/Active states
     $iconDir = $PSScriptRoot
+    $icoPath = $null
     if ($State -eq "Idle") {
         $icoPath = Join-Path $iconDir "favicon.ico"
-        if (Test-Path $icoPath) {
-            try {
-                $img = [System.Drawing.Image]::FromFile($icoPath)
-                $bmp = New-Object System.Drawing.Bitmap($img, 16, 16)
-                $hIcon = $bmp.GetHicon()
-                $tempIcon = [System.Drawing.Icon]::FromHandle($hIcon)
-                $icon = $tempIcon.Clone()
-                $tempIcon.Dispose()
-                [IconHelper]::DestroyIcon($hIcon) | Out-Null
-                $img.Dispose()
-                $bmp.Dispose()
-                return $icon
-            } catch {}
-        }
     }
     elseif ($State -eq "Active" -or $State -eq "Gaming") {
         $icoPath = Join-Path $iconDir "260 Swampert.ico"
-        if (Test-Path $icoPath) {
-            try {
-                $img = [System.Drawing.Image]::FromFile($icoPath)
-                $bmp = New-Object System.Drawing.Bitmap($img, 16, 16)
-                $hIcon = $bmp.GetHicon()
-                $tempIcon = [System.Drawing.Icon]::FromHandle($hIcon)
-                $icon = $tempIcon.Clone()
-                $tempIcon.Dispose()
-                [IconHelper]::DestroyIcon($hIcon) | Out-Null
-                $img.Dispose()
-                $bmp.Dispose()
-                return $icon
-            } catch {}
+    }
+
+    if ($icoPath -and (Test-Path $icoPath)) {
+        $img = $null
+        $bmp = $null
+        $hIcon = [IntPtr]::Zero
+        try {
+            $img = [System.Drawing.Image]::FromFile($icoPath)
+            $bmp = New-Object System.Drawing.Bitmap($img, 16, 16)
+            $hIcon = $bmp.GetHicon()
+            $tempIcon = [System.Drawing.Icon]::FromHandle($hIcon)
+            $icon = $tempIcon.Clone()
+            $tempIcon.Dispose()
+            return $icon
+        }
+        catch {
+            # Fall through to generated icon
+        }
+        finally {
+            if ($hIcon -ne [IntPtr]::Zero) { [IconHelper]::DestroyIcon($hIcon) | Out-Null }
+            if ($bmp) { $bmp.Dispose() }
+            if ($img) { $img.Dispose() }
         }
     }
 

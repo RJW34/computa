@@ -104,6 +104,24 @@ class ConfigurationAuditor:
                     category="system",
                 ))
 
+        # Check for problematic Windows updates
+        try:
+            from abso.core.kb_checker import check_problematic_kbs
+
+            bad_kbs = check_problematic_kbs()
+            for kb in bad_kbs:
+                all_issues.append(Issue(
+                    title=f"Problematic update installed: {kb.kb_id} — {kb.title}",
+                    severity=kb.severity,
+                    current_value=f"{kb.kb_id} installed ({kb.affected})",
+                    optimal_value=f"Uninstall {kb.kb_id}",
+                    explanation=f"This Windows update is known to cause: {kb.affected}. "
+                                f"Run 'abso setup' or uninstall manually via Windows Update.",
+                    category="windows_update",
+                ))
+        except Exception as e:
+            logger.error(f"KB check failed: {e}")
+
         # Sort by severity (critical first)
         severity_order = {"critical": 0, "warning": 1, "info": 2}
         all_issues.sort(key=lambda x: severity_order.get(x.severity, 3))

@@ -25,8 +25,10 @@ function Show-QuickPanel {
     )
 
     if ($script:QuickPanelForm -and -not $script:QuickPanelForm.IsDisposed) {
-        $script:QuickPanelForm.Close()
-        $script:QuickPanelForm.Dispose()
+        try {
+            $script:QuickPanelForm.Close()
+            $script:QuickPanelForm.Dispose()
+        } catch {}
         $script:QuickPanelForm = $null
     }
 
@@ -79,10 +81,13 @@ function Show-QuickPanel {
     $form.Add_MouseMove({
         param($s, $e)
         if ($script:QP_Dragging) {
-            $s.Location = New-Object System.Drawing.Point(
-                ($s.Location.X + $e.X - $script:QP_DragStart.X),
-                ($s.Location.Y + $e.Y - $script:QP_DragStart.Y)
-            )
+            $newX = $s.Location.X + $e.X - $script:QP_DragStart.X
+            $newY = $s.Location.Y + $e.Y - $script:QP_DragStart.Y
+            # Clamp to screen bounds so the panel can't be dragged off-screen
+            $screen = [System.Windows.Forms.Screen]::FromControl($s).WorkingArea
+            $newX = [Math]::Max($screen.Left, [Math]::Min($newX, $screen.Right - $s.Width))
+            $newY = [Math]::Max($screen.Top, [Math]::Min($newY, $screen.Bottom - $s.Height))
+            $s.Location = New-Object System.Drawing.Point($newX, $newY)
         }
     })
     $form.Add_MouseUp({ $script:QP_Dragging = $false })
@@ -118,8 +123,7 @@ function Show-QuickPanel {
     $closeLabel.Cursor = [System.Windows.Forms.Cursors]::Hand
     $closeLabel.TextAlign = [System.Drawing.ContentAlignment]::MiddleCenter
     $closeLabel.Add_Click({
-        $script:QuickPanelForm.Close()
-        $script:QuickPanelVisible = $false
+        Close-QuickPanel
     })
     $closeLabel.Add_MouseEnter({ $this.ForeColor = [System.Drawing.Color]::FromArgb(255, 220, 70, 70) })
     $closeLabel.Add_MouseLeave({ $this.ForeColor = [System.Drawing.Color]::FromArgb(255, 100, 100, 100) })
@@ -173,8 +177,10 @@ function Close-QuickPanel {
     Closes the quick panel if it's open.
     #>
     if ($script:QuickPanelForm -and -not $script:QuickPanelForm.IsDisposed) {
-        $script:QuickPanelForm.Close()
-        $script:QuickPanelForm.Dispose()
+        try {
+            $script:QuickPanelForm.Close()
+            $script:QuickPanelForm.Dispose()
+        } catch {}
         $script:QuickPanelForm = $null
     }
     $script:QuickPanelVisible = $false

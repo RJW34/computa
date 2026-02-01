@@ -101,10 +101,16 @@ def cli(ctx) -> None:
 
     Run without arguments to launch interactive mode.
     """
-    # If no command is given, run interactive mode
+    # If no command is given, check for first run or launch interactive
     if ctx.invoked_subcommand is None:
-        from abso.interactive import run_interactive
-        run_interactive()
+        from abso.core.setup_wizard import is_first_run
+
+        if is_first_run():
+            from abso.core.setup_wizard import SetupWizard
+            SetupWizard().run()
+        else:
+            from abso.interactive import run_interactive
+            run_interactive()
 
 
 @cli.command()
@@ -112,6 +118,21 @@ def interactive() -> None:
     """Launch interactive menu mode (default when run without arguments)."""
     from abso.interactive import run_interactive
     run_interactive()
+
+
+@cli.command()
+def setup() -> None:
+    """Run the first-time setup wizard.
+
+    Walks through hardware detection, Windows update checks, system audit,
+    game detection, and profile selection.
+    """
+    if not is_admin():
+        console.print("[red]Setup wizard requires admin privileges.[/red]")
+        console.print("Please run from an elevated (admin) terminal.")
+        raise SystemExit(1)
+    from abso.core.setup_wizard import SetupWizard
+    SetupWizard().run()
 
 
 @cli.command()
