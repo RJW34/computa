@@ -23,9 +23,9 @@ NVCP Settings (per-game for Rivals2.exe):
 External Tools: RTSS, frame pacing hooks DISABLED.
 
 EXPLICIT PROHIBITIONS (per canonical spec):
-- LLM = Ultra (causes rollback contention)
+- LLM = Ultra (can cause frame pacing issues, overrides FPS caps)
 - Fast Sync (incompatible with rollback)
-- G-SYNC / VRR (timing variance)
+- G-SYNC / VRR (adds ~2-5ms latency overhead)
 - External FPS caps
 - Refresh-minus-X logic
 - Ultimate Performance plan (need scheduler headroom)
@@ -144,7 +144,7 @@ class Rivals2OnlineProfile(BaseProfile):
                 "hdr": False,  # Rivals 2 is SDR
                 "auto_hdr": False,
                 "vrr_optimize": False,  # Windows VRR OFF
-                "refresh_rate": 240,  # Set refresh rate for online play
+                "max_refresh_rate": True,  # Set display to max refresh rate for current resolution
             },
             "PowerSettingsHandler": {
                 # High performance but not "ultimate" - preserve scheduler elasticity
@@ -171,13 +171,14 @@ class Rivals2OnlineProfile(BaseProfile):
             "NvidiaSettingsHandler": {
                 # ONLINE profile: Conservative settings for rollback stability
                 # Per rollback.md canonical spec - frame pacing stability > absolute latency
-                "low_latency_mode": "on",  # ON, NOT Ultra! (Ultra causes rollback contention)
+                "low_latency_mode": "on",  # ON, NOT Ultra! (Ultra can cause frame pacing issues, overrides FPS caps)
                 "power_management": "prefer_max_performance",
                 "vsync": "off",  # OFF - rollback netcode is timing-sensitive, not tear-sensitive
-                "gsync": "off",  # OFF - No VRR for online (per canonical spec)
+                "vsync_tear_control": "disable",  # Explicit tear control off with VSync OFF
+                "gsync": "off",  # OFF - VRR adds ~2-5ms latency overhead
                 "max_frame_rate": "off",  # Uncapped — no external limiters for online play
                 "shader_cache": "unlimited",
-                "threaded_optimization": "auto",  # Auto for Rivals 2
+                "threaded_optimization": "off",  # OFF - UE5 driver contention
                 "triple_buffering": "off",  # OFF - irrelevant without VSync
                 "game_name": "Rivals 2 Online",
             },
@@ -231,7 +232,7 @@ class Rivals2OnlineProfile(BaseProfile):
                 "category": "NVIDIA Control Panel",
                 "setting": "G-SYNC / VRR",
                 "value": "OFF",
-                "reason": "VRR OFF for online - rollback netcode needs consistent timing, not VRR.",
+                "reason": "VRR OFF for online - adds ~2-5ms latency overhead.",
             },
             {
                 "category": "NVIDIA Control Panel",
@@ -249,7 +250,7 @@ class Rivals2OnlineProfile(BaseProfile):
                 "category": "NVIDIA Control Panel",
                 "setting": "Low Latency Mode",
                 "value": "On",
-                "reason": "ON (not Ultra) - Ultra can cause rollback timing contention.",
+                "reason": "ON (not Ultra) - Ultra can cause frame pacing issues and overrides FPS caps.",
             },
             {
                 "category": "NVIDIA Control Panel",

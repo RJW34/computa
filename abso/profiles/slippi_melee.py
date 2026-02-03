@@ -50,8 +50,8 @@ class SlippiMeleeProfile(BaseProfile):
 
     @property
     def graphics_api(self) -> Literal["dx11", "dx12", "vulkan", "opengl", "unknown"]:
-        """Recommended backend is DX12 for HAGS compatibility."""
-        return "dx12"
+        """Backend is user's choice - Vulkan or DX12 both work well."""
+        return "unknown"
 
     @property
     def allows_aggressive_settings(self) -> bool:
@@ -93,10 +93,8 @@ class SlippiMeleeProfile(BaseProfile):
                 "game_mode": True,
                 "game_bar": False,
                 "game_dvr": False,
-                # HAGS: ENABLED with DX12 backend!
-                # Testing confirmed: HAGS + DX12 achieves consistent 0.0ms render latency.
-                # HAGS was designed for DX12's scheduling model - DX11 has issues, DX12 works great.
-                # This combination outperforms DX11 + HAGS OFF.
+                # HAGS: Generally helps with DX12; results vary by system.
+                # Enable by default, but users should test both ON/OFF.
                 "hags": True,
                 # HDR disabled for competitive - adds processing overhead
                 "hdr": False,
@@ -132,9 +130,9 @@ class SlippiMeleeProfile(BaseProfile):
             "NvidiaSettingsHandler": {
                 # Absolute minimum latency - no sync overhead
                 # Per rollback.md canonical spec for Slippi/SSBM
-                # Use DX12 backend in Dolphin for HAGS compatibility
-                "low_latency_mode": "ultra",  # ULTRA - safe for decoupled rollback (emulator)
+                "low_latency_mode": "on",  # ON recommended; Ultra optional (test both)
                 "vsync": "off",  # OFF - removes sync latency entirely
+                "vsync_tear_control": "disable",  # Explicit tear control off with VSync OFF
                 "gsync": "off",  # OFF - Melee is fixed 60fps, no VRR benefit
                 "power_management": "prefer_max_performance",
                 "shader_cache": "unlimited",
@@ -142,9 +140,8 @@ class SlippiMeleeProfile(BaseProfile):
                 "max_frame_rate": "off",  # OFF - no artificial limiting
                 "triple_buffering": "off",  # OFF - only works with VSync
                 "game_name": "Slippi Melee",
-                #
-                # IMPORTANT: Use DX12 backend with HAGS ON for 0.0ms render latency.
-                # DX11 + HAGS causes micro-stutters. DX12 + HAGS works as designed.
+                # Backend: Experiment with Vulkan and DX12 - both work well.
+                # Vulkan often best on NVIDIA/AMD. DX12 + HAGS can also achieve low latency.
                 # High refresh still helps via reduced scanout latency even without VRR.
             },
             "NetworkSettingsHandler": {
@@ -200,22 +197,23 @@ class SlippiMeleeProfile(BaseProfile):
         """Get recommended Dolphin and NVCP settings.
 
         Optimized for absolute minimum latency in competitive Melee.
-        Key findings from testing (January 2026):
-        - DX12 + HAGS ON = 0.0ms render latency (confirmed on RTX 4070 + i9-14900F)
-        - DX11 + HAGS causes micro-stutters - avoid this combination
+        Key notes:
+        - Backend: Experiment with Vulkan and DX12 (Vulkan often best on NVIDIA/AMD)
+        - HAGS: Generally helps with DX12; results vary by system
+        - LLM: On recommended; Ultra may work but test for your setup
         - Lower internal resolution = measurably lower render latency
         - G-Sync/VSync disabled - fixed 60fps games don't benefit from VRR
-        - VRR Optimize OFF is critical for minimum latency
+        - Results vary by system - always test configurations
         """
         return [
             # === WINDOWS SETTINGS ===
             {
                 "category": "Windows Settings",
                 "setting": "Hardware Accelerated GPU Scheduling (HAGS)",
-                "value": "On (requires DX12 backend)",
+                "value": "On (test both settings)",
                 "reason": (
-                    "HAGS + DX12 = 0.0ms render latency. HAGS was designed for DX12's scheduling. "
-                    "WARNING: DX11 + HAGS causes micro-stutters - only enable with DX12 backend."
+                    "HAGS generally helps with DX12 backend; results vary by system. "
+                    "Test both ON and OFF for your specific setup. Avoid with DX11 backend."
                 ),
             },
             {
@@ -251,11 +249,11 @@ class SlippiMeleeProfile(BaseProfile):
             {
                 "category": "Nvidia Control Panel",
                 "setting": "Low Latency Mode",
-                "value": "Ultra",
+                "value": "On (test Ultra)",
                 "reason": (
-                    "Ultra provides just-in-time frame submission for minimum latency. "
-                    "For locked 60fps games like Melee, Ultra is optimal since there's no "
-                    "risk of frame rate instability causing stutter."
+                    "On reduces render queue safely. Ultra may provide additional latency "
+                    "reduction but can cause micro-stutters on some systems. Test both "
+                    "settings to find what works best for your hardware."
                 ),
             },
             {
@@ -281,11 +279,11 @@ class SlippiMeleeProfile(BaseProfile):
             {
                 "category": "Graphics",
                 "setting": "Backend",
-                "value": "Direct3D 12",
+                "value": "Experiment (Vulkan often best)",
                 "reason": (
-                    "DX12 + HAGS ON = 0.0ms render latency (tested January 2026). "
-                    "HAGS was designed for DX12's scheduling model. DX11 + HAGS causes "
-                    "micro-stutters. DX12 + HAGS works as intended and achieves lowest latency."
+                    "Test both Vulkan and DX12 for your system. Vulkan is often best on "
+                    "modern NVIDIA/AMD GPUs. DX12 + HAGS can also achieve low latency. "
+                    "The difference is typically 0-2ms between the two."
                 ),
             },
             {
@@ -378,6 +376,21 @@ class SlippiMeleeProfile(BaseProfile):
             },
             {
                 "category": "Dolphin.ini [Core]",
+                "setting": "ImmediateXFBEnable",
+                "value": "True (default for Melee)",
+                "reason": "Immediately Present XFB - skips frame buffer queue for lower latency.",
+            },
+            {
+                "category": "Dolphin.ini [Core]",
+                "setting": "RushPresentation",
+                "value": "Optional (test for 8-14ms reduction)",
+                "reason": (
+                    "Rush Frame Presentation (December 2025 feature). Can reduce latency by "
+                    "8-14ms but may cause frame pacing variance on slower GPUs. Test both settings."
+                ),
+            },
+            {
+                "category": "Dolphin.ini [Core]",
                 "setting": "TimeStretching",
                 "value": "False",
                 "reason": "Audio time stretching adds processing overhead.",
@@ -441,6 +454,18 @@ class SlippiMeleeProfile(BaseProfile):
                 "reason": (
                     "With 60fps on a high refresh display, tears are small and fast-moving. "
                     "The latency reduction far outweighs the visual artifact for competitive play."
+                ),
+            },
+
+            # === IMPORTANT DISCLAIMER ===
+            {
+                "category": "Important",
+                "setting": "System Variance Disclaimer",
+                "value": "Results vary by system",
+                "reason": (
+                    "Latency improvements depend on your specific GPU, CPU, drivers, and settings. "
+                    "Always test configurations rather than assuming one setting is universally best. "
+                    "The settings above are starting points - experiment to find what works for you."
                 ),
             },
         ]

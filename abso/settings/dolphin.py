@@ -1,4 +1,17 @@
-"""Dolphin emulator configuration handler for Slippi."""
+"""Dolphin emulator configuration handler for Slippi.
+
+Manages latency-critical Dolphin settings including:
+- Immediately Present XFB (ImmediateXFBEnable) - skips frame buffer queue
+- Rush Frame Presentation (RushPresentation) - experimental 8-14ms reduction
+- Smooth Frame Presentation (SmoothPresentation) - for VRR displays
+- Backend Multithreading (BackendMultithreading) - driver threading overhead
+- GPU Sync (SyncGPU) - adds latency when enabled
+
+Sources:
+- Dolphin Progress Report December 2025 (Rush Frame Presentation)
+- Dolphin Performance Guide
+- melee.tv competitive optimization
+"""
 
 from __future__ import annotations
 
@@ -46,11 +59,26 @@ class DolphinConfigHandler:
             result["current_settings"]["UseDePosterize"] = self._extract_value(
                 content, "UseDePosterize"
             )
+            result["current_settings"]["BackendMultithreading"] = self._extract_value(
+                content, "BackendMultithreading"
+            )
 
         if self.dolphin_ini.exists():
             content = self.dolphin_ini.read_text(encoding="utf-8")
             result["current_settings"]["ReduceTimingDispersion"] = self._extract_value(
                 content, "ReduceTimingDispersion"
+            )
+            result["current_settings"]["ImmediateXFBEnable"] = self._extract_value(
+                content, "ImmediateXFBEnable"
+            )
+            result["current_settings"]["RushPresentation"] = self._extract_value(
+                content, "RushPresentation"
+            )
+            result["current_settings"]["SmoothPresentation"] = self._extract_value(
+                content, "SmoothPresentation"
+            )
+            result["current_settings"]["SyncGPU"] = self._extract_value(
+                content, "SyncGPU"
             )
 
         return result
@@ -89,6 +117,7 @@ class DolphinConfigHandler:
             "TextureScalingFactor": settings.get("texture_scaling_factor", "1"),
             "UseScalingFilter": settings.get("use_scaling_filter", "False"),
             "UseDePosterize": settings.get("use_deposterize", "False"),
+            "BackendMultithreading": settings.get("backend_multithreading", "False"),
         }
 
         if self.gfx_ini.exists():
@@ -112,6 +141,10 @@ class DolphinConfigHandler:
         # Dolphin.ini settings
         dolphin_settings = {
             "ReduceTimingDispersion": settings.get("reduce_timing_dispersion", "True"),
+            "ImmediateXFBEnable": settings.get("immediate_xfb_enable", "True"),
+            "RushPresentation": settings.get("rush_presentation", "False"),
+            "SmoothPresentation": settings.get("smooth_presentation", "False"),
+            "SyncGPU": settings.get("sync_gpu", "False"),
         }
 
         if self.dolphin_ini.exists():
@@ -187,6 +220,36 @@ class DolphinConfigHandler:
                 "current": "False",
                 "recommended": "True",
                 "reason": "Ishiiruka-specific setting for tighter frame timing",
+            })
+
+        # Check BackendMultithreading
+        if current.get("BackendMultithreading") == "True":
+            issues.append({
+                "severity": "low",
+                "setting": "BackendMultithreading",
+                "current": "True",
+                "recommended": "False",
+                "reason": "Backend multithreading adds driver overhead",
+            })
+
+        # Check SyncGPU
+        if current.get("SyncGPU") == "True":
+            issues.append({
+                "severity": "medium",
+                "setting": "SyncGPU",
+                "current": "True",
+                "recommended": "False",
+                "reason": "GPU sync adds latency - disable for competitive play",
+            })
+
+        # Check ImmediateXFBEnable (should be True for Melee)
+        if current.get("ImmediateXFBEnable") == "False":
+            issues.append({
+                "severity": "medium",
+                "setting": "ImmediateXFBEnable",
+                "current": "False",
+                "recommended": "True",
+                "reason": "Immediately Present XFB skips frame buffer queue for lower latency",
             })
 
         return issues

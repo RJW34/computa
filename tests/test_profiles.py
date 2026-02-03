@@ -99,12 +99,15 @@ class TestProfileSettings:
         assert settings["game_dvr"] is False
 
     def test_slippi_nvidia_settings(self):
-        """Test SlippiMeleeProfile returns Nvidia settings for minimum latency."""
+        """Test SlippiMeleeProfile returns Nvidia settings for minimum latency.
+
+        LLM is set to 'on' (not 'ultra') per updated research - Ultra optional but test both.
+        """
         profile = SlippiMeleeProfile()
         settings = profile.get_settings("NvidiaSettingsHandler")
 
         # Minimum latency settings per rollback.md canonical spec
-        assert settings["low_latency_mode"] == "ultra"
+        assert settings["low_latency_mode"] == "on"  # On recommended; Ultra optional
         assert settings["vsync"] == "off"
         assert settings["gsync"] == "off"
         assert settings["threaded_optimization"] == "off"
