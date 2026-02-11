@@ -99,8 +99,8 @@ class RollbackGuard:
     }
 
     SAFE_POWER_SETTINGS = {
-        "active_plan": "high_performance",
-        "ensure_ultimate_performance": False,
+        "active_plan": "ultimate_performance",
+        "ensure_ultimate_performance": True,
     }
 
     def __init__(self, mode: str = "block") -> None:
@@ -246,24 +246,7 @@ class RollbackGuard:
         if not power_settings:
             return
 
-        # Ultimate Performance can reduce scheduler elasticity
-        active_plan = power_settings.get("active_plan", "")
-        ensure_ultimate = power_settings.get("ensure_ultimate_performance", False)
-
-        if active_plan == "ultimate_performance" or ensure_ultimate:
-            # This is a warning, not a hard violation, but we record it
-            logger.warning(
-                "RollbackGuard: Ultimate Performance may reduce scheduler elasticity. "
-                "Consider High Performance for online play."
-            )
-
-            if self.mode == "override":
-                if "PowerSettingsHandler" not in result.enforced_overrides:
-                    result.enforced_overrides["PowerSettingsHandler"] = {}
-                result.enforced_overrides["PowerSettingsHandler"]["active_plan"] = \
-                    "high_performance"
-                result.enforced_overrides["PowerSettingsHandler"]["ensure_ultimate_performance"] = \
-                    False
+        # No power-plan overrides are enforced here; Ultimate Performance is allowed.
 
     def _check_external_limiters(
         self,

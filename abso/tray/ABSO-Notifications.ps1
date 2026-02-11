@@ -156,8 +156,14 @@ function Close-ProgressOverlay {
         $script:ProgressTimer = $null
     }
     if ($script:ProgressForm) {
-        $script:ProgressForm.Close()
-        $script:ProgressForm.Dispose()
+        try {
+            $script:ProgressForm.Hide()  # Force desktop repaint before disposing
+            [System.Windows.Forms.Application]::DoEvents()
+            $script:ProgressForm.Close()
+            $script:ProgressForm.Dispose()
+        } catch {
+            Write-TrayLog "ProgressForm disposal error: $($_.Exception.Message)" -Level "WARN"
+        }
         $script:ProgressForm = $null
     }
     $script:ProgressLabel = $null

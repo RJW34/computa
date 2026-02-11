@@ -4,7 +4,7 @@ Target: Offline tournament conditions simulation on standard gaming PCs.
 Design Goal: Maximize practice transfer to tournament environment.
 
 This profile simulates the look, feel, and timing consistency of Rivals 2
-played offline at tournaments on standardized gaming PCs (144-144 Hz fixed refresh).
+played offline at tournaments on standardized gaming PCs (144 Hz fixed refresh).
 
 Priorities (in order):
 1. Deterministic frame pacing
@@ -15,7 +15,7 @@ Priorities (in order):
 NOT a latency-minimum lab profile.
 
 Core Assumptions:
-- Tournaments run 144 Hz or 144 Hz monitors
+- Tournaments run 144 Hz monitors
 - VRR / G-SYNC is disabled at events
 - VSync is disabled
 - FPS variance fits inside larger frame budget
@@ -25,14 +25,13 @@ EXPLICIT PROHIBITIONS (any deviation is a bug):
 - LLM = Ultra (FORBIDDEN - tournaments don't use it)
 - Fast Sync / Adaptive Sync (FORBIDDEN)
 - VRR / G-SYNC (FORBIDDEN)
-- Ultimate Performance power plan (FORBIDDEN - need scheduler headroom)
 - High / Realtime CPU priority (FORBIDDEN)
 - Any overlay or injector (Steam, Discord, NVIDIA, RTSS)
 - Secondary FPS caps (RTSS or driver caps - use in-game only)
 
 NVIDIA Driver Settings (per-app):
 - Low Latency Mode: ON (not Ultra)
-- Max Frame Rate: 165
+- Max Frame Rate: OFF (use in-game 144 cap)
 - VSync: OFF
 - Power Management: Prefer Maximum Performance
 - Threaded Optimization: OFF
@@ -40,24 +39,22 @@ NVIDIA Driver Settings (per-app):
 - G-SYNC (per-app): OFF
 
 Canonical one-line definition:
-> Exclusive fullscreen + 144Hz + no VRR + NV LLM ON + driver cap 165 + HAGS ON + High Performance plan + no overlays
+> Exclusive fullscreen + 144Hz + no VRR + NV LLM ON + in-game cap 144 + HAGS ON + Ultimate Performance plan + no overlays
 """
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Literal
+from typing import Any, Literal
 
-from abso.profiles.base import BaseProfile
-
-if TYPE_CHECKING:
-    from abso.settings.base import SettingsHandler
+from abso.profiles.profile_bases import Rivals2BaseProfile
 
 
-class Rivals2TournamentSimProfile(BaseProfile):
+
+class Rivals2TournamentSimProfile(Rivals2BaseProfile):
     """Optimization profile for Rivals 2 Tournament Simulation (144Hz).
 
     Simulates offline tournament conditions for practice transfer.
-    Uses fixed 144Hz refresh with driver-level 144 FPS cap.
+    Uses fixed 144Hz refresh with in-game 144 FPS cap.
 
     This is NOT a minimum latency profile - it's a consistency profile
     designed to match tournament PC conditions.
@@ -81,11 +78,7 @@ class Rivals2TournamentSimProfile(BaseProfile):
 
     @property
     def executable_hints(self) -> list[str]:
-        return [
-            "Rivals2-Win64-Shipping.exe",
-            "RivalsofAether2.exe",
-            "Rivals2.exe",
-        ]
+        return super().executable_hints
 
     # === Validation Metadata Overrides ===
 
@@ -109,80 +102,15 @@ class Rivals2TournamentSimProfile(BaseProfile):
         """Tournament sim uses conservative settings for consistency."""
         return False
 
-    def get_handlers(self) -> list[SettingsHandler]:
-        from abso.settings.cnm import CNMSettingsHandler
-        from abso.settings.graphics import GraphicsSettingsHandler
-        from abso.settings.memory import MemorySettingsHandler
-        from abso.settings.mouse import MouseSettingsHandler
-        from abso.settings.network import NetworkSettingsHandler
-        from abso.settings.nvidia import NvidiaSettingsHandler
-        from abso.settings.power import PowerSettingsHandler
-        from abso.settings.process_priority import ProcessPriorityHandler
-        from abso.settings.registry import RegistrySettingsHandler
-        from abso.settings.services import ServicesSettingsHandler
-        from abso.settings.windows import WindowsSettingsHandler
-
-        return [
-            WindowsSettingsHandler(),
-            PowerSettingsHandler(),
-            RegistrySettingsHandler(),
-            NvidiaSettingsHandler(),
-            NetworkSettingsHandler(),
-            MouseSettingsHandler(),
-            GraphicsSettingsHandler(),
-            ServicesSettingsHandler(),
-            MemorySettingsHandler(),
-            ProcessPriorityHandler(self.executable_hints),
-            CNMSettingsHandler(),
-        ]
-
-    def get_settings(self, handler_name: str) -> dict[str, Any]:
-        """Get tournament simulation settings.
-
-        These settings prioritize:
-        1. Deterministic frame pacing
-        2. Stable worst-case latency
-        3. Visual consistency under rollback
-        4. High practice transfer fidelity
-
-        FORBIDDEN settings enforced here:
-        - LLM Ultra (use ON only)
-        - Ultimate Performance plan
-        - VRR / G-SYNC
-        - Fast Sync / Adaptive Sync
-        """
-        settings_map: dict[str, dict[str, Any]] = {
+    def _settings_overrides(self) -> dict[str, dict[str, Any]]:
+        """Tournament simulation settings overrides."""
+        return {
             "WindowsSettingsHandler": {
-                "game_mode": True,
-                "game_bar": False,
-                "game_dvr": False,
-                "hags": True,  # Hardware Accelerated GPU Scheduling ON
-                "hdr": False,  # HDR OFF (Rivals 2 is SDR)
-                "auto_hdr": False,  # Auto HDR OFF
-                "vrr_optimize": False,  # Windows VRR OFF (FORBIDDEN)
                 # Override refresh rate to 144Hz for tournament simulation
                 "refresh_rate": 144,
             },
-            "PowerSettingsHandler": {
-                # High Performance ONLY - Ultimate Performance is FORBIDDEN
-                # Need scheduler headroom for consistent frame pacing
-                "ensure_ultimate_performance": False,  # FORBIDDEN
-                "active_plan": "high_performance",
-                "disable_usb_suspend": True,
-                "disable_pcie_power_saving": True,
-                "processor_max_performance": True,
-                "disable_core_parking": True,
-            },
             "RegistrySettingsHandler": {
-                "system_responsiveness": 10,
-                "network_throttling": 0xFFFFFFFF,
-                "win32_priority_separation": 0x2A,
-                "game_priority": {
-                    "gpu_priority": 8,
-                    "priority": 6,  # Normal-High (not aggressive)
-                    "scheduling_category": "High",
-                    "sfio_priority": "High",
-                },
+                "win32_priority_separation": 0x26,
             },
             "NvidiaSettingsHandler": {
                 # Tournament simulation: 144Hz fixed, use in-game cap
@@ -190,47 +118,23 @@ class Rivals2TournamentSimProfile(BaseProfile):
                 "low_latency_mode": "on",  # ON only, not Ultra
                 "power_management": "prefer_max_performance",
                 "vsync": "off",  # VSync OFF
-                "gsync": "off",  # G-SYNC OFF (FORBIDDEN for tournament sim)
-                "max_frame_rate": "off",  # Uncapped - use in-game 165 cap
+                "vrr_app_override": "force_off",  # G-SYNC OFF (FORBIDDEN for tournament sim)
+                "max_frame_rate": "off",  # Uncapped - use in-game 144 cap
                 "shader_cache": "unlimited",
-                "threaded_optimization": "auto",  # Auto for Rivals 2
+                "threaded_optimization": "off",  # OFF - prevents UE5 driver contention
                 "triple_buffering": "off",  # OFF (irrelevant without VSync)
-                "game_name": "Rivals 2 Tournament Sim",
-                # Explicit VRR/G-SYNC disable flags
-                "vrr_override": "off",
-                "vrr_requested_state": "off",
             },
             "NetworkSettingsHandler": {
-                "disable_nagle": True,
-                "preset": "gaming",
-            },
-            "MouseSettingsHandler": {
-                "disable_acceleration": True,
-                "set_linear_curve": True,
-            },
-            "GraphicsSettingsHandler": {
-                "disable_global_fso": True,  # FSO OFF
-                "disable_mpo": False,  # MPO enabled (default)
-            },
-            "ServicesSettingsHandler": {
-                "preset": "gaming",
-            },
-            "MemorySettingsHandler": {
-                "large_system_cache": 0,
-                "disable_paging_executive": 1,
+                # Tournament sim is offline-first; keep OS defaults for TCP
+                "disable_nagle": False,
+                "preset": "default",
             },
             "ProcessPriorityHandler": {
                 # Normal or Above Normal priority - High/Realtime FORBIDDEN
-                "gpu_priority": 8,
-                "cpu_priority": 2,  # Above Normal (not High)
+                "cpu_priority": 2,
                 "io_priority": 2,
             },
-            "CNMSettingsHandler": {
-                "action": "stop",
-            },
         }
-
-        return settings_map.get(handler_name, {})
 
     def get_forbidden_settings(self) -> dict[str, list[str]]:
         """Get list of explicitly forbidden settings for this profile.
@@ -241,13 +145,8 @@ class Rivals2TournamentSimProfile(BaseProfile):
         return {
             "NvidiaSettingsHandler": [
                 "low_latency_mode: ultra (must be 'on' only)",
-                "fast_sync: any (forbidden entirely)",
-                "adaptive_sync: any (forbidden entirely)",
-                "gsync: on (must be 'off')",
-                "vrr: any enabled state (must be off)",
-            ],
-            "PowerSettingsHandler": [
-                "active_plan: ultimate_performance (must be high_performance)",
+                "vsync: fast or adaptive (forbidden entirely)",
+                "vrr_app_override: allow (must be force_off)",
             ],
             "ProcessPriorityHandler": [
                 "cpu_priority: 3 (High) or 4 (Realtime) - must be 2 or lower",
@@ -275,15 +174,11 @@ class Rivals2TournamentSimProfile(BaseProfile):
         nvidia = applied_settings.get("NvidiaSettingsHandler", {})
         if nvidia.get("low_latency_mode") == "ultra":
             violations.append("VIOLATION: LLM is Ultra (must be ON only)")
-        if nvidia.get("gsync") == "on":
-            violations.append("VIOLATION: G-SYNC is enabled (must be OFF)")
-        if nvidia.get("fast_sync") == "on":
-            violations.append("VIOLATION: Fast Sync is enabled (FORBIDDEN)")
-
-        # Check power plan
-        power = applied_settings.get("PowerSettingsHandler", {})
-        if power.get("active_plan") == "ultimate_performance":
-            violations.append("VIOLATION: Ultimate Performance plan (must be High Performance)")
+        vrr_override = nvidia.get("vrr_app_override")
+        if vrr_override not in (None, "force_off", "disallow", "fixed_refresh"):
+            violations.append("VIOLATION: VRR/G-SYNC is enabled (must be OFF)")
+        if nvidia.get("vsync") in {"fast", "adaptive", "adaptive_half"}:
+            violations.append("VIOLATION: Fast/Adaptive Sync is enabled (FORBIDDEN)")
 
         # Check CPU priority
         priority = applied_settings.get("ProcessPriorityHandler", {})
@@ -304,7 +199,7 @@ class Rivals2TournamentSimProfile(BaseProfile):
             {
                 "category": "=== EXPLICIT PROHIBITIONS ===",
                 "setting": "FORBIDDEN",
-                "value": "LLM Ultra, Fast Sync, VRR/G-SYNC, Ultimate Performance, Overlays",
+                "value": "LLM Ultra, Fast Sync, VRR/G-SYNC, Overlays",
                 "reason": "These settings are explicitly prohibited for tournament simulation accuracy.",
             },
 
@@ -364,8 +259,8 @@ class Rivals2TournamentSimProfile(BaseProfile):
             {
                 "category": "NVIDIA Control Panel",
                 "setting": "Max Frame Rate",
-                "value": "165",
-                "reason": "Driver-level cap at refresh rate for consistent frame pacing.",
+                "value": "Off",
+                "reason": "Driver cap OFF - in-game 144 FPS cap is authoritative.",
             },
             {
                 "category": "NVIDIA Control Panel",
@@ -434,8 +329,8 @@ class Rivals2TournamentSimProfile(BaseProfile):
             {
                 "category": "Power / Scheduling",
                 "setting": "Power Plan",
-                "value": "High Performance",
-                "reason": "Ultimate Performance is FORBIDDEN. Need scheduler headroom.",
+                "value": "Ultimate Performance",
+                "reason": "Standardized on Ultimate Performance for consistent clocks.",
             },
             {
                 "category": "Power / Scheduling",
@@ -485,8 +380,8 @@ class Rivals2TournamentSimProfile(BaseProfile):
             {
                 "category": "Enforcement Rules",
                 "setting": "FPS ceiling",
-                "value": "165 (never exceed)",
-                "reason": "FPS must never exceed 165 for tournament sim.",
+                "value": "144 (via in-game cap)",
+                "reason": "FPS should match the 144Hz cap for tournament simulation.",
             },
             {
                 "category": "Enforcement Rules",
@@ -501,3 +396,6 @@ class Rivals2TournamentSimProfile(BaseProfile):
                 "reason": "NOT for ranked ladder optimization.",
             },
         ]
+
+
+

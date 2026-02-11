@@ -70,7 +70,7 @@ class ProfileLinter:
     Performs pre-apply checks to catch:
     - NVIDIA pipeline conflicts (Reflex + LLM, LLM Ultra + FPS cap, etc.)
     - Windows graphics stack conflicts (HDR on SDR, VRR on latency profiles)
-    - Power & scheduler sanity (RAM requirements, Ultimate Performance restrictions)
+    - Power & scheduler sanity (RAM requirements, scheduler sanity)
     """
 
     # Profiles that use NVIDIA Reflex (LLM must be OFF)
@@ -337,7 +337,6 @@ class ProfileLinter:
 
         Checks:
         - Disable Paging Executive only if RAM >= 32GB
-        - Ultimate Performance restrictions for online profiles
         """
         power_settings = settings_map.get("PowerSettingsHandler", {})
         memory_settings = settings_map.get("MemorySettingsHandler", {})
@@ -358,26 +357,7 @@ class ProfileLinter:
                 setting_path="MemorySettingsHandler.disable_paging_executive",
             ))
 
-        # Check 2: Ultimate Performance for online rollback profiles
-        active_plan = power_settings.get("active_plan", "")
-        ensure_ultimate = power_settings.get("ensure_ultimate_performance", False)
-
-        if profile.optimization_target == "stable_online":
-            if active_plan == "ultimate_performance" or ensure_ultimate:
-                result.add_issue(LintIssue(
-                    code="POWER_ULTIMATE_ONLINE",
-                    severity=LintSeverity.WARNING,
-                    message="Ultimate Performance may reduce scheduler elasticity for online play",
-                    details=(
-                        "Online rollback profiles benefit from scheduler headroom. "
-                        "Ultimate Performance disables frequency scaling which can "
-                        "reduce the scheduler's ability to handle timing variance. "
-                        "Consider using High Performance instead."
-                    ),
-                    setting_path="PowerSettingsHandler.active_plan",
-                ))
-
-        # Check 3: Aggressive quantum settings for online play
+        # Check 2: Aggressive quantum settings for online play
         win32_priority = registry_settings.get("win32_priority_separation", 0)
         if win32_priority == 0x2A and profile.optimization_target == "stable_online":
             result.add_issue(LintIssue(

@@ -95,13 +95,13 @@ High-refresh tearing is visually negligible and latency-optimal.
 
 | Setting | Value |
 |----|----|
-| Power Plan | **High Performance** |
-| Ultimate Performance | FORBIDDEN |
+| Power Plan | **Ultimate Performance** |
 | CPU Priority | Normal / Above Normal |
 | High / Realtime Priority | FORBIDDEN |
 
 **Reason:**  
-Rollback requires scheduling headroom. Over-aggression causes hitches.
+Standardized on Ultimate Performance; rollback stability is preserved by
+sync/VRR constraints and conservative latency settings elsewhere.
 
 ---
 
@@ -135,14 +135,13 @@ The optimizer MUST block these when `rivals2-online` is active:
 - G-SYNC / VRR  
 - External FPS caps  
 - Refresh-minus-X logic  
-- Ultimate Performance plan  
 - Injection tools (SK / RTSS)  
 
 ---
 
 ### Canonical One-Line Definition (Rivals 2 Online)
 
-> **Exclusive fullscreen + no sync + 240 FPS cap + NV LLM ON (not Ultra - can cause frame pacing issues) + HAGS ON + High Performance plan + no overlays**
+> **Exclusive fullscreen + no sync + 240 FPS cap + NV LLM ON (not Ultra - can cause frame pacing issues) + HAGS ON + Ultimate Performance plan + no overlays**
 
 ---
 
@@ -243,8 +242,8 @@ If SK / RTSS / overlays are detected:
 - Allow `slippi-melee`
 
 ## 4. Power Plan Guardrails
-- `rivals2-online` → High Performance only
-- `slippi-melee` → Ultimate Performance allowed
+- `rivals2-online` → Ultimate Performance standard
+- `slippi-melee` → Ultimate Performance standard
 
 ---
 

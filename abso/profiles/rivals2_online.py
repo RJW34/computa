@@ -28,24 +28,21 @@ EXPLICIT PROHIBITIONS (per canonical spec):
 - G-SYNC / VRR (adds ~2-5ms latency overhead)
 - External FPS caps
 - Refresh-minus-X logic
-- Ultimate Performance plan (need scheduler headroom)
 - Injection tools (RTSS)
 
 Canonical one-line definition:
-> Exclusive fullscreen + no sync + uncapped FPS + NV LLM ON (not Ultra) + HAGS ON + High Performance plan + no overlays
+> Exclusive fullscreen + no sync + uncapped FPS + NV LLM ON (not Ultra) + HAGS ON + Ultimate Performance plan + no overlays
 """
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Literal
+from typing import Any, Literal
 
-from abso.profiles.base import BaseProfile
-
-if TYPE_CHECKING:
-    from abso.settings.base import SettingsHandler
+from abso.profiles.profile_bases import Rivals2BaseProfile
 
 
-class Rivals2OnlineProfile(BaseProfile):
+
+class Rivals2OnlineProfile(Rivals2BaseProfile):
     """Optimization profile for Rivals 2 ONLINE / MATCHMAKING play.
 
     Conservative stability-focused profile for:
@@ -74,11 +71,7 @@ class Rivals2OnlineProfile(BaseProfile):
 
     @property
     def executable_hints(self) -> list[str]:
-        return [
-            "Rivals2-Win64-Shipping.exe",
-            "RivalsofAether2.exe",
-            "Rivals2.exe",
-        ]
+        return super().executable_hints
 
     # === Validation Metadata Overrides ===
 
@@ -102,71 +95,11 @@ class Rivals2OnlineProfile(BaseProfile):
         """Online profiles should NOT use aggressive settings."""
         return False
 
-    def get_handlers(self) -> list[SettingsHandler]:
-        from abso.settings.cnm import CNMSettingsHandler
-        from abso.settings.graphics import GraphicsSettingsHandler
-        from abso.settings.memory import MemorySettingsHandler
-        from abso.settings.mouse import MouseSettingsHandler
-        from abso.settings.network import NetworkSettingsHandler
-        from abso.settings.nvidia import NvidiaSettingsHandler
-        from abso.settings.power import PowerSettingsHandler
-        from abso.settings.process_priority import ProcessPriorityHandler
-        from abso.settings.registry import RegistrySettingsHandler
-        from abso.settings.services import ServicesSettingsHandler
-        from abso.settings.windows import WindowsSettingsHandler
-
-        return [
-            WindowsSettingsHandler(),
-            PowerSettingsHandler(),
-            RegistrySettingsHandler(),
-            NvidiaSettingsHandler(),
-            NetworkSettingsHandler(),
-            MouseSettingsHandler(),
-            GraphicsSettingsHandler(),
-            ServicesSettingsHandler(),
-            MemorySettingsHandler(),
-            ProcessPriorityHandler(self.executable_hints),
-            CNMSettingsHandler(),
-        ]
-
-    def get_settings(self, handler_name: str) -> dict[str, Any]:
-        """Get stable, rollback-safe settings for online play.
-
-        CRITICAL: These settings prioritize rollback netcode stability.
-        Do NOT use aggressive latency settings for online play.
-        """
-        settings_map: dict[str, dict[str, Any]] = {
+    def _settings_overrides(self) -> dict[str, dict[str, Any]]:
+        """Stable, rollback-safe settings for online play."""
+        return {
             "WindowsSettingsHandler": {
-                "game_mode": True,
-                "game_bar": False,
-                "game_dvr": False,
-                "hags": True,  # Hardware Accelerated GPU Scheduling
-                "hdr": False,  # Rivals 2 is SDR
-                "auto_hdr": False,
-                "vrr_optimize": False,  # Windows VRR OFF
                 "max_refresh_rate": True,  # Set display to max refresh rate for current resolution
-            },
-            "PowerSettingsHandler": {
-                # High performance but not "ultimate" - preserve scheduler elasticity
-                "ensure_ultimate_performance": False,
-                "active_plan": "high_performance",
-                "disable_usb_suspend": True,
-                "disable_pcie_power_saving": True,
-                "processor_max_performance": True,
-                "disable_core_parking": True,
-            },
-            "RegistrySettingsHandler": {
-                "system_responsiveness": 10,
-                "network_throttling": 0xFFFFFFFF,
-                "win32_priority_separation": 0x2A,
-                "game_priority": {
-                    "gpu_priority": 8,
-                    "priority": 6,
-                    "scheduling_category": "High",
-                    "sfio_priority": "High",
-                },
-                # CONSERVATIVE: No forced sub-0.5ms timers
-                # Do not remove scheduler elasticity
             },
             "NvidiaSettingsHandler": {
                 # ONLINE profile: Conservative settings for rollback stability
@@ -175,43 +108,17 @@ class Rivals2OnlineProfile(BaseProfile):
                 "power_management": "prefer_max_performance",
                 "vsync": "off",  # OFF - rollback netcode is timing-sensitive, not tear-sensitive
                 "vsync_tear_control": "disable",  # Explicit tear control off with VSync OFF
-                "gsync": "off",  # OFF - VRR adds ~2-5ms latency overhead
-                "max_frame_rate": "off",  # Uncapped â€” no external limiters for online play
+                "vrr_app_override": "force_off",  # OFF - VRR adds ~2-5ms latency overhead
+                "max_frame_rate": "off",  # Uncapped — no external limiters for online play
                 "shader_cache": "unlimited",
                 "threaded_optimization": "off",  # OFF - UE5 driver contention
                 "triple_buffering": "off",  # OFF - irrelevant without VSync
-                "game_name": "Rivals 2 Online",
-            },
-            "NetworkSettingsHandler": {
-                "disable_nagle": True,
-                "preset": "gaming",
-            },
-            "MouseSettingsHandler": {
-                "disable_acceleration": True,
-                "set_linear_curve": True,
-            },
-            "GraphicsSettingsHandler": {
-                "disable_global_fso": True,
-                "disable_mpo": False,  # MPO enabled for VRR
-            },
-            "ServicesSettingsHandler": {
-                "preset": "gaming",
-            },
-            "MemorySettingsHandler": {
-                "large_system_cache": 0,
-                "disable_paging_executive": 1,
             },
             "ProcessPriorityHandler": {
-                "gpu_priority": 8,
                 "cpu_priority": 2,  # Normal-High (not aggressive)
                 "io_priority": 2,
             },
-            "CNMSettingsHandler": {
-                "action": "stop",
-            },
         }
-
-        return settings_map.get(handler_name, {})
 
     def get_in_game_settings(self) -> list[dict[str, str]]:
         """Get recommended in-game settings for ONLINE play."""
@@ -283,3 +190,6 @@ class Rivals2OnlineProfile(BaseProfile):
                 "reason": "Rollback resync frames must not cause cascading frame loss.",
             },
         ]
+
+
+

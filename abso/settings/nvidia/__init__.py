@@ -227,7 +227,7 @@ class NvidiaSettingsHandler(SettingsHandler):
                 k: v for k, v in settings.items()
                 if k in ("low_latency_mode", "power_management", "vsync",
                          "max_frame_rate", "shader_cache", "threaded_optimization",
-                         "triple_buffering", "vrr_app_override")
+                         "triple_buffering", "vrr_app_override", "vsync_tear_control")
             }
 
         if not nvidia_settings:
@@ -244,22 +244,32 @@ class NvidiaSettingsHandler(SettingsHandler):
 
             manager = DRSProfileManager()
 
-            # Use first executable if available
+            # Use provided executables (bind all when multiple are supplied)
             if executables:
-                executable = executables[0]
                 profile_name = game_name
+                primary_exe = executables[0]
 
-                result = manager.apply_settings_to_app(
-                    executable,
-                    nvidia_settings,
-                    profile_name=profile_name,
-                )
+                if len(executables) == 1:
+                    result = manager.apply_settings_to_app(
+                        primary_exe,
+                        nvidia_settings,
+                        profile_name=profile_name,
+                    )
+                else:
+                    result = manager.apply_settings_to_profile(
+                        executables,
+                        nvidia_settings,
+                        profile_name=profile_name,
+                    )
 
                 # Report results
                 if result.get("settings_applied"):
                     for setting, value in result["settings_applied"].items():
                         applied.append(f"{setting}: {value}")
                     applied.insert(0, f"NVIDIA profile '{profile_name}' configured:")
+
+                if len(executables) > 1:
+                    applied.append(f"Bound executables: {', '.join(executables)}")
 
                 if result.get("errors"):
                     for err in result["errors"]:
@@ -273,9 +283,35 @@ class NvidiaSettingsHandler(SettingsHandler):
 
                     # If NPI was launched, add a clear message
                     if result.get("npi_launched"):
-                        applied.append("ACTION REQUIRED: NPI opened - add the app to the profile and click Apply")
+                        applied.append("ACTION REQUIRED: NPI opened - add the app(s) to the profile and click Apply")
 
                 logger.info(f"NVIDIA settings applied for {game_name}: {nvidia_settings}")
+
+                # Post-apply verification: read back settings to confirm they took effect
+                verification_failures: list[str] = []
+                try:
+                    verify_result = manager.get_app_settings(primary_exe)
+                    for setting_name, expected_value in result.get("settings_applied", {}).items():
+                        if setting_name.startswith("_"):
+                            continue
+                        actual = verify_result.get(setting_name)
+                        if actual is None:
+                            continue
+                        # Resolve friendly names to numeric via the DRS manager
+                        resolved = manager._resolve_setting(setting_name, expected_value)
+                        if resolved is None:
+                            continue  # Can't resolve - skip verification
+                        _, resolved_value = resolved
+                        if str(actual) != str(resolved_value):
+                            verification_failures.append(
+                                f"{setting_name}: expected={expected_value} ({resolved_value}), actual={actual}"
+                            )
+                    if verification_failures:
+                        logger.warning(
+                            f"NVIDIA post-apply verification mismatches: {verification_failures}"
+                        )
+                except Exception as ve:
+                    logger.warning(f"NVIDIA post-apply verification skipped: {ve}")
 
                 return {
                     "success": len(errors) == 0,
@@ -284,6 +320,7 @@ class NvidiaSettingsHandler(SettingsHandler):
                     "applied": applied,
                     "app_bound": result.get("app_bound", False),
                     "npi_launched": result.get("npi_launched", False),
+                    "verification_failures": verification_failures if verification_failures else None,
                 }
             else:
                 # No executable - apply to global profile
@@ -297,31 +334,29 @@ class NvidiaSettingsHandler(SettingsHandler):
 
         except ImportError as e:
             logger.warning(f"NVAPI DRS module not available: {e}")
-            # Fall back to logging only
             applied.append(f"NVIDIA settings for {game_name} (apply manually in NVCP):")
             for key, value in nvidia_settings.items():
                 setting_name = key.replace("_", " ").title()
                 applied.append(f"  - {setting_name}: {value}")
             return {
-                "success": True,
-                "error": None,
+                "success": False,
+                "error": f"NVAPI module unavailable: {e}",
                 "requires_reboot": False,
                 "applied": applied,
-                "note": "NVAPI module unavailable - settings logged for manual application",
+                "note": "NVAPI module unavailable - settings NOT applied, manual application required",
             }
         except Exception as e:
             logger.error(f"NVAPI DRS error: {e}")
-            # Fall back to logging only
             applied.append(f"NVIDIA settings for {game_name} (apply manually in NVCP):")
             for key, value in nvidia_settings.items():
                 setting_name = key.replace("_", " ").title()
                 applied.append(f"  - {setting_name}: {value}")
             return {
-                "success": True,
-                "error": None,
+                "success": False,
+                "error": f"NVAPI error: {e}",
                 "requires_reboot": False,
                 "applied": applied,
-                "note": f"NVAPI error ({e}) - settings logged for manual application",
+                "note": f"NVAPI error ({e}) - settings NOT applied, manual application required",
             }
 
     def backup(self) -> dict[str, Any]:

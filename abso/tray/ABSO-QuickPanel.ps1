@@ -4,6 +4,19 @@
 $script:QuickPanelForm = $null
 $script:QuickPanelVisible = $false
 
+function Blend-QPColor {
+    param(
+        [System.Drawing.Color]$Base,
+        [System.Drawing.Color]$Overlay,
+        [double]$Ratio = 0.2
+    )
+    $ratio = [Math]::Max(0.0, [Math]::Min(1.0, $Ratio))
+    $r = [int]([Math]::Round($Base.R * (1 - $ratio) + $Overlay.R * $ratio))
+    $g = [int]([Math]::Round($Base.G * (1 - $ratio) + $Overlay.G * $ratio))
+    $b = [int]([Math]::Round($Base.B * (1 - $ratio) + $Overlay.B * $ratio))
+    return [System.Drawing.Color]::FromArgb(255, $r, $g, $b)
+}
+
 function Show-QuickPanel {
     <#
     .SYNOPSIS
@@ -26,9 +39,13 @@ function Show-QuickPanel {
 
     if ($script:QuickPanelForm -and -not $script:QuickPanelForm.IsDisposed) {
         try {
+            $script:QuickPanelForm.Hide()
+            [System.Windows.Forms.Application]::DoEvents()
             $script:QuickPanelForm.Close()
             $script:QuickPanelForm.Dispose()
-        } catch {}
+        } catch {
+            Write-TrayLog "QuickPanel disposal error: $($_.Exception.Message)" -Level "WARN"
+        }
         $script:QuickPanelForm = $null
     }
 
@@ -132,6 +149,15 @@ function Show-QuickPanel {
     # Profile buttons
     $y = $padding + 24
     foreach ($entry in $favProfiles) {
+        $catColor = $null
+        $catName = $entry.Profile.Cat
+        if (Get-Command Get-CategoryColor -ErrorAction SilentlyContinue) {
+            $catColor = Get-CategoryColor -Category $catName -Fallback ([System.Drawing.Color]::FromArgb(255, 200, 200, 200))
+        }
+        else {
+            $catColor = [System.Drawing.Color]::FromArgb(255, 200, 200, 200)
+        }
+
         $btn = New-Object System.Windows.Forms.Button
         $btn.Text = $entry.Profile.Name
         $btn.Tag = $entry.Id
@@ -144,17 +170,17 @@ function Show-QuickPanel {
         $btn.Padding = New-Object System.Windows.Forms.Padding(8, 0, 0, 0)
 
         if ($entry.Id -eq $ActiveProfile) {
-            $btn.BackColor = [System.Drawing.Color]::FromArgb(255, 40, 80, 50)
-            $btn.ForeColor = [System.Drawing.Color]::FromArgb(255, 90, 200, 120)
-            $btn.FlatAppearance.BorderColor = [System.Drawing.Color]::FromArgb(255, 60, 120, 70)
+            $btn.BackColor = Blend-QPColor -Base ([System.Drawing.Color]::FromArgb(255, 28, 28, 32)) -Overlay $catColor -Ratio 0.25
+            $btn.ForeColor = $catColor
+            $btn.FlatAppearance.BorderColor = $catColor
         }
         else {
-            $btn.BackColor = [System.Drawing.Color]::FromArgb(255, 45, 45, 50)
-            $btn.ForeColor = [System.Drawing.Color]::FromArgb(255, 200, 200, 200)
-            $btn.FlatAppearance.BorderColor = [System.Drawing.Color]::FromArgb(255, 60, 60, 65)
+            $btn.BackColor = Blend-QPColor -Base ([System.Drawing.Color]::FromArgb(255, 45, 45, 50)) -Overlay $catColor -Ratio 0.12
+            $btn.ForeColor = $catColor
+            $btn.FlatAppearance.BorderColor = $catColor
         }
 
-        $btn.FlatAppearance.MouseOverBackColor = [System.Drawing.Color]::FromArgb(255, 60, 60, 68)
+        $btn.FlatAppearance.MouseOverBackColor = Blend-QPColor -Base $btn.BackColor -Overlay $catColor -Ratio 0.18
         $btn.FlatAppearance.BorderSize = 1
 
         $capturedId = $entry.Id
@@ -178,9 +204,13 @@ function Close-QuickPanel {
     #>
     if ($script:QuickPanelForm -and -not $script:QuickPanelForm.IsDisposed) {
         try {
+            $script:QuickPanelForm.Hide()  # Force desktop repaint before disposing
+            [System.Windows.Forms.Application]::DoEvents()
             $script:QuickPanelForm.Close()
             $script:QuickPanelForm.Dispose()
-        } catch {}
+        } catch {
+            Write-TrayLog "QuickPanel Close disposal error: $($_.Exception.Message)" -Level "WARN"
+        }
         $script:QuickPanelForm = $null
     }
     $script:QuickPanelVisible = $false

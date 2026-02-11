@@ -33,13 +33,34 @@ class CNMSettingsHandler(SettingsHandler):
     - Windows scheduled task (CNM-Server-Tray)
     """
 
-    # Path to CNM control script (adjust if CNM is installed elsewhere)
-    CNM_CONTROL_SCRIPT = Path(
-        r"C:\Users\mtoli\Documents\Code\iphone bridge\startup\CNM-Control.ps1"
-    )
+    # Default relative path from project root (fallback)
+    _DEFAULT_RELATIVE_PATH = Path(r"..\..\iphone bridge\startup\CNM-Control.ps1")
 
     def __init__(self) -> None:
-        self._control_script_exists = self.CNM_CONTROL_SCRIPT.exists()
+        self._control_script = self._resolve_control_script()
+        self._control_script_exists = self._control_script is not None and self._control_script.exists()
+
+    @staticmethod
+    def _resolve_control_script() -> Path | None:
+        """Resolve CNM control script path from env, config, or fallback."""
+        import os
+
+        # 1. Environment variable override
+        env_path = os.environ.get("ABSO_CNM_SCRIPT")
+        if env_path:
+            p = Path(env_path)
+            if p.exists():
+                return p
+            logger.warning(f"ABSO_CNM_SCRIPT set but path not found: {p}")
+
+        # 2. Relative to project root
+        project_root = Path(__file__).resolve().parent.parent.parent
+        fallback = (project_root / CNMSettingsHandler._DEFAULT_RELATIVE_PATH).resolve()
+        if fallback.exists():
+            return fallback
+
+        logger.debug(f"CNM control script not found at {fallback}")
+        return None
 
     def detect(self) -> dict[str, Any]:
         """Detect current CNM state."""
@@ -64,7 +85,7 @@ class CNMSettingsHandler(SettingsHandler):
                     "-ExecutionPolicy",
                     "Bypass",
                     "-File",
-                    str(self.CNM_CONTROL_SCRIPT),
+                    str(self._control_script),
                     "-Status",
                 ],
                 capture_output=True,
@@ -183,7 +204,7 @@ class CNMSettingsHandler(SettingsHandler):
                     "-ExecutionPolicy",
                     "Bypass",
                     "-File",
-                    str(self.CNM_CONTROL_SCRIPT),
+                    str(self._control_script),
                     flag,
                     "-Quiet",
                 ],

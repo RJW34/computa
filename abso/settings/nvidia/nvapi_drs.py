@@ -994,49 +994,36 @@ class DRSProfileManager:
     setting G-Sync, Low Latency Mode, V-Sync, etc. for specific games.
     """
 
-    # Setting IDs (from NVIDIA's documentation and NPI)
+    # Setting IDs - verified against NVIDIA nvapi/NvApiDriverSettings.h
+    # https://github.com/NVIDIA/nvapi
     SETTING_IDS = {
         # V-Sync and frame control
-        "vsync_mode": 0x00A879CF,  # VSync Mode
-        "vsync_behavior": 0x00A879AC,  # VSync Behavior Flags
-        "vsync_smooth_afi": 0x00A879AB,  # Smooth AFR
-        "frame_rate_limiter": 0x00A879C4,  # Frame Rate Limiter (v1)
-        "frame_rate_limiter_v3": 0x00A879C9,  # Frame Rate Limiter (v3)
-        "frame_rate_limiter_gps": 0x00A879C8,  # FRL GPS Control
+        "vsync_mode": 0x00A879CF,           # VSYNCMODE_ID
+        "vsync_tear_control": 0x005A375C,   # VSYNCTEARCONTROL_ID
+        "frame_rate_limiter": 0x10835002,   # FRL_FPS_ID (v1 and v3 use same ID)
+        "frame_rate_limiter_v3": 0x10835002, # FRL_FPS_ID
 
-        # Low Latency Mode
-        "low_latency_mode": 0x00A879CE,  # Low Latency Mode (Reflex/LLM)
-        "prerendered_frames": 0x00A879CF,  # Maximum Pre-Rendered Frames
+        # Low Latency Mode / Pre-rendered frames (same underlying setting)
+        "low_latency_mode": 0x007BA09E,     # PRERENDERLIMIT_ID
+        "prerendered_frames": 0x007BA09E,   # PRERENDERLIMIT_ID (alias)
 
         # G-Sync / VRR
-        "vrr_app_override": 0x10A879CF,  # Per-app G-Sync control
-        "vrr_requested_state": 0x10A879AC,  # VRR requested state
-        "gsync_app_mode": 0x10A879CF,  # G-Sync application mode
+        "vrr_app_override": 0x10A879CF,     # VRR_APP_OVERRIDE_ID
+        "vrr_requested_state": 0x10A879AC,  # VRR_APP_OVERRIDE_REQUEST_STATE_ID
+        "vsync_vrr_control": 0x10A879CE,    # VSYNCVRRCONTROL_ID
 
         # Power management
-        "power_management": 0x00A879CF,  # Power management mode
-        "preferred_pstate": 0x00A879E1,  # Preferred P-State
+        "power_management": 0x1057EB71,     # PREFERRED_PSTATE_ID
+        "preferred_pstate": 0x1057EB71,     # PREFERRED_PSTATE_ID (alias)
 
         # Threading
-        "threaded_optimization": 0x00A879E2,  # Threaded Optimization
+        "threaded_optimization": 0x20C1221E, # OGL_THREAD_CONTROL_ID
 
         # Shader cache
-        "shader_cache": 0x00A879A6,  # Shader Cache
+        "shader_cache": 0x00198FFF,         # PS_SHADERDISKCACHE_ID
 
         # Triple buffering
-        "triple_buffering": 0x00A879A7,  # Triple Buffering
-
-        # Anisotropic filtering
-        "aniso_filter": 0x00A879A0,  # Anisotropic Filtering
-        "aniso_filter_sample": 0x00A879A1,  # AF Sample Optimization
-
-        # Antialiasing
-        "aa_mode": 0x00A879B3,  # AA Mode
-        "aa_mode_method": 0x00A879B4,  # AA Method
-
-        # Texture filtering
-        "texture_filter_quality": 0x00A879B1,  # Texture Filter Quality
-        "texture_filter_neg_lod": 0x00A879B2,  # Negative LOD Bias
+        "triple_buffering": 0x20FDD1F9,     # OGL_TRIPLE_BUFFER_ID
     }
 
     # Setting value mappings
@@ -1187,6 +1174,96 @@ class DRSProfileManager:
 
         return results
 
+    def apply_settings_to_profile(
+        self,
+        app_executables: list[str],
+        settings: dict[str, Any],
+        profile_name: str,
+    ) -> dict[str, Any]:
+        """Apply NVIDIA settings to a profile and bind multiple executables.
+
+        This creates (or reuses) a single profile, applies settings once,
+        and binds all provided executables to that profile.
+
+        Args:
+            app_executables: List of executable names.
+            settings: Dictionary of setting names to values.
+            profile_name: Profile name to create/use.
+
+        Returns:
+            Dictionary with results of each setting change and binding status.
+        """
+        results = {
+            "profile_name": profile_name,
+            "executables": app_executables,
+            "settings_applied": {},
+            "errors": [],
+        }
+
+        if not app_executables:
+            results["errors"].append({"setting": "executables", "error": "No executables provided"})
+            return results
+
+        try:
+            with self._drs as drs:
+                # Find or create the profile
+                profile = drs.find_profile_by_name(profile_name)
+                if not profile:
+                    profile = drs.create_profile(profile_name)
+                    results["profile_created"] = True
+                else:
+                    results["profile_created"] = False
+
+                # Bind all applications to the profile
+                drs._app_binding_failures = []
+                for exe in app_executables:
+                    drs.add_application_to_profile(profile, exe)
+
+                if drs._app_binding_failures:
+                    results["app_bound"] = False
+                    results["app_binding_failures"] = list(drs._app_binding_failures)
+
+                    first_failed = drs._app_binding_failures[0]
+                    npi_launched = self._try_npi_for_app_binding(profile_name, first_failed)
+
+                    if npi_launched:
+                        results["app_binding_note"] = (
+                            f"Profile '{profile_name}' created with all settings. "
+                            f"NPI launched - please add executables to the profile and click Apply."
+                        )
+                        results["npi_launched"] = True
+                    else:
+                        results["app_binding_note"] = (
+                            f"Profile '{profile_name}' created with all settings configured. "
+                            f"Automatic app binding unavailable on this driver version. "
+                            f"To activate: NVCP > Manage 3D Settings > Program Settings > "
+                            f"Add executables to '{profile_name}'."
+                        )
+                        results["manual_instructions"] = self.get_manual_binding_instructions(
+                            profile_name, first_failed
+                        )
+                else:
+                    results["app_bound"] = True
+
+                # Apply each setting once
+                for setting_name, value in settings.items():
+                    try:
+                        self._apply_single_setting(drs, profile, setting_name, value)
+                        results["settings_applied"][setting_name] = value
+                    except Exception as e:
+                        results["errors"].append({
+                            "setting": setting_name,
+                            "error": str(e),
+                        })
+                        logger.error(f"Failed to apply {setting_name}: {e}")
+
+        except Exception as e:
+            results["fatal_error"] = str(e)
+            logger.error(f"Failed to apply settings: {e}")
+            raise
+
+        return results
+
     def _apply_single_setting(
         self,
         drs: NVAPIDRS,
@@ -1238,6 +1315,7 @@ class DRSProfileManager:
             "max_frame_rate": ("frame_rate_limiter_v3", {"off": 0, "disabled": 0}),
             "frame_rate_limit": ("frame_rate_limiter_v3", {"off": 0, "disabled": 0}),
             "fps_cap": ("frame_rate_limiter_v3", {"off": 0, "disabled": 0}),
+            "vsync_tear_control": ("vsync_tear_control", {"disable": 0, "off": 0, "enable": 1, "on": 1}),
         }
 
         if name_lower in setting_map:

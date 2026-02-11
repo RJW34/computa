@@ -2,15 +2,12 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
-from abso.profiles.base import BaseProfile
-
-if TYPE_CHECKING:
-    from abso.settings.base import SettingsHandler
+from abso.profiles.profile_bases import EmulatorLatencyBaseProfile
 
 
-class RyujinxSSBUProfile(BaseProfile):
+class RyujinxSSBUProfile(EmulatorLatencyBaseProfile):
     """Optimization profile for SSBU/HewDraw Remix via Ryujinx emulator.
 
     Focus: Ultra-low input latency for competitive platform fighting.
@@ -41,71 +38,8 @@ class RyujinxSSBUProfile(BaseProfile):
     def executable_hints(self) -> list[str]:
         return ["Ryujinx.exe", "Ryujinx.Ava.exe", "Ryujinx.Headless.SDL2.exe"]
 
-    def get_handlers(self) -> list[SettingsHandler]:
-        from abso.settings.cnm import CNMSettingsHandler
-        from abso.settings.graphics import GraphicsSettingsHandler
-        from abso.settings.memory import MemorySettingsHandler
-        from abso.settings.mouse import MouseSettingsHandler
-        from abso.settings.network import NetworkSettingsHandler
-        from abso.settings.nvidia import NvidiaSettingsHandler
-        from abso.settings.power import PowerSettingsHandler
-        from abso.settings.process_priority import ProcessPriorityHandler
-        from abso.settings.registry import RegistrySettingsHandler
-        from abso.settings.services import ServicesSettingsHandler
-        from abso.settings.windows import WindowsSettingsHandler
-
-        return [
-            WindowsSettingsHandler(),
-            PowerSettingsHandler(),
-            RegistrySettingsHandler(),
-            NvidiaSettingsHandler(),
-            NetworkSettingsHandler(),
-            MouseSettingsHandler(),
-            GraphicsSettingsHandler(),
-            ServicesSettingsHandler(),
-            MemorySettingsHandler(),
-            ProcessPriorityHandler([
-                "Ryujinx.exe",
-                "Ryujinx.Ava.exe",
-                "Ryujinx.Headless.SDL2.exe",
-            ]),
-            CNMSettingsHandler(),
-        ]
-
-    def get_settings(self, handler_name: str) -> dict[str, Any]:
-        settings_map: dict[str, dict[str, Any]] = {
-            "WindowsSettingsHandler": {
-                "game_mode": True,
-                "game_bar": False,
-                "game_dvr": False,
-                # HAGS: ENABLED - Ryujinx uses Vulkan which works well with HAGS
-                # Similar to DX12 in Dolphin, Vulkan's scheduling model benefits from HAGS
-                "hags": True,
-                # HDR disabled - SSBU is SDR content, HDR adds processing overhead
-                "hdr": False,
-                "auto_hdr": False,
-                # VRR Optimize: DISABLED - critical for minimum latency
-                # Even in exclusive fullscreen, this adds compositor overhead
-                "vrr_optimize": False,
-            },
-            "PowerSettingsHandler": {
-                "ensure_ultimate_performance": True,
-                "active_plan": "ultimate_performance",
-                "disable_usb_suspend": True,
-                "disable_pcie_power_saving": True,
-                "processor_max_performance": True,
-            },
-            "RegistrySettingsHandler": {
-                "system_responsiveness": 10,
-                "network_throttling": 0xFFFFFFFF,
-                "win32_priority_separation": 0x2A,  # Short fixed quantum, max foreground boost
-                "game_priority": {
-                    "gpu_priority": 8,
-                    "priority": 6,
-                    "scheduling_category": "High",
-                    "sfio_priority": "High",
-                },
-            },
+    def _settings_overrides(self) -> dict[str, dict[str, Any]]:
+        return {
             "NvidiaSettingsHandler": {
                 # Absolute minimum latency - no sync overhead
                 # SSBU is 60fps like Melee, same optimization approach
@@ -119,39 +53,7 @@ class RyujinxSSBUProfile(BaseProfile):
                 # - Triple Buffering: OFF
                 # - G-Sync: OFF per-app (fixed 60fps doesn't need VRR)
             },
-            "NetworkSettingsHandler": {
-                "disable_nagle": True,
-                "preset": "gaming",
-            },
-            "MouseSettingsHandler": {
-                "disable_acceleration": True,
-                "set_linear_curve": True,
-            },
-            "GraphicsSettingsHandler": {
-                # Disable FSO globally for true exclusive fullscreen
-                "disable_global_fso": True,
-                # MPO can cause stutter with emulators
-                # Safe to disable since SSBU is fixed 60fps (no VRR benefit)
-                "disable_mpo": True,
-            },
-            "ServicesSettingsHandler": {
-                "preset": "gaming",
-            },
-            "MemorySettingsHandler": {
-                "large_system_cache": 0,
-                "disable_paging_executive": 1,
-            },
-            "ProcessPriorityHandler": {
-                "gpu_priority": 8,
-                "cpu_priority": 3,  # High
-                "io_priority": 3,   # High
-            },
-            "CNMSettingsHandler": {
-                "action": "stop",
-            },
         }
-
-        return settings_map.get(handler_name, {})
 
     def get_in_game_settings(self) -> list[dict[str, str]]:
         """Get recommended Ryujinx and system settings.
@@ -420,3 +322,5 @@ class RyujinxSSBUProfile(BaseProfile):
                 ),
             },
         ]
+
+

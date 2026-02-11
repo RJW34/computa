@@ -101,8 +101,14 @@ class ProductivityOLEDProfile(BaseProfile):
                 },
             },
             "NvidiaSettingsHandler": {
-                # Balanced preset - smooth visuals with adaptive vsync
-                "preset": "balanced",
+                # Balanced explicit settings - smooth visuals with adaptive vsync
+                "low_latency_mode": "on",
+                "power_management": "prefer_max_performance",
+                "vsync": "adaptive",
+                "max_frame_rate": "off",
+                "shader_cache": "unlimited",
+                "threaded_optimization": "auto",
+                "vrr_app_override": "allow",
             },
             "MouseSettingsHandler": {
                 # Keep consistent mouse behavior

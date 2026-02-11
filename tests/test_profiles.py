@@ -109,7 +109,7 @@ class TestProfileSettings:
         # Minimum latency settings per rollback.md canonical spec
         assert settings["low_latency_mode"] == "on"  # On recommended; Ultra optional
         assert settings["vsync"] == "off"
-        assert settings["gsync"] == "off"
+        assert settings["vrr_app_override"] == "force_off"
         assert settings["threaded_optimization"] == "off"
 
     def test_cod_nvidia_settings(self):
@@ -128,12 +128,13 @@ class TestProfileSettings:
         assert settings["preset"] == "balanced"
 
     def test_pokemon_auto_chess_nvidia_settings(self):
-        """Test PokemonAutoChessProfile returns Nvidia settings with low_latency preset."""
+        """Test PokemonAutoChessProfile returns explicit Nvidia settings."""
         profile = PokemonAutoChessProfile()
         settings = profile.get_settings("NvidiaSettingsHandler")
 
         # WebGL benefits from low latency settings with VSync disabled
-        assert settings["preset"] == "low_latency_high_fps"
+        assert settings["low_latency_mode"] == "on"
+        assert settings["vsync"] == "off"
 
     def test_pokemon_auto_chess_windows_settings(self):
         """Test PokemonAutoChessProfile returns Windows settings."""
@@ -149,8 +150,8 @@ class TestProfileSettings:
         profile = PokemonAutoChessProfile()
         settings = profile.get_settings("NetworkSettingsHandler")
 
-        assert settings["disable_nagle"] is True
-        assert settings["preset"] == "gaming"
+        assert settings["disable_nagle"] is False
+        assert settings["preset"] == "default"
 
     def test_unknown_handler_returns_empty(self):
         """Test that unknown handler name returns empty dict."""

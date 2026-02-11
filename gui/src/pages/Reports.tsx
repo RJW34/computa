@@ -6,11 +6,23 @@ import { Copy, FileDown, Gamepad2 } from 'lucide-react';
 
 const PROFILES = [
   { id: 'slippi-melee', name: 'Slippi Melee' },
-  { id: 'slippi-melee-oled', name: 'Slippi (OLED)' },
+  { id: 'slippi-melee-streaming', name: 'Slippi Melee (Streaming)' },
   { id: 'rivals2', name: 'Rivals 2' },
-  { id: 'rivals2-oled', name: 'Rivals 2 (OLED)' },
-  { id: 'rivals2-oled-vrr', name: 'Rivals 2 (OLED + G-Sync)' },
+  { id: 'rivals2-offline', name: 'Rivals 2: Offline' },
+  { id: 'rivals2-online', name: 'Rivals 2: Online' },
+  { id: 'rivals2-streaming', name: 'Rivals 2 (Streaming)' },
+  { id: 'rivals2-tournament-sim-144hz', name: 'Rivals 2: Tournament Sim' },
+  { id: 'rivals2-300hz-max', name: 'Rivals 2: 300Hz Max' },
+  { id: 'ryujinx-ssbu', name: 'SSBU / HewDraw Remix' },
+  { id: 'ryujinx-ssbu-streaming', name: 'SSBU / HewDraw Remix (Streaming)' },
   { id: 'cod-bo7', name: 'CoD BO7' },
+  { id: 'fortnite', name: 'Fortnite' },
+  { id: 'fortnite-streaming', name: 'Fortnite (Streaming)' },
+  { id: 'diablo4', name: 'Diablo 4' },
+  { id: 'pokemon-auto-chess', name: 'Pokemon Auto Chess' },
+  { id: 'pacdeluxe', name: 'PAC Deluxe' },
+  { id: 'pacdeluxe-streaming', name: 'PACDeluxe (Streaming)' },
+  { id: 'productivity', name: 'Desktop / Productivity' },
 ];
 
 const SAMPLE_REPORT = `## Graphics

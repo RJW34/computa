@@ -280,76 +280,144 @@ $script:Profiles = [ordered]@{
     # --- Productivity ---
     "productivity" = @{
         Name     = "Desktop / Productivity"
-        Sub      = "HDR + VRR + Balanced"
+        Sub      = "HDR ON | Adaptive VSync | VRR (if enabled)"
         Cat      = "Productivity"
-        Desc     = "Browsing, coding, general desktop. VRR on, HDR enabled."
-        Exes     = @("Code.exe", "devenv.exe", "chrome.exe", "firefox.exe", "msedge.exe")
+        Desc     = "Multi-monitor browsing/coding. HDR, adaptive sync (VRR if enabled). No power plan change."
+        Exes     = @("Code.exe", "devenv.exe", "chrome.exe", "firefox.exe", "msedge.exe", "WindowsTerminal.exe", "idea64.exe")
     }
 
     # --- Fighting Games: Rivals 2 ---
     "rivals2-offline"   = @{
         Name     = "Rivals 2: Training"
-        Sub      = "LLM Ultra | Uncapped"
+        Sub      = "LLM Ultra | Fast Sync | 297fps"
         Cat      = "Fighting"
-        Desc     = "Training/combos. LLM Ultra, no sync, max refresh."
+        Desc     = "Offline training/combos. LLM Ultra, Fast Sync, Ultimate Performance."
         Exes     = @("Rivals2-Win64-Shipping.exe", "RivalsofAether2.exe", "Rivals2.exe")
     }
     "rivals2-online"    = @{
         Name     = "Rivals 2: Online"
         Sub      = "LLM ON | Uncapped | Rollback-Safe"
         Cat      = "Fighting"
-        Desc     = "Ranked/online. LLM ON (not Ultra), 240fps cap, 240Hz."
+        Desc     = "Ranked/online. LLM ON (not Ultra), uncapped FPS, max refresh, no VRR. Ultimate Performance."
+        Exes     = @("Rivals2-Win64-Shipping.exe", "RivalsofAether2.exe", "Rivals2.exe")
+    }
+    "rivals2-streaming" = @{
+        Name     = "Rivals 2: Streaming"
+        Sub      = "Rollback-Safe | OBS 1080p60"
+        Cat      = "Fighting"
+        Desc     = "Streaming profile for Rivals 2. OBS settings applied, FSO/MPO ON for multi-monitor."
         Exes     = @("Rivals2-Win64-Shipping.exe", "RivalsofAether2.exe", "Rivals2.exe")
     }
     "rivals2-tournament-sim-144hz" = @{
         Name     = "Rivals 2: Tournament Sim"
-        Sub      = "LLM ON | 144Hz | Practice Transfer"
+        Sub      = "LLM ON | 144Hz | No VRR"
         Cat      = "Fighting"
-        Desc     = "Simulates tournament PCs (144Hz). Practice transfer focus."
+        Desc     = "Simulates tournament PCs. 144Hz forced, no G-Sync, no Ultra, Ultimate Performance."
         Exes     = @("Rivals2-Win64-Shipping.exe", "RivalsofAether2.exe", "Rivals2.exe")
     }
     "rivals2-300hz-max" = @{
         Name     = "Rivals 2: 300Hz MAX"
-        Sub      = "LLM Ultra | 300Hz | No Compromises"
+        Sub      = "LLM Ultra | 300Hz | Ultimate Performance"
         Cat      = "Fighting"
-        Desc     = "Maximum performance. 300Hz, LLM Ultra, Ultimate Performance."
+        Desc     = "Absolute minimum latency. 300Hz, LLM Ultra, uncapped, all aggressive opts."
         Exes     = @("Rivals2-Win64-Shipping.exe", "RivalsofAether2.exe", "Rivals2.exe")
     }
 
     # --- Fighting Games: Melee ---
     "slippi-melee"      = @{
         Name     = "Slippi Melee"
-        Sub      = "LLM Ultra | DX12 + HAGS"
+        Sub      = "LLM ON | HAGS ON | No Sync"
         Cat      = "Fighting"
-        Desc     = "Competitive Melee. LLM Ultra, no sync, max refresh."
+        Desc     = "Competitive Melee. LLM ON, HAGS ON, Ultimate Performance."
+        Exes     = @("Slippi Dolphin.exe", "Dolphin.exe")
+    }
+    "slippi-melee-streaming" = @{
+        Name     = "Slippi Melee (Streaming)"
+        Sub      = "OBS 1080p60 | Multi-monitor"
+        Cat      = "Fighting"
+        Desc     = "Streaming profile for Slippi. OBS settings applied, FSO/MPO ON for multi-monitor."
         Exes     = @("Slippi Dolphin.exe", "Dolphin.exe")
     }
 
     # --- Fighting Games: SSBU ---
     "ryujinx-ssbu"      = @{
-        Name     = "SSBU (Ryujinx)"
-        Sub      = "LLM Ultra | Vulkan"
+        Name     = "SSBU / HewDraw Remix"
+        Sub      = "LLM Ultra | Fixed 60fps"
         Cat      = "Fighting"
-        Desc     = "Smash Ultimate via Ryujinx. Fixed 60fps, latency-first."
+        Desc     = "Smash Ultimate via Ryujinx. HAGS ON, Ultimate Performance."
+        Exes     = @("Ryujinx.exe", "Ryujinx.Ava.exe", "Ryujinx.Headless.SDL2.exe")
+    }
+    "ryujinx-ssbu-streaming" = @{
+        Name     = "SSBU / HewDraw Remix (Streaming)"
+        Sub      = "OBS 1080p60 | Multi-monitor"
+        Cat      = "Fighting"
+        Desc     = "Streaming profile for Ryujinx. OBS settings applied, FSO/MPO ON for multi-monitor."
         Exes     = @("Ryujinx.exe", "Ryujinx.Ava.exe", "Ryujinx.Headless.SDL2.exe")
     }
 
     # --- ARPG ---
     "diablo4"           = @{
         Name     = "Diablo 4"
-        Sub      = "HDR + Reflex | Balanced"
+        Sub      = "HDR ON | Adaptive VSync"
         Cat      = "ARPG"
-        Desc     = "Native HDR + Reflex. Balanced for variable FPS."
+        Desc     = "Native HDR, adaptive sync. Balanced preset, Ultimate Performance plan."
         Exes     = @("Diablo IV.exe")
     }
 
     # --- Shooter ---
     "cod-bo7"           = @{
         Name     = "CoD: Black Ops 7"
-        Sub      = "HDR + Reflex | Low Latency"
+        Sub      = "HDR ON | Reflex ON+Boost | LLM OFF"
         Cat      = "Shooter"
-        Desc     = "Native HDR + Reflex. Competitive FPS settings."
+        Desc     = "Reflex handles latency (LLM OFF). HDR, HAGS ON, Ultimate Performance."
         Exes     = @("cod.exe", "BlackOps7.exe")
+    }
+    "fortnite"          = @{
+        Name     = "Fortnite"
+        Sub      = "Reflex ON+Boost | LLM OFF | HAGS ON"
+        Cat      = "Shooter"
+        Desc     = "Competitive Fortnite. Reflex handles latency, max refresh, Ultimate Performance."
+        Exes     = @(
+            "FortniteClient-Win64-Shipping.exe",
+            "FortniteClient-Win64-Shipping_EAC.exe",
+            "FortniteClient-Win64-Shipping_BE.exe",
+            "FortniteClient-Win64-Shipping_EAC_EOS.exe"
+        )
+    }
+    "fortnite-streaming" = @{
+        Name     = "Fortnite (Streaming)"
+        Sub      = "Reflex ON+Boost | OBS 1080p60"
+        Cat      = "Shooter"
+        Desc     = "Streaming profile for Fortnite. OBS settings applied, FSO/MPO ON for multi-monitor."
+        Exes     = @(
+            "FortniteClient-Win64-Shipping.exe",
+            "FortniteClient-Win64-Shipping_EAC.exe",
+            "FortniteClient-Win64-Shipping_BE.exe",
+            "FortniteClient-Win64-Shipping_EAC_EOS.exe"
+        )
+    }
+
+    # --- Browser Games ---
+    "pokemon-auto-chess" = @{
+        Name     = "Pokemon Auto Chess"
+        Sub      = "LLM ON | Browser WebGL"
+        Cat      = "Other"
+        Desc     = "WebGL browser game. VSync OFF, Ultimate Performance, foreground priority boost."
+        Exes     = @("chrome.exe", "msedge.exe", "firefox.exe", "brave.exe")
+    }
+    "pacdeluxe"         = @{
+        Name     = "PACDeluxe"
+        Sub      = "LLM ON | Tauri + WebView2 | Adaptive VSync"
+        Cat      = "Other"
+        Desc     = "Native Tauri client. Adaptive sync, Ultimate Performance, priority boost."
+        Exes     = @("PACDeluxe.exe", "msedge.exe")
+    }
+    "pacdeluxe-streaming" = @{
+        Name     = "PACDeluxe (Streaming)"
+        Sub      = "OBS 1080p60 | Multi-monitor"
+        Cat      = "Other"
+        Desc     = "Streaming profile for PACDeluxe. OBS settings applied, FSO/MPO ON for multi-monitor."
+        Exes     = @("PACDeluxe.exe", "msedge.exe")
     }
 }
 
@@ -360,6 +428,43 @@ $script:CategoryColors = @{
     "ARPG"         = $script:Colors.CatARPG
     "Shooter"      = $script:Colors.CatShooter
     "Other"        = $script:Colors.CatOther
+}
+
+# ============================================================================
+# COLOR HELPERS
+# ============================================================================
+
+function Get-CategoryColor {
+    param(
+        [string]$Category,
+        [System.Drawing.Color]$Fallback = $script:Colors.Text
+    )
+    if ($Category -and $script:CategoryColors.ContainsKey($Category)) {
+        return $script:CategoryColors[$Category]
+    }
+    return $Fallback
+}
+
+function Blend-Color {
+    param(
+        [System.Drawing.Color]$Base,
+        [System.Drawing.Color]$Overlay,
+        [double]$Ratio = 0.2
+    )
+    $ratio = [Math]::Max(0.0, [Math]::Min(1.0, $Ratio))
+    $r = [int]([Math]::Round($Base.R * (1 - $ratio) + $Overlay.R * $ratio))
+    $g = [int]([Math]::Round($Base.G * (1 - $ratio) + $Overlay.G * $ratio))
+    $b = [int]([Math]::Round($Base.B * (1 - $ratio) + $Overlay.B * $ratio))
+    return [System.Drawing.Color]::FromArgb(255, $r, $g, $b)
+}
+
+function Dim-Color {
+    param(
+        [System.Drawing.Color]$Color,
+        [int]$Alpha = 200
+    )
+    $alpha = [Math]::Max(0, [Math]::Min(255, $Alpha))
+    return [System.Drawing.Color]::FromArgb($alpha, $Color.R, $Color.G, $Color.B)
 }
 
 # ============================================================================
@@ -463,9 +568,29 @@ function Apply-Profile {
         Update-ProgressOverlay -StepText "Running profile application..."
 
         Write-TrayLog "Running: $($script:PythonExe) -m abso apply $ProfileId --json"
-        Start-Process -FilePath $script:PythonExe -ArgumentList "-m", "abso", "apply", $ProfileId, "--json" `
-            -NoNewWindow -Wait -WorkingDirectory $script:ProjectRoot `
+        $proc = Start-Process -FilePath $script:PythonExe -ArgumentList "-m", "abso", "apply", $ProfileId, "--json" `
+            -NoNewWindow -PassThru -WorkingDirectory $script:ProjectRoot `
             -RedirectStandardOutput $tempFile -RedirectStandardError $errFile
+
+        # Poll instead of -Wait so the UI thread message pump stays alive
+        $timeout = (Get-Date).AddSeconds(120)
+        while (-not $proc.HasExited -and (Get-Date) -lt $timeout) {
+            [System.Windows.Forms.Application]::DoEvents()
+            Start-Sleep -Milliseconds 100
+        }
+        if (-not $proc.HasExited) {
+            Write-TrayLog "Apply-Profile timed out after 120s, killing process" -Level "ERROR"
+            $proc.Kill()
+            $proc.Dispose()
+            Close-ProgressOverlay
+            Play-FailSound
+            Set-IconState -State "Error"
+            Show-Notification -Title "A.B.S.O." -Message "Apply timed out after 120s" -Type "Error"
+            Remove-Item $tempFile -Force -ErrorAction SilentlyContinue
+            Remove-Item $errFile -Force -ErrorAction SilentlyContinue
+            return
+        }
+        $proc.Dispose()
 
         $rawOutput = Get-Content $tempFile -Raw -ErrorAction SilentlyContinue
         $errOutput = Get-Content $errFile -Raw -ErrorAction SilentlyContinue
@@ -553,9 +678,27 @@ function Restore-Settings {
         $tempFile = [System.IO.Path]::GetTempFileName()
         $errFile = "$tempFile.err"
 
-        Start-Process -FilePath $script:PythonExe -ArgumentList "-m", "abso", "restore", "latest", "--json" `
-            -NoNewWindow -Wait -WorkingDirectory $script:ProjectRoot `
+        $proc = Start-Process -FilePath $script:PythonExe -ArgumentList "-m", "abso", "restore", "latest", "--json" `
+            -NoNewWindow -PassThru -WorkingDirectory $script:ProjectRoot `
             -RedirectStandardOutput $tempFile -RedirectStandardError $errFile
+
+        $timeout = (Get-Date).AddSeconds(120)
+        while (-not $proc.HasExited -and (Get-Date) -lt $timeout) {
+            [System.Windows.Forms.Application]::DoEvents()
+            Start-Sleep -Milliseconds 100
+        }
+        if (-not $proc.HasExited) {
+            Write-TrayLog "Restore-Settings timed out after 120s, killing process" -Level "ERROR"
+            $proc.Kill()
+            $proc.Dispose()
+            Close-ProgressOverlay
+            Show-Notification -Title "A.B.S.O." -Message "Restore timed out after 120s" -Type "Error"
+            Set-IconState -State "Error"
+            Remove-Item $tempFile -Force -ErrorAction SilentlyContinue
+            Remove-Item $errFile -Force -ErrorAction SilentlyContinue
+            return
+        }
+        $proc.Dispose()
 
         $rawOutput = Get-Content $tempFile -Raw -ErrorAction SilentlyContinue
         Remove-Item $tempFile -Force -ErrorAction SilentlyContinue
@@ -600,16 +743,19 @@ function Update-MenuState {
         $p = $script:Profiles[$item.Tag]
         $isFav = Test-Favorite -ProfileId $item.Tag -Config $script:TrayConfig
         $starPrefix = if ($isFav) { "[*] " } else { "      " }
+        $catColor = Get-CategoryColor -Category $p.Cat -Fallback $script:Colors.Text
 
         if ($isActive) {
             $item.Text = "  >>  $($p.Name)"
-            $item.ForeColor = $script:Colors.AccentGreen
+            $item.ForeColor = $catColor
             $item.Font = $script:FontBold
+            $item.BackColor = Blend-Color -Base $script:Colors.Background -Overlay $catColor -Ratio 0.2
         }
         else {
             $item.Text = "$starPrefix$($p.Name)"
-            $item.ForeColor = $script:Colors.Text
+            $item.ForeColor = $catColor
             $item.Font = $script:FontNormal
+            $item.BackColor = $script:Colors.Background
         }
     }
     $script:restoreItem.Enabled = ($null -ne $script:activeProfile)
@@ -624,7 +770,7 @@ function Update-MenuState {
 
         if ($script:statusItem) {
             $script:statusItem.Text = "      Active: $($p.Name)"
-            $script:statusItem.ForeColor = $script:Colors.AccentGreen
+            $script:statusItem.ForeColor = Get-CategoryColor -Category $p.Cat -Fallback $script:Colors.AccentGreen
         }
     }
     else {
@@ -1158,7 +1304,7 @@ public class HotkeyMessageWindow : NativeWindow {
             $item.Text = "  [*] $($p.Name)"
             $item.Tag = $favId
             $item.BackColor = $script:Colors.Background
-            $item.ForeColor = $script:Colors.Text
+            $item.ForeColor = Get-CategoryColor -Category $p.Cat -Fallback $script:Colors.Text
             $item.Font = New-Object System.Drawing.Font("Segoe UI", 9)
             $item.ToolTipText = "$($p.Sub)`n$($p.Desc)"
             $item.Add_Click({
@@ -1196,7 +1342,7 @@ public class HotkeyMessageWindow : NativeWindow {
             $item.Text = "      $($p.Name)"
             $item.Tag = $rId
             $item.BackColor = $script:Colors.Background
-            $item.ForeColor = $script:Colors.TextDim
+            $item.ForeColor = Dim-Color -Color (Get-CategoryColor -Category $p.Cat -Fallback $script:Colors.TextDim) -Alpha 200
             $item.Font = New-Object System.Drawing.Font("Segoe UI", 9)
             $item.ToolTipText = "$($p.Sub) - Last: $($entry.timestamp)"
             $item.Add_Click({
@@ -1254,7 +1400,7 @@ public class HotkeyMessageWindow : NativeWindow {
                 $item.Text = "$starPrefix$($p.Name)"
                 $item.Tag = $id
                 $item.BackColor = $script:Colors.Background
-                $item.ForeColor = $script:Colors.Text
+                $item.ForeColor = Get-CategoryColor -Category $p.Cat -Fallback $script:Colors.Text
                 $item.Font = New-Object System.Drawing.Font("Segoe UI", 9)
 
                 $tooltipText = "$($p.Sub)`n"

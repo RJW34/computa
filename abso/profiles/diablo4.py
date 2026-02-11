@@ -76,7 +76,7 @@ class Diablo4Profile(BaseProfile):
             },
             "PowerSettingsHandler": {
                 "ensure_ultimate_performance": True,
-                "active_plan": "high_performance",  # Not as aggressive as competitive
+                "active_plan": "ultimate_performance",  # Standardize on Ultimate
                 "disable_usb_suspend": True,
                 "disable_pcie_power_saving": True,
             },
@@ -99,9 +99,9 @@ class Diablo4Profile(BaseProfile):
                 # - Threaded Optimization: Auto
             },
             "NetworkSettingsHandler": {
-                # Online ARPG - network latency affects gameplay
-                "disable_nagle": True,
-                "preset": "gaming",
+                # Online ARPG - keep OS defaults (avoid aggressive TCP tuning)
+                "disable_nagle": False,
+                "preset": "default",
             },
             "MouseSettingsHandler": {
                 # Consistent mouse behavior helps with targeting

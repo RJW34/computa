@@ -325,7 +325,7 @@ If experiencing micro-stuttering:
 | NVCP | Vertical Sync | **On** (not Fast) | Deterministic frame pacing |
 | NVCP | Low Latency Mode | **On** (not Ultra) | Ultra causes rollback contention |
 | NVCP | Max Frame Rate | **Disabled** | Let VRR handle naturally |
-| Power Plan | High Performance | Not Ultimate - preserve scheduler elasticity |
+| Power Plan | Ultimate Performance | Standardized for consistent clocks |
 | CPU Priority | Normal-High | Not aggressive |
 
 **External Tools:** RTSS, frame limiters **DISABLED**
@@ -397,7 +397,7 @@ CoD has built-in NVIDIA Reflex. **Driver Low Latency Mode conflicts with Reflex*
 
 | Setting | Value |
 |---------|-------|
-| Power Plan | High Performance (not Ultimate) |
+| Power Plan | Ultimate Performance |
 | USB Suspend | Disabled |
 | PCIe Power Saving | Disabled |
 
@@ -502,7 +502,7 @@ Uses `vrr_diablo4` preset with:
 |---------|-------|
 | HAGS | On |
 | Game Mode | On |
-| Power Plan | High Performance |
+| Power Plan | Ultimate Performance |
 
 #### NVIDIA Settings
 
@@ -548,7 +548,7 @@ Uses `vrr_diablo4` preset with:
 | Setting | Value |
 |---------|-------|
 | HAGS | On (works well with WebView2) |
-| Power Plan | High Performance |
+| Power Plan | Ultimate Performance |
 
 #### NVIDIA Settings (balanced preset)
 

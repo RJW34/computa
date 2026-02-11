@@ -142,8 +142,8 @@ class TestMakeSettingXml:
 
     def test_uses_decimal_format(self):
         """Test uses decimal format for IDs and values."""
-        xml = _make_setting_xml(17322171, 2)
-        assert "17322171" in xml
+        xml = _make_setting_xml(8102046, 2)
+        assert "8102046" in xml
         assert "0x" not in xml
 
 
@@ -169,41 +169,41 @@ class TestGenerateCustomProfile:
         """Test includes low latency setting in output."""
         path = generate_custom_profile({"low_latency_mode": "ultra"}, "test")
         content = path.read_text(encoding="utf-16")
-        assert "17322171" in content  # LOW_LATENCY_MODE decimal ID
+        assert "8102046" in content  # LOW_LATENCY_MODE decimal ID (0x007BA09E)
         assert "<SettingValue>2</SettingValue>" in content
 
     def test_includes_power_management_setting(self):
         """Test includes power management setting."""
         path = generate_custom_profile({"power_management": "prefer_max_performance"}, "test")
         content = path.read_text(encoding="utf-16")
-        assert "17322212" in content  # POWER_MANAGEMENT decimal ID
+        assert "274197361" in content  # POWER_MANAGEMENT decimal ID (0x1057EB71)
 
     def test_includes_vsync_setting(self):
         """Test includes vsync setting."""
         path = generate_custom_profile({"vsync": "adaptive"}, "test")
         content = path.read_text(encoding="utf-16")
-        assert "17322232" in content  # VSYNC decimal ID
+        assert "11041231" in content  # VSYNC decimal ID (0x00A879CF)
         assert "<SettingValue>2</SettingValue>" in content
 
     def test_includes_max_frame_rate_setting(self):
         """Test includes max frame rate setting."""
         path = generate_custom_profile({"max_frame_rate": "144"}, "test")
         content = path.read_text(encoding="utf-16")
-        assert "17322487" in content  # MAX_FRAME_RATE decimal ID
+        assert "277041154" in content  # MAX_FRAME_RATE decimal ID (0x10835002)
         assert "<SettingValue>144</SettingValue>" in content
 
     def test_includes_shader_cache_setting(self):
         """Test includes shader cache setting."""
         path = generate_custom_profile({"shader_cache": "unlimited"}, "test")
         content = path.read_text(encoding="utf-16")
-        assert "17322494" in content  # SHADER_CACHE_SIZE decimal ID
+        assert "1675263" in content  # SHADER_CACHE_SIZE decimal ID (0x00198FFF)
         assert "<SettingValue>4294967295</SettingValue>" in content
 
     def test_includes_threaded_optimization_setting(self):
         """Test includes threaded optimization setting."""
         path = generate_custom_profile({"threaded_optimization": "on"}, "test")
         content = path.read_text(encoding="utf-16")
-        assert "17322472" in content  # THREADED_OPTIMIZATION decimal ID
+        assert "549528094" in content  # THREADED_OPTIMIZATION decimal ID (0x20C1221E)
         assert "<SettingValue>1</SettingValue>" in content
 
     def test_includes_multiple_settings(self):
@@ -215,9 +215,9 @@ class TestGenerateCustomProfile:
         }
         path = generate_custom_profile(settings, "test")
         content = path.read_text(encoding="utf-16")
-        assert "17322171" in content  # LOW_LATENCY_MODE
-        assert "17322232" in content  # VSYNC
-        assert "17322212" in content  # POWER_MANAGEMENT
+        assert "8102046" in content  # LOW_LATENCY_MODE (0x007BA09E)
+        assert "11041231" in content  # VSYNC (0x00A879CF)
+        assert "274197361" in content  # POWER_MANAGEMENT (0x1057EB71)
 
     def test_empty_settings(self):
         """Test handles empty settings."""
@@ -276,7 +276,7 @@ class TestGeneratePresetProfile:
         content = path.read_text(encoding="utf-16")
         assert "abso_custom" in path.name
         # vsync on = 1
-        assert "17322232" in content  # VSYNC ID
+        assert "11041231" in content  # VSYNC ID
 
 
 class TestBuildExecutablesXml:
@@ -312,7 +312,7 @@ class TestBuildSettingsXml:
     def test_single_setting(self):
         """Test single setting generates correct XML."""
         xml = _build_settings_xml({"low_latency_mode": "ultra"})
-        assert "17322171" in xml  # LOW_LATENCY_MODE decimal ID
+        assert "8102046" in xml  # LOW_LATENCY_MODE decimal ID
         assert "<SettingValue>2</SettingValue>" in xml
 
     def test_multiple_settings(self):
@@ -322,9 +322,9 @@ class TestBuildSettingsXml:
             "vsync": "off",
             "power_management": "prefer_max_performance",
         })
-        assert "17322171" in xml  # LOW_LATENCY_MODE
-        assert "17322232" in xml  # VSYNC
-        assert "17322212" in xml  # POWER_MANAGEMENT
+        assert "8102046" in xml  # LOW_LATENCY_MODE
+        assert "11041231" in xml  # VSYNC
+        assert "274197361" in xml  # POWER_MANAGEMENT
 
     def test_empty_settings_returns_empty_string(self):
         """Test empty settings returns empty string."""
@@ -375,8 +375,8 @@ class TestGenerateGameProfile:
             "Test"
         )
         content = path.read_text(encoding="utf-16")
-        assert "17322171" in content  # LOW_LATENCY_MODE
-        assert "17322232" in content  # VSYNC
+        assert "8102046" in content  # LOW_LATENCY_MODE
+        assert "11041231" in content  # VSYNC
 
     def test_file_is_utf16_encoded(self):
         """Test file is UTF-16 encoded."""

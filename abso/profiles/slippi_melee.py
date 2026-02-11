@@ -2,15 +2,12 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Literal
+from typing import Any, Literal
 
-from abso.profiles.base import BaseProfile
-
-if TYPE_CHECKING:
-    from abso.settings.base import SettingsHandler
+from abso.profiles.profile_bases import EmulatorLatencyBaseProfile
 
 
-class SlippiMeleeProfile(BaseProfile):
+class SlippiMeleeProfile(EmulatorLatencyBaseProfile):
     """Optimization profile for Super Smash Bros. Melee via Slippi Dolphin.
 
     Focus: Ultra-low input latency for competitive play.
@@ -39,93 +36,20 @@ class SlippiMeleeProfile(BaseProfile):
     # === Validation Metadata Overrides ===
 
     @property
-    def is_emulator_profile(self) -> bool:
-        """This is a Dolphin emulator profile (fixed 60fps)."""
-        return True
-
-    @property
-    def is_sdr_only(self) -> bool:
-        """Melee (GameCube) is SDR-only content."""
-        return True
-
-    @property
     def graphics_api(self) -> Literal["dx11", "dx12", "vulkan", "opengl", "unknown"]:
         """Backend is user's choice - Vulkan or DX12 both work well."""
         return "unknown"
 
-    @property
-    def allows_aggressive_settings(self) -> bool:
-        """Emulator profiles benefit from aggressive latency settings."""
-        return True
-
-    def get_handlers(self) -> list[SettingsHandler]:
-        from abso.settings.cnm import CNMSettingsHandler
+    def _additional_handlers(self) -> list[SettingsHandler]:
         from abso.settings.dolphin import DolphinConfigHandler
-        from abso.settings.graphics import GraphicsSettingsHandler
-        from abso.settings.memory import MemorySettingsHandler
-        from abso.settings.mouse import MouseSettingsHandler
-        from abso.settings.network import NetworkSettingsHandler
-        from abso.settings.nvidia import NvidiaSettingsHandler
-        from abso.settings.power import PowerSettingsHandler
-        from abso.settings.process_priority import ProcessPriorityHandler
-        from abso.settings.registry import RegistrySettingsHandler
-        from abso.settings.services import ServicesSettingsHandler
-        from abso.settings.windows import WindowsSettingsHandler
 
-        return [
-            WindowsSettingsHandler(),
-            PowerSettingsHandler(),
-            RegistrySettingsHandler(),
-            NvidiaSettingsHandler(),
-            NetworkSettingsHandler(),
-            MouseSettingsHandler(),
-            GraphicsSettingsHandler(),
-            ServicesSettingsHandler(),
-            MemorySettingsHandler(),
-            ProcessPriorityHandler(["Slippi Dolphin.exe", "Dolphin.exe"]),
-            CNMSettingsHandler(),  # Stop CNM during gaming for power optimization
-            DolphinConfigHandler(),  # Fix Slippi Dolphin configs (Slippi Launcher overwrites these)
-        ]
+        return [DolphinConfigHandler()]
 
-    def get_settings(self, handler_name: str) -> dict[str, Any]:
-        settings_map: dict[str, dict[str, Any]] = {
+    def _settings_overrides(self) -> dict[str, dict[str, Any]]:
+        return {
             "WindowsSettingsHandler": {
-                "game_mode": True,
-                "game_bar": False,
-                "game_dvr": False,
-                # HAGS: Generally helps with DX12; results vary by system.
-                # Enable by default, but users should test both ON/OFF.
-                "hags": True,
-                # HDR disabled for competitive - adds processing overhead
-                "hdr": False,
-                "auto_hdr": False,
-                # VRR Optimize: DISABLED - critical for minimum latency!
-                # Even in exclusive fullscreen, VRROptimizeEnable=1 keeps Windows compositor
-                # logic active, adding ~0.1ms latency. Disabling achieves true 0.0ms render.
-                "vrr_optimize": False,
                 # Use max refresh rate for minimum scanout latency
                 "max_refresh_rate": True,
-            },
-            "PowerSettingsHandler": {
-                "ensure_ultimate_performance": True,
-                "active_plan": "ultimate_performance",
-                "disable_usb_suspend": True,
-                "disable_pcie_power_saving": True,
-                "processor_max_performance": True,
-            },
-            "RegistrySettingsHandler": {
-                "system_responsiveness": 10,
-                "network_throttling": 0xFFFFFFFF,
-                "win32_priority_separation": 0x2A,  # Short fixed quantum, max foreground boost
-                "game_priority": {
-                    "gpu_priority": 8,
-                    "priority": 6,
-                    "scheduling_category": "High",
-                    "sfio_priority": "High",
-                },
-                "fullscreen_optimizations": {
-                    # Will be populated with detected Dolphin path
-                },
             },
             "NvidiaSettingsHandler": {
                 # Absolute minimum latency - no sync overhead
@@ -133,52 +57,15 @@ class SlippiMeleeProfile(BaseProfile):
                 "low_latency_mode": "on",  # ON recommended; Ultra optional (test both)
                 "vsync": "off",  # OFF - removes sync latency entirely
                 "vsync_tear_control": "disable",  # Explicit tear control off with VSync OFF
-                "gsync": "off",  # OFF - Melee is fixed 60fps, no VRR benefit
+                "vrr_app_override": "force_off",  # OFF - fixed 60fps, no VRR benefit
                 "power_management": "prefer_max_performance",
                 "shader_cache": "unlimited",
                 "threaded_optimization": "off",  # OFF - emulator stability (per canonical spec)
                 "max_frame_rate": "off",  # OFF - no artificial limiting
                 "triple_buffering": "off",  # OFF - only works with VSync
-                "game_name": "Slippi Melee",
                 # Backend: Experiment with Vulkan and DX12 - both work well.
                 # Vulkan often best on NVIDIA/AMD. DX12 + HAGS can also achieve low latency.
                 # High refresh still helps via reduced scanout latency even without VRR.
-            },
-            "NetworkSettingsHandler": {
-                "disable_nagle": True,
-                "preset": "gaming",  # Also optimizes TCP global settings
-            },
-            "MouseSettingsHandler": {
-                # Disable acceleration for consistent muscle memory
-                "disable_acceleration": True,
-                "set_linear_curve": True,
-            },
-            "GraphicsSettingsHandler": {
-                # Disable FSO globally for true exclusive fullscreen
-                "disable_global_fso": True,
-                # MPO (Multi-Plane Overlay) can cause stutter with emulators.
-                # Safe to disable since Melee doesn't use G-Sync/VRR (fixed 60fps).
-                "disable_mpo": True,
-            },
-            "ServicesSettingsHandler": {
-                # Disable background services that can cause hitches
-                "preset": "gaming",
-            },
-            "MemorySettingsHandler": {
-                # Keep kernel in RAM, optimize for applications
-                "large_system_cache": 0,
-                "disable_paging_executive": 1,
-            },
-            "ProcessPriorityHandler": {
-                # High priority for Dolphin executables
-                "gpu_priority": 8,
-                "cpu_priority": 3,  # High
-                "io_priority": 3,   # High
-            },
-            "CNMSettingsHandler": {
-                # Stop CNM during gaming to allow power optimizations
-                # CNM's SetThreadExecutionState interferes with power management
-                "action": "stop",
             },
             "DolphinConfigHandler": {
                 # Fix Slippi Dolphin configs that get overwritten by Slippi Launcher
@@ -190,8 +77,6 @@ class SlippiMeleeProfile(BaseProfile):
                 "reduce_timing_dispersion": "True",  # Ishiiruka-specific: tighter frame timing
             },
         }
-
-        return settings_map.get(handler_name, {})
 
     def get_in_game_settings(self) -> list[dict[str, str]]:
         """Get recommended Dolphin and NVCP settings.
@@ -469,3 +354,5 @@ class SlippiMeleeProfile(BaseProfile):
                 ),
             },
         ]
+
+

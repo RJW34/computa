@@ -212,7 +212,7 @@ Before applying any changes:
 - VBS status detection
 
 ### 6.6 Power Management
-- Power plan selection (High Performance / Ultimate Performance)
+- Power plan selection (Ultimate Performance standard; High Performance fallback)
 - Processor power management (min/max state)
 - USB selective suspend: Disable
 - PCI Express link state power management: Off

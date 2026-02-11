@@ -48,12 +48,13 @@ class TestStabilityGateBlocks:
         assert modified["NvidiaSettingsHandler"]["low_latency_mode"] == "on"
         assert result.blocked_count >= 1
 
-    def test_ultimate_perf_blocked_for_stable_online(self):
+    def test_ultimate_perf_not_gated_for_stable_online(self):
         gate = StabilityGate()
         profile = _make_profile(optimization_target="stable_online")
         settings = {"PowerSettingsHandler": {"active_plan": "ultimate_performance"}}
         modified, result = gate.process(profile, settings)
-        assert modified["PowerSettingsHandler"]["active_plan"] == "high_performance"
+        assert modified["PowerSettingsHandler"]["active_plan"] == "ultimate_performance"
+        assert result.gated_count == 0
 
     def test_fixed_quantum_blocked_for_balanced(self):
         gate = StabilityGate()

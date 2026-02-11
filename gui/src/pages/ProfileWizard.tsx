@@ -25,15 +25,33 @@ const PROFILES = [
     target: 'minimum_latency',
   },
   {
-    id: 'rivals2-oled',
-    name: 'Rivals of Aether 2 (OLED)',
-    description: 'Ultra-low latency for OLED (no-sync, HDR disabled)',
-    target: 'minimum_latency',
+    id: 'rivals2-offline',
+    name: 'Rivals 2: Offline / Training',
+    description: 'Maximum latency reduction for offline play',
+    target: 'minimum_latency_offline',
   },
   {
-    id: 'rivals2-oled-vrr',
-    name: 'Rivals of Aether 2 (OLED + G-Sync)',
-    description: 'Tear-free VRR gaming with near-minimum latency',
+    id: 'rivals2-online',
+    name: 'Rivals 2: Online / Matchmaking',
+    description: 'Rollback-safe settings for online play',
+    target: 'stable_online',
+  },
+  {
+    id: 'rivals2-streaming',
+    name: 'Rivals 2 (Streaming)',
+    description: 'Streaming-optimized rollback-safe profile for Rivals 2',
+    target: 'stable_online',
+  },
+  {
+    id: 'rivals2-tournament-sim-144hz',
+    name: 'Rivals 2: Tournament Sim (144Hz)',
+    description: 'Tournament simulation with fixed 144Hz, no VRR',
+    target: 'tournament_simulation',
+  },
+  {
+    id: 'rivals2-300hz-max',
+    name: 'Rivals 2: 300Hz Maximum',
+    description: 'Absolute minimum latency for 300Hz setups',
     target: 'minimum_latency',
   },
   {
@@ -43,9 +61,21 @@ const PROFILES = [
     target: 'minimum_latency',
   },
   {
-    id: 'slippi-melee-oled',
-    name: 'Slippi Melee (OLED)',
-    description: 'Ultra-low latency for competitive SSBM on OLED',
+    id: 'slippi-melee-streaming',
+    name: 'Slippi Melee (Streaming)',
+    description: 'Streaming-optimized SSBM profile for multi-monitor OBS',
+    target: 'minimum_latency',
+  },
+  {
+    id: 'ryujinx-ssbu',
+    name: 'SSBU / HewDraw Remix',
+    description: 'Ultra-low latency via Ryujinx',
+    target: 'minimum_latency',
+  },
+  {
+    id: 'ryujinx-ssbu-streaming',
+    name: 'SSBU / HewDraw Remix (Streaming)',
+    description: 'Streaming-optimized Ryujinx profile for multi-monitor OBS',
     target: 'minimum_latency',
   },
   {
@@ -55,9 +85,15 @@ const PROFILES = [
     target: 'low_latency_high_fps',
   },
   {
-    id: 'cod-bo7-oled',
-    name: 'Call of Duty: Black Ops 7 (OLED)',
-    description: 'Low latency with Nvidia Reflex for OLED',
+    id: 'fortnite',
+    name: 'Fortnite',
+    description: 'Low latency with Nvidia Reflex',
+    target: 'low_latency_high_fps',
+  },
+  {
+    id: 'fortnite-streaming',
+    name: 'Fortnite (Streaming)',
+    description: 'Streaming-optimized Fortnite profile for multi-monitor OBS',
     target: 'low_latency_high_fps',
   },
   {
@@ -67,26 +103,32 @@ const PROFILES = [
     target: 'balanced',
   },
   {
-    id: 'diablo4-oled',
-    name: 'Diablo 4 (OLED)',
-    description: 'Balanced performance with HDR for OLED',
+    id: 'pokemon-auto-chess',
+    name: 'Pokemon Auto Chess',
+    description: 'WebGL browser game optimization',
     target: 'balanced',
   },
   {
     id: 'pacdeluxe',
     name: 'PAC Deluxe',
     description: 'Optimized for PAC Deluxe',
-    target: 'balanced',
+    target: 'smooth_framerate',
   },
   {
-    id: 'pacdeluxe-oled',
-    name: 'PAC Deluxe (OLED)',
-    description: 'Optimized for PAC Deluxe on OLED',
-    target: 'balanced',
+    id: 'pacdeluxe-streaming',
+    name: 'PACDeluxe (Streaming)',
+    description: 'Streaming-optimized PACDeluxe profile for multi-monitor OBS',
+    target: 'smooth_framerate',
+  },
+  {
+    id: 'productivity',
+    name: 'Desktop / Productivity',
+    description: 'HDR productivity profile for browsing and coding',
+    target: 'productivity',
   },
 ];
 
-const STEPS = ['Select Game', 'Review Settings', 'Backup Options', 'Apply'];
+const STEPS = ['Select Profile', 'Review Settings', 'Backup Options', 'Apply'];
 
 export function ProfileWizard() {
   const {
