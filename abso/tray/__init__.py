@@ -24,6 +24,7 @@ Usage:
 
 import subprocess
 import sys
+import json
 from pathlib import Path
 
 
@@ -70,6 +71,30 @@ def install_startup(uninstall: bool = False) -> None:
     )
 
 
+def get_startup_status() -> dict[str, object]:
+    """Get startup registration status from the installer script."""
+    tray_dir = get_tray_dir()
+    installer = tray_dir / "Install-Startup.ps1"
+
+    result = subprocess.run(
+        [
+            "powershell.exe",
+            "-NoProfile",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-File",
+            str(installer),
+            "-Status",
+            "-Json",
+        ],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+
+    return json.loads(result.stdout.strip() or "{}")
+
+
 if __name__ == "__main__":
     import argparse
 
@@ -84,6 +109,11 @@ if __name__ == "__main__":
         action="store_true",
         help="Remove from Windows startup",
     )
+    parser.add_argument(
+        "--startup-status",
+        action="store_true",
+        help="Show current startup registration status",
+    )
 
     args = parser.parse_args()
 
@@ -91,5 +121,7 @@ if __name__ == "__main__":
         install_startup(uninstall=False)
     elif args.uninstall_startup:
         install_startup(uninstall=True)
+    elif args.startup_status:
+        print(json.dumps(get_startup_status(), indent=2))
     else:
         start_tray()

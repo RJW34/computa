@@ -477,6 +477,8 @@ $script:FontBold = New-Object System.Drawing.Font("Segoe UI", 9, [System.Drawing
 
 $script:IconState = "Idle"
 $script:ApplyAnimTimer = $null
+$script:StartupIconHealTimer = $null
+$script:StartupIconHealAttempts = 0
 
 function Set-IconSafe {
     <#
@@ -506,33 +508,115 @@ function Set-IconState {
 
     $script:IconState = $State
 
-    if ($State -eq "Applying") {
-        # Create animation timer once, start it
-        if (-not $script:ApplyAnimTimer) {
-            $script:ApplyAnimTimer = New-Object System.Windows.Forms.Timer
-            $script:ApplyAnimTimer.Interval = 300
-            $script:ApplyAnimTimer.Add_Tick({
-                if ($script:IconState -ne "Applying") {
-                    # State changed out from under us — stop
-                    $script:ApplyAnimTimer.Stop()
-                    return
-                }
-                $newIcon = New-StateIcon -State "Applying"
-                Set-IconSafe -NewIcon $newIcon
-            })
-        }
-        # Set initial icon THEN start timer (so first frame is visible immediately)
-        $newIcon = New-StateIcon -State "Applying"
-        Set-IconSafe -NewIcon $newIcon
-        $script:ApplyAnimTimer.Start()
+    # Stop animation first to prevent timer tick racing
+    if ($script:ApplyAnimTimer) {
+        $script:ApplyAnimTimer.Stop()
     }
-    else {
-        # Stop animation first to prevent timer tick racing
-        if ($script:ApplyAnimTimer) {
-            $script:ApplyAnimTimer.Stop()
+    $newIcon = New-StateIcon -State $State
+    Set-IconSafe -NewIcon $newIcon
+}
+
+function Invoke-NotifyIconRefresh {
+    <#
+    .SYNOPSIS
+    Re-registers the tray icon with Explorer to recover from shell startup races.
+    #>
+    param([string]$Reason = "runtime")
+
+    if (-not $script:notifyIcon) { return }
+
+    try {
+        $state = if ($script:IconState) { $script:IconState } else { "Idle" }
+        $freshIcon = New-StateIcon -State $state
+        $script:notifyIcon.Visible = $false
+        [System.Windows.Forms.Application]::DoEvents()
+        Start-Sleep -Milliseconds 120
+        Set-IconSafe -NewIcon $freshIcon
+        $script:notifyIcon.Visible = $true
+        Write-TrayLog "Notify icon refreshed ($Reason)"
+    }
+    catch {
+        Write-TrayLog "Notify icon refresh failed ($Reason): $($_.Exception.Message)" -Level "WARN"
+    }
+}
+
+function Start-StartupIconSelfHeal {
+    <#
+    .SYNOPSIS
+    Performs a few delayed icon refreshes after startup.
+    #>
+    if ($script:StartupIconHealTimer) {
+        try { $script:StartupIconHealTimer.Stop() } catch {}
+        try { $script:StartupIconHealTimer.Dispose() } catch {}
+    }
+
+    $script:StartupIconHealAttempts = 0
+    $script:StartupIconHealTimer = New-Object System.Windows.Forms.Timer
+    $script:StartupIconHealTimer.Interval = 7000
+    $script:StartupIconHealTimer.Add_Tick({
+        $script:StartupIconHealAttempts++
+        Invoke-NotifyIconRefresh -Reason "startup-heal-$($script:StartupIconHealAttempts)"
+        if ($script:StartupIconHealAttempts -ge 3) {
+            $script:StartupIconHealTimer.Stop()
         }
-        $newIcon = New-StateIcon -State $State
-        Set-IconSafe -NewIcon $newIcon
+    })
+    $script:StartupIconHealTimer.Start()
+}
+
+function Wait-ExplorerShellReady {
+    <#
+    .SYNOPSIS
+    Waits briefly for explorer.exe in this session before registering NotifyIcon.
+    #>
+    param([int]$TimeoutSeconds = 45)
+
+    try {
+        $sessionId = (Get-Process -Id $PID -ErrorAction SilentlyContinue).SessionId
+        $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+        while ((Get-Date) -lt $deadline) {
+            $explorer = Get-Process -Name explorer -ErrorAction SilentlyContinue |
+                Where-Object { $_.SessionId -eq $sessionId } |
+                Select-Object -First 1
+            if ($explorer) {
+                return $true
+            }
+            Start-Sleep -Milliseconds 400
+        }
+    }
+    catch {}
+
+    return $false
+}
+
+function Play-ApplySuccessIconAnimation {
+    <#
+    .SYNOPSIS
+    Plays "Pokeball -> pop -> Swampert" confirmation sequence, then stays on Active.
+    #>
+    try {
+        $frames = Get-ApplySuccessIcons
+        if (-not $frames -or $frames.Count -lt 2) {
+            Set-IconState -State "Active"
+            return
+        }
+
+        $script:IconState = "Active"
+
+        # Keep timings short so UX stays snappy.
+        $durations = @(110, 120, 160)
+        $maxStep = [Math]::Min($durations.Count, $frames.Count - 1)
+        for ($i = 0; $i -lt $maxStep; $i++) {
+            Set-IconSafe -NewIcon $frames[$i]
+            [System.Windows.Forms.Application]::DoEvents()
+            Start-Sleep -Milliseconds $durations[$i]
+        }
+
+        # Final frame is the steady active icon (Swampert)
+        Set-IconSafe -NewIcon $frames[$frames.Count - 1]
+    }
+    catch {
+        Write-TrayLog "Play-ApplySuccessIconAnimation failed: $($_.Exception.Message)" -Level "WARN"
+        Set-IconState -State "Active"
     }
 }
 
@@ -632,7 +716,7 @@ function Apply-Profile {
             Close-ProgressOverlay
 
             Play-SuccessSound
-            Set-IconState -State "Active"
+            Play-ApplySuccessIconAnimation
             Show-Notification -Title "A.B.S.O." -Message $msg -Type "Info"
 
             $script:activeProfile = $ProfileId
@@ -939,26 +1023,131 @@ function Open-ConfigFolder {
     Start-Process "explorer.exe" -ArgumentList $configDir
 }
 
-function Toggle-Startup {
-    $startupPath = [System.IO.Path]::Combine(
+function Get-StartupStatus {
+    $legacyShortcutPath = [System.IO.Path]::Combine(
         [Environment]::GetFolderPath("Startup"),
         "ABSO-Tray.lnk"
     )
+    $installScript = Join-Path $script:ScriptDir "Install-Startup.ps1"
 
-    if (Test-Path $startupPath) {
-        Remove-Item $startupPath -Force -ErrorAction SilentlyContinue
-        Show-Notification -Title "A.B.S.O." -Message "Removed from Windows startup" -Type "Info"
-        $script:startupItem.Text = "      Enable Auto-Start"
-        $script:startupItem.Checked = $false
+    # Fallback for missing installer script
+    if (-not (Test-Path $installScript)) {
+        $legacyInstalled = Test-Path $legacyShortcutPath
+        return [PSCustomObject]@{
+            installed          = $legacyInstalled
+            mode               = if ($legacyInstalled) { "startup_shortcut" } else { "none" }
+            task_installed     = $false
+            shortcut_installed = $legacyInstalled
+        }
+    }
+
+    try {
+        $args = @(
+            "-NoProfile",
+            "-ExecutionPolicy", "Bypass",
+            "-File", $installScript,
+            "-Status",
+            "-Json"
+        )
+        $raw = & powershell.exe @args
+        if ($LASTEXITCODE -eq 0 -and $raw) {
+            return ($raw | ConvertFrom-Json)
+        }
+
+        Write-TrayLog "Get-StartupStatus fallback: installer returned empty or exit code $LASTEXITCODE" -Level "WARN"
+    }
+    catch {
+        Write-TrayLog "Get-StartupStatus failed: $($_.Exception.Message)" -Level "WARN"
+    }
+
+    $legacyInstalled = Test-Path $legacyShortcutPath
+    return [PSCustomObject]@{
+        installed          = $legacyInstalled
+        mode               = if ($legacyInstalled) { "startup_shortcut" } else { "none" }
+        task_installed     = $false
+        shortcut_installed = $legacyInstalled
+    }
+}
+
+function Set-StartupMenuState {
+    param([object]$StartupStatus)
+
+    if (-not $script:startupItem) {
+        return
+    }
+
+    $isInstalled = $false
+    $mode = "none"
+
+    if ($StartupStatus) {
+        $isInstalled = [bool]$StartupStatus.installed
+        if ($StartupStatus.mode) {
+            $mode = "$($StartupStatus.mode)"
+        }
+    }
+
+    $modeLabel = switch ($mode) {
+        "scheduled_task" { "Task Scheduler" }
+        "startup_shortcut" { "Startup Folder shortcut" }
+        default { "not configured" }
+    }
+
+    $script:startupItem.Text = if ($isInstalled) { "      Disable Auto-Start" } else { "      Enable Auto-Start" }
+    $script:startupItem.Checked = $isInstalled
+    $script:startupItem.ToolTipText = if ($isInstalled) {
+        "Start A.B.S.O. Tray when Windows starts (configured via $modeLabel)"
     }
     else {
-        $installScript = Join-Path $script:ScriptDir "Install-Startup.ps1"
-        if (Test-Path $installScript) {
-            & $installScript
-            Show-Notification -Title "A.B.S.O." -Message "Added to Windows startup" -Type "Info"
-            $script:startupItem.Text = "      Disable Auto-Start"
-            $script:startupItem.Checked = $true
+        "Start A.B.S.O. Tray when Windows starts"
+    }
+}
+
+function Toggle-Startup {
+    $installScript = Join-Path $script:ScriptDir "Install-Startup.ps1"
+    if (-not (Test-Path $installScript)) {
+        Show-Notification -Title "A.B.S.O." -Message "Startup installer not found" -Type "Error"
+        Write-TrayLog "Toggle-Startup failed: missing installer script at $installScript" -Level "ERROR"
+        return
+    }
+
+    $before = Get-StartupStatus
+    $operation = if ($before.installed) { "-Uninstall" } else { "-Install" }
+
+    try {
+        $args = @(
+            "-NoProfile",
+            "-ExecutionPolicy", "Bypass",
+            "-File", $installScript,
+            $operation,
+            "-Json"
+        )
+        $raw = & powershell.exe @args
+        if ($LASTEXITCODE -ne 0) {
+            throw "Installer exit code $LASTEXITCODE. Output: $raw"
         }
+    }
+    catch {
+        Show-Notification -Title "A.B.S.O." -Message "Failed to update startup registration" -Type "Error"
+        Write-TrayLog "Toggle-Startup failed: $($_.Exception.Message)" -Level "ERROR"
+        return
+    }
+
+    $after = Get-StartupStatus
+    Set-StartupMenuState -StartupStatus $after
+
+    if ((-not $before.installed) -and $after.installed) {
+        $modeLabel = if ("$($after.mode)" -eq "scheduled_task") { "Task Scheduler" } else { "Startup Folder shortcut" }
+        Show-Notification -Title "A.B.S.O." -Message "Added to Windows startup ($modeLabel)" -Type "Info"
+        Write-TrayLog "Startup enabled via mode: $($after.mode)"
+    }
+    elseif ($before.installed -and (-not $after.installed)) {
+        Show-Notification -Title "A.B.S.O." -Message "Removed from Windows startup" -Type "Info"
+        Write-TrayLog "Startup disabled"
+    }
+    else {
+        $state = if ($after.installed) { "enabled" } else { "disabled" }
+        Show-Notification -Title "A.B.S.O." -Message "Startup is $state" -Type "Warning"
+        Write-TrayLog "Toggle-Startup no state change detected (before=$($before.installed), after=$($after.installed))" -Level "WARN"
     }
 }
 
@@ -1056,6 +1245,14 @@ function Find-Profiles {
 function Start-TrayApp {
     Test-SoundFilesExist | Out-Null
 
+    if (-not (Wait-ExplorerShellReady -TimeoutSeconds 45)) {
+        Write-TrayLog "Explorer shell not detected within startup wait window; continuing anyway" -Level "WARN"
+    }
+    else {
+        # Small buffer after shell detection to reduce startup icon race conditions.
+        Start-Sleep -Milliseconds 1500
+    }
+
     # Load config
     $script:TrayConfig = Read-TrayConfig
     $script:LastAction = $null
@@ -1066,6 +1263,7 @@ function Start-TrayApp {
     Set-IconState -State "Idle"
     $script:notifyIcon.Text = "A.B.S.O. - Ready"
     $script:notifyIcon.Visible = $true
+    Start-StartupIconSelfHeal
 
     # Restore last active profile from recent history (if any)
     $script:activeProfile = $null
@@ -1546,16 +1744,12 @@ public class HotkeyMessageWindow : NativeWindow {
     $menu.Items.Add($settingsLabel) | Out-Null
 
     # Auto-Start toggle
-    $startupPath = [System.IO.Path]::Combine([Environment]::GetFolderPath("Startup"), "ABSO-Tray.lnk")
-    $isStartupEnabled = Test-Path $startupPath
-
+    $startupStatus = Get-StartupStatus
     $script:startupItem = New-Object System.Windows.Forms.ToolStripMenuItem
-    $script:startupItem.Text = if ($isStartupEnabled) { "      Disable Auto-Start" } else { "      Enable Auto-Start" }
-    $script:startupItem.Checked = $isStartupEnabled
     $script:startupItem.BackColor = $script:Colors.Background
     $script:startupItem.ForeColor = $script:Colors.Text
     $script:startupItem.Font = New-Object System.Drawing.Font("Segoe UI", 9)
-    $script:startupItem.ToolTipText = "Start A.B.S.O. Tray when Windows starts"
+    Set-StartupMenuState -StartupStatus $startupStatus
     $script:startupItem.Add_Click({ Toggle-Startup })
     $menu.Items.Add($script:startupItem) | Out-Null
 
@@ -1757,6 +1951,10 @@ try {
     Write-TrayLog "ABSO Tray exiting normally"
 }
 finally {
+    if ($script:StartupIconHealTimer) {
+        try { $script:StartupIconHealTimer.Stop() } catch {}
+        try { $script:StartupIconHealTimer.Dispose() } catch {}
+    }
     if ($script:ApplyAnimTimer) {
         $script:ApplyAnimTimer.Stop()
         $script:ApplyAnimTimer.Dispose()

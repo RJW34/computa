@@ -777,18 +777,33 @@ def report(profile_name: str, json_output: bool) -> None:
 @cli.command()
 @click.option("--install-startup", is_flag=True, help="Add tray to Windows startup")
 @click.option("--uninstall-startup", is_flag=True, help="Remove tray from Windows startup")
-def tray(install_startup: bool, uninstall_startup: bool) -> None:
+@click.option("--startup-status", is_flag=True, help="Show tray startup registration status")
+def tray(install_startup: bool, uninstall_startup: bool, startup_status: bool) -> None:
     """Launch the A.B.S.O. system tray application.
 
     The tray provides quick access to profile switching via left-click menu.
     It automatically pauses during gaming and restarts when the game exits.
     """
-    from abso.tray import start_tray, install_startup as do_install
+    from abso.tray import (
+        get_startup_status as do_status,
+        install_startup as do_install,
+        start_tray,
+    )
 
     if install_startup:
         do_install(uninstall=False)
     elif uninstall_startup:
         do_install(uninstall=True)
+    elif startup_status:
+        status = do_status()
+        mode = status.get("mode", "none")
+        installed = status.get("installed", False)
+        console.print(f"[bold]Startup Installed:[/bold] {'Yes' if installed else 'No'}")
+        console.print(f"[bold]Mode:[/bold] {mode}")
+        if status.get("task_installed"):
+            console.print(f"[bold]Task:[/bold] {status.get('task_name')}")
+        if status.get("shortcut_installed"):
+            console.print(f"[bold]Shortcut:[/bold] {status.get('shortcut_path')}")
     else:
         start_tray()
 

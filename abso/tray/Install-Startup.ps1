@@ -1,69 +1,314 @@
 # Install-Startup.ps1 - Add/Remove A.B.S.O. tray from Windows startup
 # Usage:
-#   .\Install-Startup.ps1 -Install    # Add to startup
-#   .\Install-Startup.ps1 -Uninstall  # Remove from startup
-#   .\Install-Startup.ps1 -Status     # Check if installed
+#   .\Install-Startup.ps1 -Install         # Add to startup (Task Scheduler first, shortcut fallback)
+#   .\Install-Startup.ps1 -Uninstall       # Remove startup registration
+#   .\Install-Startup.ps1 -Status          # Check if installed
+#   .\Install-Startup.ps1 -Status -Json    # Machine-readable status
 
 param(
     [switch]$Install,
     [switch]$Uninstall,
-    [switch]$Status
+    [switch]$Status,
+    [switch]$Json
 )
 
 $StartupFolder = [Environment]::GetFolderPath("Startup")
 $ShortcutPath = Join-Path $StartupFolder "ABSO-Tray.lnk"
 $VBSPath = Join-Path $PSScriptRoot "ABSO-Tray.vbs"
+$StartupLauncherPath = Join-Path $PSScriptRoot "ABSO-StartupLaunch.ps1"
+$TaskName = "ABSO-Tray-Startup"
+$TaskDescription = "Start A.B.S.O. tray at user logon with highest privileges"
+$CurrentUser = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
 
-function Get-InstallStatus {
-    if (Test-Path $ShortcutPath) {
+function Write-JsonResult {
+    param($Obj)
+    Write-Output ($Obj | ConvertTo-Json -Depth 5 -Compress)
+}
+
+function Test-StartupTaskInstalled {
+    try {
+        $null = Get-ScheduledTask -TaskName $TaskName -ErrorAction Stop
         return $true
     }
-    return $false
+    catch {
+        return $false
+    }
+}
+
+function Test-ShortcutInstalled {
+    return (Test-Path $ShortcutPath)
+}
+
+function Get-InstallStatus {
+    $taskInstalled = Test-StartupTaskInstalled
+    $shortcutInstalled = Test-ShortcutInstalled
+
+    $mode = "none"
+    if ($taskInstalled) {
+        $mode = "scheduled_task"
+    }
+    elseif ($shortcutInstalled) {
+        $mode = "startup_shortcut"
+    }
+
+    return [ordered]@{
+        installed          = ($taskInstalled -or $shortcutInstalled)
+        mode               = $mode
+        task_installed     = $taskInstalled
+        shortcut_installed = $shortcutInstalled
+        task_name          = $TaskName
+        shortcut_path      = $ShortcutPath
+        vbs_path           = $VBSPath
+        launcher_path      = $StartupLauncherPath
+        user               = $CurrentUser
+    }
+}
+
+function Remove-Shortcut {
+    if (Test-Path $ShortcutPath) {
+        Remove-Item $ShortcutPath -Force -ErrorAction Stop
+    }
+}
+
+function Create-Shortcut {
+    $WshShell = New-Object -ComObject WScript.Shell
+    $Shortcut = $null
+    try {
+        $Shortcut = $WshShell.CreateShortcut($ShortcutPath)
+        $Shortcut.TargetPath = "powershell.exe"
+        $Shortcut.Arguments = "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$StartupLauncherPath`""
+        $Shortcut.WorkingDirectory = $PSScriptRoot
+        $Shortcut.Description = "A.B.S.O. System Tray"
+        $Shortcut.Save()
+    }
+    finally {
+        if ($Shortcut) {
+            [System.Runtime.InteropServices.Marshal]::ReleaseComObject($Shortcut) | Out-Null
+        }
+        [System.Runtime.InteropServices.Marshal]::ReleaseComObject($WshShell) | Out-Null
+    }
+}
+
+function Register-StartupTask {
+    $taskAction = New-ScheduledTaskAction `
+        -Execute "powershell.exe" `
+        -Argument "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$StartupLauncherPath`""
+
+    try {
+        $taskTrigger = New-ScheduledTaskTrigger -AtLogOn -User $CurrentUser -RandomDelay (New-TimeSpan -Seconds 20)
+    }
+    catch {
+        $taskTrigger = New-ScheduledTaskTrigger -AtLogOn -User $CurrentUser
+    }
+
+    $taskPrincipal = New-ScheduledTaskPrincipal -UserId $CurrentUser -LogonType Interactive -RunLevel Highest
+    $taskSettings = New-ScheduledTaskSettingsSet `
+        -AllowStartIfOnBatteries `
+        -DontStopIfGoingOnBatteries `
+        -StartWhenAvailable `
+        -MultipleInstances IgnoreNew `
+        -RestartCount 3 `
+        -RestartInterval (New-TimeSpan -Minutes 1) `
+        -ExecutionTimeLimit (New-TimeSpan -Minutes 10)
+
+    Register-ScheduledTask `
+        -TaskName $TaskName `
+        -Action $taskAction `
+        -Trigger $taskTrigger `
+        -Principal $taskPrincipal `
+        -Settings $taskSettings `
+        -Description $TaskDescription `
+        -Force `
+        -ErrorAction Stop | Out-Null
+}
+
+function Remove-StartupTask {
+    if (Test-StartupTaskInstalled) {
+        Unregister-ScheduledTask -TaskName $TaskName -Confirm:$false -ErrorAction Stop
+    }
 }
 
 if ($Status) {
-    if (Get-InstallStatus) {
+    $statusObj = Get-InstallStatus
+    if ($Json) {
+        Write-JsonResult $statusObj
+    }
+    elseif ($statusObj.installed) {
+        $modeLabel = if ($statusObj.mode -eq "scheduled_task") { "Task Scheduler" } else { "Startup shortcut" }
         Write-Host "A.B.S.O. Tray is installed in Windows startup" -ForegroundColor Green
-        Write-Host "Location: $ShortcutPath"
-    } else {
+        Write-Host "Mode: $modeLabel"
+        if ($statusObj.task_installed) {
+            Write-Host "Task: $($statusObj.task_name)"
+        }
+        if ($statusObj.shortcut_installed) {
+            Write-Host "Shortcut: $($statusObj.shortcut_path)"
+        }
+    }
+    else {
         Write-Host "A.B.S.O. Tray is NOT in Windows startup" -ForegroundColor Yellow
     }
-    exit
+    exit 0
 }
 
 if ($Install) {
+    $result = [ordered]@{
+        success = $false
+        mode = "none"
+        message = ""
+        warning = $null
+        error = $null
+        status = $null
+    }
+
     if (-not (Test-Path $VBSPath)) {
-        Write-Host "Error: ABSO-Tray.vbs not found at: $VBSPath" -ForegroundColor Red
+        $result.error = "ABSO-Tray.vbs not found at: $VBSPath"
+        if ($Json) {
+            Write-JsonResult $result
+        }
+        else {
+            Write-Host "Error: $($result.error)" -ForegroundColor Red
+        }
         exit 1
     }
 
-    # Create shortcut
-    $WshShell = New-Object -ComObject WScript.Shell
-    $Shortcut = $WshShell.CreateShortcut($ShortcutPath)
-    $Shortcut.TargetPath = "wscript.exe"
-    $Shortcut.Arguments = "`"$VBSPath`""
-    $Shortcut.WorkingDirectory = $PSScriptRoot
-    $Shortcut.Description = "A.B.S.O. System Tray"
-    $Shortcut.Save()
-    [System.Runtime.InteropServices.Marshal]::ReleaseComObject($Shortcut) | Out-Null
-    [System.Runtime.InteropServices.Marshal]::ReleaseComObject($WshShell) | Out-Null
+    if (-not (Test-Path $StartupLauncherPath)) {
+        $result.error = "ABSO-StartupLaunch.ps1 not found at: $StartupLauncherPath"
+        if ($Json) {
+            Write-JsonResult $result
+        }
+        else {
+            Write-Host "Error: $($result.error)" -ForegroundColor Red
+        }
+        exit 1
+    }
 
-    Write-Host "A.B.S.O. Tray added to Windows startup" -ForegroundColor Green
-    Write-Host "Location: $ShortcutPath"
-    Write-Host ""
-    Write-Host "The tray will start automatically on next login."
-    Write-Host "To start now, run: wscript.exe `"$VBSPath`""
-    exit
+    try {
+        Register-StartupTask
+        try {
+            Remove-Shortcut
+        }
+        catch {
+            # Best-effort cleanup; task registration is the primary mechanism.
+        }
+        $result.success = $true
+        $result.mode = "scheduled_task"
+        $result.message = "A.B.S.O. Tray registered via Task Scheduler."
+    }
+    catch {
+        $taskError = "$($_.Exception.Message)"
+        $taskAlreadyInstalled = Test-StartupTaskInstalled
+
+        if ($taskAlreadyInstalled) {
+            $result.success = $true
+            $result.mode = "scheduled_task"
+            $result.warning = "Task Scheduler update failed, but an existing startup task is already installed: $taskError"
+            $result.message = "A.B.S.O. Tray will continue using the existing startup task."
+            try {
+                Remove-Shortcut
+            }
+            catch {
+                # Non-fatal cleanup issue.
+            }
+        }
+        else {
+            $result.warning = "Task Scheduler install failed: $taskError"
+            try {
+                Create-Shortcut
+                $result.success = $true
+                $result.mode = "startup_shortcut"
+                $result.message = "A.B.S.O. Tray registered via Startup shortcut fallback."
+            }
+            catch {
+                $result.error = "Startup shortcut install failed: $($_.Exception.Message)"
+            }
+        }
+    }
+
+    $result.status = Get-InstallStatus
+
+    if ($Json) {
+        Write-JsonResult $result
+    }
+    elseif ($result.success) {
+        Write-Host "A.B.S.O. Tray added to Windows startup" -ForegroundColor Green
+        Write-Host "Mode: $($result.mode)"
+        if ($result.warning) {
+            Write-Host "Warning: $($result.warning)" -ForegroundColor Yellow
+        }
+        Write-Host ""
+        Write-Host "The tray will start automatically on next login."
+        Write-Host "To start now, run: powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$StartupLauncherPath`""
+    }
+    else {
+        Write-Host "Failed to add A.B.S.O. Tray to startup" -ForegroundColor Red
+        if ($result.warning) {
+            Write-Host "Warning: $($result.warning)" -ForegroundColor Yellow
+        }
+        if ($result.error) {
+            Write-Host "Error: $($result.error)" -ForegroundColor Red
+        }
+        exit 1
+    }
+
+    exit 0
 }
 
 if ($Uninstall) {
-    if (Test-Path $ShortcutPath) {
-        Remove-Item $ShortcutPath -Force -ErrorAction Stop
-        Write-Host "A.B.S.O. Tray removed from Windows startup" -ForegroundColor Green
-    } else {
-        Write-Host "A.B.S.O. Tray was not in startup" -ForegroundColor Yellow
+    $result = [ordered]@{
+        success = $true
+        removed_task = $false
+        removed_shortcut = $false
+        error = $null
+        status = $null
     }
-    exit
+
+    try {
+        if (Test-StartupTaskInstalled) {
+            Remove-StartupTask
+            $result.removed_task = $true
+        }
+    }
+    catch {
+        $result.success = $false
+        $result.error = "Failed removing scheduled task: $($_.Exception.Message)"
+    }
+
+    try {
+        if (Test-ShortcutInstalled) {
+            Remove-Shortcut
+            $result.removed_shortcut = $true
+        }
+    }
+    catch {
+        $result.success = $false
+        if ($result.error) {
+            $result.error += "; Failed removing shortcut: $($_.Exception.Message)"
+        }
+        else {
+            $result.error = "Failed removing shortcut: $($_.Exception.Message)"
+        }
+    }
+
+    $result.status = Get-InstallStatus
+
+    if ($Json) {
+        Write-JsonResult $result
+    }
+    elseif ($result.success) {
+        if ($result.removed_task -or $result.removed_shortcut) {
+            Write-Host "A.B.S.O. Tray removed from Windows startup" -ForegroundColor Green
+        }
+        else {
+            Write-Host "A.B.S.O. Tray was not registered in startup" -ForegroundColor Yellow
+        }
+    }
+    else {
+        Write-Host "Failed to fully remove startup registration" -ForegroundColor Red
+        Write-Host "Error: $($result.error)" -ForegroundColor Red
+        exit 1
+    }
+
+    exit 0
 }
 
 # Default: show usage
@@ -71,7 +316,8 @@ Write-Host ""
 Write-Host "A.B.S.O. Tray Startup Installer" -ForegroundColor Cyan
 Write-Host ""
 Write-Host "Usage:"
-Write-Host "  -Install    Add A.B.S.O. tray to Windows startup"
-Write-Host "  -Uninstall  Remove from Windows startup"
-Write-Host "  -Status     Check if installed in startup"
+Write-Host "  -Install         Add A.B.S.O. tray to Windows startup"
+Write-Host "  -Uninstall       Remove from startup"
+Write-Host "  -Status          Check if installed in startup"
+Write-Host "  -Status -Json    Emit machine-readable status"
 Write-Host ""

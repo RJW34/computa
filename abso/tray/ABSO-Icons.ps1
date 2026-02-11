@@ -2,12 +2,12 @@
 # Generates tray icons programmatically using GDI+ with gradients and glow effects
 
 # Icon States:
-#   Idle (Gold)     - Default ready state
-#   Active (Green)  - Profile applied
-#   Gaming (Blue)   - Game detected and running
-#   Applying (Animated) - Rotating during profile apply
-#   Warning (Orange) - Audit found issues
-#   Error (Red)     - Last operation failed
+#   Idle            - Computer sprite (default ready state)
+#   Active          - Swampert (profile applied)
+#   Gaming          - Swampert (game detected and running)
+#   Applying        - Pokeball (profile being applied)
+#   Warning         - Orange warning indicator
+#   Error           - Red error indicator
 
 Add-Type -TypeDefinition @"
 using System;
@@ -22,6 +22,120 @@ public class IconHelper {
 $script:IconSize = 16
 $script:AnimationFrame = 0
 $script:PreviousIconHandle = [IntPtr]::Zero
+
+function Get-IconFromIcoPath {
+    <#
+    .SYNOPSIS
+    Loads an ICO file and returns a detached 16x16 icon clone.
+    #>
+    param([string]$Path)
+
+    if (-not $Path -or -not (Test-Path $Path)) {
+        return $null
+    }
+
+    $img = $null
+    $bmp = $null
+    $hIcon = [IntPtr]::Zero
+    try {
+        $img = [System.Drawing.Image]::FromFile($Path)
+        $bmp = New-Object System.Drawing.Bitmap($img, 16, 16)
+        $hIcon = $bmp.GetHicon()
+        $tempIcon = [System.Drawing.Icon]::FromHandle($hIcon)
+        $icon = $tempIcon.Clone()
+        $tempIcon.Dispose()
+        return $icon
+    }
+    catch {
+        return $null
+    }
+    finally {
+        if ($hIcon -ne [IntPtr]::Zero) { [IconHelper]::DestroyIcon($hIcon) | Out-Null }
+        if ($bmp) { $bmp.Dispose() }
+        if ($img) { $img.Dispose() }
+    }
+}
+
+function New-ComputerIdleIcon {
+    <#
+    .SYNOPSIS
+    Creates a compact pixel-style "computer" icon for idle state.
+    #>
+    [int]$size = 16
+    $bmp = New-Object System.Drawing.Bitmap($size, $size)
+    $g = [System.Drawing.Graphics]::FromImage($bmp)
+    $g.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::None
+    $g.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::NearestNeighbor
+    $g.PixelOffsetMode = [System.Drawing.Drawing2D.PixelOffsetMode]::Half
+    $g.Clear([System.Drawing.Color]::Transparent)
+
+    $dark = [System.Drawing.SolidBrush]::new([System.Drawing.Color]::FromArgb(255, 43, 53, 68))
+    $bezel = [System.Drawing.SolidBrush]::new([System.Drawing.Color]::FromArgb(255, 76, 92, 112))
+    $screen = [System.Drawing.SolidBrush]::new([System.Drawing.Color]::FromArgb(255, 119, 226, 232))
+    $scan = [System.Drawing.SolidBrush]::new([System.Drawing.Color]::FromArgb(180, 224, 255, 255))
+    $stand = [System.Drawing.SolidBrush]::new([System.Drawing.Color]::FromArgb(255, 155, 171, 194))
+    $kbd = [System.Drawing.SolidBrush]::new([System.Drawing.Color]::FromArgb(255, 88, 102, 128))
+    $key = [System.Drawing.SolidBrush]::new([System.Drawing.Color]::FromArgb(255, 184, 196, 214))
+    $led = [System.Drawing.SolidBrush]::new([System.Drawing.Color]::FromArgb(255, 255, 84, 74))
+
+    # Monitor body + bezel
+    $g.FillRectangle($dark, 1, 2, 14, 10)
+    $g.FillRectangle($bezel, 2, 3, 12, 8)
+    # Screen
+    $g.FillRectangle($screen, 3, 4, 10, 6)
+    $g.FillRectangle($scan, 4, 5, 8, 1)
+    # Status LED
+    $g.FillRectangle($led, 12, 10, 1, 1)
+    # Stand + keyboard
+    $g.FillRectangle($stand, 6, 12, 4, 1)
+    $g.FillRectangle($stand, 7, 13, 2, 1)
+    $g.FillRectangle($kbd, 4, 14, 8, 2)
+    $g.FillRectangle($key, 5, 15, 1, 1)
+    $g.FillRectangle($key, 7, 15, 1, 1)
+    $g.FillRectangle($key, 9, 15, 1, 1)
+    $g.FillRectangle($key, 11, 15, 1, 1)
+
+    $dark.Dispose()
+    $bezel.Dispose()
+    $screen.Dispose()
+    $scan.Dispose()
+    $stand.Dispose()
+    $kbd.Dispose()
+    $key.Dispose()
+    $led.Dispose()
+    $g.Dispose()
+
+    $hIcon = $bmp.GetHicon()
+    $tempIcon = [System.Drawing.Icon]::FromHandle($hIcon)
+    $icon = $tempIcon.Clone()
+    $tempIcon.Dispose()
+    [IconHelper]::DestroyIcon($hIcon) | Out-Null
+    $bmp.Dispose()
+    return $icon
+}
+
+function Get-ApplySuccessIcons {
+    <#
+    .SYNOPSIS
+    Returns icon sequence for "pokeball -> pop -> Swampert".
+    #>
+    $iconDir = $PSScriptRoot
+    $paths = @(
+        (Join-Path $iconDir "favicon.ico"),
+        (Join-Path $iconDir "icon0260_f00_s0.ico"),
+        (Join-Path $iconDir "icon0260_f01_s0.ico"),
+        (Join-Path $iconDir "260 Swampert.ico")
+    )
+
+    $icons = @()
+    foreach ($path in $paths) {
+        $icon = Get-IconFromIcoPath -Path $path
+        if ($icon) {
+            $icons += $icon
+        }
+    }
+    return $icons
+}
 
 function New-GlowIcon {
     <#
@@ -204,55 +318,44 @@ function New-StateIcon {
         [string]$State = "Idle"
     )
 
+    $iconDir = $PSScriptRoot
+
+    # Primary themed icon mapping first
+    if ($State -eq "Idle") {
+        $idlePath = Join-Path $iconDir "pokemon_pc_idle.ico"
+        $idleIcon = Get-IconFromIcoPath -Path $idlePath
+        if ($idleIcon) {
+            return $idleIcon
+        }
+        return New-ComputerIdleIcon
+    }
+
+    $themedPath = $null
+    if ($State -eq "Applying") {
+        $themedPath = Join-Path $iconDir "favicon.ico"
+    }
+    elseif ($State -eq "Active" -or $State -eq "Gaming") {
+        $themedPath = Join-Path $iconDir "260 Swampert.ico"
+    }
+
+    if ($themedPath) {
+        $themedIcon = Get-IconFromIcoPath -Path $themedPath
+        if ($themedIcon) {
+            return $themedIcon
+        }
+    }
+
     $colors = $script:IconColors[$State]
     $symbol = switch ($State) {
         "Idle"     { "" }
         "Active"   { "check" }
         "Gaming"   { "play" }
-        "Applying" {
-            $script:AnimationFrame = ($script:AnimationFrame + 45) % 360
-            "spin"
-        }
+        "Applying" { "spin" }
         "Warning"  { "warn" }
         "Error"    { "error" }
     }
 
-    $angle = if ($State -eq "Applying") { $script:AnimationFrame } else { 0 }
-
-    # Try to load .ico file for Idle/Active states
-    $iconDir = $PSScriptRoot
-    $icoPath = $null
-    if ($State -eq "Idle") {
-        $icoPath = Join-Path $iconDir "favicon.ico"
-    }
-    elseif ($State -eq "Active" -or $State -eq "Gaming") {
-        $icoPath = Join-Path $iconDir "260 Swampert.ico"
-    }
-
-    if ($icoPath -and (Test-Path $icoPath)) {
-        $img = $null
-        $bmp = $null
-        $hIcon = [IntPtr]::Zero
-        try {
-            $img = [System.Drawing.Image]::FromFile($icoPath)
-            $bmp = New-Object System.Drawing.Bitmap($img, 16, 16)
-            $hIcon = $bmp.GetHicon()
-            $tempIcon = [System.Drawing.Icon]::FromHandle($hIcon)
-            $icon = $tempIcon.Clone()
-            $tempIcon.Dispose()
-            return $icon
-        }
-        catch {
-            # Fall through to generated icon
-        }
-        finally {
-            if ($hIcon -ne [IntPtr]::Zero) { [IconHelper]::DestroyIcon($hIcon) | Out-Null }
-            if ($bmp) { $bmp.Dispose() }
-            if ($img) { $img.Dispose() }
-        }
-    }
-
-    return New-GlowIcon -CenterColor $colors.Center -GlowColor $colors.Glow -InnerSymbol $symbol -SpinAngle $angle
+    return New-GlowIcon -CenterColor $colors.Center -GlowColor $colors.Glow -InnerSymbol $symbol -SpinAngle 0
 }
 
 function New-CategoryIcon {
