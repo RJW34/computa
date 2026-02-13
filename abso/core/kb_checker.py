@@ -21,11 +21,13 @@ class ProblematicKB:
 
 
 KNOWN_BAD_KBS: list[ProblematicKB] = [
+    # Source: Community reports of FPS drops on NVIDIA GPUs after this update.
+    # Severity is "warning" (not "critical") since impact varies by system.
     ProblematicKB(
         kb_id="KB5074109",
-        title="NVIDIA FPS regression",
-        severity="critical",
-        affected="NVIDIA GPUs — 15-20 FPS loss",
+        title="Reported NVIDIA FPS regression",
+        severity="warning",
+        affected="NVIDIA GPUs — reported FPS drops (impact varies by system)",
         fix_action="uninstall",
     ),
 ]

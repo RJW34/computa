@@ -294,9 +294,9 @@ $script:Profiles = [ordered]@{
     # --- Fighting Games: Rivals 2 ---
     "rivals2-offline"   = @{
         Name     = "Rivals 2: Training"
-        Sub      = "LLM Ultra | Fast Sync | 297fps"
+        Sub      = "LLM ON | No Sync | Uncapped"
         Cat      = "Fighting"
-        Desc     = "Offline training/combos. LLM Ultra, Fast Sync, Ultimate Performance."
+        Desc     = "Offline training/combos. LLM ON, no sync, uncapped FPS, Ultimate Performance."
         Exes     = @("Rivals2-Win64-Shipping.exe", "RivalsofAether2.exe", "Rivals2.exe")
     }
     "rivals2-online"    = @{
@@ -322,9 +322,9 @@ $script:Profiles = [ordered]@{
     }
     "rivals2-300hz-max" = @{
         Name     = "Rivals 2: 300Hz MAX"
-        Sub      = "LLM Ultra | 300Hz | Ultimate Performance"
+        Sub      = "LLM ON | 300Hz | No Sync"
         Cat      = "Fighting"
-        Desc     = "Absolute minimum latency. 300Hz, LLM Ultra, uncapped, all aggressive opts."
+        Desc     = "Absolute minimum latency. 300Hz, LLM ON, uncapped, all aggressive opts."
         Exes     = @("Rivals2-Win64-Shipping.exe", "RivalsofAether2.exe", "Rivals2.exe")
     }
 
@@ -347,9 +347,9 @@ $script:Profiles = [ordered]@{
     # --- Fighting Games: SSBU ---
     "ryujinx-ssbu"      = @{
         Name     = "SSBU / HewDraw Remix"
-        Sub      = "LLM Ultra | Fixed 60fps"
+        Sub      = "LLM ON | Vulkan | Fixed 60fps"
         Cat      = "Fighting"
-        Desc     = "Smash Ultimate via Ryujinx. HAGS ON, Ultimate Performance."
+        Desc     = "Smash Ultimate via Ryujinx. HAGS ON, Vulkan backend, Ultimate Performance."
         Exes     = @("Ryujinx.exe", "Ryujinx.Ava.exe", "Ryujinx.Headless.SDL2.exe")
     }
     "ryujinx-ssbu-streaming" = @{
@@ -363,9 +363,9 @@ $script:Profiles = [ordered]@{
     # --- ARPG ---
     "diablo4"           = @{
         Name     = "Diablo 4"
-        Sub      = "HDR ON | Adaptive VSync"
+        Sub      = "HDR ON | Reflex ON+Boost | LLM OFF"
         Cat      = "ARPG"
-        Desc     = "Native HDR, adaptive sync. Balanced preset, Ultimate Performance plan."
+        Desc     = "Native HDR, Reflex handles latency (LLM OFF). Ultimate Performance plan."
         Exes     = @("Diablo IV.exe")
     }
 

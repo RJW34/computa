@@ -5,7 +5,7 @@ When the game is being annoying and you need every advantage.
 
 Settings:
 - 300Hz fixed refresh
-- LLM Ultra
+- LLM ON (Ultra has no effect in DX12/UE5)
 - Ultimate Performance power plan
 - No sync, no caps, no compromises
 - All aggressive optimizations enabled
@@ -37,7 +37,7 @@ class Rivals2_300HzMaxProfile(Rivals2BaseProfile):
 
     @property
     def description(self) -> str:
-        return "Absolute minimum latency - 300Hz, LLM Ultra, Ultimate Performance"
+        return "Absolute minimum latency - 300Hz, no sync, Ultimate Performance"
 
     @property
     def optimization_target(self) -> str:
@@ -72,13 +72,15 @@ class Rivals2_300HzMaxProfile(Rivals2BaseProfile):
                 "processor_min_state": 100,
             },
             "NvidiaSettingsHandler": {
-                "low_latency_mode": "ultra",  # ULTRA - maximum aggression
+                # Rivals 2 is DX12/UE5 — LLM Ultra has no effect (DX9/DX11 only).
+                "low_latency_mode": "on",
                 "power_management": "prefer_max_performance",
                 "vsync": "off",
+                "vsync_tear_control": "disable",
                 "vrr_app_override": "force_off",
-                "max_frame_rate": "off",  # Uncapped - use in-game if needed
+                "max_frame_rate": "off",  # Uncapped
                 "shader_cache": "unlimited",
-                "threaded_optimization": "auto",
+                "threaded_optimization": "off",  # OFF — UE5 driver contention
                 "triple_buffering": "off",
             },
         }
@@ -106,8 +108,11 @@ class Rivals2_300HzMaxProfile(Rivals2BaseProfile):
             {
                 "category": "NVIDIA",
                 "setting": "Low Latency Mode",
-                "value": "Ultra",
-                "reason": "Maximum frame queue reduction.",
+                "value": "On",
+                "reason": (
+                    "Reduces pre-render queue. Ultra has no effect in DX12/UE5 "
+                    "(only works in DX9/DX11)."
+                ),
             },
             {
                 "category": "NVIDIA",

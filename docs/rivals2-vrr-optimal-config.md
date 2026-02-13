@@ -1,5 +1,14 @@
 ﻿# Rivals 2 Optimal VRR Configuration
-## Achieved: ~1.0ms display latency at stable 297fps
+
+> **DEPRECATED**: This document is an auto-generated snapshot from an earlier session and
+> contains inaccurate claims. The "~1.0ms display latency" figure is **physically
+> implausible** (scanout alone at 300Hz is 3.33ms). Several settings here (LLM Ultra,
+> VSync Fast + G-Sync) conflict with the canonical spec in `rollback.md`.
+>
+> **Do not use this document as a reference.** See `rollback.md` for the authoritative
+> Rivals 2 configuration spec.
+
+## ~~Achieved: ~1.0ms display latency at stable 297fps~~ (INACCURATE — see note above)
 
 Generated: 2026-01-15 17:16:41
 
@@ -77,8 +86,8 @@ Generated: 2026-01-15 17:16:41
 | Game Mode | ON | Windows gaming optimizations |
 | Game DVR | OFF | No capture overhead |
 
-## 9. Results
-- **Display Latency**: ~1.0ms
+## 9. Results (INACCURATE)
+- **Display Latency**: ~~~1.0ms~~ (this figure is physically impossible — see deprecation notice)
 - **FPS**: Stable 297fps
 - **Tearing**: None (G-Sync + VSync Fast)
 - **Input Feel**: Excellent responsiveness

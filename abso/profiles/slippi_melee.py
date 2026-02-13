@@ -106,8 +106,8 @@ class SlippiMeleeProfile(EmulatorLatencyBaseProfile):
                 "setting": "VRR Optimize",
                 "value": "Off (critical!)",
                 "reason": (
-                    "Even in exclusive fullscreen, VRROptimizeEnable=1 keeps Windows compositor "
-                    "logic active, adding ~0.1ms latency. Disabling achieves true 0.0ms render."
+                    "VRROptimizeEnable=1 keeps Windows compositor logic in the path. "
+                    "Disabling may reduce latency for fixed-framerate emulators."
                 ),
             },
 

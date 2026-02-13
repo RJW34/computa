@@ -43,15 +43,15 @@ class RyujinxSSBUProfile(EmulatorLatencyBaseProfile):
             "NvidiaSettingsHandler": {
                 # Absolute minimum latency - no sync overhead
                 # SSBU is 60fps like Melee, same optimization approach
-                "preset": "minimum_latency",
-                # Settings applied:
-                # - Low Latency Mode: Ultra (acceptable for locked 60fps)
-                # - VSync: OFF (removes sync latency)
-                # - Power Management: Prefer Maximum Performance
-                # - Shader Cache: Unlimited (important for emulators)
-                # - Threaded Optimization: ON
-                # - Triple Buffering: OFF
-                # - G-Sync: OFF per-app (fixed 60fps doesn't need VRR)
+                # Ryujinx uses Vulkan — LLM Ultra has no effect (DX9/DX11 only).
+                "low_latency_mode": "on",  # ON for pre-render queue reduction
+                "power_management": "prefer_max_performance",
+                "vsync": "off",  # No sync latency
+                "vsync_tear_control": "disable",
+                "vrr_app_override": "force_off",  # Fixed 60fps, no VRR benefit
+                "shader_cache": "unlimited",  # Critical for emulators
+                "threaded_optimization": "on",  # Ryujinx benefits from driver threading
+                "triple_buffering": "off",
             },
         }
 
@@ -77,8 +77,8 @@ class RyujinxSSBUProfile(EmulatorLatencyBaseProfile):
                 "setting": "VRR Optimize",
                 "value": "Off (critical!)",
                 "reason": (
-                    "Even in exclusive fullscreen, VRROptimizeEnable=1 keeps Windows "
-                    "compositor logic active. Disabling achieves lower render latency."
+                    "VRROptimizeEnable=1 keeps Windows compositor logic in the path. "
+                    "Disabling may reduce latency for fixed-framerate emulators."
                 ),
             },
             {
@@ -107,10 +107,10 @@ class RyujinxSSBUProfile(EmulatorLatencyBaseProfile):
             {
                 "category": "NVCP",
                 "setting": "Low Latency Mode",
-                "value": "On or Ultra",
+                "value": "On",
                 "reason": (
-                    "'On' limits pre-render queue to 1 frame - stable for locked 60fps. "
-                    "'Ultra' can work well for emulators with consistent frame times."
+                    "Reduces pre-render queue to 1 frame. Ultra has no effect on Vulkan "
+                    "applications (only works in DX9/DX11)."
                 ),
             },
             {
@@ -202,12 +202,7 @@ class RyujinxSSBUProfile(EmulatorLatencyBaseProfile):
                     "for better performance. Use 'Host' if you experience crashes."
                 ),
             },
-            {
-                "category": "Ryujinx System",
-                "setting": "Use Hypervisor (macOS only)",
-                "value": "N/A on Windows",
-                "reason": "Hypervisor is macOS-only. Windows uses standard JIT.",
-            },
+            # Hypervisor is macOS-only — omitted since this tool is Windows-only.
             {
                 "category": "Ryujinx CPU",
                 "setting": "CPU Backend",

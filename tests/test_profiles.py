@@ -135,11 +135,12 @@ class TestProfileSettings:
         assert settings["preset"] == "reflex_game"
 
     def test_diablo4_nvidia_settings(self):
-        """Test Diablo4Profile returns Nvidia settings with preset."""
+        """Test Diablo4Profile returns Nvidia settings with Reflex preset (LLM OFF)."""
         profile = Diablo4Profile()
         settings = profile.get_settings("NvidiaSettingsHandler")
 
-        assert settings["preset"] == "balanced"
+        # Diablo 4 has native Reflex — uses vrr_diablo4 preset (LLM OFF)
+        assert settings["preset"] == "vrr_diablo4"
 
     def test_pokemon_auto_chess_nvidia_settings(self):
         """Test PokemonAutoChessProfile returns explicit Nvidia settings."""

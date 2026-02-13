@@ -16,11 +16,15 @@ A major latency feature added to Dolphin in late 2025, developed in collaboratio
 - Works best when GPU is not bottlenecked
 
 **Testing Results (Dolphin + Fizzi collaboration):**
-| Configuration | End-to-End Latency |
-|---------------|-------------------|
-| Console (CRT) | 62ms baseline |
-| Dolphin + Rush Presentation | 37ms |
-| Improvement | ~25ms faster than console |
+| Configuration | Estimated End-to-End Latency |
+|---------------|------------------------------|
+| Console (CRT) | ~33-50ms (game logic + frame buffer + CRT scanout) |
+| Dolphin (Optimized) | ~25-40ms (varies by system) |
+| Rush Presentation | May reduce by 8-14ms (test for your system) |
+
+**Note:** CRT phosphor response is near-instantaneous (~0ms pixel response). The
+console baseline depends heavily on measurement methodology. These are reference
+estimates, not precise measurements from a controlled test environment.
 
 **When to Use:**
 - Recommended for competitive play when latency is priority
@@ -166,15 +170,23 @@ VSync = False
 
 ### Slippi Dolphin (Optimized) vs Console
 
-| Component | Console (CRT) | Dolphin (Optimized) |
-|-----------|---------------|---------------------|
-| Game Logic | 16.7ms | 16.7ms |
-| Frame Buffer | ~8ms | ~0ms (Immediate XFB) |
-| Display Processing | ~33ms (CRT) | ~4ms (240Hz LCD) |
-| Rush Presentation | N/A | -8 to -14ms |
-| **Total** | **~62ms** | **~37ms** |
+| Component | Console (CRT) | Dolphin (Optimized, 240Hz LCD) |
+|-----------|---------------|--------------------------------|
+| Game Logic | 16.7ms (1 frame @ 60fps) | 16.7ms (1 frame @ 60fps) |
+| Frame Buffer | ~8ms (console frame buffer) | ~0ms (Immediate XFB) |
+| Display Scanout | ~16.7ms (CRT full scan @ 60Hz) | ~4.2ms (240Hz scanout) |
+| Pixel Response | ~0ms (CRT phosphor) | ~1-4ms (LCD GtG) |
+| Rush Presentation | N/A | -8 to -14ms (if enabled) |
 
-**Note:** These are reference values from Dolphin/Fizzi testing. Actual results vary by system configuration.
+**Important caveats:**
+- CRT phosphor response is near-instantaneous; CRT latency advantage comes from
+  no frame buffer processing, not from display processing speed.
+- CRT scanout is progressive — the top of the image appears before the bottom,
+  so effective latency depends on where on screen the action occurs.
+- These are rough estimates, not controlled measurements. Actual latency depends
+  on specific hardware, drivers, and measurement methodology.
+- The Rush Presentation figures are from Dolphin development notes and may not
+  be reproducible on all systems.
 
 ---
 

@@ -9,11 +9,12 @@ Goals:
 - Aggressive timing assumptions allowed
 
 NVCP Settings (per-game for Rivals2.exe):
-- V-Sync: FAST
-- Low Latency Mode: ULTRA
-- Max Frame Rate: ENABLED (Refresh - 3, e.g., 297 for 300Hz)
+- V-Sync: OFF (no sync for minimum latency)
+- Low Latency Mode: ON (Ultra has no effect in DX12/UE5)
+- Max Frame Rate: OFF (uncapped)
 - Power Management: Prefer Maximum Performance
-- Threaded Optimization: Auto
+- Threaded Optimization: OFF (UE5 driver contention)
+- G-SYNC: OFF (no sync overhead)
 
 External Tools: RTSS, frame pacing hooks ALLOWED.
 """
@@ -89,13 +90,16 @@ class Rivals2OfflineProfile(Rivals2BaseProfile):
                 "processor_min_state": 100,
             },
             "NvidiaSettingsHandler": {
-                # Custom settings for OFFLINE profile
-                "low_latency_mode": "ultra",  # ULTRA for offline
+                # Rivals 2 is DX12/UE5 — LLM Ultra has no effect (DX9/DX11 only).
+                # Use LLM ON for pre-render queue reduction where it works.
+                "low_latency_mode": "on",
                 "power_management": "prefer_max_performance",
-                "vsync": "fast",  # FAST V-Sync for offline
-                "max_frame_rate": "297",  # Refresh - 3 (for 300Hz)
+                "vsync": "off",  # No sync — minimum latency, accept tearing
+                "vsync_tear_control": "disable",
+                "vrr_app_override": "force_off",  # No G-Sync overhead
+                "max_frame_rate": "off",  # Uncapped
                 "shader_cache": "unlimited",
-                "threaded_optimization": "auto",  # Auto for Rivals 2
+                "threaded_optimization": "off",  # OFF — UE5 driver contention
                 "triple_buffering": "off",
             },
         }
@@ -111,27 +115,30 @@ class Rivals2OfflineProfile(Rivals2BaseProfile):
             },
             {
                 "category": "NVIDIA Control Panel",
-                "setting": "Monitor Technology",
-                "value": "G-SYNC",
-                "reason": "Enable G-Sync for tear-free gameplay.",
+                "setting": "G-SYNC",
+                "value": "Off",
+                "reason": "No sync overhead for minimum latency. Tearing is acceptable offline.",
             },
             {
                 "category": "NVIDIA Control Panel",
                 "setting": "Vertical Sync",
-                "value": "Fast",
-                "reason": "Fast V-Sync renders uncapped, discards incomplete frames.",
+                "value": "Off",
+                "reason": "No sync — minimum latency path.",
             },
             {
                 "category": "NVIDIA Control Panel",
                 "setting": "Low Latency Mode",
-                "value": "Ultra",
-                "reason": "ULTRA for aggressive frame queue reduction in offline play.",
+                "value": "On",
+                "reason": (
+                    "Reduces pre-render queue to 1 frame. Ultra has no effect in DX12/UE5 "
+                    "(only works in DX9/DX11)."
+                ),
             },
             {
                 "category": "NVIDIA Control Panel",
                 "setting": "Max Frame Rate",
-                "value": "297 (Refresh - 3)",
-                "reason": "Cap at refresh - 3 for G-Sync headroom. Adjust for your refresh rate.",
+                "value": "Off (uncapped)",
+                "reason": "No artificial limiting. Use in-game limiter if needed.",
             },
             {
                 "category": "In-Game Settings",
@@ -148,8 +155,8 @@ class Rivals2OfflineProfile(Rivals2BaseProfile):
             {
                 "category": "Validation",
                 "setting": "Expected Behavior",
-                "value": "Stable 297 FPS, no VRR disengagement",
-                "reason": "FPS should hold at cap without oscillation or hitching.",
+                "value": "Uncapped FPS, no sync overhead",
+                "reason": "FPS should run uncapped without hitching. Tearing is expected.",
             },
         ]
 

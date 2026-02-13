@@ -89,14 +89,10 @@ class Diablo4Profile(BaseProfile):
                 },
             },
             "NvidiaSettingsHandler": {
-                # Balanced preset for quality + performance
-                "preset": "balanced",
-                # Individual overrides (applied via preset):
-                # - Low Latency Mode: On (not Ultra - less aggressive)
-                # - VSync: Adaptive (for G-Sync/FreeSync compatibility)
-                # - Power Management: Prefer Maximum Performance
-                # - Shader Cache: Unlimited
-                # - Threaded Optimization: Auto
+                # Diablo 4 has native NVIDIA Reflex — LLM must be OFF to avoid conflict.
+                # Using vrr_diablo4 preset: LLM=off, VSync=off (G-Sync handles sync),
+                # threaded_opt=off for lower render latency.
+                "preset": "vrr_diablo4",
             },
             "NetworkSettingsHandler": {
                 # Online ARPG - keep OS defaults (avoid aggressive TCP tuning)
@@ -145,6 +141,15 @@ class Diablo4Profile(BaseProfile):
                 "setting": "Display Mode",
                 "value": "Fullscreen",
                 "reason": "Better performance than windowed modes.",
+            },
+            {
+                "category": "Display",
+                "setting": "NVIDIA Reflex Low Latency",
+                "value": "On + Boost",
+                "reason": (
+                    "Diablo 4 has native Reflex. Driver LLM is OFF to avoid conflict. "
+                    "Reflex handles latency more effectively at the application level."
+                ),
             },
             {
                 "category": "Display",

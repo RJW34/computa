@@ -812,8 +812,8 @@ class WindowsSettingsHandler(SettingsHandler):
         """Set VRR Optimize for windowed games (Windows 11).
 
         IMPORTANT: For minimum latency, this should be DISABLED.
-        Even in exclusive fullscreen, VRROptimizeEnable=1 keeps compositor
-        logic active that adds measurable latency (~0.1ms).
+        VRROptimizeEnable=1 keeps compositor logic in the path even in
+        exclusive fullscreen, which may add latency.
 
         Returns:
             Dict with 'success' and optional 'error'.

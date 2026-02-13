@@ -117,7 +117,7 @@ class RegistrySettingsHandler(SettingsHandler):
                 optimal_value=f"0x{self.WIN32_PRIORITY_GAMING:02X}",
                 explanation=(
                     "Win32PrioritySeparation controls CPU time slice allocation. "
-                    "0x28 uses short variable quantum with max foreground boost, "
+                    "0x2A uses short fixed quantum with max foreground boost, "
                     "giving the active game more responsive CPU scheduling."
                 ),
                 category="registry",
@@ -472,7 +472,7 @@ class RegistrySettingsHandler(SettingsHandler):
         """Set Win32PrioritySeparation value.
 
         Args:
-            value: Scheduler quantum value (typically 0x26 or 0x28 for gaming).
+            value: Scheduler quantum value (typically 0x26 or 0x2A for gaming).
 
         Raises:
             ValidationError: If value is out of DWORD range.
