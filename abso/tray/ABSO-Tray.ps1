@@ -403,9 +403,9 @@ $script:Profiles = [ordered]@{
     }
     "overwatch2"        = @{
         Name     = "Overwatch 2"
-        Sub      = "HDR ON | Reflex ON+Boost | LLM OFF"
+        Sub      = "Reflex ON+Boost | LLM OFF"
         Cat      = "Shooter"
-        Desc     = "Competitive OW2. Reflex handles latency (LLM OFF). HDR, HAGS ON, Ultimate Performance."
+        Desc     = "Competitive OW2. Reflex handles latency (LLM OFF). HAGS ON, Ultimate Performance."
         Exes     = @("Overwatch.exe")
     }
 
