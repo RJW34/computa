@@ -40,8 +40,8 @@ class Overwatch2Profile(ReflexShooterBaseProfile):
     def _settings_overrides(self) -> dict[str, dict[str, Any]]:
         return {
             "WindowsSettingsHandler": {
-                # OW2 has native HDR support
-                "hdr": True,
+                # HDR optional — disable if buggy on your display
+                "hdr": False,
             },
             "GraphicsSettingsHandler": {
                 "disable_mpo": False,
