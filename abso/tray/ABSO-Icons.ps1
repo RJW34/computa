@@ -26,9 +26,9 @@ $script:PreviousIconHandle = [IntPtr]::Zero
 function Get-IconFromIcoPath {
     <#
     .SYNOPSIS
-    Loads an ICO file and returns a detached 16x16 icon clone.
+    Loads an ICO file and returns a detached icon clone at the specified size.
     #>
-    param([string]$Path)
+    param([string]$Path, [int]$Size = 32)
 
     if (-not $Path -or -not (Test-Path $Path)) {
         return $null
@@ -39,7 +39,7 @@ function Get-IconFromIcoPath {
     $hIcon = [IntPtr]::Zero
     try {
         $img = [System.Drawing.Image]::FromFile($Path)
-        $bmp = New-Object System.Drawing.Bitmap($img, 16, 16)
+        $bmp = New-Object System.Drawing.Bitmap($img, $Size, $Size)
         $hIcon = $bmp.GetHicon()
         $tempIcon = [System.Drawing.Icon]::FromHandle($hIcon)
         $icon = $tempIcon.Clone()
