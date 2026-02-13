@@ -129,25 +129,30 @@ function Test-SoundFilesExist {
 # ============================================================================
 
 $script:Colors = @{
-    Background      = [System.Drawing.Color]::FromArgb(255, 32, 32, 32)
-    BackgroundDark  = [System.Drawing.Color]::FromArgb(255, 24, 24, 28)
-    Hover           = [System.Drawing.Color]::FromArgb(255, 55, 55, 58)
-    HoverBright     = [System.Drawing.Color]::FromArgb(255, 65, 65, 70)
-    Text            = [System.Drawing.Color]::FromArgb(255, 220, 220, 220)
-    TextDim         = [System.Drawing.Color]::FromArgb(255, 140, 140, 140)
-    TextDisabled    = [System.Drawing.Color]::FromArgb(255, 90, 90, 90)
-    Border          = [System.Drawing.Color]::FromArgb(255, 60, 60, 60)
-    Separator       = [System.Drawing.Color]::FromArgb(255, 55, 55, 55)
-    AccentGold      = [System.Drawing.Color]::FromArgb(255, 220, 180, 70)
-    AccentGreen     = [System.Drawing.Color]::FromArgb(255, 90, 200, 120)
-    AccentBlue      = [System.Drawing.Color]::FromArgb(255, 80, 160, 230)
-    AccentPurple    = [System.Drawing.Color]::FromArgb(255, 140, 120, 220)
-    FavoriteStar    = [System.Drawing.Color]::FromArgb(255, 255, 210, 70)
-    CatFighting     = [System.Drawing.Color]::FromArgb(255, 230, 120, 120)
-    CatARPG         = [System.Drawing.Color]::FromArgb(255, 180, 150, 220)
-    CatShooter      = [System.Drawing.Color]::FromArgb(255, 120, 180, 220)
-    CatOther        = [System.Drawing.Color]::FromArgb(255, 150, 200, 150)
-    CatProd         = [System.Drawing.Color]::FromArgb(255, 220, 190, 120)
+    Background      = [System.Drawing.Color]::FromArgb(255, 30, 30, 34)
+    BackgroundDark  = [System.Drawing.Color]::FromArgb(255, 22, 22, 26)
+    BackgroundLight = [System.Drawing.Color]::FromArgb(255, 40, 40, 45)
+    Hover           = [System.Drawing.Color]::FromArgb(255, 50, 50, 56)
+    HoverBright     = [System.Drawing.Color]::FromArgb(255, 62, 62, 68)
+    Text            = [System.Drawing.Color]::FromArgb(255, 225, 225, 230)
+    TextDim         = [System.Drawing.Color]::FromArgb(255, 130, 130, 140)
+    TextDisabled    = [System.Drawing.Color]::FromArgb(255, 80, 80, 88)
+    Border          = [System.Drawing.Color]::FromArgb(255, 55, 55, 62)
+    Separator       = [System.Drawing.Color]::FromArgb(255, 48, 48, 55)
+    AccentGold      = [System.Drawing.Color]::FromArgb(255, 230, 190, 70)
+    AccentGreen     = [System.Drawing.Color]::FromArgb(255, 80, 210, 120)
+    AccentBlue      = [System.Drawing.Color]::FromArgb(255, 75, 155, 235)
+    AccentPurple    = [System.Drawing.Color]::FromArgb(255, 145, 120, 225)
+    AccentAmber     = [System.Drawing.Color]::FromArgb(255, 240, 170, 60)
+    AccentRed       = [System.Drawing.Color]::FromArgb(255, 220, 75, 75)
+    AccentTeal      = [System.Drawing.Color]::FromArgb(255, 70, 200, 200)
+    FavoriteStar    = [System.Drawing.Color]::FromArgb(255, 255, 215, 70)
+    CatFighting     = [System.Drawing.Color]::FromArgb(255, 235, 115, 115)
+    CatARPG         = [System.Drawing.Color]::FromArgb(255, 175, 145, 225)
+    CatShooter      = [System.Drawing.Color]::FromArgb(255, 115, 180, 225)
+    CatStreaming    = [System.Drawing.Color]::FromArgb(255, 70, 200, 200)
+    CatOther        = [System.Drawing.Color]::FromArgb(255, 145, 200, 145)
+    CatProd         = [System.Drawing.Color]::FromArgb(255, 220, 190, 115)
 }
 
 # ============================================================================
@@ -304,7 +309,7 @@ $script:Profiles = [ordered]@{
     "rivals2-streaming" = @{
         Name     = "Rivals 2: Streaming"
         Sub      = "Rollback-Safe | OBS 1080p60"
-        Cat      = "Fighting"
+        Cat      = "Streaming"
         Desc     = "Streaming profile for Rivals 2. OBS settings applied, FSO/MPO ON for multi-monitor."
         Exes     = @("Rivals2-Win64-Shipping.exe", "RivalsofAether2.exe", "Rivals2.exe")
     }
@@ -334,7 +339,7 @@ $script:Profiles = [ordered]@{
     "slippi-melee-streaming" = @{
         Name     = "Slippi Melee (Streaming)"
         Sub      = "OBS 1080p60 | Multi-monitor"
-        Cat      = "Fighting"
+        Cat      = "Streaming"
         Desc     = "Streaming profile for Slippi. OBS settings applied, FSO/MPO ON for multi-monitor."
         Exes     = @("Slippi Dolphin.exe", "Dolphin.exe")
     }
@@ -350,7 +355,7 @@ $script:Profiles = [ordered]@{
     "ryujinx-ssbu-streaming" = @{
         Name     = "SSBU / HewDraw Remix (Streaming)"
         Sub      = "OBS 1080p60 | Multi-monitor"
-        Cat      = "Fighting"
+        Cat      = "Streaming"
         Desc     = "Streaming profile for Ryujinx. OBS settings applied, FSO/MPO ON for multi-monitor."
         Exes     = @("Ryujinx.exe", "Ryujinx.Ava.exe", "Ryujinx.Headless.SDL2.exe")
     }
@@ -387,7 +392,7 @@ $script:Profiles = [ordered]@{
     "fortnite-streaming" = @{
         Name     = "Fortnite (Streaming)"
         Sub      = "Reflex ON+Boost | OBS 1080p60"
-        Cat      = "Shooter"
+        Cat      = "Streaming"
         Desc     = "Streaming profile for Fortnite. OBS settings applied, FSO/MPO ON for multi-monitor."
         Exes     = @(
             "FortniteClient-Win64-Shipping.exe",
@@ -395,6 +400,13 @@ $script:Profiles = [ordered]@{
             "FortniteClient-Win64-Shipping_BE.exe",
             "FortniteClient-Win64-Shipping_EAC_EOS.exe"
         )
+    }
+    "overwatch2"        = @{
+        Name     = "Overwatch 2"
+        Sub      = "HDR ON | Reflex ON+Boost | LLM OFF"
+        Cat      = "Shooter"
+        Desc     = "Competitive OW2. Reflex handles latency (LLM OFF). HDR, HAGS ON, Ultimate Performance."
+        Exes     = @("Overwatch.exe")
     }
 
     # --- Browser Games ---
@@ -415,18 +427,19 @@ $script:Profiles = [ordered]@{
     "pacdeluxe-streaming" = @{
         Name     = "PACDeluxe (Streaming)"
         Sub      = "OBS 1080p60 | Multi-monitor"
-        Cat      = "Other"
+        Cat      = "Streaming"
         Desc     = "Streaming profile for PACDeluxe. OBS settings applied, FSO/MPO ON for multi-monitor."
         Exes     = @("PACDeluxe.exe", "msedge.exe")
     }
 }
 
-$script:CategoryOrder = @("Productivity", "Fighting", "ARPG", "Shooter", "Other")
+$script:CategoryOrder = @("Productivity", "Fighting", "ARPG", "Shooter", "Streaming", "Other")
 $script:CategoryColors = @{
     "Productivity" = $script:Colors.CatProd
     "Fighting"     = $script:Colors.CatFighting
     "ARPG"         = $script:Colors.CatARPG
     "Shooter"      = $script:Colors.CatShooter
+    "Streaming"    = $script:Colors.CatStreaming
     "Other"        = $script:Colors.CatOther
 }
 
@@ -466,6 +479,189 @@ function Dim-Color {
     $alpha = [Math]::Max(0, [Math]::Min(255, $Alpha))
     return [System.Drawing.Color]::FromArgb($alpha, $Color.R, $Color.G, $Color.B)
 }
+
+# ============================================================================
+# CUSTOM DARK THEME RENDERER (ToolStripRenderer)
+# ============================================================================
+
+Add-Type -TypeDefinition @"
+using System;
+using System.Drawing;
+using System.Drawing.Drawing2D;
+using System.Windows.Forms;
+
+public class DarkThemeRenderer : ToolStripProfessionalRenderer
+{
+    // Dark background colors
+    private static readonly Color BgColor = Color.FromArgb(255, 30, 30, 34);
+    private static readonly Color BgDark = Color.FromArgb(255, 22, 22, 26);
+    private static readonly Color SepColor = Color.FromArgb(255, 48, 48, 55);
+    private static readonly Color BorderColor = Color.FromArgb(255, 55, 55, 62);
+    private static readonly Color HoverColor = Color.FromArgb(40, 255, 255, 255);
+    private static readonly Color CheckBg = Color.FromArgb(255, 45, 45, 52);
+    private static readonly Color AccentGold = Color.FromArgb(255, 230, 190, 70);
+
+    public DarkThemeRenderer() : base(new DarkColorTable()) { }
+
+    // Paint the entire menu background dark
+    protected override void OnRenderToolStripBackground(ToolStripRenderEventArgs e)
+    {
+        using (var brush = new SolidBrush(BgColor))
+        {
+            e.Graphics.FillRectangle(brush, e.AffectedBounds);
+        }
+    }
+
+    // Paint the menu border with a subtle accent
+    protected override void OnRenderToolStripBorder(ToolStripRenderEventArgs e)
+    {
+        using (var pen = new Pen(BorderColor, 1f))
+        {
+            var r = new Rectangle(0, 0, e.ToolStrip.Width - 1, e.ToolStrip.Height - 1);
+            e.Graphics.DrawRectangle(pen, r);
+        }
+        // Thin gold accent line at top
+        using (var pen = new Pen(Color.FromArgb(100, AccentGold.R, AccentGold.G, AccentGold.B), 1f))
+        {
+            e.Graphics.DrawLine(pen, 1, 0, e.ToolStrip.Width - 2, 0);
+        }
+    }
+
+    // Paint item backgrounds with category-aware hover highlighting
+    protected override void OnRenderMenuItemBackground(ToolStripItemRenderEventArgs e)
+    {
+        var g = e.Graphics;
+        g.SmoothingMode = SmoothingMode.AntiAlias;
+        var rect = new Rectangle(2, 1, e.Item.Width - 4, e.Item.Height - 2);
+
+        if (e.Item.Selected && e.Item.Enabled)
+        {
+            // Rounded hover highlight with item's forecolor tint
+            Color tint = e.Item.ForeColor;
+            using (var brush = new SolidBrush(Color.FromArgb(30, tint.R, tint.G, tint.B)))
+            {
+                FillRoundRect(g, brush, rect, 4);
+            }
+            using (var pen = new Pen(Color.FromArgb(50, tint.R, tint.G, tint.B), 1f))
+            {
+                DrawRoundRect(g, pen, rect, 4);
+            }
+            // Left accent bar on hover
+            using (var brush = new SolidBrush(Color.FromArgb(140, tint.R, tint.G, tint.B)))
+            {
+                g.FillRectangle(brush, 2, rect.Y + 3, 2, rect.Height - 6);
+            }
+        }
+        else if (e.Item.Pressed)
+        {
+            using (var brush = new SolidBrush(Color.FromArgb(20, 255, 255, 255)))
+            {
+                FillRoundRect(g, brush, rect, 4);
+            }
+        }
+    }
+
+    // Custom dark separators with subtle gradient
+    protected override void OnRenderSeparator(ToolStripSeparatorRenderEventArgs e)
+    {
+        int y = e.Item.Height / 2;
+        var g = e.Graphics;
+        int w = e.Item.Width;
+        // Gradient separator: transparent -> dim -> transparent
+        using (var brush = new LinearGradientBrush(
+            new Point(16, y), new Point(w - 16, y),
+            Color.FromArgb(0, SepColor.R, SepColor.G, SepColor.B),
+            Color.FromArgb(0, SepColor.R, SepColor.G, SepColor.B)))
+        {
+            var blend = new ColorBlend(3);
+            blend.Colors = new Color[] {
+                Color.FromArgb(0, SepColor.R, SepColor.G, SepColor.B),
+                SepColor,
+                Color.FromArgb(0, SepColor.R, SepColor.G, SepColor.B)
+            };
+            blend.Positions = new float[] { 0f, 0.5f, 1f };
+            brush.InterpolationColors = blend;
+            using (var pen = new Pen(brush, 1f))
+            {
+                g.DrawLine(pen, 16, y, w - 16, y);
+            }
+        }
+    }
+
+    // Custom checked item rendering
+    protected override void OnRenderItemCheck(ToolStripItemImageRenderEventArgs e)
+    {
+        var g = e.Graphics;
+        g.SmoothingMode = SmoothingMode.AntiAlias;
+        var r = e.ImageRectangle;
+        r.Inflate(1, 1);
+        // Draw a small color-coded dot instead of a checkmark
+        Color dotColor = e.Item.ForeColor;
+        using (var brush = new SolidBrush(dotColor))
+        {
+            g.FillEllipse(brush, r.X + 2, r.Y + 2, 8, 8);
+        }
+    }
+
+    // Dark image margin
+    protected override void OnRenderImageMargin(ToolStripRenderEventArgs e)
+    {
+        // Skip default margin rendering - keep it all dark
+    }
+
+    // Helper: Fill rounded rectangle
+    private static void FillRoundRect(Graphics g, Brush brush, Rectangle r, int radius)
+    {
+        using (var path = RoundRectPath(r, radius))
+        {
+            g.FillPath(brush, path);
+        }
+    }
+
+    // Helper: Draw rounded rectangle
+    private static void DrawRoundRect(Graphics g, Pen pen, Rectangle r, int radius)
+    {
+        using (var path = RoundRectPath(r, radius))
+        {
+            g.DrawPath(pen, path);
+        }
+    }
+
+    private static GraphicsPath RoundRectPath(Rectangle r, int radius)
+    {
+        int d = radius * 2;
+        var path = new GraphicsPath();
+        path.AddArc(r.X, r.Y, d, d, 180, 90);
+        path.AddArc(r.Right - d, r.Y, d, d, 270, 90);
+        path.AddArc(r.Right - d, r.Bottom - d, d, d, 0, 90);
+        path.AddArc(r.X, r.Bottom - d, d, d, 90, 90);
+        path.CloseFigure();
+        return path;
+    }
+}
+
+public class DarkColorTable : ProfessionalColorTable
+{
+    public override Color MenuBorder { get { return Color.FromArgb(255, 55, 55, 62); } }
+    public override Color MenuItemBorder { get { return Color.Transparent; } }
+    public override Color MenuItemSelected { get { return Color.FromArgb(255, 50, 50, 56); } }
+    public override Color MenuItemSelectedGradientBegin { get { return Color.FromArgb(255, 45, 45, 52); } }
+    public override Color MenuItemSelectedGradientEnd { get { return Color.FromArgb(255, 45, 45, 52); } }
+    public override Color MenuItemPressedGradientBegin { get { return Color.FromArgb(255, 38, 38, 44); } }
+    public override Color MenuItemPressedGradientEnd { get { return Color.FromArgb(255, 38, 38, 44); } }
+    public override Color MenuStripGradientBegin { get { return Color.FromArgb(255, 30, 30, 34); } }
+    public override Color MenuStripGradientEnd { get { return Color.FromArgb(255, 30, 30, 34); } }
+    public override Color ToolStripDropDownBackground { get { return Color.FromArgb(255, 30, 30, 34); } }
+    public override Color ImageMarginGradientBegin { get { return Color.FromArgb(255, 30, 30, 34); } }
+    public override Color ImageMarginGradientMiddle { get { return Color.FromArgb(255, 30, 30, 34); } }
+    public override Color ImageMarginGradientEnd { get { return Color.FromArgb(255, 30, 30, 34); } }
+    public override Color SeparatorDark { get { return Color.FromArgb(255, 48, 48, 55); } }
+    public override Color SeparatorLight { get { return Color.Transparent; } }
+    public override Color CheckBackground { get { return Color.FromArgb(255, 45, 45, 52); } }
+    public override Color CheckSelectedBackground { get { return Color.FromArgb(255, 55, 55, 62); } }
+    public override Color CheckPressedBackground { get { return Color.FromArgb(255, 38, 38, 44); } }
+}
+"@ -ReferencedAssemblies System.Windows.Forms,System.Drawing -ErrorAction SilentlyContinue
 
 # ============================================================================
 # ICON STATE MANAGEMENT
@@ -831,9 +1027,14 @@ function Update-MenuState {
 
         if ($isActive) {
             $item.Text = "  >>  $($p.Name)"
-            $item.ForeColor = $catColor
+            $item.ForeColor = [System.Drawing.Color]::FromArgb(
+                255,
+                [Math]::Min(255, $catColor.R + 30),
+                [Math]::Min(255, $catColor.G + 30),
+                [Math]::Min(255, $catColor.B + 30)
+            )
             $item.Font = $script:FontBold
-            $item.BackColor = Blend-Color -Base $script:Colors.Background -Overlay $catColor -Ratio 0.2
+            $item.BackColor = Blend-Color -Base $script:Colors.Background -Overlay $catColor -Ratio 0.15
         }
         else {
             $item.Text = "$starPrefix$($p.Name)"
@@ -1358,25 +1559,31 @@ public class HotkeyMessageWindow : NativeWindow {
     $menu.ForeColor = $script:Colors.Text
     $menu.ShowImageMargin = $false
     $menu.ShowCheckMargin = $false
-    $menu.Renderer = New-Object System.Windows.Forms.ToolStripProfessionalRenderer
-    $menu.Renderer.RoundedEdges = $false
+    try {
+        $menu.Renderer = New-Object DarkThemeRenderer
+    }
+    catch {
+        $menu.Renderer = New-Object System.Windows.Forms.ToolStripProfessionalRenderer
+        $menu.Renderer.RoundedEdges = $false
+        Write-TrayLog "DarkThemeRenderer failed, using fallback: $($_.Exception.Message)" -Level "WARN"
+    }
 
     # ─── HEADER ───
 
     $header = New-Object System.Windows.Forms.ToolStripMenuItem
-    $header.Text = "A.B.S.O.  v$($script:AppVersion)"
+    $header.Text = "  A.B.S.O.  v$($script:AppVersion)"
     $header.Enabled = $false
-    $header.BackColor = $script:Colors.Background
+    $header.BackColor = $script:Colors.BackgroundDark
     $header.ForeColor = $script:Colors.AccentGold
     $header.Font = New-Object System.Drawing.Font("Segoe UI", 10, [System.Drawing.FontStyle]::Bold)
     $menu.Items.Add($header) | Out-Null
 
     $subheader = New-Object System.Windows.Forms.ToolStripMenuItem
-    $subheader.Text = "   Adaptive Battle Station Optimizer"
+    $subheader.Text = "    Adaptive Battle Station Optimizer"
     $subheader.Enabled = $false
-    $subheader.BackColor = $script:Colors.Background
-    $subheader.ForeColor = $script:Colors.TextDim
-    $subheader.Font = New-Object System.Drawing.Font("Segoe UI", 8)
+    $subheader.BackColor = $script:Colors.BackgroundDark
+    $subheader.ForeColor = [System.Drawing.Color]::FromArgb(255, 160, 140, 80)
+    $subheader.Font = New-Object System.Drawing.Font("Segoe UI", 7.5)
     $menu.Items.Add($subheader) | Out-Null
 
     # ─── SYSTEM INFO ───
@@ -1386,16 +1593,16 @@ public class HotkeyMessageWindow : NativeWindow {
     $sysLabel = New-Object System.Windows.Forms.ToolStripMenuItem
     $sysLabel.Text = "  SYSTEM"
     $sysLabel.Enabled = $false
-    $sysLabel.BackColor = $script:Colors.Background
-    $sysLabel.ForeColor = $script:Colors.TextDim
-    $sysLabel.Font = New-Object System.Drawing.Font("Segoe UI", 7.5, [System.Drawing.FontStyle]::Bold)
+    $sysLabel.BackColor = $script:Colors.BackgroundDark
+    $sysLabel.ForeColor = [System.Drawing.Color]::FromArgb(255, 100, 110, 130)
+    $sysLabel.Font = New-Object System.Drawing.Font("Segoe UI", 7, [System.Drawing.FontStyle]::Bold)
     $menu.Items.Add($sysLabel) | Out-Null
 
     $gpuInfo = New-Object System.Windows.Forms.ToolStripMenuItem
     $gpuInfo.Text = "      GPU: $($sysInfo.GPU)"
     $gpuInfo.Enabled = $false
     $gpuInfo.BackColor = $script:Colors.Background
-    $gpuInfo.ForeColor = $script:Colors.Text
+    $gpuInfo.ForeColor = $script:Colors.AccentTeal
     $gpuInfo.Font = New-Object System.Drawing.Font("Consolas", 8)
     $menu.Items.Add($gpuInfo) | Out-Null
 
@@ -1403,7 +1610,7 @@ public class HotkeyMessageWindow : NativeWindow {
     $monInfo.Text = "      Display: $($sysInfo.Monitor) @ $($sysInfo.RefreshRate)"
     $monInfo.Enabled = $false
     $monInfo.BackColor = $script:Colors.Background
-    $monInfo.ForeColor = $script:Colors.Text
+    $monInfo.ForeColor = $script:Colors.AccentBlue
     $monInfo.Font = New-Object System.Drawing.Font("Consolas", 8)
     $menu.Items.Add($monInfo) | Out-Null
 
@@ -1559,9 +1766,9 @@ public class HotkeyMessageWindow : NativeWindow {
     $profilesLabel = New-Object System.Windows.Forms.ToolStripMenuItem
     $profilesLabel.Text = "  PROFILES"
     $profilesLabel.Enabled = $false
-    $profilesLabel.BackColor = $script:Colors.Background
-    $profilesLabel.ForeColor = $script:Colors.TextDim
-    $profilesLabel.Font = New-Object System.Drawing.Font("Segoe UI", 7.5, [System.Drawing.FontStyle]::Bold)
+    $profilesLabel.BackColor = $script:Colors.BackgroundDark
+    $profilesLabel.ForeColor = [System.Drawing.Color]::FromArgb(255, 100, 110, 130)
+    $profilesLabel.Font = New-Object System.Drawing.Font("Segoe UI", 7, [System.Drawing.FontStyle]::Bold)
     $menu.Items.Add($profilesLabel) | Out-Null
 
     # Group profiles by category
@@ -1625,9 +1832,9 @@ public class HotkeyMessageWindow : NativeWindow {
     $actionsLabel = New-Object System.Windows.Forms.ToolStripMenuItem
     $actionsLabel.Text = "  ACTIONS"
     $actionsLabel.Enabled = $false
-    $actionsLabel.BackColor = $script:Colors.Background
-    $actionsLabel.ForeColor = $script:Colors.TextDim
-    $actionsLabel.Font = New-Object System.Drawing.Font("Segoe UI", 7.5, [System.Drawing.FontStyle]::Bold)
+    $actionsLabel.BackColor = $script:Colors.BackgroundDark
+    $actionsLabel.ForeColor = [System.Drawing.Color]::FromArgb(255, 100, 110, 130)
+    $actionsLabel.Font = New-Object System.Drawing.Font("Segoe UI", 7, [System.Drawing.FontStyle]::Bold)
     $menu.Items.Add($actionsLabel) | Out-Null
 
     # Restore Previous
@@ -1635,7 +1842,7 @@ public class HotkeyMessageWindow : NativeWindow {
     $script:restoreItem.Text = "      Restore Previous Settings"
     $script:restoreItem.Enabled = $false
     $script:restoreItem.BackColor = $script:Colors.Background
-    $script:restoreItem.ForeColor = $script:Colors.Text
+    $script:restoreItem.ForeColor = $script:Colors.AccentAmber
     $script:restoreItem.Font = New-Object System.Drawing.Font("Segoe UI", 9)
     $script:restoreItem.ToolTipText = "Restore the last backup before profile was applied"
     $script:restoreItem.Add_Click({ Restore-Settings })
@@ -1645,7 +1852,7 @@ public class HotkeyMessageWindow : NativeWindow {
     $auditItem = New-Object System.Windows.Forms.ToolStripMenuItem
     $auditItem.Text = "      Run System Audit"
     $auditItem.BackColor = $script:Colors.Background
-    $auditItem.ForeColor = $script:Colors.Text
+    $auditItem.ForeColor = $script:Colors.AccentBlue
     $auditItem.Font = New-Object System.Drawing.Font("Segoe UI", 9)
     $auditItem.ToolTipText = "Scan system for optimization issues"
     $auditItem.Add_Click({ Run-Audit })
@@ -1656,7 +1863,7 @@ public class HotkeyMessageWindow : NativeWindow {
     $backupsItem = New-Object System.Windows.Forms.ToolStripMenuItem
     $backupsItem.Text = "      Backups ($backupTime)"
     $backupsItem.BackColor = $script:Colors.Background
-    $backupsItem.ForeColor = $script:Colors.Text
+    $backupsItem.ForeColor = $script:Colors.AccentPurple
     $backupsItem.Font = New-Object System.Drawing.Font("Segoe UI", 9)
 
     # Backup submenu items
@@ -1712,7 +1919,7 @@ public class HotkeyMessageWindow : NativeWindow {
     $quickPanelItem = New-Object System.Windows.Forms.ToolStripMenuItem
     $quickPanelItem.Text = "      Quick Panel"
     $quickPanelItem.BackColor = $script:Colors.Background
-    $quickPanelItem.ForeColor = $script:Colors.Text
+    $quickPanelItem.ForeColor = $script:Colors.AccentGreen
     $quickPanelItem.Font = New-Object System.Drawing.Font("Segoe UI", 9)
     $quickPanelItem.ToolTipText = "Toggle floating quick-access panel"
     $quickPanelItem.Checked = $script:TrayConfig.showQuickPanel
@@ -1738,9 +1945,9 @@ public class HotkeyMessageWindow : NativeWindow {
     $settingsLabel = New-Object System.Windows.Forms.ToolStripMenuItem
     $settingsLabel.Text = "  SETTINGS"
     $settingsLabel.Enabled = $false
-    $settingsLabel.BackColor = $script:Colors.Background
-    $settingsLabel.ForeColor = $script:Colors.TextDim
-    $settingsLabel.Font = New-Object System.Drawing.Font("Segoe UI", 7.5, [System.Drawing.FontStyle]::Bold)
+    $settingsLabel.BackColor = $script:Colors.BackgroundDark
+    $settingsLabel.ForeColor = [System.Drawing.Color]::FromArgb(255, 100, 110, 130)
+    $settingsLabel.Font = New-Object System.Drawing.Font("Segoe UI", 7, [System.Drawing.FontStyle]::Bold)
     $menu.Items.Add($settingsLabel) | Out-Null
 
     # Auto-Start toggle

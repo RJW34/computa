@@ -63,20 +63,20 @@ function Show-QuickPanel {
 
     if ($favProfiles.Count -eq 0) { return }
 
-    $btnHeight = 32
-    $padding = 8
-    $panelWidth = 200
-    $panelHeight = $padding + ($favProfiles.Count * ($btnHeight + 4)) + $padding + 24  # +24 for header
+    $btnHeight = 44
+    $padding = 10
+    $panelWidth = 240
+    $panelHeight = $padding + ($favProfiles.Count * ($btnHeight + 5)) + $padding + 28  # +28 for header
 
     $form = New-Object System.Windows.Forms.Form
     $form.Text = ""
     $form.FormBorderStyle = [System.Windows.Forms.FormBorderStyle]::None
-    $form.BackColor = [System.Drawing.Color]::FromArgb(255, 28, 28, 32)
+    $form.BackColor = [System.Drawing.Color]::FromArgb(255, 24, 24, 28)
     $form.Size = New-Object System.Drawing.Size($panelWidth, $panelHeight)
     $form.StartPosition = [System.Windows.Forms.FormStartPosition]::Manual
     $form.TopMost = $true
     $form.ShowInTaskbar = $false
-    $form.Opacity = 0.92
+    $form.Opacity = 0.94
 
     # Position bottom-right
     $screen = [System.Windows.Forms.Screen]::PrimaryScreen.WorkingArea
@@ -109,14 +109,29 @@ function Show-QuickPanel {
     })
     $form.Add_MouseUp({ $script:QP_Dragging = $false })
 
-    # Border paint
+    # Border paint with gradient top accent
     $form.Add_Paint({
         param($s, $e)
-        $pen = New-Object System.Drawing.Pen(
-            [System.Drawing.Color]::FromArgb(60, 220, 180, 70), 1
+        $g = $e.Graphics
+        $g.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
+        # Outer border
+        $borderPen = New-Object System.Drawing.Pen(
+            [System.Drawing.Color]::FromArgb(50, 220, 180, 70), 1
         )
-        $e.Graphics.DrawRectangle($pen, 0, 0, ($s.Width - 1), ($s.Height - 1))
-        $pen.Dispose()
+        $g.DrawRectangle($borderPen, 0, 0, ($s.Width - 1), ($s.Height - 1))
+        $borderPen.Dispose()
+        # Top accent line (gold gradient)
+        $topPen = New-Object System.Drawing.Pen(
+            [System.Drawing.Color]::FromArgb(120, 230, 190, 70), 2
+        )
+        $g.DrawLine($topPen, 1, 0, ($s.Width - 2), 0)
+        $topPen.Dispose()
+        # Header background gradient
+        $headerBrush = New-Object System.Drawing.SolidBrush(
+            [System.Drawing.Color]::FromArgb(255, 20, 20, 24)
+        )
+        $g.FillRectangle($headerBrush, 1, 1, ($s.Width - 2), 26)
+        $headerBrush.Dispose()
     })
 
     # Header
@@ -146,8 +161,8 @@ function Show-QuickPanel {
     $closeLabel.Add_MouseLeave({ $this.ForeColor = [System.Drawing.Color]::FromArgb(255, 100, 100, 100) })
     $form.Controls.Add($closeLabel)
 
-    # Profile buttons
-    $y = $padding + 24
+    # Profile buttons with sub-text
+    $y = $padding + 28
     foreach ($entry in $favProfiles) {
         $catColor = $null
         $catName = $entry.Profile.Cat
@@ -158,38 +173,114 @@ function Show-QuickPanel {
             $catColor = [System.Drawing.Color]::FromArgb(255, 200, 200, 200)
         }
 
-        $btn = New-Object System.Windows.Forms.Button
-        $btn.Text = $entry.Profile.Name
-        $btn.Tag = $entry.Id
-        $btn.Location = New-Object System.Drawing.Point($padding, $y)
-        $btn.Size = New-Object System.Drawing.Size(($panelWidth - $padding * 2), $btnHeight)
-        $btn.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
-        $btn.Font = New-Object System.Drawing.Font("Segoe UI", 8.5)
-        $btn.Cursor = [System.Windows.Forms.Cursors]::Hand
-        $btn.TextAlign = [System.Drawing.ContentAlignment]::MiddleLeft
-        $btn.Padding = New-Object System.Windows.Forms.Padding(8, 0, 0, 0)
+        $isActive = ($entry.Id -eq $ActiveProfile)
 
-        if ($entry.Id -eq $ActiveProfile) {
-            $btn.BackColor = Blend-QPColor -Base ([System.Drawing.Color]::FromArgb(255, 28, 28, 32)) -Overlay $catColor -Ratio 0.25
-            $btn.ForeColor = $catColor
-            $btn.FlatAppearance.BorderColor = $catColor
+        # Container panel for custom two-line button
+        $btnPanel = New-Object System.Windows.Forms.Panel
+        $btnPanel.Tag = $entry.Id
+        $btnPanel.Location = New-Object System.Drawing.Point($padding, $y)
+        $btnPanel.Size = New-Object System.Drawing.Size(($panelWidth - $padding * 2), $btnHeight)
+        $btnPanel.Cursor = [System.Windows.Forms.Cursors]::Hand
+
+        if ($isActive) {
+            $btnPanel.BackColor = Blend-QPColor -Base ([System.Drawing.Color]::FromArgb(255, 24, 24, 28)) -Overlay $catColor -Ratio 0.20
         }
         else {
-            $btn.BackColor = Blend-QPColor -Base ([System.Drawing.Color]::FromArgb(255, 45, 45, 50)) -Overlay $catColor -Ratio 0.12
-            $btn.ForeColor = $catColor
-            $btn.FlatAppearance.BorderColor = $catColor
+            $btnPanel.BackColor = Blend-QPColor -Base ([System.Drawing.Color]::FromArgb(255, 38, 38, 44)) -Overlay $catColor -Ratio 0.08
         }
 
-        $btn.FlatAppearance.MouseOverBackColor = Blend-QPColor -Base $btn.BackColor -Overlay $catColor -Ratio 0.18
-        $btn.FlatAppearance.BorderSize = 1
-
-        $capturedId = $entry.Id
-        $btn.Add_Click({
-            if ($OnApply) { & $OnApply $capturedId }
+        # Custom paint for border + left accent bar
+        $capturedCatColor = $catColor
+        $capturedIsActive = $isActive
+        $btnPanel.Add_Paint({
+            param($s, $e)
+            $g = $e.Graphics
+            $g.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
+            # Border
+            $borderAlpha = if ($capturedIsActive) { 100 } else { 40 }
+            $borderPen = New-Object System.Drawing.Pen(
+                [System.Drawing.Color]::FromArgb($borderAlpha, $capturedCatColor.R, $capturedCatColor.G, $capturedCatColor.B), 1
+            )
+            $g.DrawRectangle($borderPen, 0, 0, ($s.Width - 1), ($s.Height - 1))
+            $borderPen.Dispose()
+            # Left accent bar
+            $barAlpha = if ($capturedIsActive) { 220 } else { 80 }
+            $barBrush = New-Object System.Drawing.SolidBrush(
+                [System.Drawing.Color]::FromArgb($barAlpha, $capturedCatColor.R, $capturedCatColor.G, $capturedCatColor.B)
+            )
+            $g.FillRectangle($barBrush, 0, 2, 3, ($s.Height - 4))
+            $barBrush.Dispose()
+            # Active glow indicator
+            if ($capturedIsActive) {
+                $glowBrush = New-Object System.Drawing.SolidBrush(
+                    [System.Drawing.Color]::FromArgb(20, $capturedCatColor.R, $capturedCatColor.G, $capturedCatColor.B)
+                )
+                $g.FillRectangle($glowBrush, 0, 0, $s.Width, $s.Height)
+                $glowBrush.Dispose()
+            }
         }.GetNewClosure())
 
-        $form.Controls.Add($btn)
-        $y += $btnHeight + 4
+        # Profile name label
+        $nameLabel = New-Object System.Windows.Forms.Label
+        $nameLabel.Text = $entry.Profile.Name
+        $nameLabel.Location = New-Object System.Drawing.Point(10, 4)
+        $nameLabel.Size = New-Object System.Drawing.Size(($panelWidth - $padding * 2 - 16), 18)
+        $nameLabel.ForeColor = if ($isActive) {
+            [System.Drawing.Color]::FromArgb(255,
+                [Math]::Min(255, $catColor.R + 30),
+                [Math]::Min(255, $catColor.G + 30),
+                [Math]::Min(255, $catColor.B + 30)
+            )
+        } else { $catColor }
+        $nameLabel.Font = if ($isActive) {
+            New-Object System.Drawing.Font("Segoe UI", 8.5, [System.Drawing.FontStyle]::Bold)
+        } else {
+            New-Object System.Drawing.Font("Segoe UI", 8.5)
+        }
+        $nameLabel.BackColor = [System.Drawing.Color]::Transparent
+        $nameLabel.Cursor = [System.Windows.Forms.Cursors]::Hand
+        $btnPanel.Controls.Add($nameLabel)
+
+        # Sub-text label (profile settings summary)
+        $subLabel = New-Object System.Windows.Forms.Label
+        $subText = if ($entry.Profile.Sub) { $entry.Profile.Sub } else { $entry.Profile.Cat }
+        $subLabel.Text = $subText
+        $subLabel.Location = New-Object System.Drawing.Point(10, 22)
+        $subLabel.Size = New-Object System.Drawing.Size(($panelWidth - $padding * 2 - 16), 16)
+        $subLabel.ForeColor = [System.Drawing.Color]::FromArgb(160, $catColor.R, $catColor.G, $catColor.B)
+        $subLabel.Font = New-Object System.Drawing.Font("Segoe UI", 7)
+        $subLabel.BackColor = [System.Drawing.Color]::Transparent
+        $subLabel.Cursor = [System.Windows.Forms.Cursors]::Hand
+        $btnPanel.Controls.Add($subLabel)
+
+        # Hover effects for the panel
+        $hoverColor = Blend-QPColor -Base $btnPanel.BackColor -Overlay $catColor -Ratio 0.15
+        $normalColor = $btnPanel.BackColor
+        $capturedHoverColor = $hoverColor
+        $capturedNormalColor = $normalColor
+        $hoverAction = { $this.Parent.BackColor = $capturedHoverColor }.GetNewClosure()
+        $leaveAction = { $this.Parent.BackColor = $capturedNormalColor }.GetNewClosure()
+        $panelHoverAction = { $this.BackColor = $capturedHoverColor }.GetNewClosure()
+        $panelLeaveAction = { $this.BackColor = $capturedNormalColor }.GetNewClosure()
+
+        $nameLabel.Add_MouseEnter($hoverAction)
+        $nameLabel.Add_MouseLeave($leaveAction)
+        $subLabel.Add_MouseEnter($hoverAction)
+        $subLabel.Add_MouseLeave($leaveAction)
+        $btnPanel.Add_MouseEnter($panelHoverAction)
+        $btnPanel.Add_MouseLeave($panelLeaveAction)
+
+        # Click handlers
+        $capturedId = $entry.Id
+        $clickAction = {
+            if ($OnApply) { & $OnApply $capturedId }
+        }.GetNewClosure()
+        $btnPanel.Add_Click($clickAction)
+        $nameLabel.Add_Click($clickAction)
+        $subLabel.Add_Click($clickAction)
+
+        $form.Controls.Add($btnPanel)
+        $y += $btnHeight + 5
     }
 
     $script:QuickPanelForm = $form

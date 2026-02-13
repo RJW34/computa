@@ -30,12 +30,12 @@ function Show-ProgressOverlay {
     $form = New-Object System.Windows.Forms.Form
     $form.Text = ""
     $form.FormBorderStyle = [System.Windows.Forms.FormBorderStyle]::None
-    $form.BackColor = [System.Drawing.Color]::FromArgb(255, 28, 28, 32)
-    $form.Size = New-Object System.Drawing.Size(320, 120)
+    $form.BackColor = [System.Drawing.Color]::FromArgb(255, 24, 24, 28)
+    $form.Size = New-Object System.Drawing.Size(340, 130)
     $form.StartPosition = [System.Windows.Forms.FormStartPosition]::Manual
     $form.TopMost = $true
     $form.ShowInTaskbar = $false
-    $form.Opacity = 0.95
+    $form.Opacity = 0.96
 
     # Position bottom-right above taskbar
     $screen = [System.Windows.Forms.Screen]::PrimaryScreen.WorkingArea
@@ -44,49 +44,81 @@ function Show-ProgressOverlay {
         ($screen.Bottom - $form.Height - 16)
     )
 
-    # Rounded corners via region
+    # Custom paint with border glow and top accent
     $form.Add_Paint({
         param($s, $e)
         $g = $e.Graphics
         $g.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
 
-        # Border glow
+        # Border
         $borderPen = New-Object System.Drawing.Pen(
-            [System.Drawing.Color]::FromArgb(60, 140, 120, 220), 1
+            [System.Drawing.Color]::FromArgb(50, 140, 120, 220), 1
         )
         $g.DrawRectangle($borderPen, 0, 0, $s.Width - 1, $s.Height - 1)
         $borderPen.Dispose()
+
+        # Top accent (purple gradient)
+        $topPen = New-Object System.Drawing.Pen(
+            [System.Drawing.Color]::FromArgb(140, 140, 120, 220), 2
+        )
+        $g.DrawLine($topPen, 1, 0, ($s.Width - 2), 0)
+        $topPen.Dispose()
+
+        # Left accent bar
+        $leftBrush = New-Object System.Drawing.SolidBrush(
+            [System.Drawing.Color]::FromArgb(100, 140, 120, 220)
+        )
+        $g.FillRectangle($leftBrush, 0, 2, 3, ($s.Height - 4))
+        $leftBrush.Dispose()
     })
+
+    # Status dot (animated indicator)
+    $dotPanel = New-Object System.Windows.Forms.Panel
+    $dotPanel.Location = New-Object System.Drawing.Point(16, 18)
+    $dotPanel.Size = New-Object System.Drawing.Size(8, 8)
+    $dotPanel.BackColor = [System.Drawing.Color]::Transparent
+    $dotPanel.Add_Paint({
+        param($s, $e)
+        $g = $e.Graphics
+        $g.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
+        $brush = New-Object System.Drawing.SolidBrush(
+            [System.Drawing.Color]::FromArgb(255, 140, 120, 220)
+        )
+        $g.FillEllipse($brush, 0, 0, 7, 7)
+        $brush.Dispose()
+    })
+    $form.Controls.Add($dotPanel)
 
     # Title label
     $titleLabel = New-Object System.Windows.Forms.Label
     $titleLabel.Text = $Title
-    $titleLabel.ForeColor = [System.Drawing.Color]::FromArgb(255, 220, 180, 70)
+    $titleLabel.ForeColor = [System.Drawing.Color]::FromArgb(255, 230, 190, 70)
     $titleLabel.Font = New-Object System.Drawing.Font("Segoe UI", 10, [System.Drawing.FontStyle]::Bold)
-    $titleLabel.Location = New-Object System.Drawing.Point(16, 12)
-    $titleLabel.Size = New-Object System.Drawing.Size(288, 24)
+    $titleLabel.Location = New-Object System.Drawing.Point(30, 12)
+    $titleLabel.Size = New-Object System.Drawing.Size(290, 24)
     $titleLabel.BackColor = [System.Drawing.Color]::Transparent
     $form.Controls.Add($titleLabel)
 
     # Step label
     $stepLabel = New-Object System.Windows.Forms.Label
     $stepLabel.Text = $StepText
-    $stepLabel.ForeColor = [System.Drawing.Color]::FromArgb(255, 180, 180, 180)
+    $stepLabel.ForeColor = [System.Drawing.Color]::FromArgb(255, 170, 170, 180)
     $stepLabel.Font = New-Object System.Drawing.Font("Segoe UI", 9)
-    $stepLabel.Location = New-Object System.Drawing.Point(16, 40)
-    $stepLabel.Size = New-Object System.Drawing.Size(288, 20)
+    $stepLabel.Location = New-Object System.Drawing.Point(16, 44)
+    $stepLabel.Size = New-Object System.Drawing.Size(308, 20)
     $stepLabel.BackColor = [System.Drawing.Color]::Transparent
     $form.Controls.Add($stepLabel)
 
-    # Progress bar (custom drawn)
+    # Progress bar track
     $progressPanel = New-Object System.Windows.Forms.Panel
-    $progressPanel.Location = New-Object System.Drawing.Point(16, 72)
-    $progressPanel.Size = New-Object System.Drawing.Size(288, 6)
-    $progressPanel.BackColor = [System.Drawing.Color]::FromArgb(255, 50, 50, 55)
+    $progressPanel.Location = New-Object System.Drawing.Point(16, 76)
+    $progressPanel.Size = New-Object System.Drawing.Size(308, 4)
+    $progressPanel.BackColor = [System.Drawing.Color]::FromArgb(255, 42, 42, 48)
 
+    # Progress bar fill (purple accent)
     $progressFill = New-Object System.Windows.Forms.Panel
     $progressFill.Location = New-Object System.Drawing.Point(0, 0)
-    $progressFill.Size = New-Object System.Drawing.Size(0, 6)
+    $progressFill.Size = New-Object System.Drawing.Size(0, 4)
     $progressFill.BackColor = [System.Drawing.Color]::FromArgb(255, 140, 120, 220)
     $progressPanel.Controls.Add($progressFill)
     $form.Controls.Add($progressPanel)
@@ -97,17 +129,17 @@ function Show-ProgressOverlay {
     $timer.Interval = 100
     $script:ProgressAngle = 0
     $timer.Add_Tick({
-        $script:ProgressAngle = ($script:ProgressAngle + 3) % 288
+        $script:ProgressAngle = ($script:ProgressAngle + 3) % 308
         if ($script:ProgressForm -and $script:ProgressBar -and -not $script:ProgressForm.IsDisposed) {
-            $barWidth = 80
-            $maxX = 288
+            $barWidth = 90
+            $maxX = 308
             $x = $script:ProgressAngle
             # Clamp width when approaching the end so the bar wraps cleanly
             if (($x + $barWidth) -gt $maxX) {
                 $barWidth = $maxX - $x
             }
             $script:ProgressBar.Location = New-Object System.Drawing.Point($x, 0)
-            $script:ProgressBar.Size = New-Object System.Drawing.Size($barWidth, 6)
+            $script:ProgressBar.Size = New-Object System.Drawing.Size($barWidth, 4)
         }
     })
     $timer.Start()
@@ -117,7 +149,7 @@ function Show-ProgressOverlay {
     $cancelLabel.Text = "Cancel"
     $cancelLabel.ForeColor = [System.Drawing.Color]::FromArgb(255, 120, 120, 120)
     $cancelLabel.Font = New-Object System.Drawing.Font("Segoe UI", 8)
-    $cancelLabel.Location = New-Object System.Drawing.Point(260, 92)
+    $cancelLabel.Location = New-Object System.Drawing.Point(280, 96)
     $cancelLabel.Size = New-Object System.Drawing.Size(50, 20)
     $cancelLabel.BackColor = [System.Drawing.Color]::Transparent
     $cancelLabel.Cursor = [System.Windows.Forms.Cursors]::Hand
