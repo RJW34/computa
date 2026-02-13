@@ -185,6 +185,12 @@ def _detect_epic_games() -> list[InstalledGame]:
 
     epic_game_patterns: dict[str, list[str]] = {
         "Rivals of Aether 2": ["RivalsOfAether2.exe", "RivalsOfAether2-Win64-Shipping.exe"],
+        "Fortnite": [
+            "FortniteClient-Win64-Shipping.exe",
+            "FortniteClient-Win64-Shipping_EAC.exe",
+            "FortniteClient-Win64-Shipping_BE.exe",
+            "FortniteClient-Win64-Shipping_EAC_EOS.exe",
+        ],
     }
 
     for epic_path in epic_paths:

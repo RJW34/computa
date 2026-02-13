@@ -8,6 +8,8 @@ from abso.profiles import get_all_profiles
 from abso.profiles.cod_bo7 import CodBo7Profile
 from abso.profiles.diablo4 import Diablo4Profile
 from abso.profiles.pokemon_auto_chess import PokemonAutoChessProfile
+from abso.profiles.rivals2 import Rivals2Profile
+from abso.profiles.rivals2_online import Rivals2OnlineProfile
 from abso.profiles.slippi_melee import SlippiMeleeProfile
 
 
@@ -85,6 +87,18 @@ class TestProfileHandlers:
         assert "NvidiaSettingsHandler" in handler_names
         assert "NetworkSettingsHandler" in handler_names
 
+    def test_rivals2_online_does_not_touch_game_config_file(self):
+        """Online profile should not include the Rivals2ConfigHandler."""
+        profile = Rivals2OnlineProfile()
+        handler_names = [h.__class__.__name__ for h in profile.get_handlers()]
+        assert "Rivals2ConfigHandler" not in handler_names
+
+    def test_rivals2_base_profile_includes_game_config_guarded_handler(self):
+        """Base Rivals2 profile includes config handler for explicit game INI tuning."""
+        profile = Rivals2Profile()
+        handler_names = [h.__class__.__name__ for h in profile.get_handlers()]
+        assert "Rivals2ConfigHandler" in handler_names
+
 
 class TestProfileSettings:
     """Test profile settings retrieval."""
@@ -99,14 +113,17 @@ class TestProfileSettings:
         assert settings["game_dvr"] is False
 
     def test_slippi_nvidia_settings(self):
-        """Test SlippiMeleeProfile returns Nvidia settings for minimum latency."""
+        """Test SlippiMeleeProfile returns Nvidia settings for minimum latency.
+
+        LLM is set to 'on' (not 'ultra') per updated research - Ultra optional but test both.
+        """
         profile = SlippiMeleeProfile()
         settings = profile.get_settings("NvidiaSettingsHandler")
 
         # Minimum latency settings per rollback.md canonical spec
-        assert settings["low_latency_mode"] == "ultra"
+        assert settings["low_latency_mode"] == "on"  # On recommended; Ultra optional
         assert settings["vsync"] == "off"
-        assert settings["gsync"] == "off"
+        assert settings["vrr_app_override"] == "force_off"
         assert settings["threaded_optimization"] == "off"
 
     def test_cod_nvidia_settings(self):
@@ -125,12 +142,13 @@ class TestProfileSettings:
         assert settings["preset"] == "balanced"
 
     def test_pokemon_auto_chess_nvidia_settings(self):
-        """Test PokemonAutoChessProfile returns Nvidia settings with low_latency preset."""
+        """Test PokemonAutoChessProfile returns explicit Nvidia settings."""
         profile = PokemonAutoChessProfile()
         settings = profile.get_settings("NvidiaSettingsHandler")
 
         # WebGL benefits from low latency settings with VSync disabled
-        assert settings["preset"] == "low_latency_high_fps"
+        assert settings["low_latency_mode"] == "on"
+        assert settings["vsync"] == "off"
 
     def test_pokemon_auto_chess_windows_settings(self):
         """Test PokemonAutoChessProfile returns Windows settings."""
@@ -146,8 +164,8 @@ class TestProfileSettings:
         profile = PokemonAutoChessProfile()
         settings = profile.get_settings("NetworkSettingsHandler")
 
-        assert settings["disable_nagle"] is True
-        assert settings["preset"] == "gaming"
+        assert settings["disable_nagle"] is False
+        assert settings["preset"] == "default"
 
     def test_unknown_handler_returns_empty(self):
         """Test that unknown handler name returns empty dict."""

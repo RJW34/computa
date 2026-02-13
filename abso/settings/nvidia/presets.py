@@ -6,37 +6,46 @@ from typing import Any
 
 
 class NvidiaSettingIDs:
-    """Known Nvidia Profile Inspector setting IDs (hex format)."""
+    """Known Nvidia setting IDs (hex string format for NPI profile parsing).
 
-    LOW_LATENCY_MODE = "0x10834BB"
-    POWER_MANAGEMENT = "0x10834E4"
-    VSYNC = "0x10834F8"
-    MAX_FRAME_RATE = "0x10835F7"
-    SHADER_CACHE_SIZE = "0x10835FE"
-    THREADED_OPTIMIZATION = "0x10835E8"
-    TRIPLE_BUFFERING = "0x10834FC"
-    TEXTURE_FILTERING_QUALITY = "0x1085B0E"
-    ANISOTROPIC_FILTERING = "0x1085BA9"
+    Verified against NVIDIA nvapi/NvApiDriverSettings.h.
+    Canonical source: DRSProfileManager.SETTING_IDS in nvapi_drs.py.
+    """
+
+    LOW_LATENCY_MODE = "0x007BA09E"       # PRERENDERLIMIT_ID
+    POWER_MANAGEMENT = "0x1057EB71"       # PREFERRED_PSTATE_ID
+    VSYNC = "0x00A879CF"                  # VSYNCMODE_ID
+    MAX_FRAME_RATE = "0x10835002"         # FRL_FPS_ID
+    SHADER_CACHE_SIZE = "0x00198FFF"      # PS_SHADERDISKCACHE_ID
+    THREADED_OPTIMIZATION = "0x20C1221E"  # OGL_THREAD_CONTROL_ID
+    TRIPLE_BUFFERING = "0x20FDD1F9"       # OGL_TRIPLE_BUFFER_ID
+    TEXTURE_FILTERING_QUALITY = "0x1085B0E"  # Unchanged (not in DRS path)
+    ANISOTROPIC_FILTERING = "0x1085BA9"      # Unchanged (not in DRS path)
     # VRR / G-Sync settings
-    VRR_APP_OVERRIDE = "0x10A879CF"  # Per-app G-Sync control
+    VRR_APP_OVERRIDE = "0x10A879CF"       # VRR_APP_OVERRIDE_ID
     VRR_APP_OVERRIDE_REQUEST_STATE = "0x10A879AC"
-    VSYNC_VRR_CONTROL = "0x10A879CE"  # Variable Refresh Rate control
+    VSYNC_VRR_CONTROL = "0x10A879CE"      # VSYNCVRRCONTROL_ID
+    VSYNC_TEAR_CONTROL = "0x005A375C"     # VSYNCTEARCONTROL_ID
 
 
 class NvidiaSettingDecimalIDs:
-    """Nvidia setting IDs in decimal format (for NIP file generation)."""
+    """Nvidia setting IDs in decimal format (for NIP file generation).
 
-    LOW_LATENCY_MODE = 17322171  # 0x10834BB
-    POWER_MANAGEMENT = 17322212  # 0x10834E4
-    VSYNC = 17322232  # 0x10834F8
-    MAX_FRAME_RATE = 17322487  # 0x10835F7
-    SHADER_CACHE_SIZE = 17322494  # 0x10835FE
-    THREADED_OPTIMIZATION = 17322472  # 0x10835E8
-    TRIPLE_BUFFERING = 17322236  # 0x10834FC
+    Verified against NVIDIA nvapi/NvApiDriverSettings.h.
+    """
+
+    LOW_LATENCY_MODE = 0x007BA09E         # PRERENDERLIMIT_ID
+    POWER_MANAGEMENT = 0x1057EB71         # PREFERRED_PSTATE_ID
+    VSYNC = 0x00A879CF                    # VSYNCMODE_ID
+    MAX_FRAME_RATE = 0x10835002           # FRL_FPS_ID
+    SHADER_CACHE_SIZE = 0x00198FFF        # PS_SHADERDISKCACHE_ID
+    THREADED_OPTIMIZATION = 0x20C1221E    # OGL_THREAD_CONTROL_ID
+    TRIPLE_BUFFERING = 0x20FDD1F9         # OGL_TRIPLE_BUFFER_ID
     # VRR / G-Sync settings
-    VRR_APP_OVERRIDE = 279542223  # 0x10A879CF - Per-app G-Sync control
-    VRR_APP_OVERRIDE_REQUEST_STATE = 279542188  # 0x10A879AC
-    VSYNC_VRR_CONTROL = 279542222  # 0x10A879CE
+    VRR_APP_OVERRIDE = 0x10A879CF         # VRR_APP_OVERRIDE_ID
+    VRR_APP_OVERRIDE_REQUEST_STATE = 0x10A879AC
+    VSYNC_VRR_CONTROL = 0x10A879CE        # VSYNCVRRCONTROL_ID
+    VSYNC_TEAR_CONTROL = 0x005A375C       # VSYNCTEARCONTROL_ID
 
 
 class NvidiaSettingValues:
@@ -81,6 +90,10 @@ class NvidiaSettingValues:
     VRR_APP_OVERRIDE_DISALLOW = 0x00000002  # Disallow VRR
     VRR_APP_OVERRIDE_ULMB = 0x00000003  # Use ULMB instead
     VRR_APP_OVERRIDE_FIXED_REFRESH = 0x00000004  # Fixed refresh rate
+
+    # VSync Tear Control
+    VSYNC_TEAR_CONTROL_DISABLE = 0x00000000
+    VSYNC_TEAR_CONTROL_ENABLE = 0x00000001
 
 
 # Preset profiles for different optimization targets

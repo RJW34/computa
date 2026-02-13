@@ -167,13 +167,13 @@ class TestParseNipFile:
         nip_content = '''<?xml version="1.0" encoding="utf-8"?>
 <Root>
   <Profile name="Base Profile">
-    <ProfileSetting id="0x10834BB">
+    <ProfileSetting id="0x007BA09E">
       <SettingValue>2</SettingValue>
     </ProfileSetting>
-    <ProfileSetting id="0x10834E4">
+    <ProfileSetting id="0x1057EB71">
       <SettingValue>1</SettingValue>
     </ProfileSetting>
-    <ProfileSetting id="0x10834F8">
+    <ProfileSetting id="0x00A879CF">
       <SettingValue>0</SettingValue>
     </ProfileSetting>
   </Profile>
@@ -191,7 +191,7 @@ class TestParseNipFile:
         nip_content = '''<?xml version="1.0" encoding="utf-8"?>
 <Root>
   <Profile name="_Global_Driver_Profile">
-    <ProfileSetting id="0x10834BB">
+    <ProfileSetting id="0x007BA09E">
       <SettingValue>1</SettingValue>
     </ProfileSetting>
   </Profile>
@@ -223,7 +223,7 @@ class TestParseNipFile:
         nip_content = '''<?xml version="1.0" encoding="utf-8"?>
 <Root>
   <Profile name="Base Profile">
-    <ProfileSetting id="0x10834BB">
+    <ProfileSetting id="0x007BA09E">
     </ProfileSetting>
   </Profile>
 </Root>'''
@@ -238,12 +238,12 @@ class TestParseNipFile:
         nip_content = '''<?xml version="1.0" encoding="utf-8"?>
 <Root>
   <Profile name="Base Profile">
-    <ProfileSetting id="0x10834BB"><SettingValue>2</SettingValue></ProfileSetting>
-    <ProfileSetting id="0x10834E4"><SettingValue>1</SettingValue></ProfileSetting>
-    <ProfileSetting id="0x10834F8"><SettingValue>2</SettingValue></ProfileSetting>
-    <ProfileSetting id="0x10835F7"><SettingValue>144</SettingValue></ProfileSetting>
-    <ProfileSetting id="0x10835FE"><SettingValue>4294967295</SettingValue></ProfileSetting>
-    <ProfileSetting id="0x10835E8"><SettingValue>1</SettingValue></ProfileSetting>
+    <ProfileSetting id="0x007BA09E"><SettingValue>2</SettingValue></ProfileSetting>
+    <ProfileSetting id="0x1057EB71"><SettingValue>1</SettingValue></ProfileSetting>
+    <ProfileSetting id="0x00A879CF"><SettingValue>2</SettingValue></ProfileSetting>
+    <ProfileSetting id="0x10835002"><SettingValue>144</SettingValue></ProfileSetting>
+    <ProfileSetting id="0x00198FFF"><SettingValue>4294967295</SettingValue></ProfileSetting>
+    <ProfileSetting id="0x20C1221E"><SettingValue>1</SettingValue></ProfileSetting>
   </Profile>
 </Root>'''
         nip_path = tmp_path / "test.nip"

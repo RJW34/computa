@@ -20,15 +20,12 @@ External Tools: RTSS, frame pacing hooks ALLOWED.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Literal
+from typing import Any, Literal
 
-from abso.profiles.base import BaseProfile
-
-if TYPE_CHECKING:
-    from abso.settings.base import SettingsHandler
+from abso.profiles.profile_bases import Rivals2BaseProfile
 
 
-class Rivals2OfflineProfile(BaseProfile):
+class Rivals2OfflineProfile(Rivals2BaseProfile):
     """Optimization profile for Rivals 2 OFFLINE / TRAINING play.
 
     Aggressive low-latency profile for:
@@ -58,11 +55,7 @@ class Rivals2OfflineProfile(BaseProfile):
 
     @property
     def executable_hints(self) -> list[str]:
-        return [
-            "Rivals2-Win64-Shipping.exe",
-            "RivalsofAether2.exe",
-            "Rivals2.exe",
-        ]
+        return super().executable_hints
 
     # === Validation Metadata Overrides ===
 
@@ -86,65 +79,14 @@ class Rivals2OfflineProfile(BaseProfile):
         """Offline profiles allow aggressive latency settings."""
         return True
 
-    def get_handlers(self) -> list[SettingsHandler]:
-        from abso.settings.cnm import CNMSettingsHandler
-        from abso.settings.graphics import GraphicsSettingsHandler
-        from abso.settings.memory import MemorySettingsHandler
-        from abso.settings.mouse import MouseSettingsHandler
-        from abso.settings.network import NetworkSettingsHandler
-        from abso.settings.nvidia import NvidiaSettingsHandler
-        from abso.settings.power import PowerSettingsHandler
-        from abso.settings.process_priority import ProcessPriorityHandler
-        from abso.settings.registry import RegistrySettingsHandler
-        from abso.settings.services import ServicesSettingsHandler
-        from abso.settings.windows import WindowsSettingsHandler
-
-        return [
-            WindowsSettingsHandler(),
-            PowerSettingsHandler(),
-            RegistrySettingsHandler(),
-            NvidiaSettingsHandler(),
-            NetworkSettingsHandler(),
-            MouseSettingsHandler(),
-            GraphicsSettingsHandler(),
-            ServicesSettingsHandler(),
-            MemorySettingsHandler(),
-            ProcessPriorityHandler(self.executable_hints),
-            CNMSettingsHandler(),
-        ]
-
-    def get_settings(self, handler_name: str) -> dict[str, Any]:
-        """Get aggressive low-latency settings for offline play."""
-        settings_map: dict[str, dict[str, Any]] = {
+    def _settings_overrides(self) -> dict[str, dict[str, Any]]:
+        """Aggressive low-latency settings for offline play."""
+        return {
             "WindowsSettingsHandler": {
-                "game_mode": True,
-                "game_bar": False,
-                "game_dvr": False,
-                "hags": True,  # Hardware Accelerated GPU Scheduling
-                "hdr": False,  # Rivals 2 is SDR
-                "auto_hdr": False,
-                "vrr_optimize": False,  # Windows VRR OFF - adds latency
-                "max_refresh_rate": True,  # Set display to max refresh rate
+                "max_refresh_rate": True,
             },
             "PowerSettingsHandler": {
-                "ensure_ultimate_performance": True,
-                "active_plan": "ultimate_performance",
-                "disable_usb_suspend": True,
-                "disable_pcie_power_saving": True,
-                "processor_max_performance": True,
-                # Aggressive timing allowed for offline
-                "disable_core_parking": True,
-            },
-            "RegistrySettingsHandler": {
-                "system_responsiveness": 10,
-                "network_throttling": 0xFFFFFFFF,
-                "win32_priority_separation": 0x2A,
-                "game_priority": {
-                    "gpu_priority": 8,
-                    "priority": 6,
-                    "scheduling_category": "High",
-                    "sfio_priority": "High",
-                },
+                "processor_min_state": 100,
             },
             "NvidiaSettingsHandler": {
                 # Custom settings for OFFLINE profile
@@ -155,38 +97,8 @@ class Rivals2OfflineProfile(BaseProfile):
                 "shader_cache": "unlimited",
                 "threaded_optimization": "auto",  # Auto for Rivals 2
                 "triple_buffering": "off",
-                "game_name": "Rivals 2 Offline",
-            },
-            "NetworkSettingsHandler": {
-                "disable_nagle": True,
-                "preset": "gaming",
-            },
-            "MouseSettingsHandler": {
-                "disable_acceleration": True,
-                "set_linear_curve": True,
-            },
-            "GraphicsSettingsHandler": {
-                "disable_global_fso": True,
-                "disable_mpo": False,  # MPO enabled for VRR
-            },
-            "ServicesSettingsHandler": {
-                "preset": "gaming",
-            },
-            "MemorySettingsHandler": {
-                "large_system_cache": 0,
-                "disable_paging_executive": 1,
-            },
-            "ProcessPriorityHandler": {
-                "gpu_priority": 8,
-                "cpu_priority": 3,  # High priority
-                "io_priority": 3,
-            },
-            "CNMSettingsHandler": {
-                "action": "stop",
             },
         }
-
-        return settings_map.get(handler_name, {})
 
     def get_in_game_settings(self) -> list[dict[str, str]]:
         """Get recommended in-game settings for OFFLINE play."""
@@ -240,3 +152,4 @@ class Rivals2OfflineProfile(BaseProfile):
                 "reason": "FPS should hold at cap without oscillation or hitching.",
             },
         ]
+

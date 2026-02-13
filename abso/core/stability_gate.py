@@ -76,7 +76,6 @@ class StabilityGate:
     - HAGS = On
     - Win32PrioritySeparation = 0x2A (fixed quantum)
     - Disable Paging Executive = 1
-    - Ultimate Performance Plan
 
     These settings are ONLY applied if:
     1. Profile type explicitly allows them
@@ -110,7 +109,7 @@ class StabilityGate:
             aggressive_value=0x2A,
             safe_value=0x26,
             description="Fixed short quantum with max foreground boost",
-            allowed_targets={"minimum_latency", "minimum_latency_offline", "low_latency_high_fps"},
+            allowed_targets={"minimum_latency", "minimum_latency_offline", "low_latency_high_fps", "stable_online"},
         ),
         GatedSetting(
             handler="MemorySettingsHandler",
@@ -119,22 +118,6 @@ class StabilityGate:
             safe_value=0,
             description="Keep kernel in RAM (requires sufficient memory)",
             allowed_targets=set(),  # Allowed for all, but gated on RAM check
-        ),
-        GatedSetting(
-            handler="PowerSettingsHandler",
-            setting="active_plan",
-            aggressive_value="ultimate_performance",
-            safe_value="high_performance",
-            description="Ultimate Performance power plan",
-            allowed_targets={"minimum_latency", "minimum_latency_offline"},
-        ),
-        GatedSetting(
-            handler="PowerSettingsHandler",
-            setting="ensure_ultimate_performance",
-            aggressive_value=True,
-            safe_value=False,
-            description="Create Ultimate Performance if missing",
-            allowed_targets={"minimum_latency", "minimum_latency_offline"},
         ),
     ]
 

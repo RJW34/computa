@@ -40,8 +40,8 @@ This document encodes that distinction explicitly.
 | Windows Variable Refresh Rate | OFF |
 | Fast Sync / Adaptive Sync | OFF |
 
-**Rationale:**  
-Rollback netcode in Rivals 2 is sensitive to timing variance, not tearing.  
+**Rationale:**
+Rollback netcode in Rivals 2 is sensitive to timing. VRR adds ~2-5ms latency overhead.
 High-refresh tearing is visually negligible and latency-optimal.
 
 ---
@@ -64,9 +64,9 @@ High-refresh tearing is visually negligible and latency-optimal.
 |----|----|----|
 | Vertical Sync | OFF | No sync latency |
 | Low Latency Mode | **ON** | Reduces queue safely |
-| Low Latency Mode = Ultra | **FORBIDDEN** | Causes rollback contention |
+| Low Latency Mode = Ultra | **AVOID** | Can cause frame pacing issues in non-GPU-bound scenarios |
 | Max Frame Rate | OFF | Avoid limiter jitter |
-| Threaded Optimization | OFF | UE5 driver contention |
+| Threaded Optimization | OFF | OFF (UE5 driver contention) |
 | Power Management | Prefer Maximum Performance | Clock stability |
 | Triple Buffering | OFF | Irrelevant without VSync |
 | G-SYNC (per-app) | OFF | No VRR |
@@ -95,13 +95,13 @@ High-refresh tearing is visually negligible and latency-optimal.
 
 | Setting | Value |
 |----|----|
-| Power Plan | **High Performance** |
-| Ultimate Performance | FORBIDDEN |
+| Power Plan | **Ultimate Performance** |
 | CPU Priority | Normal / Above Normal |
 | High / Realtime Priority | FORBIDDEN |
 
 **Reason:**  
-Rollback requires scheduling headroom. Over-aggression causes hitches.
+Standardized on Ultimate Performance; rollback stability is preserved by
+sync/VRR constraints and conservative latency settings elsewhere.
 
 ---
 
@@ -135,14 +135,13 @@ The optimizer MUST block these when `rivals2-online` is active:
 - G-SYNC / VRR  
 - External FPS caps  
 - Refresh-minus-X logic  
-- Ultimate Performance plan  
 - Injection tools (SK / RTSS)  
 
 ---
 
 ### Canonical One-Line Definition (Rivals 2 Online)
 
-> **Exclusive fullscreen + no sync + 240 FPS cap + NV LLM ON (not Ultra) + HAGS ON + High Performance plan + no overlays**
+> **Exclusive fullscreen + no sync + 240 FPS cap + NV LLM ON (not Ultra - can cause frame pacing issues) + HAGS ON + Ultimate Performance plan + no overlays**
 
 ---
 
@@ -183,13 +182,13 @@ Higher refresh = faster scanout = lower display latency.
 
 | Setting | Value | Notes |
 |----|----|----|
-| Low Latency Mode | **ULTRA** | Just-in-time submission |
+| Low Latency Mode | **On (Ultra optional, test both)** | Reduces queue safely |
 | Vertical Sync | OFF | Remove sync delay |
 | G-SYNC | OFF | Fixed 60fps |
 | Threaded Optimization | OFF | Emulator stability |
 | Power Management | Prefer Maximum Performance | |
 
-LLM Ultra is **SAFE and CORRECT** here.
+LLM On is recommended. Ultra may work but test for your specific system.
 
 ---
 
@@ -209,11 +208,13 @@ LLM Ultra is **SAFE and CORRECT** here.
 
 | Setting | Value |
 |----|----|
-| Backend | Direct3D 12 |
+| Backend | Experiment (Vulkan often best on NVIDIA/AMD) |
 | VSync | OFF |
 | Backend Multithreading | OFF |
 | Internal Resolution | 1×–2× |
 | Exclusive Fullscreen | ON |
+| Rush Frame Presentation | Optional (test for 8-14ms reduction) |
+| Immediately Present XFB | Enabled (default for Melee) |
 
 ---
 
@@ -241,8 +242,8 @@ If SK / RTSS / overlays are detected:
 - Allow `slippi-melee`
 
 ## 4. Power Plan Guardrails
-- `rivals2-online` → High Performance only
-- `slippi-melee` → Ultimate Performance allowed
+- `rivals2-online` → Ultimate Performance standard
+- `slippi-melee` → Ultimate Performance standard
 
 ---
 
@@ -258,6 +259,15 @@ If SK / RTSS / overlays are detected:
 | Priority Aggression | LOW | HIGH |
 | Frame Pacing Priority | HIGH | LOW |
 | Raw Latency Priority | MEDIUM | MAX |
+
+---
+
+## Sources
+
+- [Blur Busters G-SYNC 101](https://blurbusters.com/gsync/gsync101-input-lag-tests-and-settings/) - LLM and VRR research
+- [Dolphin Progress Report December 2025](https://dolphin-emu.org/blog/2025/12/) - Rush Frame Presentation
+- [Dolphin Performance Guide](https://wiki.dolphin-emu.org/index.php?title=Performance_Guide) - Backend recommendations
+- [melee.tv](https://melee.tv/) - Competitive Melee optimization
 
 ---
 

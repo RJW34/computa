@@ -15,15 +15,13 @@ Use this when you're done messing around.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Literal
+from typing import Any, Literal
 
-from abso.profiles.base import BaseProfile
-
-if TYPE_CHECKING:
-    from abso.settings.base import SettingsHandler
+from abso.profiles.profile_bases import Rivals2BaseProfile
 
 
-class Rivals2_300HzMaxProfile(BaseProfile):
+
+class Rivals2_300HzMaxProfile(Rivals2BaseProfile):
     """Maximum performance profile for Rivals 2 at 300Hz.
 
     No compromises. Everything maxed.
@@ -47,11 +45,7 @@ class Rivals2_300HzMaxProfile(BaseProfile):
 
     @property
     def executable_hints(self) -> list[str]:
-        return [
-            "Rivals2-Win64-Shipping.exe",
-            "RivalsofAether2.exe",
-            "Rivals2.exe",
-        ]
+        return super().executable_hints
 
     @property
     def is_online_profile(self) -> bool:
@@ -69,107 +63,25 @@ class Rivals2_300HzMaxProfile(BaseProfile):
     def allows_aggressive_settings(self) -> bool:
         return True
 
-    def get_handlers(self) -> list[SettingsHandler]:
-        from abso.settings.cnm import CNMSettingsHandler
-        from abso.settings.graphics import GraphicsSettingsHandler
-        from abso.settings.memory import MemorySettingsHandler
-        from abso.settings.mouse import MouseSettingsHandler
-        from abso.settings.network import NetworkSettingsHandler
-        from abso.settings.nvidia import NvidiaSettingsHandler
-        from abso.settings.power import PowerSettingsHandler
-        from abso.settings.process_priority import ProcessPriorityHandler
-        from abso.settings.registry import RegistrySettingsHandler
-        from abso.settings.services import ServicesSettingsHandler
-        from abso.settings.windows import WindowsSettingsHandler
-
-        return [
-            WindowsSettingsHandler(),
-            PowerSettingsHandler(),
-            RegistrySettingsHandler(),
-            NvidiaSettingsHandler(),
-            NetworkSettingsHandler(),
-            MouseSettingsHandler(),
-            GraphicsSettingsHandler(),
-            ServicesSettingsHandler(),
-            MemorySettingsHandler(),
-            ProcessPriorityHandler(self.executable_hints),
-            CNMSettingsHandler(),
-        ]
-
-    def get_settings(self, handler_name: str) -> dict[str, Any]:
-        settings_map: dict[str, dict[str, Any]] = {
+    def _settings_overrides(self) -> dict[str, dict[str, Any]]:
+        return {
             "WindowsSettingsHandler": {
-                "game_mode": True,
-                "game_bar": False,
-                "game_dvr": False,
-                "hags": True,
-                "hdr": False,
-                "auto_hdr": False,
-                "vrr_optimize": False,
                 "refresh_rate": 300,  # Lock to 300Hz
             },
             "PowerSettingsHandler": {
-                "ensure_ultimate_performance": True,
-                "active_plan": "ultimate_performance",
-                "disable_usb_suspend": True,
-                "disable_pcie_power_saving": True,
-                "processor_max_performance": True,
-                "disable_core_parking": True,
-            },
-            "RegistrySettingsHandler": {
-                "system_responsiveness": 10,
-                "network_throttling": 0xFFFFFFFF,
-                "win32_priority_separation": 0x2A,
-                "game_priority": {
-                    "gpu_priority": 8,
-                    "priority": 6,
-                    "scheduling_category": "High",
-                    "sfio_priority": "High",
-                },
+                "processor_min_state": 100,
             },
             "NvidiaSettingsHandler": {
                 "low_latency_mode": "ultra",  # ULTRA - maximum aggression
                 "power_management": "prefer_max_performance",
                 "vsync": "off",
-                "gsync": "off",
+                "vrr_app_override": "force_off",
                 "max_frame_rate": "off",  # Uncapped - use in-game if needed
                 "shader_cache": "unlimited",
                 "threaded_optimization": "auto",
                 "triple_buffering": "off",
-                "game_name": "Rivals 2 300Hz Max",
-                "vrr_override": "off",
-                "vrr_requested_state": "off",
-            },
-            "NetworkSettingsHandler": {
-                "disable_nagle": True,
-                "preset": "gaming",
-            },
-            "MouseSettingsHandler": {
-                "disable_acceleration": True,
-                "set_linear_curve": True,
-            },
-            "GraphicsSettingsHandler": {
-                "disable_global_fso": True,
-                "disable_mpo": False,
-            },
-            "ServicesSettingsHandler": {
-                "preset": "gaming",
-            },
-            "MemorySettingsHandler": {
-                "large_system_cache": 0,
-                "disable_paging_executive": 1,
-            },
-            "ProcessPriorityHandler": {
-                "gpu_priority": 8,
-                "cpu_priority": 3,  # High
-                "io_priority": 3,
-            },
-            "CNMSettingsHandler": {
-                "action": "stop",
             },
         }
-
-        return settings_map.get(handler_name, {})
 
     def get_in_game_settings(self) -> list[dict[str, str]]:
         return [
@@ -216,3 +128,6 @@ class Rivals2_300HzMaxProfile(BaseProfile):
                 "reason": "Let it rip or cap at refresh-3 for headroom.",
             },
         ]
+
+
+

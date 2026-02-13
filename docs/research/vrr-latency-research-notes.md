@@ -199,7 +199,40 @@ Combined with UE5/DX12 (where Low Latency Mode has limited effect), there's no d
 
 ---
 
+## HAGS Testing Results (2025-2026)
+
+### Average Gaming Performance Impact
+Based on testing across multiple systems and games:
+
+| Metric | With HAGS ON | Notes |
+|--------|--------------|-------|
+| Average FPS gain | ~0.3% | Minimal improvement |
+| Latency reduction | 0-2ms | Highly variable |
+| Stability | System-dependent | Some report micro-stutters |
+
+### Key Findings
+
+**HAGS benefits are inconsistent:**
+- Works best with DX12 titles (designed for DX12 scheduling model)
+- Minimal effect on Vulkan (has its own scheduling)
+- Can cause issues with DX11 (micro-stutters reported)
+- Newer GPUs (Turing+, RDNA+) see more benefit
+
+**Recommendation:**
+- Default to ON for DX12 games
+- Test both ON and OFF for your specific system/game combination
+- If experiencing micro-stutters, try disabling HAGS
+
+### Sources
+- Hardware Unboxed HAGS Testing (2025)
+- Blur Busters Forums HAGS discussions
+- Community testing reports
+
+---
+
 ## Recommended Configurations
+
+**Important:** Results are system-dependent. The configurations below are starting points - test both HAGS ON/OFF for your specific setup.
 
 ### DEFAULT: No-Sync (Minimum Latency for Fighting Games)
 

@@ -3,6 +3,7 @@
 from abso.profiles.base import BaseProfile
 from abso.profiles.cod_bo7 import CodBo7Profile
 from abso.profiles.diablo4 import Diablo4Profile
+from abso.profiles.fortnite import FortniteProfile
 from abso.profiles.pacdeluxe import PACDeluxeProfile
 from abso.profiles.pokemon_auto_chess import PokemonAutoChessProfile
 from abso.profiles.productivity_oled import ProductivityOLEDProfile
@@ -13,6 +14,13 @@ from abso.profiles.rivals2_tournament_sim import Rivals2TournamentSimProfile
 from abso.profiles.rivals2_300hz_max import Rivals2_300HzMaxProfile
 from abso.profiles.ryujinx_ssbu import RyujinxSSBUProfile
 from abso.profiles.slippi_melee import SlippiMeleeProfile
+from abso.profiles.streaming_profiles import (
+    FortniteStreamingProfile,
+    PACDeluxeStreamingProfile,
+    Rivals2StreamingProfile,
+    RyujinxSSBUStreamingProfile,
+    SlippiMeleeStreamingProfile,
+)
 
 __all__ = [
     "BaseProfile",
@@ -24,10 +32,16 @@ __all__ = [
     "Rivals2_300HzMaxProfile",
     "CodBo7Profile",
     "Diablo4Profile",
+    "FortniteProfile",
+    "FortniteStreamingProfile",
     "PokemonAutoChessProfile",
     "PACDeluxeProfile",
+    "PACDeluxeStreamingProfile",
     "ProductivityOLEDProfile",
     "RyujinxSSBUProfile",
+    "RyujinxSSBUStreamingProfile",
+    "Rivals2StreamingProfile",
+    "SlippiMeleeStreamingProfile",
     "get_all_profiles",
 ]
 
@@ -47,8 +61,14 @@ def get_all_profiles() -> dict[str, BaseProfile]:
         "rivals2-300hz-max": Rivals2_300HzMaxProfile(),
         "cod-bo7": CodBo7Profile(),
         "diablo4": Diablo4Profile(),
+        "fortnite": FortniteProfile(),
+        "fortnite-streaming": FortniteStreamingProfile(),
         "pokemon-auto-chess": PokemonAutoChessProfile(),
         "pacdeluxe": PACDeluxeProfile(),
+        "pacdeluxe-streaming": PACDeluxeStreamingProfile(),
         "productivity": ProductivityOLEDProfile(),
         "ryujinx-ssbu": RyujinxSSBUProfile(),
+        "ryujinx-ssbu-streaming": RyujinxSSBUStreamingProfile(),
+        "rivals2-streaming": Rivals2StreamingProfile(),
+        "slippi-melee-streaming": SlippiMeleeStreamingProfile(),
     }

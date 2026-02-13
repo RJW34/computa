@@ -58,7 +58,7 @@ class PowerSettingsHandler(SettingsHandler):
                 title="Not using a performance power plan",
                 severity="warning",
                 current_value=active_plan.get("name", "Unknown"),
-                optimal_value="Ultimate Performance or High Performance",
+                optimal_value="Ultimate Performance (standard) or High Performance (fallback)",
                 explanation="Performance power plans prevent CPU throttling and power-saving delays.",
                 category="power",
             ))

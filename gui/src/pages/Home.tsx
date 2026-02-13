@@ -17,18 +17,23 @@ import { Badge } from '@/components/ui/badge';
 // Profile ID to display name mapping
 const PROFILE_NAMES: Record<string, string> = {
   'rivals2': 'Rivals of Aether 2',
-  'rivals2-oled': 'Rivals 2 (OLED)',
-  'rivals2-oled-vrr': 'Rivals 2 (OLED + G-Sync)',
+  'rivals2-offline': 'Rivals 2: Offline / Training',
+  'rivals2-online': 'Rivals 2: Online / Matchmaking',
+  'rivals2-streaming': 'Rivals 2 (Streaming)',
+  'rivals2-tournament-sim-144hz': 'Rivals 2: Tournament Sim (144Hz)',
+  'rivals2-300hz-max': 'Rivals 2: 300Hz Maximum',
   'slippi-melee': 'Slippi Melee',
-  'slippi-melee-oled': 'Slippi Melee (OLED)',
+  'slippi-melee-streaming': 'Slippi Melee (Streaming)',
+  'ryujinx-ssbu': 'SSBU / HewDraw Remix',
+  'ryujinx-ssbu-streaming': 'SSBU / HewDraw Remix (Streaming)',
   'cod-bo7': 'CoD: Black Ops 7',
-  'cod-bo7-oled': 'CoD: BO7 (OLED)',
+  'fortnite': 'Fortnite',
+  'fortnite-streaming': 'Fortnite (Streaming)',
   'diablo4': 'Diablo 4',
-  'diablo4-oled': 'Diablo 4 (OLED)',
   'pacdeluxe': 'PAC Deluxe',
-  'pacdeluxe-oled': 'PAC Deluxe (OLED)',
+  'pacdeluxe-streaming': 'PACDeluxe (Streaming)',
   'pokemon-auto-chess': 'Pokemon Auto Chess',
-  'pokemon-auto-chess-oled': 'Pokemon AC (OLED)',
+  'productivity': 'Desktop / Productivity',
 };
 
 export function Home() {
@@ -100,7 +105,7 @@ export function Home() {
           <ActionCard
             icon={Gamepad2}
             title="Apply Profile"
-            subtitle={activeProfile ? `Active: ${activeProfileName}` : 'Optimize for a specific game'}
+            subtitle={activeProfile ? `Active: ${activeProfileName}` : 'Optimize for a specific profile'}
             onClick={() => setPage('profile-wizard')}
           />
 

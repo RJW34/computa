@@ -2,15 +2,12 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
-from abso.profiles.base import BaseProfile
-
-if TYPE_CHECKING:
-    from abso.settings.base import SettingsHandler
+from abso.profiles.profile_bases import WebGLBaseProfile
 
 
-class PACDeluxeProfile(BaseProfile):
+class PACDeluxeProfile(WebGLBaseProfile):
     """Optimization profile for PACDeluxe native desktop client.
 
     Focus: Smooth WebGL performance with stable frame pacing for the
@@ -53,62 +50,10 @@ class PACDeluxeProfile(BaseProfile):
         # WebView2 spawns msedge.exe processes for rendering
         return ["PACDeluxe.exe", "msedge.exe"]
 
-    def get_handlers(self) -> list[SettingsHandler]:
-        from abso.settings.cnm import CNMSettingsHandler
-        from abso.settings.graphics import GraphicsSettingsHandler
-        from abso.settings.memory import MemorySettingsHandler
-        from abso.settings.network import NetworkSettingsHandler
-        from abso.settings.nvidia import NvidiaSettingsHandler
-        from abso.settings.power import PowerSettingsHandler
-        from abso.settings.process_priority import ProcessPriorityHandler
-        from abso.settings.registry import RegistrySettingsHandler
-        from abso.settings.services import ServicesSettingsHandler
-        from abso.settings.windows import WindowsSettingsHandler
-
-        return [
-            WindowsSettingsHandler(),
-            PowerSettingsHandler(),
-            RegistrySettingsHandler(),
-            NvidiaSettingsHandler(),
-            NetworkSettingsHandler(),
-            GraphicsSettingsHandler(),
-            ServicesSettingsHandler(),
-            MemorySettingsHandler(),
-            # Target both the Tauri app and WebView2 renderer processes
-            ProcessPriorityHandler(["PACDeluxe.exe", "msedge.exe"]),
-            CNMSettingsHandler(),
-        ]
-
-    def get_settings(self, handler_name: str) -> dict[str, Any]:
-        settings_map: dict[str, dict[str, Any]] = {
-            "WindowsSettingsHandler": {
-                "game_mode": True,
-                "game_bar": False,  # Disable Game Bar overlay
-                "game_dvr": False,  # Disable background recording
-                # HAGS: Generally beneficial for WebGL/GPU compositing
-                # Works well with WebView2's GPU acceleration
-                "hags": True,
-            },
+    def _settings_overrides(self) -> dict[str, dict[str, Any]]:
+        return {
             "PowerSettingsHandler": {
-                # High performance for consistent frame pacing
-                # Not ultimate - auto-battler doesn't need ultra-low latency
-                "active_plan": "high_performance",
-                "disable_usb_suspend": True,
                 "disable_pcie_power_saving": True,
-                "processor_max_performance": True,
-            },
-            "RegistrySettingsHandler": {
-                # Moderate responsiveness - some background tasks OK
-                # Auto-battler is less latency-sensitive than competitive games
-                "system_responsiveness": 10,
-                "network_throttling": 0xFFFFFFFF,  # Disable throttling for multiplayer
-                "win32_priority_separation": 0x26,  # Short variable quantum, foreground boost
-                "game_priority": {
-                    "gpu_priority": 8,
-                    "priority": 4,  # Above normal (matches app's internal setting)
-                    "scheduling_category": "Medium",
-                    "sfio_priority": "Normal",
-                },
             },
             "NvidiaSettingsHandler": {
                 # Smooth preset for consistent frame pacing
@@ -123,42 +68,7 @@ class PACDeluxeProfile(BaseProfile):
                 #
                 # G-Sync can help smooth variable frame delivery from WebGL
             },
-            "NetworkSettingsHandler": {
-                # Critical for multiplayer - Pokemon Auto Chess uses:
-                # - Firebase for authentication
-                # - Colyseus (WebSocket) for game state sync
-                "disable_nagle": True,
-                "preset": "gaming",
-            },
-            "GraphicsSettingsHandler": {
-                # Keep FSO enabled - PACDeluxe runs windowed/borderless
-                # which works well with Windows compositor
-                "disable_global_fso": False,
-            },
-            "ServicesSettingsHandler": {
-                # Reduce background interference for smooth gameplay
-                "preset": "gaming",
-            },
-            "MemorySettingsHandler": {
-                # WebView2 can use significant memory for caching
-                # Optimize for applications, not file caching
-                "large_system_cache": 0,
-                "disable_paging_executive": 1,
-            },
-            "ProcessPriorityHandler": {
-                # Match the app's internal ABOVE_NORMAL priority
-                # Elevating further could cause system instability
-                "gpu_priority": 8,
-                "cpu_priority": 2,  # Above normal
-                "io_priority": 2,   # Above normal
-            },
-            "CNMSettingsHandler": {
-                # Stop CNM during gaming to allow power optimizations
-                "action": "stop",
-            },
         }
-
-        return settings_map.get(handler_name, {})
 
     def get_in_game_settings(self) -> list[dict[str, str]]:
         """Get recommended settings for PACDeluxe and the system.
@@ -288,3 +198,5 @@ class PACDeluxeProfile(BaseProfile):
                 "reason": "DPI scaling above 100% can affect WebGL rendering performance.",
             },
         ]
+
+

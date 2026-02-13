@@ -2,15 +2,12 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
-from abso.profiles.base import BaseProfile
-
-if TYPE_CHECKING:
-    from abso.settings.base import SettingsHandler
+from abso.profiles.profile_bases import Rivals2BaseProfile
 
 
-class Rivals2Profile(BaseProfile):
+class Rivals2Profile(Rivals2BaseProfile):
     """Optimization profile for Rivals of Aether 2.
 
     Focus: Ultra-low input latency for competitive platform fighting.
@@ -35,7 +32,7 @@ class Rivals2Profile(BaseProfile):
 
     @property
     def executable_hints(self) -> list[str]:
-        return ["Rivals2-Win64-Shipping.exe", "RivalsofAether2.exe", "Rivals2.exe"]
+        return super().executable_hints
 
     # === Validation Metadata Overrides ===
 
@@ -52,79 +49,23 @@ class Rivals2Profile(BaseProfile):
         """Rivals 2 is SDR-only."""
         return True
 
-    def get_handlers(self) -> list[SettingsHandler]:
-        from abso.settings.cnm import CNMSettingsHandler
-        from abso.settings.graphics import GraphicsSettingsHandler
-        from abso.settings.memory import MemorySettingsHandler
-        from abso.settings.mouse import MouseSettingsHandler
-        from abso.settings.network import NetworkSettingsHandler
-        from abso.settings.nvidia import NvidiaSettingsHandler
-        from abso.settings.nvidia_notifications import NvidiaNotificationHandler
-        from abso.settings.power import PowerSettingsHandler
-        from abso.settings.process_priority import ProcessPriorityHandler
-        from abso.settings.registry import RegistrySettingsHandler
-        from abso.settings.rivals2_config import Rivals2ConfigHandler
-        from abso.settings.services import ServicesSettingsHandler
-        from abso.settings.windows import WindowsSettingsHandler
+    @property
+    def include_nvidia_notifications(self) -> bool:
+        return True
 
-        return [
-            WindowsSettingsHandler(),
-            PowerSettingsHandler(),
-            RegistrySettingsHandler(),
-            NvidiaSettingsHandler(),
-            NvidiaNotificationHandler(),  # Disable NVIDIA notifications that break fullscreen
-            NetworkSettingsHandler(),
-            MouseSettingsHandler(),
-            GraphicsSettingsHandler(),
-            ServicesSettingsHandler(),
-            MemorySettingsHandler(),
-            ProcessPriorityHandler([
-                "Rivals2-Win64-Shipping.exe",  # Actual UE5 shipping exe
-                "RivalsofAether2.exe",
-                "Rivals2.exe",
-            ]),
-            Rivals2ConfigHandler(),  # Enforce game config (fullscreen mode, etc.)
-            CNMSettingsHandler(),  # Stop CNM during gaming for power optimization
-        ]
+    @property
+    def include_rivals2_config(self) -> bool:
+        return True
 
-    def get_settings(self, handler_name: str) -> dict[str, Any]:
-        settings_map: dict[str, dict[str, Any]] = {
+    def _settings_overrides(self) -> dict[str, dict[str, Any]]:
+        return {
             "WindowsSettingsHandler": {
-                "game_mode": True,
-                "game_bar": False,
-                "game_dvr": False,
-                "hags": True,  # UE5 generally benefits from HAGS when GFE removed
-                # HDR disabled - Rivals 2 is an SDR game (no native HDR support)
-                # Enabling Windows HDR with SDR content causes washed-out colors
-                "hdr": False,
-                "auto_hdr": False,  # Keep Auto HDR off - game is SDR
-                # Windows VRR setting should be OFF - it adds latency even in fullscreen
-                "vrr_optimize": False,
-                "max_refresh_rate": True,  # Set display to max refresh rate for minimum scanout
-            },
-            "PowerSettingsHandler": {
-                "ensure_ultimate_performance": True,
-                "active_plan": "ultimate_performance",
-                "disable_usb_suspend": True,
-                "disable_pcie_power_saving": True,
-                "processor_max_performance": True,
-            },
-            "RegistrySettingsHandler": {
-                "system_responsiveness": 10,
-                "network_throttling": 0xFFFFFFFF,
-                "win32_priority_separation": 0x2A,  # Short fixed quantum, max foreground boost
-                "game_priority": {
-                    "gpu_priority": 8,
-                    "priority": 6,
-                    "scheduling_category": "High",
-                    "sfio_priority": "High",
-                },
+                "max_refresh_rate": True,
             },
             "NvidiaSettingsHandler": {
                 # NO-SYNC for absolute minimum latency (Default for Rivals 2)
                 # See: rivals2-300hz-lowest-latency-guide.md for detailed rationale
                 "preset": "no_sync_fighting_game",
-                "threaded_optimization": "auto",  # Auto for Rivals 2
                 # Settings applied:
                 # - G-SYNC: Force OFF (via vrr_app_override)
                 # - VSync: OFF (no sync = no sync latency)
@@ -146,43 +87,6 @@ class Rivals2Profile(BaseProfile):
                 # ALTERNATIVE for tear-free experience:
                 # Change to "preset": "vrr_fighting_game" if tearing bothers you.
             },
-            "NetworkSettingsHandler": {
-                "disable_nagle": True,
-                "preset": "gaming",  # TCP global optimizations
-            },
-            "MouseSettingsHandler": {
-                # Disable acceleration for consistent muscle memory
-                "disable_acceleration": True,
-                "set_linear_curve": True,
-            },
-            "GraphicsSettingsHandler": {
-                # Disable FSO for true exclusive fullscreen
-                "disable_global_fso": True,
-                # MPO: Leave enabled (default) - disabling breaks VRR/G-Sync
-                # The no-sync profile doesn't use VRR, but we don't force disable
-                # to avoid issues if user later switches to VRR profile
-                "disable_mpo": False,
-            },
-            "ServicesSettingsHandler": {
-                # Disable background services for minimum hitches
-                "preset": "gaming",
-            },
-            "MemorySettingsHandler": {
-                # Keep kernel in RAM, optimize for applications
-                "large_system_cache": 0,
-                "disable_paging_executive": 1,
-            },
-            "ProcessPriorityHandler": {
-                # High priority for the game executable
-                "gpu_priority": 8,
-                "cpu_priority": 3,  # High
-                "io_priority": 3,   # High
-            },
-            "CNMSettingsHandler": {
-                # Stop CNM during gaming to allow power optimizations
-                # CNM's SetThreadExecutionState interferes with power management
-                "action": "stop",
-            },
             "Rivals2ConfigHandler": {
                 # Enforce game config settings that may be reset by the game
                 # FullscreenMode: 0=Exclusive, 1=Borderless, 2=Windowed
@@ -197,8 +101,6 @@ class Rivals2Profile(BaseProfile):
                 "disable_notifications": True,
             },
         }
-
-        return settings_map.get(handler_name, {})
 
     def get_in_game_settings(self) -> list[dict[str, str]]:
         """Get recommended in-game and NVCP settings.
@@ -522,3 +424,4 @@ class Rivals2Profile(BaseProfile):
                 ),
             },
         ]
+

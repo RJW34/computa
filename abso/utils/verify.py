@@ -91,7 +91,7 @@ def check_windows_settings() -> dict:
 
 
 def check_power_plan() -> dict:
-    """Check active power plan."""
+    """Check active power plan (Ultimate Performance is the standard)."""
     try:
         result = subprocess.run(
             ["powercfg", "/getactivescheme"],
@@ -107,7 +107,7 @@ def check_power_plan() -> dict:
             "active_scheme": output,
             "is_high_performance": is_high_perf,
             "is_ultimate": is_ultimate,
-            "ok": is_high_perf or is_ultimate
+            "ok": is_ultimate
         }
     except Exception as e:
         return {"error": str(e)}
@@ -198,7 +198,7 @@ def verify_profile(profile_name: str = None) -> dict:
                     issues.append(f"{check['description']}: got {check['value']}, expected {check['expected']}")
 
     if not results["power_plan"].get("ok"):
-        issues.append("Power plan is not High Performance or Ultimate")
+        issues.append("Power plan is not Ultimate Performance (current standard)")
 
     if profile_name and "nvidia_profile" in results:
         np = results["nvidia_profile"]

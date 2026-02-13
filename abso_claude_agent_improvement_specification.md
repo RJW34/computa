@@ -87,10 +87,7 @@ Warnings:
 
 Checks:
 - Disable Paging Executive only if RAM >= 32GB
-- Ultimate Performance allowed only for:
-  - Offline
-  - Emulator
-  - Non-rollback profiles
+- Ultimate Performance is the standard for performance profiles
 
 ---
 
@@ -144,7 +141,6 @@ The following are classified as **gated**:
 - HAGS = On
 - Win32PrioritySeparation = 0x2A
 - Disable Paging Executive
-- Ultimate Performance Plan
 
 These MUST NOT be applied blindly.
 
@@ -308,4 +304,3 @@ This upgrade is considered successful if:
 ---
 
 **End of Specification**
-
