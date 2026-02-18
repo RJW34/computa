@@ -204,6 +204,47 @@ class TestApplyProfile:
         finally:
             del ProfileApplier.PROFILES["test-profile"]
 
+    @patch("abso.core.applier.HardwareDetector.detect_monitors")
+    def test_apply_profile_blocks_when_confirmed_vrr_not_detected(self, mock_detect_monitors):
+        """VRR-required profiles should fail before applying handlers without confirmed VRR."""
+        mock_detect_monitors.return_value = [
+            {"name": "Test Monitor", "vrr_supported": "likely", "refresh_rate": 240}
+        ]
+
+        applier = ProfileApplier()
+        result = applier.apply_profile("overwatch2-gsync")
+
+        assert result.success is False
+        assert "No monitor with confirmed VRR/G-SYNC support was detected" in (result.error or "")
+
+    @patch("abso.core.applier.HardwareDetector.detect_monitors")
+    def test_apply_profile_allows_when_confirmed_vrr_detected(self, mock_detect_monitors):
+        """VRR-required mock profile should apply when a confirmed VRR monitor is detected."""
+        mock_detect_monitors.return_value = [
+            {"name": "Test Monitor", "vrr_supported": True, "refresh_rate": 240}
+        ]
+
+        handler = MagicMock()
+        handler.__class__.__name__ = "TestHandler"
+        handler.apply.return_value = {"success": True}
+
+        mock_profile = MagicMock()
+        mock_profile.requires_confirmed_vrr_support = True
+        mock_profile.get_handlers.return_value = [handler]
+        mock_profile.get_settings.return_value = {}
+        mock_profile.has_in_game_settings.return_value = False
+
+        applier = ProfileApplier()
+        applier._profiles["test-gsync-profile"] = mock_profile
+        ProfileApplier.PROFILES["test-gsync-profile"] = type(mock_profile)
+
+        try:
+            result = applier.apply_profile("test-gsync-profile")
+            assert result.success is True
+            assert "TestHandler" in result.applied_settings
+        finally:
+            del ProfileApplier.PROFILES["test-gsync-profile"]
+
 
 class TestGenerateReport:
     """Tests for generate_report method."""

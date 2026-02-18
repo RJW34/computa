@@ -306,6 +306,37 @@ class TestNvidiaApply:
         # Unknown preset means no settings to log, but still succeeds
         assert result["success"] is True
 
+    @patch("abso.settings.nvidia.nvapi_drs.DRSProfileManager")
+    def test_apply_global_vrr_mode_calls_global_profile_path(self, mock_manager_cls):
+        """global_vrr_mode should be applied to the base profile path."""
+        mock_manager = MagicMock()
+        mock_manager.apply_settings_to_global.return_value = {
+            "profile_name": "Base Profile",
+            "settings_applied": {"vrr_mode": "off"},
+            "errors": [],
+        }
+        mock_manager.apply_settings_to_app.return_value = {
+            "settings_applied": {"vsync": "off"},
+            "errors": [],
+            "app_bound": True,
+            "npi_launched": False,
+        }
+        mock_manager.get_app_settings.return_value = {}
+        mock_manager._resolve_setting.return_value = (0x00A879CF, 0x08416747)
+        mock_manager_cls.return_value = mock_manager
+
+        handler = NvidiaSettingsHandler()
+        result = handler.apply({
+            "preset": "reflex_no_sync",
+            "global_vrr_mode": "off",
+            "executables": ["Overwatch.exe"],
+            "game_name": "Overwatch 2 - No-Sync",
+        })
+
+        mock_manager.apply_settings_to_global.assert_called_once_with({"vrr_mode": "off"})
+        assert result["success"] is True
+        assert any("NVIDIA global profile configured:" in line for line in result["applied"])
+
 
 class TestNvidiaBackupRestore:
     """Tests for backup() and restore() methods."""

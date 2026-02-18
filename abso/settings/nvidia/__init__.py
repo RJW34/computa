@@ -210,12 +210,33 @@ class NvidiaSettingsHandler(SettingsHandler):
         Args:
             settings: Dictionary of settings to apply.
         """
+        settings = settings.copy()
         applied: list[str] = []
         errors: list[str] = []
 
         # Extract game info
         executables = settings.pop("executables", [])
         game_name = settings.pop("game_name", "Game")
+        driver_profile_name = settings.pop("profile_name", None)
+        global_settings: dict[str, Any] = {}
+
+        # Optional explicit global/base-profile settings
+        raw_global_settings = settings.pop("global_settings", None)
+        if isinstance(raw_global_settings, dict):
+            global_settings.update(raw_global_settings)
+
+        # Convenience aliases for global G-SYNC mode control
+        for key in ("global_vrr_mode", "global_gsync_mode", "vrr_mode"):
+            value = settings.pop(key, None)
+            if value is not None:
+                global_settings["vrr_mode"] = value
+
+        global_gsync = settings.pop("global_gsync", None)
+        if global_gsync is not None:
+            if isinstance(global_gsync, bool):
+                global_settings["vrr_mode"] = "fullscreen_only" if global_gsync else "off"
+            else:
+                global_settings["vrr_mode"] = global_gsync
 
         # Determine what settings to apply
         preset_name = settings.get("preset")
@@ -230,7 +251,7 @@ class NvidiaSettingsHandler(SettingsHandler):
                          "triple_buffering", "vrr_app_override", "vsync_tear_control")
             }
 
-        if not nvidia_settings:
+        if not nvidia_settings and not global_settings:
             return {
                 "success": True,
                 "error": None,
@@ -240,13 +261,30 @@ class NvidiaSettingsHandler(SettingsHandler):
 
         # Try to apply using NVAPI DRS
         try:
-            from abso.settings.nvidia.nvapi_drs import DRSProfileManager, NVAPIError
+            from abso.settings.nvidia.nvapi_drs import DRSProfileManager
 
             manager = DRSProfileManager()
+            verification_failures: list[str] = []
+            app_bound = True
+            npi_launched = False
+
+            if global_settings:
+                global_result = manager.apply_settings_to_global(global_settings)
+
+                if global_result.get("settings_applied"):
+                    applied.append("NVIDIA global profile configured:")
+                    for setting, value in global_result["settings_applied"].items():
+                        applied.append(f"{setting}: {value}")
+
+                if global_result.get("errors"):
+                    for err in global_result["errors"]:
+                        errors.append(f"global.{err['setting']}: {err['error']}")
+
+                logger.info(f"NVIDIA global settings applied for {game_name}: {global_settings}")
 
             # Use provided executables (bind all when multiple are supplied)
-            if executables:
-                profile_name = game_name
+            if executables and nvidia_settings:
+                profile_name = str(driver_profile_name or game_name)
                 primary_exe = executables[0]
 
                 if len(executables) == 1:
@@ -277,18 +315,22 @@ class NvidiaSettingsHandler(SettingsHandler):
 
                 # Note about app binding
                 if not result.get("app_bound", True):
+                    app_bound = False
                     note = result.get("app_binding_note", "")
                     if note:
                         applied.append(f"NOTE: {note}")
 
                     # If NPI was launched, add a clear message
                     if result.get("npi_launched"):
+                        npi_launched = True
                         applied.append("ACTION REQUIRED: NPI opened - add the app(s) to the profile and click Apply")
+                else:
+                    app_bound = True
+                    npi_launched = bool(result.get("npi_launched", False))
 
                 logger.info(f"NVIDIA settings applied for {game_name}: {nvidia_settings}")
 
                 # Post-apply verification: read back settings to confirm they took effect
-                verification_failures: list[str] = []
                 try:
                     verify_result = manager.get_app_settings(primary_exe)
                     for setting_name, expected_value in result.get("settings_applied", {}).items():
@@ -312,25 +354,21 @@ class NvidiaSettingsHandler(SettingsHandler):
                         )
                 except Exception as ve:
                     logger.warning(f"NVIDIA post-apply verification skipped: {ve}")
+            elif nvidia_settings and not executables:
+                logger.warning(
+                    f"No executable specified for {game_name}, per-app NVIDIA settings not applied"
+                )
+                applied.append("No executable specified - per-application NVIDIA settings not applied")
 
-                return {
-                    "success": len(errors) == 0,
-                    "error": "; ".join(errors) if errors else None,
-                    "requires_reboot": False,
-                    "applied": applied,
-                    "app_bound": result.get("app_bound", False),
-                    "npi_launched": result.get("npi_launched", False),
-                    "verification_failures": verification_failures if verification_failures else None,
-                }
-            else:
-                # No executable - apply to global profile
-                logger.warning(f"No executable specified for {game_name}, settings not applied")
-                return {
-                    "success": True,
-                    "error": None,
-                    "requires_reboot": False,
-                    "applied": ["No executable specified - NVIDIA settings not applied"],
-                }
+            return {
+                "success": len(errors) == 0,
+                "error": "; ".join(errors) if errors else None,
+                "requires_reboot": False,
+                "applied": applied,
+                "app_bound": app_bound,
+                "npi_launched": npi_launched,
+                "verification_failures": verification_failures if verification_failures else None,
+            }
 
         except ImportError as e:
             logger.warning(f"NVAPI DRS module not available: {e}")
@@ -338,6 +376,11 @@ class NvidiaSettingsHandler(SettingsHandler):
             for key, value in nvidia_settings.items():
                 setting_name = key.replace("_", " ").title()
                 applied.append(f"  - {setting_name}: {value}")
+            if global_settings:
+                applied.append("Global settings requested:")
+                for key, value in global_settings.items():
+                    setting_name = key.replace("_", " ").title()
+                    applied.append(f"  - {setting_name}: {value}")
             return {
                 "success": False,
                 "error": f"NVAPI module unavailable: {e}",
@@ -351,6 +394,11 @@ class NvidiaSettingsHandler(SettingsHandler):
             for key, value in nvidia_settings.items():
                 setting_name = key.replace("_", " ").title()
                 applied.append(f"  - {setting_name}: {value}")
+            if global_settings:
+                applied.append("Global settings requested:")
+                for key, value in global_settings.items():
+                    setting_name = key.replace("_", " ").title()
+                    applied.append(f"  - {setting_name}: {value}")
             return {
                 "success": False,
                 "error": f"NVAPI error: {e}",

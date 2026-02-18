@@ -48,6 +48,7 @@ $script:ScriptDir = $PSScriptRoot
 
 $script:SoundFile = Join-Path $PSScriptRoot "pokemon-red_blue_yellow-save-game-sound-effect.mp3"
 $script:FailSoundFile = Join-Path $PSScriptRoot "hit-weak-not-very-effective.mp3"
+$script:VrrWarningSoundFile = Join-Path $PSScriptRoot "oot_navi_hey1.mp3"
 $script:MediaPlayer = $null
 
 function Get-MediaPlayer {
@@ -104,6 +105,36 @@ function Play-FailSound {
     }
 }
 
+function Play-VrrWarningSound {
+    try {
+        if (-not $script:TrayConfig.soundEnabled) { return }
+        if (Test-Path $script:VrrWarningSoundFile) {
+            Play-SoundFile -FilePath $script:VrrWarningSoundFile -Volume ([Math]::Min(1.0, $script:TrayConfig.soundVolume * 2.5))
+            Write-TrayLog "Playing VRR warning sound"
+        }
+        else {
+            Write-TrayLog "VRR warning sound file not found: $($script:VrrWarningSoundFile)" -Level "WARN"
+            Play-FailSound
+        }
+    }
+    catch {
+        Write-TrayLog "Failed to play VRR warning sound: $($_.Exception.Message)" -Level "WARN"
+        Play-FailSound
+    }
+}
+
+function Test-IsVrrPrerequisiteError {
+    param([string]$Message)
+
+    if (-not $Message) { return $false }
+
+    return (
+        $Message -match "VRR/G-SYNC support" -or
+        $Message -match "Adaptive Sync/FreeSync" -or
+        $Message -match "Enable G-SYNC in NVIDIA Control Panel"
+    )
+}
+
 $script:SoundFilesChecked = $false
 
 function Test-SoundFilesExist {
@@ -118,6 +149,10 @@ function Test-SoundFilesExist {
     }
     if (-not (Test-Path $script:FailSoundFile)) {
         Write-TrayLog "FAIL SOUND FILE MISSING: $($script:FailSoundFile)" -Level "WARN"
+        $script:SoundFilesValid = $false
+    }
+    if (-not (Test-Path $script:VrrWarningSoundFile)) {
+        Write-TrayLog "VRR WARNING SOUND FILE MISSING: $($script:VrrWarningSoundFile)" -Level "WARN"
         $script:SoundFilesValid = $false
     }
     if ($script:SoundFilesValid) { Write-TrayLog "Sound files validated" }
@@ -933,12 +968,27 @@ function Apply-Profile {
             Update-QuickPanel -Favorites $script:TrayConfig.favorites -Profiles $script:Profiles -ActiveProfile $script:activeProfile -OnApply { param($id) Apply-Profile $id }
         }
         else {
-            $err = if ($json.error) { $json.error } else { "Unknown error" }
+            $err = if ($json.error) {
+                $json.error
+            }
+            elseif ($json.data -and $json.data.error) {
+                $json.data.error
+            }
+            else {
+                "Unknown error"
+            }
             Write-TrayLog "Profile apply failed: $err" -Level "ERROR"
             Close-ProgressOverlay
-            Play-FailSound
+            $isVrrPrereqError = Test-IsVrrPrerequisiteError -Message $err
+            if ($isVrrPrereqError) {
+                Play-VrrWarningSound
+            }
+            else {
+                Play-FailSound
+            }
             Set-IconState -State "Error"
-            Show-Notification -Title "A.B.S.O." -Message "Failed: $err" -Type "Error"
+            $notifyType = if ($isVrrPrereqError) { "Warning" } else { "Error" }
+            Show-Notification -Title "A.B.S.O." -Message "Failed: $err" -Type $notifyType
             $script:LastAction = "Failed: $err"
             $script:LastActionTime = Get-Date -Format "HH:mm"
             Update-MenuState

@@ -1009,7 +1009,10 @@ class DRSProfileManager:
 
         # G-Sync / VRR
         "vrr_app_override": 0x10A879CF,     # VRR_APP_OVERRIDE_ID
-        "vrr_requested_state": 0x10A879AC,  # VRR_APP_OVERRIDE_REQUEST_STATE_ID
+        "vrr_app_override_request_state": 0x10A879AC,  # VRR_APP_OVERRIDE_REQUEST_STATE_ID
+        "vrr_mode": 0x1194F158,             # VRR_MODE_ID (Enable G-SYNC globally)
+        "vrr_request_state": 0x1094F1F7,    # VRRREQUESTSTATE_ID
+        "vrr_requested_state": 0x1094F1F7,  # VRRREQUESTSTATE_ID (backwards-compat alias)
         "vsync_vrr_control": 0x10A879CE,    # VSYNCVRRCONTROL_ID
 
         # Power management
@@ -1028,11 +1031,17 @@ class DRSProfileManager:
 
     # Setting value mappings
     VSYNC_VALUES = {
-        "off": 0x00000000,
-        "on": 0x00000001,
-        "fast": 0x00000002,
-        "adaptive": 0x00000003,
-        "adaptive_half": 0x00000004,
+        # NvApiDriverSettings.h: EValues_VSYNCMODE
+        "off": 0x08416747,           # VSYNCMODE_FORCEOFF
+        "on": 0x47814940,            # VSYNCMODE_FORCEON
+        "use_3d_app": 0x60925292,    # VSYNCMODE_PASSIVE
+        "passive": 0x60925292,       # VSYNCMODE_PASSIVE
+        "adaptive": 0x18888888,      # VSYNCMODE_VIRTUAL
+        "adaptive_half": 0x32610244, # VSYNCMODE_FLIPINTERVAL2
+        # Fast Sync is represented by VSYNCTEARCONTROL_ENABLE.
+        # Keep this alias for compatibility; callers should also set
+        # vsync_tear_control=enable for deterministic behavior.
+        "fast": 0x47814940,          # VSYNCMODE_FORCEON
     }
 
     LOW_LATENCY_VALUES = {
@@ -1047,6 +1056,17 @@ class DRSProfileManager:
         "disallow": 0x00000002,    # Disallow VRR
         "ulmb": 0x00000003,        # Use ULMB instead
         "fixed_refresh": 0x00000004,  # Fixed refresh
+    }
+
+    VRR_MODE_VALUES = {
+        "off": 0x00000000,                       # VRR_MODE_DISABLED
+        "disabled": 0x00000000,                  # VRR_MODE_DISABLED
+        "on": 0x00000001,                        # VRR_MODE_FULLSCREEN_ONLY
+        "enabled": 0x00000001,                   # VRR_MODE_FULLSCREEN_ONLY
+        "fullscreen": 0x00000001,                # VRR_MODE_FULLSCREEN_ONLY
+        "fullscreen_only": 0x00000001,           # VRR_MODE_FULLSCREEN_ONLY
+        "fullscreen_and_windowed": 0x00000002,   # VRR_MODE_FULLSCREEN_AND_WINDOWED
+        "windowed": 0x00000002,                  # VRR_MODE_FULLSCREEN_AND_WINDOWED
     }
 
     POWER_MGMT_VALUES = {
@@ -1072,9 +1092,28 @@ class DRSProfileManager:
         "on": 0x00000001,
     }
 
+    VSYNC_TEAR_CONTROL_VALUES = {
+        # NvApiDriverSettings.h: EValues_VSYNCTEARCONTROL
+        "disable": 0x96861077,  # VSYNCTEARCONTROL_DISABLE
+        "off": 0x96861077,      # VSYNCTEARCONTROL_DISABLE
+        "enable": 0x99941284,   # VSYNCTEARCONTROL_ENABLE
+        "on": 0x99941284,       # VSYNCTEARCONTROL_ENABLE
+    }
+
     def __init__(self):
         """Initialize the profile manager."""
         self._drs = NVAPIDRS()
+
+    @staticmethod
+    def _get_profile_num_apps(drs: NVAPIDRS, profile_name: str) -> int | None:
+        """Get application count for a profile by name."""
+        try:
+            for info in drs.enumerate_profiles():
+                if info.get("name") == profile_name:
+                    return int(info.get("num_apps", 0))
+        except Exception:
+            return None
+        return None
 
     def apply_settings_to_app(
         self,
@@ -1104,6 +1143,7 @@ class DRSProfileManager:
                 }
             )
         """
+        profile_name_was_explicit = profile_name is not None
         if profile_name is None:
             app_base = app_executable.rsplit(".", 1)[0]
             profile_name = f"ABSO - {app_base}"
@@ -1125,33 +1165,57 @@ class DRSProfileManager:
                 else:
                     results["profile_created"] = False
 
+                existing_profile_num_apps = 0
+                if not results["profile_created"]:
+                    existing_profile_num_apps = self._get_profile_num_apps(drs, profile_name) or 0
+
                 # Add the application to the profile (may fail on newer drivers)
                 drs._app_binding_failures = []  # Reset tracking
                 drs.add_application_to_profile(profile, app_executable)
 
+                # Detect silent binding failure cases (e.g., executable already owned by
+                # a different profile). These can leave a profile with zero bound apps.
+                profile_num_apps = self._get_profile_num_apps(drs, profile_name)
+                if profile_num_apps == 0 and app_executable not in drs._app_binding_failures:
+                    drs._app_binding_failures.append(app_executable)
+
                 # Check if app binding succeeded
                 if drs._app_binding_failures:
-                    results["app_bound"] = False
-
-                    # Try to launch NPI for easy app binding
-                    npi_launched = self._try_npi_for_app_binding(profile_name, app_executable)
-
-                    if npi_launched:
+                    if (
+                        profile_name_was_explicit
+                        and existing_profile_num_apps > 0
+                        and (profile_num_apps or 0) > 0
+                    ):
+                        # Existing predefined profile likely already has executable binding.
+                        # Driver may reject CreateApplication updates with struct-version errors.
+                        results["app_bound"] = True
                         results["app_binding_note"] = (
-                            f"Profile '{profile_name}' created with all settings. "
-                            f"NPI launched - please add '{app_executable}' to the profile and click Apply."
+                            f"Using existing executable binding for profile '{profile_name}'. "
+                            "Skipped CreateApplication update."
                         )
-                        results["npi_launched"] = True
+                        drs._app_binding_failures = []
                     else:
-                        results["app_binding_note"] = (
-                            f"Profile '{profile_name}' created with all settings configured. "
-                            f"Automatic app binding unavailable on this driver version. "
-                            f"To activate: NVCP > Manage 3D Settings > Program Settings > "
-                            f"Add '{app_executable}' > Select '{profile_name}'"
-                        )
-                        results["manual_instructions"] = self.get_manual_binding_instructions(
-                            profile_name, app_executable
-                        )
+                        results["app_bound"] = False
+
+                        # Try to launch NPI for easy app binding
+                        npi_launched = self._try_npi_for_app_binding(profile_name, app_executable)
+
+                        if npi_launched:
+                            results["app_binding_note"] = (
+                                f"Profile '{profile_name}' created with all settings. "
+                                f"NPI launched - please add '{app_executable}' to the profile and click Apply."
+                            )
+                            results["npi_launched"] = True
+                        else:
+                            results["app_binding_note"] = (
+                                f"Profile '{profile_name}' created with all settings configured. "
+                                f"Automatic app binding unavailable on this driver version. "
+                                f"To activate: NVCP > Manage 3D Settings > Program Settings > "
+                                f"Add '{app_executable}' > Select '{profile_name}'"
+                            )
+                            results["manual_instructions"] = self.get_manual_binding_instructions(
+                                profile_name, app_executable
+                            )
                 else:
                     results["app_bound"] = True
 
@@ -1214,34 +1278,51 @@ class DRSProfileManager:
                 else:
                     results["profile_created"] = False
 
+                existing_profile_num_apps = 0
+                if not results["profile_created"]:
+                    existing_profile_num_apps = self._get_profile_num_apps(drs, profile_name) or 0
+
                 # Bind all applications to the profile
                 drs._app_binding_failures = []
                 for exe in app_executables:
                     drs.add_application_to_profile(profile, exe)
 
+                # Detect silent binding failure where profile still has no executables.
+                profile_num_apps = self._get_profile_num_apps(drs, profile_name)
+                if profile_num_apps == 0 and not drs._app_binding_failures:
+                    drs._app_binding_failures.extend(app_executables)
+
                 if drs._app_binding_failures:
-                    results["app_bound"] = False
-                    results["app_binding_failures"] = list(drs._app_binding_failures)
-
-                    first_failed = drs._app_binding_failures[0]
-                    npi_launched = self._try_npi_for_app_binding(profile_name, first_failed)
-
-                    if npi_launched:
+                    if existing_profile_num_apps > 0 and (profile_num_apps or 0) > 0:
+                        results["app_bound"] = True
                         results["app_binding_note"] = (
-                            f"Profile '{profile_name}' created with all settings. "
-                            f"NPI launched - please add executables to the profile and click Apply."
+                            f"Using existing executable binding for profile '{profile_name}'. "
+                            "Skipped CreateApplication updates."
                         )
-                        results["npi_launched"] = True
+                        drs._app_binding_failures = []
                     else:
-                        results["app_binding_note"] = (
-                            f"Profile '{profile_name}' created with all settings configured. "
-                            f"Automatic app binding unavailable on this driver version. "
-                            f"To activate: NVCP > Manage 3D Settings > Program Settings > "
-                            f"Add executables to '{profile_name}'."
-                        )
-                        results["manual_instructions"] = self.get_manual_binding_instructions(
-                            profile_name, first_failed
-                        )
+                        results["app_bound"] = False
+                        results["app_binding_failures"] = list(drs._app_binding_failures)
+
+                        first_failed = drs._app_binding_failures[0]
+                        npi_launched = self._try_npi_for_app_binding(profile_name, first_failed)
+
+                        if npi_launched:
+                            results["app_binding_note"] = (
+                                f"Profile '{profile_name}' created with all settings. "
+                                f"NPI launched - please add executables to the profile and click Apply."
+                            )
+                            results["npi_launched"] = True
+                        else:
+                            results["app_binding_note"] = (
+                                f"Profile '{profile_name}' created with all settings configured. "
+                                f"Automatic app binding unavailable on this driver version. "
+                                f"To activate: NVCP > Manage 3D Settings > Program Settings > "
+                                f"Add executables to '{profile_name}'."
+                            )
+                            results["manual_instructions"] = self.get_manual_binding_instructions(
+                                profile_name, first_failed
+                            )
                 else:
                     results["app_bound"] = True
 
@@ -1260,6 +1341,46 @@ class DRSProfileManager:
         except Exception as e:
             results["fatal_error"] = str(e)
             logger.error(f"Failed to apply settings: {e}")
+            raise
+
+        return results
+
+    def apply_settings_to_global(self, settings: dict[str, Any]) -> dict[str, Any]:
+        """Apply NVIDIA settings to the global/base profile.
+
+        Args:
+            settings: Dictionary of setting names to values.
+
+        Returns:
+            Dictionary with settings_applied and errors.
+        """
+        results = {
+            "profile_name": NVDRS_GLOBAL_PROFILE_NAME,
+            "settings_applied": {},
+            "errors": [],
+        }
+
+        if not settings:
+            return results
+
+        try:
+            with self._drs as drs:
+                global_profile = drs.get_base_profile()
+
+                for setting_name, value in settings.items():
+                    try:
+                        self._apply_single_setting(drs, global_profile, setting_name, value)
+                        results["settings_applied"][setting_name] = value
+                    except Exception as e:
+                        results["errors"].append({
+                            "setting": setting_name,
+                            "error": str(e),
+                        })
+                        logger.error(f"Failed to apply global setting {setting_name}: {e}")
+
+        except Exception as e:
+            results["fatal_error"] = str(e)
+            logger.error(f"Failed to apply global settings: {e}")
             raise
 
         return results
@@ -1304,8 +1425,15 @@ class DRSProfileManager:
             "llm": ("low_latency_mode", self.LOW_LATENCY_VALUES),
             "nvidia_reflex": ("low_latency_mode", self.LOW_LATENCY_VALUES),
             "vrr_app_override": ("vrr_app_override", self.VRR_OVERRIDE_VALUES),
+            "vrr_app_override_request_state": ("vrr_app_override_request_state", self.VRR_OVERRIDE_VALUES),
             "gsync": ("vrr_app_override", self.VRR_OVERRIDE_VALUES),
             "g_sync": ("vrr_app_override", self.VRR_OVERRIDE_VALUES),
+            "vrr_mode": ("vrr_mode", self.VRR_MODE_VALUES),
+            "global_vrr_mode": ("vrr_mode", self.VRR_MODE_VALUES),
+            "global_gsync_mode": ("vrr_mode", self.VRR_MODE_VALUES),
+            "global_gsync": ("vrr_mode", self.VRR_MODE_VALUES),
+            "vrr_request_state": ("vrr_request_state", self.VRR_MODE_VALUES),
+            "vrr_requested_state": ("vrr_request_state", self.VRR_MODE_VALUES),
             "power_management": ("power_management", self.POWER_MGMT_VALUES),
             "power_management_mode": ("power_management", self.POWER_MGMT_VALUES),
             "threaded_optimization": ("threaded_optimization", self.THREADED_OPT_VALUES),
@@ -1315,7 +1443,8 @@ class DRSProfileManager:
             "max_frame_rate": ("frame_rate_limiter_v3", {"off": 0, "disabled": 0}),
             "frame_rate_limit": ("frame_rate_limiter_v3", {"off": 0, "disabled": 0}),
             "fps_cap": ("frame_rate_limiter_v3", {"off": 0, "disabled": 0}),
-            "vsync_tear_control": ("vsync_tear_control", {"disable": 0, "off": 0, "enable": 1, "on": 1}),
+            "vsync_tear_control": ("vsync_tear_control", self.VSYNC_TEAR_CONTROL_VALUES),
+            "vsync_vrr_control": ("vsync_vrr_control", {"disable": 0, "off": 0, "enable": 1, "on": 1}),
         }
 
         if name_lower in setting_map:

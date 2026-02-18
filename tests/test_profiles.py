@@ -164,12 +164,16 @@ class TestProfileSettings:
         profile = Overwatch2Profile()
         settings = profile.get_settings("NvidiaSettingsHandler")
         assert settings["preset"] == "reflex_no_sync"
+        assert settings["profile_name"] == "Overwatch 2"
+        assert settings["global_vrr_mode"] == "off"
 
     def test_overwatch2_gsync_nvidia_settings(self):
         """G-SYNC Overwatch profile should use reflex VRR preset."""
         profile = Overwatch2GSyncProfile()
         settings = profile.get_settings("NvidiaSettingsHandler")
         assert settings["preset"] == "reflex_gsync"
+        assert settings["profile_name"] == "Overwatch 2"
+        assert settings["global_vrr_mode"] == "fullscreen_only"
 
     def test_pokemon_auto_chess_windows_settings(self):
         """Test PokemonAutoChessProfile returns Windows settings."""
@@ -282,6 +286,13 @@ class TestBaseProfileImplementation:
         assert no_sync.executable_hints == ["Overwatch.exe"]
         assert gsync.executable_hints == ["Overwatch.exe"]
 
+    def test_overwatch2_gsync_requires_confirmed_vrr(self):
+        """G-SYNC variant should require confirmed VRR support preflight."""
+        no_sync = Overwatch2Profile()
+        gsync = Overwatch2GSyncProfile()
+        assert no_sync.requires_confirmed_vrr_support is False
+        assert gsync.requires_confirmed_vrr_support is True
+
     def test_pokemon_auto_chess_optimization_target(self):
         """Test PokemonAutoChessProfile has balanced optimization target."""
         profile = PokemonAutoChessProfile()
@@ -339,6 +350,7 @@ class TestAllProfilesLoad:
         assert isinstance(profile.is_online_profile, bool)
         assert isinstance(profile.is_emulator_profile, bool)
         assert isinstance(profile.requires_reflex, bool)
+        assert isinstance(profile.requires_confirmed_vrr_support, bool)
         assert isinstance(profile.is_sdr_only, bool)
         assert profile.network_scope in {"full", "limited", "none"}
         assert profile.graphics_api in {"dx11", "dx12", "vulkan", "opengl", "unknown"}

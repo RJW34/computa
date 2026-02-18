@@ -67,6 +67,10 @@ class Overwatch2Profile(_Overwatch2BaseProfile):
             "NvidiaSettingsHandler": {
                 # Reflex handles queueing; keep driver queue options and VRR deterministic.
                 "preset": "reflex_no_sync",
+                # Use NVIDIA's predefined OW2 profile to avoid executable binding conflicts.
+                "profile_name": "Overwatch 2",
+                # Enforce global no-sync state for deterministic No-SYNC profile transitions.
+                "global_vrr_mode": "off",
             },
         }
 
@@ -136,10 +140,18 @@ class Overwatch2GSyncProfile(_Overwatch2BaseProfile):
     def description(self) -> str:
         return "Low latency VRR profile (Reflex, VSync safety net, G-SYNC ON)"
 
+    @property
+    def requires_confirmed_vrr_support(self) -> bool:
+        return True
+
     def _variant_overrides(self) -> dict[str, dict[str, Any]]:
         return {
             "NvidiaSettingsHandler": {
                 "preset": "reflex_gsync",
+                # Use NVIDIA's predefined OW2 profile to avoid executable binding conflicts.
+                "profile_name": "Overwatch 2",
+                # Ensure global G-SYNC is enabled before launching OW2.
+                "global_vrr_mode": "fullscreen_only",
             },
         }
 

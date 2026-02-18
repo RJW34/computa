@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Any
 
 from abso.core.config import ConfigManager
+from abso.core.detector import HardwareDetector
 from abso.core.exceptions import (
     LintFailedError,
     ProfileNotFoundError,
@@ -212,6 +213,13 @@ class ProfileApplier:
             in_game_settings=profile.has_in_game_settings(),
         )
 
+        # === PHASE 0: Hardware prerequisites ===
+        preflight_error = self._validate_profile_prerequisites(profile)
+        if preflight_error:
+            result.success = False
+            result.error = preflight_error
+            return result
+
         # Collect all settings from profile
         settings_map = self._collect_settings(profile)
 
@@ -363,6 +371,43 @@ class ProfileApplier:
         )
 
         return result
+
+    def _validate_profile_prerequisites(self, profile: BaseProfile) -> str | None:
+        """Validate hardware prerequisites before applying any settings.
+
+        Returns:
+            Error message string when prerequisites are not met, otherwise None.
+        """
+        if getattr(profile, "requires_confirmed_vrr_support", False) is not True:
+            return None
+
+        try:
+            detector = HardwareDetector()
+            monitors = detector.detect_monitors()
+        except Exception as e:
+            logger.warning(f"VRR preflight detection failed: {e}")
+            monitors = []
+
+        if not monitors:
+            return (
+                "Cannot confirm VRR/G-SYNC support because no monitors were detected. "
+                "Enable monitor Adaptive Sync/FreeSync in OSD, enable G-SYNC in NVIDIA Control Panel, then retry."
+            )
+
+        confirmed_vrr = [m for m in monitors if m.get("vrr_supported") is True]
+        if confirmed_vrr:
+            return None
+
+        status_summary = ", ".join(
+            f"{m.get('name', 'Unknown')}: {m.get('vrr_supported', 'unknown')}"
+            for m in monitors
+        )
+
+        return (
+            "No monitor with confirmed VRR/G-SYNC support was detected. "
+            "Turn on monitor Adaptive Sync/FreeSync in OSD, enable G-SYNC in NVIDIA Control Panel, then retry. "
+            f"Detected VRR status: {status_summary}"
+        )
 
     def _collect_settings(self, profile: BaseProfile) -> dict[str, dict[str, Any]]:
         """Collect all settings from a profile's handlers.

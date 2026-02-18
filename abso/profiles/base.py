@@ -101,6 +101,15 @@ class BaseProfile(ABC):
         return False
 
     @property
+    def requires_confirmed_vrr_support(self) -> bool:
+        """Whether profile should only run when VRR/G-SYNC support is confirmed.
+
+        Use this for VRR-dependent profiles that should fail fast when the
+        monitor stack is not reporting VRR capability.
+        """
+        return False
+
+    @property
     def is_sdr_only(self) -> bool:
         """Whether the game is SDR-only (no native HDR).
 
