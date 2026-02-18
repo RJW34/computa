@@ -372,6 +372,8 @@ Generates markdown report of in-game settings.
 |------------|-------|------|
 | `slippi-melee` | `SlippiMeleeProfile` | Super Smash Bros. Melee (Slippi) |
 | `cod-bo7` | `CodBo7Profile` | Call of Duty: Black Ops 7 |
+| `overwatch2` | `Overwatch2Profile` | Overwatch 2 (No-Sync) |
+| `overwatch2-gsync` | `Overwatch2GSyncProfile` | Overwatch 2 (G-SYNC) |
 | `diablo4` | `Diablo4Profile` | Diablo 4 |
 | `rivals2` | `Rivals2Profile` | Rivals of Aether 2 |
 

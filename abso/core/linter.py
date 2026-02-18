@@ -74,7 +74,7 @@ class ProfileLinter:
     """
 
     # Profiles that use NVIDIA Reflex (LLM must be OFF)
-    REFLEX_PRESETS = {"reflex_game", "vrr_diablo4"}
+    REFLEX_PRESETS = {"reflex_game", "reflex_no_sync", "reflex_gsync", "vrr_diablo4"}
 
     # Presets with LLM Ultra (cannot have explicit FPS cap)
     LLM_ULTRA_PRESETS = {"minimum_latency"}

@@ -7,6 +7,7 @@ import pytest
 from abso.profiles import get_all_profiles
 from abso.profiles.cod_bo7 import CodBo7Profile
 from abso.profiles.diablo4 import Diablo4Profile
+from abso.profiles.overwatch2 import Overwatch2GSyncProfile, Overwatch2Profile
 from abso.profiles.pokemon_auto_chess import PokemonAutoChessProfile
 from abso.profiles.rivals2 import Rivals2Profile
 from abso.profiles.rivals2_online import Rivals2OnlineProfile
@@ -39,6 +40,13 @@ class TestProfileLoading:
         profile = PokemonAutoChessProfile()
         assert profile.profile_id == "pokemon-auto-chess"
         assert profile.display_name == "Pokemon Auto Chess"
+
+    def test_overwatch2_profiles_load(self):
+        """Test both Overwatch 2 profiles can be instantiated."""
+        no_sync = Overwatch2Profile()
+        gsync = Overwatch2GSyncProfile()
+        assert no_sync.profile_id == "overwatch2"
+        assert gsync.profile_id == "overwatch2-gsync"
 
 
 class TestProfileHandlers:
@@ -151,6 +159,18 @@ class TestProfileSettings:
         assert settings["low_latency_mode"] == "on"
         assert settings["vsync"] == "off"
 
+    def test_overwatch2_no_sync_nvidia_settings(self):
+        """No-sync Overwatch profile should explicitly disable VRR/G-SYNC."""
+        profile = Overwatch2Profile()
+        settings = profile.get_settings("NvidiaSettingsHandler")
+        assert settings["preset"] == "reflex_no_sync"
+
+    def test_overwatch2_gsync_nvidia_settings(self):
+        """G-SYNC Overwatch profile should use reflex VRR preset."""
+        profile = Overwatch2GSyncProfile()
+        settings = profile.get_settings("NvidiaSettingsHandler")
+        assert settings["preset"] == "reflex_gsync"
+
     def test_pokemon_auto_chess_windows_settings(self):
         """Test PokemonAutoChessProfile returns Windows settings."""
         profile = PokemonAutoChessProfile()
@@ -254,6 +274,13 @@ class TestBaseProfileImplementation:
         assert "chrome.exe" in hints
         assert "msedge.exe" in hints
         assert "firefox.exe" in hints
+
+    def test_overwatch2_executable_hints(self):
+        """Both Overwatch variants should target Overwatch.exe."""
+        no_sync = Overwatch2Profile()
+        gsync = Overwatch2GSyncProfile()
+        assert no_sync.executable_hints == ["Overwatch.exe"]
+        assert gsync.executable_hints == ["Overwatch.exe"]
 
     def test_pokemon_auto_chess_optimization_target(self):
         """Test PokemonAutoChessProfile has balanced optimization target."""

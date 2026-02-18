@@ -402,10 +402,17 @@ $script:Profiles = [ordered]@{
         )
     }
     "overwatch2"        = @{
-        Name     = "Overwatch 2"
-        Sub      = "Reflex ON+Boost | LLM OFF"
+        Name     = "Overwatch 2 - No-Sync"
+        Sub      = "Reflex ON+Boost | VSync OFF | G-SYNC OFF"
         Cat      = "Shooter"
-        Desc     = "Competitive OW2. Reflex handles latency (LLM OFF). HAGS ON, Ultimate Performance."
+        Desc     = "Minimum latency profile. No-sync path with VRR explicitly disabled for deterministic behavior."
+        Exes     = @("Overwatch.exe")
+    }
+    "overwatch2-gsync"  = @{
+        Name     = "Overwatch 2 - GSYNC"
+        Sub      = "Reflex ON+Boost | VSync Safety Net | G-SYNC ON"
+        Cat      = "Shooter"
+        Desc     = "Tear-free low latency VRR profile. Use in-game FPS cap at refresh minus 3."
         Exes     = @("Overwatch.exe")
     }
 

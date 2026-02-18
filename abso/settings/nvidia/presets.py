@@ -223,6 +223,44 @@ NVIDIA_PRESETS: dict[str, dict[str, Any]] = {
     },
 
     # === REFLEX-ENABLED GAMES ===
+    "reflex_no_sync": {
+        "description": "Reflex game no-sync profile - minimum latency, tearing acceptable",
+        "settings": {
+            "low_latency_mode": "off",  # Reflex replaces driver LLM
+            "power_management": "prefer_max_performance",
+            "vsync": "off",
+            "max_frame_rate": "off",  # Use in-game limiter only if needed
+            "shader_cache": "unlimited",
+            "threaded_optimization": "on",
+            "triple_buffering": "off",
+            "vrr_app_override": "force_off",  # Enforce no VRR/G-SYNC for deterministic no-sync
+            "vsync_tear_control": "disable",
+        },
+        "notes": {
+            "usage": "For competitive no-sync play where minimum latency is prioritized over tearing.",
+            "reflex": "Set in-game NVIDIA Reflex to On + Boost.",
+            "warning": "Will tear on high-motion scenes; this is expected for no-sync mode.",
+        },
+    },
+    "reflex_gsync": {
+        "description": "Reflex + G-SYNC profile - tear-free low latency",
+        "settings": {
+            "low_latency_mode": "off",  # Reflex replaces driver LLM
+            "power_management": "prefer_max_performance",
+            "vsync": "on",  # NVCP safety net for VRR
+            "max_frame_rate": "off",  # Set in-game cap to refresh - 3
+            "shader_cache": "unlimited",
+            "threaded_optimization": "on",
+            "triple_buffering": "off",
+            "vrr_app_override": "allow",  # Enforce VRR/G-SYNC for this game
+            "vsync_tear_control": "disable",
+        },
+        "notes": {
+            "usage": "For VRR users who want tear-free output without giving up Reflex.",
+            "fps_cap": "Set in-game FPS cap to refresh_rate - 3 to keep VSync as safety net only.",
+            "reflex": "Set in-game NVIDIA Reflex to On + Boost.",
+        },
+    },
     "reflex_game": {
         "description": "For games with NVIDIA Reflex - let Reflex handle latency",
         "settings": {

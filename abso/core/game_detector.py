@@ -226,6 +226,10 @@ def _detect_battlenet_games() -> list[InstalledGame]:
             "registry_key": r"SOFTWARE\WOW6432Node\Blizzard Entertainment\Diablo IV",
             "executables": ["Diablo IV.exe"],
         },
+        "Overwatch 2": {
+            "registry_key": r"SOFTWARE\WOW6432Node\Blizzard Entertainment\Overwatch",
+            "executables": ["Overwatch.exe"],
+        },
         "Call of Duty": {
             "registry_key": r"SOFTWARE\WOW6432Node\Activision\Call of Duty",
             "executables": ["cod.exe", "BlackOps7.exe", "ModernWarfare.exe"],

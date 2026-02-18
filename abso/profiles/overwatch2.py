@@ -1,4 +1,4 @@
-"""Overwatch 2 profile."""
+"""Overwatch 2 profiles."""
 
 from __future__ import annotations
 
@@ -7,11 +7,47 @@ from typing import Any, Literal
 from abso.profiles.profile_bases import ReflexShooterBaseProfile
 
 
-class Overwatch2Profile(ReflexShooterBaseProfile):
-    """Optimization profile for Overwatch 2.
+class _Overwatch2BaseProfile(ReflexShooterBaseProfile):
+    """Shared Overwatch 2 profile defaults."""
 
-    Focus: Low latency, high FPS competitive play with NVIDIA Reflex.
-    Overwatch 2 uses DirectX 11 by default. Reflex On + Boost is recommended.
+    @property
+    def executable_hints(self) -> list[str]:
+        return ["Overwatch.exe"]
+
+    @property
+    def graphics_api(self) -> Literal["dx11", "dx12", "vulkan", "opengl", "unknown"]:
+        # Overwatch 2 uses DX11 in most competitive configurations.
+        return "dx11"
+
+    def _base_overrides(self) -> dict[str, dict[str, Any]]:
+        return {
+            "WindowsSettingsHandler": {
+                # Keep HDR disabled by default to avoid SDR/HDR tone-mapping bugs.
+                "hdr": False,
+            },
+            "GraphicsSettingsHandler": {
+                # Keep MPO enabled unless explicitly troubleshooting compositor issues.
+                "disable_mpo": False,
+            },
+        }
+
+    def _variant_overrides(self) -> dict[str, dict[str, Any]]:
+        return {}
+
+    def _settings_overrides(self) -> dict[str, dict[str, Any]]:
+        merged = self._base_overrides()
+        for handler, values in self._variant_overrides().items():
+            if handler not in merged:
+                merged[handler] = {}
+            merged[handler].update(values)
+        return merged
+
+
+class Overwatch2Profile(_Overwatch2BaseProfile):
+    """Overwatch 2 no-sync profile.
+
+    This is the absolute minimum-latency variant. It explicitly disables VRR/G-SYNC
+    per-app so behavior is deterministic even when users have global VRR enabled.
     """
 
     @property
@@ -20,31 +56,17 @@ class Overwatch2Profile(ReflexShooterBaseProfile):
 
     @property
     def display_name(self) -> str:
-        return "Overwatch 2"
+        return "Overwatch 2 - No-Sync"
 
     @property
     def description(self) -> str:
-        return "Low latency, high FPS competitive settings with Reflex"
+        return "Minimum latency no-sync profile (Reflex, VSync OFF, VRR OFF)"
 
-    @property
-    def executable_hints(self) -> list[str]:
-        return ["Overwatch.exe"]
-
-    # === Validation Metadata Overrides ===
-
-    @property
-    def graphics_api(self) -> Literal["dx11", "dx12", "vulkan", "opengl", "unknown"]:
-        """Overwatch 2 uses DirectX 11 by default."""
-        return "dx11"
-
-    def _settings_overrides(self) -> dict[str, dict[str, Any]]:
+    def _variant_overrides(self) -> dict[str, dict[str, Any]]:
         return {
-            "WindowsSettingsHandler": {
-                # HDR optional — disable if buggy on your display
-                "hdr": False,
-            },
-            "GraphicsSettingsHandler": {
-                "disable_mpo": False,
+            "NvidiaSettingsHandler": {
+                # Reflex handles queueing; keep driver queue options and VRR deterministic.
+                "preset": "reflex_no_sync",
             },
         }
 
@@ -53,73 +75,116 @@ class Overwatch2Profile(ReflexShooterBaseProfile):
             {
                 "category": "Display",
                 "setting": "Display Mode",
-                "value": "Fullscreen",
-                "reason": "Lowest input latency path.",
+                "value": "Fullscreen (Exclusive)",
+                "reason": "Lowest-latency presentation path.",
             },
             {
                 "category": "Display",
                 "setting": "VSync",
                 "value": "Off",
-                "reason": "Adds a frame of latency. Use Reflex instead.",
+                "reason": "No-sync mode removes sync queueing latency.",
             },
             {
                 "category": "Display",
-                "setting": "NVIDIA Reflex",
+                "setting": "NVIDIA Reflex Low Latency",
                 "value": "Enabled + Boost",
-                "reason": "Hardware-level latency reduction. Takes priority over driver LLM.",
+                "reason": "Use native Reflex; keep driver LLM off.",
             },
             {
                 "category": "Display",
                 "setting": "Frame Rate Cap",
-                "value": "Match monitor Hz or Uncapped",
-                "reason": "Cap at refresh rate - 3 if using G-Sync; otherwise uncapped.",
-            },
-            {
-                "category": "Display",
-                "setting": "Triple Buffering",
-                "value": "Off",
-                "reason": "Adds render queue depth. Not needed with Reflex.",
+                "value": "Uncapped or high fixed cap",
+                "reason": "No-sync profile prioritizes minimum click-to-pixel latency.",
             },
             {
                 "category": "Display",
                 "setting": "Reduce Buffering",
                 "value": "On",
-                "reason": "Reduces render pipeline depth for lower latency.",
-            },
-            {
-                "category": "Graphics",
-                "setting": "Render Scale",
-                "value": "100% (or 75% if GPU-bound)",
-                "reason": "Native for clarity; lower if FPS-limited.",
+                "reason": "Reduces render queue depth in-engine.",
             },
             {
                 "category": "Graphics",
                 "setting": "Dynamic Render Scale",
                 "value": "Off",
-                "reason": "Inconsistent frame times. Prefer fixed render scale.",
+                "reason": "Avoid frametime variance from dynamic scaling.",
             },
             {
                 "category": "Graphics",
-                "setting": "DLSS / FSR",
-                "value": "Off or Quality (if GPU-bound)",
-                "reason": "Upscaling adds latency. Only use if needed to hit target FPS.",
-            },
-            {
-                "category": "Graphics",
-                "setting": "Texture Quality",
-                "value": "High (if VRAM allows)",
-                "reason": "Minimal FPS impact, better visual clarity for target identification.",
-            },
-            {
-                "category": "Graphics",
-                "setting": "Shadow Detail",
-                "value": "Low or Medium",
-                "reason": "Shadows are GPU-heavy with minimal competitive value.",
-            },
-            {
-                "category": "Graphics",
-                "setting": "Effects Detail",
+                "setting": "Shadows / Effects",
                 "value": "Low",
-                "reason": "Reduces visual clutter and frame time spikes during team fights.",
+                "reason": "Improves frame-time consistency in team fights.",
+            },
+        ]
+
+
+class Overwatch2GSyncProfile(_Overwatch2BaseProfile):
+    """Overwatch 2 G-SYNC profile.
+
+    Tear-free low-latency VRR profile. Uses Reflex + NVCP VSync safety net and
+    per-app VRR enabled.
+    """
+
+    @property
+    def profile_id(self) -> str:
+        return "overwatch2-gsync"
+
+    @property
+    def display_name(self) -> str:
+        return "Overwatch 2 - GSYNC"
+
+    @property
+    def description(self) -> str:
+        return "Low latency VRR profile (Reflex, VSync safety net, G-SYNC ON)"
+
+    def _variant_overrides(self) -> dict[str, dict[str, Any]]:
+        return {
+            "NvidiaSettingsHandler": {
+                "preset": "reflex_gsync",
+            },
+        }
+
+    def get_in_game_settings(self) -> list[dict[str, str]]:
+        return [
+            {
+                "category": "Display",
+                "setting": "Display Mode",
+                "value": "Fullscreen (Exclusive)",
+                "reason": "Best VRR behavior with lowest compositor overhead.",
+            },
+            {
+                "category": "Display",
+                "setting": "VSync",
+                "value": "Off (in-game)",
+                "reason": "Use NVCP VSync as safety net; keep in-game VSync off.",
+            },
+            {
+                "category": "Display",
+                "setting": "NVIDIA Reflex Low Latency",
+                "value": "Enabled + Boost",
+                "reason": "Native Reflex should own queue control.",
+            },
+            {
+                "category": "Display",
+                "setting": "Frame Rate Cap",
+                "value": "Refresh rate - 3",
+                "reason": "Keeps NVCP VSync from engaging while preserving VRR tear-free output.",
+            },
+            {
+                "category": "Display",
+                "setting": "Reduce Buffering",
+                "value": "On",
+                "reason": "Maintains low queue depth in the render pipeline.",
+            },
+            {
+                "category": "Graphics",
+                "setting": "Dynamic Render Scale",
+                "value": "Off",
+                "reason": "Avoid large frame pacing oscillations.",
+            },
+            {
+                "category": "Graphics",
+                "setting": "Shadows / Effects",
+                "value": "Low",
+                "reason": "Minimizes frame spikes during heavy ability usage.",
             },
         ]

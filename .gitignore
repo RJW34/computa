@@ -64,3 +64,6 @@ IMPROVEMENT_PLAN.md
 
 # Claude
 .claude/
+
+# Local runtime state
+.abso_state.json

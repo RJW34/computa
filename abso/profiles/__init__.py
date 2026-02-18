@@ -4,7 +4,7 @@ from abso.profiles.base import BaseProfile
 from abso.profiles.cod_bo7 import CodBo7Profile
 from abso.profiles.diablo4 import Diablo4Profile
 from abso.profiles.fortnite import FortniteProfile
-from abso.profiles.overwatch2 import Overwatch2Profile
+from abso.profiles.overwatch2 import Overwatch2GSyncProfile, Overwatch2Profile
 from abso.profiles.pacdeluxe import PACDeluxeProfile
 from abso.profiles.pokemon_auto_chess import PokemonAutoChessProfile
 from abso.profiles.productivity_oled import ProductivityOLEDProfile
@@ -36,6 +36,7 @@ __all__ = [
     "FortniteProfile",
     "FortniteStreamingProfile",
     "Overwatch2Profile",
+    "Overwatch2GSyncProfile",
     "PokemonAutoChessProfile",
     "PACDeluxeProfile",
     "PACDeluxeStreamingProfile",
@@ -66,6 +67,7 @@ def get_all_profiles() -> dict[str, BaseProfile]:
         "fortnite": FortniteProfile(),
         "fortnite-streaming": FortniteStreamingProfile(),
         "overwatch2": Overwatch2Profile(),
+        "overwatch2-gsync": Overwatch2GSyncProfile(),
         "pokemon-auto-chess": PokemonAutoChessProfile(),
         "pacdeluxe": PACDeluxeProfile(),
         "pacdeluxe-streaming": PACDeluxeStreamingProfile(),

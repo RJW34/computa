@@ -95,6 +95,8 @@ python -m abso restore 20240115_143022  # Specific backup
 | `slippi-melee` | Super Smash Bros. Melee (Slippi) | Ultra-low latency |
 | `rivals2` | Rivals of Aether 2 | Ultra-low latency |
 | `cod-bo7` | Call of Duty: Black Ops 7 | Low latency, stable FPS |
+| `overwatch2` | Overwatch 2 (No-Sync) | Minimum latency no-sync |
+| `overwatch2-gsync` | Overwatch 2 (G-SYNC) | Tear-free low latency VRR |
 | `diablo4` | Diablo 4 | Balanced performance |
 
 ## What Gets Optimized

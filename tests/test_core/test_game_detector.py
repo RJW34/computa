@@ -231,6 +231,20 @@ class TestDetectBattlenetGames:
         diablo_games = [g for g in result if "Diablo" in g.name]
         assert len(diablo_games) >= 1
 
+    @patch("abso.core.game_detector.winreg.CloseKey")
+    @patch("abso.core.game_detector.winreg.QueryValueEx")
+    @patch("abso.core.game_detector.winreg.OpenKey")
+    def test_finds_overwatch2_from_registry(self, mock_open, mock_query, mock_close, tmp_path):
+        """Test finds Overwatch 2 from Battle.net registry key."""
+        game_folder = tmp_path / "Overwatch"
+        game_folder.mkdir()
+        (game_folder / "Overwatch.exe").touch()
+
+        mock_query.return_value = (str(game_folder), 1)
+        result = _detect_battlenet_games()
+        ow_games = [g for g in result if "Overwatch" in g.name]
+        assert len(ow_games) >= 1
+
 
 class TestDetectStandaloneGames:
     """Tests for _detect_standalone_games function."""

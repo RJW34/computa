@@ -62,6 +62,8 @@ class TestProfileApplierInit:
         assert "cod-bo7" in ProfileApplier.PROFILES
         assert "diablo4" in ProfileApplier.PROFILES
         assert "rivals2" in ProfileApplier.PROFILES
+        assert "overwatch2" in ProfileApplier.PROFILES
+        assert "overwatch2-gsync" in ProfileApplier.PROFILES
 
 
 class TestGetProfile:
