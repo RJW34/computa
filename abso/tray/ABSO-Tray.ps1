@@ -149,6 +149,12 @@ function Test-NeedsNoSyncOsdReminder {
     $toProfile = $script:Profiles[$ToProfileId]
     if (-not $fromProfile -or -not $toProfile) { return $false }
 
+    $fromSyncMode = if ($fromProfile.SyncMode) { "$($fromProfile.SyncMode)".ToLowerInvariant() } else { "" }
+    $toSyncMode = if ($toProfile.SyncMode) { "$($toProfile.SyncMode)".ToLowerInvariant() } else { "" }
+    if (($fromSyncMode -eq "on") -and ($toSyncMode -eq "off")) {
+        return $true
+    }
+
     $fromText = (($fromProfile.Name, $fromProfile.Sub, $fromProfile.Desc) -join " ").ToLowerInvariant()
     $toText = (($toProfile.Name, $toProfile.Sub, $toProfile.Desc) -join " ").ToLowerInvariant()
 
@@ -361,6 +367,14 @@ $script:Profiles = [ordered]@{
     }
 
     # --- Fighting Games: Rivals 2 ---
+    "rivals2" = @{
+        Name     = "Rivals of Aether 2"
+        Sub      = "LLM ON | No Sync (Default)"
+        Cat      = "Fighting"
+        Desc     = "Default Rivals 2 profile. Minimum-latency no-sync path, Ultimate Performance."
+        Exes     = @("Rivals2-Win64-Shipping.exe", "RivalsofAether2.exe", "Rivals2.exe")
+        SyncMode = "off"
+    }
     "rivals2-offline"   = @{
         Name     = "Rivals 2: Training"
         Sub      = "LLM ON | No Sync | Uncapped"
@@ -476,6 +490,7 @@ $script:Profiles = [ordered]@{
         Cat      = "Shooter"
         Desc     = "Minimum latency profile. No-sync path with VRR explicitly disabled for deterministic behavior."
         Exes     = @("Overwatch.exe")
+        SyncMode = "off"
     }
     "overwatch2-gsync"  = @{
         Name     = "Overwatch 2 - GSYNC"
@@ -483,6 +498,7 @@ $script:Profiles = [ordered]@{
         Cat      = "Shooter"
         Desc     = "Tear-free low latency VRR profile. Use in-game FPS cap at refresh minus 3."
         Exes     = @("Overwatch.exe")
+        SyncMode = "on"
     }
 
     # --- Browser Games ---
@@ -508,6 +524,120 @@ $script:Profiles = [ordered]@{
         Exes     = @("PACDeluxe.exe", "msedge.exe")
     }
 }
+
+function Get-CategoryFromOptimizationTarget {
+    param([string]$OptimizationTarget)
+
+    $target = if ($null -eq $OptimizationTarget) { "" } else { "$OptimizationTarget" }
+    switch ($target.ToLowerInvariant()) {
+        "productivity" { return "Productivity" }
+        "low_latency_high_fps" { return "Shooter" }
+        "stable_online" { return "Fighting" }
+        "minimum_latency" { return "Fighting" }
+        "minimum_latency_offline" { return "Fighting" }
+        "tournament_simulation" { return "Fighting" }
+        "balanced" { return "Other" }
+        "smooth_framerate" { return "Other" }
+        default { return "Other" }
+    }
+}
+
+function Initialize-ProfilesFromCliCatalog {
+    <#
+    .SYNOPSIS
+    Loads profile metadata from Python CLI to prevent registry drift.
+
+    If CLI metadata is unavailable, keeps built-in fallback definitions.
+    #>
+    if (-not $script:PythonExe) { return }
+
+    try {
+        $raw = & $script:PythonExe "-m" "abso" "profiles" "--json" 2>$null
+        if ($LASTEXITCODE -ne 0 -or -not $raw) {
+            Write-TrayLog "Profile catalog refresh skipped (exit=$LASTEXITCODE)" -Level "WARN"
+            return
+        }
+
+        $payload = $raw | ConvertFrom-Json
+        if (-not $payload -or (-not $payload.success) -or (-not $payload.data)) {
+            Write-TrayLog "Profile catalog payload missing or invalid; using fallback definitions" -Level "WARN"
+            return
+        }
+
+        $cliProfiles = [ordered]@{}
+        foreach ($entry in @($payload.data)) {
+            $id = "$($entry.id)"
+            if ([string]::IsNullOrWhiteSpace($id)) { continue }
+
+            $fallback = if ($script:Profiles.Contains($id)) { $script:Profiles[$id] } else { $null }
+            $name = if ($entry.display_name) { "$($entry.display_name)" } elseif ($fallback) { "$($fallback.Name)" } else { $id }
+            $sub = if ($entry.tray_subtitle) { "$($entry.tray_subtitle)" } elseif ($fallback) { "$($fallback.Sub)" } else { "Profile" }
+            $cat = if ($entry.tray_category) {
+                "$($entry.tray_category)"
+            }
+            elseif ($fallback) {
+                "$($fallback.Cat)"
+            }
+            else {
+                Get-CategoryFromOptimizationTarget -OptimizationTarget "$($entry.optimization_target)"
+            }
+            $desc = if ($entry.tray_description) {
+                "$($entry.tray_description)"
+            }
+            elseif ($entry.description) {
+                "$($entry.description)"
+            }
+            elseif ($fallback) {
+                "$($fallback.Desc)"
+            }
+            else {
+                ""
+            }
+
+            $exeHints = @()
+            foreach ($exe in @($entry.executables)) {
+                if (-not [string]::IsNullOrWhiteSpace("$exe")) {
+                    $exeHints += "$exe"
+                }
+            }
+            if ($exeHints.Count -eq 0 -and $fallback) {
+                $exeHints = @($fallback.Exes)
+            }
+
+            $syncMode = if ($entry.sync_mode) {
+                "$($entry.sync_mode)".ToLowerInvariant()
+            }
+            elseif ($fallback -and $fallback.SyncMode) {
+                "$($fallback.SyncMode)".ToLowerInvariant()
+            }
+            else {
+                "agnostic"
+            }
+
+            $cliProfiles[$id] = @{
+                Name     = $name
+                Sub      = $sub
+                Cat      = $cat
+                Desc     = $desc
+                Exes     = $exeHints
+                SyncMode = $syncMode
+            }
+        }
+
+        if ($cliProfiles.Count -gt 0) {
+            $script:Profiles = $cliProfiles
+            Write-TrayLog "Profile catalog loaded from CLI ($($cliProfiles.Count) profiles)"
+        }
+        else {
+            Write-TrayLog "Profile catalog refresh returned zero profiles; using fallback definitions" -Level "WARN"
+        }
+    }
+    catch {
+        Write-TrayLog "Profile catalog refresh failed: $($_.Exception.Message)" -Level "WARN"
+    }
+}
+
+Initialize-ProfilesFromCliCatalog
 
 $script:CategoryOrder = @("Productivity", "Fighting", "ARPG", "Shooter", "Streaming", "Other")
 $script:CategoryColors = @{
@@ -2258,6 +2388,19 @@ try {
     Write-TrayLog "ABSO Tray starting (PID: $PID) v$($script:AppVersion)"
     Start-TrayApp
     Write-TrayLog "ABSO Tray exiting normally"
+}
+catch {
+    $fatal = $_.Exception.Message
+    Write-TrayLog "ABSO Tray fatal startup/runtime error: $fatal" -Level "ERROR"
+    try {
+        [System.Windows.Forms.MessageBox]::Show(
+            "A.B.S.O. Tray encountered a fatal error and exited.`n`n$fatal`n`nSee log: $($script:LogFile)",
+            "A.B.S.O.",
+            [System.Windows.Forms.MessageBoxButtons]::OK,
+            [System.Windows.Forms.MessageBoxIcon]::Error
+        ) | Out-Null
+    }
+    catch {}
 }
 finally {
     if ($script:StartupIconHealTimer) {

@@ -1,35 +1,41 @@
 // Prevents additional console window on Windows in release
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use std::process::Command;
+use serde::Deserialize;
 use std::path::PathBuf;
+use std::process::Command;
 use std::sync::Mutex;
 use tauri::{
-    Emitter,
-    Manager,
+    image::Image,
     menu::{Menu, MenuItem, PredefinedMenuItem, Submenu},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
-    image::Image,
+    Emitter, Manager,
 };
 
-/// Available profiles for quick switching
-const PROFILES: &[(&str, &str)] = &[
-    ("rivals2", "Rivals of Aether 2"),
-    ("rivals2-oled", "Rivals 2 (OLED)"),
-    ("rivals2-oled-vrr", "Rivals 2 (OLED + G-Sync)"),
-    ("slippi-melee", "Slippi Melee"),
-    ("slippi-melee-oled", "Slippi Melee (OLED)"),
-    ("cod-bo7", "CoD: Black Ops 7"),
-    ("cod-bo7-oled", "CoD: BO7 (OLED)"),
-    ("diablo4", "Diablo 4"),
-    ("diablo4-oled", "Diablo 4 (OLED)"),
-    ("pacdeluxe", "PAC Deluxe"),
-    ("pacdeluxe-oled", "PAC Deluxe (OLED)"),
-];
+#[derive(Clone, Debug)]
+struct TrayProfile {
+    id: String,
+    name: String,
+}
+
+#[derive(Deserialize)]
+struct CliResponse<T> {
+    success: bool,
+    data: T,
+    #[allow(dead_code)]
+    error: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct CliProfile {
+    id: String,
+    display_name: String,
+}
 
 /// State to track the currently active profile
 struct AppState {
     active_profile: Mutex<Option<String>>,
+    tray_profiles: Mutex<Vec<TrayProfile>>,
 }
 
 /// Get the path to the bundled abso.exe sidecar
@@ -46,9 +52,9 @@ fn get_sidecar_path(app_handle: Option<&tauri::AppHandle>) -> PathBuf {
 
     // Fallback for development: look for dist/abso.exe in project root
     let dev_paths = [
-        PathBuf::from("../../dist/abso.exe"),        // From src-tauri
-        PathBuf::from("../dist/abso.exe"),           // From gui
-        PathBuf::from("dist/abso.exe"),              // From project root
+        PathBuf::from("../../dist/abso.exe"), // From src-tauri
+        PathBuf::from("../dist/abso.exe"),    // From gui
+        PathBuf::from("dist/abso.exe"),       // From project root
     ];
 
     for path in &dev_paths {
@@ -124,7 +130,12 @@ async fn run_abso_command(
             .arg(&command)
             .args(&args)
             .output()
-            .map_err(|e| format!("Failed to execute sidecar: {} (path: {:?})", e, sidecar_path))?
+            .map_err(|e| {
+                format!(
+                    "Failed to execute sidecar: {} (path: {:?})",
+                    e, sidecar_path
+                )
+            })?
     };
 
     if output.status.success() {
@@ -161,9 +172,7 @@ fn is_admin() -> bool {
     {
         // Simple check: try to read a protected registry key
         use std::process::Command;
-        let output = Command::new("net")
-            .args(["session"])
-            .output();
+        let output = Command::new("net").args(["session"]).output();
 
         match output {
             Ok(o) => o.status.success(),
@@ -194,7 +203,11 @@ fn get_backend_info(app_handle: tauri::AppHandle) -> serde_json::Value {
 #[tauri::command]
 fn get_active_profile(state: tauri::State<AppState>) -> Option<String> {
     // Handle poisoned mutex gracefully - return None instead of panicking
-    state.active_profile.lock().ok().and_then(|guard| guard.clone())
+    state
+        .active_profile
+        .lock()
+        .ok()
+        .and_then(|guard| guard.clone())
 }
 
 /// Set the active profile (called from frontend after applying)
@@ -231,8 +244,63 @@ fn apply_profile_sync(app_handle: &tauri::AppHandle, profile_id: &str) -> Result
     }
 }
 
+fn fallback_tray_profiles() -> Vec<TrayProfile> {
+    Vec::new()
+}
+
+/// Load tray profile menu entries from CLI metadata.
+fn load_tray_profiles(app_handle: &tauri::AppHandle) -> Vec<TrayProfile> {
+    let output = if should_use_python() {
+        Command::new("python")
+            .args(["-m", "abso", "profiles", "--json"])
+            .current_dir(get_project_root())
+            .output()
+    } else {
+        let sidecar_path = get_sidecar_path(Some(app_handle));
+        Command::new(&sidecar_path)
+            .args(["profiles", "--json"])
+            .output()
+    };
+
+    let output = match output {
+        Ok(o) => o,
+        Err(e) => {
+            eprintln!("Failed to load profiles for tray menu: {}", e);
+            return fallback_tray_profiles();
+        }
+    };
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        eprintln!("profiles --json failed for tray menu: {}", stderr);
+        return fallback_tray_profiles();
+    }
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let parsed: Result<CliResponse<Vec<CliProfile>>, _> = serde_json::from_str(&stdout);
+    match parsed {
+        Ok(payload) if payload.success && !payload.data.is_empty() => payload
+            .data
+            .into_iter()
+            .map(|profile| TrayProfile {
+                id: profile.id,
+                name: profile.display_name,
+            })
+            .collect(),
+        Ok(_) => fallback_tray_profiles(),
+        Err(e) => {
+            eprintln!("Failed to parse profile metadata for tray menu: {}", e);
+            fallback_tray_profiles()
+        }
+    }
+}
+
 /// Create the tray menu
-fn create_tray_menu(app: &tauri::AppHandle, active_profile: Option<&str>) -> Result<Menu<tauri::Wry>, tauri::Error> {
+fn create_tray_menu(
+    app: &tauri::AppHandle,
+    profiles: &[TrayProfile],
+    active_profile: Option<&str>,
+) -> Result<Menu<tauri::Wry>, tauri::Error> {
     let menu = Menu::new(app)?;
 
     // Add "Show Window" item
@@ -244,15 +312,32 @@ fn create_tray_menu(app: &tauri::AppHandle, active_profile: Option<&str>) -> Res
     // Create profiles submenu
     let profiles_submenu = Submenu::with_id(app, "profiles", "Quick Apply Profile", true)?;
 
-    for (id, name) in PROFILES {
-        let is_active = active_profile.map_or(false, |p| p == *id);
-        let label = if is_active {
-            format!("✓ {}", name)
-        } else {
-            format!("  {}", name)
-        };
-        let item = MenuItem::with_id(app, format!("profile_{}", id), &label, true, None::<&str>)?;
-        profiles_submenu.append(&item)?;
+    if profiles.is_empty() {
+        let unavailable = MenuItem::with_id(
+            app,
+            "profiles_unavailable",
+            "No profiles available",
+            false,
+            None::<&str>,
+        )?;
+        profiles_submenu.append(&unavailable)?;
+    } else {
+        for profile in profiles {
+            let is_active = active_profile.map_or(false, |p| p == profile.id);
+            let label = if is_active {
+                format!("* {}", profile.name)
+            } else {
+                format!("  {}", profile.name)
+            };
+            let item = MenuItem::with_id(
+                app,
+                format!("profile_{}", profile.id),
+                &label,
+                true,
+                None::<&str>,
+            )?;
+            profiles_submenu.append(&item)?;
+        }
     }
 
     menu.append(&profiles_submenu)?;
@@ -268,8 +353,23 @@ fn create_tray_menu(app: &tauri::AppHandle, active_profile: Option<&str>) -> Res
 
 /// Update the tray menu to reflect the active profile
 fn update_tray_menu(app: &tauri::AppHandle, active_profile: Option<&str>) {
+    let mut profiles = app
+        .state::<AppState>()
+        .tray_profiles
+        .lock()
+        .ok()
+        .map(|guard| guard.clone())
+        .unwrap_or_default();
+
+    if profiles.is_empty() {
+        profiles = load_tray_profiles(app);
+        if let Ok(mut guard) = app.state::<AppState>().tray_profiles.lock() {
+            *guard = profiles.clone();
+        }
+    }
+
     if let Some(tray) = app.tray_by_id("main-tray") {
-        if let Ok(menu) = create_tray_menu(app, active_profile) {
+        if let Ok(menu) = create_tray_menu(app, &profiles, active_profile) {
             let _ = tray.set_menu(Some(menu));
         }
     }
@@ -280,6 +380,7 @@ fn main() {
         .plugin(tauri_plugin_shell::init())
         .manage(AppState {
             active_profile: Mutex::new(None),
+            tray_profiles: Mutex::new(Vec::new()),
         })
         .setup(|app| {
             // Load tray icon
@@ -291,8 +392,13 @@ fn main() {
                         .expect("Failed to load embedded icon")
                 });
 
+            let tray_profiles = load_tray_profiles(app.handle());
+            if let Ok(mut guard) = app.state::<AppState>().tray_profiles.lock() {
+                *guard = tray_profiles.clone();
+            }
+
             // Create initial tray menu
-            let menu = create_tray_menu(app.handle(), None)?;
+            let menu = create_tray_menu(app.handle(), &tray_profiles, None)?;
 
             // Build tray icon
             let _tray = TrayIconBuilder::with_id("main-tray")
@@ -324,7 +430,8 @@ fn main() {
                                 let app = app_clone.clone();
                                 let profile_id = profile_id_owned.clone();
                                 move || apply_profile_sync(&app, &profile_id)
-                            }).await;
+                            })
+                            .await;
 
                             match result {
                                 Ok(Ok(_)) => {

@@ -3,57 +3,57 @@ import { Header } from '@/components/Header';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Copy, FileDown, Gamepad2 } from 'lucide-react';
-
-const PROFILES = [
-  { id: 'slippi-melee', name: 'Slippi Melee' },
-  { id: 'slippi-melee-streaming', name: 'Slippi Melee (Streaming)' },
-  { id: 'rivals2', name: 'Rivals 2' },
-  { id: 'rivals2-offline', name: 'Rivals 2: Offline' },
-  { id: 'rivals2-online', name: 'Rivals 2: Online' },
-  { id: 'rivals2-streaming', name: 'Rivals 2 (Streaming)' },
-  { id: 'rivals2-tournament-sim-144hz', name: 'Rivals 2: Tournament Sim' },
-  { id: 'rivals2-300hz-max', name: 'Rivals 2: 300Hz Max' },
-  { id: 'ryujinx-ssbu', name: 'SSBU / HewDraw Remix' },
-  { id: 'ryujinx-ssbu-streaming', name: 'SSBU / HewDraw Remix (Streaming)' },
-  { id: 'cod-bo7', name: 'CoD BO7' },
-  { id: 'fortnite', name: 'Fortnite' },
-  { id: 'fortnite-streaming', name: 'Fortnite (Streaming)' },
-  { id: 'diablo4', name: 'Diablo 4' },
-  { id: 'pokemon-auto-chess', name: 'Pokemon Auto Chess' },
-  { id: 'pacdeluxe', name: 'PAC Deluxe' },
-  { id: 'pacdeluxe-streaming', name: 'PACDeluxe (Streaming)' },
-  { id: 'productivity', name: 'Desktop / Productivity' },
-];
-
-const SAMPLE_REPORT = `## Graphics
-
-- **Backend**: Vulkan (lower latency than OpenGL)
-- **VSync**: OFF
-- **Fullscreen**: Exclusive
-- **Internal Resolution**: Native
-
-## Audio
-
-- **Backend**: Cubeb (lowest latency)
-- **Latency**: Lowest stable setting
-
-## Controller
-
-- **Adapter Mode**: Wii U / GameCube Adapter
-- **Background Input**: ON
-
-## Display Notes
-
-Even without VRR, higher refresh rate monitors reduce scanout latency.
-At 144Hz vs 60Hz, you save ~10ms of display latency.
-`;
+import { useAppStore } from '@/stores/appStore';
+import * as api from '@/lib/api';
 
 export function Reports() {
-  const [selectedProfile, setSelectedProfile] = React.useState(PROFILES[0].id);
+  const { profiles, profilesLoading, loadProfiles } = useAppStore();
+  const [selectedProfile, setSelectedProfile] = React.useState<string | null>(null);
+  const [reportContent, setReportContent] = React.useState<string>('');
+  const [reportLoading, setReportLoading] = React.useState(false);
+  const [reportError, setReportError] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    if (profiles.length === 0) {
+      void loadProfiles();
+    }
+  }, [loadProfiles, profiles.length]);
+
+  React.useEffect(() => {
+    if (selectedProfile === null && profiles.length > 0) {
+      setSelectedProfile(profiles[0].id);
+    }
+  }, [profiles, selectedProfile]);
+
+  React.useEffect(() => {
+    const loadReport = async () => {
+      if (!selectedProfile) {
+        return;
+      }
+
+      setReportLoading(true);
+      setReportError(null);
+      try {
+        const report = await api.getReport(selectedProfile);
+        setReportContent(report.content);
+      } catch (error) {
+        setReportError(error instanceof Error ? error.message : 'Failed to load report');
+        setReportContent('');
+      } finally {
+        setReportLoading(false);
+      }
+    };
+
+    void loadReport();
+  }, [selectedProfile]);
 
   const handleCopy = () => {
-    navigator.clipboard.writeText(SAMPLE_REPORT);
+    if (reportContent) {
+      void navigator.clipboard.writeText(reportContent);
+    }
   };
+
+  const selectedProfileName = profiles.find((p) => p.id === selectedProfile)?.display_name;
 
   return (
     <div className="min-h-screen">
@@ -61,18 +61,22 @@ export function Reports() {
 
       <main className="container mx-auto px-6 py-6 max-w-3xl">
         <p className="text-muted-foreground mb-4">
-          Select a game to view recommended in-game settings:
+          Select a profile to view recommended in-game settings:
         </p>
 
+        {profilesLoading && (
+          <p className="text-sm text-muted-foreground mb-4">Loading profiles...</p>
+        )}
+
         {/* Profile selector */}
-        <div className="flex gap-2 mb-6">
-          {PROFILES.map((profile) => (
+        <div className="flex flex-wrap gap-2 mb-6">
+          {profiles.map((profile) => (
             <Button
               key={profile.id}
               variant={selectedProfile === profile.id ? 'default' : 'outline'}
               onClick={() => setSelectedProfile(profile.id)}
             >
-              {profile.name}
+              {profile.display_name}
             </Button>
           ))}
         </div>
@@ -83,23 +87,26 @@ export function Reports() {
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-semibold text-lg flex items-center gap-2">
                 <Gamepad2 className="h-5 w-5" />
-                {PROFILES.find((p) => p.id === selectedProfile)?.name} - In-Game
-                Settings
+                {selectedProfileName ? `${selectedProfileName} - In-Game Settings` : 'In-Game Settings'}
               </h3>
             </div>
 
             <div className="prose prose-sm dark:prose-invert max-w-none">
               <div className="bg-muted p-4 rounded-md font-mono text-sm whitespace-pre-wrap">
-                {SAMPLE_REPORT}
+                {reportLoading
+                  ? 'Loading report...'
+                  : reportError
+                    ? `Failed to load report: ${reportError}`
+                    : reportContent || 'No report available.'}
               </div>
             </div>
 
             <div className="flex gap-2 mt-4">
-              <Button variant="outline" onClick={handleCopy}>
+              <Button variant="outline" onClick={handleCopy} disabled={!reportContent}>
                 <Copy className="h-4 w-4 mr-2" />
                 Copy to Clipboard
               </Button>
-              <Button variant="outline">
+              <Button variant="outline" disabled>
                 <FileDown className="h-4 w-4 mr-2" />
                 Export as PDF
               </Button>

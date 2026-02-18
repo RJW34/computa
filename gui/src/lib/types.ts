@@ -50,7 +50,11 @@ export interface Profile {
   description: string;
   optimization_target: string;
   executables: string[];
-  detected: boolean;
+  detected?: boolean;
+  tray_category?: string;
+  tray_subtitle?: string;
+  tray_description?: string;
+  sync_mode?: 'on' | 'off' | 'agnostic';
 }
 
 export interface ProfileSettings {

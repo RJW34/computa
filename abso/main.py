@@ -3,7 +3,6 @@
 import json
 import os
 import sys
-from dataclasses import asdict
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -16,6 +15,7 @@ from abso.core.applier import ProfileApplier
 from abso.core.auditor import ConfigurationAuditor
 from abso.core.backup import BackupManager
 from abso.core.detector import HardwareDetector
+from abso.profiles.catalog import get_profile_manifest
 from abso.utils.admin import is_admin
 
 console = Console()
@@ -181,7 +181,7 @@ def detect(json_output: bool) -> None:
                     console.print(f"  [green]{manufacturer} {system_family}[/green]")
                 else:
                     console.print(f"  [green]{manufacturer} {model}[/green]")
-            console.print(f"  Type: [cyan]Pre-built[/cyan]")
+            console.print("  Type: [cyan]Pre-built[/cyan]")
             # Show motherboard for reference
             mobo_model = sys_info.get("motherboard_model")
             if mobo_model:
@@ -192,7 +192,7 @@ def detect(json_output: bool) -> None:
             mobo_model = sys_info.get("motherboard_model") or model
             console.print(f"  Motherboard: {mobo_mfr}")
             console.print(f"  Model: {mobo_model}")
-            console.print(f"  Type: [yellow]Custom Build[/yellow]")
+            console.print("  Type: [yellow]Custom Build[/yellow]")
 
         if sys_info.get("chassis_type"):
             console.print(f"  Chassis: {sys_info.get('chassis_type')}")
@@ -323,19 +323,7 @@ def audit(verbose: bool, json_output: bool) -> None:
 @click.option("--json", "json_output", is_flag=True, help="Output as JSON for GUI integration")
 def profiles(json_output: bool) -> None:
     """List available game optimization profiles."""
-    # Dynamically generate profile list from ProfileApplier.PROFILES
-    applier = ProfileApplier()
-    available_profiles = []
-
-    for profile_id, profile_class in ProfileApplier.PROFILES.items():
-        profile = profile_class()
-        available_profiles.append({
-            "id": profile_id,
-            "display_name": profile.display_name,
-            "description": profile.description,
-            "optimization_target": profile.optimization_target,
-            "executables": profile.executable_hints,
-        })
+    available_profiles = get_profile_manifest()
 
     if json_output:
         output_json(available_profiles)
@@ -784,18 +772,14 @@ def tray(install_startup: bool, uninstall_startup: bool, startup_status: bool) -
     The tray provides quick access to profile switching via left-click menu.
     It automatically pauses during gaming and restarts when the game exits.
     """
-    from abso.tray import (
-        get_startup_status as do_status,
-        install_startup as do_install,
-        start_tray,
-    )
+    import abso.tray as tray_module
 
     if install_startup:
-        do_install(uninstall=False)
+        tray_module.install_startup(uninstall=False)
     elif uninstall_startup:
-        do_install(uninstall=True)
+        tray_module.install_startup(uninstall=True)
     elif startup_status:
-        status = do_status()
+        status = tray_module.get_startup_status()
         mode = status.get("mode", "none")
         installed = status.get("installed", False)
         console.print(f"[bold]Startup Installed:[/bold] {'Yes' if installed else 'No'}")
@@ -805,7 +789,7 @@ def tray(install_startup: bool, uninstall_startup: bool, startup_status: bool) -
         if status.get("shortcut_installed"):
             console.print(f"[bold]Shortcut:[/bold] {status.get('shortcut_path')}")
     else:
-        start_tray()
+        tray_module.start_tray()
 
 
 @cli.command()

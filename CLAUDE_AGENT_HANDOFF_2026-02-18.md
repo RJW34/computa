@@ -147,3 +147,69 @@ The new split makes behavior explicit and predictable:
   - Readback confirms:
     - OW2 `frame_rate_limiter_v3 = 297`
     - Base profile `vrr_mode = 1` (fullscreen-only global G-SYNC mode)
+
+## Comprehensive Audit + Rectification Pass (2026-02-18, later session)
+### Goal
+Reduce hardcoded drift across the stack, improve tray startup robustness, and make profile behavior agnostic/metadata-driven where possible.
+
+### Major Changes
+- Centralized profile source-of-truth:
+  - Added `abso/profiles/catalog.py` as canonical registry + metadata manifest.
+  - Catalog now owns:
+    - profile class registration
+    - tray category/subtitle metadata
+    - explicit `sync_mode` metadata (`on`/`off`/`agnostic`) for transition logic.
+- Python core now consumes central catalog:
+  - `abso/profiles/__init__.py` -> `get_all_profiles()` now delegates to catalog.
+  - `abso/core/applier.py` -> `ProfileApplier.PROFILES` now generated from catalog.
+  - `abso/main.py` -> `profiles --json` now emits catalog manifest (includes tray metadata + sync_mode).
+
+### Tray Hardening
+- `abso/tray/ABSO-Tray.ps1`
+  - Added missing fallback profile: `rivals2`.
+  - Added explicit fallback `SyncMode` fields for OW2 no-sync / gsync.
+  - `Test-NeedsNoSyncOsdReminder` now first uses explicit `SyncMode` metadata, then falls back to text heuristics.
+  - Added `Initialize-ProfilesFromCliCatalog`:
+    - pulls `python -m abso profiles --json`
+    - builds tray profile table from canonical metadata
+    - keeps existing static table as fallback when CLI metadata is unavailable.
+  - Added top-level fatal error catch with explicit logging and message box (no more silent tray exits).
+- `abso/tray/ABSO-StartupLaunch.ps1`
+  - Added post-launch verification that tray process actually started.
+  - Added retry logic (`2` attempts) with structured startup log messages.
+- `abso/tray/Install-Startup.ps1`
+  - Startup status now includes task health (`task_enabled`, last run/result).
+  - `installed` now reflects task usability (installed+enabled), not mere task existence.
+  - Explicitly enables scheduled task after registration.
+
+### GUI + Tauri Drift Removal
+- `gui/src-tauri/src/main.rs`
+  - Removed stale hardcoded tray profile list (`rivals2-oled`, etc.).
+  - Tray menu now loads profile list dynamically from `abso profiles --json`.
+  - If CLI metadata is unavailable, tray now shows `No profiles available` (no stale fallback IDs).
+  - Added tray profile state cache and dynamic menu refresh based on active profile.
+- React frontend:
+  - `gui/src/pages/ProfileWizard.tsx`: removed hardcoded profile catalog, now uses store-loaded API profiles.
+  - `gui/src/pages/Home.tsx`: removed hardcoded profile name map, resolves active profile name from API profiles.
+  - `gui/src/pages/Reports.tsx`: removed hardcoded profile list/sample report; now loads real per-profile report from backend.
+  - `gui/src/lib/types.ts`: expanded `Profile` type to include optional tray metadata fields + `sync_mode`.
+
+### New Tests
+- Added `tests/test_profiles_catalog.py`:
+  - catalog keys == `ProfileApplier.PROFILES`
+  - catalog keys == `get_all_profiles()`
+  - catalog key matches each profile’s `profile_id`
+  - manifest includes required tray/GUI metadata fields.
+
+### Validation
+- Python:
+  - Full suite: `879 passed, 1 warning`.
+  - Targeted: `tests/test_cli.py`, `tests/test_core/test_applier.py`, `tests/test_profiles_catalog.py` all pass.
+- GUI:
+  - `npm --prefix gui run build` passes.
+- Tauri:
+  - `cargo check --manifest-path gui/src-tauri/Cargo.toml` passes.
+
+### Residual Known Warnings (Pre-existing)
+- `pytest` warns about unknown config option `asyncio_mode`.
+- Intermittent pytest temp cleanup `PermissionError` at process exit on this Windows environment.

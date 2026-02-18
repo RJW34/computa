@@ -17,117 +17,6 @@ import { useAppStore } from '@/stores/appStore';
 import { cn } from '@/lib/utils';
 import * as api from '@/lib/api';
 
-const PROFILES = [
-  {
-    id: 'rivals2',
-    name: 'Rivals of Aether 2',
-    description: 'Ultra-low latency for competitive play with HDR',
-    target: 'minimum_latency',
-  },
-  {
-    id: 'rivals2-offline',
-    name: 'Rivals 2: Offline / Training',
-    description: 'Maximum latency reduction for offline play',
-    target: 'minimum_latency_offline',
-  },
-  {
-    id: 'rivals2-online',
-    name: 'Rivals 2: Online / Matchmaking',
-    description: 'Rollback-safe settings for online play',
-    target: 'stable_online',
-  },
-  {
-    id: 'rivals2-streaming',
-    name: 'Rivals 2 (Streaming)',
-    description: 'Streaming-optimized rollback-safe profile for Rivals 2',
-    target: 'stable_online',
-  },
-  {
-    id: 'rivals2-tournament-sim-144hz',
-    name: 'Rivals 2: Tournament Sim (144Hz)',
-    description: 'Tournament simulation with fixed 144Hz, no VRR',
-    target: 'tournament_simulation',
-  },
-  {
-    id: 'rivals2-300hz-max',
-    name: 'Rivals 2: 300Hz Maximum',
-    description: 'Absolute minimum latency for 300Hz setups',
-    target: 'minimum_latency',
-  },
-  {
-    id: 'slippi-melee',
-    name: 'Slippi Melee',
-    description: 'Ultra-low latency for competitive SSBM',
-    target: 'minimum_latency',
-  },
-  {
-    id: 'slippi-melee-streaming',
-    name: 'Slippi Melee (Streaming)',
-    description: 'Streaming-optimized SSBM profile for multi-monitor OBS',
-    target: 'minimum_latency',
-  },
-  {
-    id: 'ryujinx-ssbu',
-    name: 'SSBU / HewDraw Remix',
-    description: 'Ultra-low latency via Ryujinx',
-    target: 'minimum_latency',
-  },
-  {
-    id: 'ryujinx-ssbu-streaming',
-    name: 'SSBU / HewDraw Remix (Streaming)',
-    description: 'Streaming-optimized Ryujinx profile for multi-monitor OBS',
-    target: 'minimum_latency',
-  },
-  {
-    id: 'cod-bo7',
-    name: 'Call of Duty: Black Ops 7',
-    description: 'Low latency with Nvidia Reflex',
-    target: 'low_latency_high_fps',
-  },
-  {
-    id: 'fortnite',
-    name: 'Fortnite',
-    description: 'Low latency with Nvidia Reflex',
-    target: 'low_latency_high_fps',
-  },
-  {
-    id: 'fortnite-streaming',
-    name: 'Fortnite (Streaming)',
-    description: 'Streaming-optimized Fortnite profile for multi-monitor OBS',
-    target: 'low_latency_high_fps',
-  },
-  {
-    id: 'diablo4',
-    name: 'Diablo 4',
-    description: 'Balanced performance for ARPG',
-    target: 'balanced',
-  },
-  {
-    id: 'pokemon-auto-chess',
-    name: 'Pokemon Auto Chess',
-    description: 'WebGL browser game optimization',
-    target: 'balanced',
-  },
-  {
-    id: 'pacdeluxe',
-    name: 'PAC Deluxe',
-    description: 'Optimized for PAC Deluxe',
-    target: 'smooth_framerate',
-  },
-  {
-    id: 'pacdeluxe-streaming',
-    name: 'PACDeluxe (Streaming)',
-    description: 'Streaming-optimized PACDeluxe profile for multi-monitor OBS',
-    target: 'smooth_framerate',
-  },
-  {
-    id: 'productivity',
-    name: 'Desktop / Productivity',
-    description: 'HDR productivity profile for browsing and coding',
-    target: 'productivity',
-  },
-];
-
 const STEPS = ['Select Profile', 'Review Settings', 'Backup Options', 'Apply'];
 
 export function ProfileWizard() {
@@ -139,6 +28,9 @@ export function ProfileWizard() {
     setWizardStep,
     resetWizard,
     setActiveProfile,
+    profiles,
+    profilesLoading,
+    loadProfiles,
   } = useAppStore();
 
   const [createBackup, setCreateBackup] = React.useState(true);
@@ -159,7 +51,13 @@ export function ProfileWizard() {
     };
   }, []);
 
-  const selectedProfile = PROFILES.find((p) => p.id === wizardProfile);
+  React.useEffect(() => {
+    if (profiles.length === 0) {
+      void loadProfiles();
+    }
+  }, [loadProfiles, profiles.length]);
+
+  const selectedProfile = profiles.find((p) => p.id === wizardProfile);
 
   const handleBack = () => {
     if (wizardStep === 0) {
@@ -259,7 +157,10 @@ export function ProfileWizard() {
         {/* Step 0: Select Game */}
         {wizardStep === 0 && (
           <div className="space-y-4">
-            {PROFILES.map((profile) => (
+            {profilesLoading && (
+              <p className="text-sm text-muted-foreground">Loading profiles...</p>
+            )}
+            {profiles.map((profile) => (
               <Card
                 key={profile.id}
                 className={cn(
@@ -274,7 +175,7 @@ export function ProfileWizard() {
                   <div className="flex items-center gap-4">
                     <Gamepad2 className="h-8 w-8 text-muted-foreground" />
                     <div>
-                      <h3 className="font-semibold">{profile.name}</h3>
+                      <h3 className="font-semibold">{profile.display_name}</h3>
                       <p className="text-sm text-muted-foreground">
                         {profile.description}
                       </p>
@@ -293,9 +194,9 @@ export function ProfileWizard() {
         {wizardStep === 1 && selectedProfile && (
           <div className="space-y-4">
             <div className="mb-6">
-              <h2 className="text-xl font-semibold">{selectedProfile.name}</h2>
+              <h2 className="text-xl font-semibold">{selectedProfile.display_name}</h2>
               <p className="text-muted-foreground">
-                Target: {selectedProfile.target.replace(/_/g, ' ')}
+                Target: {selectedProfile.optimization_target.replace(/_/g, ' ')}
               </p>
             </div>
 
@@ -418,7 +319,7 @@ export function ProfileWizard() {
         {wizardStep === 3 && !applyComplete && (
           <div className="space-y-6 text-center py-12">
             <h2 className="text-xl font-semibold">
-              {applying ? `Applying ${selectedProfile?.name}` : applyError ? 'Apply Failed' : 'Ready to Apply'}
+              {applying ? `Applying ${selectedProfile?.display_name}` : applyError ? 'Apply Failed' : 'Ready to Apply'}
             </h2>
 
             {applyError && (
@@ -474,7 +375,7 @@ export function ProfileWizard() {
               </>
             ) : !applyError && (
               <p className="text-muted-foreground">
-                Click Apply to optimize your system for {selectedProfile?.name}
+                Click Apply to optimize your system for {selectedProfile?.display_name}
               </p>
             )}
           </div>
@@ -490,7 +391,7 @@ export function ProfileWizard() {
             </div>
             <h2 className="text-2xl font-semibold">Success!</h2>
             <p className="text-muted-foreground">
-              {selectedProfile?.name} profile has been applied.
+              {selectedProfile?.display_name} profile has been applied.
             </p>
 
             <Card className="text-left">

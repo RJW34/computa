@@ -35,16 +35,40 @@ function Test-StartupTaskInstalled {
     }
 }
 
+function Get-StartupTaskInfoSafe {
+    try {
+        $task = Get-ScheduledTask -TaskName $TaskName -ErrorAction Stop
+        $taskInfo = Get-ScheduledTaskInfo -TaskName $TaskName -ErrorAction SilentlyContinue
+        return [ordered]@{
+            exists = $true
+            enabled = [bool]$task.Settings.Enabled
+            last_run_time = if ($taskInfo) { $taskInfo.LastRunTime } else { $null }
+            last_task_result = if ($taskInfo) { $taskInfo.LastTaskResult } else { $null }
+        }
+    }
+    catch {
+        return [ordered]@{
+            exists = $false
+            enabled = $false
+            last_run_time = $null
+            last_task_result = $null
+        }
+    }
+}
+
 function Test-ShortcutInstalled {
     return (Test-Path $ShortcutPath)
 }
 
 function Get-InstallStatus {
-    $taskInstalled = Test-StartupTaskInstalled
+    $taskInfo = Get-StartupTaskInfoSafe
+    $taskInstalled = [bool]$taskInfo.exists
+    $taskEnabled = [bool]$taskInfo.enabled
     $shortcutInstalled = Test-ShortcutInstalled
+    $taskUsable = ($taskInstalled -and $taskEnabled)
 
     $mode = "none"
-    if ($taskInstalled) {
+    if ($taskUsable) {
         $mode = "scheduled_task"
     }
     elseif ($shortcutInstalled) {
@@ -52,9 +76,12 @@ function Get-InstallStatus {
     }
 
     return [ordered]@{
-        installed          = ($taskInstalled -or $shortcutInstalled)
+        installed          = ($taskUsable -or $shortcutInstalled)
         mode               = $mode
         task_installed     = $taskInstalled
+        task_enabled       = $taskEnabled
+        task_last_run_time = $taskInfo.last_run_time
+        task_last_result   = $taskInfo.last_task_result
         shortcut_installed = $shortcutInstalled
         task_name          = $TaskName
         shortcut_path      = $ShortcutPath
@@ -120,6 +147,11 @@ function Register-StartupTask {
         -Description $TaskDescription `
         -Force `
         -ErrorAction Stop | Out-Null
+
+    try {
+        Enable-ScheduledTask -TaskName $TaskName -ErrorAction Stop | Out-Null
+    }
+    catch {}
 }
 
 function Remove-StartupTask {

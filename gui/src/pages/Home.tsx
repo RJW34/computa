@@ -14,30 +14,18 @@ import { Header } from '@/components/Header';
 import { useAppStore } from '@/stores/appStore';
 import { Badge } from '@/components/ui/badge';
 
-// Profile ID to display name mapping
-const PROFILE_NAMES: Record<string, string> = {
-  'rivals2': 'Rivals of Aether 2',
-  'rivals2-offline': 'Rivals 2: Offline / Training',
-  'rivals2-online': 'Rivals 2: Online / Matchmaking',
-  'rivals2-streaming': 'Rivals 2 (Streaming)',
-  'rivals2-tournament-sim-144hz': 'Rivals 2: Tournament Sim (144Hz)',
-  'rivals2-300hz-max': 'Rivals 2: 300Hz Maximum',
-  'slippi-melee': 'Slippi Melee',
-  'slippi-melee-streaming': 'Slippi Melee (Streaming)',
-  'ryujinx-ssbu': 'SSBU / HewDraw Remix',
-  'ryujinx-ssbu-streaming': 'SSBU / HewDraw Remix (Streaming)',
-  'cod-bo7': 'CoD: Black Ops 7',
-  'fortnite': 'Fortnite',
-  'fortnite-streaming': 'Fortnite (Streaming)',
-  'diablo4': 'Diablo 4',
-  'pacdeluxe': 'PAC Deluxe',
-  'pacdeluxe-streaming': 'PACDeluxe (Streaming)',
-  'pokemon-auto-chess': 'Pokemon Auto Chess',
-  'productivity': 'Desktop / Productivity',
-};
-
 export function Home() {
-  const { setPage, auditResults, runAudit, loadBackups, backups, activeProfile, activeProfileAppliedAt } = useAppStore();
+  const {
+    setPage,
+    auditResults,
+    runAudit,
+    loadBackups,
+    backups,
+    activeProfile,
+    activeProfileAppliedAt,
+    profiles,
+    loadProfiles,
+  } = useAppStore();
 
   // Track if initial load has been done to prevent duplicate calls
   const initialLoadDone = React.useRef(false);
@@ -49,7 +37,8 @@ export function Home() {
 
     runAudit();
     loadBackups();
-  }, [runAudit, loadBackups]);
+    void loadProfiles();
+  }, [runAudit, loadBackups, loadProfiles]);
 
   const criticalCount = auditResults.filter((i) => i.severity === 'critical').length;
   const warningCount = auditResults.filter((i) => i.severity === 'warning').length;
@@ -71,7 +60,9 @@ export function Home() {
     return 'just now';
   };
 
-  const activeProfileName = activeProfile ? (PROFILE_NAMES[activeProfile] || activeProfile) : null;
+  const activeProfileName = activeProfile
+    ? (profiles.find((p) => p.id === activeProfile)?.display_name || activeProfile)
+    : null;
 
   return (
     <div className="min-h-screen pb-12">
