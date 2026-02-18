@@ -135,6 +135,40 @@ function Test-IsVrrPrerequisiteError {
     )
 }
 
+function Test-NeedsNoSyncOsdReminder {
+    param(
+        [string]$FromProfileId,
+        [string]$ToProfileId
+    )
+
+    if ([string]::IsNullOrWhiteSpace($FromProfileId) -or [string]::IsNullOrWhiteSpace($ToProfileId)) {
+        return $false
+    }
+
+    $fromProfile = $script:Profiles[$FromProfileId]
+    $toProfile = $script:Profiles[$ToProfileId]
+    if (-not $fromProfile -or -not $toProfile) { return $false }
+
+    $fromText = (($fromProfile.Name, $fromProfile.Sub, $fromProfile.Desc) -join " ").ToLowerInvariant()
+    $toText = (($toProfile.Name, $toProfile.Sub, $toProfile.Desc) -join " ").ToLowerInvariant()
+
+    # Treat profile metadata as source of truth:
+    # - sync-on intents should contain explicit ON markers
+    # - no-sync intents should contain explicit OFF/no-sync markers
+    $fromSyncOn = (
+        $fromText -match "\bg-?sync\s*on\b" -or
+        $fromText -match "\bvrr\s*on\b"
+    )
+    $toSyncOff = (
+        $toText -match "\bg-?sync\s*off\b" -or
+        $toText -match "\bvrr\s*off\b" -or
+        $toText -match "\bno[-\s]?sync\b" -or
+        $toText -match "\bno\s+vrr\b"
+    )
+
+    return ($fromSyncOn -and $toSyncOff)
+}
+
 $script:SoundFilesChecked = $false
 
 function Test-SoundFilesExist {
@@ -867,6 +901,8 @@ function Apply-Profile {
 
     Write-TrayLog "Apply-Profile called with: $ProfileId"
     $profile = $script:Profiles[$ProfileId]
+    $previousProfileId = $script:activeProfile
+    $needsNoSyncOsdReminder = Test-NeedsNoSyncOsdReminder -FromProfileId $previousProfileId -ToProfileId $ProfileId
 
     if (-not $profile) {
         Write-TrayLog "Profile not found: $ProfileId" -Level "ERROR"
@@ -953,9 +989,18 @@ function Apply-Profile {
             Start-Sleep -Milliseconds 500
             Close-ProgressOverlay
 
-            Play-SuccessSound
+            $notifyType = "Info"
+            if ($needsNoSyncOsdReminder) {
+                $notifyType = "Warning"
+                $msg += " | Reminder: Turn OFF Adaptive Sync/FreeSync in monitor OSD for strict No-Sync mode."
+                Play-VrrWarningSound
+                Write-TrayLog "No-Sync OSD reminder shown for transition: $previousProfileId -> $ProfileId"
+            }
+            else {
+                Play-SuccessSound
+            }
             Play-ApplySuccessIconAnimation
-            Show-Notification -Title "A.B.S.O." -Message $msg -Type "Info"
+            Show-Notification -Title "A.B.S.O." -Message $msg -Type $notifyType
 
             $script:activeProfile = $ProfileId
             $script:LastAction = "Applied: $($profile.Name)"
