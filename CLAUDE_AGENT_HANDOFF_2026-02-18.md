@@ -213,3 +213,39 @@ Reduce hardcoded drift across the stack, improve tray startup robustness, and ma
 ### Residual Known Warnings (Pre-existing)
 - `pytest` warns about unknown config option `asyncio_mode`.
 - Intermittent pytest temp cleanup `PermissionError` at process exit on this Windows environment.
+
+## 2.0 Overhaul Pass (2026-02-18, final session)
+### Goal
+Implement a production-grade 2.0 architecture pass with explicit checkpoints and end-to-end hardening.
+
+### Delivered
+- Transaction/compliance core:
+  - `abso/core/transaction.py`
+  - `abso/core/compliance.py`
+  - `abso/main.py` `apply` now uses transaction manager.
+- Config safety/invariants:
+  - `abso/core/config_safety.py`
+  - `abso/settings/rivals2_config.py` allowlist/protected-key enforcement + verify support.
+- Capability graph:
+  - `abso/core/capabilities.py`
+  - `abso/core/applier.py` preflight integration and capability reporting.
+- Diagnostics/watchdog:
+  - `abso/core/health.py`
+  - `abso/main.py` new `health` command.
+  - `abso/tray/__init__.py` runtime supervision helpers.
+- Declarative manifests:
+  - `abso/core/manifests.py`
+  - `abso/core/manifests/linter_rules.json`
+  - `abso/core/manifests/game_detection.json`
+- Integration matrix + CI contract:
+  - `abso/core/manifests/integration_test_matrix.json`
+  - `tests/test_core/test_integration_matrix.py`
+  - `.github/workflows/ci.yml` new matrix-contract job.
+- Checkpoint doc:
+  - `2.0_OVERHAUL_GUIDE.md` updated to mark P0-P7 completed with progress journal entries.
+
+### Validation
+- `python -m pytest -q` -> exit code 0
+- `python -m ruff check abso tests` -> exit code 0
+- `python -m black --check abso tests` -> exit code 0
+- `python -m mypy abso --ignore-missing-imports --no-error-summary` -> exit code 0

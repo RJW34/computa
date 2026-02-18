@@ -15,6 +15,7 @@ from abso.core.applier import ProfileApplier
 from abso.core.auditor import ConfigurationAuditor
 from abso.core.backup import BackupManager
 from abso.core.detector import HardwareDetector
+from abso.core.transaction import ProfileTransactionManager
 from abso.profiles.catalog import get_profile_manifest
 from abso.utils.admin import is_admin
 
@@ -417,49 +418,50 @@ def apply(profile_name: str, no_backup: bool, json_output: bool) -> None:
         console.print("Please run as administrator.")
         sys.exit(1)
 
-    backup_id = None
-
     if not json_output:
         console.print(Panel(f"Applying Profile: {profile_name}", style="bold blue"))
-
-    # Create backup first (unless explicitly skipped)
-    if not no_backup:
-        if not json_output:
-            console.print("[yellow]Creating backup before applying changes...[/yellow]")
-        BACKUPS_DIR.mkdir(parents=True, exist_ok=True)
-        backup_manager = BackupManager(BACKUPS_DIR)
-        backup_id = backup_manager.create_backup()
-        if not json_output:
-            console.print(f"[green]Backup created: {backup_id}[/green]\n")
-    else:
-        if not json_output:
+        if no_backup:
             console.print("[yellow]Warning: Skipping backup as requested.[/yellow]\n")
-
-    applier = ProfileApplier()
+        else:
+            console.print("[yellow]Creating backup before applying changes...[/yellow]")
 
     try:
-        result = applier.apply_profile(profile_name)
+        tx_manager = ProfileTransactionManager(BACKUPS_DIR)
+        tx = tx_manager.execute(profile_id=profile_name, create_backup=not no_backup)
+        result = tx.apply_result
 
         if json_output:
+            applied_settings = result.applied_settings if result else []
+            failed_settings = result.failed_settings if result else []
             output_json({
-                "success": result.success,
+                "success": tx.success,
                 "profile": profile_name,
-                "backup_id": backup_id,
-                "requires_reboot": result.requires_reboot,
-                "in_game_settings": result.in_game_settings if hasattr(result, "in_game_settings") else [],
-                "error": result.error if not result.success else None,
-                "applied_settings": result.applied_settings,
-                "failed_settings": result.failed_settings,
+                "backup_id": tx.backup_id,
+                "requires_reboot": result.requires_reboot if result else False,
+                "in_game_settings": result.in_game_settings if result else False,
+                "error": tx.error if not tx.success else None,
+                "applied_settings": applied_settings,
+                "failed_settings": failed_settings,
+                "capabilities": (
+                    result.capability_report.to_dict()
+                    if result and result.capability_report
+                    else None
+                ),
                 "results": [
-                    {"handler": h, "status": "success"} for h in result.applied_settings
+                    {"handler": h, "status": "success"} for h in applied_settings
                 ] + [
                     {"handler": f.split(":")[0].strip(), "status": "failed", "error": f}
-                    for f in result.failed_settings
+                    for f in failed_settings
                 ],
+                "transaction": tx.to_dict(),
+                "compliance": tx.compliance_report.to_dict() if tx.compliance_report else None,
             })
             return
 
-        if result.success:
+        if tx.backup_id and not no_backup:
+            console.print(f"[green]Backup created: {tx.backup_id}[/green]\n")
+
+        if tx.success and result and result.success:
             set_current_profile(profile_name)
             console.print(f"\n[green]Profile '{profile_name}' applied successfully![/green]")
 
@@ -470,16 +472,27 @@ def apply(profile_name: str, no_backup: bool, json_output: bool) -> None:
             if result.in_game_settings:
                 # Actually generate the report file
                 REPORTS_DIR.mkdir(parents=True, exist_ok=True)
+                applier = tx_manager.applier
                 report_path = applier.generate_report(profile_name, REPORTS_DIR)
                 console.print(f"\n[cyan]In-game settings saved to: {report_path}[/cyan]")
         else:
-            console.print(f"\n[red]Failed to apply profile: {result.error}[/red]")
+            err = tx.error or (result.error if result else "Unknown transaction error")
+            console.print(f"\n[red]Failed to apply profile: {err}[/red]")
+            if tx.rollback_performed and tx.backup_id:
+                console.print(
+                    f"[yellow]Automatic rollback completed from backup {tx.backup_id}.[/yellow]"
+                )
             sys.exit(1)
 
     except ValueError as e:
         if json_output:
             json_error(str(e))
         console.print(f"[red]Error: {e}[/red]")
+        sys.exit(1)
+    except Exception as e:
+        if json_output:
+            json_error(f"Unexpected apply failure: {e}")
+        console.print(f"[red]Unexpected apply failure: {e}[/red]")
         sys.exit(1)
 
 
@@ -790,6 +803,69 @@ def tray(install_startup: bool, uninstall_startup: bool, startup_status: bool) -
             console.print(f"[bold]Shortcut:[/bold] {status.get('shortcut_path')}")
     else:
         tray_module.start_tray()
+
+
+@cli.command()
+@click.option("--bundle", is_flag=True, help="Write diagnostics bundle ZIP")
+@click.option(
+    "--output-dir",
+    type=click.Path(path_type=Path, file_okay=False, dir_okay=True),
+    default=None,
+    help="Output directory for diagnostics bundle",
+)
+@click.option(
+    "--start-tray-if-missing",
+    is_flag=True,
+    help="Attempt to start tray if runtime check shows it is missing",
+)
+@click.option("--json", "json_output", is_flag=True, help="Output as JSON for GUI integration")
+def health(
+    bundle: bool,
+    output_dir: Path | None,
+    start_tray_if_missing: bool,
+    json_output: bool,
+) -> None:
+    """Generate diagnostics and optional support bundle."""
+    from abso.core.health import build_health_report, write_health_bundle
+    import abso.tray as tray_module
+
+    report = build_health_report(
+        root_dir=ROOT_DIR,
+        backups_dir=BACKUPS_DIR,
+        state_file=STATE_FILE,
+    )
+
+    if start_tray_if_missing:
+        report["tray_start_attempt"] = tray_module.ensure_tray_running(start_if_missing=True)
+
+    if bundle:
+        target_dir = output_dir or (REPORTS_DIR / "diagnostics")
+        bundle_path = write_health_bundle(report, target_dir)
+        report["bundle_path"] = str(bundle_path)
+
+    if json_output:
+        output_json(report)
+        return
+
+    console.print(Panel("ABSO Health Report", style="bold blue"))
+    summary = report.get("summary", {})
+    console.print(
+        f"Checks: [green]{summary.get('ok', 0)} ok[/green], "
+        f"[yellow]{summary.get('warning', 0)} warning[/yellow], "
+        f"[red]{summary.get('error', 0)} error[/red]"
+    )
+    current_profile = report.get("current_profile") or "(none)"
+    console.print(f"Current profile: {current_profile}")
+
+    if report.get("bundle_path"):
+        console.print(f"[green]Bundle:[/green] {report['bundle_path']}")
+
+    checks = report.get("checks", {})
+    for check_name in ["tray_startup", "tray_runtime", "state_file", "backups", "config", "fallback"]:
+        check = checks.get(check_name, {})
+        status = check.get("status", "error")
+        color = {"ok": "green", "warning": "yellow", "error": "red"}.get(status, "white")
+        console.print(f"  [{color}]{check_name}: {status}[/{color}]")
 
 
 @cli.command()

@@ -6,10 +6,13 @@ unsafe combinations, and sanity check aggressive settings.
 
 from __future__ import annotations
 
+import json
 import logging
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import TYPE_CHECKING, Any
+
+from abso.core.manifests import load_linter_rules
 
 if TYPE_CHECKING:
     from abso.profiles.base import BaseProfile
@@ -99,6 +102,24 @@ class ProfileLinter:
             system_ram_gb: System RAM in GB (used for memory setting checks).
         """
         self.system_ram_gb = system_ram_gb
+        fallback_rules = {
+            "reflex_presets": sorted(self.REFLEX_PRESETS),
+            "llm_ultra_presets": sorted(self.LLM_ULTRA_PRESETS),
+            "fast_sync_presets": sorted(self.FAST_SYNC_PRESETS),
+            "emulator_targets": sorted(self.EMULATOR_TARGETS),
+            "rollback_targets": sorted(self.ROLLBACK_TARGETS),
+            "dx12_vulkan_indicators": sorted(self.DX12_VULKAN_INDICATORS),
+        }
+        rules = load_linter_rules(json.dumps(fallback_rules, sort_keys=True))
+
+        self.reflex_presets = set(rules.get("reflex_presets", fallback_rules["reflex_presets"]))
+        self.llm_ultra_presets = set(rules.get("llm_ultra_presets", fallback_rules["llm_ultra_presets"]))
+        self.fast_sync_presets = set(rules.get("fast_sync_presets", fallback_rules["fast_sync_presets"]))
+        self.emulator_targets = set(rules.get("emulator_targets", fallback_rules["emulator_targets"]))
+        self.rollback_targets = set(rules.get("rollback_targets", fallback_rules["rollback_targets"]))
+        self.dx12_vulkan_indicators = set(
+            rules.get("dx12_vulkan_indicators", fallback_rules["dx12_vulkan_indicators"])
+        )
 
     def lint(self, profile: BaseProfile) -> LintResult:
         """Run all lint checks on a profile.
@@ -183,7 +204,7 @@ class ProfileLinter:
         max_fps = nvidia_settings.get("max_frame_rate", "")
 
         # Check 1: Reflex preset + LLM conflict
-        if preset in self.REFLEX_PRESETS and llm and llm != "off":
+        if preset in self.reflex_presets and llm and llm != "off":
             result.add_issue(LintIssue(
                 code="NVIDIA_REFLEX_LLM_CONFLICT",
                 severity=LintSeverity.ERROR,
@@ -199,7 +220,7 @@ class ProfileLinter:
         # Check 2: LLM Ultra + explicit FPS cap
         # Note: LLM Ultra and FPS cap CAN work together (Ultra handles queue, cap limits rate)
         # But for online profiles, LLM Ultra's timing isn't ideal for rollback netcode
-        if (llm == "ultra" or preset in self.LLM_ULTRA_PRESETS):
+        if llm == "ultra" or preset in self.llm_ultra_presets:
             if max_fps and max_fps != "off":
                 # Only warn for online profiles - offline can use aggressive settings
                 allows_aggressive = getattr(profile, "allows_aggressive_settings", False)
@@ -218,7 +239,7 @@ class ProfileLinter:
                     ))
 
         # Check 3: Fast Sync + rollback profile
-        if vsync == "fast" and profile.optimization_target in self.ROLLBACK_TARGETS:
+        if vsync == "fast" and profile.optimization_target in self.rollback_targets:
             result.add_issue(LintIssue(
                 code="NVIDIA_FAST_SYNC_ROLLBACK",
                 severity=LintSeverity.ERROR,
@@ -231,12 +252,12 @@ class ProfileLinter:
             ))
 
         # Check 4: LLM Ultra warning on DX12/UE5 titles
-        if llm == "ultra" or preset in self.LLM_ULTRA_PRESETS:
+        if llm == "ultra" or preset in self.llm_ultra_presets:
             profile_desc = profile.description.lower()
             profile_name = profile.display_name.lower()
             is_dx12_vulkan = any(
                 ind in profile_desc or ind in profile_name
-                for ind in self.DX12_VULKAN_INDICATORS
+                for ind in self.dx12_vulkan_indicators
             )
             if is_dx12_vulkan:
                 result.add_issue(LintIssue(

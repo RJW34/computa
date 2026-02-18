@@ -9,7 +9,10 @@ import pytest
 
 import abso.main as main
 from abso.tray import (
+    ensure_tray_running,
     get_startup_status,
+    get_tray_processes,
+    is_tray_running,
     install_startup,
     start_tray,
 )
@@ -89,3 +92,35 @@ def test_cli_tray_startup_status_option():
 
     assert result.exit_code == 0
     assert "Startup Installed" in result.output
+
+
+def test_get_tray_processes_parses_single_object():
+    """get_tray_processes should normalize single JSON object into list."""
+    payload = '{"ProcessId":1234,"Name":"powershell.exe","CommandLine":"ABSO-Tray.ps1"}'
+    with patch("abso.tray.subprocess.run") as mock_run:
+        mock_run.return_value.returncode = 0
+        mock_run.return_value.stdout = payload
+        processes = get_tray_processes()
+
+    assert isinstance(processes, list)
+    assert len(processes) == 1
+    assert processes[0]["ProcessId"] == 1234
+
+
+def test_is_tray_running_true_when_process_found():
+    """is_tray_running should return true when tray process list is non-empty."""
+    with patch("abso.tray.get_tray_processes", return_value=[{"ProcessId": 1}]):
+        assert is_tray_running() is True
+
+
+def test_ensure_tray_running_starts_when_missing():
+    """ensure_tray_running should attempt startup when requested."""
+    with patch("abso.tray.is_tray_running", side_effect=[False, True]):
+        with patch("abso.tray.start_tray") as mock_start:
+            with patch("abso.tray.get_tray_processes", return_value=[{"ProcessId": 1}]):
+                result = ensure_tray_running(start_if_missing=True)
+
+    mock_start.assert_called_once()
+    assert result["running_before"] is False
+    assert result["started"] is True
+    assert result["running_after"] is True

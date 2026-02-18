@@ -25,6 +25,7 @@ Usage:
 import subprocess
 import sys
 import json
+import time
 from pathlib import Path
 
 
@@ -93,6 +94,68 @@ def get_startup_status() -> dict[str, object]:
     )
 
     return json.loads(result.stdout.strip() or "{}")
+
+
+def get_tray_processes() -> list[dict[str, object]]:
+    """Return running PowerShell processes that host ABSO tray."""
+    ps_command = (
+        "Get-CimInstance Win32_Process -Filter \"Name='powershell.exe'\" "
+        "| Where-Object { $_.CommandLine -match 'ABSO-Tray.ps1' } "
+        "| Select-Object ProcessId, Name, CommandLine "
+        "| ConvertTo-Json -Compress"
+    )
+    result = subprocess.run(
+        [
+            "powershell.exe",
+            "-NoProfile",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-Command",
+            ps_command,
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    if result.returncode != 0 or not result.stdout.strip():
+        return []
+
+    payload = json.loads(result.stdout)
+    if isinstance(payload, list):
+        return payload
+    if isinstance(payload, dict):
+        return [payload]
+    return []
+
+
+def is_tray_running() -> bool:
+    """Return True when at least one tray host process is detected."""
+    return len(get_tray_processes()) > 0
+
+
+def ensure_tray_running(start_if_missing: bool = False) -> dict[str, object]:
+    """Check tray process and optionally start it when missing."""
+    running_before = is_tray_running()
+    started = False
+    error: str | None = None
+
+    if (not running_before) and start_if_missing:
+        try:
+            start_tray()
+            started = True
+            time.sleep(1.0)
+        except Exception as e:
+            error = str(e)
+
+    running_after = is_tray_running()
+    return {
+        "running_before": running_before,
+        "started": started,
+        "running_after": running_after,
+        "error": error,
+        "processes": get_tray_processes() if running_after else [],
+    }
 
 
 if __name__ == "__main__":

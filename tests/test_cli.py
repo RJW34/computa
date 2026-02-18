@@ -1,9 +1,11 @@
 """CLI smoke tests for A.B.S.O."""
 
+import json
 from unittest.mock import MagicMock, patch
 
 from click.testing import CliRunner
 
+from abso.core.applier import ApplyResult
 from abso.main import cli
 
 
@@ -142,6 +144,58 @@ class TestCLIApply:
         # Click should show usage error for missing argument
         assert result.exit_code != 0
 
+    @patch("abso.main.ProfileTransactionManager")
+    @patch("abso.main.is_admin", return_value=True)
+    def test_apply_json_uses_transaction_manager(self, mock_is_admin, mock_tx_manager_cls):
+        """JSON apply should use transactional execution and return transaction metadata."""
+        tx_result = MagicMock()
+        tx_result.success = True
+        tx_result.backup_id = None
+        tx_result.error = None
+        tx_result.rollback_performed = False
+        tx_result.apply_result = ApplyResult(
+            success=True,
+            requires_reboot=False,
+            in_game_settings=False,
+            applied_settings=["WindowsSettingsHandler"],
+            failed_settings=[],
+        )
+        tx_result.compliance_report = MagicMock()
+        tx_result.compliance_report.to_dict.return_value = {
+            "profile_id": "slippi-melee",
+            "passed": True,
+            "has_critical": False,
+            "issues": [],
+        }
+        tx_result.to_dict.return_value = {
+            "success": True,
+            "profile_id": "slippi-melee",
+            "state": "committed",
+            "backup_id": None,
+            "error": None,
+            "rollback_performed": False,
+            "rollback_error": None,
+            "compliance": tx_result.compliance_report.to_dict.return_value,
+            "checkpoints": [],
+        }
+
+        mock_manager = mock_tx_manager_cls.return_value
+        mock_manager.execute.return_value = tx_result
+
+        runner = CliRunner()
+        result = runner.invoke(cli, ["apply", "slippi-melee", "--json", "--no-backup"])
+
+        assert result.exit_code == 0
+        payload = json.loads(result.output)
+        assert payload["success"] is True
+        assert payload["data"]["success"] is True
+        assert payload["data"]["profile"] == "slippi-melee"
+        assert payload["data"]["transaction"]["profile_id"] == "slippi-melee"
+        mock_manager.execute.assert_called_once_with(
+            profile_id="slippi-melee",
+            create_backup=False,
+        )
+
 
 class TestCLIRestore:
     """Test restore command error handling."""
@@ -201,6 +255,28 @@ class TestCLIAuditWithIssues:
 
         # Should complete without exception
         assert result.exception is None or result.exit_code in [0, 1]
+
+
+class TestCLIHealth:
+    """Test health diagnostics command."""
+
+    @patch("abso.core.health.build_health_report")
+    def test_health_json_output(self, mock_build_health_report):
+        """health --json should return serialized diagnostics payload."""
+        mock_build_health_report.return_value = {
+            "generated_at": "2026-02-18T00:00:00",
+            "checks": {"tray_runtime": {"status": "ok"}},
+            "summary": {"ok": 1, "warning": 0, "error": 0},
+            "current_profile": "overwatch2",
+        }
+
+        runner = CliRunner()
+        result = runner.invoke(cli, ["health", "--json"])
+
+        assert result.exit_code == 0
+        payload = json.loads(result.output)
+        assert payload["success"] is True
+        assert payload["data"]["summary"]["ok"] == 1
 
 
 class TestCLIRestoreWithMocks:

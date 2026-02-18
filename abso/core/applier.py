@@ -16,8 +16,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from abso.core.capabilities import CapabilityEngine, CapabilityReport
 from abso.core.config import ConfigManager
-from abso.core.detector import HardwareDetector
 from abso.core.exceptions import (
     ProfileNotFoundError,
 )
@@ -50,11 +50,14 @@ class ApplyResult:
     stability_gate_result: StabilityGateResult | None = None
     network_scope_result: NetworkScopeResult | None = None
     multimon_result: MultiMonitorResult | None = None
+    capability_report: CapabilityReport | None = None
 
     # Validation summary
     lint_warnings: int = 0
     gated_settings_blocked: int = 0
     rollback_overrides_applied: int = 0
+    capability_blockers: int = 0
+    capability_warnings: int = 0
 
 
 class ProfileApplier:
@@ -70,6 +73,7 @@ class ProfileApplier:
         skip_stability_gate: bool = False,
         skip_network_scope: bool = False,
         skip_multimon_detection: bool = False,
+        skip_capability_checks: bool = False,
         rollback_guard_mode: str = "block",
         force_aggressive: bool = False,
     ) -> None:
@@ -106,10 +110,12 @@ class ProfileApplier:
         self.skip_stability_gate = skip_stability_gate
         self.skip_network_scope = skip_network_scope
         self.skip_multimon_detection = skip_multimon_detection
+        self.skip_capability_checks = skip_capability_checks
         self.force_aggressive = force_aggressive
 
         # Initialize subsystems
         self._fallback_controller = FallbackController()
+        self._capability_engine = CapabilityEngine()
         self._linter = ProfileLinter()
         self._rollback_guard = RollbackGuard(mode=rollback_guard_mode)
         self._stability_gate = StabilityGate(
@@ -170,12 +176,16 @@ class ProfileApplier:
             in_game_settings=profile.has_in_game_settings(),
         )
 
-        # === PHASE 0: Hardware prerequisites ===
-        preflight_error = self._validate_profile_prerequisites(profile)
-        if preflight_error:
-            result.success = False
-            result.error = preflight_error
-            return result
+        # === PHASE 0: Capability Graph ===
+        if not self.skip_capability_checks:
+            capability_report = self._capability_engine.evaluate(profile)
+            result.capability_report = capability_report
+            result.capability_blockers = len(capability_report.blockers)
+            result.capability_warnings = len(capability_report.warnings)
+            if capability_report.has_blockers and not self.force_aggressive:
+                result.success = False
+                result.error = capability_report.blockers[0].message
+                return result
 
         # Collect all settings from profile
         settings_map = self._collect_settings(profile)
@@ -335,36 +345,10 @@ class ProfileApplier:
         Returns:
             Error message string when prerequisites are not met, otherwise None.
         """
-        if getattr(profile, "requires_confirmed_vrr_support", False) is not True:
-            return None
-
-        try:
-            detector = HardwareDetector()
-            monitors = detector.detect_monitors()
-        except Exception as e:
-            logger.warning(f"VRR preflight detection failed: {e}")
-            monitors = []
-
-        if not monitors:
-            return (
-                "Cannot confirm VRR/G-SYNC support because no monitors were detected. "
-                "Enable monitor Adaptive Sync/FreeSync in OSD, enable G-SYNC in NVIDIA Control Panel, then retry."
-            )
-
-        confirmed_vrr = [m for m in monitors if m.get("vrr_supported") is True]
-        if confirmed_vrr:
-            return None
-
-        status_summary = ", ".join(
-            f"{m.get('name', 'Unknown')}: {m.get('vrr_supported', 'unknown')}"
-            for m in monitors
-        )
-
-        return (
-            "No monitor with confirmed VRR/G-SYNC support was detected. "
-            "Turn on monitor Adaptive Sync/FreeSync in OSD, enable G-SYNC in NVIDIA Control Panel, then retry. "
-            f"Detected VRR status: {status_summary}"
-        )
+        capability_report = self._capability_engine.evaluate(profile)
+        if capability_report.has_blockers:
+            return capability_report.blockers[0].message
+        return None
 
     def _collect_settings(self, profile: BaseProfile) -> dict[str, dict[str, Any]]:
         """Collect all settings from a profile's handlers.

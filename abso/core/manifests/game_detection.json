@@ -1,0 +1,64 @@
+{
+  "steam_game_patterns": {
+    "Rivals of Aether 2": [
+      "RivalsOfAether2.exe",
+      "RivalsOfAether2-Win64-Shipping.exe"
+    ],
+    "Diablo IV": [
+      "Diablo IV.exe"
+    ],
+    "Slippi Launcher": [
+      "Slippi Dolphin.exe",
+      "Dolphin.exe"
+    ]
+  },
+  "epic_paths": [
+    "%PROGRAMFILES%\\Epic Games",
+    "%PROGRAMFILES(X86)%\\Epic Games",
+    "D:\\Epic Games",
+    "E:\\Epic Games"
+  ],
+  "epic_game_patterns": {
+    "Rivals of Aether 2": [
+      "RivalsOfAether2.exe",
+      "RivalsOfAether2-Win64-Shipping.exe"
+    ],
+    "Fortnite": [
+      "FortniteClient-Win64-Shipping.exe",
+      "FortniteClient-Win64-Shipping_EAC.exe",
+      "FortniteClient-Win64-Shipping_BE.exe",
+      "FortniteClient-Win64-Shipping_EAC_EOS.exe"
+    ]
+  },
+  "battle_net_games": {
+    "Diablo IV": {
+      "registry_key": "SOFTWARE\\WOW6432Node\\Blizzard Entertainment\\Diablo IV",
+      "executables": [
+        "Diablo IV.exe"
+      ]
+    },
+    "Overwatch 2": {
+      "registry_key": "SOFTWARE\\WOW6432Node\\Blizzard Entertainment\\Overwatch",
+      "executables": [
+        "Overwatch.exe"
+      ]
+    },
+    "Call of Duty": {
+      "registry_key": "SOFTWARE\\WOW6432Node\\Activision\\Call of Duty",
+      "executables": [
+        "cod.exe",
+        "BlackOps7.exe",
+        "ModernWarfare.exe"
+      ]
+    }
+  },
+  "standalone_locations": [
+    "%APPDATA%\\Slippi Launcher\\netplay",
+    "%LOCALAPPDATA%\\SlippiOnline",
+    "~\\AppData\\Roaming\\Slippi Launcher"
+  ],
+  "standalone_executables": [
+    "Slippi Dolphin.exe",
+    "Dolphin.exe"
+  ]
+}

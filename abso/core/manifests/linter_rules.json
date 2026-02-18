@@ -1,0 +1,24 @@
+{
+  "reflex_presets": [
+    "reflex_game",
+    "reflex_no_sync",
+    "reflex_gsync",
+    "vrr_diablo4"
+  ],
+  "llm_ultra_presets": [
+    "minimum_latency"
+  ],
+  "fast_sync_presets": [],
+  "emulator_targets": [
+    "minimum_latency"
+  ],
+  "rollback_targets": [
+    "stable_online"
+  ],
+  "dx12_vulkan_indicators": [
+    "ue5",
+    "vulkan",
+    "dx12",
+    "unreal"
+  ]
+}

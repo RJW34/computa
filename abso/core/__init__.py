@@ -12,6 +12,7 @@ Includes validation subsystems:
 from abso.core.applier import ApplyResult, ProfileApplier
 from abso.core.auditor import ConfigurationAuditor
 from abso.core.backup import BackupManager
+from abso.core.capabilities import CapabilityEngine, CapabilityFinding, CapabilityReport
 from abso.core.detector import HardwareDetector
 from abso.core.fallback_controller import FallbackController, FallbackState, FailureRecord
 from abso.core.linter import LintIssue, LintResult, LintSeverity, ProfileLinter
@@ -45,6 +46,9 @@ __all__ = [
     "ProfileApplier",
     "ApplyResult",
     "BackupManager",
+    "CapabilityEngine",
+    "CapabilityReport",
+    "CapabilityFinding",
     # Linter
     "ProfileLinter",
     "LintResult",

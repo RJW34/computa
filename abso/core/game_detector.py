@@ -2,12 +2,16 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import os
+import re
 import winreg
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+
+from abso.core.manifests import load_game_detection_manifest
 
 logger = logging.getLogger(__name__)
 
@@ -21,6 +25,63 @@ class InstalledGame:
     install_path: Path
     platform: str  # steam, epic, battle_net, standalone
     profile_match: str | None = None  # Matching profile name if any
+
+
+DEFAULT_GAME_DETECTION_MANIFEST: dict[str, Any] = {
+    "steam_game_patterns": {
+        "Rivals of Aether 2": ["RivalsOfAether2.exe", "RivalsOfAether2-Win64-Shipping.exe"],
+        "Diablo IV": ["Diablo IV.exe"],
+        "Slippi Launcher": ["Slippi Dolphin.exe", "Dolphin.exe"],
+    },
+    "epic_paths": [
+        "%PROGRAMFILES%\\Epic Games",
+        "%PROGRAMFILES(X86)%\\Epic Games",
+        "D:\\Epic Games",
+        "E:\\Epic Games",
+    ],
+    "epic_game_patterns": {
+        "Rivals of Aether 2": ["RivalsOfAether2.exe", "RivalsOfAether2-Win64-Shipping.exe"],
+        "Fortnite": [
+            "FortniteClient-Win64-Shipping.exe",
+            "FortniteClient-Win64-Shipping_EAC.exe",
+            "FortniteClient-Win64-Shipping_BE.exe",
+            "FortniteClient-Win64-Shipping_EAC_EOS.exe",
+        ],
+    },
+    "battle_net_games": {
+        "Diablo IV": {
+            "registry_key": r"SOFTWARE\WOW6432Node\Blizzard Entertainment\Diablo IV",
+            "executables": ["Diablo IV.exe"],
+        },
+        "Overwatch 2": {
+            "registry_key": r"SOFTWARE\WOW6432Node\Blizzard Entertainment\Overwatch",
+            "executables": ["Overwatch.exe"],
+        },
+        "Call of Duty": {
+            "registry_key": r"SOFTWARE\WOW6432Node\Activision\Call of Duty",
+            "executables": ["cod.exe", "BlackOps7.exe", "ModernWarfare.exe"],
+        },
+    },
+    "standalone_locations": [
+        "%APPDATA%\\Slippi Launcher\\netplay",
+        "%LOCALAPPDATA%\\SlippiOnline",
+        "~\\AppData\\Roaming\\Slippi Launcher",
+    ],
+    "standalone_executables": ["Slippi Dolphin.exe", "Dolphin.exe"],
+}
+
+GAME_DETECTION_MANIFEST = load_game_detection_manifest(
+    json.dumps(DEFAULT_GAME_DETECTION_MANIFEST, sort_keys=True)
+)
+
+
+def _resolve_path_template(template: str) -> Path:
+    """Resolve manifest path templates using env vars and user home."""
+    resolved = template
+    for var_name in re.findall(r"%([^%]+)%", template):
+        value = os.environ.get(var_name, "")
+        resolved = resolved.replace(f"%{var_name}%", value)
+    return Path(os.path.expanduser(resolved))
 
 
 def detect_installed_games() -> list[InstalledGame]:
@@ -132,12 +193,10 @@ def _detect_steam_games() -> list[InstalledGame]:
 
     library_folders = _get_steam_library_folders()
 
-    # Known Steam game executables to look for
-    steam_game_patterns: dict[str, list[str]] = {
-        "Rivals of Aether 2": ["RivalsOfAether2.exe", "RivalsOfAether2-Win64-Shipping.exe"],
-        "Diablo IV": ["Diablo IV.exe"],
-        "Slippi Launcher": ["Slippi Dolphin.exe", "Dolphin.exe"],
-    }
+    steam_game_patterns: dict[str, list[str]] = GAME_DETECTION_MANIFEST.get(
+        "steam_game_patterns",
+        DEFAULT_GAME_DETECTION_MANIFEST["steam_game_patterns"],
+    )
 
     for library_folder in library_folders:
         if not library_folder.exists():
@@ -183,23 +242,16 @@ def _detect_epic_games() -> list[InstalledGame]:
     """Detect installed Epic Games."""
     games: list[InstalledGame] = []
 
-    # Epic Games default install locations
-    epic_paths = [
-        Path(os.environ.get("PROGRAMFILES", "C:\\Program Files")) / "Epic Games",
-        Path(os.environ.get("PROGRAMFILES(X86)", "C:\\Program Files (x86)")) / "Epic Games",
-        Path("D:\\Epic Games"),
-        Path("E:\\Epic Games"),
-    ]
+    path_templates = GAME_DETECTION_MANIFEST.get(
+        "epic_paths",
+        DEFAULT_GAME_DETECTION_MANIFEST["epic_paths"],
+    )
+    epic_paths = [_resolve_path_template(path) for path in path_templates]
 
-    epic_game_patterns: dict[str, list[str]] = {
-        "Rivals of Aether 2": ["RivalsOfAether2.exe", "RivalsOfAether2-Win64-Shipping.exe"],
-        "Fortnite": [
-            "FortniteClient-Win64-Shipping.exe",
-            "FortniteClient-Win64-Shipping_EAC.exe",
-            "FortniteClient-Win64-Shipping_BE.exe",
-            "FortniteClient-Win64-Shipping_EAC_EOS.exe",
-        ],
-    }
+    epic_game_patterns: dict[str, list[str]] = GAME_DETECTION_MANIFEST.get(
+        "epic_game_patterns",
+        DEFAULT_GAME_DETECTION_MANIFEST["epic_game_patterns"],
+    )
 
     for epic_path in epic_paths:
         if not epic_path.exists():
@@ -240,21 +292,10 @@ def _detect_battlenet_games() -> list[InstalledGame]:
     """Detect installed Battle.net games."""
     games: list[InstalledGame] = []
 
-    # Battle.net game install locations from registry
-    bnet_games_config: dict[str, dict[str, Any]] = {
-        "Diablo IV": {
-            "registry_key": r"SOFTWARE\WOW6432Node\Blizzard Entertainment\Diablo IV",
-            "executables": ["Diablo IV.exe"],
-        },
-        "Overwatch 2": {
-            "registry_key": r"SOFTWARE\WOW6432Node\Blizzard Entertainment\Overwatch",
-            "executables": ["Overwatch.exe"],
-        },
-        "Call of Duty": {
-            "registry_key": r"SOFTWARE\WOW6432Node\Activision\Call of Duty",
-            "executables": ["cod.exe", "BlackOps7.exe", "ModernWarfare.exe"],
-        },
-    }
+    bnet_games_config: dict[str, dict[str, Any]] = GAME_DETECTION_MANIFEST.get(
+        "battle_net_games",
+        DEFAULT_GAME_DETECTION_MANIFEST["battle_net_games"],
+    )
 
     for game_name, config in bnet_games_config.items():
         try:
@@ -298,16 +339,19 @@ def _detect_standalone_games() -> list[InstalledGame]:
     """Detect games installed in common standalone locations."""
     games: list[InstalledGame] = []
 
-    # Slippi is commonly installed standalone
-    slippi_locations = [
-        Path(os.environ.get("APPDATA", "")) / "Slippi Launcher" / "netplay",
-        Path(os.environ.get("LOCALAPPDATA", "")) / "SlippiOnline",
-        Path.home() / "AppData" / "Roaming" / "Slippi Launcher",
-    ]
+    location_templates = GAME_DETECTION_MANIFEST.get(
+        "standalone_locations",
+        DEFAULT_GAME_DETECTION_MANIFEST["standalone_locations"],
+    )
+    slippi_locations = [_resolve_path_template(path) for path in location_templates]
+    executables = GAME_DETECTION_MANIFEST.get(
+        "standalone_executables",
+        DEFAULT_GAME_DETECTION_MANIFEST["standalone_executables"],
+    )
 
     for slippi_path in slippi_locations:
         if slippi_path.exists():
-            for exe_name in ["Slippi Dolphin.exe", "Dolphin.exe"]:
+            for exe_name in executables:
                 try:
                     matches = list(slippi_path.rglob(exe_name))
                 except OSError as e:

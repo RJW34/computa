@@ -1,39 +1,83 @@
-# Claude Code Agent Handoff
+# Claude Code Agent Handoff (2.0 Overhaul Pass)
 
-## Purpose
-This file is a concise handoff for another CLI agent (including Claude Code) to understand what was done in the latest Codex audit/assist pass and what was committed.
+## Scope Completed
+This pass implemented the full `2.0 Overhaul` plan from `2.0_OVERHAUL_GUIDE.md` (P0-P7), including code, tests, CI wiring, and checkpoint updates.
 
-## Repository State at Time of Handoff
-- Branch: `fix/slippi-rivals-profile-accuracy`
-- Remote: `origin` -> `https://github.com/RJW34/A.B.S.O..git`
-- Worktree before this handoff already contained many modified and untracked files (feature work in progress).
+## High-Impact Changes
+1. Transaction + compliance core
+- Added `abso/core/transaction.py` (checkpointed transactional apply, compliance evaluation, critical auto-rollback).
+- Added `abso/core/compliance.py` (critical/warning mapping for apply and verify outcomes).
+- Wired CLI apply to transaction path in `abso/main.py` (`ProfileTransactionManager.execute(profile_id=...)`).
+- JSON apply output now includes `transaction`, `compliance`, and capability metadata payloads.
 
-## What Codex Changed In This Turn
-- Added this document: `CLAUDE_AGENT_HANDOFF.md`
-- Did **not** modify source logic during this specific turn.
-- At user request, committed and pushed **all currently uncommitted changes** in the repo (including pre-existing user changes) in one commit.
+2. Config safety + Rivals 2 invariants
+- Added `abso/core/config_safety.py` (allowed-key validation + deterministic INI patch helpers).
+- Hardened `abso/settings/rivals2_config.py`:
+  - explicit key allowlist
+  - conversion validation
+  - protected key invariants for control/profile identity fields
+  - verify_active support for post-apply checks
+  - optional frame cap key support (`frame_rate_limit`)
 
-## Audit Findings Previously Reported (No Code Changes Applied Yet)
-1. Backup/restore handler coverage mismatch:
-   - `abso/core/backup.py` does not include all handlers used by active profiles (e.g. `ProcessPriorityHandler`, `CNMSettingsHandler`, `OBSSettingsHandler`, `Rivals2ConfigHandler`, `DolphinConfigHandler`, `NvidiaNotificationHandler`).
-2. `ProcessPriorityHandler.restore()` truthiness bug:
-   - May re-apply empty settings instead of removing IFEO keys.
-3. `NetworkSettingsHandler.restore()` incomplete:
-   - Restores interface registry values but not `tcp_global` settings that are backed up/applied.
-4. Tray applies can be surfaced as success on partial failure:
-   - `abso/tray/ABSO-Tray.ps1` treats any applied settings as success in some partial-failure cases.
-5. GUI/Tauri drift:
-   - `gui/src-tauri/src/main.rs` and `gui/src/lib/api.ts` include outdated profile IDs/command usage compared to current CLI.
+3. Capability graph preflight
+- Added `abso/core/capabilities.py`.
+- Integrated into `abso/core/applier.py`:
+  - capability report on apply result
+  - blockers fail apply pre-handler
+  - warnings surfaced in result metadata
 
-## Rivals 2 Symptom Context (from audit)
-- User issue: online profile use sometimes corresponds with Rivals 2 tag/control profile seeming unset.
-- `rivals2-online` profile does not include `Rivals2ConfigHandler` override in current profile class.
-- `Rivals2ConfigHandler` only edits `GameUserSettings.ini` keys (`FullscreenMode`, `bUseVSync`, `bUseRawInput`), not `.sav` tag/control files.
-- No direct code path was found in this repo that writes Rivals tag/control `.sav` data.
+4. Health/watchdog diagnostics
+- Added `abso/core/health.py` (health report + zipped diagnostics bundle writer).
+- Extended `abso/tray/__init__.py`:
+  - `get_tray_processes()`
+  - `is_tray_running()`
+  - `ensure_tray_running(start_if_missing=...)`
+- Added CLI command `abso health` in `abso/main.py`:
+  - JSON report mode
+  - optional bundle generation
+  - optional start-tray-if-missing action
 
-## Suggested Next Work Item
-- Implement the restore/backup coverage and restore logic fixes above, then add regression tests for:
-  - backup handler coverage expectations
-  - `ProcessPriorityHandler.restore()` empty-state behavior
-  - `NetworkSettingsHandler.restore()` tcp global restoration
-  - tray apply success/failure semantics.
+5. Declarative heuristics manifests
+- Added manifest loader: `abso/core/manifests.py`.
+- Added manifests:
+  - `abso/core/manifests/linter_rules.json`
+  - `abso/core/manifests/game_detection.json`
+  - `abso/core/manifests/integration_test_matrix.json`
+- Migrated hardcoded linter/game detector rules to manifest-backed loading with fallback defaults:
+  - `abso/core/linter.py`
+  - `abso/core/game_detector.py`
+
+6. Integration matrix contract + CI
+- Added matrix contract tests:
+  - `tests/test_core/test_integration_matrix.py`
+- Added CI job in `.github/workflows/ci.yml`:
+  - `Integration Matrix Contract`
+
+## New/Updated Tests
+- New:
+  - `tests/test_core/test_compliance.py`
+  - `tests/test_core/test_transaction.py`
+  - `tests/test_core/test_config_safety.py`
+  - `tests/test_handlers/test_rivals2_config.py`
+  - `tests/test_core/test_capabilities.py`
+  - `tests/test_core/test_health.py`
+  - `tests/test_core/test_manifests.py`
+  - `tests/test_core/test_integration_matrix.py`
+- Updated:
+  - `tests/test_cli.py`
+  - `tests/test_core/test_applier.py`
+  - `tests/test_tray_startup.py`
+
+## Operational Notes
+- Capability blockers (e.g., VRR-required profiles without confirmed VRR) now stop apply in preflight.
+- Rivals2 config mutations are now fail-closed for unsupported keys and guarded against accidental profile/control field mutation.
+- `abso health --bundle` writes a zipped diagnostics package including report + tray logs when present.
+
+## Validation Performed
+- Full tests: `python -m pytest -q` (exit code 0)
+- Lint: `python -m ruff check abso tests` (exit code 0)
+- Format check: `python -m black --check abso tests` (exit code 0)
+- Type check: `python -m mypy abso --ignore-missing-imports --no-error-summary` (exit code 0)
+
+## Checkpoint Source of Truth
+- `2.0_OVERHAUL_GUIDE.md` checkpoint table and progress journal now mark `P0-P7` as `COMPLETED`.

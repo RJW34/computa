@@ -204,7 +204,7 @@ class TestApplyProfile:
         finally:
             del ProfileApplier.PROFILES["test-profile"]
 
-    @patch("abso.core.applier.HardwareDetector.detect_monitors")
+    @patch("abso.core.capabilities.HardwareDetector.detect_monitors")
     def test_apply_profile_blocks_when_confirmed_vrr_not_detected(self, mock_detect_monitors):
         """VRR-required profiles should fail before applying handlers without confirmed VRR."""
         mock_detect_monitors.return_value = [
@@ -217,7 +217,7 @@ class TestApplyProfile:
         assert result.success is False
         assert "No monitor with confirmed VRR/G-SYNC support was detected" in (result.error or "")
 
-    @patch("abso.core.applier.HardwareDetector.detect_monitors")
+    @patch("abso.core.capabilities.HardwareDetector.detect_monitors")
     def test_apply_profile_allows_when_confirmed_vrr_detected(self, mock_detect_monitors):
         """VRR-required mock profile should apply when a confirmed VRR monitor is detected."""
         mock_detect_monitors.return_value = [
