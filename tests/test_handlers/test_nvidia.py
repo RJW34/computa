@@ -337,6 +337,82 @@ class TestNvidiaApply:
         assert result["success"] is True
         assert any("NVIDIA global profile configured:" in line for line in result["applied"])
 
+    @patch("abso.settings.nvidia.nvapi_drs.DRSProfileManager")
+    def test_apply_auto_vrr_fps_cap_overrides_preset(self, mock_manager_cls):
+        """auto_vrr_fps_cap should set max_frame_rate to refresh-3 for preset profiles."""
+        mock_manager = MagicMock()
+        mock_manager.apply_settings_to_app.return_value = {
+            "settings_applied": {
+                "max_frame_rate": 277,
+                "vsync": "on",
+                "vrr_app_override": "allow",
+            },
+            "errors": [],
+            "app_bound": True,
+            "npi_launched": False,
+        }
+        mock_manager.get_app_settings.return_value = {}
+        mock_manager._resolve_setting.return_value = (0x10835002, 277)
+        mock_manager_cls.return_value = mock_manager
+
+        handler = NvidiaSettingsHandler()
+        with patch.object(handler, "_detect_primary_refresh_rate", return_value=280):
+            result = handler.apply({
+                "preset": "reflex_gsync",
+                "auto_vrr_fps_cap": True,
+                "executables": ["Overwatch.exe"],
+                "game_name": "Overwatch 2 - GSYNC",
+                "profile_name": "Overwatch 2",
+            })
+
+        args, kwargs = mock_manager.apply_settings_to_app.call_args
+        sent_settings = args[1]
+        assert sent_settings["max_frame_rate"] == 277
+        assert result["success"] is True
+        assert any("Auto VRR FPS cap: 277 (from 280 Hz)" in line for line in result["applied"])
+
+    @patch("abso.settings.nvidia.nvapi_drs.DRSProfileManager")
+    def test_apply_verification_uses_explicit_profile_name(self, mock_manager_cls):
+        """Verification should read back from explicit profile name when provided."""
+        mock_manager = MagicMock()
+        mock_manager.apply_settings_to_app.return_value = {
+            "settings_applied": {"vsync": "on"},
+            "errors": [],
+            "app_bound": True,
+            "npi_launched": False,
+        }
+        mock_manager.get_app_settings.return_value = {"vsync_mode": 0x47814940}
+        mock_manager._resolve_setting.return_value = (0x00A879CF, 0x47814940)
+        mock_manager_cls.return_value = mock_manager
+
+        handler = NvidiaSettingsHandler()
+        handler.apply({
+            "preset": "reflex_gsync",
+            "executables": ["Overwatch.exe"],
+            "game_name": "Overwatch 2 - GSYNC",
+            "profile_name": "Overwatch 2",
+        })
+
+        mock_manager.get_app_settings.assert_called_once_with(
+            "Overwatch.exe",
+            profile_name="Overwatch 2",
+        )
+
+    @patch("abso.settings.windows.WindowsSettingsHandler._get_refresh_rate_info")
+    @patch("abso.core.detector.HardwareDetector.detect_monitors")
+    def test_detect_primary_refresh_rate_falls_back_to_windows_handler(
+        self,
+        mock_detect_monitors,
+        mock_refresh_info,
+    ):
+        """Refresh rate detection should fallback when pywin32 monitor detection is unavailable."""
+        mock_detect_monitors.return_value = []
+        mock_refresh_info.return_value = {"current": 300, "max": None, "available": []}
+
+        handler = NvidiaSettingsHandler()
+        rate = handler._detect_primary_refresh_rate()
+        assert rate == 300
+
 
 class TestNvidiaBackupRestore:
     """Tests for backup() and restore() methods."""

@@ -238,17 +238,59 @@ class NvidiaSettingsHandler(SettingsHandler):
             else:
                 global_settings["vrr_mode"] = global_gsync
 
+        # Optional auto-cap for VRR profiles (refresh - 3)
+        auto_vrr_fps_cap = bool(settings.pop("auto_vrr_fps_cap", False))
+        forced_refresh_hz = settings.pop("vrr_refresh_rate_hz", None)
+        if auto_vrr_fps_cap:
+            refresh_hz: int | None = None
+            if forced_refresh_hz is not None:
+                with contextlib.suppress(ValueError, TypeError):
+                    refresh_hz = int(float(forced_refresh_hz))
+            if refresh_hz is None:
+                refresh_hz = self._detect_primary_refresh_rate()
+
+            if refresh_hz and refresh_hz > 0:
+                from abso.core.vrr import get_vrr_fps_cap
+
+                auto_cap = get_vrr_fps_cap(refresh_hz)
+                settings["max_frame_rate"] = auto_cap
+                applied.append(f"Auto VRR FPS cap: {auto_cap} (from {refresh_hz} Hz)")
+                logger.info(
+                    f"Auto VRR FPS cap enabled for {game_name}: refresh={refresh_hz}Hz cap={auto_cap}"
+                )
+            else:
+                applied.append(
+                    "NOTE: Auto VRR FPS cap requested but refresh rate could not be detected"
+                )
+                logger.warning(
+                    f"Auto VRR FPS cap requested for {game_name}, but refresh detection failed"
+                )
+
         # Determine what settings to apply
         preset_name = settings.get("preset")
+        allowed_keys = (
+            "low_latency_mode",
+            "power_management",
+            "vsync",
+            "max_frame_rate",
+            "shader_cache",
+            "threaded_optimization",
+            "triple_buffering",
+            "vrr_app_override",
+            "vsync_tear_control",
+            "vsync_vrr_control",
+        )
         if preset_name and preset_name in NVIDIA_PRESETS:
             preset = NVIDIA_PRESETS[preset_name]
             nvidia_settings = preset.get("settings", {}).copy()
+            # Allow per-profile overrides on top of presets (e.g., auto frame cap).
+            for key in allowed_keys:
+                if key in settings:
+                    nvidia_settings[key] = settings[key]
         else:
             nvidia_settings = {
                 k: v for k, v in settings.items()
-                if k in ("low_latency_mode", "power_management", "vsync",
-                         "max_frame_rate", "shader_cache", "threaded_optimization",
-                         "triple_buffering", "vrr_app_override", "vsync_tear_control")
+                if k in allowed_keys
             }
 
         if not nvidia_settings and not global_settings:
@@ -332,7 +374,10 @@ class NvidiaSettingsHandler(SettingsHandler):
 
                 # Post-apply verification: read back settings to confirm they took effect
                 try:
-                    verify_result = manager.get_app_settings(primary_exe)
+                    verify_result = manager.get_app_settings(
+                        primary_exe,
+                        profile_name=profile_name,
+                    )
                     for setting_name, expected_value in result.get("settings_applied", {}).items():
                         if setting_name.startswith("_"):
                             continue
@@ -499,6 +544,57 @@ class NvidiaSettingsHandler(SettingsHandler):
             logger.debug(f"nvidia-smi detection failed: {e}")
 
         return result
+
+    def _detect_primary_refresh_rate(self) -> int | None:
+        """Detect current/maximum refresh rate for the primary display.
+
+        Returns:
+            Refresh rate in Hz, or None when unavailable.
+        """
+        try:
+            from abso.core.detector import HardwareDetector
+
+            monitors = HardwareDetector().detect_monitors()
+            if not monitors:
+                raise RuntimeError("No monitors returned from HardwareDetector")
+
+            primary = next((m for m in monitors if m.get("is_primary")), monitors[0])
+            candidates = [
+                primary.get("refresh_rate"),
+                primary.get("max_refresh_rate"),
+                primary.get("max_refresh_capability"),
+            ]
+
+            numeric: list[int] = []
+            for value in candidates:
+                with contextlib.suppress(ValueError, TypeError):
+                    if value is not None:
+                        numeric.append(int(float(value)))
+
+            if numeric:
+                return max(numeric)
+        except Exception as e:
+            logger.warning(f"Primary refresh rate detection failed: {e}")
+
+        # Fallback path: Windows handler uses ctypes and does not depend on pywin32.
+        try:
+            from abso.settings.windows import WindowsSettingsHandler
+
+            refresh_info = WindowsSettingsHandler()._get_refresh_rate_info()
+            candidates = [refresh_info.get("max"), refresh_info.get("current")]
+            numeric: list[int] = []
+            for value in candidates:
+                with contextlib.suppress(ValueError, TypeError):
+                    if value is not None:
+                        numeric.append(int(float(value)))
+
+            if numeric:
+                return max(numeric)
+        except Exception as e:
+            logger.warning(f"Primary refresh rate fallback detection failed: {e}")
+            return None
+
+        return None
 
     # Keep these methods for backwards compatibility with tests
     def _get_setting_value(self, value: str, setting_type: str) -> int:

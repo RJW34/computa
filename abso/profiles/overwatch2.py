@@ -150,6 +150,8 @@ class Overwatch2GSyncProfile(_Overwatch2BaseProfile):
                 "preset": "reflex_gsync",
                 # Use NVIDIA's predefined OW2 profile to avoid executable binding conflicts.
                 "profile_name": "Overwatch 2",
+                # Enforce VRR-safe cap automatically (refresh-3) to keep VSync as safety net.
+                "auto_vrr_fps_cap": True,
                 # Ensure global G-SYNC is enabled before launching OW2.
                 "global_vrr_mode": "fullscreen_only",
             },

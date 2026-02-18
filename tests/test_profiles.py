@@ -173,6 +173,7 @@ class TestProfileSettings:
         settings = profile.get_settings("NvidiaSettingsHandler")
         assert settings["preset"] == "reflex_gsync"
         assert settings["profile_name"] == "Overwatch 2"
+        assert settings["auto_vrr_fps_cap"] is True
         assert settings["global_vrr_mode"] == "fullscreen_only"
 
     def test_pokemon_auto_chess_windows_settings(self):

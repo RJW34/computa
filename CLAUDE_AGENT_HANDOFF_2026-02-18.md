@@ -111,3 +111,39 @@ The new split makes behavior explicit and predictable:
     - Validates global alias resolution and global apply call flow.
 - Validation:
   - Full suite passed: `871 passed, 1 warning`.
+
+## Follow-up Fixes (OW2 GSYNC Auto FPS Cap + Verification Accuracy)
+- User-observed issue:
+  - Switching to `Overwatch 2 - GSYNC` still allowed OW2 to run at uncapped ~300 FPS.
+  - This happened because `reflex_gsync` intentionally left `max_frame_rate=off` (manual cap assumption).
+- New behavior:
+  - `Overwatch 2 - GSYNC` now sets `auto_vrr_fps_cap: true`.
+  - `NvidiaSettingsHandler` now computes cap = `refresh_rate - 3` and overrides `max_frame_rate` automatically.
+  - Detection path:
+    - Primary: `HardwareDetector.detect_monitors()`
+    - Fallback: `WindowsSettingsHandler._get_refresh_rate_info()` (ctypes path, no pywin32 dependency)
+- Verification fix:
+  - Post-apply readback now queries explicit profile names when provided (`profile_name="Overwatch 2"`), avoiding false mismatch logs from reading `ABSO - Overwatch`.
+- Files changed:
+  - `abso/profiles/overwatch2.py`
+    - Added `auto_vrr_fps_cap: True` to GSYNC variant.
+  - `abso/settings/nvidia/__init__.py`
+    - Added auto VRR cap logic and fallback refresh-rate detection.
+    - Added preset override merge behavior so computed cap overrides preset `max_frame_rate`.
+    - Updated verification call to pass explicit profile name.
+  - `abso/settings/nvidia/nvapi_drs.py`
+    - `get_app_settings` now supports optional `profile_name` parameter for direct profile verification.
+- Tests:
+  - `tests/test_profiles.py`
+    - Assert OW2 GSYNC includes `auto_vrr_fps_cap`.
+  - `tests/test_handlers/test_nvidia.py`
+    - Added auto-cap behavior test (280 Hz -> cap 277).
+    - Added explicit profile-name verification call test.
+    - Added fallback refresh detection test.
+  - `tests/test_handlers/test_nvidia_nvapi_drs.py`
+    - Added explicit profile-name readback test.
+- Runtime verification in this environment:
+  - Applying OW2 GSYNC now reports: `Auto VRR FPS cap: 297 (from 300 Hz)`.
+  - Readback confirms:
+    - OW2 `frame_rate_limiter_v3 = 297`
+    - Base profile `vrr_mode = 1` (fullscreen-only global G-SYNC mode)

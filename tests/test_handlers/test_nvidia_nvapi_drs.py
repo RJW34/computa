@@ -59,3 +59,27 @@ def test_apply_settings_to_global_applies_all_settings():
     assert result["settings_applied"]["vrr_mode"] == "off"
     assert result["settings_applied"]["vsync"] == "off"
     assert manager._apply_single_setting.call_count == 2
+
+
+def test_get_app_settings_prefers_explicit_profile_name():
+    """Explicit profile_name should be used for readback instead of ABSO auto name."""
+    manager = DRSProfileManager()
+
+    fake_profile = object()
+    fake_drs = MagicMock()
+    fake_drs.find_profile_by_name.return_value = fake_profile
+    fake_drs.get_setting.return_value = None
+
+    class _Ctx:
+        def __enter__(self):
+            return fake_drs
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+    manager._drs = _Ctx()
+    result = manager.get_app_settings("Overwatch.exe", profile_name="Overwatch 2")
+
+    fake_drs.find_profile_by_name.assert_called_once_with("Overwatch 2")
+    fake_drs.get_base_profile.assert_not_called()
+    assert result["_profile"] == "Overwatch 2"

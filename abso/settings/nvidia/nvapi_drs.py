@@ -1484,11 +1484,17 @@ class DRSProfileManager:
 
         return setting_id, numeric_value
 
-    def get_app_settings(self, app_executable: str) -> dict[str, Any]:
-        """Get current NVIDIA settings for an application.
+    def get_app_settings(
+        self,
+        app_executable: str | None = None,
+        profile_name: str | None = None,
+    ) -> dict[str, Any]:
+        """Get current NVIDIA settings for an application/profile.
 
         Args:
             app_executable: The executable name.
+            profile_name: Optional explicit profile name. When provided, this
+                profile is read directly.
 
         Returns:
             Dictionary of current settings.
@@ -1497,18 +1503,26 @@ class DRSProfileManager:
 
         try:
             with self._drs as drs:
-                # Look for profile containing this app
-                # For now, try ABSO profile first
-                app_base = app_executable.rsplit(".", 1)[0]
-                profile_name = f"ABSO - {app_base}"
+                profile = None
+                selected_profile_name = None
 
-                profile = drs.find_profile_by_name(profile_name)
+                if profile_name:
+                    profile = drs.find_profile_by_name(profile_name)
+                    selected_profile_name = profile_name
+
+                # Look for profile containing this app
+                # For now, try ABSO profile first when no explicit profile was requested.
+                if not profile and app_executable:
+                    app_base = app_executable.rsplit(".", 1)[0]
+                    selected_profile_name = f"ABSO - {app_base}"
+                    profile = drs.find_profile_by_name(selected_profile_name)
+
                 if not profile:
                     # Check global profile
                     profile = drs.get_base_profile()
                     results["_profile"] = "Base Profile"
                 else:
-                    results["_profile"] = profile_name
+                    results["_profile"] = selected_profile_name
 
                 # Read key settings
                 for name, setting_id in self.SETTING_IDS.items():
