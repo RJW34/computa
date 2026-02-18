@@ -37,21 +37,17 @@ def detect_installed_games() -> list[InstalledGame]:
     """
     games: list[InstalledGame] = []
 
-    # Detect Steam games
-    steam_games = _detect_steam_games()
-    games.extend(steam_games)
-
-    # Detect Epic Games
-    epic_games = _detect_epic_games()
-    games.extend(epic_games)
-
-    # Detect Battle.net games
-    bnet_games = _detect_battlenet_games()
-    games.extend(bnet_games)
-
-    # Detect common standalone locations
-    standalone_games = _detect_standalone_games()
-    games.extend(standalone_games)
+    detectors = [
+        ("steam", _detect_steam_games),
+        ("epic", _detect_epic_games),
+        ("battle_net", _detect_battlenet_games),
+        ("standalone", _detect_standalone_games),
+    ]
+    for name, detector in detectors:
+        try:
+            games.extend(detector())
+        except Exception as e:
+            logger.warning(f"Game detection for '{name}' failed: {e}")
 
     return games
 
@@ -147,15 +143,27 @@ def _detect_steam_games() -> list[InstalledGame]:
         if not library_folder.exists():
             continue
 
+        try:
+            game_folders = list(library_folder.iterdir())
+        except OSError as e:
+            logger.debug(f"Skipping unreadable Steam library folder '{library_folder}': {e}")
+            continue
+
         for game_name, executables in steam_game_patterns.items():
             # Look for game folders that might contain these executables
-            for game_folder in library_folder.iterdir():
+            for game_folder in game_folders:
                 if not game_folder.is_dir():
                     continue
 
                 for exe_name in executables:
                     # Search for executable in game folder (up to 3 levels deep)
-                    for exe_path in game_folder.rglob(exe_name):
+                    try:
+                        matches = list(game_folder.rglob(exe_name))
+                    except OSError as e:
+                        logger.debug(f"Failed to scan '{game_folder}' for '{exe_name}': {e}")
+                        continue
+
+                    for exe_path in matches:
                         if exe_path.is_file():
                             games.append(InstalledGame(
                                 name=game_name,
@@ -197,13 +205,25 @@ def _detect_epic_games() -> list[InstalledGame]:
         if not epic_path.exists():
             continue
 
-        for game_folder in epic_path.iterdir():
+        try:
+            game_folders = list(epic_path.iterdir())
+        except OSError as e:
+            logger.debug(f"Skipping unreadable Epic path '{epic_path}': {e}")
+            continue
+
+        for game_folder in game_folders:
             if not game_folder.is_dir():
                 continue
 
             for game_name, executables in epic_game_patterns.items():
                 for exe_name in executables:
-                    for exe_path in game_folder.rglob(exe_name):
+                    try:
+                        matches = list(game_folder.rglob(exe_name))
+                    except OSError as e:
+                        logger.debug(f"Failed to scan '{game_folder}' for '{exe_name}': {e}")
+                        continue
+
+                    for exe_path in matches:
                         if exe_path.is_file():
                             games.append(InstalledGame(
                                 name=game_name,
@@ -288,7 +308,13 @@ def _detect_standalone_games() -> list[InstalledGame]:
     for slippi_path in slippi_locations:
         if slippi_path.exists():
             for exe_name in ["Slippi Dolphin.exe", "Dolphin.exe"]:
-                for exe_path in slippi_path.rglob(exe_name):
+                try:
+                    matches = list(slippi_path.rglob(exe_name))
+                except OSError as e:
+                    logger.debug(f"Failed to scan standalone path '{slippi_path}' for '{exe_name}': {e}")
+                    continue
+
+                for exe_path in matches:
                     if exe_path.is_file():
                         games.append(InstalledGame(
                             name="Slippi Melee",

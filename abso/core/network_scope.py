@@ -49,39 +49,12 @@ class NetworkScopeManager:
     side effects on streaming, downloads, and general internet usage.
     """
 
-    # Profile types that allow Nagle disable
-    NAGLE_ALLOWED_TYPES = {
+    # Legacy fallback targets for profiles that don't define network_scope metadata.
+    LEGACY_FULL_SCOPE_TARGETS = {
         "minimum_latency",
         "minimum_latency_offline",
         "low_latency_high_fps",
         "stable_online",
-    }
-
-    # Keywords that indicate network-sensitive games
-    NETWORK_SENSITIVE_KEYWORDS = {
-        "rollback",
-        "netcode",
-        "online",
-        "multiplayer",
-        "competitive",
-        "shooter",
-        "fps",
-        "fighting",
-    }
-
-    # Profile IDs that are known network-sensitive
-    NETWORK_SENSITIVE_PROFILES = {
-        "rivals2",
-        "rivals2-online",
-        "rivals2-offline",
-        "rivals2-oled",
-        "rivals2-oled-vrr",
-        "rivals2-oled-vrr-multimon",
-        "cod-bo7",
-        "cod-bo7-oled",
-        "slippi-melee",
-        "slippi-melee-oled",
-        "slippi-melee-vrr",
     }
 
     # Settings that should be scoped (not applied globally)
@@ -104,33 +77,31 @@ class NetworkScopeManager:
         Returns:
             NetworkScope with allowed optimizations.
         """
-        # Check explicit profile ID
-        if profile.profile_id in self.NETWORK_SENSITIVE_PROFILES:
+        # Preferred source of truth: profile metadata.
+        # BaseProfile.network_scope returns one of: full, limited, none.
+        network_scope = getattr(profile, "network_scope", "none")
+        if network_scope == "full":
             return NetworkScope(
                 allow_nagle_disable=True,
                 allow_tcp_optimizations=True,
-                scope_reason=f"Profile '{profile.profile_id}' is network-sensitive",
+                scope_reason=f"Profile '{profile.profile_id}' declares network_scope=full",
+            )
+        if network_scope == "limited":
+            return NetworkScope(
+                allow_nagle_disable=False,
+                allow_tcp_optimizations=True,
+                scope_reason=f"Profile '{profile.profile_id}' declares network_scope=limited",
             )
 
-        # Check optimization target
-        if profile.optimization_target in self.NAGLE_ALLOWED_TYPES:
+        # Legacy fallback for older/custom profiles that may not expose metadata.
+        if profile.optimization_target in self.LEGACY_FULL_SCOPE_TARGETS:
             return NetworkScope(
                 allow_nagle_disable=True,
                 allow_tcp_optimizations=True,
-                scope_reason=f"Target '{profile.optimization_target}' allows network tuning",
+                scope_reason=(
+                    f"Legacy fallback: target '{profile.optimization_target}' allows network tuning"
+                ),
             )
-
-        # Check profile name/description for keywords
-        name_lower = profile.display_name.lower()
-        desc_lower = profile.description.lower()
-
-        for keyword in self.NETWORK_SENSITIVE_KEYWORDS:
-            if keyword in name_lower or keyword in desc_lower:
-                return NetworkScope(
-                    allow_nagle_disable=True,
-                    allow_tcp_optimizations=True,
-                    scope_reason=f"Profile contains network keyword: '{keyword}'",
-                )
 
         # Default: No aggressive network tuning
         return NetworkScope(
