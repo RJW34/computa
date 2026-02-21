@@ -114,6 +114,7 @@ class TestApplyProfile:
         mock_handler.apply.return_value = {"success": True}
 
         mock_profile = MagicMock()
+        mock_profile.requires_confirmed_vrr_support = False
         mock_profile.get_handlers.return_value = [mock_handler]
         mock_profile.get_settings.return_value = {}
         mock_profile.has_in_game_settings.return_value = False
@@ -141,6 +142,7 @@ class TestApplyProfile:
         handler2.apply.return_value = {"success": False, "error": "Failed"}
 
         mock_profile = MagicMock()
+        mock_profile.requires_confirmed_vrr_support = False
         mock_profile.get_handlers.return_value = [handler1, handler2]
         mock_profile.get_settings.return_value = {}
         mock_profile.has_in_game_settings.return_value = False
@@ -165,6 +167,7 @@ class TestApplyProfile:
         handler.apply.side_effect = PermissionError("Access denied")
 
         mock_profile = MagicMock()
+        mock_profile.requires_confirmed_vrr_support = False
         mock_profile.get_handlers.return_value = [handler]
         mock_profile.get_settings.return_value = {}
         mock_profile.has_in_game_settings.return_value = False
@@ -188,6 +191,7 @@ class TestApplyProfile:
         handler.apply.return_value = {"success": True, "requires_reboot": True}
 
         mock_profile = MagicMock()
+        mock_profile.requires_confirmed_vrr_support = False
         mock_profile.get_handlers.return_value = [handler]
         mock_profile.get_settings.return_value = {}
         mock_profile.has_in_game_settings.return_value = False
@@ -404,6 +408,7 @@ class TestProfileOverrides:
         mock_handler.apply.return_value = {"success": True}
 
         mock_profile = MagicMock()
+        mock_profile.requires_confirmed_vrr_support = False
         mock_profile.get_handlers.return_value = [mock_handler]
         mock_profile.get_settings.return_value = {}
         mock_profile.has_in_game_settings.return_value = False
@@ -445,6 +450,7 @@ disabled_handlers:
         mock_handler.apply.return_value = {"success": True}
 
         mock_profile = MagicMock()
+        mock_profile.requires_confirmed_vrr_support = False
         mock_profile.get_handlers.return_value = [mock_handler]
         mock_profile.get_settings.return_value = {"preset": "balanced"}
         mock_profile.has_in_game_settings.return_value = False

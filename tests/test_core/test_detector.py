@@ -307,7 +307,7 @@ class TestParseEdidForVrr:
 
         result = _parse_edid_for_vrr(bytes(edid))
 
-        assert result["vrr_supported"] is True
+        assert result["vrr_supported"] == "hardware"
         assert result["vrr_type"] == "freesync"
         assert result["vrr_min_hz"] == 48
         assert result["vrr_max_hz"] == 144

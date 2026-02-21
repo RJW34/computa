@@ -144,6 +144,23 @@ class CapabilityEngine:
         if confirmed_vrr:
             return
 
+        # Check if hardware capability was detected but VRR isn't confirmed active
+        hardware_capable = [m for m in monitors if m.get("vrr_supported") == "hardware"]
+        if hardware_capable:
+            names = ", ".join(m.get("name", "Unknown") for m in hardware_capable)
+            report.findings.append(
+                CapabilityFinding(
+                    code="VRR_REQUIRED_NOT_ACTIVE",
+                    severity="blocker",
+                    message=(
+                        f"Monitor(s) ({names}) support VRR/FreeSync but active VRR could not be confirmed. "
+                        "Turn on Adaptive Sync/FreeSync in your monitor's OSD menu, "
+                        "enable G-SYNC in NVIDIA Control Panel, then retry."
+                    ),
+                )
+            )
+            return
+
         status_summary = ", ".join(
             f"{m.get('name', 'Unknown')}: {m.get('vrr_supported', 'unknown')}"
             for m in monitors

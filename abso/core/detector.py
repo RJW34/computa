@@ -380,8 +380,12 @@ def _parse_edid_for_vrr(edid: bytes) -> dict[str, Any]:
                     oui = edid[db_offset + 1 : db_offset + 4]
 
                     # AMD FreeSync OUI: 00-1A-00 (stored little-endian: 00 1A 00)
+                    # EDID reports hardware capability, NOT whether VRR is
+                    # currently enabled in the monitor's OSD.  Mark as
+                    # "hardware" so callers can distinguish panel capability
+                    # from confirmed-active VRR.
                     if list(oui) == [0x00, 0x1A, 0x00] or list(oui) == [0x1A, 0x00, 0x00]:
-                        result["vrr_supported"] = True
+                        result["vrr_supported"] = "hardware"
                         result["vrr_type"] = "freesync"
                         # FreeSync range is typically in bytes 5-6 of the data block
                         if length >= 6 and db_offset + 6 < len(edid):
@@ -1127,18 +1131,30 @@ class HardwareDetector:
                         vrr_info["vrr_type"] = gsync_type
 
                     # Method 2: Try EDID parsing for FreeSync/Adaptive-Sync
+                    # EDID reports hardware capability (panel supports VRR),
+                    # not whether VRR is currently enabled in the monitor OSD.
+                    # Returns "hardware" instead of True to indicate unconfirmed.
                     if not vrr_info.get("vrr_supported") and monitor_id:
                         edid_vrr = _detect_vrr_from_edid(monitor_id)
                         if edid_vrr.get("vrr_supported"):
                             vrr_info.update(edid_vrr)
 
-                    # Method 3: Check NVIDIA registry for G-Sync compatible status
-                    if not vrr_info.get("vrr_supported"):
+                    # Method 3: Check NVIDIA registry for G-Sync enabled status
+                    # Always run this (not just as fallback) to cross-reference
+                    # EDID hardware capability with actual driver configuration.
+                    if vrr_info.get("vrr_supported") is not True:
                         gsync_registry = _detect_gsync_from_nvidia_registry()
-                        # G-Sync compatible mode enabled system-wide suggests VRR support
-                        if gsync_registry.get("gsync_enabled_globally") and max_refresh_rate > 60:
-                            vrr_info["vrr_supported"] = True
-                            vrr_info["vrr_type"] = "gsync_compatible"
+                        if gsync_registry.get("gsync_enabled_globally"):
+                            if vrr_info.get("vrr_supported") == "hardware":
+                                # EDID confirmed hardware capability + NVIDIA
+                                # driver has G-SYNC enabled → promote to confirmed
+                                vrr_info["vrr_supported"] = True
+                                if vrr_info.get("vrr_type") not in ("gsync_native", "gsync_ultimate"):
+                                    vrr_info["vrr_type"] = "gsync_compatible"
+                            elif max_refresh_rate > 60:
+                                # No EDID data but NVIDIA says G-SYNC is on
+                                vrr_info["vrr_supported"] = True
+                                vrr_info["vrr_type"] = "gsync_compatible"
 
                     # Method 4: Fall back to heuristics
                     if vrr_info.get("vrr_supported") is None:
