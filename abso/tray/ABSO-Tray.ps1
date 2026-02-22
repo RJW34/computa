@@ -128,18 +128,21 @@ function Play-RestartSound {
     try {
         if (-not $script:TrayConfig.soundEnabled) { return }
         if (Test-Path $script:RestartSoundFile) {
-            # Spawn a detached process to play the sound so it survives
-            # the tray process exiting during restart.
-            $filePath = $script:RestartSoundFile -replace "'", "''"
+            # Spawn a detached process so the sound survives the tray
+            # exiting.  Use -EncodedCommand to avoid quoting issues.
             $vol = $script:TrayConfig.soundVolume
-            $cmd = "Add-Type -AssemblyName PresentationCore; " +
-                   "`$p = New-Object System.Windows.Media.MediaPlayer; " +
-                   "`$p.Open([Uri]'$filePath'); " +
-                   "`$p.Volume = $vol; " +
-                   "Start-Sleep -Milliseconds 200; " +
-                   "`$p.Play(); " +
-                   "Start-Sleep -Seconds 3"
-            Start-Process powershell.exe -ArgumentList "-NoProfile", "-WindowStyle", "Hidden", "-Command", $cmd -WindowStyle Hidden
+            $soundCmd = @"
+Add-Type -AssemblyName PresentationCore
+`$p = New-Object System.Windows.Media.MediaPlayer
+`$p.Open([Uri]'$($script:RestartSoundFile)')
+`$p.Volume = $vol
+Start-Sleep -Milliseconds 300
+`$p.Play()
+Start-Sleep -Seconds 3
+"@
+            $bytes = [System.Text.Encoding]::Unicode.GetBytes($soundCmd)
+            $encoded = [Convert]::ToBase64String($bytes)
+            Start-Process powershell.exe -ArgumentList "-NoProfile", "-WindowStyle", "Hidden", "-EncodedCommand", $encoded -WindowStyle Hidden
             Write-TrayLog "Playing restart sound (detached)"
         }
         else {
