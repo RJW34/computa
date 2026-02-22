@@ -479,6 +479,22 @@ def _detect_gsync_from_nvidia_registry() -> dict[str, Any]:
     except OSError as e:
         logger.debug(f"G-Sync registry detection failed: {e}")
 
+    # Fallback: Modern drivers (591+) store G-SYNC in the DRS global profile
+    # rather than the legacy registry paths above.  Query NVAPI directly.
+    if not result["gsync_enabled_globally"]:
+        try:
+            from abso.settings.nvidia.nvapi_drs import DRSProfileManager
+
+            mgr = DRSProfileManager()
+            global_settings = mgr.get_app_settings()
+            # vrr_mode: 0=disabled, 1=fullscreen_only, 2=fullscreen_and_windowed
+            vrr_mode = global_settings.get("vrr_mode")
+            if vrr_mode is not None and vrr_mode >= 1:
+                result["gsync_enabled_globally"] = True
+                logger.debug(f"G-Sync detected via DRS global vrr_mode={vrr_mode}")
+        except Exception as e:
+            logger.debug(f"DRS G-Sync detection fallback failed: {e}")
+
     return result
 
 
