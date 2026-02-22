@@ -2172,7 +2172,7 @@ public class HotkeyMessageWindow : NativeWindow {
                 # Multiple profiles — create a flyout submenu
                 $firstProfile = $script:Profiles[$profileIds[0]]
                 $submenuItem = New-Object System.Windows.Forms.ToolStripMenuItem
-                $submenuItem.Text = "      $($firstProfile.Name -replace ':.*$', '')"
+                $submenuItem.Text = "      $($firstProfile.Name -replace '(:|\s+-\s+).*$', '')"
                 $submenuItem.Tag = $cat
                 $submenuItem.BackColor = $script:Colors.Background
                 $submenuItem.ForeColor = $catColor
