@@ -1336,16 +1336,11 @@ function Update-MenuState {
         }
         else {
             if ($inSubmenu) {
-                # Rebuild submenu text with sync badge
-                $sm = if ($p.SyncMode) { $p.SyncMode } else { "agnostic" }
-                $badge = switch ($sm) { "off" { "[NS]  " } "on" { "[GS]  " } default { "" } }
-                $item.Text = "$badge$($p.Name)"
+                $item.Text = $p.Name
             } else {
                 $isFav = Test-Favorite -ProfileId $item.Tag -Config $script:TrayConfig
                 $starPrefix = if ($isFav) { "[*] " } else { "      " }
-                $sm = if ($p.SyncMode) { $p.SyncMode } else { "agnostic" }
-                $badgeSuffix = switch ($sm) { "off" { "  [NS]" } "on" { "  [GS]" } default { "" } }
-                $item.Text = "$starPrefix$($p.Name)$badgeSuffix"
+                $item.Text = "$starPrefix$($p.Name)"
             }
             $item.ForeColor = $catColor
             $item.Font = $script:FontNormal
@@ -2072,32 +2067,25 @@ public class HotkeyMessageWindow : NativeWindow {
         return $ProfileId
     }
 
-    function Get-SyncBadge {
-        param([string]$ProfileId)
-        $p = $script:Profiles[$ProfileId]
-        $sm = if ($p.SyncMode) { $p.SyncMode } else { "agnostic" }
-        switch ($sm) {
-            "off"      { return "[NS]" }
-            "on"       { return "[GS]" }
-            default    { return "" }
-        }
-    }
-
     # Helper to create a profile menu item (used in both direct items and submenus)
     function New-ProfileMenuItem {
         param([string]$ProfileId, [bool]$InSubmenu = $false, [bool]$ShowBadge = $false)
         $p = $script:Profiles[$ProfileId]
         $isFav = Test-Favorite -ProfileId $ProfileId -Config $script:TrayConfig
-        $badge = if ($ShowBadge) { Get-SyncBadge -ProfileId $ProfileId } else { "" }
 
         $item = New-Object System.Windows.Forms.ToolStripMenuItem
         if ($InSubmenu) {
-            $prefix = if ($badge) { "$badge  " } else { "" }
-            $item.Text = "$prefix$($p.Name)"
+            $item.Text = $p.Name
         } else {
-            $badgeSuffix = if ($badge) { "  $badge" } else { "" }
             $starPrefix = if ($isFav) { "[*] " } else { "      " }
-            $item.Text = "$starPrefix$($p.Name)$badgeSuffix"
+            $item.Text = "$starPrefix$($p.Name)"
+        }
+
+        # Set sync badge icon if applicable
+        if ($ShowBadge) {
+            $sm = if ($p.SyncMode) { $p.SyncMode } else { "agnostic" }
+            $badgeImg = New-SyncBadgeImage -SyncMode $sm
+            if ($badgeImg) { $item.Image = $badgeImg }
         }
         $item.Tag = $ProfileId
         $item.BackColor = $script:Colors.Background

@@ -430,3 +430,71 @@ function New-CategoryIcon {
     $bmp.Dispose()
     return $icon
 }
+
+function New-SyncBadgeImage {
+    <#
+    .SYNOPSIS
+    Creates a 16x16 bitmap badge for sync mode display on menu items.
+    .PARAMETER SyncMode
+    "on" = G-SYNC/VRR (NVIDIA green pill with white "G"),
+    "off" = No-Sync (amber pill with white prohibition symbol).
+    Returns $null for "agnostic" or unknown modes.
+    #>
+    param([string]$SyncMode)
+
+    if ($SyncMode -ne "on" -and $SyncMode -ne "off") { return $null }
+
+    $bmp = New-Object System.Drawing.Bitmap(16, 16)
+    $g = [System.Drawing.Graphics]::FromImage($bmp)
+    $g.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
+    $g.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic
+    $g.Clear([System.Drawing.Color]::Transparent)
+
+    if ($SyncMode -eq "on") {
+        # G-SYNC badge: NVIDIA green (#76B900) rounded pill with white "G"
+        $bgBrush = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::FromArgb(255, 118, 185, 0))
+        # Draw rounded pill shape
+        $g.FillEllipse($bgBrush, 0, 1, 6, 6)
+        $g.FillEllipse($bgBrush, 10, 1, 6, 6)
+        $g.FillEllipse($bgBrush, 0, 9, 6, 6)
+        $g.FillEllipse($bgBrush, 10, 9, 6, 6)
+        $g.FillRectangle($bgBrush, 3, 1, 10, 14)
+        $g.FillRectangle($bgBrush, 0, 4, 16, 8)
+
+        # White "G" — instantly recognizable as G-SYNC
+        $font = New-Object System.Drawing.Font("Segoe UI", 8.5, [System.Drawing.FontStyle]::Bold)
+        $textBrush = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::White)
+        $sf = New-Object System.Drawing.StringFormat
+        $sf.Alignment = [System.Drawing.StringAlignment]::Center
+        $sf.LineAlignment = [System.Drawing.StringAlignment]::Center
+        $rect = New-Object System.Drawing.RectangleF(0, 0, 16, 16)
+        $g.DrawString("G", $font, $textBrush, $rect, $sf)
+        $font.Dispose()
+        $textBrush.Dispose()
+        $sf.Dispose()
+        $bgBrush.Dispose()
+    }
+    else {
+        # No-Sync badge: Amber pill with white circle-slash (prohibition symbol)
+        $bgBrush = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::FromArgb(255, 210, 150, 40))
+        # Draw rounded pill shape
+        $g.FillEllipse($bgBrush, 0, 1, 6, 6)
+        $g.FillEllipse($bgBrush, 10, 1, 6, 6)
+        $g.FillEllipse($bgBrush, 0, 9, 6, 6)
+        $g.FillEllipse($bgBrush, 10, 9, 6, 6)
+        $g.FillRectangle($bgBrush, 3, 1, 10, 14)
+        $g.FillRectangle($bgBrush, 0, 4, 16, 8)
+
+        # White circle with diagonal slash — universal "off/disabled"
+        $pen = New-Object System.Drawing.Pen([System.Drawing.Color]::White, 1.6)
+        $pen.StartCap = [System.Drawing.Drawing2D.LineCap]::Round
+        $pen.EndCap = [System.Drawing.Drawing2D.LineCap]::Round
+        $g.DrawEllipse($pen, 3, 3, 10, 10)
+        $g.DrawLine($pen, 5, 5, 11, 11)
+        $pen.Dispose()
+        $bgBrush.Dispose()
+    }
+
+    $g.Dispose()
+    return $bmp
+}
