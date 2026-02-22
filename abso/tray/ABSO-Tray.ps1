@@ -445,6 +445,22 @@ $script:Profiles = [ordered]@{
         Desc     = "Simulates tournament PCs. 144Hz forced, no G-Sync, no Ultra, Ultimate Performance."
         Exes     = @("Rivals2-Win64-Shipping.exe", "RivalsofAether2.exe", "Rivals2.exe")
     }
+    "rivals2-gsync" = @{
+        Name     = "Rivals 2: G-SYNC"
+        Sub      = "LLM ON | G-SYNC ON | VSync Safety Net"
+        Cat      = "Fighting"
+        Desc     = "Low latency VRR profile. G-SYNC ON, VSync safety net, auto FPS cap at refresh-3."
+        Exes     = @("Rivals2-Win64-Shipping.exe", "RivalsofAether2.exe", "Rivals2.exe")
+        SyncMode = "on"
+    }
+    "rivals2-online-gsync" = @{
+        Name     = "Rivals 2: Online G-SYNC"
+        Sub      = "G-SYNC ON | Rollback-Safe | VRR"
+        Cat      = "Fighting"
+        Desc     = "Rollback-safe VRR profile. G-SYNC ON, stability-focused, conservative priority."
+        Exes     = @("Rivals2-Win64-Shipping.exe", "RivalsofAether2.exe", "Rivals2.exe")
+        SyncMode = "on"
+    }
     "rivals2-300hz-max" = @{
         Name     = "Rivals 2: 300Hz MAX"
         Sub      = "LLM ON | 300Hz | No Sync"
@@ -575,8 +591,10 @@ function Get-CategoryFromOptimizationTarget {
         "productivity" { return "Productivity" }
         "low_latency_high_fps" { return "Shooter" }
         "stable_online" { return "Fighting" }
+        "stable_online_vrr" { return "Fighting" }
         "minimum_latency" { return "Fighting" }
         "minimum_latency_offline" { return "Fighting" }
+        "low_latency_vrr" { return "Fighting" }
         "tournament_simulation" { return "Fighting" }
         "balanced" { return "Other" }
         "smooth_framerate" { return "Other" }
