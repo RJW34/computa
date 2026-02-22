@@ -5,6 +5,7 @@ from __future__ import annotations
 import ctypes
 import logging
 import winreg
+from ctypes import wintypes
 from typing import Any
 
 from abso.core.models import Issue
@@ -20,6 +21,89 @@ ENUM_CURRENT_SETTINGS = -1
 DISP_CHANGE_SUCCESSFUL = 0
 CDS_UPDATEREGISTRY = 0x00000001
 CDS_TEST = 0x00000002
+
+# CCD API constants for HDR control
+QDC_ONLY_ACTIVE_PATHS = 0x00000002
+DISPLAYCONFIG_DEVICE_INFO_GET_ADVANCED_COLOR_INFO = 9
+DISPLAYCONFIG_DEVICE_INFO_SET_ADVANCED_COLOR_STATE = 10
+
+
+class _LUID(ctypes.Structure):
+    _fields_ = [("LowPart", wintypes.DWORD), ("HighPart", wintypes.LONG)]
+
+
+class DISPLAYCONFIG_DEVICE_INFO_HEADER(ctypes.Structure):
+    _fields_ = [
+        ("type", wintypes.UINT),
+        ("size", wintypes.UINT),
+        ("adapterId", _LUID),
+        ("id", wintypes.UINT),
+    ]
+
+
+class DISPLAYCONFIG_GET_ADVANCED_COLOR_INFO(ctypes.Structure):
+    """Query structure for advanced color (HDR) info per display target.
+
+    The 'value' field is a bitfield:
+      bit 0: advancedColorSupported
+      bit 1: advancedColorEnabled
+      bit 2: wideColorEnforced
+      bit 3: advancedColorForceDisabled
+    """
+    _fields_ = [
+        ("header", DISPLAYCONFIG_DEVICE_INFO_HEADER),
+        ("value", wintypes.UINT),
+        ("colorEncoding", wintypes.UINT),
+        ("bitsPerColorChannel", wintypes.UINT),
+    ]
+
+
+class DISPLAYCONFIG_SET_ADVANCED_COLOR_STATE(ctypes.Structure):
+    """Set structure for toggling advanced color (HDR) per display target.
+
+    The 'value' field is a bitfield:
+      bit 0: enableAdvancedColor (1=on, 0=off)
+    """
+    _fields_ = [
+        ("header", DISPLAYCONFIG_DEVICE_INFO_HEADER),
+        ("value", wintypes.UINT),
+    ]
+
+
+class DISPLAYCONFIG_PATH_SOURCE_INFO(ctypes.Structure):
+    _fields_ = [
+        ("adapterId", _LUID),
+        ("id", wintypes.UINT),
+        ("modeInfoIdx", wintypes.UINT),
+        ("statusFlags", wintypes.UINT),
+    ]
+
+
+class DISPLAYCONFIG_RATIONAL(ctypes.Structure):
+    _fields_ = [("Numerator", wintypes.UINT), ("Denominator", wintypes.UINT)]
+
+
+class DISPLAYCONFIG_PATH_TARGET_INFO(ctypes.Structure):
+    _fields_ = [
+        ("adapterId", _LUID),
+        ("id", wintypes.UINT),
+        ("modeInfoIdx", wintypes.UINT),
+        ("outputTechnology", wintypes.UINT),
+        ("rotation", wintypes.UINT),
+        ("scaling", wintypes.UINT),
+        ("refreshRate", DISPLAYCONFIG_RATIONAL),
+        ("scanLineOrdering", wintypes.UINT),
+        ("targetAvailable", wintypes.BOOL),
+        ("statusFlags", wintypes.UINT),
+    ]
+
+
+class DISPLAYCONFIG_PATH_INFO(ctypes.Structure):
+    _fields_ = [
+        ("sourceInfo", DISPLAYCONFIG_PATH_SOURCE_INFO),
+        ("targetInfo", DISPLAYCONFIG_PATH_TARGET_INFO),
+        ("flags", wintypes.UINT),
+    ]
 
 
 class DEVMODE(ctypes.Structure):
@@ -493,44 +577,79 @@ class WindowsSettingsHandler(SettingsHandler):
         finally:
             winreg.CloseKey(key)
 
-    def _get_hdr(self) -> dict[str, bool] | bool | None:
-        """Get Windows HDR status for all monitors.
+    @staticmethod
+    def _get_active_display_targets() -> list[tuple[_LUID, int]]:
+        """Enumerate active display targets via QueryDisplayConfig.
 
-        HDR is per-monitor via HDREnabled (primary) in MonitorDataStore.
+        Returns:
+            List of (adapterId, targetId) tuples for each active display.
+        """
+        user32 = ctypes.windll.user32
+        num_paths = wintypes.UINT()
+        num_modes = wintypes.UINT()
+
+        status = user32.GetDisplayConfigBufferSizes(
+            QDC_ONLY_ACTIVE_PATHS,
+            ctypes.byref(num_paths),
+            ctypes.byref(num_modes),
+        )
+        if status != 0 or num_paths.value == 0:
+            return []
+
+        paths = (DISPLAYCONFIG_PATH_INFO * num_paths.value)()
+        # We only need paths, not modes, but the API requires the modes buffer
+        modes_buf = (ctypes.c_byte * (num_modes.value * 64))()
+
+        status = user32.QueryDisplayConfig(
+            QDC_ONLY_ACTIVE_PATHS,
+            ctypes.byref(num_paths),
+            paths,
+            ctypes.byref(num_modes),
+            modes_buf,
+            None,
+        )
+        if status != 0:
+            return []
+
+        targets: list[tuple[_LUID, int]] = []
+        for i in range(num_paths.value):
+            t = paths[i].targetInfo
+            targets.append((t.adapterId, t.id))
+        return targets
+
+    def _get_hdr(self) -> bool | None:
+        """Get Windows HDR status using the CCD DisplayConfig API.
+
+        Queries each active display target for advanced color (HDR) state.
         Returns True if ANY monitor has HDR enabled, False if all off, None if unavailable.
         """
-        monitor_hdr: dict[str, bool] = {}
         try:
-            key = winreg.OpenKey(
-                winreg.HKEY_LOCAL_MACHINE,
-                r"SYSTEM\CurrentControlSet\Control\GraphicsDrivers\MonitorDataStore",
-                0,
-                winreg.KEY_READ
-            )
-            i = 0
-            while True:
-                try:
-                    subkey_name = winreg.EnumKey(key, i)
-                    subkey = winreg.OpenKey(key, subkey_name, 0, winreg.KEY_READ)
-                    try:
-                        # HDREnabled is the primary toggle
-                        value = winreg.QueryValueEx(subkey, "HDREnabled")[0]
-                        monitor_hdr[subkey_name] = bool(value)
-                    except FileNotFoundError:
-                        # HDREnabled not set - monitor likely doesn't support HDR
-                        pass
-                    winreg.CloseKey(subkey)
-                    i += 1
-                except OSError:
-                    break
-            winreg.CloseKey(key)
+            targets = self._get_active_display_targets()
+            if not targets:
+                return None
 
-            # Return True if ANY monitor has HDR enabled
-            if monitor_hdr:
-                return any(monitor_hdr.values())
-            return None
+            any_enabled = False
+            for adapter_id, target_id in targets:
+                info = DISPLAYCONFIG_GET_ADVANCED_COLOR_INFO()
+                info.header.type = DISPLAYCONFIG_DEVICE_INFO_GET_ADVANCED_COLOR_INFO
+                info.header.size = ctypes.sizeof(info)
+                info.header.adapterId = adapter_id
+                info.header.id = target_id
+
+                status = ctypes.windll.user32.DisplayConfigGetDeviceInfo(
+                    ctypes.byref(info)
+                )
+                if status != 0:
+                    continue
+
+                # bit 1 of value = advancedColorEnabled
+                if info.value & 0x02:
+                    any_enabled = True
+                    break
+
+            return any_enabled
         except Exception as e:
-            logger.debug(f"Failed to get HDR status: {e}")
+            logger.debug(f"CCD HDR detection failed: {e}")
             return None
 
     def _is_monitor_hdr_capable(self, monitor_id: str) -> bool:
@@ -588,11 +707,15 @@ class WindowsSettingsHandler(SettingsHandler):
         return False
 
     def _set_hdr(self, enabled: bool) -> dict[str, Any]:
-        """Set Windows HDR status intelligently per-monitor.
+        """Set Windows HDR status using the CCD DisplayConfig API.
+
+        Uses DisplayConfigSetDeviceInfo with ADVANCED_COLOR_STATE to
+        actually toggle HDR on the display pipeline.  Registry-only writes
+        do NOT take effect on modern Windows 11.
 
         For HDR enable requests:
-        - Only enables HDR on monitors detected as HDR-capable
-        - Leaves SDR monitors unchanged (HDR disabled)
+        - Only enables HDR on monitors that report advancedColorSupported
+        - Leaves SDR monitors unchanged
 
         For HDR disable requests:
         - Disables HDR on all monitors
@@ -610,70 +733,76 @@ class WindowsSettingsHandler(SettingsHandler):
         }
 
         try:
-            key = winreg.OpenKey(
-                winreg.HKEY_LOCAL_MACHINE,
-                r"SYSTEM\CurrentControlSet\Control\GraphicsDrivers\MonitorDataStore",
-                0,
-                winreg.KEY_READ
-            )
-            monitor_keys: list[str] = []
-            i = 0
-            while True:
-                try:
-                    subkey_name = winreg.EnumKey(key, i)
-                    monitor_keys.append(subkey_name)
-                    i += 1
-                except OSError:
-                    break
-            winreg.CloseKey(key)
+            targets = self._get_active_display_targets()
+            if not targets:
+                result["errors"].append("No active display targets found")
+                result["success"] = False
+                return result
 
-            # Set HDR values per-monitor based on capability
-            for monitor_id in monitor_keys:
+            user32 = ctypes.windll.user32
+
+            for adapter_id, target_id in targets:
                 try:
-                    # Determine what value to set for this monitor
+                    # Query current advanced color info for this target
+                    info = DISPLAYCONFIG_GET_ADVANCED_COLOR_INFO()
+                    info.header.type = DISPLAYCONFIG_DEVICE_INFO_GET_ADVANCED_COLOR_INFO
+                    info.header.size = ctypes.sizeof(info)
+                    info.header.adapterId = adapter_id
+                    info.header.id = target_id
+
+                    status = user32.DisplayConfigGetDeviceInfo(ctypes.byref(info))
+                    if status != 0:
+                        logger.debug(
+                            f"DisplayConfigGetDeviceInfo failed for target {target_id}: {status}"
+                        )
+                        continue
+
+                    supported = bool(info.value & 0x01)  # bit 0: advancedColorSupported
+                    currently_enabled = bool(info.value & 0x02)  # bit 1: advancedColorEnabled
+
                     if enabled:
-                        # Only enable HDR on capable monitors
-                        if self._is_monitor_hdr_capable(monitor_id):
-                            value = 1
-                            action = "enabled (HDR-capable)"
-                            result["hdr_capable_count"] += 1
-                        else:
-                            value = 0
-                            action = "kept disabled (SDR monitor)"
+                        if not supported:
+                            logger.debug(f"Target {target_id}: SDR monitor, skipping HDR enable")
+                            continue
+                        result["hdr_capable_count"] += 1
+                        if currently_enabled:
+                            # Already on, count it
+                            result["hdr_enabled_count"] += 1
+                            logger.debug(f"Target {target_id}: HDR already enabled")
+                            continue
                     else:
-                        # Disable HDR on all monitors
-                        value = 0
-                        action = "disabled"
+                        if not currently_enabled:
+                            logger.debug(f"Target {target_id}: HDR already disabled")
+                            continue
 
-                    subkey = winreg.OpenKey(
-                        winreg.HKEY_LOCAL_MACHINE,
-                        rf"SYSTEM\CurrentControlSet\Control\GraphicsDrivers\MonitorDataStore\{monitor_id}",
-                        0,
-                        winreg.KEY_ALL_ACCESS
-                    )
-                    winreg.SetValueEx(subkey, "HDREnabled", 0, winreg.REG_DWORD, value)
-                    winreg.SetValueEx(subkey, "AdvancedColorEnabled", 0, winreg.REG_DWORD, value)
-                    winreg.CloseKey(subkey)
-                    logger.info(f"HDR {action} for monitor: {monitor_id}")
+                    # Set advanced color state
+                    state = DISPLAYCONFIG_SET_ADVANCED_COLOR_STATE()
+                    state.header.type = DISPLAYCONFIG_DEVICE_INFO_SET_ADVANCED_COLOR_STATE
+                    state.header.size = ctypes.sizeof(state)
+                    state.header.adapterId = adapter_id
+                    state.header.id = target_id
+                    state.value = 1 if enabled else 0  # bit 0: enableAdvancedColor
 
-                    if value == 1:
-                        result["hdr_enabled_count"] += 1
+                    status = user32.DisplayConfigSetDeviceInfo(ctypes.byref(state))
+                    if status != 0:
+                        error_msg = (
+                            f"DisplayConfigSetDeviceInfo failed for target {target_id}: "
+                            f"error {status}"
+                        )
+                        logger.error(error_msg)
+                        result["errors"].append(error_msg)
+                        result["success"] = False
+                    else:
+                        action = "enabled" if enabled else "disabled"
+                        logger.info(f"HDR {action} for display target {target_id}")
+                        if enabled:
+                            result["hdr_enabled_count"] += 1
 
-                except PermissionError:
-                    error_msg = f"Permission denied setting HDR for monitor: {monitor_id}"
-                    logger.warning(error_msg)
-                    result["errors"].append(error_msg)
-                    result["success"] = False
                 except Exception as e:
-                    error_msg = f"Failed to set HDR for monitor {monitor_id}: {e}"
+                    error_msg = f"Failed to set HDR for target {target_id}: {e}"
                     logger.error(error_msg)
                     result["errors"].append(error_msg)
                     result["success"] = False
-
-            # If HDR was requested but no capable monitors found, that's not an error
-            # but we should note it
-            if enabled and result["hdr_capable_count"] == 0:
-                logger.info("No HDR-capable monitors detected")
 
         except Exception as e:
             error_msg = f"Failed to set HDR: {e}"
