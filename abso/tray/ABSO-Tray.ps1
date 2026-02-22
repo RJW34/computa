@@ -2148,12 +2148,12 @@ public class HotkeyMessageWindow : NativeWindow {
     $mergedOther = @()
     if ($catGameGroups.Contains("ARPG")) {
         foreach ($gg in $catGameGroups["ARPG"].Keys) {
-            foreach ($pid in $catGameGroups["ARPG"][$gg]) { $mergedOther += $pid }
+            foreach ($profId in $catGameGroups["ARPG"][$gg]) { $mergedOther += $profId }
         }
     }
     if ($catGameGroups.Contains("Other")) {
         foreach ($gg in $catGameGroups["Other"].Keys) {
-            foreach ($pid in $catGameGroups["Other"][$gg]) { $mergedOther += $pid }
+            foreach ($profId in $catGameGroups["Other"][$gg]) { $mergedOther += $profId }
         }
     }
 
@@ -2190,8 +2190,8 @@ public class HotkeyMessageWindow : NativeWindow {
                 $submenuItem.ForeColor = $catColor
                 $submenuItem.Font = New-Object System.Drawing.Font("Segoe UI", 9)
 
-                foreach ($pid in $profileIds) {
-                    $subItem = New-ProfileMenuItem -ProfileId $pid -InSubmenu $true -ShowBadge $true
+                foreach ($profId in $profileIds) {
+                    $subItem = New-ProfileMenuItem -ProfileId $profId -InSubmenu $true -ShowBadge $true
                     $submenuItem.DropDownItems.Add($subItem) | Out-Null
                     $script:profileMenuItems += $subItem
                 }
@@ -2215,8 +2215,8 @@ public class HotkeyMessageWindow : NativeWindow {
         $menu.Items.Add($otherCatItem) | Out-Null
         $script:categoryHeaders += $otherCatItem
 
-        foreach ($pid in $mergedOther) {
-            $item = New-ProfileMenuItem -ProfileId $pid
+        foreach ($profId in $mergedOther) {
+            $item = New-ProfileMenuItem -ProfileId $profId
             $menu.Items.Add($item) | Out-Null
             $script:profileMenuItems += $item
         }
@@ -2232,8 +2232,8 @@ public class HotkeyMessageWindow : NativeWindow {
         $streamingSubmenu.ForeColor = $streamColor
         $streamingSubmenu.Font = New-Object System.Drawing.Font("Segoe UI", 8.5, [System.Drawing.FontStyle]::Bold)
 
-        foreach ($pid in $streamingProfiles) {
-            $subItem = New-ProfileMenuItem -ProfileId $pid -InSubmenu $true
+        foreach ($profId in $streamingProfiles) {
+            $subItem = New-ProfileMenuItem -ProfileId $profId -InSubmenu $true
             $streamingSubmenu.DropDownItems.Add($subItem) | Out-Null
             $script:profileMenuItems += $subItem
         }
