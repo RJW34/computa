@@ -1313,12 +1313,18 @@ function Update-MenuState {
         $item.Checked = $isActive
 
         $p = $script:Profiles[$item.Tag]
-        $isFav = Test-Favorite -ProfileId $item.Tag -Config $script:TrayConfig
-        $starPrefix = if ($isFav) { "[*] " } else { "      " }
+        if (-not $p) { continue }
         $catColor = Get-CategoryColor -Category $p.Cat -Fallback $script:Colors.Text
 
+        # Items inside submenus (OwnerItem is a ToolStripMenuItem) vs top-level items
+        $inSubmenu = ($null -ne $item.OwnerItem -and $item.OwnerItem -is [System.Windows.Forms.ToolStripMenuItem])
+
         if ($isActive) {
-            $item.Text = "  >>  $($p.Name)"
+            if ($inSubmenu) {
+                $item.Text = ">> $($p.Name)"
+            } else {
+                $item.Text = "  >>  $($p.Name)"
+            }
             $item.ForeColor = [System.Drawing.Color]::FromArgb(
                 255,
                 [Math]::Min(255, $catColor.R + 30),
@@ -1329,13 +1335,24 @@ function Update-MenuState {
             $item.BackColor = Blend-Color -Base $script:Colors.Background -Overlay $catColor -Ratio 0.15
         }
         else {
-            $item.Text = "$starPrefix$($p.Name)"
+            if ($inSubmenu) {
+                # Rebuild submenu text with sync badge
+                $sm = if ($p.SyncMode) { $p.SyncMode } else { "agnostic" }
+                $badge = switch ($sm) { "off" { "[NS]  " } "on" { "[GS]  " } default { "" } }
+                $item.Text = "$badge$($p.Name)"
+            } else {
+                $isFav = Test-Favorite -ProfileId $item.Tag -Config $script:TrayConfig
+                $starPrefix = if ($isFav) { "[*] " } else { "      " }
+                $sm = if ($p.SyncMode) { $p.SyncMode } else { "agnostic" }
+                $badgeSuffix = switch ($sm) { "off" { "  [NS]" } "on" { "  [GS]" } default { "" } }
+                $item.Text = "$starPrefix$($p.Name)$badgeSuffix"
+            }
             $item.ForeColor = $catColor
             $item.Font = $script:FontNormal
             $item.BackColor = $script:Colors.Background
         }
     }
-    $script:restoreItem.Enabled = ($null -ne $script:activeProfile)
+    if ($script:restoreItem) { $script:restoreItem.Enabled = ($null -ne $script:activeProfile) }
 
     if ($script:activeProfile) {
         $p = $script:Profiles[$script:activeProfile]
@@ -1769,9 +1786,6 @@ function Start-TrayApp {
     }
     $script:profileMenuItems = @()
 
-    # Get system info
-    $sysInfo = Get-SystemInfo
-
     # ═══════════════════════════════════════════════════════════════════════
     # HIDDEN FORM FOR HOTKEYS (WM_HOTKEY receiver)
     # ═══════════════════════════════════════════════════════════════════════
@@ -1878,51 +1892,10 @@ public class HotkeyMessageWindow : NativeWindow {
     $subheader.Font = New-Object System.Drawing.Font("Segoe UI", 7.5)
     $menu.Items.Add($subheader) | Out-Null
 
-    # ─── SYSTEM INFO ───
-
-    $menu.Items.Add((New-Object System.Windows.Forms.ToolStripSeparator)) | Out-Null
-
-    $sysLabel = New-Object System.Windows.Forms.ToolStripMenuItem
-    $sysLabel.Text = "  SYSTEM"
-    $sysLabel.Enabled = $false
-    $sysLabel.BackColor = $script:Colors.BackgroundDark
-    $sysLabel.ForeColor = [System.Drawing.Color]::FromArgb(255, 100, 110, 130)
-    $sysLabel.Font = New-Object System.Drawing.Font("Segoe UI", 7, [System.Drawing.FontStyle]::Bold)
-    $menu.Items.Add($sysLabel) | Out-Null
-
-    $gpuInfo = New-Object System.Windows.Forms.ToolStripMenuItem
-    $gpuInfo.Text = "      GPU: $($sysInfo.GPU)"
-    $gpuInfo.Enabled = $false
-    $gpuInfo.BackColor = $script:Colors.Background
-    $gpuInfo.ForeColor = $script:Colors.AccentTeal
-    $gpuInfo.Font = New-Object System.Drawing.Font("Consolas", 8)
-    $menu.Items.Add($gpuInfo) | Out-Null
-
-    $monInfo = New-Object System.Windows.Forms.ToolStripMenuItem
-    $monInfo.Text = "      Display: $($sysInfo.Monitor) @ $($sysInfo.RefreshRate)"
-    $monInfo.Enabled = $false
-    $monInfo.BackColor = $script:Colors.Background
-    $monInfo.ForeColor = $script:Colors.AccentBlue
-    $monInfo.Font = New-Object System.Drawing.Font("Consolas", 8)
-    $menu.Items.Add($monInfo) | Out-Null
-
-    $script:statusItem = New-Object System.Windows.Forms.ToolStripMenuItem
-    $script:statusItem.Text = "      Status: Ready"
-    $script:statusItem.Enabled = $false
-    $script:statusItem.BackColor = $script:Colors.Background
-    $script:statusItem.ForeColor = $script:Colors.AccentGreen
-    $script:statusItem.Font = New-Object System.Drawing.Font("Consolas", 8)
-    $menu.Items.Add($script:statusItem) | Out-Null
-
-    # Audit status (hidden by default)
-    $script:auditStatusItem = New-Object System.Windows.Forms.ToolStripMenuItem
-    $script:auditStatusItem.Text = ""
-    $script:auditStatusItem.Enabled = $false
-    $script:auditStatusItem.BackColor = $script:Colors.Background
-    $script:auditStatusItem.ForeColor = $script:Colors.TextDim
-    $script:auditStatusItem.Font = New-Object System.Drawing.Font("Consolas", 8)
-    $script:auditStatusItem.Visible = $false
-    $menu.Items.Add($script:auditStatusItem) | Out-Null
+    # Status/audit items — not shown in menu, but kept as state holders
+    # for Update-MenuState and Run-Audit which reference them.
+    $script:statusItem = $null
+    $script:auditStatusItem = $null
 
     # ─── SEARCH ───
 
@@ -1960,12 +1933,30 @@ public class HotkeyMessageWindow : NativeWindow {
             foreach ($item in $script:profileMenuItems) {
                 $item.Visible = ($matchedIds -contains $item.Tag)
             }
+            # Show/hide game group submenus based on whether any children match
+            foreach ($submenuItem in $script:gameGroupSubmenus) {
+                $hasVisible = $false
+                foreach ($child in $submenuItem.DropDownItems) {
+                    if ($child -is [System.Windows.Forms.ToolStripMenuItem] -and $child.Visible) {
+                        $hasVisible = $true
+                        break
+                    }
+                }
+                $submenuItem.Visible = $hasVisible
+            }
             # Show/hide category headers
             foreach ($catItem in $script:categoryHeaders) {
                 $cat = $catItem.Tag
                 $hasVisible = $false
                 foreach ($pItem in $script:profileMenuItems) {
-                    if ($pItem.Visible -and $script:Profiles[$pItem.Tag].Cat -eq $cat) {
+                    if ($pItem.Visible -and $script:Profiles[$pItem.Tag] -and $script:Profiles[$pItem.Tag].Cat -eq $cat) {
+                        $hasVisible = $true
+                        break
+                    }
+                }
+                # Also check game group submenus under this category
+                foreach ($submenuItem in $script:gameGroupSubmenus) {
+                    if ($submenuItem.Visible -and $submenuItem.Tag -eq $cat) {
                         $hasVisible = $true
                         break
                     }
@@ -2051,7 +2042,7 @@ public class HotkeyMessageWindow : NativeWindow {
         }
     }
 
-    # ─── PROFILES ───
+    # ─── PROFILES (game submenus with sync badges) ───
 
     $menu.Items.Add((New-Object System.Windows.Forms.ToolStripSeparator)) | Out-Null
 
@@ -2063,102 +2054,233 @@ public class HotkeyMessageWindow : NativeWindow {
     $profilesLabel.Font = New-Object System.Drawing.Font("Segoe UI", 7, [System.Drawing.FontStyle]::Bold)
     $menu.Items.Add($profilesLabel) | Out-Null
 
-    # Group profiles by category
-    $catProfiles = @{}
+    # --- Derive game groups from profile IDs ---
+    # Strip known variant suffixes to get the base game identifier.
+    # Order matters: longer suffixes before shorter ones that are substrings.
+    $variantSuffixes = @(
+        "-online-gsync", "-tournament-sim-144hz", "-300hz-max",
+        "-streaming", "-offline", "-online", "-gsync"
+    )
+
+    function Get-GameGroup {
+        param([string]$ProfileId)
+        foreach ($suffix in $variantSuffixes) {
+            if ($ProfileId.EndsWith($suffix)) {
+                return $ProfileId.Substring(0, $ProfileId.Length - $suffix.Length)
+            }
+        }
+        return $ProfileId
+    }
+
+    function Get-SyncBadge {
+        param([string]$ProfileId)
+        $p = $script:Profiles[$ProfileId]
+        $sm = if ($p.SyncMode) { $p.SyncMode } else { "agnostic" }
+        switch ($sm) {
+            "off"      { return "[NS]" }
+            "on"       { return "[GS]" }
+            default    { return "" }
+        }
+    }
+
+    # Helper to create a profile menu item (used in both direct items and submenus)
+    function New-ProfileMenuItem {
+        param([string]$ProfileId, [bool]$InSubmenu = $false, [bool]$ShowBadge = $false)
+        $p = $script:Profiles[$ProfileId]
+        $isFav = Test-Favorite -ProfileId $ProfileId -Config $script:TrayConfig
+        $badge = if ($ShowBadge) { Get-SyncBadge -ProfileId $ProfileId } else { "" }
+
+        $item = New-Object System.Windows.Forms.ToolStripMenuItem
+        if ($InSubmenu) {
+            $prefix = if ($badge) { "$badge  " } else { "" }
+            $item.Text = "$prefix$($p.Name)"
+        } else {
+            $badgeSuffix = if ($badge) { "  $badge" } else { "" }
+            $starPrefix = if ($isFav) { "[*] " } else { "      " }
+            $item.Text = "$starPrefix$($p.Name)$badgeSuffix"
+        }
+        $item.Tag = $ProfileId
+        $item.BackColor = $script:Colors.Background
+        $item.ForeColor = Get-CategoryColor -Category $p.Cat -Fallback $script:Colors.Text
+        $item.Font = New-Object System.Drawing.Font("Segoe UI", 9)
+
+        $tooltipText = "$($p.Sub)`n"
+        if ($p.Desc) { $tooltipText += "`n$($p.Desc)" }
+        if ($isFav) { $tooltipText += "`n`n[Favorited]" }
+        $item.ToolTipText = $tooltipText.Trim()
+
+        $item.Add_Click({
+            param($s, $ev)
+            Apply-Profile $s.Tag
+        }.GetNewClosure())
+
+        return $item
+    }
+
+    # Group non-streaming profiles by category, then by game group.
+    # Streaming profiles are collected into a single flyout submenu.
+    $catGameGroups = [ordered]@{}
+    $streamingProfiles = @()
+
     foreach ($id in $script:Profiles.Keys) {
         $p = $script:Profiles[$id]
-        if (-not $catProfiles.ContainsKey($p.Cat)) {
-            $catProfiles[$p.Cat] = @()
+        if ($p.Cat -eq "Streaming") {
+            $streamingProfiles += $id
+            continue
         }
-        $catProfiles[$p.Cat] += @{ Id = $id; Profile = $p }
+        $gameGroup = Get-GameGroup -ProfileId $id
+        $cat = $p.Cat
+        if (-not $catGameGroups.Contains($cat)) {
+            $catGameGroups[$cat] = [ordered]@{}
+        }
+        if (-not $catGameGroups[$cat].Contains($gameGroup)) {
+            $catGameGroups[$cat][$gameGroup] = @()
+        }
+        $catGameGroups[$cat][$gameGroup] += $id
     }
 
     $script:categoryHeaders = @()
+    $script:gameGroupSubmenus = @()
 
-    foreach ($cat in $script:CategoryOrder) {
-        if ($catProfiles.ContainsKey($cat)) {
-            $catItem = New-Object System.Windows.Forms.ToolStripMenuItem
-            $catItem.Text = "    $cat"
-            $catItem.Tag = $cat
-            $catItem.Enabled = $false
-            $catItem.BackColor = $script:Colors.Background
-            $catItem.ForeColor = $script:CategoryColors[$cat]
-            $catItem.Font = New-Object System.Drawing.Font("Segoe UI", 8.5, [System.Drawing.FontStyle]::Bold)
-            $menu.Items.Add($catItem) | Out-Null
-            $script:categoryHeaders += $catItem
+    # Merge ARPG + Other into a single "Other" section
+    $mergedCategoryOrder = @("Productivity", "Fighting", "Shooter")
+    # Add ARPG/Other as merged
+    $mergedOther = @()
+    if ($catGameGroups.Contains("ARPG")) {
+        foreach ($gg in $catGameGroups["ARPG"].Keys) {
+            foreach ($pid in $catGameGroups["ARPG"][$gg]) { $mergedOther += $pid }
+        }
+    }
+    if ($catGameGroups.Contains("Other")) {
+        foreach ($gg in $catGameGroups["Other"].Keys) {
+            foreach ($pid in $catGameGroups["Other"][$gg]) { $mergedOther += $pid }
+        }
+    }
 
-            foreach ($entry in $catProfiles[$cat]) {
-                $id = $entry.Id
-                $p = $entry.Profile
-                $isFav = Test-Favorite -ProfileId $id -Config $script:TrayConfig
+    foreach ($cat in $mergedCategoryOrder) {
+        if (-not $catGameGroups.Contains($cat)) { continue }
 
-                $item = New-Object System.Windows.Forms.ToolStripMenuItem
-                $starPrefix = if ($isFav) { "[*] " } else { "      " }
-                $item.Text = "$starPrefix$($p.Name)"
-                $item.Tag = $id
-                $item.BackColor = $script:Colors.Background
-                $item.ForeColor = Get-CategoryColor -Category $p.Cat -Fallback $script:Colors.Text
-                $item.Font = New-Object System.Drawing.Font("Segoe UI", 9)
+        $catColor = if ($script:CategoryColors.ContainsKey($cat)) { $script:CategoryColors[$cat] } else { $script:Colors.Text }
+        $catItem = New-Object System.Windows.Forms.ToolStripMenuItem
+        $catItem.Text = "    $cat"
+        $catItem.Tag = $cat
+        $catItem.Enabled = $false
+        $catItem.BackColor = $script:Colors.Background
+        $catItem.ForeColor = $catColor
+        $catItem.Font = New-Object System.Drawing.Font("Segoe UI", 8.5, [System.Drawing.FontStyle]::Bold)
+        $menu.Items.Add($catItem) | Out-Null
+        $script:categoryHeaders += $catItem
 
-                $tooltipText = "$($p.Sub)`n"
-                if ($p.Desc) { $tooltipText += "`n$($p.Desc)" }
-                if ($isFav) { $tooltipText += "`n`n[Favorited]" }
-                $item.ToolTipText = $tooltipText.Trim()
+        foreach ($gameGroup in $catGameGroups[$cat].Keys) {
+            $profileIds = $catGameGroups[$cat][$gameGroup]
 
-                # Left-click applies profile
-                $item.Add_Click({
-                    param($s, $ev)
-                    Apply-Profile $s.Tag
-                }.GetNewClosure())
-
+            if ($profileIds.Count -eq 1) {
+                # Single profile — show directly with optional sync badge
+                $item = New-ProfileMenuItem -ProfileId $profileIds[0] -ShowBadge $true
                 $menu.Items.Add($item) | Out-Null
                 $script:profileMenuItems += $item
+            }
+            else {
+                # Multiple profiles — create a flyout submenu
+                $firstProfile = $script:Profiles[$profileIds[0]]
+                $submenuItem = New-Object System.Windows.Forms.ToolStripMenuItem
+                $submenuItem.Text = "      $($firstProfile.Name -replace ':.*$', '')"
+                $submenuItem.Tag = $cat
+                $submenuItem.BackColor = $script:Colors.Background
+                $submenuItem.ForeColor = $catColor
+                $submenuItem.Font = New-Object System.Drawing.Font("Segoe UI", 9)
+
+                foreach ($pid in $profileIds) {
+                    $subItem = New-ProfileMenuItem -ProfileId $pid -InSubmenu $true -ShowBadge $true
+                    $submenuItem.DropDownItems.Add($subItem) | Out-Null
+                    $script:profileMenuItems += $subItem
+                }
+
+                $menu.Items.Add($submenuItem) | Out-Null
+                $script:gameGroupSubmenus += $submenuItem
             }
         }
     }
 
-    # ─── ACTIONS ───
+    # Merged ARPG + Other category
+    if ($mergedOther.Count -gt 0) {
+        $otherColor = if ($script:CategoryColors.ContainsKey("Other")) { $script:CategoryColors["Other"] } else { $script:Colors.Text }
+        $otherCatItem = New-Object System.Windows.Forms.ToolStripMenuItem
+        $otherCatItem.Text = "    Other"
+        $otherCatItem.Tag = "Other"
+        $otherCatItem.Enabled = $false
+        $otherCatItem.BackColor = $script:Colors.Background
+        $otherCatItem.ForeColor = $otherColor
+        $otherCatItem.Font = New-Object System.Drawing.Font("Segoe UI", 8.5, [System.Drawing.FontStyle]::Bold)
+        $menu.Items.Add($otherCatItem) | Out-Null
+        $script:categoryHeaders += $otherCatItem
+
+        foreach ($pid in $mergedOther) {
+            $item = New-ProfileMenuItem -ProfileId $pid
+            $menu.Items.Add($item) | Out-Null
+            $script:profileMenuItems += $item
+        }
+    }
+
+    # Streaming — single flyout submenu
+    if ($streamingProfiles.Count -gt 0) {
+        $streamColor = if ($script:CategoryColors.ContainsKey("Streaming")) { $script:CategoryColors["Streaming"] } else { $script:Colors.Text }
+        $streamingSubmenu = New-Object System.Windows.Forms.ToolStripMenuItem
+        $streamingSubmenu.Text = "    Streaming"
+        $streamingSubmenu.Tag = "Streaming"
+        $streamingSubmenu.BackColor = $script:Colors.Background
+        $streamingSubmenu.ForeColor = $streamColor
+        $streamingSubmenu.Font = New-Object System.Drawing.Font("Segoe UI", 8.5, [System.Drawing.FontStyle]::Bold)
+
+        foreach ($pid in $streamingProfiles) {
+            $subItem = New-ProfileMenuItem -ProfileId $pid -InSubmenu $true
+            $streamingSubmenu.DropDownItems.Add($subItem) | Out-Null
+            $script:profileMenuItems += $subItem
+        }
+
+        $menu.Items.Add($streamingSubmenu) | Out-Null
+        $script:gameGroupSubmenus += $streamingSubmenu
+    }
+
+    # ─── ACTIONS (flyout submenu) ───
 
     $menu.Items.Add((New-Object System.Windows.Forms.ToolStripSeparator)) | Out-Null
 
-    $actionsLabel = New-Object System.Windows.Forms.ToolStripMenuItem
-    $actionsLabel.Text = "  ACTIONS"
-    $actionsLabel.Enabled = $false
-    $actionsLabel.BackColor = $script:Colors.BackgroundDark
-    $actionsLabel.ForeColor = [System.Drawing.Color]::FromArgb(255, 100, 110, 130)
-    $actionsLabel.Font = New-Object System.Drawing.Font("Segoe UI", 7, [System.Drawing.FontStyle]::Bold)
-    $menu.Items.Add($actionsLabel) | Out-Null
+    $actionsMenu = New-Object System.Windows.Forms.ToolStripMenuItem
+    $actionsMenu.Text = "  Actions"
+    $actionsMenu.BackColor = $script:Colors.Background
+    $actionsMenu.ForeColor = $script:Colors.AccentAmber
+    $actionsMenu.Font = New-Object System.Drawing.Font("Segoe UI", 9)
 
     # Restore Previous
     $script:restoreItem = New-Object System.Windows.Forms.ToolStripMenuItem
-    $script:restoreItem.Text = "      Restore Previous Settings"
+    $script:restoreItem.Text = "Restore Previous Settings"
     $script:restoreItem.Enabled = $false
     $script:restoreItem.BackColor = $script:Colors.Background
     $script:restoreItem.ForeColor = $script:Colors.AccentAmber
     $script:restoreItem.Font = New-Object System.Drawing.Font("Segoe UI", 9)
     $script:restoreItem.ToolTipText = "Restore the last backup before profile was applied"
     $script:restoreItem.Add_Click({ Restore-Settings })
-    $menu.Items.Add($script:restoreItem) | Out-Null
+    $actionsMenu.DropDownItems.Add($script:restoreItem) | Out-Null
 
     # Run Audit
     $auditItem = New-Object System.Windows.Forms.ToolStripMenuItem
-    $auditItem.Text = "      Run System Audit"
+    $auditItem.Text = "Run System Audit"
     $auditItem.BackColor = $script:Colors.Background
     $auditItem.ForeColor = $script:Colors.AccentBlue
     $auditItem.Font = New-Object System.Drawing.Font("Segoe UI", 9)
     $auditItem.ToolTipText = "Scan system for optimization issues"
     $auditItem.Add_Click({ Run-Audit })
-    $menu.Items.Add($auditItem) | Out-Null
+    $actionsMenu.DropDownItems.Add($auditItem) | Out-Null
 
-    # Backups submenu
+    # Backups submenu (nested inside Actions)
     $backupTime = Get-LastBackupTime
     $backupsItem = New-Object System.Windows.Forms.ToolStripMenuItem
-    $backupsItem.Text = "      Backups ($backupTime)"
+    $backupsItem.Text = "Backups ($backupTime)"
     $backupsItem.BackColor = $script:Colors.Background
     $backupsItem.ForeColor = $script:Colors.AccentPurple
     $backupsItem.Font = New-Object System.Drawing.Font("Segoe UI", 9)
 
-    # Backup submenu items
     $openBackupsItem = New-Object System.Windows.Forms.ToolStripMenuItem
     $openBackupsItem.Text = "Open Backups Folder"
     $openBackupsItem.BackColor = $script:Colors.Background
@@ -2169,7 +2291,6 @@ public class HotkeyMessageWindow : NativeWindow {
 
     $backupsItem.DropDownItems.Add((New-Object System.Windows.Forms.ToolStripSeparator)) | Out-Null
 
-    # Recent backups
     $recentBackups = Get-RecentBackups -Count 5
     foreach ($backup in $recentBackups) {
         $bItem = New-Object System.Windows.Forms.ToolStripMenuItem
@@ -2205,11 +2326,13 @@ public class HotkeyMessageWindow : NativeWindow {
         $backupsItem.DropDownItems.Add($bItem) | Out-Null
     }
 
-    $menu.Items.Add($backupsItem) | Out-Null
+    $actionsMenu.DropDownItems.Add($backupsItem) | Out-Null
+
+    $actionsMenu.DropDownItems.Add((New-Object System.Windows.Forms.ToolStripSeparator)) | Out-Null
 
     # Toggle Quick Panel
     $quickPanelItem = New-Object System.Windows.Forms.ToolStripMenuItem
-    $quickPanelItem.Text = "      Quick Panel"
+    $quickPanelItem.Text = "Quick Panel"
     $quickPanelItem.BackColor = $script:Colors.Background
     $quickPanelItem.ForeColor = $script:Colors.AccentGreen
     $quickPanelItem.Font = New-Object System.Drawing.Font("Segoe UI", 9)
@@ -2224,23 +2347,20 @@ public class HotkeyMessageWindow : NativeWindow {
             Show-QuickPanel -Favorites $script:TrayConfig.favorites -Profiles $script:Profiles -ActiveProfile $script:activeProfile -OnApply { param($id) Apply-Profile $id }
             $script:TrayConfig.showQuickPanel = $true
         }
-        # Use config value (authoritative) rather than $QuickPanelVisible which may lag
         $quickPanelItem.Checked = $script:TrayConfig.showQuickPanel
         Save-TrayConfig $script:TrayConfig
     })
-    $menu.Items.Add($quickPanelItem) | Out-Null
+    $actionsMenu.DropDownItems.Add($quickPanelItem) | Out-Null
 
-    # ─── SETTINGS ───
+    $menu.Items.Add($actionsMenu) | Out-Null
 
-    $menu.Items.Add((New-Object System.Windows.Forms.ToolStripSeparator)) | Out-Null
+    # ─── SETTINGS (flyout submenu) ───
 
-    $settingsLabel = New-Object System.Windows.Forms.ToolStripMenuItem
-    $settingsLabel.Text = "  SETTINGS"
-    $settingsLabel.Enabled = $false
-    $settingsLabel.BackColor = $script:Colors.BackgroundDark
-    $settingsLabel.ForeColor = [System.Drawing.Color]::FromArgb(255, 100, 110, 130)
-    $settingsLabel.Font = New-Object System.Drawing.Font("Segoe UI", 7, [System.Drawing.FontStyle]::Bold)
-    $menu.Items.Add($settingsLabel) | Out-Null
+    $settingsMenu = New-Object System.Windows.Forms.ToolStripMenuItem
+    $settingsMenu.Text = "  Settings"
+    $settingsMenu.BackColor = $script:Colors.Background
+    $settingsMenu.ForeColor = $script:Colors.Text
+    $settingsMenu.Font = New-Object System.Drawing.Font("Segoe UI", 9)
 
     # Auto-Start toggle
     $startupStatus = Get-StartupStatus
@@ -2250,11 +2370,11 @@ public class HotkeyMessageWindow : NativeWindow {
     $script:startupItem.Font = New-Object System.Drawing.Font("Segoe UI", 9)
     Set-StartupMenuState -StartupStatus $startupStatus
     $script:startupItem.Add_Click({ Toggle-Startup })
-    $menu.Items.Add($script:startupItem) | Out-Null
+    $settingsMenu.DropDownItems.Add($script:startupItem) | Out-Null
 
     # Notifications toggle
     $script:notifyToggle = New-Object System.Windows.Forms.ToolStripMenuItem
-    $script:notifyToggle.Text = "      Notifications"
+    $script:notifyToggle.Text = "Notifications"
     $script:notifyToggle.Checked = $script:EnableBalloonNotifications
     $script:notifyToggle.BackColor = $script:Colors.Background
     $script:notifyToggle.ForeColor = $script:Colors.Text
@@ -2266,11 +2386,11 @@ public class HotkeyMessageWindow : NativeWindow {
         $state = if ($script:EnableBalloonNotifications) { "enabled" } else { "disabled" }
         Write-TrayLog "Notifications $state"
     })
-    $menu.Items.Add($script:notifyToggle) | Out-Null
+    $settingsMenu.DropDownItems.Add($script:notifyToggle) | Out-Null
 
     # Sound toggle
     $soundToggle = New-Object System.Windows.Forms.ToolStripMenuItem
-    $soundToggle.Text = "      Sound Effects"
+    $soundToggle.Text = "Sound Effects"
     $soundToggle.Checked = $script:TrayConfig.soundEnabled
     $soundToggle.BackColor = $script:Colors.Background
     $soundToggle.ForeColor = $script:Colors.Text
@@ -2282,11 +2402,13 @@ public class HotkeyMessageWindow : NativeWindow {
         Save-TrayConfig $script:TrayConfig
         Write-TrayLog "Sound effects: $($script:TrayConfig.soundEnabled)"
     })
-    $menu.Items.Add($soundToggle) | Out-Null
+    $settingsMenu.DropDownItems.Add($soundToggle) | Out-Null
+
+    $settingsMenu.DropDownItems.Add((New-Object System.Windows.Forms.ToolStripSeparator)) | Out-Null
 
     # Open Settings Panel
     $settingsPanelItem = New-Object System.Windows.Forms.ToolStripMenuItem
-    $settingsPanelItem.Text = "      Open Settings..."
+    $settingsPanelItem.Text = "Open Settings..."
     $settingsPanelItem.BackColor = $script:Colors.Background
     $settingsPanelItem.ForeColor = $script:Colors.Text
     $settingsPanelItem.Font = New-Object System.Drawing.Font("Segoe UI", 9)
@@ -2297,26 +2419,28 @@ public class HotkeyMessageWindow : NativeWindow {
             Write-TrayLog "Settings saved"
         }
     })
-    $menu.Items.Add($settingsPanelItem) | Out-Null
+    $settingsMenu.DropDownItems.Add($settingsPanelItem) | Out-Null
 
     # View Log
     $logItem = New-Object System.Windows.Forms.ToolStripMenuItem
-    $logItem.Text = "      View Log File"
+    $logItem.Text = "View Log File"
     $logItem.BackColor = $script:Colors.Background
     $logItem.ForeColor = $script:Colors.TextDim
     $logItem.Font = New-Object System.Drawing.Font("Segoe UI", 9)
     $logItem.ToolTipText = $script:LogFile
     $logItem.Add_Click({ Open-LogFile })
-    $menu.Items.Add($logItem) | Out-Null
+    $settingsMenu.DropDownItems.Add($logItem) | Out-Null
 
     # Open Config Folder
     $configFolderItem = New-Object System.Windows.Forms.ToolStripMenuItem
-    $configFolderItem.Text = "      Open Config Folder"
+    $configFolderItem.Text = "Open Config Folder"
     $configFolderItem.BackColor = $script:Colors.Background
     $configFolderItem.ForeColor = $script:Colors.TextDim
     $configFolderItem.Font = New-Object System.Drawing.Font("Segoe UI", 9)
     $configFolderItem.Add_Click({ Open-ConfigFolder })
-    $menu.Items.Add($configFolderItem) | Out-Null
+    $settingsMenu.DropDownItems.Add($configFolderItem) | Out-Null
+
+    $menu.Items.Add($settingsMenu) | Out-Null
 
     # ─── STATUS BAR ───
 
