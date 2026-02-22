@@ -93,6 +93,25 @@ class ProfileTransactionManager:
         )
         tx.add_checkpoint("plan", "ok", "Transaction planned")
 
+        # === PHASE 0: Restore previous baseline ===
+        # When switching profiles, stale settings from the previous profile
+        # can leak through if the new profile doesn't explicitly override them.
+        # Restore the latest backup (taken before the previous profile was applied)
+        # to return to a clean pre-profile baseline before applying the new one.
+        if create_backup:
+            try:
+                self.backup_dir.mkdir(parents=True, exist_ok=True)
+                restore_manager = BackupManager(self.backup_dir)
+                existing_backups = restore_manager.list_backups()
+                if existing_backups:
+                    restore_manager.restore_backup("latest")
+                    tx.add_checkpoint("baseline_restore", "ok", "Restored previous baseline for clean switch")
+                else:
+                    tx.add_checkpoint("baseline_restore", "skipped", "No previous backup — first application")
+            except Exception as e:
+                logger.warning(f"Baseline restore failed, continuing with apply: {e}")
+                tx.add_checkpoint("baseline_restore", "warn", f"Restore failed: {e}")
+
         backup_manager: BackupManager | None = None
         if create_backup:
             try:
