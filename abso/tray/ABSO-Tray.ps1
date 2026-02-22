@@ -49,6 +49,7 @@ $script:ScriptDir = $PSScriptRoot
 $script:SoundFile = Join-Path $PSScriptRoot "pokemon-red_blue_yellow-save-game-sound-effect.mp3"
 $script:FailSoundFile = Join-Path $PSScriptRoot "hit-weak-not-very-effective.mp3"
 $script:VrrWarningSoundFile = Join-Path $PSScriptRoot "oot_navi_hey1.mp3"
+$script:RestartSoundFile = Join-Path $PSScriptRoot "pokemon-redblueyellow-item-found-sound-effect.mp3"
 $script:MediaPlayer = $null
 
 function Get-MediaPlayer {
@@ -123,6 +124,22 @@ function Play-VrrWarningSound {
     }
 }
 
+function Play-RestartSound {
+    try {
+        if (-not $script:TrayConfig.soundEnabled) { return }
+        if (Test-Path $script:RestartSoundFile) {
+            Play-SoundFile -FilePath $script:RestartSoundFile -Volume $script:TrayConfig.soundVolume
+            Write-TrayLog "Playing restart sound"
+        }
+        else {
+            Write-TrayLog "Restart sound file not found: $($script:RestartSoundFile)" -Level "WARN"
+        }
+    }
+    catch {
+        Write-TrayLog "Failed to play restart sound: $($_.Exception.Message)" -Level "WARN"
+    }
+}
+
 function Test-IsVrrPrerequisiteError {
     param([string]$Message)
 
@@ -193,6 +210,10 @@ function Test-SoundFilesExist {
     }
     if (-not (Test-Path $script:VrrWarningSoundFile)) {
         Write-TrayLog "VRR WARNING SOUND FILE MISSING: $($script:VrrWarningSoundFile)" -Level "WARN"
+        $script:SoundFilesValid = $false
+    }
+    if (-not (Test-Path $script:RestartSoundFile)) {
+        Write-TrayLog "RESTART SOUND FILE MISSING: $($script:RestartSoundFile)" -Level "WARN"
         $script:SoundFilesValid = $false
     }
     if ($script:SoundFilesValid) { Write-TrayLog "Sound files validated" }
@@ -2281,6 +2302,7 @@ public class HotkeyMessageWindow : NativeWindow {
     $restartItem.ForeColor = $script:Colors.TextDim
     $restartItem.Font = New-Object System.Drawing.Font("Segoe UI", 9)
     $restartItem.Add_Click({
+        Play-RestartSound
         if ($script:HotkeyWindow) { Unregister-GlobalHotkeys -WindowHandle $script:HotkeyWindow.Handle }
         Close-QuickPanel
         Close-ProgressOverlay
