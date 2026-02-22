@@ -273,11 +273,11 @@ class ProfileApplier:
 
             try:
                 # Get processed settings from our settings_map
-                settings = settings_map.get(handler_name, {})
-
-                # If not in our map, get from profile directly
-                if settings is None:
-                    settings = profile.get_settings(handler_name)
+                if handler_name in settings_map:
+                    settings = settings_map[handler_name]
+                else:
+                    # Not in our map (e.g. empty dict was skipped), get from profile directly
+                    settings = profile.get_settings(handler_name) or {}
 
                 # Merge with user overrides from config
                 if profile_overrides:
@@ -364,7 +364,7 @@ class ProfileApplier:
         for handler in profile.get_handlers():
             handler_name = handler.__class__.__name__
             settings = profile.get_settings(handler_name)
-            if settings:
+            if settings is not None:
                 settings_map[handler_name] = settings.copy()
 
         return settings_map
