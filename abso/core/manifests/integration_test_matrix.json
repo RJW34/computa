@@ -37,6 +37,20 @@
       "expected": { "transaction_state": "committed", "apply_success": true }
     },
     {
+      "id": "apply-rivals2-gsync",
+      "profile_id": "rivals2-gsync",
+      "kind": "apply_profile",
+      "assumptions": ["administrator", "nvidia_gpu", "vrr_confirmed"],
+      "expected": { "transaction_state": "committed", "apply_success": true }
+    },
+    {
+      "id": "apply-rivals2-online-gsync",
+      "profile_id": "rivals2-online-gsync",
+      "kind": "apply_profile",
+      "assumptions": ["administrator", "nvidia_gpu", "vrr_confirmed"],
+      "expected": { "transaction_state": "committed", "apply_success": true }
+    },
+    {
       "id": "apply-rivals2-300hz-max",
       "profile_id": "rivals2-300hz-max",
       "kind": "apply_profile",

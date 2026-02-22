@@ -19,6 +19,7 @@ from abso.profiles.pacdeluxe import PACDeluxeProfile
 from abso.profiles.pokemon_auto_chess import PokemonAutoChessProfile
 from abso.profiles.productivity_oled import ProductivityOLEDProfile
 from abso.profiles.rivals2 import Rivals2Profile
+from abso.profiles.rivals2_gsync import Rivals2GSyncProfile, Rivals2OnlineGSyncProfile
 from abso.profiles.rivals2_300hz_max import Rivals2_300HzMaxProfile
 from abso.profiles.rivals2_offline import Rivals2OfflineProfile
 from abso.profiles.rivals2_online import Rivals2OnlineProfile
@@ -79,6 +80,18 @@ PROFILE_CATALOG: OrderedDict[str, ProfileCatalogEntry] = OrderedDict(
             tray_category="Fighting",
             tray_subtitle="LLM ON | 144Hz | No VRR",
             sync_mode="off",
+        ),
+        "rivals2-gsync": ProfileCatalogEntry(
+            profile_class=Rivals2GSyncProfile,
+            tray_category="Fighting",
+            tray_subtitle="LLM ON | G-SYNC ON | VSync Safety Net",
+            sync_mode="on",
+        ),
+        "rivals2-online-gsync": ProfileCatalogEntry(
+            profile_class=Rivals2OnlineGSyncProfile,
+            tray_category="Fighting",
+            tray_subtitle="G-SYNC ON | Rollback-Safe | VRR",
+            sync_mode="on",
         ),
         "rivals2-300hz-max": ProfileCatalogEntry(
             profile_class=Rivals2_300HzMaxProfile,
