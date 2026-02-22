@@ -128,20 +128,29 @@ function Play-RestartSound {
     try {
         if (-not $script:TrayConfig.soundEnabled) { return }
         if (Test-Path $script:RestartSoundFile) {
-            # Spawn a detached process so the sound survives the tray
-            # exiting.  Use -EncodedCommand to avoid quoting issues.
-            $vol = [int]($script:TrayConfig.soundVolume * 100)
+            # Spawn a detached process so the sound survives the tray exiting.
+            # Use mciSendString with "wait" flag for synchronous playback —
+            # WMPlayer.OCX failed because Start-Sleep doesn't pump COM messages.
+            $mciVol = [int]($script:TrayConfig.soundVolume * 1000)
+            $filePath = $script:RestartSoundFile
             $soundCmd = @"
-`$wmp = New-Object -ComObject WMPlayer.OCX
-`$wmp.settings.volume = $vol
-`$wmp.URL = '$($script:RestartSoundFile)'
-Start-Sleep -Seconds 4
-`$wmp.close()
+Add-Type -TypeDefinition @'
+using System;
+using System.Runtime.InteropServices;
+public class MCI {
+    [DllImport("winmm.dll", CharSet = CharSet.Unicode)]
+    public static extern int mciSendStringW(string command, System.Text.StringBuilder buffer, int bufferSize, IntPtr callback);
+}
+'@
+[MCI]::mciSendStringW('open "$filePath" type mpegvideo alias abso_snd', `$null, 0, [IntPtr]::Zero) | Out-Null
+[MCI]::mciSendStringW('setaudio abso_snd volume to $mciVol', `$null, 0, [IntPtr]::Zero) | Out-Null
+[MCI]::mciSendStringW('play abso_snd wait', `$null, 0, [IntPtr]::Zero) | Out-Null
+[MCI]::mciSendStringW('close abso_snd', `$null, 0, [IntPtr]::Zero) | Out-Null
 "@
             $bytes = [System.Text.Encoding]::Unicode.GetBytes($soundCmd)
             $encoded = [Convert]::ToBase64String($bytes)
             Start-Process powershell.exe -ArgumentList "-NoProfile", "-WindowStyle", "Hidden", "-EncodedCommand", $encoded -WindowStyle Hidden
-            Write-TrayLog "Playing restart sound (detached)"
+            Write-TrayLog "Playing restart sound (detached, mciSendString)"
         }
         else {
             Write-TrayLog "Restart sound file not found: $($script:RestartSoundFile)" -Level "WARN"
