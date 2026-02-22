@@ -128,8 +128,19 @@ function Play-RestartSound {
     try {
         if (-not $script:TrayConfig.soundEnabled) { return }
         if (Test-Path $script:RestartSoundFile) {
-            Play-SoundFile -FilePath $script:RestartSoundFile -Volume $script:TrayConfig.soundVolume
-            Write-TrayLog "Playing restart sound"
+            # Spawn a detached process to play the sound so it survives
+            # the tray process exiting during restart.
+            $filePath = $script:RestartSoundFile -replace "'", "''"
+            $vol = $script:TrayConfig.soundVolume
+            $cmd = "Add-Type -AssemblyName PresentationCore; " +
+                   "`$p = New-Object System.Windows.Media.MediaPlayer; " +
+                   "`$p.Open([Uri]'$filePath'); " +
+                   "`$p.Volume = $vol; " +
+                   "Start-Sleep -Milliseconds 200; " +
+                   "`$p.Play(); " +
+                   "Start-Sleep -Seconds 3"
+            Start-Process powershell.exe -ArgumentList "-NoProfile", "-WindowStyle", "Hidden", "-Command", $cmd -WindowStyle Hidden
+            Write-TrayLog "Playing restart sound (detached)"
         }
         else {
             Write-TrayLog "Restart sound file not found: $($script:RestartSoundFile)" -Level "WARN"
