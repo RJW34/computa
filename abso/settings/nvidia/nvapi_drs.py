@@ -1197,25 +1197,18 @@ class DRSProfileManager:
                     else:
                         results["app_bound"] = False
 
-                        # Try to launch NPI for easy app binding
-                        npi_launched = self._try_npi_for_app_binding(profile_name, app_executable)
-
-                        if npi_launched:
-                            results["app_binding_note"] = (
-                                f"Profile '{profile_name}' created with all settings. "
-                                f"NPI launched - please add '{app_executable}' to the profile and click Apply."
-                            )
-                            results["npi_launched"] = True
-                        else:
-                            results["app_binding_note"] = (
-                                f"Profile '{profile_name}' created with all settings configured. "
-                                f"Automatic app binding unavailable on this driver version. "
-                                f"To activate: NVCP > Manage 3D Settings > Program Settings > "
-                                f"Add '{app_executable}' > Select '{profile_name}'"
-                            )
-                            results["manual_instructions"] = self.get_manual_binding_instructions(
-                                profile_name, app_executable
-                            )
+                        # NPI GUI launch disabled — popping up a window during
+                        # headless profile apply is confusing.  Provide manual
+                        # instructions instead.
+                        results["app_binding_note"] = (
+                            f"Profile '{profile_name}' created with all settings configured. "
+                            f"Automatic app binding unavailable on this driver version. "
+                            f"To activate: NVCP > Manage 3D Settings > Program Settings > "
+                            f"Add '{app_executable}' > Select '{profile_name}'"
+                        )
+                        results["manual_instructions"] = self.get_manual_binding_instructions(
+                            profile_name, app_executable
+                        )
                 else:
                     results["app_bound"] = True
 
@@ -1305,24 +1298,15 @@ class DRSProfileManager:
                         results["app_binding_failures"] = list(drs._app_binding_failures)
 
                         first_failed = drs._app_binding_failures[0]
-                        npi_launched = self._try_npi_for_app_binding(profile_name, first_failed)
-
-                        if npi_launched:
-                            results["app_binding_note"] = (
-                                f"Profile '{profile_name}' created with all settings. "
-                                f"NPI launched - please add executables to the profile and click Apply."
-                            )
-                            results["npi_launched"] = True
-                        else:
-                            results["app_binding_note"] = (
-                                f"Profile '{profile_name}' created with all settings configured. "
-                                f"Automatic app binding unavailable on this driver version. "
-                                f"To activate: NVCP > Manage 3D Settings > Program Settings > "
-                                f"Add executables to '{profile_name}'."
-                            )
-                            results["manual_instructions"] = self.get_manual_binding_instructions(
-                                profile_name, first_failed
-                            )
+                        results["app_binding_note"] = (
+                            f"Profile '{profile_name}' created with all settings configured. "
+                            f"Automatic app binding unavailable on this driver version. "
+                            f"To activate: NVCP > Manage 3D Settings > Program Settings > "
+                            f"Add executables to '{profile_name}'."
+                        )
+                        results["manual_instructions"] = self.get_manual_binding_instructions(
+                            profile_name, first_failed
+                        )
                 else:
                     results["app_bound"] = True
 
