@@ -130,15 +130,13 @@ function Play-RestartSound {
         if (Test-Path $script:RestartSoundFile) {
             # Spawn a detached process so the sound survives the tray
             # exiting.  Use -EncodedCommand to avoid quoting issues.
-            $vol = $script:TrayConfig.soundVolume
+            $vol = [int]($script:TrayConfig.soundVolume * 100)
             $soundCmd = @"
-Add-Type -AssemblyName PresentationCore
-`$p = New-Object System.Windows.Media.MediaPlayer
-`$p.Open([Uri]'$($script:RestartSoundFile)')
-`$p.Volume = $vol
-Start-Sleep -Milliseconds 300
-`$p.Play()
-Start-Sleep -Seconds 3
+`$wmp = New-Object -ComObject WMPlayer.OCX
+`$wmp.settings.volume = $vol
+`$wmp.URL = '$($script:RestartSoundFile)'
+Start-Sleep -Seconds 4
+`$wmp.close()
 "@
             $bytes = [System.Text.Encoding]::Unicode.GetBytes($soundCmd)
             $encoded = [Convert]::ToBase64String($bytes)
