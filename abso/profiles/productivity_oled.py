@@ -57,6 +57,7 @@ class ProductivityOLEDProfile(BaseProfile):
         ]
 
     def get_handlers(self) -> list[SettingsHandler]:
+        from abso.settings.color import ColorProfileSettingsHandler
         from abso.settings.graphics import GraphicsSettingsHandler
         from abso.settings.memory import MemorySettingsHandler
         from abso.settings.mouse import MouseSettingsHandler
@@ -72,6 +73,7 @@ class ProductivityOLEDProfile(BaseProfile):
             MouseSettingsHandler(),
             GraphicsSettingsHandler(),
             MemorySettingsHandler(),
+            ColorProfileSettingsHandler(),
         ]
 
     def get_settings(self, handler_name: str) -> dict[str, Any]:
@@ -125,6 +127,12 @@ class ProductivityOLEDProfile(BaseProfile):
                 # Default settings - keep system cache for app launching
                 "large_system_cache": 0,
                 "disable_paging_executive": 0,  # Let Windows manage
+            },
+            "ColorProfileSettingsHandler": {
+                "icc_profile": "native",      # Keep calibrated profile
+                "digital_vibrance": 50,
+                "show_osd_guidance": True,
+                "game_type": "productivity",
             },
         }
 

@@ -35,6 +35,7 @@ class ProfileOverrides:
     power: dict[str, Any] = field(default_factory=dict)
     timer: dict[str, Any] = field(default_factory=dict)
     mouse: dict[str, Any] = field(default_factory=dict)
+    color: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass

@@ -532,7 +532,7 @@ Uses `vrr_diablo4` preset with:
 ### 7. PACDeluxe (Tauri Desktop Client)
 
 **Profile ID:** `pacdeluxe`, `pacdeluxe-oled`
-**Executables:** `PACDeluxe.exe`, `msedge.exe`
+**Executables:** `pac-deluxe.exe`, `msedgewebview2.exe`
 **Optimization Target:** Smooth framerate for WebGL auto-battler
 
 *Native Windows 11 desktop client wrapping Pokemon Auto Chess in Tauri v2 shell using WebView2.*

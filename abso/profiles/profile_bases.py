@@ -157,6 +157,7 @@ class Rivals2BaseProfile(BaseProfile):
 
     def get_handlers(self) -> list[SettingsHandler]:
         from abso.settings.cnm import CNMSettingsHandler
+        from abso.settings.color import ColorProfileSettingsHandler
         from abso.settings.graphics import GraphicsSettingsHandler
         from abso.settings.memory import MemorySettingsHandler
         from abso.settings.mouse import MouseSettingsHandler
@@ -195,6 +196,7 @@ class Rivals2BaseProfile(BaseProfile):
             handlers.append(Rivals2ConfigHandler())
 
         handlers.append(CNMSettingsHandler())
+        handlers.append(ColorProfileSettingsHandler())
         return handlers
 
     def _base_settings(self) -> dict[str, dict[str, Any]]:
@@ -253,6 +255,12 @@ class Rivals2BaseProfile(BaseProfile):
             "CNMSettingsHandler": {
                 "action": "stop",
             },
+            "ColorProfileSettingsHandler": {
+                "icc_profile": "srgb",
+                "digital_vibrance": 50,
+                "show_osd_guidance": True,
+                "game_type": "competitive_fps",
+            },
         }
 
     def _settings_overrides(self) -> dict[str, dict[str, Any]]:
@@ -280,6 +288,7 @@ class EmulatorLatencyBaseProfile(BaseProfile):
 
     def get_handlers(self) -> list[SettingsHandler]:
         from abso.settings.cnm import CNMSettingsHandler
+        from abso.settings.color import ColorProfileSettingsHandler
         from abso.settings.graphics import GraphicsSettingsHandler
         from abso.settings.memory import MemorySettingsHandler
         from abso.settings.mouse import MouseSettingsHandler
@@ -303,6 +312,7 @@ class EmulatorLatencyBaseProfile(BaseProfile):
             MemorySettingsHandler(),
             ProcessPriorityHandler(self.executable_hints),
             CNMSettingsHandler(),
+            ColorProfileSettingsHandler(),
         ]
 
         handlers.extend(self._additional_handlers())
@@ -367,6 +377,12 @@ class EmulatorLatencyBaseProfile(BaseProfile):
             "CNMSettingsHandler": {
                 "action": "stop",
             },
+            "ColorProfileSettingsHandler": {
+                "icc_profile": "srgb",
+                "digital_vibrance": 50,
+                "show_osd_guidance": True,
+                "game_type": "emulator",
+            },
         }
 
     def _settings_overrides(self) -> dict[str, dict[str, Any]]:
@@ -382,6 +398,7 @@ class WebGLBaseProfile(BaseProfile):
 
     def get_handlers(self) -> list[SettingsHandler]:
         from abso.settings.cnm import CNMSettingsHandler
+        from abso.settings.color import ColorProfileSettingsHandler
         from abso.settings.graphics import GraphicsSettingsHandler
         from abso.settings.memory import MemorySettingsHandler
         from abso.settings.network import NetworkSettingsHandler
@@ -403,6 +420,7 @@ class WebGLBaseProfile(BaseProfile):
             MemorySettingsHandler(),
             ProcessPriorityHandler(self.executable_hints),
             CNMSettingsHandler(),
+            ColorProfileSettingsHandler(),
         ]
 
     def _base_settings(self) -> dict[str, dict[str, Any]]:
@@ -452,6 +470,12 @@ class WebGLBaseProfile(BaseProfile):
             "CNMSettingsHandler": {
                 "action": "stop",
             },
+            "ColorProfileSettingsHandler": {
+                "icc_profile": "srgb",
+                "digital_vibrance": 50,
+                "show_osd_guidance": True,
+                "game_type": "casual",
+            },
         }
 
     def _settings_overrides(self) -> dict[str, dict[str, Any]]:
@@ -479,6 +503,7 @@ class ReflexShooterBaseProfile(BaseProfile):
 
     def get_handlers(self) -> list[SettingsHandler]:
         from abso.settings.cnm import CNMSettingsHandler
+        from abso.settings.color import ColorProfileSettingsHandler
         from abso.settings.graphics import GraphicsSettingsHandler
         from abso.settings.memory import MemorySettingsHandler
         from abso.settings.mouse import MouseSettingsHandler
@@ -502,6 +527,7 @@ class ReflexShooterBaseProfile(BaseProfile):
             MemorySettingsHandler(),
             ProcessPriorityHandler(self.executable_hints),
             CNMSettingsHandler(),
+            ColorProfileSettingsHandler(),
         ]
 
     def _base_settings(self) -> dict[str, dict[str, Any]]:
@@ -562,6 +588,12 @@ class ReflexShooterBaseProfile(BaseProfile):
             },
             "CNMSettingsHandler": {
                 "action": "stop",
+            },
+            "ColorProfileSettingsHandler": {
+                "icc_profile": "srgb",
+                "digital_vibrance": 50,
+                "show_osd_guidance": True,
+                "game_type": "competitive_fps",
             },
         }
 

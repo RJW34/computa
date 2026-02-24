@@ -46,9 +46,9 @@ class PACDeluxeProfile(WebGLBaseProfile):
 
     @property
     def executable_hints(self) -> list[str]:
-        # PACDeluxe.exe is the main Tauri app
-        # WebView2 spawns msedge.exe processes for rendering
-        return ["PACDeluxe.exe", "msedge.exe"]
+        # pac-deluxe.exe is the main Tauri app (installed to C:\Program Files\PACDeluxe\)
+        # WebView2 spawns msedgewebview2.exe processes for rendering
+        return ["pac-deluxe.exe", "msedgewebview2.exe"]
 
     def _settings_overrides(self) -> dict[str, dict[str, Any]]:
         return {

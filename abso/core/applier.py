@@ -393,6 +393,7 @@ class ProfileApplier:
             "PowerSettingsHandler": "power",
             "TimerSettingsHandler": "timer",
             "MouseSettingsHandler": "mouse",
+            "ColorProfileSettingsHandler": "color",
         }
 
         attr_name = handler_to_attr.get(handler_name)

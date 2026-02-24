@@ -38,6 +38,7 @@ class Diablo4Profile(BaseProfile):
 
     def get_handlers(self) -> list[SettingsHandler]:
         from abso.settings.cnm import CNMSettingsHandler
+        from abso.settings.color import ColorProfileSettingsHandler
         from abso.settings.graphics import GraphicsSettingsHandler
         from abso.settings.memory import MemorySettingsHandler
         from abso.settings.mouse import MouseSettingsHandler
@@ -61,6 +62,7 @@ class Diablo4Profile(BaseProfile):
             MemorySettingsHandler(),
             ProcessPriorityHandler(["Diablo IV.exe"]),
             CNMSettingsHandler(),
+            ColorProfileSettingsHandler(),
         ]
 
     def get_settings(self, handler_name: str) -> dict[str, Any]:
@@ -129,6 +131,12 @@ class Diablo4Profile(BaseProfile):
                 "gpu_priority": 8,
                 "cpu_priority": 2,  # Normal - Diablo 4 is less latency-critical
                 "io_priority": 2,
+            },
+            "ColorProfileSettingsHandler": {
+                "icc_profile": "native",      # HDR game, let wide gamut work
+                "digital_vibrance": 50,
+                "show_osd_guidance": True,
+                "game_type": "cinematic",
             },
         }
 

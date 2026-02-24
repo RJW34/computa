@@ -572,14 +572,14 @@ $script:Profiles = [ordered]@{
         Sub      = "LLM ON | Tauri + WebView2 | Adaptive VSync"
         Cat      = "Other"
         Desc     = "Native Tauri client. Adaptive sync, Ultimate Performance, priority boost."
-        Exes     = @("PACDeluxe.exe", "msedge.exe")
+        Exes     = @("pac-deluxe.exe", "msedgewebview2.exe")
     }
     "pacdeluxe-streaming" = @{
         Name     = "PACDeluxe (Streaming)"
         Sub      = "OBS 1080p60 | Multi-monitor"
         Cat      = "Streaming"
         Desc     = "Streaming profile for PACDeluxe. OBS settings applied, FSO/MPO ON for multi-monitor."
-        Exes     = @("PACDeluxe.exe", "msedge.exe")
+        Exes     = @("pac-deluxe.exe", "msedgewebview2.exe")
     }
 }
 
