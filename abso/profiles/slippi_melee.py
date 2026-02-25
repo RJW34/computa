@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import os
+import re
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
 
 from abso.profiles.profile_bases import EmulatorLatencyBaseProfile
@@ -86,6 +89,55 @@ class SlippiMeleeProfile(EmulatorLatencyBaseProfile):
             },
         }
 
+    def _detect_dolphin_backend(self) -> Literal["dx11", "dx12", "vulkan", "opengl"] | None:
+        """Best-effort detection of active Dolphin backend from GFX.ini."""
+        appdata = os.environ.get("APPDATA")
+        if not appdata:
+            return None
+
+        gfx_ini = Path(appdata) / "Slippi Launcher" / "netplay" / "User" / "Config" / "GFX.ini"
+        if not gfx_ini.exists():
+            return None
+
+        try:
+            content = gfx_ini.read_text(encoding="utf-8")
+        except OSError:
+            return None
+
+        match = re.search(r"^GFXBackend\s*=\s*(.+)$", content, re.MULTILINE)
+        if not match:
+            return None
+
+        raw = match.group(1).strip().lower()
+        if "d3d11" in raw or "dx11" in raw:
+            return "dx11"
+        if "d3d12" in raw or "dx12" in raw:
+            return "dx12"
+        if "vulkan" in raw:
+            return "vulkan"
+        if "opengl" in raw or raw.startswith("ogl"):
+            return "opengl"
+        return None
+
+    def get_settings(self, handler_name: str) -> dict[str, Any]:
+        """Get handler settings with backend-aware adaptive overrides."""
+        settings = super().get_settings(handler_name).copy()
+        backend = self._detect_dolphin_backend()
+
+        if handler_name == "NvidiaSettingsHandler" and backend in {"dx12", "vulkan", "opengl"}:
+            # NVIDIA LLM is DX9/DX11-only. For DX12/Vulkan/OpenGL backends,
+            # avoid forcing queue controls that provide no real benefit.
+            settings["low_latency_mode"] = "off"
+
+        if handler_name == "WindowsSettingsHandler":
+            # HAGS behavior is backend-dependent for emulators.
+            if backend in {"dx11", "opengl"}:
+                settings["hags"] = False
+            elif backend in {"dx12", "vulkan"}:
+                settings["hags"] = True
+
+        return settings
+
     def get_in_game_settings(self) -> list[dict[str, str]]:
         """Get recommended Dolphin and NVCP settings.
 
@@ -103,10 +155,10 @@ class SlippiMeleeProfile(EmulatorLatencyBaseProfile):
             {
                 "category": "Windows Settings",
                 "setting": "Hardware Accelerated GPU Scheduling (HAGS)",
-                "value": "On (test both settings)",
+                "value": "Backend-aware (DX11/OpenGL: Off, DX12/Vulkan: On)",
                 "reason": (
-                    "HAGS generally helps with DX12 backend; results vary by system. "
-                    "Test both ON and OFF for your specific setup. Avoid with DX11 backend."
+                    "HAGS is adapted to Dolphin backend: disable for DX11/OpenGL paths, "
+                    "enable for DX12/Vulkan paths."
                 ),
             },
             {
@@ -142,11 +194,10 @@ class SlippiMeleeProfile(EmulatorLatencyBaseProfile):
             {
                 "category": "Nvidia Control Panel",
                 "setting": "Low Latency Mode",
-                "value": "On (test Ultra)",
+                "value": "Backend-aware (DX11: On, DX12/Vulkan/OpenGL: Off)",
                 "reason": (
-                    "On reduces render queue safely. Ultra may provide additional latency "
-                    "reduction but can cause micro-stutters on some systems. Test both "
-                    "settings to find what works best for your hardware."
+                    "Driver LLM is relevant on DX11 paths. For DX12/Vulkan/OpenGL, "
+                    "the profile disables LLM because the setting does not provide the same queue benefits."
                 ),
             },
             {

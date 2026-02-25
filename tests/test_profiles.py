@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from unittest.mock import patch
+
 import pytest
 
 from abso.profiles import get_all_profiles
@@ -141,13 +143,28 @@ class TestProfileSettings:
         LLM is set to 'on' (not 'ultra') per updated research - Ultra optional but test both.
         """
         profile = SlippiMeleeProfile()
-        settings = profile.get_settings("NvidiaSettingsHandler")
+        with patch.object(profile, "_detect_dolphin_backend", return_value="dx11"):
+            settings = profile.get_settings("NvidiaSettingsHandler")
 
         # Minimum latency settings per rollback.md canonical spec
         assert settings["low_latency_mode"] == "on"  # On recommended; Ultra optional
         assert settings["vsync"] == "off"
         assert settings["vrr_app_override"] == "force_off"
         assert settings["threaded_optimization"] == "off"
+
+    def test_slippi_nvidia_settings_vulkan_disables_llm(self):
+        """Vulkan backend should disable driver LLM (DX11-only control)."""
+        profile = SlippiMeleeProfile()
+        with patch.object(profile, "_detect_dolphin_backend", return_value="vulkan"):
+            settings = profile.get_settings("NvidiaSettingsHandler")
+        assert settings["low_latency_mode"] == "off"
+
+    def test_slippi_windows_settings_dx11_disables_hags(self):
+        """DX11 backend should disable HAGS for stability."""
+        profile = SlippiMeleeProfile()
+        with patch.object(profile, "_detect_dolphin_backend", return_value="dx11"):
+            settings = profile.get_settings("WindowsSettingsHandler")
+        assert settings["hags"] is False
 
     def test_slippi_console_parity_nvidia_settings(self):
         """Console-parity Slippi should bias for pacing consistency over minimum latency."""
