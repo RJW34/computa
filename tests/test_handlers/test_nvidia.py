@@ -413,6 +413,44 @@ class TestNvidiaApply:
         rate = handler._detect_primary_refresh_rate()
         assert rate == 300
 
+    @patch("abso.core.detector.HardwareDetector.detect_monitors")
+    def test_detect_primary_refresh_rate_prefers_active_mode_over_capability(
+        self,
+        mock_detect_monitors,
+    ):
+        """Use active/current mode refresh for VRR cap calculations."""
+        mock_detect_monitors.return_value = [
+            {
+                "is_primary": True,
+                "refresh_rate": 240,
+                "max_refresh_rate": 240,
+                "max_refresh_capability": 280,
+            },
+        ]
+
+        handler = NvidiaSettingsHandler()
+        rate = handler._detect_primary_refresh_rate()
+        assert rate == 240
+
+    @patch("abso.core.detector.HardwareDetector.detect_monitors")
+    def test_detect_primary_refresh_rate_uses_capability_when_mode_missing(
+        self,
+        mock_detect_monitors,
+    ):
+        """Fallback to capability when no active/max mode refresh is available."""
+        mock_detect_monitors.return_value = [
+            {
+                "is_primary": True,
+                "refresh_rate": None,
+                "max_refresh_rate": None,
+                "max_refresh_capability": 280,
+            },
+        ]
+
+        handler = NvidiaSettingsHandler()
+        rate = handler._detect_primary_refresh_rate()
+        assert rate == 280
+
 
 class TestNvidiaBackupRestore:
     """Tests for backup() and restore() methods."""

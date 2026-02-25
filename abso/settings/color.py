@@ -11,6 +11,7 @@ reused from windows.py).
 
 from __future__ import annotations
 
+import contextlib
 import ctypes
 import json
 import logging
@@ -36,7 +37,7 @@ ICC_PROFILE_ALIASES: dict[str, str] = {
 }
 
 # Windows color directory
-COLOR_DIR = Path(os.environ.get("SystemRoot", r"C:\Windows")) / "System32" / "spool" / "drivers" / "color"
+COLOR_DIR = Path(os.environ.get("SYSTEMROOT", r"C:\Windows")) / "System32" / "spool" / "drivers" / "color"
 
 # Registry paths for ICC profile associations
 # Per-monitor: HKCU\SOFTWARE\Microsoft\Windows NT\CurrentVersion\ICM\ProfileAssociations\Display\{class_guid}\{index}
@@ -53,15 +54,19 @@ NVAPI_SET_DVC_LEVEL_EX = 0x4A82C2B1
 NVAPI_GET_DVC_INFO = 0x4085DE45
 NVAPI_SET_DVC_LEVEL = 0x172409B4
 NVAPI_ENUM_NVIDIA_DISPLAY_HANDLE = 0x9ABDD40D
+NVAPI_GET_ASSOCIATED_NVIDIA_DISPLAY_NAME = 0x22A78B05
+NVAPI_GET_ASSOCIATED_NVIDIA_DISPLAY_HANDLE = 0x35C29134
 NVAPI_INITIALIZE = 0x0150E828
 
 # DVC user-facing range (0-100, 50=default/no change)
 DVC_USER_MIN = 0
 DVC_USER_MAX = 100
 DVC_USER_DEFAULT = 50
+NVAPI_SHORT_STRING_MAX = 64
 
 # CCD API constants (same as windows.py)
 QDC_ONLY_ACTIVE_PATHS = 0x00000002
+DISPLAYCONFIG_DEVICE_INFO_GET_SOURCE_NAME = 1
 DISPLAYCONFIG_DEVICE_INFO_GET_ADVANCED_COLOR_INFO = 9
 
 # Color encoding names
@@ -97,6 +102,13 @@ class _DISPLAYCONFIG_GET_ADVANCED_COLOR_INFO(ctypes.Structure):
         ("value", wintypes.UINT),
         ("colorEncoding", wintypes.UINT),
         ("bitsPerColorChannel", wintypes.UINT),
+    ]
+
+
+class _DISPLAYCONFIG_SOURCE_DEVICE_NAME(ctypes.Structure):
+    _fields_ = [
+        ("header", _DISPLAYCONFIG_DEVICE_INFO_HEADER),
+        ("viewGdiDeviceName", ctypes.c_wchar * 32),
     ]
 
 
@@ -679,7 +691,7 @@ class ColorProfileSettingsHandler(SettingsHandler):
             return True
 
         try:
-            system32 = Path(os.environ.get("SystemRoot", r"C:\Windows")) / "System32"
+            system32 = Path(os.environ.get("SYSTEMROOT", r"C:\Windows")) / "System32"
             nvapi_path = system32 / "nvapi64.dll"
             if not nvapi_path.exists():
                 logger.debug("nvapi64.dll not found")
@@ -728,10 +740,22 @@ class ColorProfileSettingsHandler(SettingsHandler):
         self._interface_table[name] = func
         return func
 
-    def _get_nvidia_display_handle(self) -> c_int | None:
-        """Get the primary NVIDIA display handle."""
+    @staticmethod
+    def _normalize_display_name(name: str | None) -> str:
+        """Normalize display names across Win32/NVAPI formats for matching."""
+        if not name:
+            return ""
+        normalized = str(name).strip().upper().replace("/", "\\")
+        while normalized.startswith("\\"):
+            normalized = normalized[1:]
+        normalized = normalized.replace(".\\", "")
+        return normalized
+
+    def _enumerate_nvidia_display_handles(self) -> list[c_int]:
+        """Enumerate all available NVIDIA display handles."""
+        handles: list[c_int] = []
         if not self._init_nvapi():
-            return None
+            return handles
 
         try:
             enum_func = self._nvapi_get_function(
@@ -741,15 +765,86 @@ class ColorProfileSettingsHandler(SettingsHandler):
                 [c_uint, ctypes.POINTER(c_int)],
             )
             if not enum_func:
+                return handles
+
+            for index in range(16):
+                handle = c_int(0)
+                status = enum_func(index, ctypes.byref(handle))
+                if status != 0:
+                    break
+                if handle.value != 0:
+                    handles.append(handle)
+        except Exception as e:
+            logger.debug(f"Failed to enumerate NVIDIA display handles: {e}")
+
+        return handles
+
+    def _get_associated_nvidia_display_handle(self, device_name: str) -> c_int | None:
+        """Map a Windows display device name to the matching NVIDIA display handle."""
+        if not self._init_nvapi() or not device_name:
+            return None
+
+        normalized_target = self._normalize_display_name(device_name)
+
+        # First try direct lookup from GDI device name -> NV display handle.
+        try:
+            assoc_func = self._nvapi_get_function(
+                "NvAPI_GetAssociatedNvidiaDisplayHandle",
+                NVAPI_GET_ASSOCIATED_NVIDIA_DISPLAY_HANDLE,
+                c_int,
+                [ctypes.c_char_p, ctypes.POINTER(c_int)],
+            )
+            if assoc_func:
+                handle = c_int(0)
+                status = assoc_func(device_name.encode("ascii", "ignore"), ctypes.byref(handle))
+                if status == 0 and handle.value != 0:
+                    return handle
+        except Exception as e:
+            logger.debug(f"NvAPI_GetAssociatedNvidiaDisplayHandle failed: {e}")
+
+        # Fallback: enumerate handles and compare associated display names.
+        try:
+            name_func = self._nvapi_get_function(
+                "NvAPI_GetAssociatedNvidiaDisplayName",
+                NVAPI_GET_ASSOCIATED_NVIDIA_DISPLAY_NAME,
+                c_int,
+                [c_int, ctypes.POINTER(ctypes.c_char)],
+            )
+            if not name_func:
                 return None
 
-            handle = c_int(0)
-            status = enum_func(0, ctypes.byref(handle))  # index 0 = primary
-            if status != 0:
-                logger.debug(f"EnumNvidiaDisplayHandle failed: {status}")
-                return None
+            for handle in self._enumerate_nvidia_display_handles():
+                buffer = ctypes.create_string_buffer(NVAPI_SHORT_STRING_MAX)
+                status = name_func(handle, buffer)
+                if status != 0:
+                    continue
 
-            return handle
+                associated_name = buffer.value.decode("ascii", errors="ignore")
+                if self._normalize_display_name(associated_name) == normalized_target:
+                    return handle
+        except Exception as e:
+            logger.debug(f"NvAPI_GetAssociatedNvidiaDisplayName fallback failed: {e}")
+
+        return None
+
+    def _get_nvidia_display_handle(self) -> c_int | None:
+        """Get NVIDIA display handle for the Windows primary display."""
+        if not self._init_nvapi():
+            return None
+
+        try:
+            monitor_info = self._get_primary_monitor_info()
+            primary_device_name = monitor_info.get("device_name") if monitor_info else None
+            if primary_device_name:
+                associated = self._get_associated_nvidia_display_handle(primary_device_name)
+                if associated is not None:
+                    return associated
+
+            handles = self._enumerate_nvidia_display_handles()
+            if handles:
+                return handles[0]
+
+            return None
 
         except Exception as e:
             logger.debug(f"Failed to get NVIDIA display handle: {e}")
@@ -906,14 +1001,20 @@ class ColorProfileSettingsHandler(SettingsHandler):
             if not targets:
                 return result
 
-            # Query first active target (primary)
-            adapter_id, target_id = targets[0]
+            monitor_info = self._get_primary_monitor_info()
+            primary_device_name = monitor_info.get("device_name") if monitor_info else None
+            selected = self._select_primary_target(
+                targets=targets,
+                primary_device_name=primary_device_name,
+            )
+            if not selected:
+                return result
 
             info = _DISPLAYCONFIG_GET_ADVANCED_COLOR_INFO()
             info.header.type = DISPLAYCONFIG_DEVICE_INFO_GET_ADVANCED_COLOR_INFO
             info.header.size = ctypes.sizeof(info)
-            info.header.adapterId = adapter_id
-            info.header.id = target_id
+            info.header.adapterId = selected["adapter_id"]
+            info.header.id = selected["target_id"]
 
             status = ctypes.windll.user32.DisplayConfigGetDeviceInfo(ctypes.byref(info))
             if status == 0:
@@ -927,8 +1028,47 @@ class ColorProfileSettingsHandler(SettingsHandler):
 
         return result
 
+    @classmethod
+    def _select_primary_target(
+        cls,
+        targets: list[dict[str, Any]],
+        primary_device_name: str | None,
+    ) -> dict[str, Any] | None:
+        """Select CCD target matching the primary display device."""
+        if not targets:
+            return None
+
+        normalized_primary = cls._normalize_display_name(primary_device_name)
+        if normalized_primary:
+            for target in targets:
+                normalized_source = cls._normalize_display_name(target.get("source_device_name"))
+                if normalized_source and normalized_source == normalized_primary:
+                    return target
+
+        return targets[0]
+
     @staticmethod
-    def _get_active_display_targets() -> list[tuple[_LUID, int]]:
+    def _get_source_device_name(adapter_id: _LUID, source_id: int) -> str | None:
+        """Resolve CCD source to GDI device name (e.g. '\\\\.\\DISPLAY1')."""
+        try:
+            user32 = ctypes.windll.user32
+
+            name_info = _DISPLAYCONFIG_SOURCE_DEVICE_NAME()
+            name_info.header.type = DISPLAYCONFIG_DEVICE_INFO_GET_SOURCE_NAME
+            name_info.header.size = ctypes.sizeof(name_info)
+            name_info.header.adapterId = adapter_id
+            name_info.header.id = source_id
+
+            status = user32.DisplayConfigGetDeviceInfo(ctypes.byref(name_info))
+            if status == 0 and name_info.viewGdiDeviceName:
+                return str(name_info.viewGdiDeviceName)
+        except Exception as e:
+            logger.debug(f"Failed to resolve source device name for source_id={source_id}: {e}")
+
+        return None
+
+    @staticmethod
+    def _get_active_display_targets() -> list[dict[str, Any]]:
         """Enumerate active display targets via QueryDisplayConfig."""
         user32 = ctypes.windll.user32
         num_paths = wintypes.UINT()
@@ -956,10 +1096,20 @@ class ColorProfileSettingsHandler(SettingsHandler):
         if status != 0:
             return []
 
-        targets: list[tuple[_LUID, int]] = []
+        targets: list[dict[str, Any]] = []
         for i in range(num_paths.value):
-            t = paths[i].targetInfo
-            targets.append((t.adapterId, t.id))
+            path = paths[i]
+            source = path.sourceInfo
+            target = path.targetInfo
+            targets.append({
+                "adapter_id": target.adapterId,
+                "target_id": target.id,
+                "source_id": source.id,
+                "source_device_name": ColorProfileSettingsHandler._get_source_device_name(
+                    source.adapterId,
+                    source.id,
+                ),
+            })
         return targets
 
     # =========================================================================
@@ -1028,10 +1178,8 @@ class ColorProfileSettingsHandler(SettingsHandler):
 
             data: dict[str, bool] = {}
             if OSD_ACK_FILE.exists():
-                try:
+                with contextlib.suppress(Exception):
                     data = json.loads(OSD_ACK_FILE.read_text(encoding="utf-8"))
-                except Exception:
-                    pass
 
             data[model_key] = True
             OSD_ACK_FILE.write_text(json.dumps(data, indent=2), encoding="utf-8")

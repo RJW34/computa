@@ -202,3 +202,129 @@ class Overwatch2GSyncProfile(_Overwatch2BaseProfile):
                 "reason": "Minimizes frame spikes during heavy ability usage.",
             },
         ]
+
+
+class Overwatch2GSyncHDRProfile(_Overwatch2BaseProfile):
+    """Overwatch 2 G-SYNC + HDR profile.
+
+    Tear-free low-latency VRR with native HDR enabled. Designed for
+    HDR-capable monitors (OLED, Mini-LED). Uses native color space
+    instead of sRGB clamp.
+
+    OW2's HDR implementation works well on OLED with proper in-game
+    calibration (Paper White Nits, Max Nits). Auto HDR is disabled
+    since OW2 has native HDR support.
+    """
+
+    @property
+    def profile_id(self) -> str:
+        return "overwatch2-gsync-hdr"
+
+    @property
+    def display_name(self) -> str:
+        return "Overwatch 2 - GSYNC HDR"
+
+    @property
+    def description(self) -> str:
+        return "Tear-free low latency VRR with native HDR (OLED/Mini-LED)"
+
+    @property
+    def requires_confirmed_vrr_support(self) -> bool:
+        return True
+
+    def _base_overrides(self) -> dict[str, dict[str, Any]]:
+        return {
+            "WindowsSettingsHandler": {
+                "hdr": True,
+                "auto_hdr": False,
+            },
+            "GraphicsSettingsHandler": {
+                "disable_mpo": False,
+            },
+            "ColorProfileSettingsHandler": {
+                "icc_profile": "native",
+                "digital_vibrance": 50,
+                "show_osd_guidance": True,
+                "game_type": "competitive_fps",
+            },
+        }
+
+    def _variant_overrides(self) -> dict[str, dict[str, Any]]:
+        return {
+            "NvidiaSettingsHandler": {
+                "preset": "reflex_gsync",
+                "profile_name": "Overwatch 2",
+                "auto_vrr_fps_cap": True,
+                "global_vrr_mode": "fullscreen_only",
+            },
+        }
+
+    def get_in_game_settings(self) -> list[dict[str, str]]:
+        return [
+            {
+                "category": "Display",
+                "setting": "Display Mode",
+                "value": "Fullscreen (Exclusive)",
+                "reason": "Best VRR behavior with lowest compositor overhead.",
+            },
+            {
+                "category": "Display",
+                "setting": "VSync",
+                "value": "Off (in-game)",
+                "reason": "Use NVCP VSync as safety net; keep in-game VSync off.",
+            },
+            {
+                "category": "Display",
+                "setting": "NVIDIA Reflex Low Latency",
+                "value": "Enabled + Boost",
+                "reason": "Native Reflex should own queue control.",
+            },
+            {
+                "category": "Display",
+                "setting": "Frame Rate Cap",
+                "value": "Refresh rate - 3",
+                "reason": "Keeps NVCP VSync from engaging while preserving VRR tear-free output.",
+            },
+            {
+                "category": "Display",
+                "setting": "Reduce Buffering",
+                "value": "On",
+                "reason": "Maintains low queue depth in the render pipeline.",
+            },
+            {
+                "category": "Display",
+                "setting": "HDR Mode",
+                "value": "On",
+                "reason": "Native HDR output for OLED/Mini-LED displays.",
+            },
+            {
+                "category": "Display",
+                "setting": "HDR Paper White Nits",
+                "value": "~200 (calibrate to taste)",
+                "reason": "Controls SDR-content brightness under HDR. ~200 nits is a good OLED starting point.",
+            },
+            {
+                "category": "Display",
+                "setting": "HDR Max Display Brightness",
+                "value": "Match monitor peak (e.g. 1000+ nits OLED)",
+                "reason": "Set to your display's actual peak brightness for correct tone mapping.",
+            },
+            {
+                "category": "Display",
+                "setting": "HDR UI Brightness",
+                "value": "Adjust to taste",
+                "reason": "OW2-specific slider for HUD brightness under HDR.",
+            },
+            {
+                "category": "Graphics",
+                "setting": "Dynamic Render Scale",
+                "value": "Off",
+                "reason": "Avoid large frame pacing oscillations.",
+            },
+            {
+                "category": "Graphics",
+                "setting": "Shadows / Effects",
+                "value": "Low",
+                "reason": "Minimizes frame spikes during heavy ability usage.",
+            },
+        ]

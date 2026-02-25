@@ -14,18 +14,25 @@ from abso.profiles.base import BaseProfile
 from abso.profiles.cod_bo7 import CodBo7Profile
 from abso.profiles.diablo4 import Diablo4Profile
 from abso.profiles.fortnite import FortniteProfile
-from abso.profiles.overwatch2 import Overwatch2GSyncProfile, Overwatch2Profile
+from abso.profiles.overwatch2 import (
+    Overwatch2GSyncHDRProfile,
+    Overwatch2GSyncProfile,
+    Overwatch2Profile,
+)
 from abso.profiles.pacdeluxe import PACDeluxeProfile
 from abso.profiles.pokemon_auto_chess import PokemonAutoChessProfile
 from abso.profiles.productivity_oled import ProductivityOLEDProfile
 from abso.profiles.rivals2 import Rivals2Profile
-from abso.profiles.rivals2_gsync import Rivals2GSyncProfile, Rivals2OnlineGSyncProfile
 from abso.profiles.rivals2_300hz_max import Rivals2_300HzMaxProfile
+from abso.profiles.rivals2_gsync import Rivals2GSyncProfile, Rivals2OnlineGSyncProfile
 from abso.profiles.rivals2_offline import Rivals2OfflineProfile
 from abso.profiles.rivals2_online import Rivals2OnlineProfile
 from abso.profiles.rivals2_tournament_sim import Rivals2TournamentSimProfile
 from abso.profiles.ryujinx_ssbu import RyujinxSSBUProfile
-from abso.profiles.slippi_melee import SlippiMeleeProfile
+from abso.profiles.slippi_melee import (
+    SlippiMeleeConsoleParityProfile,
+    SlippiMeleeProfile,
+)
 from abso.profiles.streaming_profiles import (
     FortniteStreamingProfile,
     PACDeluxeStreamingProfile,
@@ -54,7 +61,13 @@ PROFILE_CATALOG: OrderedDict[str, ProfileCatalogEntry] = OrderedDict(
         "slippi-melee": ProfileCatalogEntry(
             profile_class=SlippiMeleeProfile,
             tray_category="Fighting",
-            tray_subtitle="LLM ON | HAGS ON | No Sync",
+            tray_subtitle="Competitive | LLM ON | No Sync",
+            sync_mode="off",
+        ),
+        "slippi-melee-console-parity": ProfileCatalogEntry(
+            profile_class=SlippiMeleeConsoleParityProfile,
+            tray_category="Fighting",
+            tray_subtitle="Console-Parity | VSync ON | LLM OFF",
             sync_mode="off",
         ),
         "rivals2": ProfileCatalogEntry(
@@ -133,6 +146,12 @@ PROFILE_CATALOG: OrderedDict[str, ProfileCatalogEntry] = OrderedDict(
             profile_class=Overwatch2GSyncProfile,
             tray_category="Shooter",
             tray_subtitle="Reflex ON+Boost | VSync Safety Net | G-SYNC ON",
+            sync_mode="on",
+        ),
+        "overwatch2-gsync-hdr": ProfileCatalogEntry(
+            profile_class=Overwatch2GSyncHDRProfile,
+            tray_category="Shooter",
+            tray_subtitle="HDR ON | Reflex ON+Boost | G-SYNC ON",
             sync_mode="on",
         ),
         "pokemon-auto-chess": ProfileCatalogEntry(
@@ -219,4 +238,3 @@ def get_profile_manifest() -> list[dict[str, Any]]:
             }
         )
     return manifest
-

@@ -3,29 +3,21 @@
 from __future__ import annotations
 
 import json
+from ctypes import c_int
 from pathlib import Path
-from typing import Any
 from unittest.mock import MagicMock, patch
-
-import pytest
 
 from abso.data.monitor_osd import (
     OSDRecommendation,
     get_osd_recommendations,
 )
 from abso.settings.color import (
-    COLOR_DIR,
-    DVC_USER_DEFAULT,
-    DVC_USER_MAX,
-    DVC_USER_MIN,
-    DVCRange,
-    ICC_PROFILE_ALIASES,
     ColorProfileSettingsHandler,
+    DVCRange,
     _extract_model_key,
     _internal_to_user,
     _user_to_internal,
 )
-
 
 # =============================================================================
 # Unit Tests: Vibrance Conversion
@@ -391,6 +383,97 @@ class TestColorHandlerDetect:
         assert result["monitor_device"] == r"\\.\DISPLAY1"
         assert result["monitor_id"] == r"MONITOR\GSM7847\{guid}"
 
+    def test_select_primary_target_prefers_matching_source(self):
+        targets = [
+            {
+                "adapter_id": object(),
+                "target_id": 1,
+                "source_id": 1,
+                "source_device_name": r"\\.\DISPLAY2",
+            },
+            {
+                "adapter_id": object(),
+                "target_id": 2,
+                "source_id": 2,
+                "source_device_name": r"\\.\DISPLAY1",
+            },
+        ]
+
+        selected = ColorProfileSettingsHandler._select_primary_target(
+            targets=targets,
+            primary_device_name=r"\\.\DISPLAY1",
+        )
+
+        assert selected is not None
+        assert selected["target_id"] == 2
+
+    def test_select_primary_target_falls_back_to_first(self):
+        targets = [
+            {
+                "adapter_id": object(),
+                "target_id": 7,
+                "source_id": 7,
+                "source_device_name": r"\\.\DISPLAY9",
+            },
+            {
+                "adapter_id": object(),
+                "target_id": 8,
+                "source_id": 8,
+                "source_device_name": r"\\.\DISPLAY8",
+            },
+        ]
+
+        selected = ColorProfileSettingsHandler._select_primary_target(
+            targets=targets,
+            primary_device_name=r"\\.\DISPLAY1",
+        )
+
+        assert selected is not None
+        assert selected["target_id"] == 7
+
+    @patch.object(ColorProfileSettingsHandler, "_init_nvapi", return_value=True)
+    @patch.object(ColorProfileSettingsHandler, "_get_primary_monitor_info")
+    @patch.object(ColorProfileSettingsHandler, "_get_associated_nvidia_display_handle")
+    @patch.object(ColorProfileSettingsHandler, "_enumerate_nvidia_display_handles")
+    def test_get_nvidia_display_handle_prefers_associated_primary(
+        self,
+        mock_enumerate,
+        mock_associated,
+        mock_primary,
+        mock_init,
+    ):
+        handler = ColorProfileSettingsHandler()
+        mock_primary.return_value = {"device_name": r"\\.\DISPLAY1"}
+        mock_associated.return_value = c_int(9)
+        mock_enumerate.return_value = [c_int(1)]
+
+        handle = handler._get_nvidia_display_handle()
+
+        assert handle is not None
+        assert handle.value == 9
+        mock_associated.assert_called_once_with(r"\\.\DISPLAY1")
+
+    @patch.object(ColorProfileSettingsHandler, "_init_nvapi", return_value=True)
+    @patch.object(ColorProfileSettingsHandler, "_get_primary_monitor_info")
+    @patch.object(ColorProfileSettingsHandler, "_get_associated_nvidia_display_handle")
+    @patch.object(ColorProfileSettingsHandler, "_enumerate_nvidia_display_handles")
+    def test_get_nvidia_display_handle_falls_back_to_first_enumerated(
+        self,
+        mock_enumerate,
+        mock_associated,
+        mock_primary,
+        mock_init,
+    ):
+        handler = ColorProfileSettingsHandler()
+        mock_primary.return_value = {"device_name": r"\\.\DISPLAY1"}
+        mock_associated.return_value = None
+        mock_enumerate.return_value = [c_int(4), c_int(6)]
+
+        handle = handler._get_nvidia_display_handle()
+
+        assert handle is not None
+        assert handle.value == 4
+
 
 # =============================================================================
 # Handler Tests: audit
@@ -504,3 +587,23 @@ class TestProfileIntegration:
         profile = CodBo7Profile()
         handler_names = [h.__class__.__name__ for h in profile.get_handlers()]
         assert "ColorProfileSettingsHandler" in handler_names
+
+    def test_cod_color_settings_native_for_hdr(self):
+        from abso.profiles.cod_bo7 import CodBo7Profile
+        profile = CodBo7Profile()
+        settings = profile.get_settings("ColorProfileSettingsHandler")
+        assert settings["icc_profile"] == "native"
+        assert settings["game_type"] == "competitive_fps"
+
+    def test_overwatch2_gsync_hdr_has_color_handler(self):
+        from abso.profiles.overwatch2 import Overwatch2GSyncHDRProfile
+        profile = Overwatch2GSyncHDRProfile()
+        handler_names = [h.__class__.__name__ for h in profile.get_handlers()]
+        assert "ColorProfileSettingsHandler" in handler_names
+
+    def test_overwatch2_gsync_hdr_color_settings(self):
+        from abso.profiles.overwatch2 import Overwatch2GSyncHDRProfile
+        profile = Overwatch2GSyncHDRProfile()
+        settings = profile.get_settings("ColorProfileSettingsHandler")
+        assert settings["icc_profile"] == "native"
+        assert settings["game_type"] == "competitive_fps"

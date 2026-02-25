@@ -196,6 +196,39 @@ class TestCLIApply:
             create_backup=False,
         )
 
+    @patch("abso.main.ProfileTransactionManager")
+    @patch("abso.main.is_admin", return_value=True)
+    def test_apply_json_updates_current_profile_state(self, mock_is_admin, mock_tx_manager_cls, tmp_path):
+        """JSON apply should persist current profile state for tray startup restore."""
+        tx_result = MagicMock()
+        tx_result.success = True
+        tx_result.backup_id = None
+        tx_result.error = None
+        tx_result.rollback_performed = False
+        tx_result.apply_result = ApplyResult(
+            success=True,
+            requires_reboot=False,
+            in_game_settings=False,
+            applied_settings=["WindowsSettingsHandler"],
+            failed_settings=[],
+        )
+        tx_result.compliance_report = MagicMock()
+        tx_result.compliance_report.to_dict.return_value = {}
+        tx_result.to_dict.return_value = {"success": True}
+
+        mock_manager = mock_tx_manager_cls.return_value
+        mock_manager.execute.return_value = tx_result
+
+        state_file = tmp_path / ".abso_state.json"
+        runner = CliRunner()
+        with patch("abso.main.STATE_FILE", state_file):
+            result = runner.invoke(cli, ["apply", "slippi-melee", "--json", "--no-backup"])
+
+        assert result.exit_code == 0
+        assert state_file.exists()
+        saved = json.loads(state_file.read_text(encoding="utf-8"))
+        assert saved["current_profile"] == "slippi-melee"
+
 
 class TestCLIRestore:
     """Test restore command error handling."""
@@ -294,3 +327,21 @@ class TestCLIRestoreWithMocks:
 
         # Should complete without crash
         assert result.exception is None or result.exit_code in [0, 1]
+
+    @patch("abso.main.BackupManager")
+    @patch("abso.main.is_admin", return_value=True)
+    def test_restore_json_clears_current_profile_state(self, mock_is_admin, mock_backup_class, tmp_path):
+        """Successful restore should clear state file so tray doesn't show stale active profile."""
+        mock_backup = MagicMock()
+        mock_backup.restore_backup.return_value = True
+        mock_backup_class.return_value = mock_backup
+
+        state_file = tmp_path / ".abso_state.json"
+        state_file.write_text(json.dumps({"current_profile": "overwatch2"}), encoding="utf-8")
+
+        runner = CliRunner()
+        with patch("abso.main.STATE_FILE", state_file):
+            result = runner.invoke(cli, ["restore", "latest", "--json"])
+
+        assert result.exit_code == 0
+        assert not state_file.exists()

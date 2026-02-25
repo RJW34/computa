@@ -356,3 +356,117 @@ class SlippiMeleeProfile(EmulatorLatencyBaseProfile):
         ]
 
 
+class SlippiMeleeConsoleParityProfile(SlippiMeleeProfile):
+    """Console-parity style profile for offline Melee practice on modern displays."""
+
+    @property
+    def profile_id(self) -> str:
+        return "slippi-melee-console-parity"
+
+    @property
+    def display_name(self) -> str:
+        return "Super Smash Bros. Melee (Slippi Console-Parity)"
+
+    @property
+    def description(self) -> str:
+        return "Console-like frame pacing and presentation for offline practice"
+
+    @property
+    def optimization_target(self) -> str:
+        return "balanced"
+
+    def _settings_overrides(self) -> dict[str, dict[str, Any]]:
+        return {
+            "NvidiaSettingsHandler": {
+                # Console-parity: prioritize stable cadence/feel over minimum click-to-pixel latency.
+                "low_latency_mode": "off",
+                "vsync": "on",
+                "vsync_tear_control": "disable",
+                "vrr_app_override": "force_off",
+                "power_management": "prefer_max_performance",
+                "shader_cache": "unlimited",
+                "threaded_optimization": "off",
+                "max_frame_rate": 60,
+                "triple_buffering": "off",
+            },
+            "DolphinConfigHandler": {
+                # Keep visual overhead minimal but avoid aggressive presentation shortcuts.
+                "efb_scale": "1",
+                "texture_scaling_factor": "1",
+                "use_scaling_filter": "False",
+                "use_deposterize": "False",
+                "reduce_timing_dispersion": "True",
+                "rush_presentation": "False",
+                "smooth_presentation": "False",
+            },
+        }
+
+    def get_in_game_settings(self) -> list[dict[str, str]]:
+        return [
+            {
+                "category": "Profile Goal",
+                "setting": "Target",
+                "value": "Console-like pacing and feel (offline)",
+                "reason": (
+                    "Use this when you want closer console-like presentation cadence on an LCD/OLED, "
+                    "not maximum latency reduction."
+                ),
+            },
+            {
+                "category": "Nvidia Control Panel",
+                "setting": "V-SYNC (global/per-game)",
+                "value": "On",
+                "reason": (
+                    "Keeps presentation cadence stable and tear-free for practice sessions where feel "
+                    "consistency is preferred over absolute minimum latency."
+                ),
+            },
+            {
+                "category": "Nvidia Control Panel",
+                "setting": "Low Latency Mode",
+                "value": "Off",
+                "reason": (
+                    "Avoids aggressive queue reduction. This profile intentionally favors consistent "
+                    "frame pacing over minimum queue depth."
+                ),
+            },
+            {
+                "category": "Nvidia Control Panel",
+                "setting": "Max Frame Rate",
+                "value": "60",
+                "reason": "Locks driver limiter to Melee's native cadence for stable console-parity behavior.",
+            },
+            {
+                "category": "Graphics",
+                "setting": "Dolphin VSync",
+                "value": "On",
+                "reason": "Keep VSync enabled in Dolphin for stable, console-style frame presentation.",
+            },
+            {
+                "category": "Dolphin.ini [Core]",
+                "setting": "RushPresentation",
+                "value": "False",
+                "reason": (
+                    "Disables aggressive latency-cutting presentation path to preserve a more console-like feel."
+                ),
+            },
+            {
+                "category": "Dolphin.ini [Core]",
+                "setting": "ImmediateXFBEnable",
+                "value": "True (Slippi default)",
+                "reason": (
+                    "Keep Slippi defaults unless you are running controlled local tests and explicitly "
+                    "understand the compatibility/latency tradeoff."
+                ),
+            },
+            {
+                "category": "Display",
+                "setting": "G-SYNC / VRR",
+                "value": "Off",
+                "reason": (
+                    "Melee is fixed 60fps. VRR is not required for this parity profile and can alter pacing feel."
+                ),
+            },
+        ]
+
+

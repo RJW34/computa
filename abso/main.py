@@ -65,6 +65,12 @@ def set_current_profile(profile_name: str) -> None:
     os.replace(tmp, STATE_FILE)
 
 
+def clear_current_profile() -> None:
+    """Clear the active profile state file after a restore/reset."""
+    if STATE_FILE.exists():
+        STATE_FILE.unlink()
+
+
 def json_serial(obj: Any) -> Any:
     """JSON serializer for objects not serializable by default."""
     if isinstance(obj, datetime):
@@ -431,6 +437,8 @@ def apply(profile_name: str, no_backup: bool, json_output: bool) -> None:
         result = tx.apply_result
 
         if json_output:
+            if tx.success and result and result.success:
+                set_current_profile(profile_name)
             applied_settings = result.applied_settings if result else []
             failed_settings = result.failed_settings if result else []
             output_json({
@@ -619,6 +627,7 @@ def restore(backup_id: str, json_output: bool) -> None:
 
     try:
         backup_manager.restore_backup(backup_id)
+        clear_current_profile()
         if json_output:
             output_json({"success": True, "backup_id": backup_id, "message": "Backup restored successfully"})
             return

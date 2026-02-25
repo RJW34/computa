@@ -51,6 +51,14 @@ $script:FailSoundFile = Join-Path $PSScriptRoot "hit-weak-not-very-effective.mp3
 $script:VrrWarningSoundFile = Join-Path $PSScriptRoot "oot_navi_hey1.mp3"
 $script:RestartSoundFile = Join-Path $PSScriptRoot "pokemon-redblueyellow-item-found-sound-effect.mp3"
 $script:MediaPlayer = $null
+$script:RestartSoundMarkerMaxAgeSeconds = 180
+try {
+    $restartMarkerRoot = Join-Path ([Environment]::GetFolderPath("LocalApplicationData")) "AdaptiveBattleStationOptimizer"
+}
+catch {
+    $restartMarkerRoot = $env:TEMP
+}
+$script:RestartSoundMarkerFile = Join-Path $restartMarkerRoot "tray-restart-pending.json"
 
 function Get-MediaPlayer {
     if ($null -eq $script:MediaPlayer) {
@@ -126,38 +134,120 @@ function Play-VrrWarningSound {
 
 function Play-RestartSound {
     try {
-        if (-not $script:TrayConfig.soundEnabled) { return }
-        if (Test-Path $script:RestartSoundFile) {
-            # Spawn a detached process so the sound survives the tray exiting.
-            # Use mciSendString with "wait" flag for synchronous playback —
-            # WMPlayer.OCX failed because Start-Sleep doesn't pump COM messages.
-            $mciVol = [int]($script:TrayConfig.soundVolume * 1000)
-            $filePath = $script:RestartSoundFile
-            $soundCmd = @"
-Add-Type -TypeDefinition @'
+        if (-not $script:TrayConfig.soundEnabled) {
+            Write-TrayLog "Restart sound skipped (sound effects disabled)"
+            return
+        }
+
+        if (-not (Test-Path $script:RestartSoundFile)) {
+            Write-TrayLog "Restart sound file not found: $($script:RestartSoundFile)" -Level "WARN"
+            return
+        }
+
+        if (-not ("AbsoMci" -as [type])) {
+            Add-Type -TypeDefinition @"
 using System;
 using System.Runtime.InteropServices;
-public class MCI {
+using System.Text;
+public static class AbsoMci {
     [DllImport("winmm.dll", CharSet = CharSet.Unicode)]
-    public static extern int mciSendStringW(string command, System.Text.StringBuilder buffer, int bufferSize, IntPtr callback);
+    public static extern int mciSendStringW(string command, StringBuilder buffer, int bufferSize, IntPtr callback);
 }
-'@
-[MCI]::mciSendStringW('open "$filePath" type mpegvideo alias abso_snd', `$null, 0, [IntPtr]::Zero) | Out-Null
-[MCI]::mciSendStringW('setaudio abso_snd volume to $mciVol', `$null, 0, [IntPtr]::Zero) | Out-Null
-[MCI]::mciSendStringW('play abso_snd wait', `$null, 0, [IntPtr]::Zero) | Out-Null
-[MCI]::mciSendStringW('close abso_snd', `$null, 0, [IntPtr]::Zero) | Out-Null
 "@
-            $bytes = [System.Text.Encoding]::Unicode.GetBytes($soundCmd)
-            $encoded = [Convert]::ToBase64String($bytes)
-            Start-Process powershell.exe -ArgumentList "-NoProfile", "-WindowStyle", "Hidden", "-EncodedCommand", $encoded -WindowStyle Hidden
-            Write-TrayLog "Playing restart sound (detached, mciSendString)"
         }
-        else {
-            Write-TrayLog "Restart sound file not found: $($script:RestartSoundFile)" -Level "WARN"
+
+        $volume = [Math]::Max(0, [Math]::Min(1000, [int]([Math]::Round($script:TrayConfig.soundVolume * 1000))))
+        $alias = "abso_restart_$PID"
+
+        $errBuf = New-Object System.Text.StringBuilder 260
+        $openRc = [AbsoMci]::mciSendStringW("open `"$($script:RestartSoundFile)`" type mpegvideo alias $alias", $errBuf, $errBuf.Capacity, [IntPtr]::Zero)
+        if ($openRc -ne 0) {
+            throw "MCI open failed (code=$openRc, detail='$($errBuf.ToString())')"
         }
+
+        [void][AbsoMci]::mciSendStringW("setaudio $alias volume to $volume", $null, 0, [IntPtr]::Zero)
+
+        $playBuf = New-Object System.Text.StringBuilder 260
+        $playRc = [AbsoMci]::mciSendStringW("play $alias wait", $playBuf, $playBuf.Capacity, [IntPtr]::Zero)
+        [void][AbsoMci]::mciSendStringW("close $alias", $null, 0, [IntPtr]::Zero)
+        if ($playRc -ne 0) {
+            throw "MCI play failed (code=$playRc, detail='$($playBuf.ToString())')"
+        }
+
+        Write-TrayLog "Playing restart sound (synchronous, mciSendString)"
     }
     catch {
-        Write-TrayLog "Failed to play restart sound: $($_.Exception.Message)" -Level "WARN"
+        Write-TrayLog "Failed to play restart sound via MCI: $($_.Exception.Message)" -Level "WARN"
+        # Fallback to shared MediaPlayer to keep behavior resilient on systems where MCI MP3 is unavailable.
+        try {
+            Play-SoundFile -FilePath $script:RestartSoundFile -Volume $script:TrayConfig.soundVolume
+            Start-Sleep -Milliseconds 350
+            Write-TrayLog "Restart sound fallback played via MediaPlayer"
+        }
+        catch {
+            Write-TrayLog "Restart sound fallback failed: $($_.Exception.Message)" -Level "WARN"
+        }
+    }
+}
+
+function Set-RestartSuccessSoundMarker {
+    try {
+        if (-not $script:RestartSoundMarkerFile) { return }
+
+        $dir = Split-Path -Parent $script:RestartSoundMarkerFile
+        if ($dir -and -not (Test-Path $dir)) {
+            New-Item -Path $dir -ItemType Directory -Force | Out-Null
+        }
+
+        $payload = [ordered]@{
+            requested_at = (Get-Date).ToString("o")
+            requested_pid = $PID
+            source = "restart_menu"
+        }
+        $payload | ConvertTo-Json -Depth 3 | Set-Content -Path $script:RestartSoundMarkerFile -Encoding UTF8
+        Write-TrayLog "Restart success-sound marker written"
+    }
+    catch {
+        Write-TrayLog "Failed to write restart success-sound marker: $($_.Exception.Message)" -Level "WARN"
+    }
+}
+
+function Invoke-RestartSuccessSoundIfPending {
+    if (-not $script:RestartSoundMarkerFile -or -not (Test-Path $script:RestartSoundMarkerFile)) {
+        return
+    }
+
+    try {
+        $raw = Get-Content -Path $script:RestartSoundMarkerFile -Raw -ErrorAction Stop
+        if ([string]::IsNullOrWhiteSpace($raw)) {
+            Remove-Item -Path $script:RestartSoundMarkerFile -Force -ErrorAction SilentlyContinue
+            return
+        }
+
+        $marker = $raw | ConvertFrom-Json
+        $requestedAt = $null
+        $hasTimestamp = $false
+        if ($marker -and $marker.requested_at) {
+            $hasTimestamp = [datetime]::TryParse("$($marker.requested_at)", [ref]$requestedAt)
+        }
+
+        if ($hasTimestamp) {
+            $ageSeconds = [Math]::Abs(((Get-Date).ToUniversalTime() - $requestedAt.ToUniversalTime()).TotalSeconds)
+            if ($ageSeconds -gt $script:RestartSoundMarkerMaxAgeSeconds) {
+                Write-TrayLog "Restart success-sound marker expired ($([int]$ageSeconds)s old) - skipping sound" -Level "INFO"
+                Remove-Item -Path $script:RestartSoundMarkerFile -Force -ErrorAction SilentlyContinue
+                return
+            }
+        }
+
+        # Consume marker first to avoid replay if audio fails.
+        Remove-Item -Path $script:RestartSoundMarkerFile -Force -ErrorAction SilentlyContinue
+        Write-TrayLog "Restart marker consumed; playing restart success sound"
+        Play-RestartSound
+    }
+    catch {
+        Write-TrayLog "Failed processing restart success-sound marker: $($_.Exception.Message)" -Level "WARN"
+        Remove-Item -Path $script:RestartSoundMarkerFile -Force -ErrorAction SilentlyContinue
     }
 }
 
@@ -398,7 +488,7 @@ if (-not $script:PythonExe) {
 
 $script:AppVersion = "2.0.0"
 
-$script:Profiles = [ordered]@{
+$script:FallbackProfiles = [ordered]@{
     # --- Productivity ---
     "productivity" = @{
         Name     = "Desktop / Productivity"
@@ -471,11 +561,20 @@ $script:Profiles = [ordered]@{
 
     # --- Fighting Games: Melee ---
     "slippi-melee"      = @{
-        Name     = "Slippi Melee"
-        Sub      = "LLM ON | HAGS ON | No Sync"
+        Name     = "Slippi Melee (Competitive)"
+        Sub      = "Competitive | LLM ON | No Sync"
         Cat      = "Fighting"
-        Desc     = "Competitive Melee. LLM ON, HAGS ON, Ultimate Performance."
+        Desc     = "Latency-first competitive Slippi profile. No sync path, max responsiveness."
         Exes     = @("Slippi Dolphin.exe", "Dolphin.exe")
+        SyncMode = "off"
+    }
+    "slippi-melee-console-parity" = @{
+        Name     = "Slippi Melee (Console-Parity)"
+        Sub      = "Console-Parity | VSync ON | LLM OFF"
+        Cat      = "Fighting"
+        Desc     = "Console-like frame pacing/presentation profile for offline practice on modern displays."
+        Exes     = @("Slippi Dolphin.exe", "Dolphin.exe")
+        SyncMode = "off"
     }
     "slippi-melee-streaming" = @{
         Name     = "Slippi Melee (Streaming)"
@@ -558,6 +657,14 @@ $script:Profiles = [ordered]@{
         Exes     = @("Overwatch.exe")
         SyncMode = "on"
     }
+    "overwatch2-gsync-hdr" = @{
+        Name     = "Overwatch 2 - GSYNC HDR"
+        Sub      = "HDR ON | Reflex ON+Boost | G-SYNC ON"
+        Cat      = "Shooter"
+        Desc     = "Tear-free low latency VRR with native HDR for OLED/Mini-LED displays."
+        Exes     = @("Overwatch.exe")
+        SyncMode = "on"
+    }
 
     # --- Browser Games ---
     "pokemon-auto-chess" = @{
@@ -583,6 +690,12 @@ $script:Profiles = [ordered]@{
     }
 }
 
+$script:Profiles = [ordered]@{}
+foreach ($id in $script:FallbackProfiles.Keys) {
+    $script:Profiles[$id] = $script:FallbackProfiles[$id]
+}
+$script:ProfileCatalogCacheFile = Join-Path $script:ScriptDir "profile-catalog-cache.json"
+
 function Get-CategoryFromOptimizationTarget {
     param([string]$OptimizationTarget)
 
@@ -602,6 +715,137 @@ function Get-CategoryFromOptimizationTarget {
     }
 }
 
+function Copy-ProfileMap {
+    param([hashtable]$Source)
+
+    $copy = [ordered]@{}
+    if ($Source) {
+        foreach ($id in $Source.Keys) {
+            $copy[$id] = $Source[$id]
+        }
+    }
+    return $copy
+}
+
+function Convert-CatalogEntriesToProfileMap {
+    param(
+        [object[]]$Entries,
+        [hashtable]$FallbackProfiles
+    )
+
+    $profiles = [ordered]@{}
+    foreach ($entry in @($Entries)) {
+        $id = "$($entry.id)"
+        if ([string]::IsNullOrWhiteSpace($id)) { continue }
+
+        $fallback = if ($FallbackProfiles -and $FallbackProfiles.Contains($id)) {
+            $FallbackProfiles[$id]
+        }
+        else {
+            $null
+        }
+
+        $name = if ($entry.display_name) { "$($entry.display_name)" } elseif ($fallback) { "$($fallback.Name)" } else { $id }
+        $sub = if ($entry.tray_subtitle) { "$($entry.tray_subtitle)" } elseif ($fallback) { "$($fallback.Sub)" } else { "Profile" }
+        $cat = if ($entry.tray_category) {
+            "$($entry.tray_category)"
+        }
+        elseif ($fallback) {
+            "$($fallback.Cat)"
+        }
+        else {
+            Get-CategoryFromOptimizationTarget -OptimizationTarget "$($entry.optimization_target)"
+        }
+        $desc = if ($entry.tray_description) {
+            "$($entry.tray_description)"
+        }
+        elseif ($entry.description) {
+            "$($entry.description)"
+        }
+        elseif ($fallback) {
+            "$($fallback.Desc)"
+        }
+        else {
+            ""
+        }
+
+        $exeHints = @()
+        foreach ($exe in @($entry.executables)) {
+            if (-not [string]::IsNullOrWhiteSpace("$exe")) {
+                $exeHints += "$exe"
+            }
+        }
+        if ($exeHints.Count -eq 0 -and $fallback) {
+            $exeHints = @($fallback.Exes)
+        }
+
+        $syncMode = if ($entry.sync_mode) {
+            "$($entry.sync_mode)".ToLowerInvariant()
+        }
+        elseif ($fallback -and $fallback.SyncMode) {
+            "$($fallback.SyncMode)".ToLowerInvariant()
+        }
+        else {
+            "agnostic"
+        }
+
+        $profiles[$id] = @{
+            Name     = $name
+            Sub      = $sub
+            Cat      = $cat
+            Desc     = $desc
+            Exes     = $exeHints
+            SyncMode = $syncMode
+        }
+    }
+
+    return $profiles
+}
+
+function Read-ProfileCatalogCacheEntries {
+    if (-not $script:ProfileCatalogCacheFile -or -not (Test-Path $script:ProfileCatalogCacheFile)) {
+        return @()
+    }
+
+    try {
+        $cacheRaw = Get-Content $script:ProfileCatalogCacheFile -Raw -ErrorAction Stop
+        if (-not $cacheRaw) { return @() }
+        $cachePayload = $cacheRaw | ConvertFrom-Json
+        if ($cachePayload -and $cachePayload.profiles) {
+            return @($cachePayload.profiles)
+        }
+    }
+    catch {
+        Write-TrayLog "Profile catalog cache read failed: $($_.Exception.Message)" -Level "WARN"
+    }
+
+    return @()
+}
+
+function Write-ProfileCatalogCache {
+    param([object[]]$Entries)
+
+    if (-not $script:ProfileCatalogCacheFile -or -not $Entries -or $Entries.Count -eq 0) {
+        return
+    }
+
+    try {
+        $payload = [ordered]@{
+            version = 1
+            saved_at = (Get-Date).ToString("o")
+            profiles = @($Entries)
+        }
+        $dir = Split-Path -Parent $script:ProfileCatalogCacheFile
+        if ($dir -and -not (Test-Path $dir)) {
+            New-Item -Path $dir -ItemType Directory -Force | Out-Null
+        }
+        $payload | ConvertTo-Json -Depth 8 | Set-Content -Path $script:ProfileCatalogCacheFile -Encoding UTF8
+    }
+    catch {
+        Write-TrayLog "Profile catalog cache write failed: $($_.Exception.Message)" -Level "WARN"
+    }
+}
+
 function Initialize-ProfilesFromCliCatalog {
     <#
     .SYNOPSIS
@@ -609,95 +853,155 @@ function Initialize-ProfilesFromCliCatalog {
 
     If CLI metadata is unavailable, keeps built-in fallback definitions.
     #>
-    if (-not $script:PythonExe) { return }
+    $fallbackProfiles = if ($script:FallbackProfiles) {
+        $script:FallbackProfiles
+    }
+    else {
+        $script:Profiles
+    }
 
-    try {
-        $raw = & $script:PythonExe "-m" "abso" "profiles" "--json" 2>$null
-        if ($LASTEXITCODE -ne 0 -or -not $raw) {
-            Write-TrayLog "Profile catalog refresh skipped (exit=$LASTEXITCODE)" -Level "WARN"
-            return
-        }
+    $entries = @()
+    $source = "fallback"
 
-        $payload = $raw | ConvertFrom-Json
-        if (-not $payload -or (-not $payload.success) -or (-not $payload.data)) {
-            Write-TrayLog "Profile catalog payload missing or invalid; using fallback definitions" -Level "WARN"
-            return
-        }
-
-        $cliProfiles = [ordered]@{}
-        foreach ($entry in @($payload.data)) {
-            $id = "$($entry.id)"
-            if ([string]::IsNullOrWhiteSpace($id)) { continue }
-
-            $fallback = if ($script:Profiles.Contains($id)) { $script:Profiles[$id] } else { $null }
-            $name = if ($entry.display_name) { "$($entry.display_name)" } elseif ($fallback) { "$($fallback.Name)" } else { $id }
-            $sub = if ($entry.tray_subtitle) { "$($entry.tray_subtitle)" } elseif ($fallback) { "$($fallback.Sub)" } else { "Profile" }
-            $cat = if ($entry.tray_category) {
-                "$($entry.tray_category)"
-            }
-            elseif ($fallback) {
-                "$($fallback.Cat)"
-            }
-            else {
-                Get-CategoryFromOptimizationTarget -OptimizationTarget "$($entry.optimization_target)"
-            }
-            $desc = if ($entry.tray_description) {
-                "$($entry.tray_description)"
-            }
-            elseif ($entry.description) {
-                "$($entry.description)"
-            }
-            elseif ($fallback) {
-                "$($fallback.Desc)"
-            }
-            else {
-                ""
-            }
-
-            $exeHints = @()
-            foreach ($exe in @($entry.executables)) {
-                if (-not [string]::IsNullOrWhiteSpace("$exe")) {
-                    $exeHints += "$exe"
+    # Primary source: live CLI profile catalog
+    if ($script:PythonExe) {
+        try {
+            $raw = & $script:PythonExe "-m" "abso" "profiles" "--json" 2>$null
+            if ($LASTEXITCODE -eq 0 -and $raw) {
+                $payload = $raw | ConvertFrom-Json
+                if ($payload -and $payload.success -and $payload.data) {
+                    $entries = @($payload.data)
+                    $source = "cli"
+                    Write-ProfileCatalogCache -Entries $entries
+                }
+                else {
+                    Write-TrayLog "Profile catalog payload missing/invalid from CLI; trying cache fallback" -Level "WARN"
                 }
             }
-            if ($exeHints.Count -eq 0 -and $fallback) {
-                $exeHints = @($fallback.Exes)
-            }
-
-            $syncMode = if ($entry.sync_mode) {
-                "$($entry.sync_mode)".ToLowerInvariant()
-            }
-            elseif ($fallback -and $fallback.SyncMode) {
-                "$($fallback.SyncMode)".ToLowerInvariant()
-            }
             else {
-                "agnostic"
-            }
-
-            $cliProfiles[$id] = @{
-                Name     = $name
-                Sub      = $sub
-                Cat      = $cat
-                Desc     = $desc
-                Exes     = $exeHints
-                SyncMode = $syncMode
+                Write-TrayLog "Profile catalog refresh skipped from CLI (exit=$LASTEXITCODE); trying cache fallback" -Level "WARN"
             }
         }
+        catch {
+            Write-TrayLog "Profile catalog refresh failed from CLI: $($_.Exception.Message); trying cache fallback" -Level "WARN"
+        }
+    }
+    else {
+        Write-TrayLog "Python executable unavailable for profile catalog refresh; trying cache fallback" -Level "WARN"
+    }
 
-        if ($cliProfiles.Count -gt 0) {
-            $script:Profiles = $cliProfiles
-            Write-TrayLog "Profile catalog loaded from CLI ($($cliProfiles.Count) profiles)"
-        }
-        else {
-            Write-TrayLog "Profile catalog refresh returned zero profiles; using fallback definitions" -Level "WARN"
+    # Secondary source: last known-good cached catalog (prevents drift when CLI unavailable)
+    if ($entries.Count -eq 0) {
+        $cachedEntries = Read-ProfileCatalogCacheEntries
+        if ($cachedEntries.Count -gt 0) {
+            $entries = @($cachedEntries)
+            $source = "cache"
         }
     }
-    catch {
-        Write-TrayLog "Profile catalog refresh failed: $($_.Exception.Message)" -Level "WARN"
+
+    if ($entries.Count -gt 0) {
+        $resolved = Convert-CatalogEntriesToProfileMap -Entries $entries -FallbackProfiles $fallbackProfiles
+        if ($resolved.Count -gt 0) {
+            $script:Profiles = $resolved
+            Write-TrayLog "Profile catalog loaded from $source ($($resolved.Count) profiles)"
+            return
+        }
+
+        Write-TrayLog "Resolved profile catalog from $source is empty; using built-in fallback definitions" -Level "WARN"
     }
+
+    # Final source: built-in emergency fallback map in this script
+    $script:Profiles = Copy-ProfileMap -Source $fallbackProfiles
+    Write-TrayLog "Profile catalog using built-in fallback definitions ($($script:Profiles.Count) profiles)" -Level "WARN"
 }
 
 Initialize-ProfilesFromCliCatalog
+
+function Read-ActiveProfileFromStateFile {
+    param([string]$StatePath)
+
+    if ([string]::IsNullOrWhiteSpace($StatePath) -or -not (Test-Path $StatePath)) {
+        return $null
+    }
+
+    try {
+        $raw = Get-Content -Path $StatePath -Raw -ErrorAction Stop
+        if ([string]::IsNullOrWhiteSpace($raw)) { return $null }
+
+        $state = $raw | ConvertFrom-Json
+        if (-not $state) { return $null }
+
+        $profileId = if ($state.current_profile) { "$($state.current_profile)" } else { $null }
+        if ([string]::IsNullOrWhiteSpace($profileId)) { return $null }
+
+        return [ordered]@{
+            id        = $profileId
+            applied_at = if ($state.applied_at) { "$($state.applied_at)" } else { $null }
+            source    = "state_file"
+            path      = $StatePath
+        }
+    }
+    catch {
+        Write-TrayLog "Failed reading profile state file '$StatePath': $($_.Exception.Message)" -Level "WARN"
+        return $null
+    }
+}
+
+function Resolve-StartupActiveProfile {
+    param([hashtable]$Config)
+
+    $stateCandidates = @()
+    if ($script:ProjectRoot) {
+        $stateCandidates += Join-Path $script:ProjectRoot ".abso_state.json"
+    }
+
+    try {
+        $localDataRoot = Join-Path ([Environment]::GetFolderPath("LocalApplicationData")) "AdaptiveBattleStationOptimizer"
+        if ($localDataRoot) {
+            $stateCandidates += Join-Path $localDataRoot ".abso_state.json"
+        }
+    }
+    catch {}
+
+    $uniqueCandidates = @()
+    foreach ($candidate in $stateCandidates) {
+        if ([string]::IsNullOrWhiteSpace("$candidate")) { continue }
+        if ($uniqueCandidates -contains $candidate) { continue }
+        $uniqueCandidates += $candidate
+    }
+
+    foreach ($statePath in $uniqueCandidates) {
+        $record = Read-ActiveProfileFromStateFile -StatePath $statePath
+        if (-not $record) { continue }
+
+        $profileId = "$($record.id)"
+        if ($script:Profiles.Contains($profileId)) {
+            return $record
+        }
+
+        Write-TrayLog "State file '$statePath' references unknown profile '$profileId'; falling back to tray history" -Level "WARN"
+    }
+
+    if ($Config -and $Config.recentProfiles -and $Config.recentProfiles.Count -gt 0) {
+        $lastEntry = $Config.recentProfiles[0]
+        $lastId = if ($lastEntry.id) { "$($lastEntry.id)" } else { $null }
+        if (-not [string]::IsNullOrWhiteSpace($lastId) -and $script:Profiles.Contains($lastId)) {
+            return [ordered]@{
+                id         = $lastId
+                applied_at = if ($lastEntry.timestamp) { "$($lastEntry.timestamp)" } else { $null }
+                source     = "recent_history"
+                path       = $null
+            }
+        }
+    }
+
+    return [ordered]@{
+        id         = $null
+        applied_at = $null
+        source     = "none"
+        path       = $null
+    }
+}
 
 $script:CategoryOrder = @("Productivity", "Fighting", "ARPG", "Shooter", "Streaming", "Other")
 $script:CategoryColors = @{
@@ -1770,14 +2074,15 @@ function Start-TrayApp {
     $script:notifyIcon.Visible = $true
     Start-StartupIconSelfHeal
 
-    # Restore last active profile from recent history (if any)
+    # Restore startup profile from state file first, then tray history fallback.
     $script:activeProfile = $null
-    if ($script:TrayConfig.recentProfiles -and $script:TrayConfig.recentProfiles.Count -gt 0) {
-        $lastId = $script:TrayConfig.recentProfiles[0].id
-        if ($lastId -and $script:Profiles.Contains($lastId)) {
-            $script:activeProfile = $lastId
-            Write-TrayLog "Restored active profile from history: $lastId"
-        }
+    $startupProfile = Resolve-StartupActiveProfile -Config $script:TrayConfig
+    if ($startupProfile -and $startupProfile.id) {
+        $script:activeProfile = "$($startupProfile.id)"
+        Write-TrayLog "Restored active profile ($($startupProfile.source)): $($startupProfile.id)"
+    }
+    else {
+        Write-TrayLog "No previously active profile restored at startup"
     }
     $script:profileMenuItems = @()
 
@@ -2053,7 +2358,7 @@ public class HotkeyMessageWindow : NativeWindow {
     # Strip known variant suffixes to get the base game identifier.
     # Order matters: longer suffixes before shorter ones that are substrings.
     $variantSuffixes = @(
-        "-online-gsync", "-tournament-sim-144hz", "-300hz-max",
+        "-online-gsync", "-tournament-sim-144hz", "-300hz-max", "-console-parity",
         "-streaming", "-offline", "-online", "-gsync"
     )
 
@@ -2453,7 +2758,7 @@ public class HotkeyMessageWindow : NativeWindow {
     $restartItem.ForeColor = $script:Colors.TextDim
     $restartItem.Font = New-Object System.Drawing.Font("Segoe UI", 9)
     $restartItem.Add_Click({
-        Play-RestartSound
+        Set-RestartSuccessSoundMarker
         if ($script:HotkeyWindow) { Unregister-GlobalHotkeys -WindowHandle $script:HotkeyWindow.Handle }
         Close-QuickPanel
         Close-ProgressOverlay
@@ -2508,6 +2813,8 @@ public class HotkeyMessageWindow : NativeWindow {
     $menu.Items.Add($exitItem) | Out-Null
 
     $script:notifyIcon.ContextMenuStrip = $menu
+    Update-MenuState
+    Set-IconState -State $(if ($script:activeProfile) { "Active" } else { "Idle" })
 
     # ─── LEFT-CLICK SHOWS MENU ───
 
@@ -2547,6 +2854,9 @@ public class HotkeyMessageWindow : NativeWindow {
     if ($script:TrayConfig.showQuickPanel -and $script:TrayConfig.favorites.Count -gt 0) {
         Show-QuickPanel -Favorites $script:TrayConfig.favorites -Profiles $script:Profiles -ActiveProfile $script:activeProfile -OnApply { param($id) Apply-Profile $id }
     }
+
+    # Only play restart sound once the new tray instance has fully initialized.
+    Invoke-RestartSuccessSoundIfPending
 
     [System.Windows.Forms.Application]::Run()
     $script:notifyIcon.Visible = $false

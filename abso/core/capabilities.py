@@ -85,6 +85,7 @@ class CapabilityEngine:
         self._check_vrr_requirements(profile, monitors, report)
         self._check_gpu_vendor(profile, gpu, report)
         self._check_monitor_presence(profile, monitors, report)
+        self._check_explicit_refresh_requirements(profile, monitors, report)
 
         return report
 
@@ -227,3 +228,77 @@ class CapabilityEngine:
                 message="No monitor information detected; refresh/VRR guidance may be inaccurate.",
             )
         )
+
+    def _check_explicit_refresh_requirements(
+        self,
+        profile: BaseProfile,
+        monitors: list[dict[str, Any]],
+        report: CapabilityReport,
+    ) -> None:
+        """Validate profiles that request a fixed refresh rate."""
+        try:
+            windows_settings = profile.get_settings("WindowsSettingsHandler") or {}
+        except Exception as e:
+            logger.debug(f"Failed to read Windows settings for capability checks: {e}")
+            return
+
+        requested_refresh = windows_settings.get("refresh_rate")
+        try:
+            target_hz = int(float(requested_refresh))
+        except (TypeError, ValueError):
+            return
+
+        if target_hz <= 0:
+            return
+
+        if not monitors:
+            report.findings.append(
+                CapabilityFinding(
+                    code="REFRESH_TARGET_UNVERIFIED",
+                    severity="warning",
+                    message=(
+                        f"Profile requests fixed refresh {target_hz} Hz, but no monitor data was detected. "
+                        "Cannot verify support on this machine."
+                    ),
+                )
+            )
+            return
+
+        primary = next((m for m in monitors if m.get("is_primary")), monitors[0])
+
+        candidates: list[int] = []
+        for key in ("max_refresh_capability", "max_refresh_rate", "refresh_rate"):
+            value = primary.get(key)
+            try:
+                if value is not None:
+                    parsed = int(float(value))
+                    if parsed > 0:
+                        candidates.append(parsed)
+            except (TypeError, ValueError):
+                continue
+
+        if not candidates:
+            report.findings.append(
+                CapabilityFinding(
+                    code="REFRESH_TARGET_UNVERIFIED",
+                    severity="warning",
+                    message=(
+                        f"Profile requests fixed refresh {target_hz} Hz, but monitor refresh capability "
+                        "could not be determined."
+                    ),
+                )
+            )
+            return
+
+        max_supported = max(candidates)
+        if target_hz > max_supported:
+            report.findings.append(
+                CapabilityFinding(
+                    code="REFRESH_TARGET_UNSUPPORTED",
+                    severity="blocker",
+                    message=(
+                        f"Profile requests {target_hz} Hz, but primary monitor supports up to {max_supported} Hz "
+                        "at detected capabilities. Choose a profile that matches your display."
+                    ),
+                )
+            )

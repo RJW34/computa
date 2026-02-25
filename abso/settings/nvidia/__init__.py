@@ -36,6 +36,9 @@ __all__ = [
     "NvidiaSettingIDs",
     "NvidiaSettingValues",
     "NVIDIA_PRESETS",
+    "generate_custom_profile",
+    "generate_game_profile",
+    "generate_preset_profile",
 ]
 
 
@@ -559,20 +562,24 @@ class NvidiaSettingsHandler(SettingsHandler):
                 raise RuntimeError("No monitors returned from HardwareDetector")
 
             primary = next((m for m in monitors if m.get("is_primary")), monitors[0])
-            candidates = [
-                primary.get("refresh_rate"),
-                primary.get("max_refresh_rate"),
-                primary.get("max_refresh_capability"),
+            # Prefer active mode refresh first. For VRR frame caps, using a
+            # higher "max capability" from a different mode/resolution can
+            # overcap and push rendering above the real active scan rate.
+            prioritized_candidates = [
+                ("refresh_rate", primary.get("refresh_rate")),
+                ("max_refresh_rate", primary.get("max_refresh_rate")),
+                ("max_refresh_capability", primary.get("max_refresh_capability")),
             ]
 
-            numeric: list[int] = []
-            for value in candidates:
+            for label, value in prioritized_candidates:
                 with contextlib.suppress(ValueError, TypeError):
                     if value is not None:
-                        numeric.append(int(float(value)))
-
-            if numeric:
-                return max(numeric)
+                        detected = int(float(value))
+                        if detected > 0:
+                            logger.info(
+                                f"Primary refresh detected via HardwareDetector ({label}): {detected} Hz"
+                            )
+                            return detected
         except Exception as e:
             logger.warning(f"Primary refresh rate detection failed: {e}")
 
@@ -589,7 +596,11 @@ class NvidiaSettingsHandler(SettingsHandler):
                         numeric.append(int(float(value)))
 
             if numeric:
-                return max(numeric)
+                detected = max(numeric)
+                logger.info(
+                    f"Primary refresh detected via WindowsSettingsHandler fallback: {detected} Hz"
+                )
+                return detected
         except Exception as e:
             logger.warning(f"Primary refresh rate fallback detection failed: {e}")
             return None

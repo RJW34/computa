@@ -7,11 +7,18 @@ import pytest
 from abso.profiles import get_all_profiles
 from abso.profiles.cod_bo7 import CodBo7Profile
 from abso.profiles.diablo4 import Diablo4Profile
-from abso.profiles.overwatch2 import Overwatch2GSyncProfile, Overwatch2Profile
+from abso.profiles.overwatch2 import (
+    Overwatch2GSyncHDRProfile,
+    Overwatch2GSyncProfile,
+    Overwatch2Profile,
+)
 from abso.profiles.pokemon_auto_chess import PokemonAutoChessProfile
 from abso.profiles.rivals2 import Rivals2Profile
 from abso.profiles.rivals2_online import Rivals2OnlineProfile
-from abso.profiles.slippi_melee import SlippiMeleeProfile
+from abso.profiles.slippi_melee import (
+    SlippiMeleeConsoleParityProfile,
+    SlippiMeleeProfile,
+)
 
 
 class TestProfileLoading:
@@ -22,6 +29,12 @@ class TestProfileLoading:
         profile = SlippiMeleeProfile()
         assert profile.profile_id == "slippi-melee"
         assert profile.display_name == "Super Smash Bros. Melee (Slippi)"
+
+    def test_slippi_console_parity_profile_loads(self):
+        """Test SlippiMeleeConsoleParityProfile can be instantiated."""
+        profile = SlippiMeleeConsoleParityProfile()
+        assert profile.profile_id == "slippi-melee-console-parity"
+        assert "Console-Parity" in profile.display_name
 
     def test_cod_profile_loads(self):
         """Test CodBo7Profile can be instantiated."""
@@ -42,11 +55,13 @@ class TestProfileLoading:
         assert profile.display_name == "Pokemon Auto Chess"
 
     def test_overwatch2_profiles_load(self):
-        """Test both Overwatch 2 profiles can be instantiated."""
+        """Test all Overwatch 2 profiles can be instantiated."""
         no_sync = Overwatch2Profile()
         gsync = Overwatch2GSyncProfile()
+        gsync_hdr = Overwatch2GSyncHDRProfile()
         assert no_sync.profile_id == "overwatch2"
         assert gsync.profile_id == "overwatch2-gsync"
+        assert gsync_hdr.profile_id == "overwatch2-gsync-hdr"
 
 
 class TestProfileHandlers:
@@ -134,6 +149,16 @@ class TestProfileSettings:
         assert settings["vrr_app_override"] == "force_off"
         assert settings["threaded_optimization"] == "off"
 
+    def test_slippi_console_parity_nvidia_settings(self):
+        """Console-parity Slippi should bias for pacing consistency over minimum latency."""
+        profile = SlippiMeleeConsoleParityProfile()
+        settings = profile.get_settings("NvidiaSettingsHandler")
+
+        assert settings["low_latency_mode"] == "off"
+        assert settings["vsync"] == "on"
+        assert settings["vrr_app_override"] == "force_off"
+        assert settings["max_frame_rate"] == 60
+
     def test_cod_nvidia_settings(self):
         """Test CodBo7Profile returns Nvidia settings with reflex_game preset."""
         profile = CodBo7Profile()
@@ -175,6 +200,30 @@ class TestProfileSettings:
         assert settings["profile_name"] == "Overwatch 2"
         assert settings["auto_vrr_fps_cap"] is True
         assert settings["global_vrr_mode"] == "fullscreen_only"
+
+    def test_overwatch2_gsync_hdr_settings(self):
+        """G-SYNC HDR Overwatch profile should enable HDR, disable auto-HDR, use native ICC."""
+        profile = Overwatch2GSyncHDRProfile()
+        win = profile.get_settings("WindowsSettingsHandler")
+        assert win["hdr"] is True
+        assert win["auto_hdr"] is False
+
+        nvidia = profile.get_settings("NvidiaSettingsHandler")
+        assert nvidia["preset"] == "reflex_gsync"
+        assert nvidia["profile_name"] == "Overwatch 2"
+        assert nvidia["auto_vrr_fps_cap"] is True
+        assert nvidia["global_vrr_mode"] == "fullscreen_only"
+
+        color = profile.get_settings("ColorProfileSettingsHandler")
+        assert color["icc_profile"] == "native"
+        assert color["game_type"] == "competitive_fps"
+
+    def test_cod_bo7_hdr_native_color(self):
+        """CoD BO7 with HDR enabled should use native ICC, not sRGB."""
+        profile = CodBo7Profile()
+        color = profile.get_settings("ColorProfileSettingsHandler")
+        assert color["icc_profile"] == "native"
+        assert color["game_type"] == "competitive_fps"
 
     def test_pokemon_auto_chess_windows_settings(self):
         """Test PokemonAutoChessProfile returns Windows settings."""
@@ -218,6 +267,15 @@ class TestProfileInGameSettings:
         assert "setting" in first
         assert "value" in first
         assert "reason" in first
+
+    def test_slippi_console_parity_in_game_settings(self):
+        """Console-parity Slippi profile should return guidance settings."""
+        profile = SlippiMeleeConsoleParityProfile()
+        settings = profile.get_in_game_settings()
+
+        assert isinstance(settings, list)
+        assert len(settings) > 0
+        assert any(s.get("setting") == "V-SYNC (global/per-game)" for s in settings)
 
     def test_cod_in_game_has_reflex_setting(self):
         """Test CodBo7Profile recommends Nvidia Reflex."""
@@ -288,11 +346,13 @@ class TestBaseProfileImplementation:
         assert gsync.executable_hints == ["Overwatch.exe"]
 
     def test_overwatch2_gsync_requires_confirmed_vrr(self):
-        """G-SYNC variant should require confirmed VRR support preflight."""
+        """G-SYNC variants should require confirmed VRR support preflight."""
         no_sync = Overwatch2Profile()
         gsync = Overwatch2GSyncProfile()
+        gsync_hdr = Overwatch2GSyncHDRProfile()
         assert no_sync.requires_confirmed_vrr_support is False
         assert gsync.requires_confirmed_vrr_support is True
+        assert gsync_hdr.requires_confirmed_vrr_support is True
 
     def test_pokemon_auto_chess_optimization_target(self):
         """Test PokemonAutoChessProfile has balanced optimization target."""

@@ -9,7 +9,11 @@ from abso.profiles.catalog import (
 from abso.profiles.cod_bo7 import CodBo7Profile
 from abso.profiles.diablo4 import Diablo4Profile
 from abso.profiles.fortnite import FortniteProfile
-from abso.profiles.overwatch2 import Overwatch2GSyncProfile, Overwatch2Profile
+from abso.profiles.overwatch2 import (
+    Overwatch2GSyncHDRProfile,
+    Overwatch2GSyncProfile,
+    Overwatch2Profile,
+)
 from abso.profiles.pacdeluxe import PACDeluxeProfile
 from abso.profiles.pokemon_auto_chess import PokemonAutoChessProfile
 from abso.profiles.productivity_oled import ProductivityOLEDProfile
@@ -19,7 +23,10 @@ from abso.profiles.rivals2_offline import Rivals2OfflineProfile
 from abso.profiles.rivals2_online import Rivals2OnlineProfile
 from abso.profiles.rivals2_tournament_sim import Rivals2TournamentSimProfile
 from abso.profiles.ryujinx_ssbu import RyujinxSSBUProfile
-from abso.profiles.slippi_melee import SlippiMeleeProfile
+from abso.profiles.slippi_melee import (
+    SlippiMeleeConsoleParityProfile,
+    SlippiMeleeProfile,
+)
 from abso.profiles.streaming_profiles import (
     FortniteStreamingProfile,
     PACDeluxeStreamingProfile,
@@ -30,6 +37,7 @@ from abso.profiles.streaming_profiles import (
 
 __all__ = [
     "BaseProfile",
+    "SlippiMeleeConsoleParityProfile",
     "SlippiMeleeProfile",
     "Rivals2Profile",
     "Rivals2OfflineProfile",
@@ -42,6 +50,7 @@ __all__ = [
     "FortniteStreamingProfile",
     "Overwatch2Profile",
     "Overwatch2GSyncProfile",
+    "Overwatch2GSyncHDRProfile",
     "PokemonAutoChessProfile",
     "PACDeluxeProfile",
     "PACDeluxeStreamingProfile",

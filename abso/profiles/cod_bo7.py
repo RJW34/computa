@@ -42,6 +42,13 @@ class CodBo7Profile(ReflexShooterBaseProfile):
                 # HDR enabled - OLED has negligible overhead, CoD has native HDR
                 "hdr": True,
             },
+            "ColorProfileSettingsHandler": {
+                # Native HDR needs wide gamut; sRGB clamps the color space under HDR.
+                "icc_profile": "native",
+                "digital_vibrance": 50,
+                "show_osd_guidance": True,
+                "game_type": "competitive_fps",
+            },
         }
 
     def get_in_game_settings(self) -> list[dict[str, str]]:

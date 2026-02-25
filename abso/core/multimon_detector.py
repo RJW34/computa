@@ -6,11 +6,12 @@ that may affect profile behavior.
 
 from __future__ import annotations
 
-import ctypes
 import logging
 import subprocess
 from dataclasses import dataclass, field
 from typing import Any
+
+from abso.core.detector import HardwareDetector
 
 logger = logging.getLogger(__name__)
 
@@ -83,14 +84,13 @@ class MultiMonitorDetector:
 
     # Known overlay processes
     OVERLAY_PROCESSES = {
-        "nvcontainer.exe": "NVIDIA Container (GeForce Experience)",
-        "nvdisplay.container.exe": "NVIDIA Display Container",
+        "nvidia share.exe": "NVIDIA Share Overlay",
+        "gameoverlayui.exe": "Steam Overlay",
         "gamebar.exe": "Xbox Game Bar",
         "gamebarftserver.exe": "Xbox Game Bar Server",
         "gamingservices.exe": "Xbox Gaming Services",
         "discord.exe": "Discord Overlay",
         "rtss.exe": "RivaTuner Statistics Server",
-        "steam.exe": "Steam Overlay",
         "obs64.exe": "OBS Studio",
     }
 
@@ -151,6 +151,27 @@ class MultiMonitorDetector:
         """Enumerate display monitors using Win32 API."""
         monitors: list[MonitorInfo] = []
 
+        # Primary path: reuse HardwareDetector's monitor model, which already
+        # accounts for CCD + legacy API quirks and reports active refresh.
+        try:
+            detected = HardwareDetector().detect_monitors()
+            for i, entry in enumerate(detected):
+                width, height = self._parse_resolution(entry.get("resolution"))
+                refresh_rate = self._pick_refresh_rate(entry)
+                monitors.append(MonitorInfo(
+                    name=str(entry.get("name") or entry.get("adapter") or f"Display {i + 1}"),
+                    width=width,
+                    height=height,
+                    refresh_rate=refresh_rate,
+                    is_primary=bool(entry.get("is_primary", False)),
+                    is_hdr_capable=False,
+                    is_vrr_capable=entry.get("vrr_supported") in {True, "hardware", "likely", "possible"},
+                ))
+            if monitors:
+                return monitors
+        except Exception as e:
+            logger.debug(f"HardwareDetector monitor enumeration failed: {e}")
+
         try:
             # Use Windows CCD API or fallback to basic WMI
             # Try PowerShell approach for reliability
@@ -181,12 +202,9 @@ class MultiMonitorDetector:
                                 name=parts[0],
                                 width=int(parts[1]),
                                 height=int(parts[2]),
-                                refresh_rate=60.0,  # Default, need better detection
+                                refresh_rate=60.0,  # Fallback when refresh detection is unavailable
                                 is_primary=parts[3].lower() == "true",
                             ))
-
-            # Try to get actual refresh rates
-            self._get_refresh_rates(monitors)
 
         except Exception as e:
             logger.debug(f"Monitor enumeration fallback: {e}")
@@ -201,38 +219,34 @@ class MultiMonitorDetector:
 
         return monitors
 
-    def _get_refresh_rates(self, monitors: list[MonitorInfo]) -> None:
-        """Get actual refresh rates for monitors."""
+    @staticmethod
+    def _parse_resolution(value: Any) -> tuple[int, int]:
+        """Parse resolution formatted like '2560x1440'."""
         try:
-            result = subprocess.run(
-                [
-                    "powershell", "-NoProfile", "-Command",
-                    """
-                    Get-CimInstance -Namespace root/wmi -ClassName WmiMonitorBasicDisplayParams |
-                    Select-Object -Property Active, InstanceName
-                    Get-CimInstance Win32_VideoController |
-                    Select-Object -Property CurrentRefreshRate, Name
-                    """
-                ],
-                capture_output=True,
-                text=True,
-                timeout=10,
-            )
+            text = str(value or "")
+            width_str, height_str = text.lower().split("x", 1)
+            width = int(width_str.strip())
+            height = int(height_str.strip())
+            if width > 0 and height > 0:
+                return width, height
+        except Exception:
+            pass
+        return 1920, 1080
 
-            # Parse refresh rate from output
-            for line in result.stdout.split("\n"):
-                if "CurrentRefreshRate" in line:
-                    try:
-                        # Extract number
-                        rate_str = line.split(":")[-1].strip()
-                        rate = float(rate_str) if rate_str else 60.0
-                        if monitors and rate > 0:
-                            monitors[0].refresh_rate = rate
-                    except (ValueError, IndexError):
-                        pass
-
-        except Exception as e:
-            logger.debug(f"Refresh rate detection fallback: {e}")
+    @staticmethod
+    def _pick_refresh_rate(entry: dict[str, Any]) -> float:
+        """Pick the most relevant refresh value from detector output."""
+        for key in ("refresh_rate", "max_refresh_rate", "max_refresh_capability"):
+            try:
+                value = entry.get(key)
+                if value is None:
+                    continue
+                rate = float(value)
+                if rate > 0:
+                    return rate
+            except (TypeError, ValueError):
+                continue
+        return 60.0
 
     def _detect_overlays(self, env: DisplayEnvironment) -> None:
         """Detect running overlay processes."""

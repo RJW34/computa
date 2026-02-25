@@ -11,6 +11,7 @@ def _make_profile(profile_id: str, requires_confirmed_vrr_support: bool = False)
     profile = MagicMock()
     profile.profile_id = profile_id
     profile.requires_confirmed_vrr_support = requires_confirmed_vrr_support
+    profile.get_settings.return_value = {}
     return profile
 
 
@@ -67,3 +68,50 @@ def test_capability_warns_on_non_nvidia_gpu() -> None:
 
     assert any(f.code == "GPU_NOT_NVIDIA" for f in report.findings)
     assert report.to_dict()["warnings"] >= 1
+
+
+def test_capability_blocks_fixed_refresh_when_monitor_cannot_support_it() -> None:
+    detector = MagicMock()
+    detector.detect_monitors.return_value = [
+        {
+            "name": "Primary",
+            "is_primary": True,
+            "refresh_rate": 240,
+            "max_refresh_rate": 240,
+            "max_refresh_capability": 240,
+        }
+    ]
+    detector.detect_gpu.return_value = {"name": "NVIDIA GeForce RTX 4090"}
+
+    profile = _make_profile("rivals2-300hz-max")
+    profile.get_settings.side_effect = lambda handler_name: (
+        {"refresh_rate": 300} if handler_name == "WindowsSettingsHandler" else {}
+    )
+
+    report = CapabilityEngine(detector).evaluate(profile)
+
+    assert report.has_blockers is True
+    assert any(f.code == "REFRESH_TARGET_UNSUPPORTED" for f in report.findings)
+
+
+def test_capability_allows_fixed_refresh_when_supported() -> None:
+    detector = MagicMock()
+    detector.detect_monitors.return_value = [
+        {
+            "name": "Primary",
+            "is_primary": True,
+            "refresh_rate": 240,
+            "max_refresh_rate": 240,
+            "max_refresh_capability": 360,
+        }
+    ]
+    detector.detect_gpu.return_value = {"name": "NVIDIA GeForce RTX 4090"}
+
+    profile = _make_profile("rivals2-tournament-sim")
+    profile.get_settings.side_effect = lambda handler_name: (
+        {"refresh_rate": 144} if handler_name == "WindowsSettingsHandler" else {}
+    )
+
+    report = CapabilityEngine(detector).evaluate(profile)
+
+    assert not any(f.code == "REFRESH_TARGET_UNSUPPORTED" for f in report.findings)

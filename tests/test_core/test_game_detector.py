@@ -1,5 +1,6 @@
 """Tests for game_detector module."""
 
+import json
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -202,6 +203,58 @@ class TestDetectEpicGames:
         """Test handles missing PROGRAMFILES environment variable."""
         result = _detect_epic_games()
         assert isinstance(result, list)
+
+    @patch("abso.core.game_detector._get_epic_manifest_locations")
+    def test_detects_game_from_epic_launcher_manifest(self, mock_manifest_locations, tmp_path):
+        """Manifest-based Epic detection should find known games without fixed root paths."""
+        manifest_dir = tmp_path / "Manifests"
+        manifest_dir.mkdir(parents=True)
+
+        install_path = tmp_path / "Fortnite"
+        exe_rel = Path("FortniteGame") / "Binaries" / "Win64" / "FortniteClient-Win64-Shipping.exe"
+        (install_path / exe_rel).parent.mkdir(parents=True)
+        (install_path / exe_rel).touch()
+
+        manifest_file = manifest_dir / "Fortnite.item"
+        manifest_file.write_text(json.dumps({
+            "DisplayName": "Fortnite",
+            "InstallLocation": str(install_path),
+            "LaunchExecutable": "FortniteGame\\Binaries\\Win64\\FortniteClient-Win64-Shipping.exe",
+        }), encoding="utf-8")
+
+        mock_manifest_locations.return_value = [manifest_dir]
+
+        result = _detect_epic_games()
+        assert any(g.platform == "epic" and g.name == "Fortnite" for g in result)
+
+    @patch("abso.core.game_detector._get_epic_manifest_locations")
+    def test_epic_detection_deduplicates_manifest_and_path_scan(self, mock_manifest_locations, tmp_path):
+        """Same Epic install found by both methods should only be returned once."""
+        epic_root = tmp_path / "Epic Games"
+        game_folder = epic_root / "Fortnite"
+        exe_name = "FortniteClient-Win64-Shipping.exe"
+        (game_folder / "subdir").mkdir(parents=True)
+        (game_folder / "subdir" / exe_name).touch()
+
+        manifest_dir = tmp_path / "Manifests"
+        manifest_dir.mkdir(parents=True)
+        (manifest_dir / "Fortnite.item").write_text(json.dumps({
+            "DisplayName": "Fortnite",
+            "InstallLocation": str(game_folder),
+            "LaunchExecutable": f"subdir\\{exe_name}",
+        }), encoding="utf-8")
+
+        mock_manifest_locations.return_value = [manifest_dir]
+        manifest = {
+            "epic_paths": [str(epic_root)],
+            "epic_game_patterns": {"Fortnite": [exe_name]},
+        }
+
+        with patch("abso.core.game_detector.GAME_DETECTION_MANIFEST", manifest):
+            result = _detect_epic_games()
+
+        fortnite_entries = [g for g in result if g.name == "Fortnite" and g.platform == "epic"]
+        assert len(fortnite_entries) == 1
 
 
 class TestDetectBattlenetGames:

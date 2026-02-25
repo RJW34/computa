@@ -187,6 +187,135 @@ def _parse_steam_library_folders(vdf_path: Path) -> list[Path]:
     return folders
 
 
+def _get_epic_manifest_locations() -> list[Path]:
+    """Get candidate Epic Games Launcher manifest directories."""
+    locations: list[Path] = []
+
+    # Standard launcher manifest location
+    program_data = os.environ.get("PROGRAMDATA", r"C:\ProgramData")
+    standard = Path(program_data) / "Epic" / "EpicGamesLauncher" / "Data" / "Manifests"
+    locations.append(standard)
+
+    # Registry-derived launcher data path (if available)
+    registry_roots = [
+        (winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\WOW6432Node\Epic Games\EpicGamesLauncher"),
+        (winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\Epic Games\EpicGamesLauncher"),
+        (winreg.HKEY_CURRENT_USER, r"SOFTWARE\Epic Games\EpicGamesLauncher"),
+    ]
+    for hive, key_path in registry_roots:
+        try:
+            key = winreg.OpenKey(hive, key_path)
+            try:
+                app_data_path, _ = winreg.QueryValueEx(key, "AppDataPath")
+                base = Path(app_data_path)
+                candidates = [
+                    base / "Manifests",
+                    base / "Data" / "Manifests",
+                    base,
+                ]
+                for candidate in candidates:
+                    if candidate not in locations:
+                        locations.append(candidate)
+            except FileNotFoundError:
+                pass
+            finally:
+                winreg.CloseKey(key)
+        except FileNotFoundError:
+            continue
+        except OSError as e:
+            logger.debug(f"Failed to read Epic launcher registry key '{key_path}': {e}")
+
+    return locations
+
+
+def _append_unique_game(games: list[InstalledGame], candidate: InstalledGame) -> None:
+    """Append game only when the same platform/path/executable isn't already present."""
+    key = (candidate.platform, str(candidate.install_path).lower(), candidate.executable.lower())
+    existing = {
+        (g.platform, str(g.install_path).lower(), g.executable.lower())
+        for g in games
+    }
+    if key not in existing:
+        games.append(candidate)
+
+
+def _detect_epic_games_from_manifests(
+    epic_game_patterns: dict[str, list[str]],
+) -> list[InstalledGame]:
+    """Detect Epic installs using launcher manifest metadata."""
+    games: list[InstalledGame] = []
+
+    manifest_dirs = _get_epic_manifest_locations()
+    for manifest_dir in manifest_dirs:
+        if not manifest_dir.exists():
+            continue
+
+        try:
+            manifest_files = list(manifest_dir.glob("*.item"))
+        except OSError as e:
+            logger.debug(f"Skipping unreadable Epic manifest directory '{manifest_dir}': {e}")
+            continue
+
+        for manifest_file in manifest_files:
+            try:
+                data = json.loads(manifest_file.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError) as e:
+                logger.debug(f"Failed to parse Epic manifest '{manifest_file}': {e}")
+                continue
+
+            install_location = data.get("InstallLocation")
+            launch_executable = data.get("LaunchExecutable", "")
+            display_name = data.get("DisplayName", "")
+            if not install_location:
+                continue
+
+            install_path = Path(str(install_location))
+            if not install_path.exists():
+                continue
+
+            launch_name = Path(str(launch_executable)).name if launch_executable else ""
+            matched = False
+            for game_name, executables in epic_game_patterns.items():
+                executable_match = (
+                    bool(launch_name)
+                    and any(launch_name.lower() == exe.lower() for exe in executables)
+                )
+                display_match = bool(display_name) and game_name.lower() in str(display_name).lower()
+                if not executable_match and not display_match:
+                    continue
+
+                # Prefer launcher-provided executable when it matches known patterns.
+                chosen_exe = launch_name if executable_match else executables[0]
+                _append_unique_game(
+                    games,
+                    InstalledGame(
+                        name=game_name,
+                        executable=chosen_exe,
+                        install_path=install_path,
+                        platform="epic",
+                    ),
+                )
+                matched = True
+                break
+
+            # Fallback for known launch executable when display name is unexpected.
+            if not matched and launch_name:
+                for game_name, executables in epic_game_patterns.items():
+                    if any(launch_name.lower() == exe.lower() for exe in executables):
+                        _append_unique_game(
+                            games,
+                            InstalledGame(
+                                name=game_name,
+                                executable=launch_name,
+                                install_path=install_path,
+                                platform="epic",
+                            ),
+                        )
+                        break
+
+    return games
+
+
 def _detect_steam_games() -> list[InstalledGame]:
     """Detect installed Steam games."""
     games: list[InstalledGame] = []
@@ -253,6 +382,10 @@ def _detect_epic_games() -> list[InstalledGame]:
         DEFAULT_GAME_DETECTION_MANIFEST["epic_game_patterns"],
     )
 
+    # Use launcher metadata first (more reliable than fixed drive/path assumptions).
+    for game in _detect_epic_games_from_manifests(epic_game_patterns):
+        _append_unique_game(games, game)
+
     for epic_path in epic_paths:
         if not epic_path.exists():
             continue
@@ -277,12 +410,15 @@ def _detect_epic_games() -> list[InstalledGame]:
 
                     for exe_path in matches:
                         if exe_path.is_file():
-                            games.append(InstalledGame(
-                                name=game_name,
-                                executable=exe_name,
-                                install_path=game_folder,
-                                platform="epic",
-                            ))
+                            _append_unique_game(
+                                games,
+                                InstalledGame(
+                                    name=game_name,
+                                    executable=exe_name,
+                                    install_path=game_folder,
+                                    platform="epic",
+                                ),
+                            )
                             break
 
     return games

@@ -652,60 +652,6 @@ class WindowsSettingsHandler(SettingsHandler):
             logger.debug(f"CCD HDR detection failed: {e}")
             return None
 
-    def _is_monitor_hdr_capable(self, monitor_id: str) -> bool:
-        """Check if a monitor supports HDR.
-
-        Detection methods:
-        1. Check for known OLED/HDR model codes
-        2. Check for AdvancedColorSupported registry value
-        3. Fall back to conservative defaults (don't enable HDR on unknown monitors)
-
-        Args:
-            monitor_id: The monitor ID from MonitorDataStore
-
-        Returns:
-            True if monitor appears to be HDR-capable
-        """
-        # Known HDR-capable monitor model prefixes
-        # Format: (prefix, description)
-        # LG OLED models have model codes starting with 78xx (e.g., 784C = 27GS95QE)
-        # NOT all LG monitors (GSM) are HDR - only OLEDs in 78xx range
-        hdr_capable_patterns = [
-            "GSM784",   # LG UltraGear OLED 27" (27GS95QE, 27GR95QE, etc.)
-            "GSM788",   # LG UltraGear OLED 32"/45" models
-            "GSM789",   # LG UltraGear OLED variants
-            # Add more patterns as needed for other known HDR monitors
-        ]
-
-        # Check for known HDR model patterns
-        for pattern in hdr_capable_patterns:
-            if monitor_id.startswith(pattern):
-                logger.debug(f"Monitor {monitor_id} detected as HDR-capable (OLED model pattern)")
-                return True
-
-        # Check registry for HDR capability markers
-        try:
-            subkey = winreg.OpenKey(
-                winreg.HKEY_LOCAL_MACHINE,
-                rf"SYSTEM\CurrentControlSet\Control\GraphicsDrivers\MonitorDataStore\{monitor_id}",
-                0,
-                winreg.KEY_READ
-            )
-            try:
-                # Check for AdvancedColorSupported flag
-                value = winreg.QueryValueEx(subkey, "AdvancedColorSupported")[0]
-                if value:
-                    logger.debug(f"Monitor {monitor_id} has AdvancedColorSupported=1")
-                    return True
-            except FileNotFoundError:
-                pass
-            winreg.CloseKey(subkey)
-        except Exception:
-            pass
-
-        logger.debug(f"Monitor {monitor_id} treated as SDR (no HDR capability detected)")
-        return False
-
     def _set_hdr(self, enabled: bool) -> dict[str, Any]:
         """Set Windows HDR status using the CCD DisplayConfig API.
 
@@ -1149,10 +1095,6 @@ class WindowsSettingsHandler(SettingsHandler):
             while True:
                 try:
                     # DISPLAY_DEVICE structure
-                    display_device = (ctypes.c_wchar * 32)()
-                    flags = ctypes.c_ulong()
-
-                    # Get display device name
                     class DISPLAY_DEVICE(ctypes.Structure):
                         _fields_ = [
                             ("cb", ctypes.c_ulong),
