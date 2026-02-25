@@ -146,6 +146,65 @@ QDC_ONLY_ACTIVE_PATHS = 0x00000002
 DISPLAYCONFIG_MODE_INFO_TYPE_SOURCE = 1
 DISPLAYCONFIG_MODE_INFO_TYPE_TARGET = 2
 
+# Win32 display constants (legacy APIs)
+DISPLAY_DEVICE_ATTACHED_TO_DESKTOP = 0x00000001
+DISPLAY_DEVICE_PRIMARY_DEVICE = 0x00000004
+ENUM_CURRENT_SETTINGS = -1
+
+# Win32 structure constants
+CCHDEVICENAME = 32
+CCHDEVICESTRING = 128
+CCHFORMNAME = 32
+
+
+class DISPLAY_DEVICEW(ctypes.Structure):
+    """Win32 DISPLAY_DEVICEW structure."""
+
+    _fields_ = [
+        ("cb", wintypes.DWORD),
+        ("DeviceName", wintypes.WCHAR * CCHDEVICENAME),
+        ("DeviceString", wintypes.WCHAR * CCHDEVICESTRING),
+        ("StateFlags", wintypes.DWORD),
+        ("DeviceID", wintypes.WCHAR * CCHDEVICESTRING),
+        ("DeviceKey", wintypes.WCHAR * CCHDEVICESTRING),
+    ]
+
+
+class DEVMODEW(ctypes.Structure):
+    """Win32 DEVMODEW structure (display-relevant fields)."""
+
+    _fields_ = [
+        ("dmDeviceName", wintypes.WCHAR * CCHDEVICENAME),
+        ("dmSpecVersion", wintypes.WORD),
+        ("dmDriverVersion", wintypes.WORD),
+        ("dmSize", wintypes.WORD),
+        ("dmDriverExtra", wintypes.WORD),
+        ("dmFields", wintypes.DWORD),
+        ("dmPosition", POINTL),
+        ("dmDisplayOrientation", wintypes.DWORD),
+        ("dmDisplayFixedOutput", wintypes.DWORD),
+        ("dmColor", wintypes.SHORT),
+        ("dmDuplex", wintypes.SHORT),
+        ("dmYResolution", wintypes.SHORT),
+        ("dmTTOption", wintypes.SHORT),
+        ("dmCollate", wintypes.SHORT),
+        ("dmFormName", wintypes.WCHAR * CCHFORMNAME),
+        ("dmLogPixels", wintypes.WORD),
+        ("dmBitsPerPel", wintypes.DWORD),
+        ("dmPelsWidth", wintypes.DWORD),
+        ("dmPelsHeight", wintypes.DWORD),
+        ("dmDisplayFlags", wintypes.DWORD),
+        ("dmDisplayFrequency", wintypes.DWORD),
+        ("dmICMMethod", wintypes.DWORD),
+        ("dmICMIntent", wintypes.DWORD),
+        ("dmMediaType", wintypes.DWORD),
+        ("dmDitherType", wintypes.DWORD),
+        ("dmReserved1", wintypes.DWORD),
+        ("dmReserved2", wintypes.DWORD),
+        ("dmPanningWidth", wintypes.DWORD),
+        ("dmPanningHeight", wintypes.DWORD),
+    ]
+
 
 def _get_refresh_rates_ccd() -> dict[int, float]:
     """Get refresh rates for all active displays using CCD API.
@@ -1065,7 +1124,7 @@ class HardwareDetector:
                         break
 
                     # Skip inactive adapters
-                    if not (adapter.StateFlags & 0x1):  # DISPLAY_DEVICE_ATTACHED_TO_DESKTOP
+                    if not (adapter.StateFlags & DISPLAY_DEVICE_ATTACHED_TO_DESKTOP):
                         device_index += 1
                         continue
 
@@ -1084,9 +1143,7 @@ class HardwareDetector:
                         logger.debug(f"Failed to get monitor details for device {device_index}: {e}")
 
                     # Get current settings from legacy API
-                    settings = win32api.EnumDisplaySettings(
-                        adapter.DeviceName, -1  # ENUM_CURRENT_SETTINGS
-                    )
+                    settings = win32api.EnumDisplaySettings(adapter.DeviceName, ENUM_CURRENT_SETTINGS)
 
                     legacy_refresh_rate = settings.DisplayFrequency
                     current_width = settings.PelsWidth
@@ -1190,7 +1247,7 @@ class HardwareDetector:
                         "refresh_rate": refresh_rate,
                         "max_refresh_rate": max_refresh_rate if max_refresh_rate > refresh_rate else None,
                         "max_refresh_capability": max_refresh_any_res if max_refresh_any_res > refresh_rate else None,
-                        "is_primary": bool(adapter.StateFlags & 0x4),  # DISPLAY_DEVICE_PRIMARY_DEVICE
+                        "is_primary": bool(adapter.StateFlags & DISPLAY_DEVICE_PRIMARY_DEVICE),
                         "vrr_supported": vrr_info.get("vrr_supported"),
                         "vrr_type": vrr_info.get("vrr_type"),
                         "vrr_range": (
@@ -1212,7 +1269,235 @@ class HardwareDetector:
             # Catch any remaining pywin32 or OS errors
             logger.error(f"Monitor detection failed: {e}")
 
+        if not monitors:
+            logger.info("Falling back to ctypes monitor detection (pywin32 unavailable or empty)")
+            monitors = self._detect_monitors_without_pywin32(ccd_refresh_rates)
+
         return monitors
+
+    def _detect_monitors_without_pywin32(
+        self,
+        ccd_refresh_rates: dict[int, float],
+    ) -> list[dict[str, Any]]:
+        """Detect monitors using ctypes Win32 API when pywin32 is unavailable."""
+        monitors: list[dict[str, Any]] = []
+        gsync_registry = _detect_gsync_from_nvidia_registry()
+        gsync_enabled_globally = bool(gsync_registry.get("gsync_enabled_globally"))
+
+        try:
+            user32 = ctypes.windll.user32
+            device_index = 0
+            active_display_index = 0
+
+            while True:
+                adapter = DISPLAY_DEVICEW()
+                adapter.cb = ctypes.sizeof(DISPLAY_DEVICEW)
+                if not user32.EnumDisplayDevicesW(None, device_index, ctypes.byref(adapter), 0):
+                    break
+
+                if not (adapter.StateFlags & DISPLAY_DEVICE_ATTACHED_TO_DESKTOP):
+                    device_index += 1
+                    continue
+
+                monitor = DISPLAY_DEVICEW()
+                monitor.cb = ctypes.sizeof(DISPLAY_DEVICEW)
+                monitor_name = f"Monitor {device_index + 1}"
+                monitor_id = None
+                if user32.EnumDisplayDevicesW(adapter.DeviceName, 0, ctypes.byref(monitor), 0):
+                    if monitor.DeviceString:
+                        monitor_name = str(monitor.DeviceString)
+                    if monitor.DeviceID:
+                        parts = str(monitor.DeviceID).split("\\")
+                        if len(parts) >= 2:
+                            monitor_id = parts[1]
+
+                settings = DEVMODEW()
+                settings.dmSize = ctypes.sizeof(DEVMODEW)
+                if not user32.EnumDisplaySettingsW(
+                    adapter.DeviceName,
+                    ENUM_CURRENT_SETTINGS,
+                    ctypes.byref(settings),
+                ):
+                    device_index += 1
+                    continue
+
+                current_width = int(settings.dmPelsWidth or 0)
+                current_height = int(settings.dmPelsHeight or 0)
+                legacy_refresh_rate = int(settings.dmDisplayFrequency or 0)
+                if legacy_refresh_rate <= 0:
+                    legacy_refresh_rate = 60
+
+                refresh_rate = float(legacy_refresh_rate)
+                if active_display_index in ccd_refresh_rates:
+                    ccd_rate = ccd_refresh_rates[active_display_index]
+                    if ccd_rate > refresh_rate:
+                        refresh_rate = ccd_rate
+
+                max_refresh_rate = float(refresh_rate)
+                max_refresh_any_res = float(refresh_rate)
+
+                mode_index = 0
+                while mode_index < 500:
+                    mode = DEVMODEW()
+                    mode.dmSize = ctypes.sizeof(DEVMODEW)
+                    if not user32.EnumDisplaySettingsW(adapter.DeviceName, mode_index, ctypes.byref(mode)):
+                        break
+                    mode_refresh = int(mode.dmDisplayFrequency or 0)
+                    if mode_refresh > max_refresh_any_res:
+                        max_refresh_any_res = float(mode_refresh)
+                    if (
+                        int(mode.dmPelsWidth or 0) == current_width
+                        and int(mode.dmPelsHeight or 0) == current_height
+                        and mode_refresh > max_refresh_rate
+                    ):
+                        max_refresh_rate = float(mode_refresh)
+                    mode_index += 1
+
+                vrr_info = self._derive_vrr_info(
+                    monitor_name=monitor_name,
+                    monitor_id=monitor_id,
+                    max_refresh_rate=max_refresh_rate,
+                    gsync_enabled_globally=gsync_enabled_globally,
+                )
+
+                monitors.append({
+                    "name": monitor_name,
+                    "adapter": str(adapter.DeviceString) or "Unknown",
+                    "resolution": f"{current_width}x{current_height}",
+                    "refresh_rate": refresh_rate,
+                    "max_refresh_rate": max_refresh_rate if max_refresh_rate > refresh_rate else None,
+                    "max_refresh_capability": (
+                        max_refresh_any_res if max_refresh_any_res > refresh_rate else None
+                    ),
+                    "is_primary": bool(adapter.StateFlags & DISPLAY_DEVICE_PRIMARY_DEVICE),
+                    "vrr_supported": vrr_info.get("vrr_supported"),
+                    "vrr_type": vrr_info.get("vrr_type"),
+                    "vrr_range": (
+                        f"{vrr_info.get('vrr_min_hz')}-{vrr_info.get('vrr_max_hz')}Hz"
+                        if vrr_info.get("vrr_min_hz") and vrr_info.get("vrr_max_hz")
+                        else None
+                    ),
+                })
+
+                active_display_index += 1
+                device_index += 1
+        except Exception as e:
+            logger.error(f"Monitor detection (ctypes fallback) failed: {e}")
+
+        if monitors:
+            return monitors
+
+        return self._detect_monitors_powershell(ccd_refresh_rates, gsync_enabled_globally)
+
+    def _detect_monitors_powershell(
+        self,
+        ccd_refresh_rates: dict[int, float],
+        gsync_enabled_globally: bool,
+    ) -> list[dict[str, Any]]:
+        """Best-effort monitor detection fallback via PowerShell."""
+        monitors: list[dict[str, Any]] = []
+
+        script = (
+            "Add-Type -AssemblyName System.Windows.Forms; "
+            "[System.Windows.Forms.Screen]::AllScreens | ForEach-Object { "
+            "$name = $_.DeviceName; $bounds = $_.Bounds; $primary = $_.Primary; "
+            "Write-Output ('{0}|{1}|{2}|{3}' -f $name, $bounds.Width, $bounds.Height, $primary) }"
+        )
+
+        try:
+            result = subprocess.run(
+                ["powershell", "-NoProfile", "-Command", script],
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
+            if result.returncode != 0:
+                return monitors
+
+            for index, raw_line in enumerate(result.stdout.splitlines()):
+                line = raw_line.strip()
+                if "|" not in line:
+                    continue
+                parts = line.split("|")
+                if len(parts) < 4:
+                    continue
+
+                try:
+                    width = int(parts[1].strip())
+                    height = int(parts[2].strip())
+                except ValueError:
+                    width, height = 1920, 1080
+
+                refresh_rate = float(ccd_refresh_rates.get(index, 60.0))
+                if gsync_enabled_globally and refresh_rate > 60:
+                    vrr_supported: Any = True
+                    vrr_type: str | None = "gsync_compatible"
+                elif refresh_rate >= 120:
+                    vrr_supported = "likely"
+                    vrr_type = "adaptive_sync"
+                elif refresh_rate > 60:
+                    vrr_supported = "possible"
+                    vrr_type = None
+                else:
+                    vrr_supported = "unknown"
+                    vrr_type = None
+
+                monitors.append({
+                    "name": parts[0].strip() or f"Monitor {index + 1}",
+                    "adapter": "Unknown",
+                    "resolution": f"{width}x{height}",
+                    "refresh_rate": refresh_rate,
+                    "max_refresh_rate": None,
+                    "max_refresh_capability": None,
+                    "is_primary": parts[3].strip().lower() == "true",
+                    "vrr_supported": vrr_supported,
+                    "vrr_type": vrr_type,
+                    "vrr_range": None,
+                })
+        except Exception as e:
+            logger.error(f"Monitor detection (PowerShell fallback) failed: {e}")
+
+        return monitors
+
+    def _derive_vrr_info(
+        self,
+        monitor_name: str,
+        monitor_id: str | None,
+        max_refresh_rate: float,
+        gsync_enabled_globally: bool,
+    ) -> dict[str, Any]:
+        """Derive VRR status using name, EDID, and NVIDIA global state."""
+        vrr_info: dict[str, Any] = {"vrr_supported": None, "vrr_type": None}
+
+        is_known_gsync, gsync_type = _is_known_gsync_monitor(monitor_name)
+        if is_known_gsync:
+            vrr_info["vrr_supported"] = True
+            vrr_info["vrr_type"] = gsync_type
+
+        if not vrr_info.get("vrr_supported") and monitor_id:
+            edid_vrr = _detect_vrr_from_edid(monitor_id)
+            if edid_vrr.get("vrr_supported"):
+                vrr_info.update(edid_vrr)
+
+        if vrr_info.get("vrr_supported") is not True and gsync_enabled_globally:
+            if vrr_info.get("vrr_supported") == "hardware":
+                vrr_info["vrr_supported"] = True
+                if vrr_info.get("vrr_type") not in ("gsync_native", "gsync_ultimate"):
+                    vrr_info["vrr_type"] = "gsync_compatible"
+            elif max_refresh_rate > 60:
+                vrr_info["vrr_supported"] = True
+                vrr_info["vrr_type"] = "gsync_compatible"
+
+        if vrr_info.get("vrr_supported") is None:
+            if max_refresh_rate >= 120:
+                vrr_info["vrr_supported"] = "likely"
+                vrr_info["vrr_type"] = "adaptive_sync"
+            elif max_refresh_rate > 60:
+                vrr_info["vrr_supported"] = "possible"
+            else:
+                vrr_info["vrr_supported"] = "unknown"
+
+        return vrr_info
 
     def detect_windows_version(self) -> dict[str, Any] | None:
         """Detect Windows version information.

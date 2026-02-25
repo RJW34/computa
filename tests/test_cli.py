@@ -95,6 +95,28 @@ class TestCLIDetect:
         # We're testing it doesn't crash with an exception
         assert result.exception is None or result.exit_code in [0, 1]
 
+    @patch("abso.main.HardwareDetector")
+    def test_detect_json_handles_none_ram(self, mock_detector_class):
+        """Test detect --json handles missing RAM data without crashing."""
+        mock_detector = MagicMock()
+        mock_detector.detect_all.return_value = {
+            "system": None,
+            "gpu": None,
+            "cpu": None,
+            "ram": None,
+            "monitors": None,
+        }
+        mock_detector_class.return_value = mock_detector
+
+        runner = CliRunner()
+        result = runner.invoke(cli, ["detect", "--json"])
+
+        assert result.exit_code == 0
+        payload = json.loads(result.output)
+        assert payload["success"] is True
+        assert payload["data"]["ram_gb"] is None
+        assert payload["data"]["monitors"] == []
+
 
 class TestCLIAudit:
     """Test audit command with mocked auditor."""

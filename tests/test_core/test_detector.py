@@ -216,17 +216,17 @@ class TestDetectRam:
 class TestDetectMonitors:
     """Tests for monitor detection."""
 
-    @patch("abso.core.detector.win32api", create=True)
-    def test_detect_monitors_import_error(self, mock_win32api):
-        """Test monitor detection handles ImportError gracefully."""
+    @patch.object(HardwareDetector, "_detect_monitors_without_pywin32")
+    def test_detect_monitors_import_error_uses_fallback(self, mock_fallback):
+        """Test monitor detection uses fallback when pywin32 is unavailable."""
+        mock_fallback.return_value = [{"name": "Fallback Monitor", "vrr_supported": "unknown"}]
         detector = HardwareDetector()
 
-        with (patch.dict("sys.modules", {"win32api": None}),
-              patch("builtins.__import__", side_effect=ImportError)):
+        with patch.dict("sys.modules", {"win32api": None, "pywintypes": None}):
             result = detector.detect_monitors()
 
-        # Should return empty list, not raise
-        assert isinstance(result, list)
+        assert result == mock_fallback.return_value
+        mock_fallback.assert_called_once()
 
 
 class TestDetectWindowsVersion:

@@ -159,8 +159,8 @@ def detect(json_output: bool) -> None:
             "system": hardware.get("system"),
             "gpu": hardware.get("gpu"),
             "cpu": hardware.get("cpu"),
-            "ram_gb": hardware.get("ram", {}).get("total_gb"),
-            "monitors": hardware.get("monitors", []),
+            "ram_gb": (hardware.get("ram") or {}).get("total_gb"),
+            "monitors": hardware.get("monitors") or [],
             "is_admin": is_admin(),
         }
         output_json(output_data)

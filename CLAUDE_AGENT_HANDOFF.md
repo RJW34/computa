@@ -81,3 +81,35 @@ This pass implemented the full `2.0 Overhaul` plan from `2.0_OVERHAUL_GUIDE.md` 
 
 ## Checkpoint Source of Truth
 - `2.0_OVERHAUL_GUIDE.md` checkpoint table and progress journal now mark `P0-P7` as `COMPLETED`.
+
+## Post-Overhaul Hotfix (2026-02-25)
+### Problem
+- VRR-required profiles (e.g., `slippi-melee-vrr-lab`) were blocked with `VRR_REQUIRED_NO_MONITOR_DATA` on systems without `pywin32` (`win32api` import failure), even when monitors were present and VRR was enabled.
+- `abso detect --json` crashed if `detect_all()` returned `"ram": None`.
+
+### Changes Implemented
+1. Monitor detection fallback in `abso/core/detector.py`
+- Added ctypes-based monitor enumeration fallback when pywin32 monitor detection returns empty data.
+- Added final PowerShell fallback (`System.Windows.Forms.Screen`) if ctypes enumeration fails.
+- Added Win32 structure/constants used by fallback:
+  - `DISPLAY_DEVICEW`, `DEVMODEW`
+  - `DISPLAY_DEVICE_ATTACHED_TO_DESKTOP`, `DISPLAY_DEVICE_PRIMARY_DEVICE`, `ENUM_CURRENT_SETTINGS`
+- Fallback preserves VRR derivation logic (EDID + NVIDIA global VRR state + refresh heuristics) so capability preflight can confirm VRR where appropriate.
+
+2. Detect command null-safety in `abso/main.py`
+- Updated JSON flattening for detect output:
+  - `ram_gb` now uses `(hardware.get("ram") or {}).get("total_gb")`
+  - `monitors` now uses `hardware.get("monitors") or []`
+
+3. Tests
+- Updated `tests/test_core/test_detector.py`:
+  - `test_detect_monitors_import_error_uses_fallback` now asserts fallback path is invoked when pywin32 modules are unavailable.
+- Updated `tests/test_cli.py`:
+  - Added `test_detect_json_handles_none_ram` to prevent regression on null RAM payloads.
+
+### Runtime Validation
+- `py -m pytest tests\\test_core\\test_detector.py tests\\test_core\\test_capabilities.py -q` passed.
+- `py -m pytest tests\\test_cli.py -q -k detect` passed.
+- `py -m abso detect --json` now succeeds and reports monitors under pywin32-missing conditions.
+- `py -m abso apply slippi-melee-vrr-lab --json` now succeeds with capabilities `passed: true`.
+- `py -m abso verify slippi-melee-vrr-lab --json` returns `all_active: true`.
