@@ -570,9 +570,9 @@ $script:FallbackProfiles = [ordered]@{
     }
     "slippi-melee-console-parity" = @{
         Name     = "Slippi Melee (Console-Parity)"
-        Sub      = "Console-Parity | VSync ON | LLM OFF"
+        Sub      = "Console-Parity | 60Hz + VSync | LLM OFF"
         Cat      = "Fighting"
-        Desc     = "Console-like frame pacing/presentation profile for offline practice on modern displays."
+        Desc     = "Console-style offline profile: 60Hz desktop cadence, VSync ON, and stable frame presentation."
         Exes     = @("Slippi Dolphin.exe", "Dolphin.exe")
         SyncMode = "off"
     }

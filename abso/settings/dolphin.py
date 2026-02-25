@@ -38,6 +38,24 @@ class DolphinConfigHandler:
         self.gfx_ini = self.config_dir / "GFX.ini"
         self.dolphin_ini = self.config_dir / "Dolphin.ini"
 
+    GFX_KEY_MAP: dict[str, tuple[str, str]] = {
+        "efb_scale": ("EFBScale", "Settings"),
+        "texture_scaling_factor": ("TextureScalingFactor", "Enhancements"),
+        "use_scaling_filter": ("UseScalingFilter", "Enhancements"),
+        "use_deposterize": ("UseDePosterize", "Enhancements"),
+        "backend_multithreading": ("BackendMultithreading", "Settings"),
+        "vsync": ("VSync", "Hardware"),
+    }
+
+    DOLPHIN_KEY_MAP: dict[str, tuple[str, str]] = {
+        "reduce_timing_dispersion": ("ReduceTimingDispersion", "Core"),
+        "immediate_xfb_enable": ("ImmediateXFBEnable", "Core"),
+        "rush_presentation": ("RushPresentation", "Core"),
+        "smooth_presentation": ("SmoothPresentation", "Core"),
+        "sync_gpu": ("SyncGPU", "Core"),
+        "timing_variance": ("TimingVariance", "Core"),
+    }
+
     def detect(self) -> dict[str, Any]:
         """Detect current Dolphin configuration state."""
         result = {
@@ -62,6 +80,7 @@ class DolphinConfigHandler:
             result["current_settings"]["BackendMultithreading"] = self._extract_value(
                 content, "BackendMultithreading"
             )
+            result["current_settings"]["VSync"] = self._extract_value(content, "VSync")
 
         if self.dolphin_ini.exists():
             content = self.dolphin_ini.read_text(encoding="utf-8")
@@ -80,6 +99,9 @@ class DolphinConfigHandler:
             result["current_settings"]["SyncGPU"] = self._extract_value(
                 content, "SyncGPU"
             )
+            result["current_settings"]["TimingVariance"] = self._extract_value(
+                content, "TimingVariance"
+            )
 
         return result
 
@@ -92,6 +114,29 @@ class DolphinConfigHandler:
         """Replace a value in INI content."""
         pattern = rf"^({key}\s*=\s*){re.escape(old_value)}$"
         return re.sub(pattern, rf"\g<1>{new_value}", content, flags=re.MULTILINE)
+
+    def _upsert_value(self, content: str, section: str, key: str, value: str) -> tuple[str, str | None, bool]:
+        """Update key value if present, otherwise insert it into section."""
+        current = self._extract_value(content, key)
+        if current is not None:
+            if current == value:
+                return content, current, False
+            updated = self._replace_value(content, key, current, value)
+            return updated, current, True
+
+        section_pattern = rf"(?ms)^(\[{re.escape(section)}\]\s*\n)(.*?)(?=^\[|\Z)"
+        section_match = re.search(section_pattern, content)
+        if section_match:
+            body = section_match.group(2)
+            if body and not body.endswith("\n"):
+                body += "\n"
+            body += f"{key} = {value}\n"
+            updated = content[:section_match.start(2)] + body + content[section_match.end(2):]
+            return updated, None, True
+
+        suffix = "" if content.endswith("\n") else "\n"
+        updated = f"{content}{suffix}\n[{section}]\n{key} = {value}\n"
+        return updated, None, True
 
     def apply(self, settings: dict[str, Any]) -> dict[str, Any]:
         """Apply optimal Dolphin configuration settings.
@@ -111,25 +156,22 @@ class DolphinConfigHandler:
         changes_made = []
         errors = []
 
-        # GFX.ini settings
-        gfx_settings = {
-            "EFBScale": settings.get("efb_scale", "1"),
-            "TextureScalingFactor": settings.get("texture_scaling_factor", "1"),
-            "UseScalingFilter": settings.get("use_scaling_filter", "False"),
-            "UseDePosterize": settings.get("use_deposterize", "False"),
-            "BackendMultithreading": settings.get("backend_multithreading", "False"),
-        }
+        # Apply only keys explicitly provided by the profile.
+        gfx_settings: list[tuple[str, str, str]] = []
+        for input_key, (ini_key, section) in self.GFX_KEY_MAP.items():
+            if input_key in settings and settings[input_key] is not None:
+                gfx_settings.append((section, ini_key, str(settings[input_key])))
 
         if self.gfx_ini.exists():
             try:
                 content = self.gfx_ini.read_text(encoding="utf-8")
                 modified = False
 
-                for key, target_value in gfx_settings.items():
-                    current = self._extract_value(content, key)
-                    if current is not None and current != target_value:
-                        content = self._replace_value(content, key, current, target_value)
-                        changes_made.append(f"GFX.ini: {key} {current} -> {target_value}")
+                for section, key, target_value in gfx_settings:
+                    content, previous, changed = self._upsert_value(content, section, key, target_value)
+                    if changed:
+                        prior = previous if previous is not None else "<missing>"
+                        changes_made.append(f"GFX.ini: {key} {prior} -> {target_value}")
                         modified = True
 
                 if modified:
@@ -138,25 +180,21 @@ class DolphinConfigHandler:
             except OSError as e:
                 errors.append(f"GFX.ini: {e}")
 
-        # Dolphin.ini settings
-        dolphin_settings = {
-            "ReduceTimingDispersion": settings.get("reduce_timing_dispersion", "True"),
-            "ImmediateXFBEnable": settings.get("immediate_xfb_enable", "True"),
-            "RushPresentation": settings.get("rush_presentation", "False"),
-            "SmoothPresentation": settings.get("smooth_presentation", "False"),
-            "SyncGPU": settings.get("sync_gpu", "False"),
-        }
+        dolphin_settings: list[tuple[str, str, str]] = []
+        for input_key, (ini_key, section) in self.DOLPHIN_KEY_MAP.items():
+            if input_key in settings and settings[input_key] is not None:
+                dolphin_settings.append((section, ini_key, str(settings[input_key])))
 
         if self.dolphin_ini.exists():
             try:
                 content = self.dolphin_ini.read_text(encoding="utf-8")
                 modified = False
 
-                for key, target_value in dolphin_settings.items():
-                    current = self._extract_value(content, key)
-                    if current is not None and current != target_value:
-                        content = self._replace_value(content, key, current, target_value)
-                        changes_made.append(f"Dolphin.ini: {key} {current} -> {target_value}")
+                for section, key, target_value in dolphin_settings:
+                    content, previous, changed = self._upsert_value(content, section, key, target_value)
+                    if changed:
+                        prior = previous if previous is not None else "<missing>"
+                        changes_made.append(f"Dolphin.ini: {key} {prior} -> {target_value}")
                         modified = True
 
                 if modified:

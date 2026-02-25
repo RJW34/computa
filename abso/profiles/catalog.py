@@ -67,7 +67,7 @@ PROFILE_CATALOG: OrderedDict[str, ProfileCatalogEntry] = OrderedDict(
         "slippi-melee-console-parity": ProfileCatalogEntry(
             profile_class=SlippiMeleeConsoleParityProfile,
             tray_category="Fighting",
-            tray_subtitle="Console-Parity | VSync ON | LLM OFF",
+            tray_subtitle="Console-Parity | 60Hz + VSync | LLM OFF",
             sync_mode="off",
         ),
         "rivals2": ProfileCatalogEntry(

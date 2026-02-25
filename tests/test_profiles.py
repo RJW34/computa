@@ -157,7 +157,13 @@ class TestProfileSettings:
         assert settings["low_latency_mode"] == "off"
         assert settings["vsync"] == "on"
         assert settings["vrr_app_override"] == "force_off"
-        assert settings["max_frame_rate"] == 60
+        assert settings["max_frame_rate"] == "off"
+
+    def test_slippi_console_parity_windows_refresh(self):
+        """Console-parity profile should force 60 Hz desktop cadence."""
+        profile = SlippiMeleeConsoleParityProfile()
+        settings = profile.get_settings("WindowsSettingsHandler")
+        assert settings["refresh_rate"] == 60
 
     def test_cod_nvidia_settings(self):
         """Test CodBo7Profile returns Nvidia settings with reflex_game preset."""

@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 from abso.profiles.profile_bases import EmulatorLatencyBaseProfile
+
+if TYPE_CHECKING:
+    from abso.settings.base import SettingsHandler
 
 
 class SlippiMeleeProfile(EmulatorLatencyBaseProfile):
@@ -74,7 +77,12 @@ class SlippiMeleeProfile(EmulatorLatencyBaseProfile):
                 "texture_scaling_factor": "1",  # No texture upscaling
                 "use_scaling_filter": "False",  # No scaling filter
                 "use_deposterize": "False",  # No post-processing
+                "backend_multithreading": "False",
+                "vsync": "False",
                 "reduce_timing_dispersion": "True",  # Ishiiruka-specific: tighter frame timing
+                "timing_variance": "8",
+                "immediate_xfb_enable": "True",
+                "sync_gpu": "False",
             },
         }
 
@@ -377,6 +385,10 @@ class SlippiMeleeConsoleParityProfile(SlippiMeleeProfile):
 
     def _settings_overrides(self) -> dict[str, dict[str, Any]]:
         return {
+            "WindowsSettingsHandler": {
+                # Strict console-style pacing is 60 Hz output cadence.
+                "refresh_rate": 60,
+            },
             "NvidiaSettingsHandler": {
                 # Console-parity: prioritize stable cadence/feel over minimum click-to-pixel latency.
                 "low_latency_mode": "off",
@@ -386,7 +398,7 @@ class SlippiMeleeConsoleParityProfile(SlippiMeleeProfile):
                 "power_management": "prefer_max_performance",
                 "shader_cache": "unlimited",
                 "threaded_optimization": "off",
-                "max_frame_rate": 60,
+                "max_frame_rate": "off",
                 "triple_buffering": "off",
             },
             "DolphinConfigHandler": {
@@ -395,7 +407,12 @@ class SlippiMeleeConsoleParityProfile(SlippiMeleeProfile):
                 "texture_scaling_factor": "1",
                 "use_scaling_filter": "False",
                 "use_deposterize": "False",
+                "backend_multithreading": "False",
+                "vsync": "True",
                 "reduce_timing_dispersion": "True",
+                "timing_variance": "8",
+                "immediate_xfb_enable": "True",
+                "sync_gpu": "False",
                 "rush_presentation": "False",
                 "smooth_presentation": "False",
             },
@@ -431,10 +448,13 @@ class SlippiMeleeConsoleParityProfile(SlippiMeleeProfile):
                 ),
             },
             {
-                "category": "Nvidia Control Panel",
-                "setting": "Max Frame Rate",
-                "value": "60",
-                "reason": "Locks driver limiter to Melee's native cadence for stable console-parity behavior.",
+                "category": "Windows Display",
+                "setting": "Desktop Refresh Rate",
+                "value": "60 Hz",
+                "reason": (
+                    "The profile forces 60 Hz output for stricter console-style cadence on flat panels. "
+                    "Switch back to high refresh when using the competitive profile."
+                ),
             },
             {
                 "category": "Graphics",
