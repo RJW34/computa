@@ -60,6 +60,7 @@ class TestProfileApplierInit:
         """Test PROFILES registry contains expected profiles."""
         assert "slippi-melee" in ProfileApplier.PROFILES
         assert "slippi-melee-console-parity" in ProfileApplier.PROFILES
+        assert "slippi-melee-vrr-lab" in ProfileApplier.PROFILES
         assert "cod-bo7" in ProfileApplier.PROFILES
         assert "diablo4" in ProfileApplier.PROFILES
         assert "rivals2" in ProfileApplier.PROFILES

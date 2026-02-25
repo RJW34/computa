@@ -32,6 +32,7 @@ from abso.profiles.ryujinx_ssbu import RyujinxSSBUProfile
 from abso.profiles.slippi_melee import (
     SlippiMeleeConsoleParityProfile,
     SlippiMeleeProfile,
+    SlippiMeleeVRRLabProfile,
 )
 from abso.profiles.streaming_profiles import (
     FortniteStreamingProfile,
@@ -61,7 +62,7 @@ PROFILE_CATALOG: OrderedDict[str, ProfileCatalogEntry] = OrderedDict(
         "slippi-melee": ProfileCatalogEntry(
             profile_class=SlippiMeleeProfile,
             tray_category="Fighting",
-            tray_subtitle="Competitive | LLM ON | No Sync",
+            tray_subtitle="Competitive | No Sync | Backend-Aware",
             sync_mode="off",
         ),
         "slippi-melee-console-parity": ProfileCatalogEntry(
@@ -69,6 +70,12 @@ PROFILE_CATALOG: OrderedDict[str, ProfileCatalogEntry] = OrderedDict(
             tray_category="Fighting",
             tray_subtitle="Console-Parity | 60Hz + VSync | LLM OFF",
             sync_mode="off",
+        ),
+        "slippi-melee-vrr-lab": ProfileCatalogEntry(
+            profile_class=SlippiMeleeVRRLabProfile,
+            tray_category="Fighting",
+            tray_subtitle="VRR Lab | G-SYNC ON | A/B Test",
+            sync_mode="on",
         ),
         "rivals2": ProfileCatalogEntry(
             profile_class=Rivals2Profile,

@@ -16,6 +16,13 @@
       "expected": { "transaction_state": "committed", "apply_success": true }
     },
     {
+      "id": "apply-slippi-melee-vrr-lab",
+      "profile_id": "slippi-melee-vrr-lab",
+      "kind": "apply_profile",
+      "assumptions": ["administrator", "nvidia_gpu", "vrr_confirmed"],
+      "expected": { "transaction_state": "committed", "apply_success": true }
+    },
+    {
       "id": "apply-rivals2",
       "profile_id": "rivals2",
       "kind": "apply_profile",

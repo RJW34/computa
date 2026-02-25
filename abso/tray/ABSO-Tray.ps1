@@ -562,9 +562,9 @@ $script:FallbackProfiles = [ordered]@{
     # --- Fighting Games: Melee ---
     "slippi-melee"      = @{
         Name     = "Slippi Melee (Competitive)"
-        Sub      = "Competitive | LLM ON | No Sync"
+        Sub      = "Competitive | No Sync | Backend-Aware"
         Cat      = "Fighting"
-        Desc     = "Latency-first competitive Slippi profile. No sync path, max responsiveness."
+        Desc     = "Latency-first competitive Slippi profile with backend-aware LLM/HAGS and no-sync output."
         Exes     = @("Slippi Dolphin.exe", "Dolphin.exe")
         SyncMode = "off"
     }
@@ -575,6 +575,14 @@ $script:FallbackProfiles = [ordered]@{
         Desc     = "Console-style offline profile: 60Hz desktop cadence, VSync ON, and stable frame presentation."
         Exes     = @("Slippi Dolphin.exe", "Dolphin.exe")
         SyncMode = "off"
+    }
+    "slippi-melee-vrr-lab" = @{
+        Name     = "Slippi Melee (VRR Lab)"
+        Sub      = "VRR Lab | G-SYNC ON | A/B Test"
+        Cat      = "Fighting"
+        Desc     = "Experimental VRR/G-SYNC path for controlled A/B testing versus competitive no-sync."
+        Exes     = @("Slippi Dolphin.exe", "Dolphin.exe")
+        SyncMode = "on"
     }
     "slippi-melee-streaming" = @{
         Name     = "Slippi Melee (Streaming)"
@@ -2358,7 +2366,7 @@ public class HotkeyMessageWindow : NativeWindow {
     # Strip known variant suffixes to get the base game identifier.
     # Order matters: longer suffixes before shorter ones that are substrings.
     $variantSuffixes = @(
-        "-online-gsync", "-tournament-sim-144hz", "-300hz-max", "-console-parity",
+        "-online-gsync", "-tournament-sim-144hz", "-300hz-max", "-console-parity", "-vrr-lab",
         "-streaming", "-offline", "-online", "-gsync"
     )
 

@@ -20,6 +20,7 @@ from abso.profiles.rivals2_online import Rivals2OnlineProfile
 from abso.profiles.slippi_melee import (
     SlippiMeleeConsoleParityProfile,
     SlippiMeleeProfile,
+    SlippiMeleeVRRLabProfile,
 )
 
 
@@ -37,6 +38,12 @@ class TestProfileLoading:
         profile = SlippiMeleeConsoleParityProfile()
         assert profile.profile_id == "slippi-melee-console-parity"
         assert "Console-Parity" in profile.display_name
+
+    def test_slippi_vrr_lab_profile_loads(self):
+        """Test SlippiMeleeVRRLabProfile can be instantiated."""
+        profile = SlippiMeleeVRRLabProfile()
+        assert profile.profile_id == "slippi-melee-vrr-lab"
+        assert "VRR Lab" in profile.display_name
 
     def test_cod_profile_loads(self):
         """Test CodBo7Profile can be instantiated."""
@@ -182,6 +189,15 @@ class TestProfileSettings:
         settings = profile.get_settings("WindowsSettingsHandler")
         assert settings["refresh_rate"] == 60
 
+    def test_slippi_vrr_lab_nvidia_settings(self):
+        """VRR lab profile should explicitly enable VRR test path."""
+        profile = SlippiMeleeVRRLabProfile()
+        settings = profile.get_settings("NvidiaSettingsHandler")
+
+        assert settings["vsync"] == "on"
+        assert settings["vrr_app_override"] == "allow"
+        assert settings["global_vrr_mode"] == "fullscreen_only"
+
     def test_cod_nvidia_settings(self):
         """Test CodBo7Profile returns Nvidia settings with reflex_game preset."""
         profile = CodBo7Profile()
@@ -300,6 +316,15 @@ class TestProfileInGameSettings:
         assert len(settings) > 0
         assert any(s.get("setting") == "V-SYNC (global/per-game)" for s in settings)
 
+    def test_slippi_vrr_lab_in_game_settings(self):
+        """VRR lab profile should include explicit A/B measurement guidance."""
+        profile = SlippiMeleeVRRLabProfile()
+        settings = profile.get_in_game_settings()
+
+        assert isinstance(settings, list)
+        assert len(settings) > 0
+        assert any("A/B" in s.get("value", "") for s in settings)
+
     def test_cod_in_game_has_reflex_setting(self):
         """Test CodBo7Profile recommends Nvidia Reflex."""
         profile = CodBo7Profile()
@@ -373,9 +398,11 @@ class TestBaseProfileImplementation:
         no_sync = Overwatch2Profile()
         gsync = Overwatch2GSyncProfile()
         gsync_hdr = Overwatch2GSyncHDRProfile()
+        slippi_vrr_lab = SlippiMeleeVRRLabProfile()
         assert no_sync.requires_confirmed_vrr_support is False
         assert gsync.requires_confirmed_vrr_support is True
         assert gsync_hdr.requires_confirmed_vrr_support is True
+        assert slippi_vrr_lab.requires_confirmed_vrr_support is True
 
     def test_pokemon_auto_chess_optimization_target(self):
         """Test PokemonAutoChessProfile has balanced optimization target."""

@@ -7,7 +7,6 @@ from pathlib import Path
 
 from abso.profiles.catalog import PROFILE_CATALOG
 
-
 MATRIX_PATH = Path("abso/core/manifests/integration_test_matrix.json")
 
 

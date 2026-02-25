@@ -26,6 +26,7 @@ from abso.profiles.ryujinx_ssbu import RyujinxSSBUProfile
 from abso.profiles.slippi_melee import (
     SlippiMeleeConsoleParityProfile,
     SlippiMeleeProfile,
+    SlippiMeleeVRRLabProfile,
 )
 from abso.profiles.streaming_profiles import (
     FortniteStreamingProfile,
@@ -39,6 +40,7 @@ __all__ = [
     "BaseProfile",
     "SlippiMeleeConsoleParityProfile",
     "SlippiMeleeProfile",
+    "SlippiMeleeVRRLabProfile",
     "Rivals2Profile",
     "Rivals2OfflineProfile",
     "Rivals2OnlineProfile",

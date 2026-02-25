@@ -541,3 +541,102 @@ class SlippiMeleeConsoleParityProfile(SlippiMeleeProfile):
         ]
 
 
+class SlippiMeleeVRRLabProfile(SlippiMeleeProfile):
+    """Experimental Slippi profile for controlled VRR/G-SYNC A/B testing."""
+
+    @property
+    def profile_id(self) -> str:
+        return "slippi-melee-vrr-lab"
+
+    @property
+    def display_name(self) -> str:
+        return "Super Smash Bros. Melee (Slippi VRR Lab)"
+
+    @property
+    def description(self) -> str:
+        return "Experimental VRR/G-SYNC test profile for Slippi latency and pacing A/B"
+
+    @property
+    def optimization_target(self) -> str:
+        return "balanced"
+
+    @property
+    def requires_confirmed_vrr_support(self) -> bool:
+        return True
+
+    def _settings_overrides(self) -> dict[str, dict[str, Any]]:
+        settings = super()._settings_overrides()
+
+        settings["NvidiaSettingsHandler"].update({
+            # VRR path for controlled testing (not treated as universal best).
+            "vsync": "on",
+            "vrr_app_override": "allow",
+            "vsync_tear_control": "disable",
+            "global_vrr_mode": "fullscreen_only",
+            "max_frame_rate": "off",
+            "triple_buffering": "off",
+        })
+
+        settings["DolphinConfigHandler"].update({
+            # Keep queue path explicit and avoid double-sync in Dolphin.
+            "vsync": "False",
+            "rush_presentation": "False",
+            "smooth_presentation": "True",
+        })
+
+        return settings
+
+    def get_in_game_settings(self) -> list[dict[str, str]]:
+        return [
+            {
+                "category": "Profile Goal",
+                "setting": "Target",
+                "value": "Controlled VRR A/B test (not universal default)",
+                "reason": (
+                    "Use this profile to compare VRR behavior against the competitive no-sync profile "
+                    "on your exact monitor/OSD/backend path."
+                ),
+            },
+            {
+                "category": "Display",
+                "setting": "Monitor OSD Adaptive Sync",
+                "value": "On",
+                "reason": "Required so Windows/NVIDIA can confirm VRR capability.",
+            },
+            {
+                "category": "Nvidia Control Panel",
+                "setting": "G-SYNC",
+                "value": "On (fullscreen)",
+                "reason": "Profile enables fullscreen VRR mode for Slippi Dolphin.",
+            },
+            {
+                "category": "Nvidia Control Panel",
+                "setting": "V-SYNC (global/per-game)",
+                "value": "On",
+                "reason": (
+                    "Used as a VRR safety net. Dolphin VSync stays off to avoid double-sync."
+                ),
+            },
+            {
+                "category": "Graphics",
+                "setting": "Dolphin VSync",
+                "value": "Off",
+                "reason": "Keep synchronization in one place (NVCP VRR path).",
+            },
+            {
+                "category": "Dolphin.ini [Core]",
+                "setting": "SmoothPresentation",
+                "value": "True",
+                "reason": "Intended to improve cadence behavior on VRR displays during lab testing.",
+            },
+            {
+                "category": "Measurement",
+                "setting": "A/B Method",
+                "value": "Compare against slippi-melee over repeat runs",
+                "reason": (
+                    "Judge by repeated input-to-photon consistency and frame pacing, not single-session readouts."
+                ),
+            },
+        ]
+
+
