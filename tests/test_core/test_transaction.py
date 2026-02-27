@@ -38,7 +38,7 @@ def test_transaction_rolls_back_on_critical_when_backup_available(tmp_path: Path
 
     with patch("abso.core.transaction.BackupManager") as mock_backup_cls:
         restore_manager = MagicMock()
-        restore_manager.list_backups.return_value = []  # No previous backup
+        restore_manager.get_baseline_backup.return_value = None  # No previous backup
         backup_manager = MagicMock()
         backup_manager.create_backup.return_value = "backup-123"
         mock_backup_cls.side_effect = [restore_manager, backup_manager]
@@ -65,7 +65,10 @@ def test_transaction_restores_baseline_before_apply(tmp_path: Path) -> None:
     with patch("abso.core.transaction.BackupManager") as mock_backup_cls:
         # First call is the restore-phase manager, second is the backup-phase manager
         restore_manager = MagicMock()
-        restore_manager.list_backups.return_value = [{"id": "old-backup"}]
+        baseline_path = MagicMock()
+        baseline_path.exists.return_value = True
+        baseline_path.name = "old-backup"
+        restore_manager.get_baseline_backup.return_value = baseline_path
         backup_manager = MagicMock()
         backup_manager.create_backup.return_value = "new-backup"
         mock_backup_cls.side_effect = [restore_manager, backup_manager]
@@ -73,7 +76,7 @@ def test_transaction_restores_baseline_before_apply(tmp_path: Path) -> None:
         manager = ProfileTransactionManager(tmp_path, applier=applier)
         tx = manager.execute("test-profile", create_backup=True)
 
-        restore_manager.restore_backup.assert_called_once_with("latest")
+        restore_manager.restore_backup.assert_called_once_with("old-backup")
         assert any(
             cp.phase == "baseline_restore" and cp.status == "ok"
             for cp in tx.checkpoints
@@ -92,7 +95,7 @@ def test_transaction_skips_baseline_restore_when_no_backups(tmp_path: Path) -> N
 
     with patch("abso.core.transaction.BackupManager") as mock_backup_cls:
         restore_manager = MagicMock()
-        restore_manager.list_backups.return_value = []
+        restore_manager.get_baseline_backup.return_value = None
         backup_manager = MagicMock()
         backup_manager.create_backup.return_value = "new-backup"
         mock_backup_cls.side_effect = [restore_manager, backup_manager]
@@ -135,7 +138,10 @@ def test_transaction_continues_when_baseline_restore_fails(tmp_path: Path) -> No
 
     with patch("abso.core.transaction.BackupManager") as mock_backup_cls:
         restore_manager = MagicMock()
-        restore_manager.list_backups.return_value = [{"id": "old-backup"}]
+        baseline_path = MagicMock()
+        baseline_path.exists.return_value = True
+        baseline_path.name = "old-backup"
+        restore_manager.get_baseline_backup.return_value = baseline_path
         restore_manager.restore_backup.side_effect = RuntimeError("restore broke")
         backup_manager = MagicMock()
         backup_manager.create_backup.return_value = "new-backup"

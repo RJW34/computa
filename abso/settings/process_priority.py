@@ -176,8 +176,51 @@ class ProcessPriorityHandler(SettingsHandler):
             "requires_reboot": False,  # Takes effect on next process start
         }
 
+    def _discover_configured_executables(self) -> list[str]:
+        """Scan IFEO registry for executables with PerfOptions subkey.
+
+        Returns:
+            List of executable names that have priority settings configured.
+        """
+        discovered: list[str] = []
+        try:
+            ifeo_key = winreg.OpenKey(
+                winreg.HKEY_LOCAL_MACHINE,
+                self.IFEO_KEY,
+                0,
+                winreg.KEY_READ,
+            )
+            try:
+                i = 0
+                while True:
+                    try:
+                        subkey_name = winreg.EnumKey(ifeo_key, i)
+                        i += 1
+                        # Check if this subkey has a PerfOptions child
+                        try:
+                            perf_key = winreg.OpenKey(
+                                ifeo_key,
+                                f"{subkey_name}\\PerfOptions",
+                                0,
+                                winreg.KEY_READ,
+                            )
+                            winreg.CloseKey(perf_key)
+                            discovered.append(subkey_name)
+                        except FileNotFoundError:
+                            pass
+                    except OSError:
+                        break
+            finally:
+                winreg.CloseKey(ifeo_key)
+        except Exception as e:
+            logger.debug(f"Failed to discover IFEO executables: {e}")
+
+        return discovered
+
     def backup(self) -> dict[str, Any]:
         """Backup current per-process priority settings."""
+        if not self.executables:
+            self.executables = self._discover_configured_executables()
         return self.detect()
 
     def restore(self, data: dict[str, Any]) -> bool:

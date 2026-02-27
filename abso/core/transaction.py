@@ -11,6 +11,8 @@ from typing import Any
 from abso.core.applier import ApplyResult, ProfileApplier
 from abso.core.backup import BackupManager
 from abso.core.compliance import ComplianceEngine, ComplianceReport
+from abso.core.config import get_config
+from abso.core.exceptions import BackupCorruptedError, BackupNotFoundError
 
 logger = logging.getLogger(__name__)
 
@@ -102,12 +104,17 @@ class ProfileTransactionManager:
             try:
                 self.backup_dir.mkdir(parents=True, exist_ok=True)
                 restore_manager = BackupManager(self.backup_dir)
-                existing_backups = restore_manager.list_backups()
-                if existing_backups:
-                    restore_manager.restore_backup("latest")
-                    tx.add_checkpoint("baseline_restore", "ok", "Restored previous baseline for clean switch")
+                baseline_path = restore_manager.get_baseline_backup()
+                if baseline_path and baseline_path.exists():
+                    restore_manager.restore_backup(baseline_path.name)
+                    tx.add_checkpoint("baseline_restore", "ok", f"Restored baseline: {baseline_path.name}")
                 else:
                     tx.add_checkpoint("baseline_restore", "skipped", "No previous backup — first application")
+            except BackupNotFoundError:
+                tx.add_checkpoint("baseline_restore", "skipped", "No baseline backup found — first application")
+            except BackupCorruptedError as e:
+                logger.warning(f"Baseline backup corrupted, continuing with apply: {e}")
+                tx.add_checkpoint("baseline_restore", "warn", f"Baseline corrupted: {e}")
             except Exception as e:
                 logger.warning(f"Baseline restore failed, continuing with apply: {e}")
                 tx.add_checkpoint("baseline_restore", "warn", f"Restore failed: {e}")
@@ -117,8 +124,22 @@ class ProfileTransactionManager:
             try:
                 self.backup_dir.mkdir(parents=True, exist_ok=True)
                 backup_manager = BackupManager(self.backup_dir)
-                tx.backup_id = backup_manager.create_backup()
+                tx.backup_id = backup_manager.create_backup(
+                    profile_id=profile_id,
+                    backup_type="pre_apply",
+                )
                 tx.add_checkpoint("backup", "ok", f"Backup created: {tx.backup_id}")
+
+                # Auto-prune old backups (non-fatal)
+                try:
+                    cfg = get_config()
+                    pruned = backup_manager.prune(max_backups=cfg.max_backups)
+                    if pruned:
+                        tx.add_checkpoint("prune", "ok", f"Pruned {len(pruned)} old backup(s)")
+                except Exception as prune_err:
+                    logger.warning(f"Auto-prune failed (non-fatal): {prune_err}")
+                    tx.add_checkpoint("prune", "warn", f"Prune failed: {prune_err}")
+
             except Exception as e:
                 tx.state = "failed"
                 tx.error = f"Backup failed: {e}"

@@ -21,10 +21,13 @@ import re
 from pathlib import Path
 from typing import Any
 
+from abso.core.models import Issue
+from abso.settings.base import SettingsHandler
+
 logger = logging.getLogger(__name__)
 
 
-class DolphinConfigHandler:
+class DolphinConfigHandler(SettingsHandler):
     """Handler for Dolphin/Slippi configuration files.
 
     Slippi Launcher tends to overwrite certain Dolphin settings on launch.
@@ -291,3 +294,42 @@ class DolphinConfigHandler:
             })
 
         return issues
+
+    def backup(self) -> dict[str, Any]:
+        """Backup current Dolphin configuration files."""
+        data: dict[str, Any] = {
+            "slippi_installed": self.slippi_base.exists(),
+            "gfx_ini": None,
+            "dolphin_ini": None,
+        }
+
+        try:
+            if self.gfx_ini.exists():
+                data["gfx_ini"] = self.gfx_ini.read_text(encoding="utf-8")
+        except OSError as e:
+            logger.warning(f"Failed to backup GFX.ini: {e}")
+
+        try:
+            if self.dolphin_ini.exists():
+                data["dolphin_ini"] = self.dolphin_ini.read_text(encoding="utf-8")
+        except OSError as e:
+            logger.warning(f"Failed to backup Dolphin.ini: {e}")
+
+        return data
+
+    def restore(self, data: dict[str, Any]) -> bool:
+        """Restore Dolphin configuration files from backup."""
+        if not data.get("slippi_installed"):
+            return True  # Nothing to restore if Slippi wasn't installed
+
+        try:
+            if data.get("gfx_ini") is not None and self.gfx_ini.parent.exists():
+                self.gfx_ini.write_text(data["gfx_ini"], encoding="utf-8")
+
+            if data.get("dolphin_ini") is not None and self.dolphin_ini.parent.exists():
+                self.dolphin_ini.write_text(data["dolphin_ini"], encoding="utf-8")
+
+            return True
+        except OSError as e:
+            logger.error(f"Failed to restore Dolphin config: {e}")
+            return False

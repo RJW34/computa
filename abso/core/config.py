@@ -55,6 +55,7 @@ class ABSOConfig:
 
     backup_dir: str = "backups"
     auto_backup: bool = True
+    max_backups: int = 20
     log_level: str = "INFO"
     default_profile: str | None = None
     profile_overrides: dict[str, ProfileOverrides] = field(default_factory=dict)
@@ -97,6 +98,14 @@ class ConfigManager:
         "StorageSettingsHandler",
         "AudioSettingsHandler",
         "UpdatesSettingsHandler",
+        # Profile-specific handlers
+        "DolphinConfigHandler",
+        "Rivals2ConfigHandler",
+        "NvidiaNotificationHandler",
+        "OBSSettingsHandler",
+        "ProcessPriorityHandler",
+        "CNMSettingsHandler",
+        "ColorProfileSettingsHandler",
     }
 
     def __init__(self, config_path: Path | None = None) -> None:
@@ -360,6 +369,7 @@ confirm_destructive: true
         known_keys = {
             "backup_dir",
             "auto_backup",
+            "max_backups",
             "log_level",
             "default_profile",
             "profile_overrides",

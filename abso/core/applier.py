@@ -40,6 +40,7 @@ class ApplyResult:
     success: bool
     error: str | None = None
     requires_reboot: bool = False
+    reboot_reasons: list[str] = field(default_factory=list)
     in_game_settings: bool = False
     applied_settings: list[str] = field(default_factory=list)
     failed_settings: list[str] = field(default_factory=list)
@@ -261,6 +262,7 @@ class ProfileApplier:
         failed: list[str] = []
         skipped: list[str] = []
         requires_reboot = False
+        reboot_reasons: list[str] = []
 
         for handler in profile.get_handlers():
             handler_name = handler.__class__.__name__
@@ -294,8 +296,9 @@ class ProfileApplier:
 
                 if handler_result.get("success", False):
                     applied.append(handler_name)
-                    if handler_result.get("requires_reboot", False):
+                    if handler_result.get("requires_reboot", False) or handler_result.get("requires_restart", False):
                         requires_reboot = True
+                        reboot_reasons.append(handler_name)
                 else:
                     failed.append(
                         f"{handler_name}: {handler_result.get('error', 'Unknown error')}"
@@ -317,6 +320,7 @@ class ProfileApplier:
         result.applied_settings = applied
         result.failed_settings = failed
         result.requires_reboot = requires_reboot
+        result.reboot_reasons = reboot_reasons
 
         if failed:
             result.success = False

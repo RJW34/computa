@@ -18,6 +18,8 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+DEFAULT_MAX_BACKUPS = 20
+
 
 def _get_backup_handlers() -> list[SettingsHandler]:
     """Lazily import and instantiate settings handlers for backup.
@@ -27,13 +29,20 @@ def _get_backup_handlers() -> list[SettingsHandler]:
     complete restore capability.
     """
     from abso.settings.audio import AudioSettingsHandler
+    from abso.settings.cnm import CNMSettingsHandler
+    from abso.settings.color import ColorProfileSettingsHandler
+    from abso.settings.dolphin import DolphinConfigHandler
     from abso.settings.graphics import GraphicsSettingsHandler
     from abso.settings.memory import MemorySettingsHandler
     from abso.settings.mouse import MouseSettingsHandler
     from abso.settings.network import NetworkSettingsHandler
     from abso.settings.nvidia import NvidiaSettingsHandler
+    from abso.settings.nvidia_notifications import NvidiaNotificationHandler
+    from abso.settings.obs import OBSSettingsHandler
     from abso.settings.power import PowerSettingsHandler
+    from abso.settings.process_priority import ProcessPriorityHandler
     from abso.settings.registry import RegistrySettingsHandler
+    from abso.settings.rivals2_config import Rivals2ConfigHandler
     from abso.settings.services import ServicesSettingsHandler
     from abso.settings.storage import StorageSettingsHandler
     from abso.settings.tasks import TasksSettingsHandler
@@ -60,6 +69,14 @@ def _get_backup_handlers() -> list[SettingsHandler]:
         StorageSettingsHandler(),
         AudioSettingsHandler(),
         UpdatesSettingsHandler(),
+        # Profile-specific handlers (prevent settings leak between profiles)
+        DolphinConfigHandler(),
+        Rivals2ConfigHandler(),
+        NvidiaNotificationHandler(),
+        OBSSettingsHandler(),
+        ProcessPriorityHandler(),
+        CNMSettingsHandler(),
+        ColorProfileSettingsHandler(),
     ]
 
 
@@ -75,8 +92,16 @@ class BackupManager:
         self.backup_dir = backup_dir
         self._handlers = _get_backup_handlers()
 
-    def create_backup(self) -> str:
+    def create_backup(
+        self,
+        profile_id: str | None = None,
+        backup_type: str = "pre_apply",
+    ) -> str:
         """Create a new backup of current settings.
+
+        Args:
+            profile_id: Profile being applied (for metadata tracking).
+            backup_type: Type of backup (e.g. "pre_apply", "manual").
 
         Returns:
             Backup ID (timestamp string).
@@ -88,6 +113,8 @@ class BackupManager:
         manifest: dict[str, Any] = {
             "timestamp": timestamp,
             "created_at": datetime.now().isoformat(),
+            "profile_id": profile_id,
+            "backup_type": backup_type,
             "components": {},
         }
 
@@ -241,6 +268,8 @@ class BackupManager:
                     "id": backup_path.name,
                     "created_at": manifest.get("created_at", "Unknown"),
                     "components": list(manifest.get("components", {}).keys()),
+                    "profile_id": manifest.get("profile_id"),
+                    "backup_type": manifest.get("backup_type"),
                 })
             except json.JSONDecodeError as e:
                 logger.warning(f"Corrupted manifest in backup {backup_path.name}: {e}")
@@ -251,6 +280,28 @@ class BackupManager:
         backups.sort(key=lambda x: x["id"], reverse=True)
 
         return backups
+
+    def get_baseline_backup(self) -> Path | None:
+        """Get the most recent pre-apply backup for baseline restoration.
+
+        Scans backups newest-first and returns the first with backup_type
+        "pre_apply" or None (old backups without metadata). Falls back to
+        latest if no typed backups exist.
+
+        Returns:
+            Path to baseline backup or None if no backups exist.
+        """
+        backups = self.list_backups()
+        if not backups:
+            return None
+
+        for backup in backups:
+            backup_type = backup.get("backup_type")
+            if backup_type in ("pre_apply", None):
+                return self.backup_dir / backup["id"]
+
+        # All backups have non-pre_apply types; fall back to latest
+        return self.backup_dir / backups[0]["id"]
 
     def _get_latest_backup(self) -> Path | None:
         """Get the path to the latest backup.
@@ -263,6 +314,35 @@ class BackupManager:
             return None
 
         return self.backup_dir / backups[0]["id"]
+
+    def prune(self, max_backups: int = DEFAULT_MAX_BACKUPS) -> list[str]:
+        """Delete oldest backups exceeding the retention limit.
+
+        Args:
+            max_backups: Maximum number of backups to keep.
+
+        Returns:
+            List of backup IDs that were deleted.
+        """
+        backups = self.list_backups()
+        if len(backups) <= max_backups:
+            return []
+
+        to_delete = backups[max_backups:]  # Already sorted newest-first
+        deleted: list[str] = []
+
+        for backup in to_delete:
+            backup_id = backup["id"]
+            try:
+                self.delete_backup(backup_id)
+                deleted.append(backup_id)
+            except Exception as e:
+                logger.warning(f"Failed to prune backup {backup_id}: {e}")
+
+        if deleted:
+            logger.info(f"Pruned {len(deleted)} backup(s), kept {max_backups}")
+
+        return deleted
 
     def delete_backup(self, backup_id: str) -> None:
         """Delete a backup.

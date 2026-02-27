@@ -94,12 +94,15 @@ class StorageSettingsHandler(SettingsHandler):
         requires_reboot = False
 
         try:
+            current = self.detect()
+
             if settings.get("preset") == "gaming":
                 # Apply all optimizations
+                current_la = current.get("last_access_disabled")
                 result = self._set_last_access_disabled(True)
                 if not result["success"]:
                     errors.append(result.get("error", "Failed to disable last access"))
-                else:
+                elif current_la is not True:
                     requires_reboot = True
 
                 result = self._set_8dot3_disabled(True)
@@ -112,10 +115,11 @@ class StorageSettingsHandler(SettingsHandler):
 
             else:
                 if "disable_last_access" in settings:
+                    current_la = current.get("last_access_disabled")
                     result = self._set_last_access_disabled(settings["disable_last_access"])
                     if not result["success"]:
                         errors.append(result.get("error", "Failed to set last access"))
-                    else:
+                    elif current_la != settings["disable_last_access"]:
                         requires_reboot = True
 
                 if "disable_8dot3" in settings:

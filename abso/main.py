@@ -57,12 +57,36 @@ def get_current_profile() -> str | None:
     return None
 
 
-def set_current_profile(profile_name: str) -> None:
+def set_current_profile(
+    profile_name: str,
+    requires_reboot: bool = False,
+    reboot_reasons: list[str] | None = None,
+) -> None:
     """Save the current profile to state file (atomic write)."""
-    state = {"current_profile": profile_name, "applied_at": datetime.now().isoformat()}
+    state: dict[str, Any] = {
+        "current_profile": profile_name,
+        "applied_at": datetime.now().isoformat(),
+        "reboot_pending": requires_reboot,
+        "reboot_reasons": reboot_reasons or [],
+    }
     tmp = STATE_FILE.with_suffix(".tmp")
     tmp.write_text(json.dumps(state, indent=2))
     os.replace(tmp, STATE_FILE)
+
+
+def clear_reboot_pending() -> None:
+    """Clear the reboot-pending flag from state file."""
+    if not STATE_FILE.exists():
+        return
+    try:
+        state = json.loads(STATE_FILE.read_text())
+        state["reboot_pending"] = False
+        state["reboot_reasons"] = []
+        tmp = STATE_FILE.with_suffix(".tmp")
+        tmp.write_text(json.dumps(state, indent=2))
+        os.replace(tmp, STATE_FILE)
+    except (json.JSONDecodeError, OSError):
+        pass
 
 
 def clear_current_profile() -> None:
@@ -438,7 +462,11 @@ def apply(profile_name: str, no_backup: bool, json_output: bool) -> None:
 
         if json_output:
             if tx.success and result and result.success:
-                set_current_profile(profile_name)
+                set_current_profile(
+                    profile_name,
+                    requires_reboot=result.requires_reboot,
+                    reboot_reasons=result.reboot_reasons,
+                )
             applied_settings = result.applied_settings if result else []
             failed_settings = result.failed_settings if result else []
             output_json({
@@ -470,12 +498,21 @@ def apply(profile_name: str, no_backup: bool, json_output: bool) -> None:
             console.print(f"[green]Backup created: {tx.backup_id}[/green]\n")
 
         if tx.success and result and result.success:
-            set_current_profile(profile_name)
+            set_current_profile(
+                profile_name,
+                requires_reboot=result.requires_reboot,
+                reboot_reasons=result.reboot_reasons,
+            )
             console.print(f"\n[green]Profile '{profile_name}' applied successfully![/green]")
 
-            if result.requires_reboot:
+            if result.requires_reboot and result.reboot_reasons:
+                console.print("[yellow]Note: The following changes require a reboot to take effect:[/yellow]")
+                for reason in result.reboot_reasons:
+                    console.print(f"  [yellow]- {reason}[/yellow]")
+                console.print(f"[dim]Run 'abso verify {profile_name}' to check if reboot is still needed.[/dim]")
+            elif result.requires_reboot:
                 console.print("[yellow]Note: Some changes may require a reboot to take effect.[/yellow]")
-                console.print("[dim]If you've previously applied this profile and rebooted, no new reboot is needed.[/dim]")
+                console.print(f"[dim]Run 'abso verify {profile_name}' to check if reboot is still needed.[/dim]")
 
             if result.in_game_settings:
                 # Actually generate the report file
@@ -673,6 +710,47 @@ def backups(json_output: bool) -> None:
         if backup.get("components"):
             components = ", ".join(backup["components"])
             console.print(f"  [dim]Components: {components}[/dim]")
+
+
+@cli.command()
+@click.option("--keep", "-k", type=int, default=20, help="Number of backups to keep (default: 20)")
+@click.option("--json", "json_output", is_flag=True, help="Output as JSON for GUI integration")
+def prune(keep: int, json_output: bool) -> None:
+    """Remove old backups, keeping the most recent N.
+
+    By default keeps the 20 most recent backups and deletes the rest.
+    """
+    BACKUPS_DIR.mkdir(parents=True, exist_ok=True)
+    backup_manager = BackupManager(BACKUPS_DIR)
+
+    existing = backup_manager.list_backups()
+
+    if json_output:
+        deleted = backup_manager.prune(max_backups=keep)
+        output_json({
+            "kept": keep,
+            "deleted_count": len(deleted),
+            "deleted": deleted,
+            "remaining": len(existing) - len(deleted),
+        })
+        return
+
+    if len(existing) <= keep:
+        console.print(f"[green]Nothing to prune. {len(existing)} backup(s) exist, limit is {keep}.[/green]")
+        return
+
+    console.print(f"[yellow]Found {len(existing)} backups, pruning to keep {keep}...[/yellow]")
+    deleted = backup_manager.prune(max_backups=keep)
+
+    if deleted:
+        console.print(f"[green]Deleted {len(deleted)} old backup(s).[/green]")
+        for bid in deleted:
+            console.print(f"  [dim]- {bid}[/dim]")
+    else:
+        console.print("[green]No backups needed pruning.[/green]")
+
+    remaining = len(existing) - len(deleted)
+    console.print(f"\n[bold]{remaining}[/bold] backup(s) remaining.")
 
 
 @cli.command()

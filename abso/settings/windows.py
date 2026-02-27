@@ -301,7 +301,10 @@ class WindowsSettingsHandler(SettingsHandler):
             try:
                 target = settings["vbs"]
                 current_vbs = current.get("vbs_enabled")
-                if current_vbs is not None and current_vbs != target:
+                if current_vbs is None:
+                    # Detection failed — conservatively assume reboot needed
+                    requires_reboot = True
+                elif current_vbs != target:
                     requires_reboot = True
                 self._set_vbs(target)
                 applied.append(f"VBS: {'enabled' if target else 'disabled'}")

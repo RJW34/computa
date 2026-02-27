@@ -404,6 +404,7 @@ class OBSSettingsHandler(SettingsHandler):
         """
         result: dict[str, Any] = {
             "success": False,
+            "requires_reboot": False,
             "requires_restart": True,  # OBS must be restarted for changes
             "changes": [],
         }
