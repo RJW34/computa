@@ -288,7 +288,7 @@ class WindowsSettingsHandler(SettingsHandler):
         if "hags" in settings:
             try:
                 target = settings["hags"]
-                current_hags = current.get("hags_enabled")
+                current_hags = current.get("hags")
                 # Only set requires_reboot if we can detect current value AND it differs
                 if current_hags is not None and current_hags != target:
                     requires_reboot = True
@@ -377,7 +377,7 @@ class WindowsSettingsHandler(SettingsHandler):
 
         if "hags" in settings:
             target = settings["hags"]
-            current_val = current.get("hags_enabled")
+            current_val = current.get("hags")
             # If we can't detect, assume it's active (can't prove otherwise)
             is_active = current_val is None or current_val == target
             results["settings"]["hags"] = {
@@ -619,6 +619,45 @@ class WindowsSettingsHandler(SettingsHandler):
             t = paths[i].targetInfo
             targets.append((t.adapterId, t.id))
         return targets
+
+    def _is_monitor_hdr_capable(self, monitor_id: str) -> bool:
+        """Check if a monitor supports HDR based on hardware ID or registry.
+
+        Uses a two-tier approach:
+        1. Known OLED PnP ID patterns (e.g. LG UltraGear OLED GSM78xx+)
+        2. Registry AdvancedColorSupported fallback for unknown monitors
+
+        Args:
+            monitor_id: Monitor hardware identifier (e.g., "GSM784C_12345").
+
+        Returns:
+            True if the monitor is known or detected to support HDR.
+        """
+        # LG OLED UltraGear monitors use PnP IDs in the GSM78xx+ range
+        if monitor_id.startswith("GSM"):
+            try:
+                hex_part = monitor_id[3:7]
+                pnp_num = int(hex_part, 16)
+                if pnp_num >= 0x7800:
+                    return True
+            except (ValueError, IndexError):
+                pass
+
+        # Fall back to registry AdvancedColorSupported check
+        try:
+            key = winreg.OpenKey(
+                winreg.HKEY_LOCAL_MACHINE,
+                rf"SYSTEM\CurrentControlSet\Enum\DISPLAY\{monitor_id}\Device Parameters",
+                0,
+                winreg.KEY_READ,
+            )
+            try:
+                value, _ = winreg.QueryValueEx(key, "AdvancedColorSupported")
+                return bool(value)
+            finally:
+                winreg.CloseKey(key)
+        except Exception:
+            return False
 
     def _get_hdr(self) -> bool | None:
         """Get Windows HDR status using the CCD DisplayConfig API.

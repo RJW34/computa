@@ -415,6 +415,77 @@ class SlippiMeleeProfile(EmulatorLatencyBaseProfile):
         ]
 
 
+class SlippiMeleeUniversalProfile(SlippiMeleeProfile):
+    """Lowest-latency Slippi profile with fixed HAGS (no reboot required).
+
+    Unlike the base slippi-melee profile which toggles HAGS based on
+    Dolphin backend (DX11/OpenGL: off, DX12/Vulkan: on), this profile
+    keeps HAGS always enabled. Applying this profile never requires a
+    system restart, matching how Overwatch 2 and other modern titles
+    treat HAGS as a fixed system-level setting.
+
+    Optimized for absolute minimum latency regardless of sync technology.
+    Dolphin's own latency features (Immediately Present XFB, Rush Frame
+    Presentation) provide far greater latency reduction than any HAGS
+    toggle, so fixing HAGS=True avoids unnecessary reboots with no
+    meaningful latency penalty.
+    """
+
+    @property
+    def profile_id(self) -> str:
+        return "slippi-melee-universal"
+
+    @property
+    def display_name(self) -> str:
+        return "Super Smash Bros. Melee (Slippi Universal)"
+
+    @property
+    def description(self) -> str:
+        return "Lowest latency, fixed HAGS (no reboot), sync-agnostic"
+
+    @property
+    def optimization_target(self) -> str:
+        return "minimum_latency"
+
+    def get_settings(self, handler_name: str) -> dict[str, Any]:
+        """Get handler settings with fixed HAGS and backend-aware LLM.
+
+        HAGS is always True regardless of Dolphin backend, so applying
+        this profile never triggers a reboot requirement. LLM is still
+        adapted per-backend since it is a runtime driver setting.
+        """
+        settings = super().get_settings(handler_name).copy()
+
+        if handler_name == "WindowsSettingsHandler":
+            # Fixed HAGS=True — no backend-dependent toggling.
+            # Avoids reboot requirement when switching Dolphin backends.
+            # HAGS benefit on DX12/Vulkan outweighs marginal DX11/OpenGL cost.
+            settings["hags"] = True
+
+        return settings
+
+    def get_in_game_settings(self) -> list[dict[str, str]]:
+        base = super().get_in_game_settings()
+        # Replace the HAGS entry with fixed-value guidance
+        updated = []
+        for entry in base:
+            if entry.get("setting") == "Hardware Accelerated GPU Scheduling (HAGS)":
+                updated.append({
+                    "category": "Windows Settings",
+                    "setting": "Hardware Accelerated GPU Scheduling (HAGS)",
+                    "value": "On (always — no reboot on re-apply)",
+                    "reason": (
+                        "HAGS is fixed to True regardless of Dolphin backend. This avoids "
+                        "reboot requirements when switching backends or re-applying the profile. "
+                        "Dolphin's own latency features (ImmediateXFB, RushPresentation) provide "
+                        "far more latency reduction than HAGS state changes."
+                    ),
+                })
+            else:
+                updated.append(entry)
+        return updated
+
+
 class SlippiMeleeConsoleParityProfile(SlippiMeleeProfile):
     """Console-parity style profile for offline Melee practice on modern displays."""
 

@@ -32,6 +32,7 @@ from abso.profiles.ryujinx_ssbu import RyujinxSSBUProfile
 from abso.profiles.slippi_melee import (
     SlippiMeleeConsoleParityProfile,
     SlippiMeleeProfile,
+    SlippiMeleeUniversalProfile,
     SlippiMeleeVRRLabProfile,
 )
 from abso.profiles.streaming_profiles import (
@@ -69,6 +70,13 @@ PROFILE_CATALOG: OrderedDict[str, ProfileCatalogEntry] = OrderedDict(
             profile_class=SlippiMeleeConsoleParityProfile,
             tray_category="Fighting",
             tray_subtitle="Console-Parity | 60Hz + VSync | LLM OFF",
+            sync_mode="off",
+        ),
+        "slippi-melee-universal": ProfileCatalogEntry(
+            profile_class=SlippiMeleeUniversalProfile,
+            tray_category="Fighting",
+            tray_subtitle="Lowest Latency | Fixed HAGS | No Reboot",
+            tray_description="Absolute minimum latency with fixed HAGS (no reboot required). Sync-agnostic.",
             sync_mode="off",
         ),
         "slippi-melee-vrr-lab": ProfileCatalogEntry(
