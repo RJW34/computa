@@ -32,6 +32,114 @@ Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 Add-Type -AssemblyName presentationCore
 
+# Catch WinForms thread exceptions (e.g. renderer GDI+ errors) — log instead of showing .NET dialog
+# MUST be called before any Controls are created
+[System.Windows.Forms.Application]::SetUnhandledExceptionMode([System.Windows.Forms.UnhandledExceptionMode]::CatchException)
+$script:ThreadExceptionCount = 0
+$script:ThreadExceptionThrottle = $null
+[System.Windows.Forms.Application]::add_ThreadException({
+    param($sender, $eventArgs)
+    $script:ThreadExceptionCount++
+    # Throttle: log first 5 fully, then only every 100th, to prevent log spam
+    if ($script:ThreadExceptionCount -le 5 -or ($script:ThreadExceptionCount % 100) -eq 0) {
+        $ex = $eventArgs.Exception
+        $msg = "WinForms ThreadException #$($script:ThreadExceptionCount): $($ex.GetType().Name): $($ex.Message)"
+        if ($ex.StackTrace) { $msg += "`n$($ex.StackTrace)" }
+        if ($ex.InnerException) { $msg += "`nInner: $($ex.InnerException.Message)" }
+        try { Write-TrayLog $msg -Level "ERROR" } catch {
+            $logPath = Join-Path $env:TEMP "abso_tray.log"
+            "[$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')] [ERROR] $msg" | Out-File -FilePath $logPath -Append -Encoding UTF8
+        }
+    }
+})
+
+# ============================================================================
+# DWM INTEROP - Modern Windows 11 Window Effects
+# ============================================================================
+
+Add-Type -TypeDefinition @"
+using System;
+using System.Runtime.InteropServices;
+
+public static class DwmHelper {
+    [DllImport("dwmapi.dll")]
+    public static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int attrValue, int attrSize);
+
+    [DllImport("dwmapi.dll")]
+    public static extern int DwmExtendFrameIntoClientArea(IntPtr hwnd, ref MARGINS pMarInset);
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct MARGINS {
+        public int cxLeftWidth;
+        public int cxRightWidth;
+        public int cyTopHeight;
+        public int cyBottomHeight;
+    }
+
+    // DWMWA_WINDOW_CORNER_PREFERENCE = 33  |  DWMWCP_ROUND = 2, DWMWCP_ROUNDSMALL = 3
+    public static void SetRoundedCorners(IntPtr hwnd, int preference) {
+        DwmSetWindowAttribute(hwnd, 33, ref preference, sizeof(int));
+    }
+
+    // DWMWA_USE_IMMERSIVE_DARK_MODE = 20
+    public static void SetDarkMode(IntPtr hwnd) {
+        int value = 1;
+        DwmSetWindowAttribute(hwnd, 20, ref value, sizeof(int));
+    }
+
+    // DWMWA_BORDER_COLOR = 34  (COLORREF: 0x00BBGGRR)
+    public static void SetBorderColor(IntPtr hwnd, int colorRef) {
+        DwmSetWindowAttribute(hwnd, 34, ref colorRef, sizeof(int));
+    }
+
+    // Enable drop shadow via frame extension
+    public static void EnableShadow(IntPtr hwnd) {
+        MARGINS margins = new MARGINS {
+            cxLeftWidth = 1, cxRightWidth = 1,
+            cyTopHeight = 1, cyBottomHeight = 1
+        };
+        DwmExtendFrameIntoClientArea(hwnd, ref margins);
+    }
+}
+"@ -ErrorAction SilentlyContinue
+
+function Apply-DwmWindowEffects {
+    <#
+    .SYNOPSIS
+    Applies modern Windows 11 DWM effects (rounded corners, dark mode, shadow) to a form.
+    Falls back silently on older builds.
+    .PARAMETER Form
+    The WinForms Form to style.
+    .PARAMETER CornerStyle
+    2 = round (default), 3 = round small.
+    .PARAMETER BorderColorRGB
+    Optional border color as [R,G,B] array. Converted to COLORREF internally.
+    #>
+    param(
+        [System.Windows.Forms.Form]$Form,
+        [int]$CornerStyle = 2,
+        [int[]]$BorderColorRGB = $null
+    )
+
+    if (-not $Form -or $Form.IsDisposed) { return }
+
+    try {
+        $handle = $Form.Handle
+        [DwmHelper]::SetRoundedCorners($handle, $CornerStyle)
+        [DwmHelper]::SetDarkMode($handle)
+        [DwmHelper]::EnableShadow($handle)
+
+        if ($BorderColorRGB -and $BorderColorRGB.Count -ge 3) {
+            # COLORREF = 0x00BBGGRR
+            $colorRef = $BorderColorRGB[2] -shl 16 -bor $BorderColorRGB[1] -shl 8 -bor $BorderColorRGB[0]
+            [DwmHelper]::SetBorderColor($handle, $colorRef)
+        }
+    }
+    catch {
+        # Silently ignore on unsupported Windows builds
+    }
+}
+
 # ============================================================================
 # LOAD MODULES
 # ============================================================================
@@ -225,7 +333,7 @@ function Invoke-RestartSuccessSoundIfPending {
         }
 
         $marker = $raw | ConvertFrom-Json
-        $requestedAt = $null
+        [datetime]$requestedAt = [datetime]::MinValue
         $hasTimestamp = $false
         if ($marker -and $marker.requested_at) {
             $hasTimestamp = [datetime]::TryParse("$($marker.requested_at)", [ref]$requestedAt)
@@ -336,14 +444,14 @@ function Test-SoundFilesExist {
 # ============================================================================
 
 $script:Colors = @{
-    Background      = [System.Drawing.Color]::FromArgb(255, 30, 30, 34)
-    BackgroundDark  = [System.Drawing.Color]::FromArgb(255, 22, 22, 26)
-    BackgroundLight = [System.Drawing.Color]::FromArgb(255, 40, 40, 45)
-    Hover           = [System.Drawing.Color]::FromArgb(255, 50, 50, 56)
-    HoverBright     = [System.Drawing.Color]::FromArgb(255, 62, 62, 68)
-    Text            = [System.Drawing.Color]::FromArgb(255, 225, 225, 230)
-    TextDim         = [System.Drawing.Color]::FromArgb(255, 130, 130, 140)
-    TextDisabled    = [System.Drawing.Color]::FromArgb(255, 80, 80, 88)
+    Background      = [System.Drawing.Color]::FromArgb(255, 26, 26, 30)
+    BackgroundDark  = [System.Drawing.Color]::FromArgb(255, 20, 20, 24)
+    BackgroundLight = [System.Drawing.Color]::FromArgb(255, 36, 36, 42)
+    Hover           = [System.Drawing.Color]::FromArgb(255, 44, 44, 50)
+    HoverBright     = [System.Drawing.Color]::FromArgb(255, 56, 56, 62)
+    Text            = [System.Drawing.Color]::FromArgb(255, 230, 230, 235)
+    TextDim         = [System.Drawing.Color]::FromArgb(255, 125, 125, 135)
+    TextDisabled    = [System.Drawing.Color]::FromArgb(255, 75, 75, 85)
     Border          = [System.Drawing.Color]::FromArgb(255, 55, 55, 62)
     Separator       = [System.Drawing.Color]::FromArgb(255, 48, 48, 55)
     AccentGold      = [System.Drawing.Color]::FromArgb(255, 230, 190, 70)
@@ -410,16 +518,18 @@ function Show-Notification {
         [string]$Type = "Info"
     )
 
+    # Update tray tooltip
     $maxLen = [Math]::Min(63, "$Title - $Message".Length)
     $script:notifyIcon.Text = "$Title - $Message".Substring(0, $maxLen)
 
     if ($script:EnableBalloonNotifications) {
-        $icon = switch ($Type) {
-            "Warning" { [System.Windows.Forms.ToolTipIcon]::Warning }
-            "Error" { [System.Windows.Forms.ToolTipIcon]::Error }
-            default { [System.Windows.Forms.ToolTipIcon]::Info }
+        # Map "Info" -> "Info" for toast (toast also accepts "Success")
+        $toastType = switch ($Type) {
+            "Warning" { "Warning" }
+            "Error"   { "Error" }
+            default   { "Info" }
         }
-        $script:notifyIcon.ShowBalloonTip(3000, $Title, $Message, $icon)
+        Show-ThemedToast -Title $Title -Message $Message -Type $toastType
     }
 }
 
@@ -486,7 +596,7 @@ if (-not $script:PythonExe) {
 # PROFILE DEFINITIONS
 # ============================================================================
 
-$script:AppVersion = "2.0.0"
+$script:AppVersion = "2.5.0"
 
 $script:FallbackProfiles = [ordered]@{
     # --- Productivity ---
@@ -1070,121 +1180,361 @@ using System.Windows.Forms;
 
 public class DarkThemeRenderer : ToolStripProfessionalRenderer
 {
-    // Dark background colors
-    private static readonly Color BgColor = Color.FromArgb(255, 30, 30, 34);
-    private static readonly Color BgDark = Color.FromArgb(255, 22, 22, 26);
-    private static readonly Color SepColor = Color.FromArgb(255, 48, 48, 55);
-    private static readonly Color BorderColor = Color.FromArgb(255, 55, 55, 62);
-    private static readonly Color HoverColor = Color.FromArgb(40, 255, 255, 255);
-    private static readonly Color CheckBg = Color.FromArgb(255, 45, 45, 52);
+    // Core dark palette
+    private static readonly Color BgColor = Color.FromArgb(255, 26, 26, 30);
+    private static readonly Color BgDark = Color.FromArgb(255, 20, 20, 24);
+    private static readonly Color BgSubtle = Color.FromArgb(255, 32, 32, 36);
+    private static readonly Color SepColor = Color.FromArgb(255, 44, 44, 52);
+    private static readonly Color BorderColor = Color.FromArgb(255, 50, 50, 58);
     private static readonly Color AccentGold = Color.FromArgb(255, 230, 190, 70);
+    private static readonly Color AccentGoldDim = Color.FromArgb(60, 230, 190, 70);
 
     public DarkThemeRenderer() : base(new DarkColorTable()) { }
 
-    // Paint the entire menu background dark
+    // Paint the entire menu background with a subtle vertical gradient
     protected override void OnRenderToolStripBackground(ToolStripRenderEventArgs e)
     {
-        using (var brush = new SolidBrush(BgColor))
+        try
         {
-            e.Graphics.FillRectangle(brush, e.AffectedBounds);
+            var g = e.Graphics;
+            var bounds = e.AffectedBounds;
+            if (bounds.Width < 1 || bounds.Height < 1) { base.OnRenderToolStripBackground(e); return; }
+            using (var brush = new LinearGradientBrush(
+                bounds, BgSubtle, BgColor, LinearGradientMode.Vertical))
+            {
+                var blend = new ColorBlend(3);
+                blend.Colors = new Color[] { BgSubtle, BgColor, BgDark };
+                blend.Positions = new float[] { 0f, 0.15f, 1f };
+                brush.InterpolationColors = blend;
+                g.FillRectangle(brush, bounds);
+            }
         }
+        catch { base.OnRenderToolStripBackground(e); }
     }
 
-    // Paint the menu border with a subtle accent
+    // Paint the menu border with accent and subtle inner shadow
     protected override void OnRenderToolStripBorder(ToolStripRenderEventArgs e)
     {
-        using (var pen = new Pen(BorderColor, 1f))
+        try
         {
-            var r = new Rectangle(0, 0, e.ToolStrip.Width - 1, e.ToolStrip.Height - 1);
-            e.Graphics.DrawRectangle(pen, r);
+            var g = e.Graphics;
+            int w = e.ToolStrip.Width;
+            int h = e.ToolStrip.Height;
+            if (w < 2 || h < 2) return;
+
+            // Outer border
+            using (var pen = new Pen(BorderColor, 1f))
+            {
+                g.DrawRectangle(pen, 0, 0, w - 1, h - 1);
+            }
+
+            // Top accent gradient line (gold, bright center, fading edges)
+            using (var brush = new LinearGradientBrush(
+                new Point(0, 0), new Point(Math.Max(1, w), 0),
+                Color.FromArgb(0, AccentGold.R, AccentGold.G, AccentGold.B),
+                Color.FromArgb(0, AccentGold.R, AccentGold.G, AccentGold.B)))
+            {
+                var blend = new ColorBlend(5);
+                blend.Colors = new Color[] {
+                    Color.FromArgb(10, AccentGold.R, AccentGold.G, AccentGold.B),
+                    Color.FromArgb(160, AccentGold.R, AccentGold.G, AccentGold.B),
+                    Color.FromArgb(220, AccentGold.R, AccentGold.G, AccentGold.B),
+                    Color.FromArgb(160, AccentGold.R, AccentGold.G, AccentGold.B),
+                    Color.FromArgb(10, AccentGold.R, AccentGold.G, AccentGold.B)
+                };
+                blend.Positions = new float[] { 0f, 0.2f, 0.5f, 0.8f, 1f };
+                brush.InterpolationColors = blend;
+                using (var pen = new Pen(brush, 2f))
+                {
+                    g.DrawLine(pen, 1, 0, w - 2, 0);
+                }
+            }
+
+            // Subtle inner highlight along top (gives depth)
+            using (var pen = new Pen(Color.FromArgb(8, 255, 255, 255), 1f))
+            {
+                g.DrawLine(pen, 1, 1, w - 2, 1);
+            }
         }
-        // Thin gold accent line at top
-        using (var pen = new Pen(Color.FromArgb(100, AccentGold.R, AccentGold.G, AccentGold.B), 1f))
-        {
-            e.Graphics.DrawLine(pen, 1, 0, e.ToolStrip.Width - 2, 0);
-        }
+        catch {}
     }
 
-    // Paint item backgrounds with category-aware hover highlighting
+    // Paint item backgrounds with richer hover highlighting
     protected override void OnRenderMenuItemBackground(ToolStripItemRenderEventArgs e)
     {
         var g = e.Graphics;
         g.SmoothingMode = SmoothingMode.AntiAlias;
-        var rect = new Rectangle(2, 1, e.Item.Width - 4, e.Item.Height - 2);
+        int w = e.Item.Width;
+        int h = e.Item.Height;
+        if (w < 2 || h < 2) return; // guard against zero-size layout passes
+        var rect = new Rectangle(3, 1, w - 6, h - 2);
 
-        if (e.Item.Selected && e.Item.Enabled)
+        try
         {
-            // Rounded hover highlight with item's forecolor tint
-            Color tint = e.Item.ForeColor;
-            using (var brush = new SolidBrush(Color.FromArgb(30, tint.R, tint.G, tint.B)))
+            // --- Hero Banner: active profile status item ---
+            var tag = e.Item.Tag as string;
+            if (tag == "__hero_banner__")
             {
-                FillRoundRect(g, brush, rect, 4);
+                Color tint = e.Item.ForeColor;
+                // Full-width gradient background in category color (alpha 20 -> 8)
+                var fullRect = new Rectangle(0, 0, w, h);
+                using (var brush = new LinearGradientBrush(
+                    new Rectangle(0, 0, Math.Max(1, w), Math.Max(1, h)),
+                    Color.FromArgb(20, tint.R, tint.G, tint.B),
+                    Color.FromArgb(8, tint.R, tint.G, tint.B),
+                    LinearGradientMode.Horizontal))
+                {
+                    g.FillRectangle(brush, fullRect);
+                }
+
+                // 4px left accent bar (full alpha, rounded)
+                int barH = h - 12;
+                if (barH > 2)
+                {
+                    using (var brush = new SolidBrush(Color.FromArgb(220, tint.R, tint.G, tint.B)))
+                    {
+                        FillRoundRect(g, brush, new Rectangle(2, 6, 4, barH), 2);
+                    }
+                }
+
+                // Glowing dot (10px circle with outer glow ring)
+                int dotX = 12;
+                int dotY = (h / 2) - 5;
+                using (var glowBrush = new SolidBrush(Color.FromArgb(35, tint.R, tint.G, tint.B)))
+                {
+                    g.FillEllipse(glowBrush, dotX - 3, dotY - 3, 16, 16);
+                }
+                using (var dotBrush = new SolidBrush(Color.FromArgb(200, tint.R, tint.G, tint.B)))
+                {
+                    g.FillEllipse(dotBrush, dotX, dotY, 10, 10);
+                }
+                using (var specBrush = new SolidBrush(Color.FromArgb(80, 255, 255, 255)))
+                {
+                    g.FillEllipse(specBrush, dotX + 2, dotY + 1, 4, 3);
+                }
+
+                // Render text manually (profile name + subtitle)
+                string text = e.Item.Text ?? "";
+                string[] parts = text.Split('|');
+                string name = parts.Length > 0 ? parts[0].Trim() : "";
+                string subtitle = parts.Length > 1 ? parts[1].Trim() : "";
+
+                g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
+
+                int textX = 28;
+                // Profile name in 10pt Bold, bright category color
+                Color brightTint = Color.FromArgb(255,
+                    Math.Min(255, tint.R + 40),
+                    Math.Min(255, tint.G + 40),
+                    Math.Min(255, tint.B + 40));
+                using (var font = new Font("Segoe UI", 10f, FontStyle.Bold))
+                using (var brush = new SolidBrush(brightTint))
+                {
+                    g.DrawString(name, font, brush, textX, 6);
+                }
+
+                // Subtitle in 7.5pt, dimmed category color
+                if (!string.IsNullOrEmpty(subtitle))
+                {
+                    Color dimTint = Color.FromArgb(160, tint.R, tint.G, tint.B);
+                    using (var font = new Font("Segoe UI", 7.5f))
+                    using (var brush = new SolidBrush(dimTint))
+                    {
+                        g.DrawString(subtitle, font, brush, textX, 26);
+                    }
+                }
+                return;
             }
-            using (var pen = new Pen(Color.FromArgb(50, tint.R, tint.G, tint.B), 1f))
+
+            // --- Section headers: disabled + bold items (category headers) ---
+            if (!e.Item.Enabled && e.Item.Font != null && e.Item.Font.Bold)
             {
-                DrawRoundRect(g, pen, rect, 4);
+                Color tint = e.Item.ForeColor;
+
+                // Gradient background: category color alpha 18 -> 0
+                using (var brush = new LinearGradientBrush(
+                    new Rectangle(0, 0, Math.Max(1, w), Math.Max(1, h)),
+                    Color.FromArgb(18, tint.R, tint.G, tint.B),
+                    Color.FromArgb(0, tint.R, tint.G, tint.B),
+                    LinearGradientMode.Horizontal))
+                {
+                    g.FillRectangle(brush, 0, 0, w, h);
+                }
+
+                // Bottom accent line: category color alpha 40
+                using (var pen = new Pen(Color.FromArgb(40, tint.R, tint.G, tint.B), 1f))
+                {
+                    int lineY = h - 1;
+                    g.DrawLine(pen, 28, lineY, w - 8, lineY);
+                }
+                return;
             }
-            // Left accent bar on hover
-            using (var brush = new SolidBrush(Color.FromArgb(140, tint.R, tint.G, tint.B)))
+
+            if (e.Item.Selected && e.Item.Enabled)
             {
-                g.FillRectangle(brush, 2, rect.Y + 3, 2, rect.Height - 6);
+                Color tint = e.Item.ForeColor;
+
+                if (rect.Width > 0 && rect.Height > 0)
+                {
+                    // Gradient fill: category-tinted with subtle horizontal gradient
+                    using (var brush = new LinearGradientBrush(
+                        rect, Color.FromArgb(35, tint.R, tint.G, tint.B),
+                        Color.FromArgb(12, tint.R, tint.G, tint.B),
+                        LinearGradientMode.Horizontal))
+                    {
+                        FillRoundRect(g, brush, rect, 5);
+                    }
+
+                    // Subtle border
+                    using (var pen = new Pen(Color.FromArgb(40, tint.R, tint.G, tint.B), 1f))
+                    {
+                        DrawRoundRect(g, pen, rect, 5);
+                    }
+                }
+
+                // Left accent bar with vertical gradient (full alpha center, fading top/bottom)
+                var barRect = new Rectangle(3, rect.Y + 2, 3, rect.Height - 4);
+                if (barRect.Width > 0 && barRect.Height > 2)
+                {
+                    using (var brush = new LinearGradientBrush(
+                        barRect,
+                        Color.FromArgb(60, tint.R, tint.G, tint.B),
+                        Color.FromArgb(60, tint.R, tint.G, tint.B),
+                        LinearGradientMode.Vertical))
+                    {
+                        var blend = new ColorBlend(3);
+                        blend.Colors = new Color[] {
+                            Color.FromArgb(60, tint.R, tint.G, tint.B),
+                            Color.FromArgb(220, tint.R, tint.G, tint.B),
+                            Color.FromArgb(60, tint.R, tint.G, tint.B)
+                        };
+                        blend.Positions = new float[] { 0f, 0.5f, 1f };
+                        brush.InterpolationColors = blend;
+                        FillRoundRect(g, brush, barRect, 1);
+                    }
+                }
+
+                // Soft circle glow behind the image area (icon glow)
+                using (var brush = new SolidBrush(Color.FromArgb(20, tint.R, tint.G, tint.B)))
+                {
+                    g.FillEllipse(brush, 2, rect.Y - 2, 28, rect.Height + 4);
+                }
+
+                // Subtle glow on the left edge
+                using (var brush = new SolidBrush(Color.FromArgb(15, tint.R, tint.G, tint.B)))
+                {
+                    g.FillRectangle(brush, 3, rect.Y, 30, rect.Height);
+                }
+
+                // Right-edge gradient fade for card depth
+                int fadeW = 30;
+                var fadeRect = new Rectangle(w - fadeW, rect.Y, fadeW, rect.Height);
+                if (fadeRect.Width > 0 && fadeRect.Height > 0)
+                {
+                    using (var brush = new LinearGradientBrush(
+                        fadeRect,
+                        Color.FromArgb(0, tint.R, tint.G, tint.B),
+                        Color.FromArgb(8, tint.R, tint.G, tint.B),
+                        LinearGradientMode.Horizontal))
+                    {
+                        g.FillRectangle(brush, fadeRect);
+                    }
+                }
+            }
+            else if (e.Item.Pressed)
+            {
+                if (rect.Width > 0 && rect.Height > 0)
+                {
+                    using (var brush = new SolidBrush(Color.FromArgb(25, 255, 255, 255)))
+                    {
+                        FillRoundRect(g, brush, rect, 5);
+                    }
+                }
             }
         }
-        else if (e.Item.Pressed)
+        catch
         {
-            using (var brush = new SolidBrush(Color.FromArgb(20, 255, 255, 255)))
-            {
-                FillRoundRect(g, brush, rect, 4);
-            }
+            // Silently swallow GDI+ rendering errors to prevent .NET popups
         }
     }
 
-    // Custom dark separators with subtle gradient
+    // Custom dark separators with elegant gradient fade
     protected override void OnRenderSeparator(ToolStripSeparatorRenderEventArgs e)
     {
-        int y = e.Item.Height / 2;
-        var g = e.Graphics;
-        int w = e.Item.Width;
-        // Gradient separator: transparent -> dim -> transparent
-        using (var brush = new LinearGradientBrush(
-            new Point(16, y), new Point(w - 16, y),
-            Color.FromArgb(0, SepColor.R, SepColor.G, SepColor.B),
-            Color.FromArgb(0, SepColor.R, SepColor.G, SepColor.B)))
+        try
         {
-            var blend = new ColorBlend(3);
-            blend.Colors = new Color[] {
-                Color.FromArgb(0, SepColor.R, SepColor.G, SepColor.B),
-                SepColor,
-                Color.FromArgb(0, SepColor.R, SepColor.G, SepColor.B)
-            };
-            blend.Positions = new float[] { 0f, 0.5f, 1f };
-            brush.InterpolationColors = blend;
-            using (var pen = new Pen(brush, 1f))
+            int y = e.Item.Height / 2;
+            var g = e.Graphics;
+            int w = e.Item.Width;
+            if (w <= 42) { base.OnRenderSeparator(e); return; }
+
+            using (var brush = new LinearGradientBrush(
+                new Point(20, y), new Point(w - 20, y),
+                Color.Transparent, Color.Transparent))
             {
-                g.DrawLine(pen, 16, y, w - 16, y);
+                var blend = new ColorBlend(5);
+                blend.Colors = new Color[] {
+                    Color.FromArgb(0, SepColor.R, SepColor.G, SepColor.B),
+                    Color.FromArgb(60, SepColor.R, SepColor.G, SepColor.B),
+                    Color.FromArgb(80, SepColor.R, SepColor.G, SepColor.B),
+                    Color.FromArgb(60, SepColor.R, SepColor.G, SepColor.B),
+                    Color.FromArgb(0, SepColor.R, SepColor.G, SepColor.B)
+                };
+                blend.Positions = new float[] { 0f, 0.2f, 0.5f, 0.8f, 1f };
+                brush.InterpolationColors = blend;
+                using (var pen = new Pen(brush, 1f))
+                {
+                    g.DrawLine(pen, 20, y, w - 20, y);
+                }
             }
         }
+        catch { base.OnRenderSeparator(e); }
     }
 
-    // Custom checked item rendering
+    // Custom checked item: glowing dot with ring
     protected override void OnRenderItemCheck(ToolStripItemImageRenderEventArgs e)
     {
-        var g = e.Graphics;
-        g.SmoothingMode = SmoothingMode.AntiAlias;
-        var r = e.ImageRectangle;
-        r.Inflate(1, 1);
-        // Draw a small color-coded dot instead of a checkmark
-        Color dotColor = e.Item.ForeColor;
-        using (var brush = new SolidBrush(dotColor))
+        try
         {
-            g.FillEllipse(brush, r.X + 2, r.Y + 2, 8, 8);
+            var g = e.Graphics;
+            g.SmoothingMode = SmoothingMode.AntiAlias;
+            var r = e.ImageRectangle;
+            Color dotColor = e.Item.ForeColor;
+
+            // Outer glow ring
+            using (var brush = new SolidBrush(Color.FromArgb(30, dotColor.R, dotColor.G, dotColor.B)))
+            {
+                g.FillEllipse(brush, r.X, r.Y, 12, 12);
+            }
+            // Inner solid dot
+            using (var brush = new SolidBrush(dotColor))
+            {
+                g.FillEllipse(brush, r.X + 2, r.Y + 2, 8, 8);
+            }
+            // Specular highlight
+            using (var brush = new SolidBrush(Color.FromArgb(60, 255, 255, 255)))
+            {
+                g.FillEllipse(brush, r.X + 3, r.Y + 3, 4, 3);
+            }
         }
+        catch {}
     }
 
-    // Dark image margin
+    // Dark image margin (skip default rendering)
     protected override void OnRenderImageMargin(ToolStripRenderEventArgs e)
     {
-        // Skip default margin rendering - keep it all dark
+        // Intentionally empty - keeps the entire background dark
+    }
+
+    // Override text rendering for cleaner anti-aliasing
+    protected override void OnRenderItemText(ToolStripItemTextRenderEventArgs e)
+    {
+        // Skip default text rendering for hero banner items (text is painted in background pass)
+        var tag = e.Item.Tag as string;
+        if (tag == "__hero_banner__") return;
+
+        e.Graphics.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
+        base.OnRenderItemText(e);
     }
 
     // Helper: Fill rounded rectangle
@@ -1220,24 +1570,24 @@ public class DarkThemeRenderer : ToolStripProfessionalRenderer
 
 public class DarkColorTable : ProfessionalColorTable
 {
-    public override Color MenuBorder { get { return Color.FromArgb(255, 55, 55, 62); } }
+    public override Color MenuBorder { get { return Color.FromArgb(255, 50, 50, 58); } }
     public override Color MenuItemBorder { get { return Color.Transparent; } }
-    public override Color MenuItemSelected { get { return Color.FromArgb(255, 50, 50, 56); } }
-    public override Color MenuItemSelectedGradientBegin { get { return Color.FromArgb(255, 45, 45, 52); } }
-    public override Color MenuItemSelectedGradientEnd { get { return Color.FromArgb(255, 45, 45, 52); } }
-    public override Color MenuItemPressedGradientBegin { get { return Color.FromArgb(255, 38, 38, 44); } }
-    public override Color MenuItemPressedGradientEnd { get { return Color.FromArgb(255, 38, 38, 44); } }
-    public override Color MenuStripGradientBegin { get { return Color.FromArgb(255, 30, 30, 34); } }
-    public override Color MenuStripGradientEnd { get { return Color.FromArgb(255, 30, 30, 34); } }
-    public override Color ToolStripDropDownBackground { get { return Color.FromArgb(255, 30, 30, 34); } }
-    public override Color ImageMarginGradientBegin { get { return Color.FromArgb(255, 30, 30, 34); } }
-    public override Color ImageMarginGradientMiddle { get { return Color.FromArgb(255, 30, 30, 34); } }
-    public override Color ImageMarginGradientEnd { get { return Color.FromArgb(255, 30, 30, 34); } }
-    public override Color SeparatorDark { get { return Color.FromArgb(255, 48, 48, 55); } }
+    public override Color MenuItemSelected { get { return Color.FromArgb(255, 42, 42, 48); } }
+    public override Color MenuItemSelectedGradientBegin { get { return Color.FromArgb(255, 38, 38, 44); } }
+    public override Color MenuItemSelectedGradientEnd { get { return Color.FromArgb(255, 38, 38, 44); } }
+    public override Color MenuItemPressedGradientBegin { get { return Color.FromArgb(255, 34, 34, 40); } }
+    public override Color MenuItemPressedGradientEnd { get { return Color.FromArgb(255, 34, 34, 40); } }
+    public override Color MenuStripGradientBegin { get { return Color.FromArgb(255, 26, 26, 30); } }
+    public override Color MenuStripGradientEnd { get { return Color.FromArgb(255, 26, 26, 30); } }
+    public override Color ToolStripDropDownBackground { get { return Color.FromArgb(255, 26, 26, 30); } }
+    public override Color ImageMarginGradientBegin { get { return Color.FromArgb(255, 26, 26, 30); } }
+    public override Color ImageMarginGradientMiddle { get { return Color.FromArgb(255, 26, 26, 30); } }
+    public override Color ImageMarginGradientEnd { get { return Color.FromArgb(255, 26, 26, 30); } }
+    public override Color SeparatorDark { get { return Color.FromArgb(255, 44, 44, 52); } }
     public override Color SeparatorLight { get { return Color.Transparent; } }
-    public override Color CheckBackground { get { return Color.FromArgb(255, 45, 45, 52); } }
-    public override Color CheckSelectedBackground { get { return Color.FromArgb(255, 55, 55, 62); } }
-    public override Color CheckPressedBackground { get { return Color.FromArgb(255, 38, 38, 44); } }
+    public override Color CheckBackground { get { return Color.FromArgb(255, 38, 38, 44); } }
+    public override Color CheckSelectedBackground { get { return Color.FromArgb(255, 48, 48, 55); } }
+    public override Color CheckPressedBackground { get { return Color.FromArgb(255, 34, 34, 40); } }
 }
 "@ -ReferencedAssemblies System.Windows.Forms,System.Drawing -ErrorAction SilentlyContinue
 
@@ -1328,10 +1678,15 @@ function Start-StartupIconSelfHeal {
     $script:StartupIconHealTimer = New-Object System.Windows.Forms.Timer
     $script:StartupIconHealTimer.Interval = 7000
     $script:StartupIconHealTimer.Add_Tick({
-        $script:StartupIconHealAttempts++
-        Invoke-NotifyIconRefresh -Reason "startup-heal-$($script:StartupIconHealAttempts)"
-        if ($script:StartupIconHealAttempts -ge 3) {
-            $script:StartupIconHealTimer.Stop()
+        try {
+            $script:StartupIconHealAttempts++
+            Invoke-NotifyIconRefresh -Reason "startup-heal-$($script:StartupIconHealAttempts)"
+        }
+        catch { try { Write-TrayLog "StartupIconHealTimer tick error: $($_.Exception.Message)" -Level "WARN" } catch {} }
+        finally {
+            if ($script:StartupIconHealAttempts -ge 3 -and $script:StartupIconHealTimer) {
+                try { $script:StartupIconHealTimer.Stop() } catch {}
+            }
         }
     })
     $script:StartupIconHealTimer.Start()
@@ -1491,18 +1846,18 @@ function Apply-Profile {
             Start-Sleep -Milliseconds 500
             Close-ProgressOverlay
 
-            $notifyType = "Info"
             if ($needsNoSyncOsdReminder) {
-                $notifyType = "Warning"
                 $msg += " | Reminder: Turn OFF Adaptive Sync/FreeSync in monitor OSD for strict No-Sync mode."
                 Play-VrrWarningSound
                 Write-TrayLog "No-Sync OSD reminder shown for transition: $previousProfileId -> $ProfileId"
+                Play-ApplySuccessIconAnimation
+                Show-ThemedToast -Title "A.B.S.O." -Message $msg -Type "Warning" -Duration 6000
             }
             else {
                 Play-SuccessSound
+                Play-ApplySuccessIconAnimation
+                Show-ThemedToast -Title "A.B.S.O." -Message $msg -Type "Success"
             }
-            Play-ApplySuccessIconAnimation
-            Show-Notification -Title "A.B.S.O." -Message $msg -Type $notifyType
 
             $script:activeProfile = $ProfileId
             $script:LastAction = "Applied: $($profile.Name)"
@@ -1631,32 +1986,29 @@ function Update-MenuState {
         # Items inside submenus (OwnerItem is a ToolStripMenuItem) vs top-level items
         $inSubmenu = ($null -ne $item.OwnerItem -and $item.OwnerItem -is [System.Windows.Forms.ToolStripMenuItem])
 
-        if ($isActive) {
-            if ($inSubmenu) {
-                $item.Text = ">> $($p.Name)"
-            } else {
-                $item.Text = "  >>  $($p.Name)"
-            }
-            $item.ForeColor = [System.Drawing.Color]::FromArgb(
-                255,
-                [Math]::Min(255, $catColor.R + 30),
-                [Math]::Min(255, $catColor.G + 30),
-                [Math]::Min(255, $catColor.B + 30)
-            )
-            $item.Font = $script:FontBold
-            $item.BackColor = Blend-Color -Base $script:Colors.Background -Overlay $catColor -Ratio 0.15
-        }
-        else {
-            if ($inSubmenu) {
+        try {
+            if ($isActive) {
                 $item.Text = $p.Name
-            } else {
-                $isFav = Test-Favorite -ProfileId $item.Tag -Config $script:TrayConfig
-                $starPrefix = if ($isFav) { "[*] " } else { "      " }
-                $item.Text = "$starPrefix$($p.Name)"
+                $item.Image = New-ActiveCheckBitmap -Color $catColor
+                $item.ForeColor = [System.Drawing.Color]::FromArgb(
+                    255,
+                    [Math]::Min(255, $catColor.R + 30),
+                    [Math]::Min(255, $catColor.G + 30),
+                    [Math]::Min(255, $catColor.B + 30)
+                )
+                $item.Font = $script:FontBold
+                $item.BackColor = Blend-Color -Base $script:Colors.Background -Overlay $catColor -Ratio 0.15
             }
-            $item.ForeColor = $catColor
-            $item.Font = $script:FontNormal
-            $item.BackColor = $script:Colors.Background
+            else {
+                $item.Text = $p.Name
+                $item.Image = New-CategoryBitmap -Category $p.Cat -Color $catColor
+                $item.ForeColor = $catColor
+                $item.Font = $script:FontNormal
+                $item.BackColor = $script:Colors.Background
+            }
+        }
+        catch {
+            Write-TrayLog "Update-MenuState icon error for $($item.Tag): $($_.Exception.Message)" -Level "ERROR"
         }
     }
     if ($script:restoreItem) { $script:restoreItem.Enabled = ($null -ne $script:activeProfile) }
@@ -1670,7 +2022,7 @@ function Update-MenuState {
         $script:notifyIcon.Text = $tooltipText
 
         if ($script:statusItem) {
-            $script:statusItem.Text = "      Active: $($p.Name)"
+            $script:statusItem.Text = "$($p.Name)|$($p.Sub)"
             $script:statusItem.ForeColor = Get-CategoryColor -Category $p.Cat -Fallback $script:Colors.AccentGreen
         }
     }
@@ -1678,7 +2030,7 @@ function Update-MenuState {
         $script:notifyIcon.Text = "A.B.S.O. - Ready"
 
         if ($script:statusItem) {
-            $script:statusItem.Text = "      Status: Ready"
+            $script:statusItem.Text = "Ready|No profile active"
             $script:statusItem.ForeColor = $script:Colors.AccentGreen
         }
     }
@@ -2171,7 +2523,7 @@ public class HotkeyMessageWindow : NativeWindow {
     $menu = New-Object System.Windows.Forms.ContextMenuStrip
     $menu.BackColor = $script:Colors.Background
     $menu.ForeColor = $script:Colors.Text
-    $menu.ShowImageMargin = $false
+    $menu.ShowImageMargin = $true
     $menu.ShowCheckMargin = $false
     try {
         $menu.Renderer = New-Object DarkThemeRenderer
@@ -2181,6 +2533,33 @@ public class HotkeyMessageWindow : NativeWindow {
         $menu.Renderer.RoundedEdges = $false
         Write-TrayLog "DarkThemeRenderer failed, using fallback: $($_.Exception.Message)" -Level "WARN"
     }
+
+    # Apply DWM rounded corners and dark mode to the context menu popup
+    $menu.Add_Opened({
+        try {
+            if ("DwmHelper" -as [type]) {
+                [DwmHelper]::SetRoundedCorners($menu.Handle, 3)
+                [DwmHelper]::SetDarkMode($menu.Handle)
+            }
+        } catch {}
+    })
+
+    # Also apply DWM to any submenu dropdowns as they open
+    $menu.Add_ItemAdded({
+        param($s, $e)
+        $item = $e.Item
+        if ($item -is [System.Windows.Forms.ToolStripMenuItem]) {
+            $item.DropDown.Add_Opened({
+                param($ds, $de)
+                try {
+                    if ("DwmHelper" -as [type]) {
+                        [DwmHelper]::SetRoundedCorners($ds.Handle, 3)
+                        [DwmHelper]::SetDarkMode($ds.Handle)
+                    }
+                } catch {}
+            })
+        }
+    })
 
     # ─── HEADER ───
 
@@ -2192,18 +2571,47 @@ public class HotkeyMessageWindow : NativeWindow {
     $header.Font = New-Object System.Drawing.Font("Segoe UI", 10, [System.Drawing.FontStyle]::Bold)
     $menu.Items.Add($header) | Out-Null
 
-    $subheader = New-Object System.Windows.Forms.ToolStripMenuItem
-    $subheader.Text = "    Adaptive Battle Station Optimizer"
-    $subheader.Enabled = $false
-    $subheader.BackColor = $script:Colors.BackgroundDark
-    $subheader.ForeColor = [System.Drawing.Color]::FromArgb(255, 160, 140, 80)
-    $subheader.Font = New-Object System.Drawing.Font("Segoe UI", 7.5)
-    $menu.Items.Add($subheader) | Out-Null
+    # ─── STATUS DASHBOARD ───
 
-    # Status/audit items — not shown in menu, but kept as state holders
-    # for Update-MenuState and Run-Audit which reference them.
-    $script:statusItem = $null
-    $script:auditStatusItem = $null
+    $sysInfo = Get-SystemInfo
+
+    $script:statusItem = New-Object System.Windows.Forms.ToolStripMenuItem
+    $script:statusItem.Tag = "__hero_banner__"
+    $script:statusItem.AutoSize = $false
+    $script:statusItem.Height = 48
+    if ($script:activeProfile) {
+        $ap = $script:Profiles[$script:activeProfile]
+        $script:statusItem.Text = "$($ap.Name)|$($ap.Sub)"
+        $script:statusItem.ForeColor = Get-CategoryColor -Category $ap.Cat -Fallback $script:Colors.AccentGreen
+    }
+    else {
+        $script:statusItem.Text = "Ready|No profile active"
+        $script:statusItem.ForeColor = $script:Colors.AccentGreen
+    }
+    $script:statusItem.Enabled = $false
+    $script:statusItem.BackColor = $script:Colors.BackgroundDark
+    $script:statusItem.Font = New-Object System.Drawing.Font("Segoe UI", 9, [System.Drawing.FontStyle]::Bold)
+    $menu.Items.Add($script:statusItem) | Out-Null
+
+    # System info line (GPU + refresh rate)
+    $sysInfoText = "$($sysInfo.GPU)  |  $($sysInfo.RefreshRate)"
+    $sysInfoItem = New-Object System.Windows.Forms.ToolStripMenuItem
+    $sysInfoItem.Text = $sysInfoText
+    $sysInfoItem.Enabled = $false
+    $sysInfoItem.BackColor = $script:Colors.BackgroundDark
+    $sysInfoItem.ForeColor = [System.Drawing.Color]::FromArgb(255, 90, 90, 100)
+    $sysInfoItem.Font = New-Object System.Drawing.Font("Consolas", 7.5)
+    $menu.Items.Add($sysInfoItem) | Out-Null
+
+    # Audit status item (hidden until audit is run)
+    $script:auditStatusItem = New-Object System.Windows.Forms.ToolStripMenuItem
+    $script:auditStatusItem.Text = ""
+    $script:auditStatusItem.Enabled = $false
+    $script:auditStatusItem.BackColor = $script:Colors.BackgroundDark
+    $script:auditStatusItem.ForeColor = $script:Colors.AccentGreen
+    $script:auditStatusItem.Font = New-Object System.Drawing.Font("Segoe UI", 8)
+    $script:auditStatusItem.Visible = $false
+    $menu.Items.Add($script:auditStatusItem) | Out-Null
 
     # ─── SEARCH ───
 
@@ -2286,7 +2694,7 @@ public class HotkeyMessageWindow : NativeWindow {
 
     if ($favProfiles.Count -gt 0) {
         $favLabel = New-Object System.Windows.Forms.ToolStripMenuItem
-        $favLabel.Text = "  FAVORITES"
+        $favLabel.Text = "FAVORITES"
         $favLabel.Enabled = $false
         $favLabel.BackColor = $script:Colors.Background
         $favLabel.ForeColor = $script:Colors.FavoriteStar
@@ -2296,11 +2704,13 @@ public class HotkeyMessageWindow : NativeWindow {
 
         foreach ($favId in $favProfiles) {
             $p = $script:Profiles[$favId]
+            $catColor = Get-CategoryColor -Category $p.Cat -Fallback $script:Colors.Text
             $item = New-Object System.Windows.Forms.ToolStripMenuItem
-            $item.Text = "  [*] $($p.Name)"
+            $item.Text = $p.Name
             $item.Tag = $favId
+            $item.Image = New-CategoryBitmap -Category $p.Cat -Color $catColor
             $item.BackColor = $script:Colors.Background
-            $item.ForeColor = Get-CategoryColor -Category $p.Cat -Fallback $script:Colors.Text
+            $item.ForeColor = $catColor
             $item.Font = New-Object System.Drawing.Font("Segoe UI", 9)
             $item.ToolTipText = "$($p.Sub)`n$($p.Desc)"
             $item.Add_Click({
@@ -2317,7 +2727,7 @@ public class HotkeyMessageWindow : NativeWindow {
     $recentProfiles = @($script:TrayConfig.recentProfiles)
     if ($recentProfiles.Count -gt 0) {
         $recentLabel = New-Object System.Windows.Forms.ToolStripMenuItem
-        $recentLabel.Text = "  RECENT"
+        $recentLabel.Text = "RECENT"
         $recentLabel.Enabled = $false
         $recentLabel.BackColor = $script:Colors.Background
         $recentLabel.ForeColor = $script:Colors.TextDim
@@ -2334,11 +2744,13 @@ public class HotkeyMessageWindow : NativeWindow {
             if ($shownRecent -ge 3) { break }
 
             $p = $script:Profiles[$rId]
+            $catColor = Dim-Color -Color (Get-CategoryColor -Category $p.Cat -Fallback $script:Colors.TextDim) -Alpha 200
             $item = New-Object System.Windows.Forms.ToolStripMenuItem
-            $item.Text = "      $($p.Name)"
+            $item.Text = $p.Name
             $item.Tag = $rId
+            $item.Image = New-CategoryBitmap -Category $p.Cat -Color $catColor
             $item.BackColor = $script:Colors.Background
-            $item.ForeColor = Dim-Color -Color (Get-CategoryColor -Category $p.Cat -Fallback $script:Colors.TextDim) -Alpha 200
+            $item.ForeColor = $catColor
             $item.Font = New-Object System.Drawing.Font("Segoe UI", 9)
             $item.ToolTipText = "$($p.Sub) - Last: $($entry.timestamp)"
             $item.Add_Click({
@@ -2355,7 +2767,7 @@ public class HotkeyMessageWindow : NativeWindow {
     $menu.Items.Add((New-Object System.Windows.Forms.ToolStripSeparator)) | Out-Null
 
     $profilesLabel = New-Object System.Windows.Forms.ToolStripMenuItem
-    $profilesLabel.Text = "  PROFILES"
+    $profilesLabel.Text = "PROFILES"
     $profilesLabel.Enabled = $false
     $profilesLabel.BackColor = $script:Colors.BackgroundDark
     $profilesLabel.ForeColor = [System.Drawing.Color]::FromArgb(255, 100, 110, 130)
@@ -2385,24 +2797,28 @@ public class HotkeyMessageWindow : NativeWindow {
         param([string]$ProfileId, [bool]$InSubmenu = $false, [bool]$ShowBadge = $false)
         $p = $script:Profiles[$ProfileId]
         $isFav = Test-Favorite -ProfileId $ProfileId -Config $script:TrayConfig
+        $catColor = Get-CategoryColor -Category $p.Cat -Fallback $script:Colors.Text
 
         $item = New-Object System.Windows.Forms.ToolStripMenuItem
-        if ($InSubmenu) {
-            $item.Text = $p.Name
-        } else {
-            $starPrefix = if ($isFav) { "[*] " } else { "      " }
-            $item.Text = "$starPrefix$($p.Name)"
-        }
+        $item.Text = $p.Name
 
-        # Set sync badge icon if applicable
-        if ($ShowBadge) {
+        # Category icon by default; sync badge overrides for variant items in submenus only
+        $badgeSet = $false
+        if ($ShowBadge -and $InSubmenu) {
             $sm = if ($p.SyncMode) { $p.SyncMode } else { "agnostic" }
             $badgeImg = New-SyncBadgeImage -SyncMode $sm
-            if ($badgeImg) { $item.Image = $badgeImg }
+            if ($badgeImg) {
+                $item.Image = $badgeImg
+                $badgeSet = $true
+            }
         }
+        if (-not $badgeSet) {
+            $item.Image = New-CategoryBitmap -Category $p.Cat -Color $catColor
+        }
+
         $item.Tag = $ProfileId
         $item.BackColor = $script:Colors.Background
-        $item.ForeColor = Get-CategoryColor -Category $p.Cat -Fallback $script:Colors.Text
+        $item.ForeColor = $catColor
         $item.Font = New-Object System.Drawing.Font("Segoe UI", 9)
 
         $tooltipText = "$($p.Sub)`n"
@@ -2463,8 +2879,9 @@ public class HotkeyMessageWindow : NativeWindow {
 
         $catColor = if ($script:CategoryColors.ContainsKey($cat)) { $script:CategoryColors[$cat] } else { $script:Colors.Text }
         $catItem = New-Object System.Windows.Forms.ToolStripMenuItem
-        $catItem.Text = "    $cat"
+        $catItem.Text = $cat
         $catItem.Tag = $cat
+        $catItem.Image = New-CategoryBitmap -Category $cat -Color $catColor
         $catItem.Enabled = $false
         $catItem.BackColor = $script:Colors.Background
         $catItem.ForeColor = $catColor
@@ -2485,8 +2902,9 @@ public class HotkeyMessageWindow : NativeWindow {
                 # Multiple profiles — create a flyout submenu
                 $firstProfile = $script:Profiles[$profileIds[0]]
                 $submenuItem = New-Object System.Windows.Forms.ToolStripMenuItem
-                $submenuItem.Text = "      $($firstProfile.Name -replace '(:|\s+-\s+).*$', '')"
+                $submenuItem.Text = ($firstProfile.Name -replace '(:|\s+-\s+).*$', '')
                 $submenuItem.Tag = $cat
+                $submenuItem.Image = New-CategoryBitmap -Category $cat -Color $catColor
                 $submenuItem.BackColor = $script:Colors.Background
                 $submenuItem.ForeColor = $catColor
                 $submenuItem.Font = New-Object System.Drawing.Font("Segoe UI", 9)
@@ -2507,8 +2925,9 @@ public class HotkeyMessageWindow : NativeWindow {
     if ($mergedOther.Count -gt 0) {
         $otherColor = if ($script:CategoryColors.ContainsKey("Other")) { $script:CategoryColors["Other"] } else { $script:Colors.Text }
         $otherCatItem = New-Object System.Windows.Forms.ToolStripMenuItem
-        $otherCatItem.Text = "    Other"
+        $otherCatItem.Text = "Other"
         $otherCatItem.Tag = "Other"
+        $otherCatItem.Image = New-CategoryBitmap -Category "Other" -Color $otherColor
         $otherCatItem.Enabled = $false
         $otherCatItem.BackColor = $script:Colors.Background
         $otherCatItem.ForeColor = $otherColor
@@ -2527,8 +2946,9 @@ public class HotkeyMessageWindow : NativeWindow {
     if ($streamingProfiles.Count -gt 0) {
         $streamColor = if ($script:CategoryColors.ContainsKey("Streaming")) { $script:CategoryColors["Streaming"] } else { $script:Colors.Text }
         $streamingSubmenu = New-Object System.Windows.Forms.ToolStripMenuItem
-        $streamingSubmenu.Text = "    Streaming"
+        $streamingSubmenu.Text = "Streaming"
         $streamingSubmenu.Tag = "Streaming"
+        $streamingSubmenu.Image = New-CategoryBitmap -Category "Streaming" -Color $streamColor
         $streamingSubmenu.BackColor = $script:Colors.Background
         $streamingSubmenu.ForeColor = $streamColor
         $streamingSubmenu.Font = New-Object System.Drawing.Font("Segoe UI", 8.5, [System.Drawing.FontStyle]::Bold)
@@ -2909,6 +3329,7 @@ finally {
     if ($script:HotkeyPressedSub) {
         try { Unregister-Event -SubscriptionId $script:HotkeyPressedSub.Id -ErrorAction SilentlyContinue } catch {}
     }
+    Close-ThemedToast
     Close-ProgressOverlay
     Close-QuickPanel
     if ($script:notifyIcon) {

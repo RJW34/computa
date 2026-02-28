@@ -71,12 +71,12 @@ function Show-QuickPanel {
     $form = New-Object System.Windows.Forms.Form
     $form.Text = ""
     $form.FormBorderStyle = [System.Windows.Forms.FormBorderStyle]::None
-    $form.BackColor = [System.Drawing.Color]::FromArgb(255, 24, 24, 28)
+    $form.BackColor = [System.Drawing.Color]::FromArgb(255, 22, 22, 26)
     $form.Size = New-Object System.Drawing.Size($panelWidth, $panelHeight)
     $form.StartPosition = [System.Windows.Forms.FormStartPosition]::Manual
     $form.TopMost = $true
     $form.ShowInTaskbar = $false
-    $form.Opacity = 0.94
+    $form.Opacity = 0
 
     # Position bottom-right
     $screen = [System.Windows.Forms.Screen]::PrimaryScreen.WorkingArea
@@ -128,10 +128,17 @@ function Show-QuickPanel {
         $topPen.Dispose()
         # Header background gradient
         $headerBrush = New-Object System.Drawing.SolidBrush(
-            [System.Drawing.Color]::FromArgb(255, 20, 20, 24)
+            [System.Drawing.Color]::FromArgb(255, 18, 18, 22)
         )
         $g.FillRectangle($headerBrush, 1, 1, ($s.Width - 2), 26)
         $headerBrush.Dispose()
+
+        # Subtle bottom edge on header
+        $edgePen = New-Object System.Drawing.Pen(
+            [System.Drawing.Color]::FromArgb(25, 230, 190, 70), 1
+        )
+        $g.DrawLine($edgePen, 8, 27, ($s.Width - 8), 27)
+        $edgePen.Dispose()
     })
 
     # Header
@@ -183,10 +190,10 @@ function Show-QuickPanel {
         $btnPanel.Cursor = [System.Windows.Forms.Cursors]::Hand
 
         if ($isActive) {
-            $btnPanel.BackColor = Blend-QPColor -Base ([System.Drawing.Color]::FromArgb(255, 24, 24, 28)) -Overlay $catColor -Ratio 0.20
+            $btnPanel.BackColor = Blend-QPColor -Base ([System.Drawing.Color]::FromArgb(255, 22, 22, 26)) -Overlay $catColor -Ratio 0.22
         }
         else {
-            $btnPanel.BackColor = Blend-QPColor -Base ([System.Drawing.Color]::FromArgb(255, 38, 38, 44)) -Overlay $catColor -Ratio 0.08
+            $btnPanel.BackColor = Blend-QPColor -Base ([System.Drawing.Color]::FromArgb(255, 32, 32, 38)) -Overlay $catColor -Ratio 0.06
         }
 
         # Custom paint for border + left accent bar
@@ -220,11 +227,46 @@ function Show-QuickPanel {
             }
         }.GetNewClosure())
 
-        # Profile name label
+        # Category icon PictureBox
+        $iconBox = New-Object System.Windows.Forms.PictureBox
+        $iconBox.Location = New-Object System.Drawing.Point(10, 14)
+        $iconBox.Size = New-Object System.Drawing.Size(16, 16)
+        $iconBox.SizeMode = [System.Windows.Forms.PictureBoxSizeMode]::Zoom
+        $iconBox.BackColor = [System.Drawing.Color]::Transparent
+        $iconBox.Cursor = [System.Windows.Forms.Cursors]::Hand
+        if (Get-Command New-CategoryBitmap -ErrorAction SilentlyContinue) {
+            $iconBox.Image = New-CategoryBitmap -Category $catName -Color $catColor
+        }
+        $btnPanel.Controls.Add($iconBox)
+
+        # Active glowing dot indicator
+        if ($isActive) {
+            $dotPanel = New-Object System.Windows.Forms.Panel
+            $dotPanel.Location = New-Object System.Drawing.Point(($panelWidth - $padding * 2 - 22), 16)
+            $dotPanel.Size = New-Object System.Drawing.Size(12, 12)
+            $dotPanel.BackColor = [System.Drawing.Color]::Transparent
+            $capturedDotColor = $catColor
+            $dotPanel.Add_Paint({
+                param($s, $e)
+                $dg = $e.Graphics
+                $dg.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
+                $glowB = New-Object System.Drawing.SolidBrush(
+                    [System.Drawing.Color]::FromArgb(40, $capturedDotColor.R, $capturedDotColor.G, $capturedDotColor.B)
+                )
+                $dg.FillEllipse($glowB, 0, 0, 11, 11)
+                $glowB.Dispose()
+                $dotB = New-Object System.Drawing.SolidBrush($capturedDotColor)
+                $dg.FillEllipse($dotB, 2, 2, 8, 8)
+                $dotB.Dispose()
+            }.GetNewClosure())
+            $btnPanel.Controls.Add($dotPanel)
+        }
+
+        # Profile name label (shifted right for icon)
         $nameLabel = New-Object System.Windows.Forms.Label
         $nameLabel.Text = $entry.Profile.Name
-        $nameLabel.Location = New-Object System.Drawing.Point(10, 4)
-        $nameLabel.Size = New-Object System.Drawing.Size(($panelWidth - $padding * 2 - 16), 18)
+        $nameLabel.Location = New-Object System.Drawing.Point(32, 4)
+        $nameLabel.Size = New-Object System.Drawing.Size(($panelWidth - $padding * 2 - 38), 18)
         $nameLabel.ForeColor = if ($isActive) {
             [System.Drawing.Color]::FromArgb(255,
                 [Math]::Min(255, $catColor.R + 30),
@@ -245,8 +287,8 @@ function Show-QuickPanel {
         $subLabel = New-Object System.Windows.Forms.Label
         $subText = if ($entry.Profile.Sub) { $entry.Profile.Sub } else { $entry.Profile.Cat }
         $subLabel.Text = $subText
-        $subLabel.Location = New-Object System.Drawing.Point(10, 22)
-        $subLabel.Size = New-Object System.Drawing.Size(($panelWidth - $padding * 2 - 16), 16)
+        $subLabel.Location = New-Object System.Drawing.Point(32, 22)
+        $subLabel.Size = New-Object System.Drawing.Size(($panelWidth - $padding * 2 - 38), 16)
         $subLabel.ForeColor = [System.Drawing.Color]::FromArgb(160, $catColor.R, $catColor.G, $catColor.B)
         $subLabel.Font = New-Object System.Drawing.Font("Segoe UI", 7)
         $subLabel.BackColor = [System.Drawing.Color]::Transparent
@@ -267,6 +309,8 @@ function Show-QuickPanel {
         $nameLabel.Add_MouseLeave($leaveAction)
         $subLabel.Add_MouseEnter($hoverAction)
         $subLabel.Add_MouseLeave($leaveAction)
+        $iconBox.Add_MouseEnter($hoverAction)
+        $iconBox.Add_MouseLeave($leaveAction)
         $btnPanel.Add_MouseEnter($panelHoverAction)
         $btnPanel.Add_MouseLeave($panelLeaveAction)
 
@@ -278,6 +322,7 @@ function Show-QuickPanel {
         $btnPanel.Add_Click($clickAction)
         $nameLabel.Add_Click($clickAction)
         $subLabel.Add_Click($clickAction)
+        $iconBox.Add_Click($clickAction)
 
         $form.Controls.Add($btnPanel)
         $y += $btnHeight + 5
@@ -286,6 +331,38 @@ function Show-QuickPanel {
     $script:QuickPanelForm = $form
     $script:QuickPanelVisible = $true
     $form.Show()
+
+    # Apply DWM rounded corners, dark mode, and shadow
+    try {
+        if ("DwmHelper" -as [type]) {
+            Apply-DwmWindowEffects -Form $form -CornerStyle 3 -BorderColorRGB @(220, 180, 70)
+        }
+    } catch {}
+
+    # Fade-in animation
+    $qpFadeTimer = New-Object System.Windows.Forms.Timer
+    $qpFadeTimer.Interval = 16
+    $capturedForm = $form
+    $qpFadeTimer.Add_Tick({
+        try {
+            if ($capturedForm -and -not $capturedForm.IsDisposed) {
+                $newOp = $capturedForm.Opacity + 0.12
+                if ($newOp -ge 0.95) {
+                    $capturedForm.Opacity = 0.95
+                    $qpFadeTimer.Stop()
+                    $qpFadeTimer.Dispose()
+                }
+                else {
+                    $capturedForm.Opacity = $newOp
+                }
+            }
+            else {
+                $qpFadeTimer.Stop()
+                $qpFadeTimer.Dispose()
+            }
+        } catch { try { $qpFadeTimer.Stop(); $qpFadeTimer.Dispose() } catch {} }
+    })
+    $qpFadeTimer.Start()
 }
 
 function Close-QuickPanel {

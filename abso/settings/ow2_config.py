@@ -79,6 +79,7 @@ class OW2ConfigHandler(SettingsHandler):
         "triple_buffering": "TripleBufferingEnabled",
         "show_fps": "ShowFPSCounter",
         "show_latency": "ShowIND",
+        "hdr": "HDR",
     }
 
     # Settings that accept bool-like input and are stored as "0"/"1" in the INI.
@@ -86,6 +87,7 @@ class OW2ConfigHandler(SettingsHandler):
     BOOL_SETTINGS: frozenset[str] = frozenset({
         "vsync", "reduce_buffering", "dynamic_render_scale",
         "upscaling", "triple_buffering", "show_fps", "show_latency",
+        "hdr",
     })
 
     # Keys that must never be mutated by automation.

@@ -410,6 +410,16 @@ function New-CategoryIcon {
             $g.DrawLine($pen, 8, 10, 8, 13)
             $g.DrawLine($pen, 5, 13, 11, 13)
         }
+        "Streaming" {
+            # Broadcast/signal waves icon
+            $g.DrawArc($pen, 2, 4, 12, 12, 220, 100)
+            $g.DrawArc($pen, 4, 6, 8, 8, 220, 100)
+            $g.DrawArc($pen, 6, 8, 4, 4, 220, 100)
+            # Center dot
+            $dotBrush = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::White)
+            $g.FillEllipse($dotBrush, 7, 11, 3, 3)
+            $dotBrush.Dispose()
+        }
         default {
             # Star
             $g.DrawLine($pen, 8, 2, 8, 14)
@@ -429,6 +439,133 @@ function New-CategoryIcon {
     [IconHelper]::DestroyIcon($hIcon) | Out-Null
     $bmp.Dispose()
     return $icon
+}
+
+function New-CategoryBitmap {
+    <#
+    .SYNOPSIS
+    Creates a 16x16 bitmap for a profile category using a specified color.
+    Identical drawing to New-CategoryIcon but returns a Bitmap (for menu item .Image).
+    .PARAMETER Category
+    One of: Fighting, ARPG, Shooter, Productivity, Streaming, Other
+    .PARAMETER Color
+    The color used for the pen strokes and fills.
+    #>
+    param(
+        [string]$Category,
+        [System.Drawing.Color]$Color = [System.Drawing.Color]::White
+    )
+
+    $bmp = New-Object System.Drawing.Bitmap(16, 16)
+    $g = [System.Drawing.Graphics]::FromImage($bmp)
+    $g.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
+    $g.Clear([System.Drawing.Color]::Transparent)
+
+    $pen = New-Object System.Drawing.Pen($Color, 1.2)
+    $pen.StartCap = [System.Drawing.Drawing2D.LineCap]::Round
+    $pen.EndCap = [System.Drawing.Drawing2D.LineCap]::Round
+
+    switch ($Category) {
+        "Fighting" {
+            # Crossed swords
+            $g.DrawLine($pen, 3, 12, 13, 2)
+            $g.DrawLine($pen, 13, 12, 3, 2)
+            $g.DrawLine($pen, 2, 13, 5, 10)
+            $g.DrawLine($pen, 11, 10, 14, 13)
+        }
+        "ARPG" {
+            # Shield shape
+            $points = @(
+                (New-Object System.Drawing.PointF(8, 2)),
+                (New-Object System.Drawing.PointF(13, 4)),
+                (New-Object System.Drawing.PointF(12, 10)),
+                (New-Object System.Drawing.PointF(8, 14)),
+                (New-Object System.Drawing.PointF(4, 10)),
+                (New-Object System.Drawing.PointF(3, 4))
+            )
+            $g.DrawPolygon($pen, $points)
+        }
+        "Shooter" {
+            # Crosshair
+            $g.DrawEllipse($pen, 4, 4, 8, 8)
+            $g.DrawLine($pen, 8, 1, 8, 5)
+            $g.DrawLine($pen, 8, 11, 8, 15)
+            $g.DrawLine($pen, 1, 8, 5, 8)
+            $g.DrawLine($pen, 11, 8, 15, 8)
+        }
+        "Productivity" {
+            # Monitor
+            $g.DrawRectangle($pen, 2, 2, 12, 8)
+            $g.DrawLine($pen, 8, 10, 8, 13)
+            $g.DrawLine($pen, 5, 13, 11, 13)
+        }
+        "Streaming" {
+            # Broadcast/signal waves
+            $g.DrawArc($pen, 2, 4, 12, 12, 220, 100)
+            $g.DrawArc($pen, 4, 6, 8, 8, 220, 100)
+            $g.DrawArc($pen, 6, 8, 4, 4, 220, 100)
+            $dotBrush = New-Object System.Drawing.SolidBrush($Color)
+            $g.FillEllipse($dotBrush, 7, 11, 3, 3)
+            $dotBrush.Dispose()
+        }
+        default {
+            # Star
+            $g.DrawLine($pen, 8, 2, 8, 14)
+            $g.DrawLine($pen, 2, 8, 14, 8)
+            $g.DrawLine($pen, 4, 4, 12, 12)
+            $g.DrawLine($pen, 12, 4, 4, 12)
+        }
+    }
+
+    $pen.Dispose()
+    $g.Dispose()
+    return $bmp
+}
+
+function New-ActiveCheckBitmap {
+    <#
+    .SYNOPSIS
+    Creates a 16x16 bitmap with a category-colored filled circle, white checkmark, and outer glow ring.
+    Used to mark the currently active profile.
+    .PARAMETER Color
+    The category color for the circle and glow.
+    #>
+    param([System.Drawing.Color]$Color)
+
+    $bmp = New-Object System.Drawing.Bitmap(16, 16)
+    $g = [System.Drawing.Graphics]::FromImage($bmp)
+    $g.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
+    $g.Clear([System.Drawing.Color]::Transparent)
+
+    # Outer glow ring
+    $glowBrush = New-Object System.Drawing.SolidBrush(
+        [System.Drawing.Color]::FromArgb(50, $Color.R, $Color.G, $Color.B)
+    )
+    $g.FillEllipse($glowBrush, 0, 0, 15, 15)
+    $glowBrush.Dispose()
+
+    # Main filled circle
+    $mainBrush = New-Object System.Drawing.SolidBrush($Color)
+    $g.FillEllipse($mainBrush, 2, 2, 12, 12)
+    $mainBrush.Dispose()
+
+    # White checkmark
+    $pen = New-Object System.Drawing.Pen([System.Drawing.Color]::White, 1.8)
+    $pen.StartCap = [System.Drawing.Drawing2D.LineCap]::Round
+    $pen.EndCap = [System.Drawing.Drawing2D.LineCap]::Round
+    $g.DrawLine($pen, 5, 8, 7, 10.5)
+    $g.DrawLine($pen, 7, 10.5, 11, 5.5)
+    $pen.Dispose()
+
+    # Specular highlight
+    $highlightBrush = New-Object System.Drawing.SolidBrush(
+        [System.Drawing.Color]::FromArgb(70, 255, 255, 255)
+    )
+    $g.FillEllipse($highlightBrush, 4, 3, 5, 3)
+    $highlightBrush.Dispose()
+
+    $g.Dispose()
+    return $bmp
 }
 
 function New-SyncBadgeImage {

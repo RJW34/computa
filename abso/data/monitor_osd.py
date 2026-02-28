@@ -49,6 +49,11 @@ _MONITOR_DB: list[MonitorOSDProfile] = [
                     reason="Lowest input lag processing pipeline.",
                 ),
                 OSDRecommendation(
+                    setting="Color Gamut (SDR only)",
+                    value="Use 'sRGB' picture mode, or stay on 'Game Optimizer' and lower digital vibrance",
+                    reason="OLED native gamut is DCI-P3. SDR games output sRGB; the wider gamut causes oversaturation. Switch to 'sRGB' mode for accurate colors (some settings restricted), or compensate via digital vibrance if you need Game Optimizer's lowest input lag.",
+                ),
+                OSDRecommendation(
                     setting="Black Stabilizer",
                     value="60-70",
                     reason="Improves shadow visibility without washing out colors.",

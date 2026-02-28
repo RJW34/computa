@@ -210,12 +210,12 @@ function Show-SettingsPanel {
 
     $form = New-Object System.Windows.Forms.Form
     $form.Text = "A.B.S.O. Settings"
-    $form.Size = New-Object System.Drawing.Size(400, 420)
+    $form.Size = New-Object System.Drawing.Size(420, 470)
     $form.FormBorderStyle = [System.Windows.Forms.FormBorderStyle]::FixedDialog
     $form.MaximizeBox = $false
     $form.StartPosition = [System.Windows.Forms.FormStartPosition]::CenterScreen
-    $form.BackColor = [System.Drawing.Color]::FromArgb(255, 32, 32, 36)
-    $form.ForeColor = [System.Drawing.Color]::FromArgb(255, 220, 220, 220)
+    $form.BackColor = [System.Drawing.Color]::FromArgb(255, 26, 26, 30)
+    $form.ForeColor = [System.Drawing.Color]::FromArgb(255, 225, 225, 230)
     $form.Font = New-Object System.Drawing.Font("Segoe UI", 9)
     $form.TopMost = $true
 
@@ -243,8 +243,8 @@ function Show-SettingsPanel {
     $defCombo.Location = New-Object System.Drawing.Point(16, $y)
     $defCombo.Size = New-Object System.Drawing.Size(350, 28)
     $defCombo.DropDownStyle = [System.Windows.Forms.ComboBoxStyle]::DropDownList
-    $defCombo.BackColor = [System.Drawing.Color]::FromArgb(255, 50, 50, 55)
-    $defCombo.ForeColor = [System.Drawing.Color]::FromArgb(255, 220, 220, 220)
+    $defCombo.BackColor = [System.Drawing.Color]::FromArgb(255, 38, 38, 44)
+    $defCombo.ForeColor = [System.Drawing.Color]::FromArgb(255, 225, 225, 230)
     $defCombo.Items.Add("(None)") | Out-Null
     # Populate with available profiles
     if ($script:Profiles) {
@@ -265,6 +265,37 @@ function Show-SettingsPanel {
     }
     $form.Controls.Add($defCombo)
     $y += 36
+
+    # Gradient separator (gold gradient line)
+    $sep1 = New-Object System.Windows.Forms.Panel
+    $sep1.Location = New-Object System.Drawing.Point(16, $y)
+    $sep1.Size = New-Object System.Drawing.Size(350, 3)
+    $sep1.BackColor = [System.Drawing.Color]::Transparent
+    $sep1.Add_Paint({
+        param($s, $e)
+        $sg = $e.Graphics
+        $goldColor = [System.Drawing.Color]::FromArgb(255, 220, 180, 70)
+        $gradBrush = New-Object System.Drawing.Drawing2D.LinearGradientBrush(
+            (New-Object System.Drawing.Point(0, 1)),
+            (New-Object System.Drawing.Point($s.Width, 1)),
+            [System.Drawing.Color]::FromArgb(0, $goldColor.R, $goldColor.G, $goldColor.B),
+            [System.Drawing.Color]::FromArgb(0, $goldColor.R, $goldColor.G, $goldColor.B)
+        )
+        $blend = New-Object System.Drawing.Drawing2D.ColorBlend(3)
+        $blend.Colors = @(
+            [System.Drawing.Color]::FromArgb(0, $goldColor.R, $goldColor.G, $goldColor.B),
+            [System.Drawing.Color]::FromArgb(80, $goldColor.R, $goldColor.G, $goldColor.B),
+            [System.Drawing.Color]::FromArgb(0, $goldColor.R, $goldColor.G, $goldColor.B)
+        )
+        $blend.Positions = @([float]0, [float]0.5, [float]1)
+        $gradBrush.InterpolationColors = $blend
+        $gradPen = New-Object System.Drawing.Pen($gradBrush, 1)
+        $sg.DrawLine($gradPen, 0, 1, $s.Width, 1)
+        $gradPen.Dispose()
+        $gradBrush.Dispose()
+    })
+    $form.Controls.Add($sep1)
+    $y += 12
 
     # --- Audio Section ---
     $audioLabel = New-Object System.Windows.Forms.Label
@@ -298,7 +329,7 @@ function Show-SettingsPanel {
     $volTrack.Maximum = 100
     $volTrack.Value = [int]($Config.soundVolume * 100)
     $volTrack.TickFrequency = 25
-    $volTrack.BackColor = [System.Drawing.Color]::FromArgb(255, 32, 32, 36)
+    $volTrack.BackColor = [System.Drawing.Color]::FromArgb(255, 26, 26, 30)
     $form.Controls.Add($volTrack)
 
     $volValueLabel = New-Object System.Windows.Forms.Label
@@ -311,6 +342,37 @@ function Show-SettingsPanel {
         $volValueLabel.Text = "$($volTrack.Value)%"
     })
     $y += 48
+
+    # Gradient separator (gold gradient line)
+    $sep2 = New-Object System.Windows.Forms.Panel
+    $sep2.Location = New-Object System.Drawing.Point(16, $y)
+    $sep2.Size = New-Object System.Drawing.Size(350, 3)
+    $sep2.BackColor = [System.Drawing.Color]::Transparent
+    $sep2.Add_Paint({
+        param($s, $e)
+        $sg = $e.Graphics
+        $goldColor = [System.Drawing.Color]::FromArgb(255, 220, 180, 70)
+        $gradBrush = New-Object System.Drawing.Drawing2D.LinearGradientBrush(
+            (New-Object System.Drawing.Point(0, 1)),
+            (New-Object System.Drawing.Point($s.Width, 1)),
+            [System.Drawing.Color]::FromArgb(0, $goldColor.R, $goldColor.G, $goldColor.B),
+            [System.Drawing.Color]::FromArgb(0, $goldColor.R, $goldColor.G, $goldColor.B)
+        )
+        $blend = New-Object System.Drawing.Drawing2D.ColorBlend(3)
+        $blend.Colors = @(
+            [System.Drawing.Color]::FromArgb(0, $goldColor.R, $goldColor.G, $goldColor.B),
+            [System.Drawing.Color]::FromArgb(80, $goldColor.R, $goldColor.G, $goldColor.B),
+            [System.Drawing.Color]::FromArgb(0, $goldColor.R, $goldColor.G, $goldColor.B)
+        )
+        $blend.Positions = @([float]0, [float]0.5, [float]1)
+        $gradBrush.InterpolationColors = $blend
+        $gradPen = New-Object System.Drawing.Pen($gradBrush, 1)
+        $sg.DrawLine($gradPen, 0, 1, $s.Width, 1)
+        $gradPen.Dispose()
+        $gradBrush.Dispose()
+    })
+    $form.Controls.Add($sep2)
+    $y += 12
 
     # --- Hotkeys Section ---
     $hkLabel = New-Object System.Windows.Forms.Label
@@ -332,8 +394,8 @@ function Show-SettingsPanel {
     $hk1Text.Text = $Config.hotkeys.openMenu
     $hk1Text.Location = New-Object System.Drawing.Point(120, $y)
     $hk1Text.Size = New-Object System.Drawing.Size(200, 26)
-    $hk1Text.BackColor = [System.Drawing.Color]::FromArgb(255, 50, 50, 55)
-    $hk1Text.ForeColor = [System.Drawing.Color]::FromArgb(255, 220, 220, 220)
+    $hk1Text.BackColor = [System.Drawing.Color]::FromArgb(255, 38, 38, 44)
+    $hk1Text.ForeColor = [System.Drawing.Color]::FromArgb(255, 225, 225, 230)
     $hk1Text.ReadOnly = $true
     $form.Controls.Add($hk1Text)
     $y += 32
@@ -348,8 +410,8 @@ function Show-SettingsPanel {
     $hk2Text.Text = $Config.hotkeys.restore
     $hk2Text.Location = New-Object System.Drawing.Point(120, $y)
     $hk2Text.Size = New-Object System.Drawing.Size(200, 26)
-    $hk2Text.BackColor = [System.Drawing.Color]::FromArgb(255, 50, 50, 55)
-    $hk2Text.ForeColor = [System.Drawing.Color]::FromArgb(255, 220, 220, 220)
+    $hk2Text.BackColor = [System.Drawing.Color]::FromArgb(255, 38, 38, 44)
+    $hk2Text.ForeColor = [System.Drawing.Color]::FromArgb(255, 225, 225, 230)
     $hk2Text.ReadOnly = $true
     $form.Controls.Add($hk2Text)
     $y += 48
@@ -357,12 +419,14 @@ function Show-SettingsPanel {
     # --- Save / Close Buttons ---
     $saveBtn = New-Object System.Windows.Forms.Button
     $saveBtn.Text = "Save"
-    $saveBtn.Location = New-Object System.Drawing.Point(200, ($y + 10))
-    $saveBtn.Size = New-Object System.Drawing.Size(80, 32)
-    $saveBtn.BackColor = [System.Drawing.Color]::FromArgb(255, 90, 200, 120)
-    $saveBtn.ForeColor = [System.Drawing.Color]::FromArgb(255, 20, 20, 20)
+    $saveBtn.Location = New-Object System.Drawing.Point(210, ($y + 10))
+    $saveBtn.Size = New-Object System.Drawing.Size(90, 34)
+    $saveBtn.BackColor = [System.Drawing.Color]::FromArgb(255, 70, 190, 110)
+    $saveBtn.ForeColor = [System.Drawing.Color]::FromArgb(255, 16, 16, 16)
     $saveBtn.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
-    $saveBtn.Font = New-Object System.Drawing.Font("Segoe UI", 9, [System.Drawing.FontStyle]::Bold)
+    $saveBtn.FlatAppearance.BorderSize = 0
+    $saveBtn.Font = New-Object System.Drawing.Font("Segoe UI Semibold", 9)
+    $saveBtn.Cursor = [System.Windows.Forms.Cursors]::Hand
     $saveBtn.Add_Click({
         $Config.soundEnabled = $soundCheck.Checked
         $Config.soundVolume = $volTrack.Value / 100.0
@@ -381,11 +445,14 @@ function Show-SettingsPanel {
 
     $closeBtn = New-Object System.Windows.Forms.Button
     $closeBtn.Text = "Close"
-    $closeBtn.Location = New-Object System.Drawing.Point(290, ($y + 10))
-    $closeBtn.Size = New-Object System.Drawing.Size(80, 32)
-    $closeBtn.BackColor = [System.Drawing.Color]::FromArgb(255, 60, 60, 65)
-    $closeBtn.ForeColor = [System.Drawing.Color]::FromArgb(255, 200, 200, 200)
+    $closeBtn.Location = New-Object System.Drawing.Point(310, ($y + 10))
+    $closeBtn.Size = New-Object System.Drawing.Size(90, 34)
+    $closeBtn.BackColor = [System.Drawing.Color]::FromArgb(255, 50, 50, 56)
+    $closeBtn.ForeColor = [System.Drawing.Color]::FromArgb(255, 190, 190, 195)
     $closeBtn.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
+    $closeBtn.FlatAppearance.BorderSize = 0
+    $closeBtn.Font = New-Object System.Drawing.Font("Segoe UI", 9)
+    $closeBtn.Cursor = [System.Windows.Forms.Cursors]::Hand
     $closeBtn.Add_Click({ $form.Close() })
     $form.Controls.Add($closeBtn)
 
@@ -395,6 +462,18 @@ function Show-SettingsPanel {
         $script:SettingsForm = $null
     })
     $form.Show()
+
+    # Apply full DWM effects (rounded corners, dark mode, shadow, border color)
+    try {
+        if (Get-Command Apply-DwmWindowEffects -ErrorAction SilentlyContinue) {
+            Apply-DwmWindowEffects -Form $form -CornerStyle 2 -BorderColorRGB @(230, 190, 70)
+        }
+        elseif ("DwmHelper" -as [type]) {
+            [DwmHelper]::SetDarkMode($form.Handle)
+            $colorRef = 70 -shl 16 -bor 190 -shl 8 -bor 230
+            [DwmHelper]::SetBorderColor($form.Handle, $colorRef)
+        }
+    } catch {}
 }
 
 # ============================================================================

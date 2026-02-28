@@ -47,6 +47,7 @@ class _Overwatch2BaseProfile(ReflexShooterBaseProfile):
                 "render_scale": 0,               # 100%
                 "upscaling": False,              # Disabled
                 "triple_buffering": False,       # Off
+                "hdr": False,                    # Off — prevents blown-out SDR from OW2 internal HDR pipeline
                 "gfx_preset": 1,                 # Low
                 "effects_quality": 1,            # Low
                 "texture_detail": 1,             # Low
@@ -277,6 +278,10 @@ class Overwatch2GSyncHDRProfile(_Overwatch2BaseProfile):
                 "digital_vibrance": 50,
                 "show_osd_guidance": True,
                 "game_type": "competitive_fps",
+            },
+            "OW2ConfigHandler": {
+                **base.get("OW2ConfigHandler", {}),
+                "hdr": True,  # Native HDR — OW2 handles tone mapping for OLED/Mini-LED
             },
         })
         return base
