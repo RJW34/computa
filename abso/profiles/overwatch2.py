@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 from abso.profiles.profile_bases import ReflexShooterBaseProfile
+
+if TYPE_CHECKING:
+    from abso.settings.base import SettingsHandler
 
 
 class _Overwatch2BaseProfile(ReflexShooterBaseProfile):
@@ -19,6 +22,13 @@ class _Overwatch2BaseProfile(ReflexShooterBaseProfile):
         # Overwatch 2 uses DX11 in most competitive configurations.
         return "dx11"
 
+    def get_handlers(self) -> list[SettingsHandler]:
+        from abso.settings.ow2_config import OW2ConfigHandler
+
+        handlers = super().get_handlers()
+        handlers.append(OW2ConfigHandler())
+        return handlers
+
     def _base_overrides(self) -> dict[str, dict[str, Any]]:
         return {
             "WindowsSettingsHandler": {
@@ -28,6 +38,22 @@ class _Overwatch2BaseProfile(ReflexShooterBaseProfile):
             "GraphicsSettingsHandler": {
                 # Keep MPO enabled unless explicitly troubleshooting compositor issues.
                 "disable_mpo": False,
+            },
+            "OW2ConfigHandler": {
+                "window_mode": 0,               # Fullscreen
+                "vsync": False,                  # Off
+                "reduce_buffering": True,        # On
+                "dynamic_render_scale": False,   # Off
+                "render_scale": 0,               # 100%
+                "upscaling": False,              # Disabled
+                "triple_buffering": False,       # Off
+                "gfx_preset": 1,                 # Low
+                "effects_quality": 1,            # Low
+                "texture_detail": 1,             # Low
+                "model_quality": 1,              # Low
+                "aa_detail": 0,                  # Off
+                "show_fps": True,
+                "show_latency": True,
             },
         }
 
@@ -71,6 +97,10 @@ class Overwatch2Profile(_Overwatch2BaseProfile):
                 "profile_name": "Overwatch 2",
                 # Enforce global no-sync state for deterministic No-SYNC profile transitions.
                 "global_vrr_mode": "off",
+            },
+            "OW2ConfigHandler": {
+                # No-sync: uncapped / high fixed cap for minimum latency.
+                "frame_rate_cap": 400,
             },
         }
 
@@ -233,7 +263,8 @@ class Overwatch2GSyncHDRProfile(_Overwatch2BaseProfile):
         return True
 
     def _base_overrides(self) -> dict[str, dict[str, Any]]:
-        return {
+        base = super()._base_overrides()
+        base.update({
             "WindowsSettingsHandler": {
                 "hdr": True,
                 "auto_hdr": False,
@@ -247,7 +278,8 @@ class Overwatch2GSyncHDRProfile(_Overwatch2BaseProfile):
                 "show_osd_guidance": True,
                 "game_type": "competitive_fps",
             },
-        }
+        })
+        return base
 
     def _variant_overrides(self) -> dict[str, dict[str, Any]]:
         return {
