@@ -186,6 +186,14 @@ class Overwatch2GSyncProfile(_Overwatch2BaseProfile):
                 # Ensure global G-SYNC is enabled before launching OW2.
                 "global_vrr_mode": "fullscreen_only",
             },
+            "ColorProfileSettingsHandler": {
+                # Slightly below neutral (50) to compensate for DCI-P3 oversaturation in SDR.
+                "digital_vibrance": 45,
+            },
+            "OW2ConfigHandler": {
+                # Remove any pre-existing in-game cap; NVCP auto_vrr_fps_cap handles the real limit.
+                "frame_rate_cap": 400,
+            },
         }
 
     def get_in_game_settings(self) -> list[dict[str, str]]:
@@ -293,6 +301,10 @@ class Overwatch2GSyncHDRProfile(_Overwatch2BaseProfile):
                 "profile_name": "Overwatch 2",
                 "auto_vrr_fps_cap": True,
                 "global_vrr_mode": "fullscreen_only",
+            },
+            "OW2ConfigHandler": {
+                # Remove any pre-existing in-game cap; NVCP auto_vrr_fps_cap handles the real limit.
+                "frame_rate_cap": 400,
             },
         }
 
