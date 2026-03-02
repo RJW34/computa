@@ -538,14 +538,22 @@ class NvidiaSettingsHandler(SettingsHandler):
         stale settings (e.g., FRL=0) that interfere if the driver falls
         back to them.
 
+        Uses ``target_profile_name`` (the DRS profile name being actively
+        written, e.g. "Overwatch 2") as the base for pattern matching so
+        variant suffixes like "Overwatch 2 - GSYNC" are correctly caught.
+
         Args:
             manager: DRSProfileManager instance.
-            target_profile_name: The profile name we're about to create/update.
-            game_name: Display name of the game.
+            target_profile_name: The DRS profile name we're about to create/update.
+            game_name: Display name of the game (may include variant suffix).
         """
         try:
             all_profiles = manager.list_profiles(include_predefined=False)
             stale_names: list[str] = []
+
+            # Use the DRS profile name as base (e.g. "Overwatch 2"), not the
+            # display name which may already contain a variant suffix.
+            base_lower = target_profile_name.lower()
 
             for profile in all_profiles:
                 name = profile.get("name", "")
@@ -559,13 +567,12 @@ class NvidiaSettingsHandler(SettingsHandler):
                 if num_apps > 0:
                     continue
 
-                # Match patterns: "ABSO - <game>", "<game> - <variant>"
+                # Match patterns: "ABSO - <anything>", "<base> - <variant>"
                 name_lower = name.lower()
-                game_lower = game_name.lower()
                 if (
                     name_lower.startswith("abso -")
-                    or name_lower.startswith(f"{game_lower} -")
-                    or name_lower.startswith(f"{game_lower} –")  # en-dash variant
+                    or name_lower.startswith(f"{base_lower} -")
+                    or name_lower.startswith(f"{base_lower} –")  # en-dash variant
                 ):
                     stale_names.append(name)
 
