@@ -70,6 +70,7 @@ class OW2ConfigHandler(SettingsHandler):
         "dynamic_render_scale": "UseGPUScale",
         "dynamic_render_scale_v2": "DynamicRenderScale",
         "frame_rate_cap": "FrameRateCap",
+        "use_custom_frame_rates": "UseCustomFrameRates",
         "render_scale": "RenderScale",
         "gfx_preset": "GFXPresetLevel",
         "effects_quality": "EffectsQuality",
@@ -87,6 +88,7 @@ class OW2ConfigHandler(SettingsHandler):
     # Kept as a class constant so new boolean keys only need one addition.
     BOOL_SETTINGS: frozenset[str] = frozenset({
         "vsync", "reduce_buffering", "dynamic_render_scale", "dynamic_render_scale_v2",
+        "use_custom_frame_rates",
         "upscaling", "triple_buffering", "show_fps", "show_latency",
         "hdr",
     })
@@ -199,6 +201,11 @@ class OW2ConfigHandler(SettingsHandler):
                     )
             except Exception as e:
                 logger.warning("OW2 auto VRR FPS cap detection failed: %s", e)
+
+        # OW2 ignores FrameRateCap unless UseCustomFrameRates is "1".
+        # Automatically enable it whenever we set a custom cap.
+        if "frame_rate_cap" in settings and "use_custom_frame_rates" not in settings:
+            settings["use_custom_frame_rates"] = True
 
         invalid = validate_allowed_keys(
             set(settings.keys()),
