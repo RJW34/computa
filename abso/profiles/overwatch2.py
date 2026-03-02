@@ -43,7 +43,8 @@ class _Overwatch2BaseProfile(ReflexShooterBaseProfile):
                 "window_mode": 0,               # Fullscreen
                 "vsync": False,                  # Off
                 "reduce_buffering": True,        # On
-                "dynamic_render_scale": False,   # Off
+                "dynamic_render_scale": False,   # Off (UseGPUScale)
+                "dynamic_render_scale_v2": False,  # Off (DynamicRenderScale — current key)
                 "render_scale": 0,               # 100%
                 "upscaling": False,              # Disabled
                 "triple_buffering": False,       # Off
@@ -191,8 +192,8 @@ class Overwatch2GSyncProfile(_Overwatch2BaseProfile):
                 "digital_vibrance": 45,
             },
             "OW2ConfigHandler": {
-                # Remove any pre-existing in-game cap; NVCP auto_vrr_fps_cap handles the real limit.
-                "frame_rate_cap": 400,
+                # Set in-game cap to refresh - 3 so OW2 and NVCP agree on the VRR target.
+                "auto_vrr_fps_cap": True,
             },
         }
 
@@ -219,8 +220,8 @@ class Overwatch2GSyncProfile(_Overwatch2BaseProfile):
             {
                 "category": "Display",
                 "setting": "Frame Rate Cap",
-                "value": "Refresh rate - 3",
-                "reason": "Keeps NVCP VSync from engaging while preserving VRR tear-free output.",
+                "value": "Auto (refresh - 3)",
+                "reason": "Set by ABSO to keep NVCP VSync from engaging while preserving VRR.",
             },
             {
                 "category": "Display",
@@ -303,8 +304,8 @@ class Overwatch2GSyncHDRProfile(_Overwatch2BaseProfile):
                 "global_vrr_mode": "fullscreen_only",
             },
             "OW2ConfigHandler": {
-                # Remove any pre-existing in-game cap; NVCP auto_vrr_fps_cap handles the real limit.
-                "frame_rate_cap": 400,
+                # Set in-game cap to refresh - 3 so OW2 and NVCP agree on the VRR target.
+                "auto_vrr_fps_cap": True,
             },
         }
 
@@ -331,8 +332,8 @@ class Overwatch2GSyncHDRProfile(_Overwatch2BaseProfile):
             {
                 "category": "Display",
                 "setting": "Frame Rate Cap",
-                "value": "Refresh rate - 3",
-                "reason": "Keeps NVCP VSync from engaging while preserving VRR tear-free output.",
+                "value": "Auto (refresh - 3)",
+                "reason": "Set by ABSO to keep NVCP VSync from engaging while preserving VRR.",
             },
             {
                 "category": "Display",

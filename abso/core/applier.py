@@ -12,6 +12,7 @@ Integrates validation subsystems:
 from __future__ import annotations
 
 import logging
+import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -44,6 +45,7 @@ class ApplyResult:
     in_game_settings: bool = False
     applied_settings: list[str] = field(default_factory=list)
     failed_settings: list[str] = field(default_factory=list)
+    warnings: list[str] = field(default_factory=list)
 
     # Validation subsystem results
     lint_result: LintResult | None = None
@@ -333,6 +335,11 @@ class ProfileApplier:
         if skipped:
             logger.info(f"Skipped handlers (disabled in config): {', '.join(skipped)}")
 
+        # === Post-apply: Game-running detection ===
+        game_warnings = self._check_game_running(profile.executable_hints)
+        if game_warnings:
+            result.warnings.extend(game_warnings)
+
         # Log summary
         logger.info(
             f"Profile '{profile_name}' applied: "
@@ -372,6 +379,40 @@ class ProfileApplier:
                 settings_map[handler_name] = settings.copy()
 
         return settings_map
+
+    def _check_game_running(self, executable_hints: list[str]) -> list[str]:
+        """Check if any of the profile's game executables are currently running.
+
+        Args:
+            executable_hints: List of executable filenames to check.
+
+        Returns:
+            List of warning strings for each running executable found.
+        """
+        if not executable_hints:
+            return []
+
+        warnings: list[str] = []
+        try:
+            result = subprocess.run(
+                ["tasklist", "/fo", "csv", "/nh"],
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
+            if result.returncode == 0:
+                running_procs = result.stdout.lower()
+                for exe in executable_hints:
+                    if exe.lower() in running_procs:
+                        warnings.append(
+                            f"{exe} is currently running. "
+                            f"Restart the game for new settings to take effect."
+                        )
+                        logger.warning(f"Game executable running during apply: {exe}")
+        except Exception as e:
+            logger.debug(f"Game-running detection failed: {e}")
+
+        return warnings
 
     def _merge_overrides(
         self,

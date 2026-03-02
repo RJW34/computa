@@ -244,7 +244,7 @@ class CapabilityEngine:
 
         requested_refresh = windows_settings.get("refresh_rate")
         try:
-            target_hz = int(float(requested_refresh))
+            target_hz = round(float(requested_refresh))
         except (TypeError, ValueError):
             return
 
@@ -271,7 +271,7 @@ class CapabilityEngine:
             value = primary.get(key)
             try:
                 if value is not None:
-                    parsed = int(float(value))
+                    parsed = round(float(value))
                     if parsed > 0:
                         candidates.append(parsed)
             except (TypeError, ValueError):

@@ -248,7 +248,7 @@ class NvidiaSettingsHandler(SettingsHandler):
             refresh_hz: int | None = None
             if forced_refresh_hz is not None:
                 with contextlib.suppress(ValueError, TypeError):
-                    refresh_hz = int(float(forced_refresh_hz))
+                    refresh_hz = round(float(forced_refresh_hz))
             if refresh_hz is None:
                 refresh_hz = self._detect_primary_refresh_rate()
 
@@ -312,6 +312,14 @@ class NvidiaSettingsHandler(SettingsHandler):
             verification_failures: list[str] = []
             app_bound = True
             npi_launched = False
+
+            # Clean up stale ABSO profiles (0-app leftovers from previous versions)
+            profile_name_for_cleanup = str(driver_profile_name or game_name)
+            self._cleanup_stale_profiles(manager, profile_name_for_cleanup, game_name)
+
+            # Safety net: always clear global FRL to prevent it from capping games
+            if "max_frame_rate" not in global_settings:
+                global_settings["max_frame_rate"] = "off"
 
             if global_settings:
                 global_result = manager.apply_settings_to_global(global_settings)
@@ -517,6 +525,60 @@ class NvidiaSettingsHandler(SettingsHandler):
         """Check if NPI is available (backwards compatibility)."""
         return self._npi.is_available()
 
+    def _cleanup_stale_profiles(
+        self,
+        manager: Any,
+        target_profile_name: str,
+        game_name: str,
+    ) -> None:
+        """Delete stale ABSO-created NVIDIA profiles with 0 bound applications.
+
+        Previous ABSO versions may have created profiles like
+        "Overwatch 2 - GSYNC" that are no longer used. These can contain
+        stale settings (e.g., FRL=0) that interfere if the driver falls
+        back to them.
+
+        Args:
+            manager: DRSProfileManager instance.
+            target_profile_name: The profile name we're about to create/update.
+            game_name: Display name of the game.
+        """
+        try:
+            all_profiles = manager.list_profiles(include_predefined=False)
+            stale_names: list[str] = []
+
+            for profile in all_profiles:
+                name = profile.get("name", "")
+                num_apps = profile.get("num_apps", 0)
+
+                # Skip the profile we're about to use
+                if name == target_profile_name:
+                    continue
+
+                # Skip profiles that have apps bound (actively in use)
+                if num_apps > 0:
+                    continue
+
+                # Match patterns: "ABSO - <game>", "<game> - <variant>"
+                name_lower = name.lower()
+                game_lower = game_name.lower()
+                if (
+                    name_lower.startswith("abso -")
+                    or name_lower.startswith(f"{game_lower} -")
+                    or name_lower.startswith(f"{game_lower} –")  # en-dash variant
+                ):
+                    stale_names.append(name)
+
+            if stale_names:
+                logger.info(f"Cleaning up {len(stale_names)} stale NVIDIA profile(s): {stale_names}")
+                cleanup_result = manager.delete_profiles_by_name(stale_names)
+                for deleted in cleanup_result.get("deleted", []):
+                    logger.info(f"Deleted stale NVIDIA profile: {deleted}")
+                for err in cleanup_result.get("errors", []):
+                    logger.warning(f"Failed to delete stale profile: {err}")
+        except Exception as e:
+            logger.debug(f"Stale NVIDIA profile cleanup failed (non-fatal): {e}")
+
     def _detect_gpu_info(self) -> dict[str, Any]:
         """Detect GPU information via nvidia-smi."""
         result: dict[str, Any] = {
@@ -574,7 +636,7 @@ class NvidiaSettingsHandler(SettingsHandler):
             for label, value in prioritized_candidates:
                 with contextlib.suppress(ValueError, TypeError):
                     if value is not None:
-                        detected = int(float(value))
+                        detected = round(float(value))
                         if detected > 0:
                             logger.info(
                                 f"Primary refresh detected via HardwareDetector ({label}): {detected} Hz"
@@ -593,7 +655,7 @@ class NvidiaSettingsHandler(SettingsHandler):
             for value in candidates:
                 with contextlib.suppress(ValueError, TypeError):
                     if value is not None:
-                        numeric.append(int(float(value)))
+                        numeric.append(round(float(value)))
 
             if numeric:
                 detected = max(numeric)

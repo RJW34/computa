@@ -214,14 +214,14 @@ def _user_to_internal(user_level: int, hw: DVCRange) -> int:
         if DVC_USER_DEFAULT == 0:
             return hw.default_level
         t = clamped / DVC_USER_DEFAULT
-        return int(hw.min_level + t * (hw.default_level - hw.min_level))
+        return round(hw.min_level + t * (hw.default_level - hw.min_level))
     else:
         # Map [50..100] → [default..max]
         span = DVC_USER_MAX - DVC_USER_DEFAULT
         if span == 0:
             return hw.max_level
         t = (clamped - DVC_USER_DEFAULT) / span
-        return int(hw.default_level + t * (hw.max_level - hw.default_level))
+        return round(hw.default_level + t * (hw.max_level - hw.default_level))
 
 
 def _internal_to_user(internal_level: int, hw: DVCRange) -> int:
@@ -234,13 +234,13 @@ def _internal_to_user(internal_level: int, hw: DVCRange) -> int:
         if span == 0:
             return DVC_USER_DEFAULT
         t = (internal_level - hw.min_level) / span
-        return int(DVC_USER_MIN + t * DVC_USER_DEFAULT)
+        return round(DVC_USER_MIN + t * DVC_USER_DEFAULT)
     else:
         span = hw.max_level - hw.default_level
         if span == 0:
             return DVC_USER_MAX
         t = (internal_level - hw.default_level) / span
-        return int(DVC_USER_DEFAULT + t * (DVC_USER_MAX - DVC_USER_DEFAULT))
+        return round(DVC_USER_DEFAULT + t * (DVC_USER_MAX - DVC_USER_DEFAULT))
 
 
 # =============================================================================

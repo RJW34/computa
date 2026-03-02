@@ -254,6 +254,7 @@ NVIDIA_PRESETS: dict[str, dict[str, Any]] = {
             "triple_buffering": "off",
             "vrr_app_override": "allow",  # Enforce VRR/G-SYNC for this game
             "vsync_tear_control": "disable",
+            "vsync_vrr_control": "enable",  # Coordinate VSync with VRR — safety net only below max refresh
         },
         "notes": {
             "usage": "For VRR users who want tear-free output without giving up Reflex.",

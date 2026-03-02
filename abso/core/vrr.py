@@ -84,11 +84,15 @@ VRR_FPS_CAPS: dict[int, int] = {
 COMMON_FPS_PRESETS = [30, 60, 120, 144, 165, 240, 300, 360]
 
 
-def get_vrr_fps_cap(refresh_rate: int) -> int:
+def get_vrr_fps_cap(refresh_rate: int | float) -> int:
     """Calculate optimal FPS cap for VRR displays.
 
     The "3 frames below" rule: Cap FPS at minimum 3 below refresh rate
     to ensure VRR stays engaged and V-SYNC never activates.
+
+    Accepts float inputs (e.g. 299.99) and rounds to the nearest integer
+    before lookup so fractional Hz values from CCD/pixel-clock detection
+    hit the correct preset.
 
     Args:
         refresh_rate: Monitor's maximum refresh rate in Hz.
@@ -96,6 +100,7 @@ def get_vrr_fps_cap(refresh_rate: int) -> int:
     Returns:
         Optimal FPS cap value.
     """
+    refresh_rate = round(float(refresh_rate))
     # Use preset if available
     if refresh_rate in VRR_FPS_CAPS:
         return VRR_FPS_CAPS[refresh_rate]

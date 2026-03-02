@@ -68,6 +68,7 @@ class OW2ConfigHandler(SettingsHandler):
         "vsync": "LimitToRefresh",
         "reduce_buffering": "CpuForceSyncEnabled",
         "dynamic_render_scale": "UseGPUScale",
+        "dynamic_render_scale_v2": "DynamicRenderScale",
         "frame_rate_cap": "FrameRateCap",
         "render_scale": "RenderScale",
         "gfx_preset": "GFXPresetLevel",
@@ -85,7 +86,7 @@ class OW2ConfigHandler(SettingsHandler):
     # Settings that accept bool-like input and are stored as "0"/"1" in the INI.
     # Kept as a class constant so new boolean keys only need one addition.
     BOOL_SETTINGS: frozenset[str] = frozenset({
-        "vsync", "reduce_buffering", "dynamic_render_scale",
+        "vsync", "reduce_buffering", "dynamic_render_scale", "dynamic_render_scale_v2",
         "upscaling", "triple_buffering", "show_fps", "show_latency",
         "hdr",
     })
@@ -181,6 +182,24 @@ class OW2ConfigHandler(SettingsHandler):
 
     def apply(self, settings: dict[str, Any]) -> dict[str, Any]:
         """Apply OW2 render settings to Settings_v0.ini."""
+        settings = dict(settings)  # Don't mutate caller's dict
+
+        # Auto VRR FPS cap: detect refresh rate and set in-game cap to refresh - 3
+        if settings.pop("auto_vrr_fps_cap", False):
+            try:
+                from abso.core.vrr import get_vrr_fps_cap
+                from abso.settings.nvidia import NvidiaSettingsHandler
+
+                refresh_hz = NvidiaSettingsHandler()._detect_primary_refresh_rate()
+                if refresh_hz and refresh_hz > 0:
+                    settings["frame_rate_cap"] = get_vrr_fps_cap(refresh_hz)
+                    logger.info(
+                        "OW2 auto VRR FPS cap: %d (from %d Hz)",
+                        settings["frame_rate_cap"], refresh_hz,
+                    )
+            except Exception as e:
+                logger.warning("OW2 auto VRR FPS cap detection failed: %s", e)
+
         invalid = validate_allowed_keys(
             set(settings.keys()),
             set(self.MUTABLE_SETTINGS.keys()),

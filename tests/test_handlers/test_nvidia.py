@@ -333,7 +333,7 @@ class TestNvidiaApply:
             "game_name": "Overwatch 2 - No-Sync",
         })
 
-        mock_manager.apply_settings_to_global.assert_called_once_with({"vrr_mode": "off"})
+        mock_manager.apply_settings_to_global.assert_called_once_with({"vrr_mode": "off", "max_frame_rate": "off"})
         assert result["success"] is True
         assert any("NVIDIA global profile configured:" in line for line in result["applied"])
 

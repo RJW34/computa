@@ -1103,8 +1103,8 @@ class WindowsSettingsHandler(SettingsHandler):
             logger.warning("Could not determine maximum refresh rate")
             return
 
-        if current_hz == max_hz:
-            logger.info(f"Display already at maximum refresh rate ({max_hz} Hz)")
+        if current_hz and current_hz >= max_hz:
+            logger.info(f"Display already at or above maximum enumerated rate ({current_hz} Hz >= {max_hz} Hz)")
             return
 
         logger.info(f"Setting display to maximum refresh rate: {max_hz} Hz (was {current_hz} Hz)")

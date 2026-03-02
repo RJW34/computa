@@ -478,6 +478,7 @@ def apply(profile_name: str, no_backup: bool, json_output: bool) -> None:
                 "error": tx.error if not tx.success else None,
                 "applied_settings": applied_settings,
                 "failed_settings": failed_settings,
+                "warnings": result.warnings if result else [],
                 "capabilities": (
                     result.capability_report.to_dict()
                     if result and result.capability_report
@@ -513,6 +514,10 @@ def apply(profile_name: str, no_backup: bool, json_output: bool) -> None:
             elif result.requires_reboot:
                 console.print("[yellow]Note: Some changes may require a reboot to take effect.[/yellow]")
                 console.print(f"[dim]Run 'abso verify {profile_name}' to check if reboot is still needed.[/dim]")
+
+            if result.warnings:
+                for warning in result.warnings:
+                    console.print(f"[yellow]Warning: {warning}[/yellow]")
 
             if result.in_game_settings:
                 # Actually generate the report file
@@ -577,12 +582,16 @@ def reapply(json_output: bool) -> None:
             output_json({
                 "success": result.success,
                 "profile": current_profile,
+                "warnings": result.warnings,
                 "error": result.error if not result.success else None,
             })
             return
 
         if result.success:
             console.print(f"\n[green]Profile '{current_profile}' re-applied successfully![/green]")
+            if result.warnings:
+                for warning in result.warnings:
+                    console.print(f"[yellow]Warning: {warning}[/yellow]")
         else:
             console.print(f"\n[red]Failed to re-apply profile: {result.error}[/red]")
             sys.exit(1)
