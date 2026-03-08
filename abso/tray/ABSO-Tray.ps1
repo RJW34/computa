@@ -801,7 +801,7 @@ $script:FallbackProfiles = [ordered]@{
         Exes     = @("chrome.exe", "msedge.exe", "firefox.exe", "brave.exe")
     }
     "pacdeluxe"         = @{
-        Name     = "PACDeluxe"
+        Name     = "PACDeluxe (Pokemon Auto Chess)"
         Sub      = "LLM ON | Tauri + WebView2 | Adaptive VSync"
         Cat      = "Other"
         Desc     = "Native Tauri client. Adaptive sync, Ultimate Performance, priority boost."

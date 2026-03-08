@@ -194,6 +194,8 @@ class Overwatch2GSyncProfile(_Overwatch2BaseProfile):
                 "digital_vibrance": 45,
             },
             "OW2ConfigHandler": {
+                # Explicit borderless — higher FPS cap than exclusive, G-SYNC via fullscreen_and_windowed.
+                "window_mode": 1,
                 # Set in-game cap to refresh - 3 so OW2 and NVCP agree on the VRR target.
                 "auto_vrr_fps_cap": True,
             },
@@ -306,6 +308,8 @@ class Overwatch2GSyncHDRProfile(_Overwatch2BaseProfile):
                 "global_vrr_mode": "fullscreen_and_windowed",
             },
             "OW2ConfigHandler": {
+                # Explicit borderless — higher FPS cap than exclusive, G-SYNC via fullscreen_and_windowed.
+                "window_mode": 1,
                 # Set in-game cap to refresh - 3 so OW2 and NVCP agree on the VRR target.
                 "auto_vrr_fps_cap": True,
             },
