@@ -315,12 +315,14 @@ class ProfileLinter:
             ))
 
         # Check 2: VRR Optimize ON for latency-critical profiles
+        # Exception: VRR profiles need vrr_optimize for borderless windowed G-SYNC,
+        # where the FPS cap gain outweighs the ~0.1ms compositor overhead.
         is_latency_critical = profile.optimization_target in {
             "minimum_latency",
             "minimum_latency_offline",
             "low_latency_high_fps",
         }
-        if vrr_optimize and is_latency_critical:
+        if vrr_optimize and is_latency_critical and not profile.requires_confirmed_vrr_support:
             result.add_issue(LintIssue(
                 code="WINDOWS_VRR_OPTIMIZE_LATENCY",
                 severity=LintSeverity.ERROR,
