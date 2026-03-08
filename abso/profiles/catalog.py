@@ -196,7 +196,7 @@ PROFILE_CATALOG: OrderedDict[str, ProfileCatalogEntry] = OrderedDict(
         "ryujinx-ssbu": ProfileCatalogEntry(
             profile_class=RyujinxSSBUProfile,
             tray_category="Fighting",
-            tray_subtitle="LLM ON | Vulkan | Fixed 60fps",
+            tray_subtitle="Vulkan | Fixed 60fps | HAGS ON",
             sync_mode="off",
         ),
         "ryujinx-ssbu-streaming": ProfileCatalogEntry(

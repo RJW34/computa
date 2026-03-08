@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
 
 from abso.profiles.base import BaseProfile
 
@@ -31,6 +31,11 @@ class Diablo4Profile(BaseProfile):
     @property
     def optimization_target(self) -> str:
         return "balanced"
+
+    @property
+    def graphics_api(self) -> Literal["dx11", "dx12", "vulkan", "opengl", "unknown"]:
+        """Diablo 4 uses DirectX 12."""
+        return "dx12"
 
     @property
     def executable_hints(self) -> list[str]:
@@ -92,9 +97,11 @@ class Diablo4Profile(BaseProfile):
             },
             "NvidiaSettingsHandler": {
                 # Diablo 4 has native NVIDIA Reflex — LLM must be OFF to avoid conflict.
-                # Using vrr_diablo4 preset: LLM=off, VSync=off (G-Sync handles sync),
-                # threaded_opt=off for lower render latency.
+                # Using vrr_diablo4 preset: LLM=off, threaded_opt=off for lower render latency.
+                # Override VSync to adaptive: acts as safety net for non-G-Sync users
+                # (VSync only engages when FPS exceeds refresh rate, otherwise stays off).
                 "preset": "vrr_diablo4",
+                "vsync": "adaptive",
             },
             "NetworkSettingsHandler": {
                 # Online ARPG - keep OS defaults (avoid aggressive TCP tuning)

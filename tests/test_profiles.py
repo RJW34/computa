@@ -119,11 +119,11 @@ class TestProfileHandlers:
         assert "NvidiaSettingsHandler" in handler_names
         assert "NetworkSettingsHandler" in handler_names
 
-    def test_rivals2_online_does_not_touch_game_config_file(self):
-        """Online profile should not include the Rivals2ConfigHandler."""
+    def test_rivals2_online_includes_game_config_handler(self):
+        """Online profile should include the Rivals2ConfigHandler for INI tuning."""
         profile = Rivals2OnlineProfile()
         handler_names = [h.__class__.__name__ for h in profile.get_handlers()]
-        assert "Rivals2ConfigHandler" not in handler_names
+        assert "Rivals2ConfigHandler" in handler_names
 
     def test_rivals2_base_profile_includes_game_config_guarded_handler(self):
         """Base Rivals2 profile includes config handler for explicit game INI tuning."""
@@ -238,7 +238,7 @@ class TestProfileSettings:
         assert settings["preset"] == "reflex_gsync"
         assert settings["profile_name"] == "Overwatch 2"
         assert settings["auto_vrr_fps_cap"] is True
-        assert settings["global_vrr_mode"] == "fullscreen_only"
+        assert settings["global_vrr_mode"] == "fullscreen_and_windowed"
 
     def test_overwatch2_gsync_hdr_settings(self):
         """G-SYNC HDR Overwatch profile should enable HDR, disable auto-HDR, use native ICC."""
@@ -251,7 +251,7 @@ class TestProfileSettings:
         assert nvidia["preset"] == "reflex_gsync"
         assert nvidia["profile_name"] == "Overwatch 2"
         assert nvidia["auto_vrr_fps_cap"] is True
-        assert nvidia["global_vrr_mode"] == "fullscreen_only"
+        assert nvidia["global_vrr_mode"] == "fullscreen_and_windowed"
 
         color = profile.get_settings("ColorProfileSettingsHandler")
         assert color["icc_profile"] == "native"

@@ -686,6 +686,14 @@ $script:FallbackProfiles = [ordered]@{
         Exes     = @("Slippi Dolphin.exe", "Dolphin.exe")
         SyncMode = "off"
     }
+    "slippi-melee-universal" = @{
+        Name     = "Slippi Melee (Universal)"
+        Sub      = "Lowest Latency | Fixed HAGS | No Reboot"
+        Cat      = "Fighting"
+        Desc     = "Absolute minimum latency with fixed HAGS (no reboot required). Sync-agnostic."
+        Exes     = @("Slippi Dolphin.exe", "Dolphin.exe")
+        SyncMode = "off"
+    }
     "slippi-melee-vrr-lab" = @{
         Name     = "Slippi Melee (VRR Lab)"
         Sub      = "VRR Lab | G-SYNC ON | A/B Test"
@@ -705,17 +713,17 @@ $script:FallbackProfiles = [ordered]@{
     # --- Fighting Games: SSBU ---
     "ryujinx-ssbu"      = @{
         Name     = "SSBU / HewDraw Remix"
-        Sub      = "LLM ON | Vulkan | Fixed 60fps"
+        Sub      = "Vulkan | Fixed 60fps | HAGS ON"
         Cat      = "Fighting"
-        Desc     = "Smash Ultimate via Ryujinx. HAGS ON, Vulkan backend, Ultimate Performance."
-        Exes     = @("Ryujinx.exe", "Ryujinx.Ava.exe", "Ryujinx.Headless.SDL2.exe")
+        Desc     = "Smash Ultimate via Ryujinx/forks. HAGS ON, Vulkan backend, Ultimate Performance."
+        Exes     = @("Ryujinx.exe", "Ryujinx.Ava.exe", "Ryujinx.Headless.SDL2.exe", "Ryubing.exe")
     }
     "ryujinx-ssbu-streaming" = @{
         Name     = "SSBU / HewDraw Remix (Streaming)"
         Sub      = "OBS 1080p60 | Multi-monitor"
         Cat      = "Streaming"
-        Desc     = "Streaming profile for Ryujinx. OBS settings applied, FSO/MPO ON for multi-monitor."
-        Exes     = @("Ryujinx.exe", "Ryujinx.Ava.exe", "Ryujinx.Headless.SDL2.exe")
+        Desc     = "Streaming profile for Ryujinx/forks. OBS settings applied, FSO/MPO ON for multi-monitor."
+        Exes     = @("Ryujinx.exe", "Ryujinx.Ava.exe", "Ryujinx.Headless.SDL2.exe", "Ryubing.exe")
     }
 
     # --- ARPG ---
@@ -2980,6 +2988,7 @@ public class HotkeyMessageWindow : NativeWindow {
     $script:restoreItem.BackColor = $script:Colors.Background
     $script:restoreItem.ForeColor = $script:Colors.AccentAmber
     $script:restoreItem.Font = New-Object System.Drawing.Font("Segoe UI", 9)
+    $script:restoreItem.Image = New-ActionBitmap -Action "Restore" -Color $script:Colors.AccentAmber
     $script:restoreItem.ToolTipText = "Restore the last backup before profile was applied"
     $script:restoreItem.Add_Click({ Restore-Settings })
     $actionsMenu.DropDownItems.Add($script:restoreItem) | Out-Null
@@ -2990,6 +2999,7 @@ public class HotkeyMessageWindow : NativeWindow {
     $auditItem.BackColor = $script:Colors.Background
     $auditItem.ForeColor = $script:Colors.AccentBlue
     $auditItem.Font = New-Object System.Drawing.Font("Segoe UI", 9)
+    $auditItem.Image = New-ActionBitmap -Action "Audit" -Color $script:Colors.AccentBlue
     $auditItem.ToolTipText = "Scan system for optimization issues"
     $auditItem.Add_Click({ Run-Audit })
     $actionsMenu.DropDownItems.Add($auditItem) | Out-Null
@@ -3001,6 +3011,7 @@ public class HotkeyMessageWindow : NativeWindow {
     $backupsItem.BackColor = $script:Colors.Background
     $backupsItem.ForeColor = $script:Colors.AccentPurple
     $backupsItem.Font = New-Object System.Drawing.Font("Segoe UI", 9)
+    $backupsItem.Image = New-ActionBitmap -Action "Backups" -Color $script:Colors.AccentPurple
 
     $openBackupsItem = New-Object System.Windows.Forms.ToolStripMenuItem
     $openBackupsItem.Text = "Open Backups Folder"
@@ -3057,6 +3068,7 @@ public class HotkeyMessageWindow : NativeWindow {
     $quickPanelItem.BackColor = $script:Colors.Background
     $quickPanelItem.ForeColor = $script:Colors.AccentGreen
     $quickPanelItem.Font = New-Object System.Drawing.Font("Segoe UI", 9)
+    $quickPanelItem.Image = New-ActionBitmap -Action "QuickPanel" -Color $script:Colors.AccentGreen
     $quickPanelItem.ToolTipText = "Toggle floating quick-access panel"
     $quickPanelItem.Checked = $script:TrayConfig.showQuickPanel
     $quickPanelItem.Add_Click({
@@ -3082,6 +3094,7 @@ public class HotkeyMessageWindow : NativeWindow {
     $settingsMenu.BackColor = $script:Colors.Background
     $settingsMenu.ForeColor = $script:Colors.Text
     $settingsMenu.Font = New-Object System.Drawing.Font("Segoe UI", 9)
+    $settingsMenu.Image = New-ActionBitmap -Action "Settings" -Color $script:Colors.Text
 
     # Auto-Start toggle
     $startupStatus = Get-StartupStatus
@@ -3231,6 +3244,7 @@ public class HotkeyMessageWindow : NativeWindow {
     $exitItem.BackColor = $script:Colors.Background
     $exitItem.ForeColor = $script:Colors.TextDim
     $exitItem.Font = New-Object System.Drawing.Font("Segoe UI", 9)
+    $exitItem.Image = New-ActionBitmap -Action "Exit" -Color $script:Colors.TextDim
     $exitItem.Add_Click({
         if ($script:HotkeyWindow) { Unregister-GlobalHotkeys -WindowHandle $script:HotkeyWindow.Handle }
         Close-QuickPanel

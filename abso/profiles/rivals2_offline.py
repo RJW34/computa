@@ -80,6 +80,14 @@ class Rivals2OfflineProfile(Rivals2BaseProfile):
         """Offline profiles allow aggressive latency settings."""
         return True
 
+    @property
+    def include_nvidia_notifications(self) -> bool:
+        return True
+
+    @property
+    def include_rivals2_config(self) -> bool:
+        return True
+
     def _settings_overrides(self) -> dict[str, dict[str, Any]]:
         """Aggressive low-latency settings for offline play."""
         return {
@@ -101,6 +109,14 @@ class Rivals2OfflineProfile(Rivals2BaseProfile):
                 "shader_cache": "unlimited",
                 "threaded_optimization": "off",  # OFF — UE5 driver contention
                 "triple_buffering": "off",
+            },
+            "Rivals2ConfigHandler": {
+                "fullscreen_mode": 0,  # Exclusive fullscreen for lowest latency
+                "vsync": False,  # In-game VSync OFF
+                "raw_input": True,  # Best input latency
+            },
+            "NvidiaNotificationHandler": {
+                "disable_notifications": True,
             },
         }
 

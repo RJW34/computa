@@ -95,6 +95,14 @@ class Rivals2OnlineProfile(Rivals2BaseProfile):
         """Online profiles should NOT use aggressive settings."""
         return False
 
+    @property
+    def include_nvidia_notifications(self) -> bool:
+        return True
+
+    @property
+    def include_rivals2_config(self) -> bool:
+        return True
+
     def _settings_overrides(self) -> dict[str, dict[str, Any]]:
         """Stable, rollback-safe settings for online play."""
         return {
@@ -109,7 +117,7 @@ class Rivals2OnlineProfile(Rivals2BaseProfile):
                 "vsync": "off",  # OFF - rollback netcode is timing-sensitive, not tear-sensitive
                 "vsync_tear_control": "disable",  # Explicit tear control off with VSync OFF
                 "vrr_app_override": "force_off",  # OFF - VRR adds ~2-5ms latency overhead
-                "max_frame_rate": "off",  # Uncapped — no external limiters for online play
+                "max_frame_rate": "off",  # Uncapped ï¿½ no external limiters for online play
                 "shader_cache": "unlimited",
                 "threaded_optimization": "off",  # OFF - UE5 driver contention
                 "triple_buffering": "off",  # OFF - irrelevant without VSync
@@ -117,6 +125,14 @@ class Rivals2OnlineProfile(Rivals2BaseProfile):
             "ProcessPriorityHandler": {
                 "cpu_priority": 2,  # Normal-High (not aggressive)
                 "io_priority": 2,
+            },
+            "Rivals2ConfigHandler": {
+                "fullscreen_mode": 0,  # Exclusive fullscreen for lowest latency
+                "vsync": False,  # In-game VSync OFF â€” driver handles sync
+                "raw_input": True,  # Best input latency
+            },
+            "NvidiaNotificationHandler": {
+                "disable_notifications": True,
             },
         }
 

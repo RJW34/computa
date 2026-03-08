@@ -40,7 +40,7 @@ class _Overwatch2BaseProfile(ReflexShooterBaseProfile):
                 "disable_mpo": False,
             },
             "OW2ConfigHandler": {
-                "window_mode": 0,               # Fullscreen
+                "window_mode": 1,               # Borderless Windowed (higher FPS cap than Exclusive)
                 "vsync": False,                  # Off
                 "reduce_buffering": True,        # On
                 "dynamic_render_scale": False,   # Off (UseGPUScale)
@@ -101,7 +101,9 @@ class Overwatch2Profile(_Overwatch2BaseProfile):
                 "global_vrr_mode": "off",
             },
             "OW2ConfigHandler": {
-                # No-sync: uncapped / high fixed cap for minimum latency.
+                # No-sync: exclusive fullscreen for cleanest presentation path.
+                "window_mode": 0,
+                # Uncapped / high fixed cap for minimum latency.
                 "frame_rate_cap": 400,
             },
         }
@@ -112,7 +114,7 @@ class Overwatch2Profile(_Overwatch2BaseProfile):
                 "category": "Display",
                 "setting": "Display Mode",
                 "value": "Fullscreen (Exclusive)",
-                "reason": "Lowest-latency presentation path.",
+                "reason": "No-sync: exclusive fullscreen avoids compositor overhead. FPS cap difference only matters under VRR.",
             },
             {
                 "category": "Display",
@@ -185,7 +187,7 @@ class Overwatch2GSyncProfile(_Overwatch2BaseProfile):
                 # Enforce VRR-safe cap automatically (refresh-3) to keep VSync as safety net.
                 "auto_vrr_fps_cap": True,
                 # Ensure global G-SYNC is enabled before launching OW2.
-                "global_vrr_mode": "fullscreen_only",
+                "global_vrr_mode": "fullscreen_and_windowed",
             },
             "ColorProfileSettingsHandler": {
                 # Slightly below neutral (50) to compensate for DCI-P3 oversaturation in SDR.
@@ -202,8 +204,8 @@ class Overwatch2GSyncProfile(_Overwatch2BaseProfile):
             {
                 "category": "Display",
                 "setting": "Display Mode",
-                "value": "Fullscreen (Exclusive)",
-                "reason": "Best VRR behavior with lowest compositor overhead.",
+                "value": "Borderless Windowed",
+                "reason": "OW2 has a higher FPS cap in borderless (~297) vs exclusive (~276). G-SYNC works in borderless with fullscreen_and_windowed mode.",
             },
             {
                 "category": "Display",
@@ -301,7 +303,7 @@ class Overwatch2GSyncHDRProfile(_Overwatch2BaseProfile):
                 "preset": "reflex_gsync",
                 "profile_name": "Overwatch 2",
                 "auto_vrr_fps_cap": True,
-                "global_vrr_mode": "fullscreen_only",
+                "global_vrr_mode": "fullscreen_and_windowed",
             },
             "OW2ConfigHandler": {
                 # Set in-game cap to refresh - 3 so OW2 and NVCP agree on the VRR target.
@@ -314,8 +316,8 @@ class Overwatch2GSyncHDRProfile(_Overwatch2BaseProfile):
             {
                 "category": "Display",
                 "setting": "Display Mode",
-                "value": "Fullscreen (Exclusive)",
-                "reason": "Best VRR behavior with lowest compositor overhead.",
+                "value": "Borderless Windowed",
+                "reason": "OW2 has a higher FPS cap in borderless (~297) vs exclusive (~276). G-SYNC works in borderless with fullscreen_and_windowed mode.",
             },
             {
                 "category": "Display",

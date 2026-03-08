@@ -8,7 +8,7 @@ from abso.profiles.profile_bases import EmulatorLatencyBaseProfile
 
 
 class RyujinxSSBUProfile(EmulatorLatencyBaseProfile):
-    """Optimization profile for SSBU/HewDraw Remix via Ryujinx emulator.
+    """Optimization profile for SSBU/HewDraw Remix via Ryujinx or forks.
 
     Focus: Ultra-low input latency for competitive platform fighting.
     SSBU runs at 60fps, similar to Melee optimization goals.
@@ -16,6 +16,10 @@ class RyujinxSSBUProfile(EmulatorLatencyBaseProfile):
     HewDraw Remix (HDR) is a comprehensive gameplay mod that makes
     SSBU play more like traditional platform fighters with enhanced
     mechanics and balance changes.
+
+    Note: The original Ryujinx project was shut down in October 2024
+    due to Nintendo legal action. Community forks like Ryubing continue
+    development. Executable hints cover both original and common forks.
     """
 
     @property
@@ -36,15 +40,15 @@ class RyujinxSSBUProfile(EmulatorLatencyBaseProfile):
 
     @property
     def executable_hints(self) -> list[str]:
-        return ["Ryujinx.exe", "Ryujinx.Ava.exe", "Ryujinx.Headless.SDL2.exe"]
+        return ["Ryujinx.exe", "Ryujinx.Ava.exe", "Ryujinx.Headless.SDL2.exe", "Ryubing.exe"]
 
     def _settings_overrides(self) -> dict[str, dict[str, Any]]:
         return {
             "NvidiaSettingsHandler": {
                 # Absolute minimum latency - no sync overhead
                 # SSBU is 60fps like Melee, same optimization approach
-                # Ryujinx uses Vulkan — LLM Ultra has no effect (DX9/DX11 only).
-                "low_latency_mode": "on",  # ON for pre-render queue reduction
+                # Ryujinx uses Vulkan — LLM has no effect (DX9/DX11 only).
+                "low_latency_mode": "off",  # OFF — no benefit on Vulkan render queues
                 "power_management": "prefer_max_performance",
                 "vsync": "off",  # No sync latency
                 "vsync_tear_control": "disable",
@@ -107,10 +111,10 @@ class RyujinxSSBUProfile(EmulatorLatencyBaseProfile):
             {
                 "category": "NVCP",
                 "setting": "Low Latency Mode",
-                "value": "On",
+                "value": "Off",
                 "reason": (
-                    "Reduces pre-render queue to 1 frame. Ultra has no effect on Vulkan "
-                    "applications (only works in DX9/DX11)."
+                    "LLM has no effect on Vulkan render queues (only works in DX9/DX11). "
+                    "Setting to Off for accuracy. Ryujinx manages its own frame pacing."
                 ),
             },
             {
