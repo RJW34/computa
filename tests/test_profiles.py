@@ -238,7 +238,7 @@ class TestProfileSettings:
         assert settings["preset"] == "reflex_gsync"
         assert settings["profile_name"] == "Overwatch 2"
         assert settings["auto_vrr_fps_cap"] is True
-        assert settings["global_vrr_mode"] == "fullscreen_only"
+        assert settings["global_vrr_mode"] == "fullscreen_and_windowed"
 
     def test_overwatch2_gsync_hdr_settings(self):
         """G-SYNC HDR Overwatch profile should enable HDR, disable auto-HDR, use native ICC."""
@@ -251,7 +251,7 @@ class TestProfileSettings:
         assert nvidia["preset"] == "reflex_gsync"
         assert nvidia["profile_name"] == "Overwatch 2"
         assert nvidia["auto_vrr_fps_cap"] is True
-        assert nvidia["global_vrr_mode"] == "fullscreen_only"
+        assert nvidia["global_vrr_mode"] == "fullscreen_and_windowed"
 
         color = profile.get_settings("ColorProfileSettingsHandler")
         assert color["icc_profile"] == "native"
