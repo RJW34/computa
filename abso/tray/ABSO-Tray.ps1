@@ -148,6 +148,7 @@ $script:ScriptDir = $PSScriptRoot
 . (Join-Path $script:ScriptDir "ABSO-Icons.ps1")
 . (Join-Path $script:ScriptDir "ABSO-Notifications.ps1")
 . (Join-Path $script:ScriptDir "ABSO-Settings.ps1")
+. (Join-Path $script:ScriptDir "ABSO-StartupState.ps1")
 . (Join-Path $script:ScriptDir "ABSO-QuickPanel.ps1")
 
 # ============================================================================
@@ -1043,92 +1044,6 @@ function Initialize-ProfilesFromCliCatalog {
 
 Initialize-ProfilesFromCliCatalog
 
-function Read-ActiveProfileFromStateFile {
-    param([string]$StatePath)
-
-    if ([string]::IsNullOrWhiteSpace($StatePath) -or -not (Test-Path $StatePath)) {
-        return $null
-    }
-
-    try {
-        $raw = Get-Content -Path $StatePath -Raw -ErrorAction Stop
-        if ([string]::IsNullOrWhiteSpace($raw)) { return $null }
-
-        $state = $raw | ConvertFrom-Json
-        if (-not $state) { return $null }
-
-        $profileId = if ($state.current_profile) { "$($state.current_profile)" } else { $null }
-        if ([string]::IsNullOrWhiteSpace($profileId)) { return $null }
-
-        return [ordered]@{
-            id        = $profileId
-            applied_at = if ($state.applied_at) { "$($state.applied_at)" } else { $null }
-            source    = "state_file"
-            path      = $StatePath
-        }
-    }
-    catch {
-        Write-TrayLog "Failed reading profile state file '$StatePath': $($_.Exception.Message)" -Level "WARN"
-        return $null
-    }
-}
-
-function Resolve-StartupActiveProfile {
-    param([hashtable]$Config)
-
-    $stateCandidates = @()
-    if ($script:ProjectRoot) {
-        $stateCandidates += Join-Path $script:ProjectRoot ".abso_state.json"
-    }
-
-    try {
-        $localDataRoot = Join-Path ([Environment]::GetFolderPath("LocalApplicationData")) "AdaptiveBattleStationOptimizer"
-        if ($localDataRoot) {
-            $stateCandidates += Join-Path $localDataRoot ".abso_state.json"
-        }
-    }
-    catch {}
-
-    $uniqueCandidates = @()
-    foreach ($candidate in $stateCandidates) {
-        if ([string]::IsNullOrWhiteSpace("$candidate")) { continue }
-        if ($uniqueCandidates -contains $candidate) { continue }
-        $uniqueCandidates += $candidate
-    }
-
-    foreach ($statePath in $uniqueCandidates) {
-        $record = Read-ActiveProfileFromStateFile -StatePath $statePath
-        if (-not $record) { continue }
-
-        $profileId = "$($record.id)"
-        if ($script:Profiles.Contains($profileId)) {
-            return $record
-        }
-
-        Write-TrayLog "State file '$statePath' references unknown profile '$profileId'; falling back to tray history" -Level "WARN"
-    }
-
-    if ($Config -and $Config.recentProfiles -and $Config.recentProfiles.Count -gt 0) {
-        $lastEntry = $Config.recentProfiles[0]
-        $lastId = if ($lastEntry.id) { "$($lastEntry.id)" } else { $null }
-        if (-not [string]::IsNullOrWhiteSpace($lastId) -and $script:Profiles.Contains($lastId)) {
-            return [ordered]@{
-                id         = $lastId
-                applied_at = if ($lastEntry.timestamp) { "$($lastEntry.timestamp)" } else { $null }
-                source     = "recent_history"
-                path       = $null
-            }
-        }
-    }
-
-    return [ordered]@{
-        id         = $null
-        applied_at = $null
-        source     = "none"
-        path       = $null
-    }
-}
-
 $script:CategoryOrder = @("Productivity", "Fighting", "ARPG", "Shooter", "Streaming", "Other")
 $script:CategoryColors = @{
     "Productivity" = $script:Colors.CatProd
@@ -1871,7 +1786,7 @@ function Apply-Profile {
             $script:LastAction = "Applied: $($profile.Name)"
             $script:LastActionTime = Get-Date -Format "HH:mm"
 
-            # Record in history
+            # Record in history and persist the last known active state for startup arbitration.
             $script:TrayConfig = Add-ProfileHistory -ProfileId $ProfileId -ProfileName $profile.Name -Config $script:TrayConfig
 
             Update-MenuState
@@ -1961,6 +1876,7 @@ function Restore-Settings {
             $script:activeProfile = $null
             $script:LastAction = "Restored settings"
             $script:LastActionTime = Get-Date -Format "HH:mm"
+            $script:TrayConfig = Set-LastProfileState -Config $script:TrayConfig -Status "restored" -Source "tray_restore"
             Set-IconState -State "Idle"
             Update-MenuState
         }
@@ -2442,12 +2358,29 @@ function Start-TrayApp {
     $script:notifyIcon.Visible = $true
     Start-StartupIconSelfHeal
 
-    # Restore startup profile from state file first, then tray history fallback.
+    # Restore startup state using the freshest candidate across state files and tray metadata.
     $script:activeProfile = $null
-    $startupProfile = Resolve-StartupActiveProfile -Config $script:TrayConfig
-    if ($startupProfile -and $startupProfile.id) {
+    $startupProfile = Resolve-StartupActiveProfile -Config $script:TrayConfig -ProfileMap $script:Profiles
+    $script:TrayConfig = Set-StartupResolutionRecord -Config $script:TrayConfig -Record $startupProfile
+    if ($startupProfile -and $startupProfile.status -eq "active" -and $startupProfile.id) {
         $script:activeProfile = "$($startupProfile.id)"
-        Write-TrayLog "Restored active profile ($($startupProfile.source)): $($startupProfile.id)"
+        $startupProfileName = if ($startupProfile.name) {
+            "$($startupProfile.name)"
+        }
+        elseif ($script:Profiles.Contains($script:activeProfile)) {
+            "$($script:Profiles[$script:activeProfile].Name)"
+        }
+        else {
+            $script:activeProfile
+        }
+        $script:LastAction = "Startup restore [$($startupProfile.source)]: $startupProfileName"
+        $script:LastActionTime = Get-Date -Format "HH:mm"
+        Write-TrayLog "Startup restore selected active profile '$($startupProfile.id)' from '$($startupProfile.source)' (decision=$($startupProfile.decision), timestamp=$($startupProfile.timestamp))"
+    }
+    elseif ($startupProfile -and $startupProfile.status -eq "restored") {
+        $script:LastAction = "Startup restore [$($startupProfile.source)]: no active profile"
+        $script:LastActionTime = Get-Date -Format "HH:mm"
+        Write-TrayLog "Startup restore selected no active profile from '$($startupProfile.source)' (decision=$($startupProfile.decision), timestamp=$($startupProfile.timestamp))"
     }
     else {
         Write-TrayLog "No previously active profile restored at startup"

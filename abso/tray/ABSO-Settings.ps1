@@ -26,6 +26,8 @@ function Get-DefaultConfig {
         animationSpeed  = "normal"
         recentProfiles  = @()
         profileHistory  = @()
+        lastProfileState = $null
+        lastStartupResolution = $null
     }
 }
 
@@ -104,7 +106,7 @@ function Save-TrayConfig {
     }
 
     try {
-        $Config | ConvertTo-Json -Depth 4 | Set-Content $script:ConfigFile -Force -ErrorAction Stop
+        $Config | ConvertTo-Json -Depth 6 | Set-Content $script:ConfigFile -Force -ErrorAction Stop
     }
     catch {
         $errMsg = "Failed to save config: $($_.Exception.Message)"
@@ -114,6 +116,83 @@ function Save-TrayConfig {
             Write-TrayLog $errMsg -Level "ERROR"
         }
     }
+}
+
+function Set-LastProfileState {
+    <#
+    .SYNOPSIS
+    Persists the last known profile state for startup restore arbitration.
+    #>
+    param(
+        [hashtable]$Config,
+        [ValidateSet("active", "restored")]
+        [string]$Status,
+        [string]$ProfileId = $null,
+        [string]$ProfileName = $null,
+        [string]$Source = "tray",
+        [string]$Timestamp = $null,
+        [switch]$NoSave
+    )
+
+    if (-not $Config) { return $Config }
+
+    $recordedAt = if ([string]::IsNullOrWhiteSpace($Timestamp)) {
+        (Get-Date).ToString("o")
+    }
+    else {
+        "$Timestamp"
+    }
+
+    $Config.lastProfileState = @{
+        status    = $Status
+        id        = if ($Status -eq "active") { $ProfileId } else { $null }
+        name      = if ($Status -eq "active") { $ProfileName } else { $null }
+        timestamp = $recordedAt
+        source    = $Source
+    }
+
+    if (-not $NoSave) {
+        Save-TrayConfig $Config
+    }
+
+    return $Config
+}
+
+function Set-StartupResolutionRecord {
+    <#
+    .SYNOPSIS
+    Records the tray startup restore decision for later debugging.
+    #>
+    param(
+        [hashtable]$Config,
+        [object]$Record,
+        [switch]$NoSave
+    )
+
+    if (-not $Config) { return $Config }
+
+    if ($null -eq $Record) {
+        $Config.lastStartupResolution = $null
+    }
+    else {
+        $Config.lastStartupResolution = @{
+            status         = if ($Record.status) { "$($Record.status)" } else { "unknown" }
+            id             = if ($Record.id) { "$($Record.id)" } else { $null }
+            name           = if ($Record.name) { "$($Record.name)" } else { $null }
+            timestamp      = if ($Record.timestamp) { "$($Record.timestamp)" } else { $null }
+            source         = if ($Record.source) { "$($Record.source)" } else { "unknown" }
+            path           = if ($Record.path) { "$($Record.path)" } else { $null }
+            decision       = if ($Record.decision) { "$($Record.decision)" } else { "unknown" }
+            candidateCount = if ($null -ne $Record.candidate_count) { [int]$Record.candidate_count } else { 0 }
+            resolvedAt     = (Get-Date).ToString("o")
+        }
+    }
+
+    if (-not $NoSave) {
+        Save-TrayConfig $Config
+    }
+
+    return $Config
 }
 
 # ============================================================================
@@ -157,10 +236,14 @@ function Add-ProfileHistory {
     #>
     param([string]$ProfileId, [string]$ProfileName, [hashtable]$Config)
 
+    $displayTimestamp = (Get-Date).ToString("yyyy-MM-dd HH:mm:ss")
+    $recordedAt = (Get-Date).ToString("o")
     $entry = @{
         id        = $ProfileId
         name      = $ProfileName
-        timestamp = (Get-Date).ToString("yyyy-MM-dd HH:mm:ss")
+        timestamp = $displayTimestamp
+        recorded_at = $recordedAt
+        source    = "tray_apply"
     }
 
     # Add to recent (max 10)
@@ -180,6 +263,15 @@ function Add-ProfileHistory {
         $history = $history[0..49]
     }
     $Config.profileHistory = $history
+
+    $Config = Set-LastProfileState `
+        -Config $Config `
+        -Status "active" `
+        -ProfileId $ProfileId `
+        -ProfileName $ProfileName `
+        -Source "tray_apply" `
+        -Timestamp $recordedAt `
+        -NoSave
 
     Save-TrayConfig $Config
     return $Config

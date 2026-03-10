@@ -113,3 +113,43 @@ This pass implemented the full `2.0 Overhaul` plan from `2.0_OVERHAUL_GUIDE.md` 
 - `py -m abso detect --json` now succeeds and reports monitors under pywin32-missing conditions.
 - `py -m abso apply slippi-melee-vrr-lab --json` now succeeds with capabilities `passed: true`.
 - `py -m abso verify slippi-melee-vrr-lab --json` returns `all_active: true`.
+
+## Tray Startup Restore Hardening (2026-03-10)
+### Problem
+- Tray startup restore trusted the first readable `.abso_state.json` candidate, even if it was older than tray-side history/state metadata.
+- This could surface the wrong active profile at boot, especially in source-mode installs where stale repo-root state files and newer tray history disagreed.
+- Restore provenance was weak: there was no durable tray-side record of whether the last tray-side state was `active` or `restored`.
+
+### Changes Implemented
+1. Startup resolution helper
+- Added `abso/tray/ABSO-StartupState.ps1`.
+- Startup restore now merges candidates from:
+  - repo/local state files,
+  - tray config `lastProfileState`,
+  - tray `recentProfiles`.
+- Candidates are timestamp-parsed and the newest valid record wins.
+- Conflicts are logged explicitly with source/timestamp summaries.
+
+2. Tray config provenance
+- Extended `abso/tray/ABSO-Settings.ps1` defaults with:
+  - `lastProfileState`
+  - `lastStartupResolution`
+- `Add-ProfileHistory(...)` now also records:
+  - `recorded_at` ISO timestamp
+  - `source = tray_apply`
+  - `lastProfileState = active`
+- Successful restore now records `lastProfileState = restored`.
+- Startup now persists `lastStartupResolution` for postmortem/debug visibility.
+
+3. Tray startup wiring
+- `abso/tray/ABSO-Tray.ps1` now dot-sources `ABSO-StartupState.ps1`.
+- Startup status bar/logging now records the selected startup source and decision instead of silently trusting the first state file.
+
+4. Tests
+- Added `tests/test_tray_state_resolution.py` covering:
+  - newer recent-history beating stale state-file data
+  - newer explicit restore state suppressing stale active candidates
+
+### Validation
+- `py -m pytest tests/test_tray_state_resolution.py tests/test_tray_startup.py -q` passed.
+- `py -m pytest -q` passed with `1035 passed`.
