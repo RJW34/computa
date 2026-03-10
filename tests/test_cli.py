@@ -1,6 +1,7 @@
 """CLI smoke tests for A.B.S.O."""
 
 import json
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from click.testing import CliRunner
@@ -250,6 +251,151 @@ class TestCLIApply:
         assert state_file.exists()
         saved = json.loads(state_file.read_text(encoding="utf-8"))
         assert saved["current_profile"] == "slippi-melee"
+
+
+class TestCLILaunch:
+    """Test launch command wiring and state behavior."""
+
+    @patch("abso.main.launch_profile")
+    @patch("abso.main.is_admin", return_value=True)
+    def test_launch_json_returns_launch_payload(self, mock_is_admin, mock_launch_profile, tmp_path):
+        """launch --json should surface launch lifecycle metadata."""
+        tx = MagicMock()
+        tx.success = True
+        tx.backup_id = "2026-03-10_120000"
+        tx.error = None
+        tx.apply_result = ApplyResult(
+            success=True,
+            requires_reboot=False,
+            in_game_settings=False,
+            applied_settings=["WindowsSettingsHandler"],
+            failed_settings=[],
+        )
+        tx.to_dict.return_value = {
+            "success": True,
+            "profile_id": "slippi-melee",
+            "state": "committed",
+            "backup_id": "2026-03-10_120000",
+            "error": None,
+            "rollback_performed": False,
+            "rollback_error": None,
+            "compliance": None,
+            "checkpoints": [],
+        }
+
+        launch_result = MagicMock()
+        launch_result.success = True
+        launch_result.error = None
+        launch_result.transaction = tx
+        launch_result.restored = False
+        launch_result.to_dict.return_value = {
+            "success": True,
+            "profile_id": "slippi-melee",
+            "launched": True,
+            "process_id": 1234,
+            "wait_requested": True,
+            "exit_code": None,
+            "restore_attempted": False,
+            "restored": False,
+            "restore_backup_id": None,
+            "restore_error": None,
+            "error": None,
+            "warnings": [],
+            "target": {
+                "profile_id": "slippi-melee",
+                "game_name": "Slippi Melee",
+                "platform": "standalone",
+                "executable_name": "Slippi Dolphin.exe",
+                "executable_path": str(tmp_path / "Slippi Dolphin.exe"),
+                "source": "manual_path",
+                "warnings": [],
+            },
+            "transaction": tx.to_dict.return_value,
+        }
+        mock_launch_profile.return_value = launch_result
+
+        runner = CliRunner()
+        launch_path = tmp_path / "Slippi Dolphin.exe"
+        result = runner.invoke(
+            cli,
+            ["launch", "slippi-melee", "--json", "--launch-path", str(launch_path)],
+        )
+
+        assert result.exit_code == 0
+        payload = json.loads(result.output)
+        assert payload["success"] is True
+        assert payload["data"]["target"]["executable_path"] == str(launch_path)
+
+        call = mock_launch_profile.call_args.kwargs
+        assert call["profile_id"] == "slippi-melee"
+        assert call["create_backup"] is True
+        assert call["wait"] is True
+        assert call["restore_on_exit"] is False
+        assert call["launch_path"] == Path(launch_path)
+        assert call["launch_args"] == []
+
+    @patch("abso.main.launch_profile")
+    @patch("abso.main.is_admin", return_value=True)
+    def test_launch_json_clears_current_profile_state_when_restored(
+        self,
+        mock_is_admin,
+        mock_launch_profile,
+        tmp_path,
+    ):
+        """launch should clear current profile state when restore_on_exit succeeds."""
+        tx = MagicMock()
+        tx.success = True
+        tx.backup_id = "2026-03-10_120000"
+        tx.error = None
+        tx.apply_result = ApplyResult(
+            success=True,
+            requires_reboot=False,
+            in_game_settings=False,
+            applied_settings=["WindowsSettingsHandler"],
+            failed_settings=[],
+        )
+        tx.to_dict.return_value = {
+            "success": True,
+            "profile_id": "slippi-melee",
+            "state": "committed",
+            "backup_id": "2026-03-10_120000",
+            "error": None,
+            "rollback_performed": False,
+            "rollback_error": None,
+            "compliance": None,
+            "checkpoints": [],
+        }
+
+        launch_result = MagicMock()
+        launch_result.success = True
+        launch_result.error = None
+        launch_result.transaction = tx
+        launch_result.restored = True
+        launch_result.to_dict.return_value = {
+            "success": True,
+            "profile_id": "slippi-melee",
+            "launched": True,
+            "process_id": 1234,
+            "wait_requested": True,
+            "exit_code": 0,
+            "restore_attempted": True,
+            "restored": True,
+            "restore_backup_id": "2026-03-10_120000",
+            "restore_error": None,
+            "error": None,
+            "warnings": [],
+            "target": None,
+            "transaction": tx.to_dict.return_value,
+        }
+        mock_launch_profile.return_value = launch_result
+
+        state_file = tmp_path / ".abso_state.json"
+        runner = CliRunner()
+        with patch("abso.main.STATE_FILE", state_file):
+            result = runner.invoke(cli, ["launch", "slippi-melee", "--json"])
+
+        assert result.exit_code == 0
+        assert not state_file.exists()
 
 
 class TestCLIRestore:

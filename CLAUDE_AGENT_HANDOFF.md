@@ -153,3 +153,36 @@ This pass implemented the full `2.0 Overhaul` plan from `2.0_OVERHAUL_GUIDE.md` 
 ### Validation
 - `py -m pytest tests/test_tray_state_resolution.py tests/test_tray_startup.py -q` passed.
 - `py -m pytest -q` passed with `1035 passed`.
+
+## Launch Lifecycle Branch (2026-03-10)
+### Problem
+- ABSO can apply, reapply, and verify profiles, but it does not yet own the full `apply -> launch -> wait -> optional restore` lifecycle.
+- Users still have to manually resolve the game executable path and manually recover if launch resolution fails after a successful apply.
+
+### Changes Implemented
+1. Launch orchestration core
+- Added `abso/core/launcher.py`.
+- New responsibilities:
+  - resolve launch target from detected installs or explicit path override
+  - apply profile transactionally before launch
+  - launch the executable with optional passthrough args
+  - optionally wait for process exit
+  - optionally restore the pre-launch backup after exit
+
+2. CLI
+- Added `abso launch <profile>` in `abso/main.py`.
+- Supported options:
+  - `--launch-path`
+  - `--no-backup`
+  - `--no-wait`
+  - `--restore-on-exit`
+  - positional launch args
+- The command persists current profile state when apply succeeds and clears it when restore-on-exit succeeds.
+
+3. Exceptions + CI-facing tests
+- Added launch-specific exceptions in `abso/core/exceptions.py`.
+- Added `launch --json` CLI tests in `tests/test_cli.py` for state persistence and restore clearing behavior.
+
+### Validation
+- Not run locally in this branch by explicit user request: do not run tests on this PC at this time.
+- Intended validation surface is remote CI on the pull request.

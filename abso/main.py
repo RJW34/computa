@@ -15,6 +15,8 @@ from abso.core.applier import ProfileApplier
 from abso.core.auditor import ConfigurationAuditor
 from abso.core.backup import BackupManager
 from abso.core.detector import HardwareDetector
+from abso.core.exceptions import ProfileLaunchError
+from abso.core.launcher import launch_profile
 from abso.core.transaction import ProfileTransactionManager
 from abso.profiles.catalog import get_profile_manifest
 from abso.utils.admin import is_admin
@@ -544,6 +546,119 @@ def apply(profile_name: str, no_backup: bool, json_output: bool) -> None:
             json_error(f"Unexpected apply failure: {e}")
         console.print(f"[red]Unexpected apply failure: {e}[/red]")
         sys.exit(1)
+
+
+@cli.command()
+@click.argument("profile_name")
+@click.argument("launch_args", nargs=-1)
+@click.option(
+    "--launch-path",
+    type=click.Path(path_type=Path, dir_okay=False, file_okay=True),
+    default=None,
+    help="Explicit executable path override instead of auto-detecting an installed game",
+)
+@click.option("--no-backup", is_flag=True, help="Skip automatic backup before apply")
+@click.option("--no-wait", is_flag=True, help="Return immediately after launching instead of waiting for exit")
+@click.option(
+    "--restore-on-exit",
+    is_flag=True,
+    help="Restore the pre-launch backup after the launched process exits (requires backup + waiting)",
+)
+@click.option("--json", "json_output", is_flag=True, help="Output as JSON for GUI integration")
+def launch(
+    profile_name: str,
+    launch_args: tuple[str, ...],
+    launch_path: Path | None,
+    no_backup: bool,
+    no_wait: bool,
+    restore_on_exit: bool,
+    json_output: bool,
+) -> None:
+    """Apply a profile, launch its game, and optionally restore on exit."""
+    if not is_admin():
+        if json_output:
+            json_error("Admin privileges required to launch profiles")
+        console.print("[red]Error: Admin privileges required to launch profiles.[/red]")
+        console.print("Please run as administrator.")
+        sys.exit(1)
+
+    if not json_output:
+        console.print(Panel(f"Launching With Profile: {profile_name}", style="bold blue"))
+
+    try:
+        launch_result = launch_profile(
+            profile_id=profile_name,
+            backup_dir=BACKUPS_DIR,
+            create_backup=not no_backup,
+            wait=not no_wait,
+            restore_on_exit=restore_on_exit,
+            launch_path=launch_path,
+            launch_args=list(launch_args),
+        )
+    except ProfileLaunchError as e:
+        if json_output:
+            json_error(str(e))
+        console.print(f"[red]Error: {e}[/red]")
+        sys.exit(1)
+    except Exception as e:
+        if json_output:
+            json_error(f"Unexpected launch failure: {e}")
+        console.print(f"[red]Unexpected launch failure: {e}[/red]")
+        sys.exit(1)
+
+    tx = launch_result.transaction
+    apply_result = tx.apply_result
+    if tx.success and apply_result and apply_result.success:
+        set_current_profile(
+            profile_name,
+            requires_reboot=apply_result.requires_reboot,
+            reboot_reasons=apply_result.reboot_reasons,
+        )
+        if launch_result.restored:
+            clear_current_profile()
+
+    if json_output:
+        output_json(launch_result.to_dict(), success=launch_result.success, error=launch_result.error)
+        return
+
+    if tx.backup_id and not no_backup:
+        console.print(f"[green]Backup created: {tx.backup_id}[/green]")
+
+    if launch_result.target:
+        console.print(f"[cyan]Target:[/cyan] {launch_result.target.executable_path}")
+    if launch_args:
+        console.print(f"[dim]Args:[/dim] {' '.join(launch_args)}")
+
+    if launch_result.launched:
+        console.print(f"[green]Process launched[/green] (PID {launch_result.process_id})")
+        if no_wait:
+            console.print("[dim]Not waiting for process exit.[/dim]")
+        elif launch_result.exit_code is not None:
+            console.print(f"[dim]Process exit code:[/dim] {launch_result.exit_code}")
+    else:
+        console.print(f"[yellow]Launch did not start a process.[/yellow]")
+
+    for warning in launch_result.warnings:
+        console.print(f"[yellow]Warning: {warning}[/yellow]")
+
+    if launch_result.restored:
+        console.print(f"[green]Restored pre-launch backup: {launch_result.restore_backup_id}[/green]")
+    elif launch_result.restore_attempted and launch_result.restore_error:
+        console.print(f"[red]Restore failed: {launch_result.restore_error}[/red]")
+
+    if launch_result.success:
+        console.print("[green]Launch flow completed.[/green]")
+        return
+
+    if launch_result.error:
+        console.print(f"[red]Launch flow failed: {launch_result.error}[/red]")
+    else:
+        console.print("[red]Launch flow failed.[/red]")
+
+    if tx.success and apply_result and apply_result.success and not launch_result.restored:
+        console.print("[yellow]Profile settings may still be active because apply succeeded before launch failed.[/yellow]")
+
+    sys.exit(1)
 
 
 @cli.command()

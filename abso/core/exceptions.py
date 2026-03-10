@@ -105,6 +105,16 @@ class ProfileApplyError(ProfileError):
     pass
 
 
+class ProfileLaunchError(ProfileError):
+    """Failed to launch a profile target."""
+    pass
+
+
+class LaunchTargetNotFoundError(ProfileLaunchError):
+    """No launchable executable could be resolved for a profile."""
+    pass
+
+
 # Backup Errors
 class BackupError(ABSOError):
     """Base error for backup/restore operations."""
