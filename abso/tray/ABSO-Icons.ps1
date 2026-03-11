@@ -362,76 +362,13 @@ function New-CategoryIcon {
     <#
     .SYNOPSIS
     Creates a small 16x16 icon for a profile category.
+    Delegates to New-CategoryBitmap and converts the bitmap to an icon.
     .PARAMETER Category
-    One of: Fighting, ARPG, Shooter, Productivity, Other
+    One of: Fighting, ARPG, Shooter, Productivity, Streaming, Other
     #>
     param([string]$Category)
 
-    $bmp = New-Object System.Drawing.Bitmap(16, 16)
-    $g = [System.Drawing.Graphics]::FromImage($bmp)
-    $g.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
-    $g.Clear([System.Drawing.Color]::Transparent)
-
-    $pen = New-Object System.Drawing.Pen([System.Drawing.Color]::White, 1.2)
-    $pen.StartCap = [System.Drawing.Drawing2D.LineCap]::Round
-    $pen.EndCap = [System.Drawing.Drawing2D.LineCap]::Round
-
-    switch ($Category) {
-        "Fighting" {
-            # Crossed swords
-            $g.DrawLine($pen, 3, 12, 13, 2)
-            $g.DrawLine($pen, 13, 12, 3, 2)
-            $g.DrawLine($pen, 2, 13, 5, 10)
-            $g.DrawLine($pen, 11, 10, 14, 13)
-        }
-        "ARPG" {
-            # Shield shape
-            $points = @(
-                (New-Object System.Drawing.PointF(8, 2)),
-                (New-Object System.Drawing.PointF(13, 4)),
-                (New-Object System.Drawing.PointF(12, 10)),
-                (New-Object System.Drawing.PointF(8, 14)),
-                (New-Object System.Drawing.PointF(4, 10)),
-                (New-Object System.Drawing.PointF(3, 4))
-            )
-            $g.DrawPolygon($pen, $points)
-        }
-        "Shooter" {
-            # Crosshair
-            $g.DrawEllipse($pen, 4, 4, 8, 8)
-            $g.DrawLine($pen, 8, 1, 8, 5)
-            $g.DrawLine($pen, 8, 11, 8, 15)
-            $g.DrawLine($pen, 1, 8, 5, 8)
-            $g.DrawLine($pen, 11, 8, 15, 8)
-        }
-        "Productivity" {
-            # Monitor
-            $g.DrawRectangle($pen, 2, 2, 12, 8)
-            $g.DrawLine($pen, 8, 10, 8, 13)
-            $g.DrawLine($pen, 5, 13, 11, 13)
-        }
-        "Streaming" {
-            # Broadcast/signal waves icon
-            $g.DrawArc($pen, 2, 4, 12, 12, 220, 100)
-            $g.DrawArc($pen, 4, 6, 8, 8, 220, 100)
-            $g.DrawArc($pen, 6, 8, 4, 4, 220, 100)
-            # Center dot
-            $dotBrush = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::White)
-            $g.FillEllipse($dotBrush, 7, 11, 3, 3)
-            $dotBrush.Dispose()
-        }
-        default {
-            # Star
-            $g.DrawLine($pen, 8, 2, 8, 14)
-            $g.DrawLine($pen, 2, 8, 14, 8)
-            $g.DrawLine($pen, 4, 4, 12, 12)
-            $g.DrawLine($pen, 12, 4, 4, 12)
-        }
-    }
-
-    $pen.Dispose()
-    $g.Dispose()
-
+    $bmp = New-CategoryBitmap -Category $Category -Color ([System.Drawing.Color]::White)
     $hIcon = $bmp.GetHicon()
     $tempIcon = [System.Drawing.Icon]::FromHandle($hIcon)
     $icon = $tempIcon.Clone()
@@ -444,12 +381,12 @@ function New-CategoryIcon {
 function New-CategoryBitmap {
     <#
     .SYNOPSIS
-    Creates a 16x16 bitmap for a profile category using a specified color.
-    Identical drawing to New-CategoryIcon but returns a Bitmap (for menu item .Image).
+    Creates a 16x16 bitmap for a profile category using filled shapes with depth.
+    Uses the three-layer depth system: shadow/glow, main fill with gradient, specular highlight.
     .PARAMETER Category
     One of: Fighting, ARPG, Shooter, Productivity, Streaming, Other
     .PARAMETER Color
-    The color used for the pen strokes and fills.
+    The category color for fills and strokes.
     #>
     param(
         [string]$Category,
@@ -461,20 +398,57 @@ function New-CategoryBitmap {
     $g.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
     $g.Clear([System.Drawing.Color]::Transparent)
 
-    $pen = New-Object System.Drawing.Pen($Color, 1.2)
-    $pen.StartCap = [System.Drawing.Drawing2D.LineCap]::Round
-    $pen.EndCap = [System.Drawing.Drawing2D.LineCap]::Round
+    # Three-layer depth system shared resources
+    $glowBrush = New-Object System.Drawing.SolidBrush(
+        [System.Drawing.Color]::FromArgb(40, $Color.R, $Color.G, $Color.B)
+    )
+    $highlightBrush = New-Object System.Drawing.SolidBrush(
+        [System.Drawing.Color]::FromArgb(70, 255, 255, 255)
+    )
+    $lighter = [System.Drawing.Color]::FromArgb(255,
+        [Math]::Min(255, [int]$Color.R + 50),
+        [Math]::Min(255, [int]$Color.G + 50),
+        [Math]::Min(255, [int]$Color.B + 50)
+    )
+    $darker = [System.Drawing.Color]::FromArgb(255,
+        [Math]::Max(0, [int]$Color.R - 60),
+        [Math]::Max(0, [int]$Color.G - 60),
+        [Math]::Max(0, [int]$Color.B - 60)
+    )
 
     switch ($Category) {
         "Fighting" {
-            # Crossed swords
-            $g.DrawLine($pen, 3, 12, 13, 2)
-            $g.DrawLine($pen, 13, 12, 3, 2)
-            $g.DrawLine($pen, 2, 13, 5, 10)
-            $g.DrawLine($pen, 11, 10, 14, 13)
+            # Crossed blades — thick strokes with guards and pommels
+            # Layer 1: Glow behind crossing point
+            $g.FillEllipse($glowBrush, 4, 4, 8, 8)
+
+            # Layer 2: Thick crossed blade strokes
+            $bladePen = New-Object System.Drawing.Pen($Color, 2.5)
+            $bladePen.StartCap = [System.Drawing.Drawing2D.LineCap]::Round
+            $bladePen.EndCap = [System.Drawing.Drawing2D.LineCap]::Round
+            $g.DrawLine($bladePen, 3, 13, 13, 2)
+            $g.DrawLine($bladePen, 13, 13, 3, 2)
+            $bladePen.Dispose()
+
+            # Guard cross-bars (darker)
+            $guardPen = New-Object System.Drawing.Pen($darker, 1.8)
+            $guardPen.StartCap = [System.Drawing.Drawing2D.LineCap]::Round
+            $guardPen.EndCap = [System.Drawing.Drawing2D.LineCap]::Round
+            $g.DrawLine($guardPen, 2, 10, 5, 10)
+            $g.DrawLine($guardPen, 11, 10, 14, 10)
+            $guardPen.Dispose()
+
+            # Pommel dots
+            $pommelBrush = New-Object System.Drawing.SolidBrush($lighter)
+            $g.FillEllipse($pommelBrush, [float]1.5, [float]12, [float]2.5, [float]2.5)
+            $g.FillEllipse($pommelBrush, [float]12, [float]12, [float]2.5, [float]2.5)
+            $pommelBrush.Dispose()
+
+            # Layer 3: Specular highlight
+            $g.FillEllipse($highlightBrush, 5, 3, 4, 3)
         }
         "ARPG" {
-            # Shield shape
+            # Filled gradient shield with diamond emblem
             $points = @(
                 (New-Object System.Drawing.PointF(8, 2)),
                 (New-Object System.Drawing.PointF(13, 4)),
@@ -483,41 +457,418 @@ function New-CategoryBitmap {
                 (New-Object System.Drawing.PointF(4, 10)),
                 (New-Object System.Drawing.PointF(3, 4))
             )
-            $g.DrawPolygon($pen, $points)
+
+            # Layer 1: Glow behind shield
+            $g.FillEllipse($glowBrush, 2, 1, 12, 14)
+
+            # Layer 2: Filled gradient shield
+            $shieldRect = New-Object System.Drawing.Rectangle(3, 2, 10, 12)
+            $gradBrush = $null
+            try {
+                $gradBrush = New-Object System.Drawing.Drawing2D.LinearGradientBrush(
+                    $shieldRect, $lighter, $Color,
+                    [System.Drawing.Drawing2D.LinearGradientMode]::Vertical
+                )
+            } catch {
+                $gradBrush = New-Object System.Drawing.SolidBrush($Color)
+            }
+            $g.FillPolygon($gradBrush, $points)
+            $gradBrush.Dispose()
+
+            # Darker border
+            $borderPen = New-Object System.Drawing.Pen($darker, 1.0)
+            $g.DrawPolygon($borderPen, $points)
+            $borderPen.Dispose()
+
+            # Center diamond emblem
+            $diamondPoints = @(
+                (New-Object System.Drawing.PointF(8, 5)),
+                (New-Object System.Drawing.PointF(10, 8)),
+                (New-Object System.Drawing.PointF(8, 11)),
+                (New-Object System.Drawing.PointF(6, 8))
+            )
+            $diamondBrush = New-Object System.Drawing.SolidBrush($lighter)
+            $g.FillPolygon($diamondBrush, $diamondPoints)
+            $diamondBrush.Dispose()
+
+            # Layer 3: Specular highlight
+            $g.FillEllipse($highlightBrush, 5, 3, 5, 3)
         }
         "Shooter" {
-            # Crosshair
-            $g.DrawEllipse($pen, 4, 4, 8, 8)
-            $g.DrawLine($pen, 8, 1, 8, 5)
-            $g.DrawLine($pen, 8, 11, 8, 15)
-            $g.DrawLine($pen, 1, 8, 5, 8)
-            $g.DrawLine($pen, 11, 8, 15, 8)
+            # Filled crosshair reticle with center dot
+            # Layer 1: Subtle circle fill
+            $g.FillEllipse($glowBrush, 3, 3, 10, 10)
+            $innerFill = New-Object System.Drawing.SolidBrush(
+                [System.Drawing.Color]::FromArgb(25, $Color.R, $Color.G, $Color.B)
+            )
+            $g.FillEllipse($innerFill, 4, 4, 8, 8)
+            $innerFill.Dispose()
+
+            # Layer 2: Thicker reticle with center gap
+            $reticlePen = New-Object System.Drawing.Pen($Color, 1.6)
+            $reticlePen.StartCap = [System.Drawing.Drawing2D.LineCap]::Round
+            $reticlePen.EndCap = [System.Drawing.Drawing2D.LineCap]::Round
+            $g.DrawEllipse($reticlePen, 3, 3, 10, 10)
+            $g.DrawLine($reticlePen, 8, 1, 8, 5)
+            $g.DrawLine($reticlePen, 8, 11, 8, 15)
+            $g.DrawLine($reticlePen, 1, 8, 5, 8)
+            $g.DrawLine($reticlePen, 11, 8, 15, 8)
+            $reticlePen.Dispose()
+
+            # Filled center dot
+            $dotBrush = New-Object System.Drawing.SolidBrush($lighter)
+            $g.FillEllipse($dotBrush, [float]6.5, [float]6.5, [float]3, [float]3)
+            $dotBrush.Dispose()
+
+            # Layer 3: Specular highlight
+            $g.FillEllipse($highlightBrush, 4, 3, 4, 3)
         }
         "Productivity" {
-            # Monitor
-            $g.DrawRectangle($pen, 2, 2, 12, 8)
-            $g.DrawLine($pen, 8, 10, 8, 13)
-            $g.DrawLine($pen, 5, 13, 11, 13)
+            # Filled monitor with gradient screen, scanline, and stand
+            # Layer 1: Glow behind monitor
+            $g.FillEllipse($glowBrush, 1, 1, 14, 12)
+
+            # Layer 2: Filled dark bezel
+            $bezelBrush = New-Object System.Drawing.SolidBrush($darker)
+            $g.FillRectangle($bezelBrush, 2, 2, 12, 8)
+            $bezelBrush.Dispose()
+
+            # Gradient screen area
+            $screenRect = New-Object System.Drawing.Rectangle(3, 3, 10, 6)
+            $screenBrush = $null
+            try {
+                $screenBrush = New-Object System.Drawing.Drawing2D.LinearGradientBrush(
+                    $screenRect, $lighter, $Color,
+                    [System.Drawing.Drawing2D.LinearGradientMode]::Vertical
+                )
+            } catch {
+                $screenBrush = New-Object System.Drawing.SolidBrush($Color)
+            }
+            $g.FillRectangle($screenBrush, $screenRect)
+            $screenBrush.Dispose()
+
+            # Scanline highlight
+            $scanBrush = New-Object System.Drawing.SolidBrush(
+                [System.Drawing.Color]::FromArgb(50, 255, 255, 255)
+            )
+            $g.FillRectangle($scanBrush, 4, 4, 8, 1)
+            $scanBrush.Dispose()
+
+            # Filled stand and base
+            $standBrush = New-Object System.Drawing.SolidBrush($Color)
+            $g.FillRectangle($standBrush, 7, 10, 2, 2)
+            $g.FillRectangle($standBrush, 5, 12, 6, 2)
+            $standBrush.Dispose()
+
+            # Layer 3: Specular highlight
+            $g.FillEllipse($highlightBrush, 4, 3, 5, 2)
         }
         "Streaming" {
-            # Broadcast/signal waves
-            $g.DrawArc($pen, 2, 4, 12, 12, 220, 100)
-            $g.DrawArc($pen, 4, 6, 8, 8, 220, 100)
-            $g.DrawArc($pen, 6, 8, 4, 4, 220, 100)
-            $dotBrush = New-Object System.Drawing.SolidBrush($Color)
-            $g.FillEllipse($dotBrush, 7, 11, 3, 3)
-            $dotBrush.Dispose()
+            # Broadcast arcs with filled antenna base
+            # Layer 1: Background glow
+            $g.FillEllipse($glowBrush, 2, 2, 12, 12)
+
+            # Layer 2: Thicker broadcast arcs
+            $arcPen = New-Object System.Drawing.Pen($Color, 1.8)
+            $arcPen.StartCap = [System.Drawing.Drawing2D.LineCap]::Round
+            $arcPen.EndCap = [System.Drawing.Drawing2D.LineCap]::Round
+            $g.DrawArc($arcPen, 1, 3, 14, 14, 220, 100)
+            $g.DrawArc($arcPen, 3, 5, 10, 10, 220, 100)
+            $g.DrawArc($arcPen, 5, 7, 6, 6, 220, 100)
+            $arcPen.Dispose()
+
+            # Filled triangular antenna base
+            $antennaPoints = @(
+                (New-Object System.Drawing.PointF(5.5, 14)),
+                (New-Object System.Drawing.PointF(10.5, 14)),
+                (New-Object System.Drawing.PointF(8, 10))
+            )
+            $antennaBrush = New-Object System.Drawing.SolidBrush($Color)
+            $g.FillPolygon($antennaBrush, $antennaPoints)
+            $antennaBrush.Dispose()
+
+            # Bright emitter dot
+            $tipBrush = New-Object System.Drawing.SolidBrush($lighter)
+            $g.FillEllipse($tipBrush, [float]6.5, [float]9, [float]3, [float]3)
+            $tipBrush.Dispose()
+
+            # Layer 3: Specular highlight
+            $g.FillEllipse($highlightBrush, 4, 4, 4, 3)
         }
         default {
-            # Star
-            $g.DrawLine($pen, 8, 2, 8, 14)
-            $g.DrawLine($pen, 2, 8, 14, 8)
-            $g.DrawLine($pen, 4, 4, 12, 12)
-            $g.DrawLine($pen, 12, 4, 4, 12)
+            # Other: Filled 8-pointed star with gradient and center circle
+            # Layer 1: Glow behind
+            $g.FillEllipse($glowBrush, 1, 1, 14, 14)
+
+            # Layer 2: 8-pointed star polygon
+            [float]$cx = 8.0
+            [float]$cy = 8.0
+            [float]$outerR = 6.5
+            [float]$innerR = 3.0
+            $starPoints = @()
+            for ($i = 0; $i -lt 16; $i++) {
+                [float]$angle = ($i * 22.5 - 90) * [Math]::PI / 180
+                [float]$r = if ($i % 2 -eq 0) { $outerR } else { $innerR }
+                $starPoints += New-Object System.Drawing.PointF(
+                    ($cx + $r * [Math]::Cos($angle)),
+                    ($cy + $r * [Math]::Sin($angle))
+                )
+            }
+
+            $starRect = New-Object System.Drawing.Rectangle(1, 1, 14, 14)
+            $starBrush = $null
+            try {
+                $starBrush = New-Object System.Drawing.Drawing2D.LinearGradientBrush(
+                    $starRect, $lighter, $Color,
+                    [System.Drawing.Drawing2D.LinearGradientMode]::ForwardDiagonal
+                )
+            } catch {
+                $starBrush = New-Object System.Drawing.SolidBrush($Color)
+            }
+            $g.FillPolygon($starBrush, $starPoints)
+            $starBrush.Dispose()
+
+            # Bright center circle
+            $centerBrush = New-Object System.Drawing.SolidBrush($lighter)
+            $g.FillEllipse($centerBrush, 6, 6, 4, 4)
+            $centerBrush.Dispose()
+
+            # Layer 3: Specular highlight
+            $g.FillEllipse($highlightBrush, 4, 3, 5, 3)
         }
     }
 
-    $pen.Dispose()
+    $glowBrush.Dispose()
+    $highlightBrush.Dispose()
+    $g.Dispose()
+    return $bmp
+}
+
+function New-ActionBitmap {
+    <#
+    .SYNOPSIS
+    Creates a 16x16 bitmap for an action menu item using filled shapes with depth.
+    Uses the three-layer depth system: shadow/glow, main fill, specular highlight.
+    .PARAMETER Action
+    One of: Restore, Audit, Backups, QuickPanel, Settings, Exit
+    .PARAMETER Color
+    The accent color for this action icon.
+    #>
+    param(
+        [string]$Action,
+        [System.Drawing.Color]$Color
+    )
+
+    $bmp = New-Object System.Drawing.Bitmap(16, 16)
+    $g = [System.Drawing.Graphics]::FromImage($bmp)
+    $g.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
+    $g.Clear([System.Drawing.Color]::Transparent)
+
+    # Three-layer depth system shared resources
+    $glowBrush = New-Object System.Drawing.SolidBrush(
+        [System.Drawing.Color]::FromArgb(40, $Color.R, $Color.G, $Color.B)
+    )
+    $highlightBrush = New-Object System.Drawing.SolidBrush(
+        [System.Drawing.Color]::FromArgb(70, 255, 255, 255)
+    )
+    $lighter = [System.Drawing.Color]::FromArgb(255,
+        [Math]::Min(255, [int]$Color.R + 50),
+        [Math]::Min(255, [int]$Color.G + 50),
+        [Math]::Min(255, [int]$Color.B + 50)
+    )
+    $darker = [System.Drawing.Color]::FromArgb(255,
+        [Math]::Max(0, [int]$Color.R - 60),
+        [Math]::Max(0, [int]$Color.G - 60),
+        [Math]::Max(0, [int]$Color.B - 60)
+    )
+
+    switch ($Action) {
+        "Restore" {
+            # Circular undo arrow (arc + filled arrowhead)
+            # Layer 1: Glow
+            $g.FillEllipse($glowBrush, 1, 1, 14, 14)
+
+            # Layer 2: Circular arc (most of a circle)
+            $arcPen = New-Object System.Drawing.Pen($Color, 2.0)
+            $arcPen.StartCap = [System.Drawing.Drawing2D.LineCap]::Round
+            $arcPen.EndCap = [System.Drawing.Drawing2D.LineCap]::Round
+            $g.DrawArc($arcPen, 3, 3, 10, 10, 50, 260)
+            $arcPen.Dispose()
+
+            # Filled arrowhead triangle (at ~310° pointing CCW/up-left)
+            $arrowPoints = @(
+                (New-Object System.Drawing.PointF(4, 3)),
+                (New-Object System.Drawing.PointF(7.5, 1.5)),
+                (New-Object System.Drawing.PointF(7.5, 5.5))
+            )
+            $arrowBrush = New-Object System.Drawing.SolidBrush($Color)
+            $g.FillPolygon($arrowBrush, $arrowPoints)
+            $arrowBrush.Dispose()
+
+            # Layer 3: Specular
+            $g.FillEllipse($highlightBrush, 5, 4, 4, 3)
+        }
+        "Audit" {
+            # Magnifying glass — bold filled lens + thick handle
+            # Layer 1: Glow behind lens
+            $g.FillEllipse($glowBrush, 0, 0, 12, 12)
+
+            # Layer 2: Solid filled lens circle
+            $lensBrush = New-Object System.Drawing.SolidBrush($Color)
+            $g.FillEllipse($lensBrush, 1, 1, 10, 10)
+            $lensBrush.Dispose()
+
+            # Glass inner highlight (lighter center for depth)
+            $glassBrush = New-Object System.Drawing.SolidBrush(
+                [System.Drawing.Color]::FromArgb(50, 255, 255, 255)
+            )
+            $g.FillEllipse($glassBrush, 3, 3, 6, 6)
+            $glassBrush.Dispose()
+
+            # Thick handle to lower-right
+            $handlePen = New-Object System.Drawing.Pen($darker, 2.8)
+            $handlePen.StartCap = [System.Drawing.Drawing2D.LineCap]::Round
+            $handlePen.EndCap = [System.Drawing.Drawing2D.LineCap]::Round
+            $g.DrawLine($handlePen, 10, 10, 14, 14)
+            $handlePen.Dispose()
+
+            # Layer 3: Specular
+            $g.FillEllipse($highlightBrush, 3, 2, 4, 3)
+        }
+        "Backups" {
+            # Three stacked cards/layers with data lines
+            # Layer 1: Glow
+            $g.FillEllipse($glowBrush, 1, 1, 14, 14)
+
+            # Bottom card (darkest)
+            $card3Brush = New-Object System.Drawing.SolidBrush($darker)
+            $g.FillRectangle($card3Brush, 4, 6, 10, 8)
+            $card3Brush.Dispose()
+
+            # Middle card
+            $midColor = [System.Drawing.Color]::FromArgb(255,
+                [Math]::Max(0, [int]$Color.R - 30),
+                [Math]::Max(0, [int]$Color.G - 30),
+                [Math]::Max(0, [int]$Color.B - 30)
+            )
+            $card2Brush = New-Object System.Drawing.SolidBrush($midColor)
+            $g.FillRectangle($card2Brush, 3, 4, 10, 8)
+            $card2Brush.Dispose()
+
+            # Top card with gradient
+            $topRect = New-Object System.Drawing.Rectangle(2, 2, 10, 8)
+            $topBrush = $null
+            try {
+                $topBrush = New-Object System.Drawing.Drawing2D.LinearGradientBrush(
+                    $topRect, $lighter, $Color,
+                    [System.Drawing.Drawing2D.LinearGradientMode]::Vertical
+                )
+            } catch {
+                $topBrush = New-Object System.Drawing.SolidBrush($Color)
+            }
+            $g.FillRectangle($topBrush, $topRect)
+            $topBrush.Dispose()
+
+            # Data lines on top card
+            $lineBrush = New-Object System.Drawing.SolidBrush(
+                [System.Drawing.Color]::FromArgb(180, 255, 255, 255)
+            )
+            $g.FillRectangle($lineBrush, 4, 4, 6, 1)
+            $g.FillRectangle($lineBrush, 4, 6, 4, 1)
+            $g.FillRectangle($lineBrush, 4, 8, 5, 1)
+            $lineBrush.Dispose()
+
+            # Layer 3: Specular
+            $g.FillEllipse($highlightBrush, 3, 2, 5, 3)
+        }
+        "QuickPanel" {
+            # 2x2 grid of filled tiles with varying brightness
+            # Layer 1: Glow
+            $g.FillEllipse($glowBrush, 1, 1, 14, 14)
+
+            # Layer 2: Four tiles
+            $tileBrush1 = New-Object System.Drawing.SolidBrush($lighter)
+            $tileBrush2 = New-Object System.Drawing.SolidBrush($Color)
+            $tileBrush3 = New-Object System.Drawing.SolidBrush($Color)
+            $tileBrush4 = New-Object System.Drawing.SolidBrush($darker)
+
+            $g.FillRectangle($tileBrush1, 2, 2, 5, 5)     # top-left (brightest)
+            $g.FillRectangle($tileBrush2, 9, 2, 5, 5)     # top-right
+            $g.FillRectangle($tileBrush3, 2, 9, 5, 5)     # bottom-left
+            $g.FillRectangle($tileBrush4, 9, 9, 5, 5)     # bottom-right (dimmest)
+
+            $tileBrush1.Dispose()
+            $tileBrush2.Dispose()
+            $tileBrush3.Dispose()
+            $tileBrush4.Dispose()
+
+            # Layer 3: Specular
+            $g.FillEllipse($highlightBrush, 3, 2, 4, 3)
+        }
+        "Settings" {
+            # Gear cog (8 teeth + filled body + center hole)
+            # Layer 1: Glow
+            $g.FillEllipse($glowBrush, 1, 1, 14, 14)
+
+            # Layer 2: 8 rectangular teeth around circle
+            [float]$cx = 8.0; [float]$cy = 8.0
+            $toothBrush = New-Object System.Drawing.SolidBrush($Color)
+            for ($i = 0; $i -lt 8; $i++) {
+                [float]$angle = ($i * 45) * [Math]::PI / 180
+                [float]$tx = $cx + 5.5 * [Math]::Cos($angle)
+                [float]$ty = $cy + 5.5 * [Math]::Sin($angle)
+                $g.FillRectangle($toothBrush, ($tx - 1.2), ($ty - 1.2), [float]2.4, [float]2.4)
+            }
+            $toothBrush.Dispose()
+
+            # Filled circle body with gradient
+            $bodyRect = New-Object System.Drawing.Rectangle(3, 3, 10, 10)
+            $bodyBrush = $null
+            try {
+                $bodyBrush = New-Object System.Drawing.Drawing2D.LinearGradientBrush(
+                    $bodyRect, $lighter, $Color,
+                    [System.Drawing.Drawing2D.LinearGradientMode]::ForwardDiagonal
+                )
+            } catch {
+                $bodyBrush = New-Object System.Drawing.SolidBrush($Color)
+            }
+            $g.FillEllipse($bodyBrush, $bodyRect)
+            $bodyBrush.Dispose()
+
+            # Center hole
+            $holeBrush = New-Object System.Drawing.SolidBrush($darker)
+            $g.FillEllipse($holeBrush, 6, 6, 4, 4)
+            $holeBrush.Dispose()
+
+            # Layer 3: Specular
+            $g.FillEllipse($highlightBrush, 4, 3, 5, 3)
+        }
+        "Exit" {
+            # IEC power symbol (open circle arc + vertical line)
+            # Layer 1: Glow
+            $g.FillEllipse($glowBrush, 2, 2, 12, 12)
+
+            # Layer 2: Open circle arc (gap at top)
+            $arcPen = New-Object System.Drawing.Pen($Color, 1.8)
+            $arcPen.StartCap = [System.Drawing.Drawing2D.LineCap]::Round
+            $arcPen.EndCap = [System.Drawing.Drawing2D.LineCap]::Round
+            $g.DrawArc($arcPen, 3, 4, 10, 10, 50, 260)
+            $arcPen.Dispose()
+
+            # Vertical line through gap
+            $linePen = New-Object System.Drawing.Pen($Color, 1.8)
+            $linePen.StartCap = [System.Drawing.Drawing2D.LineCap]::Round
+            $linePen.EndCap = [System.Drawing.Drawing2D.LineCap]::Round
+            $g.DrawLine($linePen, 8, 2, 8, 8)
+            $linePen.Dispose()
+
+            # Layer 3: Specular
+            $g.FillEllipse($highlightBrush, 4, 3, 5, 3)
+        }
+    }
+
+    $glowBrush.Dispose()
+    $highlightBrush.Dispose()
     $g.Dispose()
     return $bmp
 }
