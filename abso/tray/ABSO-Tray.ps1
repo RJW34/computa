@@ -770,7 +770,7 @@ $script:FallbackProfiles = [ordered]@{
     }
     "overwatch2"        = @{
         Name     = "Overwatch 2 - No-Sync"
-        Sub      = "Reflex ON+Boost | VSync OFF | G-SYNC OFF"
+        Sub      = "Reflex OFF | VSync OFF | G-SYNC OFF"
         Cat      = "Shooter"
         Desc     = "Minimum latency profile. No-sync path with VRR explicitly disabled for deterministic behavior."
         Exes     = @("Overwatch.exe")

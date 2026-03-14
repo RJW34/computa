@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "saved_at": "2026-03-08T03:09:50.338606",
+  "saved_at": "2026-03-14T16:32:07.877052",
   "profiles": [
     {
       "id": "slippi-melee",
@@ -225,14 +225,14 @@
     {
       "id": "overwatch2",
       "display_name": "Overwatch 2 - No-Sync",
-      "description": "Minimum latency no-sync profile (Reflex, VSync OFF, VRR OFF)",
+      "description": "Minimum latency no-sync profile (Reflex OFF, VSync OFF, VRR OFF)",
       "optimization_target": "low_latency_high_fps",
       "executables": [
         "Overwatch.exe"
       ],
       "tray_category": "Shooter",
-      "tray_subtitle": "Reflex ON+Boost | VSync OFF | G-SYNC OFF",
-      "tray_description": "Minimum latency no-sync profile (Reflex, VSync OFF, VRR OFF)",
+      "tray_subtitle": "Reflex OFF | VSync OFF | G-SYNC OFF",
+      "tray_description": "Minimum latency no-sync profile (Reflex OFF, VSync OFF, VRR OFF)",
       "sync_mode": "off"
     },
     {

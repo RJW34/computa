@@ -88,7 +88,7 @@ class Overwatch2Profile(_Overwatch2BaseProfile):
 
     @property
     def description(self) -> str:
-        return "Minimum latency no-sync profile (Reflex, VSync OFF, VRR OFF)"
+        return "Minimum latency no-sync profile (Reflex OFF, VSync OFF, VRR OFF)"
 
     def _variant_overrides(self) -> dict[str, dict[str, Any]]:
         return {
@@ -103,8 +103,8 @@ class Overwatch2Profile(_Overwatch2BaseProfile):
             "OW2ConfigHandler": {
                 # No-sync: exclusive fullscreen for cleanest presentation path.
                 "window_mode": 0,
-                # Uncapped / high fixed cap for minimum latency.
-                "frame_rate_cap": 400,
+                # Uncapped for minimum latency (600 = OW2 max).
+                "frame_rate_cap": 600,
             },
         }
 
@@ -125,20 +125,27 @@ class Overwatch2Profile(_Overwatch2BaseProfile):
             {
                 "category": "Display",
                 "setting": "NVIDIA Reflex Low Latency",
-                "value": "Enabled + Boost",
-                "reason": "Use native Reflex; keep driver LLM off.",
+                "value": "Off",
+                "reason": (
+                    "GPU is not saturated at 1440p Low — Reflex throttles CPU frame "
+                    "submission without benefit, costing ~60fps. Higher uncapped FPS "
+                    "= lower latency than Reflex queue management."
+                ),
             },
             {
                 "category": "Display",
                 "setting": "Frame Rate Cap",
-                "value": "Uncapped or high fixed cap",
-                "reason": "No-sync profile prioritizes minimum click-to-pixel latency.",
+                "value": "Uncapped (600)",
+                "reason": "No-sync profile: maximum FPS = minimum click-to-pixel latency.",
             },
             {
                 "category": "Display",
                 "setting": "Reduce Buffering",
                 "value": "On",
-                "reason": "Reduces render queue depth in-engine.",
+                "reason": (
+                    "Essential with Reflex OFF — limits pre-render buffer to 1 frame. "
+                    "Only mechanism keeping render queue shallow."
+                ),
             },
             {
                 "category": "Graphics",

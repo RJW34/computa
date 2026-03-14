@@ -154,7 +154,7 @@ PROFILE_CATALOG: OrderedDict[str, ProfileCatalogEntry] = OrderedDict(
         "overwatch2": ProfileCatalogEntry(
             profile_class=Overwatch2Profile,
             tray_category="Shooter",
-            tray_subtitle="Reflex ON+Boost | VSync OFF | G-SYNC OFF",
+            tray_subtitle="Reflex OFF | VSync OFF | G-SYNC OFF",
             sync_mode="off",
         ),
         "overwatch2-gsync": ProfileCatalogEntry(
