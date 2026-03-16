@@ -145,18 +145,24 @@ class CapabilityEngine:
         if confirmed_vrr:
             return
 
-        # Check if hardware capability was detected but VRR isn't confirmed active
-        hardware_capable = [m for m in monitors if m.get("vrr_supported") == "hardware"]
-        if hardware_capable:
-            names = ", ".join(m.get("name", "Unknown") for m in hardware_capable)
+        # Accept "likely" or "hardware" — the profile itself will enable G-SYNC.
+        # This avoids a catch-22 where a no-sync profile disables VRR globally,
+        # making it impossible to switch to a G-Sync profile because VRR can't
+        # be "confirmed" while it's disabled.
+        likely_vrr = [
+            m for m in monitors
+            if m.get("vrr_supported") in ("hardware", "likely")
+        ]
+        if likely_vrr:
+            names = ", ".join(m.get("name", "Unknown") for m in likely_vrr)
             report.findings.append(
                 CapabilityFinding(
-                    code="VRR_REQUIRED_NOT_ACTIVE",
-                    severity="blocker",
+                    code="VRR_LIKELY_ACCEPTED",
+                    severity="info",
                     message=(
-                        f"Monitor(s) ({names}) support VRR/FreeSync but active VRR could not be confirmed. "
-                        "Turn on Adaptive Sync/FreeSync in your monitor's OSD menu, "
-                        "enable G-SYNC in NVIDIA Control Panel, then retry."
+                        f"VRR support detected as likely on {names}. "
+                        "Profile will enable G-SYNC. If you experience issues, "
+                        "verify Adaptive Sync/FreeSync is enabled in your monitor OSD."
                     ),
                 )
             )
