@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import ctypes
 import logging
+import threading
 import time
 from ctypes import Structure, wintypes, byref
 from typing import Any
@@ -110,12 +111,31 @@ def _detect_controller_model(h_physical: wintypes.HANDLE) -> str | None:
         return None
 
 
-def _set_vcp(h_physical: wintypes.HANDLE, code: int, value: int) -> bool:
-    """Set a VCP feature on the monitor."""
-    try:
-        return bool(ctypes.windll.dxva2.SetVCPFeature(h_physical, code, value))
-    except Exception:
+def _set_vcp(
+    h_physical: wintypes.HANDLE, code: int, value: int, timeout: float = 5.0,
+) -> bool:
+    """Set a VCP feature on the monitor with timeout.
+
+    DDC/CI calls can hang if the monitor is mid-transition (e.g. after an
+    HDR mode switch). A thread-based timeout prevents blocking the apply.
+    """
+    result_box: list[bool] = [False]
+
+    def _do_set() -> None:
+        try:
+            result_box[0] = bool(
+                ctypes.windll.dxva2.SetVCPFeature(h_physical, code, value)
+            )
+        except Exception:
+            result_box[0] = False
+
+    t = threading.Thread(target=_do_set, daemon=True)
+    t.start()
+    t.join(timeout=timeout)
+    if t.is_alive():
+        logger.warning(f"SetVCPFeature 0x{code:02X}={value} timed out after {timeout}s")
         return False
+    return result_box[0]
 
 
 def _destroy_physical_monitors(
@@ -128,15 +148,8 @@ def _destroy_physical_monitors(
         pass
 
 
-def set_monitor_adaptive_sync(enable: bool) -> dict[str, Any]:
-    """Toggle the primary monitor's Adaptive Sync via DDC/CI.
-
-    Args:
-        enable: True to enable Adaptive Sync, False to disable.
-
-    Returns:
-        Dict with 'success' bool and optional 'error' string.
-    """
+def _try_adaptive_sync_toggle(enable: bool) -> dict[str, Any]:
+    """Single attempt to toggle Adaptive Sync. Internal helper."""
     result: dict[str, Any] = {"success": False, "error": None}
 
     try:
@@ -146,7 +159,6 @@ def set_monitor_adaptive_sync(enable: bool) -> dict[str, Any]:
         result["error"] = "dxva2.dll not available"
         return result
 
-    h_monitor = None
     monitors = None
     count = wintypes.DWORD()
 
@@ -180,7 +192,7 @@ def set_monitor_adaptive_sync(enable: bool) -> dict[str, Any]:
         sequence = vcp_profile["enable_sequence" if enable else "disable_sequence"]
         for code, value in sequence:
             if not _set_vcp(h_physical, code, value):
-                result["error"] = f"SetVCPFeature 0x{code:02X}={value} failed"
+                result["error"] = f"SetVCPFeature 0x{code:02X}={value} timed out or failed"
                 return result
 
         result["success"] = True
@@ -192,3 +204,36 @@ def set_monitor_adaptive_sync(enable: bool) -> dict[str, Any]:
     finally:
         if monitors is not None:
             _destroy_physical_monitors(count.value, monitors)
+
+
+def set_monitor_adaptive_sync(
+    enable: bool, retries: int = 3, retry_delay: float = 2.0,
+) -> dict[str, Any]:
+    """Toggle the primary monitor's Adaptive Sync via DDC/CI.
+
+    Retries with a delay if the monitor is unresponsive (e.g. during an
+    HDR mode switch the display briefly resets and DDC/CI hangs).
+
+    Args:
+        enable: True to enable Adaptive Sync, False to disable.
+        retries: Number of attempts before giving up.
+        retry_delay: Seconds to wait between retries.
+
+    Returns:
+        Dict with 'success' bool and optional 'error' string.
+    """
+    last_result: dict[str, Any] = {"success": False, "error": "No attempts made"}
+
+    for attempt in range(retries):
+        last_result = _try_adaptive_sync_toggle(enable)
+        if last_result["success"]:
+            return last_result
+        if attempt < retries - 1:
+            logger.info(
+                f"Monitor DDC/CI attempt {attempt + 1} failed, "
+                f"retrying in {retry_delay}s..."
+            )
+            time.sleep(retry_delay)
+
+    logger.warning(f"Monitor Adaptive Sync toggle failed after {retries} attempts")
+    return last_result
