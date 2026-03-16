@@ -335,6 +335,29 @@ class NvidiaSettingsHandler(SettingsHandler):
 
                 logger.info(f"NVIDIA global settings applied for {game_name}: {global_settings}")
 
+                # Sync monitor OSD Adaptive Sync to match driver VRR mode.
+                # The monitor firmware needs Adaptive Sync enabled for G-SYNC
+                # to work, and disabled for strict no-sync.
+                vrr_mode_value = global_settings.get("vrr_mode")
+                if vrr_mode_value is not None:
+                    enable_adaptive = vrr_mode_value not in ("off", "disabled", 0, "0")
+                    try:
+                        from abso.settings.nvidia.monitor_adaptive_sync import (
+                            set_monitor_adaptive_sync,
+                        )
+
+                        sync_result = set_monitor_adaptive_sync(enable_adaptive)
+                        if sync_result["success"]:
+                            state = "enabled" if enable_adaptive else "disabled"
+                            applied.append(f"Monitor Adaptive Sync: {state}")
+                            logger.info(f"Monitor Adaptive Sync {state}")
+                        elif sync_result.get("error"):
+                            logger.warning(
+                                f"Monitor Adaptive Sync toggle failed: {sync_result['error']}"
+                            )
+                    except Exception as e:
+                        logger.warning(f"Monitor Adaptive Sync toggle skipped: {e}")
+
             # Use provided executables (bind all when multiple are supplied)
             if executables and nvidia_settings:
                 profile_name = str(driver_profile_name or game_name)
