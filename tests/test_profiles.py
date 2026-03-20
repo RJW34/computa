@@ -9,6 +9,7 @@ import pytest
 from abso.profiles import get_all_profiles
 from abso.profiles.cod_bo7 import CodBo7Profile
 from abso.profiles.diablo4 import Diablo4Profile
+from abso.profiles.marvel_rivals import MarvelRivalsHDRProfile, MarvelRivalsSDRProfile
 from abso.profiles.overwatch2 import (
     Overwatch2GSyncHDRProfile,
     Overwatch2GSyncProfile,
@@ -20,6 +21,7 @@ from abso.profiles.rivals2_online import Rivals2OnlineProfile
 from abso.profiles.slippi_melee import (
     SlippiMeleeConsoleParityProfile,
     SlippiMeleeProfile,
+    SlippiMeleeUniversalProfile,
     SlippiMeleeVRRLabProfile,
 )
 
@@ -38,6 +40,12 @@ class TestProfileLoading:
         profile = SlippiMeleeConsoleParityProfile()
         assert profile.profile_id == "slippi-melee-console-parity"
         assert "Console-Parity" in profile.display_name
+
+    def test_slippi_universal_profile_loads(self):
+        """Test SlippiMeleeUniversalProfile can be instantiated."""
+        profile = SlippiMeleeUniversalProfile()
+        assert profile.profile_id == "slippi-melee-universal"
+        assert "Universal" in profile.display_name
 
     def test_slippi_vrr_lab_profile_loads(self):
         """Test SlippiMeleeVRRLabProfile can be instantiated."""
@@ -71,6 +79,15 @@ class TestProfileLoading:
         assert no_sync.profile_id == "overwatch2"
         assert gsync.profile_id == "overwatch2-gsync"
         assert gsync_hdr.profile_id == "overwatch2-gsync-hdr"
+
+    def test_marvel_rivals_profiles_load(self):
+        """Test both Marvel Rivals variants can be instantiated."""
+        sdr = MarvelRivalsSDRProfile()
+        hdr = MarvelRivalsHDRProfile()
+        assert sdr.profile_id == "marvel-rivals-sdr"
+        assert hdr.profile_id == "marvel-rivals-hdr"
+        assert "Marvel Rivals" in sdr.display_name
+        assert "Marvel Rivals" in hdr.display_name
 
 
 class TestProfileHandlers:
@@ -160,11 +177,18 @@ class TestProfileSettings:
         assert settings["threaded_optimization"] == "off"
 
     def test_slippi_nvidia_settings_vulkan_disables_llm(self):
-        """Vulkan backend should disable driver LLM (DX11-only control)."""
+        """Vulkan backend should disable driver LLM."""
         profile = SlippiMeleeProfile()
         with patch.object(profile, "_detect_dolphin_backend", return_value="vulkan"):
             settings = profile.get_settings("NvidiaSettingsHandler")
         assert settings["low_latency_mode"] == "off"
+
+    def test_slippi_nvidia_settings_dx12_keeps_llm_on(self):
+        """DX12 backend should keep LLM enabled on current NVIDIA drivers."""
+        profile = SlippiMeleeProfile()
+        with patch.object(profile, "_detect_dolphin_backend", return_value="dx12"):
+            settings = profile.get_settings("NvidiaSettingsHandler")
+        assert settings["low_latency_mode"] == "on"
 
     def test_slippi_windows_settings_dx11_disables_hags(self):
         """DX11 backend should disable HAGS for stability."""
@@ -172,6 +196,20 @@ class TestProfileSettings:
         with patch.object(profile, "_detect_dolphin_backend", return_value="dx11"):
             settings = profile.get_settings("WindowsSettingsHandler")
         assert settings["hags"] is False
+
+    def test_slippi_universal_windows_settings_keep_hags_on(self):
+        """Universal Slippi profile should keep HAGS on for no-reboot reapply."""
+        profile = SlippiMeleeUniversalProfile()
+        with patch.object(profile, "_detect_dolphin_backend", return_value="dx11"):
+            settings = profile.get_settings("WindowsSettingsHandler")
+        assert settings["hags"] is True
+
+    def test_slippi_competitive_dolphin_settings_clear_vrr_presentation_flags(self):
+        """Competitive Slippi should explicitly clear VRR-lab presentation toggles."""
+        profile = SlippiMeleeProfile()
+        settings = profile.get_settings("DolphinConfigHandler")
+        assert settings["rush_presentation"] == "False"
+        assert settings["smooth_presentation"] == "False"
 
     def test_slippi_console_parity_nvidia_settings(self):
         """Console-parity Slippi should bias for pacing consistency over minimum latency."""
@@ -255,6 +293,44 @@ class TestProfileSettings:
 
         color = profile.get_settings("ColorProfileSettingsHandler")
         assert color["icc_profile"] == "native"
+        assert color["game_type"] == "competitive_fps"
+
+    def test_marvel_rivals_sdr_settings(self):
+        """SDR Marvel Rivals profile should keep the Reflex + VRR SDR path."""
+        profile = MarvelRivalsSDRProfile()
+
+        win = profile.get_settings("WindowsSettingsHandler")
+        assert win["hdr"] is False
+        assert win["auto_hdr"] is False
+
+        nvidia = profile.get_settings("NvidiaSettingsHandler")
+        assert nvidia["preset"] == "reflex_gsync"
+        assert nvidia["profile_name"] == "Marvel Rivals"
+        assert nvidia["auto_vrr_fps_cap"] is True
+        assert nvidia["global_vrr_mode"] == "fullscreen_only"
+
+        color = profile.get_settings("ColorProfileSettingsHandler")
+        assert color["icc_profile"] == "srgb"
+        assert color["digital_vibrance"] == 45
+        assert color["game_type"] == "competitive_fps"
+
+    def test_marvel_rivals_hdr_settings(self):
+        """HDR Marvel Rivals profile should preserve HDR while keeping Reflex + VRR."""
+        profile = MarvelRivalsHDRProfile()
+
+        win = profile.get_settings("WindowsSettingsHandler")
+        assert win["hdr"] is True
+        assert win["auto_hdr"] is False
+
+        nvidia = profile.get_settings("NvidiaSettingsHandler")
+        assert nvidia["preset"] == "reflex_gsync"
+        assert nvidia["profile_name"] == "Marvel Rivals"
+        assert nvidia["auto_vrr_fps_cap"] is True
+        assert nvidia["global_vrr_mode"] == "fullscreen_only"
+
+        color = profile.get_settings("ColorProfileSettingsHandler")
+        assert color["icc_profile"] == "native"
+        assert color["digital_vibrance"] == 50
         assert color["game_type"] == "competitive_fps"
 
     def test_cod_bo7_hdr_native_color(self):
@@ -398,10 +474,14 @@ class TestBaseProfileImplementation:
         no_sync = Overwatch2Profile()
         gsync = Overwatch2GSyncProfile()
         gsync_hdr = Overwatch2GSyncHDRProfile()
+        marvel_sdr = MarvelRivalsSDRProfile()
+        marvel_hdr = MarvelRivalsHDRProfile()
         slippi_vrr_lab = SlippiMeleeVRRLabProfile()
         assert no_sync.requires_confirmed_vrr_support is False
         assert gsync.requires_confirmed_vrr_support is True
         assert gsync_hdr.requires_confirmed_vrr_support is True
+        assert marvel_sdr.requires_confirmed_vrr_support is True
+        assert marvel_hdr.requires_confirmed_vrr_support is True
         assert slippi_vrr_lab.requires_confirmed_vrr_support is True
 
     def test_pokemon_auto_chess_optimization_target(self):

@@ -85,6 +85,10 @@ class SlippiMeleeProfile(EmulatorLatencyBaseProfile):
                 "reduce_timing_dispersion": "True",  # Ishiiruka-specific: tighter frame timing
                 "timing_variance": "8",
                 "immediate_xfb_enable": "True",
+                # Clear presentation features that can linger after switching
+                # away from the VRR lab or parity profiles.
+                "rush_presentation": "False",
+                "smooth_presentation": "False",
                 "sync_gpu": "False",
             },
         }
@@ -124,9 +128,10 @@ class SlippiMeleeProfile(EmulatorLatencyBaseProfile):
         settings = super().get_settings(handler_name).copy()
         backend = self._detect_dolphin_backend()
 
-        if handler_name == "NvidiaSettingsHandler" and backend in {"dx12", "vulkan", "opengl"}:
-            # NVIDIA LLM is DX9/DX11-only. For DX12/Vulkan/OpenGL backends,
-            # avoid forcing queue controls that provide no real benefit.
+        if handler_name == "NvidiaSettingsHandler" and backend in {"vulkan", "opengl"}:
+            # NVIDIA added DX12 support for Low Latency Mode in the 551.23
+            # driver family, but Vulkan/OpenGL still do not expose the same
+            # driver queue control path.
             settings["low_latency_mode"] = "off"
 
         if handler_name == "WindowsSettingsHandler":
@@ -194,10 +199,10 @@ class SlippiMeleeProfile(EmulatorLatencyBaseProfile):
             {
                 "category": "Nvidia Control Panel",
                 "setting": "Low Latency Mode",
-                "value": "Backend-aware (DX11: On, DX12/Vulkan/OpenGL: Off)",
+                "value": "Backend-aware (DX11/DX12: On, Vulkan/OpenGL: Off)",
                 "reason": (
-                    "Driver LLM is relevant on DX11 paths. For DX12/Vulkan/OpenGL, "
-                    "the profile disables LLM because the setting does not provide the same queue benefits."
+                    "Driver LLM remains useful on DX11, and newer NVIDIA drivers also support "
+                    "DX12. Vulkan/OpenGL paths do not expose the same queue control benefit."
                 ),
             },
             {
@@ -223,11 +228,11 @@ class SlippiMeleeProfile(EmulatorLatencyBaseProfile):
             {
                 "category": "Graphics",
                 "setting": "Backend",
-                "value": "Experiment (Vulkan often best)",
+                "value": "Vulkan first, then test DX12",
                 "reason": (
-                    "Test both Vulkan and DX12 for your system. Vulkan is often best on "
-                    "modern NVIDIA/AMD GPUs. DX12 + HAGS can also achieve low latency. "
-                    "The difference is typically 0-2ms between the two."
+                    "Official Dolphin guidance still points most NVIDIA/AMD users to Vulkan first. "
+                    "DX12 is still worth A/B testing if Vulkan misbehaves or if HAGS + DX12 performs "
+                    "better on your exact system."
                 ),
             },
             {
@@ -327,10 +332,20 @@ class SlippiMeleeProfile(EmulatorLatencyBaseProfile):
             {
                 "category": "Dolphin.ini [Core]",
                 "setting": "RushPresentation",
-                "value": "Optional (test for 8-14ms reduction)",
+                "value": "Off by default (manual A/B test)",
                 "reason": (
-                    "Rush Frame Presentation (December 2025 feature). Can reduce latency by "
-                    "8-14ms but may cause frame pacing variance on slower GPUs. Test both settings."
+                    "Rush Frame Presentation can lower latency on some systems, but the gain varies a lot. "
+                    "This profile keeps it off by default so the no-sync path stays deterministic unless you "
+                    "explicitly A/B test it."
+                ),
+            },
+            {
+                "category": "Dolphin.ini [Core]",
+                "setting": "SmoothPresentation",
+                "value": "False",
+                "reason": (
+                    "Keep smoothing off for the competitive no-sync path. This is only meant for "
+                    "the VRR lab profile."
                 ),
             },
             {
@@ -424,7 +439,7 @@ class SlippiMeleeUniversalProfile(SlippiMeleeProfile):
     system restart, matching how Overwatch 2 and other modern titles
     treat HAGS as a fixed system-level setting.
 
-    Optimized for absolute minimum latency regardless of sync technology.
+    Optimized for the competitive no-sync path while keeping HAGS fixed.
     Dolphin's own latency features (Immediately Present XFB, Rush Frame
     Presentation) provide far greater latency reduction than any HAGS
     toggle, so fixing HAGS=True avoids unnecessary reboots with no
@@ -441,7 +456,7 @@ class SlippiMeleeUniversalProfile(SlippiMeleeProfile):
 
     @property
     def description(self) -> str:
-        return "Lowest latency, fixed HAGS (no reboot), sync-agnostic"
+        return "Lowest latency, fixed HAGS on (no reboot), no-sync competitive path"
 
     @property
     def optimization_target(self) -> str:
@@ -457,7 +472,7 @@ class SlippiMeleeUniversalProfile(SlippiMeleeProfile):
         settings = super().get_settings(handler_name).copy()
 
         if handler_name == "WindowsSettingsHandler":
-            # Fixed HAGS=True — no backend-dependent toggling.
+            # Fixed HAGS=True - no backend-dependent toggling.
             # Avoids reboot requirement when switching Dolphin backends.
             # HAGS benefit on DX12/Vulkan outweighs marginal DX11/OpenGL cost.
             settings["hags"] = True
@@ -473,7 +488,7 @@ class SlippiMeleeUniversalProfile(SlippiMeleeProfile):
                 updated.append({
                     "category": "Windows Settings",
                     "setting": "Hardware Accelerated GPU Scheduling (HAGS)",
-                    "value": "On (always — no reboot on re-apply)",
+                    "value": "On (always - no reboot on re-apply)",
                     "reason": (
                         "HAGS is fixed to True regardless of Dolphin backend. This avoids "
                         "reboot requirements when switching backends or re-applying the profile. "

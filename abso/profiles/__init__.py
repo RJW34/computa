@@ -9,6 +9,7 @@ from abso.profiles.catalog import (
 from abso.profiles.cod_bo7 import CodBo7Profile
 from abso.profiles.diablo4 import Diablo4Profile
 from abso.profiles.fortnite import FortniteProfile
+from abso.profiles.marvel_rivals import MarvelRivalsHDRProfile, MarvelRivalsSDRProfile
 from abso.profiles.overwatch2 import (
     Overwatch2GSyncHDRProfile,
     Overwatch2GSyncProfile,
@@ -26,6 +27,7 @@ from abso.profiles.ryujinx_ssbu import RyujinxSSBUProfile
 from abso.profiles.slippi_melee import (
     SlippiMeleeConsoleParityProfile,
     SlippiMeleeProfile,
+    SlippiMeleeUniversalProfile,
     SlippiMeleeVRRLabProfile,
 )
 from abso.profiles.streaming_profiles import (
@@ -40,6 +42,7 @@ __all__ = [
     "BaseProfile",
     "SlippiMeleeConsoleParityProfile",
     "SlippiMeleeProfile",
+    "SlippiMeleeUniversalProfile",
     "SlippiMeleeVRRLabProfile",
     "Rivals2Profile",
     "Rivals2OfflineProfile",
@@ -50,6 +53,8 @@ __all__ = [
     "Diablo4Profile",
     "FortniteProfile",
     "FortniteStreamingProfile",
+    "MarvelRivalsSDRProfile",
+    "MarvelRivalsHDRProfile",
     "Overwatch2Profile",
     "Overwatch2GSyncProfile",
     "Overwatch2GSyncHDRProfile",

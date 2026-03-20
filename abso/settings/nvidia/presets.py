@@ -98,8 +98,9 @@ class NvidiaSettingValues:
 
 # Preset profiles for different optimization targets
 #
-# IMPORTANT: Low Latency Mode (LLM) only works in DX9/DX11.
-# For DX12/Vulkan games, use NVIDIA Reflex instead.
+# IMPORTANT: Low Latency Mode (LLM) works in DX9/DX11 and modern NVIDIA
+# drivers also support DX12. Vulkan still does not expose the same benefit.
+# If a game has NVIDIA Reflex, use Reflex instead of layering driver LLM.
 # LLM "Ultra" auto-caps FPS and overrides manual caps - use "On" with manual cap.
 #
 # NOTE ON STUTTERING: LLM reduces the render queue (pre-rendered frames).
@@ -127,7 +128,7 @@ NVIDIA_PRESETS: dict[str, dict[str, Any]] = {
         },
         "notes": {
             "fps_cap": "Set in-game or RTSS to refresh_rate - 3 (e.g., 141 for 144Hz)",
-            "api_support": "LLM works in DX9/DX11 only. Use Reflex for DX12/Vulkan.",
+            "api_support": "LLM works in DX9/DX11/DX12. Use Reflex when available; Vulkan still relies on the game/driver path instead.",
         },
     },
     "vrr_fighting_game": {
@@ -151,7 +152,7 @@ NVIDIA_PRESETS: dict[str, dict[str, Any]] = {
                 "60Hz-logic games still benefit from high refresh (reduced scanout latency). "
                 "300Hz and 240Hz both divide evenly into 60fps - no cadence judder."
             ),
-            "api_support": "Most modern fighting games use DX12/UE5 - LLM has limited effect, Reflex unavailable in Rivals 2.",
+            "api_support": "Most modern fighting games use DX12/UE5. LLM can still help, but results vary more than classic DX11 paths and Rivals 2 still lacks Reflex.",
             "stuttering": (
                 "If experiencing micro-stutter, try low_latency_mode='off' or use NPI "
                 "to set Max Pre-Rendered Frames to 2-3. Hardware-dependent - test both."

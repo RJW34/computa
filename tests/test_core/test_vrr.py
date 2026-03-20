@@ -150,16 +150,22 @@ class TestLLMRecommendation:
         assert result["low_latency_mode"] == "off"
         assert result.get("use_reflex") is True
 
+    def test_reflex_preferred_for_dx11(self):
+        """Test Reflex is preferred over driver LLM for DX11 games that support it."""
+        result = get_llm_recommendation(GraphicsAPI.DX11, has_reflex=True)
+        assert result["low_latency_mode"] == "off"
+        assert result.get("use_reflex") is True
+
     def test_reflex_preferred_for_vulkan(self):
         """Test Reflex is preferred over LLM for Vulkan."""
         result = get_llm_recommendation(GraphicsAPI.VULKAN, has_reflex=True)
         assert result["low_latency_mode"] == "off"
         assert result.get("use_reflex") is True
 
-    def test_no_llm_for_dx12_without_reflex(self):
-        """Test LLM off for DX12 without Reflex (no alternative)."""
+    def test_llm_supported_in_dx12_without_reflex(self):
+        """Test LLM on for DX12 when Reflex is not available."""
         result = get_llm_recommendation(GraphicsAPI.DX12, has_reflex=False)
-        assert result["low_latency_mode"] == "off"
+        assert result["low_latency_mode"] == "on"
         assert "use_reflex" not in result or result.get("use_reflex") is not True
 
 

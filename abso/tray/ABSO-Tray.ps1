@@ -561,8 +561,18 @@ if (-not $script:createdNew) {
 
 $script:ProjectRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
 
-# Resolve full python path at startup (elevated admin may lose user PATH entries)
-$script:PythonExe = (Get-Command python -ErrorAction SilentlyContinue).Source
+# Resolve full python path at startup.
+# Prefer the repo-local virtualenv so tray restarts always see the current workspace code.
+$script:PythonExe = $null
+$localVenvPython = Join-Path $script:ProjectRoot ".venv\Scripts\python.exe"
+if (Test-Path $localVenvPython) {
+    $script:PythonExe = $localVenvPython
+}
+
+# Fallback to PATH/global Python if no local virtualenv exists.
+if (-not $script:PythonExe) {
+    $script:PythonExe = (Get-Command python -ErrorAction SilentlyContinue).Source
+}
 if (-not $script:PythonExe) {
     # Fallback: search common Python install paths across versions
     $found = $false
@@ -685,13 +695,13 @@ $script:FallbackProfiles = [ordered]@{
         Cat      = "Fighting"
         Desc     = "Console-style offline profile: 60Hz desktop cadence, VSync ON, and stable frame presentation."
         Exes     = @("Slippi Dolphin.exe", "Dolphin.exe")
-        SyncMode = "off"
+        SyncMode = "on"
     }
     "slippi-melee-universal" = @{
         Name     = "Slippi Melee (Universal)"
-        Sub      = "Lowest Latency | Fixed HAGS | No Reboot"
+        Sub      = "Lowest Latency | HAGS ON | No Sync"
         Cat      = "Fighting"
-        Desc     = "Absolute minimum latency with fixed HAGS (no reboot required). Sync-agnostic."
+        Desc     = "Absolute minimum latency with HAGS kept on so re-applying does not require a reboot. VSync OFF, G-SYNC/VRR OFF."
         Exes     = @("Slippi Dolphin.exe", "Dolphin.exe")
         SyncMode = "off"
     }
@@ -755,6 +765,22 @@ $script:FallbackProfiles = [ordered]@{
             "FortniteClient-Win64-Shipping_BE.exe",
             "FortniteClient-Win64-Shipping_EAC_EOS.exe"
         )
+    }
+    "marvel-rivals-sdr" = @{
+        Name     = "Marvel Rivals - SDR"
+        Sub      = "SDR | Reflex ON+Boost | G-SYNC ON"
+        Cat      = "Shooter"
+        Desc     = "Performance-first SDR Marvel Rivals profile for this 300Hz G-SYNC display. Uses Reflex, VRR, and refresh-3 cap behavior."
+        Exes     = @("Marvel.exe", "Marvel-Win64-Shipping.exe")
+        SyncMode = "on"
+    }
+    "marvel-rivals-hdr" = @{
+        Name     = "Marvel Rivals - HDR"
+        Sub      = "HDR ON | Reflex ON+Boost | G-SYNC ON"
+        Cat      = "Shooter"
+        Desc     = "Performance-first HDR Marvel Rivals profile for the HDR-capable primary display. Uses Reflex, VRR, and refresh-3 cap behavior."
+        Exes     = @("Marvel.exe", "Marvel-Win64-Shipping.exe")
+        SyncMode = "on"
     }
     "fortnite-streaming" = @{
         Name     = "Fortnite (Streaming)"
@@ -2719,8 +2745,8 @@ public class HotkeyMessageWindow : NativeWindow {
     # Strip known variant suffixes to get the base game identifier.
     # Order matters: longer suffixes before shorter ones that are substrings.
     $variantSuffixes = @(
-        "-online-gsync", "-tournament-sim-144hz", "-300hz-max", "-console-parity", "-vrr-lab",
-        "-streaming", "-offline", "-online", "-gsync"
+        "-online-gsync", "-tournament-sim-144hz", "-console-parity", "-gsync-hdr", "-300hz-max",
+        "-streaming", "-offline", "-online", "-vrr-lab", "-gsync", "-hdr", "-sdr"
     )
 
     function Get-GameGroup {

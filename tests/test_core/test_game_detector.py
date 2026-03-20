@@ -188,6 +188,23 @@ class TestDetectSteamGames:
         assert result[0].name == "Diablo IV"
         assert result[0].platform == "steam"
 
+    @patch("abso.core.game_detector._get_steam_library_folders")
+    def test_finds_marvel_rivals_in_library(self, mock_folders, tmp_path):
+        """Steam detection should find Marvel Rivals via the real local executable names."""
+        library = tmp_path / "steamapps" / "common"
+        library.mkdir(parents=True)
+        game_folder = library / "MarvelRivals"
+        game_folder.mkdir()
+        (game_folder / "Marvel.exe").touch()
+
+        mock_folders.return_value = [library]
+
+        result = _detect_steam_games()
+        marvel_games = [g for g in result if g.name == "Marvel Rivals"]
+        assert len(marvel_games) == 1
+        assert marvel_games[0].executable == "Marvel.exe"
+        assert marvel_games[0].platform == "steam"
+
 
 class TestDetectEpicGames:
     """Tests for _detect_epic_games function."""

@@ -1,4 +1,14 @@
 # Helper script to kill existing tray and relaunch
+# Self-elevate so manual restarts work the same way as the tray host.
+$isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole(
+    [Security.Principal.WindowsBuiltInRole]::Administrator
+)
+
+if (-not $isAdmin) {
+    Start-Process powershell.exe -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`"" -Verb RunAs
+    exit 0
+}
+
 # Kill any existing ABSO tray processes
 $trayPs1 = Join-Path $PSScriptRoot "ABSO-Tray.ps1"
 $trayVbs = Join-Path $PSScriptRoot "ABSO-Tray.vbs"

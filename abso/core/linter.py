@@ -263,11 +263,12 @@ class ProfileLinter:
                 result.add_issue(LintIssue(
                     code="NVIDIA_LLM_ULTRA_DX12",
                     severity=LintSeverity.WARNING,
-                    message="LLM Ultra has limited effect on DX12/Vulkan titles",
+                    message="LLM Ultra is less predictable on DX12/Vulkan titles",
                     details=(
-                        "Low Latency Mode primarily works with DX9/DX11. For DX12/Vulkan "
-                        "games, consider using in-game NVIDIA Reflex if available, or "
-                        "LLM='On' which has fewer side effects."
+                        "Modern NVIDIA drivers do support Low Latency Mode on DX12, but "
+                        "Ultra is still more prone to pacing quirks than LLM='On'. Vulkan "
+                        "also tends to see less consistent driver-side benefit. Prefer "
+                        "Reflex when available, otherwise use LLM='On' first."
                     ),
                     setting_path="NvidiaSettingsHandler.low_latency_mode",
                 ))

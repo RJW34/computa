@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "saved_at": "2026-03-16T00:12:59.592060",
+  "saved_at": "2026-03-20T05:18:48.873774-04:00",
   "profiles": [
     {
       "id": "slippi-melee",
@@ -28,20 +28,20 @@
       "tray_category": "Fighting",
       "tray_subtitle": "Console-Parity | 60Hz + VSync | LLM OFF",
       "tray_description": "Console-like frame pacing and presentation for offline practice",
-      "sync_mode": "off"
+      "sync_mode": "on"
     },
     {
       "id": "slippi-melee-universal",
       "display_name": "Super Smash Bros. Melee (Slippi Universal)",
-      "description": "Lowest latency, fixed HAGS (no reboot), sync-agnostic",
+      "description": "Lowest latency, fixed HAGS on (no reboot), no-sync competitive path",
       "optimization_target": "minimum_latency",
       "executables": [
         "Slippi Dolphin.exe",
         "Dolphin.exe"
       ],
       "tray_category": "Fighting",
-      "tray_subtitle": "Lowest Latency | Fixed HAGS | No Reboot",
-      "tray_description": "Absolute minimum latency with fixed HAGS (no reboot required). Sync-agnostic.",
+      "tray_subtitle": "Lowest Latency | HAGS ON | No Sync",
+      "tray_description": "Absolute minimum latency with HAGS kept on so re-applying does not require a reboot. VSync OFF, G-SYNC/VRR OFF.",
       "sync_mode": "off"
     },
     {
@@ -205,6 +205,34 @@
       "tray_subtitle": "Reflex ON+Boost | LLM OFF | HAGS ON",
       "tray_description": "Low latency, high FPS competitive settings with Reflex",
       "sync_mode": "agnostic"
+    },
+    {
+      "id": "marvel-rivals-sdr",
+      "display_name": "Marvel Rivals - SDR",
+      "description": "Best-performance SDR profile for 1440p high-refresh competitive play",
+      "optimization_target": "low_latency_high_fps",
+      "executables": [
+        "Marvel.exe",
+        "Marvel-Win64-Shipping.exe"
+      ],
+      "tray_category": "Shooter",
+      "tray_subtitle": "SDR | Reflex ON+Boost | G-SYNC ON",
+      "tray_description": "Best-performance SDR profile for 1440p high-refresh competitive play",
+      "sync_mode": "on"
+    },
+    {
+      "id": "marvel-rivals-hdr",
+      "display_name": "Marvel Rivals - HDR",
+      "description": "Best-performance HDR profile for OLED / high-refresh competitive play",
+      "optimization_target": "low_latency_high_fps",
+      "executables": [
+        "Marvel.exe",
+        "Marvel-Win64-Shipping.exe"
+      ],
+      "tray_category": "Shooter",
+      "tray_subtitle": "HDR ON | Reflex ON+Boost | G-SYNC ON",
+      "tray_description": "Best-performance HDR profile for OLED / high-refresh competitive play",
+      "sync_mode": "on"
     },
     {
       "id": "fortnite-streaming",

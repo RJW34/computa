@@ -43,7 +43,7 @@ class GraphicsAPI(Enum):
 
 
 # APIs that support NVIDIA Low Latency Mode
-LLM_SUPPORTED_APIS = {GraphicsAPI.DX9, GraphicsAPI.DX11}
+LLM_SUPPORTED_APIS = {GraphicsAPI.DX9, GraphicsAPI.DX11, GraphicsAPI.DX12}
 
 # APIs that should use Reflex instead of LLM
 REFLEX_PREFERRED_APIS = {GraphicsAPI.DX11, GraphicsAPI.DX12, GraphicsAPI.VULKAN}
@@ -191,7 +191,8 @@ def get_limiter_recommendation(
 def get_llm_recommendation(api: GraphicsAPI, has_reflex: bool) -> dict[str, Any]:
     """Get Low Latency Mode recommendation based on graphics API.
 
-    LLM only works in DX9/DX11. DX12/Vulkan should use Reflex.
+    LLM works on DX9/DX11 and modern NVIDIA drivers also support DX12.
+    When a game has Reflex, prefer Reflex instead of layering driver LLM.
 
     Args:
         api: Graphics API the game uses.
@@ -200,21 +201,21 @@ def get_llm_recommendation(api: GraphicsAPI, has_reflex: bool) -> dict[str, Any]
     Returns:
         Dictionary with LLM setting and explanation.
     """
-    if api in LLM_SUPPORTED_APIS:
+    if has_reflex and api in REFLEX_PREFERRED_APIS:
+        return {
+            "low_latency_mode": "off",
+            "use_reflex": True,
+            "reason": f"Use NVIDIA Reflex instead of driver LLM for {api.value}.",
+        }
+    elif api in LLM_SUPPORTED_APIS:
         return {
             "low_latency_mode": "on",  # Not "ultra" - it overrides manual FPS caps
             "reason": f"LLM 'On' recommended for {api.value}. Avoid 'Ultra' as it overrides manual FPS caps.",
         }
-    elif api in REFLEX_PREFERRED_APIS and has_reflex:
-        return {
-            "low_latency_mode": "off",
-            "use_reflex": True,
-            "reason": f"LLM doesn't work in {api.value}. Use NVIDIA Reflex instead.",
-        }
     else:
         return {
             "low_latency_mode": "off",
-            "reason": f"LLM doesn't work in {api.value}. No alternative available.",
+            "reason": f"Driver LLM does not provide the same benefit in {api.value}. No alternative available.",
         }
 
 

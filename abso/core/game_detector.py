@@ -30,6 +30,7 @@ class InstalledGame:
 DEFAULT_GAME_DETECTION_MANIFEST: dict[str, Any] = {
     "steam_game_patterns": {
         "Rivals of Aether 2": ["RivalsOfAether2.exe", "RivalsOfAether2-Win64-Shipping.exe"],
+        "Marvel Rivals": ["Marvel.exe", "Marvel-Win64-Shipping.exe"],
         "Diablo IV": ["Diablo IV.exe"],
         "Slippi Launcher": ["Slippi Dolphin.exe", "Dolphin.exe"],
     },

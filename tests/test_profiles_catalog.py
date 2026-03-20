@@ -33,3 +33,14 @@ def test_profile_manifest_has_required_fields() -> None:
         assert "tray_category" in profile
         assert "tray_subtitle" in profile
         assert profile["sync_mode"] in {"on", "off", "agnostic"}
+
+
+def test_slippi_tray_metadata_matches_sync_behavior() -> None:
+    """Slippi tray badges/descriptions should match the actual sync intent."""
+    manifest = {profile["id"]: profile for profile in get_profile_manifest()}
+
+    assert manifest["slippi-melee"]["sync_mode"] == "off"
+    assert manifest["slippi-melee-console-parity"]["sync_mode"] == "on"
+    assert manifest["slippi-melee-universal"]["sync_mode"] == "off"
+    assert manifest["slippi-melee-vrr-lab"]["sync_mode"] == "on"
+    assert "sync-agnostic" not in manifest["slippi-melee-universal"]["tray_description"].lower()

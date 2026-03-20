@@ -14,6 +14,7 @@ from abso.profiles.base import BaseProfile
 from abso.profiles.cod_bo7 import CodBo7Profile
 from abso.profiles.diablo4 import Diablo4Profile
 from abso.profiles.fortnite import FortniteProfile
+from abso.profiles.marvel_rivals import MarvelRivalsHDRProfile, MarvelRivalsSDRProfile
 from abso.profiles.overwatch2 import (
     Overwatch2GSyncHDRProfile,
     Overwatch2GSyncProfile,
@@ -70,13 +71,16 @@ PROFILE_CATALOG: OrderedDict[str, ProfileCatalogEntry] = OrderedDict(
             profile_class=SlippiMeleeConsoleParityProfile,
             tray_category="Fighting",
             tray_subtitle="Console-Parity | 60Hz + VSync | LLM OFF",
-            sync_mode="off",
+            sync_mode="on",
         ),
         "slippi-melee-universal": ProfileCatalogEntry(
             profile_class=SlippiMeleeUniversalProfile,
             tray_category="Fighting",
-            tray_subtitle="Lowest Latency | Fixed HAGS | No Reboot",
-            tray_description="Absolute minimum latency with fixed HAGS (no reboot required). Sync-agnostic.",
+            tray_subtitle="Lowest Latency | HAGS ON | No Sync",
+            tray_description=(
+                "Absolute minimum latency with HAGS kept on so re-applying does not require "
+                "a reboot. VSync OFF, G-SYNC/VRR OFF."
+            ),
             sync_mode="off",
         ),
         "slippi-melee-vrr-lab": ProfileCatalogEntry(
@@ -144,6 +148,18 @@ PROFILE_CATALOG: OrderedDict[str, ProfileCatalogEntry] = OrderedDict(
             tray_category="Shooter",
             tray_subtitle="Reflex ON+Boost | LLM OFF | HAGS ON",
             sync_mode="agnostic",
+        ),
+        "marvel-rivals-sdr": ProfileCatalogEntry(
+            profile_class=MarvelRivalsSDRProfile,
+            tray_category="Shooter",
+            tray_subtitle="SDR | Reflex ON+Boost | G-SYNC ON",
+            sync_mode="on",
+        ),
+        "marvel-rivals-hdr": ProfileCatalogEntry(
+            profile_class=MarvelRivalsHDRProfile,
+            tray_category="Shooter",
+            tray_subtitle="HDR ON | Reflex ON+Boost | G-SYNC ON",
+            sync_mode="on",
         ),
         "fortnite-streaming": ProfileCatalogEntry(
             profile_class=FortniteStreamingProfile,
