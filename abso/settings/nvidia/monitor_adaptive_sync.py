@@ -148,7 +148,9 @@ def _destroy_physical_monitors(
         pass
 
 
-def _try_adaptive_sync_toggle(enable: bool) -> dict[str, Any]:
+def _try_adaptive_sync_toggle(
+    enable: bool, controller_override: str | None = None,
+) -> dict[str, Any]:
     """Single attempt to toggle Adaptive Sync. Internal helper."""
     result: dict[str, Any] = {"success": False, "error": None}
 
@@ -180,8 +182,16 @@ def _try_adaptive_sync_toggle(enable: bool) -> dict[str, Any]:
         h_physical = monitors[0].hPhysicalMonitor
 
         # Detect controller model and select VCP profile
-        model = _detect_controller_model(h_physical)
-        vcp_profile = ADAPTIVE_SYNC_VCP_PROFILES.get(model, DEFAULT_VCP_PROFILE)
+        model = controller_override or _detect_controller_model(h_physical)
+        vcp_profile = ADAPTIVE_SYNC_VCP_PROFILES.get(model) if model else None
+
+        if vcp_profile is None:
+            result["error"] = (
+                f"Unknown monitor controller: {model or 'undetected'}. "
+                "Set ddci.controller_override in abso.yaml to your controller model "
+                f"(supported: {', '.join(ADAPTIVE_SYNC_VCP_PROFILES.keys())})"
+            )
+            return result
 
         logger.info(
             f"Monitor controller: {model or 'unknown'}, "
@@ -207,7 +217,10 @@ def _try_adaptive_sync_toggle(enable: bool) -> dict[str, Any]:
 
 
 def set_monitor_adaptive_sync(
-    enable: bool, retries: int = 3, retry_delay: float = 2.0,
+    enable: bool,
+    retries: int = 3,
+    retry_delay: float = 3.0,
+    controller_override: str | None = None,
 ) -> dict[str, Any]:
     """Toggle the primary monitor's Adaptive Sync via DDC/CI.
 
@@ -218,6 +231,7 @@ def set_monitor_adaptive_sync(
         enable: True to enable Adaptive Sync, False to disable.
         retries: Number of attempts before giving up.
         retry_delay: Seconds to wait between retries.
+        controller_override: Force a specific VCP profile (e.g., "CVTE").
 
     Returns:
         Dict with 'success' bool and optional 'error' string.
@@ -225,7 +239,7 @@ def set_monitor_adaptive_sync(
     last_result: dict[str, Any] = {"success": False, "error": "No attempts made"}
 
     for attempt in range(retries):
-        last_result = _try_adaptive_sync_toggle(enable)
+        last_result = _try_adaptive_sync_toggle(enable, controller_override)
         if last_result["success"]:
             return last_result
         if attempt < retries - 1:

@@ -8,7 +8,7 @@ import winreg
 from typing import Any
 
 from abso.core.exceptions import RegistryWriteError
-from abso.core.models import Issue
+from abso.core.models import EvidenceTier, Issue
 from abso.settings.base import SettingsHandler
 from abso.utils.validation import (
     validate_dword_value,
@@ -65,37 +65,43 @@ class RegistrySettingsHandler(SettingsHandler):
         issues: list[Issue] = []
         current = self.detect()
 
-        # System Responsiveness (10 = games get near-max CPU priority while keeping audio stable)
+        # System Responsiveness — legacy MMCSS setting, undocumented behavior on Win11
         responsiveness = current.get("system_responsiveness")
         if responsiveness is not None and responsiveness != 10:
             issues.append(Issue(
                 title="System Responsiveness not optimized for gaming",
-                severity="warning",
+                severity="info",
                 current_value=str(responsiveness),
                 optimal_value="10",
                 explanation=(
-                    "Controls CPU % reserved for background tasks. Setting to 10 gives games near-maximum "
-                    "priority while reserving minimal CPU for audio/USB, preventing crackling and dropouts."
+                    "MMCSS scheduling hint for background CPU reservation. "
+                    "Effect on modern Windows 11 is undocumented — MMCSS was redesigned "
+                    "in Win10+. May have no measurable impact on current systems. "
+                    "Opt-in via include_legacy_tweaks."
                 ),
                 category="registry",
+                evidence_tier=EvidenceTier.LEGACY_UNVERIFIED,
             ))
 
-        # Network Throttling
+        # Network Throttling — legacy multimedia setting, unclear modern effect
         throttling = current.get("network_throttling")
         if throttling is not None and throttling != 0xFFFFFFFF:
             issues.append(Issue(
                 title="Network throttling is enabled",
-                severity="warning",
+                severity="info",
                 current_value=f"0x{throttling:08X}" if throttling else "Unknown",
                 optimal_value="0xFFFFFFFF (disabled)",
                 explanation=(
-                    "Controls multimedia streaming throttling. Disabling removes any network-related throttling. "
-                    "Primary benefit is for streaming/recording while gaming."
+                    "Multimedia network throttling index — originally designed for "
+                    "Vista-era media streaming. Microsoft has not documented its effect "
+                    "on Windows 10/11 network stacks. Likely no measurable impact. "
+                    "Opt-in via include_legacy_tweaks."
                 ),
                 category="registry",
+                evidence_tier=EvidenceTier.LEGACY_UNVERIFIED,
             ))
 
-        # Game priority settings
+        # Game priority settings — documented MMCSS task priority
         game_priority = current.get("game_priority", {})
         if game_priority.get("priority") != 6:
             issues.append(Issue(
@@ -103,11 +109,15 @@ class RegistrySettingsHandler(SettingsHandler):
                 severity="info",
                 current_value=str(game_priority.get("priority", "Unknown")),
                 optimal_value="6",
-                explanation="Higher priority value gives games more CPU scheduling preference.",
+                explanation=(
+                    "MMCSS Games task priority. Higher values give game threads "
+                    "more CPU scheduling preference via the multimedia class scheduler."
+                ),
                 category="registry",
+                evidence_tier=EvidenceTier.VERIFIED,
             ))
 
-        # Win32PrioritySeparation (scheduler quantum)
+        # Win32PrioritySeparation (scheduler quantum) — documented kernel behavior
         priority_sep = current.get("win32_priority_separation")
         if priority_sep is not None and priority_sep != self.WIN32_PRIORITY_GAMING:
             issues.append(Issue(
@@ -118,9 +128,11 @@ class RegistrySettingsHandler(SettingsHandler):
                 explanation=(
                     "Win32PrioritySeparation controls CPU time slice allocation. "
                     "0x2A uses short fixed quantum with max foreground boost, "
-                    "giving the active game more responsive CPU scheduling."
+                    "giving the active game more responsive CPU scheduling. "
+                    "Documented in Windows Internals (Russinovich)."
                 ),
                 category="registry",
+                evidence_tier=EvidenceTier.VERIFIED,
             ))
 
         return issues

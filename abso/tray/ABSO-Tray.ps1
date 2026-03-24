@@ -1070,7 +1070,16 @@ function Initialize-ProfilesFromCliCatalog {
 
 Initialize-ProfilesFromCliCatalog
 
-$script:CategoryOrder = @("Productivity", "Fighting", "ARPG", "Shooter", "Streaming", "Other")
+# Preferred order for known categories; any new ones sort alphabetically after
+$preferredCategoryOrder = @("Productivity", "Fighting", "ARPG", "Shooter", "Streaming", "Other")
+$allCategories = $script:Profiles.Values | ForEach-Object { $_.Cat } | Select-Object -Unique
+$script:CategoryOrder = @()
+foreach ($cat in $preferredCategoryOrder) {
+    if ($allCategories -contains $cat) { $script:CategoryOrder += $cat }
+}
+foreach ($cat in ($allCategories | Sort-Object)) {
+    if ($script:CategoryOrder -notcontains $cat) { $script:CategoryOrder += $cat }
+}
 $script:CategoryColors = @{
     "Productivity" = $script:Colors.CatProd
     "Fighting"     = $script:Colors.CatFighting
@@ -2142,6 +2151,14 @@ function Open-ConfigFolder {
     Start-Process "explorer.exe" -ArgumentList $configDir
 }
 
+function Open-ProfilesFolder {
+    $profilesDir = Join-Path $env:USERPROFILE ".abso\profiles"
+    if (-not (Test-Path $profilesDir)) {
+        New-Item -ItemType Directory -Path $profilesDir -Force | Out-Null
+    }
+    Start-Process "explorer.exe" -ArgumentList $profilesDir
+}
+
 function Get-StartupStatus {
     $legacyShortcutPath = [System.IO.Path]::Combine(
         [Environment]::GetFolderPath("Startup"),
@@ -2827,7 +2844,18 @@ public class HotkeyMessageWindow : NativeWindow {
     $script:gameGroupSubmenus = @()
 
     # Merge ARPG + Other into a single "Other" section
-    $mergedCategoryOrder = @("Productivity", "Fighting", "Shooter")
+    # Build category order dynamically: use preferred order for known categories,
+    # append any new user-defined categories alphabetically (exclude merged/special ones)
+    $mergedExclude = @("ARPG", "Other", "Streaming")
+    $preferredMergedOrder = @("Productivity", "Fighting", "Shooter")
+    $mergedCategoryOrder = @()
+    foreach ($cat in $preferredMergedOrder) {
+        if ($catGameGroups.Contains($cat)) { $mergedCategoryOrder += $cat }
+    }
+    foreach ($cat in ($catGameGroups.Keys | Sort-Object)) {
+        if ($mergedExclude -contains $cat) { continue }
+        if ($mergedCategoryOrder -notcontains $cat) { $mergedCategoryOrder += $cat }
+    }
     # Add ARPG/Other as merged
     $mergedOther = @()
     if ($catGameGroups.Contains("ARPG")) {
@@ -3043,6 +3071,39 @@ public class HotkeyMessageWindow : NativeWindow {
         Save-TrayConfig $script:TrayConfig
     })
     $actionsMenu.DropDownItems.Add($quickPanelItem) | Out-Null
+
+    $actionsMenu.DropDownItems.Add((New-Object System.Windows.Forms.ToolStripSeparator)) | Out-Null
+
+    # Refresh Profiles
+    $refreshProfilesItem = New-Object System.Windows.Forms.ToolStripMenuItem
+    $refreshProfilesItem.Text = "Refresh Profiles"
+    $refreshProfilesItem.BackColor = $script:Colors.Background
+    $refreshProfilesItem.ForeColor = $script:Colors.AccentBlue
+    $refreshProfilesItem.Font = New-Object System.Drawing.Font("Segoe UI", 9)
+    $refreshProfilesItem.Image = New-ActionBitmap -Action "Audit" -Color $script:Colors.AccentBlue
+    $refreshProfilesItem.ToolTipText = "Reload profiles from CLI catalog and user profiles"
+    $refreshProfilesItem.Add_Click({
+        try {
+            Initialize-ProfilesFromCliCatalog
+            Show-Notification -Title "A.B.S.O." -Message "Profiles refreshed ($($script:Profiles.Count) profiles loaded)" -Type "Info"
+            Write-TrayLog "Profiles refreshed via menu ($($script:Profiles.Count) profiles)"
+        }
+        catch {
+            Write-TrayLog "Failed to refresh profiles: $($_.Exception.Message)" -Level "ERROR"
+            Show-Notification -Title "A.B.S.O." -Message "Failed to refresh profiles" -Type "Error"
+        }
+    })
+    $actionsMenu.DropDownItems.Add($refreshProfilesItem) | Out-Null
+
+    # Open Profiles Folder
+    $openProfilesItem = New-Object System.Windows.Forms.ToolStripMenuItem
+    $openProfilesItem.Text = "Open Profiles Folder"
+    $openProfilesItem.BackColor = $script:Colors.Background
+    $openProfilesItem.ForeColor = $script:Colors.TextDim
+    $openProfilesItem.Font = New-Object System.Drawing.Font("Segoe UI", 9)
+    $openProfilesItem.ToolTipText = "Open user profiles folder in Explorer"
+    $openProfilesItem.Add_Click({ Open-ProfilesFolder })
+    $actionsMenu.DropDownItems.Add($openProfilesItem) | Out-Null
 
     $menu.Items.Add($actionsMenu) | Out-Null
 

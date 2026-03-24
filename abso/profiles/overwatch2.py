@@ -93,7 +93,8 @@ class Overwatch2Profile(_Overwatch2BaseProfile):
     def _variant_overrides(self) -> dict[str, dict[str, Any]]:
         return {
             "NvidiaSettingsHandler": {
-                # Reflex handles queueing; keep driver queue options and VRR deterministic.
+                # In-game Reflex OFF (GPU not saturated at 1440p Low).
+                # Driver preset disables LLM + VSync + VRR for pure no-sync.
                 "preset": "reflex_no_sync",
                 # Use NVIDIA's predefined OW2 profile to avoid executable binding conflicts.
                 "profile_name": "Overwatch 2",

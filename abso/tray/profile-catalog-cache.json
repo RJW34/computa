@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "saved_at": "2026-03-20T05:18:48.873774-04:00",
+  "saved_at": "2026-03-23T15:15:11.748926-04:00",
   "profiles": [
     {
       "id": "slippi-melee",
@@ -364,7 +364,7 @@
         "Ryubing.exe"
       ],
       "tray_category": "Fighting",
-      "tray_subtitle": "Vulkan | Fixed 60fps | HAGS ON",
+      "tray_subtitle": "Vulkan | Fixed 60fps | HAGS ON | LLM OFF",
       "tray_description": "Ultra-low latency optimization for competitive SSBU/HDR",
       "sync_mode": "off"
     },

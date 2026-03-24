@@ -212,9 +212,9 @@ class TestApplyProfile:
 
     @patch("abso.core.capabilities.HardwareDetector.detect_monitors")
     def test_apply_profile_blocks_when_confirmed_vrr_not_detected(self, mock_detect_monitors):
-        """VRR-required profiles should fail before applying handlers without confirmed VRR."""
+        """VRR-required profiles should fail when VRR is not confirmed or likely."""
         mock_detect_monitors.return_value = [
-            {"name": "Test Monitor", "vrr_supported": "likely", "refresh_rate": 240}
+            {"name": "Test Monitor", "vrr_supported": "possible", "refresh_rate": 240}
         ]
 
         applier = ProfileApplier()

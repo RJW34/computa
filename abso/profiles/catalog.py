@@ -212,7 +212,7 @@ PROFILE_CATALOG: OrderedDict[str, ProfileCatalogEntry] = OrderedDict(
         "ryujinx-ssbu": ProfileCatalogEntry(
             profile_class=RyujinxSSBUProfile,
             tray_category="Fighting",
-            tray_subtitle="Vulkan | Fixed 60fps | HAGS ON",
+            tray_subtitle="Vulkan | Fixed 60fps | HAGS ON | LLM OFF",
             sync_mode="off",
         ),
         "ryujinx-ssbu-streaming": ProfileCatalogEntry(
@@ -237,23 +237,56 @@ PROFILE_CATALOG: OrderedDict[str, ProfileCatalogEntry] = OrderedDict(
 )
 
 
+def _load_user_profiles() -> dict[str, ProfileCatalogEntry]:
+    """Load user-defined YAML profiles from ~/.abso/profiles/.
+
+    User profiles cannot override built-in profile IDs.
+    """
+    try:
+        from abso.profiles.yaml_loader import YAMLProfileLoader
+
+        loader = YAMLProfileLoader()
+        user_profiles = loader.load_directory()
+        # Filter out conflicts with built-in profiles
+        safe = {}
+        for pid, entry in user_profiles.items():
+            if pid in PROFILE_CATALOG:
+                import logging
+
+                logging.getLogger(__name__).warning(
+                    f"User profile '{pid}' conflicts with built-in profile, skipping"
+                )
+            else:
+                safe[pid] = entry
+        return safe
+    except Exception as e:
+        import logging
+
+        logging.getLogger(__name__).debug(f"User profile loading skipped: {e}")
+        return {}
+
+
+def _get_full_catalog() -> dict[str, ProfileCatalogEntry]:
+    """Get built-in + user profiles merged."""
+    merged = dict(PROFILE_CATALOG)
+    merged.update(_load_user_profiles())
+    return merged
+
+
 def get_profile_classes() -> dict[str, type[BaseProfile]]:
     """Get profile registry mapping profile ID to profile class."""
-    return {profile_id: entry.profile_class for profile_id, entry in PROFILE_CATALOG.items()}
+    return {pid: entry.profile_class for pid, entry in _get_full_catalog().items()}
 
 
 def get_profile_instances() -> dict[str, BaseProfile]:
     """Get all profile instances keyed by profile ID."""
-    return {
-        profile_id: entry.profile_class()
-        for profile_id, entry in PROFILE_CATALOG.items()
-    }
+    return {pid: entry.profile_class() for pid, entry in _get_full_catalog().items()}
 
 
 def get_profile_manifest() -> list[dict[str, Any]]:
     """Get profile metadata for GUI/tray clients."""
     manifest: list[dict[str, Any]] = []
-    for profile_id, entry in PROFILE_CATALOG.items():
+    for profile_id, entry in _get_full_catalog().items():
         profile = entry.profile_class()
         manifest.append(
             {

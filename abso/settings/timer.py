@@ -1,9 +1,18 @@
-"""Timer resolution settings handler."""
+"""Timer resolution settings handler.
+
+Includes TimerSettingsHandler for one-shot apply/audit and
+TimerResolutionGuard for holding a resolution while a game process runs.
+"""
 
 from __future__ import annotations
 
 import ctypes
+import json
 import logging
+import os
+import subprocess
+import time
+from pathlib import Path
 from typing import Any
 
 from abso.core.models import Issue
@@ -28,8 +37,12 @@ class TimerSettingsHandler(SettingsHandler):
     This does NOT directly reduce input latency. Most modern games automatically
     request higher timer resolution when running.
 
-    Note: Timer resolution changes only persist while this process is running.
-    For persistent changes, a background service or game-specific launcher is needed.
+    Note: NtSetTimerResolution changes only persist while the calling process is
+    alive. The apply() method here is therefore ephemeral -- the resolution reverts
+    the moment the ABSO CLI exits.  For persistent resolution during a game session,
+    use ``TimerResolutionGuard`` (defined below) or the companion service at
+    ``abso.core.timer_guard_service``, which the tray app can spawn as a child
+    process to hold the resolution for the lifetime of a game.
     """
 
     # Common timer resolutions in 100ns units
@@ -42,6 +55,17 @@ class TimerSettingsHandler(SettingsHandler):
         self._ntdll: ctypes.WinDLL | None = None
         self._original_resolution: int | None = None
         self._load_ntdll()
+
+    @property
+    def is_persistent(self) -> bool:
+        """Whether timer resolution changes survive process exit.
+
+        Always returns False. NtSetTimerResolution is per-process; when the
+        calling process terminates, Windows drops the resolution request.
+        Use ``TimerResolutionGuard`` or ``abso.core.timer_guard_service``
+        to hold the resolution for the duration of a game session.
+        """
+        return False
 
     def _load_ntdll(self) -> bool:
         """Load ntdll.dll for timer resolution functions.
@@ -347,3 +371,241 @@ class TimerSettingsHandler(SettingsHandler):
             True if release succeeded.
         """
         return self.restore({})
+
+
+# ---------------------------------------------------------------------------
+# TimerResolutionGuard — holds resolution for the lifetime of a game process
+# ---------------------------------------------------------------------------
+
+_STATUS_FILE = Path(os.environ.get("TEMP", "/tmp")) / "abso_timer_guard.json"
+
+
+class TimerResolutionGuard:
+    """Context manager that holds an NtSetTimerResolution request alive.
+
+    Because NtSetTimerResolution is per-process, the resolution reverts the
+    instant the calling process exits.  This guard keeps the calling process
+    alive (or a dedicated child process) so the resolution is held for as
+    long as a game is running.
+
+    Usage as a context manager::
+
+        with TimerResolutionGuard(resolution_100ns=5000) as guard:
+            guard.hold_for_process("game.exe")
+
+    The guard also exposes a simple JSON status file at
+    ``%TEMP%\\abso_timer_guard.json`` so the PowerShell tray app can read
+    current state without needing a full IPC channel.
+    """
+
+    DEFAULT_POLL_INTERVAL: float = 5.0  # seconds
+    DEFAULT_TIMEOUT: float = 8 * 60 * 60  # 8 hours in seconds
+
+    def __init__(self, resolution_100ns: int = 5000) -> None:
+        """Initialize the guard.
+
+        Args:
+            resolution_100ns: Desired timer resolution in 100-nanosecond units.
+                Default 5000 (0.5 ms).
+        """
+        self._resolution_100ns = resolution_100ns
+        self._ntdll: ctypes.WinDLL | None = None
+        self._original_resolution: int | None = None
+        self._active = False
+        self._load_ntdll()
+
+    # -- ntdll helpers (mirror the handler but self-contained) --------------
+
+    def _load_ntdll(self) -> bool:
+        """Load ntdll.dll for timer resolution functions."""
+        try:
+            self._ntdll = ctypes.WinDLL("ntdll")
+            return True
+        except Exception as e:
+            logger.error("Failed to load ntdll.dll: %s", e)
+            return False
+
+    def _query_resolution(self) -> tuple[int, int, int] | None:
+        """Return (min, max, current) in 100ns units, or None."""
+        if not self._ntdll:
+            return None
+        try:
+            lo = ctypes.c_ulong()
+            hi = ctypes.c_ulong()
+            cur = ctypes.c_ulong()
+            status = self._ntdll.NtQueryTimerResolution(
+                ctypes.byref(lo), ctypes.byref(hi), ctypes.byref(cur)
+            )
+            if status == 0:
+                return (lo.value, hi.value, cur.value)
+            return None
+        except Exception:
+            return None
+
+    def _set_resolution(self, resolution: int, enable: bool = True) -> int | None:
+        """Call NtSetTimerResolution. Returns actual resolution or None."""
+        if not self._ntdll:
+            return None
+        try:
+            cur = ctypes.c_ulong()
+            status = self._ntdll.NtSetTimerResolution(
+                ctypes.c_ulong(resolution),
+                ctypes.c_bool(enable),
+                ctypes.byref(cur),
+            )
+            if status == 0:
+                return cur.value
+            logger.warning("NtSetTimerResolution status: %s", status)
+            return None
+        except Exception as e:
+            logger.error("NtSetTimerResolution failed: %s", e)
+            return None
+
+    # -- status file --------------------------------------------------------
+
+    def _write_status(self, status: str, process_name: str = "") -> None:
+        """Write a JSON status file so the tray app can read state."""
+        payload = {
+            "pid": os.getpid(),
+            "process_name": process_name,
+            "resolution_100ns": self._resolution_100ns,
+            "resolution_ms": self._resolution_100ns / 10000.0,
+            "start_time": time.time(),
+            "status": status,
+        }
+        try:
+            _STATUS_FILE.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+        except Exception as e:
+            logger.warning("Could not write status file: %s", e)
+
+    def _remove_status(self) -> None:
+        """Clean up the status file."""
+        try:
+            _STATUS_FILE.unlink(missing_ok=True)
+        except Exception:
+            pass
+
+    # -- context manager ----------------------------------------------------
+
+    def __enter__(self) -> TimerResolutionGuard:
+        """Set the requested timer resolution."""
+        info = self._query_resolution()
+        if info:
+            self._original_resolution = info[2]
+
+        actual = self._set_resolution(self._resolution_100ns, enable=True)
+        if actual is not None:
+            self._active = True
+            logger.info(
+                "Timer resolution set to %.3f ms (requested %.3f ms)",
+                actual / 10000.0,
+                self._resolution_100ns / 10000.0,
+            )
+        else:
+            logger.error("Failed to set timer resolution on enter")
+
+        return self
+
+    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+        """Restore the original timer resolution."""
+        self._release()
+        return None
+
+    def _release(self) -> None:
+        """Release the resolution request and clean up."""
+        if self._active:
+            self._set_resolution(
+                self._original_resolution or TimerSettingsHandler.RESOLUTION_DEFAULT,
+                enable=False,
+            )
+            self._active = False
+            logger.info("Timer resolution released")
+        self._write_status("released")
+        self._remove_status()
+
+    # -- process-lifetime hold ----------------------------------------------
+
+    @staticmethod
+    def _is_process_running(process_name: str) -> bool:
+        """Check if a process with the given name is running.
+
+        Uses ``tasklist`` so no extra dependencies are needed.
+
+        Args:
+            process_name: Executable name, e.g. ``"game.exe"``.
+
+        Returns:
+            True if at least one instance is found.
+        """
+        try:
+            result = subprocess.run(
+                ["tasklist", "/FI", f"IMAGENAME eq {process_name}", "/NH"],
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
+            # tasklist prints "INFO: No tasks are running..." when nothing matches
+            return process_name.lower() in result.stdout.lower()
+        except Exception as e:
+            logger.warning("tasklist check failed: %s", e)
+            return False
+
+    def hold_for_process(
+        self,
+        process_name: str,
+        resolution_100ns: int | None = None,
+        poll_interval: float = DEFAULT_POLL_INTERVAL,
+        timeout: float = DEFAULT_TIMEOUT,
+    ) -> None:
+        """Hold the timer resolution until *process_name* exits.
+
+        If the guard was not already entered as a context manager, this method
+        will set the resolution itself.
+
+        Args:
+            process_name: Executable name to watch (e.g. ``"game.exe"``).
+            resolution_100ns: Override the resolution set at init time.
+                If ``None``, uses the value from ``__init__``.
+            poll_interval: Seconds between process-alive checks.
+            timeout: Maximum seconds to hold before giving up.
+        """
+        if resolution_100ns is not None:
+            self._resolution_100ns = resolution_100ns
+
+        # Ensure resolution is set (idempotent if already entered)
+        if not self._active:
+            self.__enter__()
+
+        self._write_status("waiting", process_name)
+        logger.info("Waiting for %s to start...", process_name)
+
+        # Wait for the game to appear (up to 5 minutes)
+        startup_deadline = time.time() + 300
+        while time.time() < startup_deadline:
+            if self._is_process_running(process_name):
+                break
+            time.sleep(poll_interval)
+        else:
+            logger.warning(
+                "%s did not start within 5 minutes; holding anyway until timeout",
+                process_name,
+            )
+
+        self._write_status("active", process_name)
+        logger.info("Holding timer resolution for %s", process_name)
+
+        deadline = time.time() + timeout
+        try:
+            while time.time() < deadline:
+                if not self._is_process_running(process_name):
+                    logger.info("%s exited; releasing timer resolution", process_name)
+                    break
+                time.sleep(poll_interval)
+            else:
+                logger.warning(
+                    "Timeout (%.0f h) reached while holding for %s",
+                    timeout / 3600,
+                    process_name,
+                )
+        finally:
+            self._release()

@@ -508,6 +508,27 @@ function Show-SettingsPanel {
     $form.Controls.Add($hk2Text)
     $y += 48
 
+    # --- Open Profiles Folder ---
+    $profilesFolderBtn = New-Object System.Windows.Forms.Button
+    $profilesFolderBtn.Text = "Open Profiles Folder"
+    $profilesFolderBtn.Location = New-Object System.Drawing.Point(16, ($y + 10))
+    $profilesFolderBtn.Size = New-Object System.Drawing.Size(180, 34)
+    $profilesFolderBtn.BackColor = [System.Drawing.Color]::FromArgb(255, 50, 50, 56)
+    $profilesFolderBtn.ForeColor = [System.Drawing.Color]::FromArgb(255, 190, 190, 195)
+    $profilesFolderBtn.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
+    $profilesFolderBtn.FlatAppearance.BorderSize = 0
+    $profilesFolderBtn.Font = New-Object System.Drawing.Font("Segoe UI", 9)
+    $profilesFolderBtn.Cursor = [System.Windows.Forms.Cursors]::Hand
+    $profilesFolderBtn.Add_Click({
+        $profilesDir = Join-Path $env:USERPROFILE ".abso\profiles"
+        if (-not (Test-Path $profilesDir)) {
+            New-Item -ItemType Directory -Path $profilesDir -Force | Out-Null
+        }
+        Start-Process "explorer.exe" -ArgumentList $profilesDir
+    })
+    $form.Controls.Add($profilesFolderBtn)
+    $y += 48
+
     # --- Save / Close Buttons ---
     $saveBtn = New-Object System.Windows.Forms.Button
     $saveBtn.Text = "Save"

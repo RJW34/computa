@@ -1,0 +1,90 @@
+# Monitor OSD Recommendation Database
+# Community contributions welcome! Copy this file to ~/.abso/monitor_osd.yaml
+# and add your monitor's optimal settings.
+#
+# model_pattern: First 6-7 characters of Windows PnP Device ID
+#   Find yours: python -m abso detect (look at monitor IDs)
+
+monitors:
+  # ---------------------------------------------------------------------------
+  # LG 27GS95QE UltraGear OLED (240Hz, WQHD, HDR)
+  # ---------------------------------------------------------------------------
+  - model_pattern: "GSM784"
+    display_name: "LG 27GS95QE UltraGear OLED"
+    recommendations:
+      competitive_fps:
+        - setting: "Picture Mode"
+          value: "Game Optimizer → FPS"
+          reason: "Lowest input lag processing pipeline."
+        - setting: "Color Gamut (SDR only)"
+          value: "Use 'sRGB' picture mode, or stay on 'Game Optimizer' and lower digital vibrance"
+          reason: >-
+            OLED native gamut is DCI-P3. SDR games output sRGB; the wider gamut
+            causes oversaturation. Switch to 'sRGB' mode for accurate colors
+            (some settings restricted), or compensate via digital vibrance if you
+            need Game Optimizer's lowest input lag.
+        - setting: "Black Stabilizer"
+          value: "60-70"
+          reason: "Improves shadow visibility without washing out colors."
+        - setting: "Response Time"
+          value: "Fast"
+          reason: "Fastest pixel response. 'Faster' can introduce overshoot artifacts on OLED."
+        - setting: "Adaptive-Sync"
+          value: "On"
+          reason: "Enable G-Sync Compatible for tear-free gaming."
+        - setting: "OLED Pixel Care → Screen Move"
+          value: "Off (during sessions)"
+          reason: "Pixel shift can cause micro-stutters. Re-enable after sessions."
+      cinematic:
+        - setting: "Picture Mode"
+          value: "Game Optimizer → Standard / Vivid"
+          reason: "Better color processing for cinematic games with HDR."
+        - setting: "HDR Tone Mapping"
+          value: "On (HGiG if available)"
+          reason: "Game handles tone mapping; monitor pass-through is most accurate."
+        - setting: "OLED Light"
+          value: "80-100"
+          reason: "Higher brightness for HDR highlight impact."
+        - setting: "Black Stabilizer"
+          value: "50 (default)"
+          reason: "Preserve dark detail and atmosphere in cinematic games."
+      emulator:
+        - setting: "Picture Mode"
+          value: "Game Optimizer → FPS"
+          reason: "Lowest input lag for frame-perfect inputs."
+        - setting: "Aspect Ratio"
+          value: "Original (4:3 for retro)"
+          reason: "Preserve original aspect ratio; avoid stretching."
+        - setting: "Response Time"
+          value: "Fast"
+          reason: "Fastest response for fixed-FPS emulation."
+      productivity:
+        - setting: "Picture Mode"
+          value: "sRGB or Custom (calibrated)"
+          reason: "Color accuracy for development and content creation."
+        - setting: "OLED Light"
+          value: "40-60"
+          reason: "Comfortable brightness for extended coding sessions."
+        - setting: "OLED Pixel Care → Screen Move"
+          value: "On"
+          reason: "Prevent burn-in from static UI elements (taskbar, IDE chrome)."
+        - setting: "Screen Saver"
+          value: "5-10 minutes"
+          reason: "Activate OLED screen saver for static content protection."
+
+  # ---------------------------------------------------------------------------
+  # Dell S2719DGF (27", 1440p, 155Hz, TN/IPS)
+  # ---------------------------------------------------------------------------
+  - model_pattern: "DELD0E6"
+    display_name: "Dell S2719DGF"
+    recommendations:
+      competitive_fps:
+        - setting: "Preset Modes"
+          value: "FPS"
+          reason: "Optimized color and response for competitive FPS."
+        - setting: "Response Time"
+          value: "Fast"
+          reason: "Good pixel response without excessive overshoot."
+        - setting: "FreeSync"
+          value: "On"
+          reason: "Enable G-Sync Compatible mode for tear-free gaming."

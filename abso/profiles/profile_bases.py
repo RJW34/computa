@@ -158,6 +158,7 @@ class Rivals2BaseProfile(BaseProfile):
     def get_handlers(self) -> list[SettingsHandler]:
         from abso.settings.cnm import CNMSettingsHandler
         from abso.settings.color import ColorProfileSettingsHandler
+        from abso.settings.cpu_affinity import CpuAffinityHandler
         from abso.settings.graphics import GraphicsSettingsHandler
         from abso.settings.memory import MemorySettingsHandler
         from abso.settings.mouse import MouseSettingsHandler
@@ -186,9 +187,13 @@ class Rivals2BaseProfile(BaseProfile):
             MouseSettingsHandler(),
             GraphicsSettingsHandler(),
             ServicesSettingsHandler(),
-            MemorySettingsHandler(),
-            ProcessPriorityHandler(self.executable_hints),
         ]
+
+        if self.include_legacy_tweaks:
+            handlers.append(MemorySettingsHandler())
+
+        handlers.append(ProcessPriorityHandler(self.executable_hints))
+        handlers.append(CpuAffinityHandler(self.executable_hints))
 
         if self.include_rivals2_config:
             from abso.settings.rivals2_config import Rivals2ConfigHandler
@@ -200,7 +205,8 @@ class Rivals2BaseProfile(BaseProfile):
         return handlers
 
     def _base_settings(self) -> dict[str, dict[str, Any]]:
-        return {
+        # Verified settings — documented, measurable effect
+        settings: dict[str, dict[str, Any]] = {
             "WindowsSettingsHandler": {
                 "game_mode": True,
                 "game_bar": False,
@@ -218,8 +224,6 @@ class Rivals2BaseProfile(BaseProfile):
                 "processor_max_performance": True,
             },
             "RegistrySettingsHandler": {
-                "system_responsiveness": 10,
-                "network_throttling": 0xFFFFFFFF,
                 "win32_priority_separation": 0x2A,
                 "game_priority": {
                     "gpu_priority": 8,
@@ -243,14 +247,13 @@ class Rivals2BaseProfile(BaseProfile):
             "ServicesSettingsHandler": {
                 "preset": "gaming",
             },
-            "MemorySettingsHandler": {
-                "large_system_cache": 0,
-                "disable_paging_executive": 1,
-            },
             "ProcessPriorityHandler": {
                 "gpu_priority": 8,
                 "cpu_priority": 3,
                 "io_priority": 3,
+            },
+            "CpuAffinityHandler": {
+                "strategy": "p_cores_only",
             },
             "CNMSettingsHandler": {
                 "action": "stop",
@@ -262,6 +265,17 @@ class Rivals2BaseProfile(BaseProfile):
                 "game_type": "competitive_fps",
             },
         }
+
+        # Legacy/unverified settings — opt-in only
+        if self.include_legacy_tweaks:
+            settings["RegistrySettingsHandler"]["system_responsiveness"] = 10
+            settings["RegistrySettingsHandler"]["network_throttling"] = 0xFFFFFFFF
+            settings["MemorySettingsHandler"] = {
+                "large_system_cache": 0,
+                "disable_paging_executive": 1,
+            }
+
+        return settings
 
     def _settings_overrides(self) -> dict[str, dict[str, Any]]:
         return {}
@@ -289,6 +303,7 @@ class EmulatorLatencyBaseProfile(BaseProfile):
     def get_handlers(self) -> list[SettingsHandler]:
         from abso.settings.cnm import CNMSettingsHandler
         from abso.settings.color import ColorProfileSettingsHandler
+        from abso.settings.cpu_affinity import CpuAffinityHandler
         from abso.settings.graphics import GraphicsSettingsHandler
         from abso.settings.memory import MemorySettingsHandler
         from abso.settings.mouse import MouseSettingsHandler
@@ -309,8 +324,14 @@ class EmulatorLatencyBaseProfile(BaseProfile):
             MouseSettingsHandler(),
             GraphicsSettingsHandler(),
             ServicesSettingsHandler(),
-            MemorySettingsHandler(),
+        ]
+
+        if self.include_legacy_tweaks:
+            handlers.append(MemorySettingsHandler())
+
+        handlers += [
             ProcessPriorityHandler(self.executable_hints),
+            CpuAffinityHandler(self.executable_hints),
             CNMSettingsHandler(),
             ColorProfileSettingsHandler(),
         ]
@@ -322,7 +343,8 @@ class EmulatorLatencyBaseProfile(BaseProfile):
         return []
 
     def _base_settings(self) -> dict[str, dict[str, Any]]:
-        return {
+        # Verified settings — documented, measurable effect
+        settings: dict[str, dict[str, Any]] = {
             "WindowsSettingsHandler": {
                 "game_mode": True,
                 "game_bar": False,
@@ -340,8 +362,6 @@ class EmulatorLatencyBaseProfile(BaseProfile):
                 "processor_max_performance": True,
             },
             "RegistrySettingsHandler": {
-                "system_responsiveness": 10,
-                "network_throttling": 0xFFFFFFFF,
                 "win32_priority_separation": 0x2A,
                 "game_priority": {
                     "gpu_priority": 8,
@@ -360,19 +380,21 @@ class EmulatorLatencyBaseProfile(BaseProfile):
             },
             "GraphicsSettingsHandler": {
                 "disable_global_fso": True,
-                "disable_mpo": True,
+                # MPO is NOT disabled by default — it's required for G-SYNC/VRR
+                # and toggling it requires a reboot. Only disable MPO in profiles
+                # that explicitly need it (e.g., no-sync exclusive fullscreen profiles
+                # where MPO compositor interference is measured and confirmed).
             },
             "ServicesSettingsHandler": {
                 "preset": "gaming",
-            },
-            "MemorySettingsHandler": {
-                "large_system_cache": 0,
-                "disable_paging_executive": 1,
             },
             "ProcessPriorityHandler": {
                 "gpu_priority": 8,
                 "cpu_priority": 3,
                 "io_priority": 3,
+            },
+            "CpuAffinityHandler": {
+                "strategy": "p_cores_only",
             },
             "CNMSettingsHandler": {
                 "action": "stop",
@@ -384,6 +406,17 @@ class EmulatorLatencyBaseProfile(BaseProfile):
                 "game_type": "emulator",
             },
         }
+
+        # Legacy/unverified settings — opt-in only
+        if self.include_legacy_tweaks:
+            settings["RegistrySettingsHandler"]["system_responsiveness"] = 10
+            settings["RegistrySettingsHandler"]["network_throttling"] = 0xFFFFFFFF
+            settings["MemorySettingsHandler"] = {
+                "large_system_cache": 0,
+                "disable_paging_executive": 1,
+            }
+
+        return settings
 
     def _settings_overrides(self) -> dict[str, dict[str, Any]]:
         return {}
@@ -409,7 +442,7 @@ class WebGLBaseProfile(BaseProfile):
         from abso.settings.services import ServicesSettingsHandler
         from abso.settings.windows import WindowsSettingsHandler
 
-        return [
+        handlers = [
             WindowsSettingsHandler(),
             PowerSettingsHandler(),
             RegistrySettingsHandler(),
@@ -417,14 +450,21 @@ class WebGLBaseProfile(BaseProfile):
             NetworkSettingsHandler(),
             GraphicsSettingsHandler(),
             ServicesSettingsHandler(),
-            MemorySettingsHandler(),
+        ]
+
+        if self.include_legacy_tweaks:
+            handlers.append(MemorySettingsHandler())
+
+        handlers += [
             ProcessPriorityHandler(self.executable_hints),
             CNMSettingsHandler(),
             ColorProfileSettingsHandler(),
         ]
+        return handlers
 
     def _base_settings(self) -> dict[str, dict[str, Any]]:
-        return {
+        # Verified settings — documented, measurable effect
+        settings: dict[str, dict[str, Any]] = {
             "WindowsSettingsHandler": {
                 "game_mode": True,
                 "game_bar": False,
@@ -438,8 +478,6 @@ class WebGLBaseProfile(BaseProfile):
                 "processor_max_performance": True,
             },
             "RegistrySettingsHandler": {
-                "system_responsiveness": 10,
-                "network_throttling": 0xFFFFFFFF,
                 "win32_priority_separation": 0x26,
                 "game_priority": {
                     "gpu_priority": 8,
@@ -458,10 +496,6 @@ class WebGLBaseProfile(BaseProfile):
             "ServicesSettingsHandler": {
                 "preset": "gaming",
             },
-            "MemorySettingsHandler": {
-                "large_system_cache": 0,
-                "disable_paging_executive": 1,
-            },
             "ProcessPriorityHandler": {
                 "gpu_priority": 8,
                 "cpu_priority": 2,
@@ -477,6 +511,17 @@ class WebGLBaseProfile(BaseProfile):
                 "game_type": "casual",
             },
         }
+
+        # Legacy/unverified settings — opt-in only
+        if self.include_legacy_tweaks:
+            settings["RegistrySettingsHandler"]["system_responsiveness"] = 10
+            settings["RegistrySettingsHandler"]["network_throttling"] = 0xFFFFFFFF
+            settings["MemorySettingsHandler"] = {
+                "large_system_cache": 0,
+                "disable_paging_executive": 1,
+            }
+
+        return settings
 
     def _settings_overrides(self) -> dict[str, dict[str, Any]]:
         return {}
@@ -504,6 +549,7 @@ class ReflexShooterBaseProfile(BaseProfile):
     def get_handlers(self) -> list[SettingsHandler]:
         from abso.settings.cnm import CNMSettingsHandler
         from abso.settings.color import ColorProfileSettingsHandler
+        from abso.settings.cpu_affinity import CpuAffinityHandler
         from abso.settings.graphics import GraphicsSettingsHandler
         from abso.settings.memory import MemorySettingsHandler
         from abso.settings.mouse import MouseSettingsHandler
@@ -515,7 +561,7 @@ class ReflexShooterBaseProfile(BaseProfile):
         from abso.settings.services import ServicesSettingsHandler
         from abso.settings.windows import WindowsSettingsHandler
 
-        return [
+        handlers = [
             WindowsSettingsHandler(),
             PowerSettingsHandler(),
             RegistrySettingsHandler(),
@@ -524,14 +570,22 @@ class ReflexShooterBaseProfile(BaseProfile):
             MouseSettingsHandler(),
             GraphicsSettingsHandler(),
             ServicesSettingsHandler(),
-            MemorySettingsHandler(),
+        ]
+
+        if self.include_legacy_tweaks:
+            handlers.append(MemorySettingsHandler())
+
+        handlers += [
             ProcessPriorityHandler(self.executable_hints),
+            CpuAffinityHandler(self.executable_hints),
             CNMSettingsHandler(),
             ColorProfileSettingsHandler(),
         ]
+        return handlers
 
     def _base_settings(self) -> dict[str, dict[str, Any]]:
-        return {
+        # Verified settings — documented, measurable effect
+        settings: dict[str, dict[str, Any]] = {
             "WindowsSettingsHandler": {
                 "game_mode": True,
                 "game_bar": False,
@@ -550,8 +604,6 @@ class ReflexShooterBaseProfile(BaseProfile):
                 "processor_max_performance": True,
             },
             "RegistrySettingsHandler": {
-                "system_responsiveness": 10,
-                "network_throttling": 0xFFFFFFFF,
                 "win32_priority_separation": 0x2A,
                 "game_priority": {
                     "gpu_priority": 8,
@@ -577,14 +629,13 @@ class ReflexShooterBaseProfile(BaseProfile):
             "ServicesSettingsHandler": {
                 "preset": "gaming",
             },
-            "MemorySettingsHandler": {
-                "large_system_cache": 0,
-                "disable_paging_executive": 1,
-            },
             "ProcessPriorityHandler": {
                 "gpu_priority": 8,
                 "cpu_priority": 3,
                 "io_priority": 3,
+            },
+            "CpuAffinityHandler": {
+                "strategy": "p_cores_only",
             },
             "CNMSettingsHandler": {
                 "action": "stop",
@@ -596,6 +647,17 @@ class ReflexShooterBaseProfile(BaseProfile):
                 "game_type": "competitive_fps",
             },
         }
+
+        # Legacy/unverified settings — opt-in only
+        if self.include_legacy_tweaks:
+            settings["RegistrySettingsHandler"]["system_responsiveness"] = 10
+            settings["RegistrySettingsHandler"]["network_throttling"] = 0xFFFFFFFF
+            settings["MemorySettingsHandler"] = {
+                "large_system_cache": 0,
+                "disable_paging_executive": 1,
+            }
+
+        return settings
 
     def _settings_overrides(self) -> dict[str, dict[str, Any]]:
         return {}

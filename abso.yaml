@@ -1,0 +1,12 @@
+# A.B.S.O. Configuration
+# Adaptive Battle Station Optimizer
+
+backup_dir: backups
+auto_backup: true
+log_level: INFO
+confirm_destructive: true
+
+# DDC/CI — enabled for this PC (CVTE controller on LG 27GS95QE)
+ddci:
+  enabled: true
+  controller_override: CVTE

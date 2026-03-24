@@ -178,6 +178,38 @@ def detect(json_output: bool) -> None:
     detector = HardwareDetector()
     hardware = detector.detect_all()
 
+    # Gather BIOS info for both JSON and Rich output
+    bios_info = None
+    try:
+        from abso.core.bios_detector import BiosDetector
+        bios_det = BiosDetector()
+        bios_info = bios_det.detect_all()
+    except Exception:
+        pass  # BIOS detection is best-effort
+
+    # CPU topology info
+    cpu_topology = None
+    cpu_data = hardware.get("cpu")
+    if cpu_data:
+        cpu_name = cpu_data.get("name", "").lower()
+        core_count = cpu_data.get("cores", 0)
+        thread_count = cpu_data.get("threads", 0)
+        is_hybrid = False
+        if "12th gen" in cpu_name or "13th gen" in cpu_name or "14th gen" in cpu_name:
+            is_hybrid = True
+        elif any(tag in cpu_name for tag in ["core ultra", "-12", "-13", "-14"]):
+            if "intel" in cpu_name or "core" in cpu_name:
+                is_hybrid = True
+        if is_hybrid and core_count > 0 and thread_count > 0:
+            e_cores = thread_count - core_count
+            p_cores = core_count - e_cores
+            if p_cores > 0 and e_cores >= 0:
+                cpu_topology = {"type": "hybrid", "p_cores": p_cores, "e_cores": e_cores}
+            else:
+                cpu_topology = {"type": "hybrid"}
+        elif core_count > 0:
+            cpu_topology = {"type": "homogeneous"}
+
     # JSON output mode
     if json_output:
         # Flatten for GUI consumption
@@ -185,10 +217,24 @@ def detect(json_output: bool) -> None:
             "system": hardware.get("system"),
             "gpu": hardware.get("gpu"),
             "cpu": hardware.get("cpu"),
+            "cpu_topology": cpu_topology,
             "ram_gb": (hardware.get("ram") or {}).get("total_gb"),
             "monitors": hardware.get("monitors") or [],
             "is_admin": is_admin(),
+            "bios": None,
         }
+        if bios_info:
+            output_data["bios"] = {
+                "rebar_status": bios_info.rebar_status,
+                "xmp_status": bios_info.memory_profile,
+                "xmp_rated_mhz": bios_info.rated_speed_mhz,
+                "xmp_current_mhz": bios_info.current_speed_mhz,
+                "vbs_status": bios_info.vbs_status,
+                "memory_integrity": bios_info.memory_integrity,
+                "secure_boot": bios_info.secure_boot,
+                "tpm_present": bios_info.tpm_present,
+                "tpm_version": bios_info.tpm_version,
+            }
         output_json(output_data)
         return
 
@@ -247,6 +293,29 @@ def detect(json_output: bool) -> None:
         console.print(f"  Name: {cpu.get('name', 'Unknown')}")
         console.print(f"  Cores: {cpu.get('cores', 'Unknown')}")
         console.print(f"  Threads: {cpu.get('threads', 'Unknown')}")
+        # CPU topology: P-cores/E-cores for hybrid architectures
+        cpu_name = cpu.get("name", "").lower()
+        core_count = cpu.get("cores", 0)
+        thread_count = cpu.get("threads", 0)
+        is_hybrid = False
+        if "12th gen" in cpu_name or "13th gen" in cpu_name or "14th gen" in cpu_name:
+            is_hybrid = True
+        elif any(tag in cpu_name for tag in ["core ultra", "-12", "-13", "-14"]):
+            # Match i5-12600K, i7-13700K, i9-14900K style naming
+            if "intel" in cpu_name or "core" in cpu_name:
+                is_hybrid = True
+        if is_hybrid and core_count > 0 and thread_count > 0:
+            # Estimate P-cores and E-cores from thread/core ratio
+            # P-cores are hyperthreaded (2 threads each), E-cores are not (1 thread each)
+            # threads = p_cores * 2 + e_cores, cores = p_cores + e_cores
+            e_cores = thread_count - core_count
+            p_cores = core_count - e_cores
+            if p_cores > 0 and e_cores >= 0:
+                console.print(f"  Topology: [cyan]Hybrid[/cyan] ({p_cores}P + {e_cores}E)")
+            else:
+                console.print(f"  Topology: [cyan]Hybrid[/cyan]")
+        elif core_count > 0:
+            console.print(f"  Topology: [dim]Homogeneous[/dim]")
     else:
         console.print("  [red]Not detected[/red]")
 
@@ -293,6 +362,39 @@ def detect(json_output: bool) -> None:
             console.print(f"      G-Sync/VRR: {vrr_str}")
     else:
         console.print("  [red]Not detected[/red]")
+
+    # BIOS/Firmware summary
+    console.print("\n[bold]BIOS/Firmware:[/bold]")
+    if bios_info:
+        # ReBAR
+        rebar_color = {"enabled": "green", "disabled": "yellow", "unknown": "dim"}.get(
+            bios_info.rebar_status, "dim"
+        )
+        console.print(f"  ReBAR: [{rebar_color}]{bios_info.rebar_status}[/{rebar_color}]")
+
+        # XMP/EXPO
+        if bios_info.memory_profile == "xmp_enabled":
+            xmp_str = "[green]Enabled[/green]"
+            if bios_info.current_speed_mhz:
+                xmp_str += f" ({bios_info.current_speed_mhz} MHz)"
+        elif bios_info.memory_profile == "xmp_disabled_likely":
+            xmp_str = f"[yellow]Likely disabled[/yellow]"
+            if bios_info.current_speed_mhz and bios_info.rated_speed_mhz:
+                xmp_str += (
+                    f" ({bios_info.current_speed_mhz} MHz, "
+                    f"rated {bios_info.rated_speed_mhz} MHz)"
+                )
+        else:
+            xmp_str = "[dim]Unknown[/dim]"
+        console.print(f"  XMP/EXPO: {xmp_str}")
+
+        # VBS/Memory Integrity
+        vbs_color = "yellow" if bios_info.vbs_status == "enabled" else "green"
+        console.print(f"  VBS: [{vbs_color}]{bios_info.vbs_status}[/{vbs_color}]")
+        mi_color = "yellow" if bios_info.memory_integrity == "enabled" else "green"
+        console.print(f"  Memory Integrity: [{mi_color}]{bios_info.memory_integrity}[/{mi_color}]")
+    else:
+        console.print("  [dim]Detection unavailable[/dim]")
 
 
 @cli.command()
@@ -1138,6 +1240,394 @@ def config(init: bool, show: bool) -> None:
     # Default: show help
     console.print("Use [bold]abso config --init[/bold] to create a configuration file.")
     console.print("Use [bold]abso config --show[/bold] to view current settings.")
+
+
+@cli.command()
+@click.argument("process_name")
+@click.option("--duration", default=30, help="Capture duration in seconds")
+@click.option("--json", "json_output", is_flag=True, help="Output as JSON")
+def benchmark(process_name: str, duration: int, json_output: bool):
+    """Capture frame times using PresentMon for a running game."""
+    from dataclasses import asdict
+
+    from rich.table import Table
+
+    from abso.core.benchmark import (
+        FrameTimeBenchmark,
+        PresentMonNotFoundError,
+    )
+
+    bench = FrameTimeBenchmark()
+
+    try:
+        if not json_output:
+            console.print(Panel(f"Benchmarking: {process_name}", style="bold blue"))
+            console.print(f"[dim]Capturing frame times for {duration}s...[/dim]\n")
+
+        capture = bench.capture(process_name, duration_seconds=duration)
+        analysis = bench.analyze(capture)
+
+        if json_output:
+            output_json(asdict(analysis))
+            return
+
+        table = Table(title="Frame Time Analysis", show_header=True, border_style="cyan")
+        table.add_column("Metric", style="bold")
+        table.add_column("Value", justify="right")
+
+        table.add_row("Avg FPS", f"{analysis.avg_fps:.2f}")
+        table.add_row("1% Low FPS", f"{analysis.p1_low_fps:.2f}")
+        table.add_row("0.1% Low FPS", f"{analysis.p01_low_fps:.2f}")
+        table.add_row("Avg Frame Time", f"{analysis.avg_frame_time_ms:.3f} ms")
+        table.add_row("P95 Frame Time", f"{analysis.p95_frame_time_ms:.3f} ms")
+        table.add_row("P99 Frame Time", f"{analysis.p99_frame_time_ms:.3f} ms")
+        table.add_row("Stdev", f"{analysis.frame_time_stdev:.3f} ms")
+        table.add_row("Dropped Frames", str(analysis.dropped_frame_count))
+        table.add_row("Total Frames", str(analysis.total_frames))
+
+        console.print(table)
+        console.print(f"\n[dim]CSV saved: {capture.csv_path}[/dim]")
+
+    except PresentMonNotFoundError:
+        if json_output:
+            json_error(
+                "PresentMon is not installed. "
+                "Download from https://github.com/GameTechDev/PresentMon/releases "
+                "and add to PATH or install to C:\\Program Files\\PresentMon\\."
+            )
+        console.print("[red]Error: PresentMon is not installed.[/red]")
+        console.print("\nInstall PresentMon to use frame-time benchmarking:")
+        console.print("  1. Download from [cyan]https://github.com/GameTechDev/PresentMon/releases[/cyan]")
+        console.print("  2. Install to [bold]C:\\Program Files\\PresentMon\\[/bold] or add to PATH")
+        console.print("  3. Run this command again with the game running")
+        sys.exit(1)
+    except Exception as e:
+        if json_output:
+            json_error(f"Benchmark failed: {e}")
+        console.print(f"[red]Benchmark failed: {e}[/red]")
+        sys.exit(1)
+
+
+@cli.command("benchmark-compare")
+@click.argument("before_csv")
+@click.argument("after_csv")
+@click.option("--json", "json_output", is_flag=True, help="Output as JSON")
+def benchmark_compare(before_csv: str, after_csv: str, json_output: bool):
+    """Compare two benchmark captures (before/after profile)."""
+    from dataclasses import asdict
+
+    from rich.table import Table
+
+    from abso.core.benchmark import CaptureResult, FrameTimeBenchmark
+
+    bench = FrameTimeBenchmark()
+
+    # Load and parse both CSV files
+    before_path = Path(before_csv)
+    after_path = Path(after_csv)
+
+    for label, path in [("Before", before_path), ("After", after_path)]:
+        if not path.is_file():
+            if json_output:
+                json_error(f"{label} CSV not found: {path}")
+            console.print(f"[red]Error: {label} CSV not found: {path}[/red]")
+            sys.exit(1)
+
+    try:
+        before_capture = CaptureResult(
+            raw_data=bench._parse_csv(before_path, "before"),
+            process_name="before",
+            duration_seconds=0,
+            csv_path=before_path,
+            timestamp=datetime.now(),
+        )
+        after_capture = CaptureResult(
+            raw_data=bench._parse_csv(after_path, "after"),
+            process_name="after",
+            duration_seconds=0,
+            csv_path=after_path,
+            timestamp=datetime.now(),
+        )
+
+        before_analysis = bench.analyze(before_capture)
+        after_analysis = bench.analyze(after_capture)
+        comparison = bench.compare(before_analysis, after_analysis)
+
+        if json_output:
+            deltas_data = {
+                name: asdict(delta) for name, delta in comparison.deltas.items()
+            }
+            output_json({
+                "before": asdict(comparison.before),
+                "after": asdict(comparison.after),
+                "deltas": deltas_data,
+            })
+            return
+
+        console.print(Panel("Benchmark Comparison", style="bold blue"))
+
+        table = Table(title="Before vs After", show_header=True, border_style="cyan")
+        table.add_column("Metric", style="bold")
+        table.add_column("Before", justify="right")
+        table.add_column("After", justify="right")
+        table.add_column("Delta", justify="right")
+        table.add_column("", justify="center")  # Improvement indicator
+
+        display_metrics = [
+            ("Avg FPS", "avg_fps", ".2f"),
+            ("1% Low FPS", "p1_low_fps", ".2f"),
+            ("0.1% Low FPS", "p01_low_fps", ".2f"),
+            ("Avg Frame Time (ms)", "avg_frame_time_ms", ".3f"),
+            ("P95 Frame Time (ms)", "p95_frame_time_ms", ".3f"),
+            ("P99 Frame Time (ms)", "p99_frame_time_ms", ".3f"),
+            ("Stdev (ms)", "frame_time_stdev", ".3f"),
+            ("Dropped Frames", "dropped_frame_count", ".0f"),
+            ("Total Frames", "total_frames", ".0f"),
+        ]
+
+        for label, key, fmt in display_metrics:
+            delta = comparison.deltas.get(key)
+            if delta is None:
+                continue
+
+            before_str = f"{delta.before:{fmt}}"
+            after_str = f"{delta.after:{fmt}}"
+
+            # Format delta with sign and percentage
+            sign = "+" if delta.absolute > 0 else ""
+            delta_str = f"{sign}{delta.absolute:{fmt}}"
+            if delta.percentage != float("inf"):
+                delta_str += f" ({sign}{delta.percentage:.1f}%)"
+
+            if delta.improved:
+                indicator = "[green]+++[/green]"
+                delta_str = f"[green]{delta_str}[/green]"
+            elif delta.absolute == 0:
+                indicator = "[dim]---[/dim]"
+                delta_str = f"[dim]{delta_str}[/dim]"
+            else:
+                indicator = "[red]---[/red]"
+                delta_str = f"[red]{delta_str}[/red]"
+
+            table.add_row(label, before_str, after_str, delta_str, indicator)
+
+        console.print(table)
+
+    except Exception as e:
+        if json_output:
+            json_error(f"Comparison failed: {e}")
+        console.print(f"[red]Comparison failed: {e}[/red]")
+        sys.exit(1)
+
+
+@cli.command()
+@click.option("--json", "json_output", is_flag=True, help="Output as JSON")
+def bios(json_output: bool):
+    """Detect BIOS/firmware settings relevant to gaming."""
+    from abso.core.bios_detector import BiosDetector
+
+    detector = BiosDetector()
+
+    try:
+        info = detector.detect_all()
+        has_nvidia = False
+        try:
+            hw_detector = HardwareDetector()
+            gpu = hw_detector.detect_gpu()
+            if gpu and "nvidia" in (gpu.get("name", "") or "").lower():
+                has_nvidia = True
+        except Exception:
+            pass  # GPU detection is best-effort for recommendation context
+
+        recommendations = detector.get_recommendations(info, has_nvidia_gpu=has_nvidia)
+
+        if json_output:
+            output_json({
+                "rebar_status": info.rebar_status,
+                "memory_profile": info.memory_profile,
+                "rated_speed_mhz": info.rated_speed_mhz,
+                "current_speed_mhz": info.current_speed_mhz,
+                "vbs_status": info.vbs_status,
+                "memory_integrity": info.memory_integrity,
+                "secure_boot": info.secure_boot,
+                "tpm_present": info.tpm_present,
+                "tpm_version": info.tpm_version,
+                "recommendations": [
+                    {
+                        "title": rec.title,
+                        "explanation": rec.explanation,
+                        "impact": rec.impact,
+                        "current_value": rec.current_value,
+                        "recommended_value": rec.recommended_value,
+                    }
+                    for rec in recommendations
+                ],
+            })
+            return
+
+        console.print(Panel("BIOS/Firmware Detection", style="bold blue"))
+
+        # Detection results
+        rebar_color = {"enabled": "green", "disabled": "yellow", "unknown": "dim"}.get(
+            info.rebar_status, "dim"
+        )
+        console.print(f"  Resizable BAR: [{rebar_color}]{info.rebar_status}[/{rebar_color}]")
+
+        if info.memory_profile == "xmp_enabled":
+            xmp_str = "[green]Enabled[/green]"
+            if info.current_speed_mhz:
+                xmp_str += f" ({info.current_speed_mhz} MHz)"
+        elif info.memory_profile == "xmp_disabled_likely":
+            xmp_str = "[yellow]Likely disabled[/yellow]"
+            if info.current_speed_mhz and info.rated_speed_mhz:
+                xmp_str += (
+                    f" ({info.current_speed_mhz} MHz, "
+                    f"rated {info.rated_speed_mhz} MHz)"
+                )
+        else:
+            xmp_str = "[dim]Unknown[/dim]"
+        console.print(f"  XMP/EXPO: {xmp_str}")
+
+        vbs_color = "yellow" if info.vbs_status == "enabled" else "green"
+        console.print(f"  VBS: [{vbs_color}]{info.vbs_status}[/{vbs_color}]")
+
+        mi_color = "yellow" if info.memory_integrity == "enabled" else "green"
+        console.print(f"  Memory Integrity: [{mi_color}]{info.memory_integrity}[/{mi_color}]")
+
+        sb_color = {"enabled": "green", "disabled": "yellow", "unknown": "dim"}.get(
+            info.secure_boot, "dim"
+        )
+        console.print(f"  Secure Boot: [{sb_color}]{info.secure_boot}[/{sb_color}]")
+
+        if info.tpm_present:
+            tpm_ver = info.tpm_version or "Unknown version"
+            console.print(f"  TPM: [green]Present[/green] (v{tpm_ver})")
+        else:
+            console.print(f"  TPM: [dim]Not detected[/dim]")
+
+        # Recommendations
+        if recommendations:
+            console.print(f"\n[bold]Recommendations ({len(recommendations)}):[/bold]\n")
+            for rec in recommendations:
+                impact_color = {
+                    "high": "red",
+                    "medium": "yellow",
+                    "low": "blue",
+                }.get(rec.impact, "white")
+
+                console.print(
+                    f"  [{impact_color}][{rec.impact.upper()}][/{impact_color}] {rec.title}"
+                )
+                console.print(f"    Current: {rec.current_value}")
+                console.print(f"    Recommended: {rec.recommended_value}")
+                console.print(f"    [dim]{rec.explanation}[/dim]")
+                console.print()
+        else:
+            console.print(
+                "\n[green]No BIOS/firmware recommendations -- your settings look good![/green]"
+            )
+
+    except Exception as e:
+        if json_output:
+            json_error(f"BIOS detection failed: {e}")
+        console.print(f"[red]BIOS detection failed: {e}[/red]")
+        sys.exit(1)
+    finally:
+        detector.cleanup()
+
+
+@cli.command("profile-create")
+@click.argument("profile_id")
+@click.option("--game", required=True, help="Display name for the game")
+@click.option("--exe", required=True, multiple=True, help="Game executable name(s)")
+@click.option(
+    "--base",
+    type=click.Choice(["competitive_fps", "reflex_shooter", "emulator", "browser", "balanced"]),
+    default="balanced",
+    help="Base template to inherit from",
+)
+@click.option("--category", default="Other", help="Tray category (Fighting, Shooter, ARPG, etc.)")
+def profile_create(
+    profile_id: str,
+    game: str,
+    exe: tuple[str, ...],
+    base: str,
+    category: str,
+) -> None:
+    """Create a new user profile YAML template.
+
+    Generates a starter YAML in ~/.abso/profiles/ that you can customize.
+
+    Example: abso profile-create my-game --game "My Game" --exe MyGame.exe --base reflex_shooter
+    """
+    profiles_dir = Path.home() / ".abso" / "profiles"
+    profiles_dir.mkdir(parents=True, exist_ok=True)
+    output_path = profiles_dir / f"{profile_id}.yaml"
+
+    if output_path.exists():
+        console.print(f"[red]Profile already exists: {output_path}[/red]")
+        sys.exit(1)
+
+    # Build YAML content
+    exe_list = "\n".join(f"  - {e}" for e in exe)
+    yaml_content = f"""# ABSO User Profile: {game}
+# Created by: abso profile-create
+# Documentation: https://github.com/your-repo/abso/docs/profiles.md
+
+profile_id: {profile_id}
+display_name: "{game}"
+description: "Custom optimization profile for {game}"
+optimization_target: minimum_latency
+executable_hints:
+{exe_list}
+
+# Base template — inherits sensible defaults
+# Options: competitive_fps, reflex_shooter, emulator, browser, balanced
+base: {base}
+
+# Profile metadata (optional)
+# metadata:
+#   is_online_profile: false
+#   graphics_api: dx12
+#   is_sdr_only: true
+
+# Settings overrides — only include handlers you want to customize
+# Full list: WindowsSettingsHandler, NvidiaSettingsHandler, PowerSettingsHandler,
+#            RegistrySettingsHandler, NetworkSettingsHandler, MouseSettingsHandler,
+#            GraphicsSettingsHandler, ServicesSettingsHandler, ProcessPriorityHandler,
+#            ColorProfileSettingsHandler
+settings:
+  NvidiaSettingsHandler:
+    preset: {_base_to_preset(base)}
+  WindowsSettingsHandler:
+    max_refresh_rate: true
+
+# Tray app appearance
+tray_category: {category}
+tray_subtitle: "Custom | {game}"
+sync_mode: off
+
+# In-game settings recommendations (shown after profile apply)
+# in_game_settings:
+#   - category: Video
+#     setting: V-Sync
+#     value: "Off"
+#     reason: "Driver handles sync"
+"""
+    output_path.write_text(yaml_content, encoding="utf-8")
+    console.print(f"[green]Profile created: {output_path}[/green]")
+    console.print(f"Edit the YAML to customize settings, then restart the tray or run [bold]abso profiles[/bold] to verify.")
+
+
+def _base_to_preset(base: str) -> str:
+    """Map base template name to a sensible default NVIDIA preset."""
+    return {
+        "competitive_fps": "no_sync_fighting_game",
+        "reflex_shooter": "reflex_game",
+        "emulator": "no_sync_fighting_game",
+        "browser": "vrr_optimal",
+        "balanced": "vrr_optimal",
+    }.get(base, "vrr_optimal")
 
 
 def main() -> None:

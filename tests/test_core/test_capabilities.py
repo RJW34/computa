@@ -40,8 +40,8 @@ def test_capability_allows_vrr_profile_with_confirmed_monitor() -> None:
     assert report.has_blockers is False
 
 
-def test_capability_blocks_vrr_profile_when_hardware_capable_but_not_active() -> None:
-    """EDID reports hardware VRR capability but G-SYNC isn't confirmed enabled."""
+def test_capability_accepts_vrr_hardware_status() -> None:
+    """EDID reports hardware VRR — accepted as 'likely' since commit 611a5bd."""
     detector = MagicMock()
     detector.detect_monitors.return_value = [
         {"name": "DELL S2722DGM", "vrr_supported": "hardware", "is_primary": True}
@@ -51,11 +51,23 @@ def test_capability_blocks_vrr_profile_when_hardware_capable_but_not_active() ->
 
     report = CapabilityEngine(detector).evaluate(profile)
 
+    assert report.has_blockers is False
+    assert any(f.code == "VRR_LIKELY_ACCEPTED" for f in report.findings)
+
+
+def test_capability_blocks_vrr_profile_when_vrr_only_possible() -> None:
+    """VRR 'possible' (not confirmed or likely) should still block."""
+    detector = MagicMock()
+    detector.detect_monitors.return_value = [
+        {"name": "Generic Monitor", "vrr_supported": "possible", "is_primary": True}
+    ]
+    detector.detect_gpu.return_value = {"name": "NVIDIA GeForce RTX 4090"}
+    profile = _make_profile("overwatch2-gsync", requires_confirmed_vrr_support=True)
+
+    report = CapabilityEngine(detector).evaluate(profile)
+
     assert report.has_blockers is True
     assert any(f.code == "VRR_REQUIRED_NOT_ACTIVE" for f in report.findings)
-    # Message should mention Adaptive Sync/FreeSync for tray VRR detection
-    blocker = next(f for f in report.findings if f.code == "VRR_REQUIRED_NOT_ACTIVE")
-    assert "Adaptive Sync/FreeSync" in blocker.message
 
 
 def test_capability_warns_on_non_nvidia_gpu() -> None:

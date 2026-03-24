@@ -621,29 +621,15 @@ class WindowsSettingsHandler(SettingsHandler):
         return targets
 
     def _is_monitor_hdr_capable(self, monitor_id: str) -> bool:
-        """Check if a monitor supports HDR based on hardware ID or registry.
-
-        Uses a two-tier approach:
-        1. Known OLED PnP ID patterns (e.g. LG UltraGear OLED GSM78xx+)
-        2. Registry AdvancedColorSupported fallback for unknown monitors
+        """Check if a monitor supports HDR via Windows registry/CCD API.
 
         Args:
             monitor_id: Monitor hardware identifier (e.g., "GSM784C_12345").
 
         Returns:
-            True if the monitor is known or detected to support HDR.
+            True if the monitor is detected to support HDR.
         """
-        # LG OLED UltraGear monitors use PnP IDs in the GSM78xx+ range
-        if monitor_id.startswith("GSM"):
-            try:
-                hex_part = monitor_id[3:7]
-                pnp_num = int(hex_part, 16)
-                if pnp_num >= 0x7800:
-                    return True
-            except (ValueError, IndexError):
-                pass
-
-        # Fall back to registry AdvancedColorSupported check
+        # HDR capability detected via generic Windows CCD/registry API (works for all monitors)
         try:
             key = winreg.OpenKey(
                 winreg.HKEY_LOCAL_MACHINE,

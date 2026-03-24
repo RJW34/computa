@@ -5,11 +5,18 @@ recommendations keyed by game type.
 
 Monitors are identified by their manufacturer+model prefix extracted
 from the Windows device ID string (e.g. "GSM7847" for LG 27GS95QE).
+
+Data is loaded from YAML files (bundled + user override at ~/.abso/monitor_osd.yaml),
+with a built-in Python fallback if YAML loading fails.
 """
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
+from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -31,10 +38,10 @@ class MonitorOSDProfile:
 
 
 # =============================================================================
-# Monitor Database
+# Built-in Monitor Database (fallback if YAML loading fails)
 # =============================================================================
 
-_MONITOR_DB: list[MonitorOSDProfile] = [
+_BUILTIN_MONITOR_DB: list[MonitorOSDProfile] = [
     # -------------------------------------------------------------------------
     # LG 27GS95QE UltraGear OLED (240Hz, WQHD, HDR)
     # -------------------------------------------------------------------------
@@ -168,6 +175,75 @@ _MONITOR_DB: list[MonitorOSDProfile] = [
 
 
 # =============================================================================
+# YAML Loading
+# =============================================================================
+
+_MONITOR_DB: list[MonitorOSDProfile] | None = None
+
+
+def _parse_monitor_entry(data: dict) -> MonitorOSDProfile:
+    """Convert a YAML monitor dict into a MonitorOSDProfile."""
+    recommendations: dict[str, list[OSDRecommendation]] = {}
+    for game_type, recs in data.get("recommendations", {}).items():
+        recommendations[game_type] = [
+            OSDRecommendation(
+                setting=r["setting"],
+                value=r["value"],
+                reason=r["reason"],
+            )
+            for r in recs
+        ]
+    return MonitorOSDProfile(
+        model_pattern=data["model_pattern"],
+        display_name=data["display_name"],
+        recommendations=recommendations,
+    )
+
+
+def _load_monitor_db() -> list[MonitorOSDProfile]:
+    """Load monitor OSD database from YAML files.
+
+    Loads from bundled YAML first, then merges user YAML (~/.abso/monitor_osd.yaml).
+    User entries override bundled entries with matching model_pattern.
+    Falls back to built-in Python data if YAML loading fails.
+    """
+    try:
+        import yaml
+    except ImportError:
+        logger.warning("PyYAML not installed; using built-in monitor OSD data.")
+        return list(_BUILTIN_MONITOR_DB)
+
+    bundled_yaml = Path(__file__).parent / "monitor_osd.yaml"
+    user_yaml = Path.home() / ".abso" / "monitor_osd.yaml"
+
+    profiles: list[MonitorOSDProfile] = []
+    seen_patterns: set[str] = set()
+
+    # Load user YAML first (takes priority)
+    for yaml_path in [user_yaml, bundled_yaml]:
+        if yaml_path.exists():
+            try:
+                data = yaml.safe_load(yaml_path.read_text(encoding="utf-8"))
+                for monitor in data.get("monitors", []):
+                    pattern = monitor["model_pattern"]
+                    if pattern not in seen_patterns:
+                        profiles.append(_parse_monitor_entry(monitor))
+                        seen_patterns.add(pattern)
+            except Exception as e:
+                logger.warning(f"Failed to load monitor OSD YAML from {yaml_path}: {e}")
+
+    return profiles or list(_BUILTIN_MONITOR_DB)
+
+
+def _get_monitor_db() -> list[MonitorOSDProfile]:
+    """Return the monitor database, lazily loading from YAML on first access."""
+    global _MONITOR_DB
+    if _MONITOR_DB is None:
+        _MONITOR_DB = _load_monitor_db()
+    return _MONITOR_DB
+
+
+# =============================================================================
 # Lookup
 # =============================================================================
 
@@ -190,7 +266,7 @@ def get_osd_recommendations(
     # Normalize for matching
     normalized = monitor_id.upper().replace("/", "\\")
 
-    for profile in _MONITOR_DB:
+    for profile in _get_monitor_db():
         if profile.model_pattern.upper() in normalized:
             recs = profile.recommendations.get(game_type, [])
             if recs:

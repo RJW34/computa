@@ -6,7 +6,7 @@ import logging
 import winreg
 from typing import Any
 
-from abso.core.models import Issue
+from abso.core.models import EvidenceTier, Issue
 from abso.settings.base import SettingsHandler
 
 logger = logging.getLogger(__name__)
@@ -53,7 +53,7 @@ class MemorySettingsHandler(SettingsHandler):
         issues: list[Issue] = []
         current = self.detect()
 
-        # Check Large System Cache (should be 0 for gaming)
+        # Check Large System Cache — already 0 on desktop Windows by default
         large_cache = current.get("large_system_cache")
         if large_cache is not None and large_cache != 0:
             issues.append(Issue(
@@ -62,13 +62,15 @@ class MemorySettingsHandler(SettingsHandler):
                 current_value="Enabled (file server mode)",
                 optimal_value="Disabled (application mode)",
                 explanation=(
-                    "LargeSystemCache optimizes memory for file server workloads. "
-                    "Setting to 0 optimizes for applications/games, giving more RAM to processes."
+                    "LargeSystemCache=0 is already the default on desktop Windows. "
+                    "Only relevant if someone manually enabled server-mode caching. "
+                    "Opt-in via include_legacy_tweaks."
                 ),
                 category="memory",
+                evidence_tier=EvidenceTier.LEGACY_UNVERIFIED,
             ))
 
-        # Check Disable Paging Executive (optional, for systems with enough RAM)
+        # Disable Paging Executive — no-op with 16GB+ RAM
         disable_paging = current.get("disable_paging_executive")
         if disable_paging is None or disable_paging != 1:
             issues.append(Issue(
@@ -77,10 +79,14 @@ class MemorySettingsHandler(SettingsHandler):
                 current_value="Enabled (kernel can be paged to disk)",
                 optimal_value="Disabled (keep kernel in RAM)",
                 explanation=(
-                    "DisablePagingExecutive keeps Windows kernel code in RAM instead of "
-                    "allowing it to be paged to disk. Reduces latency on systems with 16GB+ RAM."
+                    "DisablePagingExecutive keeps kernel code in physical RAM. "
+                    "On systems with 16GB+ RAM (standard for gaming PCs), "
+                    "Windows already keeps the kernel resident — this setting "
+                    "has no measurable effect. Requires reboot. "
+                    "Opt-in via include_legacy_tweaks."
                 ),
                 category="memory",
+                evidence_tier=EvidenceTier.LEGACY_UNVERIFIED,
             ))
 
         return issues

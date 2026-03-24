@@ -463,11 +463,11 @@ class SlippiMeleeUniversalProfile(SlippiMeleeProfile):
         return "minimum_latency"
 
     def get_settings(self, handler_name: str) -> dict[str, Any]:
-        """Get handler settings with fixed HAGS and backend-aware LLM.
+        """Get handler settings with fixed HAGS, no MPO toggle, and backend-aware LLM.
 
-        HAGS is always True regardless of Dolphin backend, so applying
-        this profile never triggers a reboot requirement. LLM is still
-        adapted per-backend since it is a runtime driver setting.
+        HAGS is always True and MPO is never toggled, so applying this
+        profile never triggers a reboot requirement. LLM is still adapted
+        per-backend since it is a runtime driver setting.
         """
         settings = super().get_settings(handler_name).copy()
 
@@ -476,6 +476,12 @@ class SlippiMeleeUniversalProfile(SlippiMeleeProfile):
             # Avoids reboot requirement when switching Dolphin backends.
             # HAGS benefit on DX12/Vulkan outweighs marginal DX11/OpenGL cost.
             settings["hags"] = True
+
+        if handler_name == "GraphicsSettingsHandler":
+            # Do NOT toggle MPO — toggling it requires a reboot, which
+            # defeats the entire purpose of this "no reboot" profile.
+            # MPO state is left as-is from whatever the system currently has.
+            settings.pop("disable_mpo", None)
 
         return settings
 
@@ -662,6 +668,12 @@ class SlippiMeleeVRRLabProfile(SlippiMeleeProfile):
             "max_frame_rate": "off",
             "triple_buffering": "off",
         })
+
+        # MPO must be enabled for G-SYNC/VRR to work on Windows 11.
+        settings["GraphicsSettingsHandler"] = {
+            "disable_global_fso": True,
+            "disable_mpo": False,
+        }
 
         settings["DolphinConfigHandler"].update({
             # Keep queue path explicit and avoid double-sync in Dolphin.

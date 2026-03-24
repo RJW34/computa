@@ -167,6 +167,37 @@ class BaseProfile(ABC):
             "minimum_latency_offline",
         }
 
+    @property
+    def cpu_affinity_strategy(self) -> str | None:
+        """CPU affinity strategy for this profile.
+
+        Returns None to skip affinity management, or one of:
+        - "p_cores_only": Pin to performance cores (Intel hybrid)
+        - "all_cores": Use all cores (default behavior)
+        - "custom": Use custom affinity mask from get_settings()
+
+        Default: None (don't manage affinity).
+        Only effective on hybrid CPU architectures (Intel 12th gen+).
+        """
+        return None
+
+    @property
+    def include_legacy_tweaks(self) -> bool:
+        """Whether to apply legacy/unverified registry and memory tweaks.
+
+        Legacy tweaks include settings commonly found in gaming optimization
+        guides that have no documented effect on modern Windows 11:
+        - SystemResponsiveness (MMCSS scheduling hint)
+        - NetworkThrottlingIndex (multimedia network throttling)
+        - DisablePagingExecutive (kernel paging — no-op with 16GB+ RAM)
+        - LargeSystemCache (already 0 on desktop Windows)
+
+        These are NOT applied by default. Override to True if you want
+        them for completeness or placebo comfort.
+        Default: False.
+        """
+        return False
+
     @abstractmethod
     def get_handlers(self) -> list[SettingsHandler]:
         """Get settings handlers used by this profile.

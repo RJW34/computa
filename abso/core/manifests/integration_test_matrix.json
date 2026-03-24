@@ -182,6 +182,20 @@
       "kind": "apply_profile",
       "assumptions": ["administrator", "obs_installed"],
       "expected": { "transaction_state": "committed", "apply_success": true }
+    },
+    {
+      "id": "apply-marvel-rivals-sdr",
+      "profile_id": "marvel-rivals-sdr",
+      "kind": "apply_profile",
+      "assumptions": ["administrator", "nvidia_gpu", "vrr_confirmed"],
+      "expected": { "transaction_state": "committed", "apply_success": true }
+    },
+    {
+      "id": "apply-marvel-rivals-hdr",
+      "profile_id": "marvel-rivals-hdr",
+      "kind": "apply_profile",
+      "assumptions": ["administrator", "nvidia_gpu", "vrr_confirmed"],
+      "expected": { "transaction_state": "committed", "apply_success": true }
     }
   ]
 }

@@ -89,7 +89,8 @@ class TestRegistrySettingsHandlerAudit:
 
         responsiveness_issues = [i for i in issues if "Responsiveness" in i.title]
         assert len(responsiveness_issues) == 1
-        assert responsiveness_issues[0].severity == "warning"
+        assert responsiveness_issues[0].severity == "info"
+        assert responsiveness_issues[0].evidence_tier.value == "legacy_unverified"
 
     @patch.object(RegistrySettingsHandler, "detect")
     def test_audit_detects_network_throttling(self, mock_detect):

@@ -557,8 +557,12 @@ def _detect_gsync_from_nvidia_registry() -> dict[str, Any]:
     return result
 
 
+# DEPRECATED: v2.0 — prefer EDID/registry detection
 def _is_known_gsync_monitor(monitor_name: str) -> tuple[bool, str | None]:
     """Check if monitor name matches known G-Sync monitor patterns.
+
+    DEPRECATED: This hardcoded list is a last-resort fallback. Prefer EDID
+    parsing and NVIDIA registry/DRS detection for VRR discovery.
 
     Args:
         monitor_name: The monitor name/model string.
@@ -1197,22 +1201,16 @@ class HardwareDetector:
                     # Detect VRR/G-Sync capability using multiple methods
                     vrr_info: dict[str, Any] = {"vrr_supported": None, "vrr_type": None}
 
-                    # Method 1: Check if this is a known G-Sync monitor by name
-                    is_known_gsync, gsync_type = _is_known_gsync_monitor(monitor_name)
-                    if is_known_gsync:
-                        vrr_info["vrr_supported"] = True
-                        vrr_info["vrr_type"] = gsync_type
-
-                    # Method 2: Try EDID parsing for FreeSync/Adaptive-Sync
+                    # Method 1: Try EDID parsing for FreeSync/Adaptive-Sync
                     # EDID reports hardware capability (panel supports VRR),
                     # not whether VRR is currently enabled in the monitor OSD.
                     # Returns "hardware" instead of True to indicate unconfirmed.
-                    if not vrr_info.get("vrr_supported") and monitor_id:
+                    if monitor_id:
                         edid_vrr = _detect_vrr_from_edid(monitor_id)
                         if edid_vrr.get("vrr_supported"):
                             vrr_info.update(edid_vrr)
 
-                    # Method 3: Check NVIDIA registry for G-Sync enabled status
+                    # Method 2: Check NVIDIA registry for G-Sync enabled status
                     # Always run this (not just as fallback) to cross-reference
                     # EDID hardware capability with actual driver configuration.
                     if vrr_info.get("vrr_supported") is not True:
@@ -1220,7 +1218,7 @@ class HardwareDetector:
                         if gsync_registry.get("gsync_enabled_globally"):
                             if vrr_info.get("vrr_supported") == "hardware":
                                 # EDID confirmed hardware capability + NVIDIA
-                                # driver has G-SYNC enabled → promote to confirmed
+                                # driver has G-SYNC enabled -> promote to confirmed
                                 vrr_info["vrr_supported"] = True
                                 if vrr_info.get("vrr_type") not in ("gsync_native", "gsync_ultimate"):
                                     vrr_info["vrr_type"] = "gsync_compatible"
@@ -1229,7 +1227,7 @@ class HardwareDetector:
                                 vrr_info["vrr_supported"] = True
                                 vrr_info["vrr_type"] = "gsync_compatible"
 
-                    # Method 4: Fall back to heuristics
+                    # Method 3: Fall back to heuristics
                     if vrr_info.get("vrr_supported") is None:
                         # High refresh rate monitors are typically VRR-capable
                         if max_refresh_rate >= 120:
@@ -1239,6 +1237,14 @@ class HardwareDetector:
                             vrr_info["vrr_supported"] = "possible"
                         else:
                             vrr_info["vrr_supported"] = "unknown"
+
+                    # Method 4 (DEPRECATED): Hardcoded G-Sync model list — last resort
+                    if vrr_info.get("vrr_supported") is None or vrr_info.get("vrr_supported") == "unknown":
+                        is_known_gsync, gsync_type = _is_known_gsync_monitor(monitor_name)
+                        if is_known_gsync:
+                            logger.debug("G-SYNC detected via legacy model list (deprecated) for: %s", monitor_name)
+                            vrr_info["vrr_supported"] = True
+                            vrr_info["vrr_type"] = gsync_type
 
                     monitors.append({
                         "name": monitor_name,
@@ -1466,19 +1472,16 @@ class HardwareDetector:
         max_refresh_rate: float,
         gsync_enabled_globally: bool,
     ) -> dict[str, Any]:
-        """Derive VRR status using name, EDID, and NVIDIA global state."""
+        """Derive VRR status using EDID, NVIDIA state, heuristics, and legacy model list."""
         vrr_info: dict[str, Any] = {"vrr_supported": None, "vrr_type": None}
 
-        is_known_gsync, gsync_type = _is_known_gsync_monitor(monitor_name)
-        if is_known_gsync:
-            vrr_info["vrr_supported"] = True
-            vrr_info["vrr_type"] = gsync_type
-
-        if not vrr_info.get("vrr_supported") and monitor_id:
+        # Step 1: EDID parsing (most reliable hardware-level detection)
+        if monitor_id:
             edid_vrr = _detect_vrr_from_edid(monitor_id)
             if edid_vrr.get("vrr_supported"):
                 vrr_info.update(edid_vrr)
 
+        # Step 2: NVIDIA registry / DRS cross-reference
         if vrr_info.get("vrr_supported") is not True and gsync_enabled_globally:
             if vrr_info.get("vrr_supported") == "hardware":
                 vrr_info["vrr_supported"] = True
@@ -1488,6 +1491,7 @@ class HardwareDetector:
                 vrr_info["vrr_supported"] = True
                 vrr_info["vrr_type"] = "gsync_compatible"
 
+        # Step 3: Heuristics based on refresh rate
         if vrr_info.get("vrr_supported") is None:
             if max_refresh_rate >= 120:
                 vrr_info["vrr_supported"] = "likely"
@@ -1496,6 +1500,14 @@ class HardwareDetector:
                 vrr_info["vrr_supported"] = "possible"
             else:
                 vrr_info["vrr_supported"] = "unknown"
+
+        # Step 4 (DEPRECATED): Hardcoded G-Sync model list — last resort
+        if vrr_info.get("vrr_supported") is None or vrr_info.get("vrr_supported") == "unknown":
+            is_known_gsync, gsync_type = _is_known_gsync_monitor(monitor_name)
+            if is_known_gsync:
+                logger.debug("G-SYNC detected via legacy model list (deprecated) for: %s", monitor_name)
+                vrr_info["vrr_supported"] = True
+                vrr_info["vrr_type"] = gsync_type
 
         return vrr_info
 

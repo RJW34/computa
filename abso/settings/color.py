@@ -336,6 +336,22 @@ class ColorProfileSettingsHandler(SettingsHandler):
         if not settings:
             return {"success": True, "error": None, "requires_reboot": False}
 
+        # Apply user color preferences from abso.yaml (override profile defaults)
+        try:
+            from abso.core.config import get_config
+
+            color_config = get_config().color
+            if not color_config.manage_icc:
+                settings.pop("icc_profile", None)
+            elif color_config.icc_profile is not None:
+                settings["icc_profile"] = color_config.icc_profile
+            if not color_config.manage_vibrance:
+                settings.pop("digital_vibrance", None)
+            elif color_config.digital_vibrance is not None:
+                settings["digital_vibrance"] = color_config.digital_vibrance
+        except Exception:
+            pass  # Config unavailable — use profile defaults
+
         errors: list[str] = []
         applied: list[str] = []
         skipped: list[str] = []

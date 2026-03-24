@@ -26,6 +26,36 @@ DEFAULT_CONFIG_NAME = "abso.yaml"
 
 
 @dataclass
+class DDCIConfig:
+    """DDC/CI monitor control configuration.
+
+    DDC/CI Adaptive Sync toggling is OFF by default because VCP codes
+    are manufacturer-specific. Sending wrong codes to an unsupported
+    monitor can cause display glitches or hangs.
+
+    Enable only if you know your monitor's controller is supported.
+    """
+
+    enabled: bool = False
+    controller_override: str | None = None  # e.g., "CVTE" to force a VCP profile
+
+
+@dataclass
+class ColorConfig:
+    """User color preferences that override profile defaults.
+
+    Digital vibrance and ICC profiles are personal preferences, not
+    performance optimizations. These overrides let users keep their
+    preferred color settings regardless of which game profile is active.
+    """
+
+    digital_vibrance: int | None = None  # None = use profile default, 0-100 = override
+    icc_profile: str | None = None  # None = use profile default, "srgb"/"native"/filename
+    manage_vibrance: bool = True  # False = never touch vibrance
+    manage_icc: bool = True  # False = never touch ICC profiles
+
+
+@dataclass
 class ProfileOverrides:
     """Custom overrides for a game profile."""
 
@@ -62,9 +92,11 @@ class ABSOConfig:
     custom_profiles: dict[str, dict[str, Any]] = field(default_factory=dict)
     disabled_handlers: list[str] = field(default_factory=list)
     confirm_destructive: bool = True
+    ddci: DDCIConfig = field(default_factory=DDCIConfig)
+    color: ColorConfig = field(default_factory=ColorConfig)
 
     def __post_init__(self) -> None:
-        """Convert nested dicts to ProfileOverrides objects."""
+        """Convert nested dicts to typed config objects."""
         if self.profile_overrides:
             converted = {}
             for profile_id, overrides in self.profile_overrides.items():
@@ -73,6 +105,10 @@ class ABSOConfig:
                 else:
                     converted[profile_id] = overrides
             self.profile_overrides = converted
+        if isinstance(self.ddci, dict):
+            self.ddci = DDCIConfig(**self.ddci)
+        if isinstance(self.color, dict):
+            self.color = ColorConfig(**self.color)
 
 
 class ConfigManager:
@@ -159,12 +195,15 @@ class ConfigManager:
             known_keys = {
                 "backup_dir",
                 "auto_backup",
+                "max_backups",
                 "log_level",
                 "default_profile",
                 "profile_overrides",
                 "custom_profiles",
                 "disabled_handlers",
                 "confirm_destructive",
+                "ddci",
+                "color",
             }
             filtered_data = {k: v for k, v in data.items() if k in known_keys}
 
@@ -261,7 +300,7 @@ confirm_destructive: true
 #     timer:
 #       resolution_ms: 0.5
 
-# Custom profiles (advanced)
+# Custom profiles (advanced) — see also ~/.abso/profiles/ for YAML profiles
 # custom_profiles:
 #   my-game:
 #     display_name: "My Custom Game"
@@ -273,6 +312,21 @@ confirm_destructive: true
 #         game_bar: false
 #       NvidiaSettingsHandler:
 #         preset: minimum_latency
+
+# DDC/CI monitor Adaptive Sync control (OFF by default)
+# Only enable if your monitor's controller board is supported.
+# Sending wrong VCP codes can cause display glitches.
+# ddci:
+#   enabled: true
+#   controller_override: CVTE   # Force a specific VCP profile
+
+# Color preferences (override all profiles)
+# Set to prevent ABSO from changing your display colors.
+# color:
+#   digital_vibrance: 50        # 0-100, overrides all profiles
+#   icc_profile: srgb           # srgb, native, or ICC filename
+#   manage_vibrance: true       # false = never touch vibrance
+#   manage_icc: true            # false = never touch ICC profiles
 """
         try:
             self.config_path.write_text(default_yaml, encoding="utf-8")
@@ -376,6 +430,8 @@ confirm_destructive: true
             "custom_profiles",
             "disabled_handlers",
             "confirm_destructive",
+            "ddci",
+            "color",
         }
 
         unknown_keys = set(data.keys()) - known_keys
