@@ -470,6 +470,8 @@ confirm_destructive: true
             "confirm_destructive",
             "ddci",
             "color",
+            "standby_list",
+            "cpu_balancer",
         }
 
         unknown_keys = set(data.keys()) - known_keys
