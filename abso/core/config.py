@@ -6,6 +6,7 @@ for A.B.S.O. (Adaptive Battle Station Optimizer) user preferences and custom set
 
 from __future__ import annotations
 
+import dataclasses
 import logging
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
@@ -144,6 +145,13 @@ class ABSOConfig:
             self.cpu_balancer = CpuBalancerConfig(**self.cpu_balancer)
 
 
+# Derived from ABSOConfig dataclass fields — never manually maintained.
+# Adding a new field to ABSOConfig automatically makes it a known config key.
+_ABSO_CONFIG_KNOWN_KEYS: frozenset[str] = frozenset(
+    f.name for f in dataclasses.fields(ABSOConfig)
+)
+
+
 class ConfigManager:
     """Manages ABSO configuration files."""
 
@@ -228,21 +236,7 @@ class ConfigManager:
             self._validate_config_data(data)
 
             # Filter out unknown keys before creating config
-            known_keys = {
-                "backup_dir",
-                "auto_backup",
-                "max_backups",
-                "log_level",
-                "default_profile",
-                "profile_overrides",
-                "custom_profiles",
-                "disabled_handlers",
-                "confirm_destructive",
-                "ddci",
-                "color",
-                "standby_list",
-                "cpu_balancer",
-            }
+            known_keys = _ABSO_CONFIG_KNOWN_KEYS
             filtered_data = {k: v for k, v in data.items() if k in known_keys}
 
             return ABSOConfig(**filtered_data)

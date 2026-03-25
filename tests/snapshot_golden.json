@@ -1,0 +1,2831 @@
+{
+  "cod-bo7": {
+    "allows_aggressive_settings": false,
+    "display_name": "Call of Duty: Black Ops 7",
+    "graphics_api": "dx12",
+    "handlers": [
+      "WindowsSettingsHandler",
+      "PowerSettingsHandler",
+      "RegistrySettingsHandler",
+      "NvidiaSettingsHandler",
+      "NetworkSettingsHandler",
+      "MouseSettingsHandler",
+      "GraphicsSettingsHandler",
+      "ServicesSettingsHandler",
+      "ProcessPriorityHandler",
+      "CpuAffinityHandler",
+      "CNMSettingsHandler",
+      "ColorProfileSettingsHandler"
+    ],
+    "include_legacy_tweaks": false,
+    "is_emulator_profile": false,
+    "is_online_profile": false,
+    "is_sdr_only": false,
+    "network_scope": "full",
+    "optimization_target": "low_latency_high_fps",
+    "requires_reflex": true,
+    "settings": {
+      "CNMSettingsHandler": {
+        "action": "stop"
+      },
+      "ColorProfileSettingsHandler": {
+        "digital_vibrance": 50,
+        "game_type": "competitive_fps",
+        "icc_profile": "native",
+        "show_osd_guidance": true
+      },
+      "CpuAffinityHandler": {
+        "strategy": null
+      },
+      "GraphicsSettingsHandler": {
+        "disable_global_fso": true
+      },
+      "MouseSettingsHandler": {
+        "disable_acceleration": true,
+        "set_linear_curve": true
+      },
+      "NetworkSettingsHandler": {
+        "disable_nagle": true,
+        "preset": "gaming"
+      },
+      "NvidiaSettingsHandler": {
+        "preset": "reflex_game"
+      },
+      "PowerSettingsHandler": {
+        "active_plan": "ultimate_performance",
+        "disable_pcie_power_saving": true,
+        "disable_usb_suspend": true,
+        "ensure_ultimate_performance": true,
+        "processor_max_performance": true
+      },
+      "ProcessPriorityHandler": {
+        "cpu_priority": 3,
+        "gpu_priority": 8,
+        "io_priority": 3
+      },
+      "RegistrySettingsHandler": {
+        "game_priority": {
+          "gpu_priority": 8,
+          "priority": 6,
+          "scheduling_category": "High"
+        },
+        "win32_priority_separation": 42
+      },
+      "ServicesSettingsHandler": {
+        "preset": "gaming"
+      },
+      "WindowsSettingsHandler": {
+        "auto_hdr": false,
+        "game_bar": false,
+        "game_dvr": false,
+        "game_mode": true,
+        "hags": true,
+        "hdr": true,
+        "max_refresh_rate": true,
+        "vrr_optimize": false,
+        "windowed_optimizations": false
+      }
+    }
+  },
+  "diablo4": {
+    "allows_aggressive_settings": false,
+    "display_name": "Diablo 4",
+    "graphics_api": "dx12",
+    "handlers": [
+      "WindowsSettingsHandler",
+      "PowerSettingsHandler",
+      "RegistrySettingsHandler",
+      "NvidiaSettingsHandler",
+      "NetworkSettingsHandler",
+      "MouseSettingsHandler",
+      "GraphicsSettingsHandler",
+      "ServicesSettingsHandler",
+      "MemorySettingsHandler",
+      "ProcessPriorityHandler",
+      "CNMSettingsHandler",
+      "ColorProfileSettingsHandler"
+    ],
+    "include_legacy_tweaks": false,
+    "is_emulator_profile": false,
+    "is_online_profile": false,
+    "is_sdr_only": false,
+    "network_scope": "limited",
+    "optimization_target": "balanced",
+    "requires_reflex": false,
+    "settings": {
+      "CNMSettingsHandler": {
+        "action": "stop"
+      },
+      "ColorProfileSettingsHandler": {
+        "digital_vibrance": 50,
+        "game_type": "cinematic",
+        "icc_profile": "native",
+        "show_osd_guidance": true
+      },
+      "GraphicsSettingsHandler": {
+        "disable_global_fso": false
+      },
+      "MemorySettingsHandler": {
+        "disable_paging_executive": 1,
+        "large_system_cache": 0
+      },
+      "MouseSettingsHandler": {
+        "disable_acceleration": true,
+        "set_linear_curve": true
+      },
+      "NetworkSettingsHandler": {
+        "disable_nagle": false,
+        "preset": "default"
+      },
+      "NvidiaSettingsHandler": {
+        "preset": "vrr_diablo4",
+        "vsync": "adaptive"
+      },
+      "PowerSettingsHandler": {
+        "active_plan": "ultimate_performance",
+        "disable_pcie_power_saving": true,
+        "disable_usb_suspend": true,
+        "ensure_ultimate_performance": true
+      },
+      "ProcessPriorityHandler": {
+        "cpu_priority": 2,
+        "gpu_priority": 8,
+        "io_priority": 2
+      },
+      "RegistrySettingsHandler": {
+        "game_priority": {
+          "gpu_priority": 8,
+          "priority": 6,
+          "scheduling_category": "High"
+        },
+        "system_responsiveness": 10
+      },
+      "ServicesSettingsHandler": {
+        "services": {
+          "DiagTrack": {
+            "start_type": 4,
+            "stop": true
+          },
+          "SysMain": {
+            "start_type": 4,
+            "stop": true
+          }
+        }
+      },
+      "WindowsSettingsHandler": {
+        "auto_hdr": false,
+        "game_bar": false,
+        "game_dvr": false,
+        "game_mode": true,
+        "hags": true,
+        "hdr": true,
+        "max_refresh_rate": true,
+        "windowed_optimizations": false
+      }
+    }
+  },
+  "fortnite": {
+    "allows_aggressive_settings": false,
+    "display_name": "Fortnite",
+    "graphics_api": "dx12",
+    "handlers": [
+      "WindowsSettingsHandler",
+      "PowerSettingsHandler",
+      "RegistrySettingsHandler",
+      "NvidiaSettingsHandler",
+      "NetworkSettingsHandler",
+      "MouseSettingsHandler",
+      "GraphicsSettingsHandler",
+      "ServicesSettingsHandler",
+      "ProcessPriorityHandler",
+      "CpuAffinityHandler",
+      "CNMSettingsHandler",
+      "ColorProfileSettingsHandler"
+    ],
+    "include_legacy_tweaks": false,
+    "is_emulator_profile": false,
+    "is_online_profile": false,
+    "is_sdr_only": false,
+    "network_scope": "full",
+    "optimization_target": "low_latency_high_fps",
+    "requires_reflex": true,
+    "settings": {
+      "CNMSettingsHandler": {
+        "action": "stop"
+      },
+      "ColorProfileSettingsHandler": {
+        "digital_vibrance": 50,
+        "game_type": "competitive_fps",
+        "icc_profile": "srgb",
+        "show_osd_guidance": true
+      },
+      "CpuAffinityHandler": {
+        "strategy": null
+      },
+      "GraphicsSettingsHandler": {
+        "disable_global_fso": true,
+        "disable_mpo": false
+      },
+      "MouseSettingsHandler": {
+        "disable_acceleration": true,
+        "set_linear_curve": true
+      },
+      "NetworkSettingsHandler": {
+        "disable_nagle": true,
+        "preset": "gaming"
+      },
+      "NvidiaSettingsHandler": {
+        "preset": "reflex_game"
+      },
+      "PowerSettingsHandler": {
+        "active_plan": "ultimate_performance",
+        "disable_pcie_power_saving": true,
+        "disable_usb_suspend": true,
+        "ensure_ultimate_performance": true,
+        "processor_max_performance": true
+      },
+      "ProcessPriorityHandler": {
+        "cpu_priority": 3,
+        "gpu_priority": 8,
+        "io_priority": 3
+      },
+      "RegistrySettingsHandler": {
+        "game_priority": {
+          "gpu_priority": 8,
+          "priority": 6,
+          "scheduling_category": "High"
+        },
+        "win32_priority_separation": 42
+      },
+      "ServicesSettingsHandler": {
+        "preset": "gaming"
+      },
+      "WindowsSettingsHandler": {
+        "auto_hdr": false,
+        "game_bar": false,
+        "game_dvr": false,
+        "game_mode": true,
+        "hags": true,
+        "hdr": false,
+        "max_refresh_rate": true,
+        "vrr_optimize": false,
+        "windowed_optimizations": false
+      }
+    }
+  },
+  "fortnite-streaming": {
+    "allows_aggressive_settings": false,
+    "display_name": "Fortnite (Streaming)",
+    "graphics_api": "dx12",
+    "handlers": [
+      "WindowsSettingsHandler",
+      "PowerSettingsHandler",
+      "RegistrySettingsHandler",
+      "NvidiaSettingsHandler",
+      "NetworkSettingsHandler",
+      "MouseSettingsHandler",
+      "GraphicsSettingsHandler",
+      "ServicesSettingsHandler",
+      "ProcessPriorityHandler",
+      "OBSSettingsHandler",
+      "CpuAffinityHandler",
+      "CNMSettingsHandler",
+      "ColorProfileSettingsHandler"
+    ],
+    "include_legacy_tweaks": false,
+    "is_emulator_profile": false,
+    "is_online_profile": false,
+    "is_sdr_only": false,
+    "network_scope": "full",
+    "optimization_target": "low_latency_high_fps",
+    "requires_reflex": true,
+    "settings": {
+      "CNMSettingsHandler": {
+        "action": "stop"
+      },
+      "ColorProfileSettingsHandler": {
+        "digital_vibrance": 50,
+        "game_type": "competitive_fps",
+        "icc_profile": "srgb",
+        "show_osd_guidance": true
+      },
+      "CpuAffinityHandler": {
+        "strategy": null
+      },
+      "GraphicsSettingsHandler": {
+        "disable_global_fso": false,
+        "disable_mpo": false
+      },
+      "MouseSettingsHandler": {
+        "disable_acceleration": true,
+        "set_linear_curve": true
+      },
+      "NetworkSettingsHandler": {
+        "disable_nagle": true,
+        "preset": "gaming"
+      },
+      "NvidiaSettingsHandler": {
+        "preset": "reflex_game"
+      },
+      "OBSSettingsHandler": {
+        "low_latency": true,
+        "stream_encoder": {
+          "bitrate": 6000,
+          "look-ahead": false,
+          "multipass": "disabled",
+          "preset": "p5",
+          "profile": "high",
+          "psycho_aq": true,
+          "rate_control": "CBR"
+        },
+        "video": {
+          "output_cx": 1920,
+          "output_cy": 1080,
+          "scale_type": "lanczos"
+        }
+      },
+      "PowerSettingsHandler": {
+        "active_plan": "ultimate_performance",
+        "disable_pcie_power_saving": true,
+        "disable_usb_suspend": true,
+        "ensure_ultimate_performance": true,
+        "processor_max_performance": true
+      },
+      "ProcessPriorityHandler": {
+        "cpu_priority": 3,
+        "gpu_priority": 8,
+        "io_priority": 3
+      },
+      "RegistrySettingsHandler": {
+        "game_priority": {
+          "gpu_priority": 8,
+          "priority": 6,
+          "scheduling_category": "High"
+        },
+        "win32_priority_separation": 42
+      },
+      "ServicesSettingsHandler": {
+        "preset": "gaming"
+      },
+      "WindowsSettingsHandler": {
+        "auto_hdr": false,
+        "game_bar": false,
+        "game_dvr": false,
+        "game_mode": true,
+        "hags": true,
+        "hdr": false,
+        "max_refresh_rate": true,
+        "vrr_optimize": false,
+        "windowed_optimizations": false
+      }
+    }
+  },
+  "marvel-rivals-hdr": {
+    "allows_aggressive_settings": false,
+    "display_name": "Marvel Rivals - HDR",
+    "graphics_api": "dx12",
+    "handlers": [
+      "WindowsSettingsHandler",
+      "PowerSettingsHandler",
+      "RegistrySettingsHandler",
+      "NvidiaSettingsHandler",
+      "NetworkSettingsHandler",
+      "MouseSettingsHandler",
+      "GraphicsSettingsHandler",
+      "ServicesSettingsHandler",
+      "ProcessPriorityHandler",
+      "CpuAffinityHandler",
+      "CNMSettingsHandler",
+      "ColorProfileSettingsHandler"
+    ],
+    "include_legacy_tweaks": false,
+    "is_emulator_profile": false,
+    "is_online_profile": false,
+    "is_sdr_only": true,
+    "network_scope": "full",
+    "optimization_target": "low_latency_high_fps",
+    "requires_reflex": true,
+    "settings": {
+      "CNMSettingsHandler": {
+        "action": "stop"
+      },
+      "ColorProfileSettingsHandler": {
+        "digital_vibrance": 50,
+        "game_type": "competitive_fps",
+        "icc_profile": "native",
+        "show_osd_guidance": true
+      },
+      "CpuAffinityHandler": {
+        "strategy": null
+      },
+      "GraphicsSettingsHandler": {
+        "disable_global_fso": true,
+        "disable_mpo": false
+      },
+      "MouseSettingsHandler": {
+        "disable_acceleration": true,
+        "set_linear_curve": true
+      },
+      "NetworkSettingsHandler": {
+        "disable_nagle": true,
+        "preset": "gaming"
+      },
+      "NvidiaSettingsHandler": {
+        "auto_vrr_fps_cap": true,
+        "global_vrr_mode": "fullscreen_only",
+        "preset": "reflex_gsync",
+        "profile_name": "Marvel Rivals"
+      },
+      "PowerSettingsHandler": {
+        "active_plan": "ultimate_performance",
+        "disable_pcie_power_saving": true,
+        "disable_usb_suspend": true,
+        "ensure_ultimate_performance": true,
+        "processor_max_performance": true
+      },
+      "ProcessPriorityHandler": {
+        "cpu_priority": 3,
+        "gpu_priority": 8,
+        "io_priority": 3
+      },
+      "RegistrySettingsHandler": {
+        "game_priority": {
+          "gpu_priority": 8,
+          "priority": 6,
+          "scheduling_category": "High"
+        },
+        "win32_priority_separation": 42
+      },
+      "ServicesSettingsHandler": {
+        "preset": "gaming"
+      },
+      "WindowsSettingsHandler": {
+        "auto_hdr": false,
+        "game_bar": false,
+        "game_dvr": false,
+        "game_mode": true,
+        "hags": true,
+        "hdr": true,
+        "max_refresh_rate": true,
+        "vrr_optimize": false,
+        "windowed_optimizations": false
+      }
+    }
+  },
+  "marvel-rivals-sdr": {
+    "allows_aggressive_settings": false,
+    "display_name": "Marvel Rivals - SDR",
+    "graphics_api": "dx12",
+    "handlers": [
+      "WindowsSettingsHandler",
+      "PowerSettingsHandler",
+      "RegistrySettingsHandler",
+      "NvidiaSettingsHandler",
+      "NetworkSettingsHandler",
+      "MouseSettingsHandler",
+      "GraphicsSettingsHandler",
+      "ServicesSettingsHandler",
+      "ProcessPriorityHandler",
+      "CpuAffinityHandler",
+      "CNMSettingsHandler",
+      "ColorProfileSettingsHandler"
+    ],
+    "include_legacy_tweaks": false,
+    "is_emulator_profile": false,
+    "is_online_profile": false,
+    "is_sdr_only": true,
+    "network_scope": "full",
+    "optimization_target": "low_latency_high_fps",
+    "requires_reflex": true,
+    "settings": {
+      "CNMSettingsHandler": {
+        "action": "stop"
+      },
+      "ColorProfileSettingsHandler": {
+        "digital_vibrance": 45,
+        "game_type": "competitive_fps",
+        "icc_profile": "srgb",
+        "show_osd_guidance": true
+      },
+      "CpuAffinityHandler": {
+        "strategy": null
+      },
+      "GraphicsSettingsHandler": {
+        "disable_global_fso": true,
+        "disable_mpo": false
+      },
+      "MouseSettingsHandler": {
+        "disable_acceleration": true,
+        "set_linear_curve": true
+      },
+      "NetworkSettingsHandler": {
+        "disable_nagle": true,
+        "preset": "gaming"
+      },
+      "NvidiaSettingsHandler": {
+        "auto_vrr_fps_cap": true,
+        "global_vrr_mode": "fullscreen_only",
+        "preset": "reflex_gsync",
+        "profile_name": "Marvel Rivals"
+      },
+      "PowerSettingsHandler": {
+        "active_plan": "ultimate_performance",
+        "disable_pcie_power_saving": true,
+        "disable_usb_suspend": true,
+        "ensure_ultimate_performance": true,
+        "processor_max_performance": true
+      },
+      "ProcessPriorityHandler": {
+        "cpu_priority": 3,
+        "gpu_priority": 8,
+        "io_priority": 3
+      },
+      "RegistrySettingsHandler": {
+        "game_priority": {
+          "gpu_priority": 8,
+          "priority": 6,
+          "scheduling_category": "High"
+        },
+        "win32_priority_separation": 42
+      },
+      "ServicesSettingsHandler": {
+        "preset": "gaming"
+      },
+      "WindowsSettingsHandler": {
+        "auto_hdr": false,
+        "game_bar": false,
+        "game_dvr": false,
+        "game_mode": true,
+        "hags": true,
+        "hdr": false,
+        "max_refresh_rate": true,
+        "vrr_optimize": false,
+        "windowed_optimizations": false
+      }
+    }
+  },
+  "overwatch2": {
+    "allows_aggressive_settings": false,
+    "display_name": "Overwatch 2 - No-Sync",
+    "graphics_api": "dx11",
+    "handlers": [
+      "WindowsSettingsHandler",
+      "PowerSettingsHandler",
+      "RegistrySettingsHandler",
+      "NvidiaSettingsHandler",
+      "NetworkSettingsHandler",
+      "MouseSettingsHandler",
+      "GraphicsSettingsHandler",
+      "ServicesSettingsHandler",
+      "ProcessPriorityHandler",
+      "CpuAffinityHandler",
+      "CNMSettingsHandler",
+      "ColorProfileSettingsHandler",
+      "OW2ConfigHandler"
+    ],
+    "include_legacy_tweaks": false,
+    "is_emulator_profile": false,
+    "is_online_profile": false,
+    "is_sdr_only": false,
+    "network_scope": "full",
+    "optimization_target": "low_latency_high_fps",
+    "requires_reflex": true,
+    "settings": {
+      "CNMSettingsHandler": {
+        "action": "stop"
+      },
+      "ColorProfileSettingsHandler": {
+        "digital_vibrance": 50,
+        "game_type": "competitive_fps",
+        "icc_profile": "srgb",
+        "show_osd_guidance": true
+      },
+      "CpuAffinityHandler": {
+        "strategy": null
+      },
+      "GraphicsSettingsHandler": {
+        "disable_global_fso": true,
+        "disable_mpo": false
+      },
+      "MouseSettingsHandler": {
+        "disable_acceleration": true,
+        "set_linear_curve": true
+      },
+      "NetworkSettingsHandler": {
+        "disable_nagle": true,
+        "preset": "gaming"
+      },
+      "NvidiaSettingsHandler": {
+        "global_vrr_mode": "off",
+        "preset": "reflex_no_sync",
+        "profile_name": "Overwatch 2"
+      },
+      "OW2ConfigHandler": {
+        "aa_detail": 0,
+        "dynamic_render_scale": false,
+        "dynamic_render_scale_v2": false,
+        "effects_quality": 1,
+        "frame_rate_cap": 600,
+        "gfx_preset": 1,
+        "hdr": false,
+        "model_quality": 1,
+        "reduce_buffering": true,
+        "render_scale": 0,
+        "show_fps": true,
+        "show_latency": true,
+        "texture_detail": 1,
+        "triple_buffering": false,
+        "upscaling": false,
+        "vsync": false,
+        "window_mode": 0
+      },
+      "PowerSettingsHandler": {
+        "active_plan": "ultimate_performance",
+        "disable_pcie_power_saving": true,
+        "disable_usb_suspend": true,
+        "ensure_ultimate_performance": true,
+        "processor_max_performance": true
+      },
+      "ProcessPriorityHandler": {
+        "cpu_priority": 3,
+        "gpu_priority": 8,
+        "io_priority": 3
+      },
+      "RegistrySettingsHandler": {
+        "game_priority": {
+          "gpu_priority": 8,
+          "priority": 6,
+          "scheduling_category": "High"
+        },
+        "win32_priority_separation": 42
+      },
+      "ServicesSettingsHandler": {
+        "preset": "gaming"
+      },
+      "WindowsSettingsHandler": {
+        "auto_hdr": false,
+        "game_bar": false,
+        "game_dvr": false,
+        "game_mode": true,
+        "hags": true,
+        "hdr": false,
+        "max_refresh_rate": true,
+        "vrr_optimize": false,
+        "windowed_optimizations": false
+      }
+    }
+  },
+  "overwatch2-gsync": {
+    "allows_aggressive_settings": false,
+    "display_name": "Overwatch 2 - GSYNC",
+    "graphics_api": "dx11",
+    "handlers": [
+      "WindowsSettingsHandler",
+      "PowerSettingsHandler",
+      "RegistrySettingsHandler",
+      "NvidiaSettingsHandler",
+      "NetworkSettingsHandler",
+      "MouseSettingsHandler",
+      "GraphicsSettingsHandler",
+      "ServicesSettingsHandler",
+      "ProcessPriorityHandler",
+      "CpuAffinityHandler",
+      "CNMSettingsHandler",
+      "ColorProfileSettingsHandler",
+      "OW2ConfigHandler"
+    ],
+    "include_legacy_tweaks": false,
+    "is_emulator_profile": false,
+    "is_online_profile": false,
+    "is_sdr_only": false,
+    "network_scope": "full",
+    "optimization_target": "low_latency_high_fps",
+    "requires_reflex": true,
+    "settings": {
+      "CNMSettingsHandler": {
+        "action": "stop"
+      },
+      "ColorProfileSettingsHandler": {
+        "digital_vibrance": 45,
+        "game_type": "competitive_fps",
+        "icc_profile": "srgb",
+        "show_osd_guidance": true
+      },
+      "CpuAffinityHandler": {
+        "strategy": null
+      },
+      "GraphicsSettingsHandler": {
+        "disable_global_fso": true,
+        "disable_mpo": false
+      },
+      "MouseSettingsHandler": {
+        "disable_acceleration": true,
+        "set_linear_curve": true
+      },
+      "NetworkSettingsHandler": {
+        "disable_nagle": true,
+        "preset": "gaming"
+      },
+      "NvidiaSettingsHandler": {
+        "auto_vrr_fps_cap": true,
+        "global_vrr_mode": "fullscreen_only",
+        "preset": "reflex_gsync",
+        "profile_name": "Overwatch 2"
+      },
+      "OW2ConfigHandler": {
+        "aa_detail": 0,
+        "auto_vrr_fps_cap": true,
+        "dynamic_render_scale": false,
+        "dynamic_render_scale_v2": false,
+        "effects_quality": 1,
+        "gfx_preset": 1,
+        "hdr": false,
+        "model_quality": 1,
+        "reduce_buffering": true,
+        "render_scale": 0,
+        "show_fps": true,
+        "show_latency": true,
+        "texture_detail": 1,
+        "triple_buffering": false,
+        "upscaling": false,
+        "vsync": false,
+        "window_mode": 0
+      },
+      "PowerSettingsHandler": {
+        "active_plan": "ultimate_performance",
+        "disable_pcie_power_saving": true,
+        "disable_usb_suspend": true,
+        "ensure_ultimate_performance": true,
+        "processor_max_performance": true
+      },
+      "ProcessPriorityHandler": {
+        "cpu_priority": 3,
+        "gpu_priority": 8,
+        "io_priority": 3
+      },
+      "RegistrySettingsHandler": {
+        "game_priority": {
+          "gpu_priority": 8,
+          "priority": 6,
+          "scheduling_category": "High"
+        },
+        "win32_priority_separation": 42
+      },
+      "ServicesSettingsHandler": {
+        "preset": "gaming"
+      },
+      "WindowsSettingsHandler": {
+        "auto_hdr": false,
+        "game_bar": false,
+        "game_dvr": false,
+        "game_mode": true,
+        "hags": true,
+        "hdr": false,
+        "max_refresh_rate": true,
+        "vrr_optimize": false,
+        "windowed_optimizations": false
+      }
+    }
+  },
+  "overwatch2-gsync-hdr": {
+    "allows_aggressive_settings": false,
+    "display_name": "Overwatch 2 - GSYNC HDR",
+    "graphics_api": "dx11",
+    "handlers": [
+      "WindowsSettingsHandler",
+      "PowerSettingsHandler",
+      "RegistrySettingsHandler",
+      "NvidiaSettingsHandler",
+      "NetworkSettingsHandler",
+      "MouseSettingsHandler",
+      "GraphicsSettingsHandler",
+      "ServicesSettingsHandler",
+      "ProcessPriorityHandler",
+      "CpuAffinityHandler",
+      "CNMSettingsHandler",
+      "ColorProfileSettingsHandler",
+      "OW2ConfigHandler"
+    ],
+    "include_legacy_tweaks": false,
+    "is_emulator_profile": false,
+    "is_online_profile": false,
+    "is_sdr_only": false,
+    "network_scope": "full",
+    "optimization_target": "low_latency_high_fps",
+    "requires_reflex": true,
+    "settings": {
+      "CNMSettingsHandler": {
+        "action": "stop"
+      },
+      "ColorProfileSettingsHandler": {
+        "digital_vibrance": 50,
+        "game_type": "competitive_fps",
+        "icc_profile": "native",
+        "show_osd_guidance": true
+      },
+      "CpuAffinityHandler": {
+        "strategy": null
+      },
+      "GraphicsSettingsHandler": {
+        "disable_global_fso": true,
+        "disable_mpo": false
+      },
+      "MouseSettingsHandler": {
+        "disable_acceleration": true,
+        "set_linear_curve": true
+      },
+      "NetworkSettingsHandler": {
+        "disable_nagle": true,
+        "preset": "gaming"
+      },
+      "NvidiaSettingsHandler": {
+        "auto_vrr_fps_cap": true,
+        "global_vrr_mode": "fullscreen_only",
+        "preset": "reflex_gsync",
+        "profile_name": "Overwatch 2"
+      },
+      "OW2ConfigHandler": {
+        "aa_detail": 0,
+        "auto_vrr_fps_cap": true,
+        "dynamic_render_scale": false,
+        "dynamic_render_scale_v2": false,
+        "effects_quality": 1,
+        "gfx_preset": 1,
+        "hdr": true,
+        "model_quality": 1,
+        "reduce_buffering": true,
+        "render_scale": 0,
+        "show_fps": true,
+        "show_latency": true,
+        "texture_detail": 1,
+        "triple_buffering": false,
+        "upscaling": false,
+        "vsync": false,
+        "window_mode": 0
+      },
+      "PowerSettingsHandler": {
+        "active_plan": "ultimate_performance",
+        "disable_pcie_power_saving": true,
+        "disable_usb_suspend": true,
+        "ensure_ultimate_performance": true,
+        "processor_max_performance": true
+      },
+      "ProcessPriorityHandler": {
+        "cpu_priority": 3,
+        "gpu_priority": 8,
+        "io_priority": 3
+      },
+      "RegistrySettingsHandler": {
+        "game_priority": {
+          "gpu_priority": 8,
+          "priority": 6,
+          "scheduling_category": "High"
+        },
+        "win32_priority_separation": 42
+      },
+      "ServicesSettingsHandler": {
+        "preset": "gaming"
+      },
+      "WindowsSettingsHandler": {
+        "auto_hdr": false,
+        "game_bar": false,
+        "game_dvr": false,
+        "game_mode": true,
+        "hags": true,
+        "hdr": true,
+        "max_refresh_rate": true,
+        "vrr_optimize": false,
+        "windowed_optimizations": false
+      }
+    }
+  },
+  "pacdeluxe": {
+    "allows_aggressive_settings": false,
+    "display_name": "PACDeluxe (Pokemon Auto Chess)",
+    "graphics_api": "unknown",
+    "handlers": [
+      "WindowsSettingsHandler",
+      "PowerSettingsHandler",
+      "RegistrySettingsHandler",
+      "NvidiaSettingsHandler",
+      "NetworkSettingsHandler",
+      "GraphicsSettingsHandler",
+      "ServicesSettingsHandler",
+      "ProcessPriorityHandler",
+      "CNMSettingsHandler",
+      "ColorProfileSettingsHandler"
+    ],
+    "include_legacy_tweaks": false,
+    "is_emulator_profile": false,
+    "is_online_profile": false,
+    "is_sdr_only": false,
+    "network_scope": "none",
+    "optimization_target": "smooth_framerate",
+    "requires_reflex": false,
+    "settings": {
+      "CNMSettingsHandler": {
+        "action": "stop"
+      },
+      "ColorProfileSettingsHandler": {
+        "digital_vibrance": 50,
+        "game_type": "casual",
+        "icc_profile": "srgb",
+        "show_osd_guidance": true
+      },
+      "GraphicsSettingsHandler": {
+        "disable_global_fso": false
+      },
+      "NetworkSettingsHandler": {
+        "disable_nagle": false,
+        "preset": "default"
+      },
+      "NvidiaSettingsHandler": {
+        "preset": "balanced"
+      },
+      "PowerSettingsHandler": {
+        "active_plan": "ultimate_performance",
+        "disable_pcie_power_saving": true,
+        "disable_usb_suspend": true,
+        "ensure_ultimate_performance": true,
+        "processor_max_performance": true
+      },
+      "ProcessPriorityHandler": {
+        "cpu_priority": 2,
+        "gpu_priority": 8,
+        "io_priority": 2
+      },
+      "RegistrySettingsHandler": {
+        "game_priority": {
+          "gpu_priority": 8,
+          "priority": 4,
+          "scheduling_category": "Medium"
+        },
+        "win32_priority_separation": 38
+      },
+      "ServicesSettingsHandler": {
+        "preset": "gaming"
+      },
+      "WindowsSettingsHandler": {
+        "game_bar": false,
+        "game_dvr": false,
+        "game_mode": true,
+        "hags": true
+      }
+    }
+  },
+  "pacdeluxe-streaming": {
+    "allows_aggressive_settings": false,
+    "display_name": "PACDeluxe (Streaming)",
+    "graphics_api": "unknown",
+    "handlers": [
+      "WindowsSettingsHandler",
+      "PowerSettingsHandler",
+      "RegistrySettingsHandler",
+      "NvidiaSettingsHandler",
+      "NetworkSettingsHandler",
+      "GraphicsSettingsHandler",
+      "ServicesSettingsHandler",
+      "ProcessPriorityHandler",
+      "OBSSettingsHandler",
+      "CNMSettingsHandler",
+      "ColorProfileSettingsHandler"
+    ],
+    "include_legacy_tweaks": false,
+    "is_emulator_profile": false,
+    "is_online_profile": false,
+    "is_sdr_only": false,
+    "network_scope": "none",
+    "optimization_target": "smooth_framerate",
+    "requires_reflex": false,
+    "settings": {
+      "CNMSettingsHandler": {
+        "action": "stop"
+      },
+      "ColorProfileSettingsHandler": {
+        "digital_vibrance": 50,
+        "game_type": "casual",
+        "icc_profile": "srgb",
+        "show_osd_guidance": true
+      },
+      "GraphicsSettingsHandler": {
+        "disable_global_fso": false,
+        "disable_mpo": false
+      },
+      "NetworkSettingsHandler": {
+        "disable_nagle": false,
+        "preset": "default"
+      },
+      "NvidiaSettingsHandler": {
+        "preset": "balanced"
+      },
+      "OBSSettingsHandler": {
+        "low_latency": true,
+        "stream_encoder": {
+          "bitrate": 6000,
+          "look-ahead": false,
+          "multipass": "disabled",
+          "preset": "p5",
+          "profile": "high",
+          "psycho_aq": true,
+          "rate_control": "CBR"
+        },
+        "video": {
+          "output_cx": 1920,
+          "output_cy": 1080,
+          "scale_type": "lanczos"
+        }
+      },
+      "PowerSettingsHandler": {
+        "active_plan": "ultimate_performance",
+        "disable_pcie_power_saving": true,
+        "disable_usb_suspend": true,
+        "ensure_ultimate_performance": true,
+        "processor_max_performance": true
+      },
+      "ProcessPriorityHandler": {
+        "cpu_priority": 2,
+        "gpu_priority": 8,
+        "io_priority": 2
+      },
+      "RegistrySettingsHandler": {
+        "game_priority": {
+          "gpu_priority": 8,
+          "priority": 4,
+          "scheduling_category": "Medium"
+        },
+        "win32_priority_separation": 38
+      },
+      "ServicesSettingsHandler": {
+        "preset": "gaming"
+      },
+      "WindowsSettingsHandler": {
+        "game_bar": false,
+        "game_dvr": false,
+        "game_mode": true,
+        "hags": true
+      }
+    }
+  },
+  "pokemon-auto-chess": {
+    "allows_aggressive_settings": false,
+    "display_name": "Pokemon Auto Chess",
+    "graphics_api": "unknown",
+    "handlers": [
+      "WindowsSettingsHandler",
+      "PowerSettingsHandler",
+      "RegistrySettingsHandler",
+      "NvidiaSettingsHandler",
+      "NetworkSettingsHandler",
+      "GraphicsSettingsHandler",
+      "ServicesSettingsHandler",
+      "ProcessPriorityHandler",
+      "CNMSettingsHandler",
+      "ColorProfileSettingsHandler"
+    ],
+    "include_legacy_tweaks": false,
+    "is_emulator_profile": false,
+    "is_online_profile": false,
+    "is_sdr_only": false,
+    "network_scope": "limited",
+    "optimization_target": "balanced",
+    "requires_reflex": false,
+    "settings": {
+      "CNMSettingsHandler": {
+        "action": "stop"
+      },
+      "ColorProfileSettingsHandler": {
+        "digital_vibrance": 50,
+        "game_type": "casual",
+        "icc_profile": "srgb",
+        "show_osd_guidance": true
+      },
+      "GraphicsSettingsHandler": {
+        "disable_global_fso": false
+      },
+      "NetworkSettingsHandler": {
+        "disable_nagle": false,
+        "preset": "default"
+      },
+      "NvidiaSettingsHandler": {
+        "low_latency_mode": "on",
+        "max_frame_rate": "off",
+        "power_management": "prefer_max_performance",
+        "shader_cache": "unlimited",
+        "threaded_optimization": "on",
+        "triple_buffering": "off",
+        "vsync": "off"
+      },
+      "PowerSettingsHandler": {
+        "active_plan": "ultimate_performance",
+        "disable_usb_suspend": true,
+        "ensure_ultimate_performance": true,
+        "processor_max_performance": true
+      },
+      "ProcessPriorityHandler": {
+        "cpu_priority": 2,
+        "gpu_priority": 8,
+        "io_priority": 2
+      },
+      "RegistrySettingsHandler": {
+        "game_priority": {
+          "gpu_priority": 8,
+          "priority": 4,
+          "scheduling_category": "Medium"
+        },
+        "win32_priority_separation": 38
+      },
+      "ServicesSettingsHandler": {
+        "preset": "gaming"
+      },
+      "WindowsSettingsHandler": {
+        "game_bar": false,
+        "game_dvr": false,
+        "game_mode": true,
+        "hags": true
+      }
+    }
+  },
+  "productivity": {
+    "allows_aggressive_settings": false,
+    "display_name": "Desktop / Productivity",
+    "graphics_api": "unknown",
+    "handlers": [
+      "WindowsSettingsHandler",
+      "RegistrySettingsHandler",
+      "NvidiaSettingsHandler",
+      "MouseSettingsHandler",
+      "GraphicsSettingsHandler",
+      "MemorySettingsHandler",
+      "ColorProfileSettingsHandler"
+    ],
+    "include_legacy_tweaks": false,
+    "is_emulator_profile": false,
+    "is_online_profile": false,
+    "is_sdr_only": false,
+    "network_scope": "none",
+    "optimization_target": "productivity",
+    "requires_reflex": false,
+    "settings": {
+      "ColorProfileSettingsHandler": {
+        "digital_vibrance": 50,
+        "game_type": "productivity",
+        "icc_profile": "native",
+        "show_osd_guidance": true
+      },
+      "GraphicsSettingsHandler": {
+        "disable_global_fso": false,
+        "disable_mpo": false
+      },
+      "MemorySettingsHandler": {
+        "disable_paging_executive": 0,
+        "large_system_cache": 0
+      },
+      "MouseSettingsHandler": {
+        "disable_acceleration": true,
+        "set_linear_curve": true
+      },
+      "NvidiaSettingsHandler": {
+        "low_latency_mode": "on",
+        "max_frame_rate": "off",
+        "power_management": "prefer_max_performance",
+        "shader_cache": "unlimited",
+        "threaded_optimization": "auto",
+        "vrr_app_override": "allow",
+        "vsync": "adaptive"
+      },
+      "RegistrySettingsHandler": {
+        "game_priority": {
+          "gpu_priority": 8,
+          "priority": 2,
+          "scheduling_category": "Medium"
+        },
+        "system_responsiveness": 20
+      },
+      "WindowsSettingsHandler": {
+        "auto_hdr": false,
+        "game_bar": false,
+        "game_dvr": false,
+        "game_mode": true,
+        "hags": true,
+        "hdr": true,
+        "vrr_optimize": true,
+        "windowed_optimizations": true
+      }
+    }
+  },
+  "rivals2": {
+    "allows_aggressive_settings": true,
+    "display_name": "Rivals of Aether 2",
+    "graphics_api": "dx12",
+    "handlers": [
+      "WindowsSettingsHandler",
+      "PowerSettingsHandler",
+      "RegistrySettingsHandler",
+      "NvidiaSettingsHandler",
+      "NvidiaNotificationHandler",
+      "NetworkSettingsHandler",
+      "MouseSettingsHandler",
+      "GraphicsSettingsHandler",
+      "ServicesSettingsHandler",
+      "ProcessPriorityHandler",
+      "CpuAffinityHandler",
+      "Rivals2ConfigHandler",
+      "CNMSettingsHandler",
+      "ColorProfileSettingsHandler"
+    ],
+    "include_legacy_tweaks": false,
+    "is_emulator_profile": false,
+    "is_online_profile": false,
+    "is_sdr_only": true,
+    "network_scope": "full",
+    "optimization_target": "minimum_latency",
+    "requires_reflex": false,
+    "settings": {
+      "CNMSettingsHandler": {
+        "action": "stop"
+      },
+      "ColorProfileSettingsHandler": {
+        "digital_vibrance": 50,
+        "game_type": "competitive_fps",
+        "icc_profile": "srgb",
+        "show_osd_guidance": true
+      },
+      "CpuAffinityHandler": {
+        "strategy": null
+      },
+      "GraphicsSettingsHandler": {
+        "disable_global_fso": true,
+        "disable_mpo": false
+      },
+      "MouseSettingsHandler": {
+        "disable_acceleration": true,
+        "set_linear_curve": true
+      },
+      "NetworkSettingsHandler": {
+        "disable_nagle": true,
+        "preset": "gaming"
+      },
+      "NvidiaNotificationHandler": {
+        "disable_notifications": true
+      },
+      "NvidiaSettingsHandler": {
+        "preset": "no_sync_fighting_game"
+      },
+      "PowerSettingsHandler": {
+        "active_plan": "ultimate_performance",
+        "disable_pcie_power_saving": true,
+        "disable_usb_suspend": true,
+        "ensure_ultimate_performance": true,
+        "processor_max_performance": true
+      },
+      "ProcessPriorityHandler": {
+        "cpu_priority": 3,
+        "gpu_priority": 8,
+        "io_priority": 3
+      },
+      "RegistrySettingsHandler": {
+        "game_priority": {
+          "gpu_priority": 8,
+          "priority": 6,
+          "scheduling_category": "High"
+        },
+        "win32_priority_separation": 42
+      },
+      "Rivals2ConfigHandler": {
+        "fullscreen_mode": 0,
+        "raw_input": true,
+        "vsync": false
+      },
+      "ServicesSettingsHandler": {
+        "preset": "gaming"
+      },
+      "WindowsSettingsHandler": {
+        "auto_hdr": false,
+        "game_bar": false,
+        "game_dvr": false,
+        "game_mode": true,
+        "hags": true,
+        "hdr": false,
+        "max_refresh_rate": true,
+        "vrr_optimize": false,
+        "windowed_optimizations": false
+      }
+    }
+  },
+  "rivals2-300hz-max": {
+    "allows_aggressive_settings": true,
+    "display_name": "Rivals 2: 300Hz Maximum",
+    "graphics_api": "dx12",
+    "handlers": [
+      "WindowsSettingsHandler",
+      "PowerSettingsHandler",
+      "RegistrySettingsHandler",
+      "NvidiaSettingsHandler",
+      "NetworkSettingsHandler",
+      "MouseSettingsHandler",
+      "GraphicsSettingsHandler",
+      "ServicesSettingsHandler",
+      "ProcessPriorityHandler",
+      "CpuAffinityHandler",
+      "CNMSettingsHandler",
+      "ColorProfileSettingsHandler"
+    ],
+    "include_legacy_tweaks": false,
+    "is_emulator_profile": false,
+    "is_online_profile": false,
+    "is_sdr_only": true,
+    "network_scope": "full",
+    "optimization_target": "minimum_latency",
+    "requires_reflex": false,
+    "settings": {
+      "CNMSettingsHandler": {
+        "action": "stop"
+      },
+      "ColorProfileSettingsHandler": {
+        "digital_vibrance": 50,
+        "game_type": "competitive_fps",
+        "icc_profile": "srgb",
+        "show_osd_guidance": true
+      },
+      "CpuAffinityHandler": {
+        "strategy": null
+      },
+      "GraphicsSettingsHandler": {
+        "disable_global_fso": true,
+        "disable_mpo": false
+      },
+      "MouseSettingsHandler": {
+        "disable_acceleration": true,
+        "set_linear_curve": true
+      },
+      "NetworkSettingsHandler": {
+        "disable_nagle": true,
+        "preset": "gaming"
+      },
+      "NvidiaSettingsHandler": {
+        "low_latency_mode": "on",
+        "max_frame_rate": "off",
+        "power_management": "prefer_max_performance",
+        "shader_cache": "unlimited",
+        "threaded_optimization": "off",
+        "triple_buffering": "off",
+        "vrr_app_override": "force_off",
+        "vsync": "off",
+        "vsync_tear_control": "disable"
+      },
+      "PowerSettingsHandler": {
+        "active_plan": "ultimate_performance",
+        "disable_pcie_power_saving": true,
+        "disable_usb_suspend": true,
+        "ensure_ultimate_performance": true,
+        "processor_max_performance": true,
+        "processor_min_state": 100
+      },
+      "ProcessPriorityHandler": {
+        "cpu_priority": 3,
+        "gpu_priority": 8,
+        "io_priority": 3
+      },
+      "RegistrySettingsHandler": {
+        "game_priority": {
+          "gpu_priority": 8,
+          "priority": 6,
+          "scheduling_category": "High"
+        },
+        "win32_priority_separation": 42
+      },
+      "ServicesSettingsHandler": {
+        "preset": "gaming"
+      },
+      "WindowsSettingsHandler": {
+        "auto_hdr": false,
+        "game_bar": false,
+        "game_dvr": false,
+        "game_mode": true,
+        "hags": true,
+        "hdr": false,
+        "refresh_rate": 300,
+        "vrr_optimize": false,
+        "windowed_optimizations": false
+      }
+    }
+  },
+  "rivals2-gsync": {
+    "allows_aggressive_settings": false,
+    "display_name": "Rivals 2: G-SYNC",
+    "graphics_api": "dx12",
+    "handlers": [
+      "WindowsSettingsHandler",
+      "PowerSettingsHandler",
+      "RegistrySettingsHandler",
+      "NvidiaSettingsHandler",
+      "NvidiaNotificationHandler",
+      "NetworkSettingsHandler",
+      "MouseSettingsHandler",
+      "GraphicsSettingsHandler",
+      "ServicesSettingsHandler",
+      "ProcessPriorityHandler",
+      "CpuAffinityHandler",
+      "Rivals2ConfigHandler",
+      "CNMSettingsHandler",
+      "ColorProfileSettingsHandler"
+    ],
+    "include_legacy_tweaks": false,
+    "is_emulator_profile": false,
+    "is_online_profile": false,
+    "is_sdr_only": true,
+    "network_scope": "none",
+    "optimization_target": "low_latency_vrr",
+    "requires_reflex": false,
+    "settings": {
+      "CNMSettingsHandler": {
+        "action": "stop"
+      },
+      "ColorProfileSettingsHandler": {
+        "digital_vibrance": 50,
+        "game_type": "competitive_fps",
+        "icc_profile": "srgb",
+        "show_osd_guidance": true
+      },
+      "CpuAffinityHandler": {
+        "strategy": null
+      },
+      "GraphicsSettingsHandler": {
+        "disable_global_fso": true,
+        "disable_mpo": false
+      },
+      "MouseSettingsHandler": {
+        "disable_acceleration": true,
+        "set_linear_curve": true
+      },
+      "NetworkSettingsHandler": {
+        "disable_nagle": true,
+        "preset": "gaming"
+      },
+      "NvidiaNotificationHandler": {
+        "disable_notifications": true
+      },
+      "NvidiaSettingsHandler": {
+        "auto_vrr_fps_cap": true,
+        "global_vrr_mode": "fullscreen_only",
+        "preset": "vrr_fighting_game"
+      },
+      "PowerSettingsHandler": {
+        "active_plan": "ultimate_performance",
+        "disable_pcie_power_saving": true,
+        "disable_usb_suspend": true,
+        "ensure_ultimate_performance": true,
+        "processor_max_performance": true
+      },
+      "ProcessPriorityHandler": {
+        "cpu_priority": 3,
+        "gpu_priority": 8,
+        "io_priority": 3
+      },
+      "RegistrySettingsHandler": {
+        "game_priority": {
+          "gpu_priority": 8,
+          "priority": 6,
+          "scheduling_category": "High"
+        },
+        "win32_priority_separation": 42
+      },
+      "Rivals2ConfigHandler": {
+        "fullscreen_mode": 0,
+        "raw_input": true,
+        "vsync": false
+      },
+      "ServicesSettingsHandler": {
+        "preset": "gaming"
+      },
+      "WindowsSettingsHandler": {
+        "auto_hdr": false,
+        "game_bar": false,
+        "game_dvr": false,
+        "game_mode": true,
+        "hags": true,
+        "hdr": false,
+        "max_refresh_rate": true,
+        "vrr_optimize": false,
+        "windowed_optimizations": false
+      }
+    }
+  },
+  "rivals2-offline": {
+    "allows_aggressive_settings": true,
+    "display_name": "Rivals 2: Offline / Training",
+    "graphics_api": "dx12",
+    "handlers": [
+      "WindowsSettingsHandler",
+      "PowerSettingsHandler",
+      "RegistrySettingsHandler",
+      "NvidiaSettingsHandler",
+      "NvidiaNotificationHandler",
+      "NetworkSettingsHandler",
+      "MouseSettingsHandler",
+      "GraphicsSettingsHandler",
+      "ServicesSettingsHandler",
+      "ProcessPriorityHandler",
+      "CpuAffinityHandler",
+      "Rivals2ConfigHandler",
+      "CNMSettingsHandler",
+      "ColorProfileSettingsHandler"
+    ],
+    "include_legacy_tweaks": false,
+    "is_emulator_profile": false,
+    "is_online_profile": false,
+    "is_sdr_only": true,
+    "network_scope": "full",
+    "optimization_target": "minimum_latency_offline",
+    "requires_reflex": false,
+    "settings": {
+      "CNMSettingsHandler": {
+        "action": "stop"
+      },
+      "ColorProfileSettingsHandler": {
+        "digital_vibrance": 50,
+        "game_type": "competitive_fps",
+        "icc_profile": "srgb",
+        "show_osd_guidance": true
+      },
+      "CpuAffinityHandler": {
+        "strategy": null
+      },
+      "GraphicsSettingsHandler": {
+        "disable_global_fso": true,
+        "disable_mpo": false
+      },
+      "MouseSettingsHandler": {
+        "disable_acceleration": true,
+        "set_linear_curve": true
+      },
+      "NetworkSettingsHandler": {
+        "disable_nagle": true,
+        "preset": "gaming"
+      },
+      "NvidiaNotificationHandler": {
+        "disable_notifications": true
+      },
+      "NvidiaSettingsHandler": {
+        "low_latency_mode": "on",
+        "max_frame_rate": "off",
+        "power_management": "prefer_max_performance",
+        "shader_cache": "unlimited",
+        "threaded_optimization": "off",
+        "triple_buffering": "off",
+        "vrr_app_override": "force_off",
+        "vsync": "off",
+        "vsync_tear_control": "disable"
+      },
+      "PowerSettingsHandler": {
+        "active_plan": "ultimate_performance",
+        "disable_pcie_power_saving": true,
+        "disable_usb_suspend": true,
+        "ensure_ultimate_performance": true,
+        "processor_max_performance": true,
+        "processor_min_state": 100
+      },
+      "ProcessPriorityHandler": {
+        "cpu_priority": 3,
+        "gpu_priority": 8,
+        "io_priority": 3
+      },
+      "RegistrySettingsHandler": {
+        "game_priority": {
+          "gpu_priority": 8,
+          "priority": 6,
+          "scheduling_category": "High"
+        },
+        "win32_priority_separation": 42
+      },
+      "Rivals2ConfigHandler": {
+        "fullscreen_mode": 0,
+        "raw_input": true,
+        "vsync": false
+      },
+      "ServicesSettingsHandler": {
+        "preset": "gaming"
+      },
+      "WindowsSettingsHandler": {
+        "auto_hdr": false,
+        "game_bar": false,
+        "game_dvr": false,
+        "game_mode": true,
+        "hags": true,
+        "hdr": false,
+        "max_refresh_rate": true,
+        "vrr_optimize": false,
+        "windowed_optimizations": false
+      }
+    }
+  },
+  "rivals2-online": {
+    "allows_aggressive_settings": false,
+    "display_name": "Rivals 2: Online / Matchmaking",
+    "graphics_api": "dx12",
+    "handlers": [
+      "WindowsSettingsHandler",
+      "PowerSettingsHandler",
+      "RegistrySettingsHandler",
+      "NvidiaSettingsHandler",
+      "NvidiaNotificationHandler",
+      "NetworkSettingsHandler",
+      "MouseSettingsHandler",
+      "GraphicsSettingsHandler",
+      "ServicesSettingsHandler",
+      "ProcessPriorityHandler",
+      "CpuAffinityHandler",
+      "Rivals2ConfigHandler",
+      "CNMSettingsHandler",
+      "ColorProfileSettingsHandler"
+    ],
+    "include_legacy_tweaks": false,
+    "is_emulator_profile": false,
+    "is_online_profile": true,
+    "is_sdr_only": true,
+    "network_scope": "full",
+    "optimization_target": "stable_online",
+    "requires_reflex": false,
+    "settings": {
+      "CNMSettingsHandler": {
+        "action": "stop"
+      },
+      "ColorProfileSettingsHandler": {
+        "digital_vibrance": 50,
+        "game_type": "competitive_fps",
+        "icc_profile": "srgb",
+        "show_osd_guidance": true
+      },
+      "CpuAffinityHandler": {
+        "strategy": null
+      },
+      "GraphicsSettingsHandler": {
+        "disable_global_fso": true,
+        "disable_mpo": false
+      },
+      "MouseSettingsHandler": {
+        "disable_acceleration": true,
+        "set_linear_curve": true
+      },
+      "NetworkSettingsHandler": {
+        "disable_nagle": true,
+        "preset": "gaming"
+      },
+      "NvidiaNotificationHandler": {
+        "disable_notifications": true
+      },
+      "NvidiaSettingsHandler": {
+        "low_latency_mode": "on",
+        "max_frame_rate": "off",
+        "power_management": "prefer_max_performance",
+        "shader_cache": "unlimited",
+        "threaded_optimization": "off",
+        "triple_buffering": "off",
+        "vrr_app_override": "force_off",
+        "vsync": "off",
+        "vsync_tear_control": "disable"
+      },
+      "PowerSettingsHandler": {
+        "active_plan": "ultimate_performance",
+        "disable_pcie_power_saving": true,
+        "disable_usb_suspend": true,
+        "ensure_ultimate_performance": true,
+        "processor_max_performance": true
+      },
+      "ProcessPriorityHandler": {
+        "cpu_priority": 2,
+        "gpu_priority": 8,
+        "io_priority": 2
+      },
+      "RegistrySettingsHandler": {
+        "game_priority": {
+          "gpu_priority": 8,
+          "priority": 6,
+          "scheduling_category": "High"
+        },
+        "win32_priority_separation": 42
+      },
+      "Rivals2ConfigHandler": {
+        "fullscreen_mode": 0,
+        "raw_input": true,
+        "vsync": false
+      },
+      "ServicesSettingsHandler": {
+        "preset": "gaming"
+      },
+      "WindowsSettingsHandler": {
+        "auto_hdr": false,
+        "game_bar": false,
+        "game_dvr": false,
+        "game_mode": true,
+        "hags": true,
+        "hdr": false,
+        "max_refresh_rate": true,
+        "vrr_optimize": false,
+        "windowed_optimizations": false
+      }
+    }
+  },
+  "rivals2-online-gsync": {
+    "allows_aggressive_settings": false,
+    "display_name": "Rivals 2: Online G-SYNC",
+    "graphics_api": "dx12",
+    "handlers": [
+      "WindowsSettingsHandler",
+      "PowerSettingsHandler",
+      "RegistrySettingsHandler",
+      "NvidiaSettingsHandler",
+      "NetworkSettingsHandler",
+      "MouseSettingsHandler",
+      "GraphicsSettingsHandler",
+      "ServicesSettingsHandler",
+      "ProcessPriorityHandler",
+      "CpuAffinityHandler",
+      "Rivals2ConfigHandler",
+      "CNMSettingsHandler",
+      "ColorProfileSettingsHandler"
+    ],
+    "include_legacy_tweaks": false,
+    "is_emulator_profile": false,
+    "is_online_profile": true,
+    "is_sdr_only": true,
+    "network_scope": "none",
+    "optimization_target": "stable_online_vrr",
+    "requires_reflex": false,
+    "settings": {
+      "CNMSettingsHandler": {
+        "action": "stop"
+      },
+      "ColorProfileSettingsHandler": {
+        "digital_vibrance": 50,
+        "game_type": "competitive_fps",
+        "icc_profile": "srgb",
+        "show_osd_guidance": true
+      },
+      "CpuAffinityHandler": {
+        "strategy": null
+      },
+      "GraphicsSettingsHandler": {
+        "disable_global_fso": true,
+        "disable_mpo": false
+      },
+      "MouseSettingsHandler": {
+        "disable_acceleration": true,
+        "set_linear_curve": true
+      },
+      "NetworkSettingsHandler": {
+        "disable_nagle": true,
+        "preset": "gaming"
+      },
+      "NvidiaSettingsHandler": {
+        "auto_vrr_fps_cap": true,
+        "global_vrr_mode": "fullscreen_only",
+        "preset": "vrr_fighting_game",
+        "threaded_optimization": "off"
+      },
+      "PowerSettingsHandler": {
+        "active_plan": "ultimate_performance",
+        "disable_pcie_power_saving": true,
+        "disable_usb_suspend": true,
+        "ensure_ultimate_performance": true,
+        "processor_max_performance": true
+      },
+      "ProcessPriorityHandler": {
+        "cpu_priority": 2,
+        "gpu_priority": 8,
+        "io_priority": 2
+      },
+      "RegistrySettingsHandler": {
+        "game_priority": {
+          "gpu_priority": 8,
+          "priority": 6,
+          "scheduling_category": "High"
+        },
+        "win32_priority_separation": 42
+      },
+      "Rivals2ConfigHandler": {
+        "fullscreen_mode": 0,
+        "raw_input": true,
+        "vsync": false
+      },
+      "ServicesSettingsHandler": {
+        "preset": "gaming"
+      },
+      "WindowsSettingsHandler": {
+        "auto_hdr": false,
+        "game_bar": false,
+        "game_dvr": false,
+        "game_mode": true,
+        "hags": true,
+        "hdr": false,
+        "max_refresh_rate": true,
+        "vrr_optimize": false,
+        "windowed_optimizations": false
+      }
+    }
+  },
+  "rivals2-streaming": {
+    "allows_aggressive_settings": false,
+    "display_name": "Rivals 2 (Streaming)",
+    "graphics_api": "dx12",
+    "handlers": [
+      "WindowsSettingsHandler",
+      "PowerSettingsHandler",
+      "RegistrySettingsHandler",
+      "NvidiaSettingsHandler",
+      "NvidiaNotificationHandler",
+      "NetworkSettingsHandler",
+      "MouseSettingsHandler",
+      "GraphicsSettingsHandler",
+      "ServicesSettingsHandler",
+      "ProcessPriorityHandler",
+      "OBSSettingsHandler",
+      "CpuAffinityHandler",
+      "Rivals2ConfigHandler",
+      "CNMSettingsHandler",
+      "ColorProfileSettingsHandler"
+    ],
+    "include_legacy_tweaks": false,
+    "is_emulator_profile": false,
+    "is_online_profile": true,
+    "is_sdr_only": true,
+    "network_scope": "full",
+    "optimization_target": "stable_online",
+    "requires_reflex": false,
+    "settings": {
+      "CNMSettingsHandler": {
+        "action": "stop"
+      },
+      "ColorProfileSettingsHandler": {
+        "digital_vibrance": 50,
+        "game_type": "competitive_fps",
+        "icc_profile": "srgb",
+        "show_osd_guidance": true
+      },
+      "CpuAffinityHandler": {
+        "strategy": null
+      },
+      "GraphicsSettingsHandler": {
+        "disable_global_fso": false,
+        "disable_mpo": false
+      },
+      "MouseSettingsHandler": {
+        "disable_acceleration": true,
+        "set_linear_curve": true
+      },
+      "NetworkSettingsHandler": {
+        "disable_nagle": true,
+        "preset": "gaming"
+      },
+      "NvidiaNotificationHandler": {
+        "disable_notifications": true
+      },
+      "NvidiaSettingsHandler": {
+        "low_latency_mode": "on",
+        "max_frame_rate": "off",
+        "power_management": "prefer_max_performance",
+        "shader_cache": "unlimited",
+        "threaded_optimization": "off",
+        "triple_buffering": "off",
+        "vrr_app_override": "force_off",
+        "vsync": "off",
+        "vsync_tear_control": "disable"
+      },
+      "OBSSettingsHandler": {
+        "low_latency": true,
+        "stream_encoder": {
+          "bitrate": 6000,
+          "look-ahead": false,
+          "multipass": "disabled",
+          "preset": "p5",
+          "profile": "high",
+          "psycho_aq": true,
+          "rate_control": "CBR"
+        },
+        "video": {
+          "output_cx": 1920,
+          "output_cy": 1080,
+          "scale_type": "lanczos"
+        }
+      },
+      "PowerSettingsHandler": {
+        "active_plan": "ultimate_performance",
+        "disable_pcie_power_saving": true,
+        "disable_usb_suspend": true,
+        "ensure_ultimate_performance": true,
+        "processor_max_performance": true
+      },
+      "ProcessPriorityHandler": {
+        "cpu_priority": 2,
+        "gpu_priority": 8,
+        "io_priority": 2
+      },
+      "RegistrySettingsHandler": {
+        "game_priority": {
+          "gpu_priority": 8,
+          "priority": 6,
+          "scheduling_category": "High"
+        },
+        "win32_priority_separation": 42
+      },
+      "Rivals2ConfigHandler": {
+        "fullscreen_mode": 0,
+        "raw_input": true,
+        "vsync": false
+      },
+      "ServicesSettingsHandler": {
+        "preset": "gaming"
+      },
+      "WindowsSettingsHandler": {
+        "auto_hdr": false,
+        "game_bar": false,
+        "game_dvr": false,
+        "game_mode": true,
+        "hags": true,
+        "hdr": false,
+        "max_refresh_rate": true,
+        "vrr_optimize": false,
+        "windowed_optimizations": false
+      }
+    }
+  },
+  "rivals2-tournament-sim-144hz": {
+    "allows_aggressive_settings": false,
+    "display_name": "Rivals 2: Tournament Sim (144Hz)",
+    "graphics_api": "dx12",
+    "handlers": [
+      "WindowsSettingsHandler",
+      "PowerSettingsHandler",
+      "RegistrySettingsHandler",
+      "NvidiaSettingsHandler",
+      "NetworkSettingsHandler",
+      "MouseSettingsHandler",
+      "GraphicsSettingsHandler",
+      "ServicesSettingsHandler",
+      "ProcessPriorityHandler",
+      "CpuAffinityHandler",
+      "CNMSettingsHandler",
+      "ColorProfileSettingsHandler"
+    ],
+    "include_legacy_tweaks": false,
+    "is_emulator_profile": false,
+    "is_online_profile": false,
+    "is_sdr_only": true,
+    "network_scope": "none",
+    "optimization_target": "tournament_simulation",
+    "requires_reflex": false,
+    "settings": {
+      "CNMSettingsHandler": {
+        "action": "stop"
+      },
+      "ColorProfileSettingsHandler": {
+        "digital_vibrance": 50,
+        "game_type": "competitive_fps",
+        "icc_profile": "srgb",
+        "show_osd_guidance": true
+      },
+      "CpuAffinityHandler": {
+        "strategy": null
+      },
+      "GraphicsSettingsHandler": {
+        "disable_global_fso": true,
+        "disable_mpo": false
+      },
+      "MouseSettingsHandler": {
+        "disable_acceleration": true,
+        "set_linear_curve": true
+      },
+      "NetworkSettingsHandler": {
+        "disable_nagle": false,
+        "preset": "default"
+      },
+      "NvidiaSettingsHandler": {
+        "low_latency_mode": "on",
+        "max_frame_rate": "off",
+        "power_management": "prefer_max_performance",
+        "shader_cache": "unlimited",
+        "threaded_optimization": "off",
+        "triple_buffering": "off",
+        "vrr_app_override": "force_off",
+        "vsync": "off"
+      },
+      "PowerSettingsHandler": {
+        "active_plan": "ultimate_performance",
+        "disable_pcie_power_saving": true,
+        "disable_usb_suspend": true,
+        "ensure_ultimate_performance": true,
+        "processor_max_performance": true
+      },
+      "ProcessPriorityHandler": {
+        "cpu_priority": 2,
+        "gpu_priority": 8,
+        "io_priority": 2
+      },
+      "RegistrySettingsHandler": {
+        "game_priority": {
+          "gpu_priority": 8,
+          "priority": 6,
+          "scheduling_category": "High"
+        },
+        "win32_priority_separation": 38
+      },
+      "ServicesSettingsHandler": {
+        "preset": "gaming"
+      },
+      "WindowsSettingsHandler": {
+        "auto_hdr": false,
+        "game_bar": false,
+        "game_dvr": false,
+        "game_mode": true,
+        "hags": true,
+        "hdr": false,
+        "refresh_rate": 144,
+        "vrr_optimize": false,
+        "windowed_optimizations": false
+      }
+    }
+  },
+  "ryujinx-ssbu": {
+    "allows_aggressive_settings": true,
+    "display_name": "SSBU / HewDraw Remix (Ryujinx)",
+    "graphics_api": "unknown",
+    "handlers": [
+      "WindowsSettingsHandler",
+      "PowerSettingsHandler",
+      "RegistrySettingsHandler",
+      "NvidiaSettingsHandler",
+      "NetworkSettingsHandler",
+      "MouseSettingsHandler",
+      "GraphicsSettingsHandler",
+      "ServicesSettingsHandler",
+      "ProcessPriorityHandler",
+      "CpuAffinityHandler",
+      "CNMSettingsHandler",
+      "ColorProfileSettingsHandler"
+    ],
+    "include_legacy_tweaks": false,
+    "is_emulator_profile": true,
+    "is_online_profile": false,
+    "is_sdr_only": true,
+    "network_scope": "full",
+    "optimization_target": "minimum_latency",
+    "requires_reflex": false,
+    "settings": {
+      "CNMSettingsHandler": {
+        "action": "stop"
+      },
+      "ColorProfileSettingsHandler": {
+        "digital_vibrance": 50,
+        "game_type": "emulator",
+        "icc_profile": "srgb",
+        "show_osd_guidance": true
+      },
+      "CpuAffinityHandler": {
+        "strategy": null
+      },
+      "GraphicsSettingsHandler": {
+        "disable_global_fso": true
+      },
+      "MouseSettingsHandler": {
+        "disable_acceleration": true,
+        "set_linear_curve": true
+      },
+      "NetworkSettingsHandler": {
+        "disable_nagle": true,
+        "preset": "gaming"
+      },
+      "NvidiaSettingsHandler": {
+        "low_latency_mode": "off",
+        "power_management": "prefer_max_performance",
+        "shader_cache": "unlimited",
+        "threaded_optimization": "on",
+        "triple_buffering": "off",
+        "vrr_app_override": "force_off",
+        "vsync": "off",
+        "vsync_tear_control": "disable"
+      },
+      "PowerSettingsHandler": {
+        "active_plan": "ultimate_performance",
+        "disable_pcie_power_saving": true,
+        "disable_usb_suspend": true,
+        "ensure_ultimate_performance": true,
+        "processor_max_performance": true
+      },
+      "ProcessPriorityHandler": {
+        "cpu_priority": 3,
+        "gpu_priority": 8,
+        "io_priority": 3
+      },
+      "RegistrySettingsHandler": {
+        "game_priority": {
+          "gpu_priority": 8,
+          "priority": 6,
+          "scheduling_category": "High"
+        },
+        "win32_priority_separation": 42
+      },
+      "ServicesSettingsHandler": {
+        "preset": "gaming"
+      },
+      "WindowsSettingsHandler": {
+        "auto_hdr": false,
+        "game_bar": false,
+        "game_dvr": false,
+        "game_mode": true,
+        "hags": true,
+        "hdr": false,
+        "vrr_optimize": false,
+        "windowed_optimizations": false
+      }
+    }
+  },
+  "ryujinx-ssbu-streaming": {
+    "allows_aggressive_settings": true,
+    "display_name": "SSBU / HewDraw Remix (Streaming)",
+    "graphics_api": "unknown",
+    "handlers": [
+      "WindowsSettingsHandler",
+      "PowerSettingsHandler",
+      "RegistrySettingsHandler",
+      "NvidiaSettingsHandler",
+      "NetworkSettingsHandler",
+      "MouseSettingsHandler",
+      "GraphicsSettingsHandler",
+      "ServicesSettingsHandler",
+      "ProcessPriorityHandler",
+      "OBSSettingsHandler",
+      "CpuAffinityHandler",
+      "CNMSettingsHandler",
+      "ColorProfileSettingsHandler"
+    ],
+    "include_legacy_tweaks": false,
+    "is_emulator_profile": true,
+    "is_online_profile": false,
+    "is_sdr_only": true,
+    "network_scope": "full",
+    "optimization_target": "minimum_latency",
+    "requires_reflex": false,
+    "settings": {
+      "CNMSettingsHandler": {
+        "action": "stop"
+      },
+      "ColorProfileSettingsHandler": {
+        "digital_vibrance": 50,
+        "game_type": "emulator",
+        "icc_profile": "srgb",
+        "show_osd_guidance": true
+      },
+      "CpuAffinityHandler": {
+        "strategy": null
+      },
+      "GraphicsSettingsHandler": {
+        "disable_global_fso": false,
+        "disable_mpo": false
+      },
+      "MouseSettingsHandler": {
+        "disable_acceleration": true,
+        "set_linear_curve": true
+      },
+      "NetworkSettingsHandler": {
+        "disable_nagle": true,
+        "preset": "gaming"
+      },
+      "NvidiaSettingsHandler": {
+        "low_latency_mode": "off",
+        "power_management": "prefer_max_performance",
+        "shader_cache": "unlimited",
+        "threaded_optimization": "on",
+        "triple_buffering": "off",
+        "vrr_app_override": "force_off",
+        "vsync": "off",
+        "vsync_tear_control": "disable"
+      },
+      "OBSSettingsHandler": {
+        "low_latency": true,
+        "stream_encoder": {
+          "bitrate": 6000,
+          "look-ahead": false,
+          "multipass": "disabled",
+          "preset": "p5",
+          "profile": "high",
+          "psycho_aq": true,
+          "rate_control": "CBR"
+        },
+        "video": {
+          "output_cx": 1920,
+          "output_cy": 1080,
+          "scale_type": "lanczos"
+        }
+      },
+      "PowerSettingsHandler": {
+        "active_plan": "ultimate_performance",
+        "disable_pcie_power_saving": true,
+        "disable_usb_suspend": true,
+        "ensure_ultimate_performance": true,
+        "processor_max_performance": true
+      },
+      "ProcessPriorityHandler": {
+        "cpu_priority": 3,
+        "gpu_priority": 8,
+        "io_priority": 3
+      },
+      "RegistrySettingsHandler": {
+        "game_priority": {
+          "gpu_priority": 8,
+          "priority": 6,
+          "scheduling_category": "High"
+        },
+        "win32_priority_separation": 42
+      },
+      "ServicesSettingsHandler": {
+        "preset": "gaming"
+      },
+      "WindowsSettingsHandler": {
+        "auto_hdr": false,
+        "game_bar": false,
+        "game_dvr": false,
+        "game_mode": true,
+        "hags": true,
+        "hdr": false,
+        "vrr_optimize": false,
+        "windowed_optimizations": false
+      }
+    }
+  },
+  "slippi-melee": {
+    "allows_aggressive_settings": true,
+    "display_name": "Super Smash Bros. Melee (Slippi)",
+    "graphics_api": "unknown",
+    "handlers": [
+      "WindowsSettingsHandler",
+      "PowerSettingsHandler",
+      "RegistrySettingsHandler",
+      "NvidiaSettingsHandler",
+      "NetworkSettingsHandler",
+      "MouseSettingsHandler",
+      "GraphicsSettingsHandler",
+      "ServicesSettingsHandler",
+      "ProcessPriorityHandler",
+      "CpuAffinityHandler",
+      "CNMSettingsHandler",
+      "ColorProfileSettingsHandler",
+      "DolphinConfigHandler"
+    ],
+    "include_legacy_tweaks": false,
+    "is_emulator_profile": true,
+    "is_online_profile": false,
+    "is_sdr_only": true,
+    "network_scope": "full",
+    "optimization_target": "minimum_latency",
+    "requires_reflex": false,
+    "settings": {
+      "CNMSettingsHandler": {
+        "action": "stop"
+      },
+      "ColorProfileSettingsHandler": {
+        "digital_vibrance": 50,
+        "game_type": "emulator",
+        "icc_profile": "srgb",
+        "show_osd_guidance": true
+      },
+      "CpuAffinityHandler": {
+        "strategy": null
+      },
+      "DolphinConfigHandler": {
+        "backend_multithreading": "False",
+        "efb_scale": "1",
+        "immediate_xfb_enable": "True",
+        "reduce_timing_dispersion": "True",
+        "rush_presentation": "False",
+        "smooth_presentation": "False",
+        "sync_gpu": "False",
+        "texture_scaling_factor": "1",
+        "timing_variance": "8",
+        "use_deposterize": "False",
+        "use_scaling_filter": "False",
+        "vsync": "False"
+      },
+      "GraphicsSettingsHandler": {
+        "disable_global_fso": true
+      },
+      "MouseSettingsHandler": {
+        "disable_acceleration": true,
+        "set_linear_curve": true
+      },
+      "NetworkSettingsHandler": {
+        "disable_nagle": true,
+        "preset": "gaming"
+      },
+      "NvidiaSettingsHandler": {
+        "low_latency_mode": "on",
+        "max_frame_rate": "off",
+        "power_management": "prefer_max_performance",
+        "shader_cache": "unlimited",
+        "threaded_optimization": "off",
+        "triple_buffering": "off",
+        "vrr_app_override": "force_off",
+        "vsync": "off",
+        "vsync_tear_control": "disable"
+      },
+      "PowerSettingsHandler": {
+        "active_plan": "ultimate_performance",
+        "disable_pcie_power_saving": true,
+        "disable_usb_suspend": true,
+        "ensure_ultimate_performance": true,
+        "processor_max_performance": true
+      },
+      "ProcessPriorityHandler": {
+        "cpu_priority": 3,
+        "gpu_priority": 8,
+        "io_priority": 3
+      },
+      "RegistrySettingsHandler": {
+        "game_priority": {
+          "gpu_priority": 8,
+          "priority": 6,
+          "scheduling_category": "High"
+        },
+        "win32_priority_separation": 42
+      },
+      "ServicesSettingsHandler": {
+        "preset": "gaming"
+      },
+      "WindowsSettingsHandler": {
+        "auto_hdr": false,
+        "game_bar": false,
+        "game_dvr": false,
+        "game_mode": true,
+        "hags": true,
+        "hdr": false,
+        "max_refresh_rate": true,
+        "vrr_optimize": false,
+        "windowed_optimizations": false
+      }
+    }
+  },
+  "slippi-melee-console-parity": {
+    "allows_aggressive_settings": true,
+    "display_name": "Super Smash Bros. Melee (Slippi Console-Parity)",
+    "graphics_api": "unknown",
+    "handlers": [
+      "WindowsSettingsHandler",
+      "PowerSettingsHandler",
+      "RegistrySettingsHandler",
+      "NvidiaSettingsHandler",
+      "NetworkSettingsHandler",
+      "MouseSettingsHandler",
+      "GraphicsSettingsHandler",
+      "ServicesSettingsHandler",
+      "ProcessPriorityHandler",
+      "CpuAffinityHandler",
+      "CNMSettingsHandler",
+      "ColorProfileSettingsHandler",
+      "DolphinConfigHandler"
+    ],
+    "include_legacy_tweaks": false,
+    "is_emulator_profile": true,
+    "is_online_profile": false,
+    "is_sdr_only": true,
+    "network_scope": "limited",
+    "optimization_target": "balanced",
+    "requires_reflex": false,
+    "settings": {
+      "CNMSettingsHandler": {
+        "action": "stop"
+      },
+      "ColorProfileSettingsHandler": {
+        "digital_vibrance": 50,
+        "game_type": "emulator",
+        "icc_profile": "srgb",
+        "show_osd_guidance": true
+      },
+      "CpuAffinityHandler": {
+        "strategy": null
+      },
+      "DolphinConfigHandler": {
+        "backend_multithreading": "False",
+        "efb_scale": "1",
+        "immediate_xfb_enable": "True",
+        "reduce_timing_dispersion": "True",
+        "rush_presentation": "False",
+        "smooth_presentation": "False",
+        "sync_gpu": "False",
+        "texture_scaling_factor": "1",
+        "timing_variance": "8",
+        "use_deposterize": "False",
+        "use_scaling_filter": "False",
+        "vsync": "True"
+      },
+      "GraphicsSettingsHandler": {
+        "disable_global_fso": true
+      },
+      "MouseSettingsHandler": {
+        "disable_acceleration": true,
+        "set_linear_curve": true
+      },
+      "NetworkSettingsHandler": {
+        "disable_nagle": true,
+        "preset": "gaming"
+      },
+      "NvidiaSettingsHandler": {
+        "low_latency_mode": "off",
+        "max_frame_rate": "off",
+        "power_management": "prefer_max_performance",
+        "shader_cache": "unlimited",
+        "threaded_optimization": "off",
+        "triple_buffering": "off",
+        "vrr_app_override": "force_off",
+        "vsync": "on",
+        "vsync_tear_control": "disable"
+      },
+      "PowerSettingsHandler": {
+        "active_plan": "ultimate_performance",
+        "disable_pcie_power_saving": true,
+        "disable_usb_suspend": true,
+        "ensure_ultimate_performance": true,
+        "processor_max_performance": true
+      },
+      "ProcessPriorityHandler": {
+        "cpu_priority": 3,
+        "gpu_priority": 8,
+        "io_priority": 3
+      },
+      "RegistrySettingsHandler": {
+        "game_priority": {
+          "gpu_priority": 8,
+          "priority": 6,
+          "scheduling_category": "High"
+        },
+        "win32_priority_separation": 42
+      },
+      "ServicesSettingsHandler": {
+        "preset": "gaming"
+      },
+      "WindowsSettingsHandler": {
+        "auto_hdr": false,
+        "game_bar": false,
+        "game_dvr": false,
+        "game_mode": true,
+        "hags": true,
+        "hdr": false,
+        "refresh_rate": 60,
+        "vrr_optimize": false,
+        "windowed_optimizations": false
+      }
+    }
+  },
+  "slippi-melee-streaming": {
+    "allows_aggressive_settings": true,
+    "display_name": "Slippi Melee (Streaming)",
+    "graphics_api": "unknown",
+    "handlers": [
+      "WindowsSettingsHandler",
+      "PowerSettingsHandler",
+      "RegistrySettingsHandler",
+      "NvidiaSettingsHandler",
+      "NetworkSettingsHandler",
+      "MouseSettingsHandler",
+      "GraphicsSettingsHandler",
+      "ServicesSettingsHandler",
+      "ProcessPriorityHandler",
+      "OBSSettingsHandler",
+      "CpuAffinityHandler",
+      "CNMSettingsHandler",
+      "ColorProfileSettingsHandler",
+      "DolphinConfigHandler"
+    ],
+    "include_legacy_tweaks": false,
+    "is_emulator_profile": true,
+    "is_online_profile": false,
+    "is_sdr_only": true,
+    "network_scope": "full",
+    "optimization_target": "minimum_latency",
+    "requires_reflex": false,
+    "settings": {
+      "CNMSettingsHandler": {
+        "action": "stop"
+      },
+      "ColorProfileSettingsHandler": {
+        "digital_vibrance": 50,
+        "game_type": "emulator",
+        "icc_profile": "srgb",
+        "show_osd_guidance": true
+      },
+      "CpuAffinityHandler": {
+        "strategy": null
+      },
+      "DolphinConfigHandler": {
+        "backend_multithreading": "False",
+        "efb_scale": "1",
+        "immediate_xfb_enable": "True",
+        "reduce_timing_dispersion": "True",
+        "rush_presentation": "False",
+        "smooth_presentation": "False",
+        "sync_gpu": "False",
+        "texture_scaling_factor": "1",
+        "timing_variance": "8",
+        "use_deposterize": "False",
+        "use_scaling_filter": "False",
+        "vsync": "False"
+      },
+      "GraphicsSettingsHandler": {
+        "disable_global_fso": false,
+        "disable_mpo": false
+      },
+      "MouseSettingsHandler": {
+        "disable_acceleration": true,
+        "set_linear_curve": true
+      },
+      "NetworkSettingsHandler": {
+        "disable_nagle": true,
+        "preset": "gaming"
+      },
+      "NvidiaSettingsHandler": {
+        "low_latency_mode": "on",
+        "max_frame_rate": "off",
+        "power_management": "prefer_max_performance",
+        "shader_cache": "unlimited",
+        "threaded_optimization": "off",
+        "triple_buffering": "off",
+        "vrr_app_override": "force_off",
+        "vsync": "off",
+        "vsync_tear_control": "disable"
+      },
+      "OBSSettingsHandler": {
+        "low_latency": true,
+        "stream_encoder": {
+          "bitrate": 6000,
+          "look-ahead": false,
+          "multipass": "disabled",
+          "preset": "p5",
+          "profile": "high",
+          "psycho_aq": true,
+          "rate_control": "CBR"
+        },
+        "video": {
+          "output_cx": 1920,
+          "output_cy": 1080,
+          "scale_type": "lanczos"
+        }
+      },
+      "PowerSettingsHandler": {
+        "active_plan": "ultimate_performance",
+        "disable_pcie_power_saving": true,
+        "disable_usb_suspend": true,
+        "ensure_ultimate_performance": true,
+        "processor_max_performance": true
+      },
+      "ProcessPriorityHandler": {
+        "cpu_priority": 3,
+        "gpu_priority": 8,
+        "io_priority": 3
+      },
+      "RegistrySettingsHandler": {
+        "game_priority": {
+          "gpu_priority": 8,
+          "priority": 6,
+          "scheduling_category": "High"
+        },
+        "win32_priority_separation": 42
+      },
+      "ServicesSettingsHandler": {
+        "preset": "gaming"
+      },
+      "WindowsSettingsHandler": {
+        "auto_hdr": false,
+        "game_bar": false,
+        "game_dvr": false,
+        "game_mode": true,
+        "hags": true,
+        "hdr": false,
+        "max_refresh_rate": true,
+        "vrr_optimize": false,
+        "windowed_optimizations": false
+      }
+    }
+  },
+  "slippi-melee-universal": {
+    "allows_aggressive_settings": true,
+    "display_name": "Super Smash Bros. Melee (Slippi Universal)",
+    "graphics_api": "unknown",
+    "handlers": [
+      "WindowsSettingsHandler",
+      "PowerSettingsHandler",
+      "RegistrySettingsHandler",
+      "NvidiaSettingsHandler",
+      "NetworkSettingsHandler",
+      "MouseSettingsHandler",
+      "GraphicsSettingsHandler",
+      "ServicesSettingsHandler",
+      "ProcessPriorityHandler",
+      "CpuAffinityHandler",
+      "CNMSettingsHandler",
+      "ColorProfileSettingsHandler",
+      "DolphinConfigHandler"
+    ],
+    "include_legacy_tweaks": false,
+    "is_emulator_profile": true,
+    "is_online_profile": false,
+    "is_sdr_only": true,
+    "network_scope": "full",
+    "optimization_target": "minimum_latency",
+    "requires_reflex": false,
+    "settings": {
+      "CNMSettingsHandler": {
+        "action": "stop"
+      },
+      "ColorProfileSettingsHandler": {
+        "digital_vibrance": 50,
+        "game_type": "emulator",
+        "icc_profile": "srgb",
+        "show_osd_guidance": true
+      },
+      "CpuAffinityHandler": {
+        "strategy": null
+      },
+      "DolphinConfigHandler": {
+        "backend_multithreading": "False",
+        "efb_scale": "1",
+        "immediate_xfb_enable": "True",
+        "reduce_timing_dispersion": "True",
+        "rush_presentation": "False",
+        "smooth_presentation": "False",
+        "sync_gpu": "False",
+        "texture_scaling_factor": "1",
+        "timing_variance": "8",
+        "use_deposterize": "False",
+        "use_scaling_filter": "False",
+        "vsync": "False"
+      },
+      "GraphicsSettingsHandler": {
+        "disable_global_fso": true
+      },
+      "MouseSettingsHandler": {
+        "disable_acceleration": true,
+        "set_linear_curve": true
+      },
+      "NetworkSettingsHandler": {
+        "disable_nagle": true,
+        "preset": "gaming"
+      },
+      "NvidiaSettingsHandler": {
+        "low_latency_mode": "on",
+        "max_frame_rate": "off",
+        "power_management": "prefer_max_performance",
+        "shader_cache": "unlimited",
+        "threaded_optimization": "off",
+        "triple_buffering": "off",
+        "vrr_app_override": "force_off",
+        "vsync": "off",
+        "vsync_tear_control": "disable"
+      },
+      "PowerSettingsHandler": {
+        "active_plan": "ultimate_performance",
+        "disable_pcie_power_saving": true,
+        "disable_usb_suspend": true,
+        "ensure_ultimate_performance": true,
+        "processor_max_performance": true
+      },
+      "ProcessPriorityHandler": {
+        "cpu_priority": 3,
+        "gpu_priority": 8,
+        "io_priority": 3
+      },
+      "RegistrySettingsHandler": {
+        "game_priority": {
+          "gpu_priority": 8,
+          "priority": 6,
+          "scheduling_category": "High"
+        },
+        "win32_priority_separation": 42
+      },
+      "ServicesSettingsHandler": {
+        "preset": "gaming"
+      },
+      "WindowsSettingsHandler": {
+        "auto_hdr": false,
+        "game_bar": false,
+        "game_dvr": false,
+        "game_mode": true,
+        "hags": true,
+        "hdr": false,
+        "max_refresh_rate": true,
+        "vrr_optimize": false,
+        "windowed_optimizations": false
+      }
+    }
+  },
+  "slippi-melee-vrr-lab": {
+    "allows_aggressive_settings": true,
+    "display_name": "Super Smash Bros. Melee (Slippi VRR Lab)",
+    "graphics_api": "unknown",
+    "handlers": [
+      "WindowsSettingsHandler",
+      "PowerSettingsHandler",
+      "RegistrySettingsHandler",
+      "NvidiaSettingsHandler",
+      "NetworkSettingsHandler",
+      "MouseSettingsHandler",
+      "GraphicsSettingsHandler",
+      "ServicesSettingsHandler",
+      "ProcessPriorityHandler",
+      "CpuAffinityHandler",
+      "CNMSettingsHandler",
+      "ColorProfileSettingsHandler",
+      "DolphinConfigHandler"
+    ],
+    "include_legacy_tweaks": false,
+    "is_emulator_profile": true,
+    "is_online_profile": false,
+    "is_sdr_only": true,
+    "network_scope": "limited",
+    "optimization_target": "balanced",
+    "requires_reflex": false,
+    "settings": {
+      "CNMSettingsHandler": {
+        "action": "stop"
+      },
+      "ColorProfileSettingsHandler": {
+        "digital_vibrance": 50,
+        "game_type": "emulator",
+        "icc_profile": "srgb",
+        "show_osd_guidance": true
+      },
+      "CpuAffinityHandler": {
+        "strategy": null
+      },
+      "DolphinConfigHandler": {
+        "backend_multithreading": "False",
+        "efb_scale": "1",
+        "immediate_xfb_enable": "True",
+        "reduce_timing_dispersion": "True",
+        "rush_presentation": "False",
+        "smooth_presentation": "True",
+        "sync_gpu": "False",
+        "texture_scaling_factor": "1",
+        "timing_variance": "8",
+        "use_deposterize": "False",
+        "use_scaling_filter": "False",
+        "vsync": "False"
+      },
+      "GraphicsSettingsHandler": {
+        "disable_global_fso": true,
+        "disable_mpo": false
+      },
+      "MouseSettingsHandler": {
+        "disable_acceleration": true,
+        "set_linear_curve": true
+      },
+      "NetworkSettingsHandler": {
+        "disable_nagle": true,
+        "preset": "gaming"
+      },
+      "NvidiaSettingsHandler": {
+        "global_vrr_mode": "fullscreen_only",
+        "low_latency_mode": "on",
+        "max_frame_rate": "off",
+        "power_management": "prefer_max_performance",
+        "shader_cache": "unlimited",
+        "threaded_optimization": "off",
+        "triple_buffering": "off",
+        "vrr_app_override": "allow",
+        "vsync": "on",
+        "vsync_tear_control": "disable"
+      },
+      "PowerSettingsHandler": {
+        "active_plan": "ultimate_performance",
+        "disable_pcie_power_saving": true,
+        "disable_usb_suspend": true,
+        "ensure_ultimate_performance": true,
+        "processor_max_performance": true
+      },
+      "ProcessPriorityHandler": {
+        "cpu_priority": 3,
+        "gpu_priority": 8,
+        "io_priority": 3
+      },
+      "RegistrySettingsHandler": {
+        "game_priority": {
+          "gpu_priority": 8,
+          "priority": 6,
+          "scheduling_category": "High"
+        },
+        "win32_priority_separation": 42
+      },
+      "ServicesSettingsHandler": {
+        "preset": "gaming"
+      },
+      "WindowsSettingsHandler": {
+        "auto_hdr": false,
+        "game_bar": false,
+        "game_dvr": false,
+        "game_mode": true,
+        "hags": true,
+        "hdr": false,
+        "max_refresh_rate": true,
+        "vrr_optimize": false,
+        "windowed_optimizations": false
+      }
+    }
+  }
+}
