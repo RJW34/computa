@@ -82,7 +82,12 @@ class NetworkSettingsHandler(SettingsHandler):
                 severity="info",
                 current_value="Default (enabled)",
                 optimal_value="Disabled (TCPNoDelay=1)",
-                explanation="Disabling Nagle reduces network latency by sending packets immediately instead of buffering.",
+                explanation=(
+                    "Nagle buffers small TCP packets before sending (up to ~40ms). "
+                    "Note: most competitive games (OW2, Fortnite, Rivals 2, Valorant) "
+                    "use UDP for gameplay, where Nagle has no effect. Disabling it "
+                    "only helps TCP-based traffic (login, chat, matchmaking)."
+                ),
                 category="network",
             ))
 

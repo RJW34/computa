@@ -253,7 +253,10 @@ class Rivals2BaseProfile(BaseProfile):
                 "io_priority": 3,
             },
             "CpuAffinityHandler": {
-                "strategy": "p_cores_only",
+                # No affinity pinning by default. Intel officially discourages
+                # hard affinity on hybrid CPUs (prevents Thread Director from
+                # optimizing). Users can opt in via abso.yaml profile_overrides.
+                "strategy": None,
             },
             "CNMSettingsHandler": {
                 "action": "stop",
@@ -394,7 +397,10 @@ class EmulatorLatencyBaseProfile(BaseProfile):
                 "io_priority": 3,
             },
             "CpuAffinityHandler": {
-                "strategy": "p_cores_only",
+                # No affinity pinning by default. Intel officially discourages
+                # hard affinity on hybrid CPUs (prevents Thread Director from
+                # optimizing). Users can opt in via abso.yaml profile_overrides.
+                "strategy": None,
             },
             "CNMSettingsHandler": {
                 "action": "stop",
@@ -635,7 +641,10 @@ class ReflexShooterBaseProfile(BaseProfile):
                 "io_priority": 3,
             },
             "CpuAffinityHandler": {
-                "strategy": "p_cores_only",
+                # No affinity pinning by default. Intel officially discourages
+                # hard affinity on hybrid CPUs (prevents Thread Director from
+                # optimizing). Users can opt in via abso.yaml profile_overrides.
+                "strategy": None,
             },
             "CNMSettingsHandler": {
                 "action": "stop",

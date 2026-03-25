@@ -168,9 +168,13 @@ class Diablo4Profile(BaseProfile):
             },
             {
                 "category": "Display",
-                "setting": "VSync",
-                "value": "Off (if using G-Sync) / On (otherwise)",
-                "reason": "G-Sync handles sync; otherwise VSync prevents tearing.",
+                "setting": "VSync (in-game)",
+                "value": "Off",
+                "reason": (
+                    "Keep in-game VSync OFF. ABSO sets NVCP VSync to Adaptive as a "
+                    "safety net — it only engages if FPS exceeds refresh rate, adding "
+                    "zero latency when FPS is capped below refresh."
+                ),
             },
             {
                 "category": "Display",

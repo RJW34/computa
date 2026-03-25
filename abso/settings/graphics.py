@@ -38,6 +38,10 @@ class GraphicsSettingsHandler(SettingsHandler):
 
     # Registry paths
     DWM_KEY = r"SOFTWARE\Microsoft\Windows\Dwm"
+    # MPO disable: Windows 11 24H2+ requires DisableOverlays under GraphicsDrivers.
+    # The old OverlayTestMode under DWM no longer works on 24H2+.
+    GRAPHICS_DRIVERS_KEY = r"SYSTEM\CurrentControlSet\Control\GraphicsDrivers"
+    DWM_LEGACY_KEY = r"SOFTWARE\Microsoft\Windows\Dwm"  # Fallback for pre-24H2
     GAME_CONFIG_KEY = r"System\GameConfigStore"
     EXPLORER_ADVANCED_KEY = r"Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced"
     COLOR_MANAGEMENT_KEY = r"Software\Microsoft\Windows\CurrentVersion\ColorManagement"
@@ -194,20 +198,42 @@ class GraphicsSettingsHandler(SettingsHandler):
     # Private helper methods
 
     def _get_mpo_disabled(self) -> bool:
-        """Check if Multi-Plane Overlay is disabled."""
+        """Check if Multi-Plane Overlay is disabled.
+
+        Windows 11 24H2+ uses DisableOverlays under GraphicsDrivers.
+        Falls back to the legacy OverlayTestMode under DWM for pre-24H2.
+        """
+        # Check new 24H2+ key first
         try:
             key = winreg.OpenKey(
                 winreg.HKEY_LOCAL_MACHINE,
-                self.DWM_KEY,
+                self.GRAPHICS_DRIVERS_KEY,
                 0,
-                winreg.KEY_READ
+                winreg.KEY_READ,
+            )
+            try:
+                value = winreg.QueryValueEx(key, "DisableOverlays")[0]
+                return value == 1
+            except FileNotFoundError:
+                pass  # Key doesn't exist, check legacy
+            finally:
+                winreg.CloseKey(key)
+        except Exception:
+            pass
+
+        # Fallback: legacy DWM key (pre-24H2)
+        try:
+            key = winreg.OpenKey(
+                winreg.HKEY_LOCAL_MACHINE,
+                self.DWM_LEGACY_KEY,
+                0,
+                winreg.KEY_READ,
             )
             try:
                 value = winreg.QueryValueEx(key, "OverlayTestMode")[0]
-                # OverlayTestMode = 5 disables MPO
                 return value == 5
             except FileNotFoundError:
-                return False  # Not set = MPO enabled (default)
+                return False
             finally:
                 winreg.CloseKey(key)
         except Exception as e:
@@ -215,23 +241,50 @@ class GraphicsSettingsHandler(SettingsHandler):
             return False
 
     def _set_mpo_disabled(self, disabled: bool) -> None:
-        """Enable or disable Multi-Plane Overlay."""
-        key = winreg.OpenKey(
-            winreg.HKEY_LOCAL_MACHINE,
-            self.DWM_KEY,
-            0,
-            winreg.KEY_ALL_ACCESS
-        )
+        """Enable or disable Multi-Plane Overlay.
+
+        Sets BOTH the new 24H2+ key (DisableOverlays) and the legacy DWM
+        key (OverlayTestMode) for compatibility across Windows versions.
+        """
+        # Set new 24H2+ key: GraphicsDrivers\DisableOverlays
         try:
-            if disabled:
-                # Set OverlayTestMode = 5 to disable MPO
-                winreg.SetValueEx(key, "OverlayTestMode", 0, winreg.REG_DWORD, 5)
-            else:
-                # Remove the key to re-enable MPO
-                with contextlib.suppress(FileNotFoundError):
-                    winreg.DeleteValue(key, "OverlayTestMode")
-        finally:
-            winreg.CloseKey(key)
+            key = winreg.OpenKey(
+                winreg.HKEY_LOCAL_MACHINE,
+                self.GRAPHICS_DRIVERS_KEY,
+                0,
+                winreg.KEY_ALL_ACCESS,
+            )
+            try:
+                if disabled:
+                    winreg.SetValueEx(key, "DisableOverlays", 0, winreg.REG_DWORD, 1)
+                else:
+                    with contextlib.suppress(FileNotFoundError):
+                        winreg.DeleteValue(key, "DisableOverlays")
+            finally:
+                winreg.CloseKey(key)
+        except PermissionError:
+            logger.warning("Permission denied setting DisableOverlays (requires admin)")
+        except Exception as e:
+            logger.warning(f"Failed to set DisableOverlays: {e}")
+
+        # Also set legacy DWM key for pre-24H2 compatibility
+        try:
+            key = winreg.OpenKey(
+                winreg.HKEY_LOCAL_MACHINE,
+                self.DWM_LEGACY_KEY,
+                0,
+                winreg.KEY_ALL_ACCESS,
+            )
+            try:
+                if disabled:
+                    winreg.SetValueEx(key, "OverlayTestMode", 0, winreg.REG_DWORD, 5)
+                else:
+                    with contextlib.suppress(FileNotFoundError):
+                        winreg.DeleteValue(key, "OverlayTestMode")
+            finally:
+                winreg.CloseKey(key)
+        except Exception as e:
+            logger.debug(f"Legacy DWM MPO key: {e}")
 
     def _get_global_fso_disabled(self) -> bool:
         """Check if global Fullscreen Optimizations are disabled."""

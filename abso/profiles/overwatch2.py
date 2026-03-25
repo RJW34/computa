@@ -126,11 +126,13 @@ class Overwatch2Profile(_Overwatch2BaseProfile):
             {
                 "category": "Display",
                 "setting": "NVIDIA Reflex Low Latency",
-                "value": "Off",
+                "value": "Off (high-end GPU) / On+Boost (mid-range GPU)",
                 "reason": (
-                    "GPU is not saturated at 1440p Low — Reflex throttles CPU frame "
-                    "submission without benefit, costing ~60fps. Higher uncapped FPS "
-                    "= lower latency than Reflex queue management."
+                    "On a high-end GPU at 1440p Low, the GPU is not saturated — Reflex "
+                    "throttles CPU frame submission without benefit, costing ~60fps. "
+                    "Higher uncapped FPS = lower latency than Reflex queue management. "
+                    "If your GPU IS saturated (check: GPU usage >90%), switch to "
+                    "On+Boost instead."
                 ),
             },
             {
