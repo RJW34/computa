@@ -539,8 +539,9 @@ def games(json_output: bool) -> None:
 @cli.command()
 @click.argument("profile_name")
 @click.option("--no-backup", is_flag=True, help="Skip automatic backup (not recommended)")
+@click.option("--benchmark", is_flag=True, help="Capture before/after frame times (requires PresentMon)")
 @click.option("--json", "json_output", is_flag=True, help="Output as JSON for GUI integration")
-def apply(profile_name: str, no_backup: bool, json_output: bool) -> None:
+def apply(profile_name: str, no_backup: bool, benchmark: bool, json_output: bool) -> None:
     """Apply a game optimization profile.
 
     PROFILE_NAME is the profile to apply (e.g., slippi-melee, cod-bo7, diablo4).
@@ -558,6 +559,42 @@ def apply(profile_name: str, no_backup: bool, json_output: bool) -> None:
             console.print("[yellow]Warning: Skipping backup as requested.[/yellow]\n")
         else:
             console.print("[yellow]Creating backup before applying changes...[/yellow]")
+
+    # --- Benchmark: capture baseline before apply ---
+    benchmark_baseline = None
+    benchmark_exe = None
+    if benchmark:
+        try:
+            from abso.core.benchmark import FrameTimeBenchmark, PresentMonNotFoundError
+
+            bench = FrameTimeBenchmark()
+            profile_class = ProfileApplier.PROFILES.get(profile_name)
+            if profile_class:
+                for exe in profile_class().executable_hints:
+                    # Check if game is running
+                    check = subprocess.run(
+                        ["tasklist", "/FI", f"IMAGENAME eq {exe}", "/NH"],
+                        capture_output=True, text=True, timeout=5,
+                    )
+                    if exe.lower() in check.stdout.lower():
+                        benchmark_exe = exe
+                        break
+
+            if benchmark_exe:
+                if not json_output:
+                    console.print(f"[cyan]Capturing 30s baseline for {benchmark_exe}...[/cyan]")
+                baseline_capture = bench.capture(benchmark_exe, duration=30)
+                benchmark_baseline = bench.analyze(baseline_capture)
+            elif not json_output:
+                console.print("[dim]Game not running — skipping benchmark baseline[/dim]")
+        except PresentMonNotFoundError:
+            if not json_output:
+                console.print("[dim]PresentMon not found — skipping benchmark[/dim]")
+            benchmark = False
+        except Exception as e:
+            if not json_output:
+                console.print(f"[dim]Benchmark baseline failed: {e}[/dim]")
+            benchmark_baseline = None
 
     try:
         tx_manager = ProfileTransactionManager(BACKUPS_DIR)
@@ -629,6 +666,49 @@ def apply(profile_name: str, no_backup: bool, json_output: bool) -> None:
                 applier = tx_manager.applier
                 report_path = applier.generate_report(profile_name, REPORTS_DIR)
                 console.print(f"\n[cyan]In-game settings saved to: {report_path}[/cyan]")
+
+            # --- Benchmark: capture after apply and compare ---
+            if benchmark and benchmark_baseline and benchmark_exe:
+                try:
+                    console.print(f"\n[cyan]Capturing 30s post-apply for {benchmark_exe}...[/cyan]")
+                    after_capture = bench.capture(benchmark_exe, duration=30)
+                    after_analysis = bench.analyze(after_capture)
+                    comparison = bench.compare(benchmark_baseline, after_analysis)
+
+                    from rich.table import Table
+
+                    table = Table(title="Benchmark Comparison (Before → After)")
+                    table.add_column("Metric", style="bold")
+                    table.add_column("Before", justify="right")
+                    table.add_column("After", justify="right")
+                    table.add_column("Delta", justify="right")
+
+                    def _fmt_delta(val: float, higher_is_better: bool = True) -> str:
+                        if val > 0:
+                            color = "green" if higher_is_better else "red"
+                            return f"[{color}]+{val:.1f}[/{color}]"
+                        elif val < 0:
+                            color = "red" if higher_is_better else "green"
+                            return f"[{color}]{val:.1f}[/{color}]"
+                        return "0"
+
+                    b, a = comparison.before, comparison.after
+                    table.add_row("Avg FPS", f"{b.avg_fps:.1f}", f"{a.avg_fps:.1f}",
+                                  _fmt_delta(a.avg_fps - b.avg_fps, True))
+                    table.add_row("1% Low", f"{b.fps_1_low:.1f}", f"{a.fps_1_low:.1f}",
+                                  _fmt_delta(a.fps_1_low - b.fps_1_low, True))
+                    table.add_row("0.1% Low", f"{b.fps_01_low:.1f}", f"{a.fps_01_low:.1f}",
+                                  _fmt_delta(a.fps_01_low - b.fps_01_low, True))
+                    table.add_row("Avg Frame Time", f"{b.avg_frametime_ms:.2f}ms", f"{a.avg_frametime_ms:.2f}ms",
+                                  _fmt_delta(a.avg_frametime_ms - b.avg_frametime_ms, False))
+                    table.add_row("P99 Frame Time", f"{b.p99_frametime_ms:.2f}ms", f"{a.p99_frametime_ms:.2f}ms",
+                                  _fmt_delta(a.p99_frametime_ms - b.p99_frametime_ms, False))
+                    table.add_row("Stdev", f"{b.stdev_frametime_ms:.2f}ms", f"{a.stdev_frametime_ms:.2f}ms",
+                                  _fmt_delta(a.stdev_frametime_ms - b.stdev_frametime_ms, False))
+
+                    console.print(table)
+                except Exception as e:
+                    console.print(f"[dim]Post-apply benchmark failed: {e}[/dim]")
         else:
             err = tx.error or (result.error if result else "Unknown transaction error")
             console.print(f"\n[red]Failed to apply profile: {err}[/red]")
@@ -1628,6 +1708,151 @@ def _base_to_preset(base: str) -> str:
         "browser": "vrr_optimal",
         "balanced": "vrr_optimal",
     }.get(base, "vrr_optimal")
+
+
+@cli.command("memory-clear")
+@click.option("--json", "json_output", is_flag=True, help="Output as JSON")
+def memory_clear(json_output: bool) -> None:
+    """Purge the Windows standby list (ISLC equivalent).
+
+    Clears cached memory pages that can cause stutters during long gaming sessions.
+    Requires admin elevation.
+    """
+    if not is_admin():
+        if json_output:
+            json_error("Admin privileges required")
+        console.print("[red]Error: Admin privileges required.[/red]")
+        sys.exit(1)
+
+    try:
+        from abso.settings.standby_list import StandbyListHandler
+
+        handler = StandbyListHandler()
+        before = handler.detect()
+
+        if not json_output:
+            console.print(
+                f"[dim]Memory before: {before['available_mb']}MB available "
+                f"({before['memory_load_percent']}% load)[/dim]"
+            )
+            console.print("[cyan]Purging standby list...[/cyan]")
+
+        success = handler.clear_standby_list()
+        after = handler.detect()
+
+        if json_output:
+            output_json({
+                "success": success,
+                "before_available_mb": before["available_mb"],
+                "after_available_mb": after["available_mb"],
+                "freed_mb": after["available_mb"] - before["available_mb"],
+            })
+        elif success:
+            freed = after["available_mb"] - before["available_mb"]
+            console.print(
+                f"[green]Standby list purged. Freed ~{freed}MB "
+                f"({after['available_mb']}MB now available)[/green]"
+            )
+        else:
+            console.print("[red]Failed to purge standby list (privilege escalation may have failed)[/red]")
+    except Exception as e:
+        if json_output:
+            json_error(str(e))
+        console.print(f"[red]Error: {e}[/red]")
+        sys.exit(1)
+
+
+@cli.command()
+@click.option("--tier", type=click.IntRange(1, 3), required=True, help="Debloat tier (1=safe, 2=moderate, 3=aggressive)")
+@click.option("--dry-run", is_flag=True, help="Show what would be changed without applying")
+@click.option("--json", "json_output", is_flag=True, help="Output as JSON")
+def debloat(tier: int, dry_run: bool, json_output: bool) -> None:
+    """Apply Windows debloat and privacy tweaks.
+
+    Tier 1: Safe telemetry/privacy tweaks (always reversible).
+    Tier 2: Moderate tweaks including background app control.
+    Tier 3: Aggressive — removes bloatware appx packages (partially irreversible).
+    """
+    if not is_admin():
+        if json_output:
+            json_error("Admin privileges required")
+        console.print("[red]Error: Admin privileges required.[/red]")
+        sys.exit(1)
+
+    try:
+        from abso.settings.debloat import DebloatHandler
+
+        handler = DebloatHandler(tier=tier)
+
+        if dry_run:
+            issues = handler.audit()
+            if json_output:
+                output_json({"tier": tier, "issues": [
+                    {"title": i.title, "severity": i.severity, "current": i.current_value,
+                     "optimal": i.optimal_value} for i in issues
+                ]})
+            else:
+                console.print(Panel(f"Debloat Tier {tier} — Dry Run ({len(issues)} items)", style="bold yellow"))
+                for issue in issues:
+                    console.print(f"  [yellow]{issue.title}[/yellow]: {issue.current_value} → {issue.optimal_value}")
+            return
+
+        if not json_output:
+            console.print(Panel(f"Applying Debloat Tier {tier}", style="bold blue"))
+            if tier == 3:
+                console.print("[red]WARNING: Tier 3 removes appx packages. This is partially irreversible.[/red]")
+
+        result = handler.apply({"debloat_tier": tier})
+
+        if json_output:
+            output_json(result)
+        elif result.get("success"):
+            console.print(f"[green]Debloat tier {tier} applied successfully.[/green]")
+            if result.get("applied"):
+                for item in result["applied"]:
+                    console.print(f"  [green]✓[/green] {item}")
+        else:
+            console.print(f"[red]Debloat failed: {result.get('error')}[/red]")
+            sys.exit(1)
+
+    except Exception as e:
+        if json_output:
+            json_error(str(e))
+        console.print(f"[red]Error: {e}[/red]")
+        sys.exit(1)
+
+
+@cli.command("cpu-balance")
+@click.option("--pid", type=int, required=True, help="Game process ID to protect")
+@click.option("--system-threshold", type=int, default=85, help="System CPU % to trigger intervention")
+@click.option("--process-threshold", type=int, default=20, help="Per-process CPU % threshold")
+@click.option("--poll-interval", type=int, default=1000, help="Poll interval in ms")
+def cpu_balance(pid: int, system_threshold: int, process_threshold: int, poll_interval: int) -> None:
+    """Run real-time CPU priority balancer for a game session.
+
+    Monitors CPU usage and temporarily lowers background process priority
+    when the game is being starved. Exits when the game process exits.
+
+    Typically launched by the tray app, not run manually.
+    """
+    from abso.core.cpu_balancer import CpuBalancer, CpuBalancerConfig
+
+    config = CpuBalancerConfig(
+        system_cpu_threshold=system_threshold,
+        process_cpu_threshold=process_threshold,
+        poll_interval_ms=poll_interval,
+    )
+    balancer = CpuBalancer(pid, config)
+
+    import signal
+
+    def _shutdown(signum, frame):
+        balancer.stop()
+
+    signal.signal(signal.SIGTERM, _shutdown)
+    signal.signal(signal.SIGINT, _shutdown)
+
+    balancer.run()
 
 
 def main() -> None:

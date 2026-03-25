@@ -1,0 +1,388 @@
+# Windows Debloat & Privacy Tweaks Database
+# Community contributions welcome!
+# Tiers: 1=safe, 2=moderate, 3=aggressive (partially irreversible)
+#
+# Registry types: DWORD, SZ, EXPAND_SZ, QWORD
+# Service start types: 2=Automatic, 3=Manual, 4=Disabled
+# Appx packages: removed via PowerShell (tier 3 only, not easily reversible)
+
+registry_tweaks:
+  # ---------------------------------------------------------------------------
+  # TIER 1: Always Safe — privacy/telemetry settings with no functionality loss
+  # ---------------------------------------------------------------------------
+
+  - name: "Disable Advertising ID"
+    tier: 1
+    description: "Prevents Windows from using your advertising ID for personalization across apps"
+    hive: HKCU
+    key: "Software\\Microsoft\\Windows\\CurrentVersion\\AdvertisingInfo"
+    value: "Enabled"
+    type: DWORD
+    desired: 0
+    default: 1
+
+  - name: "Disable Activity History"
+    tier: 1
+    description: "Prevents Windows from collecting activity history (Timeline)"
+    hive: HKLM
+    key: "SOFTWARE\\Policies\\Microsoft\\Windows\\System"
+    value: "EnableActivityFeed"
+    type: DWORD
+    desired: 0
+    default: 1
+
+  - name: "Disable Activity History Upload"
+    tier: 1
+    description: "Prevents uploading activity history to Microsoft servers"
+    hive: HKLM
+    key: "SOFTWARE\\Policies\\Microsoft\\Windows\\System"
+    value: "UploadUserActivities"
+    type: DWORD
+    desired: 0
+    default: 1
+
+  - name: "Disable Consumer Features"
+    tier: 1
+    description: "Stops auto-installation of suggested third-party apps (Candy Crush, etc.)"
+    hive: HKLM
+    key: "SOFTWARE\\Policies\\Microsoft\\Windows\\CloudContent"
+    value: "DisableWindowsConsumerFeatures"
+    type: DWORD
+    desired: 1
+    default: 0
+
+  - name: "Disable Bing Search in Start Menu"
+    tier: 1
+    description: "Prevents Start Menu searches from querying Bing web results"
+    hive: HKCU
+    key: "Software\\Policies\\Microsoft\\Windows\\Explorer"
+    value: "DisableSearchBoxSuggestions"
+    type: DWORD
+    desired: 1
+    default: 0
+
+  - name: "Disable Feedback Frequency"
+    tier: 1
+    description: "Sets Windows feedback prompts to never (0)"
+    hive: HKCU
+    key: "Software\\Microsoft\\Siuf\\Rules"
+    value: "NumberOfSIUFInPeriod"
+    type: DWORD
+    desired: 0
+    default: 1
+
+  - name: "Disable Tailored Experiences"
+    tier: 1
+    description: "Prevents Microsoft from using diagnostic data for personalized tips and ads"
+    hive: HKCU
+    key: "Software\\Microsoft\\Windows\\CurrentVersion\\Privacy"
+    value: "TailoredExperiencesWithDiagnosticDataEnabled"
+    type: DWORD
+    desired: 0
+    default: 1
+
+  - name: "Disable Content Delivery Manager Subscribed Content"
+    tier: 1
+    description: "Disables suggested apps in Settings and Start Menu"
+    hive: HKCU
+    key: "Software\\Microsoft\\Windows\\CurrentVersion\\ContentDeliveryManager"
+    value: "SubscribedContent-338388Enabled"
+    type: DWORD
+    desired: 0
+    default: 1
+
+  - name: "Disable Content Delivery Manager Suggestions"
+    tier: 1
+    description: "Disables app suggestions in Start Menu and Settings"
+    hive: HKCU
+    key: "Software\\Microsoft\\Windows\\CurrentVersion\\ContentDeliveryManager"
+    value: "SubscribedContent-338389Enabled"
+    type: DWORD
+    desired: 0
+    default: 1
+
+  - name: "Disable Content Delivery Manager Spotlight Suggestions"
+    tier: 1
+    description: "Disables suggested content on lock screen and other surfaces"
+    hive: HKCU
+    key: "Software\\Microsoft\\Windows\\CurrentVersion\\ContentDeliveryManager"
+    value: "SubscribedContent-353698Enabled"
+    type: DWORD
+    desired: 0
+    default: 1
+
+  - name: "Disable Windows Tips and Suggestions"
+    tier: 1
+    description: "Disables Windows tip notifications and suggestion popups"
+    hive: HKCU
+    key: "Software\\Microsoft\\Windows\\CurrentVersion\\ContentDeliveryManager"
+    value: "SoftLandingEnabled"
+    type: DWORD
+    desired: 0
+    default: 1
+
+  - name: "Disable App Launch Tracking"
+    tier: 1
+    description: "Prevents Windows from tracking which apps you launch for personalization"
+    hive: HKCU
+    key: "Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Advanced"
+    value: "Start_TrackProgs"
+    type: DWORD
+    desired: 0
+    default: 1
+
+  - name: "Disable Diagnostic Data (Required Only)"
+    tier: 1
+    description: "Sets telemetry to Required/Basic level (minimum allowed, cannot fully disable)"
+    hive: HKLM
+    key: "SOFTWARE\\Policies\\Microsoft\\Windows\\DataCollection"
+    value: "AllowTelemetry"
+    type: DWORD
+    desired: 1
+    default: 3
+
+  - name: "Disable Typing Insights"
+    tier: 1
+    description: "Prevents Windows from collecting typing data for suggestions"
+    hive: HKCU
+    key: "Software\\Microsoft\\Input\\Settings"
+    value: "InsightsEnabled"
+    type: DWORD
+    desired: 0
+    default: 1
+
+  - name: "Disable Handwriting Data Sharing"
+    tier: 1
+    description: "Prevents sharing handwriting recognition data with Microsoft"
+    hive: HKCU
+    key: "Software\\Microsoft\\Input\\TIPC"
+    value: "Enabled"
+    type: DWORD
+    desired: 0
+    default: 1
+
+  - name: "Disable Improve Inking and Typing"
+    tier: 1
+    description: "Stops sending inking and typing data to Microsoft for improvement"
+    hive: HKLM
+    key: "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Policies\\TextInput"
+    value: "AllowLinguisticDataCollection"
+    type: DWORD
+    desired: 0
+    default: 1
+
+  # ---------------------------------------------------------------------------
+  # TIER 2: Moderate — disables features some users may rely on
+  # ---------------------------------------------------------------------------
+
+  - name: "Disable Background Apps (Global)"
+    tier: 2
+    description: "Prevents UWP/Store apps from running in background. Saves CPU/RAM."
+    hive: HKCU
+    key: "Software\\Microsoft\\Windows\\CurrentVersion\\BackgroundAccessApplications"
+    value: "GlobalUserDisabled"
+    type: DWORD
+    desired: 1
+    default: 0
+
+  - name: "Disable Location Tracking"
+    tier: 2
+    description: "Disables Windows location services system-wide"
+    hive: HKLM
+    key: "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\CapabilityAccessManager\\ConsentStore\\location"
+    value: "Value"
+    type: SZ
+    desired: "Deny"
+    default: "Allow"
+
+  - name: "Disable Find My Device"
+    tier: 2
+    description: "Disables the Find My Device remote tracking feature"
+    hive: HKLM
+    key: "SOFTWARE\\Microsoft\\MdmCommon\\SettingValues"
+    value: "LocationSyncEnabled"
+    type: DWORD
+    desired: 0
+    default: 1
+
+  - name: "Disable Clipboard History Cloud Sync"
+    tier: 2
+    description: "Disables syncing clipboard history across devices via the cloud"
+    hive: HKLM
+    key: "SOFTWARE\\Policies\\Microsoft\\Windows\\System"
+    value: "AllowCrossDeviceClipboard"
+    type: DWORD
+    desired: 0
+    default: 1
+
+  - name: "Disable Online Speech Recognition"
+    tier: 2
+    description: "Prevents sending voice data to Microsoft for cloud speech recognition"
+    hive: HKCU
+    key: "Software\\Microsoft\\Speech_OneCore\\Settings\\OnlineSpeechPrivacy"
+    value: "HasAccepted"
+    type: DWORD
+    desired: 0
+    default: 1
+
+  - name: "Disable Camera on Lock Screen"
+    tier: 2
+    description: "Prevents apps from using the camera when the device is locked"
+    hive: HKLM
+    key: "SOFTWARE\\Policies\\Microsoft\\Windows\\Personalization"
+    value: "NoLockScreenCamera"
+    type: DWORD
+    desired: 1
+    default: 0
+
+  - name: "Disable Notification Network Usage"
+    tier: 2
+    description: "Prevents Windows from using network for notification delivery optimization"
+    hive: HKLM
+    key: "SOFTWARE\\Policies\\Microsoft\\Windows\\CurrentVersion\\PushNotifications"
+    value: "NoCloudApplicationNotification"
+    type: DWORD
+    desired: 1
+    default: 0
+
+  - name: "Disable WiFi Sense"
+    tier: 2
+    description: "Disables automatic connection to suggested open hotspots and shared networks"
+    hive: HKLM
+    key: "SOFTWARE\\Microsoft\\WcmSvc\\wifinetworkmanager\\config"
+    value: "AutoConnectAllowedOEM"
+    type: DWORD
+    desired: 0
+    default: 1
+
+  - name: "Disable Connected User Experiences (Registry)"
+    tier: 2
+    description: "Disables the Connected User Experiences and Telemetry policy"
+    hive: HKLM
+    key: "SOFTWARE\\Policies\\Microsoft\\Windows\\DataCollection"
+    value: "DisableEnterpriseAuthProxy"
+    type: DWORD
+    desired: 1
+    default: 0
+
+service_tweaks:
+  # ---------------------------------------------------------------------------
+  # TIER 1: Safe — telemetry services that provide no user-facing functionality
+  # ---------------------------------------------------------------------------
+
+  - name: "Disable DiagTrack"
+    tier: 1
+    description: "Connected User Experiences and Telemetry — sends diagnostic data to Microsoft"
+    service: "DiagTrack"
+    desired_start: 4  # Disabled
+    default_start: 2  # Automatic
+
+  - name: "Disable dmwappushservice"
+    tier: 1
+    description: "WAP Push Message Routing — routes telemetry push messages"
+    service: "dmwappushservice"
+    desired_start: 4  # Disabled
+    default_start: 3  # Manual
+
+  # ---------------------------------------------------------------------------
+  # TIER 2: Moderate — services some features depend on
+  # ---------------------------------------------------------------------------
+
+  - name: "SysMain to Manual"
+    tier: 2
+    description: "Superfetch/SysMain — prefetches apps into RAM, can cause I/O spikes during gaming"
+    service: "SysMain"
+    desired_start: 3  # Manual
+    default_start: 2  # Automatic
+
+  - name: "Disable Connected User Experiences Service"
+    tier: 2
+    description: "CDPUserSvc — Connected Devices Platform, enables cross-device features"
+    service: "CDPUserSvc"
+    desired_start: 4  # Disabled
+    default_start: 2  # Automatic
+
+appx_packages:
+  # ---------------------------------------------------------------------------
+  # TIER 3: Aggressive — removed via PowerShell, reinstall requires Store/DISM
+  # ---------------------------------------------------------------------------
+
+  - name: "Microsoft.BingNews"
+    display_name: "Microsoft News"
+    tier: 3
+
+  - name: "Microsoft.BingWeather"
+    display_name: "MSN Weather"
+    tier: 3
+
+  - name: "Microsoft.GetHelp"
+    display_name: "Get Help"
+    tier: 3
+
+  - name: "Microsoft.Getstarted"
+    display_name: "Tips"
+    tier: 3
+
+  - name: "Microsoft.MicrosoftSolitaireCollection"
+    display_name: "Solitaire"
+    tier: 3
+
+  - name: "Microsoft.WindowsMaps"
+    display_name: "Windows Maps"
+    tier: 3
+
+  - name: "Microsoft.ZuneMusic"
+    display_name: "Groove Music"
+    tier: 3
+
+  - name: "Microsoft.ZuneVideo"
+    display_name: "Movies & TV"
+    tier: 3
+
+  - name: "Microsoft.549981C3F5F10"
+    display_name: "Cortana"
+    tier: 3
+
+  - name: "MicrosoftWindows.Client.WebExperience"
+    display_name: "Widgets"
+    tier: 3
+
+  - name: "Microsoft.Copilot"
+    display_name: "Copilot"
+    tier: 3
+
+  - name: "Clipchamp.Clipchamp"
+    display_name: "Clipchamp"
+    tier: 3
+
+  - name: "Microsoft.WindowsFeedbackHub"
+    display_name: "Feedback Hub"
+    tier: 3
+
+  - name: "Microsoft.PowerAutomateDesktop"
+    display_name: "Power Automate"
+    tier: 3
+
+  - name: "Microsoft.MicrosoftOfficeHub"
+    display_name: "Office Hub"
+    tier: 3
+
+  - name: "Microsoft.People"
+    display_name: "People"
+    tier: 3
+
+  - name: "Microsoft.WindowsAlarms"
+    display_name: "Alarms & Clock"
+    tier: 3
+
+  - name: "Microsoft.WindowsSoundRecorder"
+    display_name: "Sound Recorder"
+    tier: 3
+
+  - name: "microsoft.windowscommunicationsapps"
+    display_name: "Mail & Calendar"
+    tier: 3
+
+  - name: "Microsoft.Todos"
+    display_name: "Microsoft To Do"
+    tier: 3

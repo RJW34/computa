@@ -26,6 +26,33 @@ DEFAULT_CONFIG_NAME = "abso.yaml"
 
 
 @dataclass
+class StandbyListConfig:
+    """Standby list clearing configuration (ISLC equivalent)."""
+
+    enabled: bool = False
+    threshold_mb: int = 1024  # Purge when standby >= this
+    free_threshold_mb: int = 1024  # AND free RAM < this
+    poll_interval_ms: int = 1000
+
+
+@dataclass
+class CpuBalancerConfig:
+    """ProBalance-style CPU priority intervention configuration."""
+
+    enabled: bool = False
+    system_cpu_threshold: int = 85
+    process_cpu_threshold: int = 20
+    trigger_delay_ms: int = 2800
+    restraint_duration_ms: int = 6000
+    poll_interval_ms: int = 1000
+    excluded_processes: list[str] = field(default_factory=lambda: [
+        "csrss.exe", "dwm.exe", "audiodg.exe", "System",
+        "svchost.exe", "wininit.exe", "services.exe",
+        "smss.exe", "lsass.exe", "winlogon.exe",
+    ])
+
+
+@dataclass
 class DDCIConfig:
     """DDC/CI monitor control configuration.
 
@@ -94,6 +121,8 @@ class ABSOConfig:
     confirm_destructive: bool = True
     ddci: DDCIConfig = field(default_factory=DDCIConfig)
     color: ColorConfig = field(default_factory=ColorConfig)
+    standby_list: StandbyListConfig = field(default_factory=StandbyListConfig)
+    cpu_balancer: CpuBalancerConfig = field(default_factory=CpuBalancerConfig)
 
     def __post_init__(self) -> None:
         """Convert nested dicts to typed config objects."""
@@ -109,6 +138,10 @@ class ABSOConfig:
             self.ddci = DDCIConfig(**self.ddci)
         if isinstance(self.color, dict):
             self.color = ColorConfig(**self.color)
+        if isinstance(self.standby_list, dict):
+            self.standby_list = StandbyListConfig(**self.standby_list)
+        if isinstance(self.cpu_balancer, dict):
+            self.cpu_balancer = CpuBalancerConfig(**self.cpu_balancer)
 
 
 class ConfigManager:
@@ -142,6 +175,9 @@ class ConfigManager:
         "ProcessPriorityHandler",
         "CNMSettingsHandler",
         "ColorProfileSettingsHandler",
+        "CpuAffinityHandler",
+        "StandbyListHandler",
+        "DebloatHandler",
     }
 
     def __init__(self, config_path: Path | None = None) -> None:
@@ -204,6 +240,8 @@ class ConfigManager:
                 "confirm_destructive",
                 "ddci",
                 "color",
+                "standby_list",
+                "cpu_balancer",
             }
             filtered_data = {k: v for k, v in data.items() if k in known_keys}
 
