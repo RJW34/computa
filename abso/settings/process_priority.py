@@ -395,8 +395,11 @@ class ProcessPriorityHandler(SettingsHandler):
                     perf_key = winreg.CreateKey(exe_key, "PerfOptions")
 
                 try:
-                    if "gpu_priority" in settings and settings["gpu_priority"] is not None:
-                        winreg.SetValueEx(perf_key, "GpuPriority", 0, winreg.REG_DWORD, settings["gpu_priority"])
+                    # NOTE: GpuPriority is NOT a documented IFEO PerfOptions value.
+                    # Microsoft only documents: CpuPriorityClass, IoPriority,
+                    # PagePriority, WorkingSetLimitInKB. GPU priority for games
+                    # is set via MMCSS Tasks\Games (RegistrySettingsHandler), not IFEO.
+                    # We skip GpuPriority here to avoid writing undocumented values.
 
                     if "cpu_priority" in settings and settings["cpu_priority"] is not None:
                         winreg.SetValueEx(perf_key, "CpuPriorityClass", 0, winreg.REG_DWORD, settings["cpu_priority"])

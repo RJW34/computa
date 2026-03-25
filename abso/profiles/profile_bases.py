@@ -230,7 +230,7 @@ class Rivals2BaseProfile(BaseProfile):
                     "gpu_priority": 8,
                     "priority": 6,
                     "scheduling_category": "High",
-                    "sfio_priority": "High",
+                    # sfio_priority omitted — has no effect per Microsoft docs
                 },
             },
             "NetworkSettingsHandler": {
@@ -372,7 +372,7 @@ class EmulatorLatencyBaseProfile(BaseProfile):
                     "gpu_priority": 8,
                     "priority": 6,
                     "scheduling_category": "High",
-                    "sfio_priority": "High",
+                    # sfio_priority omitted — has no effect per Microsoft docs
                 },
             },
             "NetworkSettingsHandler": {
@@ -491,7 +491,7 @@ class WebGLBaseProfile(BaseProfile):
                     "gpu_priority": 8,
                     "priority": 4,
                     "scheduling_category": "Medium",
-                    "sfio_priority": "Normal",
+                    # sfio_priority omitted — has no effect per Microsoft docs
                 },
             },
             "NetworkSettingsHandler": {
@@ -618,7 +618,7 @@ class ReflexShooterBaseProfile(BaseProfile):
                     "gpu_priority": 8,
                     "priority": 6,
                     "scheduling_category": "High",
-                    "sfio_priority": "High",
+                    # sfio_priority omitted — has no effect per Microsoft docs
                 },
             },
             "NvidiaSettingsHandler": {

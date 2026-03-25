@@ -229,8 +229,10 @@ class WindowsSettingsHandler(SettingsHandler):
                 current_value="Enabled",
                 optimal_value="Disabled (for max performance)",
                 explanation=(
-                    "VBS provides security but may reduce performance 0-5% depending on workload. "
-                    "Impact is often overstated. Test before disabling - security tradeoff may not be worth it."
+                    "VBS/Memory Integrity adds a virtualization layer that increases CPU instruction "
+                    "latency. Independent testing (Tom's Hardware, Neowin) shows 5-15% FPS impact in "
+                    "games, with ~8% typical. Requires reboot. Security tradeoff — disable only on "
+                    "dedicated gaming machines."
                 ),
                 category="windows",
             ))

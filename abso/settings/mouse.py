@@ -316,11 +316,40 @@ class MouseSettingsHandler(SettingsHandler):
         self._notify_settings_change()
 
     def _notify_settings_change(self) -> None:
-        """Notify Windows that mouse settings have changed."""
+        """Notify Windows that mouse settings have changed.
+
+        SPI_SETMOUSE requires pvParam to point to a 3-int array
+        (MouseSpeed, MouseThreshold1, MouseThreshold2). We read the
+        current registry values and pass them so the call is valid
+        per the Win32 contract.
+        """
         try:
             import ctypes
-            # SPI_SETMOUSE = 0x0004
-            # SPIF_UPDATEINIFILE | SPIF_SENDCHANGE = 0x03
-            ctypes.windll.user32.SystemParametersInfoW(0x0004, 0, None, 0x03)
+            from ctypes import wintypes
+
+            # Read current values to pass to SPI_SETMOUSE
+            mouse_params = (ctypes.c_int * 3)(0, 0, 0)
+            try:
+                key = winreg.OpenKey(
+                    winreg.HKEY_CURRENT_USER,
+                    self.MOUSE_KEY,
+                    0,
+                    winreg.KEY_READ,
+                )
+                try:
+                    mouse_params[0] = int(winreg.QueryValueEx(key, "MouseThreshold1")[0])
+                    mouse_params[1] = int(winreg.QueryValueEx(key, "MouseThreshold2")[0])
+                    mouse_params[2] = int(winreg.QueryValueEx(key, "MouseSpeed")[0])
+                except (FileNotFoundError, ValueError):
+                    pass
+                finally:
+                    winreg.CloseKey(key)
+            except Exception:
+                pass
+
+            # SPI_SETMOUSE = 0x0004, SPIF_UPDATEINIFILE | SPIF_SENDCHANGE = 0x03
+            ctypes.windll.user32.SystemParametersInfoW(
+                0x0004, 0, ctypes.byref(mouse_params), 0x03,
+            )
         except Exception as e:
             logger.debug(f"Failed to notify settings change: {e}")

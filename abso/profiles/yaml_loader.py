@@ -122,7 +122,7 @@ class BalancedBaseProfile(BaseProfile):
                     "gpu_priority": 8,
                     "priority": 6,
                     "scheduling_category": "High",
-                    "sfio_priority": "High",
+                    # sfio_priority omitted — has no effect per Microsoft docs
                 },
             },
             "NetworkSettingsHandler": {

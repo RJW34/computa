@@ -400,8 +400,10 @@ class RegistrySettingsHandler(SettingsHandler):
                     winreg.SetValueEx(key, "Priority", 0, winreg.REG_DWORD, settings["priority"])
                 if "scheduling_category" in settings:
                     winreg.SetValueEx(key, "Scheduling Category", 0, winreg.REG_SZ, settings["scheduling_category"])
-                if "sfio_priority" in settings:
-                    winreg.SetValueEx(key, "SFIO Priority", 0, winreg.REG_SZ, settings["sfio_priority"])
+                # NOTE: SFIO Priority is intentionally NOT written.
+                # Microsoft documentation confirms it has no effect — the IO
+                # priority of MMCSS-registered threads is not influenced by this
+                # value. We still read it in detect()/backup() for completeness.
             finally:
                 winreg.CloseKey(key)
         except PermissionError as e:
