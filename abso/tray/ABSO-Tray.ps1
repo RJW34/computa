@@ -1001,7 +1001,9 @@ function Write-ProfileCatalogCache {
         if ($dir -and -not (Test-Path $dir)) {
             New-Item -Path $dir -ItemType Directory -Force | Out-Null
         }
-        $payload | ConvertTo-Json -Depth 8 | Set-Content -Path $script:ProfileCatalogCacheFile -Encoding UTF8
+        # Use .NET WriteAllText to avoid UTF-8 BOM (PowerShell 5.1 Set-Content adds BOM)
+        $jsonText = $payload | ConvertTo-Json -Depth 8
+        [System.IO.File]::WriteAllText($script:ProfileCatalogCacheFile, $jsonText, [System.Text.UTF8Encoding]::new($false))
     }
     catch {
         Write-TrayLog "Profile catalog cache write failed: $($_.Exception.Message)" -Level "WARN"
@@ -1846,8 +1848,8 @@ function Apply-Profile {
                     $currentPlan = (powercfg /getactivescheme 2>$null) -replace '.*GUID:\s*(\S+).*','$1'
                     if ($currentPlan -and $currentPlan -match '^[0-9a-f\-]+$') {
                         $stateFile = Join-Path $script:ProjectRoot ".power_switcher_state.json"
-                        @{ pre_game_plan_guid = $currentPlan; game_plan_name = $powerPlan; game_exe = $ProfileId } |
-                            ConvertTo-Json | Set-Content $stateFile -Encoding UTF8
+                        $stateJson = @{ pre_game_plan_guid = $currentPlan; game_plan_name = $powerPlan; game_exe = $ProfileId } | ConvertTo-Json
+                        [System.IO.File]::WriteAllText($stateFile, $stateJson, [System.Text.UTF8Encoding]::new($false))
                         Write-TrayLog "Saved pre-game power plan: $currentPlan"
                     }
                     # Find and activate the gaming plan
