@@ -942,13 +942,22 @@ function Convert-CatalogEntriesToProfileMap {
             "agnostic"
         }
 
+        $optTarget = if ($entry.optimization_target) {
+            "$($entry.optimization_target)"
+        } elseif ($fallback -and $fallback.OptTarget) {
+            "$($fallback.OptTarget)"
+        } else {
+            ""
+        }
+
         $profiles[$id] = @{
-            Name     = $name
-            Sub      = $sub
-            Cat      = $cat
-            Desc     = $desc
-            Exes     = $exeHints
-            SyncMode = $syncMode
+            Name      = $name
+            Sub       = $sub
+            Cat       = $cat
+            Desc      = $desc
+            Exes      = $exeHints
+            SyncMode  = $syncMode
+            OptTarget = $optTarget
         }
     }
 
@@ -1821,6 +1830,44 @@ function Apply-Profile {
             $script:LastAction = "Applied: $($profile.Name)"
             $script:LastActionTime = Get-Date -Format "HH:mm"
 
+            # Power plan switching: save current plan and switch to gaming plan
+            # if this profile has a power_plan_on_launch metadata field.
+            try {
+                $powerPlan = $profile.power_plan_on_launch
+                if (-not $powerPlan) {
+                    # Default: competitive profiles use Ultimate Performance
+                    $opt = $profile.OptTarget
+                    if ($opt -and ($opt -match "latency|fps|tournament")) {
+                        $powerPlan = "ultimate_performance"
+                    }
+                }
+                if ($powerPlan) {
+                    # Save current plan for restoration
+                    $currentPlan = (powercfg /getactivescheme 2>$null) -replace '.*GUID:\s*(\S+).*','$1'
+                    if ($currentPlan -and $currentPlan -match '^[0-9a-f\-]+$') {
+                        $stateFile = Join-Path $script:ProjectRoot ".power_switcher_state.json"
+                        @{ pre_game_plan_guid = $currentPlan; game_plan_name = $powerPlan; game_exe = $ProfileId } |
+                            ConvertTo-Json | Set-Content $stateFile -Encoding UTF8
+                        Write-TrayLog "Saved pre-game power plan: $currentPlan"
+                    }
+                    # Find and activate the gaming plan
+                    $plans = powercfg /list 2>$null
+                    $targetGuid = $null
+                    foreach ($line in $plans) {
+                        if ($line -match "ultimate" -and $line -match '(\{?[0-9a-f\-]+\}?)') {
+                            $targetGuid = $Matches[1] -replace '[{}]',''
+                            break
+                        }
+                    }
+                    if ($targetGuid) {
+                        powercfg /setactive $targetGuid 2>$null
+                        Write-TrayLog "Switched to power plan: $powerPlan ($targetGuid)"
+                    }
+                }
+            } catch {
+                Write-TrayLog "Power plan switch failed: $($_.Exception.Message)" -Level "WARN"
+            }
+
             # Record in history and persist the last known active state for startup arbitration.
             $script:TrayConfig = Add-ProfileHistory -ProfileId $ProfileId -ProfileName $profile.Name -Config $script:TrayConfig
 
@@ -2429,6 +2476,22 @@ function Start-TrayApp {
         Write-TrayLog "No previously active profile restored at startup"
     }
     $script:profileMenuItems = @()
+
+    # Power plan crash recovery: if a gaming power plan was active when
+    # the tray or system crashed, restore the pre-game plan.
+    try {
+        $powerStateFile = Join-Path $script:ProjectRoot ".power_switcher_state.json"
+        if (Test-Path $powerStateFile) {
+            $powerState = Get-Content $powerStateFile -Raw | ConvertFrom-Json
+            if ($powerState.pre_game_plan_guid) {
+                powercfg /setactive $powerState.pre_game_plan_guid 2>$null
+                Write-TrayLog "Power plan crash recovery: restored $($powerState.pre_game_plan_guid)"
+                Remove-Item $powerStateFile -Force -ErrorAction SilentlyContinue
+            }
+        }
+    } catch {
+        Write-TrayLog "Power plan crash recovery failed: $($_.Exception.Message)" -Level "WARN"
+    }
 
     # ═══════════════════════════════════════════════════════════════════════
     # HIDDEN FORM FOR HOTKEYS (WM_HOTKEY receiver)
@@ -3104,6 +3167,45 @@ public class HotkeyMessageWindow : NativeWindow {
     $openProfilesItem.ToolTipText = "Open user profiles folder in Explorer"
     $openProfilesItem.Add_Click({ Open-ProfilesFolder })
     $actionsMenu.DropDownItems.Add($openProfilesItem) | Out-Null
+
+    $actionsMenu.DropDownItems.Add((New-Object System.Windows.Forms.ToolStripSeparator)) | Out-Null
+
+    # Clear Standby List (ISLC equivalent)
+    $clearMemoryItem = New-Object System.Windows.Forms.ToolStripMenuItem
+    $clearMemoryItem.Text = "Clear Standby List"
+    $clearMemoryItem.BackColor = $script:Colors.Background
+    $clearMemoryItem.ForeColor = $script:Colors.AccentBlue
+    $clearMemoryItem.Font = New-Object System.Drawing.Font("Segoe UI", 9)
+    $clearMemoryItem.ToolTipText = "Purge cached memory pages (ISLC equivalent)"
+    $clearMemoryItem.Add_Click({
+        try {
+            Write-TrayLog "Clearing standby list..."
+            $tempFile = [System.IO.Path]::GetTempFileName()
+            $proc = Start-Process -FilePath $script:PythonExe `
+                -ArgumentList "-m", "abso", "memory-clear", "--json" `
+                -NoNewWindow -PassThru -WorkingDirectory $script:ProjectRoot `
+                -RedirectStandardOutput $tempFile
+            $proc.WaitForExit(15000)
+            if (-not $proc.HasExited) { $proc.Kill() }
+            $proc.Dispose()
+            $raw = Get-Content $tempFile -Raw -ErrorAction SilentlyContinue
+            Remove-Item $tempFile -Force -ErrorAction SilentlyContinue
+            if ($raw) {
+                $json = $raw | ConvertFrom-Json
+                if ($json.success -and $json.data) {
+                    $freed = $json.data.freed_mb
+                    Show-Notification -Title "A.B.S.O." -Message "Standby list cleared. Freed ~${freed}MB" -Type "Success"
+                    Write-TrayLog "Standby list cleared: freed ${freed}MB"
+                } else {
+                    Show-Notification -Title "A.B.S.O." -Message "Standby clear failed" -Type "Error"
+                }
+            }
+        } catch {
+            Write-TrayLog "Clear standby failed: $($_.Exception.Message)" -Level "ERROR"
+            Show-Notification -Title "A.B.S.O." -Message "Standby clear failed: $($_.Exception.Message)" -Type "Error"
+        }
+    })
+    $actionsMenu.DropDownItems.Add($clearMemoryItem) | Out-Null
 
     $menu.Items.Add($actionsMenu) | Out-Null
 
