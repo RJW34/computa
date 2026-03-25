@@ -88,6 +88,7 @@ class ProductivityOLEDProfile(BaseProfile):
                 # HDR enabled for OLED
                 "hdr": True,
                 "auto_hdr": False,  # Not gaming, no need for Auto HDR
+                "windowed_optimizations": True,  # Beneficial for desktop apps
                 # VRR ON - smooth scrolling benefit
                 "vrr_optimize": True,
             },

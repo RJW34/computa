@@ -79,6 +79,7 @@ class Diablo4Profile(BaseProfile):
                 "hags": True,
                 "hdr": True,  # Diablo 4 has native HDR support
                 "auto_hdr": False,  # Native HDR, no Auto HDR needed
+                "windowed_optimizations": False,  # Causes stutter on 24H2
                 "max_refresh_rate": True,
             },
             "PowerSettingsHandler": {

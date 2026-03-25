@@ -173,6 +173,7 @@ class WindowsSettingsHandler(SettingsHandler):
             "vbs": self._get_vbs(),
             "hdr": self._get_hdr(),
             "auto_hdr": self._get_auto_hdr(),
+            "windowed_optimizations": self._get_windowed_optimizations(),
             "vrr_optimize": self._get_vrr_optimize(),
             "refresh_rate": refresh_info.get("current"),
             "max_refresh_rate": refresh_info.get("max"),
@@ -328,6 +329,14 @@ class WindowsSettingsHandler(SettingsHandler):
                 applied.append(f"Auto HDR: {'enabled' if settings['auto_hdr'] else 'disabled'}")
             else:
                 errors.append(f"Auto HDR: {auto_hdr_result.get('error', 'Unknown error')}")
+
+        if "windowed_optimizations" in settings:
+            wo_result = self._set_windowed_optimizations(settings["windowed_optimizations"])
+            if wo_result["success"]:
+                state = "enabled" if settings["windowed_optimizations"] else "disabled"
+                applied.append(f"Windowed Optimizations: {state}")
+            else:
+                errors.append(f"Windowed Optimizations: {wo_result.get('error', 'Unknown error')}")
 
         if "vrr_optimize" in settings:
             vrr_result = self._set_vrr_optimize(settings["vrr_optimize"])
@@ -787,102 +796,140 @@ class WindowsSettingsHandler(SettingsHandler):
         return result
 
     def _get_auto_hdr(self) -> bool | None:
-        """Get Windows Auto HDR status (Windows 11 only)."""
-        try:
-            key = winreg.OpenKey(
-                winreg.HKEY_CURRENT_USER,
-                r"Software\Microsoft\DirectX\UserGpuPreferences",
-                0,
-                winreg.KEY_READ
-            )
-            try:
-                value = winreg.QueryValueEx(key, "DirectXUserGlobalSettings")[0]
-                # Auto HDR is enabled if SwapEffectUpgradeEnable=1 in the string
-                return "SwapEffectUpgradeEnable=1" in str(value)
-            except FileNotFoundError:
-                return None
-            finally:
-                winreg.CloseKey(key)
-        except Exception as e:
-            logger.debug(f"Failed to get Auto HDR status: {e}")
-            return None
+        """Get Windows Auto HDR status (Windows 11 only).
+
+        Auto HDR is controlled by AutoHDREnable in DirectXUserGlobalSettings.
+        NOTE: SwapEffectUpgradeEnable is a DIFFERENT setting (windowed optimizations).
+        """
+        return self._get_directx_flag("AutoHDREnable")
 
     def _set_auto_hdr(self, enabled: bool) -> dict[str, Any]:
         """Set Windows Auto HDR status (Windows 11 only).
 
         Auto HDR converts SDR games to HDR automatically.
         For competitive gaming, this should typically be disabled.
-
-        Returns:
-            Dict with 'success' and optional 'error'.
+        Uses AutoHDREnable flag (not SwapEffectUpgradeEnable which is windowed optimizations).
         """
+        return self._set_directx_flag("AutoHDREnable", enabled, "Auto HDR")
+
+    def _get_windowed_optimizations(self) -> bool | None:
+        """Get 'Optimizations for windowed games' status (Windows 11).
+
+        Controlled by SwapEffectUpgradeEnable in DirectXUserGlobalSettings.
+        When enabled, Windows upgrades DX10/DX11 swap chains to flip model
+        in windowed/borderless mode. Can cause stutter on 24H2.
+        """
+        return self._get_directx_flag("SwapEffectUpgradeEnable")
+
+    def _set_windowed_optimizations(self, enabled: bool) -> dict[str, Any]:
+        """Set 'Optimizations for windowed games' (Windows 11).
+
+        For competitive gaming, this should typically be DISABLED — the
+        DX10/DX11 swap chain upgrade can introduce frame pacing stutter,
+        especially on Windows 11 24H2 with G-SYNC borderless.
+
+        Also sets SwapEffectUpgradeCache DWORD for full effect.
+        """
+        result = self._set_directx_flag("SwapEffectUpgradeEnable", enabled, "Windowed Optimizations")
+
+        # Also set the cache DWORD that Windows checks
+        try:
+            key = winreg.OpenKey(
+                winreg.HKEY_CURRENT_USER,
+                r"Software\Microsoft\DirectX\GraphicsSettings",
+                0,
+                winreg.KEY_ALL_ACCESS,
+            )
+            try:
+                winreg.SetValueEx(key, "SwapEffectUpgradeCache", 0, winreg.REG_DWORD, 1 if enabled else 0)
+            finally:
+                winreg.CloseKey(key)
+        except FileNotFoundError:
+            try:
+                key = winreg.CreateKey(
+                    winreg.HKEY_CURRENT_USER,
+                    r"Software\Microsoft\DirectX\GraphicsSettings",
+                )
+                try:
+                    winreg.SetValueEx(key, "SwapEffectUpgradeCache", 0, winreg.REG_DWORD, 1 if enabled else 0)
+                finally:
+                    winreg.CloseKey(key)
+            except Exception as e:
+                logger.debug(f"Failed to set SwapEffectUpgradeCache: {e}")
+        except Exception as e:
+            logger.debug(f"Failed to set SwapEffectUpgradeCache: {e}")
+
+        return result
+
+    # --- Shared DirectX flag helpers ---
+
+    def _get_directx_flag(self, flag_name: str) -> bool | None:
+        """Read a flag from DirectXUserGlobalSettings semicolon-delimited string."""
+        try:
+            key = winreg.OpenKey(
+                winreg.HKEY_CURRENT_USER,
+                r"Software\Microsoft\DirectX\UserGpuPreferences",
+                0,
+                winreg.KEY_READ,
+            )
+            try:
+                value = winreg.QueryValueEx(key, "DirectXUserGlobalSettings")[0]
+                return f"{flag_name}=1" in str(value)
+            except FileNotFoundError:
+                return None
+            finally:
+                winreg.CloseKey(key)
+        except Exception as e:
+            logger.debug(f"Failed to get {flag_name}: {e}")
+            return None
+
+    def _set_directx_flag(self, flag_name: str, enabled: bool, display_name: str) -> dict[str, Any]:
+        """Set a flag in DirectXUserGlobalSettings semicolon-delimited string."""
         result: dict[str, Any] = {"success": True, "error": None}
+        val = "1" if enabled else "0"
 
         try:
             key = winreg.OpenKey(
                 winreg.HKEY_CURRENT_USER,
                 r"Software\Microsoft\DirectX\UserGpuPreferences",
                 0,
-                winreg.KEY_ALL_ACCESS
+                winreg.KEY_ALL_ACCESS,
             )
             try:
                 current = winreg.QueryValueEx(key, "DirectXUserGlobalSettings")[0]
-                # Parse and update the SwapEffectUpgradeEnable setting
-                if "SwapEffectUpgradeEnable=" in current:
-                    new_value = current.replace(
-                        "SwapEffectUpgradeEnable=1" if not enabled else "SwapEffectUpgradeEnable=0",
-                        "SwapEffectUpgradeEnable=1" if enabled else "SwapEffectUpgradeEnable=0"
-                    )
+                if f"{flag_name}=" in current:
+                    # Replace existing value
+                    import re
+                    new_value = re.sub(rf"{flag_name}=\d", f"{flag_name}={val}", current)
                 else:
-                    # Add the setting
-                    new_value = current + f";SwapEffectUpgradeEnable={'1' if enabled else '0'}"
+                    new_value = current.rstrip(";") + f";{flag_name}={val}"
                 winreg.SetValueEx(key, "DirectXUserGlobalSettings", 0, winreg.REG_SZ, new_value)
-                logger.info(f"Auto HDR set to {'enabled' if enabled else 'disabled'}")
+                logger.info(f"{display_name} set to {'enabled' if enabled else 'disabled'}")
             except FileNotFoundError:
-                # Create default value
                 winreg.SetValueEx(
-                    key,
-                    "DirectXUserGlobalSettings",
-                    0,
-                    winreg.REG_SZ,
-                    f"SwapEffectUpgradeEnable={'1' if enabled else '0'}"
+                    key, "DirectXUserGlobalSettings", 0, winreg.REG_SZ,
+                    f"SwapEffectUpgradeEnable=0;AutoHDREnable=0;VRROptimizeEnable=0;{flag_name}={val}",
                 )
-                logger.info(f"Auto HDR set to {'enabled' if enabled else 'disabled'} (created new key)")
+                logger.info(f"{display_name} set to {'enabled' if enabled else 'disabled'} (created)")
             finally:
                 winreg.CloseKey(key)
         except FileNotFoundError:
-            # Key doesn't exist, create it
             try:
                 key = winreg.CreateKey(
                     winreg.HKEY_CURRENT_USER,
-                    r"Software\Microsoft\DirectX\UserGpuPreferences"
+                    r"Software\Microsoft\DirectX\UserGpuPreferences",
                 )
                 try:
                     winreg.SetValueEx(
-                        key,
-                        "DirectXUserGlobalSettings",
-                        0,
-                        winreg.REG_SZ,
-                        f"SwapEffectUpgradeEnable={'1' if enabled else '0'}"
+                        key, "DirectXUserGlobalSettings", 0, winreg.REG_SZ,
+                        f"SwapEffectUpgradeEnable=0;AutoHDREnable=0;VRROptimizeEnable=0;{flag_name}={val}",
                     )
-                    logger.info(f"Auto HDR set to {'enabled' if enabled else 'disabled'} (created registry path)")
                 finally:
                     winreg.CloseKey(key)
             except Exception as e:
-                error_msg = f"Failed to create Auto HDR registry key: {e}"
-                logger.error(error_msg)
-                result["success"] = False
-                result["error"] = error_msg
-        except PermissionError as e:
-            error_msg = f"Permission denied setting Auto HDR: {e}"
-            logger.error(error_msg)
-            result["success"] = False
-            result["error"] = error_msg
+                result = {"success": False, "error": f"Failed to create {display_name} key: {e}"}
         except Exception as e:
-            error_msg = f"Failed to set Auto HDR: {e}"
-            logger.error(error_msg)
-            result["success"] = False
-            result["error"] = error_msg
+            result = {"success": False, "error": f"Failed to set {display_name}: {e}"}
 
         return result
 

@@ -214,6 +214,7 @@ class Rivals2BaseProfile(BaseProfile):
                 "hags": True,
                 "hdr": False,
                 "auto_hdr": False,
+                "windowed_optimizations": False,
                 "vrr_optimize": False,
             },
             "PowerSettingsHandler": {
@@ -355,6 +356,7 @@ class EmulatorLatencyBaseProfile(BaseProfile):
                 "hags": True,
                 "hdr": False,
                 "auto_hdr": False,
+                "windowed_optimizations": False,
                 "vrr_optimize": False,
             },
             "PowerSettingsHandler": {
@@ -599,6 +601,7 @@ class ReflexShooterBaseProfile(BaseProfile):
                 "hags": True,
                 "hdr": False,
                 "auto_hdr": False,
+                "windowed_optimizations": False,
                 "vrr_optimize": False,
                 "max_refresh_rate": True,
             },
