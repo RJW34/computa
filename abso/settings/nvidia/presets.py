@@ -303,7 +303,7 @@ NVIDIA_PRESETS: dict[str, dict[str, Any]] = {
         },
         "notes": {
             "warning": "Causes screen tearing. Only use if tearing is acceptable.",
-            "api_support": "LLM Ultra only works in DX9/DX11.",
+            "api_support": "LLM Ultra works in DX9/DX11/DX12 (driver 551.23+). Vulkan unsupported.",
             "gsync": "G-Sync disabled for this profile to eliminate VRR overhead.",
         },
     },

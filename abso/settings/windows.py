@@ -26,6 +26,10 @@ CDS_TEST = 0x00000002
 QDC_ONLY_ACTIVE_PATHS = 0x00000002
 DISPLAYCONFIG_DEVICE_INFO_GET_ADVANCED_COLOR_INFO = 9
 DISPLAYCONFIG_DEVICE_INFO_SET_ADVANCED_COLOR_STATE = 10
+# Windows 11 24H2+ introduced new types that separate HDR from WCG (Wide Color Gamut).
+# Type 10 now toggles WCG on 24H2, NOT HDR. Use type 16 for HDR on 24H2+.
+DISPLAYCONFIG_DEVICE_INFO_GET_ADVANCED_COLOR_INFO_2 = 15  # 24H2+
+DISPLAYCONFIG_DEVICE_INFO_SET_HDR_STATE = 16  # 24H2+
 
 
 class _LUID(ctypes.Structure):
@@ -758,16 +762,34 @@ class WindowsSettingsHandler(SettingsHandler):
                             logger.debug(f"Target {target_id}: HDR already disabled")
                             continue
 
-                    # Set advanced color state
+                    # Set HDR state.
+                    # Windows 11 24H2+ changed type 10 to toggle WCG (not HDR).
+                    # Use type 16 (SET_HDR_STATE) on 24H2+, fall back to type 10.
+                    set_success = False
+
+                    # Try 24H2+ API first (type 16)
                     state = DISPLAYCONFIG_SET_ADVANCED_COLOR_STATE()
-                    state.header.type = DISPLAYCONFIG_DEVICE_INFO_SET_ADVANCED_COLOR_STATE
+                    state.header.type = DISPLAYCONFIG_DEVICE_INFO_SET_HDR_STATE
                     state.header.size = ctypes.sizeof(state)
                     state.header.adapterId = adapter_id
                     state.header.id = target_id
-                    state.value = 1 if enabled else 0  # bit 0: enableAdvancedColor
+                    state.value = 1 if enabled else 0
 
                     status = user32.DisplayConfigSetDeviceInfo(ctypes.byref(state))
-                    if status != 0:
+                    if status == 0:
+                        set_success = True
+                    else:
+                        # Fall back to legacy type 10 for pre-24H2
+                        logger.debug(
+                            f"Target {target_id}: type 16 failed ({status}), "
+                            "falling back to type 10 (pre-24H2)"
+                        )
+                        state.header.type = DISPLAYCONFIG_DEVICE_INFO_SET_ADVANCED_COLOR_STATE
+                        status = user32.DisplayConfigSetDeviceInfo(ctypes.byref(state))
+                        if status == 0:
+                            set_success = True
+
+                    if not set_success:
                         error_msg = (
                             f"DisplayConfigSetDeviceInfo failed for target {target_id}: "
                             f"error {status}"

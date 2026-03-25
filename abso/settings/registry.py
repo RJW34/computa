@@ -38,8 +38,9 @@ class RegistrySettingsHandler(SettingsHandler):
     # Win32PrioritySeparation values
     # Format: 0xAABBCC where (6-bit value):
     #   Bits 5-4 (AA): Quantum length (0/1=default, 2=short, 3=long)
-    #   Bits 3-2 (BB): Quantum type (0/1=default, 2=variable, 3=fixed)
+    #   Bits 3-2 (BB): Quantum type (0/1=default, 2=fixed, 3=variable)
     #   Bits 1-0 (CC): Foreground boost (0=none, 1=minimum, 2=maximum)
+    # Ref: Windows Internals (Russinovich), "Master Your Quantum" (MSDN archive)
     #
     # Common values:
     # 0x26 (38) = Short, variable, max boost (Windows desktop default)
