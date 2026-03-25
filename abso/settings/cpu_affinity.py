@@ -177,7 +177,12 @@ class CpuAffinityHandler(SettingsHandler):
             Result dict ``{success, error, requires_reboot}``.
         """
         errors: list[str] = []
-        strategy: str = settings.get("strategy", "all_cores")
+        strategy = settings.get("strategy")
+
+        # None = don't manage affinity (default). Skip entirely.
+        if strategy is None:
+            return {"success": True, "error": None, "requires_reboot": False}
+
         topology = self._get_topology()
         target_exes: list[str] = settings.get("executables", self.executables)
 
