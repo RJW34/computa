@@ -64,6 +64,7 @@ class SlippiMeleeProfile(EmulatorLatencyBaseProfile):
                 "vsync": "off",  # OFF - removes sync latency entirely
                 "vsync_tear_control": "disable",  # Explicit tear control off with VSync OFF
                 "vrr_app_override": "force_off",  # OFF - fixed 60fps, no VRR benefit
+                "global_vrr_mode": "off",  # Enforce global VRR off for clean no-sync transitions
                 "power_management": "prefer_max_performance",
                 "shader_cache": "unlimited",
                 "threaded_optimization": "off",  # OFF - emulator stability (per canonical spec)
@@ -538,6 +539,7 @@ class SlippiMeleeConsoleParityProfile(SlippiMeleeProfile):
                 "vsync": "on",
                 "vsync_tear_control": "disable",
                 "vrr_app_override": "force_off",
+                "global_vrr_mode": "off",  # Enforce global VRR off for clean no-sync transitions
                 "power_management": "prefer_max_performance",
                 "shader_cache": "unlimited",
                 "threaded_optimization": "off",

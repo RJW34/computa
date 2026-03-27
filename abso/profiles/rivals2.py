@@ -66,6 +66,7 @@ class Rivals2Profile(Rivals2BaseProfile):
                 # NO-SYNC for absolute minimum latency (Default for Rivals 2)
                 # See: rivals2-300hz-lowest-latency-guide.md for detailed rationale
                 "preset": "no_sync_fighting_game",
+                "global_vrr_mode": "off",  # Enforce global VRR off for clean no-sync transitions
                 # Settings applied:
                 # - G-SYNC: Force OFF (via vrr_app_override)
                 # - VSync: OFF (no sync = no sync latency)

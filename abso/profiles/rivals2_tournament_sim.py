@@ -119,6 +119,7 @@ class Rivals2TournamentSimProfile(Rivals2BaseProfile):
                 "power_management": "prefer_max_performance",
                 "vsync": "off",  # VSync OFF
                 "vrr_app_override": "force_off",  # G-SYNC OFF (FORBIDDEN for tournament sim)
+                "global_vrr_mode": "off",  # Enforce global VRR off for clean no-sync transitions
                 "max_frame_rate": "off",  # Uncapped - use in-game 144 cap
                 "shader_cache": "unlimited",
                 "threaded_optimization": "off",  # OFF - prevents UE5 driver contention

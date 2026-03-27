@@ -1030,8 +1030,29 @@ function Initialize-ProfilesFromCliCatalog {
     # Primary source: live CLI profile catalog
     if ($script:PythonExe) {
         try {
-            $raw = & $script:PythonExe "-m" "abso" "profiles" "--json" 2>$null
-            if ($LASTEXITCODE -eq 0 -and $raw) {
+            $tempFile = [System.IO.Path]::GetTempFileName()
+            $errFile = "$tempFile.err"
+            $proc = Start-Process -FilePath $script:PythonExe -ArgumentList "-m", "abso", "profiles", "--json" `
+                -NoNewWindow -PassThru -WorkingDirectory $script:ProjectRoot `
+                -RedirectStandardOutput $tempFile -RedirectStandardError $errFile
+
+            $proc.WaitForExit(15000)
+            if (-not $proc.HasExited) {
+                Write-TrayLog "Profile catalog refresh timed out after 15s, killing process" -Level "WARN"
+                $proc.Kill()
+            }
+            $exitCode = $proc.ExitCode
+            $proc.Dispose()
+
+            $raw = Get-Content $tempFile -Raw -ErrorAction SilentlyContinue
+            $errOutput = Get-Content $errFile -Raw -ErrorAction SilentlyContinue
+            Remove-Item $tempFile -Force -ErrorAction SilentlyContinue
+            Remove-Item $errFile -Force -ErrorAction SilentlyContinue
+            if ($errOutput) {
+                Write-TrayLog "Profile catalog stderr: $errOutput" -Level "WARN"
+            }
+
+            if ($exitCode -eq 0 -and $raw) {
                 $payload = $raw | ConvertFrom-Json
                 if ($payload -and $payload.success -and $payload.data) {
                     $entries = @($payload.data)
@@ -1043,7 +1064,7 @@ function Initialize-ProfilesFromCliCatalog {
                 }
             }
             else {
-                Write-TrayLog "Profile catalog refresh skipped from CLI (exit=$LASTEXITCODE); trying cache fallback" -Level "WARN"
+                Write-TrayLog "Profile catalog refresh skipped from CLI (exit=$exitCode); trying cache fallback" -Level "WARN"
             }
         }
         catch {
@@ -1572,6 +1593,7 @@ $script:IconState = "Idle"
 $script:ApplyAnimTimer = $null
 $script:StartupIconHealTimer = $null
 $script:StartupIconHealAttempts = 0
+$script:ProcessGuardTimer = $null
 
 function Set-IconSafe {
     <#
@@ -1774,6 +1796,7 @@ function Apply-Profile {
             Remove-Item $errFile -Force -ErrorAction SilentlyContinue
             return
         }
+        $exitCode = $proc.ExitCode
         $proc.Dispose()
 
         $rawOutput = Get-Content $tempFile -Raw -ErrorAction SilentlyContinue
@@ -1788,34 +1811,45 @@ function Apply-Profile {
 
         $json = $rawOutput | ConvertFrom-Json
 
-        # Treat as success if either fully successful or has applied settings (partial success)
-        $hasAppliedSettings = $json.data.applied_settings -and $json.data.applied_settings.Count -gt 0
-        if (($json.success -and $json.data.success) -or $hasAppliedSettings) {
+        $failedHandlers = @()
+        if ($json.data -and $json.data.results) {
+            foreach ($r in $json.data.results) {
+                if ($r.status -and $r.status -ne "success" -and $r.status -ne "skipped") {
+                    $failedHandlers += $r.handler
+                }
+            }
+        }
+
+        $applySucceeded = (
+            $exitCode -eq 0 -and
+            $json.success -and
+            $json.data -and
+            $json.data.success -and
+            $failedHandlers.Count -eq 0
+        )
+
+        if ($applySucceeded) {
             $msg = "$($profile.Name) ($($profile.Sub))"
             if ($json.data.requires_reboot) { $msg += " - Restart required" }
 
-            # Check for partial failures in individual handlers
-            $failedHandlers = @()
-            if ($json.data.results) {
-                foreach ($r in $json.data.results) {
-                    if ($r.status -and $r.status -ne "success" -and $r.status -ne "skipped") {
-                        $failedHandlers += $r.handler
-                    }
-                }
-            }
-            if ($failedHandlers.Count -gt 0) {
-                $msg += " (partial: $($failedHandlers -join ', ') failed)"
-                Write-TrayLog "Profile applied with partial failures: $($failedHandlers -join ', ')" -Level "WARN"
-            }
-            else {
-                Write-TrayLog "Profile applied successfully: $ProfileId"
-            }
+            Write-TrayLog "Profile applied successfully: $ProfileId"
 
             Update-ProgressOverlay -StepText "Profile applied successfully!"
             Start-Sleep -Milliseconds 500
             Close-ProgressOverlay
 
-            if ($needsNoSyncOsdReminder) {
+            # Suppress OSD reminder if DDC/CI already toggled monitor Adaptive Sync
+            $ddciHandled = $false
+            if ($json.data.applied_settings) {
+                foreach ($line in $json.data.applied_settings) {
+                    if ($line -match "Monitor Adaptive Sync:\s*disabled") {
+                        $ddciHandled = $true
+                        break
+                    }
+                }
+            }
+
+            if ($needsNoSyncOsdReminder -and -not $ddciHandled) {
                 $msg += " | Reminder: Turn OFF Adaptive Sync/FreeSync in monitor OSD for strict No-Sync mode."
                 Play-VrrWarningSound
                 Write-TrayLog "No-Sync OSD reminder shown for transition: $previousProfileId -> $ProfileId"
@@ -1877,11 +1911,17 @@ function Apply-Profile {
             Update-QuickPanel -Favorites $script:TrayConfig.favorites -Profiles $script:Profiles -ActiveProfile $script:activeProfile -OnApply { param($id) Apply-Profile $id }
         }
         else {
-            $err = if ($json.error) {
+            $err = if ($failedHandlers.Count -gt 0) {
+                "Handler failures: $($failedHandlers -join ', ')"
+            }
+            elseif ($json.error) {
                 $json.error
             }
             elseif ($json.data -and $json.data.error) {
                 $json.data.error
+            }
+            elseif ($json.data -and $json.data.failed_settings -and $json.data.failed_settings.Count -gt 0) {
+                $json.data.failed_settings -join "; "
             }
             else {
                 "Unknown error"
@@ -1946,15 +1986,18 @@ function Restore-Settings {
         }
         $proc.Dispose()
 
+        $exitCode = $proc.ExitCode
         $rawOutput = Get-Content $tempFile -Raw -ErrorAction SilentlyContinue
+        $errOutput = Get-Content $errFile -Raw -ErrorAction SilentlyContinue
         Remove-Item $tempFile -Force -ErrorAction SilentlyContinue
         Remove-Item $errFile -Force -ErrorAction SilentlyContinue
+        if ($errOutput) { Write-TrayLog "Restore CLI stderr: $errOutput" -Level "WARN" }
 
         if (-not $rawOutput) { throw "No output" }
 
         $json = $rawOutput | ConvertFrom-Json
 
-        if ($json.success) {
+        if ($exitCode -eq 0 -and $json.success -and $json.data -and $json.data.success) {
             Close-ProgressOverlay
             Show-Notification -Title "A.B.S.O." -Message "Settings restored" -Type "Info"
             $script:activeProfile = $null
@@ -1965,8 +2008,17 @@ function Restore-Settings {
             Update-MenuState
         }
         else {
+            $restoreError = if ($json.error) {
+                $json.error
+            }
+            elseif ($json.data -and $json.data.message) {
+                $json.data.message
+            }
+            else {
+                "Restore failed"
+            }
             Close-ProgressOverlay
-            Show-Notification -Title "A.B.S.O." -Message "Failed: $($json.error)" -Type "Warning"
+            Show-Notification -Title "A.B.S.O." -Message "Failed: $restoreError" -Type "Warning"
             Set-IconState -State "Warning"
         }
     }
@@ -2130,7 +2182,7 @@ function Run-Audit {
         if ($rawOutput) {
             $json = $rawOutput | ConvertFrom-Json
             if ($json.success -and $json.data) {
-                $issues = $json.data.issues
+                $issues = if ($json.data -is [System.Array]) { @($json.data) } else { @($json.data.issues) }
                 $issueCount = if ($issues) { $issues.Count } else { 0 }
                 $script:AuditIssueCount = $issueCount
 
@@ -2421,6 +2473,96 @@ function Find-Profiles {
     }
 
     return $matches
+}
+
+# ============================================================================
+# PROCESS GUARD — Demote misbehaving background apps from RealTime priority
+# ============================================================================
+
+# Default targets: Discord sets itself to RealTime which starves game threads.
+# Process names are queried in a single Get-Process call for efficiency.
+$script:ProcessGuardNames = @("Discord", "DiscordPTB", "DiscordCanary")
+$script:ProcessGuardCeiling = [System.Diagnostics.ProcessPriorityClass]::Normal
+$script:ProcessGuardDemotedPIDs = @{}  # PID -> $true; suppresses repeat log spam
+$script:ProcessGuardIdleIntervalMs  = 30000  # 30s when no targets found
+$script:ProcessGuardActiveIntervalMs = 5000  # 5s after a demotion (re-escalation window)
+$script:ProcessGuardIntervalMs = $script:ProcessGuardIdleIntervalMs
+
+function Invoke-ProcessGuardTick {
+    <#
+    .SYNOPSIS
+    Single Get-Process call for all guard targets. Demotes any above the ceiling.
+    Adaptive interval: speeds up after demotion, slows down when idle.
+    #>
+    $demotedThisTick = $false
+
+    # One call, all names — returns $null when none match
+    $procs = Get-Process -Name $script:ProcessGuardNames -ErrorAction SilentlyContinue
+    if (-not $procs) {
+        # Nothing running — switch to slow poll and clear stale PID cache
+        if ($script:ProcessGuardDemotedPIDs.Count -gt 0) { $script:ProcessGuardDemotedPIDs = @{} }
+        if ($script:ProcessGuardTimer -and $script:ProcessGuardTimer.Interval -ne $script:ProcessGuardIdleIntervalMs) {
+            $script:ProcessGuardTimer.Interval = $script:ProcessGuardIdleIntervalMs
+        }
+        return
+    }
+
+    foreach ($proc in $procs) {
+        try {
+            if ($proc.PriorityClass -gt $script:ProcessGuardCeiling) {
+                $was = $proc.PriorityClass
+                $proc.PriorityClass = $script:ProcessGuardCeiling
+                $demotedThisTick = $true
+
+                # Log first demotion per PID only
+                $pidKey = $proc.Id
+                if (-not $script:ProcessGuardDemotedPIDs.ContainsKey($pidKey)) {
+                    $script:ProcessGuardDemotedPIDs[$pidKey] = $true
+                    Write-TrayLog "ProcessGuard: Demoted $($proc.ProcessName) (PID $pidKey) from $was to $($script:ProcessGuardCeiling)"
+                }
+            }
+        } catch {
+            # Process exited or access denied between enumerate and set — benign
+        }
+    }
+
+    # Adaptive interval: fast poll after demotion, slow poll when stable
+    $desiredInterval = if ($demotedThisTick) { $script:ProcessGuardActiveIntervalMs } else { $script:ProcessGuardIdleIntervalMs }
+    if ($script:ProcessGuardTimer -and $script:ProcessGuardTimer.Interval -ne $desiredInterval) {
+        $script:ProcessGuardTimer.Interval = $desiredInterval
+    }
+}
+
+function Start-ProcessGuardTimer {
+    <#
+    .SYNOPSIS
+    Starts the periodic process guard timer.
+    #>
+    if ($script:ProcessGuardTimer) {
+        try { $script:ProcessGuardTimer.Stop() } catch {}
+        try { $script:ProcessGuardTimer.Dispose() } catch {}
+    }
+
+    $script:ProcessGuardTimer = New-Object System.Windows.Forms.Timer
+    $script:ProcessGuardTimer.Interval = $script:ProcessGuardIdleIntervalMs
+    $script:ProcessGuardTimer.Add_Tick({
+        try { Invoke-ProcessGuardTick } catch {
+            try { Write-TrayLog "ProcessGuard tick error: $($_.Exception.Message)" -Level "WARN" } catch {}
+        }
+    })
+    $script:ProcessGuardTimer.Start()
+    Write-TrayLog "ProcessGuard started (idle: $($script:ProcessGuardIdleIntervalMs)ms, active: $($script:ProcessGuardActiveIntervalMs)ms, targets: $($script:ProcessGuardNames -join ', '))"
+
+    # Run once immediately so startup-launched Discord gets caught right away
+    try { Invoke-ProcessGuardTick } catch {}
+}
+
+function Stop-ProcessGuardTimer {
+    if ($script:ProcessGuardTimer) {
+        try { $script:ProcessGuardTimer.Stop() } catch {}
+        try { $script:ProcessGuardTimer.Dispose() } catch {}
+        $script:ProcessGuardTimer = $null
+    }
 }
 
 # ============================================================================
@@ -3424,6 +3566,9 @@ public class HotkeyMessageWindow : NativeWindow {
     # Only play restart sound once the new tray instance has fully initialized.
     Invoke-RestartSuccessSoundIfPending
 
+    # ─── PROCESS GUARD (demote Discord etc. from RealTime) ───
+    Start-ProcessGuardTimer
+
     [System.Windows.Forms.Application]::Run()
     $script:notifyIcon.Visible = $false
     $script:notifyIcon.Dispose()
@@ -3452,6 +3597,7 @@ catch {
     catch {}
 }
 finally {
+    Stop-ProcessGuardTimer
     if ($script:StartupIconHealTimer) {
         try { $script:StartupIconHealTimer.Stop() } catch {}
         try { $script:StartupIconHealTimer.Dispose() } catch {}

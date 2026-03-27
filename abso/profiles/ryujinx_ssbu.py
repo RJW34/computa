@@ -53,6 +53,7 @@ class RyujinxSSBUProfile(EmulatorLatencyBaseProfile):
                 "vsync": "off",  # No sync latency
                 "vsync_tear_control": "disable",
                 "vrr_app_override": "force_off",  # Fixed 60fps, no VRR benefit
+                "global_vrr_mode": "off",  # Enforce global VRR off for clean no-sync transitions
                 "shader_cache": "unlimited",  # Critical for emulators
                 "threaded_optimization": "on",  # Ryujinx benefits from driver threading
                 "triple_buffering": "off",

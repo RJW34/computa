@@ -117,6 +117,7 @@ class Rivals2OnlineProfile(Rivals2BaseProfile):
                 "vsync": "off",  # OFF - rollback netcode is timing-sensitive, not tear-sensitive
                 "vsync_tear_control": "disable",  # Explicit tear control off with VSync OFF
                 "vrr_app_override": "force_off",  # OFF - VRR adds ~2-5ms latency overhead
+                "global_vrr_mode": "off",  # Enforce global VRR off for clean no-sync transitions
                 "max_frame_rate": "off",  # Uncapped � no external limiters for online play
                 "shader_cache": "unlimited",
                 "threaded_optimization": "off",  # OFF - UE5 driver contention

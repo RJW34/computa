@@ -105,6 +105,7 @@ class Rivals2OfflineProfile(Rivals2BaseProfile):
                 "vsync": "off",  # No sync — minimum latency, accept tearing
                 "vsync_tear_control": "disable",
                 "vrr_app_override": "force_off",  # No G-Sync overhead
+                "global_vrr_mode": "off",  # Enforce global VRR off for clean no-sync transitions
                 "max_frame_rate": "off",  # Uncapped
                 "shader_cache": "unlimited",
                 "threaded_optimization": "off",  # OFF — UE5 driver contention

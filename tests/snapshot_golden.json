@@ -17,6 +17,56 @@
       "CNMSettingsHandler",
       "ColorProfileSettingsHandler"
     ],
+    "in_game_settings": [
+      {
+        "category": "Display",
+        "reason": "Lower input latency than borderless.",
+        "setting": "Display Mode",
+        "value": "Fullscreen Exclusive"
+      },
+      {
+        "category": "Display",
+        "reason": "Use Reflex instead for latency control.",
+        "setting": "VSync",
+        "value": "Off"
+      },
+      {
+        "category": "Display",
+        "reason": "Hardware-level latency reduction. Takes priority over driver settings.",
+        "setting": "Nvidia Reflex Low Latency",
+        "value": "On + Boost"
+      },
+      {
+        "category": "Display",
+        "reason": "Cap slightly below max if using G-Sync for tear-free.",
+        "setting": "Frame Rate Limit",
+        "value": "Match monitor Hz or Unlimited"
+      },
+      {
+        "category": "Graphics",
+        "reason": "Native looks best; DLSS adds minimal latency.",
+        "setting": "Render Resolution",
+        "value": "100% (or DLSS Performance if GPU-limited)"
+      },
+      {
+        "category": "Graphics",
+        "reason": "Eliminates texture pop-in if you have VRAM headroom.",
+        "setting": "On-Demand Texture Streaming",
+        "value": "Off"
+      },
+      {
+        "category": "Graphics",
+        "reason": "Let shaders fully compile to reduce stutter.",
+        "setting": "Shaders",
+        "value": "Restart after first launch"
+      },
+      {
+        "category": "Audio",
+        "reason": "Use appropriate preset for your setup.",
+        "setting": "Audio Mix",
+        "value": "Headphones"
+      }
+    ],
     "include_legacy_tweaks": false,
     "is_emulator_profile": false,
     "is_online_profile": false,
@@ -104,6 +154,50 @@
       "ProcessPriorityHandler",
       "CNMSettingsHandler",
       "ColorProfileSettingsHandler"
+    ],
+    "in_game_settings": [
+      {
+        "category": "Display",
+        "reason": "Better performance than windowed modes.",
+        "setting": "Display Mode",
+        "value": "Fullscreen"
+      },
+      {
+        "category": "Display",
+        "reason": "Diablo 4 has native Reflex. Driver LLM is OFF to avoid conflict. Reflex handles latency more effectively at the application level.",
+        "setting": "NVIDIA Reflex Low Latency",
+        "value": "On + Boost"
+      },
+      {
+        "category": "Display",
+        "reason": "Keep in-game VSync OFF. ABSO sets NVCP VSync to Adaptive as a safety net \u2014 it only engages if FPS exceeds refresh rate, adding zero latency when FPS is capped below refresh.",
+        "setting": "VSync (in-game)",
+        "value": "Off"
+      },
+      {
+        "category": "Display",
+        "reason": "G-Sync sweet spot to prevent VSync activation.",
+        "setting": "Limit FPS",
+        "value": "2-3 below monitor refresh rate"
+      },
+      {
+        "category": "Display",
+        "reason": "Good visual quality with performance headroom.",
+        "setting": "DLSS/FSR",
+        "value": "Quality or Balanced"
+      },
+      {
+        "category": "Graphics",
+        "reason": "Prioritize stable frame times over max settings.",
+        "setting": "Overall Quality",
+        "value": "Adjust based on GPU"
+      },
+      {
+        "category": "Graphics",
+        "reason": "High effects can cause frame drops in dense combat.",
+        "setting": "Effects",
+        "value": "Medium-High"
+      }
     ],
     "include_legacy_tweaks": false,
     "is_emulator_profile": false,
@@ -202,6 +296,68 @@
       "CNMSettingsHandler",
       "ColorProfileSettingsHandler"
     ],
+    "in_game_settings": [
+      {
+        "category": "Display",
+        "reason": "Lowest latency path vs windowed or borderless.",
+        "setting": "Display Mode",
+        "value": "Fullscreen (Exclusive)"
+      },
+      {
+        "category": "Display",
+        "reason": "Disable sync latency. Use VRR + FPS cap if you prefer tear-free.",
+        "setting": "VSync",
+        "value": "Off"
+      },
+      {
+        "category": "Display",
+        "reason": "Reflex controls the render queue more effectively than driver LLM.",
+        "setting": "NVIDIA Reflex Low Latency",
+        "value": "On + Boost"
+      },
+      {
+        "category": "Display",
+        "reason": "Cap below refresh for G-Sync safety net; otherwise uncapped for minimum latency.",
+        "setting": "Frame Rate Limit",
+        "value": "Refresh rate - 3 (VRR) or Unlimited (no sync)"
+      },
+      {
+        "category": "Graphics",
+        "reason": "DX12 offers stable frame pacing; Performance Mode maximizes FPS on weaker GPUs.",
+        "setting": "Rendering Mode",
+        "value": "DirectX 12 (recommended) or Performance Mode"
+      },
+      {
+        "category": "Graphics",
+        "reason": "Better CPU utilization and frame time consistency.",
+        "setting": "Multithreaded Rendering",
+        "value": "On"
+      },
+      {
+        "category": "Graphics",
+        "reason": "Maintain high FPS while keeping input latency low.",
+        "setting": "3D Resolution / DLSS",
+        "value": "100% or DLSS Performance if GPU-bound"
+      },
+      {
+        "category": "Graphics",
+        "reason": "Reduces visual latency and improves clarity during fast flicks.",
+        "setting": "Motion Blur",
+        "value": "Off"
+      },
+      {
+        "category": "Graphics",
+        "reason": "Minimize frame time spikes in busy endgames.",
+        "setting": "Shadows / Effects",
+        "value": "Low"
+      },
+      {
+        "category": "Content",
+        "reason": "Avoids texture streaming hitches and VRAM spikes.",
+        "setting": "High Resolution Textures",
+        "value": "Off"
+      }
+    ],
     "include_legacy_tweaks": false,
     "is_emulator_profile": false,
     "is_online_profile": false,
@@ -291,6 +447,68 @@
       "CpuAffinityHandler",
       "CNMSettingsHandler",
       "ColorProfileSettingsHandler"
+    ],
+    "in_game_settings": [
+      {
+        "category": "Display",
+        "reason": "Lowest latency path vs windowed or borderless.",
+        "setting": "Display Mode",
+        "value": "Fullscreen (Exclusive)"
+      },
+      {
+        "category": "Display",
+        "reason": "Disable sync latency. Use VRR + FPS cap if you prefer tear-free.",
+        "setting": "VSync",
+        "value": "Off"
+      },
+      {
+        "category": "Display",
+        "reason": "Reflex controls the render queue more effectively than driver LLM.",
+        "setting": "NVIDIA Reflex Low Latency",
+        "value": "On + Boost"
+      },
+      {
+        "category": "Display",
+        "reason": "Cap below refresh for G-Sync safety net; otherwise uncapped for minimum latency.",
+        "setting": "Frame Rate Limit",
+        "value": "Refresh rate - 3 (VRR) or Unlimited (no sync)"
+      },
+      {
+        "category": "Graphics",
+        "reason": "DX12 offers stable frame pacing; Performance Mode maximizes FPS on weaker GPUs.",
+        "setting": "Rendering Mode",
+        "value": "DirectX 12 (recommended) or Performance Mode"
+      },
+      {
+        "category": "Graphics",
+        "reason": "Better CPU utilization and frame time consistency.",
+        "setting": "Multithreaded Rendering",
+        "value": "On"
+      },
+      {
+        "category": "Graphics",
+        "reason": "Maintain high FPS while keeping input latency low.",
+        "setting": "3D Resolution / DLSS",
+        "value": "100% or DLSS Performance if GPU-bound"
+      },
+      {
+        "category": "Graphics",
+        "reason": "Reduces visual latency and improves clarity during fast flicks.",
+        "setting": "Motion Blur",
+        "value": "Off"
+      },
+      {
+        "category": "Graphics",
+        "reason": "Minimize frame time spikes in busy endgames.",
+        "setting": "Shadows / Effects",
+        "value": "Low"
+      },
+      {
+        "category": "Content",
+        "reason": "Avoids texture streaming hitches and VRAM spikes.",
+        "setting": "High Resolution Textures",
+        "value": "Off"
+      }
     ],
     "include_legacy_tweaks": false,
     "is_emulator_profile": false,
@@ -398,6 +616,74 @@
       "CNMSettingsHandler",
       "ColorProfileSettingsHandler"
     ],
+    "in_game_settings": [
+      {
+        "category": "Display",
+        "reason": "This PC's primary display reports HDR capability, so the HDR path can stay active without using Auto HDR.",
+        "setting": "HDR",
+        "value": "On"
+      },
+      {
+        "category": "Display",
+        "reason": "Keep HDR enabled, but tune it once in-game so you do not give away visibility for the sake of raw brightness.",
+        "setting": "HDR Calibration",
+        "value": "Calibrate paper white / peak brightness to the monitor"
+      },
+      {
+        "category": "Display",
+        "reason": "Best match for the profile's G-SYNC fullscreen path and lowest presentation overhead.",
+        "setting": "Display Mode",
+        "value": "Fullscreen"
+      },
+      {
+        "category": "Display",
+        "reason": "Leave VSync to NVIDIA Control Panel as the VRR safety net; keep the in-game toggle off.",
+        "setting": "VSync",
+        "value": "Off (in-game)"
+      },
+      {
+        "category": "Display",
+        "reason": "Reflex should own queue control in Marvel Rivals; the profile disables driver LLM to avoid overlap.",
+        "setting": "NVIDIA Reflex Low Latency",
+        "value": "On + Boost"
+      },
+      {
+        "category": "Display",
+        "reason": "Keeps G-SYNC active and prevents NVCP VSync from engaging while preserving tear-free latency.",
+        "setting": "Frame Rate Limit",
+        "value": "Auto (refresh rate - 3, so 297 on this 300 Hz monitor)"
+      },
+      {
+        "category": "Display",
+        "reason": "Frame generation lifts reported FPS, but it is not the cleanest low-latency path for a competitive shooter.",
+        "setting": "Frame Generation",
+        "value": "Off for ranked / competitive"
+      },
+      {
+        "category": "Graphics",
+        "reason": "This build ships DLSS, XeSS, and AMD upscaling support; on an RTX 4070, DLSS is the best performance lever if native render cannot hold target cap.",
+        "setting": "Upscaling",
+        "value": "DLSS Quality or Balanced"
+      },
+      {
+        "category": "Graphics",
+        "reason": "Heavy fights and destruction are where frame-time spikes happen; low competitive settings keep the frame queue cleaner.",
+        "setting": "Shadow / Effects / Post Processing",
+        "value": "Low"
+      },
+      {
+        "category": "Graphics",
+        "reason": "A 12 GB RTX 4070 can handle more, but medium is the safer performance-first choice during long sessions and new patches.",
+        "setting": "Textures",
+        "value": "Medium"
+      },
+      {
+        "category": "Graphics",
+        "reason": "Reduces visual noise and preserves target clarity during fast tracking.",
+        "setting": "Motion Blur / Film Grain / Chromatic Aberration",
+        "value": "Off"
+      }
+    ],
     "include_legacy_tweaks": false,
     "is_emulator_profile": false,
     "is_online_profile": false,
@@ -489,6 +775,74 @@
       "CpuAffinityHandler",
       "CNMSettingsHandler",
       "ColorProfileSettingsHandler"
+    ],
+    "in_game_settings": [
+      {
+        "category": "Display",
+        "reason": "This variant keeps the cleaner SDR path that is already active on this PC.",
+        "setting": "HDR",
+        "value": "Off"
+      },
+      {
+        "category": "Display",
+        "reason": "Matches the profile's sRGB clamp and avoids wide-gamut oversaturation in SDR.",
+        "setting": "Color Space",
+        "value": "SDR / default gamut"
+      },
+      {
+        "category": "Display",
+        "reason": "Best match for the profile's G-SYNC fullscreen path and lowest presentation overhead.",
+        "setting": "Display Mode",
+        "value": "Fullscreen"
+      },
+      {
+        "category": "Display",
+        "reason": "Leave VSync to NVIDIA Control Panel as the VRR safety net; keep the in-game toggle off.",
+        "setting": "VSync",
+        "value": "Off (in-game)"
+      },
+      {
+        "category": "Display",
+        "reason": "Reflex should own queue control in Marvel Rivals; the profile disables driver LLM to avoid overlap.",
+        "setting": "NVIDIA Reflex Low Latency",
+        "value": "On + Boost"
+      },
+      {
+        "category": "Display",
+        "reason": "Keeps G-SYNC active and prevents NVCP VSync from engaging while preserving tear-free latency.",
+        "setting": "Frame Rate Limit",
+        "value": "Auto (refresh rate - 3, so 297 on this 300 Hz monitor)"
+      },
+      {
+        "category": "Display",
+        "reason": "Frame generation lifts reported FPS, but it is not the cleanest low-latency path for a competitive shooter.",
+        "setting": "Frame Generation",
+        "value": "Off for ranked / competitive"
+      },
+      {
+        "category": "Graphics",
+        "reason": "This build ships DLSS, XeSS, and AMD upscaling support; on an RTX 4070, DLSS is the best performance lever if native render cannot hold target cap.",
+        "setting": "Upscaling",
+        "value": "DLSS Quality or Balanced"
+      },
+      {
+        "category": "Graphics",
+        "reason": "Heavy fights and destruction are where frame-time spikes happen; low competitive settings keep the frame queue cleaner.",
+        "setting": "Shadow / Effects / Post Processing",
+        "value": "Low"
+      },
+      {
+        "category": "Graphics",
+        "reason": "A 12 GB RTX 4070 can handle more, but medium is the safer performance-first choice during long sessions and new patches.",
+        "setting": "Textures",
+        "value": "Medium"
+      },
+      {
+        "category": "Graphics",
+        "reason": "Reduces visual noise and preserves target clarity during fast tracking.",
+        "setting": "Motion Blur / Film Grain / Chromatic Aberration",
+        "value": "Off"
+      }
     ],
     "include_legacy_tweaks": false,
     "is_emulator_profile": false,
@@ -582,6 +936,50 @@
       "CNMSettingsHandler",
       "ColorProfileSettingsHandler",
       "OW2ConfigHandler"
+    ],
+    "in_game_settings": [
+      {
+        "category": "Display",
+        "reason": "No-sync: exclusive fullscreen avoids compositor overhead. FPS cap difference only matters under VRR.",
+        "setting": "Display Mode",
+        "value": "Fullscreen (Exclusive)"
+      },
+      {
+        "category": "Display",
+        "reason": "No-sync mode removes sync queueing latency.",
+        "setting": "VSync",
+        "value": "Off"
+      },
+      {
+        "category": "Display",
+        "reason": "On a high-end GPU at 1440p Low, the GPU is not saturated - Reflex throttles CPU frame submission without benefit, costing about 60 FPS. Higher uncapped FPS means lower latency than Reflex queue management. If your GPU is saturated (GPU usage above 90%), switch to On+Boost instead.",
+        "setting": "NVIDIA Reflex Low Latency",
+        "value": "Off (high-end GPU) / On+Boost (mid-range GPU)"
+      },
+      {
+        "category": "Display",
+        "reason": "No-sync profile: maximum FPS equals minimum click-to-pixel latency.",
+        "setting": "Frame Rate Cap",
+        "value": "Uncapped (600)"
+      },
+      {
+        "category": "Display",
+        "reason": "Essential with Reflex OFF - limits pre-render buffer to 1 frame. Only mechanism keeping render queue shallow.",
+        "setting": "Reduce Buffering",
+        "value": "On"
+      },
+      {
+        "category": "Graphics",
+        "reason": "Avoid frametime variance from dynamic scaling.",
+        "setting": "Dynamic Render Scale",
+        "value": "Off"
+      },
+      {
+        "category": "Graphics",
+        "reason": "Improves frame-time consistency in team fights.",
+        "setting": "Shadows / Effects",
+        "value": "Low"
+      }
     ],
     "include_legacy_tweaks": false,
     "is_emulator_profile": false,
@@ -693,6 +1091,50 @@
       "CNMSettingsHandler",
       "ColorProfileSettingsHandler",
       "OW2ConfigHandler"
+    ],
+    "in_game_settings": [
+      {
+        "category": "Display",
+        "reason": "This profile is tuned for fullscreen-only G-SYNC. Do not switch to borderless/windowed mode after launch.",
+        "setting": "Display Mode",
+        "value": "Fullscreen (Exclusive)"
+      },
+      {
+        "category": "Display",
+        "reason": "Use NVCP VSync as safety net; keep in-game VSync off.",
+        "setting": "VSync",
+        "value": "Off (in-game)"
+      },
+      {
+        "category": "Display",
+        "reason": "Native Reflex should own queue control.",
+        "setting": "NVIDIA Reflex Low Latency",
+        "value": "Enabled + Boost"
+      },
+      {
+        "category": "Display",
+        "reason": "Set by ABSO to keep NVCP VSync from engaging while preserving VRR.",
+        "setting": "Frame Rate Cap",
+        "value": "Auto (refresh - 3)"
+      },
+      {
+        "category": "Display",
+        "reason": "Maintains low queue depth in the render pipeline.",
+        "setting": "Reduce Buffering",
+        "value": "On"
+      },
+      {
+        "category": "Graphics",
+        "reason": "Avoid large frame pacing oscillations.",
+        "setting": "Dynamic Render Scale",
+        "value": "Off"
+      },
+      {
+        "category": "Graphics",
+        "reason": "Minimizes frame spikes during heavy ability usage.",
+        "setting": "Shadows / Effects",
+        "value": "Low"
+      }
     ],
     "include_legacy_tweaks": false,
     "is_emulator_profile": false,
@@ -806,6 +1248,74 @@
       "ColorProfileSettingsHandler",
       "OW2ConfigHandler"
     ],
+    "in_game_settings": [
+      {
+        "category": "Display",
+        "reason": "This profile is tuned for fullscreen-only G-SYNC. Do not switch to borderless/windowed mode after launch.",
+        "setting": "Display Mode",
+        "value": "Fullscreen (Exclusive)"
+      },
+      {
+        "category": "Display",
+        "reason": "Use NVCP VSync as safety net; keep in-game VSync off.",
+        "setting": "VSync",
+        "value": "Off (in-game)"
+      },
+      {
+        "category": "Display",
+        "reason": "Native Reflex should own queue control.",
+        "setting": "NVIDIA Reflex Low Latency",
+        "value": "Enabled + Boost"
+      },
+      {
+        "category": "Display",
+        "reason": "Set by ABSO to keep NVCP VSync from engaging while preserving VRR.",
+        "setting": "Frame Rate Cap",
+        "value": "Auto (refresh - 3)"
+      },
+      {
+        "category": "Display",
+        "reason": "Maintains low queue depth in the render pipeline.",
+        "setting": "Reduce Buffering",
+        "value": "On"
+      },
+      {
+        "category": "Display",
+        "reason": "Native HDR output for OLED/Mini-LED displays.",
+        "setting": "HDR Mode",
+        "value": "On"
+      },
+      {
+        "category": "Display",
+        "reason": "Controls SDR-content brightness under HDR. ~200 nits is a good OLED starting point.",
+        "setting": "HDR Paper White Nits",
+        "value": "~200 (calibrate to taste)"
+      },
+      {
+        "category": "Display",
+        "reason": "Set to your display's actual peak brightness for correct tone mapping.",
+        "setting": "HDR Max Display Brightness",
+        "value": "Match monitor peak (e.g. 1000+ nits OLED)"
+      },
+      {
+        "category": "Display",
+        "reason": "OW2-specific slider for HUD brightness under HDR.",
+        "setting": "HDR UI Brightness",
+        "value": "Adjust to taste"
+      },
+      {
+        "category": "Graphics",
+        "reason": "Avoid large frame pacing oscillations.",
+        "setting": "Dynamic Render Scale",
+        "value": "Off"
+      },
+      {
+        "category": "Graphics",
+        "reason": "Minimizes frame spikes during heavy ability usage.",
+        "setting": "Shadows / Effects",
+        "value": "Low"
+      }
+    ],
     "include_legacy_tweaks": false,
     "is_emulator_profile": false,
     "is_online_profile": false,
@@ -915,6 +1425,104 @@
       "CNMSettingsHandler",
       "ColorProfileSettingsHandler"
     ],
+    "in_game_settings": [
+      {
+        "category": "PACDeluxe",
+        "reason": "Monitor FPS, CPU, and memory usage in real-time.",
+        "setting": "Performance Overlay",
+        "value": "Ctrl+Shift+P to toggle"
+      },
+      {
+        "category": "PACDeluxe",
+        "reason": "Reduces compositor overhead for smoother rendering.",
+        "setting": "Fullscreen Mode",
+        "value": "Alt+Enter or F11"
+      },
+      {
+        "category": "WebView2 Optimization",
+        "reason": "WebView2 uses GPU acceleration by default. Verify in edge://gpu.",
+        "setting": "GPU Acceleration",
+        "value": "Enabled (default)"
+      },
+      {
+        "category": "WebView2 Optimization",
+        "reason": "The app disables WebView2 background throttling automatically.",
+        "setting": "Disable Background Throttling",
+        "value": "PACDeluxe handles this internally"
+      },
+      {
+        "category": "Nvidia Control Panel",
+        "reason": "Ensure WebView2 uses discrete GPU, not integrated graphics.",
+        "setting": "Preferred GPU",
+        "value": "High-performance NVIDIA processor"
+      },
+      {
+        "category": "Nvidia Control Panel",
+        "reason": "Prevents GPU clock throttling during gameplay.",
+        "setting": "Power Management Mode",
+        "value": "Prefer Maximum Performance"
+      },
+      {
+        "category": "Nvidia Control Panel",
+        "reason": "WebGL generates many shaders - larger cache prevents stutter.",
+        "setting": "Shader Cache Size",
+        "value": "Unlimited"
+      },
+      {
+        "category": "Nvidia Control Panel",
+        "reason": "Adaptive VSync prevents tearing without constant latency penalty. Use 'Off' if you prefer lowest latency and can tolerate minor tearing.",
+        "setting": "Vertical Sync",
+        "value": "Adaptive (or Off for lowest latency)"
+      },
+      {
+        "category": "Nvidia Control Panel",
+        "reason": "Pre-render limit of 1. 'Ultra' is overkill for auto-battlers and may cause inconsistent frame pacing.",
+        "setting": "Low Latency Mode",
+        "value": "On"
+      },
+      {
+        "category": "Network",
+        "reason": "Pokemon Auto Chess is multiplayer - stable connection reduces desync. WiFi works but wired is more consistent.",
+        "setting": "Connection Type",
+        "value": "Wired Ethernet preferred"
+      },
+      {
+        "category": "Network",
+        "reason": "Large downloads can cause network latency spikes.",
+        "setting": "Background Downloads",
+        "value": "Pause during gameplay"
+      },
+      {
+        "category": "Game Settings",
+        "reason": "Start with High, reduce if frame drops occur during battles.",
+        "setting": "Graphics Quality",
+        "value": "High (or Medium if stuttering)"
+      },
+      {
+        "category": "Game Settings",
+        "reason": "Ability animations help track what's happening in battles.",
+        "setting": "Animations",
+        "value": "On"
+      },
+      {
+        "category": "Game Settings",
+        "reason": "Audio cues provide useful feedback during auto-battles.",
+        "setting": "Sound",
+        "value": "Enabled"
+      },
+      {
+        "category": "System",
+        "reason": "Close browsers, Discord (or use PTT), and heavy apps. PACDeluxe benefits from reduced CPU/GPU competition.",
+        "setting": "Close Background Apps",
+        "value": "Recommended"
+      },
+      {
+        "category": "System",
+        "reason": "DPI scaling above 100% can affect WebGL rendering performance.",
+        "setting": "Display Scaling",
+        "value": "100% (native) preferred"
+      }
+    ],
     "include_legacy_tweaks": false,
     "is_emulator_profile": false,
     "is_online_profile": false,
@@ -989,6 +1597,104 @@
       "OBSSettingsHandler",
       "CNMSettingsHandler",
       "ColorProfileSettingsHandler"
+    ],
+    "in_game_settings": [
+      {
+        "category": "PACDeluxe",
+        "reason": "Monitor FPS, CPU, and memory usage in real-time.",
+        "setting": "Performance Overlay",
+        "value": "Ctrl+Shift+P to toggle"
+      },
+      {
+        "category": "PACDeluxe",
+        "reason": "Reduces compositor overhead for smoother rendering.",
+        "setting": "Fullscreen Mode",
+        "value": "Alt+Enter or F11"
+      },
+      {
+        "category": "WebView2 Optimization",
+        "reason": "WebView2 uses GPU acceleration by default. Verify in edge://gpu.",
+        "setting": "GPU Acceleration",
+        "value": "Enabled (default)"
+      },
+      {
+        "category": "WebView2 Optimization",
+        "reason": "The app disables WebView2 background throttling automatically.",
+        "setting": "Disable Background Throttling",
+        "value": "PACDeluxe handles this internally"
+      },
+      {
+        "category": "Nvidia Control Panel",
+        "reason": "Ensure WebView2 uses discrete GPU, not integrated graphics.",
+        "setting": "Preferred GPU",
+        "value": "High-performance NVIDIA processor"
+      },
+      {
+        "category": "Nvidia Control Panel",
+        "reason": "Prevents GPU clock throttling during gameplay.",
+        "setting": "Power Management Mode",
+        "value": "Prefer Maximum Performance"
+      },
+      {
+        "category": "Nvidia Control Panel",
+        "reason": "WebGL generates many shaders - larger cache prevents stutter.",
+        "setting": "Shader Cache Size",
+        "value": "Unlimited"
+      },
+      {
+        "category": "Nvidia Control Panel",
+        "reason": "Adaptive VSync prevents tearing without constant latency penalty. Use 'Off' if you prefer lowest latency and can tolerate minor tearing.",
+        "setting": "Vertical Sync",
+        "value": "Adaptive (or Off for lowest latency)"
+      },
+      {
+        "category": "Nvidia Control Panel",
+        "reason": "Pre-render limit of 1. 'Ultra' is overkill for auto-battlers and may cause inconsistent frame pacing.",
+        "setting": "Low Latency Mode",
+        "value": "On"
+      },
+      {
+        "category": "Network",
+        "reason": "Pokemon Auto Chess is multiplayer - stable connection reduces desync. WiFi works but wired is more consistent.",
+        "setting": "Connection Type",
+        "value": "Wired Ethernet preferred"
+      },
+      {
+        "category": "Network",
+        "reason": "Large downloads can cause network latency spikes.",
+        "setting": "Background Downloads",
+        "value": "Pause during gameplay"
+      },
+      {
+        "category": "Game Settings",
+        "reason": "Start with High, reduce if frame drops occur during battles.",
+        "setting": "Graphics Quality",
+        "value": "High (or Medium if stuttering)"
+      },
+      {
+        "category": "Game Settings",
+        "reason": "Ability animations help track what's happening in battles.",
+        "setting": "Animations",
+        "value": "On"
+      },
+      {
+        "category": "Game Settings",
+        "reason": "Audio cues provide useful feedback during auto-battles.",
+        "setting": "Sound",
+        "value": "Enabled"
+      },
+      {
+        "category": "System",
+        "reason": "Close browsers, Discord (or use PTT), and heavy apps. PACDeluxe benefits from reduced CPU/GPU competition.",
+        "setting": "Close Background Apps",
+        "value": "Recommended"
+      },
+      {
+        "category": "System",
+        "reason": "DPI scaling above 100% can affect WebGL rendering performance.",
+        "setting": "Display Scaling",
+        "value": "100% (native) preferred"
+      }
     ],
     "include_legacy_tweaks": false,
     "is_emulator_profile": false,
@@ -1082,6 +1788,68 @@
       "CNMSettingsHandler",
       "ColorProfileSettingsHandler"
     ],
+    "in_game_settings": [
+      {
+        "category": "Chrome Settings",
+        "reason": "Essential for WebGL performance. Check chrome://gpu for status.",
+        "setting": "Hardware Acceleration",
+        "value": "Enabled"
+      },
+      {
+        "category": "Chrome Settings",
+        "reason": "chrome://flags/#use-angle - D3D11 often fastest on Windows.",
+        "setting": "Use Angle Graphics Backend",
+        "value": "OpenGL or D3D11"
+      },
+      {
+        "category": "Chrome Settings",
+        "reason": "chrome://flags/#enable-webgl-developer-extensions",
+        "setting": "WebGL Developer Extensions",
+        "value": "Enabled"
+      },
+      {
+        "category": "Chrome Settings",
+        "reason": "chrome://flags/#enable-gpu-rasterization - Offloads rendering to GPU.",
+        "setting": "GPU Rasterization",
+        "value": "Enabled"
+      },
+      {
+        "category": "Game Settings",
+        "reason": "Balance between visual quality and consistent frame rate.",
+        "setting": "Graphics Quality",
+        "value": "Medium or High"
+      },
+      {
+        "category": "Game Settings",
+        "reason": "Auto-battlers benefit from visible ability animations.",
+        "setting": "Animations",
+        "value": "On"
+      },
+      {
+        "category": "Game Settings",
+        "reason": "Audio cues can help track battle events.",
+        "setting": "Sound Effects",
+        "value": "User preference"
+      },
+      {
+        "category": "Browser Optimization",
+        "reason": "Reduces memory and CPU competition for the game tab.",
+        "setting": "Other Tabs",
+        "value": "Close or suspend inactive tabs"
+      },
+      {
+        "category": "Browser Optimization",
+        "reason": "Ad blockers are fine, but disable heavy extensions while playing.",
+        "setting": "Extensions",
+        "value": "Disable unnecessary extensions"
+      },
+      {
+        "category": "Browser Optimization",
+        "reason": "Reduces browser UI overhead and improves focus.",
+        "setting": "Full Screen Mode",
+        "value": "F11 for fullscreen"
+      }
+    ],
     "include_legacy_tweaks": false,
     "is_emulator_profile": false,
     "is_online_profile": false,
@@ -1158,6 +1926,92 @@
       "MemorySettingsHandler",
       "ColorProfileSettingsHandler"
     ],
+    "in_game_settings": [
+      {
+        "category": "=== DISPLAY SETTINGS ===",
+        "reason": "OLED panels excel at HDR. Enable in Windows Display Settings.",
+        "setting": "HDR",
+        "value": "ON"
+      },
+      {
+        "category": "Display Settings",
+        "reason": "Comfortable for extended coding sessions. Adjust in HDR settings.",
+        "setting": "SDR content brightness",
+        "value": "40-50%"
+      },
+      {
+        "category": "Display Settings",
+        "reason": "Reduces blue light for late-night coding. Settings > Display > Night light.",
+        "setting": "Night Light",
+        "value": "Scheduled (evening hours)"
+      },
+      {
+        "category": "Display Settings",
+        "reason": "Higher refresh = smoother scrolling and cursor movement.",
+        "setting": "Refresh Rate",
+        "value": "Maximum available"
+      },
+      {
+        "category": "=== MULTI-MONITOR ===",
+        "reason": "HAGS helps with mixed refresh multi-monitor setups.",
+        "setting": "Mixed refresh rate monitors",
+        "value": "Hardware-accelerated GPU scheduling ON"
+      },
+      {
+        "category": "Multi-Monitor",
+        "reason": "Smooth scrolling in browsers and editors.",
+        "setting": "VRR/G-Sync",
+        "value": "Enable for windowed and full screen mode"
+      },
+      {
+        "category": "Multi-Monitor",
+        "reason": "Taskbar and new windows appear on primary monitor.",
+        "setting": "Primary monitor",
+        "value": "Set to your main OLED display"
+      },
+      {
+        "category": "=== OLED CARE ===",
+        "reason": "Prevent burn-in from static UI elements. Windows Settings > Power.",
+        "setting": "Screen timeout",
+        "value": "5-10 minutes"
+      },
+      {
+        "category": "OLED Care",
+        "reason": "Reduces OLED power draw and potential burn-in from bright backgrounds.",
+        "setting": "Dark mode",
+        "value": "Enable in Windows and apps"
+      },
+      {
+        "category": "OLED Care",
+        "reason": "Reduces static elements. Right-click taskbar > Taskbar settings.",
+        "setting": "Taskbar auto-hide",
+        "value": "Consider enabling"
+      },
+      {
+        "category": "OLED Care",
+        "reason": "Most OLED monitors have built-in pixel refresh cycles.",
+        "setting": "Pixel refresh",
+        "value": "Run periodically per monitor manufacturer"
+      },
+      {
+        "category": "=== APP SETTINGS ===",
+        "reason": "Easier on eyes and OLED-friendly.",
+        "setting": "VS Code theme",
+        "value": "Dark theme (e.g., Dark+, One Dark Pro)"
+      },
+      {
+        "category": "App Settings",
+        "reason": "Chrome: Settings > Appearance. Firefox: about:config darkmode.",
+        "setting": "Browser dark mode",
+        "value": "Enable via extension or settings"
+      },
+      {
+        "category": "App Settings",
+        "reason": "Enables GPU rendering for smoother scrolling.",
+        "setting": "Hardware acceleration",
+        "value": "ON in browsers and editors"
+      }
+    ],
     "include_legacy_tweaks": false,
     "is_emulator_profile": false,
     "is_online_profile": false,
@@ -1233,6 +2087,194 @@
       "CNMSettingsHandler",
       "ColorProfileSettingsHandler"
     ],
+    "in_game_settings": [
+      {
+        "category": "=== DEFAULT: NO-SYNC (Minimum Latency) ===",
+        "reason": "Absolute minimum click-to-pixel latency. No sync = no sync overhead. At 300Hz, tearing is barely visible. This is the competitive standard for fighting games.",
+        "setting": "Overview",
+        "value": "G-SYNC OFF, V-SYNC OFF, 300Hz, Uncapped/240 FPS"
+      },
+      {
+        "category": "Nvidia Control Panel",
+        "reason": "Display > Set up G-SYNC. Uncheck 'Enable G-SYNC, G-SYNC Compatible'. Eliminates all VRR overhead. Frames display immediately when ready.",
+        "setting": "Set up G-SYNC",
+        "value": "UNCHECKED (Disabled)"
+      },
+      {
+        "category": "Nvidia Control Panel",
+        "reason": "Manage 3D Settings > Program Settings > Rivals2.exe. No sync = frames render and display with zero sync latency.",
+        "setting": "Vertical sync",
+        "value": "Off"
+      },
+      {
+        "category": "Nvidia Control Panel",
+        "reason": "Manage 3D Settings. Reduces render queue depth from ~3 frames to ~1-2. Note: Limited effect in DX12/UE5 games. CAN cause stuttering on some systems - if you experience micro-stutter, try 'Off' or use Nvidia Profile Inspector to set Max Pre-Rendered Frames to 2 (middle ground between latency and smoothness).",
+        "setting": "Low Latency Mode",
+        "value": "On (or Off if stuttering)"
+      },
+      {
+        "category": "Nvidia Control Panel",
+        "reason": "Manage 3D Settings. Let GPU render as fast as possible. Use in-game cap if needed, not NVCP (in-game has lower limiter latency).",
+        "setting": "Max Frame Rate",
+        "value": "Off"
+      },
+      {
+        "category": "Nvidia Control Panel",
+        "reason": "Manage 3D Settings. Prevents GPU downclocking for consistent frametimes.",
+        "setting": "Power management mode",
+        "value": "Prefer maximum performance"
+      },
+      {
+        "category": "Nvidia Control Panel",
+        "reason": "Manage 3D Settings. Only relevant with V-SYNC on (which we disable).",
+        "setting": "Triple buffering",
+        "value": "Off"
+      },
+      {
+        "category": "Nvidia Control Panel",
+        "reason": "Display > Change resolution. CRITICAL for no-sync setup: 300Hz = 3.33ms scanout vs 240Hz = 4.17ms. Monitor refresh rate directly determines scanout speed.",
+        "setting": "Preferred refresh rate",
+        "value": "Highest available (300Hz)"
+      },
+      {
+        "category": "Windows Settings",
+        "reason": "Settings > System > Display > Advanced display. WITHOUT G-SYNC, monitor refresh rate DIRECTLY determines scanout time. 300Hz = 3.33ms scanout. 240Hz = 4.17ms scanout. Always use max refresh.",
+        "setting": "Refresh Rate",
+        "value": "300Hz (MUST be at max)"
+      },
+      {
+        "category": "Windows Settings",
+        "reason": "Settings > System > Display > Graphics > Change default graphics settings. Not needed with G-SYNC disabled. Turn off to be explicit.",
+        "setting": "Variable refresh rate",
+        "value": "Off"
+      },
+      {
+        "category": "In-Game Video",
+        "reason": "No sync of any kind. Frames display immediately when ready.",
+        "setting": "V-SYNC",
+        "value": "Off"
+      },
+      {
+        "category": "In-Game Video",
+        "reason": "Rivals 2 now supports custom FPS caps (1-999). For no-sync, set 999 for effectively uncapped. No limiter = no limiter latency. FPS will exceed 300 if GPU capable - this is intended for minimum latency with no-sync setup.",
+        "setting": "Frame Rate Cap",
+        "value": "999 (uncapped) or highest your GPU sustains"
+      },
+      {
+        "category": "In-Game Video",
+        "reason": "Required for no-sync. Borderless windowed adds compositor latency.",
+        "setting": "Display Mode",
+        "value": "Exclusive Fullscreen"
+      },
+      {
+        "category": "=== ALTERNATIVE: VRR (Tear-Free) ===",
+        "reason": "Use this if tearing bothers you. Adds ~2-5ms latency vs no-sync. V-SYNC acts as safety net only - never activates with FPS capped below refresh. For 300Hz: cap at 297. For 240Hz: cap at 237. For 144Hz: cap at 141.",
+        "setting": "Overview",
+        "value": "G-SYNC ON, V-SYNC ON (NVCP), in-game cap at refresh-3"
+      },
+      {
+        "category": "Nvidia Control Panel (VRR Alternative)",
+        "reason": "Display > Set up G-SYNC. Check 'Enable G-SYNC' and 'Enable for full screen mode'.",
+        "setting": "Set up G-SYNC",
+        "value": "Enable G-SYNC, G-SYNC Compatible: ON"
+      },
+      {
+        "category": "Nvidia Control Panel (VRR Alternative)",
+        "reason": "Manage 3D Settings. Acts as SAFETY NET only with G-SYNC. With FPS capped at 240 on 300Hz monitor, V-SYNC never engages.",
+        "setting": "Vertical sync",
+        "value": "On"
+      },
+      {
+        "category": "Nvidia Control Panel (VRR Alternative)",
+        "reason": "Reduces render queue. 'Ultra' overrides manual FPS caps - avoid with G-SYNC. 'On' may cause micro-stutter on some systems. If stuttering occurs, try 'Off' or use Nvidia Profile Inspector to manually set Pre-Rendered Frames to 2-3.",
+        "setting": "Low Latency Mode",
+        "value": "On (or Off if stuttering)"
+      },
+      {
+        "category": "In-Game Video (VRR Alternative)",
+        "reason": "ALWAYS disable in-game V-SYNC with G-SYNC. NVCP V-SYNC handles sync.",
+        "setting": "V-SYNC",
+        "value": "Off (CRITICAL)"
+      },
+      {
+        "category": "In-Game Video (VRR Alternative)",
+        "reason": "Must cap below refresh for G-SYNC to work properly. With custom cap support (1-999), set exactly 3 below your refresh rate. In-game limiter has lower latency than NVCP/RTSS limiters.",
+        "setting": "Frame Rate Cap",
+        "value": "Refresh rate - 3 (e.g., 297 for 300Hz)"
+      },
+      {
+        "category": "In-Game Video (Both)",
+        "reason": "Native resolution for sharpest visuals. Lower only if GPU-limited and can't maintain FPS cap.",
+        "setting": "Resolution Scale",
+        "value": "100% (Native)"
+      },
+      {
+        "category": "In-Game Video (Both)",
+        "reason": "Stable frametimes matter more than visual fidelity. Reduce settings if dropping below your FPS cap. Fighting games are about consistent frame delivery.",
+        "setting": "Graphics Quality",
+        "value": "Medium-High (prioritize stable FPS)"
+      },
+      {
+        "category": "In-Game Video (Both)",
+        "reason": "Obscures visual clarity in fast-paced combat. Always disable for competitive play.",
+        "setting": "Motion Blur",
+        "value": "Off"
+      },
+      {
+        "category": "In-Game Video (Both)",
+        "reason": "UE5 uses TAA-based AA. Disable if it causes ghosting on fast-moving characters.",
+        "setting": "Anti-Aliasing",
+        "value": "TAA (or disable if ghosting)"
+      },
+      {
+        "category": "In-Game Video (Both)",
+        "reason": "Rivals 2 does not implement NVIDIA Reflex. Combined with UE5/DX12 (where LLM has limited effect), there's no driver-level latency reduction for this game. Focus on proper FPS cap + system optimization.",
+        "setting": "NVIDIA Reflex",
+        "value": "Not available"
+      },
+      {
+        "category": "Audio (Both)",
+        "reason": "Audio cues are important for reactions. Lower is better but may cause crackling if too aggressive.",
+        "setting": "Audio Latency",
+        "value": "Lowest stable setting"
+      },
+      {
+        "category": "Controller (Both)",
+        "reason": "Wired/USB dongle: 1-4ms latency. Bluetooth: 10-20ms+ latency. Never use Bluetooth for competitive play.",
+        "setting": "Input Method",
+        "value": "Wired or 2.4GHz wireless dongle"
+      },
+      {
+        "category": "Latency Comparison",
+        "reason": "| Configuration           | Scanout | Limiter | Tearing | Total Relative |\n|-------------------------|---------|---------|---------|----------------|\n| No sync, 999 cap 300Hz  | ~3.3ms  | ~0ms    | Yes     | LOWEST (DEFAULT)|\n| G-SYNC+VSYNC, 297 cap   | ~3.4ms  | ~0.5ms  | No      | +2-3ms (VRR)   |\n\nWITHOUT G-SYNC: Monitor refresh rate DIRECTLY affects scanout. 300Hz = 3.33ms. WITH G-SYNC: Scanout matches FPS. 297fps = 3.37ms scanout.",
+        "setting": "Expected results at 300Hz monitor",
+        "value": "See table below"
+      },
+      {
+        "category": "Latency Comparison",
+        "reason": "Rivals 2 now supports custom FPS caps (1-999).\n\n| Setup | Recommended Cap | Why |\n|-------|-----------------|-----|\n| No-sync 300Hz | 999 | Uncapped = no limiter latency |\n| G-Sync 300Hz | 297 | Refresh - 3 for G-Sync headroom |\n| G-Sync 240Hz | 237 | Refresh - 3 for G-Sync headroom |\n| G-Sync 144Hz | 141 | Refresh - 3 for G-Sync headroom |\n\nIn-game limiter (~0.5ms overhead) is faster than NVCP/RTSS (~2-4ms overhead).",
+        "setting": "Custom FPS cap recommendations",
+        "value": "Set based on your monitor and sync mode"
+      },
+      {
+        "category": "Latency Comparison",
+        "reason": "WITHOUT G-SYNC, scanout time = 1000ms / refresh rate:\n- 300Hz: 3.33ms scanout (faster)\n- 240Hz: 4.17ms scanout (slower)\n\nThis is different from G-SYNC where scanout matches FPS. For no-sync, monitor MUST be at 300Hz for minimum latency.",
+        "setting": "Why 300Hz matters for no-sync",
+        "value": "Scanout time is fixed by refresh rate"
+      },
+      {
+        "category": "Troubleshooting",
+        "reason": "Low Latency Mode reduces the render queue, which CAN cause stuttering on some hardware/game combinations - especially if CPU-bound or with variable frame times. Try these in order:\n1. Set Low Latency Mode to 'Off' in NVCP\n2. Use Nvidia Profile Inspector to set 'Maximum Pre-Rendered Frames' to 2 (provides buffer against frame time variance while keeping latency reasonable)\n3. If still stuttering, try Pre-Rendered Frames = 3 (driver default)\n\nThese settings are hardware-dependent. Test and find what works for YOUR system.",
+        "setting": "If experiencing micro-stuttering",
+        "value": "Adjust Low Latency Mode / Pre-Rendered Frames"
+      },
+      {
+        "category": "Final Recommendation",
+        "reason": "Fighting games prioritize minimum latency. At 300Hz, tearing is barely visible (~3.33ms tear lines). The no-sync setup provides absolute minimum click-to-pixel latency. Use VRR alternative only if tearing genuinely bothers you - it adds ~2-5ms. NOTE: These recommendations are based on common setups but may not be optimal for all hardware. If you experience stuttering, see the Troubleshooting section above.",
+        "setting": "Default configuration",
+        "value": "No-Sync (G-SYNC OFF, V-SYNC OFF, 300Hz)"
+      }
+    ],
     "include_legacy_tweaks": false,
     "is_emulator_profile": false,
     "is_online_profile": false,
@@ -1269,6 +2311,7 @@
         "disable_notifications": true
       },
       "NvidiaSettingsHandler": {
+        "global_vrr_mode": "off",
         "preset": "no_sync_fighting_game"
       },
       "PowerSettingsHandler": {
@@ -1330,6 +2373,50 @@
       "CNMSettingsHandler",
       "ColorProfileSettingsHandler"
     ],
+    "in_game_settings": [
+      {
+        "category": "Profile",
+        "reason": "No compromises. Everything maxed.",
+        "setting": "Mode",
+        "value": "300Hz MAXIMUM PERFORMANCE"
+      },
+      {
+        "category": "Display",
+        "reason": "Maximum refresh for minimum scanout latency.",
+        "setting": "Refresh Rate",
+        "value": "300Hz (locked)"
+      },
+      {
+        "category": "Display",
+        "reason": "True exclusive for lowest latency.",
+        "setting": "Display Mode",
+        "value": "Exclusive Fullscreen"
+      },
+      {
+        "category": "NVIDIA",
+        "reason": "Reduces pre-render queue. Ultra has no effect in DX12/UE5 (only works in DX9/DX11).",
+        "setting": "Low Latency Mode",
+        "value": "On"
+      },
+      {
+        "category": "NVIDIA",
+        "reason": "No sync overhead.",
+        "setting": "VSync / G-SYNC",
+        "value": "OFF"
+      },
+      {
+        "category": "Power",
+        "reason": "Maximum CPU/GPU clocks.",
+        "setting": "Power Plan",
+        "value": "Ultimate Performance"
+      },
+      {
+        "category": "In-Game",
+        "reason": "Let it rip or cap at refresh-3 for headroom.",
+        "setting": "FPS Limit",
+        "value": "Uncapped or 297"
+      }
+    ],
     "include_legacy_tweaks": false,
     "is_emulator_profile": false,
     "is_online_profile": false,
@@ -1363,6 +2450,7 @@
         "preset": "gaming"
       },
       "NvidiaSettingsHandler": {
+        "global_vrr_mode": "off",
         "low_latency_mode": "on",
         "max_frame_rate": "off",
         "power_management": "prefer_max_performance",
@@ -1429,6 +2517,62 @@
       "Rivals2ConfigHandler",
       "CNMSettingsHandler",
       "ColorProfileSettingsHandler"
+    ],
+    "in_game_settings": [
+      {
+        "category": "=== G-SYNC PROFILE ===",
+        "reason": "Tear-free low-latency VRR profile. VSync acts as safety net only \u2014 never activates with FPS capped below refresh rate. For 300Hz: cap at 297. For 240Hz: cap at 237. For 144Hz: cap at 141.",
+        "setting": "Overview",
+        "value": "G-SYNC ON, VSync ON (NVCP), FPS cap at refresh-3"
+      },
+      {
+        "category": "NVIDIA Control Panel",
+        "reason": "Display > Set up G-SYNC. Check 'Enable G-SYNC' and 'Enable for full screen mode'.",
+        "setting": "Set up G-SYNC",
+        "value": "Enable G-SYNC, G-SYNC Compatible: ON"
+      },
+      {
+        "category": "NVIDIA Control Panel",
+        "reason": "Manage 3D Settings. Acts as SAFETY NET only with G-SYNC. With FPS capped below refresh, VSync never engages.",
+        "setting": "Vertical sync",
+        "value": "On"
+      },
+      {
+        "category": "NVIDIA Control Panel",
+        "reason": "Reduces render queue depth. Limited effect in DX12/UE5 but 'On' is correct (not 'Off' \u2014 Rivals 2 has no Reflex). If stuttering occurs, try 'Off' or set Pre-Rendered Frames to 2 via Nvidia Profile Inspector.",
+        "setting": "Low Latency Mode",
+        "value": "On"
+      },
+      {
+        "category": "NVIDIA Control Panel",
+        "reason": "ABSO auto-detects your refresh rate and caps at refresh-3. Keeps G-SYNC active and VSync from engaging.",
+        "setting": "Max Frame Rate",
+        "value": "Refresh rate - 3 (auto-set by ABSO)"
+      },
+      {
+        "category": "In-Game Video",
+        "reason": "Required for proper G-SYNC behavior. Borderless adds compositor latency.",
+        "setting": "Display Mode",
+        "value": "Exclusive Fullscreen"
+      },
+      {
+        "category": "In-Game Video",
+        "reason": "ALWAYS disable in-game VSync with G-SYNC. NVCP VSync handles sync.",
+        "setting": "V-SYNC",
+        "value": "Off"
+      },
+      {
+        "category": "In-Game Video",
+        "reason": "Must cap below refresh for G-SYNC to work properly. In-game limiter has lower latency than NVCP/RTSS limiters.",
+        "setting": "Frame Rate Cap",
+        "value": "Refresh rate - 3 (e.g., 297 for 300Hz)"
+      },
+      {
+        "category": "In-Game Video",
+        "reason": "Rivals 2 does not implement NVIDIA Reflex. LLM 'On' is set via NVCP instead. This is different from OW2/Fortnite where Reflex handles queue control.",
+        "setting": "NVIDIA Reflex",
+        "value": "Not available"
+      }
     ],
     "include_legacy_tweaks": false,
     "is_emulator_profile": false,
@@ -1531,6 +2675,56 @@
       "CNMSettingsHandler",
       "ColorProfileSettingsHandler"
     ],
+    "in_game_settings": [
+      {
+        "category": "=== OFFLINE PROFILE ===",
+        "reason": "This profile is for OFFLINE play only. Use ONLINE profile for matchmaking.",
+        "setting": "Use Case",
+        "value": "Training, Local VS, CPU, Replays"
+      },
+      {
+        "category": "NVIDIA Control Panel",
+        "reason": "No sync overhead for minimum latency. Tearing is acceptable offline.",
+        "setting": "G-SYNC",
+        "value": "Off"
+      },
+      {
+        "category": "NVIDIA Control Panel",
+        "reason": "No sync \u2014 minimum latency path.",
+        "setting": "Vertical Sync",
+        "value": "Off"
+      },
+      {
+        "category": "NVIDIA Control Panel",
+        "reason": "Reduces pre-render queue to 1 frame. Ultra has no effect in DX12/UE5 (only works in DX9/DX11).",
+        "setting": "Low Latency Mode",
+        "value": "On"
+      },
+      {
+        "category": "NVIDIA Control Panel",
+        "reason": "No artificial limiting. Use in-game limiter if needed.",
+        "setting": "Max Frame Rate",
+        "value": "Off (uncapped)"
+      },
+      {
+        "category": "In-Game Settings",
+        "reason": "Native engine frame pacing, driver handles sync.",
+        "setting": "V-Sync",
+        "value": "OFF"
+      },
+      {
+        "category": "External Tools",
+        "reason": "External limiters and frame pacing hooks are permitted for offline.",
+        "setting": "RTSS",
+        "value": "ALLOWED"
+      },
+      {
+        "category": "Validation",
+        "reason": "FPS should run uncapped without hitching. Tearing is expected.",
+        "setting": "Expected Behavior",
+        "value": "Uncapped FPS, no sync overhead"
+      }
+    ],
     "include_legacy_tweaks": false,
     "is_emulator_profile": false,
     "is_online_profile": false,
@@ -1567,6 +2761,7 @@
         "disable_notifications": true
       },
       "NvidiaSettingsHandler": {
+        "global_vrr_mode": "off",
         "low_latency_mode": "on",
         "max_frame_rate": "off",
         "power_management": "prefer_max_performance",
@@ -1639,6 +2834,74 @@
       "CNMSettingsHandler",
       "ColorProfileSettingsHandler"
     ],
+    "in_game_settings": [
+      {
+        "category": "=== ONLINE PROFILE ===",
+        "reason": "This profile prioritizes STABILITY for rollback netcode.",
+        "setting": "Use Case",
+        "value": "Ranked, Unranked, Rollback Sessions"
+      },
+      {
+        "category": "=== EXPLICIT PROHIBITIONS ===",
+        "reason": "These cause rollback timing failures at 300Hz. Stability > latency online.",
+        "setting": "DO NOT USE",
+        "value": "LLM Ultra, Fast VSync, External FPS Caps, Refresh-3 Logic"
+      },
+      {
+        "category": "NVIDIA Control Panel",
+        "reason": "VRR OFF for online - adds ~2-5ms latency overhead.",
+        "setting": "G-SYNC / VRR",
+        "value": "OFF"
+      },
+      {
+        "category": "NVIDIA Control Panel",
+        "reason": "OFF - rollback netcode is timing-sensitive, high-refresh tearing is negligible.",
+        "setting": "Vertical Sync",
+        "value": "OFF"
+      },
+      {
+        "category": "NVIDIA Control Panel",
+        "reason": "OFF - prevents UE5 driver contention issues.",
+        "setting": "Threaded Optimization",
+        "value": "OFF"
+      },
+      {
+        "category": "NVIDIA Control Panel",
+        "reason": "ON (not Ultra) - Ultra can cause frame pacing issues and overrides FPS caps.",
+        "setting": "Low Latency Mode",
+        "value": "On"
+      },
+      {
+        "category": "NVIDIA Control Panel",
+        "reason": "No external FPS cap \u2014 uncapped for online play.",
+        "setting": "Max Frame Rate",
+        "value": "DISABLED"
+      },
+      {
+        "category": "In-Game Settings",
+        "reason": "Native engine timing must remain authoritative.",
+        "setting": "V-Sync",
+        "value": "OFF"
+      },
+      {
+        "category": "External Tools",
+        "reason": "External limiters cause limiter contention with rollback. Disable all.",
+        "setting": "RTSS / Frame Limiters",
+        "value": "DISABLED"
+      },
+      {
+        "category": "Monitoring",
+        "reason": "Monitoring overlays are fine, but no frame pacing intervention.",
+        "setting": "Overlays",
+        "value": "ALLOWED (read-only)"
+      },
+      {
+        "category": "Validation",
+        "reason": "Rollback resync frames must not cause cascading frame loss.",
+        "setting": "Expected Behavior",
+        "value": "Minor frametime variance OK, no persistent VRR dropouts"
+      }
+    ],
     "include_legacy_tweaks": false,
     "is_emulator_profile": false,
     "is_online_profile": true,
@@ -1675,6 +2938,7 @@
         "disable_notifications": true
       },
       "NvidiaSettingsHandler": {
+        "global_vrr_mode": "off",
         "low_latency_mode": "on",
         "max_frame_rate": "off",
         "power_management": "prefer_max_performance",
@@ -1744,6 +3008,62 @@
       "Rivals2ConfigHandler",
       "CNMSettingsHandler",
       "ColorProfileSettingsHandler"
+    ],
+    "in_game_settings": [
+      {
+        "category": "=== ONLINE G-SYNC PROFILE ===",
+        "reason": "Tear-free VRR for online play. Stability constraints applied for SnapNet rollback netcode. Threaded optimization OFF to prevent UE5 driver contention during rollback recovery.",
+        "setting": "Overview",
+        "value": "G-SYNC ON, Rollback-Safe, Stability-Focused"
+      },
+      {
+        "category": "NVIDIA Control Panel",
+        "reason": "Display > Set up G-SYNC. Check 'Enable G-SYNC' and 'Enable for full screen mode'.",
+        "setting": "Set up G-SYNC",
+        "value": "Enable G-SYNC, G-SYNC Compatible: ON"
+      },
+      {
+        "category": "NVIDIA Control Panel",
+        "reason": "NVCP VSync as safety net only. Never engages with FPS capped below refresh.",
+        "setting": "Vertical sync",
+        "value": "On (safety net)"
+      },
+      {
+        "category": "NVIDIA Control Panel",
+        "reason": "OFF \u2014 prevents UE5 driver contention that can destabilize rollback timing.",
+        "setting": "Threaded Optimization",
+        "value": "Off"
+      },
+      {
+        "category": "NVIDIA Control Panel",
+        "reason": "Ultra can cause frame pacing issues and overrides FPS caps. 'On' reduces queue depth safely for online play.",
+        "setting": "Low Latency Mode",
+        "value": "On (NOT Ultra)"
+      },
+      {
+        "category": "In-Game Video",
+        "reason": "Required for proper G-SYNC behavior.",
+        "setting": "Display Mode",
+        "value": "Exclusive Fullscreen"
+      },
+      {
+        "category": "In-Game Video",
+        "reason": "NVCP VSync handles sync. In-game VSync must be off with G-SYNC.",
+        "setting": "V-SYNC",
+        "value": "Off"
+      },
+      {
+        "category": "In-Game Video",
+        "reason": "Keeps G-SYNC active. Use in-game cap for lowest limiter latency.",
+        "setting": "Frame Rate Cap",
+        "value": "Refresh rate - 3"
+      },
+      {
+        "category": "Validation",
+        "reason": "G-SYNC smooths frame delivery. Conservative priority prevents timing contention.",
+        "setting": "Expected Behavior",
+        "value": "Tear-free, stable frametimes, no rollback dropouts"
+      }
     ],
     "include_legacy_tweaks": false,
     "is_emulator_profile": false,
@@ -1845,6 +3165,74 @@
       "CNMSettingsHandler",
       "ColorProfileSettingsHandler"
     ],
+    "in_game_settings": [
+      {
+        "category": "=== ONLINE PROFILE ===",
+        "reason": "This profile prioritizes STABILITY for rollback netcode.",
+        "setting": "Use Case",
+        "value": "Ranked, Unranked, Rollback Sessions"
+      },
+      {
+        "category": "=== EXPLICIT PROHIBITIONS ===",
+        "reason": "These cause rollback timing failures at 300Hz. Stability > latency online.",
+        "setting": "DO NOT USE",
+        "value": "LLM Ultra, Fast VSync, External FPS Caps, Refresh-3 Logic"
+      },
+      {
+        "category": "NVIDIA Control Panel",
+        "reason": "VRR OFF for online - adds ~2-5ms latency overhead.",
+        "setting": "G-SYNC / VRR",
+        "value": "OFF"
+      },
+      {
+        "category": "NVIDIA Control Panel",
+        "reason": "OFF - rollback netcode is timing-sensitive, high-refresh tearing is negligible.",
+        "setting": "Vertical Sync",
+        "value": "OFF"
+      },
+      {
+        "category": "NVIDIA Control Panel",
+        "reason": "OFF - prevents UE5 driver contention issues.",
+        "setting": "Threaded Optimization",
+        "value": "OFF"
+      },
+      {
+        "category": "NVIDIA Control Panel",
+        "reason": "ON (not Ultra) - Ultra can cause frame pacing issues and overrides FPS caps.",
+        "setting": "Low Latency Mode",
+        "value": "On"
+      },
+      {
+        "category": "NVIDIA Control Panel",
+        "reason": "No external FPS cap \u2014 uncapped for online play.",
+        "setting": "Max Frame Rate",
+        "value": "DISABLED"
+      },
+      {
+        "category": "In-Game Settings",
+        "reason": "Native engine timing must remain authoritative.",
+        "setting": "V-Sync",
+        "value": "OFF"
+      },
+      {
+        "category": "External Tools",
+        "reason": "External limiters cause limiter contention with rollback. Disable all.",
+        "setting": "RTSS / Frame Limiters",
+        "value": "DISABLED"
+      },
+      {
+        "category": "Monitoring",
+        "reason": "Monitoring overlays are fine, but no frame pacing intervention.",
+        "setting": "Overlays",
+        "value": "ALLOWED (read-only)"
+      },
+      {
+        "category": "Validation",
+        "reason": "Rollback resync frames must not cause cascading frame loss.",
+        "setting": "Expected Behavior",
+        "value": "Minor frametime variance OK, no persistent VRR dropouts"
+      }
+    ],
     "include_legacy_tweaks": false,
     "is_emulator_profile": false,
     "is_online_profile": true,
@@ -1881,6 +3269,7 @@
         "disable_notifications": true
       },
       "NvidiaSettingsHandler": {
+        "global_vrr_mode": "off",
         "low_latency_mode": "on",
         "max_frame_rate": "off",
         "power_management": "prefer_max_performance",
@@ -1967,6 +3356,200 @@
       "CNMSettingsHandler",
       "ColorProfileSettingsHandler"
     ],
+    "in_game_settings": [
+      {
+        "category": "=== TOURNAMENT SIMULATION PROFILE ===",
+        "reason": "This profile simulates 144-144Hz tournament PCs, NOT minimum latency.",
+        "setting": "Purpose",
+        "value": "Practice transfer to tournament conditions"
+      },
+      {
+        "category": "=== EXPLICIT PROHIBITIONS ===",
+        "reason": "These settings are explicitly prohibited for tournament simulation accuracy.",
+        "setting": "FORBIDDEN",
+        "value": "LLM Ultra, Fast Sync, VRR/G-SYNC, Overlays"
+      },
+      {
+        "category": "Display Configuration",
+        "reason": "Tournament standard. System will override to 144Hz if different.",
+        "setting": "Monitor Refresh Rate",
+        "value": "144 Hz"
+      },
+      {
+        "category": "Display Configuration",
+        "reason": "Required for consistent frame delivery.",
+        "setting": "Display Mode",
+        "value": "Exclusive Fullscreen"
+      },
+      {
+        "category": "Display Configuration",
+        "reason": "Tournaments disable VSync for input responsiveness.",
+        "setting": "VSync",
+        "value": "OFF"
+      },
+      {
+        "category": "Display Configuration",
+        "reason": "Tournament PCs do not use VRR. Disabled for practice transfer.",
+        "setting": "VRR / G-SYNC",
+        "value": "OFF (FORBIDDEN)"
+      },
+      {
+        "category": "Frame Rate Control",
+        "reason": "In-game cap at refresh rate. One authoritative cap only.",
+        "setting": "In-game FPS Limit",
+        "value": "144 FPS"
+      },
+      {
+        "category": "Frame Rate Control",
+        "reason": "Uncapped in driver - in-game cap is authoritative.",
+        "setting": "Driver FPS Cap (NVIDIA)",
+        "value": "OFF"
+      },
+      {
+        "category": "Frame Rate Control",
+        "reason": "Only one FPS cap allowed - the in-game cap.",
+        "setting": "Secondary Caps",
+        "value": "NONE (driver cap OFF, RTSS disabled)"
+      },
+      {
+        "category": "NVIDIA Control Panel",
+        "reason": "ON reduces queue depth. Ultra is FORBIDDEN for tournament sim.",
+        "setting": "Low Latency Mode",
+        "value": "ON (not Ultra)"
+      },
+      {
+        "category": "NVIDIA Control Panel",
+        "reason": "Driver cap OFF - in-game 144 FPS cap is authoritative.",
+        "setting": "Max Frame Rate",
+        "value": "Off"
+      },
+      {
+        "category": "NVIDIA Control Panel",
+        "reason": "Tournaments disable VSync.",
+        "setting": "Vertical sync",
+        "value": "Off"
+      },
+      {
+        "category": "NVIDIA Control Panel",
+        "reason": "Tournament PCs do not have G-SYNC enabled.",
+        "setting": "G-SYNC",
+        "value": "Off (FORBIDDEN)"
+      },
+      {
+        "category": "NVIDIA Control Panel",
+        "reason": "Consistent GPU clocks for stable frame times.",
+        "setting": "Power management mode",
+        "value": "Prefer maximum performance"
+      },
+      {
+        "category": "NVIDIA Control Panel",
+        "reason": "Prevents UE5 driver contention.",
+        "setting": "Threaded optimization",
+        "value": "Off"
+      },
+      {
+        "category": "NVIDIA Control Panel",
+        "reason": "Irrelevant without VSync.",
+        "setting": "Triple buffering",
+        "value": "Off"
+      },
+      {
+        "category": "Windows Settings",
+        "reason": "Prioritizes game process.",
+        "setting": "Game Mode",
+        "value": "ON"
+      },
+      {
+        "category": "Windows Settings",
+        "reason": "Hardware Accelerated GPU Scheduling enabled.",
+        "setting": "HAGS",
+        "value": "ON"
+      },
+      {
+        "category": "Windows Settings",
+        "reason": "True exclusive fullscreen for lowest latency.",
+        "setting": "Fullscreen Optimizations",
+        "value": "OFF (per executable)"
+      },
+      {
+        "category": "Windows Settings",
+        "reason": "Background capture disabled.",
+        "setting": "Game Bar / DVR",
+        "value": "OFF"
+      },
+      {
+        "category": "Windows Settings",
+        "reason": "Rivals 2 is SDR. HDR causes washed colors.",
+        "setting": "HDR / Auto HDR",
+        "value": "OFF"
+      },
+      {
+        "category": "Power / Scheduling",
+        "reason": "Standardized on Ultimate Performance for consistent clocks.",
+        "setting": "Power Plan",
+        "value": "Ultimate Performance"
+      },
+      {
+        "category": "Power / Scheduling",
+        "reason": "High / Realtime priority is FORBIDDEN.",
+        "setting": "CPU Priority",
+        "value": "Normal or Above Normal"
+      },
+      {
+        "category": "Overlays / Injection",
+        "reason": "All overlays must be disabled for tournament sim.",
+        "setting": "Steam Overlay",
+        "value": "DISABLED"
+      },
+      {
+        "category": "Overlays / Injection",
+        "reason": "All overlays must be disabled for tournament sim.",
+        "setting": "Discord Overlay",
+        "value": "DISABLED"
+      },
+      {
+        "category": "Overlays / Injection",
+        "reason": "All overlays must be disabled for tournament sim.",
+        "setting": "NVIDIA Overlay / GFE",
+        "value": "DISABLED"
+      },
+      {
+        "category": "Overlays / Injection",
+        "reason": "All overlays and frame limiters must be disabled.",
+        "setting": "RTSS",
+        "value": "DISABLED"
+      },
+      {
+        "category": "Enforcement Rules",
+        "reason": "This is NOT rivals2-online or rivals2-offline-lab.",
+        "setting": "Distinct from other profiles",
+        "value": "Yes"
+      },
+      {
+        "category": "Enforcement Rules",
+        "reason": "VRR must never be enabled for this profile.",
+        "setting": "VRR enforcement",
+        "value": "NEVER enabled"
+      },
+      {
+        "category": "Enforcement Rules",
+        "reason": "FPS should match the 144Hz cap for tournament simulation.",
+        "setting": "FPS ceiling",
+        "value": "144 (via in-game cap)"
+      },
+      {
+        "category": "Enforcement Rules",
+        "reason": "System refresh will be overridden to 144Hz.",
+        "setting": "Refresh override",
+        "value": "Force 144Hz if different"
+      },
+      {
+        "category": "Enforcement Rules",
+        "reason": "NOT for ranked ladder optimization.",
+        "setting": "Intended use",
+        "value": "Online practice, offline friendlies, tournament simulation"
+      }
+    ],
     "include_legacy_tweaks": false,
     "is_emulator_profile": false,
     "is_online_profile": false,
@@ -2000,6 +3583,7 @@
         "preset": "default"
       },
       "NvidiaSettingsHandler": {
+        "global_vrr_mode": "off",
         "low_latency_mode": "on",
         "max_frame_rate": "off",
         "power_management": "prefer_max_performance",
@@ -2063,6 +3647,194 @@
       "CNMSettingsHandler",
       "ColorProfileSettingsHandler"
     ],
+    "in_game_settings": [
+      {
+        "category": "=== WINDOWS SETTINGS ===",
+        "reason": "HAGS works well with Vulkan (Ryujinx's primary backend). Similar to DX12, Vulkan's scheduling model benefits from HAGS.",
+        "setting": "Hardware Accelerated GPU Scheduling (HAGS)",
+        "value": "On"
+      },
+      {
+        "category": "Windows Settings",
+        "reason": "VRROptimizeEnable=1 keeps Windows compositor logic in the path. Disabling may reduce latency for fixed-framerate emulators.",
+        "setting": "VRR Optimize",
+        "value": "Off (critical!)"
+      },
+      {
+        "category": "Windows Settings",
+        "reason": "Prioritizes game processes and reduces background activity.",
+        "setting": "Game Mode",
+        "value": "On"
+      },
+      {
+        "category": "=== NVIDIA CONTROL PANEL ===",
+        "reason": "SSBU runs at fixed 60fps - G-SYNC adds overhead syncing to a constant rate. Disabling removes sync latency. High refresh still helps via reduced scanout.",
+        "setting": "G-SYNC",
+        "value": "Off"
+      },
+      {
+        "category": "NVCP",
+        "reason": "Disabling V-SYNC eliminates frame queue latency. May cause minor tearing.",
+        "setting": "V-SYNC",
+        "value": "Off"
+      },
+      {
+        "category": "NVCP",
+        "reason": "LLM has no effect on Vulkan render queues (only works in DX9/DX11). Setting to Off for accuracy. Ryujinx manages its own frame pacing.",
+        "setting": "Low Latency Mode",
+        "value": "Off"
+      },
+      {
+        "category": "NVCP",
+        "reason": "Critical for emulators! Ryujinx compiles shaders on-the-fly. Unlimited cache prevents stutter from shader recompilation.",
+        "setting": "Shader Cache Size",
+        "value": "Unlimited"
+      },
+      {
+        "category": "NVCP",
+        "reason": "Prevents GPU downclocking during gameplay.",
+        "setting": "Power Management Mode",
+        "value": "Prefer Maximum Performance"
+      },
+      {
+        "category": "NVCP",
+        "reason": "Ryujinx benefits from driver threading for shader compilation.",
+        "setting": "Threaded Optimization",
+        "value": "On"
+      },
+      {
+        "category": "=== RYUJINX SETTINGS ===",
+        "reason": "Vulkan has better performance than OpenGL in Ryujinx. Works well with HAGS enabled.",
+        "setting": "Graphics Backend",
+        "value": "Vulkan"
+      },
+      {
+        "category": "Ryujinx Graphics",
+        "reason": "Disable VSync in Ryujinx for minimum latency. Let NVCP handle sync (which we also disable).",
+        "setting": "Enable VSync",
+        "value": "Off"
+      },
+      {
+        "category": "Ryujinx Graphics",
+        "reason": "Lower resolution = lower render latency. For competitive play, prioritize latency over visuals. Native or 2x is recommended.",
+        "setting": "Resolution Scale",
+        "value": "Native (1x) or 2x max"
+      },
+      {
+        "category": "Ryujinx Graphics",
+        "reason": "Native aspect ratio for proper gameplay.",
+        "setting": "Aspect Ratio",
+        "value": "16:9 (default)"
+      },
+      {
+        "category": "Ryujinx Graphics",
+        "reason": "AA adds GPU overhead. Disable for minimum latency.",
+        "setting": "Anti-Aliasing",
+        "value": "None"
+      },
+      {
+        "category": "Ryujinx Graphics",
+        "reason": "Simple filters have lowest overhead. Avoid FSR/SMAA for latency.",
+        "setting": "Scaling Filter",
+        "value": "Bilinear or Nearest"
+      },
+      {
+        "category": "Ryujinx System",
+        "reason": "PPTC caches compiled code between sessions, dramatically reducing stutter after the first run. Essential for smooth gameplay.",
+        "setting": "Enable PPTC (Profiled Persistent Translation Cache)",
+        "value": "On"
+      },
+      {
+        "category": "Ryujinx System",
+        "reason": "Disabling speeds up game loading.",
+        "setting": "Enable FS Integrity Checks",
+        "value": "Off"
+      },
+      {
+        "category": "Ryujinx System",
+        "reason": "Fastest memory mode. 'Host Unchecked' skips memory access validation for better performance. Use 'Host' if you experience crashes.",
+        "setting": "Memory Manager Mode",
+        "value": "Host Unchecked"
+      },
+      {
+        "category": "Ryujinx CPU",
+        "reason": "JIT compilation provides best performance on Windows.",
+        "setting": "CPU Backend",
+        "value": "JIT (default)"
+      },
+      {
+        "category": "=== RYUJINX AUDIO ===",
+        "reason": "SDL2 provides good latency. OpenAL is an alternative if issues occur.",
+        "setting": "Audio Backend",
+        "value": "SDL2"
+      },
+      {
+        "category": "Ryujinx Audio",
+        "reason": "Full volume - adjust in Windows mixer if needed.",
+        "setting": "Volume",
+        "value": "100%"
+      },
+      {
+        "category": "=== CONTROLLER ===",
+        "reason": "Pro Controller mapping works best for SSBU. Configure your GameCube adapter or fight stick as Pro Controller.",
+        "setting": "Controller Type",
+        "value": "Pro Controller (recommended)"
+      },
+      {
+        "category": "Controller",
+        "reason": "Wired/USB dongle: 1-4ms latency. Bluetooth: 10-20ms+ latency. Never use Bluetooth for competitive play.",
+        "setting": "Input Device",
+        "value": "Wired or 2.4GHz wireless"
+      },
+      {
+        "category": "Controller",
+        "reason": "Set appropriate deadzones for your controller to prevent drift.",
+        "setting": "Deadzones",
+        "value": "Configure per controller"
+      },
+      {
+        "category": "=== HEWDRAW REMIX ===",
+        "reason": "HewDraw Remix is loaded via mod frameworks. Ensure mods are properly installed in Ryujinx's mod directory.",
+        "setting": "HDR Installation",
+        "value": "Use Skyline or ARCropolis"
+      },
+      {
+        "category": "HewDraw Remix",
+        "reason": "Place HDR files in Ryujinx's mod folder. SSBU Title ID: 01006A800016E000",
+        "setting": "Mod Location",
+        "value": "mods/contents/[TitleID]/"
+      },
+      {
+        "category": "HewDraw Remix",
+        "reason": "HDR adds training mode features useful for competitive practice.",
+        "setting": "Training Mode Features",
+        "value": "Frame data display, input display"
+      },
+      {
+        "category": "=== DISPLAY INFO ===",
+        "reason": "60fps @ 60Hz = ~17ms scanout, 60fps @ 240Hz = ~4ms scanout. This benefit is from faster pixel refresh, NOT from VRR. Use your monitor's max refresh rate with G-Sync/VSync OFF.",
+        "setting": "High refresh benefit",
+        "value": "Reduced scanout latency (no G-Sync needed)"
+      },
+      {
+        "category": "Display Info",
+        "reason": "With 60fps on a high refresh display, tears are small and fast-moving. The latency reduction outweighs the visual artifact for competitive play.",
+        "setting": "Tearing",
+        "value": "May occur but minimal at high refresh"
+      },
+      {
+        "category": "=== EXPECTED RESULTS ===",
+        "reason": "SSBU should run at locked 60fps on modern hardware. If dropping frames, lower resolution scale or check PPTC cache status.",
+        "setting": "Target Performance",
+        "value": "Locked 60fps with low render latency"
+      },
+      {
+        "category": "Expected Results",
+        "reason": "First playthrough will have shader compilation stutter. This is cached by PPTC and subsequent runs will be smooth.",
+        "setting": "First Run Stutter",
+        "value": "Normal - PPTC needs to build"
+      }
+    ],
     "include_legacy_tweaks": false,
     "is_emulator_profile": true,
     "is_online_profile": false,
@@ -2095,6 +3867,7 @@
         "preset": "gaming"
       },
       "NvidiaSettingsHandler": {
+        "global_vrr_mode": "off",
         "low_latency_mode": "off",
         "power_management": "prefer_max_performance",
         "shader_cache": "unlimited",
@@ -2158,6 +3931,194 @@
       "CNMSettingsHandler",
       "ColorProfileSettingsHandler"
     ],
+    "in_game_settings": [
+      {
+        "category": "=== WINDOWS SETTINGS ===",
+        "reason": "HAGS works well with Vulkan (Ryujinx's primary backend). Similar to DX12, Vulkan's scheduling model benefits from HAGS.",
+        "setting": "Hardware Accelerated GPU Scheduling (HAGS)",
+        "value": "On"
+      },
+      {
+        "category": "Windows Settings",
+        "reason": "VRROptimizeEnable=1 keeps Windows compositor logic in the path. Disabling may reduce latency for fixed-framerate emulators.",
+        "setting": "VRR Optimize",
+        "value": "Off (critical!)"
+      },
+      {
+        "category": "Windows Settings",
+        "reason": "Prioritizes game processes and reduces background activity.",
+        "setting": "Game Mode",
+        "value": "On"
+      },
+      {
+        "category": "=== NVIDIA CONTROL PANEL ===",
+        "reason": "SSBU runs at fixed 60fps - G-SYNC adds overhead syncing to a constant rate. Disabling removes sync latency. High refresh still helps via reduced scanout.",
+        "setting": "G-SYNC",
+        "value": "Off"
+      },
+      {
+        "category": "NVCP",
+        "reason": "Disabling V-SYNC eliminates frame queue latency. May cause minor tearing.",
+        "setting": "V-SYNC",
+        "value": "Off"
+      },
+      {
+        "category": "NVCP",
+        "reason": "LLM has no effect on Vulkan render queues (only works in DX9/DX11). Setting to Off for accuracy. Ryujinx manages its own frame pacing.",
+        "setting": "Low Latency Mode",
+        "value": "Off"
+      },
+      {
+        "category": "NVCP",
+        "reason": "Critical for emulators! Ryujinx compiles shaders on-the-fly. Unlimited cache prevents stutter from shader recompilation.",
+        "setting": "Shader Cache Size",
+        "value": "Unlimited"
+      },
+      {
+        "category": "NVCP",
+        "reason": "Prevents GPU downclocking during gameplay.",
+        "setting": "Power Management Mode",
+        "value": "Prefer Maximum Performance"
+      },
+      {
+        "category": "NVCP",
+        "reason": "Ryujinx benefits from driver threading for shader compilation.",
+        "setting": "Threaded Optimization",
+        "value": "On"
+      },
+      {
+        "category": "=== RYUJINX SETTINGS ===",
+        "reason": "Vulkan has better performance than OpenGL in Ryujinx. Works well with HAGS enabled.",
+        "setting": "Graphics Backend",
+        "value": "Vulkan"
+      },
+      {
+        "category": "Ryujinx Graphics",
+        "reason": "Disable VSync in Ryujinx for minimum latency. Let NVCP handle sync (which we also disable).",
+        "setting": "Enable VSync",
+        "value": "Off"
+      },
+      {
+        "category": "Ryujinx Graphics",
+        "reason": "Lower resolution = lower render latency. For competitive play, prioritize latency over visuals. Native or 2x is recommended.",
+        "setting": "Resolution Scale",
+        "value": "Native (1x) or 2x max"
+      },
+      {
+        "category": "Ryujinx Graphics",
+        "reason": "Native aspect ratio for proper gameplay.",
+        "setting": "Aspect Ratio",
+        "value": "16:9 (default)"
+      },
+      {
+        "category": "Ryujinx Graphics",
+        "reason": "AA adds GPU overhead. Disable for minimum latency.",
+        "setting": "Anti-Aliasing",
+        "value": "None"
+      },
+      {
+        "category": "Ryujinx Graphics",
+        "reason": "Simple filters have lowest overhead. Avoid FSR/SMAA for latency.",
+        "setting": "Scaling Filter",
+        "value": "Bilinear or Nearest"
+      },
+      {
+        "category": "Ryujinx System",
+        "reason": "PPTC caches compiled code between sessions, dramatically reducing stutter after the first run. Essential for smooth gameplay.",
+        "setting": "Enable PPTC (Profiled Persistent Translation Cache)",
+        "value": "On"
+      },
+      {
+        "category": "Ryujinx System",
+        "reason": "Disabling speeds up game loading.",
+        "setting": "Enable FS Integrity Checks",
+        "value": "Off"
+      },
+      {
+        "category": "Ryujinx System",
+        "reason": "Fastest memory mode. 'Host Unchecked' skips memory access validation for better performance. Use 'Host' if you experience crashes.",
+        "setting": "Memory Manager Mode",
+        "value": "Host Unchecked"
+      },
+      {
+        "category": "Ryujinx CPU",
+        "reason": "JIT compilation provides best performance on Windows.",
+        "setting": "CPU Backend",
+        "value": "JIT (default)"
+      },
+      {
+        "category": "=== RYUJINX AUDIO ===",
+        "reason": "SDL2 provides good latency. OpenAL is an alternative if issues occur.",
+        "setting": "Audio Backend",
+        "value": "SDL2"
+      },
+      {
+        "category": "Ryujinx Audio",
+        "reason": "Full volume - adjust in Windows mixer if needed.",
+        "setting": "Volume",
+        "value": "100%"
+      },
+      {
+        "category": "=== CONTROLLER ===",
+        "reason": "Pro Controller mapping works best for SSBU. Configure your GameCube adapter or fight stick as Pro Controller.",
+        "setting": "Controller Type",
+        "value": "Pro Controller (recommended)"
+      },
+      {
+        "category": "Controller",
+        "reason": "Wired/USB dongle: 1-4ms latency. Bluetooth: 10-20ms+ latency. Never use Bluetooth for competitive play.",
+        "setting": "Input Device",
+        "value": "Wired or 2.4GHz wireless"
+      },
+      {
+        "category": "Controller",
+        "reason": "Set appropriate deadzones for your controller to prevent drift.",
+        "setting": "Deadzones",
+        "value": "Configure per controller"
+      },
+      {
+        "category": "=== HEWDRAW REMIX ===",
+        "reason": "HewDraw Remix is loaded via mod frameworks. Ensure mods are properly installed in Ryujinx's mod directory.",
+        "setting": "HDR Installation",
+        "value": "Use Skyline or ARCropolis"
+      },
+      {
+        "category": "HewDraw Remix",
+        "reason": "Place HDR files in Ryujinx's mod folder. SSBU Title ID: 01006A800016E000",
+        "setting": "Mod Location",
+        "value": "mods/contents/[TitleID]/"
+      },
+      {
+        "category": "HewDraw Remix",
+        "reason": "HDR adds training mode features useful for competitive practice.",
+        "setting": "Training Mode Features",
+        "value": "Frame data display, input display"
+      },
+      {
+        "category": "=== DISPLAY INFO ===",
+        "reason": "60fps @ 60Hz = ~17ms scanout, 60fps @ 240Hz = ~4ms scanout. This benefit is from faster pixel refresh, NOT from VRR. Use your monitor's max refresh rate with G-Sync/VSync OFF.",
+        "setting": "High refresh benefit",
+        "value": "Reduced scanout latency (no G-Sync needed)"
+      },
+      {
+        "category": "Display Info",
+        "reason": "With 60fps on a high refresh display, tears are small and fast-moving. The latency reduction outweighs the visual artifact for competitive play.",
+        "setting": "Tearing",
+        "value": "May occur but minimal at high refresh"
+      },
+      {
+        "category": "=== EXPECTED RESULTS ===",
+        "reason": "SSBU should run at locked 60fps on modern hardware. If dropping frames, lower resolution scale or check PPTC cache status.",
+        "setting": "Target Performance",
+        "value": "Locked 60fps with low render latency"
+      },
+      {
+        "category": "Expected Results",
+        "reason": "First playthrough will have shader compilation stutter. This is cached by PPTC and subsequent runs will be smooth.",
+        "setting": "First Run Stutter",
+        "value": "Normal - PPTC needs to build"
+      }
+    ],
     "include_legacy_tweaks": false,
     "is_emulator_profile": true,
     "is_online_profile": false,
@@ -2191,6 +4152,7 @@
         "preset": "gaming"
       },
       "NvidiaSettingsHandler": {
+        "global_vrr_mode": "off",
         "low_latency_mode": "off",
         "power_management": "prefer_max_performance",
         "shader_cache": "unlimited",
@@ -2271,6 +4233,218 @@
       "ColorProfileSettingsHandler",
       "DolphinConfigHandler"
     ],
+    "in_game_settings": [
+      {
+        "category": "Windows Settings",
+        "reason": "HAGS is adapted to Dolphin backend: disable for DX11/OpenGL paths, enable for DX12/Vulkan paths.",
+        "setting": "Hardware Accelerated GPU Scheduling (HAGS)",
+        "value": "Backend-aware (DX11/OpenGL: Off, DX12/Vulkan: On)"
+      },
+      {
+        "category": "Windows Settings",
+        "reason": "VRROptimizeEnable=1 keeps Windows compositor logic in the path. Disabling may reduce latency for fixed-framerate emulators.",
+        "setting": "VRR Optimize",
+        "value": "Off (critical!)"
+      },
+      {
+        "category": "Nvidia Control Panel",
+        "reason": "Melee runs at fixed 60fps - G-SYNC adds overhead syncing to a constant rate. Disabling removes ~1-2ms+ of sync latency. High refresh still helps via reduced scanout latency even without VRR.",
+        "setting": "G-SYNC",
+        "value": "Off"
+      },
+      {
+        "category": "Nvidia Control Panel",
+        "reason": "Disabling V-SYNC eliminates frame queue latency entirely. May cause tearing, but competitive players prioritize input latency.",
+        "setting": "V-SYNC (global/per-game)",
+        "value": "Off"
+      },
+      {
+        "category": "Nvidia Control Panel",
+        "reason": "Driver LLM remains useful on DX11, and newer NVIDIA drivers also support DX12. Vulkan/OpenGL paths do not expose the same queue control benefit.",
+        "setting": "Low Latency Mode",
+        "value": "Backend-aware (DX11/DX12: On, Vulkan/OpenGL: Off)"
+      },
+      {
+        "category": "Nvidia Control Panel",
+        "reason": "Reduces driver threading overhead for emulation workloads.",
+        "setting": "Threaded Optimization",
+        "value": "Off"
+      },
+      {
+        "category": "Nvidia Control Panel",
+        "reason": "Only works with VSync and adds latency.",
+        "setting": "Triple Buffering",
+        "value": "Off"
+      },
+      {
+        "category": "Nvidia Control Panel",
+        "reason": "No artificial frame limiting.",
+        "setting": "Max Frame Rate",
+        "value": "Off"
+      },
+      {
+        "category": "Graphics",
+        "reason": "Official Dolphin guidance still points most NVIDIA/AMD users to Vulkan first. DX12 is still worth A/B testing if Vulkan misbehaves or if HAGS + DX12 performs better on your exact system.",
+        "setting": "Backend",
+        "value": "Vulkan first, then test DX12"
+      },
+      {
+        "category": "Graphics",
+        "reason": "Disable Dolphin's V-SYNC. No sync anywhere for minimum latency (tearing acceptable).",
+        "setting": "VSync",
+        "value": "Off"
+      },
+      {
+        "category": "Graphics",
+        "reason": "Lower latency than borderless windowed.",
+        "setting": "Fullscreen Mode",
+        "value": "Exclusive Fullscreen"
+      },
+      {
+        "category": "Graphics",
+        "reason": "Lower resolution = lower render latency. Tested: dropping resolution reduced render latency from 0.3ms to 0.1ms. Melee is a 2001 game - it doesn't need 4K. Prioritize latency over visuals.",
+        "setting": "Internal Resolution",
+        "value": "Native (1x) or 2x max"
+      },
+      {
+        "category": "GFX.ini [Settings]",
+        "reason": "Native resolution = lowest render latency. Higher res adds GPU work. Tested: EFBScale 2 added measurable latency vs EFBScale 1.",
+        "setting": "EFBScale",
+        "value": "1 (Native)"
+      },
+      {
+        "category": "GFX.ini [Settings]",
+        "reason": "Reduces driver threading overhead.",
+        "setting": "BackendMultithreading",
+        "value": "False"
+      },
+      {
+        "category": "GFX.ini [Enhancements]",
+        "reason": "Scaling adds GPU overhead.",
+        "setting": "UseScalingFilter",
+        "value": "False"
+      },
+      {
+        "category": "GFX.ini [Enhancements]",
+        "reason": "Post-processing adds GPU overhead.",
+        "setting": "UseDePosterize",
+        "value": "False"
+      },
+      {
+        "category": "GFX.ini [Enhancements]",
+        "reason": "Texture upscaling adds GPU overhead.",
+        "setting": "TextureScalingFactor",
+        "value": "1"
+      },
+      {
+        "category": "GFX.ini [Hacks]",
+        "reason": "EFB access is slow - disable for performance.",
+        "setting": "EFBAccessEnable",
+        "value": "False"
+      },
+      {
+        "category": "GFX.ini [Hacks]",
+        "reason": "Offloads texture decoding to GPU.",
+        "setting": "EnableGPUTextureDecoding",
+        "value": "True"
+      },
+      {
+        "category": "Dolphin.ini [Core]",
+        "reason": "Ishiiruka-specific: reduces frame timing variance.",
+        "setting": "TimingVariance",
+        "value": "8"
+      },
+      {
+        "category": "Dolphin.ini [Core]",
+        "reason": "Ishiiruka-specific: tighter frame timing.",
+        "setting": "ReduceTimingDispersion",
+        "value": "True"
+      },
+      {
+        "category": "Dolphin.ini [Core]",
+        "reason": "GPU sync adds latency - disable.",
+        "setting": "SyncGPU",
+        "value": "False"
+      },
+      {
+        "category": "Dolphin.ini [Core]",
+        "reason": "Immediately Present XFB - skips frame buffer queue for lower latency.",
+        "setting": "ImmediateXFBEnable",
+        "value": "True (default for Melee)"
+      },
+      {
+        "category": "Dolphin.ini [Core]",
+        "reason": "Rush Frame Presentation can lower latency on some systems, but the gain varies a lot. This profile keeps it off by default so the no-sync path stays deterministic unless you explicitly A/B test it.",
+        "setting": "RushPresentation",
+        "value": "Off by default (manual A/B test)"
+      },
+      {
+        "category": "Dolphin.ini [Core]",
+        "reason": "Keep smoothing off for the competitive no-sync path. This is only meant for the VRR lab profile.",
+        "setting": "SmoothPresentation",
+        "value": "False"
+      },
+      {
+        "category": "Dolphin.ini [Core]",
+        "reason": "Audio time stretching adds processing overhead.",
+        "setting": "TimeStretching",
+        "value": "False"
+      },
+      {
+        "category": "Game Settings (GALE01.ini)",
+        "reason": "Memory Management Unit emulation adds overhead - not needed for Melee.",
+        "setting": "MMU",
+        "value": "False"
+      },
+      {
+        "category": "Game Settings (GALE01.ini)",
+        "reason": "Floating point result flags add CPU overhead - not needed for Melee.",
+        "setting": "FPRF",
+        "value": "False"
+      },
+      {
+        "category": "Audio",
+        "reason": "Exclusive mode bypasses Windows audio mixer for lowest latency.",
+        "setting": "Backend",
+        "value": "Exclusive WASAPI (Ishiiruka) / Cubeb (Mainline)"
+      },
+      {
+        "category": "Audio",
+        "reason": "Lower is better, but too low causes crackling.",
+        "setting": "Latency",
+        "value": "Lowest stable setting"
+      },
+      {
+        "category": "Controller",
+        "reason": "Not PC mode. Native adapter support has lower latency.",
+        "setting": "Adapter Mode",
+        "value": "Wii U / Switch mode"
+      },
+      {
+        "category": "Controller",
+        "reason": "Allows input when alt-tabbed.",
+        "setting": "Background Input",
+        "value": "On"
+      },
+      {
+        "category": "Display Info",
+        "reason": "60fps @ 60Hz = ~17ms scanout, 60fps @ 240Hz = ~4ms scanout. This benefit is from faster pixel refresh, NOT from VRR. Use your monitor's max refresh rate with G-Sync/VSync OFF for minimum latency.",
+        "setting": "High refresh benefit",
+        "value": "Reduced scanout latency (no G-Sync needed)"
+      },
+      {
+        "category": "Display Info",
+        "reason": "With 60fps on a high refresh display, tears are small and fast-moving. The latency reduction far outweighs the visual artifact for competitive play.",
+        "setting": "Tearing",
+        "value": "May occur but minimal impact"
+      },
+      {
+        "category": "Important",
+        "reason": "Latency improvements depend on your specific GPU, CPU, drivers, and settings. Always test configurations rather than assuming one setting is universally best. The settings above are starting points - experiment to find what works for you.",
+        "setting": "System Variance Disclaimer",
+        "value": "Results vary by system"
+      }
+    ],
     "include_legacy_tweaks": false,
     "is_emulator_profile": true,
     "is_online_profile": false,
@@ -2317,6 +4491,7 @@
         "preset": "gaming"
       },
       "NvidiaSettingsHandler": {
+        "global_vrr_mode": "off",
         "low_latency_mode": "on",
         "max_frame_rate": "off",
         "power_management": "prefer_max_performance",
@@ -2382,6 +4557,56 @@
       "ColorProfileSettingsHandler",
       "DolphinConfigHandler"
     ],
+    "in_game_settings": [
+      {
+        "category": "Profile Goal",
+        "reason": "Use this when you want closer console-like presentation cadence on an LCD/OLED, not maximum latency reduction.",
+        "setting": "Target",
+        "value": "Console-like pacing and feel (offline)"
+      },
+      {
+        "category": "Nvidia Control Panel",
+        "reason": "Keeps presentation cadence stable and tear-free for practice sessions where feel consistency is preferred over absolute minimum latency.",
+        "setting": "V-SYNC (global/per-game)",
+        "value": "On"
+      },
+      {
+        "category": "Nvidia Control Panel",
+        "reason": "Avoids aggressive queue reduction. This profile intentionally favors consistent frame pacing over minimum queue depth.",
+        "setting": "Low Latency Mode",
+        "value": "Off"
+      },
+      {
+        "category": "Windows Display",
+        "reason": "The profile forces 60 Hz output for stricter console-style cadence on flat panels. Switch back to high refresh when using the competitive profile.",
+        "setting": "Desktop Refresh Rate",
+        "value": "60 Hz"
+      },
+      {
+        "category": "Graphics",
+        "reason": "Keep VSync enabled in Dolphin for stable, console-style frame presentation.",
+        "setting": "Dolphin VSync",
+        "value": "On"
+      },
+      {
+        "category": "Dolphin.ini [Core]",
+        "reason": "Disables aggressive latency-cutting presentation path to preserve a more console-like feel.",
+        "setting": "RushPresentation",
+        "value": "False"
+      },
+      {
+        "category": "Dolphin.ini [Core]",
+        "reason": "Keep Slippi defaults unless you are running controlled local tests and explicitly understand the compatibility/latency tradeoff.",
+        "setting": "ImmediateXFBEnable",
+        "value": "True (Slippi default)"
+      },
+      {
+        "category": "Display",
+        "reason": "Melee is fixed 60fps. VRR is not required for this parity profile and can alter pacing feel.",
+        "setting": "G-SYNC / VRR",
+        "value": "Off"
+      }
+    ],
     "include_legacy_tweaks": false,
     "is_emulator_profile": true,
     "is_online_profile": false,
@@ -2428,6 +4653,7 @@
         "preset": "gaming"
       },
       "NvidiaSettingsHandler": {
+        "global_vrr_mode": "off",
         "low_latency_mode": "off",
         "max_frame_rate": "off",
         "power_management": "prefer_max_performance",
@@ -2494,6 +4720,218 @@
       "ColorProfileSettingsHandler",
       "DolphinConfigHandler"
     ],
+    "in_game_settings": [
+      {
+        "category": "Windows Settings",
+        "reason": "HAGS is adapted to Dolphin backend: disable for DX11/OpenGL paths, enable for DX12/Vulkan paths.",
+        "setting": "Hardware Accelerated GPU Scheduling (HAGS)",
+        "value": "Backend-aware (DX11/OpenGL: Off, DX12/Vulkan: On)"
+      },
+      {
+        "category": "Windows Settings",
+        "reason": "VRROptimizeEnable=1 keeps Windows compositor logic in the path. Disabling may reduce latency for fixed-framerate emulators.",
+        "setting": "VRR Optimize",
+        "value": "Off (critical!)"
+      },
+      {
+        "category": "Nvidia Control Panel",
+        "reason": "Melee runs at fixed 60fps - G-SYNC adds overhead syncing to a constant rate. Disabling removes ~1-2ms+ of sync latency. High refresh still helps via reduced scanout latency even without VRR.",
+        "setting": "G-SYNC",
+        "value": "Off"
+      },
+      {
+        "category": "Nvidia Control Panel",
+        "reason": "Disabling V-SYNC eliminates frame queue latency entirely. May cause tearing, but competitive players prioritize input latency.",
+        "setting": "V-SYNC (global/per-game)",
+        "value": "Off"
+      },
+      {
+        "category": "Nvidia Control Panel",
+        "reason": "Driver LLM remains useful on DX11, and newer NVIDIA drivers also support DX12. Vulkan/OpenGL paths do not expose the same queue control benefit.",
+        "setting": "Low Latency Mode",
+        "value": "Backend-aware (DX11/DX12: On, Vulkan/OpenGL: Off)"
+      },
+      {
+        "category": "Nvidia Control Panel",
+        "reason": "Reduces driver threading overhead for emulation workloads.",
+        "setting": "Threaded Optimization",
+        "value": "Off"
+      },
+      {
+        "category": "Nvidia Control Panel",
+        "reason": "Only works with VSync and adds latency.",
+        "setting": "Triple Buffering",
+        "value": "Off"
+      },
+      {
+        "category": "Nvidia Control Panel",
+        "reason": "No artificial frame limiting.",
+        "setting": "Max Frame Rate",
+        "value": "Off"
+      },
+      {
+        "category": "Graphics",
+        "reason": "Official Dolphin guidance still points most NVIDIA/AMD users to Vulkan first. DX12 is still worth A/B testing if Vulkan misbehaves or if HAGS + DX12 performs better on your exact system.",
+        "setting": "Backend",
+        "value": "Vulkan first, then test DX12"
+      },
+      {
+        "category": "Graphics",
+        "reason": "Disable Dolphin's V-SYNC. No sync anywhere for minimum latency (tearing acceptable).",
+        "setting": "VSync",
+        "value": "Off"
+      },
+      {
+        "category": "Graphics",
+        "reason": "Lower latency than borderless windowed.",
+        "setting": "Fullscreen Mode",
+        "value": "Exclusive Fullscreen"
+      },
+      {
+        "category": "Graphics",
+        "reason": "Lower resolution = lower render latency. Tested: dropping resolution reduced render latency from 0.3ms to 0.1ms. Melee is a 2001 game - it doesn't need 4K. Prioritize latency over visuals.",
+        "setting": "Internal Resolution",
+        "value": "Native (1x) or 2x max"
+      },
+      {
+        "category": "GFX.ini [Settings]",
+        "reason": "Native resolution = lowest render latency. Higher res adds GPU work. Tested: EFBScale 2 added measurable latency vs EFBScale 1.",
+        "setting": "EFBScale",
+        "value": "1 (Native)"
+      },
+      {
+        "category": "GFX.ini [Settings]",
+        "reason": "Reduces driver threading overhead.",
+        "setting": "BackendMultithreading",
+        "value": "False"
+      },
+      {
+        "category": "GFX.ini [Enhancements]",
+        "reason": "Scaling adds GPU overhead.",
+        "setting": "UseScalingFilter",
+        "value": "False"
+      },
+      {
+        "category": "GFX.ini [Enhancements]",
+        "reason": "Post-processing adds GPU overhead.",
+        "setting": "UseDePosterize",
+        "value": "False"
+      },
+      {
+        "category": "GFX.ini [Enhancements]",
+        "reason": "Texture upscaling adds GPU overhead.",
+        "setting": "TextureScalingFactor",
+        "value": "1"
+      },
+      {
+        "category": "GFX.ini [Hacks]",
+        "reason": "EFB access is slow - disable for performance.",
+        "setting": "EFBAccessEnable",
+        "value": "False"
+      },
+      {
+        "category": "GFX.ini [Hacks]",
+        "reason": "Offloads texture decoding to GPU.",
+        "setting": "EnableGPUTextureDecoding",
+        "value": "True"
+      },
+      {
+        "category": "Dolphin.ini [Core]",
+        "reason": "Ishiiruka-specific: reduces frame timing variance.",
+        "setting": "TimingVariance",
+        "value": "8"
+      },
+      {
+        "category": "Dolphin.ini [Core]",
+        "reason": "Ishiiruka-specific: tighter frame timing.",
+        "setting": "ReduceTimingDispersion",
+        "value": "True"
+      },
+      {
+        "category": "Dolphin.ini [Core]",
+        "reason": "GPU sync adds latency - disable.",
+        "setting": "SyncGPU",
+        "value": "False"
+      },
+      {
+        "category": "Dolphin.ini [Core]",
+        "reason": "Immediately Present XFB - skips frame buffer queue for lower latency.",
+        "setting": "ImmediateXFBEnable",
+        "value": "True (default for Melee)"
+      },
+      {
+        "category": "Dolphin.ini [Core]",
+        "reason": "Rush Frame Presentation can lower latency on some systems, but the gain varies a lot. This profile keeps it off by default so the no-sync path stays deterministic unless you explicitly A/B test it.",
+        "setting": "RushPresentation",
+        "value": "Off by default (manual A/B test)"
+      },
+      {
+        "category": "Dolphin.ini [Core]",
+        "reason": "Keep smoothing off for the competitive no-sync path. This is only meant for the VRR lab profile.",
+        "setting": "SmoothPresentation",
+        "value": "False"
+      },
+      {
+        "category": "Dolphin.ini [Core]",
+        "reason": "Audio time stretching adds processing overhead.",
+        "setting": "TimeStretching",
+        "value": "False"
+      },
+      {
+        "category": "Game Settings (GALE01.ini)",
+        "reason": "Memory Management Unit emulation adds overhead - not needed for Melee.",
+        "setting": "MMU",
+        "value": "False"
+      },
+      {
+        "category": "Game Settings (GALE01.ini)",
+        "reason": "Floating point result flags add CPU overhead - not needed for Melee.",
+        "setting": "FPRF",
+        "value": "False"
+      },
+      {
+        "category": "Audio",
+        "reason": "Exclusive mode bypasses Windows audio mixer for lowest latency.",
+        "setting": "Backend",
+        "value": "Exclusive WASAPI (Ishiiruka) / Cubeb (Mainline)"
+      },
+      {
+        "category": "Audio",
+        "reason": "Lower is better, but too low causes crackling.",
+        "setting": "Latency",
+        "value": "Lowest stable setting"
+      },
+      {
+        "category": "Controller",
+        "reason": "Not PC mode. Native adapter support has lower latency.",
+        "setting": "Adapter Mode",
+        "value": "Wii U / Switch mode"
+      },
+      {
+        "category": "Controller",
+        "reason": "Allows input when alt-tabbed.",
+        "setting": "Background Input",
+        "value": "On"
+      },
+      {
+        "category": "Display Info",
+        "reason": "60fps @ 60Hz = ~17ms scanout, 60fps @ 240Hz = ~4ms scanout. This benefit is from faster pixel refresh, NOT from VRR. Use your monitor's max refresh rate with G-Sync/VSync OFF for minimum latency.",
+        "setting": "High refresh benefit",
+        "value": "Reduced scanout latency (no G-Sync needed)"
+      },
+      {
+        "category": "Display Info",
+        "reason": "With 60fps on a high refresh display, tears are small and fast-moving. The latency reduction far outweighs the visual artifact for competitive play.",
+        "setting": "Tearing",
+        "value": "May occur but minimal impact"
+      },
+      {
+        "category": "Important",
+        "reason": "Latency improvements depend on your specific GPU, CPU, drivers, and settings. Always test configurations rather than assuming one setting is universally best. The settings above are starting points - experiment to find what works for you.",
+        "setting": "System Variance Disclaimer",
+        "value": "Results vary by system"
+      }
+    ],
     "include_legacy_tweaks": false,
     "is_emulator_profile": true,
     "is_online_profile": false,
@@ -2541,6 +4979,7 @@
         "preset": "gaming"
       },
       "NvidiaSettingsHandler": {
+        "global_vrr_mode": "off",
         "low_latency_mode": "on",
         "max_frame_rate": "off",
         "power_management": "prefer_max_performance",
@@ -2623,6 +5062,218 @@
       "ColorProfileSettingsHandler",
       "DolphinConfigHandler"
     ],
+    "in_game_settings": [
+      {
+        "category": "Windows Settings",
+        "reason": "HAGS is fixed to True regardless of Dolphin backend. This avoids reboot requirements when switching backends or re-applying the profile. Dolphin's own latency features (ImmediateXFB, RushPresentation) provide far more latency reduction than HAGS state changes.",
+        "setting": "Hardware Accelerated GPU Scheduling (HAGS)",
+        "value": "On (always - no reboot on re-apply)"
+      },
+      {
+        "category": "Windows Settings",
+        "reason": "VRROptimizeEnable=1 keeps Windows compositor logic in the path. Disabling may reduce latency for fixed-framerate emulators.",
+        "setting": "VRR Optimize",
+        "value": "Off (critical!)"
+      },
+      {
+        "category": "Nvidia Control Panel",
+        "reason": "Melee runs at fixed 60fps - G-SYNC adds overhead syncing to a constant rate. Disabling removes ~1-2ms+ of sync latency. High refresh still helps via reduced scanout latency even without VRR.",
+        "setting": "G-SYNC",
+        "value": "Off"
+      },
+      {
+        "category": "Nvidia Control Panel",
+        "reason": "Disabling V-SYNC eliminates frame queue latency entirely. May cause tearing, but competitive players prioritize input latency.",
+        "setting": "V-SYNC (global/per-game)",
+        "value": "Off"
+      },
+      {
+        "category": "Nvidia Control Panel",
+        "reason": "Driver LLM remains useful on DX11, and newer NVIDIA drivers also support DX12. Vulkan/OpenGL paths do not expose the same queue control benefit.",
+        "setting": "Low Latency Mode",
+        "value": "Backend-aware (DX11/DX12: On, Vulkan/OpenGL: Off)"
+      },
+      {
+        "category": "Nvidia Control Panel",
+        "reason": "Reduces driver threading overhead for emulation workloads.",
+        "setting": "Threaded Optimization",
+        "value": "Off"
+      },
+      {
+        "category": "Nvidia Control Panel",
+        "reason": "Only works with VSync and adds latency.",
+        "setting": "Triple Buffering",
+        "value": "Off"
+      },
+      {
+        "category": "Nvidia Control Panel",
+        "reason": "No artificial frame limiting.",
+        "setting": "Max Frame Rate",
+        "value": "Off"
+      },
+      {
+        "category": "Graphics",
+        "reason": "Official Dolphin guidance still points most NVIDIA/AMD users to Vulkan first. DX12 is still worth A/B testing if Vulkan misbehaves or if HAGS + DX12 performs better on your exact system.",
+        "setting": "Backend",
+        "value": "Vulkan first, then test DX12"
+      },
+      {
+        "category": "Graphics",
+        "reason": "Disable Dolphin's V-SYNC. No sync anywhere for minimum latency (tearing acceptable).",
+        "setting": "VSync",
+        "value": "Off"
+      },
+      {
+        "category": "Graphics",
+        "reason": "Lower latency than borderless windowed.",
+        "setting": "Fullscreen Mode",
+        "value": "Exclusive Fullscreen"
+      },
+      {
+        "category": "Graphics",
+        "reason": "Lower resolution = lower render latency. Tested: dropping resolution reduced render latency from 0.3ms to 0.1ms. Melee is a 2001 game - it doesn't need 4K. Prioritize latency over visuals.",
+        "setting": "Internal Resolution",
+        "value": "Native (1x) or 2x max"
+      },
+      {
+        "category": "GFX.ini [Settings]",
+        "reason": "Native resolution = lowest render latency. Higher res adds GPU work. Tested: EFBScale 2 added measurable latency vs EFBScale 1.",
+        "setting": "EFBScale",
+        "value": "1 (Native)"
+      },
+      {
+        "category": "GFX.ini [Settings]",
+        "reason": "Reduces driver threading overhead.",
+        "setting": "BackendMultithreading",
+        "value": "False"
+      },
+      {
+        "category": "GFX.ini [Enhancements]",
+        "reason": "Scaling adds GPU overhead.",
+        "setting": "UseScalingFilter",
+        "value": "False"
+      },
+      {
+        "category": "GFX.ini [Enhancements]",
+        "reason": "Post-processing adds GPU overhead.",
+        "setting": "UseDePosterize",
+        "value": "False"
+      },
+      {
+        "category": "GFX.ini [Enhancements]",
+        "reason": "Texture upscaling adds GPU overhead.",
+        "setting": "TextureScalingFactor",
+        "value": "1"
+      },
+      {
+        "category": "GFX.ini [Hacks]",
+        "reason": "EFB access is slow - disable for performance.",
+        "setting": "EFBAccessEnable",
+        "value": "False"
+      },
+      {
+        "category": "GFX.ini [Hacks]",
+        "reason": "Offloads texture decoding to GPU.",
+        "setting": "EnableGPUTextureDecoding",
+        "value": "True"
+      },
+      {
+        "category": "Dolphin.ini [Core]",
+        "reason": "Ishiiruka-specific: reduces frame timing variance.",
+        "setting": "TimingVariance",
+        "value": "8"
+      },
+      {
+        "category": "Dolphin.ini [Core]",
+        "reason": "Ishiiruka-specific: tighter frame timing.",
+        "setting": "ReduceTimingDispersion",
+        "value": "True"
+      },
+      {
+        "category": "Dolphin.ini [Core]",
+        "reason": "GPU sync adds latency - disable.",
+        "setting": "SyncGPU",
+        "value": "False"
+      },
+      {
+        "category": "Dolphin.ini [Core]",
+        "reason": "Immediately Present XFB - skips frame buffer queue for lower latency.",
+        "setting": "ImmediateXFBEnable",
+        "value": "True (default for Melee)"
+      },
+      {
+        "category": "Dolphin.ini [Core]",
+        "reason": "Rush Frame Presentation can lower latency on some systems, but the gain varies a lot. This profile keeps it off by default so the no-sync path stays deterministic unless you explicitly A/B test it.",
+        "setting": "RushPresentation",
+        "value": "Off by default (manual A/B test)"
+      },
+      {
+        "category": "Dolphin.ini [Core]",
+        "reason": "Keep smoothing off for the competitive no-sync path. This is only meant for the VRR lab profile.",
+        "setting": "SmoothPresentation",
+        "value": "False"
+      },
+      {
+        "category": "Dolphin.ini [Core]",
+        "reason": "Audio time stretching adds processing overhead.",
+        "setting": "TimeStretching",
+        "value": "False"
+      },
+      {
+        "category": "Game Settings (GALE01.ini)",
+        "reason": "Memory Management Unit emulation adds overhead - not needed for Melee.",
+        "setting": "MMU",
+        "value": "False"
+      },
+      {
+        "category": "Game Settings (GALE01.ini)",
+        "reason": "Floating point result flags add CPU overhead - not needed for Melee.",
+        "setting": "FPRF",
+        "value": "False"
+      },
+      {
+        "category": "Audio",
+        "reason": "Exclusive mode bypasses Windows audio mixer for lowest latency.",
+        "setting": "Backend",
+        "value": "Exclusive WASAPI (Ishiiruka) / Cubeb (Mainline)"
+      },
+      {
+        "category": "Audio",
+        "reason": "Lower is better, but too low causes crackling.",
+        "setting": "Latency",
+        "value": "Lowest stable setting"
+      },
+      {
+        "category": "Controller",
+        "reason": "Not PC mode. Native adapter support has lower latency.",
+        "setting": "Adapter Mode",
+        "value": "Wii U / Switch mode"
+      },
+      {
+        "category": "Controller",
+        "reason": "Allows input when alt-tabbed.",
+        "setting": "Background Input",
+        "value": "On"
+      },
+      {
+        "category": "Display Info",
+        "reason": "60fps @ 60Hz = ~17ms scanout, 60fps @ 240Hz = ~4ms scanout. This benefit is from faster pixel refresh, NOT from VRR. Use your monitor's max refresh rate with G-Sync/VSync OFF for minimum latency.",
+        "setting": "High refresh benefit",
+        "value": "Reduced scanout latency (no G-Sync needed)"
+      },
+      {
+        "category": "Display Info",
+        "reason": "With 60fps on a high refresh display, tears are small and fast-moving. The latency reduction far outweighs the visual artifact for competitive play.",
+        "setting": "Tearing",
+        "value": "May occur but minimal impact"
+      },
+      {
+        "category": "Important",
+        "reason": "Latency improvements depend on your specific GPU, CPU, drivers, and settings. Always test configurations rather than assuming one setting is universally best. The settings above are starting points - experiment to find what works for you.",
+        "setting": "System Variance Disclaimer",
+        "value": "Results vary by system"
+      }
+    ],
     "include_legacy_tweaks": false,
     "is_emulator_profile": true,
     "is_online_profile": false,
@@ -2669,6 +5320,7 @@
         "preset": "gaming"
       },
       "NvidiaSettingsHandler": {
+        "global_vrr_mode": "off",
         "low_latency_mode": "on",
         "max_frame_rate": "off",
         "power_management": "prefer_max_performance",
@@ -2733,6 +5385,50 @@
       "CNMSettingsHandler",
       "ColorProfileSettingsHandler",
       "DolphinConfigHandler"
+    ],
+    "in_game_settings": [
+      {
+        "category": "Profile Goal",
+        "reason": "Use this profile to compare VRR behavior against the competitive no-sync profile on your exact monitor/OSD/backend path.",
+        "setting": "Target",
+        "value": "Controlled VRR A/B test (not universal default)"
+      },
+      {
+        "category": "Display",
+        "reason": "Required so Windows/NVIDIA can confirm VRR capability.",
+        "setting": "Monitor OSD Adaptive Sync",
+        "value": "On"
+      },
+      {
+        "category": "Nvidia Control Panel",
+        "reason": "Profile enables fullscreen VRR mode for Slippi Dolphin.",
+        "setting": "G-SYNC",
+        "value": "On (fullscreen)"
+      },
+      {
+        "category": "Nvidia Control Panel",
+        "reason": "Used as a VRR safety net. Dolphin VSync stays off to avoid double-sync.",
+        "setting": "V-SYNC (global/per-game)",
+        "value": "On"
+      },
+      {
+        "category": "Graphics",
+        "reason": "Keep synchronization in one place (NVCP VRR path).",
+        "setting": "Dolphin VSync",
+        "value": "Off"
+      },
+      {
+        "category": "Dolphin.ini [Core]",
+        "reason": "Intended to improve cadence behavior on VRR displays during lab testing.",
+        "setting": "SmoothPresentation",
+        "value": "True"
+      },
+      {
+        "category": "Measurement",
+        "reason": "Judge by repeated input-to-photon consistency and frame pacing, not single-session readouts.",
+        "setting": "A/B Method",
+        "value": "Compare against slippi-melee over repeat runs"
+      }
     ],
     "include_legacy_tweaks": false,
     "is_emulator_profile": true,
