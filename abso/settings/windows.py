@@ -169,13 +169,16 @@ class WindowsSettingsHandler(SettingsHandler):
     def detect(self) -> dict[str, Any]:
         """Detect current Windows gaming settings."""
         refresh_info = self._get_refresh_rate_info()
+        hdr_state = self._get_hdr_state_summary()
         return {
             "game_mode": self._get_game_mode(),
             "game_bar": self._get_game_bar(),
             "game_dvr": self._get_game_dvr(),
             "hags": self._get_hags(),
             "vbs": self._get_vbs(),
-            "hdr": self._get_hdr(),
+            "hdr": hdr_state["any_enabled"] if hdr_state["available"] else None,
+            "hdr_capable_count": hdr_state["hdr_capable_count"] if hdr_state["available"] else None,
+            "hdr_enabled_count": hdr_state["hdr_enabled_count"] if hdr_state["available"] else None,
             "auto_hdr": self._get_auto_hdr(),
             "windowed_optimizations": self._get_windowed_optimizations(),
             "vrr_optimize": self._get_vrr_optimize(),
@@ -307,7 +310,7 @@ class WindowsSettingsHandler(SettingsHandler):
         if "vbs" in settings:
             try:
                 target = settings["vbs"]
-                current_vbs = current.get("vbs_enabled")
+                current_vbs = current.get("vbs")
                 if current_vbs is None:
                     # Detection failed — conservatively assume reboot needed
                     requires_reboot = True
@@ -322,7 +325,14 @@ class WindowsSettingsHandler(SettingsHandler):
             hdr_result = self._set_hdr(settings["hdr"])
             if hdr_result["success"]:
                 if settings["hdr"]:
-                    applied.append(f"HDR: enabled on {hdr_result['hdr_enabled_count']} monitor(s)")
+                    hdr_capable_count = int(hdr_result.get("hdr_capable_count", 0) or 0)
+                    hdr_enabled_count = int(hdr_result.get("hdr_enabled_count", 0) or 0)
+                    if hdr_capable_count <= 0:
+                        errors.append("HDR: no HDR-capable active displays were detected")
+                    elif hdr_enabled_count <= 0:
+                        errors.append("HDR: enable requested, but Windows reported 0 HDR-enabled displays")
+                    else:
+                        applied.append(f"HDR: enabled on {hdr_enabled_count} monitor(s)")
                 else:
                     applied.append("HDR: disabled on all monitors")
             else:
@@ -405,7 +415,7 @@ class WindowsSettingsHandler(SettingsHandler):
 
         if "vbs" in settings:
             target = settings["vbs"]
-            current_val = current.get("vbs_enabled")
+            current_val = current.get("vbs")
             # If we can't detect, assume it's active (can't prove otherwise)
             is_active = current_val is None or current_val == target
             results["settings"]["vbs"] = {
@@ -660,18 +670,21 @@ class WindowsSettingsHandler(SettingsHandler):
         except Exception:
             return False
 
-    def _get_hdr(self) -> bool | None:
-        """Get Windows HDR status using the CCD DisplayConfig API.
+    def _get_hdr_state_summary(self) -> dict[str, Any]:
+        """Summarize active-target HDR capability and enabled state."""
+        summary: dict[str, Any] = {
+            "available": False,
+            "hdr_capable_count": 0,
+            "hdr_enabled_count": 0,
+            "any_enabled": False,
+        }
 
-        Queries each active display target for advanced color (HDR) state.
-        Returns True if ANY monitor has HDR enabled, False if all off, None if unavailable.
-        """
         try:
             targets = self._get_active_display_targets()
             if not targets:
-                return None
+                return summary
 
-            any_enabled = False
+            summary["available"] = True
             for adapter_id, target_id in targets:
                 info = DISPLAYCONFIG_GET_ADVANCED_COLOR_INFO()
                 info.header.type = DISPLAYCONFIG_DEVICE_INFO_GET_ADVANCED_COLOR_INFO
@@ -685,15 +698,27 @@ class WindowsSettingsHandler(SettingsHandler):
                 if status != 0:
                     continue
 
-                # bit 1 of value = advancedColorEnabled
+                if info.value & 0x01:
+                    summary["hdr_capable_count"] += 1
                 if info.value & 0x02:
-                    any_enabled = True
-                    break
+                    summary["hdr_enabled_count"] += 1
 
-            return any_enabled
+            summary["any_enabled"] = summary["hdr_enabled_count"] > 0
+            return summary
         except Exception as e:
-            logger.debug(f"CCD HDR detection failed: {e}")
+            logger.debug(f"HDR state summary failed: {e}")
+            return summary
+
+    def _get_hdr(self) -> bool | None:
+        """Get Windows HDR status using the CCD DisplayConfig API.
+
+        Queries each active display target for advanced color (HDR) state.
+        Returns True if ANY monitor has HDR enabled, False if all off, None if unavailable.
+        """
+        summary = self._get_hdr_state_summary()
+        if not summary["available"]:
             return None
+        return bool(summary["any_enabled"])
 
     def _set_hdr(self, enabled: bool) -> dict[str, Any]:
         """Set Windows HDR status using the CCD DisplayConfig API.

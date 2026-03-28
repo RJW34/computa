@@ -138,6 +138,7 @@ class ProfileLinter:
         # Run all checks
         self._check_nvidia_conflicts(profile, settings_map, result)
         self._check_windows_conflicts(profile, settings_map, result)
+        self._check_presentation_guidance(profile, settings_map, result)
         self._check_power_sanity(profile, settings_map, result)
         self._check_emulator_vrr(profile, settings_map, result)
 
@@ -291,6 +292,7 @@ class ProfileLinter:
         """
         windows_settings = settings_map.get("WindowsSettingsHandler", {})
         graphics_settings = settings_map.get("GraphicsSettingsHandler", {})
+        color_settings = settings_map.get("ColorProfileSettingsHandler", {})
 
         if not windows_settings and not graphics_settings:
             return
@@ -313,6 +315,33 @@ class ProfileLinter:
                     "content causes washed-out colors. Set hdr=False and auto_hdr=False."
                 ),
                 setting_path="WindowsSettingsHandler.hdr",
+            ))
+
+        # Check 1b: Native HDR profiles must not also enable Auto HDR.
+        if hdr and auto_hdr:
+            result.add_issue(LintIssue(
+                code="WINDOWS_NATIVE_HDR_AUTO_HDR_CONFLICT",
+                severity=LintSeverity.ERROR,
+                message="Native HDR profile must keep Auto HDR disabled",
+                details=(
+                    "Auto HDR is only for SDR titles. Native HDR profiles should set "
+                    "hdr=True and auto_hdr=False to avoid conflicting tone-mapping paths."
+                ),
+                setting_path="WindowsSettingsHandler.auto_hdr",
+            ))
+
+        # Check 1c: Native HDR profiles should not clamp to sRGB.
+        if hdr and color_settings.get("icc_profile") == "srgb":
+            result.add_issue(LintIssue(
+                code="COLOR_HDR_SRGB_CLAMP",
+                severity=LintSeverity.ERROR,
+                message="Native HDR profile cannot use an sRGB clamp color path",
+                details=(
+                    "HDR output needs the display's native wide-gamut path. "
+                    "Using icc_profile='srgb' under HDR can clamp color and "
+                    "distort tone mapping."
+                ),
+                setting_path="ColorProfileSettingsHandler.icc_profile",
             ))
 
         # Check 2: VRR Optimize ON for latency-critical profiles
@@ -394,6 +423,90 @@ class ProfileLinter:
                     "for rollback netcode. Monitor for issues."
                 ),
                 setting_path="RegistrySettingsHandler.win32_priority_separation",
+            ))
+
+    def _check_presentation_guidance(
+        self,
+        profile: BaseProfile,
+        settings_map: dict[str, dict[str, Any]],
+        result: LintResult,
+    ) -> None:
+        """Check that in-game display guidance matches the configured VRR path."""
+        if not getattr(profile, "requires_confirmed_vrr_support", False):
+            return
+
+        try:
+            in_game_settings = profile.get_in_game_settings()
+        except Exception:
+            return
+
+        display_mode = next(
+            (
+                entry for entry in in_game_settings
+                if str(entry.get("setting", "")).strip().lower() == "display mode"
+            ),
+            None,
+        )
+        if not display_mode:
+            return
+
+        display_value = str(display_mode.get("value", "")).lower()
+        display_reason = str(display_mode.get("reason", "")).lower()
+
+        recommends_windowed = any(term in display_value for term in ("borderless", "windowed"))
+        if not recommends_windowed:
+            positive_windowed_phrases = (
+                "switch to borderless",
+                "toggle borderless",
+                "use borderless",
+                "run borderless",
+                "borderless windowed",
+                "windowed mode",
+            )
+            negative_windowed_phrases = (
+                "do not switch",
+                "do not use",
+                "don't switch",
+                "don't use",
+                "adds compositor latency",
+                "disable borderless",
+                "avoid borderless",
+            )
+            recommends_windowed = (
+                any(phrase in display_reason for phrase in positive_windowed_phrases)
+                and not any(phrase in display_reason for phrase in negative_windowed_phrases)
+            )
+
+        if not recommends_windowed:
+            return
+
+        nvidia_settings = settings_map.get("NvidiaSettingsHandler", {})
+        windows_settings = settings_map.get("WindowsSettingsHandler", {})
+        global_vrr_mode = (
+            nvidia_settings.get("global_vrr_mode")
+            or nvidia_settings.get("global_gsync_mode")
+            or nvidia_settings.get("vrr_mode")
+        )
+        vrr_optimize = bool(windows_settings.get("vrr_optimize", False))
+
+        missing_support: list[str] = []
+        if global_vrr_mode != "fullscreen_and_windowed":
+            missing_support.append("global_vrr_mode='fullscreen_and_windowed'")
+        if not vrr_optimize:
+            missing_support.append("WindowsSettingsHandler.vrr_optimize=True")
+
+        if missing_support:
+            result.add_issue(LintIssue(
+                code="VRR_DISPLAY_MODE_GUIDANCE_MISMATCH",
+                severity=LintSeverity.ERROR,
+                message="VRR profile display-mode guidance does not match the configured VRR path",
+                details=(
+                    "This profile recommends borderless/windowed presentation, but its "
+                    "configured VRR path does not support that guidance. Borderless VRR "
+                    "profiles must explicitly enable windowed G-SYNC support. Missing: "
+                    f"{', '.join(missing_support)}."
+                ),
+                setting_path="NvidiaSettingsHandler.global_vrr_mode",
             ))
 
     def _check_emulator_vrr(

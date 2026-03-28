@@ -9,8 +9,23 @@ from abso.core.applier import ApplyResult
 from abso.core.transaction import ProfileTransactionManager
 
 
-def test_transaction_commits_on_success_without_backup(tmp_path: Path) -> None:
+def _make_applier() -> MagicMock:
     applier = MagicMock()
+    applier.PROFILES = {"test-profile": object()}
+    applier.validate_profile_prerequisites.return_value = None
+    return applier
+
+
+def _complete_restore_summary() -> MagicMock:
+    summary = MagicMock()
+    summary.complete = True
+    summary.skipped_components = []
+    summary.failed_components = []
+    return summary
+
+
+def test_transaction_commits_on_success_without_backup(tmp_path: Path) -> None:
+    applier = _make_applier()
     applier.apply_profile.return_value = ApplyResult(
         success=True,
         applied_settings=["WindowsSettingsHandler"],
@@ -28,7 +43,7 @@ def test_transaction_commits_on_success_without_backup(tmp_path: Path) -> None:
 
 
 def test_transaction_rolls_back_on_critical_when_backup_available(tmp_path: Path) -> None:
-    applier = MagicMock()
+    applier = _make_applier()
     applier.apply_profile.return_value = ApplyResult(
         success=False,
         error="handler failure",
@@ -41,6 +56,7 @@ def test_transaction_rolls_back_on_critical_when_backup_available(tmp_path: Path
         restore_manager.get_baseline_backup.return_value = None  # No previous backup
         backup_manager = MagicMock()
         backup_manager.create_backup.return_value = "backup-123"
+        backup_manager.restore_backup.return_value = _complete_restore_summary()
         mock_backup_cls.side_effect = [restore_manager, backup_manager]
 
         manager = ProfileTransactionManager(tmp_path, applier=applier)
@@ -55,7 +71,7 @@ def test_transaction_rolls_back_on_critical_when_backup_available(tmp_path: Path
 
 def test_transaction_restores_baseline_before_apply(tmp_path: Path) -> None:
     """When a previous backup exists, restore it before applying new profile."""
-    applier = MagicMock()
+    applier = _make_applier()
     applier.apply_profile.return_value = ApplyResult(
         success=True,
         applied_settings=["WindowsSettingsHandler"],
@@ -69,6 +85,7 @@ def test_transaction_restores_baseline_before_apply(tmp_path: Path) -> None:
         baseline_path.exists.return_value = True
         baseline_path.name = "old-backup"
         restore_manager.get_baseline_backup.return_value = baseline_path
+        restore_manager.restore_backup.return_value = _complete_restore_summary()
         backup_manager = MagicMock()
         backup_manager.create_backup.return_value = "new-backup"
         mock_backup_cls.side_effect = [restore_manager, backup_manager]
@@ -86,7 +103,7 @@ def test_transaction_restores_baseline_before_apply(tmp_path: Path) -> None:
 
 def test_transaction_skips_baseline_restore_when_no_backups(tmp_path: Path) -> None:
     """On first-ever apply, skip restore since there's no previous backup."""
-    applier = MagicMock()
+    applier = _make_applier()
     applier.apply_profile.return_value = ApplyResult(
         success=True,
         applied_settings=["WindowsSettingsHandler"],
@@ -113,7 +130,7 @@ def test_transaction_skips_baseline_restore_when_no_backups(tmp_path: Path) -> N
 
 def test_transaction_skips_baseline_restore_when_no_backup_flag(tmp_path: Path) -> None:
     """When --no-backup is used, skip the baseline restore phase entirely."""
-    applier = MagicMock()
+    applier = _make_applier()
     applier.apply_profile.return_value = ApplyResult(
         success=True,
         applied_settings=["WindowsSettingsHandler"],
@@ -129,7 +146,7 @@ def test_transaction_skips_baseline_restore_when_no_backup_flag(tmp_path: Path) 
 
 def test_transaction_continues_when_baseline_restore_fails(tmp_path: Path) -> None:
     """If baseline restore fails, log warning and continue with apply."""
-    applier = MagicMock()
+    applier = _make_applier()
     applier.apply_profile.return_value = ApplyResult(
         success=True,
         applied_settings=["WindowsSettingsHandler"],
@@ -159,7 +176,7 @@ def test_transaction_continues_when_baseline_restore_fails(tmp_path: Path) -> No
 
 
 def test_transaction_handles_apply_exception_and_fails_cleanly(tmp_path: Path) -> None:
-    applier = MagicMock()
+    applier = _make_applier()
     applier.apply_profile.side_effect = RuntimeError("boom")
     applier.verify_profile.return_value = {"all_active": True, "handlers": {}}
 
@@ -171,3 +188,36 @@ def test_transaction_handles_apply_exception_and_fails_cleanly(tmp_path: Path) -
     assert tx.apply_result is not None
     assert "Profile apply crashed" in (tx.apply_result.error or "")
     assert any(cp.phase == "apply" and cp.status == "failed" for cp in tx.checkpoints)
+
+
+def test_transaction_rejects_unknown_profile_before_touching_backups(tmp_path: Path) -> None:
+    applier = MagicMock()
+    applier.PROFILES = {}
+
+    with patch("abso.core.transaction.BackupManager") as mock_backup_cls:
+        manager = ProfileTransactionManager(tmp_path, applier=applier)
+        tx = manager.execute("missing-profile", create_backup=True)
+
+    mock_backup_cls.assert_not_called()
+    assert tx.success is False
+    assert tx.error == "Unknown profile: missing-profile"
+    assert any(cp.phase == "validate" and cp.status == "failed" for cp in tx.checkpoints)
+
+
+def test_transaction_rejects_capability_blocker_before_touching_backups(tmp_path: Path) -> None:
+    applier = _make_applier()
+    applier.validate_profile_prerequisites.return_value = (
+        "This profile requires at least one HDR-capable active display, but none were detected."
+    )
+
+    with patch("abso.core.transaction.BackupManager") as mock_backup_cls:
+        manager = ProfileTransactionManager(tmp_path, applier=applier)
+        tx = manager.execute("test-profile", create_backup=True)
+
+    mock_backup_cls.assert_not_called()
+    applier.apply_profile.assert_not_called()
+    assert tx.success is False
+    assert tx.error == (
+        "This profile requires at least one HDR-capable active display, but none were detected."
+    )
+    assert any(cp.phase == "validate" and cp.status == "failed" for cp in tx.checkpoints)

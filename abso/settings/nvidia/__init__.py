@@ -24,7 +24,7 @@ from typing import Any
 from abso.core.models import Issue
 from abso.settings.base import SettingsHandler
 
-from .npi import NPIManager
+from .npi import NPIManager, NPI_IMPORTS_DISABLED
 from .presets import NVIDIA_PRESETS, NvidiaSettingIDs, NvidiaSettingValues
 from .profiles import generate_custom_profile, generate_game_profile, generate_preset_profile
 
@@ -310,6 +310,7 @@ class NvidiaSettingsHandler(SettingsHandler):
 
             manager = DRSProfileManager()
             verification_failures: list[str] = []
+            global_verification_failures: list[str] = []
             app_bound = True
             npi_launched = False
 
@@ -334,6 +335,23 @@ class NvidiaSettingsHandler(SettingsHandler):
                         errors.append(f"global.{err['setting']}: {err['error']}")
 
                 logger.info(f"NVIDIA global settings applied for {game_name}: {global_settings}")
+
+                try:
+                    global_verify_result = manager.get_app_settings()
+                    global_verification_failures = self._collect_verification_failures(
+                        manager,
+                        global_verify_result,
+                        global_result.get("settings_applied", {}),
+                    )
+                    if global_verification_failures:
+                        logger.warning(
+                            "NVIDIA global post-apply verification mismatches: %s",
+                            global_verification_failures,
+                        )
+                        for failure in global_verification_failures:
+                            errors.append(f"global verification failed: {failure}")
+                except Exception as ve:
+                    logger.warning(f"NVIDIA global post-apply verification skipped: {ve}")
 
                 # Sync monitor OSD Adaptive Sync to match driver VRR mode.
                 # The monitor firmware needs Adaptive Sync enabled for G-SYNC
@@ -418,6 +436,7 @@ class NvidiaSettingsHandler(SettingsHandler):
                     note = result.get("app_binding_note", "")
                     if note:
                         applied.append(f"NOTE: {note}")
+                        errors.append(f"App binding failed: {note}")
 
                     # If NPI was launched, add a clear message
                     if result.get("npi_launched"):
@@ -435,25 +454,15 @@ class NvidiaSettingsHandler(SettingsHandler):
                         primary_exe,
                         profile_name=profile_name,
                     )
-                    for setting_name, expected_value in result.get("settings_applied", {}).items():
-                        if setting_name.startswith("_"):
-                            continue
-                        actual = verify_result.get(setting_name)
-                        if actual is None:
-                            continue
-                        # Resolve friendly names to numeric via the DRS manager
-                        resolved = manager._resolve_setting(setting_name, expected_value)
-                        if resolved is None:
-                            continue  # Can't resolve - skip verification
-                        _, resolved_value = resolved
-                        if str(actual) != str(resolved_value):
-                            verification_failures.append(
-                                f"{setting_name}: expected={expected_value} ({resolved_value}), actual={actual}"
-                            )
+                    verification_failures = self._collect_verification_failures(
+                        manager,
+                        verify_result,
+                        result.get("settings_applied", {}),
+                    )
                     if verification_failures:
-                        logger.warning(
-                            f"NVIDIA post-apply verification mismatches: {verification_failures}"
-                        )
+                        logger.warning("NVIDIA post-apply verification mismatches: %s", verification_failures)
+                        for failure in verification_failures:
+                            errors.append(f"verification failed: {failure}")
                 except Exception as ve:
                     logger.warning(f"NVIDIA post-apply verification skipped: {ve}")
             elif nvidia_settings and not executables:
@@ -469,6 +478,7 @@ class NvidiaSettingsHandler(SettingsHandler):
                 "applied": applied,
                 "app_bound": app_bound,
                 "npi_launched": npi_launched,
+                "global_verification_failures": global_verification_failures if global_verification_failures else None,
                 "verification_failures": verification_failures if verification_failures else None,
             }
 
@@ -509,40 +519,105 @@ class NvidiaSettingsHandler(SettingsHandler):
                 "note": f"NVAPI error ({e}) - settings NOT applied, manual application required",
             }
 
+    def _collect_verification_failures(
+        self,
+        manager: Any,
+        verify_result: dict[str, Any],
+        requested_settings: dict[str, Any],
+    ) -> list[str]:
+        """Compare requested DRS writes against numeric driver readback values."""
+        failures: list[str] = []
+
+        for setting_name, expected_value in requested_settings.items():
+            if str(setting_name).startswith("_"):
+                continue
+
+            resolved = manager._resolve_setting(setting_name, expected_value)
+            if resolved is None:
+                continue
+
+            setting_id, resolved_value = resolved
+            actual = self._find_verified_setting_value(manager, verify_result, setting_id)
+            if actual is None:
+                continue
+
+            if str(actual) != str(resolved_value):
+                failures.append(
+                    f"{setting_name}: expected={expected_value} ({resolved_value}), actual={actual}"
+                )
+
+        return failures
+
+    def _find_verified_setting_value(
+        self,
+        manager: Any,
+        verify_result: dict[str, Any],
+        setting_id: int,
+    ) -> Any:
+        """Find a readback value by canonical DRS setting id, regardless of alias name."""
+        for candidate_name, candidate_id in getattr(manager, "SETTING_IDS", {}).items():
+            if candidate_id == setting_id and candidate_name in verify_result:
+                return verify_result[candidate_name]
+        return None
+
     def backup(self) -> dict[str, Any]:
         """Backup current Nvidia profile settings.
 
-        Note: NPI does not support headless export, so this method returns
-        success with a note that manual restoration may be needed. The profile
-        can be restored by re-applying the preset.
+        Nvidia Profile Inspector exports are not safe to restore automatically
+        in the current implementation. We only report backup success when the
+        handler is not applicable on this machine (for example no NVIDIA GPU is
+        present). Otherwise we mark the component as not safely restorable so
+        callers can treat the backup as incomplete instead of pretending a
+        rollback exists.
 
         Returns:
-            Dictionary containing backup metadata. Always succeeds since
-            Nvidia settings can be restored via preset re-application.
+            Dictionary containing backup metadata and whether restore is safe.
         """
-        if not self._npi.is_available():
+        gpu_info = self._detect_gpu_info()
+        has_nvidia_gpu = bool(gpu_info.get("gpu_name"))
+
+        if not has_nvidia_gpu:
             return {
-                "success": True,  # Not a failure - just nothing to backup
-                "note": "NPI not available - no Nvidia settings to backup",
+                "success": True,
+                "nvidia_present": False,
+                "note": "No NVIDIA GPU detected - nothing to back up",
                 "profile_path": None,
             }
 
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        if not self._npi.is_available():
+            return {
+                "success": False,
+                "nvidia_present": True,
+                "profile_path": None,
+                "timestamp": timestamp,
+                "note": (
+                    "NVIDIA backup unavailable: Nvidia Profile Inspector was not found, "
+                    "so current driver settings cannot be captured safely."
+                ),
+            }
 
-        # NPI cannot export headlessly (opens GUI), so skip export entirely
-        # Settings can be restored by re-applying the profile
-        backup_path = None
-        export_note = (
-            "NPI export skipped (opens GUI). "
-            "To restore Nvidia settings, re-apply the game profile."
-        )
-        logger.debug("Nvidia profile export skipped - NPI requires GUI")
+        if NPI_IMPORTS_DISABLED:
+            logger.warning(
+                "NVIDIA backup marked unrestorable because NPI import is disabled for safety"
+            )
+            return {
+                "success": False,
+                "nvidia_present": True,
+                "profile_path": None,
+                "timestamp": timestamp,
+                "note": (
+                    "NVIDIA backup cannot be restored safely because Profile Inspector import "
+                    "is disabled to avoid wiping the user's driver profile database."
+                ),
+            }
 
         return {
-            "success": True,  # Always succeed - we can restore via preset
-            "profile_path": str(backup_path) if backup_path else None,
+            "success": False,
+            "nvidia_present": True,
+            "profile_path": None,
             "timestamp": timestamp,
-            "note": export_note,
+            "note": "NVIDIA backup is unavailable in the current configuration",
         }
 
     def restore(self, data: dict[str, Any]) -> bool:
@@ -554,18 +629,34 @@ class NvidiaSettingsHandler(SettingsHandler):
         Returns:
             True if restore succeeded, False otherwise.
         """
+        if data.get("nvidia_present") is False:
+            logger.info("Skipping NVIDIA restore: no NVIDIA GPU was present when the backup was created")
+            return True
+
         profile_path = data.get("profile_path")
 
         if not profile_path:
-            logger.warning("No profile_path in backup data, nothing to restore")
-            return True  # Not an error, just nothing to do
+            logger.error(
+                "NVIDIA restore unavailable: the backup did not contain a restorable profile artifact"
+            )
+            return False
 
         if not Path(profile_path).exists():
             logger.error(f"Backup profile not found: {profile_path}")
             return False
 
-        result = self.apply({"profile_path": profile_path})
-        return result.get("success", False)
+        if NPI_IMPORTS_DISABLED:
+            logger.error(
+                "NVIDIA restore unavailable: Profile Inspector import is disabled for safety"
+            )
+            return False
+
+        try:
+            self._import_profile(Path(profile_path))
+            return True
+        except Exception as e:
+            logger.error(f"Failed to restore NVIDIA profile from backup: {e}")
+            return False
 
     def _check_npi_available(self) -> bool:
         """Check if NPI is available (backwards compatibility)."""

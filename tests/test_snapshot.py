@@ -1,12 +1,12 @@
 """Profile settings snapshot test.
 
-Captures the exact handler list and settings dict every profile produces.
-Used as a safety net during refactoring — any diff means the refactor
-changed behavior. Run BEFORE and AFTER every structural change.
+Captures the exact handler list, settings dict, and in-game guidance every
+profile produces. Used as a safety net during refactoring - any diff means the
+refactor changed behavior.
 
 Usage:
-    pytest tests/test_snapshot.py -v          # Verify against golden file
-    pytest tests/test_snapshot.py --update    # Regenerate golden file
+    pytest tests/test_snapshot.py -v
+    python tests/test_snapshot.py --update
 """
 
 from __future__ import annotations
@@ -29,14 +29,14 @@ def _build_snapshot() -> dict[str, Any]:
     for pid, cls in sorted(get_profile_classes().items()):
         profile = cls()
         handlers = [type(h).__name__ for h in profile.get_handlers()]
-        settings = {}
+        settings: dict[str, Any] = {}
         for handler_name in handlers:
-            s = profile.get_settings(handler_name)
-            # Convert any non-serializable values
-            settings[handler_name] = _make_serializable(s)
+            settings[handler_name] = _make_serializable(profile.get_settings(handler_name))
+
         snapshot[pid] = {
             "handlers": handlers,
             "settings": settings,
+            "in_game_settings": _make_serializable(profile.get_in_game_settings()),
             "display_name": profile.display_name,
             "optimization_target": profile.optimization_target,
             "is_online_profile": profile.is_online_profile,
@@ -63,11 +63,7 @@ def _make_serializable(obj: Any) -> Any:
 
 
 def test_profile_settings_snapshot() -> None:
-    """Verify all profile settings match the golden snapshot.
-
-    If the golden file doesn't exist, create it and skip (first run).
-    On subsequent runs, compare against the golden file.
-    """
+    """Verify all profile settings match the golden snapshot."""
     current = _build_snapshot()
 
     if not GOLDEN_FILE.exists():
@@ -75,11 +71,10 @@ def test_profile_settings_snapshot() -> None:
             json.dumps(current, indent=2, sort_keys=True, default=str),
             encoding="utf-8",
         )
-        pytest.skip(f"Golden file created at {GOLDEN_FILE} — run again to verify")
+        pytest.skip(f"Golden file created at {GOLDEN_FILE} - run again to verify")
 
     golden = json.loads(GOLDEN_FILE.read_text(encoding="utf-8"))
 
-    # Compare profile IDs
     current_ids = set(current.keys())
     golden_ids = set(golden.keys())
     assert current_ids == golden_ids, (
@@ -88,13 +83,11 @@ def test_profile_settings_snapshot() -> None:
         f"  Removed: {golden_ids - current_ids}"
     )
 
-    # Compare each profile
     diffs: list[str] = []
     for pid in sorted(current_ids):
         cur = current[pid]
         gld = golden[pid]
 
-        # Compare handler lists
         if cur["handlers"] != gld["handlers"]:
             diffs.append(
                 f"{pid}: handlers changed\n"
@@ -102,30 +95,38 @@ def test_profile_settings_snapshot() -> None:
                 f"  now:  {cur['handlers']}"
             )
 
-        # Compare settings per handler
         for handler in set(cur["settings"]) | set(gld.get("settings", {})):
             cur_s = cur["settings"].get(handler, {})
             gld_s = gld.get("settings", {}).get(handler, {})
             if cur_s != gld_s:
-                # Find specific key differences
                 all_keys = set(cur_s) | set(gld_s)
-                for k in sorted(all_keys):
-                    cv = cur_s.get(k)
-                    gv = gld_s.get(k)
-                    if cv != gv:
-                        diffs.append(f"{pid}.{handler}.{k}: {gv!r} → {cv!r}")
+                for key in sorted(all_keys):
+                    cur_value = cur_s.get(key)
+                    golden_value = gld_s.get(key)
+                    if cur_value != golden_value:
+                        diffs.append(f"{pid}.{handler}.{key}: {golden_value!r} -> {cur_value!r}")
 
-        # Compare metadata
-        for key in ["display_name", "optimization_target", "is_online_profile",
-                     "is_emulator_profile", "requires_reflex", "is_sdr_only",
-                     "network_scope", "graphics_api", "allows_aggressive_settings",
-                     "include_legacy_tweaks"]:
+        if cur.get("in_game_settings") != gld.get("in_game_settings"):
+            diffs.append(f"{pid}.in_game_settings changed")
+
+        for key in [
+            "display_name",
+            "optimization_target",
+            "is_online_profile",
+            "is_emulator_profile",
+            "requires_reflex",
+            "is_sdr_only",
+            "network_scope",
+            "graphics_api",
+            "allows_aggressive_settings",
+            "include_legacy_tweaks",
+        ]:
             if cur.get(key) != gld.get(key):
-                diffs.append(f"{pid}.{key}: {gld.get(key)!r} → {cur.get(key)!r}")
+                diffs.append(f"{pid}.{key}: {gld.get(key)!r} -> {cur.get(key)!r}")
 
     assert not diffs, (
         f"Profile settings changed ({len(diffs)} diff(s)):\n"
-        + "\n".join(f"  {d}" for d in diffs)
+        + "\n".join(f"  {diff}" for diff in diffs)
     )
 
 
@@ -138,7 +139,6 @@ def test_profile_count() -> None:
 
 
 if __name__ == "__main__":
-    # Allow running directly to generate/update golden file
     if "--update" in sys.argv:
         snapshot = _build_snapshot()
         GOLDEN_FILE.write_text(
@@ -147,6 +147,5 @@ if __name__ == "__main__":
         )
         print(f"Golden file updated: {GOLDEN_FILE} ({len(snapshot)} profiles)")
     else:
-        # Print current snapshot for inspection
         snapshot = _build_snapshot()
         print(json.dumps(snapshot, indent=2, sort_keys=True, default=str))

@@ -118,7 +118,7 @@ export function Home() {
           <ActionCard
             icon={Settings}
             title="Settings"
-            subtitle="Fine-tune individual settings"
+            subtitle="Review profile-driven setting targets"
             onClick={() => setPage('settings')}
           />
 
@@ -144,7 +144,7 @@ export function Home() {
           <ActionCard
             icon={Timer}
             title="Timer"
-            subtitle="Set system timer resolution"
+            subtitle="Inspect current timer resolution"
             onClick={() => setPage('timer')}
           />
         </div>

@@ -7,7 +7,7 @@ import { useAppStore } from '@/stores/appStore';
 import * as api from '@/lib/api';
 
 export function Reports() {
-  const { profiles, profilesLoading, loadProfiles } = useAppStore();
+  const { profiles, profilesLoading, loadProfiles, activeProfile } = useAppStore();
   const [selectedProfile, setSelectedProfile] = React.useState<string | null>(null);
   const [reportContent, setReportContent] = React.useState<string>('');
   const [reportLoading, setReportLoading] = React.useState(false);
@@ -21,9 +21,12 @@ export function Reports() {
 
   React.useEffect(() => {
     if (selectedProfile === null && profiles.length > 0) {
-      setSelectedProfile(profiles[0].id);
+      const preferredProfile = activeProfile && profiles.some((p) => p.id === activeProfile)
+        ? activeProfile
+        : profiles[0].id;
+      setSelectedProfile(preferredProfile);
     }
-  }, [profiles, selectedProfile]);
+  }, [activeProfile, profiles, selectedProfile]);
 
   React.useEffect(() => {
     const loadReport = async () => {

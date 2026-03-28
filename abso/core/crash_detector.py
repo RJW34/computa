@@ -293,9 +293,15 @@ class CrashDetector:
         )
 
         try:
-            self._backup_manager.restore_backup("latest")
-            logger.info("Auto-rollback completed successfully")
-            return True
+            restore_summary = self._backup_manager.restore_backup("latest")
+            if restore_summary.complete:
+                logger.info("Auto-rollback completed successfully")
+                return True
+
+            incomplete = restore_summary.failed_components + restore_summary.skipped_components
+            handlers = ", ".join(item["handler"] for item in incomplete)
+            logger.error("Auto-rollback incomplete for handlers: %s", handlers)
+            return False
         except Exception:
             logger.error(
                 "Auto-rollback FAILED for profile '%s'",

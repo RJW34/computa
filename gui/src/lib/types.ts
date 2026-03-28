@@ -119,13 +119,47 @@ export interface ApplyStep {
   message?: string;
 }
 
+export interface ApplyHandlerResult {
+  handler: string;
+  status: 'success' | 'failed' | 'skipped';
+  error?: string;
+}
+
+export interface TransactionCheckpoint {
+  phase: string;
+  status: string;
+  message: string;
+  at?: string;
+}
+
+export interface TransactionSummary {
+  success: boolean;
+  profile_id: string;
+  state: string;
+  backup_id?: string | null;
+  error?: string | null;
+  rollback_performed: boolean;
+  rollback_error?: string | null;
+  checkpoints: TransactionCheckpoint[];
+}
+
 export interface ApplyResult {
   success: boolean;
-  backup_id?: string;
-  steps: ApplyStep[];
+  profile: string;
+  backup_id?: string | null;
   requires_reboot: boolean;
-  in_game_settings: InGameSetting[];
-  errors: string[];
+  in_game_settings: boolean;
+  error?: string | null;
+  applied_settings: string[];
+  failed_settings: string[];
+  warnings: string[];
+  results: ApplyHandlerResult[];
+  transaction?: TransactionSummary;
+  compliance?: {
+    passed: boolean;
+    has_critical: boolean;
+    issues: unknown[];
+  } | null;
 }
 
 // Navigation types

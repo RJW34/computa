@@ -278,6 +278,17 @@ class TestProfileSettings:
         assert settings["auto_vrr_fps_cap"] is True
         assert settings["global_vrr_mode"] == "fullscreen_only"
 
+    def test_overwatch2_gsync_in_game_display_mode_matches_fullscreen_vrr_path(self):
+        """G-SYNC Overwatch guidance should match the fullscreen-only driver path."""
+        profile = Overwatch2GSyncProfile()
+        display_mode = next(
+            item for item in profile.get_in_game_settings()
+            if item["setting"] == "Display Mode"
+        )
+        assert display_mode["value"] == "Fullscreen (Exclusive)"
+        assert "fullscreen-only g-sync" in display_mode["reason"].lower()
+        assert "do not switch to borderless/windowed" in display_mode["reason"].lower()
+
     def test_overwatch2_gsync_hdr_settings(self):
         """G-SYNC HDR Overwatch profile should enable HDR, disable auto-HDR, use native ICC."""
         profile = Overwatch2GSyncHDRProfile()
@@ -294,6 +305,17 @@ class TestProfileSettings:
         color = profile.get_settings("ColorProfileSettingsHandler")
         assert color["icc_profile"] == "native"
         assert color["game_type"] == "competitive_fps"
+
+    def test_overwatch2_gsync_hdr_in_game_display_mode_matches_fullscreen_vrr_path(self):
+        """G-SYNC HDR guidance should stay aligned with fullscreen-only VRR settings."""
+        profile = Overwatch2GSyncHDRProfile()
+        display_mode = next(
+            item for item in profile.get_in_game_settings()
+            if item["setting"] == "Display Mode"
+        )
+        assert display_mode["value"] == "Fullscreen (Exclusive)"
+        assert "fullscreen-only g-sync" in display_mode["reason"].lower()
+        assert "do not switch to borderless/windowed" in display_mode["reason"].lower()
 
     def test_marvel_rivals_sdr_settings(self):
         """SDR Marvel Rivals profile should keep the Reflex + VRR SDR path."""

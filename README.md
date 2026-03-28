@@ -14,6 +14,24 @@ A.B.S.O. is a CLI-first Windows 11 gaming optimization tool that automatically d
 - **Safe by Default** - Automatic backups before any changes
 - **Easy Restore** - One-click rollback to previous settings
 
+## Quality Bar
+
+A.B.S.O. is being hardened against a stricter product standard than a typical tweak tool. The current quality rubric and remediation roadmap live here:
+
+- [`docs/INDEX.md`](docs/INDEX.md)
+- [`docs/HERMES_HANDOFF.md`](docs/HERMES_HANDOFF.md)
+- [`docs/QUALITY_RUBRIC.md`](docs/QUALITY_RUBRIC.md)
+- [`docs/REMEDIATION_ROADMAP.md`](docs/REMEDIATION_ROADMAP.md)
+
+These documents define:
+
+- the fastest reading order for new agents
+- machine-role policy for implementation vs validation
+- what the project is allowed to claim
+- how profile quality is graded
+- what must be true before calling a profile "optimal"
+- the execution plan to raise the project to `A` grades across the board
+
 ## Requirements
 
 - Windows 10/11 (64-bit)

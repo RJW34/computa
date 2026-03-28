@@ -398,6 +398,112 @@ class TestNvidiaApply:
             profile_name="Overwatch 2",
         )
 
+    @patch("abso.settings.nvidia.nvapi_drs.DRSProfileManager")
+    def test_apply_verification_uses_alias_readback_for_vsync_and_frame_cap(self, mock_manager_cls):
+        """Verification should understand driver readback aliases like vsync_mode and frame_rate_limiter_v3."""
+        mock_manager = MagicMock()
+        mock_manager.apply_settings_to_app.return_value = {
+            "settings_applied": {"vsync": "on", "max_frame_rate": 277},
+            "errors": [],
+            "app_bound": True,
+            "npi_launched": False,
+        }
+        mock_manager.get_app_settings.return_value = {
+            "vsync_mode": 0x47814940,
+            "frame_rate_limiter_v3": 277,
+        }
+
+        def resolve_side_effect(name, value):
+            mapping = {
+                ("vsync", "on"): (0x00A879CF, 0x47814940),
+                ("max_frame_rate", 277): (0x10835002, 277),
+            }
+            return mapping[(name, value)]
+
+        mock_manager._resolve_setting.side_effect = resolve_side_effect
+        mock_manager_cls.return_value = mock_manager
+
+        handler = NvidiaSettingsHandler()
+        result = handler.apply({
+            "vsync": "on",
+            "max_frame_rate": 277,
+            "executables": ["Overwatch.exe"],
+            "game_name": "Overwatch 2 - GSYNC",
+            "profile_name": "Overwatch 2",
+        })
+
+        assert result["success"] is True
+        assert result["verification_failures"] is None
+
+    @patch("abso.settings.nvidia.nvapi_drs.DRSProfileManager")
+    def test_apply_global_vrr_mode_readback_mismatch_fails(self, mock_manager_cls):
+        """Global G-SYNC mode should fail the apply if driver readback does not match."""
+        mock_manager = MagicMock()
+        mock_manager.apply_settings_to_global.return_value = {
+            "profile_name": "Base Profile",
+            "settings_applied": {"vrr_mode": "fullscreen_only", "max_frame_rate": "off"},
+            "errors": [],
+        }
+        mock_manager.apply_settings_to_app.return_value = {
+            "settings_applied": {"vrr_app_override": "allow"},
+            "errors": [],
+            "app_bound": True,
+            "npi_launched": False,
+        }
+        mock_manager.get_app_settings.side_effect = [
+            {"vrr_mode": 0x00000000, "frame_rate_limiter_v3": 0},
+            {"vrr_app_override": 0x00000000},
+        ]
+
+        def resolve_side_effect(name, value):
+            mapping = {
+                ("vrr_mode", "fullscreen_only"): (0x1194F158, 0x00000001),
+                ("max_frame_rate", "off"): (0x10835002, 0),
+                ("vrr_app_override", "allow"): (0x10A879CF, 0x00000000),
+            }
+            return mapping[(name, value)]
+
+        mock_manager._resolve_setting.side_effect = resolve_side_effect
+        mock_manager_cls.return_value = mock_manager
+
+        handler = NvidiaSettingsHandler()
+        result = handler.apply({
+            "preset": "reflex_gsync",
+            "global_vrr_mode": "fullscreen_only",
+            "executables": ["Overwatch.exe"],
+            "game_name": "Overwatch 2 - GSYNC",
+            "profile_name": "Overwatch 2",
+        })
+
+        assert result["success"] is False
+        assert "global verification failed" in (result["error"] or "")
+
+    @patch("abso.settings.nvidia.nvapi_drs.DRSProfileManager")
+    def test_apply_fails_when_app_binding_is_unavailable(self, mock_manager_cls):
+        """A profile with unbound executables must not count as successfully applied."""
+        mock_manager = MagicMock()
+        mock_manager.apply_settings_to_app.return_value = {
+            "settings_applied": {"vrr_app_override": "allow"},
+            "errors": [],
+            "app_bound": False,
+            "npi_launched": False,
+            "app_binding_note": "Automatic app binding unavailable on this driver version.",
+        }
+        mock_manager.get_app_settings.return_value = {"vrr_app_override": 0x00000000}
+        mock_manager._resolve_setting.return_value = (0x10A879CF, 0x00000000)
+        mock_manager_cls.return_value = mock_manager
+
+        handler = NvidiaSettingsHandler()
+        result = handler.apply({
+            "preset": "reflex_gsync",
+            "executables": ["Overwatch.exe"],
+            "game_name": "Overwatch 2 - GSYNC",
+            "profile_name": "Overwatch 2",
+        })
+
+        assert result["success"] is False
+        assert "App binding failed" in (result["error"] or "")
+
     @patch("abso.settings.windows.WindowsSettingsHandler._get_refresh_rate_info")
     @patch("abso.core.detector.HardwareDetector.detect_monitors")
     def test_detect_primary_refresh_rate_falls_back_to_windows_handler(
@@ -456,56 +562,53 @@ class TestNvidiaBackupRestore:
     """Tests for backup() and restore() methods."""
 
     def test_backup_when_npi_unavailable(self):
-        """Test backup succeeds with note when NPI unavailable."""
+        """Test backup is marked incomplete when an NVIDIA GPU is present but NPI is unavailable."""
         handler = NvidiaSettingsHandler()
 
-        with patch.object(handler._npi, "is_available", return_value=False):
+        with (
+            patch.object(handler, "_detect_gpu_info", return_value={"gpu_name": "NVIDIA GeForce RTX 4090"}),
+            patch.object(handler._npi, "is_available", return_value=False),
+        ):
             result = handler.backup()
 
-        # Backup always succeeds - NPI unavailable just means nothing to backup
-        assert result["success"] is True
+        assert result["success"] is False
+        assert result["nvidia_present"] is True
         assert result["profile_path"] is None
-        assert "not available" in result["note"]
+        assert "cannot be captured safely" in result["note"]
 
-    def test_backup_skips_export_npi_gui_limitation(self, tmp_path):
-        """Test backup succeeds but skips file creation.
-
-        NPI doesn't support headless export (opens GUI), so backup skips
-        the export step entirely. Settings can be restored by re-applying
-        the game profile.
-        """
+    def test_backup_succeeds_when_no_nvidia_gpu_is_present(self, tmp_path):
+        """Test backup reports success when the handler is not applicable on this machine."""
         handler = NvidiaSettingsHandler()
         handler.BACKUP_DIR = tmp_path
 
-        with patch.object(handler._npi, "is_available", return_value=True):
+        with patch.object(handler, "_detect_gpu_info", return_value={"gpu_name": None}):
             result = handler.backup()
 
         assert result["success"] is True
-        # profile_path is None - export skipped due to NPI GUI limitation
+        assert result["nvidia_present"] is False
         assert result["profile_path"] is None
-        assert "note" in result
-        assert "GUI" in result["note"] or "skipped" in result["note"].lower()
+        assert "No NVIDIA GPU detected" in result["note"]
 
-    def test_backup_handles_exception(self):
-        """Test backup succeeds with note when export fails (NPI doesn't support headless export)."""
+    def test_backup_marks_restore_unavailable_when_imports_are_disabled(self):
+        """Test backup does not pretend to be restorable when safe imports are disabled."""
         handler = NvidiaSettingsHandler()
 
-        with (patch.object(handler._npi, "is_available", return_value=True),
-              patch.object(handler._npi, "export_profile", side_effect=Exception("Export failed"))):
+        with (
+            patch.object(handler, "_detect_gpu_info", return_value={"gpu_name": "NVIDIA GeForce RTX 4090"}),
+            patch.object(handler._npi, "is_available", return_value=True),
+        ):
             result = handler.backup()
 
-        # Backup always succeeds - export failure just means we note it
-        # Nvidia settings can be restored by re-applying the game profile
-        assert result["success"] is True
+        assert result["success"] is False
         assert result["profile_path"] is None
-        assert result["note"] is not None
+        assert "cannot be restored safely" in result["note"]
 
     def test_restore_without_profile_path(self):
-        """Test restore with no profile_path returns True."""
+        """Test restore with no profile_path returns False."""
         handler = NvidiaSettingsHandler()
         result = handler.restore({})
 
-        assert result is True
+        assert result is False
 
     def test_restore_missing_file_returns_false(self, tmp_path):
         """Test restore with missing file returns False."""
@@ -521,8 +624,11 @@ class TestNvidiaBackupRestore:
 
         handler = NvidiaSettingsHandler()
 
-        with (patch.object(handler._npi, "is_available", return_value=True),
-              patch.object(handler._npi, "import_profile")):
+        with (
+            patch("abso.settings.nvidia.NPI_IMPORTS_DISABLED", False),
+            patch.object(handler._npi, "is_available", return_value=True),
+            patch.object(handler._npi, "import_profile"),
+        ):
             result = handler.restore({"profile_path": str(profile_file)})
 
         assert result is True

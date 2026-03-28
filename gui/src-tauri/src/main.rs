@@ -2,6 +2,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use serde::Deserialize;
+use std::fs;
 use std::path::PathBuf;
 use std::process::Command;
 use std::sync::Mutex;
@@ -30,6 +31,25 @@ struct CliResponse<T> {
 struct CliProfile {
     id: String,
     display_name: String,
+}
+
+#[derive(Deserialize)]
+struct ApplyCliData {
+    success: bool,
+    #[allow(dead_code)]
+    profile: Option<String>,
+    #[allow(dead_code)]
+    backup_id: Option<String>,
+    #[serde(default)]
+    failed_settings: Vec<String>,
+    #[allow(dead_code)]
+    warnings: Vec<String>,
+    error: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct TrayProfileCache {
+    profiles: Vec<CliProfile>,
 }
 
 /// State to track the currently active profile
@@ -222,7 +242,7 @@ fn set_active_profile(state: tauri::State<AppState>, profile_id: Option<String>)
 }
 
 /// Apply a profile via CLI (used by tray menu)
-fn apply_profile_sync(app_handle: &tauri::AppHandle, profile_id: &str) -> Result<String, String> {
+fn apply_profile_sync(app_handle: &tauri::AppHandle, profile_id: &str) -> Result<(), String> {
     let output = if should_use_python() {
         Command::new("python")
             .args(["-m", "abso", "apply", profile_id, "--json"])
@@ -238,13 +258,78 @@ fn apply_profile_sync(app_handle: &tauri::AppHandle, profile_id: &str) -> Result
     };
 
     if output.status.success() {
-        Ok(String::from_utf8_lossy(&output.stdout).to_string())
+        let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+        let parsed: CliResponse<ApplyCliData> = serde_json::from_str(&stdout)
+            .map_err(|e| format!("Failed to parse apply response: {}. stdout: {}", e, stdout))?;
+
+        if parsed.success && parsed.data.success && parsed.data.failed_settings.is_empty() {
+            Ok(())
+        } else {
+            let mut parts: Vec<String> = Vec::new();
+            if let Some(error) = parsed.error.or(parsed.data.error) {
+                if !error.trim().is_empty() {
+                    parts.push(error);
+                }
+            }
+            if !parsed.data.failed_settings.is_empty() {
+                parts.push(format!(
+                    "Failed handlers: {}",
+                    parsed.data.failed_settings.join("; ")
+                ));
+            }
+
+            Err(if parts.is_empty() {
+                "Profile apply failed".to_string()
+            } else {
+                parts.join(" | ")
+            })
+        }
     } else {
         Err(String::from_utf8_lossy(&output.stderr).to_string())
     }
 }
 
-fn fallback_tray_profiles() -> Vec<TrayProfile> {
+fn fallback_tray_profiles(app_handle: &tauri::AppHandle) -> Vec<TrayProfile> {
+    let mut candidate_paths = vec![get_project_root()
+        .join("abso")
+        .join("tray")
+        .join("profile-catalog-cache.json")];
+
+    if let Ok(resource_dir) = app_handle.path().resource_dir() {
+        candidate_paths.push(resource_dir.join("profile-catalog-cache.json"));
+        candidate_paths.push(
+            resource_dir
+                .join("abso")
+                .join("tray")
+                .join("profile-catalog-cache.json"),
+        );
+    }
+
+    for path in candidate_paths {
+        if !path.exists() {
+            continue;
+        }
+
+        let Ok(raw) = fs::read_to_string(&path) else {
+            continue;
+        };
+
+        let Ok(cache) = serde_json::from_str::<TrayProfileCache>(&raw) else {
+            continue;
+        };
+
+        if !cache.profiles.is_empty() {
+            return cache
+                .profiles
+                .into_iter()
+                .map(|profile| TrayProfile {
+                    id: profile.id,
+                    name: profile.display_name,
+                })
+                .collect();
+        }
+    }
+
     Vec::new()
 }
 
@@ -266,14 +351,14 @@ fn load_tray_profiles(app_handle: &tauri::AppHandle) -> Vec<TrayProfile> {
         Ok(o) => o,
         Err(e) => {
             eprintln!("Failed to load profiles for tray menu: {}", e);
-            return fallback_tray_profiles();
+            return fallback_tray_profiles(app_handle);
         }
     };
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
         eprintln!("profiles --json failed for tray menu: {}", stderr);
-        return fallback_tray_profiles();
+        return fallback_tray_profiles(app_handle);
     }
 
     let stdout = String::from_utf8_lossy(&output.stdout);
@@ -287,10 +372,10 @@ fn load_tray_profiles(app_handle: &tauri::AppHandle) -> Vec<TrayProfile> {
                 name: profile.display_name,
             })
             .collect(),
-        Ok(_) => fallback_tray_profiles(),
+        Ok(_) => fallback_tray_profiles(app_handle),
         Err(e) => {
             eprintln!("Failed to parse profile metadata for tray menu: {}", e);
-            fallback_tray_profiles()
+            fallback_tray_profiles(app_handle)
         }
     }
 }
@@ -434,7 +519,7 @@ fn main() {
                             .await;
 
                             match result {
-                                Ok(Ok(_)) => {
+                                Ok(Ok(())) => {
                                     // Update state with proper error handling
                                     let state: tauri::State<AppState> = app_clone.state();
                                     if let Ok(mut guard) = state.active_profile.lock() {

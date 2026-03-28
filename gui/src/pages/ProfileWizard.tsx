@@ -38,6 +38,9 @@ export function ProfileWizard() {
   const [applyProgress, setApplyProgress] = React.useState(0);
   const [applyComplete, setApplyComplete] = React.useState(false);
   const [applyError, setApplyError] = React.useState<string | null>(null);
+  const [appliedBackupId, setAppliedBackupId] = React.useState<string | null>(null);
+  const [undoing, setUndoing] = React.useState(false);
+  const [copyingReport, setCopyingReport] = React.useState(false);
 
   // Track interval for cleanup on unmount
   const progressIntervalRef = React.useRef<number | null>(null);
@@ -80,6 +83,7 @@ export function ProfileWizard() {
     setApplying(true);
     setApplyProgress(0);
     setApplyError(null);
+    setAppliedBackupId(null);
 
     try {
       // Show progress animation while API call runs
@@ -99,6 +103,7 @@ export function ProfileWizard() {
       setApplyProgress(100);
 
       if (result.success) {
+        setAppliedBackupId(result.backup_id ?? null);
         // Track the active profile in frontend store
         setActiveProfile(wizardProfile);
 
@@ -111,16 +116,49 @@ export function ProfileWizard() {
 
         setApplyComplete(true);
       } else {
-        // Use errors array if available, otherwise generic message
-        const errorMsg = result.errors?.length > 0
-          ? result.errors.join('; ')
-          : 'Failed to apply profile';
-        setApplyError(errorMsg);
+        setApplyError(result.error || 'Failed to apply profile');
       }
     } catch (error) {
       setApplyError(error instanceof Error ? error.message : 'Failed to apply profile');
     } finally {
       setApplying(false);
+    }
+  };
+
+  const handleUndo = async () => {
+    if (!appliedBackupId) {
+      setApplyError('Undo is unavailable because this profile was applied without creating a backup.');
+      return;
+    }
+
+    setUndoing(true);
+    setApplyError(null);
+    try {
+      await api.restoreBackup(appliedBackupId);
+      setActiveProfile(null);
+      await api.setActiveProfileBackend(null);
+      resetWizard();
+      setPage('home');
+    } catch (error) {
+      setApplyError(error instanceof Error ? error.message : 'Failed to restore backup');
+    } finally {
+      setUndoing(false);
+    }
+  };
+
+  const handleCopyReport = async () => {
+    if (!selectedProfile) {
+      return;
+    }
+
+    setCopyingReport(true);
+    try {
+      const report = await api.getReport(selectedProfile.id);
+      await navigator.clipboard.writeText(report.content);
+    } catch (error) {
+      setApplyError(error instanceof Error ? error.message : 'Failed to copy report');
+    } finally {
+      setCopyingReport(false);
     }
   };
 
@@ -407,11 +445,15 @@ export function ProfileWizard() {
                   <li>• <strong>Internal Resolution</strong>: Native</li>
                 </ul>
                 <div className="flex gap-2 mt-4">
-                  <Button variant="outline" size="sm">
-                    <Copy className="h-4 w-4 mr-2" />
+                  <Button variant="outline" size="sm" onClick={() => void handleCopyReport()} disabled={copyingReport}>
+                    {copyingReport ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <Copy className="h-4 w-4 mr-2" />
+                    )}
                     Copy to Clipboard
                   </Button>
-                  <Button variant="outline" size="sm">
+                  <Button variant="outline" size="sm" onClick={() => setPage('reports')}>
                     View Full Report
                   </Button>
                 </div>
@@ -419,9 +461,13 @@ export function ProfileWizard() {
             </Card>
 
             <div className="flex justify-center gap-4 pt-4">
-              <Button variant="outline" onClick={handleDone}>
-                <Undo2 className="h-4 w-4 mr-2" />
-                Undo (Restore)
+              <Button variant="outline" onClick={() => void handleUndo()} disabled={undoing || !appliedBackupId}>
+                {undoing ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Undo2 className="h-4 w-4 mr-2" />
+                )}
+                {appliedBackupId ? 'Undo (Restore)' : 'Undo Unavailable'}
               </Button>
               <Button onClick={handleDone}>Done (Go Home)</Button>
             </div>

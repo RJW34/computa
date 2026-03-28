@@ -5,7 +5,6 @@ import type {
   Profile,
   Backup,
   ApplyResult,
-  AllSettings,
 } from './types';
 
 /**
@@ -38,7 +37,20 @@ export async function runAbsoJson<T>(
   const response = JSON.parse(result) as CliResponse<T>;
 
   if (!response.success) {
-    throw new Error(response.error || 'Command failed');
+    const dataError =
+      response.data &&
+      typeof response.data === 'object' &&
+      'error' in response.data &&
+      typeof (response.data as { error?: unknown }).error === 'string'
+        ? (response.data as { error: string }).error
+        : response.data &&
+            typeof response.data === 'object' &&
+            'message' in response.data &&
+            typeof (response.data as { message?: unknown }).message === 'string'
+          ? (response.data as { message: string }).message
+          : undefined;
+
+    throw new Error(response.error || dataError || 'Command failed');
   }
 
   return response.data;
@@ -113,7 +125,7 @@ export async function restoreBackup(
  * Create a manual backup
  */
 export async function createBackup(): Promise<Backup> {
-  return runAbsoJson<Backup>('backup');
+  return runAbsoJson<Backup>('backup-create');
 }
 
 /**
@@ -122,42 +134,7 @@ export async function createBackup(): Promise<Backup> {
 export async function deleteBackup(
   backupId: string
 ): Promise<{ success: boolean }> {
-  return runAbsoJson<{ success: boolean }>('backup', ['--delete', backupId]);
-}
-
-/**
- * Get current settings
- */
-export async function getCurrentSettings(): Promise<AllSettings> {
-  return runAbsoJson<AllSettings>('settings');
-}
-
-/**
- * Apply individual settings
- */
-export async function applySettings(
-  handler: string,
-  settings: Record<string, unknown>
-): Promise<{ success: boolean; message: string }> {
-  return runAbsoJson<{ success: boolean; message: string }>('settings', [
-    '--apply',
-    handler,
-    JSON.stringify(settings),
-  ]);
-}
-
-/**
- * Set timer resolution
- */
-export async function setTimerResolution(
-  resolutionMs: number,
-  keepAlive = false
-): Promise<{ success: boolean; current: number }> {
-  const args = ['-r', resolutionMs.toString()];
-  if (keepAlive) {
-    args.push('-k');
-  }
-  return runAbsoJson<{ success: boolean; current: number }>('timer', args);
+  return runAbsoJson<{ success: boolean }>('backup-delete', [backupId]);
 }
 
 /**
@@ -181,17 +158,6 @@ export async function getReport(
   profileId: string
 ): Promise<{ content: string; path: string }> {
   return runAbsoJson<{ content: string; path: string }>('report', [profileId]);
-}
-
-/**
- * Get profile settings preview (what will change)
- */
-export async function previewProfile(
-  profileId: string
-): Promise<{ current: AllSettings; target: AllSettings }> {
-  return runAbsoJson<{ current: AllSettings; target: AllSettings }>('preview', [
-    profileId,
-  ]);
 }
 
 /**

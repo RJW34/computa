@@ -95,6 +95,28 @@ class ProfileTransactionManager:
         )
         tx.add_checkpoint("plan", "ok", "Transaction planned")
 
+        if profile_id not in self.applier.PROFILES:
+            tx.state = "failed"
+            tx.error = f"Unknown profile: {profile_id}"
+            tx.add_checkpoint("validate", "failed", tx.error)
+            return tx
+
+        try:
+            prerequisite_error = self.applier.validate_profile_prerequisites(profile_id)
+        except Exception as e:
+            tx.state = "failed"
+            tx.error = f"Prerequisite validation failed: {e}"
+            tx.add_checkpoint("validate", "failed", tx.error)
+            return tx
+
+        if prerequisite_error:
+            tx.state = "failed"
+            tx.error = prerequisite_error
+            tx.add_checkpoint("validate", "failed", prerequisite_error)
+            return tx
+
+        tx.add_checkpoint("validate", "ok", "Profile prerequisites satisfied")
+
         # === PHASE 0: Restore previous baseline ===
         # When switching profiles, stale settings from the previous profile
         # can leak through if the new profile doesn't explicitly override them.
@@ -106,8 +128,23 @@ class ProfileTransactionManager:
                 restore_manager = BackupManager(self.backup_dir)
                 baseline_path = restore_manager.get_baseline_backup()
                 if baseline_path and baseline_path.exists():
-                    restore_manager.restore_backup(baseline_path.name)
-                    tx.add_checkpoint("baseline_restore", "ok", f"Restored baseline: {baseline_path.name}")
+                    restore_summary = restore_manager.restore_backup(baseline_path.name)
+                    if restore_summary.complete:
+                        tx.add_checkpoint("baseline_restore", "ok", f"Restored baseline: {baseline_path.name}")
+                    else:
+                        incomplete_handlers = [
+                            item["handler"]
+                            for item in (
+                                restore_summary.skipped_components
+                                + restore_summary.failed_components
+                            )
+                        ]
+                        tx.add_checkpoint(
+                            "baseline_restore",
+                            "warn",
+                            "Baseline restore incomplete: "
+                            + ", ".join(incomplete_handlers),
+                        )
                 else:
                     tx.add_checkpoint("baseline_restore", "skipped", "No previous backup — first application")
             except BackupNotFoundError:
@@ -208,11 +245,31 @@ class ProfileTransactionManager:
         if has_critical and self.auto_rollback_on_critical and tx.backup_id and backup_manager:
             tx.state = "rolling_back"
             try:
-                backup_manager.restore_backup(tx.backup_id)
-                tx.rollback_performed = True
-                tx.state = "rolled_back"
-                tx.error = "Critical compliance failure; restored backup automatically."
-                tx.add_checkpoint("rollback", "ok", f"Restored backup {tx.backup_id}")
+                restore_summary = backup_manager.restore_backup(tx.backup_id)
+                if restore_summary.complete:
+                    tx.rollback_performed = True
+                    tx.state = "rolled_back"
+                    tx.error = "Critical compliance failure; restored backup automatically."
+                    tx.add_checkpoint("rollback", "ok", f"Restored backup {tx.backup_id}")
+                else:
+                    incomplete_handlers = [
+                        item["handler"]
+                        for item in (
+                            restore_summary.skipped_components
+                            + restore_summary.failed_components
+                        )
+                    ]
+                    tx.rollback_performed = False
+                    tx.rollback_error = (
+                        "Rollback incomplete for handlers: "
+                        + ", ".join(incomplete_handlers)
+                    )
+                    tx.state = "failed"
+                    tx.error = (
+                        "Critical compliance failure and rollback was incomplete: "
+                        f"{tx.rollback_error}"
+                    )
+                    tx.add_checkpoint("rollback", "failed", tx.error)
             except Exception as e:
                 tx.rollback_error = str(e)
                 tx.state = "failed"

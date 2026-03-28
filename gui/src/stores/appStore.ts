@@ -68,7 +68,7 @@ interface AppState {
 
 export const useAppStore = create<AppState>()(
   persist(
-    (set, _get) => ({
+    (set) => ({
       // Hydration state - tracks when localStorage data has been loaded
       _hasHydrated: false,
       setHasHydrated: (state) => set({ _hasHydrated: state }),
@@ -148,7 +148,7 @@ export const useAppStore = create<AppState>()(
       activeProfileAppliedAt: null,
       setActiveProfile: (profileId, appliedAt) => set({
         activeProfile: profileId,
-        activeProfileAppliedAt: appliedAt || new Date().toISOString(),
+        activeProfileAppliedAt: profileId ? (appliedAt || new Date().toISOString()) : null,
       }),
 
       // Backups

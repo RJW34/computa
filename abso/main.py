@@ -16,7 +16,7 @@ from abso.core.applier import ProfileApplier
 from abso.core.auditor import ConfigurationAuditor
 from abso.core.backup import BackupManager
 from abso.core.detector import HardwareDetector
-from abso.core.exceptions import ProfileLaunchError
+from abso.core.exceptions import BackupNotFoundError, ProfileLaunchError
 from abso.core.launcher import launch_profile
 from abso.core.transaction import ProfileTransactionManager
 from abso.profiles.catalog import get_profile_manifest
@@ -122,6 +122,16 @@ def json_error(message: str, exit_code: int = 1) -> None:
     """Output an error as JSON and exit."""
     output_json(None, success=False, error=message)
     sys.exit(exit_code)
+
+
+def _describe_restore_summary(summary: dict[str, Any]) -> str | None:
+    """Build a concise message for an incomplete restore summary."""
+    incomplete = summary.get("failed_components", []) + summary.get("skipped_components", [])
+    if not incomplete:
+        return None
+
+    handlers = ", ".join(item.get("handler", "unknown") for item in incomplete)
+    return f"Restore incomplete for: {handlers}"
 
 
 @click.group(invoke_without_command=True)
@@ -634,7 +644,7 @@ def apply(profile_name: str, no_backup: bool, benchmark: bool, json_output: bool
                 ],
                 "transaction": tx.to_dict(),
                 "compliance": tx.compliance_report.to_dict() if tx.compliance_report else None,
-            })
+            }, success=tx.success)
             return
 
         if tx.backup_id and not no_backup:
@@ -970,10 +980,29 @@ def restore(backup_id: str, json_output: bool) -> None:
     backup_manager = BackupManager(BACKUPS_DIR)
 
     try:
-        backup_manager.restore_backup(backup_id)
+        restore_summary = backup_manager.restore_backup(backup_id).to_dict()
+        restore_error = _describe_restore_summary(restore_summary)
+        if restore_error:
+            if json_output:
+                output_json({
+                    "success": False,
+                    "backup_id": backup_id,
+                    "message": restore_error,
+                    "restore_summary": restore_summary,
+                }, success=False)
+                return
+            console.print(f"[red]{restore_error}[/red]")
+            for item in restore_summary["failed_components"] + restore_summary["skipped_components"]:
+                console.print(f"  [red]- {item['handler']}: {item.get('detail', item['reason'])}[/red]")
+            sys.exit(1)
         clear_current_profile()
         if json_output:
-            output_json({"success": True, "backup_id": backup_id, "message": "Backup restored successfully"})
+            output_json({
+                "success": True,
+                "backup_id": backup_id,
+                "message": "Backup restored successfully",
+                "restore_summary": restore_summary,
+            })
             return
         console.print(f"\n[green]Backup '{backup_id}' restored successfully![/green]")
         console.print("[yellow]Note: Some changes may require a reboot to take effect.[/yellow]")
@@ -1017,6 +1046,52 @@ def backups(json_output: bool) -> None:
         if backup.get("components"):
             components = ", ".join(backup["components"])
             console.print(f"  [dim]Components: {components}[/dim]")
+
+
+@cli.command("backup-create")
+@click.option("--json", "json_output", is_flag=True, help="Output as JSON for GUI integration")
+def backup_create(json_output: bool) -> None:
+    """Create a manual backup."""
+    BACKUPS_DIR.mkdir(parents=True, exist_ok=True)
+    backup_manager = BackupManager(BACKUPS_DIR)
+
+    backup_id = backup_manager.create_backup(
+        profile_id=get_current_profile(),
+        backup_type="manual",
+    )
+    backup = next(
+        (item for item in backup_manager.list_backups() if item["id"] == backup_id),
+        {"id": backup_id, "created_at": datetime.now().isoformat(), "components": []},
+    )
+
+    if json_output:
+        output_json(backup)
+        return
+
+    console.print(f"[green]Created manual backup: {backup_id}[/green]")
+
+
+@cli.command("backup-delete")
+@click.argument("backup_id")
+@click.option("--json", "json_output", is_flag=True, help="Output as JSON for GUI integration")
+def backup_delete(backup_id: str, json_output: bool) -> None:
+    """Delete a backup by ID."""
+    BACKUPS_DIR.mkdir(parents=True, exist_ok=True)
+    backup_manager = BackupManager(BACKUPS_DIR)
+
+    try:
+        backup_manager.delete_backup(backup_id)
+    except BackupNotFoundError:
+        if json_output:
+            json_error(f"Backup '{backup_id}' not found")
+        console.print(f"[red]Error: Backup '{backup_id}' not found.[/red]")
+        sys.exit(1)
+
+    if json_output:
+        output_json({"success": True, "backup_id": backup_id})
+        return
+
+    console.print(f"[green]Deleted backup: {backup_id}[/green]")
 
 
 @cli.command()

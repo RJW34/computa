@@ -361,6 +361,11 @@ class ProfileApplier:
             return capability_report.blockers[0].message
         return None
 
+    def validate_profile_prerequisites(self, profile_name: str) -> str | None:
+        """Validate a named profile before any transactional side effects begin."""
+        profile = self._get_profile(profile_name)
+        return self._validate_profile_prerequisites(profile)
+
     def _collect_settings(self, profile: BaseProfile) -> dict[str, dict[str, Any]]:
         """Collect all settings from a profile's handlers.
 

@@ -276,7 +276,12 @@ def _restore_launch_backup(result: LaunchResult, backup_dir: Path, backup_id: st
     result.restore_backup_id = backup_id
 
     try:
-        BackupManager(backup_dir).restore_backup(backup_id)
-        result.restored = True
+        restore_summary = BackupManager(backup_dir).restore_backup(backup_id)
+        if restore_summary.complete:
+            result.restored = True
+        else:
+            incomplete = restore_summary.failed_components + restore_summary.skipped_components
+            handlers = ", ".join(item["handler"] for item in incomplete)
+            result.restore_error = f"Restore incomplete for handlers: {handlers}"
     except Exception as e:
         result.restore_error = str(e)

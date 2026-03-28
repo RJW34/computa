@@ -2,16 +2,21 @@
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 from abso.core.capabilities import CapabilityEngine
 
 
-def _make_profile(profile_id: str, requires_confirmed_vrr_support: bool = False) -> MagicMock:
+def _make_profile(
+    profile_id: str,
+    requires_confirmed_vrr_support: bool = False,
+    settings_map: dict[str, dict[str, object]] | None = None,
+) -> MagicMock:
     profile = MagicMock()
     profile.profile_id = profile_id
     profile.requires_confirmed_vrr_support = requires_confirmed_vrr_support
-    profile.get_settings.return_value = {}
+    settings_map = settings_map or {}
+    profile.get_settings.side_effect = lambda handler_name: settings_map.get(handler_name, {})
     return profile
 
 
@@ -67,7 +72,7 @@ def test_capability_blocks_vrr_profile_when_vrr_only_possible() -> None:
     report = CapabilityEngine(detector).evaluate(profile)
 
     assert report.has_blockers is True
-    assert any(f.code == "VRR_REQUIRED_NOT_ACTIVE" for f in report.findings)
+    assert any(f.code == "VRR_REQUIRED_NOT_CONFIRMED" for f in report.findings)
 
 
 def test_capability_warns_on_non_nvidia_gpu() -> None:
@@ -127,3 +132,74 @@ def test_capability_allows_fixed_refresh_when_supported() -> None:
     report = CapabilityEngine(detector).evaluate(profile)
 
     assert not any(f.code == "REFRESH_TARGET_UNSUPPORTED" for f in report.findings)
+
+
+@patch("abso.core.capabilities.WindowsSettingsHandler.detect")
+def test_capability_blocks_hdr_profile_when_no_hdr_capable_display(mock_detect) -> None:
+    detector = MagicMock()
+    detector.detect_monitors.return_value = [
+        {"name": "Primary", "vrr_supported": True, "is_primary": True}
+    ]
+    detector.detect_gpu.return_value = {"name": "NVIDIA GeForce RTX 4090"}
+    mock_detect.return_value = {
+        "hdr_capable_count": 0,
+        "hdr_enabled_count": 0,
+    }
+    profile = _make_profile(
+        "overwatch2-gsync-hdr",
+        requires_confirmed_vrr_support=True,
+        settings_map={"WindowsSettingsHandler": {"hdr": True, "auto_hdr": False}},
+    )
+
+    report = CapabilityEngine(detector).evaluate(profile)
+
+    assert report.has_blockers is True
+    assert any(f.code == "HDR_REQUIRED_NO_CAPABLE_DISPLAY" for f in report.findings)
+
+
+@patch("abso.core.capabilities.WindowsSettingsHandler.detect")
+def test_capability_blocks_hdr_profile_when_hdr_capability_cannot_be_verified(mock_detect) -> None:
+    detector = MagicMock()
+    detector.detect_monitors.return_value = [
+        {"name": "Primary", "vrr_supported": True, "is_primary": True}
+    ]
+    detector.detect_gpu.return_value = {"name": "NVIDIA GeForce RTX 4090"}
+    mock_detect.return_value = {
+        "hdr_capable_count": None,
+        "hdr_enabled_count": None,
+    }
+    profile = _make_profile(
+        "overwatch2-gsync-hdr",
+        requires_confirmed_vrr_support=True,
+        settings_map={"WindowsSettingsHandler": {"hdr": True, "auto_hdr": False}},
+    )
+
+    report = CapabilityEngine(detector).evaluate(profile)
+
+    assert report.has_blockers is True
+    assert any(f.code == "HDR_REQUIRED_UNVERIFIED" for f in report.findings)
+
+
+@patch("abso.core.capabilities.WindowsSettingsHandler.detect")
+def test_capability_allows_hdr_profile_with_confirmed_hdr_capable_display(mock_detect) -> None:
+    detector = MagicMock()
+    detector.detect_monitors.return_value = [
+        {"name": "Primary", "vrr_supported": True, "is_primary": True}
+    ]
+    detector.detect_gpu.return_value = {"name": "NVIDIA GeForce RTX 4090"}
+    mock_detect.return_value = {
+        "hdr_capable_count": 1,
+        "hdr_enabled_count": 0,
+    }
+    profile = _make_profile(
+        "overwatch2-gsync-hdr",
+        requires_confirmed_vrr_support=True,
+        settings_map={"WindowsSettingsHandler": {"hdr": True, "auto_hdr": False}},
+    )
+
+    report = CapabilityEngine(detector).evaluate(profile)
+
+    assert not any(
+        f.code in {"HDR_REQUIRED_NO_CAPABLE_DISPLAY", "HDR_REQUIRED_UNVERIFIED"}
+        for f in report.findings
+    )

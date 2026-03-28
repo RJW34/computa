@@ -8,6 +8,7 @@ from typing import Any
 
 from abso.core.detector import HardwareDetector
 from abso.profiles.base import BaseProfile
+from abso.settings.windows import WindowsSettingsHandler
 
 logger = logging.getLogger(__name__)
 
@@ -85,6 +86,7 @@ class CapabilityEngine:
         self._check_vrr_requirements(profile, monitors, report)
         self._check_gpu_vendor(profile, gpu, report)
         self._check_monitor_presence(profile, monitors, report)
+        self._check_hdr_requirements(profile, report)
         self._check_explicit_refresh_requirements(profile, monitors, report)
 
         return report
@@ -233,6 +235,76 @@ class CapabilityEngine:
                 severity="warning",
                 message="No monitor information detected; refresh/VRR guidance may be inaccurate.",
             )
+        )
+
+    def _check_hdr_requirements(
+        self,
+        profile: BaseProfile,
+        report: CapabilityReport,
+    ) -> None:
+        """Block profiles that require HDR on machines without a confirmed HDR output path."""
+        try:
+            windows_settings = profile.get_settings("WindowsSettingsHandler") or {}
+        except Exception as e:
+            logger.debug(f"Failed to read Windows settings for HDR capability checks: {e}")
+            return
+
+        if not self._profile_requests_hdr_output(windows_settings):
+            return
+
+        try:
+            detected = WindowsSettingsHandler().detect()
+        except Exception as e:
+            logger.warning(f"Capability HDR detection failed: {e}")
+            report.findings.append(
+                CapabilityFinding(
+                    code="HDR_REQUIRED_UNVERIFIED",
+                    severity="blocker",
+                    message=(
+                        "This profile requires a confirmed HDR-capable active display, "
+                        "but HDR capability detection failed on this machine."
+                    ),
+                    details=str(e),
+                )
+            )
+            return
+
+        hdr_capable_count = detected.get("hdr_capable_count")
+        try:
+            parsed_count = int(hdr_capable_count) if hdr_capable_count is not None else None
+        except (TypeError, ValueError):
+            parsed_count = None
+
+        if parsed_count is None:
+            report.findings.append(
+                CapabilityFinding(
+                    code="HDR_REQUIRED_UNVERIFIED",
+                    severity="blocker",
+                    message=(
+                        "This profile requires a confirmed HDR-capable active display, "
+                        "but HDR capability could not be verified."
+                    ),
+                )
+            )
+            return
+
+        if parsed_count < 1:
+            report.findings.append(
+                CapabilityFinding(
+                    code="HDR_REQUIRED_NO_CAPABLE_DISPLAY",
+                    severity="blocker",
+                    message=(
+                        "This profile requires at least one HDR-capable active display, "
+                        "but none were detected."
+                    ),
+                )
+            )
+
+    def _profile_requests_hdr_output(self, windows_settings: dict[str, Any]) -> bool:
+        """Return True when a profile depends on an HDR-capable display path."""
+        return bool(
+            windows_settings.get("hdr") is True
+            or windows_settings.get("auto_hdr") is True
         )
 
     def _check_explicit_refresh_requirements(

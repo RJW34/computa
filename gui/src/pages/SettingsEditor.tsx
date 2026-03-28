@@ -1,10 +1,8 @@
-import * as React from 'react';
 import { Header } from '@/components/Header';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { RotateCcw } from 'lucide-react';
+import { ArrowRight, ShieldAlert } from 'lucide-react';
 import { useAppStore } from '@/stores/appStore';
 
 // Simple settings shown by default
@@ -107,41 +105,7 @@ const ADVANCED_SETTINGS = [
 ];
 
 export function SettingsEditor() {
-  const { settingsMode, setSettingsMode } = useAppStore();
-  const [settings, setSettings] = React.useState<Record<string, boolean>>({});
-  const [hasChanges, setHasChanges] = React.useState(false);
-
-  // Initialize settings with defaults
-  React.useEffect(() => {
-    const defaults: Record<string, boolean> = {};
-    [...SIMPLE_SETTINGS, ...ADVANCED_SETTINGS].forEach((category) => {
-      category.settings.forEach((setting) => {
-        defaults[setting.id] = setting.default;
-      });
-    });
-    setSettings(defaults);
-  }, []);
-
-  const handleToggle = (id: string, value: boolean) => {
-    setSettings((prev) => ({ ...prev, [id]: value }));
-    setHasChanges(true);
-  };
-
-  const handleApply = () => {
-    // Would call API to apply settings
-    setHasChanges(false);
-  };
-
-  const handleReset = () => {
-    const defaults: Record<string, boolean> = {};
-    [...SIMPLE_SETTINGS, ...ADVANCED_SETTINGS].forEach((category) => {
-      category.settings.forEach((setting) => {
-        defaults[setting.id] = setting.default;
-      });
-    });
-    setSettings(defaults);
-    setHasChanges(false);
-  };
+  const { settingsMode, setSettingsMode, setPage } = useAppStore();
 
   const allSettings =
     settingsMode === 'advanced'
@@ -153,7 +117,32 @@ export function SettingsEditor() {
       <Header showBack title="Settings" />
 
       <main className="container mx-auto px-6 py-6 max-w-3xl">
-        {/* Mode toggle */}
+        <Card className="mb-6 border-warning/40 bg-warning/5">
+          <CardContent className="pt-6">
+            <div className="flex gap-3">
+              <ShieldAlert className="h-5 w-5 text-warning flex-shrink-0 mt-0.5" />
+              <div className="space-y-3">
+                <div>
+                  <p className="font-medium">Direct per-setting apply is intentionally disabled.</p>
+                  <p className="text-sm text-muted-foreground">
+                    This page now shows the targets ABSO profiles aim for. We only apply settings
+                    through the profile pipeline so backup, validation, and rollback stay honest.
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Button onClick={() => setPage('profile-wizard')}>
+                    Apply a Profile
+                    <ArrowRight className="h-4 w-4 ml-2" />
+                  </Button>
+                  <Button variant="outline" onClick={() => setPage('audit')}>
+                    Run Audit
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
         <div className="flex items-center justify-between mb-6">
           <Tabs
             value={settingsMode}
@@ -164,14 +153,8 @@ export function SettingsEditor() {
               <TabsTrigger value="advanced">Advanced</TabsTrigger>
             </TabsList>
           </Tabs>
-
-          <Button variant="outline" size="sm" onClick={handleReset}>
-            <RotateCcw className="h-4 w-4 mr-2" />
-            Reset All
-          </Button>
         </div>
 
-        {/* Settings groups */}
         <div className="space-y-6">
           {allSettings.map((category) => (
             <Card key={category.category}>
@@ -185,38 +168,26 @@ export function SettingsEditor() {
                     className="flex items-center justify-between"
                   >
                     <div className="flex-1 pr-4">
-                      <label
-                        htmlFor={setting.id}
-                        className="font-medium cursor-pointer"
-                      >
-                        {setting.label}
-                      </label>
+                      <div className="font-medium">{setting.label}</div>
                       <p className="text-sm text-muted-foreground">
                         {setting.description}
                       </p>
                     </div>
-                    <Switch
-                      id={setting.id}
-                      checked={settings[setting.id] ?? setting.default}
-                      onCheckedChange={(checked) =>
-                        handleToggle(setting.id, checked)
-                      }
-                    />
+                    <div
+                      className={`rounded-full px-3 py-1 text-xs font-medium ${
+                        setting.default
+                          ? 'bg-success/10 text-success'
+                          : 'bg-muted text-muted-foreground'
+                      }`}
+                    >
+                      Recommended: {setting.default ? 'On' : 'Off'}
+                    </div>
                   </div>
                 ))}
               </CardContent>
             </Card>
           ))}
         </div>
-
-        {/* Apply button */}
-        {hasChanges && (
-          <div className="fixed bottom-20 left-0 right-0 p-4 bg-background border-t">
-            <div className="container mx-auto max-w-3xl flex justify-end">
-              <Button onClick={handleApply}>Apply Changes</Button>
-            </div>
-          </div>
-        )}
       </main>
     </div>
   );

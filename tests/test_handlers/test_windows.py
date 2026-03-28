@@ -12,8 +12,10 @@ class TestWindowsDetect:
     """Tests for WindowsSettingsHandler.detect()."""
 
     @patch.object(WindowsSettingsHandler, "_get_refresh_rate_info")
+    @patch.object(WindowsSettingsHandler, "_get_vrr_optimize")
+    @patch.object(WindowsSettingsHandler, "_get_windowed_optimizations")
     @patch.object(WindowsSettingsHandler, "_get_auto_hdr")
-    @patch.object(WindowsSettingsHandler, "_get_hdr")
+    @patch.object(WindowsSettingsHandler, "_get_hdr_state_summary")
     @patch.object(WindowsSettingsHandler, "_get_vbs")
     @patch.object(WindowsSettingsHandler, "_get_hags")
     @patch.object(WindowsSettingsHandler, "_get_game_dvr")
@@ -26,8 +28,10 @@ class TestWindowsDetect:
         mock_game_dvr,
         mock_hags,
         mock_vbs,
-        mock_hdr,
+        mock_hdr_summary,
         mock_auto_hdr,
+        mock_windowed_optimizations,
+        mock_vrr_optimize,
         mock_refresh_info,
     ):
         """Test detect returns dictionary with all expected keys."""
@@ -36,8 +40,15 @@ class TestWindowsDetect:
         mock_game_dvr.return_value = False
         mock_hags.return_value = True
         mock_vbs.return_value = False
-        mock_hdr.return_value = True
+        mock_hdr_summary.return_value = {
+            "available": True,
+            "hdr_capable_count": 1,
+            "hdr_enabled_count": 1,
+            "any_enabled": True,
+        }
         mock_auto_hdr.return_value = False
+        mock_windowed_optimizations.return_value = False
+        mock_vrr_optimize.return_value = False
         mock_refresh_info.return_value = {"current": 240, "max": 240, "available": [60, 120, 240]}
 
         handler = WindowsSettingsHandler()
@@ -49,14 +60,20 @@ class TestWindowsDetect:
         assert "hags" in result
         assert "vbs" in result
         assert "hdr" in result
+        assert "hdr_capable_count" in result
+        assert "hdr_enabled_count" in result
         assert "auto_hdr" in result
+        assert "windowed_optimizations" in result
+        assert "vrr_optimize" in result
         assert "refresh_rate" in result
         assert "max_refresh_rate" in result
         assert "available_refresh_rates" in result
 
     @patch.object(WindowsSettingsHandler, "_get_refresh_rate_info")
+    @patch.object(WindowsSettingsHandler, "_get_vrr_optimize")
+    @patch.object(WindowsSettingsHandler, "_get_windowed_optimizations")
     @patch.object(WindowsSettingsHandler, "_get_auto_hdr")
-    @patch.object(WindowsSettingsHandler, "_get_hdr")
+    @patch.object(WindowsSettingsHandler, "_get_hdr_state_summary")
     @patch.object(WindowsSettingsHandler, "_get_vbs")
     @patch.object(WindowsSettingsHandler, "_get_hags")
     @patch.object(WindowsSettingsHandler, "_get_game_dvr")
@@ -69,8 +86,10 @@ class TestWindowsDetect:
         mock_game_dvr,
         mock_hags,
         mock_vbs,
-        mock_hdr,
+        mock_hdr_summary,
         mock_auto_hdr,
+        mock_windowed_optimizations,
+        mock_vrr_optimize,
         mock_refresh_info,
     ):
         """Test detecting game mode when enabled."""
@@ -79,18 +98,29 @@ class TestWindowsDetect:
         mock_game_dvr.return_value = False
         mock_hags.return_value = None
         mock_vbs.return_value = False
-        mock_hdr.return_value = None
+        mock_hdr_summary.return_value = {
+            "available": False,
+            "hdr_capable_count": 0,
+            "hdr_enabled_count": 0,
+            "any_enabled": False,
+        }
         mock_auto_hdr.return_value = None
+        mock_windowed_optimizations.return_value = None
+        mock_vrr_optimize.return_value = None
         mock_refresh_info.return_value = {"current": 60, "max": 60, "available": [60]}
 
         handler = WindowsSettingsHandler()
         result = handler.detect()
 
         assert result["game_mode"] is True
+        assert result["hdr"] is None
+        assert result["hdr_capable_count"] is None
 
     @patch.object(WindowsSettingsHandler, "_get_refresh_rate_info")
+    @patch.object(WindowsSettingsHandler, "_get_vrr_optimize")
+    @patch.object(WindowsSettingsHandler, "_get_windowed_optimizations")
     @patch.object(WindowsSettingsHandler, "_get_auto_hdr")
-    @patch.object(WindowsSettingsHandler, "_get_hdr")
+    @patch.object(WindowsSettingsHandler, "_get_hdr_state_summary")
     @patch.object(WindowsSettingsHandler, "_get_vbs")
     @patch.object(WindowsSettingsHandler, "_get_hags")
     @patch.object(WindowsSettingsHandler, "_get_game_dvr")
@@ -103,8 +133,10 @@ class TestWindowsDetect:
         mock_game_dvr,
         mock_hags,
         mock_vbs,
-        mock_hdr,
+        mock_hdr_summary,
         mock_auto_hdr,
+        mock_windowed_optimizations,
+        mock_vrr_optimize,
         mock_refresh_info,
     ):
         """Test detect handles missing registry keys gracefully."""
@@ -113,8 +145,15 @@ class TestWindowsDetect:
         mock_game_dvr.return_value = None
         mock_hags.return_value = None
         mock_vbs.return_value = None
-        mock_hdr.return_value = None
+        mock_hdr_summary.return_value = {
+            "available": False,
+            "hdr_capable_count": 0,
+            "hdr_enabled_count": 0,
+            "any_enabled": False,
+        }
         mock_auto_hdr.return_value = None
+        mock_windowed_optimizations.return_value = None
+        mock_vrr_optimize.return_value = None
         mock_refresh_info.return_value = {"current": None, "max": None, "available": []}
 
         handler = WindowsSettingsHandler()
@@ -271,7 +310,7 @@ class TestWindowsApply:
     @patch.object(WindowsSettingsHandler, "_set_game_mode")
     def test_apply_game_mode(self, mock_set_game_mode, mock_detect):
         """Test applying game mode setting."""
-        mock_detect.return_value = {"game_mode": False, "hags_enabled": None, "vbs_enabled": None}
+        mock_detect.return_value = {"game_mode": False, "hags": None, "vbs": None}
         mock_set_game_mode.return_value = None
 
         handler = WindowsSettingsHandler()
@@ -288,7 +327,7 @@ class TestWindowsApply:
         self, mock_set_dvr, mock_set_bar, mock_set_mode, mock_detect
     ):
         """Test applying multiple settings at once."""
-        mock_detect.return_value = {"hags_enabled": None, "vbs_enabled": None}
+        mock_detect.return_value = {"hags": None, "vbs": None}
         mock_set_mode.return_value = None
         mock_set_bar.return_value = None
         mock_set_dvr.return_value = None
@@ -307,7 +346,7 @@ class TestWindowsApply:
     @patch.object(WindowsSettingsHandler, "_set_game_mode")
     def test_apply_permission_error(self, mock_set_game_mode, mock_detect):
         """Test apply handles permission errors."""
-        mock_detect.return_value = {"hags_enabled": None, "vbs_enabled": None}
+        mock_detect.return_value = {"hags": None, "vbs": None}
         mock_set_game_mode.side_effect = PermissionError("Access denied")
 
         handler = WindowsSettingsHandler()
@@ -321,7 +360,7 @@ class TestWindowsApply:
     @patch.object(WindowsSettingsHandler, "_set_vbs")
     def test_apply_vbs_requires_reboot(self, mock_set_vbs, mock_detect):
         """Test that VBS changes require reboot when value differs."""
-        mock_detect.return_value = {"hags_enabled": None, "vbs_enabled": True}
+        mock_detect.return_value = {"hags": None, "vbs": True}
         mock_set_vbs.return_value = None
 
         handler = WindowsSettingsHandler()
@@ -334,7 +373,7 @@ class TestWindowsApply:
     @patch.object(WindowsSettingsHandler, "_set_hdr")
     def test_apply_hdr_success(self, mock_set_hdr, mock_detect):
         """Test applying HDR setting successfully."""
-        mock_detect.return_value = {"hags_enabled": None, "vbs_enabled": None}
+        mock_detect.return_value = {"hags": None, "vbs": None}
         mock_set_hdr.return_value = {
             "success": True,
             "hdr_capable_count": 1,
@@ -352,7 +391,7 @@ class TestWindowsApply:
     @patch.object(WindowsSettingsHandler, "_set_hdr")
     def test_apply_hdr_failure(self, mock_set_hdr, mock_detect):
         """Test applying HDR setting with error."""
-        mock_detect.return_value = {"hags_enabled": None, "vbs_enabled": None}
+        mock_detect.return_value = {"hags": None, "vbs": None}
         mock_set_hdr.return_value = {
             "success": False,
             "hdr_capable_count": 0,
@@ -367,10 +406,30 @@ class TestWindowsApply:
         assert "Permission denied" in result["error"]
 
     @patch.object(WindowsSettingsHandler, "detect")
+    @patch.object(WindowsSettingsHandler, "_set_hdr")
+    def test_apply_hdr_enable_fails_when_windows_reports_zero_hdr_outputs(
+        self, mock_set_hdr, mock_detect
+    ):
+        """HDR enable should fail if Windows reports no HDR-capable/enabled outputs."""
+        mock_detect.return_value = {"hags": None, "vbs": None}
+        mock_set_hdr.return_value = {
+            "success": True,
+            "hdr_capable_count": 0,
+            "hdr_enabled_count": 0,
+            "errors": [],
+        }
+
+        handler = WindowsSettingsHandler()
+        result = handler.apply({"hdr": True})
+
+        assert result["success"] is False
+        assert "no HDR-capable active displays" in (result["error"] or "")
+
+    @patch.object(WindowsSettingsHandler, "detect")
     @patch.object(WindowsSettingsHandler, "_set_auto_hdr")
     def test_apply_auto_hdr_success(self, mock_set_auto_hdr, mock_detect):
         """Test applying Auto HDR setting successfully."""
-        mock_detect.return_value = {"hags_enabled": None, "vbs_enabled": None}
+        mock_detect.return_value = {"hags": None, "vbs": None}
         mock_set_auto_hdr.return_value = {"success": True, "error": None}
 
         handler = WindowsSettingsHandler()
@@ -383,7 +442,7 @@ class TestWindowsApply:
     @patch.object(WindowsSettingsHandler, "_set_auto_hdr")
     def test_apply_auto_hdr_failure(self, mock_set_auto_hdr, mock_detect):
         """Test applying Auto HDR setting with error."""
-        mock_detect.return_value = {"hags_enabled": None, "vbs_enabled": None}
+        mock_detect.return_value = {"hags": None, "vbs": None}
         mock_set_auto_hdr.return_value = {"success": False, "error": "Registry access denied"}
 
         handler = WindowsSettingsHandler()
@@ -406,7 +465,11 @@ class TestWindowsBackupRestore:
             "hags": True,
             "vbs": False,
             "hdr": True,
+            "hdr_capable_count": 1,
+            "hdr_enabled_count": 1,
             "auto_hdr": False,
+            "windowed_optimizations": False,
+            "vrr_optimize": False,
             "refresh_rate": 240,
             "max_refresh_rate": 240,
             "available_refresh_rates": [60, 120, 240],
@@ -447,25 +510,12 @@ class TestWindowsHdrCapability:
     """Tests for HDR capability detection."""
 
     @patch("abso.settings.windows.winreg")
-    def test_is_monitor_hdr_capable_oled_pattern(self, mock_winreg):
-        """Test OLED monitors are detected as HDR capable."""
-        handler = WindowsSettingsHandler()
-
-        # LG UltraGear OLED 27" - should be detected
-        assert handler._is_monitor_hdr_capable("GSM784C_12345") is True
-        assert handler._is_monitor_hdr_capable("GSM7889_67890") is True
-        assert handler._is_monitor_hdr_capable("GSM7890_ABCDE") is True
-
-    @patch("abso.settings.windows.winreg")
-    def test_is_monitor_hdr_capable_non_oled_lg(self, mock_winreg):
-        """Test non-OLED LG monitors are not automatically HDR capable."""
+    def test_is_monitor_hdr_capable_returns_false_when_registry_capability_missing(self, mock_winreg):
+        """HDR capability should not be guessed when Windows has no capability flag."""
         mock_winreg.OpenKey.side_effect = FileNotFoundError()
 
         handler = WindowsSettingsHandler()
-
-        # LG non-OLED monitors (GSM5xxx range) - should NOT be detected
-        assert handler._is_monitor_hdr_capable("GSM5C12_12345") is False
-        assert handler._is_monitor_hdr_capable("GSM5ABC_67890") is False
+        assert handler._is_monitor_hdr_capable("GSM784C_12345") is False
 
     @patch("abso.settings.windows.winreg")
     def test_is_monitor_hdr_capable_registry_check(self, mock_winreg):

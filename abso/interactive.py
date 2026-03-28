@@ -484,8 +484,16 @@ def run_restore_backup() -> None:
         task = progress.add_task("Restoring backup...", total=None)
 
         try:
-            backup_manager.restore_backup(selected_backup)
-            progress.update(task, description="[green]\u2713[/green] Backup restored successfully!")
+            restore_summary = backup_manager.restore_backup(selected_backup)
+            if restore_summary.complete:
+                progress.update(task, description="[green]\u2713[/green] Backup restored successfully!")
+            else:
+                incomplete = restore_summary.failed_components + restore_summary.skipped_components
+                handlers = ", ".join(item["handler"] for item in incomplete)
+                progress.update(
+                    task,
+                    description=f"[yellow]![/yellow] Restore incomplete: {handlers}",
+                )
         except Exception as e:
             progress.update(task, description=f"[red]\u2717[/red] Restore failed: {e}")
 

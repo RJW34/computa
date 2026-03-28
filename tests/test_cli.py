@@ -487,7 +487,16 @@ class TestCLIRestoreWithMocks:
     def test_restore_latest(self, mock_backup_class):
         """Test restore latest command."""
         mock_backup = MagicMock()
-        mock_backup.restore_backup.return_value = True
+        mock_summary = MagicMock()
+        mock_summary.complete = True
+        mock_summary.to_dict.return_value = {
+            "backup_id": "latest",
+            "complete": True,
+            "restored_components": [],
+            "skipped_components": [],
+            "failed_components": [],
+        }
+        mock_backup.restore_backup.return_value = mock_summary
         mock_backup_class.return_value = mock_backup
 
         runner = CliRunner()
@@ -501,7 +510,16 @@ class TestCLIRestoreWithMocks:
     def test_restore_json_clears_current_profile_state(self, mock_is_admin, mock_backup_class, tmp_path):
         """Successful restore should clear state file so tray doesn't show stale active profile."""
         mock_backup = MagicMock()
-        mock_backup.restore_backup.return_value = True
+        mock_summary = MagicMock()
+        mock_summary.complete = True
+        mock_summary.to_dict.return_value = {
+            "backup_id": "latest",
+            "complete": True,
+            "restored_components": [],
+            "skipped_components": [],
+            "failed_components": [],
+        }
+        mock_backup.restore_backup.return_value = mock_summary
         mock_backup_class.return_value = mock_backup
 
         state_file = tmp_path / ".abso_state.json"

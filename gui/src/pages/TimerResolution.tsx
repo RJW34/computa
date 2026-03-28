@@ -2,18 +2,35 @@ import * as React from 'react';
 import { Header } from '@/components/Header';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Slider } from '@/components/ui/slider';
-import { Switch } from '@/components/ui/switch';
-import { Info } from 'lucide-react';
+import { Info, Loader2, RefreshCcw } from 'lucide-react';
+import * as api from '@/lib/api';
 
 export function TimerResolution() {
-  const [resolution, setResolution] = React.useState(0.5);
-  const [keepAlive, setKeepAlive] = React.useState(false);
-  const [currentResolution] = React.useState(15.625);
+  const [loading, setLoading] = React.useState(true);
+  const [error, setError] = React.useState<string | null>(null);
+  const [timerInfo, setTimerInfo] = React.useState<{
+    current: number;
+    minimum: number;
+    maximum: number;
+  } | null>(null);
 
-  const handleApply = () => {
-    // Would call api.setTimerResolution(resolution, keepAlive)
-  };
+  const loadStatus = React.useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const status = await api.getTimerResolution();
+      setTimerInfo(status);
+    } catch (loadError) {
+      setError(loadError instanceof Error ? loadError.message : 'Failed to query timer resolution');
+      setTimerInfo(null);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  React.useEffect(() => {
+    void loadStatus();
+  }, [loadStatus]);
 
   return (
     <div className="min-h-screen">
@@ -22,39 +39,33 @@ export function TimerResolution() {
       <main className="container mx-auto px-6 py-6 max-w-2xl">
         <Card className="mb-6">
           <CardContent className="pt-6">
-            <p className="text-sm text-muted-foreground mb-2">
-              Current Resolution:
-            </p>
-            <p className="text-2xl font-bold">{currentResolution} ms</p>
-            <p className="text-sm text-muted-foreground">(default)</p>
-          </CardContent>
-        </Card>
-
-        <Card className="mb-6">
-          <CardContent className="pt-6 pb-8">
-            <div className="space-y-6">
-              <div>
-                <div className="flex justify-between mb-4">
-                  <span className="text-sm text-muted-foreground">
-                    0.5ms (Gaming)
-                  </span>
-                  <span className="text-sm text-muted-foreground">
-                    15.625ms (Default)
-                  </span>
-                </div>
-                <Slider
-                  value={[resolution]}
-                  onValueChange={([value]) => setResolution(value)}
-                  min={0.5}
-                  max={15.625}
-                  step={0.5}
-                  className="mb-4"
-                />
-                <p className="text-center font-medium">
-                  Selected: {resolution} ms
-                </p>
+            {loading ? (
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span>Reading current timer state...</span>
               </div>
-            </div>
+            ) : error ? (
+              <div className="text-sm text-destructive">
+                Failed to read timer status: {error}
+              </div>
+            ) : timerInfo ? (
+              <div className="space-y-3">
+                <div>
+                  <p className="text-sm text-muted-foreground mb-2">Current Resolution</p>
+                  <p className="text-2xl font-bold">{timerInfo.current} ms</p>
+                </div>
+                <div className="grid grid-cols-2 gap-4 text-sm text-muted-foreground">
+                  <div>
+                    <p className="font-medium text-foreground">Fastest Supported</p>
+                    <p>{timerInfo.minimum} ms</p>
+                  </div>
+                  <div>
+                    <p className="font-medium text-foreground">Default / Highest</p>
+                    <p>{timerInfo.maximum} ms</p>
+                  </div>
+                </div>
+              </div>
+            ) : null}
           </CardContent>
         </Card>
 
@@ -73,33 +84,21 @@ export function TimerResolution() {
                   Note: This does NOT directly reduce input latency. For input
                   latency, use Nvidia Reflex or frame queue management.
                 </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="mb-6">
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <label htmlFor="keep-alive" className="font-medium">
-                  Keep resolution while A.B.S.O. is running
-                </label>
-                <p className="text-sm text-muted-foreground">
-                  Timer resolution resets when the process that set it exits
+                <p className="text-muted-foreground mt-2">
+                  The GUI currently exposes timer status only. A one-shot timer request would
+                  revert as soon as the command exits, so we do not present a fake “Apply”
+                  control here until a persistent desktop-owned timer service exists.
                 </p>
               </div>
-              <Switch
-                id="keep-alive"
-                checked={keepAlive}
-                onCheckedChange={setKeepAlive}
-              />
             </div>
           </CardContent>
         </Card>
 
         <div className="flex justify-end">
-          <Button onClick={handleApply}>Apply</Button>
+          <Button variant="outline" onClick={() => void loadStatus()} disabled={loading}>
+            <RefreshCcw className="h-4 w-4 mr-2" />
+            Refresh Status
+          </Button>
         </div>
       </main>
     </div>

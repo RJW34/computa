@@ -223,6 +223,31 @@ class TestApplyProfile:
         assert result.success is False
         assert "No monitor with confirmed VRR/G-SYNC support was detected" in (result.error or "")
 
+    @patch("abso.core.capabilities.WindowsSettingsHandler.detect")
+    @patch("abso.core.capabilities.HardwareDetector.detect_gpu")
+    @patch("abso.core.capabilities.HardwareDetector.detect_monitors")
+    def test_apply_profile_blocks_hdr_profile_when_no_hdr_capable_display(
+        self,
+        mock_detect_monitors,
+        mock_detect_gpu,
+        mock_windows_detect,
+    ):
+        """HDR-native profiles should fail before handler apply when no HDR-capable output exists."""
+        mock_detect_monitors.return_value = [
+            {"name": "Test Monitor", "vrr_supported": True, "refresh_rate": 240}
+        ]
+        mock_detect_gpu.return_value = {"name": "NVIDIA GeForce RTX 4090"}
+        mock_windows_detect.return_value = {
+            "hdr_capable_count": 0,
+            "hdr_enabled_count": 0,
+        }
+
+        applier = ProfileApplier()
+        result = applier.apply_profile("overwatch2-gsync-hdr")
+
+        assert result.success is False
+        assert "requires at least one HDR-capable active display" in (result.error or "")
+
     @patch("abso.core.capabilities.HardwareDetector.detect_monitors")
     def test_apply_profile_allows_when_confirmed_vrr_detected(self, mock_detect_monitors):
         """VRR-required mock profile should apply when a confirmed VRR monitor is detected."""

@@ -40,20 +40,20 @@ class _Overwatch2BaseProfile(ReflexShooterBaseProfile):
                 "disable_mpo": False,
             },
             "OW2ConfigHandler": {
-                "window_mode": 0,               # Fullscreen (Exclusive)
-                "vsync": False,                  # Off
-                "reduce_buffering": True,        # On
-                "dynamic_render_scale": False,   # Off (UseGPUScale)
-                "dynamic_render_scale_v2": False,  # Off (DynamicRenderScale — current key)
-                "render_scale": 0,               # 100%
-                "upscaling": False,              # Disabled
-                "triple_buffering": False,       # Off
-                "hdr": False,                    # Off — prevents blown-out SDR from OW2 internal HDR pipeline
-                "gfx_preset": 1,                 # Low
-                "effects_quality": 1,            # Low
-                "texture_detail": 1,             # Low
-                "model_quality": 1,              # Low
-                "aa_detail": 0,                  # Off
+                "window_mode": 0,  # Fullscreen (Exclusive)
+                "vsync": False,  # Off
+                "reduce_buffering": True,  # On
+                "dynamic_render_scale": False,  # Off (UseGPUScale)
+                "dynamic_render_scale_v2": False,  # Off (DynamicRenderScale current key)
+                "render_scale": 0,  # 100%
+                "upscaling": False,  # Disabled
+                "triple_buffering": False,  # Off
+                "hdr": False,  # Off - prevents blown-out SDR from OW2 internal HDR pipeline
+                "gfx_preset": 1,  # Low
+                "effects_quality": 1,  # Low
+                "texture_detail": 1,  # Low
+                "model_quality": 1,  # Low
+                "aa_detail": 0,  # Off
                 "show_fps": True,
                 "show_latency": True,
             },
@@ -128,25 +128,24 @@ class Overwatch2Profile(_Overwatch2BaseProfile):
                 "setting": "NVIDIA Reflex Low Latency",
                 "value": "Off (high-end GPU) / On+Boost (mid-range GPU)",
                 "reason": (
-                    "On a high-end GPU at 1440p Low, the GPU is not saturated — Reflex "
-                    "throttles CPU frame submission without benefit, costing ~60fps. "
-                    "Higher uncapped FPS = lower latency than Reflex queue management. "
-                    "If your GPU IS saturated (check: GPU usage >90%), switch to "
-                    "On+Boost instead."
+                    "On a high-end GPU at 1440p Low, the GPU is not saturated - Reflex "
+                    "throttles CPU frame submission without benefit, costing about 60 FPS. "
+                    "Higher uncapped FPS means lower latency than Reflex queue management. "
+                    "If your GPU is saturated (GPU usage above 90%), switch to On+Boost instead."
                 ),
             },
             {
                 "category": "Display",
                 "setting": "Frame Rate Cap",
                 "value": "Uncapped (600)",
-                "reason": "No-sync profile: maximum FPS = minimum click-to-pixel latency.",
+                "reason": "No-sync profile: maximum FPS equals minimum click-to-pixel latency.",
             },
             {
                 "category": "Display",
                 "setting": "Reduce Buffering",
                 "value": "On",
                 "reason": (
-                    "Essential with Reflex OFF — limits pre-render buffer to 1 frame. "
+                    "Essential with Reflex OFF - limits pre-render buffer to 1 frame. "
                     "Only mechanism keeping render queue shallow."
                 ),
             },
@@ -196,7 +195,8 @@ class Overwatch2GSyncProfile(_Overwatch2BaseProfile):
                 "profile_name": "Overwatch 2",
                 # Enforce VRR-safe cap automatically (refresh-3) to keep VSync as safety net.
                 "auto_vrr_fps_cap": True,
-                # Ensure global G-SYNC is enabled before launching OW2.
+                # This profile is intentionally fullscreen-only. If we ever add a
+                # borderless OW2 VRR profile, it needs a different VRR path.
                 "global_vrr_mode": "fullscreen_only",
             },
             "ColorProfileSettingsHandler": {
@@ -214,11 +214,10 @@ class Overwatch2GSyncProfile(_Overwatch2BaseProfile):
             {
                 "category": "Display",
                 "setting": "Display Mode",
-                "value": "Fullscreen → then toggle Borderless",
+                "value": "Fullscreen (Exclusive)",
                 "reason": (
-                    "OW2 launches in Exclusive Fullscreen for G-SYNC handshake. "
-                    "Once in-game, switch to Borderless Windowed in Video Settings "
-                    "for a higher FPS cap (~297 vs ~276)."
+                    "This profile is tuned for fullscreen-only G-SYNC. "
+                    "Do not switch to borderless/windowed mode after launch."
                 ),
             },
             {
@@ -306,7 +305,7 @@ class Overwatch2GSyncHDRProfile(_Overwatch2BaseProfile):
             },
             "OW2ConfigHandler": {
                 **base.get("OW2ConfigHandler", {}),
-                "hdr": True,  # Native HDR — OW2 handles tone mapping for OLED/Mini-LED
+                "hdr": True,  # Native HDR - OW2 handles tone mapping for OLED/Mini-LED
             },
         })
         return base
@@ -330,11 +329,10 @@ class Overwatch2GSyncHDRProfile(_Overwatch2BaseProfile):
             {
                 "category": "Display",
                 "setting": "Display Mode",
-                "value": "Fullscreen → then toggle Borderless",
+                "value": "Fullscreen (Exclusive)",
                 "reason": (
-                    "OW2 launches in Exclusive Fullscreen for G-SYNC handshake. "
-                    "Once in-game, switch to Borderless Windowed in Video Settings "
-                    "for a higher FPS cap (~297 vs ~276)."
+                    "This profile is tuned for fullscreen-only G-SYNC. "
+                    "Do not switch to borderless/windowed mode after launch."
                 ),
             },
             {

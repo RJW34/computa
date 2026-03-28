@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -19,6 +20,31 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 DEFAULT_MAX_BACKUPS = 20
+
+
+@dataclass
+class BackupRestoreSummary:
+    """Summary of a backup restore attempt."""
+
+    backup_id: str
+    restored_components: list[str] = field(default_factory=list)
+    skipped_components: list[dict[str, str]] = field(default_factory=list)
+    failed_components: list[dict[str, str]] = field(default_factory=list)
+
+    @property
+    def complete(self) -> bool:
+        """Whether every backed-up component was restored successfully."""
+        return not self.skipped_components and not self.failed_components
+
+    def to_dict(self) -> dict[str, Any]:
+        """Convert the summary to a JSON-friendly structure."""
+        return {
+            "backup_id": self.backup_id,
+            "complete": self.complete,
+            "restored_components": list(self.restored_components),
+            "skipped_components": list(self.skipped_components),
+            "failed_components": list(self.failed_components),
+        }
 
 
 def _get_backup_handlers() -> list[SettingsHandler]:
@@ -131,12 +157,28 @@ class BackupManager:
                     encoding="utf-8"
                 )
 
+                component_success = True
+                component_note = None
+                if isinstance(data, dict):
+                    component_success = bool(data.get("success", True))
+                    component_note = data.get("note") or data.get("error")
+
                 manifest["components"][handler_name] = {
                     "file": f"{handler_name}.json",
-                    "success": True,
+                    "success": component_success,
                 }
 
-                logger.info(f"Backed up {handler_name}")
+                if component_note:
+                    manifest["components"][handler_name]["note"] = str(component_note)
+
+                if component_success:
+                    logger.info(f"Backed up {handler_name}")
+                else:
+                    logger.warning(
+                        "Backed up %s with restore unavailable: %s",
+                        handler_name,
+                        component_note or "No restore path was reported",
+                    )
 
             except PermissionError as e:
                 logger.error(f"Permission denied backing up {handler_name}: {e}")
@@ -170,7 +212,7 @@ class BackupManager:
         logger.info(f"Backup created: {timestamp}")
         return timestamp
 
-    def restore_backup(self, backup_id: str) -> None:
+    def restore_backup(self, backup_id: str) -> BackupRestoreSummary:
         """Restore settings from a backup.
 
         Args:
@@ -210,38 +252,89 @@ class BackupManager:
             handler.__class__.__name__: handler
             for handler in self._handlers
         }
+        restore_summary = BackupRestoreSummary(backup_id=backup_path.name)
 
         # Restore each component
         for handler_name, component_info in manifest["components"].items():
             if not component_info.get("success", False):
-                logger.warning(f"Skipping {handler_name}: was not backed up successfully")
+                detail = str(
+                    component_info.get("error")
+                    or component_info.get("note")
+                    or "Component was not backed up with a safe restore path"
+                )
+                logger.warning(f"Skipping {handler_name}: {detail}")
+                restore_summary.skipped_components.append({
+                    "handler": handler_name,
+                    "reason": "backup_unavailable",
+                    "detail": detail,
+                })
                 continue
 
             handler = handler_map.get(handler_name)
             if not handler:
                 logger.warning(f"No handler for {handler_name}")
+                restore_summary.skipped_components.append({
+                    "handler": handler_name,
+                    "reason": "handler_missing",
+                    "detail": "No restore handler is registered for this component",
+                })
                 continue
 
             try:
                 component_path = backup_path / component_info["file"]
                 if not component_path.exists():
                     logger.error(f"Backup file missing for {handler_name}: {component_path}")
+                    restore_summary.failed_components.append({
+                        "handler": handler_name,
+                        "reason": "backup_file_missing",
+                        "detail": str(component_path),
+                    })
                     continue
                 data = json.loads(component_path.read_text(encoding="utf-8"))
 
-                handler.restore(data)
-                logger.info(f"Restored {handler_name}")
+                restore_ok = handler.restore(data)
+                if restore_ok:
+                    restore_summary.restored_components.append(handler_name)
+                    logger.info(f"Restored {handler_name}")
+                else:
+                    logger.error(f"Restore handler reported failure for {handler_name}")
+                    restore_summary.failed_components.append({
+                        "handler": handler_name,
+                        "reason": "restore_failed",
+                        "detail": "Handler returned False",
+                    })
 
             except json.JSONDecodeError as e:
                 logger.error(f"Corrupted backup data for {handler_name}: {e}")
+                restore_summary.failed_components.append({
+                    "handler": handler_name,
+                    "reason": "backup_data_corrupted",
+                    "detail": str(e),
+                })
             except PermissionError as e:
                 logger.error(f"Permission denied restoring {handler_name}: {e}")
+                restore_summary.failed_components.append({
+                    "handler": handler_name,
+                    "reason": "permission_denied",
+                    "detail": str(e),
+                })
             except OSError as e:
                 logger.error(f"OS error restoring {handler_name}: {e}")
+                restore_summary.failed_components.append({
+                    "handler": handler_name,
+                    "reason": "os_error",
+                    "detail": str(e),
+                })
             except (ValueError, TypeError, KeyError) as e:
                 logger.error(f"Data error restoring {handler_name}: {e}")
+                restore_summary.failed_components.append({
+                    "handler": handler_name,
+                    "reason": "data_error",
+                    "detail": str(e),
+                })
 
         logger.info(f"Backup restored: {backup_id}")
+        return restore_summary
 
     def list_backups(self) -> list[dict[str, Any]]:
         """List all available backups.

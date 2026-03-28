@@ -103,6 +103,24 @@ class TestCreateBackup:
         assert manifest["components"]["Handler2"]["success"] is False
         assert "Permission denied" in manifest["components"]["Handler2"]["error"]
 
+    def test_create_backup_marks_unrestorable_component(self, tmp_path):
+        """Test create_backup respects a handler-reported success flag."""
+        mock_handler = MagicMock()
+        mock_handler.__class__.__name__ = "NvidiaSettingsHandler"
+        mock_handler.backup.return_value = {
+            "success": False,
+            "note": "Safe restore unavailable",
+            "profile_path": None,
+        }
+
+        with patch("abso.core.backup._get_backup_handlers", return_value=[mock_handler]):
+            manager = BackupManager(tmp_path)
+            backup_id = manager.create_backup()
+
+        manifest = json.loads((tmp_path / backup_id / "manifest.json").read_text())
+        assert manifest["components"]["NvidiaSettingsHandler"]["success"] is False
+        assert manifest["components"]["NvidiaSettingsHandler"]["note"] == "Safe restore unavailable"
+
     def test_create_backup_returns_timestamp_id(self, tmp_path):
         """Test create_backup returns timestamp-based ID."""
         with patch("abso.core.backup._get_backup_handlers", return_value=[]):
@@ -221,6 +239,24 @@ class TestRestoreBackup:
 
         # Restore should not be called for failed component
         mock_handler.restore.assert_not_called()
+
+    def test_restore_backup_returns_incomplete_summary_when_handler_restore_fails(self, tmp_path):
+        """Test restore summary is incomplete when a handler reports restore failure."""
+        mock_handler = MagicMock()
+        mock_handler.__class__.__name__ = "TestHandler"
+        mock_handler.backup.return_value = {"setting": "value"}
+        mock_handler.restore.return_value = False
+
+        with patch("abso.core.backup._get_backup_handlers", return_value=[mock_handler]):
+            manager = BackupManager(tmp_path)
+            backup_id = manager.create_backup()
+
+        with patch("abso.core.backup._get_backup_handlers", return_value=[mock_handler]):
+            manager = BackupManager(tmp_path)
+            summary = manager.restore_backup(backup_id)
+
+        assert summary.complete is False
+        assert summary.failed_components[0]["handler"] == "TestHandler"
 
 
 class TestListBackups:

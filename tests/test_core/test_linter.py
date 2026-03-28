@@ -7,6 +7,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from abso.core.linter import LintSeverity, ProfileLinter
+from abso.profiles.catalog import get_profile_classes
 
 
 def _make_profile(**kwargs):
@@ -22,11 +23,13 @@ def _make_profile(**kwargs):
     profile.requires_reflex = kwargs.get("requires_reflex", False)
     profile.is_sdr_only = kwargs.get("is_sdr_only", False)
     profile.allows_aggressive_settings = kwargs.get("allows_aggressive_settings", True)
+    profile.requires_confirmed_vrr_support = kwargs.get("requires_confirmed_vrr_support", False)
 
     handlers = kwargs.get("handlers", [])
     profile.get_handlers.return_value = handlers
     settings_map = kwargs.get("settings_map", {})
     profile.get_settings.side_effect = lambda name: settings_map.get(name, {})
+    profile.get_in_game_settings.return_value = kwargs.get("in_game_settings", [])
     return profile
 
 
@@ -56,6 +59,56 @@ class TestProfileLinterValid:
         profile = _make_profile(handlers=[])
         result = linter.lint(profile)
         assert result.passed
+
+    def test_windowed_vrr_guidance_passes_when_settings_support_it(self):
+        linter = ProfileLinter()
+        nvidia_handler = MagicMock()
+        nvidia_handler.__class__.__name__ = "NvidiaSettingsHandler"
+        windows_handler = MagicMock()
+        windows_handler.__class__.__name__ = "WindowsSettingsHandler"
+        profile = _make_profile(
+            requires_confirmed_vrr_support=True,
+            handlers=[nvidia_handler, windows_handler],
+            settings_map={
+                "NvidiaSettingsHandler": {"global_vrr_mode": "fullscreen_and_windowed"},
+                "WindowsSettingsHandler": {"vrr_optimize": True},
+            },
+            in_game_settings=[
+                {
+                    "setting": "Display Mode",
+                    "value": "Borderless Windowed",
+                    "reason": "Windowed VRR path",
+                }
+            ],
+        )
+        result = linter.lint(profile)
+        assert result.passed
+        assert not any(e.code == "VRR_DISPLAY_MODE_GUIDANCE_MISMATCH" for e in result.errors)
+
+    def test_negative_borderless_warning_does_not_trigger_guidance_mismatch(self):
+        linter = ProfileLinter()
+        nvidia_handler = MagicMock()
+        nvidia_handler.__class__.__name__ = "NvidiaSettingsHandler"
+        windows_handler = MagicMock()
+        windows_handler.__class__.__name__ = "WindowsSettingsHandler"
+        profile = _make_profile(
+            requires_confirmed_vrr_support=True,
+            handlers=[nvidia_handler, windows_handler],
+            settings_map={
+                "NvidiaSettingsHandler": {"global_vrr_mode": "fullscreen_only"},
+                "WindowsSettingsHandler": {"vrr_optimize": False},
+            },
+            in_game_settings=[
+                {
+                    "setting": "Display Mode",
+                    "value": "Exclusive Fullscreen",
+                    "reason": "Do not switch to borderless/windowed mode after launch.",
+                }
+            ],
+        )
+        result = linter.lint(profile)
+        assert result.passed
+        assert not any(e.code == "VRR_DISPLAY_MODE_GUIDANCE_MISMATCH" for e in result.errors)
 
 
 class TestProfileLinterErrors:
@@ -110,3 +163,73 @@ class TestProfileLinterErrors:
         result = linter.lint(profile)
         assert result.has_errors
         assert any(e.code == "WINDOWS_HDR_SDR_MISMATCH" for e in result.errors)
+
+    def test_native_hdr_profile_rejects_auto_hdr(self):
+        linter = ProfileLinter()
+        win_handler = MagicMock()
+        win_handler.__class__.__name__ = "WindowsSettingsHandler"
+        profile = _make_profile(
+            handlers=[win_handler],
+            settings_map={
+                "WindowsSettingsHandler": {"hdr": True, "auto_hdr": True}
+            },
+        )
+        result = linter.lint(profile)
+        assert result.has_errors
+        assert any(e.code == "WINDOWS_NATIVE_HDR_AUTO_HDR_CONFLICT" for e in result.errors)
+
+    def test_native_hdr_profile_rejects_srgb_clamp(self):
+        linter = ProfileLinter()
+        win_handler = MagicMock()
+        win_handler.__class__.__name__ = "WindowsSettingsHandler"
+        color_handler = MagicMock()
+        color_handler.__class__.__name__ = "ColorProfileSettingsHandler"
+        profile = _make_profile(
+            handlers=[win_handler, color_handler],
+            settings_map={
+                "WindowsSettingsHandler": {"hdr": True, "auto_hdr": False},
+                "ColorProfileSettingsHandler": {"icc_profile": "srgb"},
+            },
+        )
+        result = linter.lint(profile)
+        assert result.has_errors
+        assert any(e.code == "COLOR_HDR_SRGB_CLAMP" for e in result.errors)
+
+    def test_vrr_profile_borderless_guidance_requires_matching_settings(self):
+        linter = ProfileLinter()
+        nvidia_handler = MagicMock()
+        nvidia_handler.__class__.__name__ = "NvidiaSettingsHandler"
+        windows_handler = MagicMock()
+        windows_handler.__class__.__name__ = "WindowsSettingsHandler"
+        profile = _make_profile(
+            requires_confirmed_vrr_support=True,
+            handlers=[nvidia_handler, windows_handler],
+            settings_map={
+                "NvidiaSettingsHandler": {"global_vrr_mode": "fullscreen_only"},
+                "WindowsSettingsHandler": {"vrr_optimize": False},
+            },
+            in_game_settings=[
+                {
+                    "setting": "Display Mode",
+                    "value": "Fullscreen -> then toggle Borderless",
+                    "reason": "Switch to Borderless Windowed after launch",
+                }
+            ],
+        )
+        result = linter.lint(profile)
+        assert result.has_errors
+        assert any(e.code == "VRR_DISPLAY_MODE_GUIDANCE_MISMATCH" for e in result.errors)
+
+
+def test_all_shipped_profiles_pass_linter_without_errors():
+    """Every shipped profile should lint cleanly at error severity."""
+    linter = ProfileLinter()
+    failures = []
+
+    for profile_id, profile_cls in sorted(get_profile_classes().items()):
+        profile = profile_cls()
+        result = linter.lint(profile)
+        if result.errors:
+            failures.append((profile_id, [issue.code for issue in result.errors]))
+
+    assert not failures, f"Profiles failed linting: {failures}"
