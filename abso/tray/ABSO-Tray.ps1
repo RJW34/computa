@@ -770,7 +770,7 @@ $script:FallbackProfiles = [ordered]@{
         Name     = "Marvel Rivals - SDR"
         Sub      = "SDR | Reflex ON+Boost | G-SYNC ON"
         Cat      = "Shooter"
-        Desc     = "Performance-first SDR Marvel Rivals profile for this 300Hz G-SYNC display. Uses Reflex, VRR, and refresh-3 cap behavior."
+        Desc     = "Performance-first SDR Marvel Rivals profile. Uses Reflex + VRR and expects you to A/B the in-game Performance Optimization (Beta) toggle."
         Exes     = @("Marvel.exe", "Marvel-Win64-Shipping.exe")
         SyncMode = "on"
     }
@@ -778,7 +778,7 @@ $script:FallbackProfiles = [ordered]@{
         Name     = "Marvel Rivals - HDR"
         Sub      = "HDR ON | Reflex ON+Boost | G-SYNC ON"
         Cat      = "Shooter"
-        Desc     = "Performance-first HDR Marvel Rivals profile for the HDR-capable primary display. Uses Reflex, VRR, and refresh-3 cap behavior."
+        Desc     = "Performance-first HDR Marvel Rivals profile. Uses Reflex + VRR and expects you to A/B the in-game Performance Optimization (Beta) toggle."
         Exes     = @("Marvel.exe", "Marvel-Win64-Shipping.exe")
         SyncMode = "on"
     }

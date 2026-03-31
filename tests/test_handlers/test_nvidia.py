@@ -250,8 +250,24 @@ class TestNvidiaApply:
     Apply now logs settings for manual application instead.
     """
 
-    def test_apply_logs_preset_settings(self):
+    @patch("abso.settings.nvidia.nvapi_drs.DRSProfileManager")
+    def test_apply_logs_preset_settings(self, mock_manager_cls):
         """Test apply logs preset settings for manual application."""
+        mock_manager = MagicMock()
+        mock_manager.apply_settings_to_app.return_value = {
+            "settings_applied": {
+                "low_latency_mode": "ultra",
+                "power_management": "prefer_max_performance",
+                "vsync": "off",
+            },
+            "errors": [],
+            "app_bound": True,
+            "npi_launched": False,
+        }
+        mock_manager.get_app_settings.return_value = {}
+        mock_manager._resolve_setting.return_value = None
+        mock_manager_cls.return_value = mock_manager
+
         handler = NvidiaSettingsHandler()
 
         result = handler.apply({
@@ -266,8 +282,23 @@ class TestNvidiaApply:
         assert len(result["applied"]) > 0
         assert any("Test Game" in line or "low_latency_mode" in line for line in result["applied"])
 
-    def test_apply_logs_individual_settings(self):
+    @patch("abso.settings.nvidia.nvapi_drs.DRSProfileManager")
+    def test_apply_logs_individual_settings(self, mock_manager_cls):
         """Test apply individual settings via NVAPI."""
+        mock_manager = MagicMock()
+        mock_manager.apply_settings_to_app.return_value = {
+            "settings_applied": {
+                "low_latency_mode": "ultra",
+                "vsync": "off",
+            },
+            "errors": [],
+            "app_bound": True,
+            "npi_launched": False,
+        }
+        mock_manager.get_app_settings.return_value = {}
+        mock_manager._resolve_setting.return_value = None
+        mock_manager_cls.return_value = mock_manager
+
         handler = NvidiaSettingsHandler()
 
         result = handler.apply({
@@ -282,6 +313,30 @@ class TestNvidiaApply:
         # The format is now "setting_name: value" instead of "Setting Name: value"
         assert any("low_latency_mode" in line.lower() for line in result["applied"])
         assert any("ultra" in line.lower() for line in result["applied"])
+
+    @patch("abso.settings.nvidia.nvapi_drs.DRSProfileManager")
+    def test_apply_without_global_settings_does_not_touch_base_profile(self, mock_manager_cls):
+        """Per-app-only applies should not mutate the global NVIDIA profile."""
+        mock_manager = MagicMock()
+        mock_manager.apply_settings_to_app.return_value = {
+            "settings_applied": {"vsync": "off"},
+            "errors": [],
+            "app_bound": True,
+            "npi_launched": False,
+        }
+        mock_manager.get_app_settings.return_value = {}
+        mock_manager._resolve_setting.return_value = None
+        mock_manager_cls.return_value = mock_manager
+
+        handler = NvidiaSettingsHandler()
+        result = handler.apply({
+            "vsync": "off",
+            "executables": ["Game.exe"],
+            "game_name": "Test Game",
+        })
+
+        assert result["success"] is True
+        mock_manager.apply_settings_to_global.assert_not_called()
 
     def test_apply_without_settings_succeeds(self):
         """Test apply with no NVIDIA settings succeeds."""

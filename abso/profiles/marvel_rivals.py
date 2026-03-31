@@ -84,6 +84,15 @@ class _MarvelRivalsBaseProfile(ReflexShooterBaseProfile):
             },
             {
                 "category": "Graphics",
+                "setting": "Performance Optimization (Beta)",
+                "value": "A/B test On vs Off on your hardware",
+                "reason": (
+                    "Marvel Rivals added an experimental PC optimization toggle in March 2026. "
+                    "Keep the setting that improves 1% lows and frametime consistency on your system."
+                ),
+            },
+            {
+                "category": "Graphics",
                 "setting": "Shadow / Effects / Post Processing",
                 "value": "Low",
                 "reason": "Heavy fights and destruction are where frame-time spikes happen; low competitive settings keep the frame queue cleaner.",

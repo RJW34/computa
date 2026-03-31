@@ -667,6 +667,12 @@
       },
       {
         "category": "Graphics",
+        "reason": "Marvel Rivals added an experimental PC optimization toggle in March 2026. Keep the setting that improves 1% lows and frametime consistency on your system.",
+        "setting": "Performance Optimization (Beta)",
+        "value": "A/B test On vs Off on your hardware"
+      },
+      {
+        "category": "Graphics",
         "reason": "Heavy fights and destruction are where frame-time spikes happen; low competitive settings keep the frame queue cleaner.",
         "setting": "Shadow / Effects / Post Processing",
         "value": "Low"
@@ -824,6 +830,12 @@
         "reason": "This build ships DLSS, XeSS, and AMD upscaling support; on an RTX 4070, DLSS is the best performance lever if native render cannot hold target cap.",
         "setting": "Upscaling",
         "value": "DLSS Quality or Balanced"
+      },
+      {
+        "category": "Graphics",
+        "reason": "Marvel Rivals added an experimental PC optimization toggle in March 2026. Keep the setting that improves 1% lows and frametime consistency on your system.",
+        "setting": "Performance Optimization (Beta)",
+        "value": "A/B test On vs Off on your hardware"
       },
       {
         "category": "Graphics",

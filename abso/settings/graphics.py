@@ -213,7 +213,8 @@ class GraphicsSettingsHandler(SettingsHandler):
             )
             try:
                 value = winreg.QueryValueEx(key, "DisableOverlays")[0]
-                return value == 1
+                if value in (0, 1):
+                    return value == 1
             except FileNotFoundError:
                 pass  # Key doesn't exist, check legacy
             finally:

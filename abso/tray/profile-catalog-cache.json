@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "saved_at": "2026-03-25T11:41:41.046875-04:00",
+  "saved_at": "2026-03-30T22:50:48.247255-04:00",
   "profiles": [
     {
       "id": "slippi-melee",
@@ -217,7 +217,7 @@
       ],
       "tray_category": "Shooter",
       "tray_subtitle": "SDR | Reflex ON+Boost | G-SYNC ON",
-      "tray_description": "Best-performance SDR profile for 1440p high-refresh competitive play",
+      "tray_description": "Performance-first SDR Marvel Rivals profile. Uses Reflex + VRR and expects you to A/B the in-game Performance Optimization (Beta) toggle on your hardware.",
       "sync_mode": "on"
     },
     {
@@ -231,7 +231,7 @@
       ],
       "tray_category": "Shooter",
       "tray_subtitle": "HDR ON | Reflex ON+Boost | G-SYNC ON",
-      "tray_description": "Best-performance HDR profile for OLED / high-refresh competitive play",
+      "tray_description": "Performance-first HDR Marvel Rivals profile. Uses Reflex + VRR and expects you to A/B the in-game Performance Optimization (Beta) toggle on your hardware.",
       "sync_mode": "on"
     },
     {

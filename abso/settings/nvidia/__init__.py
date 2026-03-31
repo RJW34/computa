@@ -41,6 +41,26 @@ __all__ = [
     "generate_preset_profile",
 ]
 
+VERIFICATION_SETTING_IDS = {
+    "vsync_mode": 0x00A879CF,
+    "vsync_tear_control": 0x005A375C,
+    "frame_rate_limiter": 0x10835002,
+    "frame_rate_limiter_v3": 0x10835002,
+    "low_latency_mode": 0x007BA09E,
+    "prerendered_frames": 0x007BA09E,
+    "vrr_app_override": 0x10A879CF,
+    "vrr_app_override_request_state": 0x10A879AC,
+    "vrr_mode": 0x1194F158,
+    "vrr_request_state": 0x1094F1F7,
+    "vrr_requested_state": 0x1094F1F7,
+    "vsync_vrr_control": 0x10A879CE,
+    "power_management": 0x1057EB71,
+    "preferred_pstate": 0x1057EB71,
+    "threaded_optimization": 0x20C1221E,
+    "shader_cache": 0x00198FFF,
+    "triple_buffering": 0x20FDD1F9,
+}
+
 
 class NvidiaSettingsHandler(SettingsHandler):
     """Handles Nvidia GPU settings via Profile Inspector.
@@ -318,8 +338,10 @@ class NvidiaSettingsHandler(SettingsHandler):
             profile_name_for_cleanup = str(driver_profile_name or game_name)
             self._cleanup_stale_profiles(manager, profile_name_for_cleanup, game_name)
 
-            # Safety net: always clear global FRL to prevent it from capping games
-            if "max_frame_rate" not in global_settings:
+            # Safety net: when we are already touching the global/base profile,
+            # also clear any lingering global FRL so it cannot unexpectedly cap
+            # the active game profile.
+            if global_settings and "max_frame_rate" not in global_settings:
                 global_settings["max_frame_rate"] = "off"
 
             if global_settings:
@@ -555,7 +577,11 @@ class NvidiaSettingsHandler(SettingsHandler):
         setting_id: int,
     ) -> Any:
         """Find a readback value by canonical DRS setting id, regardless of alias name."""
-        for candidate_name, candidate_id in getattr(manager, "SETTING_IDS", {}).items():
+        setting_ids = getattr(manager, "SETTING_IDS", None)
+        if not isinstance(setting_ids, dict):
+            setting_ids = VERIFICATION_SETTING_IDS
+
+        for candidate_name, candidate_id in setting_ids.items():
             if candidate_id == setting_id and candidate_name in verify_result:
                 return verify_result[candidate_name]
         return None

@@ -153,12 +153,20 @@ PROFILE_CATALOG: OrderedDict[str, ProfileCatalogEntry] = OrderedDict(
             profile_class=MarvelRivalsSDRProfile,
             tray_category="Shooter",
             tray_subtitle="SDR | Reflex ON+Boost | G-SYNC ON",
+            tray_description=(
+                "Performance-first SDR Marvel Rivals profile. Uses Reflex + VRR and expects "
+                "you to A/B the in-game Performance Optimization (Beta) toggle on your hardware."
+            ),
             sync_mode="on",
         ),
         "marvel-rivals-hdr": ProfileCatalogEntry(
             profile_class=MarvelRivalsHDRProfile,
             tray_category="Shooter",
             tray_subtitle="HDR ON | Reflex ON+Boost | G-SYNC ON",
+            tray_description=(
+                "Performance-first HDR Marvel Rivals profile. Uses Reflex + VRR and expects "
+                "you to A/B the in-game Performance Optimization (Beta) toggle on your hardware."
+            ),
             sync_mode="on",
         ),
         "fortnite-streaming": ProfileCatalogEntry(
