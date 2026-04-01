@@ -50,6 +50,8 @@ export interface Profile {
   description: string;
   optimization_target: string;
   executables: string[];
+  handlers?: string[];
+  has_in_game_settings?: boolean;
   detected?: boolean;
   tray_category?: string;
   tray_subtitle?: string;
@@ -143,23 +145,43 @@ export interface TransactionSummary {
   checkpoints: TransactionCheckpoint[];
 }
 
+export interface ComplianceIssue {
+  code: string;
+  severity: Severity;
+  message: string;
+  details?: string | null;
+  source?: string | null;
+}
+
+export interface ComplianceSummary {
+  profile_id?: string;
+  passed: boolean;
+  has_critical: boolean;
+  issues: ComplianceIssue[];
+}
+
+export interface BackendState {
+  current_profile: string | null;
+  applied_at: string | null;
+  reboot_pending: boolean;
+  reboot_reasons: string[];
+}
+
 export interface ApplyResult {
   success: boolean;
   profile: string;
   backup_id?: string | null;
   requires_reboot: boolean;
+  reboot_reasons: string[];
   in_game_settings: boolean;
   error?: string | null;
   applied_settings: string[];
   failed_settings: string[];
   warnings: string[];
+  notices: string[];
   results: ApplyHandlerResult[];
   transaction?: TransactionSummary;
-  compliance?: {
-    passed: boolean;
-    has_critical: boolean;
-    issues: unknown[];
-  } | null;
+  compliance?: ComplianceSummary | null;
 }
 
 // Navigation types

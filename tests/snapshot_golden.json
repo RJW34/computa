@@ -391,7 +391,11 @@
         "preset": "gaming"
       },
       "NvidiaSettingsHandler": {
-        "preset": "reflex_game"
+        "preset": "reflex_game",
+        "profile_aliases": [
+          "Fortnite (Streaming)"
+        ],
+        "profile_name": "Fortnite"
       },
       "PowerSettingsHandler": {
         "active_plan": "ultimate_performance",
@@ -543,7 +547,11 @@
         "preset": "gaming"
       },
       "NvidiaSettingsHandler": {
-        "preset": "reflex_game"
+        "preset": "reflex_game",
+        "profile_aliases": [
+          "Fortnite (Streaming)"
+        ],
+        "profile_name": "Fortnite"
       },
       "OBSSettingsHandler": {
         "low_latency": true,
@@ -1758,7 +1766,11 @@
         "preset": "default"
       },
       "NvidiaSettingsHandler": {
-        "preset": "balanced"
+        "preset": "balanced",
+        "profile_aliases": [
+          "PACDeluxe (Streaming)"
+        ],
+        "profile_name": "PACDeluxe (Pokemon Auto Chess)"
       },
       "PowerSettingsHandler": {
         "active_plan": "ultimate_performance",
@@ -1932,7 +1944,11 @@
         "preset": "default"
       },
       "NvidiaSettingsHandler": {
-        "preset": "balanced"
+        "preset": "balanced",
+        "profile_aliases": [
+          "PACDeluxe (Streaming)"
+        ],
+        "profile_name": "PACDeluxe (Pokemon Auto Chess)"
       },
       "OBSSettingsHandler": {
         "low_latency": true,
@@ -2522,7 +2538,16 @@
       },
       "NvidiaSettingsHandler": {
         "global_vrr_mode": "off",
-        "preset": "no_sync_fighting_game"
+        "preset": "no_sync_fighting_game",
+        "profile_aliases": [
+          "Rivals2-Win64-Shipping.exe",
+          "Rivals of Aether 2",
+          "Rivals 2: Offline / Training",
+          "Rivals 2: G-SYNC",
+          "Rivals 2: 300Hz Maximum",
+          "Rivals 2: Tournament Sim (144Hz)"
+        ],
+        "profile_name": "Rivals 2"
       },
       "PowerSettingsHandler": {
         "active_plan": "ultimate_performance",
@@ -2664,6 +2689,15 @@
         "low_latency_mode": "on",
         "max_frame_rate": "off",
         "power_management": "prefer_max_performance",
+        "profile_aliases": [
+          "Rivals2-Win64-Shipping.exe",
+          "Rivals of Aether 2",
+          "Rivals 2: Offline / Training",
+          "Rivals 2: G-SYNC",
+          "Rivals 2: 300Hz Maximum",
+          "Rivals 2: Tournament Sim (144Hz)"
+        ],
+        "profile_name": "Rivals 2",
         "shader_cache": "unlimited",
         "threaded_optimization": "off",
         "triple_buffering": "off",
@@ -2822,7 +2856,16 @@
       "NvidiaSettingsHandler": {
         "auto_vrr_fps_cap": true,
         "global_vrr_mode": "fullscreen_only",
-        "preset": "vrr_fighting_game"
+        "preset": "vrr_fighting_game",
+        "profile_aliases": [
+          "Rivals2-Win64-Shipping.exe",
+          "Rivals of Aether 2",
+          "Rivals 2: Offline / Training",
+          "Rivals 2: G-SYNC",
+          "Rivals 2: 300Hz Maximum",
+          "Rivals 2: Tournament Sim (144Hz)"
+        ],
+        "profile_name": "Rivals 2"
       },
       "PowerSettingsHandler": {
         "active_plan": "ultimate_performance",
@@ -2975,6 +3018,15 @@
         "low_latency_mode": "on",
         "max_frame_rate": "off",
         "power_management": "prefer_max_performance",
+        "profile_aliases": [
+          "Rivals2-Win64-Shipping.exe",
+          "Rivals of Aether 2",
+          "Rivals 2: Offline / Training",
+          "Rivals 2: G-SYNC",
+          "Rivals 2: 300Hz Maximum",
+          "Rivals 2: Tournament Sim (144Hz)"
+        ],
+        "profile_name": "Rivals 2",
         "shader_cache": "unlimited",
         "threaded_optimization": "off",
         "triple_buffering": "off",
@@ -3152,6 +3204,12 @@
         "low_latency_mode": "on",
         "max_frame_rate": "off",
         "power_management": "prefer_max_performance",
+        "profile_aliases": [
+          "Rivals 2: Online / Matchmaking",
+          "Rivals 2: Online G-SYNC",
+          "Rivals 2 (Streaming)"
+        ],
+        "profile_name": "Rivals 2 Online",
         "shader_cache": "unlimited",
         "threaded_optimization": "off",
         "triple_buffering": "off",
@@ -3311,6 +3369,12 @@
         "auto_vrr_fps_cap": true,
         "global_vrr_mode": "fullscreen_only",
         "preset": "vrr_fighting_game",
+        "profile_aliases": [
+          "Rivals 2: Online / Matchmaking",
+          "Rivals 2: Online G-SYNC",
+          "Rivals 2 (Streaming)"
+        ],
+        "profile_name": "Rivals 2 Online",
         "threaded_optimization": "off"
       },
       "PowerSettingsHandler": {
@@ -3483,6 +3547,12 @@
         "low_latency_mode": "on",
         "max_frame_rate": "off",
         "power_management": "prefer_max_performance",
+        "profile_aliases": [
+          "Rivals 2: Online / Matchmaking",
+          "Rivals 2: Online G-SYNC",
+          "Rivals 2 (Streaming)"
+        ],
+        "profile_name": "Rivals 2 Online",
         "shader_cache": "unlimited",
         "threaded_optimization": "off",
         "triple_buffering": "off",
@@ -3797,6 +3867,15 @@
         "low_latency_mode": "on",
         "max_frame_rate": "off",
         "power_management": "prefer_max_performance",
+        "profile_aliases": [
+          "Rivals2-Win64-Shipping.exe",
+          "Rivals of Aether 2",
+          "Rivals 2: Offline / Training",
+          "Rivals 2: G-SYNC",
+          "Rivals 2: 300Hz Maximum",
+          "Rivals 2: Tournament Sim (144Hz)"
+        ],
+        "profile_name": "Rivals 2",
         "shader_cache": "unlimited",
         "threaded_optimization": "off",
         "triple_buffering": "off",
@@ -4080,6 +4159,10 @@
         "global_vrr_mode": "off",
         "low_latency_mode": "off",
         "power_management": "prefer_max_performance",
+        "profile_aliases": [
+          "SSBU / HewDraw Remix (Streaming)"
+        ],
+        "profile_name": "SSBU / HewDraw Remix (Ryujinx)",
         "shader_cache": "unlimited",
         "threaded_optimization": "on",
         "triple_buffering": "off",
@@ -4365,6 +4448,10 @@
         "global_vrr_mode": "off",
         "low_latency_mode": "off",
         "power_management": "prefer_max_performance",
+        "profile_aliases": [
+          "SSBU / HewDraw Remix (Streaming)"
+        ],
+        "profile_name": "SSBU / HewDraw Remix (Ryujinx)",
         "shader_cache": "unlimited",
         "threaded_optimization": "on",
         "triple_buffering": "off",
@@ -4705,6 +4792,13 @@
         "low_latency_mode": "on",
         "max_frame_rate": "off",
         "power_management": "prefer_max_performance",
+        "profile_aliases": [
+          "Super Smash Bros. Melee (Slippi Universal)",
+          "Super Smash Bros. Melee (Slippi Console-Parity)",
+          "Super Smash Bros. Melee (Slippi VRR Lab)",
+          "Slippi Melee (Streaming)"
+        ],
+        "profile_name": "Super Smash Bros. Melee (Slippi)",
         "shader_cache": "unlimited",
         "threaded_optimization": "off",
         "triple_buffering": "off",
@@ -4867,6 +4961,13 @@
         "low_latency_mode": "off",
         "max_frame_rate": "off",
         "power_management": "prefer_max_performance",
+        "profile_aliases": [
+          "Super Smash Bros. Melee (Slippi Universal)",
+          "Super Smash Bros. Melee (Slippi Console-Parity)",
+          "Super Smash Bros. Melee (Slippi VRR Lab)",
+          "Slippi Melee (Streaming)"
+        ],
+        "profile_name": "Super Smash Bros. Melee (Slippi)",
         "shader_cache": "unlimited",
         "threaded_optimization": "off",
         "triple_buffering": "off",
@@ -5193,6 +5294,13 @@
         "low_latency_mode": "on",
         "max_frame_rate": "off",
         "power_management": "prefer_max_performance",
+        "profile_aliases": [
+          "Super Smash Bros. Melee (Slippi Universal)",
+          "Super Smash Bros. Melee (Slippi Console-Parity)",
+          "Super Smash Bros. Melee (Slippi VRR Lab)",
+          "Slippi Melee (Streaming)"
+        ],
+        "profile_name": "Super Smash Bros. Melee (Slippi)",
         "shader_cache": "unlimited",
         "threaded_optimization": "off",
         "triple_buffering": "off",
@@ -5534,6 +5642,13 @@
         "low_latency_mode": "on",
         "max_frame_rate": "off",
         "power_management": "prefer_max_performance",
+        "profile_aliases": [
+          "Super Smash Bros. Melee (Slippi Universal)",
+          "Super Smash Bros. Melee (Slippi Console-Parity)",
+          "Super Smash Bros. Melee (Slippi VRR Lab)",
+          "Slippi Melee (Streaming)"
+        ],
+        "profile_name": "Super Smash Bros. Melee (Slippi)",
         "shader_cache": "unlimited",
         "threaded_optimization": "off",
         "triple_buffering": "off",
@@ -5691,6 +5806,13 @@
         "low_latency_mode": "on",
         "max_frame_rate": "off",
         "power_management": "prefer_max_performance",
+        "profile_aliases": [
+          "Super Smash Bros. Melee (Slippi Universal)",
+          "Super Smash Bros. Melee (Slippi Console-Parity)",
+          "Super Smash Bros. Melee (Slippi VRR Lab)",
+          "Slippi Melee (Streaming)"
+        ],
+        "profile_name": "Super Smash Bros. Melee (Slippi)",
         "shader_cache": "unlimited",
         "threaded_optimization": "off",
         "triple_buffering": "off",

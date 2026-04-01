@@ -60,6 +60,7 @@ export function Header({ showBack, title }: HeaderProps) {
             variant="ghost"
             size="icon"
             title="Settings"
+            onClick={() => setPage('settings')}
           >
             <Settings className="h-5 w-5" />
           </Button>

@@ -120,6 +120,7 @@ class TestApplyProfile:
         mock_profile.get_handlers.return_value = [mock_handler]
         mock_profile.get_settings.return_value = {}
         mock_profile.has_in_game_settings.return_value = False
+        mock_profile.validate_settings.return_value = []
 
         applier = ProfileApplier()
         applier._profiles["test-profile"] = mock_profile
@@ -148,6 +149,7 @@ class TestApplyProfile:
         mock_profile.get_handlers.return_value = [handler1, handler2]
         mock_profile.get_settings.return_value = {}
         mock_profile.has_in_game_settings.return_value = False
+        mock_profile.validate_settings.return_value = []
 
         applier = ProfileApplier()
         applier._profiles["test-profile"] = mock_profile
@@ -210,6 +212,66 @@ class TestApplyProfile:
         finally:
             del ProfileApplier.PROFILES["test-profile"]
 
+    def test_apply_profile_collects_handler_notices(self):
+        """Handler notices should be propagated to the apply result."""
+        handler = MagicMock()
+        handler.__class__.__name__ = "TestHandler"
+        handler.apply.return_value = {
+            "success": True,
+            "notices": ["Reused existing bound NVIDIA profile"],
+        }
+
+        mock_profile = MagicMock()
+        mock_profile.requires_confirmed_vrr_support = False
+        mock_profile.get_handlers.return_value = [handler]
+        mock_profile.get_settings.return_value = {}
+        mock_profile.has_in_game_settings.return_value = False
+        mock_profile.validate_settings.return_value = []
+        mock_profile.validate_settings.return_value = []
+        mock_profile.validate_settings.return_value = []
+        mock_profile.validate_settings.return_value = []
+
+        applier = ProfileApplier()
+        applier._profiles["test-profile"] = mock_profile
+        ProfileApplier.PROFILES["test-profile"] = type(mock_profile)
+
+        try:
+            result = applier.apply_profile("test-profile")
+
+            assert result.success is True
+            assert result.notices == ["Reused existing bound NVIDIA profile"]
+        finally:
+            del ProfileApplier.PROFILES["test-profile"]
+
+    def test_apply_profile_blocks_on_profile_contract_violation(self):
+        """Profile-specific validation must abort before handlers run."""
+        handler = MagicMock()
+        handler.__class__.__name__ = "TestHandler"
+
+        mock_profile = MagicMock()
+        mock_profile.requires_confirmed_vrr_support = False
+        mock_profile.get_handlers.return_value = [handler]
+        mock_profile.get_settings.return_value = {}
+        mock_profile.has_in_game_settings.return_value = False
+        mock_profile.validate_settings.return_value = []
+        mock_profile.validate_settings.return_value = []
+        mock_profile.validate_settings.return_value = []
+        mock_profile.validate_settings.return_value = ["VRR path must remain disabled"]
+
+        applier = ProfileApplier()
+        applier._profiles["test-profile"] = mock_profile
+        ProfileApplier.PROFILES["test-profile"] = type(mock_profile)
+
+        try:
+            result = applier.apply_profile("test-profile")
+
+            assert result.success is False
+            assert "Profile contract violations" in (result.error or "")
+            assert result.failed_settings == ["ProfileContract: VRR path must remain disabled"]
+            handler.apply.assert_not_called()
+        finally:
+            del ProfileApplier.PROFILES["test-profile"]
+
     @patch("abso.core.capabilities.HardwareDetector.detect_monitors")
     def test_apply_profile_blocks_when_confirmed_vrr_not_detected(self, mock_detect_monitors):
         """VRR-required profiles should fail when VRR is not confirmed or likely."""
@@ -264,6 +326,7 @@ class TestApplyProfile:
         mock_profile.get_handlers.return_value = [handler]
         mock_profile.get_settings.return_value = {}
         mock_profile.has_in_game_settings.return_value = False
+        mock_profile.validate_settings.return_value = []
 
         applier = ProfileApplier()
         applier._profiles["test-gsync-profile"] = mock_profile
@@ -439,6 +502,7 @@ class TestProfileOverrides:
         mock_profile.get_handlers.return_value = [mock_handler]
         mock_profile.get_settings.return_value = {}
         mock_profile.has_in_game_settings.return_value = False
+        mock_profile.validate_settings.return_value = []
 
         applier = ProfileApplier()
         applier._profiles["test-profile"] = mock_profile
@@ -481,6 +545,7 @@ disabled_handlers:
         mock_profile.get_handlers.return_value = [mock_handler]
         mock_profile.get_settings.return_value = {"preset": "balanced"}
         mock_profile.has_in_game_settings.return_value = False
+        mock_profile.validate_settings.return_value = []
 
         applier = ProfileApplier()
         applier._profiles["test-profile"] = mock_profile

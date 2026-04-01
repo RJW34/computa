@@ -39,6 +39,19 @@ class SlippiMeleeProfile(EmulatorLatencyBaseProfile):
     def executable_hints(self) -> list[str]:
         return ["Slippi Dolphin.exe", "Dolphin.exe"]
 
+    @property
+    def nvidia_profile_name(self) -> str | None:
+        return "Super Smash Bros. Melee (Slippi)"
+
+    @property
+    def nvidia_profile_aliases(self) -> list[str]:
+        return [
+            "Super Smash Bros. Melee (Slippi Universal)",
+            "Super Smash Bros. Melee (Slippi Console-Parity)",
+            "Super Smash Bros. Melee (Slippi VRR Lab)",
+            "Slippi Melee (Streaming)",
+        ]
+
     # === Validation Metadata Overrides ===
 
     @property

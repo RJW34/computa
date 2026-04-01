@@ -36,11 +36,18 @@ class BackupRestoreSummary:
         """Whether every backed-up component was restored successfully."""
         return not self.skipped_components and not self.failed_components
 
+    @property
+    def has_blocking_issues(self) -> bool:
+        """Whether restore failed for any component ABSO promises to restore."""
+        issues = self.skipped_components + self.failed_components
+        return any(bool(item.get("blocking", True)) for item in issues)
+
     def to_dict(self) -> dict[str, Any]:
         """Convert the summary to a JSON-friendly structure."""
         return {
             "backup_id": self.backup_id,
             "complete": self.complete,
+            "has_blocking_issues": self.has_blocking_issues,
             "restored_components": list(self.restored_components),
             "skipped_components": list(self.skipped_components),
             "failed_components": list(self.failed_components),
@@ -146,6 +153,7 @@ class BackupManager:
 
         for handler in self._handlers:
             handler_name = handler.__class__.__name__
+            restore_guarantee = str(getattr(handler, "restore_guarantee", "full"))
 
             try:
                 data = handler.backup()
@@ -166,6 +174,7 @@ class BackupManager:
                 manifest["components"][handler_name] = {
                     "file": f"{handler_name}.json",
                     "success": component_success,
+                    "restore_guarantee": restore_guarantee,
                 }
 
                 if component_note:
@@ -185,6 +194,7 @@ class BackupManager:
                 manifest["components"][handler_name] = {
                     "file": None,
                     "success": False,
+                    "restore_guarantee": restore_guarantee,
                     "error": f"Permission denied: {e}",
                 }
             except OSError as e:
@@ -192,6 +202,7 @@ class BackupManager:
                 manifest["components"][handler_name] = {
                     "file": None,
                     "success": False,
+                    "restore_guarantee": restore_guarantee,
                     "error": f"OS error: {e}",
                 }
             except (ValueError, TypeError) as e:
@@ -199,6 +210,7 @@ class BackupManager:
                 manifest["components"][handler_name] = {
                     "file": None,
                     "success": False,
+                    "restore_guarantee": restore_guarantee,
                     "error": f"Data error: {e}",
                 }
 
@@ -256,6 +268,8 @@ class BackupManager:
 
         # Restore each component
         for handler_name, component_info in manifest["components"].items():
+            restore_guarantee = str(component_info.get("restore_guarantee", "full"))
+            is_blocking = restore_guarantee != "none"
             if not component_info.get("success", False):
                 detail = str(
                     component_info.get("error")
@@ -267,6 +281,7 @@ class BackupManager:
                     "handler": handler_name,
                     "reason": "backup_unavailable",
                     "detail": detail,
+                    "blocking": is_blocking,
                 })
                 continue
 
@@ -277,6 +292,7 @@ class BackupManager:
                     "handler": handler_name,
                     "reason": "handler_missing",
                     "detail": "No restore handler is registered for this component",
+                    "blocking": is_blocking,
                 })
                 continue
 
@@ -288,6 +304,7 @@ class BackupManager:
                         "handler": handler_name,
                         "reason": "backup_file_missing",
                         "detail": str(component_path),
+                        "blocking": is_blocking,
                     })
                     continue
                 data = json.loads(component_path.read_text(encoding="utf-8"))
@@ -302,6 +319,7 @@ class BackupManager:
                         "handler": handler_name,
                         "reason": "restore_failed",
                         "detail": "Handler returned False",
+                        "blocking": is_blocking,
                     })
 
             except json.JSONDecodeError as e:
@@ -310,6 +328,7 @@ class BackupManager:
                     "handler": handler_name,
                     "reason": "backup_data_corrupted",
                     "detail": str(e),
+                    "blocking": is_blocking,
                 })
             except PermissionError as e:
                 logger.error(f"Permission denied restoring {handler_name}: {e}")
@@ -317,6 +336,7 @@ class BackupManager:
                     "handler": handler_name,
                     "reason": "permission_denied",
                     "detail": str(e),
+                    "blocking": is_blocking,
                 })
             except OSError as e:
                 logger.error(f"OS error restoring {handler_name}: {e}")
@@ -324,6 +344,7 @@ class BackupManager:
                     "handler": handler_name,
                     "reason": "os_error",
                     "detail": str(e),
+                    "blocking": is_blocking,
                 })
             except (ValueError, TypeError, KeyError) as e:
                 logger.error(f"Data error restoring {handler_name}: {e}")
@@ -331,6 +352,7 @@ class BackupManager:
                     "handler": handler_name,
                     "reason": "data_error",
                     "detail": str(e),
+                    "blocking": is_blocking,
                 })
 
         logger.info(f"Backup restored: {backup_id}")

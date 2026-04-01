@@ -86,6 +86,11 @@ class NvidiaSettingsHandler(SettingsHandler):
         self._npi = NPIManager(npi_path)
 
     @property
+    def restore_guarantee(self) -> str:
+        """NVIDIA restore is intentionally not promised as automatic/safe."""
+        return "none"
+
+    @property
     def NPI_PATH(self) -> Path | None:
         """Get NPI path for backwards compatibility."""
         return self._npi.get_path()
@@ -236,11 +241,18 @@ class NvidiaSettingsHandler(SettingsHandler):
         settings = settings.copy()
         applied: list[str] = []
         errors: list[str] = []
+        warnings: list[str] = []
+        notices: list[str] = []
 
         # Extract game info
         executables = settings.pop("executables", [])
         game_name = settings.pop("game_name", "Game")
         driver_profile_name = settings.pop("profile_name", None)
+        raw_profile_aliases = settings.pop("profile_aliases", [])
+        driver_profile_aliases = [
+            str(alias) for alias in raw_profile_aliases
+            if isinstance(alias, str) and alias.strip()
+        ]
         global_settings: dict[str, Any] = {}
 
         # Optional explicit global/base-profile settings
@@ -423,27 +435,35 @@ class NvidiaSettingsHandler(SettingsHandler):
 
             # Use provided executables (bind all when multiple are supplied)
             if executables and nvidia_settings:
-                profile_name = str(driver_profile_name or game_name)
+                requested_profile_name = str(driver_profile_name or game_name)
                 primary_exe = executables[0]
 
                 if len(executables) == 1:
                     result = manager.apply_settings_to_app(
                         primary_exe,
                         nvidia_settings,
-                        profile_name=profile_name,
+                        profile_name=requested_profile_name,
+                        profile_aliases=driver_profile_aliases,
                     )
                 else:
                     result = manager.apply_settings_to_profile(
                         executables,
                         nvidia_settings,
-                        profile_name=profile_name,
+                        profile_name=requested_profile_name,
+                        profile_aliases=driver_profile_aliases,
                     )
+
+                effective_profile_name = str(result.get("profile_name") or requested_profile_name)
+                if result.get("profile_selection_note"):
+                    selection_note = str(result["profile_selection_note"])
+                    applied.append(selection_note)
+                    notices.append(selection_note)
 
                 # Report results
                 if result.get("settings_applied"):
                     for setting, value in result["settings_applied"].items():
                         applied.append(f"{setting}: {value}")
-                    applied.insert(0, f"NVIDIA profile '{profile_name}' configured:")
+                    applied.insert(0, f"NVIDIA profile '{effective_profile_name}' configured:")
 
                 if len(executables) > 1:
                     applied.append(f"Bound executables: {', '.join(executables)}")
@@ -467,6 +487,12 @@ class NvidiaSettingsHandler(SettingsHandler):
                 else:
                     app_bound = True
                     npi_launched = bool(result.get("npi_launched", False))
+                    note = result.get("app_binding_note", "")
+                    if note:
+                        if result.get("app_binding_exact", True):
+                            notices.append(str(note))
+                        else:
+                            warnings.append(str(note))
 
                 logger.info(f"NVIDIA settings applied for {game_name}: {nvidia_settings}")
 
@@ -474,7 +500,7 @@ class NvidiaSettingsHandler(SettingsHandler):
                 try:
                     verify_result = manager.get_app_settings(
                         primary_exe,
-                        profile_name=profile_name,
+                        profile_name=effective_profile_name,
                     )
                     verification_failures = self._collect_verification_failures(
                         manager,
@@ -498,6 +524,8 @@ class NvidiaSettingsHandler(SettingsHandler):
                 "error": "; ".join(errors) if errors else None,
                 "requires_reboot": False,
                 "applied": applied,
+                "warnings": warnings,
+                "notices": notices,
                 "app_bound": app_bound,
                 "npi_launched": npi_launched,
                 "global_verification_failures": global_verification_failures if global_verification_failures else None,
@@ -520,6 +548,8 @@ class NvidiaSettingsHandler(SettingsHandler):
                 "error": f"NVAPI module unavailable: {e}",
                 "requires_reboot": False,
                 "applied": applied,
+                "warnings": warnings,
+                "notices": notices,
                 "note": "NVAPI module unavailable - settings NOT applied, manual application required",
             }
         except Exception as e:
@@ -538,6 +568,8 @@ class NvidiaSettingsHandler(SettingsHandler):
                 "error": f"NVAPI error: {e}",
                 "requires_reboot": False,
                 "applied": applied,
+                "warnings": warnings,
+                "notices": notices,
                 "note": f"NVAPI error ({e}) - settings NOT applied, manual application required",
             }
 
@@ -585,6 +617,201 @@ class NvidiaSettingsHandler(SettingsHandler):
             if candidate_id == setting_id and candidate_name in verify_result:
                 return verify_result[candidate_name]
         return None
+
+    def verify_active(self, settings: dict[str, Any]) -> dict[str, Any]:
+        """Verify NVIDIA setting readback for a profile.
+
+        This verifies driver setting values on the target profile/global profile.
+        Current NVAPI readback does not prove executable-to-profile membership,
+        so the returned metadata explicitly marks the scope as profile readback.
+        """
+        settings = settings.copy()
+        executables = list(settings.pop("executables", []))
+        game_name = settings.pop("game_name", "Game")
+        driver_profile_name = settings.pop("profile_name", None)
+        raw_profile_aliases = settings.pop("profile_aliases", [])
+        driver_profile_aliases = [
+            str(alias) for alias in raw_profile_aliases
+            if isinstance(alias, str) and alias.strip()
+        ]
+
+        global_settings: dict[str, Any] = {}
+        raw_global_settings = settings.pop("global_settings", None)
+        if isinstance(raw_global_settings, dict):
+            global_settings.update(raw_global_settings)
+
+        for key in ("global_vrr_mode", "global_gsync_mode", "vrr_mode"):
+            value = settings.pop(key, None)
+            if value is not None:
+                global_settings["vrr_mode"] = value
+
+        global_gsync = settings.pop("global_gsync", None)
+        if global_gsync is not None:
+            if isinstance(global_gsync, bool):
+                global_settings["vrr_mode"] = "fullscreen_only" if global_gsync else "off"
+            else:
+                global_settings["vrr_mode"] = global_gsync
+
+        auto_vrr_fps_cap = bool(settings.pop("auto_vrr_fps_cap", False))
+        forced_refresh_hz = settings.pop("vrr_refresh_rate_hz", None)
+        if auto_vrr_fps_cap:
+            refresh_hz: int | None = None
+            if forced_refresh_hz is not None:
+                with contextlib.suppress(ValueError, TypeError):
+                    refresh_hz = round(float(forced_refresh_hz))
+            if refresh_hz is None:
+                refresh_hz = self._detect_primary_refresh_rate()
+
+            if refresh_hz and refresh_hz > 0:
+                from abso.core.vrr import get_vrr_fps_cap
+
+                settings["max_frame_rate"] = get_vrr_fps_cap(refresh_hz)
+
+        preset_name = settings.get("preset")
+        allowed_keys = (
+            "low_latency_mode",
+            "power_management",
+            "vsync",
+            "max_frame_rate",
+            "shader_cache",
+            "threaded_optimization",
+            "triple_buffering",
+            "vrr_app_override",
+            "vsync_tear_control",
+            "vsync_vrr_control",
+        )
+        if preset_name and preset_name in NVIDIA_PRESETS:
+            preset = NVIDIA_PRESETS[preset_name]
+            nvidia_settings = preset.get("settings", {}).copy()
+            for key in allowed_keys:
+                if key in settings:
+                    nvidia_settings[key] = settings[key]
+        else:
+            nvidia_settings = {
+                key: value for key, value in settings.items()
+                if key in allowed_keys
+            }
+
+        result: dict[str, Any] = {
+            "all_active": True,
+            "scope": "profile_readback_only",
+            "profile_name": str(driver_profile_name or game_name),
+            "global_failures": [],
+            "setting_failures": [],
+            "notes": [],
+        }
+
+        try:
+            from abso.settings.nvidia.nvapi_drs import DRSProfileManager
+
+            manager = DRSProfileManager()
+
+            if global_settings:
+                global_verify = manager.get_app_settings()
+                if global_verify.get("_error"):
+                    result["global_failures"].append(str(global_verify["_error"]))
+                else:
+                    result["global_failures"] = self._collect_verification_failures(
+                        manager,
+                        global_verify,
+                        global_settings,
+                    )
+
+            if nvidia_settings:
+                if executables:
+                    effective_profile_name = str(driver_profile_name or game_name)
+                    binding_owner_profiles: dict[str, str] = {}
+                    if driver_profile_aliases:
+                        try:
+                            with manager._drs as drs:
+                                selected_profile_name, _, selection_note = manager._select_profile_target(
+                                    drs,
+                                    effective_profile_name,
+                                    driver_profile_aliases,
+                                )
+                            effective_profile_name = selected_profile_name
+                            if selection_note:
+                                result["notes"].append(selection_note)
+                        except Exception:
+                            pass
+
+                    try:
+                        with manager._drs as drs:
+                            profile_handle = drs.find_profile_by_name(effective_profile_name)
+                            for exe in executables:
+                                owner_profile_name = manager._get_application_owner_profile_name(
+                                    drs,
+                                    exe,
+                                )
+                                if not owner_profile_name and profile_handle and manager._profile_contains_application(
+                                    drs,
+                                    profile_handle,
+                                    exe,
+                                ):
+                                    owner_profile_name = effective_profile_name
+
+                                if owner_profile_name:
+                                    binding_owner_profiles[exe] = owner_profile_name
+                    except Exception as binding_error:
+                        result["notes"].append(
+                            f"Executable binding ownership could not be queried: {binding_error}"
+                        )
+
+                    verify_result = manager.get_app_settings(
+                        executables[0],
+                        profile_name=effective_profile_name,
+                    )
+                    if verify_result.get("_error"):
+                        result["setting_failures"].append(str(verify_result["_error"]))
+                    else:
+                        result["profile_name"] = effective_profile_name
+                        result["readback_profile"] = verify_result.get("_profile")
+                        result["setting_failures"] = self._collect_verification_failures(
+                            manager,
+                            verify_result,
+                            nvidia_settings,
+                        )
+                        if binding_owner_profiles:
+                            result["binding_owner_profiles"] = binding_owner_profiles
+
+                        mismatched_bindings = [
+                            f"{exe} -> {owner}"
+                            for exe, owner in binding_owner_profiles.items()
+                            if owner != effective_profile_name
+                        ]
+                        unresolved_bindings = [
+                            exe for exe in executables
+                            if exe not in binding_owner_profiles
+                        ]
+
+                        if mismatched_bindings:
+                            result["setting_failures"].append(
+                                "Executable binding mismatch: "
+                                + ", ".join(sorted(mismatched_bindings))
+                            )
+                        elif len(binding_owner_profiles) == len(executables):
+                            result["scope"] = "profile_and_binding_readback"
+                            result["notes"].append(
+                                "Executable membership was confirmed on the effective NVIDIA profile."
+                            )
+                        else:
+                            result["notes"].append(
+                                "Executable membership could not be proven for: "
+                                + ", ".join(sorted(unresolved_bindings))
+                                + ". Verification covers driver profile settings only."
+                            )
+                else:
+                    result["setting_failures"].append(
+                        "Per-application NVIDIA settings could not be verified because no executable was provided."
+                    )
+
+        except Exception as e:
+            result["all_active"] = False
+            result["error"] = str(e)
+            return result
+
+        result["all_active"] = not result["global_failures"] and not result["setting_failures"]
+        return result
 
     def backup(self) -> dict[str, Any]:
         """Backup current Nvidia profile settings.

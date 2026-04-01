@@ -601,6 +601,119 @@ class NVAPIDRS:
 
         return profile_handle
 
+    def get_profile_name(self, profile_handle: NvDRSProfileHandle) -> str | None:
+        """Resolve a profile handle back to its current display name."""
+        if not self._session:
+            self.create_session()
+            self.load_settings()
+
+        get_profile_info = self._get_function(
+            "NvAPI_DRS_GetProfileInfo",
+            0x61CD6FD6,
+            c_int,
+            [NvDRSSessionHandle, NvDRSProfileHandle, POINTER(NVDRS_PROFILE)]
+        )
+
+        profile_info = NVDRS_PROFILE()
+        profile_info.version = NVDRS_PROFILE_VER
+        status = get_profile_info(self._session, profile_handle, byref(profile_info))
+        if status == NvAPIStatus.OK:
+            return _nvapi_unicode_to_str(profile_info.profileName)
+        if status in {NvAPIStatus.PROFILE_NOT_FOUND, NvAPIStatus.INVALID_HANDLE}:
+            return None
+        raise NVAPIError("Failed to get profile name", status)
+
+    def get_application_info(
+        self,
+        profile_handle: NvDRSProfileHandle,
+        app_name: str,
+    ) -> dict[str, Any] | None:
+        """Get exact application membership info for a specific profile."""
+        if not self._session:
+            self.create_session()
+            self.load_settings()
+
+        get_application = self._get_function(
+            "NvAPI_DRS_GetApplicationInfo",
+            0xED1F8C69,
+            c_int,
+            [NvDRSSessionHandle, NvDRSProfileHandle, c_wchar_p, c_void_p]
+        )
+
+        app_structs = [
+            (NVDRS_APPLICATION_V4, NVDRS_APPLICATION_VER4),
+            (NVDRS_APPLICATION_V3, NVDRS_APPLICATION_VER3),
+            (NVDRS_APPLICATION_V2, NVDRS_APPLICATION_VER2),
+            (NVDRS_APPLICATION_V1, NVDRS_APPLICATION_VER1),
+        ]
+
+        for app_class, app_version in app_structs:
+            app_info = app_class()
+            app_info.version = app_version
+            status = get_application(self._session, profile_handle, app_name, byref(app_info))
+
+            if status == NvAPIStatus.OK:
+                return {
+                    "app_name": _nvapi_unicode_to_str(app_info.appName),
+                    "user_friendly_name": _nvapi_unicode_to_str(app_info.userFriendlyName),
+                }
+            if status in {
+                NvAPIStatus.EXECUTABLE_NOT_FOUND,
+                NvAPIStatus.PROFILE_NOT_FOUND,
+                NvAPIStatus.INVALID_HANDLE,
+            }:
+                return None
+            if status == NvAPIStatus.INCOMPATIBLE_STRUCT_VERSION:
+                continue
+            raise NVAPIError(f"Failed to get application info for '{app_name}'", status)
+
+        return None
+
+    def find_application_owner(self, app_name: str) -> dict[str, Any] | None:
+        """Resolve which NVIDIA profile currently owns an executable binding."""
+        if not self._session:
+            self.create_session()
+            self.load_settings()
+
+        find_application = self._get_function(
+            "NvAPI_DRS_FindApplicationByName",
+            0xEEE566B2,
+            c_int,
+            [NvDRSSessionHandle, c_wchar_p, POINTER(NvDRSProfileHandle), c_void_p]
+        )
+
+        app_structs = [
+            (NVDRS_APPLICATION_V4, NVDRS_APPLICATION_VER4),
+            (NVDRS_APPLICATION_V3, NVDRS_APPLICATION_VER3),
+            (NVDRS_APPLICATION_V2, NVDRS_APPLICATION_VER2),
+            (NVDRS_APPLICATION_V1, NVDRS_APPLICATION_VER1),
+        ]
+
+        for app_class, app_version in app_structs:
+            profile_handle = NvDRSProfileHandle()
+            app_info = app_class()
+            app_info.version = app_version
+            status = find_application(self._session, app_name, byref(profile_handle), byref(app_info))
+
+            if status == NvAPIStatus.OK:
+                return {
+                    "profile_handle": profile_handle,
+                    "profile_name": self.get_profile_name(profile_handle),
+                    "app_name": _nvapi_unicode_to_str(app_info.appName),
+                    "user_friendly_name": _nvapi_unicode_to_str(app_info.userFriendlyName),
+                }
+            if status in {
+                NvAPIStatus.EXECUTABLE_NOT_FOUND,
+                NvAPIStatus.PROFILE_NOT_FOUND,
+                NvAPIStatus.DATA_NOT_FOUND,
+            }:
+                return None
+            if status == NvAPIStatus.INCOMPATIBLE_STRUCT_VERSION:
+                continue
+            raise NVAPIError(f"Failed to locate application owner for '{app_name}'", status)
+
+        return None
+
     def get_base_profile(self) -> NvDRSProfileHandle:
         """Get the base (global) profile handle.
 
@@ -775,6 +888,9 @@ class NVAPIDRS:
         if not self._session:
             raise NVAPIError("No active DRS session")
 
+        if not hasattr(self, "_app_binding_statuses"):
+            self._app_binding_statuses = {}
+
         # NvAPI_DRS_CreateApplication - interface ID 0x4347A9DE
         create_app = self._get_function(
             "NvAPI_DRS_CreateApplication",
@@ -814,9 +930,11 @@ class NVAPIDRS:
             status = create_app(self._session, profile_handle, byref(app_info))
 
             if status == NvAPIStatus.OK:
+                self._app_binding_statuses[app_name] = "created"
                 logger.info(f"Added application to profile: {app_name} (using V{app_version >> 16})")
                 return
             elif status == NvAPIStatus.EXECUTABLE_ALREADY_IN_USE:
+                self._app_binding_statuses[app_name] = "already_in_use"
                 logger.debug(f"Application {app_name} already in a profile")
                 return
             elif status == NvAPIStatus.INCOMPATIBLE_STRUCT_VERSION:
@@ -831,6 +949,7 @@ class NVAPIDRS:
             f"NVAPI app binding failed for '{app_name}' (driver struct version mismatch). "
             f"Falling back to NPI or manual instructions."
         )
+        self._app_binding_statuses[app_name] = "unavailable"
         # Store the failure for reporting
         if not hasattr(self, '_app_binding_failures'):
             self._app_binding_failures = []
@@ -1115,11 +1234,106 @@ class DRSProfileManager:
             return None
         return None
 
+    @staticmethod
+    def _build_profile_index(drs: NVAPIDRS) -> dict[str, dict[str, Any]]:
+        """Enumerate profiles once and index them by name."""
+        try:
+            return {
+                str(info.get("name")): info
+                for info in drs.enumerate_profiles()
+                if info.get("name")
+            }
+        except Exception:
+            return {}
+
+    @staticmethod
+    def _reset_binding_tracking(drs: NVAPIDRS) -> None:
+        """Reset temporary binding tracking attached to the DRS wrapper."""
+        drs._app_binding_failures = []
+        drs._app_binding_statuses = {}
+
+    @staticmethod
+    def _get_binding_status(drs: NVAPIDRS, app_name: str) -> str | None:
+        """Get the tracked binding status for a specific executable."""
+        statuses = getattr(drs, "_app_binding_statuses", {})
+        if isinstance(statuses, dict):
+            return statuses.get(app_name)
+        return None
+
+    @staticmethod
+    def _get_application_owner_profile_name(
+        drs: NVAPIDRS,
+        app_name: str,
+    ) -> str | None:
+        """Resolve the current driver-profile owner for an executable."""
+        try:
+            owner = drs.find_application_owner(app_name)
+        except Exception:
+            return None
+
+        if isinstance(owner, dict):
+            profile_name = owner.get("profile_name")
+            if profile_name:
+                return str(profile_name)
+        return None
+
+    @staticmethod
+    def _profile_contains_application(
+        drs: NVAPIDRS,
+        profile_handle: NvDRSProfileHandle,
+        app_name: str,
+    ) -> bool:
+        """Check whether a profile explicitly contains an executable."""
+        try:
+            return drs.get_application_info(profile_handle, app_name) is not None
+        except Exception:
+            return False
+
+    @classmethod
+    def _select_profile_target(
+        cls,
+        drs: NVAPIDRS,
+        requested_profile_name: str,
+        profile_aliases: list[str] | None,
+    ) -> tuple[str, int, str | None]:
+        """Choose the safest existing profile to update for an application.
+
+        Preference order:
+        1. Requested profile when it already exists and is bound.
+        2. First bound legacy alias profile.
+        3. Requested profile (existing but unbound, or to be created).
+        """
+        profile_index = cls._build_profile_index(drs)
+        requested_info = profile_index.get(requested_profile_name)
+        requested_num_apps = int(requested_info.get("num_apps", 0)) if requested_info else 0
+
+        if requested_info and requested_num_apps > 0:
+            return requested_profile_name, requested_num_apps, None
+
+        for alias in profile_aliases or []:
+            if not alias or alias == requested_profile_name:
+                continue
+
+            alias_info = profile_index.get(alias)
+            alias_num_apps = int(alias_info.get("num_apps", 0)) if alias_info else 0
+            if alias_info and alias_num_apps > 0:
+                return (
+                    alias,
+                    alias_num_apps,
+                    (
+                        f"Reusing existing bound NVIDIA profile '{alias}' "
+                        f"instead of unbound requested profile '{requested_profile_name}'."
+                    ),
+                )
+
+        return requested_profile_name, requested_num_apps, None
+
     def apply_settings_to_app(
         self,
         app_executable: str,
         settings: dict[str, Any],
         profile_name: str | None = None,
+        profile_aliases: list[str] | None = None,
     ) -> dict[str, Any]:
         """Apply NVIDIA settings to a specific application.
 
@@ -1128,6 +1342,8 @@ class DRSProfileManager:
             settings: Dictionary of setting names to values.
             profile_name: Optional custom profile name. If None, uses
                          "ABSO - {app_name}" format.
+            profile_aliases: Optional ordered list of legacy/custom profile
+                         names that may already be safely bound to this app.
 
         Returns:
             Dictionary with results of each setting change.
@@ -1148,8 +1364,10 @@ class DRSProfileManager:
             app_base = app_executable.rsplit(".", 1)[0]
             profile_name = f"ABSO - {app_base}"
 
+        requested_profile_name = profile_name
         results = {
             "profile_name": profile_name,
+            "requested_profile_name": requested_profile_name,
             "app_executable": app_executable,
             "settings_applied": {},
             "errors": [],
@@ -1157,72 +1375,133 @@ class DRSProfileManager:
 
         try:
             with self._drs as drs:
-                # Find or create the profile
-                profile = drs.find_profile_by_name(profile_name)
+                selected_profile_name, existing_profile_num_apps, selection_note = (
+                    self._select_profile_target(drs, requested_profile_name, profile_aliases)
+                )
+                selected_from_alias = selected_profile_name != requested_profile_name
+                results["profile_name"] = selected_profile_name
+                if selection_note:
+                    results["profile_selection_note"] = selection_note
+
+                profile = drs.find_profile_by_name(selected_profile_name)
                 if not profile:
-                    profile = drs.create_profile(profile_name)
+                    profile = drs.create_profile(selected_profile_name)
                     results["profile_created"] = True
                 else:
                     results["profile_created"] = False
 
-                existing_profile_num_apps = 0
-                if not results["profile_created"]:
-                    existing_profile_num_apps = self._get_profile_num_apps(drs, profile_name) or 0
-
-                # Add the application to the profile (may fail on newer drivers)
-                drs._app_binding_failures = []  # Reset tracking
+                self._reset_binding_tracking(drs)
                 drs.add_application_to_profile(profile, app_executable)
+                binding_status = self._get_binding_status(drs, app_executable)
 
-                # Detect silent binding failure cases (e.g., executable already owned by
-                # a different profile). These can leave a profile with zero bound apps.
-                profile_num_apps = self._get_profile_num_apps(drs, profile_name)
+                profile_num_apps = self._get_profile_num_apps(drs, selected_profile_name)
                 if profile_num_apps == 0 and app_executable not in drs._app_binding_failures:
                     drs._app_binding_failures.append(app_executable)
 
-                # Check if app binding succeeded
-                if drs._app_binding_failures:
-                    if (
+                owner_profile_name = self._get_application_owner_profile_name(
+                    drs,
+                    app_executable,
+                )
+                on_selected_profile = self._profile_contains_application(
+                    drs,
+                    profile,
+                    app_executable,
+                )
+                if on_selected_profile and not owner_profile_name:
+                    owner_profile_name = selected_profile_name
+
+                if owner_profile_name:
+                    results["app_binding_owner_profile"] = owner_profile_name
+
+                if owner_profile_name == selected_profile_name:
+                    results["app_bound"] = True
+                    results["app_binding_exact"] = True
+                    if binding_status == "created":
+                        results["app_binding_state"] = "created"
+                    elif binding_status == "already_in_use":
+                        results["app_binding_state"] = "existing_binding_confirmed"
+                        results["app_binding_note"] = (
+                            f"'{app_executable}' was already associated with NVIDIA profile "
+                            f"'{selected_profile_name}'. ABSO confirmed that membership and updated "
+                            "the existing profile in place."
+                        )
+                    else:
+                        results["app_binding_state"] = "confirmed"
+                elif owner_profile_name:
+                    results["app_bound"] = False
+                    results["app_binding_exact"] = False
+                    results["app_binding_state"] = "bound_elsewhere"
+                    results["app_binding_failures"] = [app_executable]
+                    results["app_binding_note"] = (
+                        f"'{app_executable}' is currently owned by NVIDIA profile "
+                        f"'{owner_profile_name}', not '{selected_profile_name}'. "
+                        "ABSO will not count this as a successful binding."
+                    )
+                    results["manual_instructions"] = self.get_manual_binding_instructions(
+                        selected_profile_name,
+                        app_executable,
+                    )
+                elif drs._app_binding_failures:
+                    if selected_from_alias and existing_profile_num_apps > 0 and (profile_num_apps or 0) > 0:
+                        results["app_bound"] = True
+                        results["app_binding_exact"] = False
+                        results["app_binding_state"] = "reused_family_profile"
+                        results["app_binding_note"] = (
+                            f"Reused existing bound NVIDIA profile '{selected_profile_name}', but NVAPI could not "
+                            f"prove '{app_executable}' is currently attached to it. ABSO verified writes on that "
+                            "driver profile only."
+                        )
+                        drs._app_binding_failures = []
+                    elif (
                         profile_name_was_explicit
+                        and not results["profile_created"]
                         and existing_profile_num_apps > 0
                         and (profile_num_apps or 0) > 0
                     ):
-                        # Existing predefined profile likely already has executable binding.
-                        # Driver may reject CreateApplication updates with struct-version errors.
                         results["app_bound"] = True
+                        results["app_binding_exact"] = False
+                        results["app_binding_state"] = "existing_profile_unverified"
                         results["app_binding_note"] = (
-                            f"Using existing executable binding for profile '{profile_name}'. "
-                            "Skipped CreateApplication update."
+                            f"Profile '{selected_profile_name}' already exists and has bound applications, but "
+                            f"NVAPI could not prove '{app_executable}' belongs to it. ABSO verified driver "
+                            "settings on that profile only."
                         )
                         drs._app_binding_failures = []
                     else:
                         results["app_bound"] = False
-
-                        # NPI GUI launch disabled — popping up a window during
-                        # headless profile apply is confusing.  Provide manual
-                        # instructions instead.
+                        results["app_binding_exact"] = False
+                        results["app_binding_state"] = "manual_required"
+                        results["app_binding_failures"] = list(drs._app_binding_failures)
                         results["app_binding_note"] = (
-                            f"Profile '{profile_name}' created with all settings configured. "
+                            f"Profile '{selected_profile_name}' created with all settings configured. "
                             f"Automatic app binding unavailable on this driver version. "
                             f"To activate: NVCP > Manage 3D Settings > Program Settings > "
-                            f"Add '{app_executable}' > Select '{profile_name}'"
+                            f"Add '{app_executable}' > Select '{selected_profile_name}'"
                         )
                         results["manual_instructions"] = self.get_manual_binding_instructions(
-                            profile_name, app_executable
+                            selected_profile_name, app_executable
                         )
                 else:
                     results["app_bound"] = True
+                    results["app_binding_exact"] = bool(on_selected_profile)
+                    results["app_binding_state"] = "confirmed" if on_selected_profile else "profile_only"
 
-                # Apply each setting
-                for setting_name, value in settings.items():
-                    try:
-                        self._apply_single_setting(drs, profile, setting_name, value)
-                        results["settings_applied"][setting_name] = value
-                    except Exception as e:
-                        results["errors"].append({
-                            "setting": setting_name,
-                            "error": str(e),
-                        })
-                        logger.error(f"Failed to apply {setting_name}: {e}")
+                if results.get("app_binding_state") != "bound_elsewhere":
+                    for setting_name, value in settings.items():
+                        try:
+                            self._apply_single_setting(drs, profile, setting_name, value)
+                            results["settings_applied"][setting_name] = value
+                        except Exception as e:
+                            results["errors"].append({
+                                "setting": setting_name,
+                                "error": str(e),
+                            })
+                            logger.error(f"Failed to apply {setting_name}: {e}")
+                else:
+                    logger.warning(
+                        "Skipping NVIDIA writes for %s because it is bound to a different profile",
+                        app_executable,
+                    )
 
         except Exception as e:
             results["fatal_error"] = str(e)
@@ -1236,6 +1515,7 @@ class DRSProfileManager:
         app_executables: list[str],
         settings: dict[str, Any],
         profile_name: str,
+        profile_aliases: list[str] | None = None,
     ) -> dict[str, Any]:
         """Apply NVIDIA settings to a profile and bind multiple executables.
 
@@ -1246,12 +1526,15 @@ class DRSProfileManager:
             app_executables: List of executable names.
             settings: Dictionary of setting names to values.
             profile_name: Profile name to create/use.
+            profile_aliases: Optional ordered list of legacy/custom profile
+                names that may already be safely bound to these executables.
 
         Returns:
             Dictionary with results of each setting change and binding status.
         """
         results = {
             "profile_name": profile_name,
+            "requested_profile_name": profile_name,
             "executables": app_executables,
             "settings_applied": {},
             "errors": [],
@@ -1263,64 +1546,151 @@ class DRSProfileManager:
 
         try:
             with self._drs as drs:
-                # Find or create the profile
-                profile = drs.find_profile_by_name(profile_name)
+                selected_profile_name, existing_profile_num_apps, selection_note = (
+                    self._select_profile_target(drs, profile_name, profile_aliases)
+                )
+                selected_from_alias = selected_profile_name != profile_name
+                results["profile_name"] = selected_profile_name
+                if selection_note:
+                    results["profile_selection_note"] = selection_note
+
+                profile = drs.find_profile_by_name(selected_profile_name)
                 if not profile:
-                    profile = drs.create_profile(profile_name)
+                    profile = drs.create_profile(selected_profile_name)
                     results["profile_created"] = True
                 else:
                     results["profile_created"] = False
 
-                existing_profile_num_apps = 0
-                if not results["profile_created"]:
-                    existing_profile_num_apps = self._get_profile_num_apps(drs, profile_name) or 0
-
-                # Bind all applications to the profile
-                drs._app_binding_failures = []
+                self._reset_binding_tracking(drs)
                 for exe in app_executables:
                     drs.add_application_to_profile(profile, exe)
+                binding_statuses = {
+                    exe: self._get_binding_status(drs, exe)
+                    for exe in app_executables
+                }
 
-                # Detect silent binding failure where profile still has no executables.
-                profile_num_apps = self._get_profile_num_apps(drs, profile_name)
+                profile_num_apps = self._get_profile_num_apps(drs, selected_profile_name)
                 if profile_num_apps == 0 and not drs._app_binding_failures:
                     drs._app_binding_failures.extend(app_executables)
 
-                if drs._app_binding_failures:
-                    if existing_profile_num_apps > 0 and (profile_num_apps or 0) > 0:
-                        results["app_bound"] = True
+                owner_profile_names = {
+                    exe: self._get_application_owner_profile_name(drs, exe)
+                    for exe in app_executables
+                }
+                on_selected_profile = {
+                    exe: self._profile_contains_application(drs, profile, exe)
+                    for exe in app_executables
+                }
+                for exe, contained in on_selected_profile.items():
+                    if contained and not owner_profile_names.get(exe):
+                        owner_profile_names[exe] = selected_profile_name
+
+                results["app_binding_owner_profiles"] = {
+                    exe: owner
+                    for exe, owner in owner_profile_names.items()
+                    if owner
+                }
+
+                exact_executables = [
+                    exe for exe, owner in owner_profile_names.items()
+                    if owner == selected_profile_name
+                ]
+                conflicting_executables = {
+                    exe: owner
+                    for exe, owner in owner_profile_names.items()
+                    if owner and owner != selected_profile_name
+                }
+
+                if len(exact_executables) == len(app_executables):
+                    results["app_bound"] = True
+                    results["app_binding_exact"] = True
+                    if any(status == "created" for status in binding_statuses.values()):
+                        results["app_binding_state"] = "created"
+                    elif any(status == "already_in_use" for status in binding_statuses.values()):
+                        results["app_binding_state"] = "existing_binding_confirmed"
                         results["app_binding_note"] = (
-                            f"Using existing executable binding for profile '{profile_name}'. "
-                            "Skipped CreateApplication updates."
+                            f"One or more executables were already associated with NVIDIA profile "
+                            f"'{selected_profile_name}'. ABSO confirmed that membership and updated "
+                            "the existing profile in place."
+                        )
+                    else:
+                        results["app_binding_state"] = "confirmed"
+                elif conflicting_executables:
+                    results["app_bound"] = False
+                    results["app_binding_exact"] = False
+                    results["app_binding_state"] = "bound_elsewhere"
+                    results["app_binding_failures"] = sorted(conflicting_executables)
+                    conflict_summary = ", ".join(
+                        f"{exe} -> {owner}"
+                        for exe, owner in sorted(conflicting_executables.items())
+                    )
+                    results["app_binding_note"] = (
+                        f"One or more executables are currently owned by different NVIDIA profiles "
+                        f"({conflict_summary}), not '{selected_profile_name}'. ABSO will not count this "
+                        "as a successful binding."
+                    )
+                    first_failed = sorted(conflicting_executables)[0]
+                    results["manual_instructions"] = self.get_manual_binding_instructions(
+                        selected_profile_name,
+                        first_failed,
+                    )
+                elif drs._app_binding_failures:
+                    if selected_from_alias and existing_profile_num_apps > 0 and (profile_num_apps or 0) > 0:
+                        results["app_bound"] = True
+                        results["app_binding_exact"] = False
+                        results["app_binding_state"] = "reused_family_profile"
+                        results["app_binding_note"] = (
+                            f"Reused existing bound NVIDIA profile '{selected_profile_name}', but NVAPI could not "
+                            "prove every executable is currently attached to it. ABSO verified writes on that "
+                            "driver profile only."
+                        )
+                        drs._app_binding_failures = []
+                    elif not results["profile_created"] and existing_profile_num_apps > 0 and (profile_num_apps or 0) > 0:
+                        results["app_bound"] = True
+                        results["app_binding_exact"] = False
+                        results["app_binding_state"] = "existing_profile_unverified"
+                        results["app_binding_note"] = (
+                            f"Profile '{selected_profile_name}' already exists and has bound applications, but "
+                            "NVAPI could not prove every executable belongs to it. ABSO verified driver settings "
+                            "on that profile only."
                         )
                         drs._app_binding_failures = []
                     else:
                         results["app_bound"] = False
+                        results["app_binding_exact"] = False
+                        results["app_binding_state"] = "manual_required"
                         results["app_binding_failures"] = list(drs._app_binding_failures)
-
                         first_failed = drs._app_binding_failures[0]
                         results["app_binding_note"] = (
-                            f"Profile '{profile_name}' created with all settings configured. "
+                            f"Profile '{selected_profile_name}' created with all settings configured. "
                             f"Automatic app binding unavailable on this driver version. "
                             f"To activate: NVCP > Manage 3D Settings > Program Settings > "
-                            f"Add executables to '{profile_name}'."
+                            f"Add executables to '{selected_profile_name}'."
                         )
                         results["manual_instructions"] = self.get_manual_binding_instructions(
-                            profile_name, first_failed
+                            selected_profile_name, first_failed
                         )
                 else:
                     results["app_bound"] = True
+                    results["app_binding_exact"] = False
+                    results["app_binding_state"] = "profile_only"
 
-                # Apply each setting once
-                for setting_name, value in settings.items():
-                    try:
-                        self._apply_single_setting(drs, profile, setting_name, value)
-                        results["settings_applied"][setting_name] = value
-                    except Exception as e:
-                        results["errors"].append({
-                            "setting": setting_name,
-                            "error": str(e),
-                        })
-                        logger.error(f"Failed to apply {setting_name}: {e}")
+                if results.get("app_binding_state") != "bound_elsewhere":
+                    for setting_name, value in settings.items():
+                        try:
+                            self._apply_single_setting(drs, profile, setting_name, value)
+                            results["settings_applied"][setting_name] = value
+                        except Exception as e:
+                            results["errors"].append({
+                                "setting": setting_name,
+                                "error": str(e),
+                            })
+                            logger.error(f"Failed to apply {setting_name}: {e}")
+                else:
+                    logger.warning(
+                        "Skipping NVIDIA writes for profile %s because one or more executables are bound elsewhere",
+                        selected_profile_name,
+                    )
 
         except Exception as e:
             results["fatal_error"] = str(e)

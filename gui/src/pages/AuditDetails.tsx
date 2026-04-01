@@ -10,7 +10,7 @@ import {
   RefreshCw,
   ChevronDown,
   ChevronUp,
-  Wrench,
+  ArrowRight,
 } from 'lucide-react';
 import { useAppStore } from '@/stores/appStore';
 import { cn } from '@/lib/utils';
@@ -26,7 +26,7 @@ const SEVERITY_CONFIG: Record<
 };
 
 export function AuditDetails() {
-  const { auditResults, auditLoading, runAudit } = useAppStore();
+  const { auditResults, auditLoading, auditError, auditHasRun, runAudit, setPage } = useAppStore();
   const [expandedIssue, setExpandedIssue] = React.useState<string | null>(null);
   const [filterSeverity, setFilterSeverity] = React.useState<Severity | 'all'>('all');
   const [filterCategory, setFilterCategory] = React.useState<string>('all');
@@ -102,7 +102,7 @@ export function AuditDetails() {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => runAudit()}
+            onClick={() => void runAudit()}
             disabled={auditLoading}
           >
             <RefreshCw
@@ -117,8 +117,14 @@ export function AuditDetails() {
           {filteredIssues.length === 0 ? (
             <Card>
               <CardContent className="py-8 text-center text-muted-foreground">
-                {auditResults.length === 0
-                  ? 'No issues found. Your system is optimized!'
+                {auditLoading
+                  ? 'Running audit...'
+                  : auditError
+                    ? `Audit failed: ${auditError}`
+                    : !auditHasRun
+                      ? 'Run an audit to see findings from the current audit scope.'
+                      : auditResults.length === 0
+                        ? 'No issues were detected by the current audit scope.'
                   : 'No issues match the current filters.'}
               </CardContent>
             </Card>
@@ -186,11 +192,6 @@ export function AuditDetails() {
                           </div>
                         )}
                       </div>
-
-                      <Button variant="outline" size="sm" className="ml-4">
-                        <Wrench className="h-4 w-4 mr-2" />
-                        Fix
-                      </Button>
                     </div>
                   </CardContent>
                 </Card>
@@ -199,13 +200,18 @@ export function AuditDetails() {
           )}
         </div>
 
-        {/* Fix all button */}
         {filteredIssues.length > 0 && (
-          <div className="mt-6 flex justify-end">
-            <Button>
-              <Wrench className="h-4 w-4 mr-2" />
-              Fix All ({filteredIssues.length})
-            </Button>
+          <div className="mt-6 rounded-lg border bg-muted/40 px-4 py-3 text-sm text-muted-foreground">
+            Automatic per-issue fixing is not available from this screen. Use the profile pipeline or review profile-driven targets instead.
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Button size="sm" onClick={() => setPage('profile-wizard')}>
+                Apply a Profile
+                <ArrowRight className="h-4 w-4 ml-2" />
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => setPage('settings')}>
+                Review Targets
+              </Button>
+            </div>
           </div>
         )}
       </main>

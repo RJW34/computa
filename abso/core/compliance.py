@@ -80,6 +80,7 @@ class ComplianceEngine:
     # Handlers where verify mismatches are treated as critical by default.
     CRITICAL_VERIFY_HANDLERS: set[str] = {
         "WindowsSettingsHandler",
+        "NvidiaSettingsHandler",
         "Rivals2ConfigHandler",
     }
 

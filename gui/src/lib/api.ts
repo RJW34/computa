@@ -5,6 +5,7 @@ import type {
   Profile,
   Backup,
   ApplyResult,
+  BackendState,
 } from './types';
 
 /**
@@ -161,14 +162,21 @@ export async function getReport(
 }
 
 /**
- * Get the currently active profile (from backend state)
+ * Get persisted backend active-profile state.
+ */
+export async function getCurrentState(): Promise<BackendState> {
+  return runAbsoJson<BackendState>('state');
+}
+
+/**
+ * Get the current Tauri-side active profile cache.
  */
 export async function getActiveProfile(): Promise<string | null> {
   return invoke<string | null>('get_active_profile');
 }
 
 /**
- * Set the active profile in backend state (for tray menu sync)
+ * Set the current Tauri-side active profile cache (for tray menu sync)
  */
 export async function setActiveProfileBackend(profileId: string | null): Promise<void> {
   return invoke<void>('set_active_profile', { profileId });

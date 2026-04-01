@@ -5,6 +5,7 @@ from __future__ import annotations
 from unittest.mock import MagicMock, patch
 
 from abso.settings.nvidia import NvidiaSettingsHandler
+from abso.settings.nvidia.nvapi_drs import DRSProfileManager as RealDRSProfileManager
 from abso.settings.nvidia.parsing import (
     parse_low_latency_value,
 )
@@ -558,6 +559,175 @@ class TestNvidiaApply:
 
         assert result["success"] is False
         assert "App binding failed" in (result["error"] or "")
+
+    @patch("abso.settings.nvidia.nvapi_drs.DRSProfileManager")
+    def test_apply_verifies_against_effective_profile_when_legacy_alias_is_reused(self, mock_manager_cls):
+        """Verification must read back from the profile actually updated by NVAPI."""
+        mock_manager = MagicMock()
+        mock_manager.apply_settings_to_app.return_value = {
+            "requested_profile_name": "Rivals 2",
+            "profile_name": "Rivals2-Win64-Shipping.exe",
+            "profile_selection_note": (
+                "Reusing existing bound NVIDIA profile 'Rivals2-Win64-Shipping.exe' "
+                "instead of unbound requested profile 'Rivals 2'."
+            ),
+            "settings_applied": {"vrr_app_override": "allow"},
+            "errors": [],
+            "app_bound": True,
+            "npi_launched": False,
+        }
+        mock_manager.get_app_settings.return_value = {"vrr_app_override": 0x00000000}
+        mock_manager._resolve_setting.return_value = (0x10A879CF, 0x00000000)
+        mock_manager_cls.return_value = mock_manager
+
+        handler = NvidiaSettingsHandler()
+        result = handler.apply({
+            "preset": "vrr_fighting_game",
+            "executables": ["Rivals2-Win64-Shipping.exe"],
+            "game_name": "Rivals 2: G-SYNC",
+            "profile_name": "Rivals 2",
+            "profile_aliases": ["Rivals2-Win64-Shipping.exe"],
+        })
+
+        assert result["success"] is True
+        mock_manager.get_app_settings.assert_called_once_with(
+            "Rivals2-Win64-Shipping.exe",
+            profile_name="Rivals2-Win64-Shipping.exe",
+        )
+
+    @patch("abso.settings.nvidia.nvapi_drs.DRSProfileManager")
+    def test_apply_surfaces_unverified_binding_as_warning(self, mock_manager_cls):
+        """Successful-but-unverified binding reuse must be exposed as a warning."""
+        mock_manager = MagicMock()
+        mock_manager.apply_settings_to_app.return_value = {
+            "settings_applied": {"vrr_app_override": "allow"},
+            "errors": [],
+            "app_bound": True,
+            "app_binding_exact": False,
+            "app_binding_note": (
+                "Profile 'Rivals 2 Online' already exists and has bound applications, but "
+                "NVAPI could not prove every executable belongs to it."
+            ),
+            "npi_launched": False,
+        }
+        mock_manager.get_app_settings.return_value = {"vrr_app_override": 0x00000000}
+        mock_manager._resolve_setting.return_value = (0x10A879CF, 0x00000000)
+        mock_manager_cls.return_value = mock_manager
+
+        handler = NvidiaSettingsHandler()
+        result = handler.apply({
+            "preset": "vrr_fighting_game",
+            "executables": ["Rivals2-Win64-Shipping.exe"],
+            "game_name": "Rivals 2 Online",
+            "profile_name": "Rivals 2 Online",
+        })
+
+        assert result["success"] is True
+        assert result["warnings"] == [
+            "Profile 'Rivals 2 Online' already exists and has bound applications, but "
+            "NVAPI could not prove every executable belongs to it."
+        ]
+
+    @patch("abso.settings.nvidia.nvapi_drs.DRSProfileManager")
+    def test_apply_surfaces_confirmed_existing_binding_as_notice(self, mock_manager_cls):
+        """Confirmed existing membership should be informational, not a warning."""
+        mock_manager = MagicMock()
+        mock_manager.apply_settings_to_app.return_value = {
+            "settings_applied": {"vrr_app_override": "allow"},
+            "errors": [],
+            "app_bound": True,
+            "app_binding_exact": True,
+            "app_binding_note": (
+                "'Overwatch.exe' was already associated with NVIDIA profile 'Overwatch 2'."
+            ),
+            "npi_launched": False,
+        }
+        mock_manager.get_app_settings.return_value = {"vrr_app_override": 0x00000000}
+        mock_manager._resolve_setting.return_value = (0x10A879CF, 0x00000000)
+        mock_manager_cls.return_value = mock_manager
+
+        handler = NvidiaSettingsHandler()
+        result = handler.apply({
+            "preset": "reflex_gsync",
+            "executables": ["Overwatch.exe"],
+            "game_name": "Overwatch 2",
+            "profile_name": "Overwatch 2",
+        })
+
+        assert result["success"] is True
+        assert result["warnings"] == []
+        assert result["notices"] == [
+            "'Overwatch.exe' was already associated with NVIDIA profile 'Overwatch 2'."
+        ]
+
+    @patch("abso.settings.nvidia.nvapi_drs.DRSProfileManager")
+    def test_verify_active_confirms_binding_membership_when_owner_matches(self, mock_manager_cls):
+        """verify_active should upgrade scope when it can prove executable ownership."""
+        manager = RealDRSProfileManager()
+        fake_drs = MagicMock()
+        fake_drs.find_profile_by_name.return_value = object()
+        fake_drs.find_application_owner.return_value = {"profile_name": "Overwatch 2"}
+        fake_drs.get_application_info.return_value = {"app_name": "Overwatch.exe"}
+
+        class _Ctx:
+            def __enter__(self_inner):
+                return fake_drs
+
+            def __exit__(self_inner, exc_type, exc, tb):
+                return False
+
+        manager._drs = _Ctx()
+        manager.get_app_settings = MagicMock(
+            return_value={"_profile": "Overwatch 2", "vrr_app_override": 0x00000000}
+        )
+        manager._resolve_setting = MagicMock(return_value=(0x10A879CF, 0x00000000))
+        mock_manager_cls.return_value = manager
+
+        handler = NvidiaSettingsHandler()
+        verify = handler.verify_active({
+            "vrr_app_override": "allow",
+            "executables": ["Overwatch.exe"],
+            "game_name": "Overwatch 2",
+            "profile_name": "Overwatch 2",
+        })
+
+        assert verify["all_active"] is True
+        assert verify["scope"] == "profile_and_binding_readback"
+        assert verify["binding_owner_profiles"] == {"Overwatch.exe": "Overwatch 2"}
+
+    @patch("abso.settings.nvidia.nvapi_drs.DRSProfileManager")
+    def test_verify_active_reports_binding_mismatch(self, mock_manager_cls):
+        """verify_active should fail when the executable is owned by a different profile."""
+        manager = RealDRSProfileManager()
+        fake_drs = MagicMock()
+        fake_drs.find_profile_by_name.return_value = object()
+        fake_drs.find_application_owner.return_value = {"profile_name": "Legacy Wrong Profile"}
+        fake_drs.get_application_info.return_value = None
+
+        class _Ctx:
+            def __enter__(self_inner):
+                return fake_drs
+
+            def __exit__(self_inner, exc_type, exc, tb):
+                return False
+
+        manager._drs = _Ctx()
+        manager.get_app_settings = MagicMock(
+            return_value={"_profile": "Overwatch 2", "vrr_app_override": 0x00000000}
+        )
+        manager._resolve_setting = MagicMock(return_value=(0x10A879CF, 0x00000000))
+        mock_manager_cls.return_value = manager
+
+        handler = NvidiaSettingsHandler()
+        verify = handler.verify_active({
+            "vrr_app_override": "allow",
+            "executables": ["Overwatch.exe"],
+            "game_name": "Overwatch 2",
+            "profile_name": "Overwatch 2",
+        })
+
+        assert verify["all_active"] is False
+        assert any("Executable binding mismatch" in item for item in verify["setting_failures"])
 
     @patch("abso.settings.windows.WindowsSettingsHandler._get_refresh_rate_info")
     @patch("abso.core.detector.HardwareDetector.detect_monitors")

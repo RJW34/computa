@@ -198,6 +198,20 @@ class BaseProfile(ABC):
         """
         return False
 
+    @property
+    def nvidia_profile_name(self) -> str | None:
+        """Stable NVIDIA DRS profile identity for this profile family.
+
+        Override this when multiple ABSO variants should reuse one driver
+        profile instead of creating display-name-specific leftovers.
+        """
+        return None
+
+    @property
+    def nvidia_profile_aliases(self) -> list[str]:
+        """Legacy or variant NVIDIA profile names worth reusing when bound."""
+        return []
+
     @abstractmethod
     def get_handlers(self) -> list[SettingsHandler]:
         """Get settings handlers used by this profile.
@@ -276,3 +290,11 @@ class BaseProfile(ABC):
             lines.append("")
 
         return "\n".join(lines)
+
+    def validate_settings(self, applied_settings: dict[str, Any]) -> list[str]:
+        """Validate the final handler settings map before ABSO applies it.
+
+        Profiles can override this to enforce profile-specific prohibitions or
+        invariants after overrides/gating have been merged.
+        """
+        return []

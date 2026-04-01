@@ -1,10 +1,11 @@
 import * as React from 'react';
-import { Shield, ShieldOff, Clock, CheckCircle } from 'lucide-react';
+import { Shield, ShieldOff, Clock, Gamepad2 } from 'lucide-react';
 import { useAppStore } from '@/stores/appStore';
 import { formatRelativeTime } from '@/lib/utils';
 
 export function StatusBar() {
-  const { isAdmin, backups, checkAdmin } = useAppStore();
+  const { isAdmin, backups, checkAdmin, activeProfile, activeProfileAppliedAt, profiles } =
+    useAppStore();
 
   // Track if admin check has been done to prevent duplicate calls
   const adminCheckDone = React.useRef(false);
@@ -16,6 +17,9 @@ export function StatusBar() {
   }, [checkAdmin]);
 
   const latestBackup = backups[0];
+  const activeProfileName = activeProfile
+    ? profiles.find((profile) => profile.id === activeProfile)?.display_name || activeProfile
+    : null;
 
   return (
     <div className="fixed bottom-0 left-0 right-0 border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -48,10 +52,17 @@ export function StatusBar() {
         </div>
 
         <div className="flex items-center gap-6">
-          {/* NPI status - placeholder */}
           <div className="flex items-center gap-2">
-            <CheckCircle className="h-4 w-4 text-success" />
-            <span className="text-muted-foreground">NPI: Available</span>
+            <Gamepad2 className="h-4 w-4 text-muted-foreground" />
+            <span className="text-muted-foreground">
+              {activeProfileName
+                ? `Active profile: ${activeProfileName}${
+                    activeProfileAppliedAt
+                      ? ` (${formatRelativeTime(activeProfileAppliedAt)})`
+                      : ''
+                  }`
+                : 'No active profile'}
+            </span>
           </div>
         </div>
       </div>

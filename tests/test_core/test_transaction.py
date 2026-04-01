@@ -19,7 +19,23 @@ def _make_applier() -> MagicMock:
 def _complete_restore_summary() -> MagicMock:
     summary = MagicMock()
     summary.complete = True
+    summary.has_blocking_issues = False
     summary.skipped_components = []
+    summary.failed_components = []
+    return summary
+
+
+def _incomplete_restore_summary(*, blocking: bool) -> MagicMock:
+    summary = MagicMock()
+    summary.complete = False
+    summary.has_blocking_issues = blocking
+    summary.skipped_components = [
+        {
+            "handler": "NvidiaSettingsHandler",
+            "detail": "restore unavailable",
+            "blocking": blocking,
+        }
+    ]
     summary.failed_components = []
     return summary
 
@@ -144,8 +160,8 @@ def test_transaction_skips_baseline_restore_when_no_backup_flag(tmp_path: Path) 
     assert tx.success is True
 
 
-def test_transaction_continues_when_baseline_restore_fails(tmp_path: Path) -> None:
-    """If baseline restore fails, log warning and continue with apply."""
+def test_transaction_fails_when_baseline_restore_raises(tmp_path: Path) -> None:
+    """A crashing baseline restore must fail closed before apply."""
     applier = _make_applier()
     applier.apply_profile.return_value = ApplyResult(
         success=True,
@@ -167,12 +183,61 @@ def test_transaction_continues_when_baseline_restore_fails(tmp_path: Path) -> No
         manager = ProfileTransactionManager(tmp_path, applier=applier)
         tx = manager.execute("test-profile", create_backup=True)
 
-        assert any(
-            cp.phase == "baseline_restore" and cp.status == "warn"
-            for cp in tx.checkpoints
-        )
-        # Apply still proceeded and succeeded
+        assert any(cp.phase == "baseline_restore" and cp.status == "failed" for cp in tx.checkpoints)
+        applier.apply_profile.assert_not_called()
+        assert tx.success is False
+
+
+def test_transaction_continues_for_non_blocking_baseline_restore_gaps(tmp_path: Path) -> None:
+    """Known non-restorable handlers should warn but not block the next apply."""
+    applier = _make_applier()
+    applier.apply_profile.return_value = ApplyResult(
+        success=True,
+        applied_settings=["WindowsSettingsHandler"],
+    )
+    applier.verify_profile.return_value = {"all_active": True, "handlers": {}}
+
+    with patch("abso.core.transaction.BackupManager") as mock_backup_cls:
+        restore_manager = MagicMock()
+        baseline_path = MagicMock()
+        baseline_path.exists.return_value = True
+        baseline_path.name = "old-backup"
+        restore_manager.get_baseline_backup.return_value = baseline_path
+        restore_manager.restore_backup.return_value = _incomplete_restore_summary(blocking=False)
+        backup_manager = MagicMock()
+        backup_manager.create_backup.return_value = "new-backup"
+        mock_backup_cls.side_effect = [restore_manager, backup_manager]
+
+        manager = ProfileTransactionManager(tmp_path, applier=applier)
+        tx = manager.execute("test-profile", create_backup=True)
+
+        assert any(cp.phase == "baseline_restore" and cp.status == "warn" for cp in tx.checkpoints)
+        applier.apply_profile.assert_called_once_with("test-profile")
         assert tx.success is True
+
+
+def test_transaction_fails_for_blocking_baseline_restore_gaps(tmp_path: Path) -> None:
+    """Restorable handler restore gaps must block the next apply."""
+    applier = _make_applier()
+    applier.verify_profile.return_value = {"all_active": True, "handlers": {}}
+
+    with patch("abso.core.transaction.BackupManager") as mock_backup_cls:
+        restore_manager = MagicMock()
+        baseline_path = MagicMock()
+        baseline_path.exists.return_value = True
+        baseline_path.name = "old-backup"
+        restore_manager.get_baseline_backup.return_value = baseline_path
+        restore_manager.restore_backup.return_value = _incomplete_restore_summary(blocking=True)
+        backup_manager = MagicMock()
+        mock_backup_cls.side_effect = [restore_manager, backup_manager]
+
+        manager = ProfileTransactionManager(tmp_path, applier=applier)
+        tx = manager.execute("test-profile", create_backup=True)
+
+        assert any(cp.phase == "baseline_restore" and cp.status == "failed" for cp in tx.checkpoints)
+        applier.apply_profile.assert_not_called()
+        backup_manager.create_backup.assert_not_called()
+        assert tx.success is False
 
 
 def test_transaction_handles_apply_exception_and_fails_cleanly(tmp_path: Path) -> None:

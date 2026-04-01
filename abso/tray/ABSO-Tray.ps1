@@ -432,12 +432,34 @@ function Get-ApplyWarningMessages {
     return @($messages)
 }
 
+function Get-ApplyNoticeMessages {
+    param($Json)
+
+    $messages = [System.Collections.Generic.List[string]]::new()
+
+    if ($Json.data -and $Json.data.notices) {
+        foreach ($notice in @($Json.data.notices)) {
+            Add-UniqueTrayMessage -Target $messages -Message "$notice"
+        }
+    }
+
+    return @($messages)
+}
+
 function Get-WarningSummaryText {
     param([string[]]$Warnings)
 
     if (-not $Warnings -or $Warnings.Count -eq 0) { return $null }
     if ($Warnings.Count -eq 1) { return "Warning: $($Warnings[0])" }
     return "Warnings: $($Warnings[0]) (+$($Warnings.Count - 1) more)"
+}
+
+function Get-NoticeSummaryText {
+    param([string[]]$Notices)
+
+    if (-not $Notices -or $Notices.Count -eq 0) { return $null }
+    if ($Notices.Count -eq 1) { return "Note: $($Notices[0])" }
+    return "Notes: $($Notices[0]) (+$($Notices.Count - 1) more)"
 }
 
 function Get-ApplyFailureMessage {
@@ -1955,10 +1977,13 @@ function Apply-Profile {
 
         if ($applySucceeded) {
             $applyWarnings = Get-ApplyWarningMessages -Json $json
+            $applyNotices = Get-ApplyNoticeMessages -Json $json
             $warningSummary = Get-WarningSummaryText -Warnings $applyWarnings
+            $noticeSummary = Get-NoticeSummaryText -Notices $applyNotices
             $msg = "$($profile.Name) ($($profile.Sub))"
             if ($json.data.requires_reboot) { $msg += " - Restart required" }
             if ($warningSummary) { $msg += " | $warningSummary" }
+            if ($noticeSummary) { $msg += " | $noticeSummary" }
 
             if ($applyWarnings.Count -gt 0) {
                 Write-TrayLog "Profile committed with warnings: $ProfileId" -Level "WARN"
@@ -1966,6 +1991,13 @@ function Apply-Profile {
                     Write-TrayLog "Apply warning [$ProfileId]: $warning" -Level "WARN"
                 }
                 Update-ProgressOverlay -StepText "Profile committed with warnings"
+            }
+            elseif ($applyNotices.Count -gt 0) {
+                Write-TrayLog "Profile applied with notices: $ProfileId"
+                foreach ($notice in $applyNotices) {
+                    Write-TrayLog "Apply notice [$ProfileId]: $notice"
+                }
+                Update-ProgressOverlay -StepText "Profile applied with notices"
             }
             else {
                 Write-TrayLog "Profile applied successfully: $ProfileId"
@@ -1998,6 +2030,11 @@ function Apply-Profile {
                 Play-ApplySuccessIconAnimation
                 Show-ThemedToast -Title "A.B.S.O." -Message $msg -Type "Warning" -Duration 6000
             }
+            elseif ($applyNotices.Count -gt 0) {
+                Play-SuccessSound
+                Play-ApplySuccessIconAnimation
+                Show-ThemedToast -Title "A.B.S.O." -Message $msg -Type "Success" -Duration 6000
+            }
             else {
                 Play-SuccessSound
                 Play-ApplySuccessIconAnimation
@@ -2007,6 +2044,9 @@ function Apply-Profile {
             $script:activeProfile = $ProfileId
             $script:LastAction = if ($applyWarnings.Count -gt 0) {
                 "Applied w/ warnings: $($profile.Name)"
+            }
+            elseif ($applyNotices.Count -gt 0) {
+                "Applied w/ notes: $($profile.Name)"
             }
             else {
                 "Applied: $($profile.Name)"

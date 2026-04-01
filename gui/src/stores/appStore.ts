@@ -36,6 +36,7 @@ interface AppState {
   auditResults: Issue[];
   auditLoading: boolean;
   auditError: string | null;
+  auditHasRun: boolean;
   runAudit: () => Promise<void>;
 
   // Profiles
@@ -117,15 +118,17 @@ export const useAppStore = create<AppState>()(
       auditResults: [],
       auditLoading: false,
       auditError: null,
+      auditHasRun: false,
       runAudit: async () => {
         set({ auditLoading: true, auditError: null });
         try {
           const results = await api.runAudit();
-          set({ auditResults: results, auditLoading: false });
+          set({ auditResults: results, auditLoading: false, auditHasRun: true });
         } catch (error) {
           set({
             auditError: error instanceof Error ? error.message : 'Audit failed',
             auditLoading: false,
+            auditHasRun: false,
           });
         }
       },

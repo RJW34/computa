@@ -83,3 +83,119 @@ def test_get_app_settings_prefers_explicit_profile_name():
     fake_drs.find_profile_by_name.assert_called_once_with("Overwatch 2")
     fake_drs.get_base_profile.assert_not_called()
     assert result["_profile"] == "Overwatch 2"
+
+
+def test_apply_settings_to_app_reuses_bound_legacy_alias_when_requested_profile_is_unbound():
+    """Prefer an already-bound legacy profile over a zero-app requested variant profile."""
+    manager = DRSProfileManager()
+
+    requested_profile = object()
+    legacy_profile = object()
+    fake_drs = MagicMock()
+    fake_drs.enumerate_profiles.return_value = [
+        {"name": "Rivals 2: Online G-SYNC", "num_apps": 0},
+        {"name": "Rivals 2 Online", "num_apps": 1},
+    ]
+    fake_drs.find_profile_by_name.side_effect = lambda name: {
+        "Rivals 2: Online G-SYNC": requested_profile,
+        "Rivals 2 Online": legacy_profile,
+    }.get(name)
+    fake_drs.add_application_to_profile.side_effect = (
+        lambda profile, exe: setattr(fake_drs, "_app_binding_failures", [exe])
+    )
+
+    class _Ctx:
+        def __enter__(self):
+            return fake_drs
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+    manager._drs = _Ctx()
+    manager._apply_single_setting = MagicMock()
+
+    result = manager.apply_settings_to_app(
+        "Rivals2-Win64-Shipping.exe",
+        {"vsync": "on"},
+        profile_name="Rivals 2: Online G-SYNC",
+        profile_aliases=["Rivals 2 Online"],
+    )
+
+    assert result["requested_profile_name"] == "Rivals 2: Online G-SYNC"
+    assert result["profile_name"] == "Rivals 2 Online"
+    assert result["app_bound"] is True
+    assert "Reusing existing bound NVIDIA profile" in result["profile_selection_note"]
+    fake_drs.find_profile_by_name.assert_called_with("Rivals 2 Online")
+
+
+def test_apply_settings_to_app_confirms_existing_binding_when_owner_matches_selected_profile():
+    """Existing binding should count as exact when ownership resolves to the selected profile."""
+    manager = DRSProfileManager()
+
+    selected_profile = object()
+    fake_drs = MagicMock()
+    fake_drs.enumerate_profiles.return_value = [{"name": "Overwatch 2", "num_apps": 1}]
+    fake_drs.find_profile_by_name.return_value = selected_profile
+    fake_drs.add_application_to_profile.side_effect = (
+        lambda profile, exe: setattr(fake_drs, "_app_binding_statuses", {exe: "already_in_use"})
+    )
+    fake_drs.find_application_owner.return_value = {"profile_name": "Overwatch 2"}
+    fake_drs.get_application_info.return_value = {"app_name": "Overwatch.exe"}
+
+    class _Ctx:
+        def __enter__(self):
+            return fake_drs
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+    manager._drs = _Ctx()
+    manager._apply_single_setting = MagicMock()
+
+    result = manager.apply_settings_to_app(
+        "Overwatch.exe",
+        {"vsync": "on"},
+        profile_name="Overwatch 2",
+    )
+
+    assert result["app_bound"] is True
+    assert result["app_binding_exact"] is True
+    assert result["app_binding_state"] == "existing_binding_confirmed"
+    assert result["app_binding_owner_profile"] == "Overwatch 2"
+
+
+def test_apply_settings_to_app_fails_when_executable_is_bound_to_different_profile():
+    """ABSO should fail closed when NVAPI proves the executable belongs elsewhere."""
+    manager = DRSProfileManager()
+
+    selected_profile = object()
+    fake_drs = MagicMock()
+    fake_drs.enumerate_profiles.return_value = [{"name": "Overwatch 2", "num_apps": 0}]
+    fake_drs.find_profile_by_name.return_value = selected_profile
+    fake_drs.add_application_to_profile.side_effect = (
+        lambda profile, exe: setattr(fake_drs, "_app_binding_statuses", {exe: "already_in_use"})
+    )
+    fake_drs.find_application_owner.return_value = {"profile_name": "Legacy Wrong Profile"}
+    fake_drs.get_application_info.return_value = None
+
+    class _Ctx:
+        def __enter__(self):
+            return fake_drs
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+    manager._drs = _Ctx()
+    manager._apply_single_setting = MagicMock()
+
+    result = manager.apply_settings_to_app(
+        "Overwatch.exe",
+        {"vsync": "on"},
+        profile_name="Overwatch 2",
+    )
+
+    assert result["app_bound"] is False
+    assert result["app_binding_exact"] is False
+    assert result["app_binding_state"] == "bound_elsewhere"
+    assert result["app_binding_owner_profile"] == "Legacy Wrong Profile"
+    assert result["settings_applied"] == {}

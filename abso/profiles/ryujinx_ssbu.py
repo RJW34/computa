@@ -42,6 +42,16 @@ class RyujinxSSBUProfile(EmulatorLatencyBaseProfile):
     def executable_hints(self) -> list[str]:
         return ["Ryujinx.exe", "Ryujinx.Ava.exe", "Ryujinx.Headless.SDL2.exe", "Ryubing.exe"]
 
+    @property
+    def nvidia_profile_name(self) -> str | None:
+        return "SSBU / HewDraw Remix (Ryujinx)"
+
+    @property
+    def nvidia_profile_aliases(self) -> list[str]:
+        return [
+            "SSBU / HewDraw Remix (Streaming)",
+        ]
+
     def _settings_overrides(self) -> dict[str, dict[str, Any]]:
         return {
             "NvidiaSettingsHandler": {

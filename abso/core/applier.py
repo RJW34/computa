@@ -46,6 +46,7 @@ class ApplyResult:
     applied_settings: list[str] = field(default_factory=list)
     failed_settings: list[str] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
+    notices: list[str] = field(default_factory=list)
 
     # Validation subsystem results
     lint_result: LintResult | None = None
@@ -216,6 +217,7 @@ class ProfileApplier:
             if multimon_result.warnings:
                 for warning in multimon_result.warnings:
                     logger.warning(f"MultiMon: {warning.message}")
+                    self._append_unique(result.warnings, warning.message)
 
         # === PHASE 3: RollbackGuard ===
         if not self.skip_rollback_guard:
@@ -259,6 +261,23 @@ class ProfileApplier:
         # === PHASE 6: Apply Handlers ===
         config_manager = ConfigManager()
         profile_overrides = config_manager.get_profile_overrides(profile_name)
+        final_settings_map = self._finalize_handler_settings(
+            profile,
+            profile_name,
+            settings_map,
+            profile_overrides,
+        )
+
+        contract_violations = self._validate_profile_contract(
+            profile_name,
+            profile,
+            final_settings_map,
+        )
+        if contract_violations and not self.force_aggressive:
+            result.success = False
+            result.error = "Profile contract violations: " + "; ".join(contract_violations)
+            result.failed_settings = [f"ProfileContract: {issue}" for issue in contract_violations]
+            return result
 
         applied: list[str] = []
         failed: list[str] = []
@@ -276,23 +295,7 @@ class ProfileApplier:
                 continue
 
             try:
-                # Get processed settings from our settings_map
-                if handler_name in settings_map:
-                    settings = settings_map[handler_name]
-                else:
-                    # Not in our map (e.g. empty dict was skipped), get from profile directly
-                    settings = profile.get_settings(handler_name) or {}
-
-                # Merge with user overrides from config
-                if profile_overrides:
-                    settings = self._merge_overrides(
-                        settings, handler_name, profile_overrides
-                    )
-
-                # Inject game info for per-game Nvidia profiles
-                if handler_name == "NvidiaSettingsHandler":
-                    settings["executables"] = profile.executable_hints
-                    settings["game_name"] = profile.display_name
+                settings = final_settings_map.get(handler_name, {}).copy()
 
                 handler_result = handler.apply(settings)
 
@@ -305,6 +308,11 @@ class ProfileApplier:
                     failed.append(
                         f"{handler_name}: {handler_result.get('error', 'Unknown error')}"
                     )
+
+                for warning in handler_result.get("warnings", []) or []:
+                    self._append_unique(result.warnings, str(warning))
+                for notice in handler_result.get("notices", []) or []:
+                    self._append_unique(result.notices, str(notice))
 
             except PermissionError as e:
                 logger.error(f"Permission denied applying {handler_name}: {e}")
@@ -338,7 +346,8 @@ class ProfileApplier:
         # === Post-apply: Game-running detection ===
         game_warnings = self._check_game_running(profile.executable_hints)
         if game_warnings:
-            result.warnings.extend(game_warnings)
+            for warning in game_warnings:
+                self._append_unique(result.warnings, warning)
 
         # Log summary
         logger.info(
@@ -384,6 +393,65 @@ class ProfileApplier:
                 settings_map[handler_name] = settings.copy()
 
         return settings_map
+
+    def _finalize_handler_settings(
+        self,
+        profile: BaseProfile,
+        profile_name: str,
+        settings_map: dict[str, dict[str, Any]],
+        profile_overrides: Any | None,
+    ) -> dict[str, dict[str, Any]]:
+        """Build the final per-handler settings map before apply/verify."""
+        final_settings: dict[str, dict[str, Any]] = {}
+
+        for handler in profile.get_handlers():
+            handler_name = handler.__class__.__name__
+            if handler_name in settings_map:
+                settings = settings_map[handler_name].copy()
+            else:
+                settings = (profile.get_settings(handler_name) or {}).copy()
+
+            if profile_overrides:
+                settings = self._merge_overrides(settings, handler_name, profile_overrides)
+
+            if handler_name == "NvidiaSettingsHandler":
+                settings["executables"] = list(profile.executable_hints)
+                settings["game_name"] = profile.display_name
+                if profile.nvidia_profile_name:
+                    settings.setdefault("profile_name", profile.nvidia_profile_name)
+                if profile.nvidia_profile_aliases:
+                    settings.setdefault("profile_aliases", list(profile.nvidia_profile_aliases))
+
+            final_settings[handler_name] = settings
+
+        return final_settings
+
+    def _validate_profile_contract(
+        self,
+        profile_name: str,
+        profile: BaseProfile,
+        final_settings: dict[str, dict[str, Any]],
+    ) -> list[str]:
+        """Validate final settings against profile-specific invariants."""
+        try:
+            violations = profile.validate_settings(final_settings)
+        except Exception as e:
+            logger.error("Profile contract validation crashed for %s: %s", profile_name, e)
+            return [f"Profile contract validation crashed: {e}"]
+
+        return [str(item).strip() for item in violations if str(item).strip()]
+
+    @staticmethod
+    def _append_unique(messages: list[str], candidate: str | None) -> None:
+        """Append a message if it is non-empty and not already present."""
+        if not candidate:
+            return
+
+        normalized = str(candidate).strip()
+        if not normalized or normalized in messages:
+            return
+
+        messages.append(normalized)
 
     def _check_game_running(self, executable_hints: list[str]) -> list[str]:
         """Check if any of the profile's game executables are currently running.
@@ -498,6 +566,15 @@ class ProfileApplier:
             Dict with 'all_active' bool and per-handler verification results.
         """
         profile = self._get_profile(profile_name)
+        settings_map = self._collect_settings(profile)
+        config_manager = ConfigManager()
+        profile_overrides = config_manager.get_profile_overrides(profile_name)
+        final_settings_map = self._finalize_handler_settings(
+            profile,
+            profile_name,
+            settings_map,
+            profile_overrides,
+        )
 
         results: dict[str, Any] = {
             "profile": profile_name,
@@ -513,7 +590,7 @@ class ProfileApplier:
             if not hasattr(handler, "verify_active"):
                 continue
 
-            settings = profile.get_settings(handler_name)
+            settings = final_settings_map.get(handler_name, {})
             if not settings:
                 continue
 

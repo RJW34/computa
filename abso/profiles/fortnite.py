@@ -34,6 +34,16 @@ class FortniteProfile(ReflexShooterBaseProfile):
             "FortniteClient-Win64-Shipping_EAC_EOS.exe",
         ]
 
+    @property
+    def nvidia_profile_name(self) -> str | None:
+        return "Fortnite"
+
+    @property
+    def nvidia_profile_aliases(self) -> list[str]:
+        return [
+            "Fortnite (Streaming)",
+        ]
+
     # === Validation Metadata Overrides ===
 
     @property

@@ -219,7 +219,7 @@ def launch_profile(
     )
 
     if not tx.success or tx.apply_result is None or not tx.apply_result.success:
-        result.error = tx.error or "Profile apply failed before launch"
+        result.error = tx.error or "Profile apply failed before launch without a detailed error"
         return result
 
     try:

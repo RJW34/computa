@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { listen } from '@tauri-apps/api/event';
 import { useAppStore } from '@/stores/appStore';
 import { StatusBar } from '@/components/StatusBar';
+import * as api from '@/lib/api';
 import {
   Home,
   ProfileWizard,
@@ -12,20 +13,39 @@ import {
   TimerResolution,
 } from '@/pages';
 
+interface ProfileAppliedEvent {
+  profile_id: string;
+  warnings: string[];
+  notices: string[];
+}
+
 function App() {
   const { currentPage, _hasHydrated, setActiveProfile } = useAppStore();
 
-  // Listen for profile changes from system tray
   useEffect(() => {
-    const unlisten = listen<string>('profile-applied', (event) => {
-      // Update the active profile in the store when applied from tray
-      setActiveProfile(event.payload);
+    if (!_hasHydrated) {
+      return;
+    }
+
+    const syncBackendState = async () => {
+      try {
+        const state = await api.getCurrentState();
+        setActiveProfile(state.current_profile, state.applied_at ?? undefined);
+      } catch (error) {
+        console.warn('Failed to sync backend active-profile state:', error);
+      }
+    };
+
+    void syncBackendState();
+
+    const unlisten = listen<ProfileAppliedEvent>('profile-applied', () => {
+      void syncBackendState();
     });
 
     return () => {
       unlisten.then((fn) => fn());
     };
-  }, [setActiveProfile]);
+  }, [_hasHydrated, setActiveProfile]);
 
   // Wait for hydration to prevent flash of default state
   if (!_hasHydrated) {

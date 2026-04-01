@@ -209,7 +209,7 @@ class SetupWizard:
             time.sleep(0.2)
 
         if not issues:
-            console.print("  [green]No issues found! System is well configured.[/green]")
+            console.print("  [green]No issues were detected by the current audit scope.[/green]")
             console.print()
             return
 

@@ -65,6 +65,28 @@ def merge_settings_map(
     return merged
 
 
+def inject_nvidia_profile_identity(
+    profile: BaseProfile,
+    handler_name: str,
+    settings: dict[str, Any],
+) -> dict[str, Any]:
+    """Attach stable NVIDIA profile metadata when a profile declares it."""
+    if handler_name != "NvidiaSettingsHandler" or not settings:
+        return settings
+
+    profile_name = profile.nvidia_profile_name
+    profile_aliases = profile.nvidia_profile_aliases
+    if not profile_name and not profile_aliases:
+        return settings
+
+    merged = settings.copy()
+    if profile_name:
+        merged.setdefault("profile_name", profile_name)
+    if profile_aliases:
+        merged.setdefault("profile_aliases", list(profile_aliases))
+    return merged
+
+
 def with_obs_executables(executables: list[str]) -> list[str]:
     merged = list(executables)
     for exe in OBS_EXECUTABLES:
@@ -154,6 +176,42 @@ class Rivals2BaseProfile(BaseProfile):
     @property
     def include_rivals2_config(self) -> bool:
         return False
+
+    @property
+    def nvidia_profile_name(self) -> str:
+        """Stable NVIDIA DRS profile identity for Rivals 2 variants.
+
+        Rivals 2 does not have a reliable predefined NVIDIA profile like
+        Overwatch 2. We intentionally collapse multiple ABSO variants onto a
+        stable custom profile family so switching between Rivals profiles
+        updates one bound driver profile instead of creating unbound leftovers.
+        """
+        return "Rivals 2 Online" if self.is_online_profile else "Rivals 2"
+
+    @property
+    def nvidia_profile_aliases(self) -> list[str]:
+        """Legacy/custom NVIDIA profile names worth reusing when already bound."""
+        if self.is_online_profile:
+            candidates = [
+                "Rivals 2: Online / Matchmaking",
+                "Rivals 2: Online G-SYNC",
+                "Rivals 2 (Streaming)",
+            ]
+        else:
+            candidates = [
+                "Rivals2-Win64-Shipping.exe",
+                "Rivals of Aether 2",
+                "Rivals 2: Offline / Training",
+                "Rivals 2: G-SYNC",
+                "Rivals 2: 300Hz Maximum",
+                "Rivals 2: Tournament Sim (144Hz)",
+            ]
+
+        deduped: list[str] = []
+        for name in candidates:
+            if name != self.nvidia_profile_name and name not in deduped:
+                deduped.append(name)
+        return deduped
 
     def get_handlers(self) -> list[SettingsHandler]:
         from abso.settings.cnm import CNMSettingsHandler
@@ -286,7 +344,7 @@ class Rivals2BaseProfile(BaseProfile):
 
     def get_settings(self, handler_name: str) -> dict[str, Any]:
         settings_map = merge_settings_map(self._base_settings(), self._settings_overrides())
-        return settings_map.get(handler_name, {})
+        return inject_nvidia_profile_identity(self, handler_name, settings_map.get(handler_name, {}))
 
 
 class EmulatorLatencyBaseProfile(BaseProfile):
@@ -431,7 +489,7 @@ class EmulatorLatencyBaseProfile(BaseProfile):
 
     def get_settings(self, handler_name: str) -> dict[str, Any]:
         settings_map = merge_settings_map(self._base_settings(), self._settings_overrides())
-        return settings_map.get(handler_name, {})
+        return inject_nvidia_profile_identity(self, handler_name, settings_map.get(handler_name, {}))
 
 
 class WebGLBaseProfile(BaseProfile):
@@ -536,7 +594,7 @@ class WebGLBaseProfile(BaseProfile):
 
     def get_settings(self, handler_name: str) -> dict[str, Any]:
         settings_map = merge_settings_map(self._base_settings(), self._settings_overrides())
-        return settings_map.get(handler_name, {})
+        return inject_nvidia_profile_identity(self, handler_name, settings_map.get(handler_name, {}))
 
 
 class ReflexShooterBaseProfile(BaseProfile):
@@ -676,4 +734,4 @@ class ReflexShooterBaseProfile(BaseProfile):
 
     def get_settings(self, handler_name: str) -> dict[str, Any]:
         settings_map = merge_settings_map(self._base_settings(), self._settings_overrides())
-        return settings_map.get(handler_name, {})
+        return inject_nvidia_profile_identity(self, handler_name, settings_map.get(handler_name, {}))

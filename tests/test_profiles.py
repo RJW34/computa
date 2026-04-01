@@ -17,6 +17,7 @@ from abso.profiles.overwatch2 import (
 )
 from abso.profiles.pokemon_auto_chess import PokemonAutoChessProfile
 from abso.profiles.rivals2 import Rivals2Profile
+from abso.profiles.rivals2_gsync import Rivals2GSyncProfile, Rivals2OnlineGSyncProfile
 from abso.profiles.rivals2_online import Rivals2OnlineProfile
 from abso.profiles.slippi_melee import (
     SlippiMeleeConsoleParityProfile,
@@ -378,6 +379,40 @@ class TestProfileSettings:
 
         assert settings["disable_nagle"] is False
         assert settings["preset"] == "default"
+
+    def test_rivals2_nvidia_settings_use_stable_profile_identity(self):
+        """Offline/general Rivals profiles should target a shared stable NVIDIA profile."""
+        profile = Rivals2Profile()
+        settings = profile.get_settings("NvidiaSettingsHandler")
+
+        assert settings["profile_name"] == "Rivals 2"
+        assert "Rivals2-Win64-Shipping.exe" in settings["profile_aliases"]
+
+    def test_rivals2_online_nvidia_settings_use_stable_profile_identity(self):
+        """Online Rivals profiles should target a separate stable NVIDIA profile family."""
+        profile = Rivals2OnlineProfile()
+        settings = profile.get_settings("NvidiaSettingsHandler")
+
+        assert settings["profile_name"] == "Rivals 2 Online"
+        assert "Rivals 2: Online G-SYNC" in settings["profile_aliases"]
+
+    def test_rivals2_gsync_nvidia_settings_use_stable_profile_identity(self):
+        """Rivals 2 G-SYNC should not create a variant-named NVIDIA profile."""
+        profile = Rivals2GSyncProfile()
+        settings = profile.get_settings("NvidiaSettingsHandler")
+
+        assert settings["profile_name"] == "Rivals 2"
+        assert settings["preset"] == "vrr_fighting_game"
+        assert "Rivals2-Win64-Shipping.exe" in settings["profile_aliases"]
+
+    def test_rivals2_online_gsync_nvidia_settings_use_stable_profile_identity(self):
+        """Rivals 2 online G-SYNC should reuse the online Rivals NVIDIA profile family."""
+        profile = Rivals2OnlineGSyncProfile()
+        settings = profile.get_settings("NvidiaSettingsHandler")
+
+        assert settings["profile_name"] == "Rivals 2 Online"
+        assert settings["preset"] == "vrr_fighting_game"
+        assert "Rivals 2: Online / Matchmaking" in settings["profile_aliases"]
 
     def test_unknown_handler_returns_empty(self):
         """Test that unknown handler name returns empty dict."""

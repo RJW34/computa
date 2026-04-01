@@ -1,7 +1,7 @@
 // Prevents additional console window on Windows in release
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
 use std::process::Command;
@@ -43,8 +43,29 @@ struct ApplyCliData {
     #[serde(default)]
     failed_settings: Vec<String>,
     #[allow(dead_code)]
+    #[serde(default)]
     warnings: Vec<String>,
+    #[serde(default)]
+    notices: Vec<String>,
     error: Option<String>,
+}
+
+#[derive(Clone, Debug, Serialize)]
+struct ApplyTrayEvent {
+    profile_id: String,
+    warnings: Vec<String>,
+    notices: Vec<String>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+struct StateCliData {
+    current_profile: Option<String>,
+    #[allow(dead_code)]
+    applied_at: Option<String>,
+    #[allow(dead_code)]
+    reboot_pending: bool,
+    #[allow(dead_code)]
+    reboot_reasons: Vec<String>,
 }
 
 #[derive(Deserialize)]
@@ -242,7 +263,10 @@ fn set_active_profile(state: tauri::State<AppState>, profile_id: Option<String>)
 }
 
 /// Apply a profile via CLI (used by tray menu)
-fn apply_profile_sync(app_handle: &tauri::AppHandle, profile_id: &str) -> Result<(), String> {
+fn apply_profile_sync(
+    app_handle: &tauri::AppHandle,
+    profile_id: &str,
+) -> Result<ApplyTrayEvent, String> {
     let output = if should_use_python() {
         Command::new("python")
             .args(["-m", "abso", "apply", profile_id, "--json"])
@@ -263,7 +287,11 @@ fn apply_profile_sync(app_handle: &tauri::AppHandle, profile_id: &str) -> Result
             .map_err(|e| format!("Failed to parse apply response: {}. stdout: {}", e, stdout))?;
 
         if parsed.success && parsed.data.success && parsed.data.failed_settings.is_empty() {
-            Ok(())
+            Ok(ApplyTrayEvent {
+                profile_id: profile_id.to_string(),
+                warnings: parsed.data.warnings,
+                notices: parsed.data.notices,
+            })
         } else {
             let mut parts: Vec<String> = Vec::new();
             if let Some(error) = parsed.error.or(parsed.data.error) {
@@ -279,13 +307,49 @@ fn apply_profile_sync(app_handle: &tauri::AppHandle, profile_id: &str) -> Result
             }
 
             Err(if parts.is_empty() {
-                "Profile apply failed".to_string()
+                "Profile apply failed without an error message from backend".to_string()
             } else {
                 parts.join(" | ")
             })
         }
     } else {
         Err(String::from_utf8_lossy(&output.stderr).to_string())
+    }
+}
+
+fn load_backend_active_profile(app_handle: &tauri::AppHandle) -> Option<String> {
+    let output = if should_use_python() {
+        Command::new("python")
+            .args(["-m", "abso", "state", "--json"])
+            .current_dir(get_project_root())
+            .output()
+    } else {
+        let sidecar_path = get_sidecar_path(Some(app_handle));
+        Command::new(&sidecar_path).args(["state", "--json"]).output()
+    };
+
+    let output = match output {
+        Ok(o) => o,
+        Err(e) => {
+            eprintln!("Failed to load backend active profile: {}", e);
+            return None;
+        }
+    };
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        eprintln!("state --json failed for tray startup: {}", stderr);
+        return None;
+    }
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    match serde_json::from_str::<CliResponse<StateCliData>>(&stdout) {
+        Ok(payload) if payload.success => payload.data.current_profile,
+        Ok(_) => None,
+        Err(e) => {
+            eprintln!("Failed to parse backend active profile state: {}", e);
+            None
+        }
     }
 }
 
@@ -482,8 +546,14 @@ fn main() {
                 *guard = tray_profiles.clone();
             }
 
+            let initial_active_profile = load_backend_active_profile(app.handle());
+            if let Ok(mut guard) = app.state::<AppState>().active_profile.lock() {
+                *guard = initial_active_profile.clone();
+            }
+
             // Create initial tray menu
-            let menu = create_tray_menu(app.handle(), &tray_profiles, None)?;
+            let menu =
+                create_tray_menu(app.handle(), &tray_profiles, initial_active_profile.as_deref())?;
 
             // Build tray icon
             let _tray = TrayIconBuilder::with_id("main-tray")
@@ -519,18 +589,18 @@ fn main() {
                             .await;
 
                             match result {
-                                Ok(Ok(())) => {
+                                Ok(Ok(apply_event)) => {
                                     // Update state with proper error handling
                                     let state: tauri::State<AppState> = app_clone.state();
                                     if let Ok(mut guard) = state.active_profile.lock() {
-                                        *guard = Some(profile_id_owned.clone());
+                                        *guard = Some(apply_event.profile_id.clone());
                                     }
 
                                     // Update tray menu
-                                    update_tray_menu(&app_clone, Some(&profile_id_owned));
+                                    update_tray_menu(&app_clone, Some(&apply_event.profile_id));
 
                                     // Emit event to frontend
-                                    let _ = app_clone.emit("profile-applied", &profile_id_owned);
+                                    let _ = app_clone.emit("profile-applied", &apply_event);
                                 }
                                 Ok(Err(e)) => {
                                     eprintln!("Failed to apply profile: {}", e);

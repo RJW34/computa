@@ -51,13 +51,7 @@ STATE_FILE = ROOT_DIR / ".abso_state.json"
 
 def get_current_profile() -> str | None:
     """Get the currently active profile from state file."""
-    if STATE_FILE.exists():
-        try:
-            state = json.loads(STATE_FILE.read_text())
-            return state.get("current_profile")
-        except (json.JSONDecodeError, OSError):
-            return None
-    return None
+    return _read_state_snapshot().get("current_profile")
 
 
 def set_current_profile(
@@ -132,6 +126,79 @@ def _describe_restore_summary(summary: dict[str, Any]) -> str | None:
 
     handlers = ", ".join(item.get("handler", "unknown") for item in incomplete)
     return f"Restore incomplete for: {handlers}"
+
+
+def _read_state_snapshot() -> dict[str, Any]:
+    """Read the persisted active-profile state file."""
+    default_state = {
+        "current_profile": None,
+        "applied_at": None,
+        "reboot_pending": False,
+        "reboot_reasons": [],
+    }
+    if not STATE_FILE.exists():
+        return default_state
+
+    try:
+        state = json.loads(STATE_FILE.read_text())
+    except (json.JSONDecodeError, OSError):
+        return default_state
+
+    return {
+        "current_profile": state.get("current_profile"),
+        "applied_at": state.get("applied_at"),
+        "reboot_pending": bool(state.get("reboot_pending", False)),
+        "reboot_reasons": list(state.get("reboot_reasons") or []),
+    }
+
+
+def _append_unique_message(messages: list[str], message: str | None) -> None:
+    """Append a non-empty message if it has not already been recorded."""
+    if not message:
+        return
+
+    normalized = message.strip()
+    if not normalized or normalized in messages:
+        return
+
+    messages.append(normalized)
+
+
+def _collect_apply_warnings(
+    tx: ProfileTransactionManager | Any,
+    result: Any | None,
+) -> list[str]:
+    """Collect user-facing warnings from apply result + transaction state."""
+    warnings: list[str] = []
+
+    if result:
+        for warning in result.warnings or []:
+            _append_unique_message(warnings, warning)
+
+    transaction = getattr(tx, "checkpoints", None) or []
+    for checkpoint in transaction:
+        if getattr(checkpoint, "status", "") == "warn":
+            _append_unique_message(warnings, getattr(checkpoint, "message", None))
+
+    compliance_report = getattr(tx, "compliance_report", None)
+    if compliance_report:
+        for issue in compliance_report.warnings:
+            detail = f"{issue.message}: {issue.details}" if issue.details else issue.message
+            _append_unique_message(warnings, detail)
+
+    return warnings
+
+
+def _collect_apply_notices(result: Any | None) -> list[str]:
+    """Collect non-warning informational notices from an apply result."""
+    notices: list[str] = []
+    if not result:
+        return notices
+
+    for notice in getattr(result, "notices", []) or []:
+        _append_unique_message(notices, notice)
+
+    return notices
 
 
 @click.group(invoke_without_command=True)
@@ -443,7 +510,7 @@ def audit(verbose: bool, json_output: bool) -> None:
     console.print(Panel("Configuration Audit", style="bold blue"))
 
     if not issues:
-        console.print("[green]No issues found! Your system appears optimally configured.[/green]")
+        console.print("[green]No issues were detected by the current audit scope.[/green]")
         return
 
     console.print(f"\n[yellow]Found {len(issues)} issue(s):[/yellow]\n")
@@ -481,6 +548,28 @@ def profiles(json_output: bool) -> None:
         console.print(f"\n[bold cyan]{profile['id']}[/bold cyan]")
         console.print(f"  {profile['display_name']}")
         console.print(f"  [dim]Focus: {profile['description']}[/dim]")
+
+
+@cli.command()
+@click.option("--json", "json_output", is_flag=True, help="Output as JSON for GUI integration")
+def state(json_output: bool) -> None:
+    """Show the persisted active-profile state."""
+    snapshot = _read_state_snapshot()
+
+    if json_output:
+        output_json(snapshot)
+        return
+
+    console.print(Panel("Current State", style="bold blue"))
+    current_profile = snapshot["current_profile"] or "(none)"
+    console.print(f"Current profile: {current_profile}")
+    if snapshot["applied_at"]:
+        console.print(f"Applied at: {snapshot['applied_at']}")
+    console.print(f"Reboot pending: {'yes' if snapshot['reboot_pending'] else 'no'}")
+    if snapshot["reboot_reasons"]:
+        console.print("Reboot reasons:")
+        for reason in snapshot["reboot_reasons"]:
+            console.print(f"  - {reason}")
 
 
 @cli.command()
@@ -611,6 +700,8 @@ def apply(profile_name: str, no_backup: bool, benchmark: bool, json_output: bool
         tx_manager = ProfileTransactionManager(BACKUPS_DIR)
         tx = tx_manager.execute(profile_id=profile_name, create_backup=not no_backup)
         result = tx.apply_result
+        apply_warnings = _collect_apply_warnings(tx, result)
+        apply_notices = _collect_apply_notices(result)
 
         if json_output:
             if tx.success and result and result.success:
@@ -630,7 +721,8 @@ def apply(profile_name: str, no_backup: bool, benchmark: bool, json_output: bool
                 "error": tx.error if not tx.success else None,
                 "applied_settings": applied_settings,
                 "failed_settings": failed_settings,
-                "warnings": result.warnings if result else [],
+                "warnings": apply_warnings,
+                "notices": apply_notices,
                 "capabilities": (
                     result.capability_report.to_dict()
                     if result and result.capability_report
@@ -656,7 +748,10 @@ def apply(profile_name: str, no_backup: bool, benchmark: bool, json_output: bool
                 requires_reboot=result.requires_reboot,
                 reboot_reasons=result.reboot_reasons,
             )
-            console.print(f"\n[green]Profile '{profile_name}' applied successfully![/green]")
+            if apply_warnings:
+                console.print(f"\n[yellow]Profile '{profile_name}' committed with warnings.[/yellow]")
+            else:
+                console.print(f"\n[green]Profile '{profile_name}' applied successfully![/green]")
 
             if result.requires_reboot and result.reboot_reasons:
                 console.print("[yellow]Note: The following changes require a reboot to take effect:[/yellow]")
@@ -667,9 +762,10 @@ def apply(profile_name: str, no_backup: bool, benchmark: bool, json_output: bool
                 console.print("[yellow]Note: Some changes may require a reboot to take effect.[/yellow]")
                 console.print(f"[dim]Run 'abso verify {profile_name}' to check if reboot is still needed.[/dim]")
 
-            if result.warnings:
-                for warning in result.warnings:
-                    console.print(f"[yellow]Warning: {warning}[/yellow]")
+            for warning in apply_warnings:
+                console.print(f"[yellow]Warning: {warning}[/yellow]")
+            for notice in apply_notices:
+                console.print(f"[cyan]Note: {notice}[/cyan]")
 
             if result.in_game_settings:
                 # Actually generate the report file
@@ -891,15 +987,20 @@ def reapply(json_output: bool) -> None:
                 "success": result.success,
                 "profile": current_profile,
                 "warnings": result.warnings,
+                "notices": result.notices,
                 "error": result.error if not result.success else None,
             })
             return
 
         if result.success:
-            console.print(f"\n[green]Profile '{current_profile}' re-applied successfully![/green]")
             if result.warnings:
+                console.print(f"\n[yellow]Profile '{current_profile}' re-applied with warnings.[/yellow]")
                 for warning in result.warnings:
                     console.print(f"[yellow]Warning: {warning}[/yellow]")
+            else:
+                console.print(f"\n[green]Profile '{current_profile}' re-applied successfully![/green]")
+            for notice in result.notices:
+                console.print(f"[cyan]Note: {notice}[/cyan]")
         else:
             console.print(f"\n[red]Failed to re-apply profile: {result.error}[/red]")
             sys.exit(1)

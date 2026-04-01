@@ -66,3 +66,14 @@ class SettingsHandler(ABC):
             True if restore succeeded, False otherwise.
         """
         pass
+
+    @property
+    def restore_guarantee(self) -> str:
+        """Describe how completely this handler can restore prior state.
+
+        Returns:
+            "full" when ABSO can restore the handler end to end,
+            "partial" when restore is best-effort, or
+            "none" when ABSO cannot safely promise automatic restore.
+        """
+        return "full"

@@ -147,8 +147,8 @@ def run_audit(verbose: bool = True) -> None:
 
     if not issues:
         console.print(Panel(
-            "[green]No issues found![/green]\n\n"
-            "Your system appears to be optimally configured for gaming.",
+            "[green]No issues were detected by the current audit scope.[/green]\n\n"
+            "This audit did not find any configuration gaps to call out.",
             title="[green]Audit Results[/green]",
             border_style="green"
         ))

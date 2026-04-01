@@ -50,6 +50,16 @@ class PACDeluxeProfile(WebGLBaseProfile):
         # WebView2 spawns msedgewebview2.exe processes for rendering
         return ["pac-deluxe.exe", "msedgewebview2.exe"]
 
+    @property
+    def nvidia_profile_name(self) -> str | None:
+        return "PACDeluxe (Pokemon Auto Chess)"
+
+    @property
+    def nvidia_profile_aliases(self) -> list[str]:
+        return [
+            "PACDeluxe (Streaming)",
+        ]
+
     def _settings_overrides(self) -> dict[str, dict[str, Any]]:
         return {
             "PowerSettingsHandler": {

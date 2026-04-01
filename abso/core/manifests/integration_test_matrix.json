@@ -128,6 +128,13 @@
       "expected": { "transaction_state": "committed", "apply_success": true }
     },
     {
+      "id": "apply-overwatch2-gsync-hdr-streaming",
+      "profile_id": "overwatch2-gsync-hdr-streaming",
+      "kind": "apply_profile",
+      "assumptions": ["administrator", "nvidia_gpu", "vrr_confirmed", "hdr_capable", "obs_installed"],
+      "expected": { "transaction_state": "committed", "apply_success": true }
+    },
+    {
       "id": "apply-pokemon-auto-chess",
       "profile_id": "pokemon-auto-chess",
       "kind": "apply_profile",

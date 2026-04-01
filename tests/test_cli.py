@@ -176,12 +176,17 @@ class TestCLIApply:
         tx_result.backup_id = None
         tx_result.error = None
         tx_result.rollback_performed = False
+        tx_result.checkpoints = [
+            MagicMock(status="warn", message="Baseline restore incomplete: NvidiaSettingsHandler")
+        ]
         tx_result.apply_result = ApplyResult(
             success=True,
             requires_reboot=False,
             in_game_settings=False,
             applied_settings=["WindowsSettingsHandler"],
             failed_settings=[],
+            warnings=["Game executable is running during apply"],
+            notices=["Reusing existing bound NVIDIA profile 'Slippi'."],
         )
         tx_result.compliance_report = MagicMock()
         tx_result.compliance_report.to_dict.return_value = {
@@ -190,6 +195,9 @@ class TestCLIApply:
             "has_critical": False,
             "issues": [],
         }
+        tx_result.compliance_report.warnings = [
+            MagicMock(message="Verification mismatch in NvidiaSettingsHandler", details=None)
+        ]
         tx_result.to_dict.return_value = {
             "success": True,
             "profile_id": "slippi-melee",
@@ -199,7 +207,14 @@ class TestCLIApply:
             "rollback_performed": False,
             "rollback_error": None,
             "compliance": tx_result.compliance_report.to_dict.return_value,
-            "checkpoints": [],
+            "checkpoints": [
+                {
+                    "phase": "baseline_restore",
+                    "status": "warn",
+                    "message": "Baseline restore incomplete: NvidiaSettingsHandler",
+                    "at": "2026-04-01T00:00:00",
+                }
+            ],
         }
 
         mock_manager = mock_tx_manager_cls.return_value
@@ -214,6 +229,12 @@ class TestCLIApply:
         assert payload["data"]["success"] is True
         assert payload["data"]["profile"] == "slippi-melee"
         assert payload["data"]["transaction"]["profile_id"] == "slippi-melee"
+        assert payload["data"]["warnings"] == [
+            "Game executable is running during apply",
+            "Baseline restore incomplete: NvidiaSettingsHandler",
+            "Verification mismatch in NvidiaSettingsHandler",
+        ]
+        assert payload["data"]["notices"] == ["Reusing existing bound NVIDIA profile 'Slippi'."]
         mock_manager.execute.assert_called_once_with(
             profile_id="slippi-melee",
             create_backup=False,
@@ -228,15 +249,18 @@ class TestCLIApply:
         tx_result.backup_id = None
         tx_result.error = None
         tx_result.rollback_performed = False
+        tx_result.checkpoints = []
         tx_result.apply_result = ApplyResult(
             success=True,
             requires_reboot=False,
             in_game_settings=False,
             applied_settings=["WindowsSettingsHandler"],
             failed_settings=[],
+            notices=["Profile already active; backend state refreshed."],
         )
         tx_result.compliance_report = MagicMock()
         tx_result.compliance_report.to_dict.return_value = {}
+        tx_result.compliance_report.warnings = []
         tx_result.to_dict.return_value = {"success": True}
 
         mock_manager = mock_tx_manager_cls.return_value
@@ -251,6 +275,35 @@ class TestCLIApply:
         assert state_file.exists()
         saved = json.loads(state_file.read_text(encoding="utf-8"))
         assert saved["current_profile"] == "slippi-melee"
+
+    def test_state_json_returns_persisted_backend_state(self, tmp_path):
+        """state --json should surface the persisted active-profile state file."""
+        state_file = tmp_path / ".abso_state.json"
+        state_file.write_text(
+            json.dumps(
+                {
+                    "current_profile": "overwatch2-gsync",
+                    "applied_at": "2026-04-01T03:19:46.610978",
+                    "reboot_pending": True,
+                    "reboot_reasons": ["HAGS toggle"],
+                }
+            ),
+            encoding="utf-8",
+        )
+
+        runner = CliRunner()
+        with patch("abso.main.STATE_FILE", state_file):
+            result = runner.invoke(cli, ["state", "--json"])
+
+        assert result.exit_code == 0
+        payload = json.loads(result.output)
+        assert payload["success"] is True
+        assert payload["data"] == {
+            "current_profile": "overwatch2-gsync",
+            "applied_at": "2026-04-01T03:19:46.610978",
+            "reboot_pending": True,
+            "reboot_reasons": ["HAGS toggle"],
+        }
 
 
 class TestCLILaunch:

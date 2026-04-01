@@ -17,6 +17,27 @@ from abso.core.exceptions import BackupCorruptedError, BackupNotFoundError
 logger = logging.getLogger(__name__)
 
 
+def _summarize_restore_issues(
+    items: list[dict[str, Any]],
+    *,
+    blocking_only: bool = False,
+) -> str:
+    """Build a concise summary for restore issues."""
+    relevant = [
+        item for item in items
+        if not blocking_only or bool(item.get("blocking", True))
+    ]
+    if not relevant:
+        return ""
+
+    parts: list[str] = []
+    for item in relevant:
+        handler = str(item.get("handler", "UnknownHandler"))
+        detail = str(item.get("detail") or item.get("reason") or "").strip()
+        parts.append(f"{handler} ({detail})" if detail else handler)
+    return ", ".join(parts)
+
+
 @dataclass
 class TransactionCheckpoint:
     """Phase checkpoint for resumable visibility."""
@@ -131,30 +152,43 @@ class ProfileTransactionManager:
                     restore_summary = restore_manager.restore_backup(baseline_path.name)
                     if restore_summary.complete:
                         tx.add_checkpoint("baseline_restore", "ok", f"Restored baseline: {baseline_path.name}")
-                    else:
-                        incomplete_handlers = [
-                            item["handler"]
-                            for item in (
-                                restore_summary.skipped_components
-                                + restore_summary.failed_components
+                    elif restore_summary.has_blocking_issues:
+                        tx.state = "failed"
+                        tx.error = (
+                            "Baseline restore incomplete for restorable handlers: "
+                            + _summarize_restore_issues(
+                                restore_summary.skipped_components + restore_summary.failed_components,
+                                blocking_only=True,
                             )
-                        ]
+                        )
+                        tx.add_checkpoint("baseline_restore", "failed", tx.error)
+                        return tx
+                    else:
                         tx.add_checkpoint(
                             "baseline_restore",
                             "warn",
-                            "Baseline restore incomplete: "
-                            + ", ".join(incomplete_handlers),
+                            "Baseline restore incomplete for known non-restorable handlers: "
+                            + _summarize_restore_issues(
+                                restore_summary.skipped_components
+                                + restore_summary.failed_components
+                            ),
                         )
                 else:
-                    tx.add_checkpoint("baseline_restore", "skipped", "No previous backup — first application")
+                    tx.add_checkpoint("baseline_restore", "skipped", "No previous backup - first application")
             except BackupNotFoundError:
-                tx.add_checkpoint("baseline_restore", "skipped", "No baseline backup found — first application")
+                tx.add_checkpoint("baseline_restore", "skipped", "No baseline backup found - first application")
             except BackupCorruptedError as e:
-                logger.warning(f"Baseline backup corrupted, continuing with apply: {e}")
-                tx.add_checkpoint("baseline_restore", "warn", f"Baseline corrupted: {e}")
+                tx.state = "failed"
+                tx.error = f"Baseline backup corrupted: {e}"
+                logger.error(tx.error)
+                tx.add_checkpoint("baseline_restore", "failed", tx.error)
+                return tx
             except Exception as e:
-                logger.warning(f"Baseline restore failed, continuing with apply: {e}")
-                tx.add_checkpoint("baseline_restore", "warn", f"Restore failed: {e}")
+                tx.state = "failed"
+                tx.error = f"Baseline restore failed: {e}"
+                logger.error(tx.error)
+                tx.add_checkpoint("baseline_restore", "failed", tx.error)
+                return tx
 
         backup_manager: BackupManager | None = None
         if create_backup:
@@ -194,7 +228,7 @@ class ProfileTransactionManager:
                 tx.add_checkpoint(
                     "apply",
                     "failed",
-                    tx.apply_result.error or "Profile apply failed",
+                    tx.apply_result.error or "Profile apply failed without a detailed error",
                 )
         except Exception as e:
             error = f"Profile apply crashed: {e}"
@@ -252,17 +286,13 @@ class ProfileTransactionManager:
                     tx.error = "Critical compliance failure; restored backup automatically."
                     tx.add_checkpoint("rollback", "ok", f"Restored backup {tx.backup_id}")
                 else:
-                    incomplete_handlers = [
-                        item["handler"]
-                        for item in (
-                            restore_summary.skipped_components
-                            + restore_summary.failed_components
-                        )
-                    ]
                     tx.rollback_performed = False
                     tx.rollback_error = (
                         "Rollback incomplete for handlers: "
-                        + ", ".join(incomplete_handlers)
+                        + _summarize_restore_issues(
+                            restore_summary.skipped_components
+                            + restore_summary.failed_components
+                        )
                     )
                     tx.state = "failed"
                     tx.error = (
