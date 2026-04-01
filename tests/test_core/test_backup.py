@@ -258,6 +258,59 @@ class TestRestoreBackup:
         assert summary.complete is False
         assert summary.failed_components[0]["handler"] == "TestHandler"
 
+    def test_restore_backup_legacy_manifest_uses_handler_restore_guarantee(self, tmp_path):
+        """Legacy manifests without restore_guarantee must inherit it from the live handler."""
+        backup_dir = tmp_path / "2026-04-01_031936"
+        backup_dir.mkdir()
+        (backup_dir / "manifest.json").write_text(
+            json.dumps(
+                {
+                    "timestamp": "2026-04-01_031936",
+                    "created_at": "2026-04-01T03:19:36.377134",
+                    "profile_id": "overwatch2-gsync",
+                    "backup_type": "pre_apply",
+                    "components": {
+                        "NvidiaSettingsHandler": {
+                            "file": "NvidiaSettingsHandler.json",
+                            "success": False,
+                            "note": (
+                                "NVIDIA backup cannot be restored safely because Profile Inspector "
+                                "import is disabled to avoid wiping the user's driver profile database."
+                            ),
+                        }
+                    },
+                },
+                indent=2,
+            ),
+            encoding="utf-8",
+        )
+        (backup_dir / "NvidiaSettingsHandler.json").write_text(
+            json.dumps({"success": False}),
+            encoding="utf-8",
+        )
+
+        mock_handler = MagicMock()
+        mock_handler.__class__.__name__ = "NvidiaSettingsHandler"
+        type(mock_handler).restore_guarantee = property(lambda self: "none")
+
+        with patch("abso.core.backup._get_backup_handlers", return_value=[mock_handler]):
+            manager = BackupManager(tmp_path)
+            summary = manager.restore_backup("2026-04-01_031936")
+
+        assert summary.complete is False
+        assert summary.has_blocking_issues is False
+        assert summary.skipped_components == [
+            {
+                "handler": "NvidiaSettingsHandler",
+                "reason": "backup_unavailable",
+                "detail": (
+                    "NVIDIA backup cannot be restored safely because Profile Inspector import "
+                    "is disabled to avoid wiping the user's driver profile database."
+                ),
+                "blocking": False,
+            }
+        ]
+
 
 class TestListBackups:
     """Tests for list_backups method."""

@@ -125,6 +125,21 @@ class BackupManager:
         self.backup_dir = backup_dir
         self._handlers = _get_backup_handlers()
 
+    @staticmethod
+    def _resolve_restore_guarantee(
+        component_info: dict[str, Any],
+        handler: SettingsHandler | None,
+    ) -> str:
+        """Resolve restore guarantee for both current and legacy backup manifests."""
+        manifest_value = component_info.get("restore_guarantee")
+        if manifest_value is not None:
+            return str(manifest_value)
+
+        if handler is not None:
+            return str(getattr(handler, "restore_guarantee", "full"))
+
+        return "full"
+
     def create_backup(
         self,
         profile_id: str | None = None,
@@ -268,7 +283,8 @@ class BackupManager:
 
         # Restore each component
         for handler_name, component_info in manifest["components"].items():
-            restore_guarantee = str(component_info.get("restore_guarantee", "full"))
+            handler = handler_map.get(handler_name)
+            restore_guarantee = self._resolve_restore_guarantee(component_info, handler)
             is_blocking = restore_guarantee != "none"
             if not component_info.get("success", False):
                 detail = str(
@@ -285,7 +301,6 @@ class BackupManager:
                 })
                 continue
 
-            handler = handler_map.get(handler_name)
             if not handler:
                 logger.warning(f"No handler for {handler_name}")
                 restore_summary.skipped_components.append({
