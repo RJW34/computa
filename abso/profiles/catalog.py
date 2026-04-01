@@ -38,6 +38,7 @@ from abso.profiles.slippi_melee import (
 )
 from abso.profiles.streaming_profiles import (
     FortniteStreamingProfile,
+    Overwatch2GSyncHDRStreamingProfile,
     PACDeluxeStreamingProfile,
     Rivals2StreamingProfile,
     RyujinxSSBUStreamingProfile,
@@ -193,6 +194,12 @@ PROFILE_CATALOG: OrderedDict[str, ProfileCatalogEntry] = OrderedDict(
             tray_subtitle="HDR ON | Reflex ON+Boost | G-SYNC ON",
             sync_mode="on",
         ),
+        "overwatch2-gsync-hdr-streaming": ProfileCatalogEntry(
+            profile_class=Overwatch2GSyncHDRStreamingProfile,
+            tray_category="Streaming",
+            tray_subtitle="HDR + G-SYNC | OBS 1080p60",
+            sync_mode="on",
+        ),
         "pokemon-auto-chess": ProfileCatalogEntry(
             profile_class=PokemonAutoChessProfile,
             tray_category="Other",
@@ -296,6 +303,7 @@ def get_profile_manifest() -> list[dict[str, Any]]:
     manifest: list[dict[str, Any]] = []
     for profile_id, entry in _get_full_catalog().items():
         profile = entry.profile_class()
+        handlers = [handler.__class__.__name__ for handler in profile.get_handlers()]
         manifest.append(
             {
                 "id": profile_id,
@@ -303,6 +311,8 @@ def get_profile_manifest() -> list[dict[str, Any]]:
                 "description": profile.description,
                 "optimization_target": profile.optimization_target,
                 "executables": profile.executable_hints,
+                "handlers": handlers,
+                "has_in_game_settings": profile.has_in_game_settings(),
                 "tray_category": entry.tray_category,
                 "tray_subtitle": entry.tray_subtitle,
                 "tray_description": entry.tray_description or profile.description,

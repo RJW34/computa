@@ -372,6 +372,97 @@ function Test-IsVrrPrerequisiteError {
     )
 }
 
+function Add-UniqueTrayMessage {
+    param(
+        [System.Collections.Generic.List[string]]$Target,
+        [AllowNull()][string]$Message
+    )
+
+    if ([string]::IsNullOrWhiteSpace($Message)) { return }
+
+    $normalized = $Message.Trim()
+    if (-not $Target.Contains($normalized)) {
+        [void]$Target.Add($normalized)
+    }
+}
+
+function Get-ExitCodeDescriptor {
+    param([AllowNull()][object]$ExitCode)
+
+    if ($null -eq $ExitCode) {
+        return "unavailable"
+    }
+
+    return "$ExitCode"
+}
+
+function Get-ApplyWarningMessages {
+    param($Json)
+
+    $messages = [System.Collections.Generic.List[string]]::new()
+
+    if ($Json.data -and $Json.data.warnings) {
+        foreach ($warning in @($Json.data.warnings)) {
+            Add-UniqueTrayMessage -Target $messages -Message "$warning"
+        }
+    }
+
+    if ($Json.data -and $Json.data.transaction -and $Json.data.transaction.checkpoints) {
+        foreach ($checkpoint in @($Json.data.transaction.checkpoints)) {
+            if ("$($checkpoint.status)".ToLowerInvariant() -eq "warn") {
+                Add-UniqueTrayMessage -Target $messages -Message "$($checkpoint.message)"
+            }
+        }
+    }
+
+    if ($Json.data -and $Json.data.compliance -and $Json.data.compliance.issues) {
+        foreach ($issue in @($Json.data.compliance.issues)) {
+            if ("$($issue.severity)".ToLowerInvariant() -ne "warning") { continue }
+
+            $detail = if ($issue.details) {
+                "$($issue.message): $($issue.details)"
+            }
+            else {
+                "$($issue.message)"
+            }
+            Add-UniqueTrayMessage -Target $messages -Message $detail
+        }
+    }
+
+    return @($messages)
+}
+
+function Get-WarningSummaryText {
+    param([string[]]$Warnings)
+
+    if (-not $Warnings -or $Warnings.Count -eq 0) { return $null }
+    if ($Warnings.Count -eq 1) { return "Warning: $($Warnings[0])" }
+    return "Warnings: $($Warnings[0]) (+$($Warnings.Count - 1) more)"
+}
+
+function Get-ApplyFailureMessage {
+    param(
+        $Json,
+        [string[]]$FailedHandlers,
+        [AllowNull()][object]$ExitCode
+    )
+
+    if ($FailedHandlers.Count -gt 0) {
+        return "Handler failures: $($FailedHandlers -join ', ')"
+    }
+    elseif ($Json.error) {
+        return "$($Json.error)"
+    }
+    elseif ($Json.data -and $Json.data.error) {
+        return "$($Json.data.error)"
+    }
+    elseif ($Json.data -and $Json.data.failed_settings -and $Json.data.failed_settings.Count -gt 0) {
+        return ($Json.data.failed_settings -join "; ")
+    }
+
+    return "Backend reported failure without a detailed error message (exit code: $(Get-ExitCodeDescriptor -ExitCode $ExitCode))"
+}
+
 function Test-NeedsNoSyncOsdReminder {
     param(
         [string]$FromProfileId,
@@ -831,6 +922,14 @@ $script:FallbackProfiles = [ordered]@{
         Exes     = @("Overwatch.exe")
         SyncMode = "on"
     }
+    "overwatch2-gsync-hdr-streaming" = @{
+        Name     = "Overwatch 2 - GSYNC HDR (Streaming)"
+        Sub      = "HDR + G-SYNC | OBS 1080p60"
+        Cat      = "Streaming"
+        Desc     = "Streaming-optimized OW2 G-SYNC HDR profile for multi-monitor OBS"
+        Exes     = @("Overwatch.exe")
+        SyncMode = "on"
+    }
 
     # --- Browser Games ---
     "pokemon-auto-chess" = @{
@@ -1068,7 +1167,12 @@ function Initialize-ProfilesFromCliCatalog {
                 Write-TrayLog "Profile catalog stderr: $errOutput" -Level "WARN"
             }
 
-            if ($exitCode -eq 0 -and $raw) {
+            $exitCodeOk = ($null -eq $exitCode -or $exitCode -eq 0)
+            if ($null -eq $exitCode) {
+                Write-TrayLog "Profile catalog CLI exit code was unavailable; falling back to payload validation" -Level "WARN"
+            }
+
+            if ($exitCodeOk -and $raw) {
                 $payload = $raw | ConvertFrom-Json
                 if ($payload -and $payload.success -and $payload.data) {
                     $entries = @($payload.data)
@@ -1836,8 +1940,13 @@ function Apply-Profile {
             }
         }
 
+        $exitCodeOk = ($null -eq $exitCode -or $exitCode -eq 0)
+        if ($null -eq $exitCode) {
+            Write-TrayLog "Apply CLI exit code was unavailable; falling back to JSON payload validation" -Level "WARN"
+        }
+
         $applySucceeded = (
-            $exitCode -eq 0 -and
+            $exitCodeOk -and
             $json.success -and
             $json.data -and
             $json.data.success -and
@@ -1845,12 +1954,24 @@ function Apply-Profile {
         )
 
         if ($applySucceeded) {
+            $applyWarnings = Get-ApplyWarningMessages -Json $json
+            $warningSummary = Get-WarningSummaryText -Warnings $applyWarnings
             $msg = "$($profile.Name) ($($profile.Sub))"
             if ($json.data.requires_reboot) { $msg += " - Restart required" }
+            if ($warningSummary) { $msg += " | $warningSummary" }
 
-            Write-TrayLog "Profile applied successfully: $ProfileId"
+            if ($applyWarnings.Count -gt 0) {
+                Write-TrayLog "Profile committed with warnings: $ProfileId" -Level "WARN"
+                foreach ($warning in $applyWarnings) {
+                    Write-TrayLog "Apply warning [$ProfileId]: $warning" -Level "WARN"
+                }
+                Update-ProgressOverlay -StepText "Profile committed with warnings"
+            }
+            else {
+                Write-TrayLog "Profile applied successfully: $ProfileId"
+                Update-ProgressOverlay -StepText "Profile applied successfully!"
+            }
 
-            Update-ProgressOverlay -StepText "Profile applied successfully!"
             Start-Sleep -Milliseconds 500
             Close-ProgressOverlay
 
@@ -1872,6 +1993,11 @@ function Apply-Profile {
                 Play-ApplySuccessIconAnimation
                 Show-ThemedToast -Title "A.B.S.O." -Message $msg -Type "Warning" -Duration 6000
             }
+            elseif ($applyWarnings.Count -gt 0) {
+                Play-SuccessSound
+                Play-ApplySuccessIconAnimation
+                Show-ThemedToast -Title "A.B.S.O." -Message $msg -Type "Warning" -Duration 6000
+            }
             else {
                 Play-SuccessSound
                 Play-ApplySuccessIconAnimation
@@ -1879,7 +2005,12 @@ function Apply-Profile {
             }
 
             $script:activeProfile = $ProfileId
-            $script:LastAction = "Applied: $($profile.Name)"
+            $script:LastAction = if ($applyWarnings.Count -gt 0) {
+                "Applied w/ warnings: $($profile.Name)"
+            }
+            else {
+                "Applied: $($profile.Name)"
+            }
             $script:LastActionTime = Get-Date -Format "HH:mm"
 
             # Power plan switching: save current plan and switch to gaming plan
@@ -1927,21 +2058,7 @@ function Apply-Profile {
             Update-QuickPanel -Favorites $script:TrayConfig.favorites -Profiles $script:Profiles -ActiveProfile $script:activeProfile -OnApply { param($id) Apply-Profile $id }
         }
         else {
-            $err = if ($failedHandlers.Count -gt 0) {
-                "Handler failures: $($failedHandlers -join ', ')"
-            }
-            elseif ($json.error) {
-                $json.error
-            }
-            elseif ($json.data -and $json.data.error) {
-                $json.data.error
-            }
-            elseif ($json.data -and $json.data.failed_settings -and $json.data.failed_settings.Count -gt 0) {
-                $json.data.failed_settings -join "; "
-            }
-            else {
-                "Unknown error"
-            }
+            $err = Get-ApplyFailureMessage -Json $json -FailedHandlers $failedHandlers -ExitCode $exitCode
             Write-TrayLog "Profile apply failed: $err" -Level "ERROR"
             Close-ProgressOverlay
             $isVrrPrereqError = Test-IsVrrPrerequisiteError -Message $err
@@ -2000,9 +2117,8 @@ function Restore-Settings {
             Remove-Item $errFile -Force -ErrorAction SilentlyContinue
             return
         }
-        $proc.Dispose()
-
         $exitCode = $proc.ExitCode
+        $proc.Dispose()
         $rawOutput = Get-Content $tempFile -Raw -ErrorAction SilentlyContinue
         $errOutput = Get-Content $errFile -Raw -ErrorAction SilentlyContinue
         Remove-Item $tempFile -Force -ErrorAction SilentlyContinue
@@ -2013,7 +2129,12 @@ function Restore-Settings {
 
         $json = $rawOutput | ConvertFrom-Json
 
-        if ($exitCode -eq 0 -and $json.success -and $json.data -and $json.data.success) {
+        $exitCodeOk = ($null -eq $exitCode -or $exitCode -eq 0)
+        if ($null -eq $exitCode) {
+            Write-TrayLog "Restore CLI exit code was unavailable; falling back to JSON payload validation" -Level "WARN"
+        }
+
+        if ($exitCodeOk -and $json.success -and $json.data -and $json.data.success) {
             Close-ProgressOverlay
             Show-Notification -Title "A.B.S.O." -Message "Settings restored" -Type "Info"
             $script:activeProfile = $null
@@ -2031,7 +2152,7 @@ function Restore-Settings {
                 $json.data.message
             }
             else {
-                "Restore failed"
+                "Backend reported restore failure without a detailed error message (exit code: $(Get-ExitCodeDescriptor -ExitCode $exitCode))"
             }
             Close-ProgressOverlay
             Show-Notification -Title "A.B.S.O." -Message "Failed: $restoreError" -Type "Warning"
@@ -2203,7 +2324,7 @@ function Run-Audit {
                 $script:AuditIssueCount = $issueCount
 
                 if ($issueCount -eq 0) {
-                    Show-Notification -Title "A.B.S.O. Audit" -Message "No issues found - system optimized!" -Type "Info"
+                    Show-Notification -Title "A.B.S.O. Audit" -Message "No issues detected by the current audit scope." -Type "Info"
                     Set-IconState -State $(if ($script:activeProfile) { "Active" } else { "Idle" })
                 }
                 else {
@@ -2219,7 +2340,7 @@ function Run-Audit {
                         $script:auditStatusItem.Visible = $true
                     }
                     else {
-                        $script:auditStatusItem.Text = "      No Issues"
+                        $script:auditStatusItem.Text = "      No Issues In Scope"
                         $script:auditStatusItem.ForeColor = $script:Colors.AccentGreen
                         $script:auditStatusItem.Visible = $true
                     }
