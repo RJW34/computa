@@ -311,6 +311,25 @@ class MultiMonitorDetector:
             ))
             result.exclusive_fullscreen_safe = False
 
+        # Warning: MPO glitch risk on multi-monitor with VRR or mixed refresh
+        vrr_monitors = [m for m in env.monitors if m.is_vrr_capable]
+        if env.is_multi_monitor and (vrr_monitors or env.has_mixed_refresh):
+            triggers: list[str] = []
+            if vrr_monitors:
+                triggers.append("VRR/G-Sync active")
+            if env.has_mixed_refresh:
+                triggers.append(
+                    f"mixed refresh ({env.min_refresh:.0f}Hz\u2013{env.max_refresh:.0f}Hz)"
+                )
+            result.warnings.append(MultiMonitorWarning(
+                code="MULTIMON_MPO_GLITCH_RISK",
+                message=f"MPO glitch risk: {', '.join(triggers)}",
+                recommendation=(
+                    "Multiplane Overlays auto-disabled to prevent black flashes "
+                    "and pixel corruption during monitor focus transitions."
+                ),
+            ))
+
         # Warning: GeForce Experience specifically
         if any("GeForce" in o for o in env.detected_overlays):
             result.warnings.append(MultiMonitorWarning(
@@ -322,6 +341,52 @@ class MultiMonitorDetector:
                     "NVIDIA drivers work fine without GFE."
                 ),
             ))
+
+    def get_mpo_recommendation(self, result: MultiMonitorResult) -> dict[str, Any]:
+        """Get MPO setting recommendation based on display environment.
+
+        Multiplane Overlays cause black flashes and pixel corruption on
+        multi-monitor setups when the DWM compositor rearranges hardware
+        overlay planes during focus transitions between monitors.  This is
+        worst with VRR/G-Sync (driver renegotiates VRR handshake on focus
+        change) and mixed refresh rates (compositor reconfigures per-monitor
+        timing).
+
+        Returns:
+            Dict with ``disable_mpo`` bool and human-readable ``reason``.
+        """
+        env = result.environment
+
+        if not env.is_multi_monitor:
+            return {
+                "disable_mpo": False,
+                "reason": "Single monitor — no cross-monitor MPO glitch risk",
+            }
+
+        vrr_monitors = [m for m in env.monitors if m.is_vrr_capable]
+        if vrr_monitors:
+            return {
+                "disable_mpo": True,
+                "reason": (
+                    "Multi-monitor with VRR-capable display(s) — disabling MPO "
+                    "to prevent black flashes during monitor focus transitions"
+                ),
+            }
+
+        if env.has_mixed_refresh:
+            return {
+                "disable_mpo": True,
+                "reason": (
+                    f"Mixed refresh rates ({env.min_refresh:.0f}Hz–{env.max_refresh:.0f}Hz) — "
+                    f"disabling MPO to prevent compositor glitches during "
+                    f"monitor focus transitions"
+                ),
+            }
+
+        return {
+            "disable_mpo": False,
+            "reason": "Multi-monitor with uniform refresh and no VRR — MPO safe",
+        }
 
     def get_vrr_recommendation(self, result: MultiMonitorResult) -> dict[str, Any]:
         """Get VRR setting recommendation based on environment.

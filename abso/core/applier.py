@@ -219,6 +219,21 @@ class ProfileApplier:
                     logger.warning(f"MultiMon: {warning.message}")
                     self._append_unique(result.warnings, warning.message)
 
+            # Environment-aware MPO: only intervene when the display
+            # environment has a known glitch risk (multi-monitor + VRR
+            # or mixed refresh).  When the environment is safe, leave
+            # the profile's value (or absence) alone so profiles can
+            # still express a preference if they have a reason.
+            mpo_rec = self._multimon_detector.get_mpo_recommendation(
+                multimon_result
+            )
+            if mpo_rec["disable_mpo"]:
+                gfx = settings_map.setdefault("GraphicsSettingsHandler", {})
+                gfx["disable_mpo"] = True
+                logger.info(f"MPO auto-disabled: {mpo_rec['reason']}")
+            else:
+                logger.debug(f"MPO not overridden: {mpo_rec['reason']}")
+
         # === PHASE 3: RollbackGuard ===
         if not self.skip_rollback_guard:
             rollback_result = self._rollback_guard.check(profile, settings_map)

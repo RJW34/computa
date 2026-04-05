@@ -2238,7 +2238,8 @@ function Update-MenuState {
             }
             else {
                 $item.Text = $p.Name
-                $item.Image = New-CategoryBitmap -Category $p.Cat -Color $catColor
+                $gg = Get-GameGroup -ProfileId $item.Tag
+                $item.Image = New-GameBitmap -GameGroup $gg -Color $catColor -Category $p.Cat
                 $item.ForeColor = $catColor
                 $item.Font = $script:FontNormal
                 $item.BackColor = $script:Colors.Background
@@ -2946,7 +2947,9 @@ public class HotkeyMessageWindow : NativeWindow {
     $script:statusItem = New-Object System.Windows.Forms.ToolStripMenuItem
     $script:statusItem.Tag = "__hero_banner__"
     $script:statusItem.AutoSize = $false
-    $script:statusItem.Height = 48
+    $script:statusItem.Size = New-Object System.Drawing.Size(280, 48)
+    $script:statusItem.Padding = New-Object System.Windows.Forms.Padding(0)
+    $script:statusItem.Margin = New-Object System.Windows.Forms.Padding(0)
     if ($script:activeProfile) {
         $ap = $script:Profiles[$script:activeProfile]
         $script:statusItem.Text = "$($ap.Name)|$($ap.Sub)"
@@ -3051,6 +3054,26 @@ public class HotkeyMessageWindow : NativeWindow {
     })
     $menu.Items.Add($searchBox) | Out-Null
 
+    # --- Derive game groups from profile IDs ---
+    # Strip known variant suffixes to get the base game identifier.
+    # Order matters: longer suffixes before shorter ones that are substrings.
+    # Defined early so favorites/recent sections can use New-GameBitmap.
+    $variantSuffixes = @(
+        "-online-gsync", "-tournament-sim-144hz", "-console-parity", "-gsync-hdr", "-300hz-max",
+        "-streaming", "-offline", "-online", "-vrr-lab", "-gsync", "-hdr", "-sdr",
+        "-universal"
+    )
+
+    function Get-GameGroup {
+        param([string]$ProfileId)
+        foreach ($suffix in $variantSuffixes) {
+            if ($ProfileId.EndsWith($suffix)) {
+                return $ProfileId.Substring(0, $ProfileId.Length - $suffix.Length)
+            }
+        }
+        return $ProfileId
+    }
+
     # ─── FAVORITES ───
 
     $favProfiles = @()
@@ -3076,7 +3099,8 @@ public class HotkeyMessageWindow : NativeWindow {
             $item = New-Object System.Windows.Forms.ToolStripMenuItem
             $item.Text = $p.Name
             $item.Tag = $favId
-            $item.Image = New-CategoryBitmap -Category $p.Cat -Color $catColor
+            $gg = Get-GameGroup -ProfileId $favId
+            $item.Image = New-GameBitmap -GameGroup $gg -Color $catColor -Category $p.Cat
             $item.BackColor = $script:Colors.Background
             $item.ForeColor = $catColor
             $item.Font = New-Object System.Drawing.Font("Segoe UI", 9)
@@ -3116,7 +3140,8 @@ public class HotkeyMessageWindow : NativeWindow {
             $item = New-Object System.Windows.Forms.ToolStripMenuItem
             $item.Text = $p.Name
             $item.Tag = $rId
-            $item.Image = New-CategoryBitmap -Category $p.Cat -Color $catColor
+            $gg = Get-GameGroup -ProfileId $rId
+            $item.Image = New-GameBitmap -GameGroup $gg -Color $catColor -Category $p.Cat
             $item.BackColor = $script:Colors.Background
             $item.ForeColor = $catColor
             $item.Font = New-Object System.Drawing.Font("Segoe UI", 9)
@@ -3142,24 +3167,6 @@ public class HotkeyMessageWindow : NativeWindow {
     $profilesLabel.Font = New-Object System.Drawing.Font("Segoe UI", 7, [System.Drawing.FontStyle]::Bold)
     $menu.Items.Add($profilesLabel) | Out-Null
 
-    # --- Derive game groups from profile IDs ---
-    # Strip known variant suffixes to get the base game identifier.
-    # Order matters: longer suffixes before shorter ones that are substrings.
-    $variantSuffixes = @(
-        "-online-gsync", "-tournament-sim-144hz", "-console-parity", "-gsync-hdr", "-300hz-max",
-        "-streaming", "-offline", "-online", "-vrr-lab", "-gsync", "-hdr", "-sdr"
-    )
-
-    function Get-GameGroup {
-        param([string]$ProfileId)
-        foreach ($suffix in $variantSuffixes) {
-            if ($ProfileId.EndsWith($suffix)) {
-                return $ProfileId.Substring(0, $ProfileId.Length - $suffix.Length)
-            }
-        }
-        return $ProfileId
-    }
-
     # Helper to create a profile menu item (used in both direct items and submenus)
     function New-ProfileMenuItem {
         param([string]$ProfileId, [bool]$InSubmenu = $false, [bool]$ShowBadge = $false)
@@ -3170,7 +3177,7 @@ public class HotkeyMessageWindow : NativeWindow {
         $item = New-Object System.Windows.Forms.ToolStripMenuItem
         $item.Text = $p.Name
 
-        # Category icon by default; sync badge overrides for variant items in submenus only
+        # Sync badge for variant items in submenus; game icon otherwise; category fallback
         $badgeSet = $false
         if ($ShowBadge -and $InSubmenu) {
             $sm = if ($p.SyncMode) { $p.SyncMode } else { "agnostic" }
@@ -3181,7 +3188,8 @@ public class HotkeyMessageWindow : NativeWindow {
             }
         }
         if (-not $badgeSet) {
-            $item.Image = New-CategoryBitmap -Category $p.Cat -Color $catColor
+            $gg = Get-GameGroup -ProfileId $ProfileId
+            $item.Image = New-GameBitmap -GameGroup $gg -Color $catColor -Category $p.Cat
         }
 
         $item.Tag = $ProfileId
@@ -3283,7 +3291,7 @@ public class HotkeyMessageWindow : NativeWindow {
                 $submenuItem = New-Object System.Windows.Forms.ToolStripMenuItem
                 $submenuItem.Text = ($firstProfile.Name -replace '(:|\s+-\s+).*$', '')
                 $submenuItem.Tag = $cat
-                $submenuItem.Image = New-CategoryBitmap -Category $cat -Color $catColor
+                $submenuItem.Image = New-GameBitmap -GameGroup $gameGroup -Color $catColor -Category $cat
                 $submenuItem.BackColor = $script:Colors.Background
                 $submenuItem.ForeColor = $catColor
                 $submenuItem.Font = New-Object System.Drawing.Font("Segoe UI", 9)

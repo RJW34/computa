@@ -644,6 +644,461 @@ function New-CategoryBitmap {
     return $bmp
 }
 
+function New-GameBitmap {
+    <#
+    .SYNOPSIS
+    Creates a 16x16 bitmap with a game-specific icon for a profile's game group.
+    Each game gets a unique silhouette that is instantly recognizable at 16x16.
+    Falls back to the category icon for unknown games.
+    .PARAMETER GameGroup
+    The game group identifier (e.g. "rivals2", "slippi-melee", "overwatch2").
+    .PARAMETER Color
+    The category color used for fills and strokes.
+    .PARAMETER Category
+    Fallback category if the game group has no specific icon.
+    #>
+    param(
+        [string]$GameGroup,
+        [System.Drawing.Color]$Color = [System.Drawing.Color]::White,
+        [string]$Category = "Other"
+    )
+
+    # Dispatch to known game icons; fall back to category for unknown games
+    $known = @(
+        "slippi-melee", "rivals2", "overwatch2", "cod-bo7", "fortnite",
+        "marvel-rivals", "diablo4", "ryujinx-ssbu", "pokemon-auto-chess",
+        "pacdeluxe", "productivity"
+    )
+    if ($GameGroup -notin $known) {
+        return New-CategoryBitmap -Category $Category -Color $Color
+    }
+
+    $bmp = New-Object System.Drawing.Bitmap(16, 16)
+    $g = [System.Drawing.Graphics]::FromImage($bmp)
+    $g.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
+    $g.Clear([System.Drawing.Color]::Transparent)
+
+    # Shared depth layers
+    $glowBrush = New-Object System.Drawing.SolidBrush(
+        [System.Drawing.Color]::FromArgb(40, $Color.R, $Color.G, $Color.B)
+    )
+    $highlightBrush = New-Object System.Drawing.SolidBrush(
+        [System.Drawing.Color]::FromArgb(70, 255, 255, 255)
+    )
+    $lighter = [System.Drawing.Color]::FromArgb(255,
+        [Math]::Min(255, [int]$Color.R + 50),
+        [Math]::Min(255, [int]$Color.G + 50),
+        [Math]::Min(255, [int]$Color.B + 50)
+    )
+    $darker = [System.Drawing.Color]::FromArgb(255,
+        [Math]::Max(0, [int]$Color.R - 60),
+        [Math]::Max(0, [int]$Color.G - 60),
+        [Math]::Max(0, [int]$Color.B - 60)
+    )
+
+    switch ($GameGroup) {
+
+        "slippi-melee" {
+            # Smash ball: circle with bold cross cutting through it
+            # Layer 1: Glow
+            $g.FillEllipse($glowBrush, 1, 1, 14, 14)
+
+            # Layer 2: Filled circle
+            $fillBrush = New-Object System.Drawing.SolidBrush($Color)
+            $g.FillEllipse($fillBrush, 2, 2, 12, 12)
+            $fillBrush.Dispose()
+
+            # Cross lines (dark cutout effect through the ball)
+            $crossPen = New-Object System.Drawing.Pen($darker, 2.4)
+            $crossPen.StartCap = [System.Drawing.Drawing2D.LineCap]::Round
+            $crossPen.EndCap = [System.Drawing.Drawing2D.LineCap]::Round
+            # Horizontal through center
+            $g.DrawLine($crossPen, 2, 8, 14, 8)
+            # Vertical through center
+            $g.DrawLine($crossPen, 8, 2, 8, 14)
+            $crossPen.Dispose()
+
+            # Bright center dot
+            $centerBrush = New-Object System.Drawing.SolidBrush($lighter)
+            $g.FillEllipse($centerBrush, [float]6.5, [float]6.5, [float]3, [float]3)
+            $centerBrush.Dispose()
+
+            # Layer 3: Specular
+            $g.FillEllipse($highlightBrush, 4, 3, 5, 3)
+        }
+
+        "rivals2" {
+            # Flame / aether spark: pointed upward teardrop with wisps
+            # Layer 1: Glow behind
+            $g.FillEllipse($glowBrush, 2, 2, 12, 13)
+
+            # Layer 2: Main flame shape (pointed top, wide rounded bottom)
+            $flamePoints = @(
+                (New-Object System.Drawing.PointF(8, 1)),       # tip
+                (New-Object System.Drawing.PointF(12, 6)),      # right shoulder
+                (New-Object System.Drawing.PointF(13, 10)),     # right mid
+                (New-Object System.Drawing.PointF(11, 14)),     # right base
+                (New-Object System.Drawing.PointF(8, 12)),      # center notch
+                (New-Object System.Drawing.PointF(5, 14)),      # left base
+                (New-Object System.Drawing.PointF(3, 10)),      # left mid
+                (New-Object System.Drawing.PointF(4, 6))        # left shoulder
+            )
+            $flameBrush = New-Object System.Drawing.SolidBrush($Color)
+            $g.FillPolygon($flameBrush, $flamePoints)
+            $flameBrush.Dispose()
+
+            # Inner bright core (smaller flame shape)
+            $corePoints = @(
+                (New-Object System.Drawing.PointF(8, 4)),
+                (New-Object System.Drawing.PointF(10.5, 7.5)),
+                (New-Object System.Drawing.PointF(10, 11)),
+                (New-Object System.Drawing.PointF(8, 9.5)),
+                (New-Object System.Drawing.PointF(6, 11)),
+                (New-Object System.Drawing.PointF(5.5, 7.5))
+            )
+            $coreBrush = New-Object System.Drawing.SolidBrush($lighter)
+            $g.FillPolygon($coreBrush, $corePoints)
+            $coreBrush.Dispose()
+
+            # Layer 3: Specular
+            $g.FillEllipse($highlightBrush, 5, 2, 4, 3)
+        }
+
+        "overwatch2" {
+            # Overwatch shield: circle with bold upward chevron
+            # Layer 1: Glow
+            $g.FillEllipse($glowBrush, 1, 1, 14, 14)
+
+            # Layer 2: Filled circle
+            $circleBrush = New-Object System.Drawing.SolidBrush($Color)
+            $g.FillEllipse($circleBrush, 2, 2, 12, 12)
+            $circleBrush.Dispose()
+
+            # Chevron cutout (white upward V)
+            $chevronPen = New-Object System.Drawing.Pen([System.Drawing.Color]::White, 2.2)
+            $chevronPen.StartCap = [System.Drawing.Drawing2D.LineCap]::Round
+            $chevronPen.EndCap = [System.Drawing.Drawing2D.LineCap]::Round
+            $chevronPen.LineJoin = [System.Drawing.Drawing2D.LineJoin]::Round
+            $g.DrawLine($chevronPen, 4.5, 10, 8, 5)
+            $g.DrawLine($chevronPen, 8, 5, 11.5, 10)
+            $chevronPen.Dispose()
+
+            # Layer 3: Specular
+            $g.FillEllipse($highlightBrush, 4, 3, 5, 3)
+        }
+
+        "cod-bo7" {
+            # Military 5-pointed star emblem
+            # Layer 1: Glow
+            $g.FillEllipse($glowBrush, 1, 1, 14, 14)
+
+            # Layer 2: Filled 5-pointed star
+            [float]$cx = 8.0; [float]$cy = 8.0
+            [float]$outerR = 6.5; [float]$innerR = 2.8
+            $starPoints = @()
+            for ($i = 0; $i -lt 10; $i++) {
+                [float]$angle = ($i * 36 - 90) * [Math]::PI / 180
+                [float]$r = if ($i % 2 -eq 0) { $outerR } else { $innerR }
+                $starPoints += New-Object System.Drawing.PointF(
+                    ($cx + $r * [Math]::Cos($angle)),
+                    ($cy + $r * [Math]::Sin($angle))
+                )
+            }
+            $starBrush = New-Object System.Drawing.SolidBrush($Color)
+            $g.FillPolygon($starBrush, $starPoints)
+            $starBrush.Dispose()
+
+            # Inner lighter star
+            $innerStarPoints = @()
+            for ($i = 0; $i -lt 10; $i++) {
+                [float]$angle = ($i * 36 - 90) * [Math]::PI / 180
+                [float]$r = if ($i % 2 -eq 0) { 4.0 } else { 1.8 }
+                $innerStarPoints += New-Object System.Drawing.PointF(
+                    ($cx + $r * [Math]::Cos($angle)),
+                    ($cy + $r * [Math]::Sin($angle))
+                )
+            }
+            $innerBrush = New-Object System.Drawing.SolidBrush($lighter)
+            $g.FillPolygon($innerBrush, $innerStarPoints)
+            $innerBrush.Dispose()
+
+            # Layer 3: Specular
+            $g.FillEllipse($highlightBrush, 5, 2, 4, 3)
+        }
+
+        "fortnite" {
+            # Llama face: rounded head shape with ears, simplified piñata icon
+            # Layer 1: Glow
+            $g.FillEllipse($glowBrush, 2, 2, 12, 13)
+
+            # Layer 2: Head shape (rounded rect body)
+            $headBrush = New-Object System.Drawing.SolidBrush($Color)
+            $g.FillEllipse($headBrush, 3, 5, 10, 10)     # face
+            $headBrush.Dispose()
+
+            # Ears (two small triangles)
+            $earBrush = New-Object System.Drawing.SolidBrush($Color)
+            $leftEar = @(
+                (New-Object System.Drawing.PointF(4, 6)),
+                (New-Object System.Drawing.PointF(3, 1)),
+                (New-Object System.Drawing.PointF(7, 5))
+            )
+            $rightEar = @(
+                (New-Object System.Drawing.PointF(12, 6)),
+                (New-Object System.Drawing.PointF(13, 1)),
+                (New-Object System.Drawing.PointF(9, 5))
+            )
+            $g.FillPolygon($earBrush, $leftEar)
+            $g.FillPolygon($earBrush, $rightEar)
+            $earBrush.Dispose()
+
+            # Inner ear highlight
+            $innerEarBrush = New-Object System.Drawing.SolidBrush($lighter)
+            $leftInner = @(
+                (New-Object System.Drawing.PointF(4.5, 6)),
+                (New-Object System.Drawing.PointF(4, 3)),
+                (New-Object System.Drawing.PointF(6, 5.5))
+            )
+            $rightInner = @(
+                (New-Object System.Drawing.PointF(11.5, 6)),
+                (New-Object System.Drawing.PointF(12, 3)),
+                (New-Object System.Drawing.PointF(10, 5.5))
+            )
+            $g.FillPolygon($innerEarBrush, $leftInner)
+            $g.FillPolygon($innerEarBrush, $rightInner)
+            $innerEarBrush.Dispose()
+
+            # Eyes (two dark dots)
+            $eyeBrush = New-Object System.Drawing.SolidBrush($darker)
+            $g.FillEllipse($eyeBrush, [float]5, [float]8, [float]2.5, [float]2.5)
+            $g.FillEllipse($eyeBrush, [float]9, [float]8, [float]2.5, [float]2.5)
+            $eyeBrush.Dispose()
+
+            # Layer 3: Specular
+            $g.FillEllipse($highlightBrush, 5, 4, 4, 3)
+        }
+
+        "marvel-rivals" {
+            # Comic diamond burst: central diamond with radiating energy lines
+            # Layer 1: Glow
+            $g.FillEllipse($glowBrush, 1, 1, 14, 14)
+
+            # Layer 2: Central diamond
+            $diamondPoints = @(
+                (New-Object System.Drawing.PointF(8, 2)),
+                (New-Object System.Drawing.PointF(13, 8)),
+                (New-Object System.Drawing.PointF(8, 14)),
+                (New-Object System.Drawing.PointF(3, 8))
+            )
+            $diamondBrush = New-Object System.Drawing.SolidBrush($Color)
+            $g.FillPolygon($diamondBrush, $diamondPoints)
+            $diamondBrush.Dispose()
+
+            # Inner lighter diamond
+            $innerDiamondPoints = @(
+                (New-Object System.Drawing.PointF(8, 4.5)),
+                (New-Object System.Drawing.PointF(11, 8)),
+                (New-Object System.Drawing.PointF(8, 11.5)),
+                (New-Object System.Drawing.PointF(5, 8))
+            )
+            $innerBrush = New-Object System.Drawing.SolidBrush($lighter)
+            $g.FillPolygon($innerBrush, $innerDiamondPoints)
+            $innerBrush.Dispose()
+
+            # Energy burst lines from corners
+            $burstPen = New-Object System.Drawing.Pen(
+                [System.Drawing.Color]::FromArgb(120, $Color.R, $Color.G, $Color.B), 1.2
+            )
+            $burstPen.StartCap = [System.Drawing.Drawing2D.LineCap]::Round
+            $burstPen.EndCap = [System.Drawing.Drawing2D.LineCap]::Round
+            $g.DrawLine($burstPen, 8, 0, 8, 2)
+            $g.DrawLine($burstPen, 15, 8, 13, 8)
+            $g.DrawLine($burstPen, 8, 16, 8, 14)
+            $g.DrawLine($burstPen, 1, 8, 3, 8)
+            $burstPen.Dispose()
+
+            # Layer 3: Specular
+            $g.FillEllipse($highlightBrush, 5, 3, 4, 3)
+        }
+
+        "diablo4" {
+            # Gothic crystal gem: downward-pointing faceted gem
+            # Layer 1: Glow
+            $g.FillEllipse($glowBrush, 2, 1, 12, 14)
+
+            # Layer 2: Gem outline (hexagonal crystal pointing down)
+            $gemPoints = @(
+                (New-Object System.Drawing.PointF(5, 2)),       # top-left
+                (New-Object System.Drawing.PointF(11, 2)),      # top-right
+                (New-Object System.Drawing.PointF(13, 5)),      # upper-right
+                (New-Object System.Drawing.PointF(8, 14)),      # bottom point
+                (New-Object System.Drawing.PointF(3, 5))        # upper-left
+            )
+            $gemBrush = New-Object System.Drawing.SolidBrush($Color)
+            $g.FillPolygon($gemBrush, $gemPoints)
+            $gemBrush.Dispose()
+
+            # Facet lines (darker internal lines for gem cuts)
+            $facetPen = New-Object System.Drawing.Pen($darker, 1.0)
+            $facetPen.StartCap = [System.Drawing.Drawing2D.LineCap]::Round
+            $facetPen.EndCap = [System.Drawing.Drawing2D.LineCap]::Round
+            $g.DrawLine($facetPen, 8, 2, 8, 14)     # center vertical
+            $g.DrawLine($facetPen, 5, 2, 8, 7)      # top-left to center
+            $g.DrawLine($facetPen, 11, 2, 8, 7)     # top-right to center
+            $g.DrawLine($facetPen, 3, 5, 13, 5)     # horizontal crown line
+            $facetPen.Dispose()
+
+            # Lighter left facet highlight
+            $facetHighlight = @(
+                (New-Object System.Drawing.PointF(5, 2)),
+                (New-Object System.Drawing.PointF(8, 2)),
+                (New-Object System.Drawing.PointF(8, 5))
+            )
+            $facetBrush = New-Object System.Drawing.SolidBrush($lighter)
+            $g.FillPolygon($facetBrush, $facetHighlight)
+            $facetBrush.Dispose()
+
+            # Layer 3: Specular
+            $g.FillEllipse($highlightBrush, 5, 2, 4, 3)
+        }
+
+        "ryujinx-ssbu" {
+            # Joy-Con pair: two rounded rectangles side by side
+            # Layer 1: Glow
+            $g.FillEllipse($glowBrush, 1, 1, 14, 14)
+
+            # Left Joy-Con
+            $leftPath = New-Object System.Drawing.Drawing2D.GraphicsPath
+            $leftPath.AddArc(1, 2, 4, 4, 180, 90)     # top-left round
+            $leftPath.AddLine(3, 2, 7, 2)               # top edge
+            $leftPath.AddLine(7, 2, 7, 14)              # right edge
+            $leftPath.AddLine(7, 14, 3, 14)             # bottom edge
+            $leftPath.AddArc(1, 10, 4, 4, 90, 90)      # bottom-left round
+            $leftPath.CloseFigure()
+            $leftBrush = New-Object System.Drawing.SolidBrush($Color)
+            $g.FillPath($leftBrush, $leftPath)
+            $leftBrush.Dispose()
+            $leftPath.Dispose()
+
+            # Right Joy-Con
+            $rightPath = New-Object System.Drawing.Drawing2D.GraphicsPath
+            $rightPath.AddLine(9, 2, 13, 2)
+            $rightPath.AddArc(11, 2, 4, 4, 270, 90)    # top-right round
+            $rightPath.AddArc(11, 10, 4, 4, 0, 90)     # bottom-right round
+            $rightPath.AddLine(13, 14, 9, 14)
+            $rightPath.AddLine(9, 14, 9, 2)
+            $rightPath.CloseFigure()
+            $rightBrush = New-Object System.Drawing.SolidBrush($Color)
+            $g.FillPath($rightBrush, $rightPath)
+            $rightBrush.Dispose()
+            $rightPath.Dispose()
+
+            # Button details: D-pad on left, face buttons on right
+            $detailBrush = New-Object System.Drawing.SolidBrush($lighter)
+            # Left stick (circle)
+            $g.FillEllipse($detailBrush, [float]3, [float]4.5, [float]2.5, [float]2.5)
+            # Right buttons (A/B dots)
+            $g.FillEllipse($detailBrush, [float]10.5, [float]5, [float]2, [float]2)
+            $g.FillEllipse($detailBrush, [float]10.5, [float]9, [float]2, [float]2)
+            $detailBrush.Dispose()
+
+            # Center gap line
+            $gapPen = New-Object System.Drawing.Pen(
+                [System.Drawing.Color]::FromArgb(60, 0, 0, 0), 1.0
+            )
+            $g.DrawLine($gapPen, 8, 2, 8, 14)
+            $gapPen.Dispose()
+
+            # Layer 3: Specular
+            $g.FillEllipse($highlightBrush, 3, 2, 5, 3)
+        }
+
+        "pokemon-auto-chess" {
+            # Pokeball: circle split horizontally with center button
+            # Layer 1: Glow
+            $g.FillEllipse($glowBrush, 1, 1, 14, 14)
+
+            # Layer 2: Top half (main color)
+            $topBrush = New-Object System.Drawing.SolidBrush($Color)
+            $g.FillEllipse($topBrush, 2, 2, 12, 12)
+            $topBrush.Dispose()
+
+            # Bottom half (lighter)
+            $bottomBrush = New-Object System.Drawing.SolidBrush($lighter)
+            $clipRegion = New-Object System.Drawing.Region(
+                (New-Object System.Drawing.RectangleF(0, 8, 16, 8))
+            )
+            $savedClip = $g.Clip
+            $g.Clip = $clipRegion
+            $g.FillEllipse($bottomBrush, 2, 2, 12, 12)
+            $g.Clip = $savedClip
+            $clipRegion.Dispose()
+            $bottomBrush.Dispose()
+
+            # Center band (dark horizontal line through middle)
+            $bandPen = New-Object System.Drawing.Pen($darker, 2.0)
+            $g.DrawLine($bandPen, 2, 8, 14, 8)
+            $bandPen.Dispose()
+
+            # Center button (circle with outline)
+            $btnOutline = New-Object System.Drawing.SolidBrush($darker)
+            $g.FillEllipse($btnOutline, [float]5.5, [float]5.5, [float]5, [float]5)
+            $btnOutline.Dispose()
+            $btnCenter = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::White)
+            $g.FillEllipse($btnCenter, [float]6.5, [float]6.5, [float]3, [float]3)
+            $btnCenter.Dispose()
+
+            # Layer 3: Specular
+            $g.FillEllipse($highlightBrush, 4, 3, 5, 3)
+        }
+
+        "pacdeluxe" {
+            # Pac-Man: circle with wedge mouth cut out
+            # Layer 1: Glow
+            $g.FillEllipse($glowBrush, 1, 1, 14, 14)
+
+            # Layer 2: Full circle
+            $bodyBrush = New-Object System.Drawing.SolidBrush($Color)
+            $g.FillEllipse($bodyBrush, 2, 2, 12, 12)
+            $bodyBrush.Dispose()
+
+            # Mouth cutout (dark triangle wedge pointing right)
+            $mouthPoints = @(
+                (New-Object System.Drawing.PointF(8, 8)),       # center
+                (New-Object System.Drawing.PointF(15, 4)),      # upper jaw
+                (New-Object System.Drawing.PointF(15, 12))      # lower jaw
+            )
+            $mouthBrush = New-Object System.Drawing.SolidBrush(
+                [System.Drawing.Color]::FromArgb(255, 26, 26, 30)
+            )
+            $g.FillPolygon($mouthBrush, $mouthPoints)
+            $mouthBrush.Dispose()
+
+            # Eye dot
+            $eyeBrush = New-Object System.Drawing.SolidBrush($darker)
+            $g.FillEllipse($eyeBrush, [float]7, [float]4, [float]2.5, [float]2.5)
+            $eyeBrush.Dispose()
+
+            # Layer 3: Specular
+            $g.FillEllipse($highlightBrush, 4, 3, 4, 3)
+        }
+
+        "productivity" {
+            # Delegate to category icon (monitor shape)
+            $glowBrush.Dispose()
+            $highlightBrush.Dispose()
+            $g.Dispose()
+            $bmp.Dispose()
+            return New-CategoryBitmap -Category "Productivity" -Color $Color
+        }
+    }
+
+    $glowBrush.Dispose()
+    $highlightBrush.Dispose()
+    $g.Dispose()
+    return $bmp
+}
+
 function New-ActionBitmap {
     <#
     .SYNOPSIS

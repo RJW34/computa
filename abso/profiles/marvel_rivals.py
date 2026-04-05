@@ -33,9 +33,6 @@ class _MarvelRivalsBaseProfile(ReflexShooterBaseProfile):
                 "auto_vrr_fps_cap": True,
                 "global_vrr_mode": "fullscreen_only",
             },
-            "GraphicsSettingsHandler": {
-                "disable_mpo": False,
-            },
         }
 
     def _variant_overrides(self) -> dict[str, dict[str, Any]]:

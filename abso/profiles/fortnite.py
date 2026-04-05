@@ -52,12 +52,7 @@ class FortniteProfile(ReflexShooterBaseProfile):
         return "dx12"
 
     def _settings_overrides(self) -> dict[str, dict[str, Any]]:
-        return {
-            "GraphicsSettingsHandler": {
-                # Enable MPO for normal compositor path (default). Disable only if troubleshooting.
-                "disable_mpo": False,
-            },
-        }
+        return {}
 
     def get_in_game_settings(self) -> list[dict[str, str]]:
         return [

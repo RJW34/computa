@@ -35,10 +35,6 @@ class _Overwatch2BaseProfile(ReflexShooterBaseProfile):
                 # Keep HDR disabled by default to avoid SDR/HDR tone-mapping bugs.
                 "hdr": False,
             },
-            "GraphicsSettingsHandler": {
-                # Keep MPO enabled unless explicitly troubleshooting compositor issues.
-                "disable_mpo": False,
-            },
             "OW2ConfigHandler": {
                 "window_mode": 0,  # Fullscreen (Exclusive)
                 "vsync": False,  # Off
@@ -293,9 +289,6 @@ class Overwatch2GSyncHDRProfile(_Overwatch2BaseProfile):
             "WindowsSettingsHandler": {
                 "hdr": True,
                 "auto_hdr": False,
-            },
-            "GraphicsSettingsHandler": {
-                "disable_mpo": False,
             },
             "ColorProfileSettingsHandler": {
                 "icc_profile": "native",

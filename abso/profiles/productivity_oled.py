@@ -121,8 +121,6 @@ class ProductivityOLEDProfile(BaseProfile):
             "GraphicsSettingsHandler": {
                 # Keep FSO enabled - works well with modern apps
                 "disable_global_fso": False,
-                # MPO ON - important for multi-monitor efficiency
-                "disable_mpo": False,
             },
             "MemorySettingsHandler": {
                 # Default settings - keep system cache for app launching

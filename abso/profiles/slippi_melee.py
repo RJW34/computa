@@ -491,12 +491,6 @@ class SlippiMeleeUniversalProfile(SlippiMeleeProfile):
             # HAGS benefit on DX12/Vulkan outweighs marginal DX11/OpenGL cost.
             settings["hags"] = True
 
-        if handler_name == "GraphicsSettingsHandler":
-            # Do NOT toggle MPO — toggling it requires a reboot, which
-            # defeats the entire purpose of this "no reboot" profile.
-            # MPO state is left as-is from whatever the system currently has.
-            settings.pop("disable_mpo", None)
-
         return settings
 
     def get_in_game_settings(self) -> list[dict[str, str]]:
@@ -684,10 +678,8 @@ class SlippiMeleeVRRLabProfile(SlippiMeleeProfile):
             "triple_buffering": "off",
         })
 
-        # MPO must be enabled for G-SYNC/VRR to work on Windows 11.
         settings["GraphicsSettingsHandler"] = {
             "disable_global_fso": True,
-            "disable_mpo": False,
         }
 
         settings["DolphinConfigHandler"].update({

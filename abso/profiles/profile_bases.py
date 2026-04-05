@@ -37,7 +37,8 @@ STREAMING_OBS_SETTINGS = {
 STREAMING_GRAPHICS_OVERRIDES = {
     # Multi-monitor streaming: keep compositor-friendly defaults
     "disable_global_fso": False,
-    "disable_mpo": False,
+    # MPO is handled by the applier's environment-aware detection —
+    # no profile-level opinion needed.
 }
 
 
@@ -301,7 +302,6 @@ class Rivals2BaseProfile(BaseProfile):
             },
             "GraphicsSettingsHandler": {
                 "disable_global_fso": True,
-                "disable_mpo": False,
             },
             "ServicesSettingsHandler": {
                 "preset": "gaming",
