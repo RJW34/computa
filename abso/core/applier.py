@@ -26,6 +26,7 @@ from abso.core.fallback_controller import FallbackController
 from abso.core.linter import LintResult, ProfileLinter
 from abso.core.multimon_detector import MultiMonitorDetector, MultiMonitorResult
 from abso.core.network_scope import NetworkScopeManager, NetworkScopeResult
+from abso.core.overlay_manager import OverlayManager
 from abso.core.rollback_guard import RollbackGuard, RollbackGuardResult
 from abso.core.stability_gate import StabilityGate, StabilityGateResult
 from abso.profiles.base import BaseProfile
@@ -62,6 +63,18 @@ class ApplyResult:
     rollback_overrides_applied: int = 0
     capability_blockers: int = 0
     capability_warnings: int = 0
+
+
+@dataclass
+class ProfilePreparationResult:
+    """Pre-apply environment preparation and capability evaluation."""
+
+    success: bool
+    error: str | None = None
+    multimon_result: MultiMonitorResult | None = None
+    capability_report: CapabilityReport | None = None
+    warnings: list[str] = field(default_factory=list)
+    notices: list[str] = field(default_factory=list)
 
 
 class ProfileApplier:
@@ -127,6 +140,8 @@ class ProfileApplier:
         )
         self._network_scope = NetworkScopeManager()
         self._multimon_detector = MultiMonitorDetector()
+        self._overlay_manager = OverlayManager()
+        self._prepared_profiles: dict[str, ProfilePreparationResult] = {}
 
     def _get_profile(self, profile_name: str) -> BaseProfile:
         """Get or create a profile instance.
@@ -156,12 +171,13 @@ class ProfileApplier:
         """Apply a game optimization profile with full validation.
 
         Validation pipeline:
-        1. ProfileLinter - Static validation (abort on hard errors)
-        2. MultiMonitorDetector - Environment detection
-        3. RollbackGuard - Online netcode protection
-        4. StabilityGate - Gate aggressive settings
-        5. NetworkScopeManager - Scope network settings
-        6. Apply handlers
+        1. MultiMonitorDetector - Environment detection
+        2. CapabilityEngine - Hardware/display prerequisites
+        3. ProfileLinter - Static validation (abort on hard errors)
+        4. RollbackGuard - Online netcode protection
+        5. StabilityGate - Gate aggressive settings
+        6. NetworkScopeManager - Scope network settings
+        7. Apply handlers
 
         Args:
             profile_name: Name of the profile to apply.
@@ -180,21 +196,31 @@ class ProfileApplier:
             in_game_settings=profile.has_in_game_settings(),
         )
 
-        # === PHASE 0: Capability Graph ===
-        if not self.skip_capability_checks:
-            capability_report = self._capability_engine.evaluate(profile)
-            result.capability_report = capability_report
-            result.capability_blockers = len(capability_report.blockers)
-            result.capability_warnings = len(capability_report.warnings)
-            if capability_report.has_blockers and not self.force_aggressive:
-                result.success = False
-                result.error = capability_report.blockers[0].message
-                return result
+        # === PHASE 0/1: Display prep + capability graph ===
+        preparation = self._prepared_profiles.pop(profile_name, None)
+        if preparation is None:
+            preparation = self._prepare_profile_environment(profile_name, profile)
+
+        result.multimon_result = preparation.multimon_result
+        result.capability_report = preparation.capability_report
+        for warning in preparation.warnings:
+            self._append_unique(result.warnings, warning)
+        for notice in preparation.notices:
+            self._append_unique(result.notices, notice)
+
+        if preparation.capability_report:
+            result.capability_blockers = len(preparation.capability_report.blockers)
+            result.capability_warnings = len(preparation.capability_report.warnings)
+
+        if not preparation.success and not self.force_aggressive:
+            result.success = False
+            result.error = preparation.error
+            return result
 
         # Collect all settings from profile
         settings_map = self._collect_settings(profile)
 
-        # === PHASE 1: Profile Linting ===
+        # === PHASE 2: Profile Linting ===
         if not self.skip_linting:
             lint_result = self._linter.lint(profile)
             result.lint_result = lint_result
@@ -208,31 +234,6 @@ class ProfileApplier:
                 result.success = False
                 result.error = f"Lint failed: {', '.join(error_codes)}"
                 return result
-
-        # === PHASE 2: Multi-Monitor Detection ===
-        if not self.skip_multimon_detection:
-            multimon_result = self._multimon_detector.detect()
-            result.multimon_result = multimon_result
-
-            if multimon_result.warnings:
-                for warning in multimon_result.warnings:
-                    logger.warning(f"MultiMon: {warning.message}")
-                    self._append_unique(result.warnings, warning.message)
-
-            # Environment-aware MPO: only intervene when the display
-            # environment has a known glitch risk (multi-monitor + VRR
-            # or mixed refresh).  When the environment is safe, leave
-            # the profile's value (or absence) alone so profiles can
-            # still express a preference if they have a reason.
-            mpo_rec = self._multimon_detector.get_mpo_recommendation(
-                multimon_result
-            )
-            if mpo_rec["disable_mpo"]:
-                gfx = settings_map.setdefault("GraphicsSettingsHandler", {})
-                gfx["disable_mpo"] = True
-                logger.info(f"MPO auto-disabled: {mpo_rec['reason']}")
-            else:
-                logger.debug(f"MPO not overridden: {mpo_rec['reason']}")
 
         # === PHASE 3: RollbackGuard ===
         if not self.skip_rollback_guard:
@@ -273,7 +274,7 @@ class ProfileApplier:
                 settings_map, network_result
             )
 
-        # === PHASE 6: Apply Handlers ===
+        # === PHASE 6: Build final settings / preflight ===
         config_manager = ConfigManager()
         profile_overrides = config_manager.get_profile_overrides(profile_name)
         final_settings_map = self._finalize_handler_settings(
@@ -282,6 +283,17 @@ class ProfileApplier:
             settings_map,
             profile_overrides,
         )
+
+        preflight_failures = self._run_handler_preflight(
+            profile_name,
+            profile,
+            final_settings_map,
+        )
+        if preflight_failures and not self.force_aggressive:
+            result.success = False
+            result.error = preflight_failures[0]
+            result.failed_settings = [f"Preflight: {issue}" for issue in preflight_failures]
+            return result
 
         contract_violations = self._validate_profile_contract(
             profile_name,
@@ -294,6 +306,7 @@ class ProfileApplier:
             result.failed_settings = [f"ProfileContract: {issue}" for issue in contract_violations]
             return result
 
+        # === PHASE 7: Apply Handlers ===
         applied: list[str] = []
         failed: list[str] = []
         skipped: list[str] = []
@@ -374,21 +387,113 @@ class ProfileApplier:
 
         return result
 
-    def _validate_profile_prerequisites(self, profile: BaseProfile) -> str | None:
-        """Validate hardware prerequisites before applying any settings.
+    def _prepare_profile_environment(
+        self,
+        profile_name: str,
+        profile: BaseProfile,
+    ) -> ProfilePreparationResult:
+        """Prepare display environment and evaluate capability blockers."""
+        warnings: list[str] = []
+        notices: list[str] = []
+        multimon_result = None
 
-        Returns:
-            Error message string when prerequisites are not met, otherwise None.
-        """
-        capability_report = self._capability_engine.evaluate(profile)
-        if capability_report.has_blockers:
-            return capability_report.blockers[0].message
-        return None
+        if not self.skip_multimon_detection:
+            multimon_result = self._multimon_detector.detect()
+            multimon_result, remediation = self._remediate_blocking_overlays(
+                profile,
+                multimon_result,
+            )
+            for warning in remediation.warnings:
+                self._append_unique(warnings, warning)
+            for notice in remediation.notices:
+                self._append_unique(notices, notice)
+
+            if multimon_result and multimon_result.warnings:
+                for warning in multimon_result.warnings:
+                    logger.warning("MultiMon: %s", warning.message)
+                    self._append_unique(warnings, warning.message)
+
+        capability_report = None
+        if not self.skip_capability_checks:
+            capability_report = self._capability_engine.evaluate(
+                profile,
+                multimon_result=multimon_result,
+            )
+            if capability_report.has_blockers:
+                return ProfilePreparationResult(
+                    success=False,
+                    error=capability_report.blockers[0].message,
+                    multimon_result=multimon_result,
+                    capability_report=capability_report,
+                    warnings=warnings,
+                    notices=notices,
+                )
+
+        return ProfilePreparationResult(
+            success=True,
+            multimon_result=multimon_result,
+            capability_report=capability_report,
+            warnings=warnings,
+            notices=notices,
+        )
+
+    def _remediate_blocking_overlays(
+        self,
+        profile: BaseProfile,
+        multimon_result: MultiMonitorResult | None,
+    ) -> tuple[MultiMonitorResult | None, Any]:
+        """Disable strict-profile overlay blockers and re-detect the display path."""
+        from abso.core.overlay_manager import OverlayRemediationResult
+
+        empty = OverlayRemediationResult()
+        if multimon_result is None:
+            return multimon_result, empty
+
+        requirements = getattr(profile, "display_path_requirements", None)
+        require_overlay_free_path = getattr(requirements, "require_overlay_free_path", False)
+        auto_disable = getattr(profile, "auto_disable_blocking_overlays", False)
+        overlays = list(multimon_result.environment.detected_overlays)
+
+        if (
+            not isinstance(require_overlay_free_path, bool)
+            or not require_overlay_free_path
+            or not isinstance(auto_disable, bool)
+            or not auto_disable
+            or not overlays
+        ):
+            return multimon_result, empty
+
+        remediation = self._overlay_manager.remediate(overlays)
+        if remediation.attempted_labels:
+            multimon_result = self._multimon_detector.detect()
+
+        return multimon_result, remediation
 
     def validate_profile_prerequisites(self, profile_name: str) -> str | None:
         """Validate a named profile before any transactional side effects begin."""
         profile = self._get_profile(profile_name)
-        return self._validate_profile_prerequisites(profile)
+        preparation = self._prepare_profile_environment(profile_name, profile)
+        self._prepared_profiles[profile_name] = preparation
+
+        if not preparation.success:
+            return preparation.error
+
+        config_manager = ConfigManager()
+        settings_map = self._collect_settings(profile)
+        final_settings = self._finalize_handler_settings(
+            profile,
+            profile_name,
+            settings_map,
+            config_manager.get_profile_overrides(profile_name),
+        )
+        preflight_failures = self._run_handler_preflight(
+            profile_name,
+            profile,
+            final_settings,
+        )
+        if preflight_failures:
+            return preflight_failures[0]
+        return None
 
     def _collect_settings(self, profile: BaseProfile) -> dict[str, dict[str, Any]]:
         """Collect all settings from a profile's handlers.
@@ -436,6 +541,8 @@ class ProfileApplier:
                     settings.setdefault("profile_name", profile.nvidia_profile_name)
                 if profile.nvidia_profile_aliases:
                     settings.setdefault("profile_aliases", list(profile.nvidia_profile_aliases))
+                if profile.requires_exact_nvidia_binding:
+                    settings.setdefault("require_exact_binding", True)
 
             final_settings[handler_name] = settings
 
@@ -455,6 +562,34 @@ class ProfileApplier:
             return [f"Profile contract validation crashed: {e}"]
 
         return [str(item).strip() for item in violations if str(item).strip()]
+
+    def _run_handler_preflight(
+        self,
+        profile_name: str,
+        profile: BaseProfile,
+        final_settings: dict[str, dict[str, Any]],
+    ) -> list[str]:
+        """Run handler preflight checks before any apply side effects."""
+        failures: list[str] = []
+
+        for handler in profile.get_handlers():
+            handler_name = handler.__class__.__name__
+            settings = final_settings.get(handler_name, {})
+            if not settings:
+                continue
+
+            try:
+                preflight_result = handler.preflight(settings.copy())
+            except Exception as e:
+                logger.error("Handler preflight crashed for %s/%s: %s", profile_name, handler_name, e)
+                failures.append(f"{handler_name}: preflight crashed: {e}")
+                continue
+
+            if not preflight_result.get("success", True):
+                error = str(preflight_result.get("error") or "preflight failed").strip()
+                failures.append(f"{handler_name}: {error}")
+
+        return failures
 
     @staticmethod
     def _append_unique(messages: list[str], candidate: str | None) -> None:

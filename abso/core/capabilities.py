@@ -7,6 +7,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from abso.core.detector import HardwareDetector
+from abso.core.multimon_detector import MultiMonitorDetector, MultiMonitorResult
 from abso.profiles.base import BaseProfile
 from abso.settings.windows import WindowsSettingsHandler
 
@@ -73,12 +74,24 @@ class CapabilityReport:
 class CapabilityEngine:
     """Evaluates whether a profile can be safely applied on this machine."""
 
-    def __init__(self, detector: HardwareDetector | None = None) -> None:
+    def __init__(
+        self,
+        detector: HardwareDetector | None = None,
+        multimon_detector: MultiMonitorDetector | None = None,
+    ) -> None:
         self.detector = detector or HardwareDetector()
+        self.multimon_detector = multimon_detector or MultiMonitorDetector()
 
-    def evaluate(self, profile: BaseProfile) -> CapabilityReport:
+    def evaluate(
+        self,
+        profile: BaseProfile,
+        multimon_result: MultiMonitorResult | None = None,
+    ) -> CapabilityReport:
         """Evaluate capability blockers/warnings for a profile."""
         report = CapabilityReport(profile_id=profile.profile_id)
+
+        if multimon_result is None:
+            multimon_result = self._safe_detect_multimon(report)
 
         monitors = self._safe_detect_monitors(report)
         gpu = self._safe_detect_gpu(report)
@@ -86,10 +99,29 @@ class CapabilityEngine:
         self._check_vrr_requirements(profile, monitors, report)
         self._check_gpu_vendor(profile, gpu, report)
         self._check_monitor_presence(profile, monitors, report)
+        self._check_display_path_requirements(profile, multimon_result, report)
         self._check_hdr_requirements(profile, report)
         self._check_explicit_refresh_requirements(profile, monitors, report)
 
         return report
+
+    def _safe_detect_multimon(
+        self,
+        report: CapabilityReport,
+    ) -> MultiMonitorResult | None:
+        try:
+            return self.multimon_detector.detect()
+        except Exception as e:
+            logger.warning(f"Capability display environment detection failed: {e}")
+            report.findings.append(
+                CapabilityFinding(
+                    code="DETECT_DISPLAY_ENV_FAILED",
+                    severity="warning",
+                    message="Display environment detection failed",
+                    details=str(e),
+                )
+            )
+            return None
 
     def _safe_detect_monitors(self, report: CapabilityReport) -> list[dict[str, Any]]:
         try:
@@ -143,26 +175,36 @@ class CapabilityEngine:
             )
             return
 
-        confirmed_vrr = [m for m in monitors if m.get("vrr_supported") is True]
-        if confirmed_vrr:
+        target_monitor = self._select_target_monitor(monitors)
+        if target_monitor is None:
+            report.findings.append(
+                CapabilityFinding(
+                    code="VRR_REQUIRED_NO_MONITOR_DATA",
+                    severity="blocker",
+                    message=(
+                        "Cannot confirm VRR/G-SYNC support because no monitors were detected. "
+                        "Enable monitor Adaptive Sync/FreeSync in OSD, enable G-SYNC in NVIDIA Control Panel, then retry."
+                    ),
+                )
+            )
             return
 
-        # Accept "likely" or "hardware" — the profile itself will enable G-SYNC.
-        # This avoids a catch-22 where a no-sync profile disables VRR globally,
-        # making it impossible to switch to a G-Sync profile because VRR can't
-        # be "confirmed" while it's disabled.
-        likely_vrr = [
-            m for m in monitors
-            if m.get("vrr_supported") in ("hardware", "likely")
-        ]
-        if likely_vrr:
-            names = ", ".join(m.get("name", "Unknown") for m in likely_vrr)
+        target_name = str(target_monitor.get("name", "Gaming display"))
+        target_status = target_monitor.get("vrr_supported")
+
+        if target_status is True:
+            return
+
+        # ABSO targets the most likely gaming display for VRR profiles. Accept
+        # "hardware" or "likely" on that display to avoid a catch-22 where a
+        # no-sync profile temporarily leaves VRR disabled globally.
+        if target_status in ("hardware", "likely"):
             report.findings.append(
                 CapabilityFinding(
                     code="VRR_LIKELY_ACCEPTED",
                     severity="info",
                     message=(
-                        f"VRR support detected as likely on {names}. "
+                        f"VRR support detected as likely on target gaming display '{target_name}'. "
                         "Profile will enable G-SYNC. If you experience issues, "
                         "verify Adaptive Sync/FreeSync is enabled in your monitor OSD."
                     ),
@@ -170,20 +212,75 @@ class CapabilityEngine:
             )
             return
 
-        status_summary = ", ".join(
-            f"{m.get('name', 'Unknown')}: {m.get('vrr_supported', 'unknown')}"
+        secondary_vrr = [
+            str(m.get("name", "Unknown"))
             for m in monitors
-        )
+            if m is not target_monitor and m.get("vrr_supported") in {True, "hardware", "likely"}
+        ]
+        details = None
+        if secondary_vrr:
+            details = (
+                "ABSO targets the primary gaming display for VRR profiles. "
+                f"Other VRR-capable displays detected: {', '.join(secondary_vrr)}"
+            )
         report.findings.append(
             CapabilityFinding(
                 code="VRR_REQUIRED_NOT_CONFIRMED",
                 severity="blocker",
                 message=(
-                    "No monitor with confirmed VRR/G-SYNC support was detected. "
-                    "Turn on monitor Adaptive Sync/FreeSync in OSD, enable G-SYNC in NVIDIA Control Panel, then retry. "
-                    f"Detected VRR status: {status_summary}"
+                    f"Target gaming display '{target_name}' does not report confirmed VRR/G-SYNC support. "
+                    "Turn on Adaptive Sync/FreeSync in that monitor's OSD, make sure it is the gaming display, "
+                    "enable G-SYNC in NVIDIA Control Panel, then retry."
                 ),
+                details=details,
             )
+        )
+
+    def _select_target_monitor(
+        self,
+        monitors: list[dict[str, Any]],
+    ) -> dict[str, Any] | None:
+        """Pick the best candidate for the user's active gaming display.
+
+        Current heuristic:
+        - prefer the highest active refresh
+        - then prefer displays with stronger VRR evidence
+        - then prefer the primary display as a tiebreaker
+        """
+        if not monitors:
+            return None
+
+        def vrr_score(monitor: dict[str, Any]) -> int:
+            status = monitor.get("vrr_supported")
+            if status is True:
+                return 4
+            if status == "hardware":
+                return 3
+            if status == "likely":
+                return 2
+            if status == "possible":
+                return 1
+            return 0
+
+        def refresh_score(monitor: dict[str, Any]) -> float:
+            for key in ("refresh_rate", "max_refresh_rate", "max_refresh_capability"):
+                value = monitor.get(key)
+                try:
+                    if value is not None:
+                        parsed = float(value)
+                        if parsed > 0:
+                            return parsed
+                except (TypeError, ValueError):
+                    continue
+            return 0.0
+
+        return max(
+            monitors,
+            key=lambda monitor: (
+                refresh_score(monitor),
+                vrr_score(monitor),
+                1 if monitor.get("is_primary") else 0,
+            ),
         )
 
     def _check_gpu_vendor(
@@ -236,6 +333,56 @@ class CapabilityEngine:
                 message="No monitor information detected; refresh/VRR guidance may be inaccurate.",
             )
         )
+
+    def _check_display_path_requirements(
+        self,
+        profile: BaseProfile,
+        multimon_result: MultiMonitorResult | None,
+        report: CapabilityReport,
+    ) -> None:
+        """Validate runtime display-path requirements for strict profiles."""
+        requirements = getattr(profile, "display_path_requirements", None)
+        require_overlay_free_path = getattr(requirements, "require_overlay_free_path", False)
+        if not isinstance(require_overlay_free_path, bool) or not require_overlay_free_path:
+            return
+
+        if multimon_result is None:
+            report.findings.append(
+                CapabilityFinding(
+                    code="DISPLAY_PATH_UNVERIFIED",
+                    severity="blocker",
+                    message=(
+                        "This profile requires a verified overlay-free display path, "
+                        "but display environment detection failed."
+                    ),
+                )
+            )
+            return
+
+        overlays = list(multimon_result.environment.detected_overlays)
+        if overlays:
+            fallback_profile_id = getattr(profile, "overlay_compatible_fallback_profile_id", None)
+            fallback_hint = ""
+            if isinstance(fallback_profile_id, str) and fallback_profile_id.strip():
+                fallback_hint = (
+                    f" If you need Medal/Discord/OBS-style overlays, use profile "
+                    f"'{fallback_profile_id}' instead."
+                )
+            report.findings.append(
+                CapabilityFinding(
+                    code="DISPLAY_OVERLAYS_BLOCK_EXCLUSIVE_PROFILE",
+                    severity="blocker",
+                    message=(
+                        "This fullscreen-exclusive profile requires overlays to be disabled "
+                        f"on the gaming display path. Disable: {', '.join(overlays)}."
+                        f"{fallback_hint}"
+                    ),
+                    details=(
+                        "Overlays can force borderless/composited presentation or destabilize "
+                        "VRR on the target display."
+                    ),
+                )
+            )
 
     def _check_hdr_requirements(
         self,
@@ -342,7 +489,7 @@ class CapabilityEngine:
             )
             return
 
-        primary = next((m for m in monitors if m.get("is_primary")), monitors[0])
+        primary = self._select_target_monitor(monitors) or monitors[0]
 
         candidates: list[int] = []
         for key in ("max_refresh_capability", "max_refresh_rate", "refresh_rate"):
@@ -372,11 +519,11 @@ class CapabilityEngine:
         if target_hz > max_supported:
             report.findings.append(
                 CapabilityFinding(
-                    code="REFRESH_TARGET_UNSUPPORTED",
-                    severity="blocker",
-                    message=(
-                        f"Profile requests {target_hz} Hz, but primary monitor supports up to {max_supported} Hz "
-                        "at detected capabilities. Choose a profile that matches your display."
-                    ),
-                )
+                code="REFRESH_TARGET_UNSUPPORTED",
+                severity="blocker",
+                message=(
+                    f"Profile requests {target_hz} Hz, but the target gaming display supports up to {max_supported} Hz "
+                    "at detected capabilities. Choose a profile that matches your display."
+                ),
             )
+        )

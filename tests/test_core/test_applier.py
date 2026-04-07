@@ -8,6 +8,7 @@ import pytest
 
 from abso.core.applier import ApplyResult, ProfileApplier
 from abso.core.exceptions import ProfileNotFoundError
+from abso.core.multimon_detector import DisplayEnvironment, MultiMonitorResult
 
 
 class TestApplyResultDataclass:
@@ -272,9 +273,14 @@ class TestApplyProfile:
         finally:
             del ProfileApplier.PROFILES["test-profile"]
 
+    @patch("abso.core.applier.MultiMonitorDetector.detect")
     @patch("abso.core.capabilities.HardwareDetector.detect_monitors")
-    def test_apply_profile_blocks_when_confirmed_vrr_not_detected(self, mock_detect_monitors):
+    def test_apply_profile_blocks_when_confirmed_vrr_not_detected(self, mock_detect_monitors, mock_multimon_detect):
         """VRR-required profiles should fail when VRR is not confirmed or likely."""
+        mock_multimon_detect.return_value = MultiMonitorResult(
+            environment=DisplayEnvironment(monitor_count=1),
+            warnings=[],
+        )
         mock_detect_monitors.return_value = [
             {"name": "Test Monitor", "vrr_supported": "possible", "refresh_rate": 240}
         ]
@@ -283,18 +289,24 @@ class TestApplyProfile:
         result = applier.apply_profile("overwatch2-gsync")
 
         assert result.success is False
-        assert "No monitor with confirmed VRR/G-SYNC support was detected" in (result.error or "")
+        assert "does not report confirmed VRR/G-SYNC support" in (result.error or "")
 
     @patch("abso.core.capabilities.WindowsSettingsHandler.detect")
     @patch("abso.core.capabilities.HardwareDetector.detect_gpu")
     @patch("abso.core.capabilities.HardwareDetector.detect_monitors")
+    @patch("abso.core.applier.MultiMonitorDetector.detect")
     def test_apply_profile_blocks_hdr_profile_when_no_hdr_capable_display(
         self,
+        mock_multimon_detect,
         mock_detect_monitors,
         mock_detect_gpu,
         mock_windows_detect,
     ):
         """HDR-native profiles should fail before handler apply when no HDR-capable output exists."""
+        mock_multimon_detect.return_value = MultiMonitorResult(
+            environment=DisplayEnvironment(monitor_count=1),
+            warnings=[],
+        )
         mock_detect_monitors.return_value = [
             {"name": "Test Monitor", "vrr_supported": True, "refresh_rate": 240}
         ]
@@ -310,9 +322,14 @@ class TestApplyProfile:
         assert result.success is False
         assert "requires at least one HDR-capable active display" in (result.error or "")
 
+    @patch("abso.core.applier.MultiMonitorDetector.detect")
     @patch("abso.core.capabilities.HardwareDetector.detect_monitors")
-    def test_apply_profile_allows_when_confirmed_vrr_detected(self, mock_detect_monitors):
+    def test_apply_profile_allows_when_confirmed_vrr_detected(self, mock_detect_monitors, mock_multimon_detect):
         """VRR-required mock profile should apply when a confirmed VRR monitor is detected."""
+        mock_multimon_detect.return_value = MultiMonitorResult(
+            environment=DisplayEnvironment(monitor_count=1),
+            warnings=[],
+        )
         mock_detect_monitors.return_value = [
             {"name": "Test Monitor", "vrr_supported": True, "refresh_rate": 240}
         ]
@@ -338,6 +355,192 @@ class TestApplyProfile:
             assert "TestHandler" in result.applied_settings
         finally:
             del ProfileApplier.PROFILES["test-gsync-profile"]
+
+    def test_apply_profile_does_not_auto_inject_mpo_disable(self):
+        """Multi-monitor warnings should not silently force an MPO reboot anymore."""
+        handler = MagicMock()
+        handler.__class__.__name__ = "GraphicsSettingsHandler"
+        handler.apply.return_value = {"success": True}
+
+        mock_profile = MagicMock()
+        mock_profile.requires_confirmed_vrr_support = False
+        mock_profile.get_handlers.return_value = [handler]
+        mock_profile.get_settings.return_value = {}
+        mock_profile.has_in_game_settings.return_value = False
+        mock_profile.validate_settings.return_value = []
+
+        applier = ProfileApplier(skip_capability_checks=True)
+        applier._profiles["test-profile"] = mock_profile
+        ProfileApplier.PROFILES["test-profile"] = type(mock_profile)
+        applier._multimon_detector.detect = MagicMock(return_value=MultiMonitorResult(
+            environment=DisplayEnvironment(
+                monitor_count=2,
+                has_mixed_refresh=True,
+                detected_overlays=["Discord Overlay"],
+            ),
+            warnings=[],
+        ))
+
+        try:
+            result = applier.apply_profile("test-profile")
+
+            assert result.success is True
+            handler.apply.assert_called_once_with({})
+        finally:
+            del ProfileApplier.PROFILES["test-profile"]
+
+    def test_apply_profile_blocks_on_handler_preflight_failure(self):
+        """Handler preflight failures should abort before apply side effects."""
+        handler = MagicMock()
+        handler.__class__.__name__ = "NvidiaSettingsHandler"
+        handler.preflight.return_value = {
+            "success": False,
+            "error": "Exact NVIDIA executable binding could not be confirmed.",
+        }
+
+        mock_profile = MagicMock()
+        mock_profile.requires_confirmed_vrr_support = False
+        mock_profile.requires_exact_nvidia_binding = False
+        mock_profile.nvidia_profile_name = None
+        mock_profile.nvidia_profile_aliases = []
+        mock_profile.executable_hints = ["Overwatch.exe"]
+        mock_profile.display_name = "Overwatch 2 - GSYNC"
+        mock_profile.profile_id = "test-preflight-profile"
+        mock_profile.get_handlers.return_value = [handler]
+        mock_profile.get_settings.return_value = {"preset": "reflex_gsync"}
+        mock_profile.has_in_game_settings.return_value = False
+        mock_profile.validate_settings.return_value = []
+
+        applier = ProfileApplier(skip_capability_checks=True)
+        applier._profiles["test-preflight-profile"] = mock_profile
+        ProfileApplier.PROFILES["test-preflight-profile"] = type(mock_profile)
+
+        try:
+            result = applier.apply_profile("test-preflight-profile")
+
+            assert result.success is False
+            assert "Exact NVIDIA executable binding could not be confirmed" in (result.error or "")
+            handler.apply.assert_not_called()
+        finally:
+            del ProfileApplier.PROFILES["test-preflight-profile"]
+
+    @patch("abso.core.applier.MultiMonitorDetector.detect")
+    def test_apply_profile_auto_disables_blocking_overlays_for_strict_profile(
+        self,
+        mock_multimon_detect,
+    ):
+        """Strict overlay-free profiles should remediate known overlays before blocking."""
+        mock_multimon_detect.side_effect = [
+            MultiMonitorResult(
+                environment=DisplayEnvironment(
+                    monitor_count=2,
+                    detected_overlays=["Discord Overlay", "Xbox Game Bar"],
+                ),
+                warnings=[],
+            ),
+            MultiMonitorResult(
+                environment=DisplayEnvironment(
+                    monitor_count=2,
+                    detected_overlays=[],
+                ),
+                warnings=[],
+            ),
+        ]
+
+        handler = MagicMock()
+        handler.__class__.__name__ = "TestHandler"
+        handler.apply.return_value = {"success": True}
+
+        mock_profile = MagicMock()
+        mock_profile.requires_confirmed_vrr_support = False
+        mock_profile.display_path_requirements.require_overlay_free_path = True
+        mock_profile.auto_disable_blocking_overlays = True
+        mock_profile.get_handlers.return_value = [handler]
+        mock_profile.get_settings.return_value = {}
+        mock_profile.has_in_game_settings.return_value = False
+        mock_profile.validate_settings.return_value = []
+
+        applier = ProfileApplier(skip_capability_checks=True)
+        applier._profiles["strict-profile"] = mock_profile
+        ProfileApplier.PROFILES["strict-profile"] = type(mock_profile)
+
+        with patch.object(applier._overlay_manager, "remediate") as mock_remediate:
+            mock_remediate.return_value.notices = [
+                "ABSO disabled Discord Overlay automatically so the strict fullscreen path could be applied."
+            ]
+            mock_remediate.return_value.warnings = []
+            mock_remediate.return_value.attempted_labels = [
+                "Discord Overlay",
+                "Xbox Game Bar",
+            ]
+
+            try:
+                result = applier.apply_profile("strict-profile")
+
+                assert result.success is True
+                assert any("Discord Overlay" in notice for notice in result.notices)
+                mock_remediate.assert_called_once_with(["Discord Overlay", "Xbox Game Bar"])
+            finally:
+                del ProfileApplier.PROFILES["strict-profile"]
+
+    @patch("abso.core.applier.MultiMonitorDetector.detect")
+    def test_validate_profile_prerequisites_caches_overlay_remediation_for_transaction_flow(
+        self,
+        mock_multimon_detect,
+    ):
+        """Transaction pre-validation should preserve remediation notices for the later apply."""
+        mock_multimon_detect.side_effect = [
+            MultiMonitorResult(
+                environment=DisplayEnvironment(
+                    monitor_count=2,
+                    detected_overlays=["Discord Overlay"],
+                ),
+                warnings=[],
+            ),
+            MultiMonitorResult(
+                environment=DisplayEnvironment(
+                    monitor_count=2,
+                    detected_overlays=[],
+                ),
+                warnings=[],
+            ),
+        ]
+
+        handler = MagicMock()
+        handler.__class__.__name__ = "TestHandler"
+        handler.apply.return_value = {"success": True}
+
+        mock_profile = MagicMock()
+        mock_profile.profile_id = "strict-profile"
+        mock_profile.requires_confirmed_vrr_support = False
+        mock_profile.display_path_requirements.require_overlay_free_path = True
+        mock_profile.auto_disable_blocking_overlays = True
+        mock_profile.get_handlers.return_value = [handler]
+        mock_profile.get_settings.return_value = {}
+        mock_profile.has_in_game_settings.return_value = False
+        mock_profile.validate_settings.return_value = []
+
+        applier = ProfileApplier(skip_capability_checks=True)
+        applier._profiles["strict-profile"] = mock_profile
+        ProfileApplier.PROFILES["strict-profile"] = type(mock_profile)
+
+        with patch.object(applier._overlay_manager, "remediate") as mock_remediate:
+            mock_remediate.return_value.notices = [
+                "ABSO disabled Discord Overlay automatically so the strict fullscreen path could be applied."
+            ]
+            mock_remediate.return_value.warnings = []
+            mock_remediate.return_value.attempted_labels = ["Discord Overlay"]
+
+            try:
+                error = applier.validate_profile_prerequisites("strict-profile")
+                assert error is None
+
+                result = applier.apply_profile("strict-profile")
+                assert result.success is True
+                assert any("Discord Overlay" in notice for notice in result.notices)
+                assert mock_remediate.call_count == 1
+            finally:
+                del ProfileApplier.PROFILES["strict-profile"]
 
 
 class TestGenerateReport:

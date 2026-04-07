@@ -64,3 +64,60 @@ class TestMultiMonitorDetector:
         assert "Steam Overlay" not in env.detected_overlays
         assert "Xbox Game Bar" in env.detected_overlays
 
+    @patch("abso.core.multimon_detector.subprocess.run")
+    @patch("abso.core.multimon_detector.HardwareDetector.detect_monitors", return_value=[])
+    def test_overlay_detection_does_not_treat_discord_client_as_overlay(
+        self,
+        _mock_detect_monitors,
+        mock_subprocess_run,
+    ):
+        """discord.exe alone should not trigger the strict Discord overlay blocker."""
+        mock_subprocess_run.return_value = MagicMock(
+            returncode=0,
+            stdout='"discord.exe","1111","Console","1","10000 K"\n',
+        )
+
+        detector = MultiMonitorDetector()
+        env = DisplayEnvironment()
+        detector._detect_overlays(env)
+
+        assert "Discord Overlay" not in env.detected_overlays
+
+    @patch("abso.core.multimon_detector.subprocess.run")
+    @patch("abso.core.multimon_detector.HardwareDetector.detect_monitors", return_value=[])
+    def test_overlay_detection_treats_discord_hook_helper_as_overlay(
+        self,
+        _mock_detect_monitors,
+        mock_subprocess_run,
+    ):
+        """Discord overlay helper processes should remain hard blockers for strict profiles."""
+        mock_subprocess_run.return_value = MagicMock(
+            returncode=0,
+            stdout='"DiscordHookHelper64.exe","1111","Console","1","10000 K"\n',
+        )
+
+        detector = MultiMonitorDetector()
+        env = DisplayEnvironment()
+        detector._detect_overlays(env)
+
+        assert "Discord Overlay" in env.detected_overlays
+
+    @patch("abso.core.multimon_detector.subprocess.run")
+    @patch("abso.core.multimon_detector.HardwareDetector.detect_monitors", return_value=[])
+    def test_overlay_detection_includes_medal(
+        self,
+        _mock_detect_monitors,
+        mock_subprocess_run,
+    ):
+        """Medal should be treated as an overlay/capture blocker for strict profiles."""
+        mock_subprocess_run.return_value = MagicMock(
+            returncode=0,
+            stdout='"medal.exe","1111","Console","1","10000 K"\n'
+                   '"medalencoder.exe","2222","Console","1","12000 K"\n',
+        )
+
+        detector = MultiMonitorDetector()
+        env = DisplayEnvironment()
+        detector._detect_overlays(env)
+
+        assert "Medal Overlay" in env.detected_overlays

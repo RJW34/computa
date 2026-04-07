@@ -1510,6 +1510,131 @@ class DRSProfileManager:
 
         return results
 
+    def probe_profile_binding(
+        self,
+        app_executables: list[str],
+        profile_name: str | None = None,
+        profile_aliases: list[str] | None = None,
+    ) -> dict[str, Any]:
+        """Inspect whether executables are already owned by the target profile.
+
+        This is a read-only preflight used by strict profiles that refuse to
+        touch NVIDIA state unless exact executable ownership can be proven.
+        """
+        executables = [str(exe).strip() for exe in app_executables if str(exe).strip()]
+        if not executables:
+            return {
+                "app_binding_exact": False,
+                "app_binding_note": "No executables were provided for NVIDIA binding verification.",
+            }
+
+        profile_name_was_explicit = profile_name is not None
+        if profile_name is None:
+            app_base = executables[0].rsplit(".", 1)[0]
+            profile_name = f"ABSO - {app_base}"
+
+        requested_profile_name = str(profile_name)
+        results: dict[str, Any] = {
+            "profile_name": requested_profile_name,
+            "requested_profile_name": requested_profile_name,
+            "app_binding_exact": False,
+            "app_binding_state": "unverified",
+        }
+
+        try:
+            with self._drs as drs:
+                selected_profile_name, existing_profile_num_apps, selection_note = (
+                    self._select_profile_target(drs, requested_profile_name, profile_aliases)
+                )
+                selected_from_alias = selected_profile_name != requested_profile_name
+                results["profile_name"] = selected_profile_name
+                if selection_note:
+                    results["profile_selection_note"] = selection_note
+
+                profile = drs.find_profile_by_name(selected_profile_name)
+                if not profile:
+                    results["app_binding_state"] = "profile_missing"
+                    results["app_binding_note"] = (
+                        f"NVIDIA profile '{selected_profile_name}' does not exist yet, so ABSO cannot "
+                        "prove exact executable ownership safely."
+                    )
+                    return results
+
+                owner_profile_names = {
+                    exe: self._get_application_owner_profile_name(drs, exe)
+                    for exe in executables
+                }
+                on_selected_profile = {
+                    exe: self._profile_contains_application(drs, profile, exe)
+                    for exe in executables
+                }
+                for exe, contained in on_selected_profile.items():
+                    if contained and not owner_profile_names.get(exe):
+                        owner_profile_names[exe] = selected_profile_name
+
+                results["app_binding_owner_profiles"] = {
+                    exe: owner for exe, owner in owner_profile_names.items() if owner
+                }
+
+                exact_executables = [
+                    exe for exe, owner in owner_profile_names.items()
+                    if owner == selected_profile_name
+                ]
+                conflicting_executables = {
+                    exe: owner
+                    for exe, owner in owner_profile_names.items()
+                    if owner and owner != selected_profile_name
+                }
+
+                if len(exact_executables) == len(executables):
+                    results["app_binding_exact"] = True
+                    results["app_binding_state"] = "confirmed"
+                    results["app_binding_note"] = (
+                        f"ABSO confirmed exact NVIDIA ownership for profile '{selected_profile_name}'."
+                    )
+                    return results
+
+                if conflicting_executables:
+                    conflict_summary = ", ".join(
+                        f"{exe} -> {owner}"
+                        for exe, owner in sorted(conflicting_executables.items())
+                    )
+                    results["app_binding_state"] = "bound_elsewhere"
+                    results["app_binding_note"] = (
+                        f"One or more executables are currently owned by different NVIDIA profiles "
+                        f"({conflict_summary}), not '{selected_profile_name}'."
+                    )
+                    return results
+
+                profile_num_apps = self._get_profile_num_apps(drs, selected_profile_name)
+                if selected_from_alias and existing_profile_num_apps > 0 and (profile_num_apps or 0) > 0:
+                    results["app_binding_state"] = "reused_family_profile"
+                    results["app_binding_note"] = (
+                        f"Reused existing bound NVIDIA profile '{selected_profile_name}', but NVAPI could not "
+                        "prove every executable is currently attached to it."
+                    )
+                    return results
+
+                if profile_name_was_explicit and existing_profile_num_apps > 0 and (profile_num_apps or 0) > 0:
+                    results["app_binding_state"] = "existing_profile_unverified"
+                    results["app_binding_note"] = (
+                        f"Profile '{selected_profile_name}' already exists and has bound applications, but "
+                        "NVAPI could not prove every executable belongs to it."
+                    )
+                    return results
+
+                results["app_binding_state"] = "manual_required"
+                results["app_binding_note"] = (
+                    f"ABSO could not prove that {', '.join(executables)} already belong to NVIDIA profile "
+                    f"'{selected_profile_name}'."
+                )
+                return results
+        except Exception as e:
+            logger.error("Failed to probe NVIDIA profile binding: %s", e)
+            results["app_binding_state"] = "probe_failed"
+            results["app_binding_note"] = f"Failed to probe NVIDIA binding state: {e}"
+            return results
+
     def apply_settings_to_profile(
         self,
         app_executables: list[str],

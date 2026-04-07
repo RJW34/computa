@@ -26,8 +26,11 @@ def build_health_report(
 
     try:
         startup_status = get_startup_status()
+        startup_ok = bool(startup_status.get("installed"))
+        if startup_status.get("mode") == "scheduled_task":
+            startup_ok = startup_ok and bool(startup_status.get("task_highest", True))
         checks["tray_startup"] = {
-            "status": "ok" if startup_status.get("installed") else "warning",
+            "status": "ok" if startup_ok else "warning",
             "data": startup_status,
         }
     except Exception as e:

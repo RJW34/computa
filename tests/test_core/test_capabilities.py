@@ -5,6 +5,8 @@ from __future__ import annotations
 from unittest.mock import MagicMock, patch
 
 from abso.core.capabilities import CapabilityEngine
+from abso.core.multimon_detector import DisplayEnvironment, MultiMonitorResult
+from abso.profiles.base import DisplayPathRequirements
 
 
 def _make_profile(
@@ -15,6 +17,7 @@ def _make_profile(
     profile = MagicMock()
     profile.profile_id = profile_id
     profile.requires_confirmed_vrr_support = requires_confirmed_vrr_support
+    profile.display_path_requirements = DisplayPathRequirements()
     settings_map = settings_map or {}
     profile.get_settings.side_effect = lambda handler_name: settings_map.get(handler_name, {})
     return profile
@@ -75,6 +78,56 @@ def test_capability_blocks_vrr_profile_when_vrr_only_possible() -> None:
     assert any(f.code == "VRR_REQUIRED_NOT_CONFIRMED" for f in report.findings)
 
 
+def test_capability_targets_highest_refresh_vrr_display_even_if_not_primary() -> None:
+    detector = MagicMock()
+    detector.detect_monitors.return_value = [
+        {
+            "name": "Secondary Office Display",
+            "vrr_supported": "possible",
+            "is_primary": True,
+            "refresh_rate": 60,
+        },
+        {
+            "name": "LG UltraGear",
+            "vrr_supported": True,
+            "is_primary": False,
+            "refresh_rate": 300,
+        },
+    ]
+    detector.detect_gpu.return_value = {"name": "NVIDIA GeForce RTX 4090"}
+    profile = _make_profile("overwatch2-gsync", requires_confirmed_vrr_support=True)
+
+    report = CapabilityEngine(detector).evaluate(profile)
+
+    assert report.has_blockers is False
+
+
+def test_capability_blocks_vrr_profile_when_target_gaming_display_lacks_confirmed_vrr() -> None:
+    detector = MagicMock()
+    detector.detect_monitors.return_value = [
+        {
+            "name": "Office Display",
+            "vrr_supported": True,
+            "is_primary": True,
+            "refresh_rate": 60,
+        },
+        {
+            "name": "LG UltraGear",
+            "vrr_supported": "possible",
+            "is_primary": False,
+            "refresh_rate": 300,
+        },
+    ]
+    detector.detect_gpu.return_value = {"name": "NVIDIA GeForce RTX 4090"}
+    profile = _make_profile("overwatch2-gsync", requires_confirmed_vrr_support=True)
+
+    report = CapabilityEngine(detector).evaluate(profile)
+
+    assert report.has_blockers is True
+    assert any(f.code == "VRR_REQUIRED_NOT_CONFIRMED" for f in report.findings)
+    assert any("LG UltraGear" in f.message for f in report.findings if f.code == "VRR_REQUIRED_NOT_CONFIRMED")
+
+
 def test_capability_warns_on_non_nvidia_gpu() -> None:
     detector = MagicMock()
     detector.detect_monitors.return_value = [{"name": "Primary", "vrr_supported": True}]
@@ -85,6 +138,30 @@ def test_capability_warns_on_non_nvidia_gpu() -> None:
 
     assert any(f.code == "GPU_NOT_NVIDIA" for f in report.findings)
     assert report.to_dict()["warnings"] >= 1
+
+
+def test_capability_blocks_overlay_sensitive_profile_when_overlays_are_detected() -> None:
+    detector = MagicMock()
+    detector.detect_monitors.return_value = [
+        {"name": "LG UltraGear", "vrr_supported": True, "is_primary": True}
+    ]
+    detector.detect_gpu.return_value = {"name": "NVIDIA GeForce RTX 4090"}
+    profile = _make_profile("overwatch2-gsync", requires_confirmed_vrr_support=True)
+    profile.display_path_requirements = DisplayPathRequirements(require_overlay_free_path=True)
+    profile.overlay_compatible_fallback_profile_id = "overwatch2-gsync-capture"
+    multimon_result = MultiMonitorResult(
+        environment=DisplayEnvironment(
+            monitors=[],
+            monitor_count=1,
+            detected_overlays=["Discord Overlay", "Xbox Game Bar"],
+        )
+    )
+
+    report = CapabilityEngine(detector).evaluate(profile, multimon_result=multimon_result)
+
+    assert report.has_blockers is True
+    finding = next(f for f in report.findings if f.code == "DISPLAY_OVERLAYS_BLOCK_EXCLUSIVE_PROFILE")
+    assert "overwatch2-gsync-capture" in finding.message
 
 
 def test_capability_blocks_fixed_refresh_when_monitor_cannot_support_it() -> None:

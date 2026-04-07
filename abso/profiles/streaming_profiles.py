@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from abso.profiles.fortnite import FortniteProfile
-from abso.profiles.overwatch2 import Overwatch2GSyncHDRProfile
+from abso.profiles.overwatch2 import Overwatch2GSyncHDRCaptureProfile
 from abso.profiles.pacdeluxe import PACDeluxeProfile
 from abso.profiles.profile_bases import OBSStreamingMixin
 from abso.profiles.rivals2_online import Rivals2OnlineProfile
@@ -75,7 +75,7 @@ class RyujinxSSBUStreamingProfile(OBSStreamingMixin, RyujinxSSBUProfile):
         return "Streaming-optimized Ryujinx profile for multi-monitor setups"
 
 
-class Overwatch2GSyncHDRStreamingProfile(OBSStreamingMixin, Overwatch2GSyncHDRProfile):
+class Overwatch2GSyncHDRStreamingProfile(OBSStreamingMixin, Overwatch2GSyncHDRCaptureProfile):
     """Streaming profile for Overwatch 2 G-SYNC HDR with OBS settings applied."""
 
     @property

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, Literal
 
+from abso.profiles.base import DisplayPathRequirements
 from abso.profiles.profile_bases import ReflexShooterBaseProfile
 
 if TYPE_CHECKING:
@@ -183,8 +184,23 @@ class Overwatch2GSyncProfile(_Overwatch2BaseProfile):
     def requires_confirmed_vrr_support(self) -> bool:
         return True
 
+    @property
+    def display_path_requirements(self) -> DisplayPathRequirements:
+        return DisplayPathRequirements(require_overlay_free_path=True)
+
+    @property
+    def requires_exact_nvidia_binding(self) -> bool:
+        return True
+
+    @property
+    def overlay_compatible_fallback_profile_id(self) -> str | None:
+        return "overwatch2-gsync-capture"
+
     def _variant_overrides(self) -> dict[str, dict[str, Any]]:
         return {
+            "GraphicsSettingsHandler": {
+                "disable_mpo": False,
+            },
             "NvidiaSettingsHandler": {
                 "preset": "reflex_gsync",
                 # Use NVIDIA's predefined OW2 profile to avoid executable binding conflicts.
@@ -283,6 +299,18 @@ class Overwatch2GSyncHDRProfile(_Overwatch2BaseProfile):
     def requires_confirmed_vrr_support(self) -> bool:
         return True
 
+    @property
+    def display_path_requirements(self) -> DisplayPathRequirements:
+        return DisplayPathRequirements(require_overlay_free_path=True)
+
+    @property
+    def requires_exact_nvidia_binding(self) -> bool:
+        return True
+
+    @property
+    def overlay_compatible_fallback_profile_id(self) -> str | None:
+        return "overwatch2-gsync-hdr-capture"
+
     def _base_overrides(self) -> dict[str, dict[str, Any]]:
         base = super()._base_overrides()
         base.update({
@@ -305,6 +333,9 @@ class Overwatch2GSyncHDRProfile(_Overwatch2BaseProfile):
 
     def _variant_overrides(self) -> dict[str, dict[str, Any]]:
         return {
+            "GraphicsSettingsHandler": {
+                "disable_mpo": False,
+            },
             "NvidiaSettingsHandler": {
                 "preset": "reflex_gsync",
                 "profile_name": "Overwatch 2",
@@ -387,5 +418,234 @@ class Overwatch2GSyncHDRProfile(_Overwatch2BaseProfile):
                 "setting": "Shadows / Effects",
                 "value": "Low",
                 "reason": "Minimizes frame spikes during heavy ability usage.",
+            },
+        ]
+
+
+class Overwatch2GSyncCaptureProfile(_Overwatch2BaseProfile):
+    """Capture-safe Overwatch 2 VRR profile.
+
+    Uses the borderless/windowed G-SYNC path so Medal/Discord/OBS-style
+    overlays can coexist with VRR more predictably than the strict
+    fullscreen-exclusive esports path.
+    """
+
+    @property
+    def profile_id(self) -> str:
+        return "overwatch2-gsync-capture"
+
+    @property
+    def display_name(self) -> str:
+        return "Overwatch 2 - GSYNC Capture-Safe"
+
+    @property
+    def description(self) -> str:
+        return "Borderless/windowed VRR path for clipping, overlays, and capture apps"
+
+    @property
+    def requires_confirmed_vrr_support(self) -> bool:
+        return True
+
+    def _variant_overrides(self) -> dict[str, dict[str, Any]]:
+        return {
+            "WindowsSettingsHandler": {
+                "windowed_optimizations": True,
+                "vrr_optimize": True,
+            },
+            "GraphicsSettingsHandler": {
+                "disable_global_fso": False,
+                "disable_mpo": False,
+            },
+            "NvidiaSettingsHandler": {
+                "preset": "reflex_gsync",
+                "profile_name": "Overwatch 2",
+                "auto_vrr_fps_cap": True,
+                "global_vrr_mode": "fullscreen_and_windowed",
+            },
+            "ColorProfileSettingsHandler": {
+                "digital_vibrance": 45,
+            },
+            "OW2ConfigHandler": {
+                "window_mode": 1,
+                "auto_vrr_fps_cap": True,
+            },
+        }
+
+    def get_in_game_settings(self) -> list[dict[str, str]]:
+        return [
+            {
+                "category": "Display",
+                "setting": "Display Mode",
+                "value": "Borderless / Windowed Fullscreen",
+                "reason": (
+                    "Capture-safe path: keeps Medal/Discord/OBS overlays compatible while "
+                    "using the windowed G-SYNC path. Use the strict fullscreen profile if "
+                    "you want the absolute lowest latency and no overlays."
+                ),
+            },
+            {
+                "category": "Display",
+                "setting": "VSync",
+                "value": "Off (in-game)",
+                "reason": "Use NVCP VSync as the VRR safety net; keep in-game VSync off.",
+            },
+            {
+                "category": "Display",
+                "setting": "NVIDIA Reflex Low Latency",
+                "value": "Enabled + Boost",
+                "reason": "Native Reflex should own queue control.",
+            },
+            {
+                "category": "Display",
+                "setting": "Frame Rate Cap",
+                "value": "Auto (refresh - 3)",
+                "reason": "Set by ABSO for stable windowed G-SYNC behavior below refresh.",
+            },
+            {
+                "category": "Display",
+                "setting": "Reduce Buffering",
+                "value": "On",
+                "reason": "Maintains low queue depth without fighting the capture-safe path.",
+            },
+            {
+                "category": "Graphics",
+                "setting": "Dynamic Render Scale",
+                "value": "Off",
+                "reason": "Avoid frame pacing swings while recording/clipping.",
+            },
+            {
+                "category": "Graphics",
+                "setting": "Shadows / Effects",
+                "value": "Low",
+                "reason": "Minimizes frame spikes during heavy team fights and capture load.",
+            },
+        ]
+
+
+class Overwatch2GSyncHDRCaptureProfile(_Overwatch2BaseProfile):
+    """Capture-safe HDR Overwatch 2 VRR profile."""
+
+    @property
+    def profile_id(self) -> str:
+        return "overwatch2-gsync-hdr-capture"
+
+    @property
+    def display_name(self) -> str:
+        return "Overwatch 2 - GSYNC HDR Capture-Safe"
+
+    @property
+    def description(self) -> str:
+        return "Borderless/windowed HDR VRR path for clipping, overlays, and capture apps"
+
+    @property
+    def requires_confirmed_vrr_support(self) -> bool:
+        return True
+
+    def _base_overrides(self) -> dict[str, dict[str, Any]]:
+        base = super()._base_overrides()
+        base.update({
+            "WindowsSettingsHandler": {
+                "hdr": True,
+                "auto_hdr": False,
+            },
+            "ColorProfileSettingsHandler": {
+                "icc_profile": "native",
+                "digital_vibrance": 50,
+                "show_osd_guidance": True,
+                "game_type": "competitive_fps",
+            },
+            "OW2ConfigHandler": {
+                **base.get("OW2ConfigHandler", {}),
+                "hdr": True,
+            },
+        })
+        return base
+
+    def _variant_overrides(self) -> dict[str, dict[str, Any]]:
+        return {
+            "WindowsSettingsHandler": {
+                "windowed_optimizations": True,
+                "vrr_optimize": True,
+            },
+            "GraphicsSettingsHandler": {
+                "disable_global_fso": False,
+                "disable_mpo": False,
+            },
+            "NvidiaSettingsHandler": {
+                "preset": "reflex_gsync",
+                "profile_name": "Overwatch 2",
+                "auto_vrr_fps_cap": True,
+                "global_vrr_mode": "fullscreen_and_windowed",
+            },
+            "OW2ConfigHandler": {
+                "window_mode": 1,
+                "auto_vrr_fps_cap": True,
+            },
+        }
+
+    def get_in_game_settings(self) -> list[dict[str, str]]:
+        return [
+            {
+                "category": "Display",
+                "setting": "Display Mode",
+                "value": "Borderless / Windowed Fullscreen",
+                "reason": (
+                    "Capture-safe HDR path: keeps Medal/Discord/OBS overlays compatible while "
+                    "using windowed G-SYNC. Use the strict HDR profile only when overlays are off."
+                ),
+            },
+            {
+                "category": "Display",
+                "setting": "VSync",
+                "value": "Off (in-game)",
+                "reason": "Use NVCP VSync as the VRR safety net; keep in-game VSync off.",
+            },
+            {
+                "category": "Display",
+                "setting": "NVIDIA Reflex Low Latency",
+                "value": "Enabled + Boost",
+                "reason": "Native Reflex should own queue control.",
+            },
+            {
+                "category": "Display",
+                "setting": "Frame Rate Cap",
+                "value": "Auto (refresh - 3)",
+                "reason": "Set by ABSO for stable windowed G-SYNC behavior below refresh.",
+            },
+            {
+                "category": "Display",
+                "setting": "Reduce Buffering",
+                "value": "On",
+                "reason": "Maintains low queue depth without fighting the capture-safe path.",
+            },
+            {
+                "category": "Display",
+                "setting": "HDR Mode",
+                "value": "On",
+                "reason": "Native HDR output for OLED/Mini-LED displays on the capture-safe path.",
+            },
+            {
+                "category": "Display",
+                "setting": "HDR Paper White Nits",
+                "value": "~200 (calibrate to taste)",
+                "reason": "Controls SDR-content brightness under HDR.",
+            },
+            {
+                "category": "Display",
+                "setting": "HDR Max Display Brightness",
+                "value": "Match monitor peak",
+                "reason": "Set to your display's actual peak brightness for correct tone mapping.",
+            },
+            {
+                "category": "Graphics",
+                "setting": "Dynamic Render Scale",
+                "value": "Off",
+                "reason": "Avoid frame pacing swings while recording/clipping.",
+            },
+            {
+                "category": "Graphics",
+                "setting": "Shadows / Effects",
+                "value": "Low",
+                "reason": "Minimizes frame spikes during heavy team fights and capture load.",
             },
         ]

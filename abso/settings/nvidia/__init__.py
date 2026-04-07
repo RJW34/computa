@@ -229,22 +229,28 @@ class NvidiaSettingsHandler(SettingsHandler):
 
         return issues
 
-    def apply(self, settings: dict[str, Any]) -> dict[str, Any]:
-        """Apply NVIDIA settings using direct NVAPI DRS integration.
+    @staticmethod
+    def _allowed_setting_keys() -> tuple[str, ...]:
+        return (
+            "low_latency_mode",
+            "power_management",
+            "vsync",
+            "max_frame_rate",
+            "shader_cache",
+            "threaded_optimization",
+            "triple_buffering",
+            "vrr_app_override",
+            "vsync_tear_control",
+            "vsync_vrr_control",
+        )
 
-        This uses NVAPI's DRS (Driver Settings) API directly, allowing safe
-        per-game profile modification without wiping the entire profile database.
+    def _extract_requested_settings(
+        self,
+        raw_settings: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Normalize NVIDIA handler settings for preflight/apply paths."""
+        settings = raw_settings.copy()
 
-        Args:
-            settings: Dictionary of settings to apply.
-        """
-        settings = settings.copy()
-        applied: list[str] = []
-        errors: list[str] = []
-        warnings: list[str] = []
-        notices: list[str] = []
-
-        # Extract game info
         executables = settings.pop("executables", [])
         game_name = settings.pop("game_name", "Game")
         driver_profile_name = settings.pop("profile_name", None)
@@ -253,14 +259,13 @@ class NvidiaSettingsHandler(SettingsHandler):
             str(alias) for alias in raw_profile_aliases
             if isinstance(alias, str) and alias.strip()
         ]
-        global_settings: dict[str, Any] = {}
+        require_exact_binding = bool(settings.pop("require_exact_binding", False))
 
-        # Optional explicit global/base-profile settings
+        global_settings: dict[str, Any] = {}
         raw_global_settings = settings.pop("global_settings", None)
         if isinstance(raw_global_settings, dict):
             global_settings.update(raw_global_settings)
 
-        # Convenience aliases for global G-SYNC mode control
         for key in ("global_vrr_mode", "global_gsync_mode", "vrr_mode"):
             value = settings.pop(key, None)
             if value is not None:
@@ -273,9 +278,123 @@ class NvidiaSettingsHandler(SettingsHandler):
             else:
                 global_settings["vrr_mode"] = global_gsync
 
-        # Optional auto-cap for VRR profiles (refresh - 3)
         auto_vrr_fps_cap = bool(settings.pop("auto_vrr_fps_cap", False))
         forced_refresh_hz = settings.pop("vrr_refresh_rate_hz", None)
+
+        return {
+            "settings": settings,
+            "executables": executables,
+            "game_name": game_name,
+            "driver_profile_name": driver_profile_name,
+            "driver_profile_aliases": driver_profile_aliases,
+            "global_settings": global_settings,
+            "auto_vrr_fps_cap": auto_vrr_fps_cap,
+            "forced_refresh_hz": forced_refresh_hz,
+            "require_exact_binding": require_exact_binding,
+        }
+
+    def _resolve_requested_nvidia_settings(
+        self,
+        settings: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Resolve preset-backed per-app NVIDIA writes."""
+        preset_name = settings.get("preset")
+        allowed_keys = self._allowed_setting_keys()
+        if preset_name and preset_name in NVIDIA_PRESETS:
+            preset = NVIDIA_PRESETS[preset_name]
+            nvidia_settings = preset.get("settings", {}).copy()
+            for key in allowed_keys:
+                if key in settings:
+                    nvidia_settings[key] = settings[key]
+            return nvidia_settings
+
+        return {
+            key: value for key, value in settings.items()
+            if key in allowed_keys
+        }
+
+    def preflight(self, settings: dict[str, Any]) -> dict[str, Any]:
+        """Validate strict NVIDIA profile prerequisites before apply."""
+        requested = self._extract_requested_settings(settings)
+        require_exact_binding = requested["require_exact_binding"]
+        executables = list(requested["executables"] or [])
+
+        if not require_exact_binding or not executables:
+            return super().preflight(settings)
+
+        nvidia_settings = self._resolve_requested_nvidia_settings(requested["settings"])
+        global_settings = dict(requested["global_settings"])
+        if not nvidia_settings and not global_settings:
+            return super().preflight(settings)
+
+        try:
+            from abso.settings.nvidia.nvapi_drs import DRSProfileManager
+
+            manager = DRSProfileManager()
+            probe = manager.probe_profile_binding(
+                executables,
+                profile_name=(
+                    str(requested["driver_profile_name"] or requested["game_name"])
+                ),
+                profile_aliases=list(requested["driver_profile_aliases"]),
+            )
+        except Exception as e:
+            return {
+                "success": False,
+                "error": f"Could not verify NVIDIA profile binding safely: {e}",
+                "warnings": [],
+                "notices": [],
+            }
+
+        if not probe.get("app_binding_exact", False):
+            return {
+                "success": False,
+                "error": str(
+                    probe.get("app_binding_note")
+                    or "Exact NVIDIA executable binding could not be confirmed."
+                ),
+                "warnings": [],
+                "notices": [],
+            }
+
+        notices: list[str] = []
+        selection_note = probe.get("profile_selection_note")
+        if selection_note:
+            notices.append(str(selection_note))
+
+        return {
+            "success": True,
+            "error": None,
+            "warnings": [],
+            "notices": notices,
+        }
+
+    def apply(self, settings: dict[str, Any]) -> dict[str, Any]:
+        """Apply NVIDIA settings using direct NVAPI DRS integration.
+
+        This uses NVAPI's DRS (Driver Settings) API directly, allowing safe
+        per-game profile modification without wiping the entire profile database.
+
+        Args:
+            settings: Dictionary of settings to apply.
+        """
+        requested = self._extract_requested_settings(settings)
+        settings = requested["settings"]
+        applied: list[str] = []
+        errors: list[str] = []
+        warnings: list[str] = []
+        notices: list[str] = []
+
+        executables = list(requested["executables"] or [])
+        game_name = str(requested["game_name"] or "Game")
+        driver_profile_name = requested["driver_profile_name"]
+        driver_profile_aliases = list(requested["driver_profile_aliases"])
+        global_settings: dict[str, Any] = dict(requested["global_settings"])
+        require_exact_binding = bool(requested["require_exact_binding"])
+
+        # Optional auto-cap for VRR profiles (refresh - 3)
+        auto_vrr_fps_cap = bool(requested["auto_vrr_fps_cap"])
+        forced_refresh_hz = requested["forced_refresh_hz"]
         if auto_vrr_fps_cap:
             refresh_hz: int | None = None
             if forced_refresh_hz is not None:
@@ -302,31 +421,7 @@ class NvidiaSettingsHandler(SettingsHandler):
                 )
 
         # Determine what settings to apply
-        preset_name = settings.get("preset")
-        allowed_keys = (
-            "low_latency_mode",
-            "power_management",
-            "vsync",
-            "max_frame_rate",
-            "shader_cache",
-            "threaded_optimization",
-            "triple_buffering",
-            "vrr_app_override",
-            "vsync_tear_control",
-            "vsync_vrr_control",
-        )
-        if preset_name and preset_name in NVIDIA_PRESETS:
-            preset = NVIDIA_PRESETS[preset_name]
-            nvidia_settings = preset.get("settings", {}).copy()
-            # Allow per-profile overrides on top of presets (e.g., auto frame cap).
-            for key in allowed_keys:
-                if key in settings:
-                    nvidia_settings[key] = settings[key]
-        else:
-            nvidia_settings = {
-                k: v for k, v in settings.items()
-                if k in allowed_keys
-            }
+        nvidia_settings = self._resolve_requested_nvidia_settings(settings)
 
         if not nvidia_settings and not global_settings:
             return {
@@ -335,6 +430,31 @@ class NvidiaSettingsHandler(SettingsHandler):
                 "requires_reboot": False,
                 "applied": ["No NVIDIA settings to apply"],
             }
+
+        if require_exact_binding:
+            preflight_result = self.preflight({
+                **settings,
+                "executables": executables,
+                "game_name": game_name,
+                "profile_name": driver_profile_name,
+                "profile_aliases": driver_profile_aliases,
+                "global_settings": global_settings,
+                "require_exact_binding": True,
+            })
+            if not preflight_result.get("success", True):
+                errors.append(str(preflight_result.get("error") or "NVIDIA preflight failed"))
+                return {
+                    "success": False,
+                    "error": "; ".join(errors),
+                    "requires_reboot": False,
+                    "applied": applied,
+                    "warnings": warnings,
+                    "notices": notices,
+                    "app_bound": False,
+                    "npi_launched": False,
+                }
+            for notice in preflight_result.get("notices", []) or []:
+                notices.append(str(notice))
 
         # Try to apply using NVAPI DRS
         try:
@@ -1008,7 +1128,7 @@ class NvidiaSettingsHandler(SettingsHandler):
         return result
 
     def _detect_primary_refresh_rate(self) -> int | None:
-        """Detect current/maximum refresh rate for the primary display.
+        """Detect refresh rate for the target gaming display.
 
         Returns:
             Refresh rate in Hz, or None when unavailable.
@@ -1020,7 +1140,7 @@ class NvidiaSettingsHandler(SettingsHandler):
             if not monitors:
                 raise RuntimeError("No monitors returned from HardwareDetector")
 
-            primary = next((m for m in monitors if m.get("is_primary")), monitors[0])
+            primary = self._select_target_gaming_monitor(monitors)
             # Prefer active mode refresh first. For VRR frame caps, using a
             # higher "max capability" from a different mode/resolution can
             # overcap and push rendering above the real active scan rate.
@@ -1036,11 +1156,11 @@ class NvidiaSettingsHandler(SettingsHandler):
                         detected = round(float(value))
                         if detected > 0:
                             logger.info(
-                                f"Primary refresh detected via HardwareDetector ({label}): {detected} Hz"
+                                f"Target display refresh detected via HardwareDetector ({label}): {detected} Hz"
                             )
                             return detected
         except Exception as e:
-            logger.warning(f"Primary refresh rate detection failed: {e}")
+            logger.warning(f"Target display refresh detection failed: {e}")
 
         # Fallback path: Windows handler uses ctypes and does not depend on pywin32.
         try:
@@ -1057,14 +1177,52 @@ class NvidiaSettingsHandler(SettingsHandler):
             if numeric:
                 detected = max(numeric)
                 logger.info(
-                    f"Primary refresh detected via WindowsSettingsHandler fallback: {detected} Hz"
+                    f"Target display refresh detected via WindowsSettingsHandler fallback: {detected} Hz"
                 )
                 return detected
         except Exception as e:
-            logger.warning(f"Primary refresh rate fallback detection failed: {e}")
+            logger.warning(f"Target display refresh fallback detection failed: {e}")
             return None
 
         return None
+
+    def _select_target_gaming_monitor(self, monitors: list[dict[str, Any]]) -> dict[str, Any]:
+        """Pick the display ABSO should treat as the gaming display."""
+        if not monitors:
+            raise RuntimeError("No monitors available for target selection")
+
+        def vrr_score(monitor: dict[str, Any]) -> int:
+            status = monitor.get("vrr_supported")
+            if status is True:
+                return 4
+            if status == "hardware":
+                return 3
+            if status == "likely":
+                return 2
+            if status == "possible":
+                return 1
+            return 0
+
+        def refresh_score(monitor: dict[str, Any]) -> float:
+            for key in ("refresh_rate", "max_refresh_rate", "max_refresh_capability"):
+                value = monitor.get(key)
+                try:
+                    if value is not None:
+                        parsed = float(value)
+                        if parsed > 0:
+                            return parsed
+                except (TypeError, ValueError):
+                    continue
+            return 0.0
+
+        return max(
+            monitors,
+            key=lambda monitor: (
+                refresh_score(monitor),
+                vrr_score(monitor),
+                1 if monitor.get("is_primary") else 0,
+            ),
+        )
 
     # Keep these methods for backwards compatibility with tests
     def _get_setting_value(self, value: str, setting_type: str) -> int:

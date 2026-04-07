@@ -20,9 +20,79 @@ $TaskName = "ABSO-Tray-Startup"
 $TaskDescription = "Start A.B.S.O. tray at user logon with highest privileges"
 $CurrentUser = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
 
+function Test-IsAdministrator {
+    try {
+        $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
+        $principal = [Security.Principal.WindowsPrincipal]::new($identity)
+        return $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+    }
+    catch {
+        return $false
+    }
+}
+
 function Write-JsonResult {
     param($Obj)
     Write-Output ($Obj | ConvertTo-Json -Depth 5 -Compress)
+}
+
+function Invoke-ElevatedSelf {
+    param([string[]]$ForwardArgs)
+
+    $elevatedArgs = @(
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-File", $PSCommandPath
+    ) + $ForwardArgs
+
+    $stdoutPath = $null
+    $stderrPath = $null
+    try {
+        if ($Json) {
+            $stdoutPath = [System.IO.Path]::GetTempFileName()
+            $stderrPath = "$stdoutPath.err"
+            $proc = Start-Process -FilePath "powershell.exe" -ArgumentList $elevatedArgs -Verb RunAs -Wait -PassThru `
+                -RedirectStandardOutput $stdoutPath -RedirectStandardError $stderrPath
+            if (Test-Path $stdoutPath) {
+                Get-Content -Path $stdoutPath -Raw -ErrorAction SilentlyContinue
+            }
+            if ($proc.ExitCode -ne 0 -and (Test-Path $stderrPath)) {
+                $stderr = Get-Content -Path $stderrPath -Raw -ErrorAction SilentlyContinue
+                if (-not [string]::IsNullOrWhiteSpace($stderr)) {
+                    Write-Error $stderr.Trim()
+                }
+            }
+            exit $proc.ExitCode
+        }
+
+        $proc = Start-Process -FilePath "powershell.exe" -ArgumentList $elevatedArgs -Verb RunAs -Wait -PassThru
+        exit $proc.ExitCode
+    }
+    catch {
+        $message = "Administrator privileges are required to update A.B.S.O. startup registration. $($_.Exception.Message)"
+        if ($Json) {
+            Write-JsonResult ([ordered]@{
+                success = $false
+                mode = "none"
+                message = ""
+                warning = $null
+                error = $message
+                status = $null
+            })
+        }
+        else {
+            Write-Host $message -ForegroundColor Red
+        }
+        exit 1
+    }
+    finally {
+        if ($stdoutPath -and (Test-Path $stdoutPath)) {
+            Remove-Item $stdoutPath -Force -ErrorAction SilentlyContinue
+        }
+        if ($stderrPath -and (Test-Path $stderrPath)) {
+            Remove-Item $stderrPath -Force -ErrorAction SilentlyContinue
+        }
+    }
 }
 
 function Test-StartupTaskInstalled {
@@ -39,11 +109,23 @@ function Get-StartupTaskInfoSafe {
     try {
         $task = Get-ScheduledTask -TaskName $TaskName -ErrorAction Stop
         $taskInfo = Get-ScheduledTaskInfo -TaskName $TaskName -ErrorAction SilentlyContinue
+        $runLevelRaw = $task.Principal.RunLevel
+        $runLevelValue = if ($null -eq $runLevelRaw) { "" } else { "$runLevelRaw" }
+        $taskHighest = $false
+        if ($runLevelRaw -is [int]) {
+            $taskHighest = ($runLevelRaw -eq 1)
+        }
+        elseif ($runLevelValue) {
+            $taskHighest = ($runLevelValue -match "Highest" -or $runLevelValue -eq "1")
+        }
         return [ordered]@{
             exists = $true
             enabled = [bool]$task.Settings.Enabled
             last_run_time = if ($taskInfo) { $taskInfo.LastRunTime } else { $null }
             last_task_result = if ($taskInfo) { $taskInfo.LastTaskResult } else { $null }
+            run_level = $runLevelValue
+            highest = $taskHighest
+            user_id = "$($task.Principal.UserId)"
         }
     }
     catch {
@@ -52,6 +134,9 @@ function Get-StartupTaskInfoSafe {
             enabled = $false
             last_run_time = $null
             last_task_result = $null
+            run_level = $null
+            highest = $false
+            user_id = $null
         }
     }
 }
@@ -82,6 +167,9 @@ function Get-InstallStatus {
         task_enabled       = $taskEnabled
         task_last_run_time = $taskInfo.last_run_time
         task_last_result   = $taskInfo.last_task_result
+        task_run_level     = $taskInfo.run_level
+        task_highest       = [bool]$taskInfo.highest
+        task_user_id       = $taskInfo.user_id
         shortcut_installed = $shortcutInstalled
         task_name          = $TaskName
         shortcut_path      = $ShortcutPath
@@ -89,6 +177,14 @@ function Get-InstallStatus {
         launcher_path      = $StartupLauncherPath
         user               = $CurrentUser
     }
+}
+
+if (($Install -or $Uninstall) -and -not (Test-IsAdministrator)) {
+    $forwardArgs = @()
+    if ($Install) { $forwardArgs += "-Install" }
+    if ($Uninstall) { $forwardArgs += "-Uninstall" }
+    if ($Json) { $forwardArgs += "-Json" }
+    Invoke-ElevatedSelf -ForwardArgs $forwardArgs
 }
 
 function Remove-Shortcut {

@@ -782,6 +782,35 @@ class TestNvidiaApply:
         rate = handler._detect_primary_refresh_rate()
         assert rate == 280
 
+    @patch("abso.core.detector.HardwareDetector.detect_monitors")
+    def test_detect_primary_refresh_rate_prefers_target_gaming_display_over_primary(
+        self,
+        mock_detect_monitors,
+    ):
+        """Choose the likely gaming display, not just the Windows primary monitor."""
+        mock_detect_monitors.return_value = [
+            {
+                "name": "Office Display",
+                "is_primary": True,
+                "refresh_rate": 60,
+                "max_refresh_rate": 60,
+                "max_refresh_capability": 60,
+                "vrr_supported": "possible",
+            },
+            {
+                "name": "LG UltraGear",
+                "is_primary": False,
+                "refresh_rate": 300,
+                "max_refresh_rate": 300,
+                "max_refresh_capability": 300,
+                "vrr_supported": True,
+            },
+        ]
+
+        handler = NvidiaSettingsHandler()
+        rate = handler._detect_primary_refresh_rate()
+        assert rate == 300
+
 
 class TestNvidiaBackupRestore:
     """Tests for backup() and restore() methods."""
@@ -857,6 +886,28 @@ class TestNvidiaBackupRestore:
             result = handler.restore({"profile_path": str(profile_file)})
 
         assert result is True
+
+
+class TestNvidiaPreflight:
+    """Tests for strict NVIDIA preflight behavior."""
+
+    @patch("abso.settings.nvidia.nvapi_drs.DRSProfileManager.probe_profile_binding")
+    def test_preflight_blocks_when_exact_binding_cannot_be_confirmed(self, mock_probe):
+        mock_probe.return_value = {
+            "app_binding_exact": False,
+            "app_binding_note": "Profile 'Overwatch 2' already exists and has bound applications, but NVAPI could not prove 'Overwatch.exe' belongs to it.",
+        }
+
+        handler = NvidiaSettingsHandler()
+        result = handler.preflight({
+            "preset": "reflex_gsync",
+            "executables": ["Overwatch.exe"],
+            "profile_name": "Overwatch 2",
+            "require_exact_binding": True,
+        })
+
+        assert result["success"] is False
+        assert "NVAPI could not prove 'Overwatch.exe' belongs to it" in result["error"]
 
 
 class TestNvidiaBackwardsCompatibility:

@@ -11,6 +11,8 @@ from abso.profiles.cod_bo7 import CodBo7Profile
 from abso.profiles.diablo4 import Diablo4Profile
 from abso.profiles.marvel_rivals import MarvelRivalsHDRProfile, MarvelRivalsSDRProfile
 from abso.profiles.overwatch2 import (
+    Overwatch2GSyncCaptureProfile,
+    Overwatch2GSyncHDRCaptureProfile,
     Overwatch2GSyncHDRProfile,
     Overwatch2GSyncProfile,
     Overwatch2Profile,
@@ -77,9 +79,13 @@ class TestProfileLoading:
         no_sync = Overwatch2Profile()
         gsync = Overwatch2GSyncProfile()
         gsync_hdr = Overwatch2GSyncHDRProfile()
+        gsync_capture = Overwatch2GSyncCaptureProfile()
+        gsync_hdr_capture = Overwatch2GSyncHDRCaptureProfile()
         assert no_sync.profile_id == "overwatch2"
         assert gsync.profile_id == "overwatch2-gsync"
         assert gsync_hdr.profile_id == "overwatch2-gsync-hdr"
+        assert gsync_capture.profile_id == "overwatch2-gsync-capture"
+        assert gsync_hdr_capture.profile_id == "overwatch2-gsync-hdr-capture"
 
     def test_marvel_rivals_profiles_load(self):
         """Test both Marvel Rivals variants can be instantiated."""
@@ -317,6 +323,86 @@ class TestProfileSettings:
         assert display_mode["value"] == "Fullscreen (Exclusive)"
         assert "fullscreen-only g-sync" in display_mode["reason"].lower()
         assert "do not switch to borderless/windowed" in display_mode["reason"].lower()
+
+    def test_overwatch2_capture_profile_uses_windowed_vrr_path(self):
+        """Capture-safe OW2 should explicitly use the borderless/windowed VRR path."""
+        profile = Overwatch2GSyncCaptureProfile()
+        windows = profile.get_settings("WindowsSettingsHandler")
+        graphics = profile.get_settings("GraphicsSettingsHandler")
+        nvidia = profile.get_settings("NvidiaSettingsHandler")
+        ow2 = profile.get_settings("OW2ConfigHandler")
+
+        assert windows["windowed_optimizations"] is True
+        assert windows["vrr_optimize"] is True
+        assert graphics["disable_global_fso"] is False
+        assert graphics["disable_mpo"] is False
+        assert nvidia["global_vrr_mode"] == "fullscreen_and_windowed"
+        assert nvidia["profile_name"] == "Overwatch 2"
+        assert ow2["window_mode"] == 1
+
+    def test_overwatch2_hdr_capture_profile_uses_windowed_hdr_vrr_path(self):
+        """HDR capture-safe OW2 should keep HDR while using the borderless/windowed VRR path."""
+        profile = Overwatch2GSyncHDRCaptureProfile()
+        windows = profile.get_settings("WindowsSettingsHandler")
+        graphics = profile.get_settings("GraphicsSettingsHandler")
+        nvidia = profile.get_settings("NvidiaSettingsHandler")
+        ow2 = profile.get_settings("OW2ConfigHandler")
+
+        assert windows["hdr"] is True
+        assert windows["auto_hdr"] is False
+        assert windows["windowed_optimizations"] is True
+        assert windows["vrr_optimize"] is True
+        assert graphics["disable_mpo"] is False
+        assert nvidia["global_vrr_mode"] == "fullscreen_and_windowed"
+        assert ow2["window_mode"] == 1
+
+    def test_overwatch2_capture_profile_allows_overlays(self):
+        """Capture-safe OW2 should not require the strict overlay-free path."""
+        strict = Overwatch2GSyncProfile()
+        capture = Overwatch2GSyncCaptureProfile()
+        hdr_capture = Overwatch2GSyncHDRCaptureProfile()
+
+        assert strict.display_path_requirements.require_overlay_free_path is True
+        assert capture.display_path_requirements.require_overlay_free_path is False
+        assert hdr_capture.display_path_requirements.require_overlay_free_path is False
+
+    def test_overwatch2_capture_profile_does_not_require_exact_binding_preflight(self):
+        """Capture-safe OW2 should not hard-block on exact NVIDIA binding proof."""
+        strict = Overwatch2GSyncProfile()
+        capture = Overwatch2GSyncCaptureProfile()
+        hdr_capture = Overwatch2GSyncHDRCaptureProfile()
+
+        assert strict.requires_exact_nvidia_binding is True
+        assert capture.requires_exact_nvidia_binding is False
+        assert hdr_capture.requires_exact_nvidia_binding is False
+
+    def test_overwatch2_strict_profiles_auto_disable_blocking_overlays(self):
+        """Strict exclusive OW2 profiles should auto-shut overlay blockers before failing."""
+        strict = Overwatch2GSyncProfile()
+        strict_hdr = Overwatch2GSyncHDRProfile()
+        capture = Overwatch2GSyncCaptureProfile()
+
+        assert strict.auto_disable_blocking_overlays is True
+        assert strict_hdr.auto_disable_blocking_overlays is True
+        assert capture.auto_disable_blocking_overlays is False
+
+    def test_all_fullscreen_only_vrr_profiles_inherit_strict_display_path_contract(self):
+        """Fullscreen-only VRR profiles should share the hardened Overwatch strict path behavior."""
+        strict_profiles = [
+            Overwatch2GSyncProfile(),
+            Overwatch2GSyncHDRProfile(),
+            MarvelRivalsSDRProfile(),
+            MarvelRivalsHDRProfile(),
+            Rivals2GSyncProfile(),
+            Rivals2OnlineGSyncProfile(),
+            SlippiMeleeVRRLabProfile(),
+        ]
+
+        for profile in strict_profiles:
+            assert profile.uses_fullscreen_only_vrr_path is True
+            assert profile.display_path_requirements.require_overlay_free_path is True
+            assert profile.requires_exact_nvidia_binding is True
+            assert profile.auto_disable_blocking_overlays is True
 
     def test_marvel_rivals_sdr_settings(self):
         """SDR Marvel Rivals profile should keep the Reflex + VRR SDR path."""

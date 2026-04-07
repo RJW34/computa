@@ -16,6 +16,8 @@ from abso.profiles.diablo4 import Diablo4Profile
 from abso.profiles.fortnite import FortniteProfile
 from abso.profiles.marvel_rivals import MarvelRivalsHDRProfile, MarvelRivalsSDRProfile
 from abso.profiles.overwatch2 import (
+    Overwatch2GSyncCaptureProfile,
+    Overwatch2GSyncHDRCaptureProfile,
     Overwatch2GSyncHDRProfile,
     Overwatch2GSyncProfile,
     Overwatch2Profile,
@@ -185,13 +187,33 @@ PROFILE_CATALOG: OrderedDict[str, ProfileCatalogEntry] = OrderedDict(
         "overwatch2-gsync": ProfileCatalogEntry(
             profile_class=Overwatch2GSyncProfile,
             tray_category="Shooter",
-            tray_subtitle="Reflex ON+Boost | VSync Safety Net | G-SYNC ON",
+            tray_subtitle="Strict Exclusive | Reflex ON+Boost | G-SYNC ON",
             sync_mode="on",
         ),
         "overwatch2-gsync-hdr": ProfileCatalogEntry(
             profile_class=Overwatch2GSyncHDRProfile,
             tray_category="Shooter",
-            tray_subtitle="HDR ON | Reflex ON+Boost | G-SYNC ON",
+            tray_subtitle="Strict HDR Exclusive | Reflex ON+Boost | G-SYNC ON",
+            sync_mode="on",
+        ),
+        "overwatch2-gsync-capture": ProfileCatalogEntry(
+            profile_class=Overwatch2GSyncCaptureProfile,
+            tray_category="Shooter",
+            tray_subtitle="Capture-Safe | Borderless VRR | Medal/Discord Friendly",
+            tray_description=(
+                "Borderless/windowed G-SYNC profile for the active gaming display. "
+                "Keeps Medal, Discord, and similar capture overlays compatible."
+            ),
+            sync_mode="on",
+        ),
+        "overwatch2-gsync-hdr-capture": ProfileCatalogEntry(
+            profile_class=Overwatch2GSyncHDRCaptureProfile,
+            tray_category="Shooter",
+            tray_subtitle="HDR Capture-Safe | Borderless VRR | Overlay Friendly",
+            tray_description=(
+                "HDR borderless/windowed G-SYNC profile for the active gaming display. "
+                "Best fit when you want HDR plus Medal/Discord-style capture workflows."
+            ),
             sync_mode="on",
         ),
         "overwatch2-gsync-hdr-streaming": ProfileCatalogEntry(

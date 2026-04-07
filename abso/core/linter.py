@@ -138,6 +138,7 @@ class ProfileLinter:
         # Run all checks
         self._check_nvidia_conflicts(profile, settings_map, result)
         self._check_windows_conflicts(profile, settings_map, result)
+        self._check_strict_vrr_contract(profile, settings_map, result)
         self._check_presentation_guidance(profile, settings_map, result)
         self._check_power_sanity(profile, settings_map, result)
         self._check_emulator_vrr(profile, settings_map, result)
@@ -507,6 +508,52 @@ class ProfileLinter:
                     f"{', '.join(missing_support)}."
                 ),
                 setting_path="NvidiaSettingsHandler.global_vrr_mode",
+            ))
+
+    def _check_strict_vrr_contract(
+        self,
+        profile: BaseProfile,
+        settings_map: dict[str, dict[str, Any]],
+        result: LintResult,
+    ) -> None:
+        """Ensure fullscreen-only VRR profiles opt into the strict display-path contract."""
+        nvidia_settings = settings_map.get("NvidiaSettingsHandler", {})
+        if not nvidia_settings:
+            return
+
+        global_vrr_mode = (
+            nvidia_settings.get("global_vrr_mode")
+            or nvidia_settings.get("global_gsync_mode")
+            or nvidia_settings.get("vrr_mode")
+        )
+        if str(global_vrr_mode or "").strip().lower() != "fullscreen_only":
+            return
+
+        requirements = getattr(profile, "display_path_requirements", None)
+        require_overlay_free_path = getattr(requirements, "require_overlay_free_path", False)
+        if not isinstance(require_overlay_free_path, bool) or not require_overlay_free_path:
+            result.add_issue(LintIssue(
+                code="STRICT_VRR_OVERLAY_PATH_REQUIRED",
+                severity=LintSeverity.ERROR,
+                message="Fullscreen-only VRR profiles must require an overlay-free display path",
+                details=(
+                    "Strict fullscreen-only VRR profiles need the hardened display-path "
+                    "contract so ABSO can auto-remediate or block overlays before apply."
+                ),
+                setting_path="BaseProfile.display_path_requirements",
+            ))
+
+        requires_exact_binding = getattr(profile, "requires_exact_nvidia_binding", False)
+        if not isinstance(requires_exact_binding, bool) or not requires_exact_binding:
+            result.add_issue(LintIssue(
+                code="STRICT_VRR_EXACT_BINDING_REQUIRED",
+                severity=LintSeverity.ERROR,
+                message="Fullscreen-only VRR profiles must require exact NVIDIA binding proof",
+                details=(
+                    "Strict fullscreen-only VRR profiles should fail closed when ABSO "
+                    "cannot prove the executable is bound to the intended NVIDIA profile."
+                ),
+                setting_path="BaseProfile.requires_exact_nvidia_binding",
             ))
 
     def _check_emulator_vrr(

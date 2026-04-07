@@ -3,10 +3,22 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Literal
 
 if TYPE_CHECKING:
     from abso.settings.base import SettingsHandler
+
+
+@dataclass(frozen=True)
+class DisplayPathRequirements:
+    """Runtime display-path requirements for a profile.
+
+    These requirements are evaluated against the user's active display
+    environment before ABSO applies any system changes.
+    """
+
+    require_overlay_free_path: bool = False
 
 
 class BaseProfile(ABC):
@@ -211,6 +223,60 @@ class BaseProfile(ABC):
     def nvidia_profile_aliases(self) -> list[str]:
         """Legacy or variant NVIDIA profile names worth reusing when bound."""
         return []
+
+    def _safe_get_handler_settings(self, handler_name: str) -> dict[str, Any]:
+        """Best-effort access to a handler's settings without surfacing profile exceptions."""
+        try:
+            settings = self.get_settings(handler_name)
+        except Exception:
+            return {}
+        return settings if isinstance(settings, dict) else {}
+
+    @property
+    def uses_fullscreen_only_vrr_path(self) -> bool:
+        """Whether this profile relies on the strict fullscreen-only VRR path.
+
+        This is derived from the effective NVIDIA settings so strict VRR
+        behavior stays consistent across profile families without requiring
+        every variant to manually duplicate the same safety contract.
+        """
+        nvidia_settings = self._safe_get_handler_settings("NvidiaSettingsHandler")
+        global_vrr_mode = (
+            nvidia_settings.get("global_vrr_mode")
+            or nvidia_settings.get("global_gsync_mode")
+            or nvidia_settings.get("vrr_mode")
+        )
+        return str(global_vrr_mode or "").strip().lower() == "fullscreen_only"
+
+    @property
+    def display_path_requirements(self) -> DisplayPathRequirements:
+        """Runtime requirements for the target gaming display path.
+
+        Fullscreen-only VRR profiles automatically inherit the strict
+        overlay-free contract used by the hardened Overwatch profiles.
+        """
+        return DisplayPathRequirements(
+            require_overlay_free_path=self.uses_fullscreen_only_vrr_path
+        )
+
+    @property
+    def requires_exact_nvidia_binding(self) -> bool:
+        """Whether NVIDIA app binding must be proven before ABSO applies.
+
+        Fullscreen-only VRR profiles should fail closed when ABSO cannot
+        prove the executable is really bound to the intended NVIDIA profile.
+        """
+        return self.uses_fullscreen_only_vrr_path
+
+    @property
+    def overlay_compatible_fallback_profile_id(self) -> str | None:
+        """Optional fallback profile to suggest when overlays block a strict path."""
+        return None
+
+    @property
+    def auto_disable_blocking_overlays(self) -> bool:
+        """Whether ABSO should try to shut down blocking overlays automatically."""
+        return bool(self.display_path_requirements.require_overlay_free_path)
 
     @abstractmethod
     def get_handlers(self) -> list[SettingsHandler]:

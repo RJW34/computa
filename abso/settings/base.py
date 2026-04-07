@@ -77,3 +77,16 @@ class SettingsHandler(ABC):
             "none" when ABSO cannot safely promise automatic restore.
         """
         return "full"
+
+    def preflight(self, settings: dict[str, Any]) -> dict[str, Any]:
+        """Validate prerequisites before apply side effects begin.
+
+        Handlers can override this when they need to block unsafe or
+        unprovable operations before ABSO creates backups or writes state.
+        """
+        return {
+            "success": True,
+            "error": None,
+            "warnings": [],
+            "notices": [],
+        }

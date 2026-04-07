@@ -2,7 +2,11 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use serde::{Deserialize, Serialize};
+#[cfg(windows)]
+use std::ffi::{c_void, OsStr};
 use std::fs;
+#[cfg(windows)]
+use std::os::windows::ffi::OsStrExt;
 use std::path::PathBuf;
 use std::process::Command;
 use std::sync::Mutex;
@@ -78,6 +82,144 @@ struct AppState {
     active_profile: Mutex<Option<String>>,
     tray_profiles: Mutex<Vec<TrayProfile>>,
 }
+
+#[cfg(windows)]
+#[link(name = "shell32")]
+unsafe extern "system" {
+    fn ShellExecuteW(
+        hwnd: *mut c_void,
+        lp_operation: *const u16,
+        lp_file: *const u16,
+        lp_parameters: *const u16,
+        lp_directory: *const u16,
+        n_show_cmd: i32,
+    ) -> isize;
+}
+
+#[cfg(windows)]
+#[link(name = "user32")]
+unsafe extern "system" {
+    fn MessageBoxW(
+        hwnd: *mut c_void,
+        lp_text: *const u16,
+        lp_caption: *const u16,
+        u_type: u32,
+    ) -> i32;
+}
+
+#[cfg(windows)]
+fn to_wide(value: &OsStr) -> Vec<u16> {
+    value.encode_wide().chain(std::iter::once(0)).collect()
+}
+
+#[cfg(windows)]
+fn quote_windows_arg(arg: &OsStr) -> String {
+    let arg = arg.to_string_lossy();
+    if arg.is_empty() || arg.chars().any(|c| c.is_whitespace() || c == '"') {
+        let mut result = String::from("\"");
+        let mut backslashes = 0usize;
+
+        for ch in arg.chars() {
+            match ch {
+                '\\' => backslashes += 1,
+                '"' => {
+                    result.push_str(&"\\".repeat(backslashes * 2 + 1));
+                    result.push('"');
+                    backslashes = 0;
+                }
+                _ => {
+                    if backslashes > 0 {
+                        result.push_str(&"\\".repeat(backslashes));
+                        backslashes = 0;
+                    }
+                    result.push(ch);
+                }
+            }
+        }
+
+        if backslashes > 0 {
+            result.push_str(&"\\".repeat(backslashes * 2));
+        }
+        result.push('"');
+        result
+    } else {
+        arg.into_owned()
+    }
+}
+
+#[cfg(windows)]
+fn relaunch_self_elevated() -> Result<(), String> {
+    let exe = std::env::current_exe().map_err(|e| format!("current_exe failed: {}", e))?;
+    let exe_dir = exe
+        .parent()
+        .ok_or_else(|| "Could not resolve executable directory".to_string())?;
+
+    let args = std::env::args_os()
+        .skip(1)
+        .map(|arg| quote_windows_arg(&arg))
+        .collect::<Vec<_>>()
+        .join(" ");
+
+    let operation = to_wide(OsStr::new("runas"));
+    let file = to_wide(exe.as_os_str());
+    let directory = to_wide(exe_dir.as_os_str());
+    let parameters = if args.is_empty() {
+        None
+    } else {
+        Some(to_wide(OsStr::new(&args)))
+    };
+
+    let result = unsafe {
+        ShellExecuteW(
+            std::ptr::null_mut(),
+            operation.as_ptr(),
+            file.as_ptr(),
+            parameters.as_ref().map_or(std::ptr::null(), |value| value.as_ptr()),
+            directory.as_ptr(),
+            1,
+        )
+    };
+
+    if result <= 32 {
+        return Err(format!("ShellExecuteW returned {}", result));
+    }
+
+    Ok(())
+}
+
+#[cfg(windows)]
+fn show_elevation_error(message: &str) {
+    let title = to_wide(OsStr::new("A.B.S.O."));
+    let body = to_wide(OsStr::new(message));
+    unsafe {
+        let _ = MessageBoxW(
+            std::ptr::null_mut(),
+            body.as_ptr(),
+            title.as_ptr(),
+            0x00000010,
+        );
+    }
+}
+
+#[cfg(windows)]
+fn ensure_gui_admin() {
+    if is_admin() {
+        return;
+    }
+
+    if let Err(error) = relaunch_self_elevated() {
+        show_elevation_error(&format!(
+            "A.B.S.O. GUI requires administrator privileges to manage system settings.\n\n{}",
+            error
+        ));
+        std::process::exit(1);
+    }
+
+    std::process::exit(0);
+}
+
+#[cfg(not(windows))]
+fn ensure_gui_admin() {}
 
 /// Get the path to the bundled abso.exe sidecar
 fn get_sidecar_path(app_handle: Option<&tauri::AppHandle>) -> PathBuf {
@@ -525,6 +667,8 @@ fn update_tray_menu(app: &tauri::AppHandle, active_profile: Option<&str>) {
 }
 
 fn main() {
+    ensure_gui_admin();
+
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .manage(AppState {

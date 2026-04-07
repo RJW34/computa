@@ -11,6 +11,8 @@ from abso.profiles.diablo4 import Diablo4Profile
 from abso.profiles.fortnite import FortniteProfile
 from abso.profiles.marvel_rivals import MarvelRivalsHDRProfile, MarvelRivalsSDRProfile
 from abso.profiles.overwatch2 import (
+    Overwatch2GSyncCaptureProfile,
+    Overwatch2GSyncHDRCaptureProfile,
     Overwatch2GSyncHDRProfile,
     Overwatch2GSyncProfile,
     Overwatch2Profile,
@@ -58,6 +60,8 @@ __all__ = [
     "Overwatch2Profile",
     "Overwatch2GSyncProfile",
     "Overwatch2GSyncHDRProfile",
+    "Overwatch2GSyncCaptureProfile",
+    "Overwatch2GSyncHDRCaptureProfile",
     "PokemonAutoChessProfile",
     "PACDeluxeProfile",
     "PACDeluxeStreamingProfile",

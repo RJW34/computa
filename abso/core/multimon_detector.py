@@ -88,10 +88,12 @@ class MultiMonitorDetector:
         "gameoverlayui.exe": "Steam Overlay",
         "gamebar.exe": "Xbox Game Bar",
         "gamebarftserver.exe": "Xbox Game Bar Server",
-        "gamingservices.exe": "Xbox Gaming Services",
-        "discord.exe": "Discord Overlay",
+        "discordhookhelper.exe": "Discord Overlay",
+        "discordhookhelper64.exe": "Discord Overlay",
         "rtss.exe": "RivaTuner Statistics Server",
         "obs64.exe": "OBS Studio",
+        "medal.exe": "Medal Overlay",
+        "medalencoder.exe": "Medal Overlay",
     }
 
     def detect(self) -> MultiMonitorResult:
@@ -325,8 +327,9 @@ class MultiMonitorDetector:
                 code="MULTIMON_MPO_GLITCH_RISK",
                 message=f"MPO glitch risk: {', '.join(triggers)}",
                 recommendation=(
-                    "Multiplane Overlays auto-disabled to prevent black flashes "
-                    "and pixel corruption during monitor focus transitions."
+                    "Do not auto-toggle MPO for this profile. Fix the display path first "
+                    "(disable overlays, simplify topology, or match refresh rates) if you "
+                    "see black flashes during monitor focus transitions."
                 ),
             ))
 
@@ -386,6 +389,45 @@ class MultiMonitorDetector:
         return {
             "disable_mpo": False,
             "reason": "Multi-monitor with uniform refresh and no VRR — MPO safe",
+        }
+
+    def get_mpo_recommendation(self, result: MultiMonitorResult) -> dict[str, Any]:
+        """Get MPO guidance based on display environment.
+
+        ABSO no longer auto-disables MPO based on topology detection alone.
+        The safe default is to keep MPO unchanged unless a profile explicitly
+        requests it or the user makes that choice knowingly.
+        """
+        env = result.environment
+
+        if not env.is_multi_monitor:
+            return {
+                "disable_mpo": False,
+                "reason": "Single monitor - no cross-monitor MPO glitch risk",
+            }
+
+        vrr_monitors = [m for m in env.monitors if m.is_vrr_capable]
+        if vrr_monitors:
+            return {
+                "disable_mpo": False,
+                "reason": (
+                    "Multi-monitor with VRR-capable display(s) - keep MPO unchanged and "
+                    "fix overlays/topology first if focus transitions cause black flashes"
+                ),
+            }
+
+        if env.has_mixed_refresh:
+            return {
+                "disable_mpo": False,
+                "reason": (
+                    f"Mixed refresh rates ({env.min_refresh:.0f}Hz-{env.max_refresh:.0f}Hz) - "
+                    "keep MPO unchanged and simplify the display path first if glitches appear"
+                ),
+            }
+
+        return {
+            "disable_mpo": False,
+            "reason": "Multi-monitor with uniform refresh and no VRR - MPO usually safe",
         }
 
     def get_vrr_recommendation(self, result: MultiMonitorResult) -> dict[str, Any]:

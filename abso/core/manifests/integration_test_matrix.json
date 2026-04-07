@@ -128,6 +128,20 @@
       "expected": { "transaction_state": "committed", "apply_success": true }
     },
     {
+      "id": "apply-overwatch2-gsync-capture",
+      "profile_id": "overwatch2-gsync-capture",
+      "kind": "apply_profile",
+      "assumptions": ["administrator", "nvidia_gpu", "vrr_confirmed"],
+      "expected": { "transaction_state": "committed", "apply_success": true }
+    },
+    {
+      "id": "apply-overwatch2-gsync-hdr-capture",
+      "profile_id": "overwatch2-gsync-hdr-capture",
+      "kind": "apply_profile",
+      "assumptions": ["administrator", "nvidia_gpu", "vrr_confirmed", "hdr_capable"],
+      "expected": { "transaction_state": "committed", "apply_success": true }
+    },
+    {
       "id": "apply-overwatch2-gsync-hdr-streaming",
       "profile_id": "overwatch2-gsync-hdr-streaming",
       "kind": "apply_profile",

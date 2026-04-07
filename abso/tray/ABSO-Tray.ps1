@@ -368,7 +368,9 @@ function Test-IsVrrPrerequisiteError {
     return (
         $Message -match "VRR/G-SYNC support" -or
         $Message -match "Adaptive Sync/FreeSync" -or
-        $Message -match "Enable G-SYNC in NVIDIA Control Panel"
+        $Message -match "Enable G-SYNC in NVIDIA Control Panel" -or
+        $Message -match "fullscreen-exclusive profile requires overlays" -or
+        $Message -match "primary display .* does not report confirmed VRR/G-SYNC support"
     )
 }
 

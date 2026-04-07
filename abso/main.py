@@ -1369,6 +1369,9 @@ def tray(install_startup: bool, uninstall_startup: bool, startup_status: bool) -
         console.print(f"[bold]Mode:[/bold] {mode}")
         if status.get("task_installed"):
             console.print(f"[bold]Task:[/bold] {status.get('task_name')}")
+            console.print(
+                f"[bold]Highest Privileges:[/bold] {'Yes' if status.get('task_highest', False) else 'No'}"
+            )
         if status.get("shortcut_installed"):
             console.print(f"[bold]Shortcut:[/bold] {status.get('shortcut_path')}")
     else:
