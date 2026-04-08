@@ -19,8 +19,15 @@ from abso.profiles.overwatch2 import (
 )
 from abso.profiles.pokemon_auto_chess import PokemonAutoChessProfile
 from abso.profiles.rivals2 import Rivals2Profile
-from abso.profiles.rivals2_gsync import Rivals2GSyncProfile, Rivals2OnlineGSyncProfile
-from abso.profiles.rivals2_online import Rivals2OnlineProfile
+from abso.profiles.rivals2_gsync import (
+    Rivals2GSyncHDRProfile,
+    Rivals2GSyncProfile,
+    Rivals2OnlineGSyncHDRProfile,
+    Rivals2OnlineGSyncProfile,
+)
+from abso.profiles.rivals2_offline import Rivals2OfflineHDRProfile, Rivals2OfflineProfile
+from abso.profiles.rivals2_online import Rivals2OnlineHDRProfile, Rivals2OnlineProfile
+from abso.profiles.streaming_profiles import Rivals2HDRStreamingProfile, Rivals2StreamingProfile
 from abso.profiles.slippi_melee import (
     SlippiMeleeConsoleParityProfile,
     SlippiMeleeProfile,
@@ -96,6 +103,30 @@ class TestProfileLoading:
         assert "Marvel Rivals" in sdr.display_name
         assert "Marvel Rivals" in hdr.display_name
 
+    def test_rivals2_consolidated_profiles_load(self):
+        """The canonical Rivals 2 matrix should expose explicit SDR/HDR lanes."""
+        offline = Rivals2OfflineProfile()
+        offline_hdr = Rivals2OfflineHDRProfile()
+        online = Rivals2OnlineProfile()
+        online_hdr = Rivals2OnlineHDRProfile()
+        gsync = Rivals2GSyncProfile()
+        gsync_hdr = Rivals2GSyncHDRProfile()
+        online_gsync = Rivals2OnlineGSyncProfile()
+        online_gsync_hdr = Rivals2OnlineGSyncHDRProfile()
+        streaming = Rivals2StreamingProfile()
+        streaming_hdr = Rivals2HDRStreamingProfile()
+
+        assert offline.profile_id == "rivals2-offline"
+        assert offline_hdr.profile_id == "rivals2-offline-hdr"
+        assert online.profile_id == "rivals2-online"
+        assert online_hdr.profile_id == "rivals2-online-hdr"
+        assert gsync.profile_id == "rivals2-gsync"
+        assert gsync_hdr.profile_id == "rivals2-gsync-hdr"
+        assert online_gsync.profile_id == "rivals2-online-gsync"
+        assert online_gsync_hdr.profile_id == "rivals2-online-gsync-hdr"
+        assert streaming.profile_id == "rivals2-streaming"
+        assert streaming_hdr.profile_id == "rivals2-streaming-hdr"
+
 
 class TestProfileHandlers:
     """Test profile handler methods."""
@@ -151,7 +182,7 @@ class TestProfileHandlers:
 
     def test_rivals2_base_profile_includes_game_config_guarded_handler(self):
         """Base Rivals2 profile includes config handler for explicit game INI tuning."""
-        profile = Rivals2Profile()
+        profile = Rivals2OfflineProfile()
         handler_names = [h.__class__.__name__ for h in profile.get_handlers()]
         assert "Rivals2ConfigHandler" in handler_names
 
@@ -468,9 +499,18 @@ class TestProfileSettings:
 
     def test_rivals2_nvidia_settings_use_stable_profile_identity(self):
         """Offline/general Rivals profiles should target a shared stable NVIDIA profile."""
+        profile = Rivals2OfflineProfile()
+        settings = profile.get_settings("NvidiaSettingsHandler")
+
+        assert settings["profile_name"] == "Rivals 2"
+        assert "Rivals2-Win64-Shipping.exe" in settings["profile_aliases"]
+
+    def test_rivals2_legacy_alias_still_resolves_to_offline_behavior(self):
+        """Legacy generic Rivals alias should preserve offline handler behavior."""
         profile = Rivals2Profile()
         settings = profile.get_settings("NvidiaSettingsHandler")
 
+        assert profile.profile_id == "rivals2"
         assert settings["profile_name"] == "Rivals 2"
         assert "Rivals2-Win64-Shipping.exe" in settings["profile_aliases"]
 
@@ -499,6 +539,78 @@ class TestProfileSettings:
         assert settings["profile_name"] == "Rivals 2 Online"
         assert settings["preset"] == "vrr_fighting_game"
         assert "Rivals 2: Online / Matchmaking" in settings["profile_aliases"]
+
+    def test_rivals2_offline_hdr_enables_native_hdr_path(self):
+        """Offline HDR profile should enable native Windows + game HDR."""
+        profile = Rivals2OfflineHDRProfile()
+
+        windows = profile.get_settings("WindowsSettingsHandler")
+        color = profile.get_settings("ColorProfileSettingsHandler")
+        config = profile.get_settings("Rivals2ConfigHandler")
+
+        assert windows["hdr"] is True
+        assert windows["auto_hdr"] is False
+        assert color["icc_profile"] == "native"
+        assert config["hdr_output"] is True
+        assert config["hdr_nits"] == 1000
+
+    def test_rivals2_online_hdr_enables_native_hdr_path(self):
+        """Online HDR profile should preserve rollback-safe behavior while enabling HDR."""
+        profile = Rivals2OnlineHDRProfile()
+
+        windows = profile.get_settings("WindowsSettingsHandler")
+        nvidia = profile.get_settings("NvidiaSettingsHandler")
+        config = profile.get_settings("Rivals2ConfigHandler")
+
+        assert windows["hdr"] is True
+        assert windows["auto_hdr"] is False
+        assert nvidia["global_vrr_mode"] == "off"
+        assert config["hdr_output"] is True
+        assert config["frame_rate_limit"] == 999
+
+    def test_rivals2_gsync_profile_sets_in_game_vrr_cap_automatically(self):
+        """VRR Rivals profiles should drive the lower-latency in-game cap, not just NVCP."""
+        profile = Rivals2GSyncProfile()
+        config = profile.get_settings("Rivals2ConfigHandler")
+
+        assert config["auto_vrr_fps_cap"] is True
+        assert config["hdr_output"] is False
+
+    def test_rivals2_gsync_hdr_profile_enables_native_hdr_and_auto_vrr_cap(self):
+        """HDR VRR Rivals profile should layer native HDR onto the VRR lane."""
+        profile = Rivals2GSyncHDRProfile()
+
+        windows = profile.get_settings("WindowsSettingsHandler")
+        nvidia = profile.get_settings("NvidiaSettingsHandler")
+        config = profile.get_settings("Rivals2ConfigHandler")
+
+        assert windows["hdr"] is True
+        assert windows["auto_hdr"] is False
+        assert nvidia["global_vrr_mode"] == "fullscreen_only"
+        assert nvidia["auto_vrr_fps_cap"] is True
+        assert config["auto_vrr_fps_cap"] is True
+        assert config["hdr_output"] is True
+
+    def test_rivals2_online_gsync_hdr_profile_stays_on_online_nvidia_family(self):
+        """Online HDR VRR profile should keep the online NVIDIA family identity."""
+        profile = Rivals2OnlineGSyncHDRProfile()
+        nvidia = profile.get_settings("NvidiaSettingsHandler")
+
+        assert nvidia["profile_name"] == "Rivals 2 Online"
+        assert "Rivals 2: Online / Matchmaking" in nvidia["profile_aliases"]
+
+    def test_rivals2_streaming_profiles_share_online_core_behavior(self):
+        """Streaming Rivals profiles should inherit the online stability lane plus OBS tuning."""
+        sdr = Rivals2StreamingProfile()
+        hdr = Rivals2HDRStreamingProfile()
+
+        sdr_config = sdr.get_settings("Rivals2ConfigHandler")
+        hdr_config = hdr.get_settings("Rivals2ConfigHandler")
+
+        assert sdr_config["frame_rate_limit"] == 999
+        assert sdr_config["hdr_output"] is False
+        assert hdr_config["frame_rate_limit"] == 999
+        assert hdr_config["hdr_output"] is True
 
     def test_unknown_handler_returns_empty(self):
         """Test that unknown handler name returns empty dict."""

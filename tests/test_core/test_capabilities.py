@@ -132,7 +132,7 @@ def test_capability_warns_on_non_nvidia_gpu() -> None:
     detector = MagicMock()
     detector.detect_monitors.return_value = [{"name": "Primary", "vrr_supported": True}]
     detector.detect_gpu.return_value = {"name": "AMD Radeon RX 7900 XTX"}
-    profile = _make_profile("rivals2")
+    profile = _make_profile("rivals2-offline")
 
     report = CapabilityEngine(detector).evaluate(profile)
 
@@ -177,9 +177,9 @@ def test_capability_blocks_fixed_refresh_when_monitor_cannot_support_it() -> Non
     ]
     detector.detect_gpu.return_value = {"name": "NVIDIA GeForce RTX 4090"}
 
-    profile = _make_profile("rivals2-300hz-max")
+    profile = _make_profile("rivals2-tournament-sim-144hz")
     profile.get_settings.side_effect = lambda handler_name: (
-        {"refresh_rate": 300} if handler_name == "WindowsSettingsHandler" else {}
+        {"refresh_rate": 360} if handler_name == "WindowsSettingsHandler" else {}
     )
 
     report = CapabilityEngine(detector).evaluate(profile)
@@ -201,7 +201,7 @@ def test_capability_allows_fixed_refresh_when_supported() -> None:
     ]
     detector.detect_gpu.return_value = {"name": "NVIDIA GeForce RTX 4090"}
 
-    profile = _make_profile("rivals2-tournament-sim")
+    profile = _make_profile("rivals2-tournament-sim-144hz")
     profile.get_settings.side_effect = lambda handler_name: (
         {"refresh_rate": 144} if handler_name == "WindowsSettingsHandler" else {}
     )

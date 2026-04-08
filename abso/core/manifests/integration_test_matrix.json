@@ -30,13 +30,6 @@
       "expected": { "transaction_state": "committed", "apply_success": true }
     },
     {
-      "id": "apply-rivals2",
-      "profile_id": "rivals2",
-      "kind": "apply_profile",
-      "assumptions": ["administrator", "nvidia_gpu"],
-      "expected": { "transaction_state": "committed", "apply_success": true }
-    },
-    {
       "id": "apply-rivals2-offline",
       "profile_id": "rivals2-offline",
       "kind": "apply_profile",
@@ -44,10 +37,24 @@
       "expected": { "transaction_state": "committed", "apply_success": true }
     },
     {
+      "id": "apply-rivals2-offline-hdr",
+      "profile_id": "rivals2-offline-hdr",
+      "kind": "apply_profile",
+      "assumptions": ["administrator", "nvidia_gpu", "hdr_capable"],
+      "expected": { "transaction_state": "committed", "apply_success": true }
+    },
+    {
       "id": "apply-rivals2-online",
       "profile_id": "rivals2-online",
       "kind": "apply_profile",
       "assumptions": ["administrator", "nvidia_gpu"],
+      "expected": { "transaction_state": "committed", "apply_success": true }
+    },
+    {
+      "id": "apply-rivals2-online-hdr",
+      "profile_id": "rivals2-online-hdr",
+      "kind": "apply_profile",
+      "assumptions": ["administrator", "nvidia_gpu", "hdr_capable"],
       "expected": { "transaction_state": "committed", "apply_success": true }
     },
     {
@@ -65,6 +72,13 @@
       "expected": { "transaction_state": "committed", "apply_success": true }
     },
     {
+      "id": "apply-rivals2-gsync-hdr",
+      "profile_id": "rivals2-gsync-hdr",
+      "kind": "apply_profile",
+      "assumptions": ["administrator", "nvidia_gpu", "vrr_confirmed", "hdr_capable"],
+      "expected": { "transaction_state": "committed", "apply_success": true }
+    },
+    {
       "id": "apply-rivals2-online-gsync",
       "profile_id": "rivals2-online-gsync",
       "kind": "apply_profile",
@@ -72,10 +86,10 @@
       "expected": { "transaction_state": "committed", "apply_success": true }
     },
     {
-      "id": "apply-rivals2-300hz-max",
-      "profile_id": "rivals2-300hz-max",
+      "id": "apply-rivals2-online-gsync-hdr",
+      "profile_id": "rivals2-online-gsync-hdr",
       "kind": "apply_profile",
-      "assumptions": ["administrator", "nvidia_gpu", "300hz_display"],
+      "assumptions": ["administrator", "nvidia_gpu", "vrr_confirmed", "hdr_capable"],
       "expected": { "transaction_state": "committed", "apply_success": true }
     },
     {
@@ -195,6 +209,13 @@
       "profile_id": "rivals2-streaming",
       "kind": "apply_profile",
       "assumptions": ["administrator", "obs_installed", "nvidia_gpu"],
+      "expected": { "transaction_state": "committed", "apply_success": true }
+    },
+    {
+      "id": "apply-rivals2-streaming-hdr",
+      "profile_id": "rivals2-streaming-hdr",
+      "kind": "apply_profile",
+      "assumptions": ["administrator", "obs_installed", "nvidia_gpu", "hdr_capable"],
       "expected": { "transaction_state": "committed", "apply_success": true }
     },
     {

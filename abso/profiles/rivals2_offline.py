@@ -23,7 +23,7 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-from abso.profiles.profile_bases import Rivals2BaseProfile
+from abso.profiles.profile_bases import Rivals2BaseProfile, Rivals2HDRMixin
 
 
 class Rivals2OfflineProfile(Rivals2BaseProfile):
@@ -66,11 +66,6 @@ class Rivals2OfflineProfile(Rivals2BaseProfile):
         return False
 
     @property
-    def is_sdr_only(self) -> bool:
-        """Rivals 2 is SDR-only."""
-        return True
-
-    @property
     def graphics_api(self) -> Literal["dx11", "dx12", "vulkan", "opengl", "unknown"]:
         """Rivals 2 uses DirectX 12 (UE5)."""
         return "dx12"
@@ -82,10 +77,6 @@ class Rivals2OfflineProfile(Rivals2BaseProfile):
 
     @property
     def include_nvidia_notifications(self) -> bool:
-        return True
-
-    @property
-    def include_rivals2_config(self) -> bool:
         return True
 
     def _settings_overrides(self) -> dict[str, dict[str, Any]]:
@@ -115,6 +106,8 @@ class Rivals2OfflineProfile(Rivals2BaseProfile):
                 "fullscreen_mode": 0,  # Exclusive fullscreen for lowest latency
                 "vsync": False,  # In-game VSync OFF
                 "raw_input": True,  # Best input latency
+                "frame_rate_limit": 999,  # Uncapped - lowest latency no-sync path
+                "hdr_output": False,
             },
             "NvidiaNotificationHandler": {
                 "disable_notifications": True,
@@ -175,5 +168,27 @@ class Rivals2OfflineProfile(Rivals2BaseProfile):
                 "value": "Uncapped FPS, no sync overhead",
                 "reason": "FPS should run uncapped without hitching. Tearing is expected.",
             },
+        ]
+
+
+class Rivals2OfflineHDRProfile(Rivals2HDRMixin, Rivals2OfflineProfile):
+    """Offline/training Rivals 2 profile with native HDR output enabled."""
+
+    @property
+    def profile_id(self) -> str:
+        return "rivals2-offline-hdr"
+
+    @property
+    def display_name(self) -> str:
+        return "Rivals 2: Offline / Training HDR"
+
+    @property
+    def description(self) -> str:
+        return "Maximum latency reduction for training/local play with native HDR output"
+
+    def get_in_game_settings(self) -> list[dict[str, str]]:
+        return [
+            *self._hdr_in_game_settings(),
+            *super().get_in_game_settings(),
         ]
 

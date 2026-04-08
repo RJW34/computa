@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from abso.profiles.profile_bases import Rivals2BaseProfile
+from abso.profiles.profile_bases import Rivals2BaseProfile, Rivals2HDRMixin
 
 
 class Rivals2GSyncProfile(Rivals2BaseProfile):
@@ -51,10 +51,6 @@ class Rivals2GSyncProfile(Rivals2BaseProfile):
     def include_nvidia_notifications(self) -> bool:
         return True
 
-    @property
-    def include_rivals2_config(self) -> bool:
-        return True
-
     def _settings_overrides(self) -> dict[str, dict[str, Any]]:
         return {
             "WindowsSettingsHandler": {
@@ -73,6 +69,8 @@ class Rivals2GSyncProfile(Rivals2BaseProfile):
                 "fullscreen_mode": 0,  # Exclusive fullscreen for best VRR
                 "vsync": False,  # In-game VSync OFF (NVCP handles sync)
                 "raw_input": True,
+                "auto_vrr_fps_cap": True,
+                "hdr_output": False,
             },
             "NvidiaNotificationHandler": {
                 "disable_notifications": True,
@@ -195,7 +193,7 @@ class Rivals2OnlineGSyncProfile(Rivals2BaseProfile):
         return True
 
     @property
-    def include_rivals2_config(self) -> bool:
+    def include_nvidia_notifications(self) -> bool:
         return True
 
     def _settings_overrides(self) -> dict[str, dict[str, Any]]:
@@ -214,10 +212,15 @@ class Rivals2OnlineGSyncProfile(Rivals2BaseProfile):
                 "fullscreen_mode": 0,
                 "vsync": False,
                 "raw_input": True,
+                "auto_vrr_fps_cap": True,
+                "hdr_output": False,
             },
             "ProcessPriorityHandler": {
                 "cpu_priority": 2,  # Conservative (not aggressive) for online stability
                 "io_priority": 2,
+            },
+            "NvidiaNotificationHandler": {
+                "disable_notifications": True,
             },
         }
 
@@ -284,4 +287,48 @@ class Rivals2OnlineGSyncProfile(Rivals2BaseProfile):
                 "value": "Tear-free, stable frametimes, no rollback dropouts",
                 "reason": "G-SYNC smooths frame delivery. Conservative priority prevents timing contention.",
             },
+        ]
+
+
+class Rivals2GSyncHDRProfile(Rivals2HDRMixin, Rivals2GSyncProfile):
+    """Low-latency VRR Rivals 2 profile with native HDR output enabled."""
+
+    @property
+    def profile_id(self) -> str:
+        return "rivals2-gsync-hdr"
+
+    @property
+    def display_name(self) -> str:
+        return "Rivals 2: G-SYNC HDR"
+
+    @property
+    def description(self) -> str:
+        return "Low latency VRR profile with native HDR output (G-SYNC ON, VSync safety net)"
+
+    def get_in_game_settings(self) -> list[dict[str, str]]:
+        return [
+            *self._hdr_in_game_settings(),
+            *super().get_in_game_settings(),
+        ]
+
+
+class Rivals2OnlineGSyncHDRProfile(Rivals2HDRMixin, Rivals2OnlineGSyncProfile):
+    """Rollback-safe Rivals 2 VRR profile with native HDR output enabled."""
+
+    @property
+    def profile_id(self) -> str:
+        return "rivals2-online-gsync-hdr"
+
+    @property
+    def display_name(self) -> str:
+        return "Rivals 2: Online G-SYNC HDR"
+
+    @property
+    def description(self) -> str:
+        return "Rollback-safe VRR profile with native HDR output (G-SYNC ON, stability-focused)"
+
+    def get_in_game_settings(self) -> list[dict[str, str]]:
+        return [
+            *self._hdr_in_game_settings(),
+            *super().get_in_game_settings(),
         ]

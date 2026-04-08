@@ -608,6 +608,10 @@ class ProfileLinter:
         Returns:
             True if the profile is likely SDR-only.
         """
+        explicit_flag = getattr(profile, "is_sdr_only", None)
+        if isinstance(explicit_flag, bool):
+            return explicit_flag
+
         # Check executable hints for known SDR games/emulators
         sdr_executables = {
             "dolphin.exe", "slippi dolphin.exe",  # Melee - GameCube era

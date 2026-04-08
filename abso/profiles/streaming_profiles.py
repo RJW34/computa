@@ -6,7 +6,7 @@ from abso.profiles.fortnite import FortniteProfile
 from abso.profiles.overwatch2 import Overwatch2GSyncHDRCaptureProfile
 from abso.profiles.pacdeluxe import PACDeluxeProfile
 from abso.profiles.profile_bases import OBSStreamingMixin
-from abso.profiles.rivals2_online import Rivals2OnlineProfile
+from abso.profiles.rivals2_online import Rivals2OnlineHDRProfile, Rivals2OnlineProfile
 from abso.profiles.ryujinx_ssbu import RyujinxSSBUProfile
 from abso.profiles.slippi_melee import SlippiMeleeProfile
 
@@ -57,6 +57,22 @@ class Rivals2StreamingProfile(OBSStreamingMixin, Rivals2OnlineProfile):
     @property
     def description(self) -> str:
         return "Streaming-optimized Rivals 2 profile (rollback-safe)"
+
+
+class Rivals2HDRStreamingProfile(OBSStreamingMixin, Rivals2OnlineHDRProfile):
+    """Streaming profile for Rivals 2 HDR based on rollback-safe settings."""
+
+    @property
+    def profile_id(self) -> str:
+        return "rivals2-streaming-hdr"
+
+    @property
+    def display_name(self) -> str:
+        return "Rivals 2 (Streaming HDR)"
+
+    @property
+    def description(self) -> str:
+        return "Streaming-optimized Rivals 2 HDR profile (rollback-safe)"
 
 
 class RyujinxSSBUStreamingProfile(OBSStreamingMixin, RyujinxSSBUProfile):

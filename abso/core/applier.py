@@ -30,7 +30,7 @@ from abso.core.overlay_manager import OverlayManager
 from abso.core.rollback_guard import RollbackGuard, RollbackGuardResult
 from abso.core.stability_gate import StabilityGate, StabilityGateResult
 from abso.profiles.base import BaseProfile
-from abso.profiles.catalog import get_profile_classes
+from abso.profiles.catalog import get_profile_classes, resolve_profile_id
 
 logger = logging.getLogger(__name__)
 
@@ -155,17 +155,19 @@ class ProfileApplier:
         Raises:
             ValueError: If profile not found.
         """
-        if profile_name not in self._profiles:
-            profile_class = self.PROFILES.get(profile_name)
+        canonical_profile_name = resolve_profile_id(profile_name) or profile_name
+
+        if canonical_profile_name not in self._profiles:
+            profile_class = self.PROFILES.get(canonical_profile_name)
             if not profile_class:
                 available = ", ".join(self.PROFILES.keys())
                 raise ProfileNotFoundError(
                     f"Unknown profile: {profile_name}",
                     details=f"Available profiles: {available}"
                 )
-            self._profiles[profile_name] = profile_class()
+            self._profiles[canonical_profile_name] = profile_class()
 
-        return self._profiles[profile_name]
+        return self._profiles[canonical_profile_name]
 
     def apply_profile(self, profile_name: str) -> ApplyResult:
         """Apply a game optimization profile with full validation.

@@ -15,7 +15,7 @@ from abso.core.game_detector import (
     match_games_to_profiles,
 )
 from abso.core.transaction import ProfileTransactionManager, TransactionResult
-from abso.profiles.catalog import get_profile_instances
+from abso.profiles.catalog import get_profile_instances, resolve_profile_id
 
 
 @dataclass
@@ -103,6 +103,7 @@ def resolve_launch_target(
     detected_games: list[InstalledGame] | None = None,
 ) -> LaunchTarget:
     """Resolve the launchable executable for a profile."""
+    canonical_profile_id = resolve_profile_id(profile_id) or profile_id
     if launch_path:
         candidate = launch_path.expanduser()
         if not candidate.exists() or not candidate.is_file():
@@ -111,7 +112,7 @@ def resolve_launch_target(
                 details=str(candidate),
             )
         return LaunchTarget(
-            profile_id=profile_id,
+            profile_id=canonical_profile_id,
             game_name=None,
             platform="manual",
             executable_name=candidate.name,
@@ -120,28 +121,28 @@ def resolve_launch_target(
         )
 
     profiles = get_profile_instances()
-    profile = profiles.get(profile_id)
+    profile = profiles.get(canonical_profile_id)
     if profile is None:
         raise LaunchTargetNotFoundError(
             "Profile has no launch metadata",
-            details=profile_id,
+            details=canonical_profile_id,
         )
 
     games = detected_games if detected_games is not None else detect_installed_games()
     matched_games = match_games_to_profiles(games, profiles)
-    candidates = [game for game in matched_games if game.profile_match == profile_id]
+    candidates = [game for game in matched_games if game.profile_match == canonical_profile_id]
 
     if not candidates:
         hints = ", ".join(profile.executable_hints) or "(none)"
         raise LaunchTargetNotFoundError(
             "No installed game matched this profile",
-            details=f"profile={profile_id}, executable_hints={hints}",
+            details=f"profile={canonical_profile_id}, executable_hints={hints}",
         )
 
     warnings: list[str] = []
     if len(candidates) > 1:
         warnings.append(
-            f"Multiple installs matched '{profile_id}'. Using the first resolvable executable."
+            f"Multiple installs matched '{canonical_profile_id}'. Using the first resolvable executable."
         )
 
     preferred_order = {
@@ -169,7 +170,7 @@ def resolve_launch_target(
             continue
 
         return LaunchTarget(
-            profile_id=profile_id,
+            profile_id=canonical_profile_id,
             game_name=game.name,
             platform=game.platform,
             executable_name=game.executable,
@@ -198,6 +199,7 @@ def launch_profile(
     popen_factory: Callable[..., subprocess.Popen[Any]] = subprocess.Popen,
 ) -> LaunchResult:
     """Apply profile, launch target executable, and optionally restore on exit."""
+    canonical_profile_id = resolve_profile_id(profile_id) or profile_id
     if restore_on_exit and not wait:
         raise ProfileLaunchError(
             "restore_on_exit requires wait=True",
@@ -210,10 +212,10 @@ def launch_profile(
         )
 
     tx_manager = transaction_manager or ProfileTransactionManager(backup_dir)
-    tx = tx_manager.execute(profile_id=profile_id, create_backup=create_backup)
+    tx = tx_manager.execute(profile_id=canonical_profile_id, create_backup=create_backup)
     result = LaunchResult(
         success=False,
-        profile_id=profile_id,
+        profile_id=canonical_profile_id,
         transaction=tx,
         wait_requested=wait,
     )
@@ -223,7 +225,7 @@ def launch_profile(
         return result
 
     try:
-        target = resolve_launch_target(profile_id=profile_id, launch_path=launch_path)
+        target = resolve_launch_target(profile_id=canonical_profile_id, launch_path=launch_path)
     except LaunchTargetNotFoundError as e:
         result.error = str(e)
         if restore_on_exit and tx.backup_id:

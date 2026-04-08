@@ -56,6 +56,8 @@ class Rivals2ConfigHandler(SettingsHandler):
         "vsync": "bUseVSync",
         "raw_input": "bUseRawInput",
         "frame_rate_limit": "FrameRateLimit",
+        "hdr_output": "bUseHDRDisplayOutput",
+        "hdr_nits": "HDRDisplayOutputNits",
     }
 
     # These keys should never be mutated by profile automation.
@@ -100,6 +102,13 @@ class Rivals2ConfigHandler(SettingsHandler):
                         result["frame_rate_limit"] = int(float(stripped.split("=", 1)[1]))
                     except ValueError:
                         logger.debug("Rivals 2 frame rate limit value was non-numeric")
+                elif stripped.startswith("bUseHDRDisplayOutput="):
+                    result["hdr_output"] = stripped.split("=", 1)[1].lower() == "true"
+                elif stripped.startswith("HDRDisplayOutputNits="):
+                    try:
+                        result["hdr_nits"] = int(float(stripped.split("=", 1)[1]))
+                    except ValueError:
+                        logger.debug("Rivals 2 HDR nits value was non-numeric")
         except Exception as e:
             logger.error(f"Failed to read Rivals 2 config: {e}")
 
@@ -141,6 +150,24 @@ class Rivals2ConfigHandler(SettingsHandler):
 
     def apply(self, settings: dict[str, Any]) -> dict[str, Any]:
         """Apply Rivals 2 game config settings."""
+        settings = dict(settings)
+
+        if settings.pop("auto_vrr_fps_cap", False):
+            try:
+                from abso.core.vrr import get_vrr_fps_cap
+                from abso.settings.nvidia import NvidiaSettingsHandler
+
+                refresh_hz = NvidiaSettingsHandler()._detect_primary_refresh_rate()
+                if refresh_hz and refresh_hz > 0:
+                    settings["frame_rate_limit"] = get_vrr_fps_cap(refresh_hz)
+                    logger.info(
+                        "Rivals 2 auto VRR FPS cap: %d (from %d Hz)",
+                        settings["frame_rate_limit"],
+                        refresh_hz,
+                    )
+            except Exception as e:
+                logger.warning("Rivals 2 auto VRR FPS cap detection failed: %s", e)
+
         invalid_requested_keys = validate_allowed_keys(
             set(settings.keys()),
             set(self.MUTABLE_SETTINGS_TO_INI.keys()),
@@ -282,6 +309,10 @@ class Rivals2ConfigHandler(SettingsHandler):
             settings["raw_input"] = data["raw_input"]
         if "frame_rate_limit" in data:
             settings["frame_rate_limit"] = data["frame_rate_limit"]
+        if "hdr_output" in data:
+            settings["hdr_output"] = data["hdr_output"]
+        if "hdr_nits" in data:
+            settings["hdr_nits"] = data["hdr_nits"]
 
         if settings:
             result = self.apply(settings)
@@ -295,7 +326,9 @@ class Rivals2ConfigHandler(SettingsHandler):
 
         if "fullscreen_mode" in settings:
             try:
-                replacements["FullscreenMode"] = str(int(settings["fullscreen_mode"]))
+                fullscreen_mode = str(int(settings["fullscreen_mode"]))
+                replacements["FullscreenMode"] = fullscreen_mode
+                replacements["LastConfirmedFullscreenMode"] = fullscreen_mode
             except (TypeError, ValueError):
                 errors.append("fullscreen_mode must be an integer")
 
@@ -321,6 +354,22 @@ class Rivals2ConfigHandler(SettingsHandler):
                 replacements["FrameRateLimit"] = str(frame_cap)
             except (TypeError, ValueError):
                 errors.append("frame_rate_limit must be a non-negative number")
+
+        if "hdr_output" in settings:
+            parsed = self._parse_bool(settings["hdr_output"])
+            if parsed is None:
+                errors.append("hdr_output must be a boolean")
+            else:
+                replacements["bUseHDRDisplayOutput"] = "True" if parsed else "False"
+
+        if "hdr_nits" in settings:
+            try:
+                hdr_nits = int(float(settings["hdr_nits"]))
+                if hdr_nits <= 0:
+                    raise ValueError
+                replacements["HDRDisplayOutputNits"] = str(hdr_nits)
+            except (TypeError, ValueError):
+                errors.append("hdr_nits must be a positive number")
 
         return replacements, errors
 

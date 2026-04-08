@@ -20,7 +20,7 @@ from abso.core.detector import HardwareDetector
 from abso.core.exceptions import BackupNotFoundError, ProfileLaunchError
 from abso.core.launcher import launch_profile
 from abso.core.transaction import ProfileTransactionManager
-from abso.profiles.catalog import get_profile_manifest
+from abso.profiles.catalog import get_profile_manifest, resolve_profile_id
 from abso.utils.admin import is_admin
 
 console = Console()
@@ -61,8 +61,9 @@ def set_current_profile(
     reboot_reasons: list[str] | None = None,
 ) -> None:
     """Save the current profile to state file (atomic write)."""
+    canonical_profile_name = resolve_profile_id(profile_name) or profile_name
     state: dict[str, Any] = {
-        "current_profile": profile_name,
+        "current_profile": canonical_profile_name,
         "applied_at": datetime.now().isoformat(),
         "reboot_pending": requires_reboot,
         "reboot_reasons": reboot_reasons or [],
@@ -146,7 +147,7 @@ def _read_state_snapshot() -> dict[str, Any]:
         return default_state
 
     return {
-        "current_profile": state.get("current_profile"),
+        "current_profile": resolve_profile_id(state.get("current_profile")),
         "applied_at": state.get("applied_at"),
         "reboot_pending": bool(state.get("reboot_pending", False)),
         "reboot_reasons": list(state.get("reboot_reasons") or []),
@@ -686,6 +687,7 @@ def apply(profile_name: str, no_backup: bool, benchmark: bool, json_output: bool
 
     PROFILE_NAME is the profile to apply (e.g., slippi-melee, cod-bo7, diablo4).
     """
+    profile_name = resolve_profile_id(profile_name) or profile_name
     if not is_admin():
         if json_output:
             json_error("Admin privileges required to apply profiles")
@@ -911,6 +913,7 @@ def launch(
     json_output: bool,
 ) -> None:
     """Apply a profile, launch its game, and optionally restore on exit."""
+    profile_name = resolve_profile_id(profile_name) or profile_name
     if not is_admin():
         if json_output:
             json_error("Admin privileges required to launch profiles")
@@ -1077,6 +1080,7 @@ def verify(profile_name: str, json_output: bool) -> None:
     This checks if settings that normally require a reboot are already in effect.
     Use after applying a profile to confirm no reboot is actually needed.
     """
+    profile_name = resolve_profile_id(profile_name) or profile_name
     applier = ProfileApplier()
 
     try:
@@ -1376,6 +1380,7 @@ def report(profile_name: str, json_output: bool) -> None:
 
     PROFILE_NAME is the profile to generate report for.
     """
+    profile_name = resolve_profile_id(profile_name) or profile_name
     REPORTS_DIR.mkdir(parents=True, exist_ok=True)
 
     applier = ProfileApplier()

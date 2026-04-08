@@ -88,11 +88,6 @@ class Rivals2TournamentSimProfile(Rivals2BaseProfile):
         return False
 
     @property
-    def is_sdr_only(self) -> bool:
-        """Rivals 2 is SDR-only."""
-        return True
-
-    @property
     def graphics_api(self) -> Literal["dx11", "dx12", "vulkan", "opengl", "unknown"]:
         """Rivals 2 uses DirectX 12 (UE5)."""
         return "dx12"
@@ -134,6 +129,13 @@ class Rivals2TournamentSimProfile(Rivals2BaseProfile):
                 # Normal or Above Normal priority - High/Realtime FORBIDDEN
                 "cpu_priority": 2,
                 "io_priority": 2,
+            },
+            "Rivals2ConfigHandler": {
+                "fullscreen_mode": 0,
+                "vsync": False,
+                "raw_input": True,
+                "frame_rate_limit": 144,
+                "hdr_output": False,
             },
         }
 
@@ -323,7 +325,10 @@ class Rivals2TournamentSimProfile(Rivals2BaseProfile):
                 "category": "Windows Settings",
                 "setting": "HDR / Auto HDR",
                 "value": "OFF",
-                "reason": "Rivals 2 is SDR. HDR causes washed colors.",
+                "reason": (
+                    "Tournament simulation intentionally stays on the SDR path. "
+                    "The goal is parity with common offline event setups, not maximum display capability."
+                ),
             },
 
             # Power / Scheduling

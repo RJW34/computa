@@ -124,6 +124,10 @@ class MarvelRivalsSDRProfile(_MarvelRivalsBaseProfile):
     def description(self) -> str:
         return "Best-performance SDR profile for 1440p high-refresh competitive play"
 
+    @property
+    def is_sdr_only(self) -> bool:
+        return True
+
     def _variant_overrides(self) -> dict[str, dict[str, Any]]:
         return {
             "WindowsSettingsHandler": {
@@ -170,6 +174,10 @@ class MarvelRivalsHDRProfile(_MarvelRivalsBaseProfile):
     @property
     def description(self) -> str:
         return "Best-performance HDR profile for OLED / high-refresh competitive play"
+
+    @property
+    def is_sdr_only(self) -> bool:
+        return False
 
     def _variant_overrides(self) -> dict[str, dict[str, Any]]:
         return {

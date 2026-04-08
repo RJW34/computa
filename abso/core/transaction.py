@@ -13,6 +13,7 @@ from abso.core.backup import BackupManager
 from abso.core.compliance import ComplianceEngine, ComplianceReport
 from abso.core.config import get_config
 from abso.core.exceptions import BackupCorruptedError, BackupNotFoundError
+from abso.profiles.catalog import resolve_profile_id
 
 logger = logging.getLogger(__name__)
 
@@ -109,21 +110,22 @@ class ProfileTransactionManager:
 
     def execute(self, profile_id: str, create_backup: bool = True) -> TransactionResult:
         """Run full transactional apply flow."""
+        canonical_profile_id = resolve_profile_id(profile_id) or profile_id
         tx = TransactionResult(
             success=False,
-            profile_id=profile_id,
+            profile_id=canonical_profile_id,
             state="planned",
         )
         tx.add_checkpoint("plan", "ok", "Transaction planned")
 
-        if profile_id not in self.applier.PROFILES:
+        if canonical_profile_id not in self.applier.PROFILES:
             tx.state = "failed"
             tx.error = f"Unknown profile: {profile_id}"
             tx.add_checkpoint("validate", "failed", tx.error)
             return tx
 
         try:
-            prerequisite_error = self.applier.validate_profile_prerequisites(profile_id)
+            prerequisite_error = self.applier.validate_profile_prerequisites(canonical_profile_id)
         except Exception as e:
             tx.state = "failed"
             tx.error = f"Prerequisite validation failed: {e}"
@@ -196,7 +198,7 @@ class ProfileTransactionManager:
                 self.backup_dir.mkdir(parents=True, exist_ok=True)
                 backup_manager = BackupManager(self.backup_dir)
                 tx.backup_id = backup_manager.create_backup(
-                    profile_id=profile_id,
+                    profile_id=canonical_profile_id,
                     backup_type="pre_apply",
                 )
                 tx.add_checkpoint("backup", "ok", f"Backup created: {tx.backup_id}")
@@ -221,7 +223,7 @@ class ProfileTransactionManager:
 
         tx.state = "applying"
         try:
-            tx.apply_result = self.applier.apply_profile(profile_id)
+            tx.apply_result = self.applier.apply_profile(canonical_profile_id)
             if tx.apply_result.success:
                 tx.add_checkpoint("apply", "ok", "Profile apply completed")
             else:
@@ -241,14 +243,14 @@ class ProfileTransactionManager:
 
         tx.state = "verifying"
         try:
-            tx.verify_result = self.applier.verify_profile(profile_id)
+            tx.verify_result = self.applier.verify_profile(canonical_profile_id)
             if tx.verify_result.get("all_active", True):
                 tx.add_checkpoint("verify", "ok", "Verification completed")
             else:
                 tx.add_checkpoint("verify", "warn", "Verification reported mismatches")
         except Exception as e:
             tx.verify_result = {
-                "profile": profile_id,
+                "profile": canonical_profile_id,
                 "all_active": False,
                 "handlers": {},
                 "error": str(e),
@@ -263,7 +265,7 @@ class ProfileTransactionManager:
             )
 
         tx.compliance_report = self.compliance_engine.evaluate(
-            profile_id=profile_id,
+            profile_id=canonical_profile_id,
             apply_result=tx.apply_result,
             verify_result=tx.verify_result,
         )

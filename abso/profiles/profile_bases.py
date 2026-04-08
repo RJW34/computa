@@ -164,7 +164,9 @@ class Rivals2BaseProfile(BaseProfile):
 
     @property
     def is_sdr_only(self) -> bool:
-        return True
+        # Current Rivals 2 builds expose native HDR output toggles in
+        # GameUserSettings.ini, so the title is no longer modeled as SDR-only.
+        return False
 
     @property
     def graphics_api(self) -> Literal["dx11", "dx12", "vulkan", "opengl", "unknown"]:
@@ -176,7 +178,7 @@ class Rivals2BaseProfile(BaseProfile):
 
     @property
     def include_rivals2_config(self) -> bool:
-        return False
+        return True
 
     @property
     def nvidia_profile_name(self) -> str:
@@ -345,6 +347,67 @@ class Rivals2BaseProfile(BaseProfile):
     def get_settings(self, handler_name: str) -> dict[str, Any]:
         settings_map = merge_settings_map(self._base_settings(), self._settings_overrides())
         return inject_nvidia_profile_identity(self, handler_name, settings_map.get(handler_name, {}))
+
+
+class Rivals2HDRMixin:
+    """Native-HDR output overrides shared by Rivals 2 HDR variants."""
+
+    @property
+    def is_sdr_only(self) -> bool:
+        return False
+
+    @property
+    def rivals2_hdr_nits(self) -> int:
+        return 1000
+
+    def _hdr_overrides(self) -> dict[str, dict[str, Any]]:
+        return {
+            "WindowsSettingsHandler": {
+                "hdr": True,
+                "auto_hdr": False,
+            },
+            "ColorProfileSettingsHandler": {
+                "icc_profile": "native",
+                "digital_vibrance": 50,
+                "show_osd_guidance": True,
+                "game_type": "competitive_fps",
+            },
+            "Rivals2ConfigHandler": {
+                "hdr_output": True,
+                "hdr_nits": self.rivals2_hdr_nits,
+            },
+        }
+
+    def _settings_overrides(self) -> dict[str, dict[str, Any]]:
+        return merge_settings_map(super()._settings_overrides(), self._hdr_overrides())
+
+    def _hdr_in_game_settings(self) -> list[dict[str, str]]:
+        return [
+            {
+                "category": "Display",
+                "setting": "HDR Output",
+                "value": "On",
+                "reason": (
+                    "Current Rivals 2 builds expose native HDR output in GameUserSettings.ini. "
+                    "Use the game's HDR path with Windows HDR on, not Auto HDR."
+                ),
+            },
+            {
+                "category": "Display",
+                "setting": "Auto HDR",
+                "value": "Off",
+                "reason": "Auto HDR is for SDR titles; keep Rivals 2 on its native HDR output path.",
+            },
+            {
+                "category": "Display",
+                "setting": "HDR Peak Brightness / Nits",
+                "value": f"Start at {self.rivals2_hdr_nits} nits or match your display peak",
+                "reason": (
+                    "Rivals 2 stores an HDR nits target in GameUserSettings.ini. "
+                    "Match it to your display peak or use 1000 nits as a sane starting point."
+                ),
+            },
+        ]
 
 
 class EmulatorLatencyBaseProfile(BaseProfile):

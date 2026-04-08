@@ -185,6 +185,25 @@ class TestProfileLinterErrors:
         assert result.has_errors
         assert any(e.code == "WINDOWS_HDR_SDR_MISMATCH" for e in result.errors)
 
+    def test_explicit_hdr_profile_not_inferred_as_sdr_from_executable_name(self):
+        linter = ProfileLinter()
+        win_handler = MagicMock()
+        win_handler.__class__.__name__ = "WindowsSettingsHandler"
+        profile = _make_profile(
+            profile_id="rivals2-online-hdr",
+            display_name="Rivals 2: Online HDR",
+            executable_hints=["Rivals2-Win64-Shipping.exe"],
+            is_sdr_only=False,
+            handlers=[win_handler],
+            settings_map={
+                "WindowsSettingsHandler": {"hdr": True, "auto_hdr": False}
+            },
+        )
+
+        result = linter.lint(profile)
+
+        assert not any(e.code == "WINDOWS_HDR_SDR_MISMATCH" for e in result.errors)
+
     def test_native_hdr_profile_rejects_auto_hdr(self):
         linter = ProfileLinter()
         win_handler = MagicMock()

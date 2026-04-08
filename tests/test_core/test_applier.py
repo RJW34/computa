@@ -64,7 +64,11 @@ class TestProfileApplierInit:
         assert "slippi-melee-vrr-lab" in ProfileApplier.PROFILES
         assert "cod-bo7" in ProfileApplier.PROFILES
         assert "diablo4" in ProfileApplier.PROFILES
-        assert "rivals2" in ProfileApplier.PROFILES
+        assert "rivals2-offline" in ProfileApplier.PROFILES
+        assert "rivals2-offline-hdr" in ProfileApplier.PROFILES
+        assert "rivals2-online-hdr" in ProfileApplier.PROFILES
+        assert "rivals2-gsync-hdr" in ProfileApplier.PROFILES
+        assert "rivals2-online-gsync-hdr" in ProfileApplier.PROFILES
         assert "overwatch2" in ProfileApplier.PROFILES
         assert "overwatch2-gsync" in ProfileApplier.PROFILES
 
@@ -625,11 +629,18 @@ class TestRealProfiles:
         assert "Diablo" in profile.display_name
 
     def test_rivals2_profile_loads(self):
-        """Test Rivals 2 profile can be loaded."""
+        """Legacy Rivals 2 id should canonicalize to the offline profile."""
         applier = ProfileApplier()
         profile = applier._get_profile("rivals2")
 
-        assert profile.profile_id == "rivals2"
+        assert profile.profile_id == "rivals2-offline"
+
+    def test_rivals2_300hz_alias_loads_offline_profile(self):
+        """Retired 300 Hz alias should canonicalize to the consolidated offline profile."""
+        applier = ProfileApplier()
+        profile = applier._get_profile("rivals2-300hz-max")
+
+        assert profile.profile_id == "rivals2-offline"
 
 
 class TestProfileOverrides:

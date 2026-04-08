@@ -25,11 +25,14 @@ from abso.profiles.overwatch2 import (
 from abso.profiles.pacdeluxe import PACDeluxeProfile
 from abso.profiles.pokemon_auto_chess import PokemonAutoChessProfile
 from abso.profiles.productivity_oled import ProductivityOLEDProfile
-from abso.profiles.rivals2 import Rivals2Profile
-from abso.profiles.rivals2_300hz_max import Rivals2_300HzMaxProfile
-from abso.profiles.rivals2_gsync import Rivals2GSyncProfile, Rivals2OnlineGSyncProfile
-from abso.profiles.rivals2_offline import Rivals2OfflineProfile
-from abso.profiles.rivals2_online import Rivals2OnlineProfile
+from abso.profiles.rivals2_gsync import (
+    Rivals2GSyncHDRProfile,
+    Rivals2GSyncProfile,
+    Rivals2OnlineGSyncHDRProfile,
+    Rivals2OnlineGSyncProfile,
+)
+from abso.profiles.rivals2_offline import Rivals2OfflineHDRProfile, Rivals2OfflineProfile
+from abso.profiles.rivals2_online import Rivals2OnlineHDRProfile, Rivals2OnlineProfile
 from abso.profiles.rivals2_tournament_sim import Rivals2TournamentSimProfile
 from abso.profiles.ryujinx_ssbu import RyujinxSSBUProfile
 from abso.profiles.slippi_melee import (
@@ -42,6 +45,7 @@ from abso.profiles.streaming_profiles import (
     FortniteStreamingProfile,
     Overwatch2GSyncHDRStreamingProfile,
     PACDeluxeStreamingProfile,
+    Rivals2HDRStreamingProfile,
     Rivals2StreamingProfile,
     RyujinxSSBUStreamingProfile,
     SlippiMeleeStreamingProfile,
@@ -92,22 +96,36 @@ PROFILE_CATALOG: OrderedDict[str, ProfileCatalogEntry] = OrderedDict(
             tray_subtitle="VRR Lab | G-SYNC ON | A/B Test",
             sync_mode="on",
         ),
-        "rivals2": ProfileCatalogEntry(
-            profile_class=Rivals2Profile,
-            tray_category="Fighting",
-            tray_subtitle="LLM ON | No Sync (Default)",
-            sync_mode="off",
-        ),
         "rivals2-offline": ProfileCatalogEntry(
             profile_class=Rivals2OfflineProfile,
             tray_category="Fighting",
             tray_subtitle="LLM ON | No Sync | Uncapped",
             sync_mode="off",
         ),
+        "rivals2-offline-hdr": ProfileCatalogEntry(
+            profile_class=Rivals2OfflineHDRProfile,
+            tray_category="Fighting",
+            tray_subtitle="HDR ON | No Sync | Uncapped",
+            tray_description=(
+                "Offline/training Rivals 2 profile with native HDR output enabled. "
+                "Keeps the uncapped no-sync path while turning on the game's HDR output."
+            ),
+            sync_mode="off",
+        ),
         "rivals2-online": ProfileCatalogEntry(
             profile_class=Rivals2OnlineProfile,
             tray_category="Fighting",
             tray_subtitle="LLM ON | Uncapped | Rollback-Safe",
+            sync_mode="off",
+        ),
+        "rivals2-online-hdr": ProfileCatalogEntry(
+            profile_class=Rivals2OnlineHDRProfile,
+            tray_category="Fighting",
+            tray_subtitle="HDR ON | Uncapped | Rollback-Safe",
+            tray_description=(
+                "Rollback-safe Rivals 2 profile with native HDR output enabled. "
+                "Keeps the conservative online timing path while turning on HDR."
+            ),
             sync_mode="off",
         ),
         "rivals2-tournament-sim-144hz": ProfileCatalogEntry(
@@ -122,17 +140,31 @@ PROFILE_CATALOG: OrderedDict[str, ProfileCatalogEntry] = OrderedDict(
             tray_subtitle="LLM ON | G-SYNC ON | VSync Safety Net",
             sync_mode="on",
         ),
+        "rivals2-gsync-hdr": ProfileCatalogEntry(
+            profile_class=Rivals2GSyncHDRProfile,
+            tray_category="Fighting",
+            tray_subtitle="HDR ON | G-SYNC ON | VSync Safety Net",
+            tray_description=(
+                "Native HDR Rivals 2 VRR profile. Uses fullscreen G-SYNC plus the game's "
+                "HDR output path and an in-game refresh-minus-3 cap."
+            ),
+            sync_mode="on",
+        ),
         "rivals2-online-gsync": ProfileCatalogEntry(
             profile_class=Rivals2OnlineGSyncProfile,
             tray_category="Fighting",
             tray_subtitle="G-SYNC ON | Rollback-Safe | VRR",
             sync_mode="on",
         ),
-        "rivals2-300hz-max": ProfileCatalogEntry(
-            profile_class=Rivals2_300HzMaxProfile,
+        "rivals2-online-gsync-hdr": ProfileCatalogEntry(
+            profile_class=Rivals2OnlineGSyncHDRProfile,
             tray_category="Fighting",
-            tray_subtitle="LLM ON | 300Hz | No Sync",
-            sync_mode="off",
+            tray_subtitle="HDR ON | G-SYNC ON | Rollback-Safe",
+            tray_description=(
+                "Rollback-safe native HDR Rivals 2 VRR profile. Uses fullscreen G-SYNC, "
+                "HDR output, and an in-game refresh-minus-3 cap."
+            ),
+            sync_mode="on",
         ),
         "cod-bo7": ProfileCatalogEntry(
             profile_class=CodBo7Profile,
@@ -264,6 +296,12 @@ PROFILE_CATALOG: OrderedDict[str, ProfileCatalogEntry] = OrderedDict(
             tray_subtitle="Rollback-Safe | OBS 1080p60",
             sync_mode="agnostic",
         ),
+        "rivals2-streaming-hdr": ProfileCatalogEntry(
+            profile_class=Rivals2HDRStreamingProfile,
+            tray_category="Streaming",
+            tray_subtitle="HDR ON | Rollback-Safe | OBS 1080p60",
+            sync_mode="agnostic",
+        ),
         "slippi-melee-streaming": ProfileCatalogEntry(
             profile_class=SlippiMeleeStreamingProfile,
             tray_category="Streaming",
@@ -272,6 +310,13 @@ PROFILE_CATALOG: OrderedDict[str, ProfileCatalogEntry] = OrderedDict(
         ),
     }
 )
+
+PROFILE_ALIASES: dict[str, str] = {
+    # Retired generic/no-value Rivals variants now map to the evidence-backed
+    # offline no-sync lane instead of lingering as separate menu clutter.
+    "rivals2": "rivals2-offline",
+    "rivals2-300hz-max": "rivals2-offline",
+}
 
 
 def _load_user_profiles() -> dict[str, ProfileCatalogEntry]:
@@ -313,6 +358,13 @@ def _get_full_catalog() -> dict[str, ProfileCatalogEntry]:
 def get_profile_classes() -> dict[str, type[BaseProfile]]:
     """Get profile registry mapping profile ID to profile class."""
     return {pid: entry.profile_class for pid, entry in _get_full_catalog().items()}
+
+
+def resolve_profile_id(profile_id: str | None) -> str | None:
+    """Resolve a potentially legacy profile id to its canonical id."""
+    if profile_id is None:
+        return None
+    return PROFILE_ALIASES.get(profile_id, profile_id)
 
 
 def get_profile_instances() -> dict[str, BaseProfile]:

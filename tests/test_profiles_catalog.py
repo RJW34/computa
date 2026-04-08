@@ -6,7 +6,12 @@ from collections import defaultdict
 
 from abso.core.applier import ProfileApplier
 from abso.profiles import get_all_profiles
-from abso.profiles.catalog import PROFILE_CATALOG, get_profile_manifest, get_profile_instances
+from abso.profiles.catalog import (
+    PROFILE_CATALOG,
+    get_profile_manifest,
+    get_profile_instances,
+    resolve_profile_id,
+)
 
 
 def test_catalog_matches_applier_registry() -> None:
@@ -23,6 +28,34 @@ def test_catalog_keys_match_profile_id_property() -> None:
     """Catalog key must match each profile class profile_id."""
     for profile_id, entry in PROFILE_CATALOG.items():
         assert entry.profile_class().profile_id == profile_id
+
+
+def test_retired_rivals_aliases_resolve_to_offline_profile() -> None:
+    """Retired generic Rivals ids should canonicalize to the consolidated offline lane."""
+    assert "rivals2" not in PROFILE_CATALOG
+    assert "rivals2-300hz-max" not in PROFILE_CATALOG
+    assert resolve_profile_id("rivals2") == "rivals2-offline"
+    assert resolve_profile_id("rivals2-300hz-max") == "rivals2-offline"
+
+
+def test_rivals_manifest_contains_canonical_hdr_variants() -> None:
+    """The live manifest should expose the consolidated Rivals SDR/HDR matrix."""
+    manifest = {profile["id"]: profile for profile in get_profile_manifest()}
+
+    for profile_id in {
+        "rivals2-offline",
+        "rivals2-offline-hdr",
+        "rivals2-online",
+        "rivals2-online-hdr",
+        "rivals2-gsync",
+        "rivals2-gsync-hdr",
+        "rivals2-online-gsync",
+        "rivals2-online-gsync-hdr",
+        "rivals2-streaming",
+        "rivals2-streaming-hdr",
+        "rivals2-tournament-sim-144hz",
+    }:
+        assert profile_id in manifest
 
 
 def test_profile_manifest_has_required_fields() -> None:

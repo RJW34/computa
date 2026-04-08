@@ -45,6 +45,8 @@ def test_apply_updates_allowed_keys_and_preserves_protected_keys(tmp_path: Path)
                 "vsync": False,
                 "raw_input": True,
                 "frame_rate_limit": 297,
+                "hdr_output": True,
+                "hdr_nits": 1000,
             }
         )
 
@@ -53,9 +55,12 @@ def test_apply_updates_allowed_keys_and_preserves_protected_keys(tmp_path: Path)
     assert "PlayerTag=goofy" in content
     assert "DefaultControlScheme=goofy" in content
     assert "FullscreenMode=0" in content
+    assert "LastConfirmedFullscreenMode=0" in content
     assert "bUseVSync=False" in content
     assert "bUseRawInput=True" in content
     assert "FrameRateLimit=297" in content
+    assert "bUseHDRDisplayOutput=True" in content
+    assert "HDRDisplayOutputNits=1000" in content
 
 
 def test_verify_active_reports_mismatch(tmp_path: Path) -> None:
@@ -81,3 +86,57 @@ def test_verify_active_reports_mismatch(tmp_path: Path) -> None:
     assert verify["settings"]["fullscreen_mode"]["active"] is False
     assert verify["settings"]["vsync"]["active"] is False
     assert verify["settings"]["raw_input"]["active"] is False
+
+
+def test_apply_auto_vrr_fps_cap_uses_detected_refresh(tmp_path: Path) -> None:
+    config_dir = tmp_path / "Rivals2" / "Saved" / "Config" / "Windows"
+    ini_path = config_dir / "GameUserSettings.ini"
+    _write_game_user_settings(
+        ini_path,
+        "\n".join(
+            [
+                "FullscreenMode=1",
+                "bUseVSync=True",
+                "bUseRawInput=False",
+                "FrameRateLimit=999",
+            ]
+        )
+        + "\n",
+    )
+
+    with (
+        patch("abso.settings.rivals2_config._get_rivals2_config_dir", return_value=config_dir),
+        patch("abso.settings.nvidia.NvidiaSettingsHandler._detect_primary_refresh_rate", return_value=300),
+    ):
+        handler = Rivals2ConfigHandler()
+        result = handler.apply({"auto_vrr_fps_cap": True})
+
+    assert result["success"] is True
+    content = ini_path.read_text(encoding="utf-8")
+    assert "FrameRateLimit=297" in content
+
+
+def test_detect_reads_hdr_settings(tmp_path: Path) -> None:
+    config_dir = tmp_path / "Rivals2" / "Saved" / "Config" / "Windows"
+    ini_path = config_dir / "GameUserSettings.ini"
+    _write_game_user_settings(
+        ini_path,
+        "\n".join(
+            [
+                "FullscreenMode=0",
+                "bUseVSync=False",
+                "bUseRawInput=True",
+                "FrameRateLimit=297",
+                "bUseHDRDisplayOutput=True",
+                "HDRDisplayOutputNits=1000",
+            ]
+        )
+        + "\n",
+    )
+
+    with patch("abso.settings.rivals2_config._get_rivals2_config_dir", return_value=config_dir):
+        handler = Rivals2ConfigHandler()
+        detected = handler.detect()
+
+    assert detected["hdr_output"] is True
+    assert detected["hdr_nits"] == 1000

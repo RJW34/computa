@@ -760,19 +760,19 @@ $script:FallbackProfiles = [ordered]@{
     }
 
     # --- Fighting Games: Rivals 2 ---
-    "rivals2" = @{
-        Name     = "Rivals of Aether 2"
-        Sub      = "LLM ON | No Sync (Default)"
-        Cat      = "Fighting"
-        Desc     = "Ultra-low latency optimization for competitive play"
-        Exes     = @("Rivals2-Win64-Shipping.exe", "RivalsofAether2.exe", "Rivals2.exe")
-        SyncMode = "off"
-    }
     "rivals2-offline"   = @{
         Name     = "Rivals 2: Offline / Training"
         Sub      = "LLM ON | No Sync | Uncapped"
         Cat      = "Fighting"
         Desc     = "Maximum latency reduction for training/local play (NOT for online)"
+        Exes     = @("Rivals2-Win64-Shipping.exe", "RivalsofAether2.exe", "Rivals2.exe")
+        SyncMode = "off"
+    }
+    "rivals2-offline-hdr" = @{
+        Name     = "Rivals 2: Offline / Training HDR"
+        Sub      = "HDR ON | No Sync | Uncapped"
+        Cat      = "Fighting"
+        Desc     = "Offline/training Rivals 2 profile with native HDR output enabled"
         Exes     = @("Rivals2-Win64-Shipping.exe", "RivalsofAether2.exe", "Rivals2.exe")
         SyncMode = "off"
     }
@@ -784,11 +784,27 @@ $script:FallbackProfiles = [ordered]@{
         Exes     = @("Rivals2-Win64-Shipping.exe", "RivalsofAether2.exe", "Rivals2.exe")
         SyncMode = "off"
     }
+    "rivals2-online-hdr" = @{
+        Name     = "Rivals 2: Online / Matchmaking HDR"
+        Sub      = "HDR ON | Uncapped | Rollback-Safe"
+        Cat      = "Fighting"
+        Desc     = "Rollback-safe Rivals 2 profile with native HDR output enabled"
+        Exes     = @("Rivals2-Win64-Shipping.exe", "RivalsofAether2.exe", "Rivals2.exe")
+        SyncMode = "off"
+    }
     "rivals2-streaming" = @{
         Name     = "Rivals 2 (Streaming)"
         Sub      = "Rollback-Safe | OBS 1080p60"
         Cat      = "Streaming"
         Desc     = "Streaming-optimized Rivals 2 profile (rollback-safe)"
+        Exes     = @("Rivals2-Win64-Shipping.exe", "RivalsofAether2.exe", "Rivals2.exe")
+        SyncMode = "agnostic"
+    }
+    "rivals2-streaming-hdr" = @{
+        Name     = "Rivals 2 (Streaming HDR)"
+        Sub      = "HDR ON | Rollback-Safe | OBS 1080p60"
+        Cat      = "Streaming"
+        Desc     = "Streaming-optimized Rivals 2 HDR profile (rollback-safe)"
         Exes     = @("Rivals2-Win64-Shipping.exe", "RivalsofAether2.exe", "Rivals2.exe")
         SyncMode = "agnostic"
     }
@@ -808,6 +824,14 @@ $script:FallbackProfiles = [ordered]@{
         Exes     = @("Rivals2-Win64-Shipping.exe", "RivalsofAether2.exe", "Rivals2.exe")
         SyncMode = "on"
     }
+    "rivals2-gsync-hdr" = @{
+        Name     = "Rivals 2: G-SYNC HDR"
+        Sub      = "HDR ON | G-SYNC ON | VSync Safety Net"
+        Cat      = "Fighting"
+        Desc     = "Native HDR Rivals 2 VRR profile with fullscreen G-SYNC"
+        Exes     = @("Rivals2-Win64-Shipping.exe", "RivalsofAether2.exe", "Rivals2.exe")
+        SyncMode = "on"
+    }
     "rivals2-online-gsync" = @{
         Name     = "Rivals 2: Online G-SYNC"
         Sub      = "G-SYNC ON | Rollback-Safe | VRR"
@@ -816,13 +840,13 @@ $script:FallbackProfiles = [ordered]@{
         Exes     = @("Rivals2-Win64-Shipping.exe", "RivalsofAether2.exe", "Rivals2.exe")
         SyncMode = "on"
     }
-    "rivals2-300hz-max" = @{
-        Name     = "Rivals 2: 300Hz Maximum"
-        Sub      = "LLM ON | 300Hz | No Sync"
+    "rivals2-online-gsync-hdr" = @{
+        Name     = "Rivals 2: Online G-SYNC HDR"
+        Sub      = "HDR ON | G-SYNC ON | Rollback-Safe"
         Cat      = "Fighting"
-        Desc     = "Absolute minimum latency - 300Hz, no sync, Ultimate Performance"
+        Desc     = "Rollback-safe native HDR Rivals 2 VRR profile"
         Exes     = @("Rivals2-Win64-Shipping.exe", "RivalsofAether2.exe", "Rivals2.exe")
-        SyncMode = "off"
+        SyncMode = "on"
     }
 
     # --- Fighting Games: Melee ---
