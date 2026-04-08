@@ -163,6 +163,22 @@ class Rivals2BaseProfile(BaseProfile):
         ]
 
     @property
+    def nvidia_binding_executables(self) -> list[str]:
+        """Bind the stable NVIDIA family to the real shipping binary only."""
+        return ["Rivals2-Win64-Shipping.exe"]
+
+    @property
+    def allow_unverified_nvidia_profile_reuse(self) -> bool:
+        """Permit safe reuse of ABSO-managed Rivals driver profiles.
+
+        NVIDIA does not always enumerate custom-profile ownership cleanly for
+        Rivals 2 on this machine, even when the stable family profile already
+        exists. ABSO still fails closed on conflicts; this only relaxes the
+        "existing bound profile, no conflicting owner" case.
+        """
+        return True
+
+    @property
     def is_sdr_only(self) -> bool:
         # Current Rivals 2 builds expose native HDR output toggles in
         # GameUserSettings.ini, so the title is no longer modeled as SDR-only.

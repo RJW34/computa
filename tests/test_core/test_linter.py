@@ -131,6 +131,26 @@ class TestProfileLinterValid:
         assert result.passed
         assert not any(e.code.startswith("STRICT_VRR_") for e in result.errors)
 
+    def test_strict_fullscreen_vrr_warns_when_binding_targets_reuse_all_detection_aliases(self):
+        linter = ProfileLinter()
+        nvidia_handler = MagicMock()
+        nvidia_handler.__class__.__name__ = "NvidiaSettingsHandler"
+        profile = _make_profile(
+            requires_confirmed_vrr_support=True,
+            executable_hints=["game-launcher.exe", "game-shipping.exe"],
+            handlers=[nvidia_handler],
+            settings_map={
+                "NvidiaSettingsHandler": {"global_vrr_mode": "fullscreen_only"},
+            },
+        )
+        profile.display_path_requirements.require_overlay_free_path = True
+        profile.requires_exact_nvidia_binding = True
+        profile.nvidia_binding_executables = ["game-launcher.exe", "game-shipping.exe"]
+
+        result = linter.lint(profile)
+
+        assert any(w.code == "STRICT_VRR_BINDING_EXECUTABLES_TOO_BROAD" for w in result.warnings)
+
 
 class TestProfileLinterErrors:
     """Test that invalid profiles produce errors."""

@@ -40,6 +40,16 @@ class SlippiMeleeProfile(EmulatorLatencyBaseProfile):
         return ["Slippi Dolphin.exe", "Dolphin.exe"]
 
     @property
+    def nvidia_binding_executables(self) -> list[str]:
+        """Target the Slippi build directly for NVIDIA profile ownership."""
+        return ["Slippi Dolphin.exe"]
+
+    @property
+    def allow_unverified_nvidia_profile_reuse(self) -> bool:
+        """Allow safe reuse of stable ABSO-managed Slippi driver profiles."""
+        return True
+
+    @property
     def nvidia_profile_name(self) -> str | None:
         return "Super Smash Bros. Melee (Slippi)"
 

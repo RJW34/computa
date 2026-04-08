@@ -969,6 +969,30 @@ class TestNvidiaPreflight:
         assert result["success"] is True
         assert any("NVIDIA predefined profile 'Overwatch 2'" in notice for notice in result["notices"])
 
+    @patch("abso.settings.nvidia.nvapi_drs.DRSProfileManager.probe_profile_binding")
+    def test_preflight_allows_stable_existing_profile_reuse_when_opted_in(self, mock_probe):
+        mock_probe.return_value = {
+            "app_binding_exact": False,
+            "app_binding_safe": False,
+            "app_binding_state": "existing_profile_unverified",
+            "app_binding_note": (
+                "Profile 'Rivals 2 Online' already exists and has bound applications, but "
+                "NVAPI could not prove every executable belongs to it."
+            ),
+        }
+
+        handler = NvidiaSettingsHandler()
+        result = handler.preflight({
+            "preset": "vrr_fighting_game",
+            "executables": ["Rivals2-Win64-Shipping.exe"],
+            "profile_name": "Rivals 2 Online",
+            "require_exact_binding": True,
+            "allow_unverified_existing_profile_reuse": True,
+        })
+
+        assert result["success"] is True
+        assert any("Proceeding with stable NVIDIA profile reuse" in notice for notice in result["notices"])
+
 
 class TestNvidiaBackwardsCompatibility:
     """Tests for backwards compatibility methods."""

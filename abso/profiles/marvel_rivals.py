@@ -18,6 +18,11 @@ class _MarvelRivalsBaseProfile(ReflexShooterBaseProfile):
         ]
 
     @property
+    def nvidia_binding_executables(self) -> list[str]:
+        """Use the actual game binary for NVIDIA binding verification."""
+        return ["Marvel-Win64-Shipping.exe"]
+
+    @property
     def graphics_api(self) -> Literal["dx11", "dx12", "vulkan", "opengl", "unknown"]:
         return "dx12"
 

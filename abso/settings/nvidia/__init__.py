@@ -260,6 +260,9 @@ class NvidiaSettingsHandler(SettingsHandler):
             if isinstance(alias, str) and alias.strip()
         ]
         require_exact_binding = bool(settings.pop("require_exact_binding", False))
+        allow_unverified_existing_profile_reuse = bool(
+            settings.pop("allow_unverified_existing_profile_reuse", False)
+        )
 
         global_settings: dict[str, Any] = {}
         raw_global_settings = settings.pop("global_settings", None)
@@ -291,6 +294,7 @@ class NvidiaSettingsHandler(SettingsHandler):
             "auto_vrr_fps_cap": auto_vrr_fps_cap,
             "forced_refresh_hz": forced_refresh_hz,
             "require_exact_binding": require_exact_binding,
+            "allow_unverified_existing_profile_reuse": allow_unverified_existing_profile_reuse,
         }
 
     def _resolve_requested_nvidia_settings(
@@ -317,6 +321,9 @@ class NvidiaSettingsHandler(SettingsHandler):
         """Validate strict NVIDIA profile prerequisites before apply."""
         requested = self._extract_requested_settings(settings)
         require_exact_binding = requested["require_exact_binding"]
+        allow_unverified_existing_profile_reuse = bool(
+            requested["allow_unverified_existing_profile_reuse"]
+        )
         executables = list(requested["executables"] or [])
 
         if not require_exact_binding or not executables:
@@ -347,6 +354,13 @@ class NvidiaSettingsHandler(SettingsHandler):
             }
 
         binding_ok = bool(probe.get("app_binding_safe", probe.get("app_binding_exact", False)))
+        if (
+            not binding_ok
+            and allow_unverified_existing_profile_reuse
+            and str(probe.get("app_binding_state") or "").strip().lower()
+            in {"reused_family_profile", "existing_profile_unverified"}
+        ):
+            binding_ok = True
         if not binding_ok:
             return {
                 "success": False,
@@ -364,7 +378,13 @@ class NvidiaSettingsHandler(SettingsHandler):
             notices.append(str(selection_note))
         binding_note = probe.get("app_binding_note")
         if binding_note:
-            notices.append(str(binding_note))
+            if str(probe.get("app_binding_state") or "").strip().lower() in {
+                "reused_family_profile",
+                "existing_profile_unverified",
+            }:
+                notices.append(f"Proceeding with stable NVIDIA profile reuse: {binding_note}")
+            else:
+                notices.append(str(binding_note))
 
         return {
             "success": True,

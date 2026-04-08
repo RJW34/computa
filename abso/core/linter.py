@@ -556,6 +556,23 @@ class ProfileLinter:
                 setting_path="BaseProfile.requires_exact_nvidia_binding",
             ))
 
+        executable_hints = list(getattr(profile, "executable_hints", []) or [])
+        binding_executables = list(
+            getattr(profile, "nvidia_binding_executables", executable_hints) or []
+        )
+        if len(executable_hints) > 1 and binding_executables == executable_hints:
+            result.add_issue(LintIssue(
+                code="STRICT_VRR_BINDING_EXECUTABLES_TOO_BROAD",
+                severity=LintSeverity.WARNING,
+                message="Strict VRR profile reuses all detection aliases for NVIDIA binding",
+                details=(
+                    "Profiles with multiple executable hints should usually provide a narrower "
+                    "nvidia_binding_executables list so strict NVIDIA binding proof targets the "
+                    "real game binary instead of every launcher or alias name."
+                ),
+                setting_path="BaseProfile.nvidia_binding_executables",
+            ))
+
     def _check_emulator_vrr(
         self,
         profile: BaseProfile,

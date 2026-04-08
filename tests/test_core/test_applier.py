@@ -248,6 +248,35 @@ class TestApplyProfile:
         finally:
             del ProfileApplier.PROFILES["test-profile"]
 
+    def test_finalize_handler_settings_uses_canonical_nvidia_binding_executables(self):
+        """NVIDIA handler settings should use canonical binding executables, not all hints."""
+        nvidia_handler = MagicMock()
+        nvidia_handler.__class__.__name__ = "NvidiaSettingsHandler"
+
+        profile = MagicMock()
+        profile.get_handlers.return_value = [nvidia_handler]
+        profile.get_settings.return_value = {"preset": "vrr_fighting_game"}
+        profile.display_name = "Rivals 2: Online G-SYNC HDR"
+        profile.executable_hints = [
+            "Rivals2-Win64-Shipping.exe",
+            "RivalsofAether2.exe",
+            "Rivals2.exe",
+        ]
+        profile.nvidia_binding_executables = ["Rivals2-Win64-Shipping.exe"]
+        profile.nvidia_profile_name = "Rivals 2 Online"
+        profile.nvidia_profile_aliases = ["Rivals 2: Online G-SYNC"]
+        profile.requires_exact_nvidia_binding = True
+        profile.allow_unverified_nvidia_profile_reuse = True
+
+        applier = ProfileApplier()
+        final = applier._finalize_handler_settings(profile, "test-profile", {}, None)
+
+        assert final["NvidiaSettingsHandler"]["executables"] == ["Rivals2-Win64-Shipping.exe"]
+        assert final["NvidiaSettingsHandler"]["profile_name"] == "Rivals 2 Online"
+        assert final["NvidiaSettingsHandler"]["profile_aliases"] == ["Rivals 2: Online G-SYNC"]
+        assert final["NvidiaSettingsHandler"]["require_exact_binding"] is True
+        assert final["NvidiaSettingsHandler"]["allow_unverified_existing_profile_reuse"] is True
+
     def test_apply_profile_blocks_on_profile_contract_violation(self):
         """Profile-specific validation must abort before handlers run."""
         handler = MagicMock()

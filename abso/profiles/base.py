@@ -224,6 +224,33 @@ class BaseProfile(ABC):
         """Legacy or variant NVIDIA profile names worth reusing when bound."""
         return []
 
+    @property
+    def nvidia_binding_executables(self) -> list[str]:
+        """Executable names ABSO should use for NVIDIA profile binding proof.
+
+        ``executable_hints`` is intentionally broad and powers process detection,
+        launch matching, and other runtime heuristics. NVIDIA driver binding is a
+        different concern: it should target the canonical game binary, not every
+        alias or launcher name a profile might recognize.
+
+        Profiles with multiple detection aliases should override this with the
+        narrowest set of real game executables that should belong to the driver
+        profile.
+        """
+        return list(self.executable_hints)
+
+    @property
+    def allow_unverified_nvidia_profile_reuse(self) -> bool:
+        """Whether strict NVIDIA preflight may reuse a stable bound profile.
+
+        Some ABSO-managed custom profile families cannot be enumerated exactly by
+        NVAPI on every driver branch even when the intended profile already
+        exists and has bound applications. Profiles should opt into this only
+        when they reuse a stable driver-profile identity and ABSO can still rule
+        out conflicting owners.
+        """
+        return False
+
     def _safe_get_handler_settings(self, handler_name: str) -> dict[str, Any]:
         """Best-effort access to a handler's settings without surfacing profile exceptions."""
         try:

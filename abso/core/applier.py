@@ -537,7 +537,7 @@ class ProfileApplier:
                 settings = self._merge_overrides(settings, handler_name, profile_overrides)
 
             if handler_name == "NvidiaSettingsHandler":
-                settings["executables"] = list(profile.executable_hints)
+                settings["executables"] = list(profile.nvidia_binding_executables)
                 settings["game_name"] = profile.display_name
                 if profile.nvidia_profile_name:
                     settings.setdefault("profile_name", profile.nvidia_profile_name)
@@ -545,6 +545,8 @@ class ProfileApplier:
                     settings.setdefault("profile_aliases", list(profile.nvidia_profile_aliases))
                 if profile.requires_exact_nvidia_binding:
                     settings.setdefault("require_exact_binding", True)
+                if profile.allow_unverified_nvidia_profile_reuse:
+                    settings.setdefault("allow_unverified_existing_profile_reuse", True)
 
             final_settings[handler_name] = settings
 

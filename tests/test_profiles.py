@@ -149,6 +149,18 @@ class TestProfileLoading:
         assert streaming.profile_id == "rivals2-streaming"
         assert streaming_hdr.profile_id == "rivals2-streaming-hdr"
 
+    def test_profiles_expose_canonical_nvidia_binding_executables(self):
+        """NVIDIA binding should target canonical binaries, not broad detection aliases."""
+        rivals = Rivals2OnlineGSyncHDRProfile()
+        marvel = MarvelRivalsHDRProfile()
+        slippi = SlippiMeleeVRRLabProfile()
+
+        assert rivals.nvidia_binding_executables == ["Rivals2-Win64-Shipping.exe"]
+        assert rivals.allow_unverified_nvidia_profile_reuse is True
+        assert marvel.nvidia_binding_executables == ["Marvel-Win64-Shipping.exe"]
+        assert slippi.nvidia_binding_executables == ["Slippi Dolphin.exe"]
+        assert slippi.allow_unverified_nvidia_profile_reuse is True
+
     def test_streaming_variants_load(self):
         """Streaming families should expose the expected explicit HDR/SDR lanes."""
         fortnite_stream = FortniteStreamingProfile()
