@@ -58,6 +58,25 @@ def test_rivals_manifest_contains_canonical_hdr_variants() -> None:
         assert profile_id in manifest
 
 
+def test_shooter_and_arpg_families_expose_canonical_hdr_sdr_pairs() -> None:
+    """Families with explicit native HDR support should expose paired SDR/HDR lanes."""
+    manifest = {profile["id"]: profile for profile in get_profile_manifest()}
+
+    for profile_id in {
+        "cod-bo7",
+        "cod-bo7-sdr",
+        "diablo4",
+        "diablo4-sdr",
+        "fortnite",
+        "fortnite-hdr",
+        "fortnite-streaming",
+        "fortnite-streaming-hdr",
+        "overwatch2-gsync-streaming",
+        "overwatch2-gsync-hdr-streaming",
+    }:
+        assert profile_id in manifest
+
+
 def test_profile_manifest_has_required_fields() -> None:
     """Manifest must include metadata required by tray and GUI surfaces."""
     manifest = get_profile_manifest()

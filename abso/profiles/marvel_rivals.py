@@ -25,6 +25,11 @@ class _MarvelRivalsBaseProfile(ReflexShooterBaseProfile):
     def requires_confirmed_vrr_support(self) -> bool:
         return True
 
+    def get_handlers(self):
+        from abso.settings.marvel_rivals_config import MarvelRivalsConfigHandler
+
+        return [*super().get_handlers(), MarvelRivalsConfigHandler()]
+
     def _shared_overrides(self) -> dict[str, dict[str, Any]]:
         return {
             "NvidiaSettingsHandler": {
@@ -32,6 +37,12 @@ class _MarvelRivalsBaseProfile(ReflexShooterBaseProfile):
                 "profile_name": "Marvel Rivals",
                 "auto_vrr_fps_cap": True,
                 "global_vrr_mode": "fullscreen_only",
+            },
+            "MarvelRivalsConfigHandler": {
+                "fullscreen_mode": 0,
+                "vsync": False,
+                "nvidia_reflex": True,
+                "auto_vrr_fps_cap": True,
             },
         }
 
@@ -140,6 +151,10 @@ class MarvelRivalsSDRProfile(_MarvelRivalsBaseProfile):
                 "show_osd_guidance": True,
                 "game_type": "competitive_fps",
             },
+            "MarvelRivalsConfigHandler": {
+                "hdr_output": False,
+                "hdr_nits": 1000,
+            },
         }
 
     def get_in_game_settings(self) -> list[dict[str, str]]:
@@ -190,6 +205,10 @@ class MarvelRivalsHDRProfile(_MarvelRivalsBaseProfile):
                 "digital_vibrance": 50,
                 "show_osd_guidance": True,
                 "game_type": "competitive_fps",
+            },
+            "MarvelRivalsConfigHandler": {
+                "hdr_output": True,
+                "hdr_nits": 1000,
             },
         }
 

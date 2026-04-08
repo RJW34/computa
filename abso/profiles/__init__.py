@@ -7,9 +7,9 @@ from abso.profiles.catalog import (
     get_profile_manifest,
     resolve_profile_id,
 )
-from abso.profiles.cod_bo7 import CodBo7Profile
-from abso.profiles.diablo4 import Diablo4Profile
-from abso.profiles.fortnite import FortniteProfile
+from abso.profiles.cod_bo7 import CodBo7Profile, CodBo7SDRProfile
+from abso.profiles.diablo4 import Diablo4Profile, Diablo4SDRProfile
+from abso.profiles.fortnite import FortniteHDRProfile, FortniteProfile
 from abso.profiles.marvel_rivals import MarvelRivalsHDRProfile, MarvelRivalsSDRProfile
 from abso.profiles.overwatch2 import (
     Overwatch2GSyncCaptureProfile,
@@ -40,7 +40,10 @@ from abso.profiles.slippi_melee import (
     SlippiMeleeVRRLabProfile,
 )
 from abso.profiles.streaming_profiles import (
+    FortniteHDRStreamingProfile,
     FortniteStreamingProfile,
+    Overwatch2GSyncStreamingProfile,
+    Overwatch2GSyncHDRStreamingProfile,
     PACDeluxeStreamingProfile,
     Rivals2HDRStreamingProfile,
     Rivals2StreamingProfile,
@@ -66,9 +69,13 @@ __all__ = [
     "Rivals2OnlineGSyncProfile",
     "Rivals2OnlineGSyncHDRProfile",
     "CodBo7Profile",
+    "CodBo7SDRProfile",
     "Diablo4Profile",
+    "Diablo4SDRProfile",
     "FortniteProfile",
+    "FortniteHDRProfile",
     "FortniteStreamingProfile",
+    "FortniteHDRStreamingProfile",
     "MarvelRivalsSDRProfile",
     "MarvelRivalsHDRProfile",
     "Overwatch2Profile",
@@ -76,6 +83,8 @@ __all__ = [
     "Overwatch2GSyncHDRProfile",
     "Overwatch2GSyncCaptureProfile",
     "Overwatch2GSyncHDRCaptureProfile",
+    "Overwatch2GSyncStreamingProfile",
+    "Overwatch2GSyncHDRStreamingProfile",
     "PokemonAutoChessProfile",
     "PACDeluxeProfile",
     "PACDeluxeStreamingProfile",

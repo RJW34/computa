@@ -911,28 +911,57 @@ $script:FallbackProfiles = [ordered]@{
 
     # --- ARPG ---
     "diablo4"           = @{
-        Name     = "Diablo 4"
+        Name     = "Diablo 4 - HDR"
         Sub      = "HDR ON | Reflex ON+Boost | LLM OFF"
         Cat      = "ARPG"
-        Desc     = "Balanced performance with visual quality"
+        Desc     = "Balanced Diablo 4 HDR profile with Reflex and VRR"
         Exes     = @("Diablo IV.exe")
-        SyncMode = "agnostic"
+        SyncMode = "on"
+    }
+    "diablo4-sdr"       = @{
+        Name     = "Diablo 4 - SDR"
+        Sub      = "SDR | Reflex ON+Boost | VRR"
+        Cat      = "ARPG"
+        Desc     = "Balanced Diablo 4 SDR profile with Reflex and VRR"
+        Exes     = @("Diablo IV.exe")
+        SyncMode = "on"
     }
 
     # --- Shooter ---
     "cod-bo7"           = @{
-        Name     = "Call of Duty: Black Ops 7"
+        Name     = "Call of Duty: Black Ops 7 - HDR"
         Sub      = "HDR ON | Reflex ON+Boost | LLM OFF"
         Cat      = "Shooter"
-        Desc     = "Low latency, stable high FPS for competitive play"
+        Desc     = "Competitive Call of Duty HDR profile with Reflex on the no-sync path"
+        Exes     = @("cod.exe", "BlackOps7.exe")
+        SyncMode = "agnostic"
+    }
+    "cod-bo7-sdr"       = @{
+        Name     = "Call of Duty: Black Ops 7 - SDR"
+        Sub      = "SDR | Reflex ON+Boost | LLM OFF"
+        Cat      = "Shooter"
+        Desc     = "Competitive Call of Duty SDR profile with Reflex on the no-sync path"
         Exes     = @("cod.exe", "BlackOps7.exe")
         SyncMode = "agnostic"
     }
     "fortnite"          = @{
-        Name     = "Fortnite"
-        Sub      = "Reflex ON+Boost | LLM OFF | HAGS ON"
+        Name     = "Fortnite - SDR"
+        Sub      = "SDR | Reflex ON+Boost | No Sync"
         Cat      = "Shooter"
-        Desc     = "Low latency, high FPS competitive settings with Reflex"
+        Desc     = "Competitive SDR Fortnite profile with Reflex and a no-sync latency path"
+        Exes     = @(
+            "FortniteClient-Win64-Shipping.exe",
+            "FortniteClient-Win64-Shipping_EAC.exe",
+            "FortniteClient-Win64-Shipping_BE.exe",
+            "FortniteClient-Win64-Shipping_EAC_EOS.exe"
+        )
+        SyncMode = "agnostic"
+    }
+    "fortnite-hdr"      = @{
+        Name     = "Fortnite - HDR"
+        Sub      = "HDR ON | Reflex ON+Boost | No Sync"
+        Cat      = "Shooter"
+        Desc     = "Competitive Fortnite HDR profile with Reflex and a no-sync latency path"
         Exes     = @(
             "FortniteClient-Win64-Shipping.exe",
             "FortniteClient-Win64-Shipping_EAC.exe",
@@ -959,9 +988,22 @@ $script:FallbackProfiles = [ordered]@{
     }
     "fortnite-streaming" = @{
         Name     = "Fortnite (Streaming)"
-        Sub      = "Reflex ON+Boost | OBS 1080p60"
+        Sub      = "SDR | Reflex ON+Boost | OBS 1080p60"
         Cat      = "Streaming"
         Desc     = "Streaming-optimized Fortnite profile for multi-monitor OBS"
+        Exes     = @(
+            "FortniteClient-Win64-Shipping.exe",
+            "FortniteClient-Win64-Shipping_EAC.exe",
+            "FortniteClient-Win64-Shipping_BE.exe",
+            "FortniteClient-Win64-Shipping_EAC_EOS.exe"
+        )
+        SyncMode = "agnostic"
+    }
+    "fortnite-streaming-hdr" = @{
+        Name     = "Fortnite (Streaming HDR)"
+        Sub      = "HDR ON | Reflex ON+Boost | OBS 1080p60"
+        Cat      = "Streaming"
+        Desc     = "Streaming-optimized Fortnite HDR profile for multi-monitor OBS"
         Exes     = @(
             "FortniteClient-Win64-Shipping.exe",
             "FortniteClient-Win64-Shipping_EAC.exe",
@@ -999,6 +1041,14 @@ $script:FallbackProfiles = [ordered]@{
         Sub      = "HDR + G-SYNC | OBS 1080p60"
         Cat      = "Streaming"
         Desc     = "Streaming-optimized OW2 G-SYNC HDR profile for multi-monitor OBS"
+        Exes     = @("Overwatch.exe")
+        SyncMode = "on"
+    }
+    "overwatch2-gsync-streaming" = @{
+        Name     = "Overwatch 2 - GSYNC (Streaming)"
+        Sub      = "G-SYNC | OBS 1080p60"
+        Cat      = "Streaming"
+        Desc     = "Streaming-optimized OW2 G-SYNC SDR profile for multi-monitor OBS"
         Exes     = @("Overwatch.exe")
         SyncMode = "on"
     }

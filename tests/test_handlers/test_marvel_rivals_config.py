@@ -1,0 +1,129 @@
+"""Tests for MarvelRivalsConfigHandler."""
+
+from __future__ import annotations
+
+from pathlib import Path
+from unittest.mock import patch
+
+from abso.settings.marvel_rivals_config import MarvelRivalsConfigHandler
+
+
+def _write_game_user_settings(path: Path, content: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(content, encoding="utf-8")
+
+
+def test_apply_updates_allowed_keys_and_reflex(tmp_path: Path) -> None:
+    config_dir = tmp_path / "Marvel" / "Saved" / "Config" / "Windows"
+    ini_path = config_dir / "GameUserSettings.ini"
+    _write_game_user_settings(
+        ini_path,
+        "\n".join(
+            [
+                "FullscreenMode=1",
+                "LastConfirmedFullscreenMode=1",
+                "PreferredFullscreenMode=1",
+                "bUseVSync=True",
+                "FrameRateLimit=120.000000",
+                "bUseHDRDisplayOutput=False",
+                "HDRDisplayOutputNits=1000",
+                "bNvidiaReflex=False",
+            ]
+        )
+        + "\n",
+    )
+
+    with patch.object(MarvelRivalsConfigHandler, "_get_config_dir", return_value=config_dir):
+        handler = MarvelRivalsConfigHandler()
+        result = handler.apply(
+            {
+                "fullscreen_mode": 0,
+                "vsync": False,
+                "frame_rate_limit": 297,
+                "hdr_output": True,
+                "hdr_nits": 1000,
+                "nvidia_reflex": True,
+            }
+        )
+
+    assert result["success"] is True
+    content = ini_path.read_text(encoding="utf-8")
+    assert "FullscreenMode=0" in content
+    assert "LastConfirmedFullscreenMode=0" in content
+    assert "PreferredFullscreenMode=0" in content
+    assert "bUseVSync=False" in content
+    assert "FrameRateLimit=297" in content
+    assert "bUseHDRDisplayOutput=True" in content
+    assert "HDRDisplayOutputNits=1000" in content
+    assert "bNvidiaReflex=True" in content
+
+
+def test_apply_auto_vrr_fps_cap_uses_detected_refresh(tmp_path: Path) -> None:
+    config_dir = tmp_path / "Marvel" / "Saved" / "Config" / "Windows"
+    ini_path = config_dir / "GameUserSettings.ini"
+    _write_game_user_settings(
+        ini_path,
+        "\n".join(
+            [
+                "FullscreenMode=0",
+                "FrameRateLimit=999",
+                "bNvidiaReflex=False",
+            ]
+        )
+        + "\n",
+    )
+
+    with (
+        patch.object(MarvelRivalsConfigHandler, "_get_config_dir", return_value=config_dir),
+        patch("abso.settings.nvidia.NvidiaSettingsHandler._detect_primary_refresh_rate", return_value=300),
+    ):
+        handler = MarvelRivalsConfigHandler()
+        result = handler.apply({"auto_vrr_fps_cap": True, "nvidia_reflex": True})
+
+    assert result["success"] is True
+    content = ini_path.read_text(encoding="utf-8")
+    assert "FrameRateLimit=297" in content
+    assert "bNvidiaReflex=True" in content
+
+
+def test_detect_and_verify_active_read_current_values(tmp_path: Path) -> None:
+    config_dir = tmp_path / "Marvel" / "Saved" / "Config" / "Windows"
+    ini_path = config_dir / "GameUserSettings.ini"
+    _write_game_user_settings(
+        ini_path,
+        "\n".join(
+            [
+                "FullscreenMode=0",
+                "LastConfirmedFullscreenMode=0",
+                "PreferredFullscreenMode=0",
+                "bUseVSync=False",
+                "FrameRateLimit=297",
+                "bUseHDRDisplayOutput=True",
+                "HDRDisplayOutputNits=1000",
+                "bNvidiaReflex=True",
+            ]
+        )
+        + "\n",
+    )
+
+    with patch.object(MarvelRivalsConfigHandler, "_get_config_dir", return_value=config_dir):
+        handler = MarvelRivalsConfigHandler()
+        detected = handler.detect()
+        verify = handler.verify_active(
+            {
+                "fullscreen_mode": 0,
+                "vsync": False,
+                "frame_rate_limit": 297,
+                "hdr_output": True,
+                "hdr_nits": 1000,
+                "nvidia_reflex": True,
+            }
+        )
+
+    assert detected["fullscreen_mode"] == 0
+    assert detected["vsync"] is False
+    assert detected["frame_rate_limit"] == 297
+    assert detected["hdr_output"] is True
+    assert detected["hdr_nits"] == 1000
+    assert detected["nvidia_reflex"] is True
+    assert verify["all_active"] is True

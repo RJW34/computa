@@ -1,29 +1,14 @@
-"""Fortnite profile."""
+"""Fortnite profiles."""
 
 from __future__ import annotations
 
 from typing import Any, Literal
 
-from abso.profiles.profile_bases import ReflexShooterBaseProfile
+from abso.profiles.profile_bases import ReflexShooterBaseProfile, merge_settings_map
 
 
-class FortniteProfile(ReflexShooterBaseProfile):
-    """Optimization profile for Fortnite.
-
-    Focus: Low latency, high FPS competitive settings with NVIDIA Reflex.
-    """
-
-    @property
-    def profile_id(self) -> str:
-        return "fortnite"
-
-    @property
-    def display_name(self) -> str:
-        return "Fortnite"
-
-    @property
-    def description(self) -> str:
-        return "Low latency, high FPS competitive settings with Reflex"
+class _FortniteBaseProfile(ReflexShooterBaseProfile):
+    """Shared Fortnite profile defaults."""
 
     @property
     def executable_hints(self) -> list[str]:
@@ -41,81 +26,199 @@ class FortniteProfile(ReflexShooterBaseProfile):
     @property
     def nvidia_profile_aliases(self) -> list[str]:
         return [
+            "Fortnite - HDR",
             "Fortnite (Streaming)",
+            "Fortnite (Streaming HDR)",
         ]
-
-    # === Validation Metadata Overrides ===
 
     @property
     def graphics_api(self) -> Literal["dx11", "dx12", "vulkan", "opengl", "unknown"]:
-        """Fortnite primarily uses DirectX 12 for competitive play."""
         return "dx12"
 
-    def _settings_overrides(self) -> dict[str, dict[str, Any]]:
+    def get_handlers(self):
+        from abso.settings.fortnite_config import FortniteConfigHandler
+
+        return [*super().get_handlers(), FortniteConfigHandler()]
+
+    def _shared_overrides(self) -> dict[str, dict[str, Any]]:
+        return {
+            "FortniteConfigHandler": {
+                "fullscreen_mode": 0,
+                "vsync": False,
+                "frame_rate_limit": 0,
+            },
+        }
+
+    def _variant_overrides(self) -> dict[str, dict[str, Any]]:
         return {}
 
-    def get_in_game_settings(self) -> list[dict[str, str]]:
+    def _settings_overrides(self) -> dict[str, dict[str, Any]]:
+        return merge_settings_map(self._shared_overrides(), self._variant_overrides())
+
+    def _common_in_game_settings(self) -> list[dict[str, str]]:
         return [
             {
                 "category": "Display",
                 "setting": "Display Mode",
                 "value": "Fullscreen (Exclusive)",
-                "reason": "Lowest latency path vs windowed or borderless.",
+                "reason": "Matches the competitive no-sync path this profile actually applies.",
             },
             {
                 "category": "Display",
                 "setting": "VSync",
                 "value": "Off",
-                "reason": "Disable sync latency. Use VRR + FPS cap if you prefer tear-free.",
+                "reason": "Keep sync latency out of the path for this Reflex-first profile.",
             },
             {
                 "category": "Display",
                 "setting": "NVIDIA Reflex Low Latency",
                 "value": "On + Boost",
-                "reason": "Reflex controls the render queue more effectively than driver LLM.",
+                "reason": "Reflex should own render-queue control. ABSO keeps driver LLM off to avoid overlap.",
             },
             {
                 "category": "Display",
                 "setting": "Frame Rate Limit",
-                "value": "Refresh rate - 3 (VRR) or Unlimited (no sync)",
-                "reason": "Cap below refresh for G-Sync safety net; otherwise uncapped for minimum latency.",
+                "value": "Unlimited",
+                "reason": "This is the explicit no-sync Fortnite lane, not a VRR cap profile.",
             },
             {
                 "category": "Graphics",
                 "setting": "Rendering Mode",
-                "value": "DirectX 12 (recommended) or Performance Mode",
-                "reason": "DX12 offers stable frame pacing; Performance Mode maximizes FPS on weaker GPUs.",
+                "value": "DirectX 12",
+                "reason": "This PC's live config already prefers DX12, and that is the intended ABSO path here.",
             },
             {
                 "category": "Graphics",
                 "setting": "Multithreaded Rendering",
                 "value": "On",
-                "reason": "Better CPU utilization and frame time consistency.",
+                "reason": "Better CPU utilization and more stable frame delivery in stacked endgames.",
             },
             {
                 "category": "Graphics",
                 "setting": "3D Resolution / DLSS",
                 "value": "100% or DLSS Performance if GPU-bound",
-                "reason": "Maintain high FPS while keeping input latency low.",
+                "reason": "Keep frame times stable first; use DLSS only when needed to hold target FPS.",
             },
             {
                 "category": "Graphics",
                 "setting": "Motion Blur",
                 "value": "Off",
-                "reason": "Reduces visual latency and improves clarity during fast flicks.",
+                "reason": "Reduces visual noise and preserves snap-tracking clarity.",
             },
             {
                 "category": "Graphics",
                 "setting": "Shadows / Effects",
                 "value": "Low",
-                "reason": "Minimize frame time spikes in busy endgames.",
+                "reason": "Endgame effects spikes matter more than visual richness in the competitive lane.",
             },
             {
                 "category": "Content",
                 "setting": "High Resolution Textures",
                 "value": "Off",
-                "reason": "Avoids texture streaming hitches and VRAM spikes.",
+                "reason": "Avoids streaming hitches and unnecessary VRAM churn.",
             },
         ]
 
 
+class FortniteProfile(_FortniteBaseProfile):
+    """Fortnite SDR competitive profile."""
+
+    @property
+    def profile_id(self) -> str:
+        return "fortnite"
+
+    @property
+    def display_name(self) -> str:
+        return "Fortnite - SDR"
+
+    @property
+    def description(self) -> str:
+        return "Competitive SDR Fortnite profile with Reflex and a no-sync latency path"
+
+    @property
+    def is_sdr_only(self) -> bool:
+        return True
+
+    def _variant_overrides(self) -> dict[str, dict[str, Any]]:
+        return {
+            "WindowsSettingsHandler": {
+                "hdr": False,
+                "auto_hdr": False,
+            },
+            "ColorProfileSettingsHandler": {
+                "icc_profile": "srgb",
+                "digital_vibrance": 50,
+                "show_osd_guidance": True,
+                "game_type": "competitive_fps",
+            },
+            "FortniteConfigHandler": {
+                "hdr_output": False,
+                "hdr_nits": 1000,
+            },
+        }
+
+    def get_in_game_settings(self) -> list[dict[str, str]]:
+        return [
+            {
+                "category": "Display",
+                "setting": "HDR",
+                "value": "Off",
+                "reason": "This variant intentionally stays on the SDR path.",
+            },
+            *self._common_in_game_settings(),
+        ]
+
+
+class FortniteHDRProfile(_FortniteBaseProfile):
+    """Fortnite HDR competitive profile."""
+
+    @property
+    def profile_id(self) -> str:
+        return "fortnite-hdr"
+
+    @property
+    def display_name(self) -> str:
+        return "Fortnite - HDR"
+
+    @property
+    def description(self) -> str:
+        return "Competitive Fortnite HDR profile with Reflex and a no-sync latency path"
+
+    @property
+    def is_sdr_only(self) -> bool:
+        return False
+
+    def _variant_overrides(self) -> dict[str, dict[str, Any]]:
+        return {
+            "WindowsSettingsHandler": {
+                "hdr": True,
+                "auto_hdr": False,
+            },
+            "ColorProfileSettingsHandler": {
+                "icc_profile": "native",
+                "digital_vibrance": 50,
+                "show_osd_guidance": True,
+                "game_type": "competitive_fps",
+            },
+            "FortniteConfigHandler": {
+                "hdr_output": True,
+                "hdr_nits": 1000,
+            },
+        }
+
+    def get_in_game_settings(self) -> list[dict[str, str]]:
+        return [
+            {
+                "category": "Display",
+                "setting": "HDR",
+                "value": "On",
+                "reason": "Fortnite exposes a native HDR output path in GameUserSettings.ini on this machine.",
+            },
+            {
+                "category": "Display",
+                "setting": "HDR Peak Brightness / Nits",
+                "value": "Start at 1000 nits or match your display peak",
+                "reason": "Keep Windows HDR and Fortnite's native HDR output aligned.",
+            },
+            *self._common_in_game_settings(),
+        ]

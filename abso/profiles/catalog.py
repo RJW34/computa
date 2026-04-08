@@ -11,9 +11,9 @@ from dataclasses import dataclass
 from typing import Any, Literal
 
 from abso.profiles.base import BaseProfile
-from abso.profiles.cod_bo7 import CodBo7Profile
-from abso.profiles.diablo4 import Diablo4Profile
-from abso.profiles.fortnite import FortniteProfile
+from abso.profiles.cod_bo7 import CodBo7Profile, CodBo7SDRProfile
+from abso.profiles.diablo4 import Diablo4Profile, Diablo4SDRProfile
+from abso.profiles.fortnite import FortniteHDRProfile, FortniteProfile
 from abso.profiles.marvel_rivals import MarvelRivalsHDRProfile, MarvelRivalsSDRProfile
 from abso.profiles.overwatch2 import (
     Overwatch2GSyncCaptureProfile,
@@ -42,7 +42,9 @@ from abso.profiles.slippi_melee import (
     SlippiMeleeVRRLabProfile,
 )
 from abso.profiles.streaming_profiles import (
+    FortniteHDRStreamingProfile,
     FortniteStreamingProfile,
+    Overwatch2GSyncStreamingProfile,
     Overwatch2GSyncHDRStreamingProfile,
     PACDeluxeStreamingProfile,
     Rivals2HDRStreamingProfile,
@@ -172,16 +174,34 @@ PROFILE_CATALOG: OrderedDict[str, ProfileCatalogEntry] = OrderedDict(
             tray_subtitle="HDR ON | Reflex ON+Boost | LLM OFF",
             sync_mode="agnostic",
         ),
+        "cod-bo7-sdr": ProfileCatalogEntry(
+            profile_class=CodBo7SDRProfile,
+            tray_category="Shooter",
+            tray_subtitle="SDR | Reflex ON+Boost | LLM OFF",
+            sync_mode="agnostic",
+        ),
         "diablo4": ProfileCatalogEntry(
             profile_class=Diablo4Profile,
             tray_category="ARPG",
             tray_subtitle="HDR ON | Reflex ON+Boost | LLM OFF",
-            sync_mode="agnostic",
+            sync_mode="on",
+        ),
+        "diablo4-sdr": ProfileCatalogEntry(
+            profile_class=Diablo4SDRProfile,
+            tray_category="ARPG",
+            tray_subtitle="SDR | Reflex ON+Boost | VRR",
+            sync_mode="on",
         ),
         "fortnite": ProfileCatalogEntry(
             profile_class=FortniteProfile,
             tray_category="Shooter",
-            tray_subtitle="Reflex ON+Boost | LLM OFF | HAGS ON",
+            tray_subtitle="SDR | Reflex ON+Boost | No Sync",
+            sync_mode="agnostic",
+        ),
+        "fortnite-hdr": ProfileCatalogEntry(
+            profile_class=FortniteHDRProfile,
+            tray_category="Shooter",
+            tray_subtitle="HDR ON | Reflex ON+Boost | No Sync",
             sync_mode="agnostic",
         ),
         "marvel-rivals-sdr": ProfileCatalogEntry(
@@ -207,7 +227,13 @@ PROFILE_CATALOG: OrderedDict[str, ProfileCatalogEntry] = OrderedDict(
         "fortnite-streaming": ProfileCatalogEntry(
             profile_class=FortniteStreamingProfile,
             tray_category="Streaming",
-            tray_subtitle="Reflex ON+Boost | OBS 1080p60",
+            tray_subtitle="SDR | Reflex ON+Boost | OBS 1080p60",
+            sync_mode="agnostic",
+        ),
+        "fortnite-streaming-hdr": ProfileCatalogEntry(
+            profile_class=FortniteHDRStreamingProfile,
+            tray_category="Streaming",
+            tray_subtitle="HDR ON | Reflex ON+Boost | OBS 1080p60",
             sync_mode="agnostic",
         ),
         "overwatch2": ProfileCatalogEntry(
@@ -252,6 +278,12 @@ PROFILE_CATALOG: OrderedDict[str, ProfileCatalogEntry] = OrderedDict(
             profile_class=Overwatch2GSyncHDRStreamingProfile,
             tray_category="Streaming",
             tray_subtitle="HDR + G-SYNC | OBS 1080p60",
+            sync_mode="on",
+        ),
+        "overwatch2-gsync-streaming": ProfileCatalogEntry(
+            profile_class=Overwatch2GSyncStreamingProfile,
+            tray_category="Streaming",
+            tray_subtitle="G-SYNC | OBS 1080p60",
             sync_mode="on",
         ),
         "pokemon-auto-chess": ProfileCatalogEntry(

@@ -1,7 +1,7 @@
 {
   "cod-bo7": {
     "allows_aggressive_settings": false,
-    "display_name": "Call of Duty: Black Ops 7",
+    "display_name": "Call of Duty: Black Ops 7 - HDR",
     "graphics_api": "dx12",
     "handlers": [
       "WindowsSettingsHandler",
@@ -20,49 +20,55 @@
     "in_game_settings": [
       {
         "category": "Display",
-        "reason": "Lower input latency than borderless.",
+        "reason": "Use the game's native HDR path when you want wide-gamut/high-contrast presentation.",
+        "setting": "HDR",
+        "value": "On"
+      },
+      {
+        "category": "Display",
+        "reason": "Matches the competitive no-sync Reflex path this profile applies.",
         "setting": "Display Mode",
         "value": "Fullscreen Exclusive"
       },
       {
         "category": "Display",
-        "reason": "Use Reflex instead for latency control.",
+        "reason": "Reflex owns latency control in this lane; do not reintroduce sync latency in-game.",
         "setting": "VSync",
         "value": "Off"
       },
       {
         "category": "Display",
-        "reason": "Hardware-level latency reduction. Takes priority over driver settings.",
-        "setting": "Nvidia Reflex Low Latency",
+        "reason": "Application-level Reflex should own queue control for Call of Duty.",
+        "setting": "NVIDIA Reflex Low Latency",
         "value": "On + Boost"
       },
       {
         "category": "Display",
-        "reason": "Cap slightly below max if using G-Sync for tear-free.",
+        "reason": "This shipped profile is the competitive no-sync path, not a VRR cap variant.",
         "setting": "Frame Rate Limit",
-        "value": "Match monitor Hz or Unlimited"
+        "value": "Unlimited"
       },
       {
         "category": "Graphics",
-        "reason": "Native looks best; DLSS adds minimal latency.",
+        "reason": "Native looks best; DLSS is the fallback when you need more GPU headroom.",
         "setting": "Render Resolution",
         "value": "100% (or DLSS Performance if GPU-limited)"
       },
       {
         "category": "Graphics",
-        "reason": "Eliminates texture pop-in if you have VRAM headroom.",
+        "reason": "Reduces unexpected texture IO churn during play.",
         "setting": "On-Demand Texture Streaming",
         "value": "Off"
       },
       {
         "category": "Graphics",
-        "reason": "Let shaders fully compile to reduce stutter.",
+        "reason": "Let shaders fully compile before judging frame-time quality.",
         "setting": "Shaders",
         "value": "Restart after first launch"
       },
       {
         "category": "Audio",
-        "reason": "Use appropriate preset for your setup.",
+        "reason": "Use the preset that matches your setup for positional clarity.",
         "setting": "Audio Mix",
         "value": "Headphones"
       }
@@ -99,7 +105,12 @@
         "preset": "gaming"
       },
       "NvidiaSettingsHandler": {
-        "preset": "reflex_game"
+        "preset": "reflex_game",
+        "profile_aliases": [
+          "Call of Duty: Black Ops 7 - SDR",
+          "Call of Duty: Black Ops 7 - HDR"
+        ],
+        "profile_name": "Call of Duty: Black Ops 7"
       },
       "PowerSettingsHandler": {
         "active_plan": "ultimate_performance",
@@ -137,9 +148,158 @@
       }
     }
   },
+  "cod-bo7-sdr": {
+    "allows_aggressive_settings": false,
+    "display_name": "Call of Duty: Black Ops 7 - SDR",
+    "graphics_api": "dx12",
+    "handlers": [
+      "WindowsSettingsHandler",
+      "PowerSettingsHandler",
+      "RegistrySettingsHandler",
+      "NvidiaSettingsHandler",
+      "NetworkSettingsHandler",
+      "MouseSettingsHandler",
+      "GraphicsSettingsHandler",
+      "ServicesSettingsHandler",
+      "ProcessPriorityHandler",
+      "CpuAffinityHandler",
+      "CNMSettingsHandler",
+      "ColorProfileSettingsHandler"
+    ],
+    "in_game_settings": [
+      {
+        "category": "Display",
+        "reason": "Use the SDR variant when you want the simpler SDR presentation path.",
+        "setting": "HDR",
+        "value": "Off"
+      },
+      {
+        "category": "Display",
+        "reason": "Matches the competitive no-sync Reflex path this profile applies.",
+        "setting": "Display Mode",
+        "value": "Fullscreen Exclusive"
+      },
+      {
+        "category": "Display",
+        "reason": "Reflex owns latency control in this lane; do not reintroduce sync latency in-game.",
+        "setting": "VSync",
+        "value": "Off"
+      },
+      {
+        "category": "Display",
+        "reason": "Application-level Reflex should own queue control for Call of Duty.",
+        "setting": "NVIDIA Reflex Low Latency",
+        "value": "On + Boost"
+      },
+      {
+        "category": "Display",
+        "reason": "This shipped profile is the competitive no-sync path, not a VRR cap variant.",
+        "setting": "Frame Rate Limit",
+        "value": "Unlimited"
+      },
+      {
+        "category": "Graphics",
+        "reason": "Native looks best; DLSS is the fallback when you need more GPU headroom.",
+        "setting": "Render Resolution",
+        "value": "100% (or DLSS Performance if GPU-limited)"
+      },
+      {
+        "category": "Graphics",
+        "reason": "Reduces unexpected texture IO churn during play.",
+        "setting": "On-Demand Texture Streaming",
+        "value": "Off"
+      },
+      {
+        "category": "Graphics",
+        "reason": "Let shaders fully compile before judging frame-time quality.",
+        "setting": "Shaders",
+        "value": "Restart after first launch"
+      },
+      {
+        "category": "Audio",
+        "reason": "Use the preset that matches your setup for positional clarity.",
+        "setting": "Audio Mix",
+        "value": "Headphones"
+      }
+    ],
+    "include_legacy_tweaks": false,
+    "is_emulator_profile": false,
+    "is_online_profile": false,
+    "is_sdr_only": true,
+    "network_scope": "full",
+    "optimization_target": "low_latency_high_fps",
+    "requires_reflex": true,
+    "settings": {
+      "CNMSettingsHandler": {
+        "action": "stop"
+      },
+      "ColorProfileSettingsHandler": {
+        "digital_vibrance": 50,
+        "game_type": "competitive_fps",
+        "icc_profile": "srgb",
+        "show_osd_guidance": true
+      },
+      "CpuAffinityHandler": {
+        "strategy": null
+      },
+      "GraphicsSettingsHandler": {
+        "disable_global_fso": true
+      },
+      "MouseSettingsHandler": {
+        "disable_acceleration": true,
+        "set_linear_curve": true
+      },
+      "NetworkSettingsHandler": {
+        "disable_nagle": true,
+        "preset": "gaming"
+      },
+      "NvidiaSettingsHandler": {
+        "preset": "reflex_game",
+        "profile_aliases": [
+          "Call of Duty: Black Ops 7 - SDR",
+          "Call of Duty: Black Ops 7 - HDR"
+        ],
+        "profile_name": "Call of Duty: Black Ops 7"
+      },
+      "PowerSettingsHandler": {
+        "active_plan": "ultimate_performance",
+        "disable_pcie_power_saving": true,
+        "disable_usb_suspend": true,
+        "ensure_ultimate_performance": true,
+        "processor_max_performance": true
+      },
+      "ProcessPriorityHandler": {
+        "cpu_priority": 3,
+        "gpu_priority": 8,
+        "io_priority": 3
+      },
+      "RegistrySettingsHandler": {
+        "game_priority": {
+          "gpu_priority": 8,
+          "priority": 6,
+          "scheduling_category": "High"
+        },
+        "win32_priority_separation": 42
+      },
+      "ServicesSettingsHandler": {
+        "preset": "gaming"
+      },
+      "WindowsSettingsHandler": {
+        "auto_hdr": false,
+        "game_bar": false,
+        "game_dvr": false,
+        "game_mode": true,
+        "hags": true,
+        "hdr": false,
+        "max_refresh_rate": true,
+        "vrr_optimize": false,
+        "windowed_optimizations": false
+      }
+    }
+  },
   "diablo4": {
     "allows_aggressive_settings": false,
-    "display_name": "Diablo 4",
+    "display_name": "Diablo 4 - HDR",
     "graphics_api": "dx12",
     "handlers": [
       "WindowsSettingsHandler",
@@ -158,37 +318,49 @@
     "in_game_settings": [
       {
         "category": "Display",
-        "reason": "Better performance than windowed modes.",
+        "reason": "Diablo 4 exposes native HDR controls in LocalPrefs.txt on this machine.",
+        "setting": "HDR",
+        "value": "On"
+      },
+      {
+        "category": "Display",
+        "reason": "Use the game's native HDR calibration rather than Auto HDR.",
+        "setting": "HDR Paper White / Max Nits",
+        "value": "Tune to your panel"
+      },
+      {
+        "category": "Display",
+        "reason": "Matches the fullscreen VRR path this profile applies.",
         "setting": "Display Mode",
         "value": "Fullscreen"
       },
       {
         "category": "Display",
-        "reason": "Diablo 4 has native Reflex. Driver LLM is OFF to avoid conflict. Reflex handles latency more effectively at the application level.",
+        "reason": "Diablo 4 has native Reflex, so ABSO keeps driver LLM off.",
         "setting": "NVIDIA Reflex Low Latency",
         "value": "On + Boost"
       },
       {
         "category": "Display",
-        "reason": "Keep in-game VSync OFF. ABSO sets NVCP VSync to Adaptive as a safety net \u2014 it only engages if FPS exceeds refresh rate, adding zero latency when FPS is capped below refresh.",
+        "reason": "Keep synchronization in the driver VRR safety-net path, not in the game.",
         "setting": "VSync (in-game)",
         "value": "Off"
       },
       {
         "category": "Display",
-        "reason": "G-Sync sweet spot to prevent VSync activation.",
-        "setting": "Limit FPS",
-        "value": "2-3 below monitor refresh rate"
+        "reason": "ABSO now makes the driver cap authoritative for this VRR lane.",
+        "setting": "Foreground FPS Limit",
+        "value": "Unlimited"
       },
       {
-        "category": "Display",
-        "reason": "Good visual quality with performance headroom.",
+        "category": "Graphics",
+        "reason": "Good visual quality with performance headroom during heavy fights.",
         "setting": "DLSS/FSR",
         "value": "Quality or Balanced"
       },
       {
         "category": "Graphics",
-        "reason": "Prioritize stable frame times over max settings.",
+        "reason": "Stable frame times matter more than maxing every setting.",
         "setting": "Overall Quality",
         "value": "Adjust based on GPU"
       },
@@ -232,8 +404,10 @@
         "preset": "default"
       },
       "NvidiaSettingsHandler": {
+        "auto_vrr_fps_cap": true,
+        "global_vrr_mode": "fullscreen_only",
         "preset": "vrr_diablo4",
-        "vsync": "adaptive"
+        "vsync": "on"
       },
       "PowerSettingsHandler": {
         "active_plan": "ultimate_performance",
@@ -268,19 +442,156 @@
       },
       "WindowsSettingsHandler": {
         "auto_hdr": false,
-        "game_bar": false,
-        "game_dvr": false,
-        "game_mode": true,
-        "hags": true,
-        "hdr": true,
-        "max_refresh_rate": true,
-        "windowed_optimizations": false
+        "hdr": true
+      }
+    }
+  },
+  "diablo4-sdr": {
+    "allows_aggressive_settings": false,
+    "display_name": "Diablo 4 - SDR",
+    "graphics_api": "dx12",
+    "handlers": [
+      "WindowsSettingsHandler",
+      "PowerSettingsHandler",
+      "RegistrySettingsHandler",
+      "NvidiaSettingsHandler",
+      "NetworkSettingsHandler",
+      "MouseSettingsHandler",
+      "GraphicsSettingsHandler",
+      "ServicesSettingsHandler",
+      "MemorySettingsHandler",
+      "ProcessPriorityHandler",
+      "CNMSettingsHandler",
+      "ColorProfileSettingsHandler"
+    ],
+    "in_game_settings": [
+      {
+        "category": "Display",
+        "reason": "Use this variant when you want the SDR path or do not have an HDR display active.",
+        "setting": "HDR",
+        "value": "Off"
+      },
+      {
+        "category": "Display",
+        "reason": "Matches the fullscreen VRR path this profile applies.",
+        "setting": "Display Mode",
+        "value": "Fullscreen"
+      },
+      {
+        "category": "Display",
+        "reason": "Diablo 4 has native Reflex, so ABSO keeps driver LLM off.",
+        "setting": "NVIDIA Reflex Low Latency",
+        "value": "On + Boost"
+      },
+      {
+        "category": "Display",
+        "reason": "Keep synchronization in the driver VRR safety-net path, not in the game.",
+        "setting": "VSync (in-game)",
+        "value": "Off"
+      },
+      {
+        "category": "Display",
+        "reason": "ABSO now makes the driver cap authoritative for this VRR lane.",
+        "setting": "Foreground FPS Limit",
+        "value": "Unlimited"
+      },
+      {
+        "category": "Graphics",
+        "reason": "Good visual quality with performance headroom during heavy fights.",
+        "setting": "DLSS/FSR",
+        "value": "Quality or Balanced"
+      },
+      {
+        "category": "Graphics",
+        "reason": "Stable frame times matter more than maxing every setting.",
+        "setting": "Overall Quality",
+        "value": "Adjust based on GPU"
+      },
+      {
+        "category": "Graphics",
+        "reason": "High effects can cause frame drops in dense combat.",
+        "setting": "Effects",
+        "value": "Medium-High"
+      }
+    ],
+    "include_legacy_tweaks": false,
+    "is_emulator_profile": false,
+    "is_online_profile": false,
+    "is_sdr_only": true,
+    "network_scope": "limited",
+    "optimization_target": "balanced",
+    "requires_reflex": false,
+    "settings": {
+      "CNMSettingsHandler": {
+        "action": "stop"
+      },
+      "ColorProfileSettingsHandler": {
+        "digital_vibrance": 45,
+        "game_type": "cinematic",
+        "icc_profile": "srgb",
+        "show_osd_guidance": true
+      },
+      "GraphicsSettingsHandler": {
+        "disable_global_fso": false
+      },
+      "MemorySettingsHandler": {
+        "disable_paging_executive": 1,
+        "large_system_cache": 0
+      },
+      "MouseSettingsHandler": {
+        "disable_acceleration": true,
+        "set_linear_curve": true
+      },
+      "NetworkSettingsHandler": {
+        "disable_nagle": false,
+        "preset": "default"
+      },
+      "NvidiaSettingsHandler": {
+        "auto_vrr_fps_cap": true,
+        "global_vrr_mode": "fullscreen_only",
+        "preset": "vrr_diablo4",
+        "vsync": "on"
+      },
+      "PowerSettingsHandler": {
+        "active_plan": "ultimate_performance",
+        "disable_pcie_power_saving": true,
+        "disable_usb_suspend": true,
+        "ensure_ultimate_performance": true
+      },
+      "ProcessPriorityHandler": {
+        "cpu_priority": 2,
+        "gpu_priority": 8,
+        "io_priority": 2
+      },
+      "RegistrySettingsHandler": {
+        "game_priority": {
+          "gpu_priority": 8,
+          "priority": 6,
+          "scheduling_category": "High"
+        },
+        "system_responsiveness": 10
+      },
+      "ServicesSettingsHandler": {
+        "services": {
+          "DiagTrack": {
+            "start_type": 4,
+            "stop": true
+          },
+          "SysMain": {
+            "start_type": 4,
+            "stop": true
+          }
+        }
+      },
+      "WindowsSettingsHandler": {
+        "auto_hdr": false,
+        "hdr": false
       }
     }
   },
   "fortnite": {
     "allows_aggressive_settings": false,
-    "display_name": "Fortnite",
+    "display_name": "Fortnite - SDR",
     "graphics_api": "dx12",
     "handlers": [
       "WindowsSettingsHandler",
@@ -294,66 +605,73 @@
       "ProcessPriorityHandler",
       "CpuAffinityHandler",
       "CNMSettingsHandler",
-      "ColorProfileSettingsHandler"
+      "ColorProfileSettingsHandler",
+      "FortniteConfigHandler"
     ],
     "in_game_settings": [
       {
         "category": "Display",
-        "reason": "Lowest latency path vs windowed or borderless.",
+        "reason": "This variant intentionally stays on the SDR path.",
+        "setting": "HDR",
+        "value": "Off"
+      },
+      {
+        "category": "Display",
+        "reason": "Matches the competitive no-sync path this profile actually applies.",
         "setting": "Display Mode",
         "value": "Fullscreen (Exclusive)"
       },
       {
         "category": "Display",
-        "reason": "Disable sync latency. Use VRR + FPS cap if you prefer tear-free.",
+        "reason": "Keep sync latency out of the path for this Reflex-first profile.",
         "setting": "VSync",
         "value": "Off"
       },
       {
         "category": "Display",
-        "reason": "Reflex controls the render queue more effectively than driver LLM.",
+        "reason": "Reflex should own render-queue control. ABSO keeps driver LLM off to avoid overlap.",
         "setting": "NVIDIA Reflex Low Latency",
         "value": "On + Boost"
       },
       {
         "category": "Display",
-        "reason": "Cap below refresh for G-Sync safety net; otherwise uncapped for minimum latency.",
+        "reason": "This is the explicit no-sync Fortnite lane, not a VRR cap profile.",
         "setting": "Frame Rate Limit",
-        "value": "Refresh rate - 3 (VRR) or Unlimited (no sync)"
+        "value": "Unlimited"
       },
       {
         "category": "Graphics",
-        "reason": "DX12 offers stable frame pacing; Performance Mode maximizes FPS on weaker GPUs.",
+        "reason": "This PC's live config already prefers DX12, and that is the intended ABSO path here.",
         "setting": "Rendering Mode",
-        "value": "DirectX 12 (recommended) or Performance Mode"
+        "value": "DirectX 12"
       },
       {
         "category": "Graphics",
-        "reason": "Better CPU utilization and frame time consistency.",
+        "reason": "Better CPU utilization and more stable frame delivery in stacked endgames.",
         "setting": "Multithreaded Rendering",
         "value": "On"
       },
       {
         "category": "Graphics",
-        "reason": "Maintain high FPS while keeping input latency low.",
+        "reason": "Keep frame times stable first; use DLSS only when needed to hold target FPS.",
         "setting": "3D Resolution / DLSS",
         "value": "100% or DLSS Performance if GPU-bound"
       },
       {
         "category": "Graphics",
-        "reason": "Reduces visual latency and improves clarity during fast flicks.",
+        "reason": "Reduces visual noise and preserves snap-tracking clarity.",
         "setting": "Motion Blur",
         "value": "Off"
       },
       {
         "category": "Graphics",
-        "reason": "Minimize frame time spikes in busy endgames.",
+        "reason": "Endgame effects spikes matter more than visual richness in the competitive lane.",
         "setting": "Shadows / Effects",
         "value": "Low"
       },
       {
         "category": "Content",
-        "reason": "Avoids texture streaming hitches and VRAM spikes.",
+        "reason": "Avoids streaming hitches and unnecessary VRAM churn.",
         "setting": "High Resolution Textures",
         "value": "Off"
       }
@@ -361,7 +679,7 @@
     "include_legacy_tweaks": false,
     "is_emulator_profile": false,
     "is_online_profile": false,
-    "is_sdr_only": false,
+    "is_sdr_only": true,
     "network_scope": "full",
     "optimization_target": "low_latency_high_fps",
     "requires_reflex": true,
@@ -378,6 +696,13 @@
       "CpuAffinityHandler": {
         "strategy": null
       },
+      "FortniteConfigHandler": {
+        "frame_rate_limit": 0,
+        "fullscreen_mode": 0,
+        "hdr_nits": 1000,
+        "hdr_output": false,
+        "vsync": false
+      },
       "GraphicsSettingsHandler": {
         "disable_global_fso": true
       },
@@ -392,7 +717,9 @@
       "NvidiaSettingsHandler": {
         "preset": "reflex_game",
         "profile_aliases": [
-          "Fortnite (Streaming)"
+          "Fortnite - HDR",
+          "Fortnite (Streaming)",
+          "Fortnite (Streaming HDR)"
         ],
         "profile_name": "Fortnite"
       },
@@ -432,9 +759,9 @@
       }
     }
   },
-  "fortnite-streaming": {
+  "fortnite-hdr": {
     "allows_aggressive_settings": false,
-    "display_name": "Fortnite (Streaming)",
+    "display_name": "Fortnite - HDR",
     "graphics_api": "dx12",
     "handlers": [
       "WindowsSettingsHandler",
@@ -446,69 +773,81 @@
       "GraphicsSettingsHandler",
       "ServicesSettingsHandler",
       "ProcessPriorityHandler",
-      "OBSSettingsHandler",
       "CpuAffinityHandler",
       "CNMSettingsHandler",
-      "ColorProfileSettingsHandler"
+      "ColorProfileSettingsHandler",
+      "FortniteConfigHandler"
     ],
     "in_game_settings": [
       {
         "category": "Display",
-        "reason": "Lowest latency path vs windowed or borderless.",
+        "reason": "Fortnite exposes a native HDR output path in GameUserSettings.ini on this machine.",
+        "setting": "HDR",
+        "value": "On"
+      },
+      {
+        "category": "Display",
+        "reason": "Keep Windows HDR and Fortnite's native HDR output aligned.",
+        "setting": "HDR Peak Brightness / Nits",
+        "value": "Start at 1000 nits or match your display peak"
+      },
+      {
+        "category": "Display",
+        "reason": "Matches the competitive no-sync path this profile actually applies.",
         "setting": "Display Mode",
         "value": "Fullscreen (Exclusive)"
       },
       {
         "category": "Display",
-        "reason": "Disable sync latency. Use VRR + FPS cap if you prefer tear-free.",
+        "reason": "Keep sync latency out of the path for this Reflex-first profile.",
         "setting": "VSync",
         "value": "Off"
       },
       {
         "category": "Display",
-        "reason": "Reflex controls the render queue more effectively than driver LLM.",
+        "reason": "Reflex should own render-queue control. ABSO keeps driver LLM off to avoid overlap.",
         "setting": "NVIDIA Reflex Low Latency",
         "value": "On + Boost"
       },
       {
         "category": "Display",
-        "reason": "Cap below refresh for G-Sync safety net; otherwise uncapped for minimum latency.",
+        "reason": "This is the explicit no-sync Fortnite lane, not a VRR cap profile.",
         "setting": "Frame Rate Limit",
-        "value": "Refresh rate - 3 (VRR) or Unlimited (no sync)"
+        "value": "Unlimited"
       },
       {
         "category": "Graphics",
-        "reason": "DX12 offers stable frame pacing; Performance Mode maximizes FPS on weaker GPUs.",
+        "reason": "This PC's live config already prefers DX12, and that is the intended ABSO path here.",
         "setting": "Rendering Mode",
-        "value": "DirectX 12 (recommended) or Performance Mode"
+        "value": "DirectX 12"
       },
       {
         "category": "Graphics",
-        "reason": "Better CPU utilization and frame time consistency.",
+        "reason": "Better CPU utilization and more stable frame delivery in stacked endgames.",
         "setting": "Multithreaded Rendering",
         "value": "On"
       },
       {
         "category": "Graphics",
-        "reason": "Maintain high FPS while keeping input latency low.",
+        "reason": "Keep frame times stable first; use DLSS only when needed to hold target FPS.",
         "setting": "3D Resolution / DLSS",
         "value": "100% or DLSS Performance if GPU-bound"
       },
       {
         "category": "Graphics",
-        "reason": "Reduces visual latency and improves clarity during fast flicks.",
+        "reason": "Reduces visual noise and preserves snap-tracking clarity.",
         "setting": "Motion Blur",
         "value": "Off"
       },
       {
         "category": "Graphics",
-        "reason": "Minimize frame time spikes in busy endgames.",
+        "reason": "Endgame effects spikes matter more than visual richness in the competitive lane.",
         "setting": "Shadows / Effects",
         "value": "Low"
       },
       {
         "category": "Content",
-        "reason": "Avoids texture streaming hitches and VRAM spikes.",
+        "reason": "Avoids streaming hitches and unnecessary VRAM churn.",
         "setting": "High Resolution Textures",
         "value": "Off"
       }
@@ -527,11 +866,189 @@
       "ColorProfileSettingsHandler": {
         "digital_vibrance": 50,
         "game_type": "competitive_fps",
+        "icc_profile": "native",
+        "show_osd_guidance": true
+      },
+      "CpuAffinityHandler": {
+        "strategy": null
+      },
+      "FortniteConfigHandler": {
+        "frame_rate_limit": 0,
+        "fullscreen_mode": 0,
+        "hdr_nits": 1000,
+        "hdr_output": true,
+        "vsync": false
+      },
+      "GraphicsSettingsHandler": {
+        "disable_global_fso": true
+      },
+      "MouseSettingsHandler": {
+        "disable_acceleration": true,
+        "set_linear_curve": true
+      },
+      "NetworkSettingsHandler": {
+        "disable_nagle": true,
+        "preset": "gaming"
+      },
+      "NvidiaSettingsHandler": {
+        "preset": "reflex_game",
+        "profile_aliases": [
+          "Fortnite - HDR",
+          "Fortnite (Streaming)",
+          "Fortnite (Streaming HDR)"
+        ],
+        "profile_name": "Fortnite"
+      },
+      "PowerSettingsHandler": {
+        "active_plan": "ultimate_performance",
+        "disable_pcie_power_saving": true,
+        "disable_usb_suspend": true,
+        "ensure_ultimate_performance": true,
+        "processor_max_performance": true
+      },
+      "ProcessPriorityHandler": {
+        "cpu_priority": 3,
+        "gpu_priority": 8,
+        "io_priority": 3
+      },
+      "RegistrySettingsHandler": {
+        "game_priority": {
+          "gpu_priority": 8,
+          "priority": 6,
+          "scheduling_category": "High"
+        },
+        "win32_priority_separation": 42
+      },
+      "ServicesSettingsHandler": {
+        "preset": "gaming"
+      },
+      "WindowsSettingsHandler": {
+        "auto_hdr": false,
+        "game_bar": false,
+        "game_dvr": false,
+        "game_mode": true,
+        "hags": true,
+        "hdr": true,
+        "max_refresh_rate": true,
+        "vrr_optimize": false,
+        "windowed_optimizations": false
+      }
+    }
+  },
+  "fortnite-streaming": {
+    "allows_aggressive_settings": false,
+    "display_name": "Fortnite (Streaming)",
+    "graphics_api": "dx12",
+    "handlers": [
+      "WindowsSettingsHandler",
+      "PowerSettingsHandler",
+      "RegistrySettingsHandler",
+      "NvidiaSettingsHandler",
+      "NetworkSettingsHandler",
+      "MouseSettingsHandler",
+      "GraphicsSettingsHandler",
+      "ServicesSettingsHandler",
+      "ProcessPriorityHandler",
+      "OBSSettingsHandler",
+      "CpuAffinityHandler",
+      "CNMSettingsHandler",
+      "ColorProfileSettingsHandler",
+      "FortniteConfigHandler"
+    ],
+    "in_game_settings": [
+      {
+        "category": "Display",
+        "reason": "This variant intentionally stays on the SDR path.",
+        "setting": "HDR",
+        "value": "Off"
+      },
+      {
+        "category": "Display",
+        "reason": "Matches the competitive no-sync path this profile actually applies.",
+        "setting": "Display Mode",
+        "value": "Fullscreen (Exclusive)"
+      },
+      {
+        "category": "Display",
+        "reason": "Keep sync latency out of the path for this Reflex-first profile.",
+        "setting": "VSync",
+        "value": "Off"
+      },
+      {
+        "category": "Display",
+        "reason": "Reflex should own render-queue control. ABSO keeps driver LLM off to avoid overlap.",
+        "setting": "NVIDIA Reflex Low Latency",
+        "value": "On + Boost"
+      },
+      {
+        "category": "Display",
+        "reason": "This is the explicit no-sync Fortnite lane, not a VRR cap profile.",
+        "setting": "Frame Rate Limit",
+        "value": "Unlimited"
+      },
+      {
+        "category": "Graphics",
+        "reason": "This PC's live config already prefers DX12, and that is the intended ABSO path here.",
+        "setting": "Rendering Mode",
+        "value": "DirectX 12"
+      },
+      {
+        "category": "Graphics",
+        "reason": "Better CPU utilization and more stable frame delivery in stacked endgames.",
+        "setting": "Multithreaded Rendering",
+        "value": "On"
+      },
+      {
+        "category": "Graphics",
+        "reason": "Keep frame times stable first; use DLSS only when needed to hold target FPS.",
+        "setting": "3D Resolution / DLSS",
+        "value": "100% or DLSS Performance if GPU-bound"
+      },
+      {
+        "category": "Graphics",
+        "reason": "Reduces visual noise and preserves snap-tracking clarity.",
+        "setting": "Motion Blur",
+        "value": "Off"
+      },
+      {
+        "category": "Graphics",
+        "reason": "Endgame effects spikes matter more than visual richness in the competitive lane.",
+        "setting": "Shadows / Effects",
+        "value": "Low"
+      },
+      {
+        "category": "Content",
+        "reason": "Avoids streaming hitches and unnecessary VRAM churn.",
+        "setting": "High Resolution Textures",
+        "value": "Off"
+      }
+    ],
+    "include_legacy_tweaks": false,
+    "is_emulator_profile": false,
+    "is_online_profile": false,
+    "is_sdr_only": true,
+    "network_scope": "full",
+    "optimization_target": "low_latency_high_fps",
+    "requires_reflex": true,
+    "settings": {
+      "CNMSettingsHandler": {
+        "action": "stop"
+      },
+      "ColorProfileSettingsHandler": {
+        "digital_vibrance": 50,
+        "game_type": "competitive_fps",
         "icc_profile": "srgb",
         "show_osd_guidance": true
       },
       "CpuAffinityHandler": {
         "strategy": null
+      },
+      "FortniteConfigHandler": {
+        "frame_rate_limit": 0,
+        "fullscreen_mode": 0,
+        "hdr_nits": 1000,
+        "hdr_output": false,
+        "vsync": false
       },
       "GraphicsSettingsHandler": {
         "disable_global_fso": false
@@ -547,7 +1064,9 @@
       "NvidiaSettingsHandler": {
         "preset": "reflex_game",
         "profile_aliases": [
-          "Fortnite (Streaming)"
+          "Fortnite - HDR",
+          "Fortnite (Streaming)",
+          "Fortnite (Streaming HDR)"
         ],
         "profile_name": "Fortnite"
       },
@@ -604,6 +1123,200 @@
       }
     }
   },
+  "fortnite-streaming-hdr": {
+    "allows_aggressive_settings": false,
+    "display_name": "Fortnite (Streaming HDR)",
+    "graphics_api": "dx12",
+    "handlers": [
+      "WindowsSettingsHandler",
+      "PowerSettingsHandler",
+      "RegistrySettingsHandler",
+      "NvidiaSettingsHandler",
+      "NetworkSettingsHandler",
+      "MouseSettingsHandler",
+      "GraphicsSettingsHandler",
+      "ServicesSettingsHandler",
+      "ProcessPriorityHandler",
+      "OBSSettingsHandler",
+      "CpuAffinityHandler",
+      "CNMSettingsHandler",
+      "ColorProfileSettingsHandler",
+      "FortniteConfigHandler"
+    ],
+    "in_game_settings": [
+      {
+        "category": "Display",
+        "reason": "Fortnite exposes a native HDR output path in GameUserSettings.ini on this machine.",
+        "setting": "HDR",
+        "value": "On"
+      },
+      {
+        "category": "Display",
+        "reason": "Keep Windows HDR and Fortnite's native HDR output aligned.",
+        "setting": "HDR Peak Brightness / Nits",
+        "value": "Start at 1000 nits or match your display peak"
+      },
+      {
+        "category": "Display",
+        "reason": "Matches the competitive no-sync path this profile actually applies.",
+        "setting": "Display Mode",
+        "value": "Fullscreen (Exclusive)"
+      },
+      {
+        "category": "Display",
+        "reason": "Keep sync latency out of the path for this Reflex-first profile.",
+        "setting": "VSync",
+        "value": "Off"
+      },
+      {
+        "category": "Display",
+        "reason": "Reflex should own render-queue control. ABSO keeps driver LLM off to avoid overlap.",
+        "setting": "NVIDIA Reflex Low Latency",
+        "value": "On + Boost"
+      },
+      {
+        "category": "Display",
+        "reason": "This is the explicit no-sync Fortnite lane, not a VRR cap profile.",
+        "setting": "Frame Rate Limit",
+        "value": "Unlimited"
+      },
+      {
+        "category": "Graphics",
+        "reason": "This PC's live config already prefers DX12, and that is the intended ABSO path here.",
+        "setting": "Rendering Mode",
+        "value": "DirectX 12"
+      },
+      {
+        "category": "Graphics",
+        "reason": "Better CPU utilization and more stable frame delivery in stacked endgames.",
+        "setting": "Multithreaded Rendering",
+        "value": "On"
+      },
+      {
+        "category": "Graphics",
+        "reason": "Keep frame times stable first; use DLSS only when needed to hold target FPS.",
+        "setting": "3D Resolution / DLSS",
+        "value": "100% or DLSS Performance if GPU-bound"
+      },
+      {
+        "category": "Graphics",
+        "reason": "Reduces visual noise and preserves snap-tracking clarity.",
+        "setting": "Motion Blur",
+        "value": "Off"
+      },
+      {
+        "category": "Graphics",
+        "reason": "Endgame effects spikes matter more than visual richness in the competitive lane.",
+        "setting": "Shadows / Effects",
+        "value": "Low"
+      },
+      {
+        "category": "Content",
+        "reason": "Avoids streaming hitches and unnecessary VRAM churn.",
+        "setting": "High Resolution Textures",
+        "value": "Off"
+      }
+    ],
+    "include_legacy_tweaks": false,
+    "is_emulator_profile": false,
+    "is_online_profile": false,
+    "is_sdr_only": false,
+    "network_scope": "full",
+    "optimization_target": "low_latency_high_fps",
+    "requires_reflex": true,
+    "settings": {
+      "CNMSettingsHandler": {
+        "action": "stop"
+      },
+      "ColorProfileSettingsHandler": {
+        "digital_vibrance": 50,
+        "game_type": "competitive_fps",
+        "icc_profile": "native",
+        "show_osd_guidance": true
+      },
+      "CpuAffinityHandler": {
+        "strategy": null
+      },
+      "FortniteConfigHandler": {
+        "frame_rate_limit": 0,
+        "fullscreen_mode": 0,
+        "hdr_nits": 1000,
+        "hdr_output": true,
+        "vsync": false
+      },
+      "GraphicsSettingsHandler": {
+        "disable_global_fso": false
+      },
+      "MouseSettingsHandler": {
+        "disable_acceleration": true,
+        "set_linear_curve": true
+      },
+      "NetworkSettingsHandler": {
+        "disable_nagle": true,
+        "preset": "gaming"
+      },
+      "NvidiaSettingsHandler": {
+        "preset": "reflex_game",
+        "profile_aliases": [
+          "Fortnite - HDR",
+          "Fortnite (Streaming)",
+          "Fortnite (Streaming HDR)"
+        ],
+        "profile_name": "Fortnite"
+      },
+      "OBSSettingsHandler": {
+        "low_latency": true,
+        "stream_encoder": {
+          "bitrate": 6000,
+          "look-ahead": false,
+          "multipass": "disabled",
+          "preset": "p5",
+          "profile": "high",
+          "psycho_aq": true,
+          "rate_control": "CBR"
+        },
+        "video": {
+          "output_cx": 1920,
+          "output_cy": 1080,
+          "scale_type": "lanczos"
+        }
+      },
+      "PowerSettingsHandler": {
+        "active_plan": "ultimate_performance",
+        "disable_pcie_power_saving": true,
+        "disable_usb_suspend": true,
+        "ensure_ultimate_performance": true,
+        "processor_max_performance": true
+      },
+      "ProcessPriorityHandler": {
+        "cpu_priority": 3,
+        "gpu_priority": 8,
+        "io_priority": 3
+      },
+      "RegistrySettingsHandler": {
+        "game_priority": {
+          "gpu_priority": 8,
+          "priority": 6,
+          "scheduling_category": "High"
+        },
+        "win32_priority_separation": 42
+      },
+      "ServicesSettingsHandler": {
+        "preset": "gaming"
+      },
+      "WindowsSettingsHandler": {
+        "auto_hdr": false,
+        "game_bar": false,
+        "game_dvr": false,
+        "game_mode": true,
+        "hags": true,
+        "hdr": true,
+        "max_refresh_rate": true,
+        "vrr_optimize": false,
+        "windowed_optimizations": false
+      }
+    }
+  },
   "marvel-rivals-hdr": {
     "allows_aggressive_settings": false,
     "display_name": "Marvel Rivals - HDR",
@@ -620,7 +1333,8 @@
       "ProcessPriorityHandler",
       "CpuAffinityHandler",
       "CNMSettingsHandler",
-      "ColorProfileSettingsHandler"
+      "ColorProfileSettingsHandler",
+      "MarvelRivalsConfigHandler"
     ],
     "in_game_settings": [
       {
@@ -719,6 +1433,14 @@
       "GraphicsSettingsHandler": {
         "disable_global_fso": true
       },
+      "MarvelRivalsConfigHandler": {
+        "auto_vrr_fps_cap": true,
+        "fullscreen_mode": 0,
+        "hdr_nits": 1000,
+        "hdr_output": true,
+        "nvidia_reflex": true,
+        "vsync": false
+      },
       "MouseSettingsHandler": {
         "disable_acceleration": true,
         "set_linear_curve": true
@@ -785,7 +1507,8 @@
       "ProcessPriorityHandler",
       "CpuAffinityHandler",
       "CNMSettingsHandler",
-      "ColorProfileSettingsHandler"
+      "ColorProfileSettingsHandler",
+      "MarvelRivalsConfigHandler"
     ],
     "in_game_settings": [
       {
@@ -883,6 +1606,14 @@
       },
       "GraphicsSettingsHandler": {
         "disable_global_fso": true
+      },
+      "MarvelRivalsConfigHandler": {
+        "auto_vrr_fps_cap": true,
+        "fullscreen_mode": 0,
+        "hdr_nits": 1000,
+        "hdr_output": false,
+        "nvidia_reflex": true,
+        "vsync": false
       },
       "MouseSettingsHandler": {
         "disable_acceleration": true,
@@ -1940,6 +2671,180 @@
         "game_mode": true,
         "hags": true,
         "hdr": true,
+        "max_refresh_rate": true,
+        "vrr_optimize": true,
+        "windowed_optimizations": true
+      }
+    }
+  },
+  "overwatch2-gsync-streaming": {
+    "allows_aggressive_settings": false,
+    "display_name": "Overwatch 2 - GSYNC (Streaming)",
+    "graphics_api": "dx11",
+    "handlers": [
+      "WindowsSettingsHandler",
+      "PowerSettingsHandler",
+      "RegistrySettingsHandler",
+      "NvidiaSettingsHandler",
+      "NetworkSettingsHandler",
+      "MouseSettingsHandler",
+      "GraphicsSettingsHandler",
+      "ServicesSettingsHandler",
+      "ProcessPriorityHandler",
+      "OBSSettingsHandler",
+      "CpuAffinityHandler",
+      "CNMSettingsHandler",
+      "ColorProfileSettingsHandler",
+      "OW2ConfigHandler"
+    ],
+    "in_game_settings": [
+      {
+        "category": "Display",
+        "reason": "Capture-safe path: keeps Medal/Discord/OBS overlays compatible while using the windowed G-SYNC path. Use the strict fullscreen profile if you want the absolute lowest latency and no overlays.",
+        "setting": "Display Mode",
+        "value": "Borderless / Windowed Fullscreen"
+      },
+      {
+        "category": "Display",
+        "reason": "Use NVCP VSync as the VRR safety net; keep in-game VSync off.",
+        "setting": "VSync",
+        "value": "Off (in-game)"
+      },
+      {
+        "category": "Display",
+        "reason": "Native Reflex should own queue control.",
+        "setting": "NVIDIA Reflex Low Latency",
+        "value": "Enabled + Boost"
+      },
+      {
+        "category": "Display",
+        "reason": "Set by ABSO for stable windowed G-SYNC behavior below refresh.",
+        "setting": "Frame Rate Cap",
+        "value": "Auto (refresh - 3)"
+      },
+      {
+        "category": "Display",
+        "reason": "Maintains low queue depth without fighting the capture-safe path.",
+        "setting": "Reduce Buffering",
+        "value": "On"
+      },
+      {
+        "category": "Graphics",
+        "reason": "Avoid frame pacing swings while recording/clipping.",
+        "setting": "Dynamic Render Scale",
+        "value": "Off"
+      },
+      {
+        "category": "Graphics",
+        "reason": "Minimizes frame spikes during heavy team fights and capture load.",
+        "setting": "Shadows / Effects",
+        "value": "Low"
+      }
+    ],
+    "include_legacy_tweaks": false,
+    "is_emulator_profile": false,
+    "is_online_profile": false,
+    "is_sdr_only": false,
+    "network_scope": "full",
+    "optimization_target": "low_latency_high_fps",
+    "requires_reflex": true,
+    "settings": {
+      "CNMSettingsHandler": {
+        "action": "stop"
+      },
+      "ColorProfileSettingsHandler": {
+        "digital_vibrance": 45,
+        "game_type": "competitive_fps",
+        "icc_profile": "srgb",
+        "show_osd_guidance": true
+      },
+      "CpuAffinityHandler": {
+        "strategy": null
+      },
+      "GraphicsSettingsHandler": {
+        "disable_global_fso": false,
+        "disable_mpo": false
+      },
+      "MouseSettingsHandler": {
+        "disable_acceleration": true,
+        "set_linear_curve": true
+      },
+      "NetworkSettingsHandler": {
+        "disable_nagle": true,
+        "preset": "gaming"
+      },
+      "NvidiaSettingsHandler": {
+        "auto_vrr_fps_cap": true,
+        "global_vrr_mode": "fullscreen_and_windowed",
+        "preset": "reflex_gsync",
+        "profile_name": "Overwatch 2"
+      },
+      "OBSSettingsHandler": {
+        "low_latency": true,
+        "stream_encoder": {
+          "bitrate": 6000,
+          "look-ahead": false,
+          "multipass": "disabled",
+          "preset": "p5",
+          "profile": "high",
+          "psycho_aq": true,
+          "rate_control": "CBR"
+        },
+        "video": {
+          "output_cx": 1920,
+          "output_cy": 1080,
+          "scale_type": "lanczos"
+        }
+      },
+      "OW2ConfigHandler": {
+        "aa_detail": 0,
+        "auto_vrr_fps_cap": true,
+        "dynamic_render_scale": false,
+        "dynamic_render_scale_v2": false,
+        "effects_quality": 1,
+        "gfx_preset": 1,
+        "hdr": false,
+        "model_quality": 1,
+        "reduce_buffering": true,
+        "render_scale": 0,
+        "show_fps": true,
+        "show_latency": true,
+        "texture_detail": 1,
+        "triple_buffering": false,
+        "upscaling": false,
+        "vsync": false,
+        "window_mode": 1
+      },
+      "PowerSettingsHandler": {
+        "active_plan": "ultimate_performance",
+        "disable_pcie_power_saving": true,
+        "disable_usb_suspend": true,
+        "ensure_ultimate_performance": true,
+        "processor_max_performance": true
+      },
+      "ProcessPriorityHandler": {
+        "cpu_priority": 3,
+        "gpu_priority": 8,
+        "io_priority": 3
+      },
+      "RegistrySettingsHandler": {
+        "game_priority": {
+          "gpu_priority": 8,
+          "priority": 6,
+          "scheduling_category": "High"
+        },
+        "win32_priority_separation": 42
+      },
+      "ServicesSettingsHandler": {
+        "preset": "gaming"
+      },
+      "WindowsSettingsHandler": {
+        "auto_hdr": false,
+        "game_bar": false,
+        "game_dvr": false,
+        "game_mode": true,
+        "hags": true,
+        "hdr": false,
         "max_refresh_rate": true,
         "vrr_optimize": true,
         "windowed_optimizations": true

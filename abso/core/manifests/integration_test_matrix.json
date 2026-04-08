@@ -96,6 +96,13 @@
       "id": "apply-cod-bo7",
       "profile_id": "cod-bo7",
       "kind": "apply_profile",
+      "assumptions": ["administrator", "nvidia_gpu", "hdr_capable"],
+      "expected": { "transaction_state": "committed", "apply_success": true }
+    },
+    {
+      "id": "apply-cod-bo7-sdr",
+      "profile_id": "cod-bo7-sdr",
+      "kind": "apply_profile",
       "assumptions": ["administrator", "nvidia_gpu"],
       "expected": { "transaction_state": "committed", "apply_success": true }
     },
@@ -103,7 +110,14 @@
       "id": "apply-diablo4",
       "profile_id": "diablo4",
       "kind": "apply_profile",
-      "assumptions": ["administrator", "nvidia_gpu", "hdr_display"],
+      "assumptions": ["administrator", "nvidia_gpu", "vrr_confirmed", "hdr_capable"],
+      "expected": { "transaction_state": "committed", "apply_success": true }
+    },
+    {
+      "id": "apply-diablo4-sdr",
+      "profile_id": "diablo4-sdr",
+      "kind": "apply_profile",
+      "assumptions": ["administrator", "nvidia_gpu", "vrr_confirmed"],
       "expected": { "transaction_state": "committed", "apply_success": true }
     },
     {
@@ -114,10 +128,24 @@
       "expected": { "transaction_state": "committed", "apply_success": true }
     },
     {
+      "id": "apply-fortnite-hdr",
+      "profile_id": "fortnite-hdr",
+      "kind": "apply_profile",
+      "assumptions": ["administrator", "nvidia_gpu", "hdr_capable"],
+      "expected": { "transaction_state": "committed", "apply_success": true }
+    },
+    {
       "id": "apply-fortnite-streaming",
       "profile_id": "fortnite-streaming",
       "kind": "apply_profile",
       "assumptions": ["administrator", "nvidia_gpu", "obs_installed"],
+      "expected": { "transaction_state": "committed", "apply_success": true }
+    },
+    {
+      "id": "apply-fortnite-streaming-hdr",
+      "profile_id": "fortnite-streaming-hdr",
+      "kind": "apply_profile",
+      "assumptions": ["administrator", "nvidia_gpu", "hdr_capable", "obs_installed"],
       "expected": { "transaction_state": "committed", "apply_success": true }
     },
     {
@@ -160,6 +188,13 @@
       "profile_id": "overwatch2-gsync-hdr-streaming",
       "kind": "apply_profile",
       "assumptions": ["administrator", "nvidia_gpu", "vrr_confirmed", "hdr_capable", "obs_installed"],
+      "expected": { "transaction_state": "committed", "apply_success": true }
+    },
+    {
+      "id": "apply-overwatch2-gsync-streaming",
+      "profile_id": "overwatch2-gsync-streaming",
+      "kind": "apply_profile",
+      "assumptions": ["administrator", "nvidia_gpu", "vrr_confirmed", "obs_installed"],
       "expected": { "transaction_state": "committed", "apply_success": true }
     },
     {
@@ -236,7 +271,7 @@
       "id": "apply-marvel-rivals-hdr",
       "profile_id": "marvel-rivals-hdr",
       "kind": "apply_profile",
-      "assumptions": ["administrator", "nvidia_gpu", "vrr_confirmed"],
+      "assumptions": ["administrator", "nvidia_gpu", "vrr_confirmed", "hdr_capable"],
       "expected": { "transaction_state": "committed", "apply_success": true }
     }
   ]

@@ -7,8 +7,9 @@ from unittest.mock import patch
 import pytest
 
 from abso.profiles import get_all_profiles
-from abso.profiles.cod_bo7 import CodBo7Profile
-from abso.profiles.diablo4 import Diablo4Profile
+from abso.profiles.cod_bo7 import CodBo7Profile, CodBo7SDRProfile
+from abso.profiles.diablo4 import Diablo4Profile, Diablo4SDRProfile
+from abso.profiles.fortnite import FortniteHDRProfile, FortniteProfile
 from abso.profiles.marvel_rivals import MarvelRivalsHDRProfile, MarvelRivalsSDRProfile
 from abso.profiles.overwatch2 import (
     Overwatch2GSyncCaptureProfile,
@@ -27,7 +28,13 @@ from abso.profiles.rivals2_gsync import (
 )
 from abso.profiles.rivals2_offline import Rivals2OfflineHDRProfile, Rivals2OfflineProfile
 from abso.profiles.rivals2_online import Rivals2OnlineHDRProfile, Rivals2OnlineProfile
-from abso.profiles.streaming_profiles import Rivals2HDRStreamingProfile, Rivals2StreamingProfile
+from abso.profiles.streaming_profiles import (
+    FortniteHDRStreamingProfile,
+    FortniteStreamingProfile,
+    Overwatch2GSyncStreamingProfile,
+    Rivals2HDRStreamingProfile,
+    Rivals2StreamingProfile,
+)
 from abso.profiles.slippi_melee import (
     SlippiMeleeConsoleParityProfile,
     SlippiMeleeProfile,
@@ -64,16 +71,31 @@ class TestProfileLoading:
         assert "VRR Lab" in profile.display_name
 
     def test_cod_profile_loads(self):
-        """Test CodBo7Profile can be instantiated."""
-        profile = CodBo7Profile()
-        assert profile.profile_id == "cod-bo7"
-        assert profile.display_name == "Call of Duty: Black Ops 7"
+        """CoD should expose explicit HDR and SDR variants."""
+        hdr = CodBo7Profile()
+        sdr = CodBo7SDRProfile()
+        assert hdr.profile_id == "cod-bo7"
+        assert hdr.display_name == "Call of Duty: Black Ops 7 - HDR"
+        assert sdr.profile_id == "cod-bo7-sdr"
+        assert sdr.display_name == "Call of Duty: Black Ops 7 - SDR"
 
     def test_diablo4_profile_loads(self):
-        """Test Diablo4Profile can be instantiated."""
-        profile = Diablo4Profile()
-        assert profile.profile_id == "diablo4"
-        assert profile.display_name == "Diablo 4"
+        """Diablo 4 should expose explicit HDR and SDR variants."""
+        hdr = Diablo4Profile()
+        sdr = Diablo4SDRProfile()
+        assert hdr.profile_id == "diablo4"
+        assert hdr.display_name == "Diablo 4 - HDR"
+        assert sdr.profile_id == "diablo4-sdr"
+        assert sdr.display_name == "Diablo 4 - SDR"
+
+    def test_fortnite_profiles_load(self):
+        """Fortnite should expose explicit SDR and HDR variants."""
+        sdr = FortniteProfile()
+        hdr = FortniteHDRProfile()
+        assert sdr.profile_id == "fortnite"
+        assert sdr.display_name == "Fortnite - SDR"
+        assert hdr.profile_id == "fortnite-hdr"
+        assert hdr.display_name == "Fortnite - HDR"
 
     def test_pokemon_auto_chess_profile_loads(self):
         """Test PokemonAutoChessProfile can be instantiated."""
@@ -127,6 +149,16 @@ class TestProfileLoading:
         assert streaming.profile_id == "rivals2-streaming"
         assert streaming_hdr.profile_id == "rivals2-streaming-hdr"
 
+    def test_streaming_variants_load(self):
+        """Streaming families should expose the expected explicit HDR/SDR lanes."""
+        fortnite_stream = FortniteStreamingProfile()
+        fortnite_stream_hdr = FortniteHDRStreamingProfile()
+        ow2_stream = Overwatch2GSyncStreamingProfile()
+
+        assert fortnite_stream.profile_id == "fortnite-streaming"
+        assert fortnite_stream_hdr.profile_id == "fortnite-streaming-hdr"
+        assert ow2_stream.profile_id == "overwatch2-gsync-streaming"
+
 
 class TestProfileHandlers:
     """Test profile handler methods."""
@@ -160,6 +192,26 @@ class TestProfileHandlers:
 
         assert isinstance(handlers, list)
         assert len(handlers) > 0
+
+    def test_fortnite_get_handlers_returns_list(self):
+        """Fortnite variants should include explicit config enforcement."""
+        profile = FortniteProfile()
+        handlers = profile.get_handlers()
+
+        assert isinstance(handlers, list)
+        assert len(handlers) > 0
+        handler_names = [h.__class__.__name__ for h in handlers]
+        assert "FortniteConfigHandler" in handler_names
+
+    def test_marvel_rivals_get_handlers_returns_list(self):
+        """Marvel Rivals variants should include explicit config enforcement."""
+        profile = MarvelRivalsSDRProfile()
+        handlers = profile.get_handlers()
+
+        assert isinstance(handlers, list)
+        assert len(handlers) > 0
+        handler_names = [h.__class__.__name__ for h in handlers]
+        assert "MarvelRivalsConfigHandler" in handler_names
 
     def test_pokemon_auto_chess_get_handlers_returns_list(self):
         """Test PokemonAutoChessProfile.get_handlers returns handlers."""
@@ -479,6 +531,72 @@ class TestProfileSettings:
         color = profile.get_settings("ColorProfileSettingsHandler")
         assert color["icc_profile"] == "native"
         assert color["game_type"] == "competitive_fps"
+
+    def test_cod_bo7_sdr_uses_srgb_color(self):
+        """The SDR CoD variant should stay on the SDR color path."""
+        profile = CodBo7SDRProfile()
+        win = profile.get_settings("WindowsSettingsHandler")
+        color = profile.get_settings("ColorProfileSettingsHandler")
+
+        assert win["hdr"] is False
+        assert win["auto_hdr"] is False
+        assert color["icc_profile"] == "srgb"
+
+    def test_diablo4_sdr_uses_srgb_color(self):
+        """The SDR Diablo 4 variant should explicitly stay on the SDR path."""
+        profile = Diablo4SDRProfile()
+        win = profile.get_settings("WindowsSettingsHandler")
+        color = profile.get_settings("ColorProfileSettingsHandler")
+
+        assert win["hdr"] is False
+        assert win["auto_hdr"] is False
+        assert color["icc_profile"] == "srgb"
+
+    def test_fortnite_sdr_and_hdr_variants_drive_native_game_config(self):
+        """Fortnite variants should enforce the matching SDR/HDR game config path."""
+        sdr = FortniteProfile()
+        hdr = FortniteHDRProfile()
+
+        sdr_windows = sdr.get_settings("WindowsSettingsHandler")
+        sdr_color = sdr.get_settings("ColorProfileSettingsHandler")
+        sdr_config = sdr.get_settings("FortniteConfigHandler")
+        hdr_windows = hdr.get_settings("WindowsSettingsHandler")
+        hdr_color = hdr.get_settings("ColorProfileSettingsHandler")
+        hdr_config = hdr.get_settings("FortniteConfigHandler")
+
+        assert sdr_windows["hdr"] is False
+        assert sdr_windows["auto_hdr"] is False
+        assert sdr_color["icc_profile"] == "srgb"
+        assert sdr_config["hdr_output"] is False
+        assert sdr_config["fullscreen_mode"] == 0
+        assert sdr_config["frame_rate_limit"] == 0
+
+        assert hdr_windows["hdr"] is True
+        assert hdr_windows["auto_hdr"] is False
+        assert hdr_color["icc_profile"] == "native"
+        assert hdr_config["hdr_output"] is True
+        assert hdr_config["fullscreen_mode"] == 0
+        assert hdr_config["frame_rate_limit"] == 0
+
+    def test_marvel_rivals_variants_drive_native_game_config(self):
+        """Marvel Rivals variants should set native HDR and Reflex in GameUserSettings."""
+        sdr = MarvelRivalsSDRProfile()
+        hdr = MarvelRivalsHDRProfile()
+
+        sdr_config = sdr.get_settings("MarvelRivalsConfigHandler")
+        hdr_config = hdr.get_settings("MarvelRivalsConfigHandler")
+
+        assert sdr_config["fullscreen_mode"] == 0
+        assert sdr_config["vsync"] is False
+        assert sdr_config["nvidia_reflex"] is True
+        assert sdr_config["auto_vrr_fps_cap"] is True
+        assert sdr_config["hdr_output"] is False
+
+        assert hdr_config["fullscreen_mode"] == 0
+        assert hdr_config["vsync"] is False
+        assert hdr_config["nvidia_reflex"] is True
+        assert hdr_config["auto_vrr_fps_cap"] is True
+        assert hdr_config["hdr_output"] is True
 
     def test_pokemon_auto_chess_windows_settings(self):
         """Test PokemonAutoChessProfile returns Windows settings."""
