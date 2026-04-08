@@ -661,6 +661,39 @@ class TestNvidiaApply:
         ]
 
     @patch("abso.settings.nvidia.nvapi_drs.DRSProfileManager")
+    def test_apply_surfaces_safe_predefined_profile_as_notice(self, mock_manager_cls):
+        """Trusted predefined NVIDIA profiles should surface as notices, not warnings."""
+        mock_manager = MagicMock()
+        mock_manager.apply_settings_to_app.return_value = {
+            "settings_applied": {"vrr_app_override": "allow"},
+            "errors": [],
+            "app_bound": True,
+            "app_binding_exact": False,
+            "app_binding_safe": True,
+            "app_binding_note": (
+                "NVIDIA predefined profile 'Overwatch 2' already exists and has bound applications. "
+                "NVAPI could not enumerate exact ownership for 'Overwatch.exe', but ABSO found no "
+                "conflicting owner and updated the predefined profile in place."
+            ),
+            "npi_launched": False,
+        }
+        mock_manager.get_app_settings.return_value = {"vrr_app_override": 0x00000000}
+        mock_manager._resolve_setting.return_value = (0x10A879CF, 0x00000000)
+        mock_manager_cls.return_value = mock_manager
+
+        handler = NvidiaSettingsHandler()
+        result = handler.apply({
+            "preset": "reflex_gsync",
+            "executables": ["Overwatch.exe"],
+            "game_name": "Overwatch 2",
+            "profile_name": "Overwatch 2",
+        })
+
+        assert result["success"] is True
+        assert result["warnings"] == []
+        assert any("NVIDIA predefined profile 'Overwatch 2'" in notice for notice in result["notices"])
+
+    @patch("abso.settings.nvidia.nvapi_drs.DRSProfileManager")
     def test_verify_active_confirms_binding_membership_when_owner_matches(self, mock_manager_cls):
         """verify_active should upgrade scope when it can prove executable ownership."""
         manager = RealDRSProfileManager()
@@ -895,7 +928,34 @@ class TestNvidiaPreflight:
     def test_preflight_blocks_when_exact_binding_cannot_be_confirmed(self, mock_probe):
         mock_probe.return_value = {
             "app_binding_exact": False,
-            "app_binding_note": "Profile 'Overwatch 2' already exists and has bound applications, but NVAPI could not prove 'Overwatch.exe' belongs to it.",
+            "app_binding_safe": False,
+            "app_binding_note": (
+                "Profile 'Rivals 2 Online' already exists and has bound applications, but "
+                "NVAPI could not prove every executable belongs to it."
+            ),
+        }
+
+        handler = NvidiaSettingsHandler()
+        result = handler.preflight({
+            "preset": "vrr_fighting_game",
+            "executables": ["Rivals2-Win64-Shipping.exe"],
+            "profile_name": "Rivals 2 Online",
+            "require_exact_binding": True,
+        })
+
+        assert result["success"] is False
+        assert "NVAPI could not prove every executable belongs to it" in result["error"]
+
+    @patch("abso.settings.nvidia.nvapi_drs.DRSProfileManager.probe_profile_binding")
+    def test_preflight_allows_safe_predefined_profile_when_no_conflicting_owner_exists(self, mock_probe):
+        mock_probe.return_value = {
+            "app_binding_exact": False,
+            "app_binding_safe": True,
+            "app_binding_note": (
+                "NVIDIA predefined profile 'Overwatch 2' already exists and has bound applications. "
+                "NVAPI could not enumerate exact ownership for every requested executable, but ABSO "
+                "found no conflicting owner."
+            ),
         }
 
         handler = NvidiaSettingsHandler()
@@ -906,8 +966,8 @@ class TestNvidiaPreflight:
             "require_exact_binding": True,
         })
 
-        assert result["success"] is False
-        assert "NVAPI could not prove 'Overwatch.exe' belongs to it" in result["error"]
+        assert result["success"] is True
+        assert any("NVIDIA predefined profile 'Overwatch 2'" in notice for notice in result["notices"])
 
 
 class TestNvidiaBackwardsCompatibility:

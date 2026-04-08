@@ -346,7 +346,8 @@ class NvidiaSettingsHandler(SettingsHandler):
                 "notices": [],
             }
 
-        if not probe.get("app_binding_exact", False):
+        binding_ok = bool(probe.get("app_binding_safe", probe.get("app_binding_exact", False)))
+        if not binding_ok:
             return {
                 "success": False,
                 "error": str(
@@ -361,6 +362,9 @@ class NvidiaSettingsHandler(SettingsHandler):
         selection_note = probe.get("profile_selection_note")
         if selection_note:
             notices.append(str(selection_note))
+        binding_note = probe.get("app_binding_note")
+        if binding_note:
+            notices.append(str(binding_note))
 
         return {
             "success": True,
@@ -609,7 +613,7 @@ class NvidiaSettingsHandler(SettingsHandler):
                     npi_launched = bool(result.get("npi_launched", False))
                     note = result.get("app_binding_note", "")
                     if note:
-                        if result.get("app_binding_exact", True):
+                        if result.get("app_binding_exact", True) or result.get("app_binding_safe", False):
                             notices.append(str(note))
                         else:
                             warnings.append(str(note))

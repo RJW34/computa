@@ -199,3 +199,73 @@ def test_apply_settings_to_app_fails_when_executable_is_bound_to_different_profi
     assert result["app_binding_state"] == "bound_elsewhere"
     assert result["app_binding_owner_profile"] == "Legacy Wrong Profile"
     assert result["settings_applied"] == {}
+
+
+def test_probe_profile_binding_trusts_predefined_profile_without_conflicting_owner():
+    """Predefined NVIDIA profiles should be safe when NVAPI shows no conflicting owner."""
+    manager = DRSProfileManager()
+
+    predefined_profile = object()
+    fake_drs = MagicMock()
+    fake_drs.enumerate_profiles.return_value = [
+        {"name": "Overwatch 2", "num_apps": 2, "is_predefined": True},
+    ]
+    fake_drs.find_profile_by_name.return_value = predefined_profile
+    fake_drs.find_application_owner.return_value = None
+    fake_drs.get_application_info.return_value = None
+
+    class _Ctx:
+        def __enter__(self):
+            return fake_drs
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+    manager._drs = _Ctx()
+
+    result = manager.probe_profile_binding(
+        ["Overwatch.exe"],
+        profile_name="Overwatch 2",
+    )
+
+    assert result["app_binding_exact"] is False
+    assert result["app_binding_safe"] is True
+    assert result["app_binding_state"] == "predefined_profile_trusted"
+    assert "NVIDIA predefined profile 'Overwatch 2'" in result["app_binding_note"]
+
+
+def test_apply_settings_to_app_trusts_predefined_profile_without_conflicting_owner():
+    """Applying to a predefined NVIDIA profile should proceed when no conflicting owner exists."""
+    manager = DRSProfileManager()
+
+    selected_profile = object()
+    fake_drs = MagicMock()
+    fake_drs.enumerate_profiles.return_value = [{"name": "Overwatch 2", "num_apps": 2, "is_predefined": True}]
+    fake_drs.find_profile_by_name.return_value = selected_profile
+    fake_drs.add_application_to_profile.side_effect = (
+        lambda profile, exe: setattr(fake_drs, "_app_binding_statuses", {exe: "already_in_use"})
+    )
+    fake_drs.find_application_owner.return_value = None
+    fake_drs.get_application_info.return_value = None
+
+    class _Ctx:
+        def __enter__(self):
+            return fake_drs
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+    manager._drs = _Ctx()
+    manager._apply_single_setting = MagicMock()
+
+    result = manager.apply_settings_to_app(
+        "Overwatch.exe",
+        {"vsync": "on"},
+        profile_name="Overwatch 2",
+    )
+
+    assert result["app_bound"] is True
+    assert result["app_binding_exact"] is False
+    assert result["app_binding_safe"] is True
+    assert result["app_binding_state"] == "predefined_profile_trusted"
+    assert result["settings_applied"]["vsync"] == "on"

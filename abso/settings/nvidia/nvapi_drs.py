@@ -1247,6 +1247,30 @@ class DRSProfileManager:
             return {}
 
     @staticmethod
+    def _is_predefined_profile(profile_info: dict[str, Any] | None) -> bool:
+        """Return whether a profile comes from NVIDIA's predefined database."""
+        return bool(profile_info and profile_info.get("is_predefined"))
+
+    @classmethod
+    def _should_trust_predefined_profile(
+        cls,
+        profile_info: dict[str, Any] | None,
+        *,
+        profile_name_was_explicit: bool,
+        existing_profile_num_apps: int,
+        profile_num_apps: int | None,
+        conflicting_executables: dict[str, str],
+    ) -> bool:
+        """Allow strict reuse of predefined NVIDIA profiles when no conflict is visible."""
+        return (
+            profile_name_was_explicit
+            and cls._is_predefined_profile(profile_info)
+            and existing_profile_num_apps > 0
+            and (profile_num_apps or 0) > 0
+            and not conflicting_executables
+        )
+
+    @staticmethod
     def _reset_binding_tracking(drs: NVAPIDRS) -> None:
         """Reset temporary binding tracking attached to the DRS wrapper."""
         drs._app_binding_failures = []
@@ -1375,10 +1399,12 @@ class DRSProfileManager:
 
         try:
             with self._drs as drs:
+                profile_index = self._build_profile_index(drs)
                 selected_profile_name, existing_profile_num_apps, selection_note = (
                     self._select_profile_target(drs, requested_profile_name, profile_aliases)
                 )
                 selected_from_alias = selected_profile_name != requested_profile_name
+                selected_profile_info = profile_index.get(selected_profile_name)
                 results["profile_name"] = selected_profile_name
                 if selection_note:
                     results["profile_selection_note"] = selection_note
@@ -1440,6 +1466,23 @@ class DRSProfileManager:
                     results["manual_instructions"] = self.get_manual_binding_instructions(
                         selected_profile_name,
                         app_executable,
+                    )
+                elif self._should_trust_predefined_profile(
+                    selected_profile_info,
+                    profile_name_was_explicit=profile_name_was_explicit,
+                    existing_profile_num_apps=existing_profile_num_apps,
+                    profile_num_apps=profile_num_apps,
+                    conflicting_executables={},
+                ):
+                    results["app_bound"] = True
+                    results["app_binding_exact"] = False
+                    results["app_binding_safe"] = True
+                    results["app_binding_state"] = "predefined_profile_trusted"
+                    results["app_binding_note"] = (
+                        f"NVIDIA predefined profile '{selected_profile_name}' already exists and has "
+                        f"bound applications. NVAPI could not enumerate exact ownership for "
+                        f"'{app_executable}', but ABSO found no conflicting owner and updated the "
+                        "predefined profile in place."
                     )
                 elif drs._app_binding_failures:
                     if selected_from_alias and existing_profile_num_apps > 0 and (profile_num_apps or 0) > 0:
@@ -1543,10 +1586,12 @@ class DRSProfileManager:
 
         try:
             with self._drs as drs:
+                profile_index = self._build_profile_index(drs)
                 selected_profile_name, existing_profile_num_apps, selection_note = (
                     self._select_profile_target(drs, requested_profile_name, profile_aliases)
                 )
                 selected_from_alias = selected_profile_name != requested_profile_name
+                selected_profile_info = profile_index.get(selected_profile_name)
                 results["profile_name"] = selected_profile_name
                 if selection_note:
                     results["profile_selection_note"] = selection_note
@@ -1588,6 +1633,7 @@ class DRSProfileManager:
 
                 if len(exact_executables) == len(executables):
                     results["app_binding_exact"] = True
+                    results["app_binding_safe"] = True
                     results["app_binding_state"] = "confirmed"
                     results["app_binding_note"] = (
                         f"ABSO confirmed exact NVIDIA ownership for profile '{selected_profile_name}'."
@@ -1607,6 +1653,22 @@ class DRSProfileManager:
                     return results
 
                 profile_num_apps = self._get_profile_num_apps(drs, selected_profile_name)
+                if self._should_trust_predefined_profile(
+                    selected_profile_info,
+                    profile_name_was_explicit=profile_name_was_explicit,
+                    existing_profile_num_apps=existing_profile_num_apps,
+                    profile_num_apps=profile_num_apps,
+                    conflicting_executables=conflicting_executables,
+                ):
+                    results["app_binding_safe"] = True
+                    results["app_binding_state"] = "predefined_profile_trusted"
+                    results["app_binding_note"] = (
+                        f"NVIDIA predefined profile '{selected_profile_name}' already exists and has "
+                        "bound applications. NVAPI could not enumerate exact ownership for every "
+                        "requested executable, but ABSO found no conflicting owner."
+                    )
+                    return results
+
                 if selected_from_alias and existing_profile_num_apps > 0 and (profile_num_apps or 0) > 0:
                     results["app_binding_state"] = "reused_family_profile"
                     results["app_binding_note"] = (
@@ -1671,10 +1733,12 @@ class DRSProfileManager:
 
         try:
             with self._drs as drs:
+                profile_index = self._build_profile_index(drs)
                 selected_profile_name, existing_profile_num_apps, selection_note = (
                     self._select_profile_target(drs, profile_name, profile_aliases)
                 )
                 selected_from_alias = selected_profile_name != profile_name
+                selected_profile_info = profile_index.get(selected_profile_name)
                 results["profile_name"] = selected_profile_name
                 if selection_note:
                     results["profile_selection_note"] = selection_note
@@ -1758,6 +1822,23 @@ class DRSProfileManager:
                     results["manual_instructions"] = self.get_manual_binding_instructions(
                         selected_profile_name,
                         first_failed,
+                    )
+                elif self._should_trust_predefined_profile(
+                    selected_profile_info,
+                    profile_name_was_explicit=True,
+                    existing_profile_num_apps=existing_profile_num_apps,
+                    profile_num_apps=profile_num_apps,
+                    conflicting_executables=conflicting_executables,
+                ):
+                    results["app_bound"] = True
+                    results["app_binding_exact"] = False
+                    results["app_binding_safe"] = True
+                    results["app_binding_state"] = "predefined_profile_trusted"
+                    results["app_binding_note"] = (
+                        f"NVIDIA predefined profile '{selected_profile_name}' already exists and has "
+                        "bound applications. NVAPI could not enumerate exact ownership for every "
+                        "requested executable, but ABSO found no conflicting owner and updated the "
+                        "predefined profile in place."
                     )
                 elif drs._app_binding_failures:
                     if selected_from_alias and existing_profile_num_apps > 0 and (profile_num_apps or 0) > 0:
