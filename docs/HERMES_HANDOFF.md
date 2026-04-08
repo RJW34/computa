@@ -18,7 +18,8 @@ Raise A.B.S.O. from its current baseline to `A` grades across the board by execu
 1. [README.md](/c:/Users/mtoli/Documents/Code/windowsoptimizerabso/README.md)
 2. [docs/QUALITY_RUBRIC.md](/c:/Users/mtoli/Documents/Code/windowsoptimizerabso/docs/QUALITY_RUBRIC.md)
 3. [docs/REMEDIATION_ROADMAP.md](/c:/Users/mtoli/Documents/Code/windowsoptimizerabso/docs/REMEDIATION_ROADMAP.md)
-4. [docs/NVAPI_INTEGRATION_PLAN.md](/c:/Users/mtoli/Documents/Code/windowsoptimizerabso/docs/NVAPI_INTEGRATION_PLAN.md)
+4. [docs/NEXT_IMPLEMENTATION_PHASE.md](/c:/Users/mtoli/Documents/Code/windowsoptimizerabso/docs/NEXT_IMPLEMENTATION_PHASE.md)
+5. [docs/NVAPI_INTEGRATION_PLAN.md](/c:/Users/mtoli/Documents/Code/windowsoptimizerabso/docs/NVAPI_INTEGRATION_PLAN.md)
 
 Optional historical context:
 
@@ -34,9 +35,9 @@ Main deficits still open:
 
 - incomplete rollback parity for some handlers
 - incomplete post-apply verification coverage
-- optimistic GUI/tray wording and hardcoded summaries
+- insufficient per-family end-to-end coverage for some shipped profiles
 - insufficient evidence discipline for "optimal" claims
-- missing machine-role guardrails for validation and signoff
+- missing benchmark-backed signoff for touched profile paths
 
 ## Machine Roles
 
@@ -89,14 +90,14 @@ For every roadmap slice, report:
 
 Start here unless blocked:
 
-1. `PR-01: Remove optimistic wording and placeholders`
-2. `PR-02: Generate profile review/success views from backend data`
-3. `PR-03: Introduce handler capability metadata`
-4. `PR-04: Enforce contract-aware transaction semantics`
+1. `PR-17: Diablo 4 Native Config Handler`
+2. `PR-20: Verification Expansion For Remaining High-Impact System Handlers`
+3. `PR-18: CoD Native Config Discovery And Contracted Handler`
+4. `PR-19: Ryujinx Config Enforcement Or Explicit Contract Limit`
 
 Reason:
 
-- These slices improve truthfulness and control-plane safety before deeper optimization work.
+- These slices close the biggest remaining end-to-end profile gaps without widening product claims.
 
 ## Definition Of Success
 

@@ -26,7 +26,7 @@ class TestProcessPriorityDetect:
     @patch.object(ProcessPriorityHandler, "_get_process_settings")
     def test_detect_returns_processes_dict(self, mock_get_settings):
         """Test detect returns dictionary with processes key."""
-        mock_get_settings.return_value = {"gpu_priority": 8}
+        mock_get_settings.return_value = {"cpu_priority": 3}
 
         handler = ProcessPriorityHandler(executables=["game.exe"])
         result = handler.detect()
@@ -37,7 +37,7 @@ class TestProcessPriorityDetect:
     @patch.object(ProcessPriorityHandler, "_get_process_settings")
     def test_detect_queries_all_executables(self, mock_get_settings):
         """Test detect queries all configured executables."""
-        mock_get_settings.return_value = {"gpu_priority": 8}
+        mock_get_settings.return_value = {"cpu_priority": 3}
 
         exes = ["game1.exe", "game2.exe", "game3.exe"]
         handler = ProcessPriorityHandler(executables=exes)
@@ -49,8 +49,8 @@ class TestProcessPriorityDetect:
     def test_detect_counts_configured_processes(self, mock_get_settings):
         """Test detect counts processes with settings."""
         mock_get_settings.side_effect = [
-            {"gpu_priority": 8},
-            {"gpu_priority": None},
+            {"cpu_priority": 3},
+            {"cpu_priority": None},
         ]
 
         handler = ProcessPriorityHandler(executables=["a.exe", "b.exe"])
@@ -63,11 +63,11 @@ class TestProcessPriorityAudit:
     """Tests for ProcessPriorityHandler.audit()."""
 
     @patch.object(ProcessPriorityHandler, "detect")
-    def test_audit_no_gpu_priority_creates_issue(self, mock_detect):
-        """Test audit creates issue when GPU priority not set."""
+    def test_audit_missing_cpu_priority_creates_issue(self, mock_detect):
+        """Test audit creates issue when CPU priority not set."""
         mock_detect.return_value = {
             "processes": {
-                "game.exe": {"gpu_priority": None}
+                "game.exe": {"cpu_priority": None, "io_priority": None}
             },
             "configured_count": 0,
         }
@@ -75,8 +75,8 @@ class TestProcessPriorityAudit:
         handler = ProcessPriorityHandler(executables=["game.exe"])
         issues = handler.audit()
 
-        gpu_issues = [i for i in issues if "GPU priority" in i.title]
-        assert len(gpu_issues) >= 1
+        cpu_issues = [i for i in issues if "CPU priority" in i.title]
+        assert len(cpu_issues) >= 1
 
     @patch.object(ProcessPriorityHandler, "detect")
     def test_audit_optimal_settings_fewer_issues(self, mock_detect):
@@ -84,9 +84,8 @@ class TestProcessPriorityAudit:
         mock_detect.return_value = {
             "processes": {
                 "game.exe": {
-                    "gpu_priority": 8,
                     "cpu_priority": 3,
-                    "io_priority": 3,
+                    "io_priority": 2,
                 }
             },
             "configured_count": 1,
@@ -95,9 +94,10 @@ class TestProcessPriorityAudit:
         handler = ProcessPriorityHandler(executables=["game.exe"])
         issues = handler.audit()
 
-        # Should not have GPU priority issue since it's set to max
-        gpu_issues = [i for i in issues if "GPU priority" in i.title]
-        assert len(gpu_issues) == 0
+        cpu_issues = [i for i in issues if "CPU priority" in i.title]
+        io_issues = [i for i in issues if "I/O priority" in i.title]
+        assert len(cpu_issues) == 0
+        assert len(io_issues) == 0
 
 
 class TestProcessPriorityApply:
@@ -111,7 +111,7 @@ class TestProcessPriorityApply:
         handler = ProcessPriorityHandler()
         result = handler.apply({
             "processes": {
-                "game.exe": {"gpu_priority": 8}
+                "game.exe": {"cpu_priority": 3}
             }
         })
 
@@ -126,7 +126,7 @@ class TestProcessPriorityApply:
         handler = ProcessPriorityHandler()
         result = handler.apply({
             "processes": {
-                "game.exe": {"gpu_priority": 8}
+                "game.exe": {"cpu_priority": 3}
             }
         })
 
@@ -140,7 +140,7 @@ class TestProcessPriorityBackupRestore:
     @patch.object(ProcessPriorityHandler, "detect")
     def test_backup_returns_current_state(self, mock_detect):
         """Test backup returns current settings."""
-        expected = {"processes": {"game.exe": {"gpu_priority": 8}}}
+        expected = {"processes": {"game.exe": {"cpu_priority": 3}}}
         mock_detect.return_value = expected
 
         handler = ProcessPriorityHandler(executables=["game.exe"])
@@ -156,9 +156,63 @@ class TestProcessPriorityBackupRestore:
         handler = ProcessPriorityHandler()
         result = handler.restore({
             "processes": {
-                "game.exe": {"gpu_priority": 8}
+                "game.exe": {"cpu_priority": 3}
             }
         })
 
         assert result is True
         mock_set_settings.assert_called()
+
+    @patch.object(ProcessPriorityHandler, "_remove_process_settings")
+    @patch.object(ProcessPriorityHandler, "_set_process_settings")
+    def test_restore_removes_empty_backed_up_state(self, mock_set_settings, mock_remove):
+        handler = ProcessPriorityHandler()
+        result = handler.restore({
+            "processes": {
+                "game.exe": {
+                    "gpu_priority": None,
+                    "cpu_priority": None,
+                    "io_priority": None,
+                    "page_priority": None,
+                }
+            }
+        })
+
+        assert result is True
+        mock_set_settings.assert_not_called()
+        mock_remove.assert_called_once_with("game.exe")
+
+
+class TestProcessPriorityVerify:
+    """Tests for verify_active()."""
+
+    @patch.object(ProcessPriorityHandler, "_get_process_settings")
+    def test_verify_active_reports_success(self, mock_get_settings):
+        mock_get_settings.return_value = {
+            "gpu_priority": None,
+            "cpu_priority": 3,
+            "io_priority": 2,
+            "page_priority": None,
+        }
+
+        handler = ProcessPriorityHandler(executables=["game.exe"])
+        result = handler.verify_active({"cpu_priority": 3, "io_priority": 2})
+
+        assert result["all_active"] is True
+        assert result["settings"]["game.exe:cpu_priority"]["active"] is True
+
+    @patch.object(ProcessPriorityHandler, "_get_process_settings")
+    def test_verify_active_reports_mismatch(self, mock_get_settings):
+        mock_get_settings.return_value = {
+            "gpu_priority": None,
+            "cpu_priority": 2,
+            "io_priority": 1,
+            "page_priority": None,
+        }
+
+        handler = ProcessPriorityHandler(executables=["game.exe"])
+        result = handler.verify_active({"cpu_priority": 3, "io_priority": 2})
+
+        assert result["all_active"] is False
+        assert result["settings"]["game.exe:cpu_priority"]["active"] is False
+        assert result["settings"]["game.exe:io_priority"]["active"] is False

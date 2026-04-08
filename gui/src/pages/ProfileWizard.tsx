@@ -379,11 +379,13 @@ export function ProfileWizard() {
               <CardContent className="p-4 space-y-3">
                 <h4 className="font-medium">Backend Application Scope</h4>
                 <p className="text-sm text-muted-foreground">
-                  These are the backend handlers this profile will run through the apply pipeline.
+                  {selectedProfile.application_scope === 'system_plus_native_config'
+                    ? 'ABSO will apply both machine-level settings and a title-specific config handler for this profile.'
+                    : 'ABSO will apply the machine-level path for this profile, but the title itself still relies on manual in-game guidance.'}
                 </p>
                 <ul className="text-sm text-muted-foreground space-y-1">
                   {(selectedProfile.handlers || []).map((handlerName) => (
-                    <li key={handlerName}>• {formatHandlerName(handlerName)}</li>
+                    <li key={handlerName}>- {formatHandlerName(handlerName)}</li>
                   ))}
                 </ul>
               </CardContent>
@@ -397,7 +399,7 @@ export function ProfileWizard() {
                 </p>
                 <ul className="text-sm text-muted-foreground space-y-1">
                   {selectedProfile.executables.map((executable) => (
-                    <li key={executable}>• {executable}</li>
+                    <li key={executable}>- {executable}</li>
                   ))}
                 </ul>
               </CardContent>

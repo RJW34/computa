@@ -278,6 +278,20 @@ class BaseProfile(ABC):
         """Whether ABSO should try to shut down blocking overlays automatically."""
         return bool(self.display_path_requirements.require_overlay_free_path)
 
+    @property
+    def application_scope(self) -> Literal["system_only", "system_plus_native_config"]:
+        """Describe how much of the profile ABSO can enforce directly.
+
+        ``system_plus_native_config`` means ABSO applies both OS/driver state
+        and a title-specific config file or emulator config handler.
+        ``system_only`` means ABSO applies the machine-level path but still
+        relies on manual in-app guidance for the title itself.
+        """
+        handler_names = {handler.__class__.__name__ for handler in self.get_handlers()}
+        if any(name.endswith("ConfigHandler") for name in handler_names):
+            return "system_plus_native_config"
+        return "system_only"
+
     @abstractmethod
     def get_handlers(self) -> list[SettingsHandler]:
         """Get settings handlers used by this profile.

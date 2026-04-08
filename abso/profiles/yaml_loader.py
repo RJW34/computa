@@ -140,7 +140,6 @@ class BalancedBaseProfile(BaseProfile):
                 "preset": "gaming",
             },
             "ProcessPriorityHandler": {
-                "gpu_priority": 8,
                 "cpu_priority": 2,
                 "io_priority": 2,
             },

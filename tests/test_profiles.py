@@ -192,6 +192,8 @@ class TestProfileHandlers:
 
         assert isinstance(handlers, list)
         assert len(handlers) > 0
+        handler_names = [h.__class__.__name__ for h in handlers]
+        assert "Diablo4ConfigHandler" in handler_names
 
     def test_fortnite_get_handlers_returns_list(self):
         """Fortnite variants should include explicit config enforcement."""
@@ -341,6 +343,28 @@ class TestProfileSettings:
 
         # Diablo 4 has native Reflex — uses vrr_diablo4 preset (LLM OFF)
         assert settings["preset"] == "vrr_diablo4"
+
+    def test_diablo4_variants_drive_native_game_config(self):
+        """Diablo IV variants should enforce the matching LocalPrefs path."""
+        hdr = Diablo4Profile()
+        sdr = Diablo4SDRProfile()
+
+        hdr_windows = hdr.get_settings("WindowsSettingsHandler")
+        hdr_config = hdr.get_settings("Diablo4ConfigHandler")
+        sdr_windows = sdr.get_settings("WindowsSettingsHandler")
+        sdr_config = sdr.get_settings("Diablo4ConfigHandler")
+
+        assert hdr.requires_reflex is True
+        assert hdr_windows["hdr"] is True
+        assert hdr_config["window_mode"] == 1
+        assert hdr_config["reflex"] is True
+        assert hdr_config["auto_refresh_rate"] is True
+        assert hdr_config["limit_foreground_fps"] is False
+        assert hdr_config["hdr_output"] is True
+
+        assert sdr_windows["hdr"] is False
+        assert sdr_config["window_mode"] == 1
+        assert sdr_config["hdr_output"] is False
 
     def test_pokemon_auto_chess_nvidia_settings(self):
         """Test PokemonAutoChessProfile returns explicit Nvidia settings."""
@@ -551,6 +575,15 @@ class TestProfileSettings:
         assert win["hdr"] is False
         assert win["auto_hdr"] is False
         assert color["icc_profile"] == "srgb"
+
+    def test_application_scope_reflects_native_config_coverage(self):
+        """Profiles should expose whether ABSO can enforce title config directly."""
+        from abso.profiles.ryujinx_ssbu import RyujinxSSBUProfile
+
+        assert Diablo4Profile().application_scope == "system_plus_native_config"
+        assert FortniteProfile().application_scope == "system_plus_native_config"
+        assert CodBo7Profile().application_scope == "system_only"
+        assert RyujinxSSBUProfile().application_scope == "system_only"
 
     def test_fortnite_sdr_and_hdr_variants_drive_native_game_config(self):
         """Fortnite variants should enforce the matching SDR/HDR game config path."""

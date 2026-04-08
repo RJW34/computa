@@ -81,7 +81,17 @@ class ComplianceEngine:
     CRITICAL_VERIFY_HANDLERS: set[str] = {
         "WindowsSettingsHandler",
         "NvidiaSettingsHandler",
+        "PowerSettingsHandler",
+        "RegistrySettingsHandler",
+        "NetworkSettingsHandler",
+        "MouseSettingsHandler",
+        "ProcessPriorityHandler",
+        "GraphicsSettingsHandler",
+        "OW2ConfigHandler",
         "Rivals2ConfigHandler",
+        "FortniteConfigHandler",
+        "MarvelRivalsConfigHandler",
+        "Diablo4ConfigHandler",
     }
 
     def evaluate(
@@ -126,11 +136,12 @@ class ComplianceEngine:
                 if all_active:
                     continue
 
-                severity = (
-                    ComplianceSeverity.CRITICAL
-                    if handler_name in self.CRITICAL_VERIFY_HANDLERS
-                    else ComplianceSeverity.WARNING
-                )
+                severity = ComplianceSeverity.WARNING
+                if (
+                    handler_name in self.CRITICAL_VERIFY_HANDLERS
+                    or handler_name.endswith("ConfigHandler")
+                ):
+                    severity = ComplianceSeverity.CRITICAL
                 report.issues.append(
                     ComplianceIssue(
                         code="VERIFY_MISMATCH",

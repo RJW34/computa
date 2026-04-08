@@ -172,24 +172,32 @@ PROFILE_CATALOG: OrderedDict[str, ProfileCatalogEntry] = OrderedDict(
             profile_class=CodBo7Profile,
             tray_category="Shooter",
             tray_subtitle="HDR ON | Reflex ON+Boost | LLM OFF",
+            tray_description=(
+                "Competitive Call of Duty HDR system path. ABSO applies the machine-level lane here, "
+                "but the title still depends on manual in-game configuration until a native handler exists."
+            ),
             sync_mode="agnostic",
         ),
         "cod-bo7-sdr": ProfileCatalogEntry(
             profile_class=CodBo7SDRProfile,
             tray_category="Shooter",
             tray_subtitle="SDR | Reflex ON+Boost | LLM OFF",
+            tray_description=(
+                "Competitive Call of Duty SDR system path. ABSO applies the machine-level lane here, "
+                "but the title still depends on manual in-game configuration until a native handler exists."
+            ),
             sync_mode="agnostic",
         ),
         "diablo4": ProfileCatalogEntry(
             profile_class=Diablo4Profile,
             tray_category="ARPG",
-            tray_subtitle="HDR ON | Reflex ON+Boost | LLM OFF",
+            tray_subtitle="HDR ON | Reflex ON | LLM OFF",
             sync_mode="on",
         ),
         "diablo4-sdr": ProfileCatalogEntry(
             profile_class=Diablo4SDRProfile,
             tray_category="ARPG",
-            tray_subtitle="SDR | Reflex ON+Boost | VRR",
+            tray_subtitle="SDR | Reflex ON | VRR",
             sync_mode="on",
         ),
         "fortnite": ProfileCatalogEntry(
@@ -314,12 +322,20 @@ PROFILE_CATALOG: OrderedDict[str, ProfileCatalogEntry] = OrderedDict(
             profile_class=RyujinxSSBUProfile,
             tray_category="Fighting",
             tray_subtitle="Vulkan | Fixed 60fps | HAGS ON | LLM OFF",
+            tray_description=(
+                "Low-latency Ryujinx system path for SSBU/HewDraw Remix. ABSO handles the OS/driver side, "
+                "but emulator settings still need to be configured manually."
+            ),
             sync_mode="off",
         ),
         "ryujinx-ssbu-streaming": ProfileCatalogEntry(
             profile_class=RyujinxSSBUStreamingProfile,
             tray_category="Streaming",
             tray_subtitle="OBS 1080p60 | Multi-monitor",
+            tray_description=(
+                "Streaming-oriented Ryujinx system path. ABSO tunes the machine and OBS side, "
+                "but the emulator itself still relies on manual configuration."
+            ),
             sync_mode="agnostic",
         ),
         "rivals2-streaming": ProfileCatalogEntry(
@@ -416,6 +432,7 @@ def get_profile_manifest() -> list[dict[str, Any]]:
                 "display_name": profile.display_name,
                 "description": profile.description,
                 "optimization_target": profile.optimization_target,
+                "application_scope": profile.application_scope,
                 "executables": profile.executable_hints,
                 "handlers": handlers,
                 "has_in_game_settings": profile.has_in_game_settings(),

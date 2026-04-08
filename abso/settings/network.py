@@ -195,12 +195,14 @@ class NetworkSettingsHandler(SettingsHandler):
         Returns:
             True if restore succeeded, False otherwise.
         """
+        success = True
         interfaces = data.get("interfaces", {})
-        if not interfaces:
-            logger.warning("No interface data in backup to restore")
+        tcp_global = data.get("tcp_global", {})
+
+        if not interfaces and not tcp_global:
+            logger.warning("No network backup data to restore")
             return True
 
-        success = True
         for guid, settings in interfaces.items():
             try:
                 key = winreg.OpenKey(
@@ -242,7 +244,73 @@ class NetworkSettingsHandler(SettingsHandler):
                 logger.error(f"Invalid backup data for interface {guid}: {e}")
                 success = False
 
+        for setting_name, value in tcp_global.items():
+            if value in {None, ""}:
+                continue
+            result = self._set_tcp_global_setting(setting_name, str(value))
+            if not result["success"]:
+                logger.error(
+                    "Failed to restore TCP global setting %s: %s",
+                    setting_name,
+                    result.get("error"),
+                )
+                success = False
+
         return success
+
+    def verify_active(self, settings: dict[str, Any]) -> dict[str, Any]:
+        """Verify requested network settings are active."""
+        results: dict[str, Any] = {"all_active": True, "settings": {}}
+        current = self.detect()
+
+        target_tcp_global: dict[str, str] = {}
+        verify_nagle = False
+
+        if settings.get("preset") == "gaming":
+            verify_nagle = True
+            target_tcp_global = {
+                name: config["gaming_value"]
+                for name, config in self.TCP_GLOBAL_SETTINGS.items()
+            }
+        else:
+            verify_nagle = bool(settings.get("disable_nagle"))
+            target_tcp_global = {
+                name: str(value).lower()
+                for name, value in settings.get("tcp_global", {}).items()
+            }
+
+        if verify_nagle:
+            interfaces = current.get("interfaces", {})
+            for guid in self._get_active_interface_guids():
+                interface_settings = interfaces.get(guid, {})
+                ack_active = interface_settings.get("tcp_ack_frequency") == 1
+                no_delay_active = interface_settings.get("tcp_no_delay") == 1
+                key_name = f"interface:{guid}"
+                results["settings"][key_name] = {
+                    "target": {"tcp_ack_frequency": 1, "tcp_no_delay": 1},
+                    "current": {
+                        "tcp_ack_frequency": interface_settings.get("tcp_ack_frequency"),
+                        "tcp_no_delay": interface_settings.get("tcp_no_delay"),
+                    },
+                    "active": ack_active and no_delay_active,
+                }
+                if not ack_active or not no_delay_active:
+                    results["all_active"] = False
+
+        current_tcp_global = current.get("tcp_global", {})
+        for setting_name, target_value in target_tcp_global.items():
+            normalized_target = str(target_value).lower()
+            current_value = self._normalize_tcp_global_value(current_tcp_global.get(setting_name))
+            is_active = current_value == normalized_target
+            results["settings"][f"tcp_global:{setting_name}"] = {
+                "target": normalized_target,
+                "current": current_value,
+                "active": is_active,
+            }
+            if not is_active:
+                results["all_active"] = False
+
+        return results
 
     # Private helper methods
 
@@ -428,3 +496,9 @@ class NetworkSettingsHandler(SettingsHandler):
             return {"success": False, "error": f"Subprocess error: {e}"}
         except FileNotFoundError:
             return {"success": False, "error": "netsh command not found"}
+
+    def _normalize_tcp_global_value(self, value: Any) -> str | None:
+        """Normalize netsh TCP global output for stable verification."""
+        if value is None:
+            return None
+        return str(value).strip().lower()

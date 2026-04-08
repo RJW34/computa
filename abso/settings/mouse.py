@@ -53,6 +53,7 @@ class MouseSettingsHandler(SettingsHandler):
         """Detect current mouse settings."""
         return {
             "mouse_speed": self._get_mouse_speed(),
+            "mouse_sensitivity": self._get_mouse_sensitivity(),
             "mouse_threshold1": self._get_mouse_threshold(1),
             "mouse_threshold2": self._get_mouse_threshold(2),
             "enhanced_pointer_precision": self._get_enhanced_pointer_precision(),
@@ -151,6 +152,8 @@ class MouseSettingsHandler(SettingsHandler):
             try:
                 if "mouse_speed" in data and data["mouse_speed"] is not None:
                     winreg.SetValueEx(key, "MouseSpeed", 0, winreg.REG_SZ, str(data["mouse_speed"]))
+                if "mouse_sensitivity" in data and data["mouse_sensitivity"] is not None:
+                    winreg.SetValueEx(key, "MouseSensitivity", 0, winreg.REG_SZ, str(data["mouse_sensitivity"]))
                 if "mouse_threshold1" in data and data["mouse_threshold1"] is not None:
                     winreg.SetValueEx(key, "MouseThreshold1", 0, winreg.REG_SZ, str(data["mouse_threshold1"]))
                 if "mouse_threshold2" in data and data["mouse_threshold2"] is not None:
@@ -170,6 +173,54 @@ class MouseSettingsHandler(SettingsHandler):
             logger.error(f"Failed to restore mouse settings: {e}")
             return False
 
+    def verify_active(self, settings: dict[str, Any]) -> dict[str, Any]:
+        """Verify requested mouse settings are active."""
+        current = self.detect()
+        results: dict[str, Any] = {"all_active": True, "settings": {}}
+
+        if "disable_acceleration" in settings:
+            target = bool(settings["disable_acceleration"])
+            current_value = current.get("is_acceleration_disabled")
+            is_active = current_value == target
+            results["settings"]["disable_acceleration"] = {
+                "target": target,
+                "current": current_value,
+                "active": is_active,
+            }
+            if not is_active:
+                results["all_active"] = False
+
+        if "set_linear_curve" in settings:
+            target = bool(settings["set_linear_curve"])
+            current_value = (
+                self._is_curve_linear(current.get("smooth_mouse_x_curve"))
+                and self._is_curve_linear(current.get("smooth_mouse_y_curve"))
+            )
+            is_active = current_value == target
+            results["settings"]["set_linear_curve"] = {
+                "target": target,
+                "current": current_value,
+                "active": is_active,
+            }
+            if not is_active:
+                results["all_active"] = False
+
+        for key in ("mouse_speed", "mouse_sensitivity"):
+            if key not in settings:
+                continue
+            target = settings[key]
+            current_value = current.get(key)
+            is_active = current_value == target
+            results["settings"][key] = {
+                "target": target,
+                "current": current_value,
+                "active": is_active,
+            }
+            if not is_active:
+                results["all_active"] = False
+
+        return results
+
     # Private helper methods
 
     def _get_mouse_speed(self) -> int | None:
@@ -185,6 +236,21 @@ class MouseSettingsHandler(SettingsHandler):
                 winreg.CloseKey(key)
         except Exception as e:
             logger.debug(f"Failed to get MouseSpeed: {e}")
+            return None
+
+    def _get_mouse_sensitivity(self) -> int | None:
+        """Get mouse pointer speed slider value (1-20)."""
+        try:
+            key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, self.MOUSE_KEY, 0, winreg.KEY_READ)
+            try:
+                value = winreg.QueryValueEx(key, "MouseSensitivity")[0]
+                return int(value)
+            except (FileNotFoundError, ValueError):
+                return None
+            finally:
+                winreg.CloseKey(key)
+        except Exception as e:
+            logger.debug(f"Failed to get MouseSensitivity: {e}")
             return None
 
     def _get_mouse_threshold(self, threshold_num: int) -> int | None:

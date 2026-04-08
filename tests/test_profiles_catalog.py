@@ -84,6 +84,7 @@ def test_profile_manifest_has_required_fields() -> None:
     for profile in manifest:
         assert profile["id"]
         assert profile["display_name"]
+        assert profile["application_scope"] in {"system_only", "system_plus_native_config"}
         assert isinstance(profile["handlers"], list)
         assert isinstance(profile["has_in_game_settings"], bool)
         assert "tray_category" in profile
@@ -100,6 +101,17 @@ def test_slippi_tray_metadata_matches_sync_behavior() -> None:
     assert manifest["slippi-melee-universal"]["sync_mode"] == "off"
     assert manifest["slippi-melee-vrr-lab"]["sync_mode"] == "on"
     assert "sync-agnostic" not in manifest["slippi-melee-universal"]["tray_description"].lower()
+
+
+def test_manifest_exposes_honest_application_scope_for_incomplete_families() -> None:
+    """Families without native handlers should surface system-only scope in the manifest."""
+    manifest = {profile["id"]: profile for profile in get_profile_manifest()}
+
+    assert manifest["diablo4"]["application_scope"] == "system_plus_native_config"
+    assert manifest["fortnite"]["application_scope"] == "system_plus_native_config"
+    assert manifest["marvel-rivals-sdr"]["application_scope"] == "system_plus_native_config"
+    assert manifest["cod-bo7"]["application_scope"] == "system_only"
+    assert manifest["ryujinx-ssbu"]["application_scope"] == "system_only"
 
 
 def test_overlapping_nvidia_profile_families_have_stable_driver_identity() -> None:

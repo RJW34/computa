@@ -193,6 +193,78 @@ class PowerSettingsHandler(SettingsHandler):
 
         return success
 
+    def verify_active(self, settings: dict[str, Any]) -> dict[str, Any]:
+        """Verify requested power settings are active."""
+        results: dict[str, Any] = {"all_active": True, "settings": {}}
+        current = self.detect()
+        active_plan = current.get("active_plan", {})
+
+        if settings.get("ensure_ultimate_performance"):
+            has_ultimate = current.get("has_ultimate_performance")
+            is_active = bool(has_ultimate)
+            results["settings"]["ensure_ultimate_performance"] = {
+                "target": True,
+                "current": has_ultimate,
+                "active": is_active,
+            }
+            if not is_active:
+                results["all_active"] = False
+
+        if "active_plan" in settings:
+            target_plan = settings["active_plan"]
+            is_active = self._plan_matches_target(active_plan, target_plan)
+            results["settings"]["active_plan"] = {
+                "target": target_plan,
+                "current": active_plan.get("guid") or active_plan.get("name"),
+                "active": is_active,
+            }
+            if not is_active:
+                results["all_active"] = False
+
+        if settings.get("disable_usb_suspend"):
+            current_value = self._get_power_setting(self.USB_SUBGROUP, self.USB_SELECTIVE_SUSPEND)
+            is_active = current_value == 0
+            results["settings"]["disable_usb_suspend"] = {
+                "target": 0,
+                "current": current_value,
+                "active": is_active,
+            }
+            if not is_active:
+                results["all_active"] = False
+
+        if settings.get("disable_pcie_power_saving"):
+            current_value = self._get_power_setting(self.PCIE_SUBGROUP, self.PCIE_LINK_STATE)
+            is_active = current_value == 0
+            results["settings"]["disable_pcie_power_saving"] = {
+                "target": 0,
+                "current": current_value,
+                "active": is_active,
+            }
+            if not is_active:
+                results["all_active"] = False
+
+        if settings.get("processor_max_performance"):
+            target_min = int(settings.get("processor_min_state", 5))
+            current_min = self._get_power_setting(self.PROCESSOR_SUBGROUP, self.PROCESSOR_MIN_STATE)
+            current_max = self._get_power_setting(self.PROCESSOR_SUBGROUP, self.PROCESSOR_MAX_STATE)
+
+            min_active = current_min == target_min
+            max_active = current_max == 100
+            results["settings"]["processor_min_state"] = {
+                "target": target_min,
+                "current": current_min,
+                "active": min_active,
+            }
+            results["settings"]["processor_max_state"] = {
+                "target": 100,
+                "current": current_max,
+                "active": max_active,
+            }
+            if not min_active or not max_active:
+                results["all_active"] = False
+
+        return results
+
     # Private helper methods
 
     def _run_powercfg(self, *args: str) -> subprocess.CompletedProcess:
@@ -343,3 +415,27 @@ class PowerSettingsHandler(SettingsHandler):
         except Exception as e:
             logger.debug(f"Failed to get power setting {setting}: {e}")
         return None
+
+    def _plan_matches_target(self, active_plan: dict[str, str], target_plan: str) -> bool:
+        """Check whether the active plan matches a requested target identifier."""
+        target = str(target_plan).strip().lower()
+        active_guid = str(active_plan.get("guid", "")).strip().lower()
+        active_name = str(active_plan.get("name", "")).strip().lower()
+
+        if not active_guid and not active_name:
+            return False
+
+        if target == "ultimate_performance":
+            return "ultimate performance" in active_name
+        if target == "high_performance":
+            return (
+                active_guid == self.HIGH_PERFORMANCE_GUID.lower()
+                or "high performance" in active_name
+            )
+        if target == "balanced":
+            return (
+                active_guid == self.BALANCED_GUID.lower()
+                or "balanced" in active_name
+            )
+
+        return active_guid == target

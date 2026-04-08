@@ -49,6 +49,7 @@ export interface Profile {
   display_name: string;
   description: string;
   optimization_target: string;
+  application_scope?: 'system_only' | 'system_plus_native_config';
   executables: string[];
   handlers?: string[];
   has_in_game_settings?: boolean;

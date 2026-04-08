@@ -32,7 +32,7 @@ class RyujinxSSBUProfile(EmulatorLatencyBaseProfile):
 
     @property
     def description(self) -> str:
-        return "Ultra-low latency optimization for competitive SSBU/HDR"
+        return "Ultra-low latency system path for competitive SSBU/HDR with manual emulator tuning"
 
     @property
     def optimization_target(self) -> str:

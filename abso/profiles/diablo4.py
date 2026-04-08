@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, Literal
 
 from abso.profiles.base import BaseProfile
+from abso.profiles.profile_bases import merge_settings_map
 
 if TYPE_CHECKING:
     from abso.settings.base import SettingsHandler
@@ -22,6 +23,10 @@ class _Diablo4BaseProfile(BaseProfile):
         return "dx12"
 
     @property
+    def requires_reflex(self) -> bool:
+        return True
+
+    @property
     def executable_hints(self) -> list[str]:
         return ["Diablo IV.exe"]
 
@@ -36,6 +41,7 @@ class _Diablo4BaseProfile(BaseProfile):
     def get_handlers(self) -> list[SettingsHandler]:
         from abso.settings.cnm import CNMSettingsHandler
         from abso.settings.color import ColorProfileSettingsHandler
+        from abso.settings.diablo4_config import Diablo4ConfigHandler
         from abso.settings.graphics import GraphicsSettingsHandler
         from abso.settings.memory import MemorySettingsHandler
         from abso.settings.mouse import MouseSettingsHandler
@@ -60,6 +66,7 @@ class _Diablo4BaseProfile(BaseProfile):
             ProcessPriorityHandler(["Diablo IV.exe"]),
             CNMSettingsHandler(),
             ColorProfileSettingsHandler(),
+            Diablo4ConfigHandler(),
         ]
 
     def _variant_overrides(self) -> dict[str, dict[str, Any]]:
@@ -120,13 +127,22 @@ class _Diablo4BaseProfile(BaseProfile):
                 },
             },
             "ProcessPriorityHandler": {
-                "gpu_priority": 8,
                 "cpu_priority": 2,
                 "io_priority": 2,
             },
+            "Diablo4ConfigHandler": {
+                "window_mode": 1,
+                "vsync": False,
+                "reflex": True,
+                "auto_refresh_rate": True,
+                "limit_foreground_fps": False,
+                "foreground_fps_limit": 0,
+                "limit_background_fps": True,
+                "background_fps_limit": 60,
+            },
         }
 
-        settings_map.update(self._variant_overrides())
+        settings_map = merge_settings_map(settings_map, self._variant_overrides())
         return settings_map.get(handler_name, {})
 
     def _common_in_game_settings(self) -> list[dict[str, str]]:
@@ -140,8 +156,8 @@ class _Diablo4BaseProfile(BaseProfile):
             {
                 "category": "Display",
                 "setting": "NVIDIA Reflex Low Latency",
-                "value": "On + Boost",
-                "reason": "Diablo 4 has native Reflex, so ABSO keeps driver LLM off.",
+                "value": "On",
+                "reason": "Diablo 4 exposes native Reflex in LocalPrefs.txt, so ABSO keeps driver LLM off.",
             },
             {
                 "category": "Display",
@@ -153,7 +169,7 @@ class _Diablo4BaseProfile(BaseProfile):
                 "category": "Display",
                 "setting": "Foreground FPS Limit",
                 "value": "Unlimited",
-                "reason": "ABSO now makes the driver cap authoritative for this VRR lane.",
+                "reason": "ABSO now disables Diablo 4's foreground limiter and keeps the VRR/driver path authoritative.",
             },
             {
                 "category": "Graphics",
@@ -189,7 +205,7 @@ class Diablo4Profile(_Diablo4BaseProfile):
 
     @property
     def description(self) -> str:
-        return "Balanced Diablo 4 HDR profile with Reflex and VRR"
+        return "Balanced Diablo 4 HDR profile with native LocalPrefs enforcement for Reflex, HDR, and VRR"
 
     @property
     def is_sdr_only(self) -> bool:
@@ -200,6 +216,12 @@ class Diablo4Profile(_Diablo4BaseProfile):
             "WindowsSettingsHandler": {
                 "hdr": True,
                 "auto_hdr": False,
+            },
+            "Diablo4ConfigHandler": {
+                "hdr_output": True,
+                "hdr_black_point": 0.0001,
+                "hdr_white_point": 1000.0,
+                "hdr_brightness": 250.0,
             },
             "ColorProfileSettingsHandler": {
                 "icc_profile": "native",
@@ -220,8 +242,8 @@ class Diablo4Profile(_Diablo4BaseProfile):
             {
                 "category": "Display",
                 "setting": "HDR Paper White / Max Nits",
-                "value": "Tune to your panel",
-                "reason": "Use the game's native HDR calibration rather than Auto HDR.",
+                "value": "Start at 250 / 1000 and tune to your panel",
+                "reason": "ABSO applies a sane native HDR baseline in LocalPrefs.txt; fine-tune from there if your panel needs it.",
             },
             *self._common_in_game_settings(),
         ]
@@ -240,7 +262,7 @@ class Diablo4SDRProfile(_Diablo4BaseProfile):
 
     @property
     def description(self) -> str:
-        return "Balanced Diablo 4 SDR profile with Reflex and VRR"
+        return "Balanced Diablo 4 SDR profile with native LocalPrefs enforcement for Reflex and VRR"
 
     @property
     def is_sdr_only(self) -> bool:
@@ -251,6 +273,9 @@ class Diablo4SDRProfile(_Diablo4BaseProfile):
             "WindowsSettingsHandler": {
                 "hdr": False,
                 "auto_hdr": False,
+            },
+            "Diablo4ConfigHandler": {
+                "hdr_output": False,
             },
             "ColorProfileSettingsHandler": {
                 "icc_profile": "srgb",

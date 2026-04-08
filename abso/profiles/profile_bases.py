@@ -309,7 +309,6 @@ class Rivals2BaseProfile(BaseProfile):
                 "preset": "gaming",
             },
             "ProcessPriorityHandler": {
-                "gpu_priority": 8,
                 "cpu_priority": 3,
                 "io_priority": 3,
             },
@@ -515,7 +514,6 @@ class EmulatorLatencyBaseProfile(BaseProfile):
                 "preset": "gaming",
             },
             "ProcessPriorityHandler": {
-                "gpu_priority": 8,
                 "cpu_priority": 3,
                 "io_priority": 3,
             },
@@ -626,7 +624,6 @@ class WebGLBaseProfile(BaseProfile):
                 "preset": "gaming",
             },
             "ProcessPriorityHandler": {
-                "gpu_priority": 8,
                 "cpu_priority": 2,
                 "io_priority": 2,
             },
@@ -760,7 +757,6 @@ class ReflexShooterBaseProfile(BaseProfile):
                 "preset": "gaming",
             },
             "ProcessPriorityHandler": {
-                "gpu_priority": 8,
                 "cpu_priority": 3,
                 "io_priority": 3,
             },

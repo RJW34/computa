@@ -57,9 +57,9 @@ def test_compliance_noncritical_verify_handler_mismatch_is_warning() -> None:
     verify_result = {
         "all_active": False,
         "handlers": {
-            "GraphicsSettingsHandler": {
+            "ColorProfileSettingsHandler": {
                 "all_active": False,
-                "settings": {"fso_disable": {"active": False}},
+                "settings": {"icc_profile": {"active": False}},
             }
         },
     }
@@ -70,3 +70,24 @@ def test_compliance_noncritical_verify_handler_mismatch_is_warning() -> None:
     mismatch = [i for i in report.issues if i.code == "VERIFY_MISMATCH"]
     assert mismatch
     assert mismatch[0].severity == ComplianceSeverity.WARNING
+
+
+def test_compliance_power_verify_handler_mismatch_is_critical() -> None:
+    engine = ComplianceEngine()
+    apply_result = ApplyResult(success=True)
+    verify_result = {
+        "all_active": False,
+        "handlers": {
+            "PowerSettingsHandler": {
+                "all_active": False,
+                "settings": {"active_plan": {"active": False}},
+            }
+        },
+    }
+
+    report = engine.evaluate("test-profile", apply_result, verify_result)
+
+    assert report.has_critical is True
+    mismatch = [i for i in report.issues if i.code == "VERIFY_MISMATCH"]
+    assert mismatch
+    assert mismatch[0].severity == ComplianceSeverity.CRITICAL

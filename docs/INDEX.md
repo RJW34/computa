@@ -7,6 +7,7 @@ This index is the shortest path to the documents that currently matter.
 - [HERMES Handoff](/c:/Users/mtoli/Documents/Code/windowsoptimizerabso/docs/HERMES_HANDOFF.md)
 - [Quality Rubric](/c:/Users/mtoli/Documents/Code/windowsoptimizerabso/docs/QUALITY_RUBRIC.md)
 - [Remediation Roadmap](/c:/Users/mtoli/Documents/Code/windowsoptimizerabso/docs/REMEDIATION_ROADMAP.md)
+- [Next Implementation Phase](/c:/Users/mtoli/Documents/Code/windowsoptimizerabso/docs/NEXT_IMPLEMENTATION_PHASE.md)
 
 ## Technical Planning
 

@@ -31,10 +31,10 @@ class ProcessPriorityHandler(SettingsHandler):
     Available settings:
     - CpuPriorityClass: 1=Idle, 2=Normal, 3=High, 4=Realtime (use 3 for games)
     - IoPriority: 0=Very Low, 1=Low, 2=Normal, 3=High
-    - GpuPriority: 0-8 (8=highest priority for GPU scheduling)
     - PagePriority: 0-5 (memory page priority)
 
     Note: Realtime CPU priority (4) can cause system instability and is not recommended.
+    GPU scheduling priority is handled via MMCSS/RegistrySettingsHandler, not IFEO.
     """
 
     IFEO_KEY = r"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Image File Execution Options"
@@ -84,21 +84,6 @@ class ProcessPriorityHandler(SettingsHandler):
         for exe in self.executables:
             exe_settings = current["processes"].get(exe, {})
 
-            # Check if GPU priority is not set to maximum
-            gpu_priority = exe_settings.get("gpu_priority")
-            if gpu_priority is None or gpu_priority < self.GPU_PRIORITY_MAX:
-                issues.append(Issue(
-                    title=f"GPU priority not optimized for {exe}",
-                    severity="info",
-                    current_value=str(gpu_priority) if gpu_priority is not None else "Not set",
-                    optimal_value=str(self.GPU_PRIORITY_MAX),
-                    explanation=(
-                        f"Setting GPU priority to {self.GPU_PRIORITY_MAX} ensures {exe} gets "
-                        "maximum GPU scheduling priority over background processes."
-                    ),
-                    category="process_priority",
-                ))
-
             # Check if CPU priority is not high
             cpu_priority = exe_settings.get("cpu_priority")
             if cpu_priority is None or cpu_priority < self.CPU_PRIORITY_HIGH:
@@ -110,6 +95,20 @@ class ProcessPriorityHandler(SettingsHandler):
                     explanation=(
                         f"High CPU priority ensures {exe} gets CPU time before normal "
                         "priority processes. Avoids stuttering from background tasks."
+                    ),
+                    category="process_priority",
+                ))
+
+            io_priority = exe_settings.get("io_priority")
+            if io_priority is None or io_priority < self.IO_PRIORITY_NORMAL:
+                issues.append(Issue(
+                    title=f"I/O priority not optimized for {exe}",
+                    severity="info",
+                    current_value=str(io_priority) if io_priority is not None else "Not set",
+                    optimal_value=str(self.IO_PRIORITY_NORMAL),
+                    explanation=(
+                        f"Normal I/O priority helps {exe} avoid background storage contention "
+                        "without over-claiming unsupported IFEO GPU tweaks."
                     ),
                     category="process_priority",
                 ))
@@ -228,7 +227,7 @@ class ProcessPriorityHandler(SettingsHandler):
         try:
             processes = data.get("processes", {})
             for exe, exe_settings in processes.items():
-                if exe_settings:
+                if any(value is not None for value in exe_settings.values()):
                     self._set_process_settings(exe, exe_settings)
                 else:
                     # Remove settings if they were not set before
@@ -237,6 +236,33 @@ class ProcessPriorityHandler(SettingsHandler):
         except Exception as e:
             logger.error(f"Failed to restore process priority settings: {e}")
             return False
+
+    def verify_active(self, settings: dict[str, Any]) -> dict[str, Any]:
+        """Verify requested IFEO process priority settings are active."""
+        results: dict[str, Any] = {"all_active": True, "settings": {}}
+
+        if "processes" in settings:
+            targets = settings["processes"]
+        else:
+            targets = {exe: settings for exe in self.executables}
+
+        for exe, exe_settings in targets.items():
+            current = self._get_process_settings(exe)
+            for key in ("cpu_priority", "io_priority", "page_priority"):
+                if key not in exe_settings:
+                    continue
+                target = exe_settings[key]
+                current_value = current.get(key)
+                is_active = current_value == target
+                results["settings"][f"{exe}:{key}"] = {
+                    "target": target,
+                    "current": current_value,
+                    "active": is_active,
+                }
+                if not is_active:
+                    results["all_active"] = False
+
+        return results
 
     def add_executable(self, exe_name: str) -> None:
         """Add an executable to the managed list.
@@ -267,7 +293,6 @@ class ProcessPriorityHandler(SettingsHandler):
         """
         validate_executable_name(exe_name)
         settings = {
-            "gpu_priority": self.GPU_PRIORITY_MAX,
             "cpu_priority": self.CPU_PRIORITY_HIGH,
             "io_priority": self.IO_PRIORITY_HIGH,
         }

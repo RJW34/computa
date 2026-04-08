@@ -1,6 +1,7 @@
 {
   "cod-bo7": {
     "allows_aggressive_settings": false,
+    "application_scope": "system_only",
     "display_name": "Call of Duty: Black Ops 7 - HDR",
     "graphics_api": "dx12",
     "handlers": [
@@ -121,7 +122,6 @@
       },
       "ProcessPriorityHandler": {
         "cpu_priority": 3,
-        "gpu_priority": 8,
         "io_priority": 3
       },
       "RegistrySettingsHandler": {
@@ -150,6 +150,7 @@
   },
   "cod-bo7-sdr": {
     "allows_aggressive_settings": false,
+    "application_scope": "system_only",
     "display_name": "Call of Duty: Black Ops 7 - SDR",
     "graphics_api": "dx12",
     "handlers": [
@@ -270,7 +271,6 @@
       },
       "ProcessPriorityHandler": {
         "cpu_priority": 3,
-        "gpu_priority": 8,
         "io_priority": 3
       },
       "RegistrySettingsHandler": {
@@ -299,6 +299,7 @@
   },
   "diablo4": {
     "allows_aggressive_settings": false,
+    "application_scope": "system_plus_native_config",
     "display_name": "Diablo 4 - HDR",
     "graphics_api": "dx12",
     "handlers": [
@@ -313,7 +314,8 @@
       "MemorySettingsHandler",
       "ProcessPriorityHandler",
       "CNMSettingsHandler",
-      "ColorProfileSettingsHandler"
+      "ColorProfileSettingsHandler",
+      "Diablo4ConfigHandler"
     ],
     "in_game_settings": [
       {
@@ -324,9 +326,9 @@
       },
       {
         "category": "Display",
-        "reason": "Use the game's native HDR calibration rather than Auto HDR.",
+        "reason": "ABSO applies a sane native HDR baseline in LocalPrefs.txt; fine-tune from there if your panel needs it.",
         "setting": "HDR Paper White / Max Nits",
-        "value": "Tune to your panel"
+        "value": "Start at 250 / 1000 and tune to your panel"
       },
       {
         "category": "Display",
@@ -336,9 +338,9 @@
       },
       {
         "category": "Display",
-        "reason": "Diablo 4 has native Reflex, so ABSO keeps driver LLM off.",
+        "reason": "Diablo 4 exposes native Reflex in LocalPrefs.txt, so ABSO keeps driver LLM off.",
         "setting": "NVIDIA Reflex Low Latency",
-        "value": "On + Boost"
+        "value": "On"
       },
       {
         "category": "Display",
@@ -348,7 +350,7 @@
       },
       {
         "category": "Display",
-        "reason": "ABSO now makes the driver cap authoritative for this VRR lane.",
+        "reason": "ABSO now disables Diablo 4's foreground limiter and keeps the VRR/driver path authoritative.",
         "setting": "Foreground FPS Limit",
         "value": "Unlimited"
       },
@@ -377,7 +379,7 @@
     "is_sdr_only": false,
     "network_scope": "limited",
     "optimization_target": "balanced",
-    "requires_reflex": false,
+    "requires_reflex": true,
     "settings": {
       "CNMSettingsHandler": {
         "action": "stop"
@@ -387,6 +389,20 @@
         "game_type": "cinematic",
         "icc_profile": "native",
         "show_osd_guidance": true
+      },
+      "Diablo4ConfigHandler": {
+        "auto_refresh_rate": true,
+        "background_fps_limit": 60,
+        "foreground_fps_limit": 0,
+        "hdr_black_point": 0.0001,
+        "hdr_brightness": 250.0,
+        "hdr_output": true,
+        "hdr_white_point": 1000.0,
+        "limit_background_fps": true,
+        "limit_foreground_fps": false,
+        "reflex": true,
+        "vsync": false,
+        "window_mode": 1
       },
       "GraphicsSettingsHandler": {
         "disable_global_fso": false
@@ -417,7 +433,6 @@
       },
       "ProcessPriorityHandler": {
         "cpu_priority": 2,
-        "gpu_priority": 8,
         "io_priority": 2
       },
       "RegistrySettingsHandler": {
@@ -442,12 +457,19 @@
       },
       "WindowsSettingsHandler": {
         "auto_hdr": false,
-        "hdr": true
+        "game_bar": false,
+        "game_dvr": false,
+        "game_mode": true,
+        "hags": true,
+        "hdr": true,
+        "max_refresh_rate": true,
+        "windowed_optimizations": false
       }
     }
   },
   "diablo4-sdr": {
     "allows_aggressive_settings": false,
+    "application_scope": "system_plus_native_config",
     "display_name": "Diablo 4 - SDR",
     "graphics_api": "dx12",
     "handlers": [
@@ -462,7 +484,8 @@
       "MemorySettingsHandler",
       "ProcessPriorityHandler",
       "CNMSettingsHandler",
-      "ColorProfileSettingsHandler"
+      "ColorProfileSettingsHandler",
+      "Diablo4ConfigHandler"
     ],
     "in_game_settings": [
       {
@@ -479,9 +502,9 @@
       },
       {
         "category": "Display",
-        "reason": "Diablo 4 has native Reflex, so ABSO keeps driver LLM off.",
+        "reason": "Diablo 4 exposes native Reflex in LocalPrefs.txt, so ABSO keeps driver LLM off.",
         "setting": "NVIDIA Reflex Low Latency",
-        "value": "On + Boost"
+        "value": "On"
       },
       {
         "category": "Display",
@@ -491,7 +514,7 @@
       },
       {
         "category": "Display",
-        "reason": "ABSO now makes the driver cap authoritative for this VRR lane.",
+        "reason": "ABSO now disables Diablo 4's foreground limiter and keeps the VRR/driver path authoritative.",
         "setting": "Foreground FPS Limit",
         "value": "Unlimited"
       },
@@ -520,7 +543,7 @@
     "is_sdr_only": true,
     "network_scope": "limited",
     "optimization_target": "balanced",
-    "requires_reflex": false,
+    "requires_reflex": true,
     "settings": {
       "CNMSettingsHandler": {
         "action": "stop"
@@ -530,6 +553,17 @@
         "game_type": "cinematic",
         "icc_profile": "srgb",
         "show_osd_guidance": true
+      },
+      "Diablo4ConfigHandler": {
+        "auto_refresh_rate": true,
+        "background_fps_limit": 60,
+        "foreground_fps_limit": 0,
+        "hdr_output": false,
+        "limit_background_fps": true,
+        "limit_foreground_fps": false,
+        "reflex": true,
+        "vsync": false,
+        "window_mode": 1
       },
       "GraphicsSettingsHandler": {
         "disable_global_fso": false
@@ -560,7 +594,6 @@
       },
       "ProcessPriorityHandler": {
         "cpu_priority": 2,
-        "gpu_priority": 8,
         "io_priority": 2
       },
       "RegistrySettingsHandler": {
@@ -585,12 +618,19 @@
       },
       "WindowsSettingsHandler": {
         "auto_hdr": false,
-        "hdr": false
+        "game_bar": false,
+        "game_dvr": false,
+        "game_mode": true,
+        "hags": true,
+        "hdr": false,
+        "max_refresh_rate": true,
+        "windowed_optimizations": false
       }
     }
   },
   "fortnite": {
     "allows_aggressive_settings": false,
+    "application_scope": "system_plus_native_config",
     "display_name": "Fortnite - SDR",
     "graphics_api": "dx12",
     "handlers": [
@@ -732,7 +772,6 @@
       },
       "ProcessPriorityHandler": {
         "cpu_priority": 3,
-        "gpu_priority": 8,
         "io_priority": 3
       },
       "RegistrySettingsHandler": {
@@ -761,6 +800,7 @@
   },
   "fortnite-hdr": {
     "allows_aggressive_settings": false,
+    "application_scope": "system_plus_native_config",
     "display_name": "Fortnite - HDR",
     "graphics_api": "dx12",
     "handlers": [
@@ -908,7 +948,6 @@
       },
       "ProcessPriorityHandler": {
         "cpu_priority": 3,
-        "gpu_priority": 8,
         "io_priority": 3
       },
       "RegistrySettingsHandler": {
@@ -937,6 +976,7 @@
   },
   "fortnite-streaming": {
     "allows_aggressive_settings": false,
+    "application_scope": "system_plus_native_config",
     "display_name": "Fortnite (Streaming)",
     "graphics_api": "dx12",
     "handlers": [
@@ -1096,7 +1136,6 @@
       },
       "ProcessPriorityHandler": {
         "cpu_priority": 3,
-        "gpu_priority": 8,
         "io_priority": 3
       },
       "RegistrySettingsHandler": {
@@ -1125,6 +1164,7 @@
   },
   "fortnite-streaming-hdr": {
     "allows_aggressive_settings": false,
+    "application_scope": "system_plus_native_config",
     "display_name": "Fortnite (Streaming HDR)",
     "graphics_api": "dx12",
     "handlers": [
@@ -1290,7 +1330,6 @@
       },
       "ProcessPriorityHandler": {
         "cpu_priority": 3,
-        "gpu_priority": 8,
         "io_priority": 3
       },
       "RegistrySettingsHandler": {
@@ -1319,6 +1358,7 @@
   },
   "marvel-rivals-hdr": {
     "allows_aggressive_settings": false,
+    "application_scope": "system_plus_native_config",
     "display_name": "Marvel Rivals - HDR",
     "graphics_api": "dx12",
     "handlers": [
@@ -1464,7 +1504,6 @@
       },
       "ProcessPriorityHandler": {
         "cpu_priority": 3,
-        "gpu_priority": 8,
         "io_priority": 3
       },
       "RegistrySettingsHandler": {
@@ -1493,6 +1532,7 @@
   },
   "marvel-rivals-sdr": {
     "allows_aggressive_settings": false,
+    "application_scope": "system_plus_native_config",
     "display_name": "Marvel Rivals - SDR",
     "graphics_api": "dx12",
     "handlers": [
@@ -1638,7 +1678,6 @@
       },
       "ProcessPriorityHandler": {
         "cpu_priority": 3,
-        "gpu_priority": 8,
         "io_priority": 3
       },
       "RegistrySettingsHandler": {
@@ -1667,6 +1706,7 @@
   },
   "overwatch2": {
     "allows_aggressive_settings": false,
+    "application_scope": "system_plus_native_config",
     "display_name": "Overwatch 2 - No-Sync",
     "graphics_api": "dx11",
     "handlers": [
@@ -1792,7 +1832,6 @@
       },
       "ProcessPriorityHandler": {
         "cpu_priority": 3,
-        "gpu_priority": 8,
         "io_priority": 3
       },
       "RegistrySettingsHandler": {
@@ -1821,6 +1860,7 @@
   },
   "overwatch2-gsync": {
     "allows_aggressive_settings": false,
+    "application_scope": "system_plus_native_config",
     "display_name": "Overwatch 2 - GSYNC",
     "graphics_api": "dx11",
     "handlers": [
@@ -1948,7 +1988,6 @@
       },
       "ProcessPriorityHandler": {
         "cpu_priority": 3,
-        "gpu_priority": 8,
         "io_priority": 3
       },
       "RegistrySettingsHandler": {
@@ -1977,6 +2016,7 @@
   },
   "overwatch2-gsync-capture": {
     "allows_aggressive_settings": false,
+    "application_scope": "system_plus_native_config",
     "display_name": "Overwatch 2 - GSYNC Capture-Safe",
     "graphics_api": "dx11",
     "handlers": [
@@ -2104,7 +2144,6 @@
       },
       "ProcessPriorityHandler": {
         "cpu_priority": 3,
-        "gpu_priority": 8,
         "io_priority": 3
       },
       "RegistrySettingsHandler": {
@@ -2133,6 +2172,7 @@
   },
   "overwatch2-gsync-hdr": {
     "allows_aggressive_settings": false,
+    "application_scope": "system_plus_native_config",
     "display_name": "Overwatch 2 - GSYNC HDR",
     "graphics_api": "dx11",
     "handlers": [
@@ -2284,7 +2324,6 @@
       },
       "ProcessPriorityHandler": {
         "cpu_priority": 3,
-        "gpu_priority": 8,
         "io_priority": 3
       },
       "RegistrySettingsHandler": {
@@ -2313,6 +2352,7 @@
   },
   "overwatch2-gsync-hdr-capture": {
     "allows_aggressive_settings": false,
+    "application_scope": "system_plus_native_config",
     "display_name": "Overwatch 2 - GSYNC HDR Capture-Safe",
     "graphics_api": "dx11",
     "handlers": [
@@ -2458,7 +2498,6 @@
       },
       "ProcessPriorityHandler": {
         "cpu_priority": 3,
-        "gpu_priority": 8,
         "io_priority": 3
       },
       "RegistrySettingsHandler": {
@@ -2487,6 +2526,7 @@
   },
   "overwatch2-gsync-hdr-streaming": {
     "allows_aggressive_settings": false,
+    "application_scope": "system_plus_native_config",
     "display_name": "Overwatch 2 - GSYNC HDR (Streaming)",
     "graphics_api": "dx11",
     "handlers": [
@@ -2650,7 +2690,6 @@
       },
       "ProcessPriorityHandler": {
         "cpu_priority": 3,
-        "gpu_priority": 8,
         "io_priority": 3
       },
       "RegistrySettingsHandler": {
@@ -2679,6 +2718,7 @@
   },
   "overwatch2-gsync-streaming": {
     "allows_aggressive_settings": false,
+    "application_scope": "system_plus_native_config",
     "display_name": "Overwatch 2 - GSYNC (Streaming)",
     "graphics_api": "dx11",
     "handlers": [
@@ -2824,7 +2864,6 @@
       },
       "ProcessPriorityHandler": {
         "cpu_priority": 3,
-        "gpu_priority": 8,
         "io_priority": 3
       },
       "RegistrySettingsHandler": {
@@ -2853,6 +2892,7 @@
   },
   "pacdeluxe": {
     "allows_aggressive_settings": false,
+    "application_scope": "system_only",
     "display_name": "PACDeluxe (Pokemon Auto Chess)",
     "graphics_api": "unknown",
     "handlers": [
@@ -3005,7 +3045,6 @@
       },
       "ProcessPriorityHandler": {
         "cpu_priority": 2,
-        "gpu_priority": 8,
         "io_priority": 2
       },
       "RegistrySettingsHandler": {
@@ -3029,6 +3068,7 @@
   },
   "pacdeluxe-streaming": {
     "allows_aggressive_settings": false,
+    "application_scope": "system_only",
     "display_name": "PACDeluxe (Streaming)",
     "graphics_api": "unknown",
     "handlers": [
@@ -3199,7 +3239,6 @@
       },
       "ProcessPriorityHandler": {
         "cpu_priority": 2,
-        "gpu_priority": 8,
         "io_priority": 2
       },
       "RegistrySettingsHandler": {
@@ -3223,6 +3262,7 @@
   },
   "pokemon-auto-chess": {
     "allows_aggressive_settings": false,
+    "application_scope": "system_only",
     "display_name": "Pokemon Auto Chess",
     "graphics_api": "unknown",
     "handlers": [
@@ -3340,7 +3380,6 @@
       },
       "ProcessPriorityHandler": {
         "cpu_priority": 2,
-        "gpu_priority": 8,
         "io_priority": 2
       },
       "RegistrySettingsHandler": {
@@ -3364,6 +3403,7 @@
   },
   "productivity": {
     "allows_aggressive_settings": false,
+    "application_scope": "system_only",
     "display_name": "Desktop / Productivity",
     "graphics_api": "unknown",
     "handlers": [
@@ -3517,6 +3557,7 @@
   },
   "rivals2-gsync": {
     "allows_aggressive_settings": false,
+    "application_scope": "system_plus_native_config",
     "display_name": "Rivals 2: G-SYNC",
     "graphics_api": "dx12",
     "handlers": [
@@ -3648,7 +3689,6 @@
       },
       "ProcessPriorityHandler": {
         "cpu_priority": 3,
-        "gpu_priority": 8,
         "io_priority": 3
       },
       "RegistrySettingsHandler": {
@@ -3684,6 +3724,7 @@
   },
   "rivals2-gsync-hdr": {
     "allows_aggressive_settings": false,
+    "application_scope": "system_plus_native_config",
     "display_name": "Rivals 2: G-SYNC HDR",
     "graphics_api": "dx12",
     "handlers": [
@@ -3833,7 +3874,6 @@
       },
       "ProcessPriorityHandler": {
         "cpu_priority": 3,
-        "gpu_priority": 8,
         "io_priority": 3
       },
       "RegistrySettingsHandler": {
@@ -3870,6 +3910,7 @@
   },
   "rivals2-offline": {
     "allows_aggressive_settings": true,
+    "application_scope": "system_plus_native_config",
     "display_name": "Rivals 2: Offline / Training",
     "graphics_api": "dx12",
     "handlers": [
@@ -4003,7 +4044,6 @@
       },
       "ProcessPriorityHandler": {
         "cpu_priority": 3,
-        "gpu_priority": 8,
         "io_priority": 3
       },
       "RegistrySettingsHandler": {
@@ -4039,6 +4079,7 @@
   },
   "rivals2-offline-hdr": {
     "allows_aggressive_settings": true,
+    "application_scope": "system_plus_native_config",
     "display_name": "Rivals 2: Offline / Training HDR",
     "graphics_api": "dx12",
     "handlers": [
@@ -4190,7 +4231,6 @@
       },
       "ProcessPriorityHandler": {
         "cpu_priority": 3,
-        "gpu_priority": 8,
         "io_priority": 3
       },
       "RegistrySettingsHandler": {
@@ -4227,6 +4267,7 @@
   },
   "rivals2-online": {
     "allows_aggressive_settings": false,
+    "application_scope": "system_plus_native_config",
     "display_name": "Rivals 2: Online / Matchmaking",
     "graphics_api": "dx12",
     "handlers": [
@@ -4374,7 +4415,6 @@
       },
       "ProcessPriorityHandler": {
         "cpu_priority": 2,
-        "gpu_priority": 8,
         "io_priority": 2
       },
       "RegistrySettingsHandler": {
@@ -4410,6 +4450,7 @@
   },
   "rivals2-online-gsync": {
     "allows_aggressive_settings": false,
+    "application_scope": "system_plus_native_config",
     "display_name": "Rivals 2: Online G-SYNC",
     "graphics_api": "dx12",
     "handlers": [
@@ -4539,7 +4580,6 @@
       },
       "ProcessPriorityHandler": {
         "cpu_priority": 2,
-        "gpu_priority": 8,
         "io_priority": 2
       },
       "RegistrySettingsHandler": {
@@ -4575,6 +4615,7 @@
   },
   "rivals2-online-gsync-hdr": {
     "allows_aggressive_settings": false,
+    "application_scope": "system_plus_native_config",
     "display_name": "Rivals 2: Online G-SYNC HDR",
     "graphics_api": "dx12",
     "handlers": [
@@ -4722,7 +4763,6 @@
       },
       "ProcessPriorityHandler": {
         "cpu_priority": 2,
-        "gpu_priority": 8,
         "io_priority": 2
       },
       "RegistrySettingsHandler": {
@@ -4759,6 +4799,7 @@
   },
   "rivals2-online-hdr": {
     "allows_aggressive_settings": false,
+    "application_scope": "system_plus_native_config",
     "display_name": "Rivals 2: Online / Matchmaking HDR",
     "graphics_api": "dx12",
     "handlers": [
@@ -4924,7 +4965,6 @@
       },
       "ProcessPriorityHandler": {
         "cpu_priority": 2,
-        "gpu_priority": 8,
         "io_priority": 2
       },
       "RegistrySettingsHandler": {
@@ -4961,6 +5001,7 @@
   },
   "rivals2-streaming": {
     "allows_aggressive_settings": false,
+    "application_scope": "system_plus_native_config",
     "display_name": "Rivals 2 (Streaming)",
     "graphics_api": "dx12",
     "handlers": [
@@ -5126,7 +5167,6 @@
       },
       "ProcessPriorityHandler": {
         "cpu_priority": 2,
-        "gpu_priority": 8,
         "io_priority": 2
       },
       "RegistrySettingsHandler": {
@@ -5162,6 +5202,7 @@
   },
   "rivals2-streaming-hdr": {
     "allows_aggressive_settings": false,
+    "application_scope": "system_plus_native_config",
     "display_name": "Rivals 2 (Streaming HDR)",
     "graphics_api": "dx12",
     "handlers": [
@@ -5345,7 +5386,6 @@
       },
       "ProcessPriorityHandler": {
         "cpu_priority": 2,
-        "gpu_priority": 8,
         "io_priority": 2
       },
       "RegistrySettingsHandler": {
@@ -5382,6 +5422,7 @@
   },
   "rivals2-tournament-sim-144hz": {
     "allows_aggressive_settings": false,
+    "application_scope": "system_plus_native_config",
     "display_name": "Rivals 2: Tournament Sim (144Hz)",
     "graphics_api": "dx12",
     "handlers": [
@@ -5653,7 +5694,6 @@
       },
       "ProcessPriorityHandler": {
         "cpu_priority": 2,
-        "gpu_priority": 8,
         "io_priority": 2
       },
       "RegistrySettingsHandler": {
@@ -5689,6 +5729,7 @@
   },
   "ryujinx-ssbu": {
     "allows_aggressive_settings": true,
+    "application_scope": "system_only",
     "display_name": "SSBU / HewDraw Remix (Ryujinx)",
     "graphics_api": "unknown",
     "handlers": [
@@ -5948,7 +5989,6 @@
       },
       "ProcessPriorityHandler": {
         "cpu_priority": 3,
-        "gpu_priority": 8,
         "io_priority": 3
       },
       "RegistrySettingsHandler": {
@@ -5976,6 +6016,7 @@
   },
   "ryujinx-ssbu-streaming": {
     "allows_aggressive_settings": true,
+    "application_scope": "system_only",
     "display_name": "SSBU / HewDraw Remix (Streaming)",
     "graphics_api": "unknown",
     "handlers": [
@@ -6253,7 +6294,6 @@
       },
       "ProcessPriorityHandler": {
         "cpu_priority": 3,
-        "gpu_priority": 8,
         "io_priority": 3
       },
       "RegistrySettingsHandler": {
@@ -6281,6 +6321,7 @@
   },
   "slippi-melee": {
     "allows_aggressive_settings": true,
+    "application_scope": "system_plus_native_config",
     "display_name": "Super Smash Bros. Melee (Slippi)",
     "graphics_api": "unknown",
     "handlers": [
@@ -6583,7 +6624,6 @@
       },
       "ProcessPriorityHandler": {
         "cpu_priority": 3,
-        "gpu_priority": 8,
         "io_priority": 3
       },
       "RegistrySettingsHandler": {
@@ -6612,6 +6652,7 @@
   },
   "slippi-melee-console-parity": {
     "allows_aggressive_settings": true,
+    "application_scope": "system_plus_native_config",
     "display_name": "Super Smash Bros. Melee (Slippi Console-Parity)",
     "graphics_api": "unknown",
     "handlers": [
@@ -6752,7 +6793,6 @@
       },
       "ProcessPriorityHandler": {
         "cpu_priority": 3,
-        "gpu_priority": 8,
         "io_priority": 3
       },
       "RegistrySettingsHandler": {
@@ -6781,6 +6821,7 @@
   },
   "slippi-melee-streaming": {
     "allows_aggressive_settings": true,
+    "application_scope": "system_plus_native_config",
     "display_name": "Slippi Melee (Streaming)",
     "graphics_api": "unknown",
     "handlers": [
@@ -7101,7 +7142,6 @@
       },
       "ProcessPriorityHandler": {
         "cpu_priority": 3,
-        "gpu_priority": 8,
         "io_priority": 3
       },
       "RegistrySettingsHandler": {
@@ -7130,6 +7170,7 @@
   },
   "slippi-melee-universal": {
     "allows_aggressive_settings": true,
+    "application_scope": "system_plus_native_config",
     "display_name": "Super Smash Bros. Melee (Slippi Universal)",
     "graphics_api": "unknown",
     "handlers": [
@@ -7432,7 +7473,6 @@
       },
       "ProcessPriorityHandler": {
         "cpu_priority": 3,
-        "gpu_priority": 8,
         "io_priority": 3
       },
       "RegistrySettingsHandler": {
@@ -7461,6 +7501,7 @@
   },
   "slippi-melee-vrr-lab": {
     "allows_aggressive_settings": true,
+    "application_scope": "system_plus_native_config",
     "display_name": "Super Smash Bros. Melee (Slippi VRR Lab)",
     "graphics_api": "unknown",
     "handlers": [
@@ -7595,7 +7636,6 @@
       },
       "ProcessPriorityHandler": {
         "cpu_priority": 3,
-        "gpu_priority": 8,
         "io_priority": 3
       },
       "RegistrySettingsHandler": {

@@ -9,13 +9,15 @@ from abso.settings.mouse import MouseSettingsHandler
 class TestMouseDetect:
     """Tests for MouseSettingsHandler.detect()."""
 
+    @patch.object(MouseSettingsHandler, "_get_mouse_sensitivity")
     @patch.object(MouseSettingsHandler, "_get_mouse_speed")
     @patch.object(MouseSettingsHandler, "_get_mouse_threshold")
     @patch.object(MouseSettingsHandler, "_get_enhanced_pointer_precision")
     @patch.object(MouseSettingsHandler, "_get_smooth_curve")
     @patch.object(MouseSettingsHandler, "_is_acceleration_disabled")
-    def test_detect_returns_expected_keys(self, mock_accel, mock_curve, mock_epp, mock_thresh, mock_speed):
+    def test_detect_returns_expected_keys(self, mock_accel, mock_curve, mock_epp, mock_thresh, mock_speed, mock_sensitivity):
         """Test detect returns dictionary with all expected keys."""
+        mock_sensitivity.return_value = 10
         mock_speed.return_value = 0
         mock_thresh.return_value = 0
         mock_epp.return_value = False
@@ -26,6 +28,7 @@ class TestMouseDetect:
         result = handler.detect()
 
         assert "mouse_speed" in result
+        assert "mouse_sensitivity" in result
         assert "mouse_threshold1" in result
         assert "mouse_threshold2" in result
         assert "enhanced_pointer_precision" in result
@@ -165,6 +168,7 @@ class TestMouseBackupRestore:
         """Test backup returns current mouse settings."""
         expected = {
             "mouse_speed": 1,
+            "mouse_sensitivity": 10,
             "mouse_threshold1": 6,
             "mouse_threshold2": 10,
             "enhanced_pointer_precision": True,
@@ -213,3 +217,64 @@ class TestMouseBackupRestore:
         result = handler.restore({"mouse_speed": 0})
 
         assert result is False
+
+
+class TestMouseVerify:
+    """Tests for verify_active()."""
+
+    @patch.object(MouseSettingsHandler, "detect")
+    @patch.object(MouseSettingsHandler, "_is_curve_linear")
+    def test_verify_active_reports_success(self, mock_is_curve_linear, mock_detect):
+        mock_detect.return_value = {
+            "mouse_speed": 0,
+            "mouse_sensitivity": 10,
+            "mouse_threshold1": 0,
+            "mouse_threshold2": 0,
+            "enhanced_pointer_precision": False,
+            "smooth_mouse_x_curve": [0] * 40,
+            "smooth_mouse_y_curve": [0] * 40,
+            "is_acceleration_disabled": True,
+        }
+        mock_is_curve_linear.return_value = True
+
+        handler = MouseSettingsHandler()
+        result = handler.verify_active(
+            {
+                "disable_acceleration": True,
+                "set_linear_curve": True,
+                "mouse_speed": 0,
+                "mouse_sensitivity": 10,
+            }
+        )
+
+        assert result["all_active"] is True
+        assert result["settings"]["set_linear_curve"]["active"] is True
+
+    @patch.object(MouseSettingsHandler, "detect")
+    @patch.object(MouseSettingsHandler, "_is_curve_linear")
+    def test_verify_active_reports_mismatch(self, mock_is_curve_linear, mock_detect):
+        mock_detect.return_value = {
+            "mouse_speed": 1,
+            "mouse_sensitivity": 6,
+            "mouse_threshold1": 6,
+            "mouse_threshold2": 10,
+            "enhanced_pointer_precision": True,
+            "smooth_mouse_x_curve": [0] * 40,
+            "smooth_mouse_y_curve": [0] * 40,
+            "is_acceleration_disabled": False,
+        }
+        mock_is_curve_linear.return_value = False
+
+        handler = MouseSettingsHandler()
+        result = handler.verify_active(
+            {
+                "disable_acceleration": True,
+                "set_linear_curve": True,
+                "mouse_speed": 0,
+                "mouse_sensitivity": 10,
+            }
+        )
+
+        assert result["all_active"] is False
+        assert result["settings"]["disable_acceleration"]["active"] is False
+        assert result["settings"]["mouse_sensitivity"]["active"] is False

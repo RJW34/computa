@@ -95,7 +95,7 @@ class CodBo7Profile(_CodBo7BaseProfile):
 
     @property
     def description(self) -> str:
-        return "Competitive Call of Duty HDR profile with Reflex on the no-sync path"
+        return "Competitive Call of Duty HDR system path with manual in-game tuning still required"
 
     @property
     def is_sdr_only(self) -> bool:
@@ -146,7 +146,7 @@ class CodBo7SDRProfile(_CodBo7BaseProfile):
 
     @property
     def description(self) -> str:
-        return "Competitive Call of Duty SDR profile with Reflex on the no-sync path"
+        return "Competitive Call of Duty SDR system path with manual in-game tuning still required"
 
     @property
     def is_sdr_only(self) -> bool:

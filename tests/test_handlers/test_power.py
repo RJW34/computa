@@ -242,3 +242,58 @@ class TestPowerBackupRestore:
         result = handler.restore({})
 
         assert result is True
+
+
+class TestPowerVerify:
+    """Tests for PowerSettingsHandler.verify_active()."""
+
+    @patch.object(PowerSettingsHandler, "detect")
+    @patch.object(PowerSettingsHandler, "_get_power_setting")
+    def test_verify_active_reports_expected_power_state(self, mock_get_power_setting, mock_detect):
+        mock_detect.return_value = {
+            "active_plan": {"guid": "guid-up", "name": "Ultimate Performance"},
+            "available_plans": [],
+            "has_ultimate_performance": True,
+        }
+        mock_get_power_setting.side_effect = [0, 0, 5, 100]
+
+        handler = PowerSettingsHandler()
+        result = handler.verify_active(
+            {
+                "ensure_ultimate_performance": True,
+                "active_plan": "ultimate_performance",
+                "disable_usb_suspend": True,
+                "disable_pcie_power_saving": True,
+                "processor_max_performance": True,
+            }
+        )
+
+        assert result["all_active"] is True
+        assert result["settings"]["active_plan"]["active"] is True
+        assert result["settings"]["processor_max_state"]["active"] is True
+
+    @patch.object(PowerSettingsHandler, "detect")
+    @patch.object(PowerSettingsHandler, "_get_power_setting")
+    def test_verify_active_reports_mismatch(self, mock_get_power_setting, mock_detect):
+        mock_detect.return_value = {
+            "active_plan": {"guid": "guid-bal", "name": "Balanced"},
+            "available_plans": [],
+            "has_ultimate_performance": False,
+        }
+        mock_get_power_setting.side_effect = [1, 1, 0, 99]
+
+        handler = PowerSettingsHandler()
+        result = handler.verify_active(
+            {
+                "ensure_ultimate_performance": True,
+                "active_plan": "ultimate_performance",
+                "disable_usb_suspend": True,
+                "disable_pcie_power_saving": True,
+                "processor_max_performance": True,
+            }
+        )
+
+        assert result["all_active"] is False
+        assert result["settings"]["ensure_ultimate_performance"]["active"] is False
+        assert result["settings"]["disable_usb_suspend"]["active"] is False
+        assert result["settings"]["processor_max_state"]["active"] is False

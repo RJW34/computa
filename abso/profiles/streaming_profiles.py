@@ -104,7 +104,7 @@ class RyujinxSSBUStreamingProfile(OBSStreamingMixin, RyujinxSSBUProfile):
 
     @property
     def description(self) -> str:
-        return "Streaming-optimized Ryujinx profile for multi-monitor setups"
+        return "Streaming-optimized Ryujinx system path for multi-monitor setups with manual emulator tuning"
 
 
 class Overwatch2GSyncHDRStreamingProfile(OBSStreamingMixin, Overwatch2GSyncHDRCaptureProfile):

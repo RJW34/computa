@@ -705,11 +705,10 @@ class ProfileApplier:
         return report_path
 
     def verify_profile(self, profile_name: str) -> dict[str, Any]:
-        """Verify that a profile's reboot-requiring settings are active.
+        """Verify that a profile's verifiable settings are active.
 
-        This checks if settings that normally require a reboot are already
-        in effect. Useful for determining if a reboot is actually needed
-        after applying a profile.
+        This checks every handler that implements ``verify_active`` and lets
+        ABSO prove more than just reboot-gated state after an apply.
 
         Args:
             profile_name: Name of the profile to verify.

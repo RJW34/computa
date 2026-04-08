@@ -1073,12 +1073,12 @@ def reapply(json_output: bool) -> None:
 @click.argument("profile_name")
 @click.option("--json", "json_output", is_flag=True, help="Output as JSON for GUI integration")
 def verify(profile_name: str, json_output: bool) -> None:
-    """Verify that a profile's reboot-requiring settings are active.
+    """Verify that a profile's verifiable settings are active.
 
     PROFILE_NAME is the profile to verify (e.g., slippi-melee, cod-bo7, rivals2).
 
-    This checks if settings that normally require a reboot are already in effect.
-    Use after applying a profile to confirm no reboot is actually needed.
+    This checks every handler that implements verify_active and helps confirm
+    the machine is actually in the intended end state after apply.
     """
     profile_name = resolve_profile_id(profile_name) or profile_name
     applier = ProfileApplier()
@@ -1096,10 +1096,10 @@ def verify(profile_name: str, json_output: bool) -> None:
         handlers = result.get("handlers", {})
 
         if all_active:
-            console.print("\n[green]All reboot-requiring settings are already active![/green]")
-            console.print("[dim]No reboot needed - settings are in effect.[/dim]")
+            console.print("\n[green]All verifiable settings are active.[/green]")
+            console.print("[dim]No outstanding verification mismatches were detected.[/dim]")
         else:
-            console.print("\n[yellow]Some settings may need a reboot:[/yellow]")
+            console.print("\n[yellow]Some settings are not yet in the intended state:[/yellow]")
 
         for handler_name, handler_result in handlers.items():
             if not handler_result.get("settings"):
@@ -1107,7 +1107,7 @@ def verify(profile_name: str, json_output: bool) -> None:
 
             console.print(f"\n[bold]{handler_name}:[/bold]")
             for setting_name, setting_info in handler_result.get("settings", {}).items():
-                status = "[green]Active[/green]" if setting_info.get("active") else "[yellow]Pending reboot[/yellow]"
+                status = "[green]Active[/green]" if setting_info.get("active") else "[yellow]Mismatch[/yellow]"
                 console.print(f"  {setting_name}: {status}")
                 console.print(f"    Target: {setting_info.get('target')}, Current: {setting_info.get('current')}")
 

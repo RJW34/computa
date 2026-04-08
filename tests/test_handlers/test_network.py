@@ -27,10 +27,12 @@ class TestNetworkRestore:
     @patch("abso.settings.network.winreg.OpenKey")
     @patch("abso.settings.network.winreg.SetValueEx")
     @patch("abso.settings.network.winreg.CloseKey")
-    def test_restore_sets_values(self, mock_close, mock_set, mock_open):
+    @patch.object(NetworkSettingsHandler, "_set_tcp_global_setting")
+    def test_restore_sets_values(self, mock_set_tcp_global, mock_close, mock_set, mock_open):
         """Test restore sets registry values correctly."""
         mock_key = MagicMock()
         mock_open.return_value = mock_key
+        mock_set_tcp_global.return_value = {"success": True}
 
         handler = NetworkSettingsHandler()
         data = {
@@ -39,7 +41,10 @@ class TestNetworkRestore:
                     "tcp_ack_frequency": 1,
                     "tcp_no_delay": 1,
                 }
-            }
+            },
+            "tcp_global": {
+                "autotuninglevel": "disabled",
+            },
         }
 
         result = handler.restore(data)
@@ -48,6 +53,7 @@ class TestNetworkRestore:
         mock_open.assert_called_once()
         assert mock_set.call_count == 2
         mock_close.assert_called_once_with(mock_key)
+        mock_set_tcp_global.assert_called_once_with("autotuninglevel", "disabled")
 
     @patch("abso.settings.network.winreg.OpenKey")
     @patch("abso.settings.network.winreg.SetValueEx")
@@ -155,3 +161,55 @@ class TestNetworkAudit:
         issues = handler.audit()
 
         assert len(issues) == 0
+
+
+class TestNetworkVerify:
+    """Tests for verify_active()."""
+
+    @patch.object(NetworkSettingsHandler, "detect")
+    @patch.object(NetworkSettingsHandler, "_get_active_interface_guids")
+    def test_verify_active_for_gaming_preset(self, mock_active_ifaces, mock_detect):
+        mock_active_ifaces.return_value = ["{GUID-1}"]
+        mock_detect.return_value = {
+            "interfaces": {
+                "{GUID-1}": {"tcp_no_delay": 1, "tcp_ack_frequency": 1},
+            },
+            "tcp_global": {
+                "autotuninglevel": "disabled",
+                "ecncapability": "disabled",
+                "rss": "enabled",
+                "timestamps": "disabled",
+            },
+        }
+
+        handler = NetworkSettingsHandler()
+        result = handler.verify_active({"preset": "gaming"})
+
+        assert result["all_active"] is True
+        assert result["settings"]["interface:{GUID-1}"]["active"] is True
+        assert result["settings"]["tcp_global:autotuninglevel"]["active"] is True
+
+    @patch.object(NetworkSettingsHandler, "detect")
+    @patch.object(NetworkSettingsHandler, "_get_active_interface_guids")
+    def test_verify_active_reports_mismatch(self, mock_active_ifaces, mock_detect):
+        mock_active_ifaces.return_value = ["{GUID-1}"]
+        mock_detect.return_value = {
+            "interfaces": {
+                "{GUID-1}": {"tcp_no_delay": None, "tcp_ack_frequency": 1},
+            },
+            "tcp_global": {
+                "autotuninglevel": "normal",
+            },
+        }
+
+        handler = NetworkSettingsHandler()
+        result = handler.verify_active(
+            {
+                "disable_nagle": True,
+                "tcp_global": {"autotuninglevel": "disabled"},
+            }
+        )
+
+        assert result["all_active"] is False
+        assert result["settings"]["interface:{GUID-1}"]["active"] is False
+        assert result["settings"]["tcp_global:autotuninglevel"]["active"] is False

@@ -2,6 +2,7 @@
 
 from abso.settings.base import SettingsHandler
 from abso.settings.cnm import CNMSettingsHandler
+from abso.settings.diablo4_config import Diablo4ConfigHandler
 from abso.settings.network import NetworkSettingsHandler
 from abso.settings.nvidia import NvidiaSettingsHandler
 from abso.settings.obs import OBSSettingsHandler
@@ -17,6 +18,7 @@ __all__ = [
     "RegistrySettingsHandler",
     "NvidiaSettingsHandler",
     "NetworkSettingsHandler",
+    "Diablo4ConfigHandler",
     "TimerSettingsHandler",
     "CNMSettingsHandler",
     "OBSSettingsHandler",

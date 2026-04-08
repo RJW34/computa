@@ -28,6 +28,19 @@ Use these ownership buckets even if one person is wearing all of them:
 3. Benchmarking comes after contracts and verification, not before.
 4. No UI improvements may add claims the backend cannot prove.
 
+## Current Immediate Execution Phase
+
+The current next-phase execution plan is tracked separately in:
+
+- [docs/NEXT_IMPLEMENTATION_PHASE.md](/c:/Users/mtoli/Documents/Code/windowsoptimizerabso/docs/NEXT_IMPLEMENTATION_PHASE.md)
+
+That document exists because the project has now cleared most of the highest-risk UX/truth issues and the highest-value open work is narrower:
+
+- Diablo 4 native config enforcement
+- CoD native config discovery plus contract hardening
+- Ryujinx enforcement or explicit contract limits
+- deeper post-apply verification for the handlers those families still depend on
+
 ## Machine Role Policy
 
 The remediation program assumes different machines may be used for implementation and validation.

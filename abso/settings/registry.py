@@ -234,6 +234,76 @@ class RegistrySettingsHandler(SettingsHandler):
                     success = False
         return success
 
+    def verify_active(self, settings: dict[str, Any]) -> dict[str, Any]:
+        """Verify requested registry settings are active."""
+        current = self.detect()
+        results: dict[str, Any] = {"all_active": True, "settings": {}}
+
+        if "system_responsiveness" in settings:
+            current_value = current.get("system_responsiveness")
+            target = settings["system_responsiveness"]
+            is_active = current_value == target
+            results["settings"]["system_responsiveness"] = {
+                "target": target,
+                "current": current_value,
+                "active": is_active,
+            }
+            if not is_active:
+                results["all_active"] = False
+
+        if "network_throttling" in settings:
+            current_value = current.get("network_throttling")
+            target = settings["network_throttling"]
+            is_active = current_value == target
+            results["settings"]["network_throttling"] = {
+                "target": target,
+                "current": current_value,
+                "active": is_active,
+            }
+            if not is_active:
+                results["all_active"] = False
+
+        if "game_priority" in settings:
+            current_value = current.get("game_priority", {})
+            target_settings = settings["game_priority"]
+            for key, target in target_settings.items():
+                setting_name = f"game_priority.{key}"
+                current_setting = current_value.get(key)
+                is_active = current_setting == target
+                results["settings"][setting_name] = {
+                    "target": target,
+                    "current": current_setting,
+                    "active": is_active,
+                }
+                if not is_active:
+                    results["all_active"] = False
+
+        if "win32_priority_separation" in settings:
+            current_value = current.get("win32_priority_separation")
+            target = settings["win32_priority_separation"]
+            is_active = current_value == target
+            results["settings"]["win32_priority_separation"] = {
+                "target": target,
+                "current": current_value,
+                "active": is_active,
+            }
+            if not is_active:
+                results["all_active"] = False
+
+        if "fullscreen_optimizations" in settings:
+            for exe_path, disabled in settings["fullscreen_optimizations"].items():
+                current_disabled = self._get_fullscreen_optimization(exe_path)
+                is_active = current_disabled == disabled
+                results["settings"][f"fullscreen_optimizations:{exe_path}"] = {
+                    "target": disabled,
+                    "current": current_disabled,
+                    "active": is_active,
+                }
+                if not is_active:
+                    results["all_active"] = False
+
+        return results
+
     # Private helper methods
 
     def _get_system_responsiveness(self) -> int | None:
@@ -462,6 +532,28 @@ class RegistrySettingsHandler(SettingsHandler):
                 f"Failed to set fullscreen optimization for {exe_path}",
                 details=str(e)
             ) from e
+
+    def _get_fullscreen_optimization(self, exe_path: str) -> bool | None:
+        """Return True when fullscreen optimizations are disabled for an executable."""
+        validate_executable_path(exe_path)
+
+        try:
+            key = winreg.OpenKey(
+                winreg.HKEY_CURRENT_USER,
+                self.APPCOMPAT_KEY,
+                0,
+                winreg.KEY_READ
+            )
+            try:
+                value = winreg.QueryValueEx(key, exe_path)[0]
+                return "DISABLEDXMAXIMIZEDWINDOWEDMODE" in str(value).upper()
+            except FileNotFoundError:
+                return False
+            finally:
+                winreg.CloseKey(key)
+        except Exception as e:
+            logger.debug(f"Failed to get fullscreen optimization for {exe_path}: {e}")
+            return None
 
     def _get_win32_priority_separation(self) -> int | None:
         """Get Win32PrioritySeparation value (scheduler quantum settings)."""

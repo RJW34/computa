@@ -39,6 +39,7 @@ def _build_snapshot() -> dict[str, Any]:
             "in_game_settings": _make_serializable(profile.get_in_game_settings()),
             "display_name": profile.display_name,
             "optimization_target": profile.optimization_target,
+            "application_scope": profile.application_scope,
             "is_online_profile": profile.is_online_profile,
             "is_emulator_profile": profile.is_emulator_profile,
             "requires_reflex": profile.requires_reflex,
@@ -112,6 +113,7 @@ def test_profile_settings_snapshot() -> None:
         for key in [
             "display_name",
             "optimization_target",
+            "application_scope",
             "is_online_profile",
             "is_emulator_profile",
             "requires_reflex",

@@ -339,3 +339,73 @@ class TestRegistrySettingsHandlerPrivateMethods:
         handler._set_win32_priority_separation(0x2A)
 
         mock_validate.assert_called_once()
+
+
+class TestRegistrySettingsHandlerVerify:
+    """Tests for verify_active()."""
+
+    @patch.object(RegistrySettingsHandler, "_get_fullscreen_optimization", return_value=True)
+    @patch.object(RegistrySettingsHandler, "detect")
+    def test_verify_active_reports_success(self, mock_detect, mock_get_fso):
+        mock_detect.return_value = {
+            "system_responsiveness": 10,
+            "network_throttling": 0xFFFFFFFF,
+            "game_priority": {
+                "gpu_priority": 8,
+                "priority": 6,
+                "scheduling_category": "High",
+            },
+            "win32_priority_separation": 0x2A,
+        }
+
+        handler = RegistrySettingsHandler()
+        result = handler.verify_active(
+            {
+                "system_responsiveness": 10,
+                "network_throttling": 0xFFFFFFFF,
+                "game_priority": {
+                    "gpu_priority": 8,
+                    "priority": 6,
+                    "scheduling_category": "High",
+                },
+                "win32_priority_separation": 0x2A,
+                "fullscreen_optimizations": {"C:\\Games\\test.exe": True},
+            }
+        )
+
+        assert result["all_active"] is True
+        assert result["settings"]["game_priority.priority"]["active"] is True
+        assert result["settings"]["fullscreen_optimizations:C:\\Games\\test.exe"]["active"] is True
+
+    @patch.object(RegistrySettingsHandler, "_get_fullscreen_optimization", return_value=False)
+    @patch.object(RegistrySettingsHandler, "detect")
+    def test_verify_active_reports_mismatch(self, mock_detect, mock_get_fso):
+        mock_detect.return_value = {
+            "system_responsiveness": 20,
+            "network_throttling": 1,
+            "game_priority": {
+                "gpu_priority": 4,
+                "priority": 2,
+                "scheduling_category": "Medium",
+            },
+            "win32_priority_separation": 0x26,
+        }
+
+        handler = RegistrySettingsHandler()
+        result = handler.verify_active(
+            {
+                "system_responsiveness": 10,
+                "network_throttling": 0xFFFFFFFF,
+                "game_priority": {
+                    "gpu_priority": 8,
+                    "priority": 6,
+                },
+                "win32_priority_separation": 0x2A,
+                "fullscreen_optimizations": {"C:\\Games\\test.exe": True},
+            }
+        )
+
+        assert result["all_active"] is False
+        assert result["settings"]["system_responsiveness"]["active"] is False
+        assert result["settings"]["game_priority.priority"]["active"] is False
+        assert result["settings"]["fullscreen_optimizations:C:\\Games\\test.exe"]["active"] is False
