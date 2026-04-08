@@ -552,6 +552,45 @@ class ProfileApplier:
 
         return final_settings
 
+    def _build_effective_settings_map(
+        self,
+        profile_name: str,
+        profile: BaseProfile,
+        profile_overrides: Any | None,
+    ) -> tuple[dict[str, dict[str, Any]], LintResult | None, StabilityGateResult | None, NetworkScopeResult | None]:
+        """Build the effective handler settings after the same transforms apply() uses.
+
+        This keeps verification aligned with the real applied path so compliance
+        is based on the settings ABSO actually attempted to enforce, not the
+        ungated profile defaults.
+        """
+        settings_map = self._collect_settings(profile)
+
+        lint_result: LintResult | None = None
+        if not self.skip_linting:
+            lint_result = self._linter.lint(profile)
+
+        stability_gate_result: StabilityGateResult | None = None
+        if not self.skip_stability_gate and not self.force_aggressive:
+            settings_map, stability_gate_result = self._stability_gate.process(
+                profile, settings_map, lint_result
+            )
+
+        network_scope_result: NetworkScopeResult | None = None
+        if not self.skip_network_scope:
+            network_scope_result = self._network_scope.apply_scope(profile, settings_map)
+            settings_map = self._network_scope.get_scoped_settings(
+                settings_map, network_scope_result
+            )
+
+        final_settings = self._finalize_handler_settings(
+            profile,
+            profile_name,
+            settings_map,
+            profile_overrides,
+        )
+        return final_settings, lint_result, stability_gate_result, network_scope_result
+
     def _validate_profile_contract(
         self,
         profile_name: str,
@@ -719,13 +758,11 @@ class ProfileApplier:
             Dict with 'all_active' bool and per-handler verification results.
         """
         profile = self._get_profile(profile_name)
-        settings_map = self._collect_settings(profile)
         config_manager = ConfigManager()
         profile_overrides = config_manager.get_profile_overrides(profile_name)
-        final_settings_map = self._finalize_handler_settings(
-            profile,
+        final_settings_map, lint_result, stability_gate_result, network_scope_result = self._build_effective_settings_map(
             profile_name,
-            settings_map,
+            profile,
             profile_overrides,
         )
 
@@ -734,6 +771,12 @@ class ProfileApplier:
             "all_active": True,
             "handlers": {},
         }
+        if lint_result is not None:
+            results["lint_warnings"] = len(lint_result.warnings)
+        if stability_gate_result is not None:
+            results["stability_gate_blocked"] = stability_gate_result.blocked_count
+        if network_scope_result is not None and network_scope_result.changes_made:
+            results["network_scope_changes"] = list(network_scope_result.changes_made)
 
         # Check handlers that have reboot-requiring settings
         for handler in profile.get_handlers():

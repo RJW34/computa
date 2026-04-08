@@ -452,15 +452,23 @@ class NetworkSettingsHandler(SettingsHandler):
                     if ":" in line:
                         parts = line.split(":", 1)
                         if len(parts) == 2:
-                            key = parts[0].strip().lower().replace(" ", "")
+                            raw_key = parts[0].strip().lower()
+                            key = raw_key.replace(" ", "").replace("-", "")
                             value = parts[1].strip()
 
                             # Map to our setting names
-                            if "autotuning" in key or "autotuninglevel" in key:
+                            if (
+                                "receivewindowautotuninglevel" in key
+                                or "autotuning" in key
+                                or "autotuninglevel" in key
+                            ):
                                 result["autotuninglevel"] = value.lower()
                             elif "ecn" in key:
                                 result["ecncapability"] = value.lower()
-                            elif "rss" in key and "receive" in key:
+                            elif (
+                                "receivesidescalingstate" in key
+                                or ("rss" in key and "receive" in key)
+                            ):
                                 result["rss"] = value.lower()
                             elif "timestamps" in key:
                                 result["timestamps"] = value.lower()

@@ -415,6 +415,9 @@ class NvidiaSettingsHandler(SettingsHandler):
         driver_profile_aliases = list(requested["driver_profile_aliases"])
         global_settings: dict[str, Any] = dict(requested["global_settings"])
         require_exact_binding = bool(requested["require_exact_binding"])
+        allow_unverified_existing_profile_reuse = bool(
+            requested["allow_unverified_existing_profile_reuse"]
+        )
 
         # Optional auto-cap for VRR profiles (refresh - 3)
         auto_vrr_fps_cap = bool(requested["auto_vrr_fps_cap"])
@@ -464,6 +467,7 @@ class NvidiaSettingsHandler(SettingsHandler):
                 "profile_aliases": driver_profile_aliases,
                 "global_settings": global_settings,
                 "require_exact_binding": True,
+                "allow_unverified_existing_profile_reuse": allow_unverified_existing_profile_reuse,
             })
             if not preflight_result.get("success", True):
                 errors.append(str(preflight_result.get("error") or "NVIDIA preflight failed"))
