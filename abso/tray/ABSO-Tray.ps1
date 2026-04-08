@@ -449,11 +449,16 @@ function Get-ApplyNoticeMessages {
 }
 
 function Get-WarningSummaryText {
-    param([string[]]$Warnings)
+    param(
+        [string[]]$Warnings,
+        [string]$Label = "Warning"
+    )
 
     if (-not $Warnings -or $Warnings.Count -eq 0) { return $null }
-    if ($Warnings.Count -eq 1) { return "Warning: $($Warnings[0])" }
-    return "Warnings: $($Warnings[0]) (+$($Warnings.Count - 1) more)"
+    if ($Warnings.Count -eq 1) { return "${Label}: $($Warnings[0])" }
+
+    $pluralLabel = if ($Label.EndsWith("s")) { $Label } else { "${Label}s" }
+    return "${pluralLabel}: $($Warnings[0]) (+$($Warnings.Count - 1) more)"
 }
 
 function Get-NoticeSummaryText {
@@ -462,6 +467,25 @@ function Get-NoticeSummaryText {
     if (-not $Notices -or $Notices.Count -eq 0) { return $null }
     if ($Notices.Count -eq 1) { return "Note: $($Notices[0])" }
     return "Notes: $($Notices[0]) (+$($Notices.Count - 1) more)"
+}
+
+function Get-ApplySummaryLevel {
+    param($Json)
+
+    $summaryLevel = if ($Json.data -and $Json.data.summary_level) {
+        "$($Json.data.summary_level)".ToLowerInvariant()
+    }
+    else {
+        ""
+    }
+
+    switch ($summaryLevel) {
+        "success" { return "success" }
+        "notice" { return "notice" }
+        "caution" { return "caution" }
+        "warning" { return "warning" }
+        default { return "success" }
+    }
 }
 
 function Get-ApplyFailureMessage {
@@ -1980,19 +2004,28 @@ function Apply-Profile {
         if ($applySucceeded) {
             $applyWarnings = Get-ApplyWarningMessages -Json $json
             $applyNotices = Get-ApplyNoticeMessages -Json $json
-            $warningSummary = Get-WarningSummaryText -Warnings $applyWarnings
+            $applySummaryLevel = Get-ApplySummaryLevel -Json $json
+            $warningLabel = if ($applySummaryLevel -eq "caution") { "Caution" } else { "Warning" }
+            $warningSummary = Get-WarningSummaryText -Warnings $applyWarnings -Label $warningLabel
             $noticeSummary = Get-NoticeSummaryText -Notices $applyNotices
             $msg = "$($profile.Name) ($($profile.Sub))"
             if ($json.data.requires_reboot) { $msg += " - Restart required" }
             if ($warningSummary) { $msg += " | $warningSummary" }
             if ($noticeSummary) { $msg += " | $noticeSummary" }
 
-            if ($applyWarnings.Count -gt 0) {
+            if ($applySummaryLevel -eq "warning") {
                 Write-TrayLog "Profile committed with warnings: $ProfileId" -Level "WARN"
                 foreach ($warning in $applyWarnings) {
                     Write-TrayLog "Apply warning [$ProfileId]: $warning" -Level "WARN"
                 }
                 Update-ProgressOverlay -StepText "Profile committed with warnings"
+            }
+            elseif ($applySummaryLevel -eq "caution") {
+                Write-TrayLog "Profile applied with cautions: $ProfileId"
+                foreach ($warning in $applyWarnings) {
+                    Write-TrayLog "Apply caution [$ProfileId]: $warning"
+                }
+                Update-ProgressOverlay -StepText "Profile applied with cautions"
             }
             elseif ($applyNotices.Count -gt 0) {
                 Write-TrayLog "Profile applied with notices: $ProfileId"
@@ -2027,10 +2060,15 @@ function Apply-Profile {
                 Play-ApplySuccessIconAnimation
                 Show-ThemedToast -Title "A.B.S.O." -Message $msg -Type "Warning" -Duration 6000
             }
-            elseif ($applyWarnings.Count -gt 0) {
+            elseif ($applySummaryLevel -eq "warning") {
                 Play-SuccessSound
                 Play-ApplySuccessIconAnimation
                 Show-ThemedToast -Title "A.B.S.O." -Message $msg -Type "Warning" -Duration 6000
+            }
+            elseif ($applySummaryLevel -eq "caution") {
+                Play-SuccessSound
+                Play-ApplySuccessIconAnimation
+                Show-ThemedToast -Title "A.B.S.O." -Message $msg -Type "Success" -Duration 6000
             }
             elseif ($applyNotices.Count -gt 0) {
                 Play-SuccessSound
@@ -2044,8 +2082,11 @@ function Apply-Profile {
             }
 
             $script:activeProfile = $ProfileId
-            $script:LastAction = if ($applyWarnings.Count -gt 0) {
+            $script:LastAction = if ($applySummaryLevel -eq "warning") {
                 "Applied w/ warnings: $($profile.Name)"
+            }
+            elseif ($applySummaryLevel -eq "caution") {
+                "Applied w/ cautions: $($profile.Name)"
             }
             elseif ($applyNotices.Count -gt 0) {
                 "Applied w/ notes: $($profile.Name)"

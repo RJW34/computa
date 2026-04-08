@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, patch
 from click.testing import CliRunner
 
 from abso.core.applier import ApplyResult
-from abso.main import cli
+from abso.main import _determine_apply_summary_level, cli
 
 
 class TestCLIHelp:
@@ -71,6 +71,42 @@ class TestCLIProfiles:
         assert result.exit_code == 0
         # Should list at least one profile
         assert "slippi" in result.output.lower() or "melee" in result.output.lower()
+
+
+class TestApplySummaryLevel:
+    """Test shared apply summary severity classification."""
+
+    def test_soft_warnings_become_cautions(self):
+        """Mixed-refresh and non-restorable baseline warnings should stay non-failing cautions."""
+        summary = _determine_apply_summary_level(
+            [
+                "Mixed refresh rates detected (59.95Hz - 300.0Hz)",
+                "2 monitors detected",
+                "MPO glitch risk: VRR/G-Sync active, mixed refresh (60Hz–300Hz)",
+                "Baseline restore incomplete for known non-restorable handlers: NvidiaSettingsHandler",
+            ],
+            [],
+        )
+
+        assert summary == "caution"
+
+    def test_actionable_warnings_stay_warnings(self):
+        """Warnings that imply user action or degraded correctness should stay warnings."""
+        summary = _determine_apply_summary_level(
+            ["Game executable is running during apply"],
+            [],
+        )
+
+        assert summary == "warning"
+
+    def test_notices_without_warnings_report_notice(self):
+        """Pure informational applies should surface as notices."""
+        summary = _determine_apply_summary_level(
+            [],
+            ["Reusing existing bound NVIDIA profile 'Slippi'."],
+        )
+
+        assert summary == "notice"
 
 
 class TestCLIDetect:
@@ -235,6 +271,7 @@ class TestCLIApply:
             "Verification mismatch in NvidiaSettingsHandler",
         ]
         assert payload["data"]["notices"] == ["Reusing existing bound NVIDIA profile 'Slippi'."]
+        assert payload["data"]["summary_level"] == "warning"
         mock_manager.execute.assert_called_once_with(
             profile_id="slippi-melee",
             create_backup=False,
@@ -272,9 +309,65 @@ class TestCLIApply:
             result = runner.invoke(cli, ["apply", "slippi-melee", "--json", "--no-backup"])
 
         assert result.exit_code == 0
+        payload = json.loads(result.output)
+        assert payload["data"]["summary_level"] == "notice"
         assert state_file.exists()
         saved = json.loads(state_file.read_text(encoding="utf-8"))
         assert saved["current_profile"] == "slippi-melee"
+
+    @patch("abso.main.ProfileTransactionManager")
+    @patch("abso.main.is_admin", return_value=True)
+    def test_apply_json_marks_soft_environment_warnings_as_caution(
+        self,
+        mock_is_admin,
+        mock_tx_manager_cls,
+    ):
+        """Successful applies with soft environment cautions should not be promoted to warning severity."""
+        tx_result = MagicMock()
+        tx_result.success = True
+        tx_result.backup_id = None
+        tx_result.error = None
+        tx_result.rollback_performed = False
+        tx_result.checkpoints = [
+            MagicMock(
+                status="warn",
+                message=(
+                    "Baseline restore incomplete for known non-restorable handlers: "
+                    "NvidiaSettingsHandler"
+                ),
+            )
+        ]
+        tx_result.apply_result = ApplyResult(
+            success=True,
+            requires_reboot=False,
+            in_game_settings=False,
+            applied_settings=["WindowsSettingsHandler"],
+            failed_settings=[],
+            warnings=[
+                "Mixed refresh rates detected (59.95Hz - 300.0Hz)",
+                "2 monitors detected",
+                "MPO glitch risk: VRR/G-Sync active, mixed refresh (60Hz–300Hz)",
+            ],
+        )
+        tx_result.compliance_report = MagicMock()
+        tx_result.compliance_report.to_dict.return_value = {
+            "profile_id": "overwatch2-gsync-hdr",
+            "passed": True,
+            "has_critical": False,
+            "issues": [],
+        }
+        tx_result.compliance_report.warnings = []
+        tx_result.to_dict.return_value = {"success": True}
+
+        mock_manager = mock_tx_manager_cls.return_value
+        mock_manager.execute.return_value = tx_result
+
+        runner = CliRunner()
+        result = runner.invoke(cli, ["apply", "overwatch2-gsync-hdr", "--json", "--no-backup"])
+
+        assert result.exit_code == 0
+        payload = json.loads(result.output)
+        assert payload["data"]["summary_level"] == "caution"
 
     def test_state_json_returns_persisted_backend_state(self, tmp_path):
         """state --json should surface the persisted active-profile state file."""

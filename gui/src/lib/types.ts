@@ -179,6 +179,7 @@ export interface ApplyResult {
   failed_settings: string[];
   warnings: string[];
   notices: string[];
+  summary_level?: 'success' | 'notice' | 'caution' | 'warning';
   results: ApplyHandlerResult[];
   transaction?: TransactionSummary;
   compliance?: ComplianceSummary | null;

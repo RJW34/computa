@@ -2,6 +2,7 @@
 
 import json
 import os
+import re
 import subprocess
 import sys
 from datetime import datetime
@@ -199,6 +200,45 @@ def _collect_apply_notices(result: Any | None) -> list[str]:
         _append_unique_message(notices, notice)
 
     return notices
+
+
+_SOFT_APPLY_WARNING_PATTERNS = (
+    re.compile(r"mixed refresh rates detected", re.IGNORECASE),
+    re.compile(r"\b\d+\s+monitors detected\b", re.IGNORECASE),
+    re.compile(r"mpo glitch risk", re.IGNORECASE),
+    re.compile(
+        r"baseline restore incomplete for known non-restorable handlers",
+        re.IGNORECASE,
+    ),
+)
+
+
+def _is_soft_apply_warning(message: str | None) -> bool:
+    """Return True when a warning is an environmental caution, not an action blocker."""
+    if not message:
+        return False
+
+    normalized = message.strip()
+    if not normalized:
+        return False
+
+    return any(pattern.search(normalized) for pattern in _SOFT_APPLY_WARNING_PATTERNS)
+
+
+def _determine_apply_summary_level(
+    warnings: list[str],
+    notices: list[str],
+) -> str:
+    """Classify apply UX severity for tray/gui surfaces."""
+    if warnings:
+        if all(_is_soft_apply_warning(warning) for warning in warnings):
+            return "caution"
+        return "warning"
+
+    if notices:
+        return "notice"
+
+    return "success"
 
 
 @click.group(invoke_without_command=True)
@@ -702,6 +742,7 @@ def apply(profile_name: str, no_backup: bool, benchmark: bool, json_output: bool
         result = tx.apply_result
         apply_warnings = _collect_apply_warnings(tx, result)
         apply_notices = _collect_apply_notices(result)
+        apply_summary_level = _determine_apply_summary_level(apply_warnings, apply_notices)
 
         if json_output:
             if tx.success and result and result.success:
@@ -723,6 +764,7 @@ def apply(profile_name: str, no_backup: bool, benchmark: bool, json_output: bool
                 "failed_settings": failed_settings,
                 "warnings": apply_warnings,
                 "notices": apply_notices,
+                "summary_level": apply_summary_level,
                 "capabilities": (
                     result.capability_report.to_dict()
                     if result and result.capability_report
@@ -748,8 +790,12 @@ def apply(profile_name: str, no_backup: bool, benchmark: bool, json_output: bool
                 requires_reboot=result.requires_reboot,
                 reboot_reasons=result.reboot_reasons,
             )
-            if apply_warnings:
+            if apply_summary_level == "warning":
                 console.print(f"\n[yellow]Profile '{profile_name}' committed with warnings.[/yellow]")
+            elif apply_summary_level == "caution":
+                console.print(f"\n[green]Profile '{profile_name}' applied with cautions.[/green]")
+            elif apply_summary_level == "notice":
+                console.print(f"\n[green]Profile '{profile_name}' applied with notices.[/green]")
             else:
                 console.print(f"\n[green]Profile '{profile_name}' applied successfully![/green]")
 
@@ -762,8 +808,9 @@ def apply(profile_name: str, no_backup: bool, benchmark: bool, json_output: bool
                 console.print("[yellow]Note: Some changes may require a reboot to take effect.[/yellow]")
                 console.print(f"[dim]Run 'abso verify {profile_name}' to check if reboot is still needed.[/dim]")
 
+            warning_prefix = "Caution" if apply_summary_level == "caution" else "Warning"
             for warning in apply_warnings:
-                console.print(f"[yellow]Warning: {warning}[/yellow]")
+                console.print(f"[yellow]{warning_prefix}: {warning}[/yellow]")
             for notice in apply_notices:
                 console.print(f"[cyan]Note: {notice}[/cyan]")
 
@@ -981,6 +1028,7 @@ def reapply(json_output: bool) -> None:
 
     try:
         result = applier.apply_profile(current_profile)
+        summary_level = _determine_apply_summary_level(result.warnings, result.notices)
 
         if json_output:
             output_json({
@@ -988,17 +1036,23 @@ def reapply(json_output: bool) -> None:
                 "profile": current_profile,
                 "warnings": result.warnings,
                 "notices": result.notices,
+                "summary_level": summary_level,
                 "error": result.error if not result.success else None,
             })
             return
 
         if result.success:
-            if result.warnings:
+            if summary_level == "warning":
                 console.print(f"\n[yellow]Profile '{current_profile}' re-applied with warnings.[/yellow]")
-                for warning in result.warnings:
-                    console.print(f"[yellow]Warning: {warning}[/yellow]")
+            elif summary_level == "caution":
+                console.print(f"\n[green]Profile '{current_profile}' re-applied with cautions.[/green]")
+            elif summary_level == "notice":
+                console.print(f"\n[green]Profile '{current_profile}' re-applied with notices.[/green]")
             else:
                 console.print(f"\n[green]Profile '{current_profile}' re-applied successfully![/green]")
+            warning_prefix = "Caution" if summary_level == "caution" else "Warning"
+            for warning in result.warnings:
+                console.print(f"[yellow]{warning_prefix}: {warning}[/yellow]")
             for notice in result.notices:
                 console.print(f"[cyan]Note: {notice}[/cyan]")
         else:

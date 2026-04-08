@@ -170,7 +170,12 @@ export function ProfileWizard() {
   const selectedProfile = profiles.find((profile) => profile.id === wizardProfile);
   const applyWarnings = React.useMemo(() => collectApplyWarnings(applyResult), [applyResult]);
   const applyNotices = React.useMemo(() => collectApplyNotices(applyResult), [applyResult]);
-  const committedWithWarnings = applyWarnings.length > 0;
+  const applySummaryLevel =
+    applyResult?.summary_level ??
+    (applyWarnings.length > 0 ? 'warning' : applyNotices.length > 0 ? 'notice' : 'success');
+  const committedWithWarnings = applySummaryLevel === 'warning';
+  const appliedWithCautions = applySummaryLevel === 'caution';
+  const appliedWithNotices = applySummaryLevel === 'notice';
 
   const handleBack = () => {
     if (wizardStep === 0) {
@@ -548,12 +553,22 @@ export function ProfileWizard() {
               </div>
             </div>
             <h2 className="text-2xl font-semibold">
-              {committedWithWarnings ? 'Committed With Warnings' : 'Profile Applied'}
+              {committedWithWarnings
+                ? 'Committed With Warnings'
+                : appliedWithCautions
+                  ? 'Applied With Cautions'
+                  : appliedWithNotices
+                    ? 'Applied With Notices'
+                    : 'Profile Applied'}
             </h2>
             <p className="text-muted-foreground">
               {committedWithWarnings
                 ? `${selectedProfile?.display_name} applied successfully, but ABSO recorded warning conditions you should review.`
-                : `${selectedProfile?.display_name} was applied successfully.`}
+                : appliedWithCautions
+                  ? `${selectedProfile?.display_name} applied successfully, with environmental cautions worth keeping in mind.`
+                  : appliedWithNotices
+                    ? `${selectedProfile?.display_name} applied successfully, with additional notices recorded by ABSO.`
+                    : `${selectedProfile?.display_name} was applied successfully.`}
             </p>
 
             <Card className="text-left">
@@ -587,9 +602,16 @@ export function ProfileWizard() {
             )}
 
             {applyWarnings.length > 0 && (
-              <Card className="text-left border-warning/40 bg-warning/5">
+              <Card
+                className={cn(
+                  'text-left',
+                  committedWithWarnings ? 'border-warning/40 bg-warning/5' : 'border-success/20 bg-success/5'
+                )}
+              >
                 <CardContent className="p-4 space-y-3">
-                  <h4 className="font-medium">Warnings</h4>
+                  <h4 className="font-medium">
+                    {committedWithWarnings ? 'Warnings' : 'Cautions'}
+                  </h4>
                   <ul className="text-sm text-muted-foreground space-y-1">
                     {applyWarnings.map((warning) => (
                       <li key={warning}>• {warning}</li>

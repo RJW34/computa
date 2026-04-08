@@ -51,6 +51,8 @@ struct ApplyCliData {
     warnings: Vec<String>,
     #[serde(default)]
     notices: Vec<String>,
+    #[serde(default)]
+    summary_level: Option<String>,
     error: Option<String>,
 }
 
@@ -59,6 +61,7 @@ struct ApplyTrayEvent {
     profile_id: String,
     warnings: Vec<String>,
     notices: Vec<String>,
+    summary_level: Option<String>,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -433,6 +436,7 @@ fn apply_profile_sync(
                 profile_id: profile_id.to_string(),
                 warnings: parsed.data.warnings,
                 notices: parsed.data.notices,
+                summary_level: parsed.data.summary_level,
             })
         } else {
             let mut parts: Vec<String> = Vec::new();
