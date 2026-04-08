@@ -68,21 +68,24 @@ def test_transaction_rolls_back_on_critical_when_backup_available(tmp_path: Path
     applier.verify_profile.return_value = {"all_active": False, "handlers": {}}
 
     with patch("abso.core.transaction.BackupManager") as mock_backup_cls:
+        rollback_manager = MagicMock()
+        rollback_manager.create_backup.return_value = "rollback-123"
+        rollback_manager.restore_backup.return_value = _complete_restore_summary()
         restore_manager = MagicMock()
         restore_manager.get_baseline_backup.return_value = None  # No previous backup
         backup_manager = MagicMock()
         backup_manager.create_backup.return_value = "backup-123"
-        backup_manager.restore_backup.return_value = _complete_restore_summary()
-        mock_backup_cls.side_effect = [restore_manager, backup_manager]
+        mock_backup_cls.side_effect = [rollback_manager, restore_manager, backup_manager]
 
         manager = ProfileTransactionManager(tmp_path, applier=applier)
         tx = manager.execute("test-profile", create_backup=True)
 
-        backup_manager.restore_backup.assert_called_once_with("backup-123")
+        rollback_manager.restore_backup.assert_called_once_with("rollback-123")
         assert tx.success is False
         assert tx.rollback_performed is True
         assert tx.state == "rolled_back"
         assert tx.backup_id == "backup-123"
+        assert tx.rollback_backup_id == "rollback-123"
 
 
 def test_transaction_restores_baseline_before_apply(tmp_path: Path) -> None:
@@ -95,7 +98,9 @@ def test_transaction_restores_baseline_before_apply(tmp_path: Path) -> None:
     applier.verify_profile.return_value = {"all_active": True, "handlers": {}}
 
     with patch("abso.core.transaction.BackupManager") as mock_backup_cls:
-        # First call is the restore-phase manager, second is the backup-phase manager
+        # First call captures rollback anchor, second restores baseline, third creates next baseline
+        rollback_manager = MagicMock()
+        rollback_manager.create_backup.return_value = "rollback-123"
         restore_manager = MagicMock()
         baseline_path = MagicMock()
         baseline_path.exists.return_value = True
@@ -104,7 +109,7 @@ def test_transaction_restores_baseline_before_apply(tmp_path: Path) -> None:
         restore_manager.restore_backup.return_value = _complete_restore_summary()
         backup_manager = MagicMock()
         backup_manager.create_backup.return_value = "new-backup"
-        mock_backup_cls.side_effect = [restore_manager, backup_manager]
+        mock_backup_cls.side_effect = [rollback_manager, restore_manager, backup_manager]
 
         manager = ProfileTransactionManager(tmp_path, applier=applier)
         tx = manager.execute("test-profile", create_backup=True)
@@ -127,11 +132,13 @@ def test_transaction_skips_baseline_restore_when_no_backups(tmp_path: Path) -> N
     applier.verify_profile.return_value = {"all_active": True, "handlers": {}}
 
     with patch("abso.core.transaction.BackupManager") as mock_backup_cls:
+        rollback_manager = MagicMock()
+        rollback_manager.create_backup.return_value = "rollback-123"
         restore_manager = MagicMock()
         restore_manager.get_baseline_backup.return_value = None
         backup_manager = MagicMock()
         backup_manager.create_backup.return_value = "new-backup"
-        mock_backup_cls.side_effect = [restore_manager, backup_manager]
+        mock_backup_cls.side_effect = [rollback_manager, restore_manager, backup_manager]
 
         manager = ProfileTransactionManager(tmp_path, applier=applier)
         tx = manager.execute("test-profile", create_backup=True)
@@ -170,6 +177,8 @@ def test_transaction_fails_when_baseline_restore_raises(tmp_path: Path) -> None:
     applier.verify_profile.return_value = {"all_active": True, "handlers": {}}
 
     with patch("abso.core.transaction.BackupManager") as mock_backup_cls:
+        rollback_manager = MagicMock()
+        rollback_manager.create_backup.return_value = "rollback-123"
         restore_manager = MagicMock()
         baseline_path = MagicMock()
         baseline_path.exists.return_value = True
@@ -178,7 +187,7 @@ def test_transaction_fails_when_baseline_restore_raises(tmp_path: Path) -> None:
         restore_manager.restore_backup.side_effect = RuntimeError("restore broke")
         backup_manager = MagicMock()
         backup_manager.create_backup.return_value = "new-backup"
-        mock_backup_cls.side_effect = [restore_manager, backup_manager]
+        mock_backup_cls.side_effect = [rollback_manager, restore_manager, backup_manager]
 
         manager = ProfileTransactionManager(tmp_path, applier=applier)
         tx = manager.execute("test-profile", create_backup=True)
@@ -198,6 +207,8 @@ def test_transaction_continues_for_non_blocking_baseline_restore_gaps(tmp_path: 
     applier.verify_profile.return_value = {"all_active": True, "handlers": {}}
 
     with patch("abso.core.transaction.BackupManager") as mock_backup_cls:
+        rollback_manager = MagicMock()
+        rollback_manager.create_backup.return_value = "rollback-123"
         restore_manager = MagicMock()
         baseline_path = MagicMock()
         baseline_path.exists.return_value = True
@@ -206,7 +217,7 @@ def test_transaction_continues_for_non_blocking_baseline_restore_gaps(tmp_path: 
         restore_manager.restore_backup.return_value = _incomplete_restore_summary(blocking=False)
         backup_manager = MagicMock()
         backup_manager.create_backup.return_value = "new-backup"
-        mock_backup_cls.side_effect = [restore_manager, backup_manager]
+        mock_backup_cls.side_effect = [rollback_manager, restore_manager, backup_manager]
 
         manager = ProfileTransactionManager(tmp_path, applier=applier)
         tx = manager.execute("test-profile", create_backup=True)
@@ -222,6 +233,8 @@ def test_transaction_fails_for_blocking_baseline_restore_gaps(tmp_path: Path) ->
     applier.verify_profile.return_value = {"all_active": True, "handlers": {}}
 
     with patch("abso.core.transaction.BackupManager") as mock_backup_cls:
+        rollback_manager = MagicMock()
+        rollback_manager.create_backup.return_value = "rollback-123"
         restore_manager = MagicMock()
         baseline_path = MagicMock()
         baseline_path.exists.return_value = True
@@ -229,7 +242,7 @@ def test_transaction_fails_for_blocking_baseline_restore_gaps(tmp_path: Path) ->
         restore_manager.get_baseline_backup.return_value = baseline_path
         restore_manager.restore_backup.return_value = _incomplete_restore_summary(blocking=True)
         backup_manager = MagicMock()
-        mock_backup_cls.side_effect = [restore_manager, backup_manager]
+        mock_backup_cls.side_effect = [rollback_manager, restore_manager, backup_manager]
 
         manager = ProfileTransactionManager(tmp_path, applier=applier)
         tx = manager.execute("test-profile", create_backup=True)
@@ -238,6 +251,42 @@ def test_transaction_fails_for_blocking_baseline_restore_gaps(tmp_path: Path) ->
         applier.apply_profile.assert_not_called()
         backup_manager.create_backup.assert_not_called()
         assert tx.success is False
+
+
+def test_transaction_uses_pre_switch_snapshot_as_rollback_target(tmp_path: Path) -> None:
+    """Critical rollback should restore the live pre-switch snapshot, not the clean baseline."""
+    applier = _make_applier()
+    applier.apply_profile.return_value = ApplyResult(
+        success=False,
+        error="handler failure",
+        failed_settings=["NvidiaSettingsHandler: failed"],
+    )
+    applier.verify_profile.return_value = {"all_active": False, "handlers": {}}
+
+    with patch("abso.core.transaction.BackupManager") as mock_backup_cls:
+        rollback_manager = MagicMock()
+        rollback_manager.create_backup.return_value = "rollback-live-state"
+        rollback_manager.restore_backup.return_value = _complete_restore_summary()
+
+        restore_manager = MagicMock()
+        baseline_path = MagicMock()
+        baseline_path.exists.return_value = True
+        baseline_path.name = "baseline-clean"
+        restore_manager.get_baseline_backup.return_value = baseline_path
+        restore_manager.restore_backup.return_value = _complete_restore_summary()
+
+        backup_manager = MagicMock()
+        backup_manager.create_backup.return_value = "baseline-for-next-switch"
+        mock_backup_cls.side_effect = [rollback_manager, restore_manager, backup_manager]
+
+        manager = ProfileTransactionManager(tmp_path, applier=applier)
+        tx = manager.execute("test-profile", create_backup=True)
+
+        restore_manager.restore_backup.assert_called_once_with("baseline-clean")
+        backup_manager.create_backup.assert_called_once()
+        rollback_manager.restore_backup.assert_called_once_with("rollback-live-state")
+        assert tx.rollback_backup_id == "rollback-live-state"
+        assert tx.backup_id == "baseline-for-next-switch"
 
 
 def test_transaction_handles_apply_exception_and_fails_cleanly(tmp_path: Path) -> None:

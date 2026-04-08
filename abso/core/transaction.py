@@ -57,6 +57,7 @@ class TransactionResult:
     profile_id: str
     state: str
     backup_id: str | None = None
+    rollback_backup_id: str | None = None
     error: str | None = None
     rollback_performed: bool = False
     rollback_error: str | None = None
@@ -77,6 +78,7 @@ class TransactionResult:
             "profile_id": self.profile_id,
             "state": self.state,
             "backup_id": self.backup_id,
+            "rollback_backup_id": self.rollback_backup_id,
             "error": self.error,
             "rollback_performed": self.rollback_performed,
             "rollback_error": self.rollback_error,
@@ -139,6 +141,28 @@ class ProfileTransactionManager:
             return tx
 
         tx.add_checkpoint("validate", "ok", "Profile prerequisites satisfied")
+
+        rollback_backup_manager: BackupManager | None = None
+        rollback_backup_id: str | None = None
+        if create_backup:
+            try:
+                self.backup_dir.mkdir(parents=True, exist_ok=True)
+                rollback_backup_manager = BackupManager(self.backup_dir)
+                rollback_backup_id = rollback_backup_manager.create_backup(
+                    profile_id=canonical_profile_id,
+                    backup_type="pre_switch",
+                )
+                tx.rollback_backup_id = rollback_backup_id
+                tx.add_checkpoint(
+                    "rollback_anchor",
+                    "ok",
+                    f"Captured pre-switch rollback snapshot: {rollback_backup_id}",
+                )
+            except Exception as e:
+                tx.state = "failed"
+                tx.error = f"Rollback snapshot failed: {e}"
+                tx.add_checkpoint("rollback_anchor", "failed", tx.error)
+                return tx
 
         # === PHASE 0: Restore previous baseline ===
         # When switching profiles, stale settings from the previous profile
@@ -278,15 +302,17 @@ class ProfileTransactionManager:
         else:
             tx.add_checkpoint("compliance", "ok", "Compliance checks passed")
 
-        if has_critical and self.auto_rollback_on_critical and tx.backup_id and backup_manager:
+        rollback_target_id = rollback_backup_id or tx.backup_id
+        rollback_manager = rollback_backup_manager or backup_manager
+        if has_critical and self.auto_rollback_on_critical and rollback_target_id and rollback_manager:
             tx.state = "rolling_back"
             try:
-                restore_summary = backup_manager.restore_backup(tx.backup_id)
+                restore_summary = rollback_manager.restore_backup(rollback_target_id)
                 if restore_summary.complete:
                     tx.rollback_performed = True
                     tx.state = "rolled_back"
                     tx.error = "Critical compliance failure; restored backup automatically."
-                    tx.add_checkpoint("rollback", "ok", f"Restored backup {tx.backup_id}")
+                    tx.add_checkpoint("rollback", "ok", f"Restored backup {rollback_target_id}")
                 else:
                     tx.rollback_performed = False
                     tx.rollback_error = (
