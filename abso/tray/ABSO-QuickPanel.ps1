@@ -4,6 +4,24 @@
 $script:QuickPanelForm = $null
 $script:QuickPanelVisible = $false
 
+function Clear-QuickPanelGeneratedImages {
+    param([System.Windows.Forms.Control]$Root)
+
+    if (-not $Root) { return }
+
+    foreach ($child in @($Root.Controls)) {
+        Clear-QuickPanelGeneratedImages -Root $child
+    }
+
+    if ($Root -is [System.Windows.Forms.PictureBox]) {
+        $image = $Root.Image
+        if ($image) {
+            $Root.Image = $null
+            try { $image.Dispose() } catch {}
+        }
+    }
+}
+
 function Blend-QPColor {
     param(
         [System.Drawing.Color]$Base,
@@ -39,6 +57,7 @@ function Show-QuickPanel {
 
     if ($script:QuickPanelForm -and -not $script:QuickPanelForm.IsDisposed) {
         try {
+            Clear-QuickPanelGeneratedImages -Root $script:QuickPanelForm
             $script:QuickPanelForm.Hide()
             [System.Windows.Forms.Application]::DoEvents()
             $script:QuickPanelForm.Close()
@@ -372,6 +391,7 @@ function Close-QuickPanel {
     #>
     if ($script:QuickPanelForm -and -not $script:QuickPanelForm.IsDisposed) {
         try {
+            Clear-QuickPanelGeneratedImages -Root $script:QuickPanelForm
             $script:QuickPanelForm.Hide()  # Force desktop repaint before disposing
             [System.Windows.Forms.Application]::DoEvents()
             $script:QuickPanelForm.Close()

@@ -1836,6 +1836,8 @@ $script:ApplyAnimTimer = $null
 $script:StartupIconHealTimer = $null
 $script:StartupIconHealAttempts = 0
 $script:ProcessGuardTimer = $null
+$script:MenuStateInitialized = $false
+$script:LastRenderedActiveProfile = $null
 
 function Set-IconSafe {
     <#
@@ -1850,6 +1852,31 @@ function Set-IconSafe {
     # Dispose old icon AFTER new one is assigned — prevents race with animation timer
     if ($oldIcon -and $oldIcon -ne $NewIcon) {
         try { $oldIcon.Dispose() } catch {}
+    }
+}
+
+function Set-MenuItemImageSafe {
+    <#
+    .SYNOPSIS
+    Replaces a ToolStrip item's image and disposes the previous one.
+    #>
+    param(
+        [System.Windows.Forms.ToolStripItem]$Item,
+        [AllowNull()][System.Drawing.Image]$NewImage
+    )
+
+    if (-not $Item) {
+        if ($NewImage) {
+            try { $NewImage.Dispose() } catch {}
+        }
+        return
+    }
+
+    $oldImage = $Item.Image
+    $Item.Image = $NewImage
+
+    if ($oldImage -and -not [object]::ReferenceEquals($oldImage, $NewImage)) {
+        try { $oldImage.Dispose() } catch {}
     }
 }
 
@@ -2329,8 +2356,13 @@ function Restore-Settings {
 # ============================================================================
 
 function Update-MenuState {
+    $fullRefresh = -not $script:MenuStateInitialized
+    $previousRenderedActive = $script:LastRenderedActiveProfile
+
     foreach ($item in $script:profileMenuItems) {
         $isActive = ($item.Tag -eq $script:activeProfile)
+        $wasActive = ($item.Tag -eq $previousRenderedActive)
+        $needsVisualRefresh = $fullRefresh -or $isActive -or $wasActive
         $item.Checked = $isActive
 
         $p = $script:Profiles[$item.Tag]
@@ -2340,10 +2372,13 @@ function Update-MenuState {
         # Items inside submenus (OwnerItem is a ToolStripMenuItem) vs top-level items
         $inSubmenu = ($null -ne $item.OwnerItem -and $item.OwnerItem -is [System.Windows.Forms.ToolStripMenuItem])
 
+        if (-not $needsVisualRefresh) { continue }
+
         try {
             if ($isActive) {
                 $item.Text = $p.Name
-                $item.Image = New-ActiveCheckBitmap -Color $catColor
+                $newImage = New-ActiveCheckBitmap -Color $catColor
+                Set-MenuItemImageSafe -Item $item -NewImage $newImage
                 $item.ForeColor = [System.Drawing.Color]::FromArgb(
                     255,
                     [Math]::Min(255, $catColor.R + 30),
@@ -2356,7 +2391,8 @@ function Update-MenuState {
             else {
                 $item.Text = $p.Name
                 $gg = Get-GameGroup -ProfileId $item.Tag
-                $item.Image = New-GameBitmap -GameGroup $gg -Color $catColor -Category $p.Cat
+                $newImage = New-GameBitmap -GameGroup $gg -Color $catColor -Category $p.Cat
+                Set-MenuItemImageSafe -Item $item -NewImage $newImage
                 $item.ForeColor = $catColor
                 $item.Font = $script:FontNormal
                 $item.BackColor = $script:Colors.Background
@@ -2399,6 +2435,9 @@ function Update-MenuState {
         if ($backupTime -ne "Never") { $parts += "Backup: $backupTime" }
         $script:statusBarItem.Text = "  $($parts -join '  |  ')"
     }
+
+    $script:LastRenderedActiveProfile = $script:activeProfile
+    $script:MenuStateInitialized = $true
 }
 
 # ============================================================================
@@ -2802,7 +2841,7 @@ function Invoke-ProcessGuardTick {
         return
     }
 
-    foreach ($proc in $procs) {
+    foreach ($proc in @($procs)) {
         try {
             if ($proc.PriorityClass -gt $script:ProcessGuardCeiling) {
                 $was = $proc.PriorityClass
@@ -2818,6 +2857,10 @@ function Invoke-ProcessGuardTick {
             }
         } catch {
             # Process exited or access denied between enumerate and set — benign
+        } finally {
+            if ($proc -and $proc -is [System.IDisposable]) {
+                try { $proc.Dispose() } catch {}
+            }
         }
     }
 
