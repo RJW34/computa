@@ -1,0 +1,30 @@
+project_id: windowsoptimizerabso
+name: A.B.S.O.
+family: System / Dashboard
+status: active
+owner: mtoli
+kind: system-ops-cli
+source_of_truth:
+  local_path: C:\Users\mtoli\Documents\Code\windowsoptimizerabso
+  remote: https://github.com/RJW34/A.B.S.O..git
+commands:
+  run: python -m abso
+  dev: python -m abso audit --verbose
+  test: python -m pytest tests -q
+telemetry:
+  emits:
+    - abso_profile_state
+    - power_plan_state
+    - suite_runtime_status
+  status_path: state/citadel_status.json
+  refresh_command: powershell -NoProfile -ExecutionPolicy Bypass -File scripts/export_citadel_status.ps1
+  refresh_cadence_seconds: 60
+related_projects:
+  - the-abso-citadel
+  - abso-reporter
+  - SteamGameDiagnostic
+  - PacdeluxeDebugWatcher
+workflow:
+  lane: ABSO suite
+  objective: Expose the currently applied optimization profile and safe system-ops health so the Citadel can treat A.B.S.O. as a live suite component.
+  next_step: Keep tray and timer state truthful enough that ABSO Reporter can trust the active profile and remediation posture it displays.
