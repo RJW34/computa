@@ -136,3 +136,37 @@ def test_startup_resolution_honors_newer_restored_state_over_older_active_candid
     assert result["id"] is None
     assert result["source"] == "last_profile_state:tray_restore"
     assert result["decision"] == "resolved_conflict_by_timestamp"
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="Tray startup resolution tests are Windows-specific")
+def test_startup_resolution_prefers_corroborated_tray_state_over_conflicting_newer_state_file(tmp_path: Path) -> None:
+    """Tray startup should trust its corroborated last successful apply over a lone conflicting state-file write."""
+    result = _resolve_startup_profile(
+        tmp_path,
+        config={
+            "lastProfileState": {
+                "status": "active",
+                "id": "overwatch2-gsync",
+                "name": "Overwatch 2 - GSYNC",
+                "timestamp": "2026-04-08T00:20:17.5404388-04:00",
+                "source": "tray_apply",
+            },
+            "recentProfiles": [
+                {
+                    "id": "overwatch2-gsync",
+                    "name": "Overwatch 2 - GSYNC",
+                    "timestamp": "2026-04-08 00:20:17",
+                    "recorded_at": "2026-04-08T00:20:17.5404388-04:00",
+                }
+            ],
+        },
+        project_state={
+            "current_profile": "slippi-melee",
+            "applied_at": "2026-04-08T12:42:38.770201",
+        },
+    )
+
+    assert result["status"] == "active"
+    assert result["id"] == "overwatch2-gsync"
+    assert result["source"] == "last_profile_state:tray_apply"
+    assert result["decision"] == "corroborated_tray_state"

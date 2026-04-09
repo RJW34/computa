@@ -2934,6 +2934,9 @@ function Start-TrayApp {
     $script:activeProfile = $null
     $startupProfile = Resolve-StartupActiveProfile -Config $script:TrayConfig -ProfileMap $script:Profiles
     $script:TrayConfig = Set-StartupResolutionRecord -Config $script:TrayConfig -Record $startupProfile
+    if ($startupProfile -and $startupProfile.sync_state_path) {
+        try { [void](Repair-StartupActiveProfileState -Record $startupProfile) } catch {}
+    }
     if ($startupProfile -and $startupProfile.status -eq "active" -and $startupProfile.id) {
         $script:activeProfile = "$($startupProfile.id)"
         $startupProfileName = if ($startupProfile.name) {

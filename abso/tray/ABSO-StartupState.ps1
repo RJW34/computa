@@ -82,6 +82,88 @@ function Format-StartupProfileRecord {
     return "$srcPart [$status] $idPart @ $tsPart$timeSrcPart$pathPart"
 }
 
+function Get-StartupProfileMeaning {
+    param([object]$Record)
+
+    if (-not $Record) {
+        return "none"
+    }
+
+    if ("$($Record.status)".ToLowerInvariant() -eq "restored") {
+        return "restored"
+    }
+
+    if ($Record.id) {
+        return "active:$($Record.id)"
+    }
+
+    return "active:<none>"
+}
+
+function Select-CorroboratedTrayCandidate {
+    param([object[]]$Candidates)
+
+    if (-not $Candidates -or $Candidates.Count -eq 0) {
+        return $null
+    }
+
+    $lastProfileState = @(
+        $Candidates | Where-Object { "$($_.source)" -like "last_profile_state:*" }
+    ) | Select-Object -First 1
+    $recentHistory = @(
+        $Candidates | Where-Object { "$($_.source)" -eq "recent_history" }
+    ) | Select-Object -First 1
+
+    if (-not $lastProfileState -or -not $recentHistory) {
+        return $null
+    }
+
+    $lastMeaning = Get-StartupProfileMeaning -Record $lastProfileState
+    $recentMeaning = Get-StartupProfileMeaning -Record $recentHistory
+    if ($lastMeaning -ne $recentMeaning) {
+        return $null
+    }
+
+    return $lastProfileState
+}
+
+function Repair-StartupActiveProfileState {
+    param([object]$Record)
+
+    if (-not $Record) { return $false }
+    if ("$($Record.status)".ToLowerInvariant() -ne "active") { return $false }
+    if ([string]::IsNullOrWhiteSpace("$($Record.id)")) { return $false }
+    if ([string]::IsNullOrWhiteSpace("$($Record.sync_state_path)")) { return $false }
+
+    $statePath = "$($Record.sync_state_path)"
+    $appliedAt = if ($Record.timestamp) { "$($Record.timestamp)" } else { (Get-Date).ToString("o") }
+
+    $state = @{
+        current_profile = "$($Record.id)"
+        applied_at = $appliedAt
+        reboot_pending = $false
+        reboot_reasons = @()
+        source = "tray_startup_reconciliation"
+    }
+
+    try {
+        $parent = Split-Path -Parent $statePath
+        if (-not [string]::IsNullOrWhiteSpace($parent) -and -not (Test-Path $parent)) {
+            New-Item -Path $parent -ItemType Directory -Force -ErrorAction Stop | Out-Null
+        }
+
+        $tmpPath = "$statePath.tmp"
+        $state | ConvertTo-Json -Depth 6 | Set-Content -Path $tmpPath -Encoding UTF8 -Force -ErrorAction Stop
+        Move-Item -LiteralPath $tmpPath -Destination $statePath -Force -ErrorAction Stop
+        Write-StartupStateLog "Reconciled active profile state file '$statePath' to '$($Record.id)' using corroborated tray state"
+        return $true
+    }
+    catch {
+        Write-StartupStateLog "Failed reconciling active profile state file '$statePath': $($_.Exception.Message)" "WARN"
+        return $false
+    }
+}
+
 function Read-ActiveProfileFromStateFile {
     param(
         [string]$StatePath,
@@ -248,6 +330,46 @@ function Resolve-StartupActiveProfile {
         }
     }
 
+    $corroboratedTrayCandidate = Select-CorroboratedTrayCandidate -Candidates $candidates
+    if ($corroboratedTrayCandidate) {
+        $corroboratedMeaning = Get-StartupProfileMeaning -Record $corroboratedTrayCandidate
+        $conflictingStateFile = @(
+            $candidates |
+                Where-Object {
+                    "$($_.source)" -eq "state_file" -and
+                    (Get-StartupProfileMeaning -Record $_) -ne $corroboratedMeaning
+                }
+        ) | Sort-Object `
+            @{ Expression = { if ($_.has_timestamp) { 1 } else { 0 } }; Descending = $true }, `
+            @{ Expression = { if ($_.parsed_at) { $_.parsed_at.Ticks } else { 0 } }; Descending = $true } |
+            Select-Object -First 1
+
+        if ($conflictingStateFile) {
+            Write-StartupStateLog (
+                "Ignoring uncorroborated state-file candidate '" +
+                (Format-StartupProfileRecord -Record $conflictingStateFile) +
+                "' in favor of corroborated tray state '" +
+                (Format-StartupProfileRecord -Record $corroboratedTrayCandidate) +
+                "'"
+            ) "WARN"
+
+            $corroboratedTrayCandidate.decision = "corroborated_tray_state"
+            $corroboratedTrayCandidate.candidate_count = $candidates.Count
+
+            return [ordered]@{
+                status          = $corroboratedTrayCandidate.status
+                id              = $corroboratedTrayCandidate.id
+                name            = $corroboratedTrayCandidate.name
+                timestamp       = $corroboratedTrayCandidate.timestamp
+                source          = $corroboratedTrayCandidate.source
+                path            = $corroboratedTrayCandidate.path
+                sync_state_path = $conflictingStateFile.path
+                decision        = $corroboratedTrayCandidate.decision
+                candidate_count = $corroboratedTrayCandidate.candidate_count
+            }
+        }
+    }
+
     $orderedCandidates = @(
         $candidates | Sort-Object `
             @{ Expression = { if ($_.has_timestamp) { 1 } else { 0 } }; Descending = $true }, `
@@ -279,6 +401,7 @@ function Resolve-StartupActiveProfile {
         timestamp       = $selected.timestamp
         source          = $selected.source
         path            = $selected.path
+        sync_state_path = $null
         decision        = $selected.decision
         candidate_count = $selected.candidate_count
     }
