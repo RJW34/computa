@@ -184,6 +184,16 @@ function Read-ActiveProfileFromStateFile {
         $profileId = if ($state.current_profile) { "$($state.current_profile)" } else { $null }
         if ([string]::IsNullOrWhiteSpace($profileId)) { return $null }
 
+        # Normalize retired ids via the alias map so state written before a
+        # profile consolidation still resolves to a live profile.
+        if (Get-Command -Name Resolve-ProfileAlias -ErrorAction SilentlyContinue) {
+            $canonical = Resolve-ProfileAlias $profileId
+            if ($canonical -and $canonical -ne $profileId) {
+                Write-StartupStateLog "State file '$StatePath' profile id '$profileId' aliased to '$canonical'"
+                $profileId = $canonical
+            }
+        }
+
         $profileName = $null
         if ($ProfileMap -and $ProfileMap.Contains($profileId) -and $ProfileMap[$profileId].Name) {
             $profileName = "$($ProfileMap[$profileId].Name)"
@@ -274,6 +284,13 @@ function Resolve-StartupActiveProfile {
         }
 
         $candidateId = if ($status -eq "active" -and $state.id) { "$($state.id)" } else { $null }
+        if ($candidateId -and (Get-Command -Name Resolve-ProfileAlias -ErrorAction SilentlyContinue)) {
+            $canonicalCandidate = Resolve-ProfileAlias $candidateId
+            if ($canonicalCandidate -and $canonicalCandidate -ne $candidateId) {
+                Write-StartupStateLog "Config lastProfileState id '$candidateId' aliased to '$canonicalCandidate'"
+                $candidateId = $canonicalCandidate
+            }
+        }
         if ($status -eq "active" -and -not [string]::IsNullOrWhiteSpace($candidateId) -and -not $profiles.Contains($candidateId)) {
             Write-StartupStateLog "Config lastProfileState references unknown profile '$candidateId'; skipping candidate" "WARN"
         }
