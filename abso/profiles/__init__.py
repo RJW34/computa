@@ -23,31 +23,16 @@ from abso.profiles.productivity_oled import ProductivityOLEDProfile
 from abso.profiles.rivals2 import Rivals2Profile
 from abso.profiles.rivals2_300hz_max import Rivals2_300HzMaxProfile
 from abso.profiles.rivals2_gsync import (
-    Rivals2GSyncHDRProfile,
     Rivals2GSyncProfile,
-    Rivals2OnlineGSyncHDRProfile,
     Rivals2OnlineGSyncProfile,
 )
-from abso.profiles.rivals2_offline import Rivals2OfflineHDRProfile, Rivals2OfflineProfile
-from abso.profiles.rivals2_online import Rivals2OnlineHDRProfile, Rivals2OnlineProfile
-from abso.profiles.rivals2_tournament_sim import Rivals2TournamentSimProfile
+from abso.profiles.rivals2_offline import Rivals2OfflineProfile
+from abso.profiles.rivals2_online import Rivals2OnlineProfile
 from abso.profiles.ryujinx_ssbu import RyujinxSSBUProfile
 from abso.profiles.slippi_melee import (
     SlippiMeleeConsoleParityProfile,
     SlippiMeleeProfile,
     SlippiMeleeUniversalProfile,
-    SlippiMeleeVRRLabProfile,
-)
-from abso.profiles.streaming_profiles import (
-    FortniteHDRStreamingProfile,
-    FortniteStreamingProfile,
-    Overwatch2GSyncStreamingProfile,
-    Overwatch2GSyncHDRStreamingProfile,
-    PACDeluxeStreamingProfile,
-    Rivals2HDRStreamingProfile,
-    Rivals2StreamingProfile,
-    RyujinxSSBUStreamingProfile,
-    SlippiMeleeStreamingProfile,
 )
 
 __all__ = [
@@ -55,24 +40,16 @@ __all__ = [
     "SlippiMeleeConsoleParityProfile",
     "SlippiMeleeProfile",
     "SlippiMeleeUniversalProfile",
-    "SlippiMeleeVRRLabProfile",
     "Rivals2Profile",
     "Rivals2OfflineProfile",
-    "Rivals2OfflineHDRProfile",
     "Rivals2OnlineProfile",
-    "Rivals2OnlineHDRProfile",
-    "Rivals2TournamentSimProfile",
     "Rivals2_300HzMaxProfile",
     "Rivals2GSyncProfile",
-    "Rivals2GSyncHDRProfile",
     "Rivals2OnlineGSyncProfile",
-    "Rivals2OnlineGSyncHDRProfile",
     "Diablo4Profile",
     "Diablo4SDRProfile",
     "FortniteProfile",
     "FortniteHDRProfile",
-    "FortniteStreamingProfile",
-    "FortniteHDRStreamingProfile",
     "MarvelRivalsSDRProfile",
     "MarvelRivalsHDRProfile",
     "Overwatch2Profile",
@@ -80,17 +57,10 @@ __all__ = [
     "Overwatch2GSyncHDRProfile",
     "Overwatch2GSyncCaptureProfile",
     "Overwatch2GSyncHDRCaptureProfile",
-    "Overwatch2GSyncStreamingProfile",
-    "Overwatch2GSyncHDRStreamingProfile",
     "PokemonAutoChessProfile",
     "PACDeluxeProfile",
-    "PACDeluxeStreamingProfile",
     "ProductivityOLEDProfile",
     "RyujinxSSBUProfile",
-    "RyujinxSSBUStreamingProfile",
-    "Rivals2StreamingProfile",
-    "Rivals2HDRStreamingProfile",
-    "SlippiMeleeStreamingProfile",
     "PROFILE_CATALOG",
     "get_profile_manifest",
     "resolve_profile_id",

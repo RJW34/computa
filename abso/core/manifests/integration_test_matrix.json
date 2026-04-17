@@ -5,260 +5,300 @@
       "id": "apply-slippi-melee",
       "profile_id": "slippi-melee",
       "kind": "apply_profile",
-      "assumptions": ["administrator", "nvidia_gpu"],
-      "expected": { "transaction_state": "committed", "apply_success": true }
+      "assumptions": [
+        "administrator",
+        "nvidia_gpu"
+      ],
+      "expected": {
+        "transaction_state": "committed",
+        "apply_success": true
+      }
     },
     {
       "id": "apply-slippi-melee-console-parity",
       "profile_id": "slippi-melee-console-parity",
       "kind": "apply_profile",
-      "assumptions": ["administrator", "nvidia_gpu"],
-      "expected": { "transaction_state": "committed", "apply_success": true }
+      "assumptions": [
+        "administrator",
+        "nvidia_gpu"
+      ],
+      "expected": {
+        "transaction_state": "committed",
+        "apply_success": true
+      }
     },
     {
       "id": "apply-slippi-melee-universal",
       "profile_id": "slippi-melee-universal",
       "kind": "apply_profile",
-      "assumptions": ["administrator", "nvidia_gpu"],
-      "expected": { "transaction_state": "committed", "apply_success": true }
-    },
-    {
-      "id": "apply-slippi-melee-vrr-lab",
-      "profile_id": "slippi-melee-vrr-lab",
-      "kind": "apply_profile",
-      "assumptions": ["administrator", "nvidia_gpu", "vrr_confirmed"],
-      "expected": { "transaction_state": "committed", "apply_success": true }
+      "assumptions": [
+        "administrator",
+        "nvidia_gpu"
+      ],
+      "expected": {
+        "transaction_state": "committed",
+        "apply_success": true
+      }
     },
     {
       "id": "apply-rivals2-offline",
       "profile_id": "rivals2-offline",
       "kind": "apply_profile",
-      "assumptions": ["administrator", "nvidia_gpu"],
-      "expected": { "transaction_state": "committed", "apply_success": true }
-    },
-    {
-      "id": "apply-rivals2-offline-hdr",
-      "profile_id": "rivals2-offline-hdr",
-      "kind": "apply_profile",
-      "assumptions": ["administrator", "nvidia_gpu", "hdr_capable"],
-      "expected": { "transaction_state": "committed", "apply_success": true }
+      "assumptions": [
+        "administrator",
+        "nvidia_gpu"
+      ],
+      "expected": {
+        "transaction_state": "committed",
+        "apply_success": true
+      }
     },
     {
       "id": "apply-rivals2-online",
       "profile_id": "rivals2-online",
       "kind": "apply_profile",
-      "assumptions": ["administrator", "nvidia_gpu"],
-      "expected": { "transaction_state": "committed", "apply_success": true }
-    },
-    {
-      "id": "apply-rivals2-online-hdr",
-      "profile_id": "rivals2-online-hdr",
-      "kind": "apply_profile",
-      "assumptions": ["administrator", "nvidia_gpu", "hdr_capable"],
-      "expected": { "transaction_state": "committed", "apply_success": true }
-    },
-    {
-      "id": "apply-rivals2-tournament-sim-144hz",
-      "profile_id": "rivals2-tournament-sim-144hz",
-      "kind": "apply_profile",
-      "assumptions": ["administrator", "nvidia_gpu"],
-      "expected": { "transaction_state": "committed", "apply_success": true }
+      "assumptions": [
+        "administrator",
+        "nvidia_gpu"
+      ],
+      "expected": {
+        "transaction_state": "committed",
+        "apply_success": true
+      }
     },
     {
       "id": "apply-rivals2-gsync",
       "profile_id": "rivals2-gsync",
       "kind": "apply_profile",
-      "assumptions": ["administrator", "nvidia_gpu", "vrr_confirmed"],
-      "expected": { "transaction_state": "committed", "apply_success": true }
-    },
-    {
-      "id": "apply-rivals2-gsync-hdr",
-      "profile_id": "rivals2-gsync-hdr",
-      "kind": "apply_profile",
-      "assumptions": ["administrator", "nvidia_gpu", "vrr_confirmed", "hdr_capable"],
-      "expected": { "transaction_state": "committed", "apply_success": true }
+      "assumptions": [
+        "administrator",
+        "nvidia_gpu",
+        "vrr_confirmed"
+      ],
+      "expected": {
+        "transaction_state": "committed",
+        "apply_success": true
+      }
     },
     {
       "id": "apply-rivals2-online-gsync",
       "profile_id": "rivals2-online-gsync",
       "kind": "apply_profile",
-      "assumptions": ["administrator", "nvidia_gpu", "vrr_confirmed"],
-      "expected": { "transaction_state": "committed", "apply_success": true }
-    },
-    {
-      "id": "apply-rivals2-online-gsync-hdr",
-      "profile_id": "rivals2-online-gsync-hdr",
-      "kind": "apply_profile",
-      "assumptions": ["administrator", "nvidia_gpu", "vrr_confirmed", "hdr_capable"],
-      "expected": { "transaction_state": "committed", "apply_success": true }
+      "assumptions": [
+        "administrator",
+        "nvidia_gpu",
+        "vrr_confirmed"
+      ],
+      "expected": {
+        "transaction_state": "committed",
+        "apply_success": true
+      }
     },
     {
       "id": "apply-diablo4",
       "profile_id": "diablo4",
       "kind": "apply_profile",
-      "assumptions": ["administrator", "nvidia_gpu", "vrr_confirmed", "hdr_capable"],
-      "expected": { "transaction_state": "committed", "apply_success": true }
+      "assumptions": [
+        "administrator",
+        "nvidia_gpu",
+        "vrr_confirmed",
+        "hdr_capable"
+      ],
+      "expected": {
+        "transaction_state": "committed",
+        "apply_success": true
+      }
     },
     {
       "id": "apply-diablo4-sdr",
       "profile_id": "diablo4-sdr",
       "kind": "apply_profile",
-      "assumptions": ["administrator", "nvidia_gpu", "vrr_confirmed"],
-      "expected": { "transaction_state": "committed", "apply_success": true }
+      "assumptions": [
+        "administrator",
+        "nvidia_gpu",
+        "vrr_confirmed"
+      ],
+      "expected": {
+        "transaction_state": "committed",
+        "apply_success": true
+      }
     },
     {
       "id": "apply-fortnite",
       "profile_id": "fortnite",
       "kind": "apply_profile",
-      "assumptions": ["administrator", "nvidia_gpu"],
-      "expected": { "transaction_state": "committed", "apply_success": true }
+      "assumptions": [
+        "administrator",
+        "nvidia_gpu"
+      ],
+      "expected": {
+        "transaction_state": "committed",
+        "apply_success": true
+      }
     },
     {
       "id": "apply-fortnite-hdr",
       "profile_id": "fortnite-hdr",
       "kind": "apply_profile",
-      "assumptions": ["administrator", "nvidia_gpu", "hdr_capable"],
-      "expected": { "transaction_state": "committed", "apply_success": true }
-    },
-    {
-      "id": "apply-fortnite-streaming",
-      "profile_id": "fortnite-streaming",
-      "kind": "apply_profile",
-      "assumptions": ["administrator", "nvidia_gpu", "obs_installed"],
-      "expected": { "transaction_state": "committed", "apply_success": true }
-    },
-    {
-      "id": "apply-fortnite-streaming-hdr",
-      "profile_id": "fortnite-streaming-hdr",
-      "kind": "apply_profile",
-      "assumptions": ["administrator", "nvidia_gpu", "hdr_capable", "obs_installed"],
-      "expected": { "transaction_state": "committed", "apply_success": true }
+      "assumptions": [
+        "administrator",
+        "nvidia_gpu",
+        "hdr_capable"
+      ],
+      "expected": {
+        "transaction_state": "committed",
+        "apply_success": true
+      }
     },
     {
       "id": "apply-overwatch2",
       "profile_id": "overwatch2",
       "kind": "apply_profile",
-      "assumptions": ["administrator", "nvidia_gpu"],
-      "expected": { "transaction_state": "committed", "apply_success": true }
+      "assumptions": [
+        "administrator",
+        "nvidia_gpu"
+      ],
+      "expected": {
+        "transaction_state": "committed",
+        "apply_success": true
+      }
     },
     {
       "id": "apply-overwatch2-gsync",
       "profile_id": "overwatch2-gsync",
       "kind": "apply_profile",
-      "assumptions": ["administrator", "nvidia_gpu", "vrr_confirmed"],
-      "expected": { "transaction_state": "committed", "apply_success": true }
+      "assumptions": [
+        "administrator",
+        "nvidia_gpu",
+        "vrr_confirmed"
+      ],
+      "expected": {
+        "transaction_state": "committed",
+        "apply_success": true
+      }
     },
     {
       "id": "apply-overwatch2-gsync-hdr",
       "profile_id": "overwatch2-gsync-hdr",
       "kind": "apply_profile",
-      "assumptions": ["administrator", "nvidia_gpu", "vrr_confirmed", "hdr_capable"],
-      "expected": { "transaction_state": "committed", "apply_success": true }
+      "assumptions": [
+        "administrator",
+        "nvidia_gpu",
+        "vrr_confirmed",
+        "hdr_capable"
+      ],
+      "expected": {
+        "transaction_state": "committed",
+        "apply_success": true
+      }
     },
     {
       "id": "apply-overwatch2-gsync-capture",
       "profile_id": "overwatch2-gsync-capture",
       "kind": "apply_profile",
-      "assumptions": ["administrator", "nvidia_gpu", "vrr_confirmed"],
-      "expected": { "transaction_state": "committed", "apply_success": true }
+      "assumptions": [
+        "administrator",
+        "nvidia_gpu",
+        "vrr_confirmed"
+      ],
+      "expected": {
+        "transaction_state": "committed",
+        "apply_success": true
+      }
     },
     {
       "id": "apply-overwatch2-gsync-hdr-capture",
       "profile_id": "overwatch2-gsync-hdr-capture",
       "kind": "apply_profile",
-      "assumptions": ["administrator", "nvidia_gpu", "vrr_confirmed", "hdr_capable"],
-      "expected": { "transaction_state": "committed", "apply_success": true }
-    },
-    {
-      "id": "apply-overwatch2-gsync-hdr-streaming",
-      "profile_id": "overwatch2-gsync-hdr-streaming",
-      "kind": "apply_profile",
-      "assumptions": ["administrator", "nvidia_gpu", "vrr_confirmed", "hdr_capable", "obs_installed"],
-      "expected": { "transaction_state": "committed", "apply_success": true }
-    },
-    {
-      "id": "apply-overwatch2-gsync-streaming",
-      "profile_id": "overwatch2-gsync-streaming",
-      "kind": "apply_profile",
-      "assumptions": ["administrator", "nvidia_gpu", "vrr_confirmed", "obs_installed"],
-      "expected": { "transaction_state": "committed", "apply_success": true }
+      "assumptions": [
+        "administrator",
+        "nvidia_gpu",
+        "vrr_confirmed",
+        "hdr_capable"
+      ],
+      "expected": {
+        "transaction_state": "committed",
+        "apply_success": true
+      }
     },
     {
       "id": "apply-pokemon-auto-chess",
       "profile_id": "pokemon-auto-chess",
       "kind": "apply_profile",
-      "assumptions": ["administrator", "browser_installed"],
-      "expected": { "transaction_state": "committed", "apply_success": true }
+      "assumptions": [
+        "administrator",
+        "browser_installed"
+      ],
+      "expected": {
+        "transaction_state": "committed",
+        "apply_success": true
+      }
     },
     {
       "id": "apply-pacdeluxe",
       "profile_id": "pacdeluxe",
       "kind": "apply_profile",
-      "assumptions": ["administrator"],
-      "expected": { "transaction_state": "committed", "apply_success": true }
-    },
-    {
-      "id": "apply-pacdeluxe-streaming",
-      "profile_id": "pacdeluxe-streaming",
-      "kind": "apply_profile",
-      "assumptions": ["administrator", "obs_installed"],
-      "expected": { "transaction_state": "committed", "apply_success": true }
+      "assumptions": [
+        "administrator"
+      ],
+      "expected": {
+        "transaction_state": "committed",
+        "apply_success": true
+      }
     },
     {
       "id": "apply-productivity",
       "profile_id": "productivity",
       "kind": "apply_profile",
-      "assumptions": ["administrator"],
-      "expected": { "transaction_state": "committed", "apply_success": true }
+      "assumptions": [
+        "administrator"
+      ],
+      "expected": {
+        "transaction_state": "committed",
+        "apply_success": true
+      }
     },
     {
       "id": "apply-ryujinx-ssbu",
       "profile_id": "ryujinx-ssbu",
       "kind": "apply_profile",
-      "assumptions": ["administrator", "nvidia_gpu"],
-      "expected": { "transaction_state": "committed", "apply_success": true }
-    },
-    {
-      "id": "apply-ryujinx-ssbu-streaming",
-      "profile_id": "ryujinx-ssbu-streaming",
-      "kind": "apply_profile",
-      "assumptions": ["administrator", "obs_installed"],
-      "expected": { "transaction_state": "committed", "apply_success": true }
-    },
-    {
-      "id": "apply-rivals2-streaming",
-      "profile_id": "rivals2-streaming",
-      "kind": "apply_profile",
-      "assumptions": ["administrator", "obs_installed", "nvidia_gpu"],
-      "expected": { "transaction_state": "committed", "apply_success": true }
-    },
-    {
-      "id": "apply-rivals2-streaming-hdr",
-      "profile_id": "rivals2-streaming-hdr",
-      "kind": "apply_profile",
-      "assumptions": ["administrator", "obs_installed", "nvidia_gpu", "hdr_capable"],
-      "expected": { "transaction_state": "committed", "apply_success": true }
-    },
-    {
-      "id": "apply-slippi-melee-streaming",
-      "profile_id": "slippi-melee-streaming",
-      "kind": "apply_profile",
-      "assumptions": ["administrator", "obs_installed"],
-      "expected": { "transaction_state": "committed", "apply_success": true }
+      "assumptions": [
+        "administrator",
+        "nvidia_gpu"
+      ],
+      "expected": {
+        "transaction_state": "committed",
+        "apply_success": true
+      }
     },
     {
       "id": "apply-marvel-rivals-sdr",
       "profile_id": "marvel-rivals-sdr",
       "kind": "apply_profile",
-      "assumptions": ["administrator", "nvidia_gpu", "vrr_confirmed"],
-      "expected": { "transaction_state": "committed", "apply_success": true }
+      "assumptions": [
+        "administrator",
+        "nvidia_gpu",
+        "vrr_confirmed"
+      ],
+      "expected": {
+        "transaction_state": "committed",
+        "apply_success": true
+      }
     },
     {
       "id": "apply-marvel-rivals-hdr",
       "profile_id": "marvel-rivals-hdr",
       "kind": "apply_profile",
-      "assumptions": ["administrator", "nvidia_gpu", "vrr_confirmed", "hdr_capable"],
-      "expected": { "transaction_state": "committed", "apply_success": true }
+      "assumptions": [
+        "administrator",
+        "nvidia_gpu",
+        "vrr_confirmed",
+        "hdr_capable"
+      ],
+      "expected": {
+        "transaction_state": "committed",
+        "apply_success": true
+      }
     }
   ]
 }

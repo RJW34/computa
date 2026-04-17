@@ -61,14 +61,13 @@ class TestProfileApplierInit:
         """Test PROFILES registry contains expected profiles."""
         assert "slippi-melee" in ProfileApplier.PROFILES
         assert "slippi-melee-console-parity" in ProfileApplier.PROFILES
-        assert "slippi-melee-vrr-lab" in ProfileApplier.PROFILES
+        assert "slippi-melee-universal" in ProfileApplier.PROFILES
         assert "cod-bo7" not in ProfileApplier.PROFILES
         assert "diablo4" in ProfileApplier.PROFILES
         assert "rivals2-offline" in ProfileApplier.PROFILES
-        assert "rivals2-offline-hdr" in ProfileApplier.PROFILES
-        assert "rivals2-online-hdr" in ProfileApplier.PROFILES
-        assert "rivals2-gsync-hdr" in ProfileApplier.PROFILES
-        assert "rivals2-online-gsync-hdr" in ProfileApplier.PROFILES
+        assert "rivals2-online" in ProfileApplier.PROFILES
+        assert "rivals2-gsync" in ProfileApplier.PROFILES
+        assert "rivals2-online-gsync" in ProfileApplier.PROFILES
         assert "overwatch2" in ProfileApplier.PROFILES
         assert "overwatch2-gsync" in ProfileApplier.PROFILES
 

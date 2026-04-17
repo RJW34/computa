@@ -38,7 +38,7 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-from abso.profiles.profile_bases import Rivals2BaseProfile, Rivals2HDRMixin
+from abso.profiles.profile_bases import Rivals2BaseProfile
 
 
 
@@ -200,28 +200,5 @@ class Rivals2OnlineProfile(Rivals2BaseProfile):
                 "reason": "Rollback resync frames must not cause cascading frame loss.",
             },
         ]
-
-
-class Rivals2OnlineHDRProfile(Rivals2HDRMixin, Rivals2OnlineProfile):
-    """Rollback-safe online Rivals 2 profile with native HDR output enabled."""
-
-    @property
-    def profile_id(self) -> str:
-        return "rivals2-online-hdr"
-
-    @property
-    def display_name(self) -> str:
-        return "Rivals 2: Online / Matchmaking HDR"
-
-    @property
-    def description(self) -> str:
-        return "Stable rollback-safe settings for online play with native HDR output"
-
-    def get_in_game_settings(self) -> list[dict[str, str]]:
-        return [
-            *self._hdr_in_game_settings(),
-            *super().get_in_game_settings(),
-        ]
-
 
 

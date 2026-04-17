@@ -137,7 +137,7 @@ def test_profile_count() -> None:
     from abso.profiles.catalog import get_profile_classes
 
     classes = get_profile_classes()
-    assert len(classes) >= 28, f"Expected at least 28 profiles, got {len(classes)}"
+    assert len(classes) >= 22, f"Expected at least 22 profiles, got {len(classes)}"
 
 
 if __name__ == "__main__":

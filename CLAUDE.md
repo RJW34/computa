@@ -15,15 +15,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Available Profiles
 
-- **slippi-melee** — Slippi Dolphin (SSBM) - minimum latency
-- **rivals2** — Rivals of Aether 2 - base minimum latency (NOT for online)
-- **rivals2-offline** — Rivals 2 training/local play
-- **rivals2-online** — Rivals 2 online/ranked (rollback-safe)
-- **rivals2-tournament-sim-144hz** — Tournament condition simulation
-- **rivals2-300hz-max** — Maximum performance 300Hz
+- **slippi-melee** / **slippi-melee-console-parity** / **slippi-melee-universal** — Slippi Dolphin (SSBM) variants
+- **rivals2-offline** / **rivals2-online** — Rivals 2 no-sync offline vs rollback-safe online
+- **rivals2-gsync** / **rivals2-online-gsync** — Rivals 2 VRR lanes (offline vs online)
 - **fortnite** / **fortnite-hdr** — Fortnite Reflex path
 - **marvel-rivals-sdr** / **marvel-rivals-hdr** — Marvel Rivals Reflex path
-- **diablo4** — Diablo 4 (balanced ARPG)
+- **overwatch2** / **overwatch2-gsync** / **overwatch2-gsync-hdr** — OW2 no-sync + strict fullscreen G-SYNC lanes
+- **overwatch2-gsync-capture** / **overwatch2-gsync-hdr-capture** — Borderless OW2 G-SYNC for capture/overlay workflows
+- **diablo4** / **diablo4-sdr** — Diablo 4 (balanced ARPG)
 - **pokemon-auto-chess** — Browser game optimization
 - **pacdeluxe** — Tauri client optimization
 - **productivity** — Non-gaming desktop work

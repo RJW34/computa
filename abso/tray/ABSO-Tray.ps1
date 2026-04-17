@@ -768,51 +768,11 @@ $script:FallbackProfiles = [ordered]@{
         Exes     = @("Rivals2-Win64-Shipping.exe", "RivalsofAether2.exe", "Rivals2.exe")
         SyncMode = "off"
     }
-    "rivals2-offline-hdr" = @{
-        Name     = "Rivals 2: Offline / Training HDR"
-        Sub      = "HDR ON | No Sync | Uncapped"
-        Cat      = "Fighting"
-        Desc     = "Offline/training Rivals 2 profile with native HDR output enabled"
-        Exes     = @("Rivals2-Win64-Shipping.exe", "RivalsofAether2.exe", "Rivals2.exe")
-        SyncMode = "off"
-    }
     "rivals2-online"    = @{
         Name     = "Rivals 2: Online / Matchmaking"
         Sub      = "LLM ON | Uncapped | Rollback-Safe"
         Cat      = "Fighting"
         Desc     = "Stable rollback-safe settings for online play (prioritizes stability)"
-        Exes     = @("Rivals2-Win64-Shipping.exe", "RivalsofAether2.exe", "Rivals2.exe")
-        SyncMode = "off"
-    }
-    "rivals2-online-hdr" = @{
-        Name     = "Rivals 2: Online / Matchmaking HDR"
-        Sub      = "HDR ON | Uncapped | Rollback-Safe"
-        Cat      = "Fighting"
-        Desc     = "Rollback-safe Rivals 2 profile with native HDR output enabled"
-        Exes     = @("Rivals2-Win64-Shipping.exe", "RivalsofAether2.exe", "Rivals2.exe")
-        SyncMode = "off"
-    }
-    "rivals2-streaming" = @{
-        Name     = "Rivals 2 (Streaming)"
-        Sub      = "Rollback-Safe | OBS 1080p60"
-        Cat      = "Streaming"
-        Desc     = "Streaming-optimized Rivals 2 profile (rollback-safe)"
-        Exes     = @("Rivals2-Win64-Shipping.exe", "RivalsofAether2.exe", "Rivals2.exe")
-        SyncMode = "agnostic"
-    }
-    "rivals2-streaming-hdr" = @{
-        Name     = "Rivals 2 (Streaming HDR)"
-        Sub      = "HDR ON | Rollback-Safe | OBS 1080p60"
-        Cat      = "Streaming"
-        Desc     = "Streaming-optimized Rivals 2 HDR profile (rollback-safe)"
-        Exes     = @("Rivals2-Win64-Shipping.exe", "RivalsofAether2.exe", "Rivals2.exe")
-        SyncMode = "agnostic"
-    }
-    "rivals2-tournament-sim-144hz" = @{
-        Name     = "Rivals 2: Tournament Sim (144Hz)"
-        Sub      = "LLM ON | 144Hz | No VRR"
-        Cat      = "Fighting"
-        Desc     = "Simulates offline tournament conditions (144Hz, no VRR, practice transfer focus)"
         Exes     = @("Rivals2-Win64-Shipping.exe", "RivalsofAether2.exe", "Rivals2.exe")
         SyncMode = "off"
     }
@@ -824,27 +784,11 @@ $script:FallbackProfiles = [ordered]@{
         Exes     = @("Rivals2-Win64-Shipping.exe", "RivalsofAether2.exe", "Rivals2.exe")
         SyncMode = "on"
     }
-    "rivals2-gsync-hdr" = @{
-        Name     = "Rivals 2: G-SYNC HDR"
-        Sub      = "HDR ON | G-SYNC ON | VSync Safety Net"
-        Cat      = "Fighting"
-        Desc     = "Native HDR Rivals 2 VRR profile with fullscreen G-SYNC"
-        Exes     = @("Rivals2-Win64-Shipping.exe", "RivalsofAether2.exe", "Rivals2.exe")
-        SyncMode = "on"
-    }
     "rivals2-online-gsync" = @{
         Name     = "Rivals 2: Online G-SYNC"
         Sub      = "G-SYNC ON | Rollback-Safe | VRR"
         Cat      = "Fighting"
         Desc     = "Rollback-safe VRR profile (G-SYNC ON, stability-focused)"
-        Exes     = @("Rivals2-Win64-Shipping.exe", "RivalsofAether2.exe", "Rivals2.exe")
-        SyncMode = "on"
-    }
-    "rivals2-online-gsync-hdr" = @{
-        Name     = "Rivals 2: Online G-SYNC HDR"
-        Sub      = "HDR ON | G-SYNC ON | Rollback-Safe"
-        Cat      = "Fighting"
-        Desc     = "Rollback-safe native HDR Rivals 2 VRR profile"
         Exes     = @("Rivals2-Win64-Shipping.exe", "RivalsofAether2.exe", "Rivals2.exe")
         SyncMode = "on"
     }
@@ -874,22 +818,6 @@ $script:FallbackProfiles = [ordered]@{
         Exes     = @("Slippi Dolphin.exe", "Dolphin.exe")
         SyncMode = "off"
     }
-    "slippi-melee-vrr-lab" = @{
-        Name     = "Super Smash Bros. Melee (Slippi VRR Lab)"
-        Sub      = "VRR Lab | G-SYNC ON | A/B Test"
-        Cat      = "Fighting"
-        Desc     = "Experimental VRR/G-SYNC test profile for Slippi latency and pacing A/B"
-        Exes     = @("Slippi Dolphin.exe", "Dolphin.exe")
-        SyncMode = "on"
-    }
-    "slippi-melee-streaming" = @{
-        Name     = "Slippi Melee (Streaming)"
-        Sub      = "OBS 1080p60 | Multi-monitor"
-        Cat      = "Streaming"
-        Desc     = "Streaming-optimized Slippi profile for multi-monitor setups"
-        Exes     = @("Slippi Dolphin.exe", "Dolphin.exe")
-        SyncMode = "agnostic"
-    }
 
     # --- Fighting Games: SSBU ---
     "ryujinx-ssbu"      = @{
@@ -899,14 +827,6 @@ $script:FallbackProfiles = [ordered]@{
         Desc     = "Ultra-low latency optimization for competitive SSBU/HDR"
         Exes     = @("Ryujinx.exe", "Ryujinx.Ava.exe", "Ryujinx.Headless.SDL2.exe", "Ryubing.exe")
         SyncMode = "off"
-    }
-    "ryujinx-ssbu-streaming" = @{
-        Name     = "SSBU / HewDraw Remix (Streaming)"
-        Sub      = "OBS 1080p60 | Multi-monitor"
-        Cat      = "Streaming"
-        Desc     = "Streaming-optimized Ryujinx profile for multi-monitor setups"
-        Exes     = @("Ryujinx.exe", "Ryujinx.Ava.exe", "Ryujinx.Headless.SDL2.exe", "Ryubing.exe")
-        SyncMode = "agnostic"
     }
 
     # --- ARPG ---
@@ -970,32 +890,6 @@ $script:FallbackProfiles = [ordered]@{
         Exes     = @("Marvel.exe", "Marvel-Win64-Shipping.exe")
         SyncMode = "on"
     }
-    "fortnite-streaming" = @{
-        Name     = "Fortnite (Streaming)"
-        Sub      = "SDR | Reflex ON+Boost | OBS 1080p60"
-        Cat      = "Streaming"
-        Desc     = "Streaming-optimized Fortnite profile for multi-monitor OBS"
-        Exes     = @(
-            "FortniteClient-Win64-Shipping.exe",
-            "FortniteClient-Win64-Shipping_EAC.exe",
-            "FortniteClient-Win64-Shipping_BE.exe",
-            "FortniteClient-Win64-Shipping_EAC_EOS.exe"
-        )
-        SyncMode = "agnostic"
-    }
-    "fortnite-streaming-hdr" = @{
-        Name     = "Fortnite (Streaming HDR)"
-        Sub      = "HDR ON | Reflex ON+Boost | OBS 1080p60"
-        Cat      = "Streaming"
-        Desc     = "Streaming-optimized Fortnite HDR profile for multi-monitor OBS"
-        Exes     = @(
-            "FortniteClient-Win64-Shipping.exe",
-            "FortniteClient-Win64-Shipping_EAC.exe",
-            "FortniteClient-Win64-Shipping_BE.exe",
-            "FortniteClient-Win64-Shipping_EAC_EOS.exe"
-        )
-        SyncMode = "agnostic"
-    }
     "overwatch2"        = @{
         Name     = "Overwatch 2 - No-Sync"
         Sub      = "Reflex OFF | VSync OFF | G-SYNC OFF"
@@ -1020,22 +914,6 @@ $script:FallbackProfiles = [ordered]@{
         Exes     = @("Overwatch.exe")
         SyncMode = "on"
     }
-    "overwatch2-gsync-hdr-streaming" = @{
-        Name     = "Overwatch 2 - GSYNC HDR (Streaming)"
-        Sub      = "HDR + G-SYNC | OBS 1080p60"
-        Cat      = "Streaming"
-        Desc     = "Streaming-optimized OW2 G-SYNC HDR profile for multi-monitor OBS"
-        Exes     = @("Overwatch.exe")
-        SyncMode = "on"
-    }
-    "overwatch2-gsync-streaming" = @{
-        Name     = "Overwatch 2 - GSYNC (Streaming)"
-        Sub      = "G-SYNC | OBS 1080p60"
-        Cat      = "Streaming"
-        Desc     = "Streaming-optimized OW2 G-SYNC SDR profile for multi-monitor OBS"
-        Exes     = @("Overwatch.exe")
-        SyncMode = "on"
-    }
 
     # --- Browser Games ---
     "pokemon-auto-chess" = @{
@@ -1051,14 +929,6 @@ $script:FallbackProfiles = [ordered]@{
         Sub      = "LLM ON | Tauri + WebView2 | Adaptive VSync"
         Cat      = "Other"
         Desc     = "Native Tauri client optimization for smooth WebGL auto-battler gameplay"
-        Exes     = @("pac-deluxe.exe", "msedgewebview2.exe")
-        SyncMode = "agnostic"
-    }
-    "pacdeluxe-streaming" = @{
-        Name     = "PACDeluxe (Streaming)"
-        Sub      = "OBS 1080p60 | Multi-monitor"
-        Cat      = "Streaming"
-        Desc     = "Streaming-optimized PACDeluxe profile for multi-monitor OBS"
         Exes     = @("pac-deluxe.exe", "msedgewebview2.exe")
         SyncMode = "agnostic"
     }

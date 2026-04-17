@@ -177,7 +177,7 @@ def test_capability_blocks_fixed_refresh_when_monitor_cannot_support_it() -> Non
     ]
     detector.detect_gpu.return_value = {"name": "NVIDIA GeForce RTX 4090"}
 
-    profile = _make_profile("rivals2-tournament-sim-144hz")
+    profile = _make_profile("rivals2-offline")
     profile.get_settings.side_effect = lambda handler_name: (
         {"refresh_rate": 360} if handler_name == "WindowsSettingsHandler" else {}
     )
@@ -201,7 +201,7 @@ def test_capability_allows_fixed_refresh_when_supported() -> None:
     ]
     detector.detect_gpu.return_value = {"name": "NVIDIA GeForce RTX 4090"}
 
-    profile = _make_profile("rivals2-tournament-sim-144hz")
+    profile = _make_profile("rivals2-offline")
     profile.get_settings.side_effect = lambda handler_name: (
         {"refresh_rate": 144} if handler_name == "WindowsSettingsHandler" else {}
     )

@@ -23,7 +23,7 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-from abso.profiles.profile_bases import Rivals2BaseProfile, Rivals2HDRMixin
+from abso.profiles.profile_bases import Rivals2BaseProfile
 
 
 class Rivals2OfflineProfile(Rivals2BaseProfile):
@@ -170,25 +170,4 @@ class Rivals2OfflineProfile(Rivals2BaseProfile):
             },
         ]
 
-
-class Rivals2OfflineHDRProfile(Rivals2HDRMixin, Rivals2OfflineProfile):
-    """Offline/training Rivals 2 profile with native HDR output enabled."""
-
-    @property
-    def profile_id(self) -> str:
-        return "rivals2-offline-hdr"
-
-    @property
-    def display_name(self) -> str:
-        return "Rivals 2: Offline / Training HDR"
-
-    @property
-    def description(self) -> str:
-        return "Maximum latency reduction for training/local play with native HDR output"
-
-    def get_in_game_settings(self) -> list[dict[str, str]]:
-        return [
-            *self._hdr_in_game_settings(),
-            *super().get_in_game_settings(),
-        ]
 

@@ -112,13 +112,18 @@ python -m abso restore 20240115_143022  # Specific backup
 |---------|------|-------|
 | `slippi-melee` | Super Smash Bros. Melee (Slippi) | Ultra-low latency |
 | `slippi-melee-console-parity` | Super Smash Bros. Melee (Slippi) | Console-like pacing/feel |
-| `slippi-melee-vrr-lab` | Super Smash Bros. Melee (Slippi) | Experimental VRR/G-SYNC A/B testing |
+| `slippi-melee-universal` | Super Smash Bros. Melee (Slippi) | Lowest latency with fixed HAGS (no reboot) |
 | `rivals2-offline` | Rivals of Aether 2 | Offline no-sync latency |
 | `rivals2-online` | Rivals of Aether 2 | Rollback-safe online play |
-| `fortnite` | Fortnite | Reflex no-sync latency |
+| `rivals2-gsync` | Rivals of Aether 2 | Low-latency VRR offline |
+| `rivals2-online-gsync` | Rivals of Aether 2 | Rollback-safe VRR online |
+| `fortnite` / `fortnite-hdr` | Fortnite | Reflex no-sync latency (SDR / HDR) |
+| `marvel-rivals-sdr` / `marvel-rivals-hdr` | Marvel Rivals | Reflex VRR (SDR / HDR) |
 | `overwatch2` | Overwatch 2 (No-Sync) | Minimum latency no-sync |
-| `overwatch2-gsync` | Overwatch 2 (G-SYNC) | Tear-free low latency VRR |
-| `diablo4` | Diablo 4 | Balanced performance |
+| `overwatch2-gsync` / `overwatch2-gsync-hdr` | Overwatch 2 (G-SYNC) | Tear-free low latency VRR (SDR / HDR) |
+| `overwatch2-gsync-capture` / `overwatch2-gsync-hdr-capture` | Overwatch 2 (G-SYNC) | Borderless VRR path for capture/overlay workflows |
+| `diablo4` / `diablo4-sdr` | Diablo 4 | Balanced performance (HDR / SDR) |
+| `ryujinx-ssbu` | Ryujinx (SSBU) | Low-latency emulator system path |
 
 ## What Gets Optimized
 

@@ -38,41 +38,39 @@ def test_retired_rivals_aliases_resolve_to_offline_profile() -> None:
     assert resolve_profile_id("rivals2-300hz-max") == "rivals2-offline"
 
 
-def test_rivals_manifest_contains_canonical_hdr_variants() -> None:
-    """The live manifest should expose the consolidated Rivals SDR/HDR matrix."""
-    manifest = {profile["id"]: profile for profile in get_profile_manifest()}
+def test_consolidated_hdr_and_streaming_aliases_resolve_to_sdr_base() -> None:
+    """Dropped HDR/streaming/lab variants must resolve to their kept base profile."""
+    assert "rivals2-offline-hdr" not in PROFILE_CATALOG
+    assert "rivals2-online-hdr" not in PROFILE_CATALOG
+    assert "rivals2-gsync-hdr" not in PROFILE_CATALOG
+    assert "rivals2-online-gsync-hdr" not in PROFILE_CATALOG
+    assert "rivals2-tournament-sim-144hz" not in PROFILE_CATALOG
+    assert "fortnite-streaming" not in PROFILE_CATALOG
+    assert "fortnite-streaming-hdr" not in PROFILE_CATALOG
+    assert "overwatch2-gsync-streaming" not in PROFILE_CATALOG
+    assert "overwatch2-gsync-hdr-streaming" not in PROFILE_CATALOG
+    assert "pacdeluxe-streaming" not in PROFILE_CATALOG
+    assert "ryujinx-ssbu-streaming" not in PROFILE_CATALOG
+    assert "rivals2-streaming" not in PROFILE_CATALOG
+    assert "rivals2-streaming-hdr" not in PROFILE_CATALOG
+    assert "slippi-melee-streaming" not in PROFILE_CATALOG
+    assert "slippi-melee-vrr-lab" not in PROFILE_CATALOG
 
-    for profile_id in {
-        "rivals2-offline",
-        "rivals2-offline-hdr",
-        "rivals2-online",
-        "rivals2-online-hdr",
-        "rivals2-gsync",
-        "rivals2-gsync-hdr",
-        "rivals2-online-gsync",
-        "rivals2-online-gsync-hdr",
-        "rivals2-streaming",
-        "rivals2-streaming-hdr",
-        "rivals2-tournament-sim-144hz",
-    }:
-        assert profile_id in manifest
-
-
-def test_shooter_and_arpg_families_expose_canonical_hdr_sdr_pairs() -> None:
-    """Families with explicit native HDR support should expose paired SDR/HDR lanes."""
-    manifest = {profile["id"]: profile for profile in get_profile_manifest()}
-
-    for profile_id in {
-        "diablo4",
-        "diablo4-sdr",
-        "fortnite",
-        "fortnite-hdr",
-        "fortnite-streaming",
-        "fortnite-streaming-hdr",
-        "overwatch2-gsync-streaming",
-        "overwatch2-gsync-hdr-streaming",
-    }:
-        assert profile_id in manifest
+    assert resolve_profile_id("rivals2-offline-hdr") == "rivals2-offline"
+    assert resolve_profile_id("rivals2-online-hdr") == "rivals2-online"
+    assert resolve_profile_id("rivals2-gsync-hdr") == "rivals2-gsync"
+    assert resolve_profile_id("rivals2-online-gsync-hdr") == "rivals2-online-gsync"
+    assert resolve_profile_id("rivals2-tournament-sim-144hz") == "rivals2-offline"
+    assert resolve_profile_id("fortnite-streaming") == "fortnite"
+    assert resolve_profile_id("fortnite-streaming-hdr") == "fortnite-hdr"
+    assert resolve_profile_id("overwatch2-gsync-streaming") == "overwatch2-gsync"
+    assert resolve_profile_id("overwatch2-gsync-hdr-streaming") == "overwatch2-gsync-hdr"
+    assert resolve_profile_id("pacdeluxe-streaming") == "pacdeluxe"
+    assert resolve_profile_id("ryujinx-ssbu-streaming") == "ryujinx-ssbu"
+    assert resolve_profile_id("rivals2-streaming") == "rivals2-online"
+    assert resolve_profile_id("rivals2-streaming-hdr") == "rivals2-online"
+    assert resolve_profile_id("slippi-melee-streaming") == "slippi-melee"
+    assert resolve_profile_id("slippi-melee-vrr-lab") == "slippi-melee"
 
 
 def test_future_dated_cod_profiles_are_not_registered() -> None:
@@ -107,7 +105,6 @@ def test_slippi_tray_metadata_matches_sync_behavior() -> None:
     assert manifest["slippi-melee"]["sync_mode"] == "off"
     assert manifest["slippi-melee-console-parity"]["sync_mode"] == "on"
     assert manifest["slippi-melee-universal"]["sync_mode"] == "off"
-    assert manifest["slippi-melee-vrr-lab"]["sync_mode"] == "on"
     assert "sync-agnostic" not in manifest["slippi-melee-universal"]["tray_description"].lower()
 
 

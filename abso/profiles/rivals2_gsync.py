@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from abso.profiles.profile_bases import Rivals2BaseProfile, Rivals2HDRMixin
+from abso.profiles.profile_bases import Rivals2BaseProfile
 
 
 class Rivals2GSyncProfile(Rivals2BaseProfile):
@@ -290,45 +290,3 @@ class Rivals2OnlineGSyncProfile(Rivals2BaseProfile):
         ]
 
 
-class Rivals2GSyncHDRProfile(Rivals2HDRMixin, Rivals2GSyncProfile):
-    """Low-latency VRR Rivals 2 profile with native HDR output enabled."""
-
-    @property
-    def profile_id(self) -> str:
-        return "rivals2-gsync-hdr"
-
-    @property
-    def display_name(self) -> str:
-        return "Rivals 2: G-SYNC HDR"
-
-    @property
-    def description(self) -> str:
-        return "Low latency VRR profile with native HDR output (G-SYNC ON, VSync safety net)"
-
-    def get_in_game_settings(self) -> list[dict[str, str]]:
-        return [
-            *self._hdr_in_game_settings(),
-            *super().get_in_game_settings(),
-        ]
-
-
-class Rivals2OnlineGSyncHDRProfile(Rivals2HDRMixin, Rivals2OnlineGSyncProfile):
-    """Rollback-safe Rivals 2 VRR profile with native HDR output enabled."""
-
-    @property
-    def profile_id(self) -> str:
-        return "rivals2-online-gsync-hdr"
-
-    @property
-    def display_name(self) -> str:
-        return "Rivals 2: Online G-SYNC HDR"
-
-    @property
-    def description(self) -> str:
-        return "Rollback-safe VRR profile with native HDR output (G-SYNC ON, stability-focused)"
-
-    def get_in_game_settings(self) -> list[dict[str, str]]:
-        return [
-            *self._hdr_in_game_settings(),
-            *super().get_in_game_settings(),
-        ]

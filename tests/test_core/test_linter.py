@@ -210,7 +210,7 @@ class TestProfileLinterErrors:
         win_handler = MagicMock()
         win_handler.__class__.__name__ = "WindowsSettingsHandler"
         profile = _make_profile(
-            profile_id="rivals2-online-hdr",
+            profile_id="rivals2-online-hdr-variant",
             display_name="Rivals 2: Online HDR",
             executable_hints=["Rivals2-Win64-Shipping.exe"],
             is_sdr_only=False,

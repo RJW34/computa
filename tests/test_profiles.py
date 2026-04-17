@@ -20,25 +20,15 @@ from abso.profiles.overwatch2 import (
 from abso.profiles.pokemon_auto_chess import PokemonAutoChessProfile
 from abso.profiles.rivals2 import Rivals2Profile
 from abso.profiles.rivals2_gsync import (
-    Rivals2GSyncHDRProfile,
     Rivals2GSyncProfile,
-    Rivals2OnlineGSyncHDRProfile,
     Rivals2OnlineGSyncProfile,
 )
-from abso.profiles.rivals2_offline import Rivals2OfflineHDRProfile, Rivals2OfflineProfile
-from abso.profiles.rivals2_online import Rivals2OnlineHDRProfile, Rivals2OnlineProfile
-from abso.profiles.streaming_profiles import (
-    FortniteHDRStreamingProfile,
-    FortniteStreamingProfile,
-    Overwatch2GSyncStreamingProfile,
-    Rivals2HDRStreamingProfile,
-    Rivals2StreamingProfile,
-)
+from abso.profiles.rivals2_offline import Rivals2OfflineProfile
+from abso.profiles.rivals2_online import Rivals2OnlineProfile
 from abso.profiles.slippi_melee import (
     SlippiMeleeConsoleParityProfile,
     SlippiMeleeProfile,
     SlippiMeleeUniversalProfile,
-    SlippiMeleeVRRLabProfile,
 )
 
 
@@ -62,12 +52,6 @@ class TestProfileLoading:
         profile = SlippiMeleeUniversalProfile()
         assert profile.profile_id == "slippi-melee-universal"
         assert "Universal" in profile.display_name
-
-    def test_slippi_vrr_lab_profile_loads(self):
-        """Test SlippiMeleeVRRLabProfile can be instantiated."""
-        profile = SlippiMeleeVRRLabProfile()
-        assert profile.profile_id == "slippi-melee-vrr-lab"
-        assert "VRR Lab" in profile.display_name
 
     def test_diablo4_profile_loads(self):
         """Diablo 4 should expose explicit HDR and SDR variants."""
@@ -116,50 +100,28 @@ class TestProfileLoading:
         assert "Marvel Rivals" in hdr.display_name
 
     def test_rivals2_consolidated_profiles_load(self):
-        """The canonical Rivals 2 matrix should expose explicit SDR/HDR lanes."""
+        """The canonical Rivals 2 matrix should expose the core SDR lanes."""
         offline = Rivals2OfflineProfile()
-        offline_hdr = Rivals2OfflineHDRProfile()
         online = Rivals2OnlineProfile()
-        online_hdr = Rivals2OnlineHDRProfile()
         gsync = Rivals2GSyncProfile()
-        gsync_hdr = Rivals2GSyncHDRProfile()
         online_gsync = Rivals2OnlineGSyncProfile()
-        online_gsync_hdr = Rivals2OnlineGSyncHDRProfile()
-        streaming = Rivals2StreamingProfile()
-        streaming_hdr = Rivals2HDRStreamingProfile()
 
         assert offline.profile_id == "rivals2-offline"
-        assert offline_hdr.profile_id == "rivals2-offline-hdr"
         assert online.profile_id == "rivals2-online"
-        assert online_hdr.profile_id == "rivals2-online-hdr"
         assert gsync.profile_id == "rivals2-gsync"
-        assert gsync_hdr.profile_id == "rivals2-gsync-hdr"
         assert online_gsync.profile_id == "rivals2-online-gsync"
-        assert online_gsync_hdr.profile_id == "rivals2-online-gsync-hdr"
-        assert streaming.profile_id == "rivals2-streaming"
-        assert streaming_hdr.profile_id == "rivals2-streaming-hdr"
 
     def test_profiles_expose_canonical_nvidia_binding_executables(self):
         """NVIDIA binding should target canonical binaries, not broad detection aliases."""
-        rivals = Rivals2OnlineGSyncHDRProfile()
+        rivals = Rivals2OnlineGSyncProfile()
         marvel = MarvelRivalsHDRProfile()
-        slippi = SlippiMeleeVRRLabProfile()
+        slippi = SlippiMeleeProfile()
 
         assert rivals.nvidia_binding_executables == ["Rivals2-Win64-Shipping.exe"]
         assert rivals.allow_unverified_nvidia_profile_reuse is True
         assert marvel.nvidia_binding_executables == ["Marvel-Win64-Shipping.exe"]
         assert slippi.nvidia_binding_executables == ["Slippi Dolphin.exe"]
         assert slippi.allow_unverified_nvidia_profile_reuse is True
-
-    def test_streaming_variants_load(self):
-        """Streaming families should expose the expected explicit HDR/SDR lanes."""
-        fortnite_stream = FortniteStreamingProfile()
-        fortnite_stream_hdr = FortniteHDRStreamingProfile()
-        ow2_stream = Overwatch2GSyncStreamingProfile()
-
-        assert fortnite_stream.profile_id == "fortnite-streaming"
-        assert fortnite_stream_hdr.profile_id == "fortnite-streaming-hdr"
-        assert ow2_stream.profile_id == "overwatch2-gsync-streaming"
 
 
 class TestProfileHandlers:
@@ -312,15 +274,6 @@ class TestProfileSettings:
         profile = SlippiMeleeConsoleParityProfile()
         settings = profile.get_settings("WindowsSettingsHandler")
         assert settings["refresh_rate"] == 60
-
-    def test_slippi_vrr_lab_nvidia_settings(self):
-        """VRR lab profile should explicitly enable VRR test path."""
-        profile = SlippiMeleeVRRLabProfile()
-        settings = profile.get_settings("NvidiaSettingsHandler")
-
-        assert settings["vsync"] == "on"
-        assert settings["vrr_app_override"] == "allow"
-        assert settings["global_vrr_mode"] == "fullscreen_only"
 
     def test_diablo4_nvidia_settings(self):
         """Test Diablo4Profile returns Nvidia settings with Reflex preset (LLM OFF)."""
@@ -488,7 +441,6 @@ class TestProfileSettings:
             MarvelRivalsHDRProfile(),
             Rivals2GSyncProfile(),
             Rivals2OnlineGSyncProfile(),
-            SlippiMeleeVRRLabProfile(),
         ]
 
         for profile in strict_profiles:
@@ -659,34 +611,6 @@ class TestProfileSettings:
         assert settings["preset"] == "vrr_fighting_game"
         assert "Rivals 2: Online / Matchmaking" in settings["profile_aliases"]
 
-    def test_rivals2_offline_hdr_enables_native_hdr_path(self):
-        """Offline HDR profile should enable native Windows + game HDR."""
-        profile = Rivals2OfflineHDRProfile()
-
-        windows = profile.get_settings("WindowsSettingsHandler")
-        color = profile.get_settings("ColorProfileSettingsHandler")
-        config = profile.get_settings("Rivals2ConfigHandler")
-
-        assert windows["hdr"] is True
-        assert windows["auto_hdr"] is False
-        assert color["icc_profile"] == "native"
-        assert config["hdr_output"] is True
-        assert config["hdr_nits"] == 1000
-
-    def test_rivals2_online_hdr_enables_native_hdr_path(self):
-        """Online HDR profile should preserve rollback-safe behavior while enabling HDR."""
-        profile = Rivals2OnlineHDRProfile()
-
-        windows = profile.get_settings("WindowsSettingsHandler")
-        nvidia = profile.get_settings("NvidiaSettingsHandler")
-        config = profile.get_settings("Rivals2ConfigHandler")
-
-        assert windows["hdr"] is True
-        assert windows["auto_hdr"] is False
-        assert nvidia["global_vrr_mode"] == "off"
-        assert config["hdr_output"] is True
-        assert config["frame_rate_limit"] == 999
-
     def test_rivals2_gsync_profile_sets_in_game_vrr_cap_automatically(self):
         """VRR Rivals profiles should drive the lower-latency in-game cap, not just NVCP."""
         profile = Rivals2GSyncProfile()
@@ -694,42 +618,6 @@ class TestProfileSettings:
 
         assert config["auto_vrr_fps_cap"] is True
         assert config["hdr_output"] is False
-
-    def test_rivals2_gsync_hdr_profile_enables_native_hdr_and_auto_vrr_cap(self):
-        """HDR VRR Rivals profile should layer native HDR onto the VRR lane."""
-        profile = Rivals2GSyncHDRProfile()
-
-        windows = profile.get_settings("WindowsSettingsHandler")
-        nvidia = profile.get_settings("NvidiaSettingsHandler")
-        config = profile.get_settings("Rivals2ConfigHandler")
-
-        assert windows["hdr"] is True
-        assert windows["auto_hdr"] is False
-        assert nvidia["global_vrr_mode"] == "fullscreen_only"
-        assert nvidia["auto_vrr_fps_cap"] is True
-        assert config["auto_vrr_fps_cap"] is True
-        assert config["hdr_output"] is True
-
-    def test_rivals2_online_gsync_hdr_profile_stays_on_online_nvidia_family(self):
-        """Online HDR VRR profile should keep the online NVIDIA family identity."""
-        profile = Rivals2OnlineGSyncHDRProfile()
-        nvidia = profile.get_settings("NvidiaSettingsHandler")
-
-        assert nvidia["profile_name"] == "Rivals 2 Online"
-        assert "Rivals 2: Online / Matchmaking" in nvidia["profile_aliases"]
-
-    def test_rivals2_streaming_profiles_share_online_core_behavior(self):
-        """Streaming Rivals profiles should inherit the online stability lane plus OBS tuning."""
-        sdr = Rivals2StreamingProfile()
-        hdr = Rivals2HDRStreamingProfile()
-
-        sdr_config = sdr.get_settings("Rivals2ConfigHandler")
-        hdr_config = hdr.get_settings("Rivals2ConfigHandler")
-
-        assert sdr_config["frame_rate_limit"] == 999
-        assert sdr_config["hdr_output"] is False
-        assert hdr_config["frame_rate_limit"] == 999
-        assert hdr_config["hdr_output"] is True
 
     def test_unknown_handler_returns_empty(self):
         """Test that unknown handler name returns empty dict."""
@@ -766,14 +654,6 @@ class TestProfileInGameSettings:
         assert len(settings) > 0
         assert any(s.get("setting") == "V-SYNC (global/per-game)" for s in settings)
 
-    def test_slippi_vrr_lab_in_game_settings(self):
-        """VRR lab profile should include explicit A/B measurement guidance."""
-        profile = SlippiMeleeVRRLabProfile()
-        settings = profile.get_in_game_settings()
-
-        assert isinstance(settings, list)
-        assert len(settings) > 0
-        assert any("A/B" in s.get("value", "") for s in settings)
 
     def test_pokemon_auto_chess_in_game_settings(self):
         """Test PokemonAutoChessProfile returns Chrome-specific settings."""
@@ -842,13 +722,11 @@ class TestBaseProfileImplementation:
         gsync_hdr = Overwatch2GSyncHDRProfile()
         marvel_sdr = MarvelRivalsSDRProfile()
         marvel_hdr = MarvelRivalsHDRProfile()
-        slippi_vrr_lab = SlippiMeleeVRRLabProfile()
         assert no_sync.requires_confirmed_vrr_support is False
         assert gsync.requires_confirmed_vrr_support is True
         assert gsync_hdr.requires_confirmed_vrr_support is True
         assert marvel_sdr.requires_confirmed_vrr_support is True
         assert marvel_hdr.requires_confirmed_vrr_support is True
-        assert slippi_vrr_lab.requires_confirmed_vrr_support is True
 
     def test_pokemon_auto_chess_optimization_target(self):
         """Test PokemonAutoChessProfile has balanced optimization target."""

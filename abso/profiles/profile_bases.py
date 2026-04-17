@@ -10,38 +10,6 @@ if TYPE_CHECKING:
     from abso.settings.base import SettingsHandler
 
 
-OBS_EXECUTABLES = [
-    "obs64.exe",
-    "obs32.exe",
-    "obs-browser.exe",
-]
-
-STREAMING_OBS_SETTINGS = {
-    "stream_encoder": {
-        "rate_control": "CBR",
-        "bitrate": 6000,
-        "preset": "p5",
-        "multipass": "disabled",
-        "profile": "high",
-        "look-ahead": False,
-        "psycho_aq": True,
-    },
-    "video": {
-        "output_cx": 1920,
-        "output_cy": 1080,
-        "scale_type": "lanczos",
-    },
-    "low_latency": True,
-}
-
-STREAMING_GRAPHICS_OVERRIDES = {
-    # Multi-monitor streaming: keep compositor-friendly defaults
-    "disable_global_fso": False,
-    # MPO is handled by the applier's environment-aware detection —
-    # no profile-level opinion needed.
-}
-
-
 def merge_settings(
     base: dict[str, Any] | None,
     overrides: dict[str, Any] | None,
@@ -86,69 +54,6 @@ def inject_nvidia_profile_identity(
     if profile_aliases:
         merged.setdefault("profile_aliases", list(profile_aliases))
     return merged
-
-
-def with_obs_executables(executables: list[str]) -> list[str]:
-    merged = list(executables)
-    for exe in OBS_EXECUTABLES:
-        if exe not in merged:
-            merged.append(exe)
-    return merged
-
-
-def _inject_obs_handlers(
-    handlers: list[SettingsHandler],
-    executables: list[str],
-) -> list[SettingsHandler]:
-    from abso.settings.obs import OBSSettingsHandler
-    from abso.settings.process_priority import ProcessPriorityHandler
-
-    merged: list[SettingsHandler] = []
-    obs_added = False
-    priority_replaced = False
-    obs_executables = with_obs_executables(executables)
-
-    for handler in handlers:
-        if isinstance(handler, ProcessPriorityHandler):
-            merged.append(ProcessPriorityHandler(obs_executables))
-            priority_replaced = True
-            if not obs_added:
-                merged.append(OBSSettingsHandler())
-                obs_added = True
-            continue
-        if isinstance(handler, OBSSettingsHandler):
-            if not obs_added:
-                merged.append(handler)
-                obs_added = True
-            continue
-        merged.append(handler)
-
-    if not priority_replaced:
-        merged.append(ProcessPriorityHandler(obs_executables))
-    if not obs_added:
-        merged.append(OBSSettingsHandler())
-
-    return merged
-
-
-class OBSStreamingMixin:
-    """Adds OBS settings + multi-monitor graphics overrides to a profile."""
-
-    obs_settings: dict[str, Any] = STREAMING_OBS_SETTINGS
-    graphics_overrides: dict[str, Any] = STREAMING_GRAPHICS_OVERRIDES
-
-    def get_handlers(self) -> list[SettingsHandler]:
-        base_handlers = super().get_handlers()
-        return _inject_obs_handlers(base_handlers, self.executable_hints)
-
-    def get_settings(self, handler_name: str) -> dict[str, Any]:
-        if handler_name == "OBSSettingsHandler":
-            return self.obs_settings.copy()
-
-        base = super().get_settings(handler_name)
-        if handler_name == "GraphicsSettingsHandler":
-            return merge_settings(base, self.graphics_overrides)
-        return base
 
 
 class Rivals2BaseProfile(BaseProfile):
@@ -352,67 +257,6 @@ class Rivals2BaseProfile(BaseProfile):
     def get_settings(self, handler_name: str) -> dict[str, Any]:
         settings_map = merge_settings_map(self._base_settings(), self._settings_overrides())
         return inject_nvidia_profile_identity(self, handler_name, settings_map.get(handler_name, {}))
-
-
-class Rivals2HDRMixin:
-    """Native-HDR output overrides shared by Rivals 2 HDR variants."""
-
-    @property
-    def is_sdr_only(self) -> bool:
-        return False
-
-    @property
-    def rivals2_hdr_nits(self) -> int:
-        return 1000
-
-    def _hdr_overrides(self) -> dict[str, dict[str, Any]]:
-        return {
-            "WindowsSettingsHandler": {
-                "hdr": True,
-                "auto_hdr": False,
-            },
-            "ColorProfileSettingsHandler": {
-                "icc_profile": "native",
-                "digital_vibrance": 50,
-                "show_osd_guidance": True,
-                "game_type": "competitive_fps",
-            },
-            "Rivals2ConfigHandler": {
-                "hdr_output": True,
-                "hdr_nits": self.rivals2_hdr_nits,
-            },
-        }
-
-    def _settings_overrides(self) -> dict[str, dict[str, Any]]:
-        return merge_settings_map(super()._settings_overrides(), self._hdr_overrides())
-
-    def _hdr_in_game_settings(self) -> list[dict[str, str]]:
-        return [
-            {
-                "category": "Display",
-                "setting": "HDR Output",
-                "value": "On",
-                "reason": (
-                    "Use the game's native HDR path with Windows HDR on when the installed "
-                    "build exposes HDR output in GameUserSettings.ini; do not use Auto HDR."
-                ),
-            },
-            {
-                "category": "Display",
-                "setting": "Auto HDR",
-                "value": "Off",
-                "reason": "Auto HDR is for SDR titles; keep Rivals 2 on its native HDR output path.",
-            },
-            {
-                "category": "Display",
-                "setting": "HDR Peak Brightness / Nits",
-                "value": f"Start at {self.rivals2_hdr_nits} nits or match your display peak",
-                "reason": (
-                    "Rivals 2 stores an HDR nits target in GameUserSettings.ini. "
-                    "Match it to your display peak or use 1000 nits as a sane starting point."
-                ),
-            },
-        ]
 
 
 class EmulatorLatencyBaseProfile(BaseProfile):
