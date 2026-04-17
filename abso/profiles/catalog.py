@@ -315,3 +315,8 @@ def get_profile_manifest() -> list[dict[str, Any]]:
             }
         )
     return manifest
+
+
+def get_profile_aliases() -> dict[str, str]:
+    """Return retired-id -> canonical-id aliases for tray/GUI normalization."""
+    return dict(PROFILE_ALIASES)

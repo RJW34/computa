@@ -1,6 +1,6 @@
 {
-    "version": 1,
-    "saved_at": "2026-04-17T16:09:53.002566-04:00",
+    "version": 2,
+    "saved_at": "2026-04-17T17:12:50.295059-04:00",
     "profiles": [
         {
             "id": "slippi-melee",
@@ -640,5 +640,24 @@
             "tray_description": "Low-latency Ryujinx system path for SSBU/HewDraw Remix. ABSO handles the OS/driver side, but emulator settings still need to be configured manually.",
             "sync_mode": "off"
         }
-    ]
+    ],
+    "aliases": {
+        "rivals2": "rivals2-offline",
+        "rivals2-300hz-max": "rivals2-offline",
+        "rivals2-tournament-sim-144hz": "rivals2-offline",
+        "rivals2-offline-hdr": "rivals2-offline",
+        "rivals2-online-hdr": "rivals2-online",
+        "rivals2-gsync-hdr": "rivals2-gsync",
+        "rivals2-online-gsync-hdr": "rivals2-online-gsync",
+        "fortnite-streaming": "fortnite",
+        "fortnite-streaming-hdr": "fortnite-hdr",
+        "overwatch2-gsync-streaming": "overwatch2-gsync",
+        "overwatch2-gsync-hdr-streaming": "overwatch2-gsync-hdr",
+        "pacdeluxe-streaming": "pacdeluxe",
+        "ryujinx-ssbu-streaming": "ryujinx-ssbu",
+        "rivals2-streaming": "rivals2-online",
+        "rivals2-streaming-hdr": "rivals2-online",
+        "slippi-melee-streaming": "slippi-melee",
+        "slippi-melee-vrr-lab": "slippi-melee"
+    }
 }

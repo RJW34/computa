@@ -20,7 +20,11 @@ from abso.core.detector import HardwareDetector
 from abso.core.exceptions import BackupNotFoundError, ProfileLaunchError
 from abso.core.launcher import launch_profile
 from abso.core.transaction import ProfileTransactionManager
-from abso.profiles.catalog import get_profile_manifest, resolve_profile_id
+from abso.profiles.catalog import (
+    get_profile_aliases,
+    get_profile_manifest,
+    resolve_profile_id,
+)
 from abso.utils.admin import is_admin
 
 console = Console()
@@ -589,6 +593,24 @@ def profiles(json_output: bool) -> None:
         console.print(f"\n[bold cyan]{profile['id']}[/bold cyan]")
         console.print(f"  {profile['display_name']}")
         console.print(f"  [dim]Focus: {profile['description']}[/dim]")
+
+
+@cli.command("profile-aliases")
+@click.option("--json", "json_output", is_flag=True, help="Output as JSON for GUI integration")
+def profile_aliases(json_output: bool) -> None:
+    """List retired -> canonical profile id aliases (for tray/GUI normalization)."""
+    aliases = get_profile_aliases()
+
+    if json_output:
+        output_json(aliases)
+        return
+
+    console.print(Panel("Profile Aliases", style="bold blue"))
+    if not aliases:
+        console.print("[dim]No aliases registered.[/dim]")
+        return
+    for legacy, canonical in sorted(aliases.items()):
+        console.print(f"  [cyan]{legacy}[/cyan] -> [green]{canonical}[/green]")
 
 
 @cli.command()

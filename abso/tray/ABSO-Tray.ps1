@@ -1075,18 +1075,57 @@ function Read-ProfileCatalogCacheEntries {
     return @()
 }
 
+function Read-ProfileAliasMapFromCache {
+    $aliases = @{}
+    if (-not $script:ProfileCatalogCacheFile -or -not (Test-Path $script:ProfileCatalogCacheFile)) {
+        return $aliases
+    }
+
+    try {
+        $cacheRaw = Get-Content $script:ProfileCatalogCacheFile -Raw -ErrorAction Stop
+        if (-not $cacheRaw) { return $aliases }
+        $cachePayload = $cacheRaw | ConvertFrom-Json
+        if ($cachePayload -and $cachePayload.aliases) {
+            $cachePayload.aliases.PSObject.Properties | ForEach-Object {
+                $aliases[$_.Name] = "$($_.Value)"
+            }
+        }
+    }
+    catch {
+        Write-TrayLog "Profile alias cache read failed: $($_.Exception.Message)" -Level "WARN"
+    }
+
+    return $aliases
+}
+
 function Write-ProfileCatalogCache {
-    param([object[]]$Entries)
+    param(
+        [object[]]$Entries,
+        [hashtable]$Aliases = $null
+    )
 
     if (-not $script:ProfileCatalogCacheFile -or -not $Entries -or $Entries.Count -eq 0) {
         return
     }
 
+    # Preserve existing aliases when caller didn't supply a fresh map.
+    if ($null -eq $Aliases) {
+        $Aliases = Read-ProfileAliasMapFromCache
+    }
+
+    $aliasOrdered = [ordered]@{}
+    if ($Aliases) {
+        foreach ($key in ($Aliases.Keys | Sort-Object)) {
+            $aliasOrdered[$key] = "$($Aliases[$key])"
+        }
+    }
+
     try {
         $payload = [ordered]@{
-            version = 1
+            version = 2
             saved_at = (Get-Date).ToString("o")
             profiles = @($Entries)
+            aliases = $aliasOrdered
         }
         $dir = Split-Path -Parent $script:ProfileCatalogCacheFile
         if ($dir -and -not (Test-Path $dir)) {
@@ -1101,12 +1140,173 @@ function Write-ProfileCatalogCache {
     }
 }
 
+function Resolve-ProfileAlias {
+    <#
+    .SYNOPSIS
+    Map a potentially-retired profile id to its canonical replacement.
+
+    Returns $null when passed a null/empty id, otherwise returns the alias
+    target if one exists or the input id unchanged.
+    #>
+    param([string]$ProfileId)
+
+    if ([string]::IsNullOrWhiteSpace($ProfileId)) {
+        return $null
+    }
+    if ($script:ProfileAliases -and $script:ProfileAliases.ContainsKey($ProfileId)) {
+        return $script:ProfileAliases[$ProfileId]
+    }
+    return $ProfileId
+}
+
+function Normalize-TrayConfigProfileIds {
+    <#
+    .SYNOPSIS
+    Resolve retired profile ids in the tray config through the alias map.
+
+    Walks favorites, defaultProfile, recentProfiles, profileHistory,
+    lastProfileState, and lastStartupResolution. Returns a tuple-like
+    object: @{ Config = <normalized>; Changed = <bool> }.
+    Caller is responsible for persisting if Changed is true.
+    #>
+    param([hashtable]$Config)
+
+    if (-not $Config) {
+        return @{ Config = $Config; Changed = $false }
+    }
+
+    $changed = $false
+
+    if ($Config.favorites) {
+        $normalized = @()
+        $seen = @{}
+        foreach ($id in $Config.favorites) {
+            $resolved = Resolve-ProfileAlias $id
+            if ([string]::IsNullOrWhiteSpace($resolved)) { continue }
+            if ($resolved -ne $id) { $changed = $true }
+            if (-not $seen.ContainsKey($resolved)) {
+                $normalized += $resolved
+                $seen[$resolved] = $true
+            }
+            else {
+                $changed = $true
+            }
+        }
+        $Config.favorites = @($normalized)
+    }
+
+    if ($Config.defaultProfile) {
+        $resolved = Resolve-ProfileAlias $Config.defaultProfile
+        if ($resolved -ne $Config.defaultProfile) {
+            $Config.defaultProfile = $resolved
+            $changed = $true
+        }
+    }
+
+    foreach ($listKey in @("recentProfiles", "profileHistory")) {
+        if (-not $Config.$listKey) { continue }
+        $items = @($Config.$listKey)
+        $updated = @()
+        foreach ($entry in $items) {
+            if ($null -eq $entry) { continue }
+            $entryId = $null
+            if ($entry -is [hashtable]) {
+                $entryId = $entry["id"]
+            }
+            elseif ($entry.PSObject.Properties["id"]) {
+                $entryId = $entry.id
+            }
+            if ($entryId) {
+                $resolved = Resolve-ProfileAlias $entryId
+                if ($resolved -ne $entryId) {
+                    if ($entry -is [hashtable]) {
+                        $entry["id"] = $resolved
+                    }
+                    else {
+                        $entry | Add-Member -NotePropertyName "id" -NotePropertyValue $resolved -Force
+                    }
+                    $changed = $true
+                }
+            }
+            $updated += $entry
+        }
+        $Config.$listKey = @($updated)
+    }
+
+    foreach ($stateKey in @("lastProfileState", "lastStartupResolution")) {
+        $state = $Config.$stateKey
+        if ($null -eq $state) { continue }
+        $stateId = $null
+        if ($state -is [hashtable]) {
+            $stateId = $state["id"]
+        }
+        elseif ($state.PSObject.Properties["id"]) {
+            $stateId = $state.id
+        }
+        if ($stateId) {
+            $resolved = Resolve-ProfileAlias $stateId
+            if ($resolved -ne $stateId) {
+                if ($state -is [hashtable]) {
+                    $state["id"] = $resolved
+                }
+                else {
+                    $state | Add-Member -NotePropertyName "id" -NotePropertyValue $resolved -Force
+                }
+                $changed = $true
+            }
+        }
+    }
+
+    return @{ Config = $Config; Changed = $changed }
+}
+
+function Fetch-ProfileAliasMapFromCli {
+    if (-not $script:PythonExe) { return $null }
+
+    try {
+        $tempFile = [System.IO.Path]::GetTempFileName()
+        $errFile = "$tempFile.err"
+        $proc = Start-Process -FilePath $script:PythonExe -ArgumentList "-m", "abso", "profile-aliases", "--json" `
+            -NoNewWindow -PassThru -WorkingDirectory $script:ProjectRoot `
+            -RedirectStandardOutput $tempFile -RedirectStandardError $errFile
+        $proc.WaitForExit(10000)
+        if (-not $proc.HasExited) {
+            Write-TrayLog "Profile alias refresh timed out after 10s, killing process" -Level "WARN"
+            $proc.Kill()
+        }
+        $exitCode = $proc.ExitCode
+        $proc.Dispose()
+
+        $raw = Get-Content $tempFile -Raw -ErrorAction SilentlyContinue
+        Remove-Item $tempFile -Force -ErrorAction SilentlyContinue
+        Remove-Item $errFile -Force -ErrorAction SilentlyContinue
+
+        if (($null -eq $exitCode -or $exitCode -eq 0) -and $raw) {
+            $payload = $raw | ConvertFrom-Json
+            if ($payload -and $payload.success -and $payload.data) {
+                $map = @{}
+                $payload.data.PSObject.Properties | ForEach-Object {
+                    $map[$_.Name] = "$($_.Value)"
+                }
+                return $map
+            }
+        }
+    }
+    catch {
+        Write-TrayLog "Profile alias refresh failed from CLI: $($_.Exception.Message)" -Level "WARN"
+    }
+
+    return $null
+}
+
 function Initialize-ProfilesFromCliCatalog {
     <#
     .SYNOPSIS
     Loads profile metadata from Python CLI to prevent registry drift.
 
     If CLI metadata is unavailable, keeps built-in fallback definitions.
+    Also loads the retired-id alias map so tray-config favorites/defaults
+    can be normalized on startup.
     #>
     $fallbackProfiles = if ($script:FallbackProfiles) {
         $script:FallbackProfiles
@@ -1117,6 +1317,7 @@ function Initialize-ProfilesFromCliCatalog {
 
     $entries = @()
     $source = "fallback"
+    $aliasMap = $null
 
     # Primary source: live CLI profile catalog
     if ($script:PythonExe) {
@@ -1153,7 +1354,9 @@ function Initialize-ProfilesFromCliCatalog {
                 if ($payload -and $payload.success -and $payload.data) {
                     $entries = @($payload.data)
                     $source = "cli"
-                    Write-ProfileCatalogCache -Entries $entries
+                    # Fetch fresh alias map alongside live catalog refresh.
+                    $aliasMap = Fetch-ProfileAliasMapFromCli
+                    Write-ProfileCatalogCache -Entries $entries -Aliases $aliasMap
                 }
                 else {
                     Write-TrayLog "Profile catalog payload missing/invalid from CLI; trying cache fallback" -Level "WARN"
@@ -1180,11 +1383,18 @@ function Initialize-ProfilesFromCliCatalog {
         }
     }
 
+    # Alias map: prefer CLI-fetched map, fall back to whatever is persisted in the cache.
+    if (-not $aliasMap) {
+        $aliasMap = Read-ProfileAliasMapFromCache
+    }
+    if (-not $aliasMap) { $aliasMap = @{} }
+    $script:ProfileAliases = $aliasMap
+
     if ($entries.Count -gt 0) {
         $resolved = Convert-CatalogEntriesToProfileMap -Entries $entries -FallbackProfiles $fallbackProfiles
         if ($resolved.Count -gt 0) {
             $script:Profiles = $resolved
-            Write-TrayLog "Profile catalog loaded from $source ($($resolved.Count) profiles)"
+            Write-TrayLog "Profile catalog loaded from $source ($($resolved.Count) profiles, $($script:ProfileAliases.Count) aliases)"
             return
         }
 
@@ -1193,7 +1403,7 @@ function Initialize-ProfilesFromCliCatalog {
 
     # Final source: built-in emergency fallback map in this script
     $script:Profiles = Copy-ProfileMap -Source $fallbackProfiles
-    Write-TrayLog "Profile catalog using built-in fallback definitions ($($script:Profiles.Count) profiles)" -Level "WARN"
+    Write-TrayLog "Profile catalog using built-in fallback definitions ($($script:Profiles.Count) profiles, $($script:ProfileAliases.Count) aliases)" -Level "WARN"
 }
 
 Initialize-ProfilesFromCliCatalog
@@ -1871,6 +2081,11 @@ function Apply-Profile {
     param([string]$ProfileId)
 
     Write-TrayLog "Apply-Profile called with: $ProfileId"
+    $resolvedId = Resolve-ProfileAlias $ProfileId
+    if ($resolvedId -and $resolvedId -ne $ProfileId) {
+        Write-TrayLog "Resolved retired profile id '$ProfileId' -> '$resolvedId' via alias map"
+        $ProfileId = $resolvedId
+    }
     $profile = $script:Profiles[$ProfileId]
     $previousProfileId = $script:activeProfile
     $needsNoSyncOsdReminder = Test-NeedsNoSyncOsdReminder -FromProfileId $previousProfileId -ToProfileId $ProfileId
@@ -2774,6 +2989,12 @@ function Start-TrayApp {
 
     # Load config
     $script:TrayConfig = Read-TrayConfig
+    $normalizeResult = Normalize-TrayConfigProfileIds -Config $script:TrayConfig
+    $script:TrayConfig = $normalizeResult.Config
+    if ($normalizeResult.Changed) {
+        Write-TrayLog "Normalized retired profile ids in tray-config.json via alias map" -Level "INFO"
+        Save-TrayConfig $script:TrayConfig
+    }
     $script:LastAction = $null
     $script:LastActionTime = $null
     $script:AuditIssueCount = 0
