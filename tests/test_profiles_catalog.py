@@ -149,7 +149,13 @@ def test_builtin_profiles_use_os_default_networking_without_explicit_scope() -> 
         if not settings:
             continue
 
-        if settings.get("disable_nagle") or settings.get("preset") == "gaming" or "tcp_global" in settings:
+        if (
+            settings.get("disable_nagle")
+            or settings.get("preset") == "gaming"
+            or "tcp_global" in settings
+            or settings.get("tcp_nodelay")
+            or settings.get("tcp_ack_frequency")
+        ):
             offenders.append(profile_id)
 
     assert not offenders

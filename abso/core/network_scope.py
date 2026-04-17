@@ -177,7 +177,11 @@ class NetworkScopeManager:
         Returns:
             Modified settings map.
         """
-        if not result.scoped_settings:
+        # Distinguish "no scope evaluation" (no NetworkSettingsHandler in map,
+        # so apply_scope returned early) from "scope evaluated and stripped
+        # every key". In the stripped-to-empty case we must still replace the
+        # handler's settings or disallowed writes would survive silently.
+        if result.scope is None:
             return settings_map
 
         modified = {k: v.copy() for k, v in settings_map.items()}

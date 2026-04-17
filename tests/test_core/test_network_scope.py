@@ -81,3 +81,32 @@ def test_network_scope_allows_explicit_full_scope() -> None:
 
     assert result.scoped_settings == settings_map["NetworkSettingsHandler"]
     assert result.changes_made == []
+
+
+def test_get_scoped_settings_does_not_fall_back_when_scope_strips_all_keys() -> None:
+    """Consumers must see the stripped map even when scoping leaves it empty."""
+    manager = NetworkScopeManager()
+    settings_map = {
+        "NetworkSettingsHandler": {
+            "tcp_global": {"autotuninglevel": "disabled"},
+            "tcp_nodelay": True,
+            "tcp_ack_frequency": 1,
+        }
+    }
+
+    result = manager.apply_scope(_NetworkProfile("none"), settings_map)
+    scoped_map = manager.get_scoped_settings(settings_map, result)
+
+    assert scoped_map["NetworkSettingsHandler"] == {}
+    assert "tcp_global" not in scoped_map["NetworkSettingsHandler"]
+
+
+def test_get_scoped_settings_passthrough_when_no_network_handler_present() -> None:
+    """Profiles that never request network handling should see the map unchanged."""
+    manager = NetworkScopeManager()
+    settings_map = {"WindowsSettingsHandler": {"game_mode": True}}
+
+    result = manager.apply_scope(_NetworkProfile("none"), settings_map)
+    scoped_map = manager.get_scoped_settings(settings_map, result)
+
+    assert scoped_map is settings_map
