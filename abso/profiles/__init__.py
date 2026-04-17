@@ -7,7 +7,6 @@ from abso.profiles.catalog import (
     get_profile_manifest,
     resolve_profile_id,
 )
-from abso.profiles.cod_bo7 import CodBo7Profile, CodBo7SDRProfile
 from abso.profiles.diablo4 import Diablo4Profile, Diablo4SDRProfile
 from abso.profiles.fortnite import FortniteHDRProfile, FortniteProfile
 from abso.profiles.marvel_rivals import MarvelRivalsHDRProfile, MarvelRivalsSDRProfile
@@ -68,8 +67,6 @@ __all__ = [
     "Rivals2GSyncHDRProfile",
     "Rivals2OnlineGSyncProfile",
     "Rivals2OnlineGSyncHDRProfile",
-    "CodBo7Profile",
-    "CodBo7SDRProfile",
     "Diablo4Profile",
     "Diablo4SDRProfile",
     "FortniteProfile",

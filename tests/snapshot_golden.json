@@ -1,302 +1,4 @@
 {
-  "cod-bo7": {
-    "allows_aggressive_settings": false,
-    "application_scope": "system_only",
-    "display_name": "Call of Duty: Black Ops 7 - HDR",
-    "graphics_api": "dx12",
-    "handlers": [
-      "WindowsSettingsHandler",
-      "PowerSettingsHandler",
-      "RegistrySettingsHandler",
-      "NvidiaSettingsHandler",
-      "NetworkSettingsHandler",
-      "MouseSettingsHandler",
-      "GraphicsSettingsHandler",
-      "ServicesSettingsHandler",
-      "ProcessPriorityHandler",
-      "CpuAffinityHandler",
-      "CNMSettingsHandler",
-      "ColorProfileSettingsHandler"
-    ],
-    "in_game_settings": [
-      {
-        "category": "Display",
-        "reason": "Use the game's native HDR path when you want wide-gamut/high-contrast presentation.",
-        "setting": "HDR",
-        "value": "On"
-      },
-      {
-        "category": "Display",
-        "reason": "Matches the competitive no-sync Reflex path this profile applies.",
-        "setting": "Display Mode",
-        "value": "Fullscreen Exclusive"
-      },
-      {
-        "category": "Display",
-        "reason": "Reflex owns latency control in this lane; do not reintroduce sync latency in-game.",
-        "setting": "VSync",
-        "value": "Off"
-      },
-      {
-        "category": "Display",
-        "reason": "Application-level Reflex should own queue control for Call of Duty.",
-        "setting": "NVIDIA Reflex Low Latency",
-        "value": "On + Boost"
-      },
-      {
-        "category": "Display",
-        "reason": "This shipped profile is the competitive no-sync path, not a VRR cap variant.",
-        "setting": "Frame Rate Limit",
-        "value": "Unlimited"
-      },
-      {
-        "category": "Graphics",
-        "reason": "Native looks best; DLSS is the fallback when you need more GPU headroom.",
-        "setting": "Render Resolution",
-        "value": "100% (or DLSS Performance if GPU-limited)"
-      },
-      {
-        "category": "Graphics",
-        "reason": "Reduces unexpected texture IO churn during play.",
-        "setting": "On-Demand Texture Streaming",
-        "value": "Off"
-      },
-      {
-        "category": "Graphics",
-        "reason": "Let shaders fully compile before judging frame-time quality.",
-        "setting": "Shaders",
-        "value": "Restart after first launch"
-      },
-      {
-        "category": "Audio",
-        "reason": "Use the preset that matches your setup for positional clarity.",
-        "setting": "Audio Mix",
-        "value": "Headphones"
-      }
-    ],
-    "include_legacy_tweaks": false,
-    "is_emulator_profile": false,
-    "is_online_profile": false,
-    "is_sdr_only": false,
-    "network_scope": "full",
-    "optimization_target": "low_latency_high_fps",
-    "requires_reflex": true,
-    "settings": {
-      "CNMSettingsHandler": {
-        "action": "stop"
-      },
-      "ColorProfileSettingsHandler": {
-        "digital_vibrance": 50,
-        "game_type": "competitive_fps",
-        "icc_profile": "native",
-        "show_osd_guidance": true
-      },
-      "CpuAffinityHandler": {
-        "strategy": null
-      },
-      "GraphicsSettingsHandler": {
-        "disable_global_fso": true
-      },
-      "MouseSettingsHandler": {
-        "disable_acceleration": true,
-        "set_linear_curve": true
-      },
-      "NetworkSettingsHandler": {
-        "disable_nagle": true,
-        "preset": "gaming"
-      },
-      "NvidiaSettingsHandler": {
-        "preset": "reflex_game",
-        "profile_aliases": [
-          "Call of Duty: Black Ops 7 - SDR",
-          "Call of Duty: Black Ops 7 - HDR"
-        ],
-        "profile_name": "Call of Duty: Black Ops 7"
-      },
-      "PowerSettingsHandler": {
-        "active_plan": "ultimate_performance",
-        "disable_pcie_power_saving": true,
-        "disable_usb_suspend": true,
-        "ensure_ultimate_performance": true,
-        "processor_max_performance": true
-      },
-      "ProcessPriorityHandler": {
-        "cpu_priority": 3,
-        "io_priority": 3
-      },
-      "RegistrySettingsHandler": {
-        "game_priority": {
-          "gpu_priority": 8,
-          "priority": 6,
-          "scheduling_category": "High"
-        },
-        "win32_priority_separation": 42
-      },
-      "ServicesSettingsHandler": {
-        "preset": "gaming"
-      },
-      "WindowsSettingsHandler": {
-        "auto_hdr": false,
-        "game_bar": false,
-        "game_dvr": false,
-        "game_mode": true,
-        "hags": true,
-        "hdr": true,
-        "max_refresh_rate": true,
-        "vrr_optimize": false,
-        "windowed_optimizations": false
-      }
-    }
-  },
-  "cod-bo7-sdr": {
-    "allows_aggressive_settings": false,
-    "application_scope": "system_only",
-    "display_name": "Call of Duty: Black Ops 7 - SDR",
-    "graphics_api": "dx12",
-    "handlers": [
-      "WindowsSettingsHandler",
-      "PowerSettingsHandler",
-      "RegistrySettingsHandler",
-      "NvidiaSettingsHandler",
-      "NetworkSettingsHandler",
-      "MouseSettingsHandler",
-      "GraphicsSettingsHandler",
-      "ServicesSettingsHandler",
-      "ProcessPriorityHandler",
-      "CpuAffinityHandler",
-      "CNMSettingsHandler",
-      "ColorProfileSettingsHandler"
-    ],
-    "in_game_settings": [
-      {
-        "category": "Display",
-        "reason": "Use the SDR variant when you want the simpler SDR presentation path.",
-        "setting": "HDR",
-        "value": "Off"
-      },
-      {
-        "category": "Display",
-        "reason": "Matches the competitive no-sync Reflex path this profile applies.",
-        "setting": "Display Mode",
-        "value": "Fullscreen Exclusive"
-      },
-      {
-        "category": "Display",
-        "reason": "Reflex owns latency control in this lane; do not reintroduce sync latency in-game.",
-        "setting": "VSync",
-        "value": "Off"
-      },
-      {
-        "category": "Display",
-        "reason": "Application-level Reflex should own queue control for Call of Duty.",
-        "setting": "NVIDIA Reflex Low Latency",
-        "value": "On + Boost"
-      },
-      {
-        "category": "Display",
-        "reason": "This shipped profile is the competitive no-sync path, not a VRR cap variant.",
-        "setting": "Frame Rate Limit",
-        "value": "Unlimited"
-      },
-      {
-        "category": "Graphics",
-        "reason": "Native looks best; DLSS is the fallback when you need more GPU headroom.",
-        "setting": "Render Resolution",
-        "value": "100% (or DLSS Performance if GPU-limited)"
-      },
-      {
-        "category": "Graphics",
-        "reason": "Reduces unexpected texture IO churn during play.",
-        "setting": "On-Demand Texture Streaming",
-        "value": "Off"
-      },
-      {
-        "category": "Graphics",
-        "reason": "Let shaders fully compile before judging frame-time quality.",
-        "setting": "Shaders",
-        "value": "Restart after first launch"
-      },
-      {
-        "category": "Audio",
-        "reason": "Use the preset that matches your setup for positional clarity.",
-        "setting": "Audio Mix",
-        "value": "Headphones"
-      }
-    ],
-    "include_legacy_tweaks": false,
-    "is_emulator_profile": false,
-    "is_online_profile": false,
-    "is_sdr_only": true,
-    "network_scope": "full",
-    "optimization_target": "low_latency_high_fps",
-    "requires_reflex": true,
-    "settings": {
-      "CNMSettingsHandler": {
-        "action": "stop"
-      },
-      "ColorProfileSettingsHandler": {
-        "digital_vibrance": 50,
-        "game_type": "competitive_fps",
-        "icc_profile": "srgb",
-        "show_osd_guidance": true
-      },
-      "CpuAffinityHandler": {
-        "strategy": null
-      },
-      "GraphicsSettingsHandler": {
-        "disable_global_fso": true
-      },
-      "MouseSettingsHandler": {
-        "disable_acceleration": true,
-        "set_linear_curve": true
-      },
-      "NetworkSettingsHandler": {
-        "disable_nagle": true,
-        "preset": "gaming"
-      },
-      "NvidiaSettingsHandler": {
-        "preset": "reflex_game",
-        "profile_aliases": [
-          "Call of Duty: Black Ops 7 - SDR",
-          "Call of Duty: Black Ops 7 - HDR"
-        ],
-        "profile_name": "Call of Duty: Black Ops 7"
-      },
-      "PowerSettingsHandler": {
-        "active_plan": "ultimate_performance",
-        "disable_pcie_power_saving": true,
-        "disable_usb_suspend": true,
-        "ensure_ultimate_performance": true,
-        "processor_max_performance": true
-      },
-      "ProcessPriorityHandler": {
-        "cpu_priority": 3,
-        "io_priority": 3
-      },
-      "RegistrySettingsHandler": {
-        "game_priority": {
-          "gpu_priority": 8,
-          "priority": 6,
-          "scheduling_category": "High"
-        },
-        "win32_priority_separation": 42
-      },
-      "ServicesSettingsHandler": {
-        "preset": "gaming"
-      },
-      "WindowsSettingsHandler": {
-        "auto_hdr": false,
-        "game_bar": false,
-        "game_dvr": false,
-        "game_mode": true,
-        "hags": true,
-        "hdr": false,
-        "max_refresh_rate": true,
-        "vrr_optimize": false,
-        "windowed_optimizations": false
-      }
-    }
-  },
   "diablo4": {
     "allows_aggressive_settings": false,
     "application_scope": "system_plus_native_config",
@@ -310,17 +12,14 @@
       "NetworkSettingsHandler",
       "MouseSettingsHandler",
       "GraphicsSettingsHandler",
-      "ServicesSettingsHandler",
-      "MemorySettingsHandler",
       "ProcessPriorityHandler",
-      "CNMSettingsHandler",
       "ColorProfileSettingsHandler",
       "Diablo4ConfigHandler"
     ],
     "in_game_settings": [
       {
         "category": "Display",
-        "reason": "Diablo 4 exposes native HDR controls in LocalPrefs.txt on this machine.",
+        "reason": "Use Diablo 4's native HDR controls in LocalPrefs.txt when the installed game and display path support HDR.",
         "setting": "HDR",
         "value": "On"
       },
@@ -377,13 +76,10 @@
     "is_emulator_profile": false,
     "is_online_profile": false,
     "is_sdr_only": false,
-    "network_scope": "limited",
+    "network_scope": "none",
     "optimization_target": "balanced",
     "requires_reflex": true,
     "settings": {
-      "CNMSettingsHandler": {
-        "action": "stop"
-      },
       "ColorProfileSettingsHandler": {
         "digital_vibrance": 50,
         "game_type": "cinematic",
@@ -406,10 +102,6 @@
       },
       "GraphicsSettingsHandler": {
         "disable_global_fso": false
-      },
-      "MemorySettingsHandler": {
-        "disable_paging_executive": 1,
-        "large_system_cache": 0
       },
       "MouseSettingsHandler": {
         "disable_acceleration": true,
@@ -440,19 +132,6 @@
           "gpu_priority": 8,
           "priority": 6,
           "scheduling_category": "High"
-        },
-        "system_responsiveness": 10
-      },
-      "ServicesSettingsHandler": {
-        "services": {
-          "DiagTrack": {
-            "start_type": 4,
-            "stop": true
-          },
-          "SysMain": {
-            "start_type": 4,
-            "stop": true
-          }
         }
       },
       "WindowsSettingsHandler": {
@@ -480,10 +159,7 @@
       "NetworkSettingsHandler",
       "MouseSettingsHandler",
       "GraphicsSettingsHandler",
-      "ServicesSettingsHandler",
-      "MemorySettingsHandler",
       "ProcessPriorityHandler",
-      "CNMSettingsHandler",
       "ColorProfileSettingsHandler",
       "Diablo4ConfigHandler"
     ],
@@ -541,13 +217,10 @@
     "is_emulator_profile": false,
     "is_online_profile": false,
     "is_sdr_only": true,
-    "network_scope": "limited",
+    "network_scope": "none",
     "optimization_target": "balanced",
     "requires_reflex": true,
     "settings": {
-      "CNMSettingsHandler": {
-        "action": "stop"
-      },
       "ColorProfileSettingsHandler": {
         "digital_vibrance": 45,
         "game_type": "cinematic",
@@ -567,10 +240,6 @@
       },
       "GraphicsSettingsHandler": {
         "disable_global_fso": false
-      },
-      "MemorySettingsHandler": {
-        "disable_paging_executive": 1,
-        "large_system_cache": 0
       },
       "MouseSettingsHandler": {
         "disable_acceleration": true,
@@ -601,19 +270,6 @@
           "gpu_priority": 8,
           "priority": 6,
           "scheduling_category": "High"
-        },
-        "system_responsiveness": 10
-      },
-      "ServicesSettingsHandler": {
-        "services": {
-          "DiagTrack": {
-            "start_type": 4,
-            "stop": true
-          },
-          "SysMain": {
-            "start_type": 4,
-            "stop": true
-          }
         }
       },
       "WindowsSettingsHandler": {
@@ -641,10 +297,8 @@
       "NetworkSettingsHandler",
       "MouseSettingsHandler",
       "GraphicsSettingsHandler",
-      "ServicesSettingsHandler",
       "ProcessPriorityHandler",
       "CpuAffinityHandler",
-      "CNMSettingsHandler",
       "ColorProfileSettingsHandler",
       "FortniteConfigHandler"
     ],
@@ -681,7 +335,7 @@
       },
       {
         "category": "Graphics",
-        "reason": "This PC's live config already prefers DX12, and that is the intended ABSO path here.",
+        "reason": "This profile is built around Fortnite's DX12 path for Reflex and modern presentation behavior.",
         "setting": "Rendering Mode",
         "value": "DirectX 12"
       },
@@ -720,13 +374,10 @@
     "is_emulator_profile": false,
     "is_online_profile": false,
     "is_sdr_only": true,
-    "network_scope": "full",
+    "network_scope": "none",
     "optimization_target": "low_latency_high_fps",
     "requires_reflex": true,
     "settings": {
-      "CNMSettingsHandler": {
-        "action": "stop"
-      },
       "ColorProfileSettingsHandler": {
         "digital_vibrance": 50,
         "game_type": "competitive_fps",
@@ -751,8 +402,8 @@
         "set_linear_curve": true
       },
       "NetworkSettingsHandler": {
-        "disable_nagle": true,
-        "preset": "gaming"
+        "disable_nagle": false,
+        "preset": "default"
       },
       "NvidiaSettingsHandler": {
         "preset": "reflex_game",
@@ -781,9 +432,6 @@
           "scheduling_category": "High"
         },
         "win32_priority_separation": 42
-      },
-      "ServicesSettingsHandler": {
-        "preset": "gaming"
       },
       "WindowsSettingsHandler": {
         "auto_hdr": false,
@@ -811,17 +459,15 @@
       "NetworkSettingsHandler",
       "MouseSettingsHandler",
       "GraphicsSettingsHandler",
-      "ServicesSettingsHandler",
       "ProcessPriorityHandler",
       "CpuAffinityHandler",
-      "CNMSettingsHandler",
       "ColorProfileSettingsHandler",
       "FortniteConfigHandler"
     ],
     "in_game_settings": [
       {
         "category": "Display",
-        "reason": "Fortnite exposes a native HDR output path in GameUserSettings.ini on this machine.",
+        "reason": "Use Fortnite's native HDR output path in GameUserSettings.ini when the installed build and display path support HDR.",
         "setting": "HDR",
         "value": "On"
       },
@@ -857,7 +503,7 @@
       },
       {
         "category": "Graphics",
-        "reason": "This PC's live config already prefers DX12, and that is the intended ABSO path here.",
+        "reason": "This profile is built around Fortnite's DX12 path for Reflex and modern presentation behavior.",
         "setting": "Rendering Mode",
         "value": "DirectX 12"
       },
@@ -896,13 +542,10 @@
     "is_emulator_profile": false,
     "is_online_profile": false,
     "is_sdr_only": false,
-    "network_scope": "full",
+    "network_scope": "none",
     "optimization_target": "low_latency_high_fps",
     "requires_reflex": true,
     "settings": {
-      "CNMSettingsHandler": {
-        "action": "stop"
-      },
       "ColorProfileSettingsHandler": {
         "digital_vibrance": 50,
         "game_type": "competitive_fps",
@@ -927,8 +570,8 @@
         "set_linear_curve": true
       },
       "NetworkSettingsHandler": {
-        "disable_nagle": true,
-        "preset": "gaming"
+        "disable_nagle": false,
+        "preset": "default"
       },
       "NvidiaSettingsHandler": {
         "preset": "reflex_game",
@@ -958,9 +601,6 @@
         },
         "win32_priority_separation": 42
       },
-      "ServicesSettingsHandler": {
-        "preset": "gaming"
-      },
       "WindowsSettingsHandler": {
         "auto_hdr": false,
         "game_bar": false,
@@ -987,11 +627,9 @@
       "NetworkSettingsHandler",
       "MouseSettingsHandler",
       "GraphicsSettingsHandler",
-      "ServicesSettingsHandler",
       "ProcessPriorityHandler",
       "OBSSettingsHandler",
       "CpuAffinityHandler",
-      "CNMSettingsHandler",
       "ColorProfileSettingsHandler",
       "FortniteConfigHandler"
     ],
@@ -1028,7 +666,7 @@
       },
       {
         "category": "Graphics",
-        "reason": "This PC's live config already prefers DX12, and that is the intended ABSO path here.",
+        "reason": "This profile is built around Fortnite's DX12 path for Reflex and modern presentation behavior.",
         "setting": "Rendering Mode",
         "value": "DirectX 12"
       },
@@ -1067,13 +705,10 @@
     "is_emulator_profile": false,
     "is_online_profile": false,
     "is_sdr_only": true,
-    "network_scope": "full",
+    "network_scope": "none",
     "optimization_target": "low_latency_high_fps",
     "requires_reflex": true,
     "settings": {
-      "CNMSettingsHandler": {
-        "action": "stop"
-      },
       "ColorProfileSettingsHandler": {
         "digital_vibrance": 50,
         "game_type": "competitive_fps",
@@ -1098,8 +733,8 @@
         "set_linear_curve": true
       },
       "NetworkSettingsHandler": {
-        "disable_nagle": true,
-        "preset": "gaming"
+        "disable_nagle": false,
+        "preset": "default"
       },
       "NvidiaSettingsHandler": {
         "preset": "reflex_game",
@@ -1146,9 +781,6 @@
         },
         "win32_priority_separation": 42
       },
-      "ServicesSettingsHandler": {
-        "preset": "gaming"
-      },
       "WindowsSettingsHandler": {
         "auto_hdr": false,
         "game_bar": false,
@@ -1175,18 +807,16 @@
       "NetworkSettingsHandler",
       "MouseSettingsHandler",
       "GraphicsSettingsHandler",
-      "ServicesSettingsHandler",
       "ProcessPriorityHandler",
       "OBSSettingsHandler",
       "CpuAffinityHandler",
-      "CNMSettingsHandler",
       "ColorProfileSettingsHandler",
       "FortniteConfigHandler"
     ],
     "in_game_settings": [
       {
         "category": "Display",
-        "reason": "Fortnite exposes a native HDR output path in GameUserSettings.ini on this machine.",
+        "reason": "Use Fortnite's native HDR output path in GameUserSettings.ini when the installed build and display path support HDR.",
         "setting": "HDR",
         "value": "On"
       },
@@ -1222,7 +852,7 @@
       },
       {
         "category": "Graphics",
-        "reason": "This PC's live config already prefers DX12, and that is the intended ABSO path here.",
+        "reason": "This profile is built around Fortnite's DX12 path for Reflex and modern presentation behavior.",
         "setting": "Rendering Mode",
         "value": "DirectX 12"
       },
@@ -1261,13 +891,10 @@
     "is_emulator_profile": false,
     "is_online_profile": false,
     "is_sdr_only": false,
-    "network_scope": "full",
+    "network_scope": "none",
     "optimization_target": "low_latency_high_fps",
     "requires_reflex": true,
     "settings": {
-      "CNMSettingsHandler": {
-        "action": "stop"
-      },
       "ColorProfileSettingsHandler": {
         "digital_vibrance": 50,
         "game_type": "competitive_fps",
@@ -1292,8 +919,8 @@
         "set_linear_curve": true
       },
       "NetworkSettingsHandler": {
-        "disable_nagle": true,
-        "preset": "gaming"
+        "disable_nagle": false,
+        "preset": "default"
       },
       "NvidiaSettingsHandler": {
         "preset": "reflex_game",
@@ -1340,9 +967,6 @@
         },
         "win32_priority_separation": 42
       },
-      "ServicesSettingsHandler": {
-        "preset": "gaming"
-      },
       "WindowsSettingsHandler": {
         "auto_hdr": false,
         "game_bar": false,
@@ -1369,17 +993,15 @@
       "NetworkSettingsHandler",
       "MouseSettingsHandler",
       "GraphicsSettingsHandler",
-      "ServicesSettingsHandler",
       "ProcessPriorityHandler",
       "CpuAffinityHandler",
-      "CNMSettingsHandler",
       "ColorProfileSettingsHandler",
       "MarvelRivalsConfigHandler"
     ],
     "in_game_settings": [
       {
         "category": "Display",
-        "reason": "This PC's primary display reports HDR capability, so the HDR path can stay active without using Auto HDR.",
+        "reason": "Use this variant when the active display path supports native HDR without relying on Auto HDR.",
         "setting": "HDR",
         "value": "On"
       },
@@ -1411,7 +1033,7 @@
         "category": "Display",
         "reason": "Keeps G-SYNC active and prevents NVCP VSync from engaging while preserving tear-free latency.",
         "setting": "Frame Rate Limit",
-        "value": "Auto (refresh rate - 3, so 297 on this 300 Hz monitor)"
+        "value": "Auto (refresh rate - 3)"
       },
       {
         "category": "Display",
@@ -1421,15 +1043,9 @@
       },
       {
         "category": "Graphics",
-        "reason": "This build ships DLSS, XeSS, and AMD upscaling support; on an RTX 4070, DLSS is the best performance lever if native render cannot hold target cap.",
+        "reason": "Upscaling is the cleanest performance lever when native rendering cannot hold the VRR cap.",
         "setting": "Upscaling",
-        "value": "DLSS Quality or Balanced"
-      },
-      {
-        "category": "Graphics",
-        "reason": "Marvel Rivals added an experimental PC optimization toggle in March 2026. Keep the setting that improves 1% lows and frametime consistency on your system.",
-        "setting": "Performance Optimization (Beta)",
-        "value": "A/B test On vs Off on your hardware"
+        "value": "Use your GPU vendor's quality/balanced upscaler if GPU-bound"
       },
       {
         "category": "Graphics",
@@ -1439,7 +1055,7 @@
       },
       {
         "category": "Graphics",
-        "reason": "A 12 GB RTX 4070 can handle more, but medium is the safer performance-first choice during long sessions and new patches.",
+        "reason": "Use a texture setting that fits your VRAM; lower it if you see streaming hitches or memory pressure.",
         "setting": "Textures",
         "value": "Medium"
       },
@@ -1454,13 +1070,10 @@
     "is_emulator_profile": false,
     "is_online_profile": false,
     "is_sdr_only": false,
-    "network_scope": "full",
+    "network_scope": "none",
     "optimization_target": "low_latency_high_fps",
     "requires_reflex": true,
     "settings": {
-      "CNMSettingsHandler": {
-        "action": "stop"
-      },
       "ColorProfileSettingsHandler": {
         "digital_vibrance": 50,
         "game_type": "competitive_fps",
@@ -1486,8 +1099,8 @@
         "set_linear_curve": true
       },
       "NetworkSettingsHandler": {
-        "disable_nagle": true,
-        "preset": "gaming"
+        "disable_nagle": false,
+        "preset": "default"
       },
       "NvidiaSettingsHandler": {
         "auto_vrr_fps_cap": true,
@@ -1513,9 +1126,6 @@
           "scheduling_category": "High"
         },
         "win32_priority_separation": 42
-      },
-      "ServicesSettingsHandler": {
-        "preset": "gaming"
       },
       "WindowsSettingsHandler": {
         "auto_hdr": false,
@@ -1543,17 +1153,15 @@
       "NetworkSettingsHandler",
       "MouseSettingsHandler",
       "GraphicsSettingsHandler",
-      "ServicesSettingsHandler",
       "ProcessPriorityHandler",
       "CpuAffinityHandler",
-      "CNMSettingsHandler",
       "ColorProfileSettingsHandler",
       "MarvelRivalsConfigHandler"
     ],
     "in_game_settings": [
       {
         "category": "Display",
-        "reason": "This variant keeps the cleaner SDR path that is already active on this PC.",
+        "reason": "Use this variant when you want the cleaner SDR path or do not have HDR active.",
         "setting": "HDR",
         "value": "Off"
       },
@@ -1585,7 +1193,7 @@
         "category": "Display",
         "reason": "Keeps G-SYNC active and prevents NVCP VSync from engaging while preserving tear-free latency.",
         "setting": "Frame Rate Limit",
-        "value": "Auto (refresh rate - 3, so 297 on this 300 Hz monitor)"
+        "value": "Auto (refresh rate - 3)"
       },
       {
         "category": "Display",
@@ -1595,15 +1203,9 @@
       },
       {
         "category": "Graphics",
-        "reason": "This build ships DLSS, XeSS, and AMD upscaling support; on an RTX 4070, DLSS is the best performance lever if native render cannot hold target cap.",
+        "reason": "Upscaling is the cleanest performance lever when native rendering cannot hold the VRR cap.",
         "setting": "Upscaling",
-        "value": "DLSS Quality or Balanced"
-      },
-      {
-        "category": "Graphics",
-        "reason": "Marvel Rivals added an experimental PC optimization toggle in March 2026. Keep the setting that improves 1% lows and frametime consistency on your system.",
-        "setting": "Performance Optimization (Beta)",
-        "value": "A/B test On vs Off on your hardware"
+        "value": "Use your GPU vendor's quality/balanced upscaler if GPU-bound"
       },
       {
         "category": "Graphics",
@@ -1613,7 +1215,7 @@
       },
       {
         "category": "Graphics",
-        "reason": "A 12 GB RTX 4070 can handle more, but medium is the safer performance-first choice during long sessions and new patches.",
+        "reason": "Use a texture setting that fits your VRAM; lower it if you see streaming hitches or memory pressure.",
         "setting": "Textures",
         "value": "Medium"
       },
@@ -1628,13 +1230,10 @@
     "is_emulator_profile": false,
     "is_online_profile": false,
     "is_sdr_only": true,
-    "network_scope": "full",
+    "network_scope": "none",
     "optimization_target": "low_latency_high_fps",
     "requires_reflex": true,
     "settings": {
-      "CNMSettingsHandler": {
-        "action": "stop"
-      },
       "ColorProfileSettingsHandler": {
         "digital_vibrance": 45,
         "game_type": "competitive_fps",
@@ -1660,8 +1259,8 @@
         "set_linear_curve": true
       },
       "NetworkSettingsHandler": {
-        "disable_nagle": true,
-        "preset": "gaming"
+        "disable_nagle": false,
+        "preset": "default"
       },
       "NvidiaSettingsHandler": {
         "auto_vrr_fps_cap": true,
@@ -1687,9 +1286,6 @@
           "scheduling_category": "High"
         },
         "win32_priority_separation": 42
-      },
-      "ServicesSettingsHandler": {
-        "preset": "gaming"
       },
       "WindowsSettingsHandler": {
         "auto_hdr": false,
@@ -1717,10 +1313,8 @@
       "NetworkSettingsHandler",
       "MouseSettingsHandler",
       "GraphicsSettingsHandler",
-      "ServicesSettingsHandler",
       "ProcessPriorityHandler",
       "CpuAffinityHandler",
-      "CNMSettingsHandler",
       "ColorProfileSettingsHandler",
       "OW2ConfigHandler"
     ],
@@ -1772,13 +1366,10 @@
     "is_emulator_profile": false,
     "is_online_profile": false,
     "is_sdr_only": false,
-    "network_scope": "full",
+    "network_scope": "none",
     "optimization_target": "low_latency_high_fps",
     "requires_reflex": true,
     "settings": {
-      "CNMSettingsHandler": {
-        "action": "stop"
-      },
       "ColorProfileSettingsHandler": {
         "digital_vibrance": 50,
         "game_type": "competitive_fps",
@@ -1796,8 +1387,8 @@
         "set_linear_curve": true
       },
       "NetworkSettingsHandler": {
-        "disable_nagle": true,
-        "preset": "gaming"
+        "disable_nagle": false,
+        "preset": "default"
       },
       "NvidiaSettingsHandler": {
         "global_vrr_mode": "off",
@@ -1842,9 +1433,6 @@
         },
         "win32_priority_separation": 42
       },
-      "ServicesSettingsHandler": {
-        "preset": "gaming"
-      },
       "WindowsSettingsHandler": {
         "auto_hdr": false,
         "game_bar": false,
@@ -1871,10 +1459,8 @@
       "NetworkSettingsHandler",
       "MouseSettingsHandler",
       "GraphicsSettingsHandler",
-      "ServicesSettingsHandler",
       "ProcessPriorityHandler",
       "CpuAffinityHandler",
-      "CNMSettingsHandler",
       "ColorProfileSettingsHandler",
       "OW2ConfigHandler"
     ],
@@ -1926,13 +1512,10 @@
     "is_emulator_profile": false,
     "is_online_profile": false,
     "is_sdr_only": false,
-    "network_scope": "full",
+    "network_scope": "none",
     "optimization_target": "low_latency_high_fps",
     "requires_reflex": true,
     "settings": {
-      "CNMSettingsHandler": {
-        "action": "stop"
-      },
       "ColorProfileSettingsHandler": {
         "digital_vibrance": 45,
         "game_type": "competitive_fps",
@@ -1951,8 +1534,8 @@
         "set_linear_curve": true
       },
       "NetworkSettingsHandler": {
-        "disable_nagle": true,
-        "preset": "gaming"
+        "disable_nagle": false,
+        "preset": "default"
       },
       "NvidiaSettingsHandler": {
         "auto_vrr_fps_cap": true,
@@ -1998,9 +1581,6 @@
         },
         "win32_priority_separation": 42
       },
-      "ServicesSettingsHandler": {
-        "preset": "gaming"
-      },
       "WindowsSettingsHandler": {
         "auto_hdr": false,
         "game_bar": false,
@@ -2027,10 +1607,8 @@
       "NetworkSettingsHandler",
       "MouseSettingsHandler",
       "GraphicsSettingsHandler",
-      "ServicesSettingsHandler",
       "ProcessPriorityHandler",
       "CpuAffinityHandler",
-      "CNMSettingsHandler",
       "ColorProfileSettingsHandler",
       "OW2ConfigHandler"
     ],
@@ -2082,13 +1660,10 @@
     "is_emulator_profile": false,
     "is_online_profile": false,
     "is_sdr_only": false,
-    "network_scope": "full",
+    "network_scope": "none",
     "optimization_target": "low_latency_high_fps",
     "requires_reflex": true,
     "settings": {
-      "CNMSettingsHandler": {
-        "action": "stop"
-      },
       "ColorProfileSettingsHandler": {
         "digital_vibrance": 45,
         "game_type": "competitive_fps",
@@ -2107,8 +1682,8 @@
         "set_linear_curve": true
       },
       "NetworkSettingsHandler": {
-        "disable_nagle": true,
-        "preset": "gaming"
+        "disable_nagle": false,
+        "preset": "default"
       },
       "NvidiaSettingsHandler": {
         "auto_vrr_fps_cap": true,
@@ -2154,9 +1729,6 @@
         },
         "win32_priority_separation": 42
       },
-      "ServicesSettingsHandler": {
-        "preset": "gaming"
-      },
       "WindowsSettingsHandler": {
         "auto_hdr": false,
         "game_bar": false,
@@ -2183,10 +1755,8 @@
       "NetworkSettingsHandler",
       "MouseSettingsHandler",
       "GraphicsSettingsHandler",
-      "ServicesSettingsHandler",
       "ProcessPriorityHandler",
       "CpuAffinityHandler",
-      "CNMSettingsHandler",
       "ColorProfileSettingsHandler",
       "OW2ConfigHandler"
     ],
@@ -2262,13 +1832,10 @@
     "is_emulator_profile": false,
     "is_online_profile": false,
     "is_sdr_only": false,
-    "network_scope": "full",
+    "network_scope": "none",
     "optimization_target": "low_latency_high_fps",
     "requires_reflex": true,
     "settings": {
-      "CNMSettingsHandler": {
-        "action": "stop"
-      },
       "ColorProfileSettingsHandler": {
         "digital_vibrance": 50,
         "game_type": "competitive_fps",
@@ -2287,8 +1854,8 @@
         "set_linear_curve": true
       },
       "NetworkSettingsHandler": {
-        "disable_nagle": true,
-        "preset": "gaming"
+        "disable_nagle": false,
+        "preset": "default"
       },
       "NvidiaSettingsHandler": {
         "auto_vrr_fps_cap": true,
@@ -2334,9 +1901,6 @@
         },
         "win32_priority_separation": 42
       },
-      "ServicesSettingsHandler": {
-        "preset": "gaming"
-      },
       "WindowsSettingsHandler": {
         "auto_hdr": false,
         "game_bar": false,
@@ -2363,10 +1927,8 @@
       "NetworkSettingsHandler",
       "MouseSettingsHandler",
       "GraphicsSettingsHandler",
-      "ServicesSettingsHandler",
       "ProcessPriorityHandler",
       "CpuAffinityHandler",
-      "CNMSettingsHandler",
       "ColorProfileSettingsHandler",
       "OW2ConfigHandler"
     ],
@@ -2436,13 +1998,10 @@
     "is_emulator_profile": false,
     "is_online_profile": false,
     "is_sdr_only": false,
-    "network_scope": "full",
+    "network_scope": "none",
     "optimization_target": "low_latency_high_fps",
     "requires_reflex": true,
     "settings": {
-      "CNMSettingsHandler": {
-        "action": "stop"
-      },
       "ColorProfileSettingsHandler": {
         "digital_vibrance": 50,
         "game_type": "competitive_fps",
@@ -2461,8 +2020,8 @@
         "set_linear_curve": true
       },
       "NetworkSettingsHandler": {
-        "disable_nagle": true,
-        "preset": "gaming"
+        "disable_nagle": false,
+        "preset": "default"
       },
       "NvidiaSettingsHandler": {
         "auto_vrr_fps_cap": true,
@@ -2508,9 +2067,6 @@
         },
         "win32_priority_separation": 42
       },
-      "ServicesSettingsHandler": {
-        "preset": "gaming"
-      },
       "WindowsSettingsHandler": {
         "auto_hdr": false,
         "game_bar": false,
@@ -2537,11 +2093,9 @@
       "NetworkSettingsHandler",
       "MouseSettingsHandler",
       "GraphicsSettingsHandler",
-      "ServicesSettingsHandler",
       "ProcessPriorityHandler",
       "OBSSettingsHandler",
       "CpuAffinityHandler",
-      "CNMSettingsHandler",
       "ColorProfileSettingsHandler",
       "OW2ConfigHandler"
     ],
@@ -2611,13 +2165,10 @@
     "is_emulator_profile": false,
     "is_online_profile": false,
     "is_sdr_only": false,
-    "network_scope": "full",
+    "network_scope": "none",
     "optimization_target": "low_latency_high_fps",
     "requires_reflex": true,
     "settings": {
-      "CNMSettingsHandler": {
-        "action": "stop"
-      },
       "ColorProfileSettingsHandler": {
         "digital_vibrance": 50,
         "game_type": "competitive_fps",
@@ -2636,8 +2187,8 @@
         "set_linear_curve": true
       },
       "NetworkSettingsHandler": {
-        "disable_nagle": true,
-        "preset": "gaming"
+        "disable_nagle": false,
+        "preset": "default"
       },
       "NvidiaSettingsHandler": {
         "auto_vrr_fps_cap": true,
@@ -2700,9 +2251,6 @@
         },
         "win32_priority_separation": 42
       },
-      "ServicesSettingsHandler": {
-        "preset": "gaming"
-      },
       "WindowsSettingsHandler": {
         "auto_hdr": false,
         "game_bar": false,
@@ -2729,11 +2277,9 @@
       "NetworkSettingsHandler",
       "MouseSettingsHandler",
       "GraphicsSettingsHandler",
-      "ServicesSettingsHandler",
       "ProcessPriorityHandler",
       "OBSSettingsHandler",
       "CpuAffinityHandler",
-      "CNMSettingsHandler",
       "ColorProfileSettingsHandler",
       "OW2ConfigHandler"
     ],
@@ -2785,13 +2331,10 @@
     "is_emulator_profile": false,
     "is_online_profile": false,
     "is_sdr_only": false,
-    "network_scope": "full",
+    "network_scope": "none",
     "optimization_target": "low_latency_high_fps",
     "requires_reflex": true,
     "settings": {
-      "CNMSettingsHandler": {
-        "action": "stop"
-      },
       "ColorProfileSettingsHandler": {
         "digital_vibrance": 45,
         "game_type": "competitive_fps",
@@ -2810,8 +2353,8 @@
         "set_linear_curve": true
       },
       "NetworkSettingsHandler": {
-        "disable_nagle": true,
-        "preset": "gaming"
+        "disable_nagle": false,
+        "preset": "default"
       },
       "NvidiaSettingsHandler": {
         "auto_vrr_fps_cap": true,
@@ -2874,9 +2417,6 @@
         },
         "win32_priority_separation": 42
       },
-      "ServicesSettingsHandler": {
-        "preset": "gaming"
-      },
       "WindowsSettingsHandler": {
         "auto_hdr": false,
         "game_bar": false,
@@ -2902,9 +2442,7 @@
       "NvidiaSettingsHandler",
       "NetworkSettingsHandler",
       "GraphicsSettingsHandler",
-      "ServicesSettingsHandler",
       "ProcessPriorityHandler",
-      "CNMSettingsHandler",
       "ColorProfileSettingsHandler"
     ],
     "in_game_settings": [
@@ -3013,9 +2551,6 @@
     "optimization_target": "smooth_framerate",
     "requires_reflex": false,
     "settings": {
-      "CNMSettingsHandler": {
-        "action": "stop"
-      },
       "ColorProfileSettingsHandler": {
         "digital_vibrance": 50,
         "game_type": "casual",
@@ -3055,9 +2590,6 @@
         },
         "win32_priority_separation": 38
       },
-      "ServicesSettingsHandler": {
-        "preset": "gaming"
-      },
       "WindowsSettingsHandler": {
         "game_bar": false,
         "game_dvr": false,
@@ -3078,10 +2610,8 @@
       "NvidiaSettingsHandler",
       "NetworkSettingsHandler",
       "GraphicsSettingsHandler",
-      "ServicesSettingsHandler",
       "ProcessPriorityHandler",
       "OBSSettingsHandler",
-      "CNMSettingsHandler",
       "ColorProfileSettingsHandler"
     ],
     "in_game_settings": [
@@ -3190,9 +2720,6 @@
     "optimization_target": "smooth_framerate",
     "requires_reflex": false,
     "settings": {
-      "CNMSettingsHandler": {
-        "action": "stop"
-      },
       "ColorProfileSettingsHandler": {
         "digital_vibrance": 50,
         "game_type": "casual",
@@ -3249,9 +2776,6 @@
         },
         "win32_priority_separation": 38
       },
-      "ServicesSettingsHandler": {
-        "preset": "gaming"
-      },
       "WindowsSettingsHandler": {
         "game_bar": false,
         "game_dvr": false,
@@ -3272,9 +2796,7 @@
       "NvidiaSettingsHandler",
       "NetworkSettingsHandler",
       "GraphicsSettingsHandler",
-      "ServicesSettingsHandler",
       "ProcessPriorityHandler",
-      "CNMSettingsHandler",
       "ColorProfileSettingsHandler"
     ],
     "in_game_settings": [
@@ -3343,13 +2865,10 @@
     "is_emulator_profile": false,
     "is_online_profile": false,
     "is_sdr_only": false,
-    "network_scope": "limited",
+    "network_scope": "none",
     "optimization_target": "balanced",
     "requires_reflex": false,
     "settings": {
-      "CNMSettingsHandler": {
-        "action": "stop"
-      },
       "ColorProfileSettingsHandler": {
         "digital_vibrance": 50,
         "game_type": "casual",
@@ -3390,9 +2909,6 @@
         },
         "win32_priority_separation": 38
       },
-      "ServicesSettingsHandler": {
-        "preset": "gaming"
-      },
       "WindowsSettingsHandler": {
         "game_bar": false,
         "game_dvr": false,
@@ -3412,7 +2928,6 @@
       "NvidiaSettingsHandler",
       "MouseSettingsHandler",
       "GraphicsSettingsHandler",
-      "MemorySettingsHandler",
       "ColorProfileSettingsHandler"
     ],
     "in_game_settings": [
@@ -3518,10 +3033,6 @@
       "GraphicsSettingsHandler": {
         "disable_global_fso": false
       },
-      "MemorySettingsHandler": {
-        "disable_paging_executive": 0,
-        "large_system_cache": 0
-      },
       "MouseSettingsHandler": {
         "disable_acceleration": true,
         "set_linear_curve": true
@@ -3569,11 +3080,9 @@
       "NetworkSettingsHandler",
       "MouseSettingsHandler",
       "GraphicsSettingsHandler",
-      "ServicesSettingsHandler",
       "ProcessPriorityHandler",
       "CpuAffinityHandler",
       "Rivals2ConfigHandler",
-      "CNMSettingsHandler",
       "ColorProfileSettingsHandler"
     ],
     "in_game_settings": [
@@ -3640,9 +3149,6 @@
     "optimization_target": "low_latency_vrr",
     "requires_reflex": false,
     "settings": {
-      "CNMSettingsHandler": {
-        "action": "stop"
-      },
       "ColorProfileSettingsHandler": {
         "digital_vibrance": 50,
         "game_type": "competitive_fps",
@@ -3660,8 +3166,8 @@
         "set_linear_curve": true
       },
       "NetworkSettingsHandler": {
-        "disable_nagle": true,
-        "preset": "gaming"
+        "disable_nagle": false,
+        "preset": "default"
       },
       "NvidiaNotificationHandler": {
         "disable_notifications": true
@@ -3705,9 +3211,6 @@
         "hdr_output": false,
         "raw_input": true,
         "vsync": false
-      },
-      "ServicesSettingsHandler": {
-        "preset": "gaming"
       },
       "WindowsSettingsHandler": {
         "auto_hdr": false,
@@ -3736,17 +3239,15 @@
       "NetworkSettingsHandler",
       "MouseSettingsHandler",
       "GraphicsSettingsHandler",
-      "ServicesSettingsHandler",
       "ProcessPriorityHandler",
       "CpuAffinityHandler",
       "Rivals2ConfigHandler",
-      "CNMSettingsHandler",
       "ColorProfileSettingsHandler"
     ],
     "in_game_settings": [
       {
         "category": "Display",
-        "reason": "Current Rivals 2 builds expose native HDR output in GameUserSettings.ini. Use the game's HDR path with Windows HDR on, not Auto HDR.",
+        "reason": "Use the game's native HDR path with Windows HDR on when the installed build exposes HDR output in GameUserSettings.ini; do not use Auto HDR.",
         "setting": "HDR Output",
         "value": "On"
       },
@@ -3825,9 +3326,6 @@
     "optimization_target": "low_latency_vrr",
     "requires_reflex": false,
     "settings": {
-      "CNMSettingsHandler": {
-        "action": "stop"
-      },
       "ColorProfileSettingsHandler": {
         "digital_vibrance": 50,
         "game_type": "competitive_fps",
@@ -3845,8 +3343,8 @@
         "set_linear_curve": true
       },
       "NetworkSettingsHandler": {
-        "disable_nagle": true,
-        "preset": "gaming"
+        "disable_nagle": false,
+        "preset": "default"
       },
       "NvidiaNotificationHandler": {
         "disable_notifications": true
@@ -3892,9 +3390,6 @@
         "raw_input": true,
         "vsync": false
       },
-      "ServicesSettingsHandler": {
-        "preset": "gaming"
-      },
       "WindowsSettingsHandler": {
         "auto_hdr": false,
         "game_bar": false,
@@ -3922,11 +3417,9 @@
       "NetworkSettingsHandler",
       "MouseSettingsHandler",
       "GraphicsSettingsHandler",
-      "ServicesSettingsHandler",
       "ProcessPriorityHandler",
       "CpuAffinityHandler",
       "Rivals2ConfigHandler",
-      "CNMSettingsHandler",
       "ColorProfileSettingsHandler"
     ],
     "in_game_settings": [
@@ -3983,13 +3476,10 @@
     "is_emulator_profile": false,
     "is_online_profile": false,
     "is_sdr_only": false,
-    "network_scope": "full",
+    "network_scope": "none",
     "optimization_target": "minimum_latency_offline",
     "requires_reflex": false,
     "settings": {
-      "CNMSettingsHandler": {
-        "action": "stop"
-      },
       "ColorProfileSettingsHandler": {
         "digital_vibrance": 50,
         "game_type": "competitive_fps",
@@ -4007,8 +3497,8 @@
         "set_linear_curve": true
       },
       "NetworkSettingsHandler": {
-        "disable_nagle": true,
-        "preset": "gaming"
+        "disable_nagle": false,
+        "preset": "default"
       },
       "NvidiaNotificationHandler": {
         "disable_notifications": true
@@ -4060,9 +3550,6 @@
         "hdr_output": false,
         "raw_input": true,
         "vsync": false
-      },
-      "ServicesSettingsHandler": {
-        "preset": "gaming"
       },
       "WindowsSettingsHandler": {
         "auto_hdr": false,
@@ -4091,17 +3578,15 @@
       "NetworkSettingsHandler",
       "MouseSettingsHandler",
       "GraphicsSettingsHandler",
-      "ServicesSettingsHandler",
       "ProcessPriorityHandler",
       "CpuAffinityHandler",
       "Rivals2ConfigHandler",
-      "CNMSettingsHandler",
       "ColorProfileSettingsHandler"
     ],
     "in_game_settings": [
       {
         "category": "Display",
-        "reason": "Current Rivals 2 builds expose native HDR output in GameUserSettings.ini. Use the game's HDR path with Windows HDR on, not Auto HDR.",
+        "reason": "Use the game's native HDR path with Windows HDR on when the installed build exposes HDR output in GameUserSettings.ini; do not use Auto HDR.",
         "setting": "HDR Output",
         "value": "On"
       },
@@ -4170,13 +3655,10 @@
     "is_emulator_profile": false,
     "is_online_profile": false,
     "is_sdr_only": false,
-    "network_scope": "full",
+    "network_scope": "none",
     "optimization_target": "minimum_latency_offline",
     "requires_reflex": false,
     "settings": {
-      "CNMSettingsHandler": {
-        "action": "stop"
-      },
       "ColorProfileSettingsHandler": {
         "digital_vibrance": 50,
         "game_type": "competitive_fps",
@@ -4194,8 +3676,8 @@
         "set_linear_curve": true
       },
       "NetworkSettingsHandler": {
-        "disable_nagle": true,
-        "preset": "gaming"
+        "disable_nagle": false,
+        "preset": "default"
       },
       "NvidiaNotificationHandler": {
         "disable_notifications": true
@@ -4249,9 +3731,6 @@
         "raw_input": true,
         "vsync": false
       },
-      "ServicesSettingsHandler": {
-        "preset": "gaming"
-      },
       "WindowsSettingsHandler": {
         "auto_hdr": false,
         "game_bar": false,
@@ -4279,11 +3758,9 @@
       "NetworkSettingsHandler",
       "MouseSettingsHandler",
       "GraphicsSettingsHandler",
-      "ServicesSettingsHandler",
       "ProcessPriorityHandler",
       "CpuAffinityHandler",
       "Rivals2ConfigHandler",
-      "CNMSettingsHandler",
       "ColorProfileSettingsHandler"
     ],
     "in_game_settings": [
@@ -4295,7 +3772,7 @@
       },
       {
         "category": "=== EXPLICIT PROHIBITIONS ===",
-        "reason": "These cause rollback timing failures at 300Hz. Stability > latency online.",
+        "reason": "These can cause rollback timing failures on high-refresh setups. Stability > latency online.",
         "setting": "DO NOT USE",
         "value": "LLM Ultra, Fast VSync, External FPS Caps, Refresh-3 Logic"
       },
@@ -4358,13 +3835,10 @@
     "is_emulator_profile": false,
     "is_online_profile": true,
     "is_sdr_only": false,
-    "network_scope": "full",
+    "network_scope": "none",
     "optimization_target": "stable_online",
     "requires_reflex": false,
     "settings": {
-      "CNMSettingsHandler": {
-        "action": "stop"
-      },
       "ColorProfileSettingsHandler": {
         "digital_vibrance": 50,
         "game_type": "competitive_fps",
@@ -4382,8 +3856,8 @@
         "set_linear_curve": true
       },
       "NetworkSettingsHandler": {
-        "disable_nagle": true,
-        "preset": "gaming"
+        "disable_nagle": false,
+        "preset": "default"
       },
       "NvidiaNotificationHandler": {
         "disable_notifications": true
@@ -4431,9 +3905,6 @@
         "hdr_output": false,
         "raw_input": true,
         "vsync": false
-      },
-      "ServicesSettingsHandler": {
-        "preset": "gaming"
       },
       "WindowsSettingsHandler": {
         "auto_hdr": false,
@@ -4462,11 +3933,9 @@
       "NetworkSettingsHandler",
       "MouseSettingsHandler",
       "GraphicsSettingsHandler",
-      "ServicesSettingsHandler",
       "ProcessPriorityHandler",
       "CpuAffinityHandler",
       "Rivals2ConfigHandler",
-      "CNMSettingsHandler",
       "ColorProfileSettingsHandler"
     ],
     "in_game_settings": [
@@ -4533,9 +4002,6 @@
     "optimization_target": "stable_online_vrr",
     "requires_reflex": false,
     "settings": {
-      "CNMSettingsHandler": {
-        "action": "stop"
-      },
       "ColorProfileSettingsHandler": {
         "digital_vibrance": 50,
         "game_type": "competitive_fps",
@@ -4553,8 +4019,8 @@
         "set_linear_curve": true
       },
       "NetworkSettingsHandler": {
-        "disable_nagle": true,
-        "preset": "gaming"
+        "disable_nagle": false,
+        "preset": "default"
       },
       "NvidiaNotificationHandler": {
         "disable_notifications": true
@@ -4596,9 +4062,6 @@
         "hdr_output": false,
         "raw_input": true,
         "vsync": false
-      },
-      "ServicesSettingsHandler": {
-        "preset": "gaming"
       },
       "WindowsSettingsHandler": {
         "auto_hdr": false,
@@ -4627,17 +4090,15 @@
       "NetworkSettingsHandler",
       "MouseSettingsHandler",
       "GraphicsSettingsHandler",
-      "ServicesSettingsHandler",
       "ProcessPriorityHandler",
       "CpuAffinityHandler",
       "Rivals2ConfigHandler",
-      "CNMSettingsHandler",
       "ColorProfileSettingsHandler"
     ],
     "in_game_settings": [
       {
         "category": "Display",
-        "reason": "Current Rivals 2 builds expose native HDR output in GameUserSettings.ini. Use the game's HDR path with Windows HDR on, not Auto HDR.",
+        "reason": "Use the game's native HDR path with Windows HDR on when the installed build exposes HDR output in GameUserSettings.ini; do not use Auto HDR.",
         "setting": "HDR Output",
         "value": "On"
       },
@@ -4716,9 +4177,6 @@
     "optimization_target": "stable_online_vrr",
     "requires_reflex": false,
     "settings": {
-      "CNMSettingsHandler": {
-        "action": "stop"
-      },
       "ColorProfileSettingsHandler": {
         "digital_vibrance": 50,
         "game_type": "competitive_fps",
@@ -4736,8 +4194,8 @@
         "set_linear_curve": true
       },
       "NetworkSettingsHandler": {
-        "disable_nagle": true,
-        "preset": "gaming"
+        "disable_nagle": false,
+        "preset": "default"
       },
       "NvidiaNotificationHandler": {
         "disable_notifications": true
@@ -4781,9 +4239,6 @@
         "raw_input": true,
         "vsync": false
       },
-      "ServicesSettingsHandler": {
-        "preset": "gaming"
-      },
       "WindowsSettingsHandler": {
         "auto_hdr": false,
         "game_bar": false,
@@ -4811,17 +4266,15 @@
       "NetworkSettingsHandler",
       "MouseSettingsHandler",
       "GraphicsSettingsHandler",
-      "ServicesSettingsHandler",
       "ProcessPriorityHandler",
       "CpuAffinityHandler",
       "Rivals2ConfigHandler",
-      "CNMSettingsHandler",
       "ColorProfileSettingsHandler"
     ],
     "in_game_settings": [
       {
         "category": "Display",
-        "reason": "Current Rivals 2 builds expose native HDR output in GameUserSettings.ini. Use the game's HDR path with Windows HDR on, not Auto HDR.",
+        "reason": "Use the game's native HDR path with Windows HDR on when the installed build exposes HDR output in GameUserSettings.ini; do not use Auto HDR.",
         "setting": "HDR Output",
         "value": "On"
       },
@@ -4845,7 +4298,7 @@
       },
       {
         "category": "=== EXPLICIT PROHIBITIONS ===",
-        "reason": "These cause rollback timing failures at 300Hz. Stability > latency online.",
+        "reason": "These can cause rollback timing failures on high-refresh setups. Stability > latency online.",
         "setting": "DO NOT USE",
         "value": "LLM Ultra, Fast VSync, External FPS Caps, Refresh-3 Logic"
       },
@@ -4908,13 +4361,10 @@
     "is_emulator_profile": false,
     "is_online_profile": true,
     "is_sdr_only": false,
-    "network_scope": "full",
+    "network_scope": "none",
     "optimization_target": "stable_online",
     "requires_reflex": false,
     "settings": {
-      "CNMSettingsHandler": {
-        "action": "stop"
-      },
       "ColorProfileSettingsHandler": {
         "digital_vibrance": 50,
         "game_type": "competitive_fps",
@@ -4932,8 +4382,8 @@
         "set_linear_curve": true
       },
       "NetworkSettingsHandler": {
-        "disable_nagle": true,
-        "preset": "gaming"
+        "disable_nagle": false,
+        "preset": "default"
       },
       "NvidiaNotificationHandler": {
         "disable_notifications": true
@@ -4983,9 +4433,6 @@
         "raw_input": true,
         "vsync": false
       },
-      "ServicesSettingsHandler": {
-        "preset": "gaming"
-      },
       "WindowsSettingsHandler": {
         "auto_hdr": false,
         "game_bar": false,
@@ -5013,12 +4460,10 @@
       "NetworkSettingsHandler",
       "MouseSettingsHandler",
       "GraphicsSettingsHandler",
-      "ServicesSettingsHandler",
       "ProcessPriorityHandler",
       "OBSSettingsHandler",
       "CpuAffinityHandler",
       "Rivals2ConfigHandler",
-      "CNMSettingsHandler",
       "ColorProfileSettingsHandler"
     ],
     "in_game_settings": [
@@ -5030,7 +4475,7 @@
       },
       {
         "category": "=== EXPLICIT PROHIBITIONS ===",
-        "reason": "These cause rollback timing failures at 300Hz. Stability > latency online.",
+        "reason": "These can cause rollback timing failures on high-refresh setups. Stability > latency online.",
         "setting": "DO NOT USE",
         "value": "LLM Ultra, Fast VSync, External FPS Caps, Refresh-3 Logic"
       },
@@ -5093,13 +4538,10 @@
     "is_emulator_profile": false,
     "is_online_profile": true,
     "is_sdr_only": false,
-    "network_scope": "full",
+    "network_scope": "none",
     "optimization_target": "stable_online",
     "requires_reflex": false,
     "settings": {
-      "CNMSettingsHandler": {
-        "action": "stop"
-      },
       "ColorProfileSettingsHandler": {
         "digital_vibrance": 50,
         "game_type": "competitive_fps",
@@ -5117,8 +4559,8 @@
         "set_linear_curve": true
       },
       "NetworkSettingsHandler": {
-        "disable_nagle": true,
-        "preset": "gaming"
+        "disable_nagle": false,
+        "preset": "default"
       },
       "NvidiaNotificationHandler": {
         "disable_notifications": true
@@ -5184,9 +4626,6 @@
         "raw_input": true,
         "vsync": false
       },
-      "ServicesSettingsHandler": {
-        "preset": "gaming"
-      },
       "WindowsSettingsHandler": {
         "auto_hdr": false,
         "game_bar": false,
@@ -5214,18 +4653,16 @@
       "NetworkSettingsHandler",
       "MouseSettingsHandler",
       "GraphicsSettingsHandler",
-      "ServicesSettingsHandler",
       "ProcessPriorityHandler",
       "OBSSettingsHandler",
       "CpuAffinityHandler",
       "Rivals2ConfigHandler",
-      "CNMSettingsHandler",
       "ColorProfileSettingsHandler"
     ],
     "in_game_settings": [
       {
         "category": "Display",
-        "reason": "Current Rivals 2 builds expose native HDR output in GameUserSettings.ini. Use the game's HDR path with Windows HDR on, not Auto HDR.",
+        "reason": "Use the game's native HDR path with Windows HDR on when the installed build exposes HDR output in GameUserSettings.ini; do not use Auto HDR.",
         "setting": "HDR Output",
         "value": "On"
       },
@@ -5249,7 +4686,7 @@
       },
       {
         "category": "=== EXPLICIT PROHIBITIONS ===",
-        "reason": "These cause rollback timing failures at 300Hz. Stability > latency online.",
+        "reason": "These can cause rollback timing failures on high-refresh setups. Stability > latency online.",
         "setting": "DO NOT USE",
         "value": "LLM Ultra, Fast VSync, External FPS Caps, Refresh-3 Logic"
       },
@@ -5312,13 +4749,10 @@
     "is_emulator_profile": false,
     "is_online_profile": true,
     "is_sdr_only": false,
-    "network_scope": "full",
+    "network_scope": "none",
     "optimization_target": "stable_online",
     "requires_reflex": false,
     "settings": {
-      "CNMSettingsHandler": {
-        "action": "stop"
-      },
       "ColorProfileSettingsHandler": {
         "digital_vibrance": 50,
         "game_type": "competitive_fps",
@@ -5336,8 +4770,8 @@
         "set_linear_curve": true
       },
       "NetworkSettingsHandler": {
-        "disable_nagle": true,
-        "preset": "gaming"
+        "disable_nagle": false,
+        "preset": "default"
       },
       "NvidiaNotificationHandler": {
         "disable_notifications": true
@@ -5404,9 +4838,6 @@
         "raw_input": true,
         "vsync": false
       },
-      "ServicesSettingsHandler": {
-        "preset": "gaming"
-      },
       "WindowsSettingsHandler": {
         "auto_hdr": false,
         "game_bar": false,
@@ -5433,11 +4864,9 @@
       "NetworkSettingsHandler",
       "MouseSettingsHandler",
       "GraphicsSettingsHandler",
-      "ServicesSettingsHandler",
       "ProcessPriorityHandler",
       "CpuAffinityHandler",
       "Rivals2ConfigHandler",
-      "CNMSettingsHandler",
       "ColorProfileSettingsHandler"
     ],
     "in_game_settings": [
@@ -5642,9 +5071,6 @@
     "optimization_target": "tournament_simulation",
     "requires_reflex": false,
     "settings": {
-      "CNMSettingsHandler": {
-        "action": "stop"
-      },
       "ColorProfileSettingsHandler": {
         "digital_vibrance": 50,
         "game_type": "competitive_fps",
@@ -5711,9 +5137,6 @@
         "raw_input": true,
         "vsync": false
       },
-      "ServicesSettingsHandler": {
-        "preset": "gaming"
-      },
       "WindowsSettingsHandler": {
         "auto_hdr": false,
         "game_bar": false,
@@ -5740,10 +5163,8 @@
       "NetworkSettingsHandler",
       "MouseSettingsHandler",
       "GraphicsSettingsHandler",
-      "ServicesSettingsHandler",
       "ProcessPriorityHandler",
       "CpuAffinityHandler",
-      "CNMSettingsHandler",
       "ColorProfileSettingsHandler"
     ],
     "in_game_settings": [
@@ -5938,13 +5359,10 @@
     "is_emulator_profile": true,
     "is_online_profile": false,
     "is_sdr_only": true,
-    "network_scope": "full",
+    "network_scope": "none",
     "optimization_target": "minimum_latency",
     "requires_reflex": false,
     "settings": {
-      "CNMSettingsHandler": {
-        "action": "stop"
-      },
       "ColorProfileSettingsHandler": {
         "digital_vibrance": 50,
         "game_type": "emulator",
@@ -5962,8 +5380,8 @@
         "set_linear_curve": true
       },
       "NetworkSettingsHandler": {
-        "disable_nagle": true,
-        "preset": "gaming"
+        "disable_nagle": false,
+        "preset": "default"
       },
       "NvidiaSettingsHandler": {
         "global_vrr_mode": "off",
@@ -5999,9 +5417,6 @@
         },
         "win32_priority_separation": 42
       },
-      "ServicesSettingsHandler": {
-        "preset": "gaming"
-      },
       "WindowsSettingsHandler": {
         "auto_hdr": false,
         "game_bar": false,
@@ -6027,11 +5442,9 @@
       "NetworkSettingsHandler",
       "MouseSettingsHandler",
       "GraphicsSettingsHandler",
-      "ServicesSettingsHandler",
       "ProcessPriorityHandler",
       "OBSSettingsHandler",
       "CpuAffinityHandler",
-      "CNMSettingsHandler",
       "ColorProfileSettingsHandler"
     ],
     "in_game_settings": [
@@ -6226,13 +5639,10 @@
     "is_emulator_profile": true,
     "is_online_profile": false,
     "is_sdr_only": true,
-    "network_scope": "full",
+    "network_scope": "none",
     "optimization_target": "minimum_latency",
     "requires_reflex": false,
     "settings": {
-      "CNMSettingsHandler": {
-        "action": "stop"
-      },
       "ColorProfileSettingsHandler": {
         "digital_vibrance": 50,
         "game_type": "emulator",
@@ -6250,8 +5660,8 @@
         "set_linear_curve": true
       },
       "NetworkSettingsHandler": {
-        "disable_nagle": true,
-        "preset": "gaming"
+        "disable_nagle": false,
+        "preset": "default"
       },
       "NvidiaSettingsHandler": {
         "global_vrr_mode": "off",
@@ -6304,9 +5714,6 @@
         },
         "win32_priority_separation": 42
       },
-      "ServicesSettingsHandler": {
-        "preset": "gaming"
-      },
       "WindowsSettingsHandler": {
         "auto_hdr": false,
         "game_bar": false,
@@ -6332,10 +5739,8 @@
       "NetworkSettingsHandler",
       "MouseSettingsHandler",
       "GraphicsSettingsHandler",
-      "ServicesSettingsHandler",
       "ProcessPriorityHandler",
       "CpuAffinityHandler",
-      "CNMSettingsHandler",
       "ColorProfileSettingsHandler",
       "DolphinConfigHandler"
     ],
@@ -6555,13 +5960,10 @@
     "is_emulator_profile": true,
     "is_online_profile": false,
     "is_sdr_only": true,
-    "network_scope": "full",
+    "network_scope": "none",
     "optimization_target": "minimum_latency",
     "requires_reflex": false,
     "settings": {
-      "CNMSettingsHandler": {
-        "action": "stop"
-      },
       "ColorProfileSettingsHandler": {
         "digital_vibrance": 50,
         "game_type": "emulator",
@@ -6593,8 +5995,8 @@
         "set_linear_curve": true
       },
       "NetworkSettingsHandler": {
-        "disable_nagle": true,
-        "preset": "gaming"
+        "disable_nagle": false,
+        "preset": "default"
       },
       "NvidiaSettingsHandler": {
         "global_vrr_mode": "off",
@@ -6634,9 +6036,6 @@
         },
         "win32_priority_separation": 42
       },
-      "ServicesSettingsHandler": {
-        "preset": "gaming"
-      },
       "WindowsSettingsHandler": {
         "auto_hdr": false,
         "game_bar": false,
@@ -6663,10 +6062,8 @@
       "NetworkSettingsHandler",
       "MouseSettingsHandler",
       "GraphicsSettingsHandler",
-      "ServicesSettingsHandler",
       "ProcessPriorityHandler",
       "CpuAffinityHandler",
-      "CNMSettingsHandler",
       "ColorProfileSettingsHandler",
       "DolphinConfigHandler"
     ],
@@ -6724,13 +6121,10 @@
     "is_emulator_profile": true,
     "is_online_profile": false,
     "is_sdr_only": true,
-    "network_scope": "limited",
+    "network_scope": "none",
     "optimization_target": "balanced",
     "requires_reflex": false,
     "settings": {
-      "CNMSettingsHandler": {
-        "action": "stop"
-      },
       "ColorProfileSettingsHandler": {
         "digital_vibrance": 50,
         "game_type": "emulator",
@@ -6762,8 +6156,8 @@
         "set_linear_curve": true
       },
       "NetworkSettingsHandler": {
-        "disable_nagle": true,
-        "preset": "gaming"
+        "disable_nagle": false,
+        "preset": "default"
       },
       "NvidiaSettingsHandler": {
         "global_vrr_mode": "off",
@@ -6803,9 +6197,6 @@
         },
         "win32_priority_separation": 42
       },
-      "ServicesSettingsHandler": {
-        "preset": "gaming"
-      },
       "WindowsSettingsHandler": {
         "auto_hdr": false,
         "game_bar": false,
@@ -6832,11 +6223,9 @@
       "NetworkSettingsHandler",
       "MouseSettingsHandler",
       "GraphicsSettingsHandler",
-      "ServicesSettingsHandler",
       "ProcessPriorityHandler",
       "OBSSettingsHandler",
       "CpuAffinityHandler",
-      "CNMSettingsHandler",
       "ColorProfileSettingsHandler",
       "DolphinConfigHandler"
     ],
@@ -7056,13 +6445,10 @@
     "is_emulator_profile": true,
     "is_online_profile": false,
     "is_sdr_only": true,
-    "network_scope": "full",
+    "network_scope": "none",
     "optimization_target": "minimum_latency",
     "requires_reflex": false,
     "settings": {
-      "CNMSettingsHandler": {
-        "action": "stop"
-      },
       "ColorProfileSettingsHandler": {
         "digital_vibrance": 50,
         "game_type": "emulator",
@@ -7094,8 +6480,8 @@
         "set_linear_curve": true
       },
       "NetworkSettingsHandler": {
-        "disable_nagle": true,
-        "preset": "gaming"
+        "disable_nagle": false,
+        "preset": "default"
       },
       "NvidiaSettingsHandler": {
         "global_vrr_mode": "off",
@@ -7152,9 +6538,6 @@
         },
         "win32_priority_separation": 42
       },
-      "ServicesSettingsHandler": {
-        "preset": "gaming"
-      },
       "WindowsSettingsHandler": {
         "auto_hdr": false,
         "game_bar": false,
@@ -7181,10 +6564,8 @@
       "NetworkSettingsHandler",
       "MouseSettingsHandler",
       "GraphicsSettingsHandler",
-      "ServicesSettingsHandler",
       "ProcessPriorityHandler",
       "CpuAffinityHandler",
-      "CNMSettingsHandler",
       "ColorProfileSettingsHandler",
       "DolphinConfigHandler"
     ],
@@ -7404,13 +6785,10 @@
     "is_emulator_profile": true,
     "is_online_profile": false,
     "is_sdr_only": true,
-    "network_scope": "full",
+    "network_scope": "none",
     "optimization_target": "minimum_latency",
     "requires_reflex": false,
     "settings": {
-      "CNMSettingsHandler": {
-        "action": "stop"
-      },
       "ColorProfileSettingsHandler": {
         "digital_vibrance": 50,
         "game_type": "emulator",
@@ -7442,8 +6820,8 @@
         "set_linear_curve": true
       },
       "NetworkSettingsHandler": {
-        "disable_nagle": true,
-        "preset": "gaming"
+        "disable_nagle": false,
+        "preset": "default"
       },
       "NvidiaSettingsHandler": {
         "global_vrr_mode": "off",
@@ -7483,9 +6861,6 @@
         },
         "win32_priority_separation": 42
       },
-      "ServicesSettingsHandler": {
-        "preset": "gaming"
-      },
       "WindowsSettingsHandler": {
         "auto_hdr": false,
         "game_bar": false,
@@ -7512,10 +6887,8 @@
       "NetworkSettingsHandler",
       "MouseSettingsHandler",
       "GraphicsSettingsHandler",
-      "ServicesSettingsHandler",
       "ProcessPriorityHandler",
       "CpuAffinityHandler",
-      "CNMSettingsHandler",
       "ColorProfileSettingsHandler",
       "DolphinConfigHandler"
     ],
@@ -7567,13 +6940,10 @@
     "is_emulator_profile": true,
     "is_online_profile": false,
     "is_sdr_only": true,
-    "network_scope": "limited",
+    "network_scope": "none",
     "optimization_target": "balanced",
     "requires_reflex": false,
     "settings": {
-      "CNMSettingsHandler": {
-        "action": "stop"
-      },
       "ColorProfileSettingsHandler": {
         "digital_vibrance": 50,
         "game_type": "emulator",
@@ -7605,8 +6975,8 @@
         "set_linear_curve": true
       },
       "NetworkSettingsHandler": {
-        "disable_nagle": true,
-        "preset": "gaming"
+        "disable_nagle": false,
+        "preset": "default"
       },
       "NvidiaSettingsHandler": {
         "global_vrr_mode": "fullscreen_only",
@@ -7645,9 +7015,6 @@
           "scheduling_category": "High"
         },
         "win32_priority_separation": 42
-      },
-      "ServicesSettingsHandler": {
-        "preset": "gaming"
       },
       "WindowsSettingsHandler": {
         "auto_hdr": false,

@@ -582,19 +582,6 @@ class TestProfileIntegration:
         handler_names = [h.__class__.__name__ for h in profile.get_handlers()]
         assert "ColorProfileSettingsHandler" in handler_names
 
-    def test_cod_has_color_handler(self):
-        from abso.profiles.cod_bo7 import CodBo7Profile
-        profile = CodBo7Profile()
-        handler_names = [h.__class__.__name__ for h in profile.get_handlers()]
-        assert "ColorProfileSettingsHandler" in handler_names
-
-    def test_cod_color_settings_native_for_hdr(self):
-        from abso.profiles.cod_bo7 import CodBo7Profile
-        profile = CodBo7Profile()
-        settings = profile.get_settings("ColorProfileSettingsHandler")
-        assert settings["icc_profile"] == "native"
-        assert settings["game_type"] == "competitive_fps"
-
     def test_overwatch2_gsync_hdr_has_color_handler(self):
         from abso.profiles.overwatch2 import Overwatch2GSyncHDRProfile
         profile = Overwatch2GSyncHDRProfile()

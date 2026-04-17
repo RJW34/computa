@@ -394,9 +394,9 @@ class TestGenerateGameProfile:
         path = generate_game_profile(
             {"vsync": "off"},
             ["Game.exe"],
-            "Call of Duty: Black Ops 7"
+            "Marvel Rivals: HDR"
         )
-        assert "call_of_duty_black_ops_7" in path.name.lower()
+        assert "marvel_rivals_hdr" in path.name.lower()
         assert ":" not in path.name
 
     def test_multiple_executables_in_file(self):

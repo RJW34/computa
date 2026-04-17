@@ -647,8 +647,9 @@ def games(json_output: bool) -> None:
         console.print("\nSupported games:")
         console.print("  - Super Smash Bros. Melee (Slippi)")
         console.print("  - Rivals of Aether 2")
-        console.print("  - Call of Duty: Black Ops 7")
         console.print("  - Diablo IV")
+        console.print("  - Fortnite")
+        console.print("  - Marvel Rivals")
         return
 
     console.print(f"[green]Found {len(detected_games)} game(s):[/green]\n")
@@ -685,7 +686,7 @@ def games(json_output: bool) -> None:
 def apply(profile_name: str, no_backup: bool, benchmark: bool, json_output: bool) -> None:
     """Apply a game optimization profile.
 
-    PROFILE_NAME is the profile to apply (e.g., slippi-melee, cod-bo7, diablo4).
+    PROFILE_NAME is the profile to apply (e.g., slippi-melee, rivals2-online, diablo4).
     """
     profile_name = resolve_profile_id(profile_name) or profile_name
     if not is_admin():
@@ -1075,7 +1076,7 @@ def reapply(json_output: bool) -> None:
 def verify(profile_name: str, json_output: bool) -> None:
     """Verify that a profile's verifiable settings are active.
 
-    PROFILE_NAME is the profile to verify (e.g., slippi-melee, cod-bo7, rivals2).
+    PROFILE_NAME is the profile to verify (e.g., slippi-melee, rivals2-online, diablo4).
 
     This checks every handler that implements verify_active and helps confirm
     the machine is actually in the intended end state after apply.

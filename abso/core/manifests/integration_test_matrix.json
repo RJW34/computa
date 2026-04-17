@@ -93,20 +93,6 @@
       "expected": { "transaction_state": "committed", "apply_success": true }
     },
     {
-      "id": "apply-cod-bo7",
-      "profile_id": "cod-bo7",
-      "kind": "apply_profile",
-      "assumptions": ["administrator", "nvidia_gpu", "hdr_capable"],
-      "expected": { "transaction_state": "committed", "apply_success": true }
-    },
-    {
-      "id": "apply-cod-bo7-sdr",
-      "profile_id": "cod-bo7-sdr",
-      "kind": "apply_profile",
-      "assumptions": ["administrator", "nvidia_gpu"],
-      "expected": { "transaction_state": "committed", "apply_success": true }
-    },
-    {
       "id": "apply-diablo4",
       "profile_id": "diablo4",
       "kind": "apply_profile",

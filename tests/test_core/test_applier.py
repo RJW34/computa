@@ -62,7 +62,7 @@ class TestProfileApplierInit:
         assert "slippi-melee" in ProfileApplier.PROFILES
         assert "slippi-melee-console-parity" in ProfileApplier.PROFILES
         assert "slippi-melee-vrr-lab" in ProfileApplier.PROFILES
-        assert "cod-bo7" in ProfileApplier.PROFILES
+        assert "cod-bo7" not in ProfileApplier.PROFILES
         assert "diablo4" in ProfileApplier.PROFILES
         assert "rivals2-offline" in ProfileApplier.PROFILES
         assert "rivals2-offline-hdr" in ProfileApplier.PROFILES
@@ -616,7 +616,7 @@ class TestListProfiles:
         assert len(profiles) >= 4  # At least the 4 default profiles
         profile_ids = [p["id"] for p in profiles]
         assert "slippi-melee" in profile_ids
-        assert "cod-bo7" in profile_ids
+        assert "cod-bo7" not in profile_ids
 
     def test_list_profiles_structure(self):
         """Test list_profiles returns correct structure."""
@@ -640,14 +640,6 @@ class TestRealProfiles:
 
         assert profile.profile_id == "slippi-melee"
         assert "Melee" in profile.display_name
-
-    def test_cod_bo7_profile_loads(self):
-        """Test CoD BO7 profile can be loaded."""
-        applier = ProfileApplier()
-        profile = applier._get_profile("cod-bo7")
-
-        assert profile.profile_id == "cod-bo7"
-        assert "Black Ops" in profile.display_name
 
     def test_diablo4_profile_loads(self):
         """Test Diablo 4 profile can be loaded."""

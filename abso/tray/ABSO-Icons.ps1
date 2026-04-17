@@ -665,7 +665,7 @@ function New-GameBitmap {
 
     # Dispatch to known game icons; fall back to category for unknown games
     $known = @(
-        "slippi-melee", "rivals2", "overwatch2", "cod-bo7", "fortnite",
+        "slippi-melee", "rivals2", "overwatch2", "fortnite",
         "marvel-rivals", "diablo4", "ryujinx-ssbu", "pokemon-auto-chess",
         "pacdeluxe", "productivity"
     )
@@ -785,45 +785,6 @@ function New-GameBitmap {
 
             # Layer 3: Specular
             $g.FillEllipse($highlightBrush, 4, 3, 5, 3)
-        }
-
-        "cod-bo7" {
-            # Military 5-pointed star emblem
-            # Layer 1: Glow
-            $g.FillEllipse($glowBrush, 1, 1, 14, 14)
-
-            # Layer 2: Filled 5-pointed star
-            [float]$cx = 8.0; [float]$cy = 8.0
-            [float]$outerR = 6.5; [float]$innerR = 2.8
-            $starPoints = @()
-            for ($i = 0; $i -lt 10; $i++) {
-                [float]$angle = ($i * 36 - 90) * [Math]::PI / 180
-                [float]$r = if ($i % 2 -eq 0) { $outerR } else { $innerR }
-                $starPoints += New-Object System.Drawing.PointF(
-                    ($cx + $r * [Math]::Cos($angle)),
-                    ($cy + $r * [Math]::Sin($angle))
-                )
-            }
-            $starBrush = New-Object System.Drawing.SolidBrush($Color)
-            $g.FillPolygon($starBrush, $starPoints)
-            $starBrush.Dispose()
-
-            # Inner lighter star
-            $innerStarPoints = @()
-            for ($i = 0; $i -lt 10; $i++) {
-                [float]$angle = ($i * 36 - 90) * [Math]::PI / 180
-                [float]$r = if ($i % 2 -eq 0) { 4.0 } else { 1.8 }
-                $innerStarPoints += New-Object System.Drawing.PointF(
-                    ($cx + $r * [Math]::Cos($angle)),
-                    ($cy + $r * [Math]::Sin($angle))
-                )
-            }
-            $innerBrush = New-Object System.Drawing.SolidBrush($lighter)
-            $g.FillPolygon($innerBrush, $innerStarPoints)
-            $innerBrush.Dispose()
-
-            # Layer 3: Specular
-            $g.FillEllipse($highlightBrush, 5, 2, 4, 3)
         }
 
         "fortnite" {

@@ -177,7 +177,7 @@ applier = ProfileApplier()
 Applies a game optimization profile.
 
 **Parameters:**
-- `profile_name`: Name of the profile (e.g., "slippi-melee", "cod-bo7")
+- `profile_name`: Name of the profile (e.g., "slippi-melee", "rivals2-online")
 
 **Returns:** `ApplyResult` dataclass containing:
 - `success`: Boolean indicating overall success
@@ -371,11 +371,11 @@ Generates markdown report of in-game settings.
 | Profile ID | Class | Game |
 |------------|-------|------|
 | `slippi-melee` | `SlippiMeleeProfile` | Super Smash Bros. Melee (Slippi) |
-| `cod-bo7` | `CodBo7Profile` | Call of Duty: Black Ops 7 |
 | `overwatch2` | `Overwatch2Profile` | Overwatch 2 (No-Sync) |
 | `overwatch2-gsync` | `Overwatch2GSyncProfile` | Overwatch 2 (G-SYNC) |
 | `diablo4` | `Diablo4Profile` | Diablo 4 |
-| `rivals2` | `Rivals2Profile` | Rivals of Aether 2 |
+| `rivals2-offline` | `Rivals2OfflineProfile` | Rivals of Aether 2 |
+| `rivals2-online` | `Rivals2OnlineProfile` | Rivals of Aether 2 |
 
 ---
 
@@ -494,7 +494,7 @@ python -m abso profiles
 
 # Apply a profile
 python -m abso apply slippi-melee
-python -m abso apply cod-bo7 --no-backup
+python -m abso apply rivals2-online --no-backup
 
 # Restore from backup
 python -m abso restore latest

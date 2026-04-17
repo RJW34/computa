@@ -364,7 +364,7 @@ def enable_privilege(privilege_id: int) -> bool:
 
 **DEPENDS ON P1 (base class collapse)**
 
-### Profiles to convert (14)
+### Profiles to convert (13)
 
 | Profile ID | Current file | Base → YAML `base:` |
 |---|---|---|
@@ -375,7 +375,6 @@ def enable_privilege(privilege_id: int) -> bool:
 | rivals2-gsync | rivals2_gsync.py | competitive_fps |
 | rivals2-online-gsync | rivals2_gsync.py | competitive_fps |
 | rivals2-tournament-sim-144hz | rivals2_tournament_sim.py | competitive_fps |
-| cod-bo7 | cod_bo7.py | reflex_shooter |
 | fortnite | fortnite.py | reflex_shooter |
 | marvel-rivals-sdr | marvel_rivals.py | reflex_shooter |
 | marvel-rivals-hdr | marvel_rivals.py | reflex_shooter |

@@ -80,7 +80,7 @@ class _MarvelRivalsBaseProfile(ReflexShooterBaseProfile):
             {
                 "category": "Display",
                 "setting": "Frame Rate Limit",
-                "value": "Auto (refresh rate - 3, so 297 on this 300 Hz monitor)",
+                "value": "Auto (refresh rate - 3)",
                 "reason": "Keeps G-SYNC active and prevents NVCP VSync from engaging while preserving tear-free latency.",
             },
             {
@@ -92,17 +92,8 @@ class _MarvelRivalsBaseProfile(ReflexShooterBaseProfile):
             {
                 "category": "Graphics",
                 "setting": "Upscaling",
-                "value": "DLSS Quality or Balanced",
-                "reason": "This build ships DLSS, XeSS, and AMD upscaling support; on an RTX 4070, DLSS is the best performance lever if native render cannot hold target cap.",
-            },
-            {
-                "category": "Graphics",
-                "setting": "Performance Optimization (Beta)",
-                "value": "A/B test On vs Off on your hardware",
-                "reason": (
-                    "Marvel Rivals added an experimental PC optimization toggle in March 2026. "
-                    "Keep the setting that improves 1% lows and frametime consistency on your system."
-                ),
+                "value": "Use your GPU vendor's quality/balanced upscaler if GPU-bound",
+                "reason": "Upscaling is the cleanest performance lever when native rendering cannot hold the VRR cap.",
             },
             {
                 "category": "Graphics",
@@ -114,7 +105,7 @@ class _MarvelRivalsBaseProfile(ReflexShooterBaseProfile):
                 "category": "Graphics",
                 "setting": "Textures",
                 "value": "Medium",
-                "reason": "A 12 GB RTX 4070 can handle more, but medium is the safer performance-first choice during long sessions and new patches.",
+                "reason": "Use a texture setting that fits your VRAM; lower it if you see streaming hitches or memory pressure.",
             },
             {
                 "category": "Graphics",
@@ -168,7 +159,7 @@ class MarvelRivalsSDRProfile(_MarvelRivalsBaseProfile):
                 "category": "Display",
                 "setting": "HDR",
                 "value": "Off",
-                "reason": "This variant keeps the cleaner SDR path that is already active on this PC.",
+                "reason": "Use this variant when you want the cleaner SDR path or do not have HDR active.",
             },
             {
                 "category": "Display",
@@ -223,7 +214,7 @@ class MarvelRivalsHDRProfile(_MarvelRivalsBaseProfile):
                 "category": "Display",
                 "setting": "HDR",
                 "value": "On",
-                "reason": "This PC's primary display reports HDR capability, so the HDR path can stay active without using Auto HDR.",
+                "reason": "Use this variant when the active display path supports native HDR without relying on Auto HDR.",
             },
             {
                 "category": "Display",

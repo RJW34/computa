@@ -142,20 +142,13 @@ class BaseProfile(ABC):
         """What network optimizations are allowed.
 
         - "full": Allow all network optimizations (Nagle disable, TCP tuning)
-        - "limited": Only safe optimizations (no Nagle disable)
+        - "limited": Reserved for narrowly verified TCP tuning (no Nagle disable)
         - "none": Use OS defaults
 
-        Default: Inferred from optimization_target.
+        Default: "none". Profiles must opt into TCP/global network changes
+        because most games use UDP for live gameplay and global TCP edits can
+        affect downloads, streaming, and general browsing.
         """
-        if self.optimization_target in {
-            "minimum_latency",
-            "minimum_latency_offline",
-            "low_latency_high_fps",
-            "stable_online",
-        }:
-            return "full"
-        if self.optimization_target in {"balanced"}:
-            return "limited"
         return "none"
 
     @property

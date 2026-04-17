@@ -97,8 +97,8 @@ python -m abso profiles
 
 # Apply a game profile
 python -m abso apply slippi-melee
-python -m abso apply rivals2
-python -m abso apply cod-bo7
+python -m abso apply rivals2-online
+python -m abso apply fortnite
 python -m abso apply diablo4
 
 # Restore from backup
@@ -113,8 +113,9 @@ python -m abso restore 20240115_143022  # Specific backup
 | `slippi-melee` | Super Smash Bros. Melee (Slippi) | Ultra-low latency |
 | `slippi-melee-console-parity` | Super Smash Bros. Melee (Slippi) | Console-like pacing/feel |
 | `slippi-melee-vrr-lab` | Super Smash Bros. Melee (Slippi) | Experimental VRR/G-SYNC A/B testing |
-| `rivals2` | Rivals of Aether 2 | Ultra-low latency |
-| `cod-bo7` | Call of Duty: Black Ops 7 | Low latency, stable FPS |
+| `rivals2-offline` | Rivals of Aether 2 | Offline no-sync latency |
+| `rivals2-online` | Rivals of Aether 2 | Rollback-safe online play |
+| `fortnite` | Fortnite | Reflex no-sync latency |
 | `overwatch2` | Overwatch 2 (No-Sync) | Minimum latency no-sync |
 | `overwatch2-gsync` | Overwatch 2 (G-SYNC) | Tear-free low latency VRR |
 | `diablo4` | Diablo 4 | Balanced performance |
@@ -255,7 +256,7 @@ abso/
 │   ├── base.py          # Base profile class
 │   ├── slippi_melee.py  # Slippi Melee profile
 │   ├── rivals2.py       # Rivals of Aether 2 profile
-│   ├── cod_bo7.py       # Call of Duty profile
+│   ├── fortnite.py      # Fortnite profile
 │   └── diablo4.py       # Diablo 4 profile
 ├── settings/            # Settings handlers
 │   ├── windows.py       # Windows settings

@@ -34,9 +34,6 @@ These facts were re-verified from the current working repo and current local mac
 - Diablo 4:
   - current profile stack in [diablo4.py](/c:/Users/mtoli/Documents/Code/windowsoptimizerabso/abso/profiles/diablo4.py)
   - current local game prefs expose native HDR, refresh, VSync, and Reflex in [LocalPrefs.txt](/c:/Users/mtoli/Documents/Diablo%20IV/LocalPrefs.txt)
-- Call of Duty: Black Ops 7:
-  - current profile stack in [cod_bo7.py](/c:/Users/mtoli/Documents/Code/windowsoptimizerabso/abso/profiles/cod_bo7.py)
-  - still inherits the shared reflex-shooter base without a game config handler in [profile_bases.py](/c:/Users/mtoli/Documents/Code/windowsoptimizerabso/abso/profiles/profile_bases.py)
 - Ryujinx SSBU / HewDraw Remix:
   - current profile stack in [ryujinx_ssbu.py](/c:/Users/mtoli/Documents/Code/windowsoptimizerabso/abso/profiles/ryujinx_ssbu.py)
   - still inherits the generic emulator base without emulator config enforcement in [profile_bases.py](/c:/Users/mtoli/Documents/Code/windowsoptimizerabso/abso/profiles/profile_bases.py)
@@ -60,9 +57,8 @@ Bring the remaining major gaming families to the same architectural standard as 
 This phase is complete when:
 
 1. Diablo 4 is end-to-end.
-2. CoD BO7 is end-to-end or explicitly contract-limited.
-3. Ryujinx SSBU is end-to-end or explicitly contract-limited.
-4. Verification coverage is expanded enough that those families are no longer “mostly OS-level” profiles.
+2. Ryujinx SSBU is end-to-end or explicitly contract-limited.
+3. Verification coverage is expanded enough that those families are no longer "mostly OS-level" profiles.
 
 ## Progress Update
 
@@ -80,12 +76,11 @@ Implemented locally in the current working tree:
   - added `verify_active` support for `ProcessPriorityHandler`
   - expanded compliance criticality for these verified handlers
 - `PR-18` and `PR-19` moved from optimistic to honest:
-  - CoD and Ryujinx now surface `system_only` application scope instead of implying end-to-end native config enforcement
-  - tray/catalog descriptions now state that those families still rely on manual in-app or emulator tuning
+  - Ryujinx now surfaces `system_only` application scope instead of implying end-to-end native config enforcement
+  - tray/catalog descriptions now state that the emulator still relies on manual tuning
 
 Still open after this implementation pass:
 
-- a true native CoD handler once the game config surface is locally discoverable and validated
 - a true Ryujinx config handler or a fork-safe explicit config contract
 - additional verification coverage for lower-priority handlers such as OBS, color, affinity, and CNM where worth enforcing
 
@@ -146,41 +141,6 @@ Acceptance:
 - HDR and SDR variants both control native Diablo IV config
 - handler has round-trip backup/restore tests
 - handler has verify tests
-
-### PR-18: CoD Native Config Discovery And Contracted Handler
-
-Owner: `Handlers` + `Profiles & Evidence`
-
-Objective:
-
-- stop shipping CoD BO7 as a mostly generic shooter profile if the game exposes a writable config path
-
-Expected grade lift:
-
-- Optimization Capability: `B` -> `B+`
-
-Files:
-
-- candidate handler file under `abso/settings/`
-- [abso/profiles/cod_bo7.py](/c:/Users/mtoli/Documents/Code/windowsoptimizerabso/abso/profiles/cod_bo7.py)
-- [abso/profiles/catalog.py](/c:/Users/mtoli/Documents/Code/windowsoptimizerabso/abso/profiles/catalog.py)
-- [abso/tray/ABSO-Tray.ps1](/c:/Users/mtoli/Documents/Code/windowsoptimizerabso/abso/tray/ABSO-Tray.ps1)
-- tests under `tests/test_handlers/` and [tests/test_profiles.py](/c:/Users/mtoli/Documents/Code/windowsoptimizerabso/tests/test_profiles.py)
-
-Tasks:
-
-- discover the current BO7 local config path and schema on the validation machine
-- determine which settings are safely writable and worth enforcing
-- if writable: implement native config enforcement and verification
-- if not writable or not stable: explicitly document the family contract as system-level plus in-game guidance, and remove any overstated claims
-
-Acceptance:
-
-- CoD no longer sits in an ambiguous middle state
-- either:
-  - it has a real config handler and verify path
-- or:
-  - its contract explicitly states what ABSO cannot enforce
 
 ### PR-19: Ryujinx Config Enforcement Or Explicit Contract Limit
 
@@ -254,14 +214,13 @@ Acceptance:
 
 1. PR-17 Diablo 4
 2. PR-20 verification expansion groundwork
-3. PR-18 CoD BO7
-4. PR-19 Ryujinx
+3. PR-19 Ryujinx
 
 Reason:
 
 - Diablo has verified local native config evidence already.
 - Verification groundwork helps the later family slices land on a stronger foundation.
-- CoD and Ryujinx need more discovery and may require contract-bound outcomes instead of immediate full handlers.
+- Ryujinx needs more discovery and may require a contract-bound outcome instead of an immediate full handler.
 
 ## Commands To Run For Every Slice
 

@@ -64,11 +64,10 @@ class BalancedBaseProfile(BaseProfile):
     """Sensible-defaults base for profiles that don't need a specialized base.
 
     Provides standard gaming handlers with moderate settings: Game Mode on,
-    Ultimate Performance power plan, and standard service/network tuning.
+    Ultimate Performance power plan, and conservative OS-default network tuning.
     """
 
     def get_handlers(self) -> list[SettingsHandler]:
-        from abso.settings.cnm import CNMSettingsHandler
         from abso.settings.color import ColorProfileSettingsHandler
         from abso.settings.graphics import GraphicsSettingsHandler
         from abso.settings.memory import MemorySettingsHandler
@@ -78,7 +77,6 @@ class BalancedBaseProfile(BaseProfile):
         from abso.settings.power import PowerSettingsHandler
         from abso.settings.process_priority import ProcessPriorityHandler
         from abso.settings.registry import RegistrySettingsHandler
-        from abso.settings.services import ServicesSettingsHandler
         from abso.settings.windows import WindowsSettingsHandler
 
         handlers: list[SettingsHandler] = [
@@ -89,7 +87,6 @@ class BalancedBaseProfile(BaseProfile):
             NetworkSettingsHandler(),
             MouseSettingsHandler(),
             GraphicsSettingsHandler(),
-            ServicesSettingsHandler(),
         ]
 
         if self.include_legacy_tweaks:
@@ -97,7 +94,6 @@ class BalancedBaseProfile(BaseProfile):
 
         handlers += [
             ProcessPriorityHandler(self.executable_hints),
-            CNMSettingsHandler(),
             ColorProfileSettingsHandler(),
         ]
         return handlers
@@ -127,7 +123,7 @@ class BalancedBaseProfile(BaseProfile):
             },
             "NetworkSettingsHandler": {
                 "disable_nagle": False,
-                "preset": "gaming",
+                "preset": "default",
             },
             "MouseSettingsHandler": {
                 "disable_acceleration": True,
@@ -136,15 +132,9 @@ class BalancedBaseProfile(BaseProfile):
             "GraphicsSettingsHandler": {
                 "disable_global_fso": True,
             },
-            "ServicesSettingsHandler": {
-                "preset": "gaming",
-            },
             "ProcessPriorityHandler": {
                 "cpu_priority": 2,
                 "io_priority": 2,
-            },
-            "CNMSettingsHandler": {
-                "action": "stop",
             },
             "ColorProfileSettingsHandler": {
                 "icc_profile": "srgb",

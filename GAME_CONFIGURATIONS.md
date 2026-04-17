@@ -42,13 +42,13 @@ Each profile configures some or all of these system components:
 | **PowerSettingsHandler** | Power plans, USB suspend, PCIe power saving, processor performance |
 | **RegistrySettingsHandler** | System responsiveness, network throttling, process priority, quantum settings |
 | **NvidiaSettingsHandler** | Low Latency Mode, VSync, Power Management, Shader Cache, Threaded Optimization, G-Sync |
-| **NetworkSettingsHandler** | Nagle's algorithm, TCP optimizations |
+| **NetworkSettingsHandler** | OS-default networking unless a profile explicitly opts into TCP tuning |
 | **MouseSettingsHandler** | Mouse acceleration, linear curve |
 | **GraphicsSettingsHandler** | Fullscreen Optimizations (FSO), Multi-Plane Overlay (MPO) |
-| **ServicesSettingsHandler** | Background services (SysMain, DiagTrack, etc.) |
-| **MemorySettingsHandler** | System cache, paging executive |
+| **ServicesSettingsHandler** | Optional background-service management; not part of default game profiles |
+| **MemorySettingsHandler** | Optional legacy memory tweaks; not part of default game profiles |
 | **ProcessPriorityHandler** | GPU/CPU/IO priority for game executables |
-| **CNMSettingsHandler** | Stops CNM service during gaming (prevents power interference) |
+| **CNMSettingsHandler** | Optional local integration, not used by built-in profiles |
 | **DolphinConfigHandler** | Dolphin emulator-specific config fixes |
 | **Rivals2ConfigHandler** | Rivals 2-specific game config enforcement |
 | **NvidiaNotificationHandler** | Disables NVIDIA notifications that break fullscreen |
@@ -126,8 +126,8 @@ Profiles use predefined NVIDIA presets that configure multiple driver settings:
 **Executables:** `Slippi Dolphin.exe`, `Dolphin.exe`
 **Optimization Target:** Minimum latency for competitive play
 
-#### Key Findings (January 2026)
-- **DX12 + HAGS ON = 0.0ms render latency** (confirmed on RTX 4070 + i9-14900F)
+#### Key Findings
+- **DX12 + HAGS ON** is the preferred Slippi path when it is stable on the target system
 - DX11 + HAGS causes micro-stutters - avoid this combination
 - Lower internal resolution = measurably lower render latency
 - G-Sync/VSync disabled - fixed 60fps games don't benefit from VRR
@@ -332,51 +332,7 @@ If experiencing micro-stuttering:
 
 ---
 
-### 3. Call of Duty: Black Ops 7
-
-**Profile IDs:** `cod-bo7`, `cod-bo7-oled`
-**Executables:** `cod.exe`, `BlackOps7.exe`
-**Optimization Target:** Low latency with stable high FPS
-
-#### Key Point: Native NVIDIA Reflex
-CoD has built-in NVIDIA Reflex. **Driver Low Latency Mode conflicts with Reflex** and can cause stuttering/increased latency.
-
-#### System Settings
-
-| Setting | Value | Reason |
-|---------|-------|--------|
-| HAGS | On | Helps latency when GFE removed |
-| HDR | Off | Competitive play - processing overhead |
-| VRR Optimize | Off | Adds latency |
-| Game Mode | On | |
-| Game Bar | Off | |
-| Game DVR | Off | |
-
-#### NVIDIA Settings (reflex_game preset)
-
-| Setting | Value | Reason |
-|---------|-------|--------|
-| Low Latency Mode | **Off** | Reflex handles this |
-| VSync | Off | Game/Reflex handles sync |
-| Power Management | Prefer Maximum Performance | |
-| Shader Cache | Unlimited | |
-| Threaded Optimization | On | |
-
-#### In-Game Settings
-
-| Setting | Value | Reason |
-|---------|-------|--------|
-| Display Mode | Fullscreen Exclusive | Lower latency than borderless |
-| VSync | Off | Use Reflex instead |
-| **Nvidia Reflex Low Latency** | **On + Boost** | Hardware-level latency reduction |
-| Frame Rate Limit | Match monitor Hz or Unlimited | |
-| Render Resolution | 100% (or DLSS Performance if GPU-limited) | |
-| On-Demand Texture Streaming | Off | Eliminates pop-in |
-| Shaders | Restart after first launch | Let shaders compile |
-
----
-
-### 4. Diablo 4
+### 3. Diablo 4
 
 **Profile IDs:** `diablo4`, `diablo4-oled`, `diablo4-oled-vrr`
 **Executables:** `Diablo IV.exe`
@@ -429,7 +385,7 @@ Uses `vrr_diablo4` preset with:
 
 ---
 
-### 5. SSBU / HewDraw Remix (Ryujinx)
+### 4. SSBU / HewDraw Remix (Ryujinx)
 
 **Profile IDs:** `ryujinx-ssbu`, `ryujinx-ssbu-oled`, `ryujinx-ssbu-vrr`
 **Executables:** `Ryujinx.exe`, `Ryujinx.Ava.exe`, `Ryujinx.Headless.SDL2.exe`
@@ -488,7 +444,7 @@ Uses `vrr_diablo4` preset with:
 
 ---
 
-### 6. Pokemon Auto Chess (Browser)
+### 5. Pokemon Auto Chess (Browser)
 
 **Profile ID:** `pokemon-auto-chess`, `pokemon-auto-chess-oled`
 **Executables:** `chrome.exe`, `msedge.exe`, `firefox.exe`, `brave.exe`
@@ -529,7 +485,7 @@ Uses `vrr_diablo4` preset with:
 
 ---
 
-### 7. PACDeluxe (Tauri Desktop Client)
+### 6. PACDeluxe (Tauri Desktop Client)
 
 **Profile ID:** `pacdeluxe`, `pacdeluxe-oled`
 **Executables:** `pac-deluxe.exe`, `msedgewebview2.exe`
@@ -566,7 +522,7 @@ Uses `vrr_diablo4` preset with:
 
 ---
 
-### 8. Productivity (OLED + HDR)
+### 7. Productivity (OLED + HDR)
 
 **Profile ID:** `productivity-oled`
 **Executables:** Code.exe, devenv.exe, chrome.exe, firefox.exe, msedge.exe, etc.
@@ -710,7 +666,6 @@ ABSO creates timestamped backups before any changes:
 | Slippi Melee | `slippi-melee` | DX12 + HAGS ON |
 | Rivals 2 (training) | `rivals2-offline` | LLM Ultra allowed |
 | Rivals 2 (ranked) | `rivals2-online` | Conservative/stable |
-| CoD BO7 | `cod-bo7` | Use in-game Reflex |
 | Diablo 4 | `diablo4` | Balanced preset |
 | SSBU/HDR (Ryujinx) | `ryujinx-ssbu` | Vulkan + PPTC |
 | Pokemon Auto Chess | `pokemon-auto-chess` | Browser optimizations |

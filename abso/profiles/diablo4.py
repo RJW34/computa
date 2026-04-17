@@ -39,18 +39,15 @@ class _Diablo4BaseProfile(BaseProfile):
         return "Diablo IV"
 
     def get_handlers(self) -> list[SettingsHandler]:
-        from abso.settings.cnm import CNMSettingsHandler
         from abso.settings.color import ColorProfileSettingsHandler
         from abso.settings.diablo4_config import Diablo4ConfigHandler
         from abso.settings.graphics import GraphicsSettingsHandler
-        from abso.settings.memory import MemorySettingsHandler
         from abso.settings.mouse import MouseSettingsHandler
         from abso.settings.network import NetworkSettingsHandler
         from abso.settings.nvidia import NvidiaSettingsHandler
         from abso.settings.power import PowerSettingsHandler
         from abso.settings.process_priority import ProcessPriorityHandler
         from abso.settings.registry import RegistrySettingsHandler
-        from abso.settings.services import ServicesSettingsHandler
         from abso.settings.windows import WindowsSettingsHandler
 
         return [
@@ -61,10 +58,7 @@ class _Diablo4BaseProfile(BaseProfile):
             NetworkSettingsHandler(),
             MouseSettingsHandler(),
             GraphicsSettingsHandler(),
-            ServicesSettingsHandler(),
-            MemorySettingsHandler(),
             ProcessPriorityHandler(["Diablo IV.exe"]),
-            CNMSettingsHandler(),
             ColorProfileSettingsHandler(),
             Diablo4ConfigHandler(),
         ]
@@ -89,7 +83,6 @@ class _Diablo4BaseProfile(BaseProfile):
                 "disable_pcie_power_saving": True,
             },
             "RegistrySettingsHandler": {
-                "system_responsiveness": 10,
                 "game_priority": {
                     "gpu_priority": 8,
                     "priority": 6,
@@ -112,19 +105,6 @@ class _Diablo4BaseProfile(BaseProfile):
             },
             "GraphicsSettingsHandler": {
                 "disable_global_fso": False,
-            },
-            "MemorySettingsHandler": {
-                "large_system_cache": 0,
-                "disable_paging_executive": 1,
-            },
-            "CNMSettingsHandler": {
-                "action": "stop",
-            },
-            "ServicesSettingsHandler": {
-                "services": {
-                    "SysMain": {"start_type": 4, "stop": True},
-                    "DiagTrack": {"start_type": 4, "stop": True},
-                },
             },
             "ProcessPriorityHandler": {
                 "cpu_priority": 2,
@@ -237,7 +217,7 @@ class Diablo4Profile(_Diablo4BaseProfile):
                 "category": "Display",
                 "setting": "HDR",
                 "value": "On",
-                "reason": "Diablo 4 exposes native HDR controls in LocalPrefs.txt on this machine.",
+                "reason": "Use Diablo 4's native HDR controls in LocalPrefs.txt when the installed game and display path support HDR.",
             },
             {
                 "category": "Display",

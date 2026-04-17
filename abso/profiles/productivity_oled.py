@@ -59,7 +59,6 @@ class ProductivityOLEDProfile(BaseProfile):
     def get_handlers(self) -> list[SettingsHandler]:
         from abso.settings.color import ColorProfileSettingsHandler
         from abso.settings.graphics import GraphicsSettingsHandler
-        from abso.settings.memory import MemorySettingsHandler
         from abso.settings.mouse import MouseSettingsHandler
         from abso.settings.nvidia import NvidiaSettingsHandler
         from abso.settings.registry import RegistrySettingsHandler
@@ -72,7 +71,6 @@ class ProductivityOLEDProfile(BaseProfile):
             NvidiaSettingsHandler(),
             MouseSettingsHandler(),
             GraphicsSettingsHandler(),
-            MemorySettingsHandler(),
             ColorProfileSettingsHandler(),
         ]
 
@@ -121,11 +119,6 @@ class ProductivityOLEDProfile(BaseProfile):
             "GraphicsSettingsHandler": {
                 # Keep FSO enabled - works well with modern apps
                 "disable_global_fso": False,
-            },
-            "MemorySettingsHandler": {
-                # Default settings - keep system cache for app launching
-                "large_system_cache": 0,
-                "disable_paging_executive": 0,  # Let Windows manage
             },
             "ColorProfileSettingsHandler": {
                 "icc_profile": "native",      # Keep calibrated profile

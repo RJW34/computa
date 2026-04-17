@@ -148,7 +148,7 @@ class TestSpecificExceptions:
         """Test ProfileNotFoundError with details."""
         error = ProfileNotFoundError(
             "Profile 'unknown' not found",
-            details="Available: slippi-melee, cod-bo7"
+            details="Available: slippi-melee, rivals2-online"
         )
 
         assert "unknown" in str(error)

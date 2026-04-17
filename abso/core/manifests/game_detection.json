@@ -51,7 +51,6 @@
       "registry_key": "SOFTWARE\\WOW6432Node\\Activision\\Call of Duty",
       "executables": [
         "cod.exe",
-        "BlackOps7.exe",
         "ModernWarfare.exe"
       ]
     }

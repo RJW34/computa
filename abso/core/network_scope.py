@@ -1,7 +1,7 @@
-"""NetworkScopeManager - Per-game network tuning.
+"""NetworkScopeManager - profile-scoped network safety.
 
-This module enforces scoped network optimizations rather than global changes,
-preventing side effects on non-gaming applications.
+This module prevents profiles from applying global TCP changes unless they
+explicitly declare that those changes are required for the target workload.
 """
 
 from __future__ import annotations
@@ -37,35 +37,20 @@ class NetworkScopeResult:
 
 
 class NetworkScopeManager:
-    """Manages per-game network tuning to prevent global side effects.
+    """Manages profile network tuning to prevent global side effects.
 
-    Key principle: Global Nagle disable is PROHIBITED.
+    Key principle: global Nagle/TCP tuning is opt-in only.
 
-    Network optimizations are only applied to profiles explicitly tagged:
-    - Rollback netcode games
-    - Twitch shooters (FPS with tick-rate sensitivity)
-
-    All other profiles retain OS defaults for network settings to prevent
-    side effects on streaming, downloads, and general internet usage.
+    The network handler's ``preset="gaming"`` writes TCPNoDelay,
+    TcpAckFrequency, and several netsh global TCP values. Those are not
+    harmless per-game switches, so the scope manager rewrites them to OS
+    defaults unless a profile explicitly declares a network scope.
     """
-
-    # Legacy fallback targets for profiles that don't define network_scope metadata.
-    LEGACY_FULL_SCOPE_TARGETS = {
-        "minimum_latency",
-        "minimum_latency_offline",
-        "low_latency_high_fps",
-        "stable_online",
-    }
 
     # Settings that should be scoped (not applied globally)
     SCOPED_SETTINGS = {
         "disable_nagle",
         "tcp_nodelay",
-    }
-
-    # Settings that are safe to apply globally
-    GLOBAL_SAFE_SETTINGS = {
-        "preset",  # Gaming preset is generally safe
     }
 
     def evaluate_scope(self, profile: BaseProfile) -> NetworkScope:
@@ -77,7 +62,7 @@ class NetworkScopeManager:
         Returns:
             NetworkScope with allowed optimizations.
         """
-        # Preferred source of truth: profile metadata.
+        # Source of truth: profile metadata.
         # BaseProfile.network_scope returns one of: full, limited, none.
         network_scope = getattr(profile, "network_scope", "none")
         if network_scope == "full":
@@ -91,16 +76,6 @@ class NetworkScopeManager:
                 allow_nagle_disable=False,
                 allow_tcp_optimizations=True,
                 scope_reason=f"Profile '{profile.profile_id}' declares network_scope=limited",
-            )
-
-        # Legacy fallback for older/custom profiles that may not expose metadata.
-        if profile.optimization_target in self.LEGACY_FULL_SCOPE_TARGETS:
-            return NetworkScope(
-                allow_nagle_disable=True,
-                allow_tcp_optimizations=True,
-                scope_reason=(
-                    f"Legacy fallback: target '{profile.optimization_target}' allows network tuning"
-                ),
             )
 
         # Default: No aggressive network tuning
@@ -149,6 +124,13 @@ class NetworkScopeManager:
                     f"'{profile.profile_id}' - {scope.scope_reason}"
                 )
 
+            if scoped.get("preset") == "gaming":
+                scoped["preset"] = "default"
+                result.changes_made.append(
+                    "Replaced NetworkSettingsHandler preset 'gaming' with 'default' "
+                    "(gaming preset disables Nagle globally)"
+                )
+
         if not scope.allow_tcp_optimizations:
             # Remove aggressive TCP settings if not allowed
             tcp_settings = ["tcp_nodelay", "tcp_ack_frequency"]
@@ -158,6 +140,12 @@ class NetworkScopeManager:
                     result.changes_made.append(
                         f"Removed '{setting}' (profile not network-sensitive)"
                     )
+
+            if "tcp_global" in scoped:
+                del scoped["tcp_global"]
+                result.changes_made.append(
+                    "Removed 'tcp_global' settings (profile does not allow TCP global tuning)"
+                )
 
         result.scoped_settings = scoped
 

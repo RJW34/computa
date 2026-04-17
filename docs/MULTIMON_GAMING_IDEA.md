@@ -39,7 +39,6 @@ slippi-melee             -> slippi-melee-multimon
 | Rivals 2 Online | ~1-2ms | Yes - rollback masks this |
 | Rivals 2 Offline | ~1-2ms | Depends on use case |
 | Diablo 4 | ~1-2ms | Yes |
-| CoD BO7 | ~1-2ms | Marginal |
 
 ## Implementation Plan
 

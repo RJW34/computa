@@ -143,7 +143,7 @@ class Rivals2OnlineProfile(Rivals2BaseProfile):
                 "category": "=== EXPLICIT PROHIBITIONS ===",
                 "setting": "DO NOT USE",
                 "value": "LLM Ultra, Fast VSync, External FPS Caps, Refresh-3 Logic",
-                "reason": "These cause rollback timing failures at 300Hz. Stability > latency online.",
+                "reason": "These can cause rollback timing failures on high-refresh setups. Stability > latency online.",
             },
             {
                 "category": "NVIDIA Control Panel",

@@ -85,7 +85,7 @@ class _FortniteBaseProfile(ReflexShooterBaseProfile):
                 "category": "Graphics",
                 "setting": "Rendering Mode",
                 "value": "DirectX 12",
-                "reason": "This PC's live config already prefers DX12, and that is the intended ABSO path here.",
+                "reason": "This profile is built around Fortnite's DX12 path for Reflex and modern presentation behavior.",
             },
             {
                 "category": "Graphics",
@@ -212,7 +212,7 @@ class FortniteHDRProfile(_FortniteBaseProfile):
                 "category": "Display",
                 "setting": "HDR",
                 "value": "On",
-                "reason": "Fortnite exposes a native HDR output path in GameUserSettings.ini on this machine.",
+                "reason": "Use Fortnite's native HDR output path in GameUserSettings.ini when the installed build and display path support HDR.",
             },
             {
                 "category": "Display",

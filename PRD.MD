@@ -116,7 +116,6 @@ Each game profile contains:
 | Game | Launcher/Runtime | Optimization Focus |
 |------|------------------|-------------------|
 | Super Smash Bros. Melee | Slippi Launcher / Slippi Dolphin | Ultra-low latency (competitive) |
-| Call of Duty: Black Ops 7 | Battle.net / Steam | Low latency, stable high FPS |
 | Diablo 4 | Battle.net | Balanced (stable FPS, visual quality) |
 
 #### Future: "Sweetspot" Mode

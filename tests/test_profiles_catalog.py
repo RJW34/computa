@@ -63,8 +63,6 @@ def test_shooter_and_arpg_families_expose_canonical_hdr_sdr_pairs() -> None:
     manifest = {profile["id"]: profile for profile in get_profile_manifest()}
 
     for profile_id in {
-        "cod-bo7",
-        "cod-bo7-sdr",
         "diablo4",
         "diablo4-sdr",
         "fortnite",
@@ -75,6 +73,16 @@ def test_shooter_and_arpg_families_expose_canonical_hdr_sdr_pairs() -> None:
         "overwatch2-gsync-hdr-streaming",
     }:
         assert profile_id in manifest
+
+
+def test_future_dated_cod_profiles_are_not_registered() -> None:
+    """BO7 profiles were not specable as of the April 16, 2025 audit date."""
+    manifest = {profile["id"]: profile for profile in get_profile_manifest()}
+
+    assert "cod-bo7" not in PROFILE_CATALOG
+    assert "cod-bo7-sdr" not in PROFILE_CATALOG
+    assert "cod-bo7" not in manifest
+    assert "cod-bo7-sdr" not in manifest
 
 
 def test_profile_manifest_has_required_fields() -> None:
@@ -110,8 +118,41 @@ def test_manifest_exposes_honest_application_scope_for_incomplete_families() -> 
     assert manifest["diablo4"]["application_scope"] == "system_plus_native_config"
     assert manifest["fortnite"]["application_scope"] == "system_plus_native_config"
     assert manifest["marvel-rivals-sdr"]["application_scope"] == "system_plus_native_config"
-    assert manifest["cod-bo7"]["application_scope"] == "system_only"
     assert manifest["ryujinx-ssbu"]["application_scope"] == "system_only"
+
+
+def test_builtin_profiles_do_not_use_optional_service_cnm_or_memory_tweaks() -> None:
+    """Built-ins should avoid broad local/service/memory side effects by default."""
+    prohibited = {
+        "CNMSettingsHandler",
+        "ServicesSettingsHandler",
+        "MemorySettingsHandler",
+    }
+
+    offenders: list[str] = []
+    for profile_id, profile in get_profile_instances().items():
+        handler_names = {handler.__class__.__name__ for handler in profile.get_handlers()}
+        if handler_names & prohibited:
+            offenders.append(profile_id)
+
+    assert not offenders
+
+
+def test_builtin_profiles_use_os_default_networking_without_explicit_scope() -> None:
+    """Profiles that do not opt into network tuning should not request TCP writes."""
+    offenders: list[str] = []
+    for profile_id, profile in get_profile_instances().items():
+        if profile.network_scope != "none":
+            continue
+
+        settings = profile.get_settings("NetworkSettingsHandler")
+        if not settings:
+            continue
+
+        if settings.get("disable_nagle") or settings.get("preset") == "gaming" or "tcp_global" in settings:
+            offenders.append(profile_id)
+
+    assert not offenders
 
 
 def test_overlapping_nvidia_profile_families_have_stable_driver_identity() -> None:

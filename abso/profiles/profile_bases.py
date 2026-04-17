@@ -172,16 +172,16 @@ class Rivals2BaseProfile(BaseProfile):
         """Permit safe reuse of ABSO-managed Rivals driver profiles.
 
         NVIDIA does not always enumerate custom-profile ownership cleanly for
-        Rivals 2 on this machine, even when the stable family profile already
-        exists. ABSO still fails closed on conflicts; this only relaxes the
-        "existing bound profile, no conflicting owner" case.
+        every driver branch, even when the stable family profile already exists.
+        ABSO still fails closed on conflicts; this only relaxes the "existing
+        bound profile, no conflicting owner" case.
         """
         return True
 
     @property
     def is_sdr_only(self) -> bool:
-        # Current Rivals 2 builds expose native HDR output toggles in
-        # GameUserSettings.ini, so the title is no longer modeled as SDR-only.
+        # Rivals 2 variants choose SDR/HDR explicitly instead of relying on a
+        # family-level SDR-only default.
         return False
 
     @property
@@ -233,7 +233,6 @@ class Rivals2BaseProfile(BaseProfile):
         return deduped
 
     def get_handlers(self) -> list[SettingsHandler]:
-        from abso.settings.cnm import CNMSettingsHandler
         from abso.settings.color import ColorProfileSettingsHandler
         from abso.settings.cpu_affinity import CpuAffinityHandler
         from abso.settings.graphics import GraphicsSettingsHandler
@@ -244,7 +243,6 @@ class Rivals2BaseProfile(BaseProfile):
         from abso.settings.power import PowerSettingsHandler
         from abso.settings.process_priority import ProcessPriorityHandler
         from abso.settings.registry import RegistrySettingsHandler
-        from abso.settings.services import ServicesSettingsHandler
         from abso.settings.windows import WindowsSettingsHandler
 
         handlers: list[SettingsHandler] = [
@@ -263,7 +261,6 @@ class Rivals2BaseProfile(BaseProfile):
             NetworkSettingsHandler(),
             MouseSettingsHandler(),
             GraphicsSettingsHandler(),
-            ServicesSettingsHandler(),
         ]
 
         if self.include_legacy_tweaks:
@@ -277,7 +274,6 @@ class Rivals2BaseProfile(BaseProfile):
 
             handlers.append(Rivals2ConfigHandler())
 
-        handlers.append(CNMSettingsHandler())
         handlers.append(ColorProfileSettingsHandler())
         return handlers
 
@@ -311,8 +307,8 @@ class Rivals2BaseProfile(BaseProfile):
                 },
             },
             "NetworkSettingsHandler": {
-                "disable_nagle": True,
-                "preset": "gaming",
+                "disable_nagle": False,
+                "preset": "default",
             },
             "MouseSettingsHandler": {
                 "disable_acceleration": True,
@@ -320,9 +316,6 @@ class Rivals2BaseProfile(BaseProfile):
             },
             "GraphicsSettingsHandler": {
                 "disable_global_fso": True,
-            },
-            "ServicesSettingsHandler": {
-                "preset": "gaming",
             },
             "ProcessPriorityHandler": {
                 "cpu_priority": 3,
@@ -333,9 +326,6 @@ class Rivals2BaseProfile(BaseProfile):
                 # hard affinity on hybrid CPUs (prevents Thread Director from
                 # optimizing). Users can opt in via abso.yaml profile_overrides.
                 "strategy": None,
-            },
-            "CNMSettingsHandler": {
-                "action": "stop",
             },
             "ColorProfileSettingsHandler": {
                 "icc_profile": "srgb",
@@ -403,8 +393,8 @@ class Rivals2HDRMixin:
                 "setting": "HDR Output",
                 "value": "On",
                 "reason": (
-                    "Current Rivals 2 builds expose native HDR output in GameUserSettings.ini. "
-                    "Use the game's HDR path with Windows HDR on, not Auto HDR."
+                    "Use the game's native HDR path with Windows HDR on when the installed "
+                    "build exposes HDR output in GameUserSettings.ini; do not use Auto HDR."
                 ),
             },
             {
@@ -441,7 +431,6 @@ class EmulatorLatencyBaseProfile(BaseProfile):
         return True
 
     def get_handlers(self) -> list[SettingsHandler]:
-        from abso.settings.cnm import CNMSettingsHandler
         from abso.settings.color import ColorProfileSettingsHandler
         from abso.settings.cpu_affinity import CpuAffinityHandler
         from abso.settings.graphics import GraphicsSettingsHandler
@@ -452,7 +441,6 @@ class EmulatorLatencyBaseProfile(BaseProfile):
         from abso.settings.power import PowerSettingsHandler
         from abso.settings.process_priority import ProcessPriorityHandler
         from abso.settings.registry import RegistrySettingsHandler
-        from abso.settings.services import ServicesSettingsHandler
         from abso.settings.windows import WindowsSettingsHandler
 
         handlers: list[SettingsHandler] = [
@@ -463,7 +451,6 @@ class EmulatorLatencyBaseProfile(BaseProfile):
             NetworkSettingsHandler(),
             MouseSettingsHandler(),
             GraphicsSettingsHandler(),
-            ServicesSettingsHandler(),
         ]
 
         if self.include_legacy_tweaks:
@@ -472,7 +459,6 @@ class EmulatorLatencyBaseProfile(BaseProfile):
         handlers += [
             ProcessPriorityHandler(self.executable_hints),
             CpuAffinityHandler(self.executable_hints),
-            CNMSettingsHandler(),
             ColorProfileSettingsHandler(),
         ]
 
@@ -512,8 +498,8 @@ class EmulatorLatencyBaseProfile(BaseProfile):
                 },
             },
             "NetworkSettingsHandler": {
-                "disable_nagle": True,
-                "preset": "gaming",
+                "disable_nagle": False,
+                "preset": "default",
             },
             "MouseSettingsHandler": {
                 "disable_acceleration": True,
@@ -526,9 +512,6 @@ class EmulatorLatencyBaseProfile(BaseProfile):
                 # that explicitly need it (e.g., no-sync exclusive fullscreen profiles
                 # where MPO compositor interference is measured and confirmed).
             },
-            "ServicesSettingsHandler": {
-                "preset": "gaming",
-            },
             "ProcessPriorityHandler": {
                 "cpu_priority": 3,
                 "io_priority": 3,
@@ -538,9 +521,6 @@ class EmulatorLatencyBaseProfile(BaseProfile):
                 # hard affinity on hybrid CPUs (prevents Thread Director from
                 # optimizing). Users can opt in via abso.yaml profile_overrides.
                 "strategy": None,
-            },
-            "CNMSettingsHandler": {
-                "action": "stop",
             },
             "ColorProfileSettingsHandler": {
                 "icc_profile": "srgb",
@@ -573,7 +553,6 @@ class WebGLBaseProfile(BaseProfile):
     """Shared base for WebGL/WebView2 performance profiles."""
 
     def get_handlers(self) -> list[SettingsHandler]:
-        from abso.settings.cnm import CNMSettingsHandler
         from abso.settings.color import ColorProfileSettingsHandler
         from abso.settings.graphics import GraphicsSettingsHandler
         from abso.settings.memory import MemorySettingsHandler
@@ -582,7 +561,6 @@ class WebGLBaseProfile(BaseProfile):
         from abso.settings.power import PowerSettingsHandler
         from abso.settings.process_priority import ProcessPriorityHandler
         from abso.settings.registry import RegistrySettingsHandler
-        from abso.settings.services import ServicesSettingsHandler
         from abso.settings.windows import WindowsSettingsHandler
 
         handlers = [
@@ -592,7 +570,6 @@ class WebGLBaseProfile(BaseProfile):
             NvidiaSettingsHandler(),
             NetworkSettingsHandler(),
             GraphicsSettingsHandler(),
-            ServicesSettingsHandler(),
         ]
 
         if self.include_legacy_tweaks:
@@ -600,7 +577,6 @@ class WebGLBaseProfile(BaseProfile):
 
         handlers += [
             ProcessPriorityHandler(self.executable_hints),
-            CNMSettingsHandler(),
             ColorProfileSettingsHandler(),
         ]
         return handlers
@@ -636,15 +612,9 @@ class WebGLBaseProfile(BaseProfile):
             "GraphicsSettingsHandler": {
                 "disable_global_fso": False,
             },
-            "ServicesSettingsHandler": {
-                "preset": "gaming",
-            },
             "ProcessPriorityHandler": {
                 "cpu_priority": 2,
                 "io_priority": 2,
-            },
-            "CNMSettingsHandler": {
-                "action": "stop",
             },
             "ColorProfileSettingsHandler": {
                 "icc_profile": "srgb",
@@ -689,7 +659,6 @@ class ReflexShooterBaseProfile(BaseProfile):
         return "dx12"
 
     def get_handlers(self) -> list[SettingsHandler]:
-        from abso.settings.cnm import CNMSettingsHandler
         from abso.settings.color import ColorProfileSettingsHandler
         from abso.settings.cpu_affinity import CpuAffinityHandler
         from abso.settings.graphics import GraphicsSettingsHandler
@@ -700,7 +669,6 @@ class ReflexShooterBaseProfile(BaseProfile):
         from abso.settings.power import PowerSettingsHandler
         from abso.settings.process_priority import ProcessPriorityHandler
         from abso.settings.registry import RegistrySettingsHandler
-        from abso.settings.services import ServicesSettingsHandler
         from abso.settings.windows import WindowsSettingsHandler
 
         handlers = [
@@ -711,7 +679,6 @@ class ReflexShooterBaseProfile(BaseProfile):
             NetworkSettingsHandler(),
             MouseSettingsHandler(),
             GraphicsSettingsHandler(),
-            ServicesSettingsHandler(),
         ]
 
         if self.include_legacy_tweaks:
@@ -720,7 +687,6 @@ class ReflexShooterBaseProfile(BaseProfile):
         handlers += [
             ProcessPriorityHandler(self.executable_hints),
             CpuAffinityHandler(self.executable_hints),
-            CNMSettingsHandler(),
             ColorProfileSettingsHandler(),
         ]
         return handlers
@@ -759,8 +725,8 @@ class ReflexShooterBaseProfile(BaseProfile):
                 "preset": "reflex_game",
             },
             "NetworkSettingsHandler": {
-                "disable_nagle": True,
-                "preset": "gaming",
+                "disable_nagle": False,
+                "preset": "default",
             },
             "MouseSettingsHandler": {
                 "disable_acceleration": True,
@@ -768,9 +734,6 @@ class ReflexShooterBaseProfile(BaseProfile):
             },
             "GraphicsSettingsHandler": {
                 "disable_global_fso": True,
-            },
-            "ServicesSettingsHandler": {
-                "preset": "gaming",
             },
             "ProcessPriorityHandler": {
                 "cpu_priority": 3,
@@ -781,9 +744,6 @@ class ReflexShooterBaseProfile(BaseProfile):
                 # hard affinity on hybrid CPUs (prevents Thread Director from
                 # optimizing). Users can opt in via abso.yaml profile_overrides.
                 "strategy": None,
-            },
-            "CNMSettingsHandler": {
-                "action": "stop",
             },
             "ColorProfileSettingsHandler": {
                 "icc_profile": "srgb",

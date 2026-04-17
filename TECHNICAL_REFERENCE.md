@@ -490,44 +490,6 @@ class BackupManager:
 
 ---
 
-### Call of Duty: Black Ops 7
-
-**Executable hints:** `cod.exe`, `BlackOps7.exe` (verify actual executable name)
-
-**Priority:** Low latency, high stable FPS
-
-**Nvidia profile:**
-- Low Latency Mode: **Off** (Reflex handles this - don't double up)
-- Reflex: Enable in-game **On + Boost** (takes priority over driver setting)
-- VSync: Off
-- Power Management: Prefer Maximum Performance
-- Shader Cache: Unlimited (CoD compiles many shaders)
-
-**Important:** When a game has Nvidia Reflex, you should NOT use driver Low Latency Mode.
-Reflex is more effective and combining them can cause stuttering.
-
-**In-game recommendations:**
-```markdown
-## Call of Duty: Black Ops 7 Settings
-
-### Display
-- Display Mode: Fullscreen Exclusive (or Borderless on Windows 11)
-- VSync: Off
-- Nvidia Reflex Low Latency: On + Boost
-- Frame Rate Limit: Match monitor Hz or cap 3 below for G-Sync
-
-### Graphics
-- Render Resolution: 100% (or use DLSS Performance if GPU-bound)
-- On-Demand Texture Streaming: Off (if VRAM allows)
-- Shader Quality: Restart game after first launch to compile shaders
-
-### Audio
-- Audio Mix: Headphones or appropriate preset
-- Reduce unnecessary audio processing
-```
-
----
-
 ### Diablo 4
 
 **Executable hints:** `Diablo IV.exe`
@@ -625,7 +587,7 @@ profile_overrides:
       preset: balanced  # Override from minimum_latency
     timer:
       resolution_ms: 1.0  # Override from 0.5
-  cod-bo7:
+  fortnite:
     windows:
       hags: false  # Disable HAGS for this profile
 

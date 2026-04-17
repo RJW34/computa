@@ -11,7 +11,6 @@ from dataclasses import dataclass
 from typing import Any, Literal
 
 from abso.profiles.base import BaseProfile
-from abso.profiles.cod_bo7 import CodBo7Profile, CodBo7SDRProfile
 from abso.profiles.diablo4 import Diablo4Profile, Diablo4SDRProfile
 from abso.profiles.fortnite import FortniteHDRProfile, FortniteProfile
 from abso.profiles.marvel_rivals import MarvelRivalsHDRProfile, MarvelRivalsSDRProfile
@@ -168,26 +167,6 @@ PROFILE_CATALOG: OrderedDict[str, ProfileCatalogEntry] = OrderedDict(
             ),
             sync_mode="on",
         ),
-        "cod-bo7": ProfileCatalogEntry(
-            profile_class=CodBo7Profile,
-            tray_category="Shooter",
-            tray_subtitle="HDR ON | Reflex ON+Boost | LLM OFF",
-            tray_description=(
-                "Competitive Call of Duty HDR system path. ABSO applies the machine-level lane here, "
-                "but the title still depends on manual in-game configuration until a native handler exists."
-            ),
-            sync_mode="agnostic",
-        ),
-        "cod-bo7-sdr": ProfileCatalogEntry(
-            profile_class=CodBo7SDRProfile,
-            tray_category="Shooter",
-            tray_subtitle="SDR | Reflex ON+Boost | LLM OFF",
-            tray_description=(
-                "Competitive Call of Duty SDR system path. ABSO applies the machine-level lane here, "
-                "but the title still depends on manual in-game configuration until a native handler exists."
-            ),
-            sync_mode="agnostic",
-        ),
         "diablo4": ProfileCatalogEntry(
             profile_class=Diablo4Profile,
             tray_category="ARPG",
@@ -217,8 +196,8 @@ PROFILE_CATALOG: OrderedDict[str, ProfileCatalogEntry] = OrderedDict(
             tray_category="Shooter",
             tray_subtitle="SDR | Reflex ON+Boost | G-SYNC ON",
             tray_description=(
-                "Performance-first SDR Marvel Rivals profile. Uses Reflex + VRR and expects "
-                "you to A/B the in-game Performance Optimization (Beta) toggle on your hardware."
+                "Performance-first SDR Marvel Rivals profile. Uses Reflex + VRR and keeps "
+                "engine-specific options in the native config handler."
             ),
             sync_mode="on",
         ),
@@ -227,8 +206,8 @@ PROFILE_CATALOG: OrderedDict[str, ProfileCatalogEntry] = OrderedDict(
             tray_category="Shooter",
             tray_subtitle="HDR ON | Reflex ON+Boost | G-SYNC ON",
             tray_description=(
-                "Performance-first HDR Marvel Rivals profile. Uses Reflex + VRR and expects "
-                "you to A/B the in-game Performance Optimization (Beta) toggle on your hardware."
+                "Performance-first HDR Marvel Rivals profile. Uses Reflex + VRR and keeps "
+                "engine-specific options in the native config handler."
             ),
             sync_mode="on",
         ),

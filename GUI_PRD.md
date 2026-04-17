@@ -240,7 +240,7 @@ Multi-step wizard for applying game optimization profiles.
 │  └─────────────────────────────────────────────────────┘   │
 │                                                             │
 │  ┌─────────────────────────────────────────────────────┐   │
-│  │ 🎮 Call of Duty: Black Ops 7                        │   │
+│  │ 🎮 Fortnite                                         │   │
 │  │    Low latency with Nvidia Reflex                   │   │
 │  └─────────────────────────────────────────────────────┘   │
 │                                                             │
@@ -638,7 +638,7 @@ View in-game settings recommendations.
 │  Select a game to view recommended in-game settings:        │
 │                                                             │
 │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐      │
-│  │ Slippi Melee │  │ Rivals 2     │  │ CoD BO7      │      │
+│  │ Slippi Melee │  │ Rivals 2     │  │ Fortnite     │      │
 │  └──────────────┘  └──────────────┘  └──────────────┘      │
 │                                                             │
 │  ═══════════════════════════════════════════════════════   │

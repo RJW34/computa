@@ -7,7 +7,6 @@ from unittest.mock import patch
 import pytest
 
 from abso.profiles import get_all_profiles
-from abso.profiles.cod_bo7 import CodBo7Profile, CodBo7SDRProfile
 from abso.profiles.diablo4 import Diablo4Profile, Diablo4SDRProfile
 from abso.profiles.fortnite import FortniteHDRProfile, FortniteProfile
 from abso.profiles.marvel_rivals import MarvelRivalsHDRProfile, MarvelRivalsSDRProfile
@@ -69,15 +68,6 @@ class TestProfileLoading:
         profile = SlippiMeleeVRRLabProfile()
         assert profile.profile_id == "slippi-melee-vrr-lab"
         assert "VRR Lab" in profile.display_name
-
-    def test_cod_profile_loads(self):
-        """CoD should expose explicit HDR and SDR variants."""
-        hdr = CodBo7Profile()
-        sdr = CodBo7SDRProfile()
-        assert hdr.profile_id == "cod-bo7"
-        assert hdr.display_name == "Call of Duty: Black Ops 7 - HDR"
-        assert sdr.profile_id == "cod-bo7-sdr"
-        assert sdr.display_name == "Call of Duty: Black Ops 7 - SDR"
 
     def test_diablo4_profile_loads(self):
         """Diablo 4 should expose explicit HDR and SDR variants."""
@@ -188,14 +178,6 @@ class TestProfileHandlers:
         assert "WindowsSettingsHandler" in handler_names
         assert "NvidiaSettingsHandler" in handler_names
         assert "NetworkSettingsHandler" in handler_names
-
-    def test_cod_get_handlers_returns_list(self):
-        """Test CodBo7Profile.get_handlers returns handlers."""
-        profile = CodBo7Profile()
-        handlers = profile.get_handlers()
-
-        assert isinstance(handlers, list)
-        assert len(handlers) > 0
 
     def test_diablo4_get_handlers_returns_list(self):
         """Test Diablo4Profile.get_handlers returns handlers."""
@@ -339,14 +321,6 @@ class TestProfileSettings:
         assert settings["vsync"] == "on"
         assert settings["vrr_app_override"] == "allow"
         assert settings["global_vrr_mode"] == "fullscreen_only"
-
-    def test_cod_nvidia_settings(self):
-        """Test CodBo7Profile returns Nvidia settings with reflex_game preset."""
-        profile = CodBo7Profile()
-        settings = profile.get_settings("NvidiaSettingsHandler")
-
-        # CoD has built-in NVIDIA Reflex - uses reflex_game preset (LLM OFF)
-        assert settings["preset"] == "reflex_game"
 
     def test_diablo4_nvidia_settings(self):
         """Test Diablo4Profile returns Nvidia settings with Reflex preset (LLM OFF)."""
@@ -561,23 +535,6 @@ class TestProfileSettings:
         assert color["digital_vibrance"] == 50
         assert color["game_type"] == "competitive_fps"
 
-    def test_cod_bo7_hdr_native_color(self):
-        """CoD BO7 with HDR enabled should use native ICC, not sRGB."""
-        profile = CodBo7Profile()
-        color = profile.get_settings("ColorProfileSettingsHandler")
-        assert color["icc_profile"] == "native"
-        assert color["game_type"] == "competitive_fps"
-
-    def test_cod_bo7_sdr_uses_srgb_color(self):
-        """The SDR CoD variant should stay on the SDR color path."""
-        profile = CodBo7SDRProfile()
-        win = profile.get_settings("WindowsSettingsHandler")
-        color = profile.get_settings("ColorProfileSettingsHandler")
-
-        assert win["hdr"] is False
-        assert win["auto_hdr"] is False
-        assert color["icc_profile"] == "srgb"
-
     def test_diablo4_sdr_uses_srgb_color(self):
         """The SDR Diablo 4 variant should explicitly stay on the SDR path."""
         profile = Diablo4SDRProfile()
@@ -594,7 +551,6 @@ class TestProfileSettings:
 
         assert Diablo4Profile().application_scope == "system_plus_native_config"
         assert FortniteProfile().application_scope == "system_plus_native_config"
-        assert CodBo7Profile().application_scope == "system_only"
         assert RyujinxSSBUProfile().application_scope == "system_only"
 
     def test_fortnite_sdr_and_hdr_variants_drive_native_game_config(self):
@@ -819,14 +775,6 @@ class TestProfileInGameSettings:
         assert len(settings) > 0
         assert any("A/B" in s.get("value", "") for s in settings)
 
-    def test_cod_in_game_has_reflex_setting(self):
-        """Test CodBo7Profile recommends Nvidia Reflex."""
-        profile = CodBo7Profile()
-        settings = profile.get_in_game_settings()
-
-        reflex_settings = [s for s in settings if "Reflex" in s.get("setting", "")]
-        assert len(reflex_settings) > 0
-
     def test_pokemon_auto_chess_in_game_settings(self):
         """Test PokemonAutoChessProfile returns Chrome-specific settings."""
         profile = PokemonAutoChessProfile()
@@ -928,12 +876,6 @@ class TestBaseProfileImplementation:
 
         # Should have category headers
         assert "##" in report
-
-    def test_cod_profile_description(self):
-        """Test CodBo7Profile has description."""
-        profile = CodBo7Profile()
-        assert isinstance(profile.description, str)
-        assert len(profile.description) > 0
 
     def test_diablo4_profile_target(self):
         """Test Diablo4Profile has balanced optimization target."""

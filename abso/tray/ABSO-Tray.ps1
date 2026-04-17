@@ -928,22 +928,6 @@ $script:FallbackProfiles = [ordered]@{
     }
 
     # --- Shooter ---
-    "cod-bo7"           = @{
-        Name     = "Call of Duty: Black Ops 7 - HDR"
-        Sub      = "HDR ON | Reflex ON+Boost | LLM OFF"
-        Cat      = "Shooter"
-        Desc     = "Competitive Call of Duty HDR profile with Reflex on the no-sync path"
-        Exes     = @("cod.exe", "BlackOps7.exe")
-        SyncMode = "agnostic"
-    }
-    "cod-bo7-sdr"       = @{
-        Name     = "Call of Duty: Black Ops 7 - SDR"
-        Sub      = "SDR | Reflex ON+Boost | LLM OFF"
-        Cat      = "Shooter"
-        Desc     = "Competitive Call of Duty SDR profile with Reflex on the no-sync path"
-        Exes     = @("cod.exe", "BlackOps7.exe")
-        SyncMode = "agnostic"
-    }
     "fortnite"          = @{
         Name     = "Fortnite - SDR"
         Sub      = "SDR | Reflex ON+Boost | No Sync"

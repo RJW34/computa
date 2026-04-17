@@ -21,7 +21,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **rivals2-online** — Rivals 2 online/ranked (rollback-safe)
 - **rivals2-tournament-sim-144hz** — Tournament condition simulation
 - **rivals2-300hz-max** — Maximum performance 300Hz
-- **cod-bo7** — Call of Duty: Black Ops 7 (Reflex enabled)
+- **fortnite** / **fortnite-hdr** — Fortnite Reflex path
+- **marvel-rivals-sdr** / **marvel-rivals-hdr** — Marvel Rivals Reflex path
 - **diablo4** — Diablo 4 (balanced ARPG)
 - **pokemon-auto-chess** — Browser game optimization
 - **pacdeluxe** — Tauri client optimization

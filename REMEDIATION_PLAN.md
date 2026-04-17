@@ -215,7 +215,7 @@ Add unused handlers to appropriate profiles:
 | `AudioSettingsHandler` | rivals2, slippi-melee | Audio latency matters for fighting games |
 | `VisualSettingsHandler` | All profiles | Reduce DWM overhead |
 | `UpdatesSettingsHandler` | All profiles | Prevent mid-game updates |
-| `StorageSettingsHandler` | diablo4, cod-bo7 | TRIM for SSD health |
+| `StorageSettingsHandler` | diablo4, fortnite | TRIM for SSD health |
 
 **Implementation:**
 ```python

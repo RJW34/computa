@@ -60,7 +60,7 @@ DEFAULT_GAME_DETECTION_MANIFEST: dict[str, Any] = {
         },
         "Call of Duty": {
             "registry_key": r"SOFTWARE\WOW6432Node\Activision\Call of Duty",
-            "executables": ["cod.exe", "BlackOps7.exe", "ModernWarfare.exe"],
+            "executables": ["cod.exe", "ModernWarfare.exe"],
         },
     },
     "standalone_locations": [
