@@ -624,9 +624,28 @@ class NvidiaSettingsHandler(SettingsHandler):
                 if not result.get("app_bound", True):
                     app_bound = False
                     note = result.get("app_binding_note", "")
+                    state = str(result.get("app_binding_state") or "").strip().lower()
+
                     if note:
                         applied.append(f"NOTE: {note}")
-                        errors.append(f"App binding failed: {note}")
+
+                    # `bound_elsewhere` is a hard failure: the driver reports the
+                    # executable(s) owned by a conflicting profile, so NVAPI
+                    # intentionally skipped the setting writes. Only profile
+                    # conflict resolution can recover from this.
+                    #
+                    # Every other unbound state (notably `manual_required`, the
+                    # driver-struct-mismatch path) still wrote the settings to
+                    # the target profile — only the per-executable association
+                    # is missing, and the note already spells out the one-click
+                    # NVCP action that finishes it. Treat those as a warning so
+                    # the rest of the handlers aren't rolled back over a known
+                    # driver limitation with a clear manual remediation.
+                    if state == "bound_elsewhere":
+                        if note:
+                            errors.append(f"App binding failed: {note}")
+                    elif note:
+                        warnings.append(f"NVIDIA app binding requires manual action: {note}")
 
                     # If NPI was launched, add a clear message
                     if result.get("npi_launched"):

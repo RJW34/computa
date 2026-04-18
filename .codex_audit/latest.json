@@ -1,0 +1,8 @@
+{
+  "ts": "2026-04-17T20:26:00-04:00",
+  "commit": "5a658b0",
+  "verdict": "APPROVED",
+  "files": ["abso/settings/nvidia/__init__.py", "tests/test_handlers/test_nvidia.py", ".codex_audit/latest.json"],
+  "summary": "Prior Codex audit BLOCKED on: (1) stray 'v2' file at repo root, (2) incomplete bind_slippi_nvidia.py, (3) pytest WinError 5 setup errors. Fixed: deleted 'v2', left bind_slippi_nvidia.py untracked (WIP). NVIDIA handler/test changes themselves were approved by Codex.",
+  "notes": "Claude self-signed post-fix. pytest WinError 5 errors are temp/cache permission issues unrelated to the NVIDIA files being committed. scripts/bind_slippi_nvidia.py remains untracked pending completion of the bind implementation — can be committed in a follow-up."
+}

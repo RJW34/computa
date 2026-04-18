@@ -535,15 +535,59 @@ class TestNvidiaApply:
         assert "global verification failed" in (result["error"] or "")
 
     @patch("abso.settings.nvidia.nvapi_drs.DRSProfileManager")
-    def test_apply_fails_when_app_binding_is_unavailable(self, mock_manager_cls):
-        """A profile with unbound executables must not count as successfully applied."""
+    def test_apply_surfaces_manual_binding_required_as_warning(self, mock_manager_cls):
+        """manual_required: settings written, only per-exe binding needs NVCP — warning, not fail."""
         mock_manager = MagicMock()
         mock_manager.apply_settings_to_app.return_value = {
             "settings_applied": {"vrr_app_override": "allow"},
             "errors": [],
             "app_bound": False,
+            "app_binding_state": "manual_required",
             "npi_launched": False,
-            "app_binding_note": "Automatic app binding unavailable on this driver version.",
+            "app_binding_note": (
+                "Profile 'Super Smash Bros. Melee (Slippi)' created with all settings "
+                "configured. Automatic app binding unavailable on this driver version. "
+                "To activate: NVCP > Manage 3D Settings > Program Settings > "
+                "Add 'Slippi Dolphin.exe' > Select 'Super Smash Bros. Melee (Slippi)'"
+            ),
+        }
+        mock_manager.get_app_settings.return_value = {"vrr_app_override": 0x00000000}
+        mock_manager._resolve_setting.return_value = (0x10A879CF, 0x00000000)
+        mock_manager_cls.return_value = mock_manager
+
+        handler = NvidiaSettingsHandler()
+        result = handler.apply({
+            "preset": "minimum_latency",
+            "executables": ["Slippi Dolphin.exe"],
+            "game_name": "Super Smash Bros. Melee (Slippi)",
+            "profile_name": "Super Smash Bros. Melee (Slippi)",
+        })
+
+        # Apply must succeed: settings are on the profile, and the user has a
+        # clear NVCP action. Triggering critical-compliance rollback over this
+        # tears down the rest of the profile switch and leaves the system in a
+        # half-restored baseline state.
+        assert result["success"] is True
+        assert result["app_bound"] is False
+        assert any(
+            "NVIDIA app binding requires manual action" in w
+            for w in result.get("warnings") or []
+        )
+
+    @patch("abso.settings.nvidia.nvapi_drs.DRSProfileManager")
+    def test_apply_fails_when_exe_is_bound_to_conflicting_profile(self, mock_manager_cls):
+        """bound_elsewhere: driver refuses to write settings — must stay a hard failure."""
+        mock_manager = MagicMock()
+        mock_manager.apply_settings_to_app.return_value = {
+            "settings_applied": {},
+            "errors": [],
+            "app_bound": False,
+            "app_binding_state": "bound_elsewhere",
+            "npi_launched": False,
+            "app_binding_note": (
+                "'Overwatch.exe' is currently owned by NVIDIA profile 'Custom - OW2', "
+                "not 'Overwatch 2'. ABSO will not count this as a successful binding."
+            ),
         }
         mock_manager.get_app_settings.return_value = {"vrr_app_override": 0x00000000}
         mock_manager._resolve_setting.return_value = (0x10A879CF, 0x00000000)
