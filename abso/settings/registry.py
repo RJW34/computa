@@ -54,12 +54,25 @@ class RegistrySettingsHandler(SettingsHandler):
 
     def detect(self) -> dict[str, Any]:
         """Detect current registry gaming settings."""
-        return {
+        result: dict[str, Any] = {
             "system_responsiveness": self._get_system_responsiveness(),
             "network_throttling": self._get_network_throttling(),
             "game_priority": self._get_game_priority(),
             "win32_priority_separation": self._get_win32_priority_separation(),
         }
+        # Omit fullscreen_optimizations from the snapshot entirely if
+        # enumeration can't be proven complete. restore() skips missing
+        # keys, so this protects current state from being overwritten by
+        # a truncated snapshot later.
+        try:
+            result["fullscreen_optimizations"] = self._enumerate_fullscreen_optimizations()
+        except OSError as e:
+            logger.warning(
+                "Skipping fullscreen_optimizations in backup snapshot; "
+                "AppCompatFlags\\Layers enumeration failed: %s",
+                e,
+            )
+        return result
 
     def audit(self) -> list[Issue]:
         """Audit registry settings for gaming optimization issues."""
@@ -224,6 +237,7 @@ class RegistrySettingsHandler(SettingsHandler):
             "network_throttling": self._set_network_throttling,
             "game_priority": self._set_game_priority,
             "win32_priority_separation": self._set_win32_priority_separation,
+            "fullscreen_optimizations": self._restore_fullscreen_optimizations,
         }
         for key, setter in restore_map.items():
             if key in data:
@@ -508,9 +522,13 @@ class RegistrySettingsHandler(SettingsHandler):
         validate_executable_path(exe_path)
 
         fso_token = "DISABLEDXMAXIMIZEDWINDOWEDMODE"
+        # Windows error code for "file/value not found" from the registry API.
+        _WIN_ERR_FILE_NOT_FOUND = 2
 
         try:
-            # CreateKey to tolerate the parent key not existing on fresh installs.
+            # CreateKey tolerates the parent key not existing on fresh installs.
+            # The returned handle already has KEY_ALL_ACCESS, which covers both
+            # the Query/Enum and Set/Delete calls below.
             key = winreg.CreateKey(winreg.HKEY_CURRENT_USER, self.APPCOMPAT_KEY)
         except OSError as e:
             raise RegistryWriteError(
@@ -519,13 +537,27 @@ class RegistrySettingsHandler(SettingsHandler):
             ) from e
 
         try:
-            existing = ""
-            with contextlib.suppress(OSError):
+            existing: str | None
+            try:
                 existing = str(winreg.QueryValueEx(key, exe_path)[0])
+            except FileNotFoundError:
+                existing = None
+            except OSError as e:
+                # Any other registry read failure is unsafe to treat as
+                # "no existing tokens" — that would silently drop HIGHDPIAWARE,
+                # PROCESSORAFFINITYMASK, etc. from an existing AppCompat entry.
+                if getattr(e, "winerror", None) == _WIN_ERR_FILE_NOT_FOUND:
+                    existing = None
+                else:
+                    raise RegistryWriteError(
+                        f"Failed to read AppCompatFlags\\Layers[{exe_path}]",
+                        details=str(e),
+                    ) from e
 
             # Tokens are whitespace-separated; the leading "~" is the
             # AppCompat layer marker (kept if any tokens remain).
-            tokens = [t for t in existing.split() if t and t != "~"]
+            source = existing or ""
+            tokens = [t for t in source.split() if t and t != "~"]
             tokens = [t for t in tokens if t.upper() != fso_token]
             if disabled:
                 tokens.append(fso_token)
@@ -533,7 +565,10 @@ class RegistrySettingsHandler(SettingsHandler):
             if tokens:
                 new_value = "~ " + " ".join(tokens)
                 winreg.SetValueEx(key, exe_path, 0, winreg.REG_SZ, new_value)
-            else:
+            elif existing is not None:
+                # Only attempt deletion when an entry actually exists; skip
+                # when there was nothing to clear so we do not race a peer
+                # writer into an unnecessary DeleteValue call.
                 with contextlib.suppress(FileNotFoundError):
                     winreg.DeleteValue(key, exe_path)
         except PermissionError as e:
@@ -548,6 +583,130 @@ class RegistrySettingsHandler(SettingsHandler):
             ) from e
         finally:
             winreg.CloseKey(key)
+
+    def _enumerate_fullscreen_optimizations(self) -> dict[str, bool]:
+        """Enumerate HKCU AppCompatFlags\\Layers for all FSO-disabled entries.
+
+        Returns a dict keyed by the registry value name (exe name or full path)
+        with ``True`` when the entry contains the ``DISABLEDXMAXIMIZEDWINDOWEDMODE``
+        token. Entries are captured verbatim so a full backup/restore round-trip
+        can reverse any ABSO-written per-exe FSO flags without disturbing
+        unrelated AppCompat layers the user or other tools may have set.
+
+        Raises:
+            OSError: If the Layers key exists but cannot be opened or enumerated.
+                The caller is expected to omit this section from the backup
+                snapshot so a partial read does not destroy live state on a
+                later restore.
+        """
+        _WIN_ERR_FILE_NOT_FOUND = 2
+        _WIN_ERR_NO_MORE_ITEMS = 259
+        result: dict[str, bool] = {}
+
+        try:
+            key = winreg.OpenKey(
+                winreg.HKEY_CURRENT_USER,
+                self.APPCOMPAT_KEY,
+                0,
+                winreg.KEY_READ,
+            )
+        except FileNotFoundError:
+            return result
+        except OSError as e:
+            if getattr(e, "winerror", None) == _WIN_ERR_FILE_NOT_FOUND:
+                return result
+            # Any other failure (permission denied, transient OS error) is
+            # unsafe to treat as "empty" because the result feeds backup +
+            # restore. Bubble up so detect() can drop the section.
+            raise
+
+        try:
+            index = 0
+            while True:
+                try:
+                    name, value, _ = winreg.EnumValue(key, index)
+                except OSError as e:
+                    if getattr(e, "winerror", None) == _WIN_ERR_NO_MORE_ITEMS:
+                        break
+                    raise
+                if "DISABLEDXMAXIMIZEDWINDOWEDMODE" in str(value).upper():
+                    result[name] = True
+                index += 1
+        finally:
+            winreg.CloseKey(key)
+        return result
+
+    def _restore_fullscreen_optimizations(self, backed_up: dict[str, bool]) -> None:
+        """Reverse ABSO per-exe FSO writes from a backup snapshot.
+
+        - Entries present in *backed_up*: re-assert their backed-up state
+          (usually ``True``, meaning disabled at backup time) via
+          ``_set_fullscreen_optimization`` so other AppCompat tokens stay
+          intact.
+        - Entries absent from *backed_up* but present in the current
+          registry with the FSO token: clear the FSO token, which removes
+          ABSO-applied shims without touching unrelated layers.
+
+        Rollback semantics are exact: user-set FSO entries created AFTER
+        the backup will be cleared on restore, matching the snapshot-at-a-
+        point-in-time contract the rest of ``RegistrySettingsHandler`` uses.
+
+        Raises:
+            RegistryWriteError: If any per-exe write/clear fails. Aggregates
+                across all failures so one flaky entry doesn't mask the
+                others, and the enclosing ``restore()`` can mark the step as
+                failed instead of reporting a false success.
+        """
+        if not isinstance(backed_up, dict):
+            raise RegistryWriteError(
+                "fullscreen_optimizations backup payload is corrupted",
+                details=(
+                    f"Expected dict, got {type(backed_up).__name__}. "
+                    "Refusing to restore from an unreadable snapshot."
+                ),
+            )
+
+        try:
+            current = self._enumerate_fullscreen_optimizations()
+        except OSError as e:
+            # If we cannot read the current state, we cannot safely restore
+            # without risking destruction of live tokens we don't know about.
+            raise RegistryWriteError(
+                "Cannot restore fullscreen_optimizations: current Layers state unreadable",
+                details=str(e),
+            ) from e
+
+        failures: list[str] = []
+
+        for exe, disabled in backed_up.items():
+            if not isinstance(exe, str) or not exe.strip():
+                continue
+            desired = bool(disabled)
+            if current.get(exe, False) != desired:
+                try:
+                    self._set_fullscreen_optimization(exe, desired)
+                except Exception as e:
+                    logger.error(
+                        f"Failed to restore fullscreen_optimizations[{exe}]: {e}"
+                    )
+                    failures.append(f"{exe}: {e}")
+
+        for exe in current:
+            if exe in backed_up:
+                continue
+            try:
+                self._set_fullscreen_optimization(exe, False)
+            except Exception as e:
+                logger.error(
+                    f"Failed to clear fullscreen_optimizations[{exe}] during restore: {e}"
+                )
+                failures.append(f"{exe}: {e}")
+
+        if failures:
+            raise RegistryWriteError(
+                "One or more fullscreen_optimizations entries could not be restored",
+                details="; ".join(failures),
+            )
 
     def _get_fullscreen_optimization(self, exe_path: str) -> bool | None:
         """Return True when fullscreen optimizations are disabled for an executable."""

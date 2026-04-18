@@ -434,6 +434,224 @@ class TestRegistrySettingsHandlerFullscreenOptimization:
 
         assert state["Overwatch.exe"] == "~ DISABLEDXMAXIMIZEDWINDOWEDMODE"
 
+    def test_non_file_not_found_read_error_aborts_write(self):
+        """Any read failure other than FileNotFoundError must raise RegistryWriteError.
+
+        The handler previously suppressed all OSErrors on QueryValueEx and then
+        proceeded with ``existing=""``, silently dropping other AppCompat tokens
+        (HIGHDPIAWARE, PROCESSORAFFINITYMASK, etc.) on any transient read error.
+        """
+        state, open_key, _, setval, delval = self._patched_writer()
+
+        def flaky_query(_key, name):  # noqa: ARG001 - signature required by patch
+            err = OSError("access denied")
+            err.winerror = 5  # ERROR_ACCESS_DENIED, not FILE_NOT_FOUND
+            raise err
+
+        with (
+            patch("abso.settings.registry.winreg.CreateKey", open_key),
+            patch("abso.settings.registry.winreg.QueryValueEx", flaky_query),
+            patch("abso.settings.registry.winreg.SetValueEx", setval),
+            patch("abso.settings.registry.winreg.DeleteValue", delval),
+            patch("abso.settings.registry.winreg.CloseKey"),
+        ):
+            handler = RegistrySettingsHandler()
+            with pytest.raises(RegistryWriteError):
+                handler._set_fullscreen_optimization(
+                    "C:\\Games\\Overwatch.exe", True
+                )
+
+        # And ABSO must not have written a truncated value.
+        assert "C:\\Games\\Overwatch.exe" not in state
+
+    def test_restore_fullscreen_optimizations_reverses_abso_write(self):
+        """Restore must re-assert backed-up state and clear any entry not in the backup."""
+        state, open_key, query, setval, delval = self._patched_writer()
+        # Simulate current: ABSO wrote FSO for OW2 during apply; backup was
+        # taken BEFORE apply and captured empty Layers, so restore must
+        # remove the Overwatch.exe entry.
+        state["Overwatch.exe"] = "~ DISABLEDXMAXIMIZEDWINDOWEDMODE"
+
+        def enum_value(_key, i):
+            keys = list(state.keys())
+            if i >= len(keys):
+                # _enumerate_fullscreen_optimizations only treats
+                # ERROR_NO_MORE_ITEMS (259) as loop termination; any other
+                # OSError must propagate. Match that contract here so the
+                # test exercises the real termination path.
+                err = OSError("no more values")
+                err.winerror = 259
+                raise err
+            name = keys[i]
+            return name, state[name], 1
+
+        with (
+            patch("abso.settings.registry.winreg.CreateKey", open_key),
+            patch("abso.settings.registry.winreg.OpenKey", open_key),
+            patch("abso.settings.registry.winreg.QueryValueEx", query),
+            patch("abso.settings.registry.winreg.SetValueEx", setval),
+            patch("abso.settings.registry.winreg.DeleteValue", delval),
+            patch("abso.settings.registry.winreg.EnumValue", enum_value),
+            patch("abso.settings.registry.winreg.CloseKey"),
+        ):
+            handler = RegistrySettingsHandler()
+            # Backup captured empty dict (no FSO entries at backup time).
+            handler._restore_fullscreen_optimizations({})
+
+        assert "Overwatch.exe" not in state
+
+    def test_restore_fullscreen_optimizations_reapplies_user_flag(self):
+        """If a user's FSO entry existed at backup but was cleared, restore re-adds it."""
+        state, open_key, query, setval, delval = self._patched_writer()
+        # Current registry has no FSO entries (e.g., ABSO cleared them).
+        # Backup recorded one the user had set manually before ABSO ran.
+
+        def enum_value(_key, i):
+            keys = list(state.keys())
+            if i >= len(keys):
+                # _enumerate_fullscreen_optimizations only treats
+                # ERROR_NO_MORE_ITEMS (259) as loop termination; any other
+                # OSError must propagate. Match that contract here so the
+                # test exercises the real termination path.
+                err = OSError("no more values")
+                err.winerror = 259
+                raise err
+            name = keys[i]
+            return name, state[name], 1
+
+        with (
+            patch("abso.settings.registry.winreg.CreateKey", open_key),
+            patch("abso.settings.registry.winreg.OpenKey", open_key),
+            patch("abso.settings.registry.winreg.QueryValueEx", query),
+            patch("abso.settings.registry.winreg.SetValueEx", setval),
+            patch("abso.settings.registry.winreg.DeleteValue", delval),
+            patch("abso.settings.registry.winreg.EnumValue", enum_value),
+            patch("abso.settings.registry.winreg.CloseKey"),
+        ):
+            handler = RegistrySettingsHandler()
+            handler._restore_fullscreen_optimizations(
+                {"C:\\Games\\UserGame.exe": True}
+            )
+
+        assert (
+            "DISABLEDXMAXIMIZEDWINDOWEDMODE" in state["C:\\Games\\UserGame.exe"]
+        )
+
+    def test_restore_fullscreen_optimizations_rejects_non_dict(self):
+        """A corrupted backup value must raise so restore() reports failure."""
+        handler = RegistrySettingsHandler()
+        with pytest.raises(RegistryWriteError):
+            handler._restore_fullscreen_optimizations("not a dict")  # type: ignore[arg-type]
+
+    def test_restore_returns_false_when_fso_backup_is_corrupted(self):
+        """Top-level restore() must surface a non-dict FSO payload as False."""
+        handler = RegistrySettingsHandler()
+        ok = handler.restore({"fullscreen_optimizations": "garbage"})
+        assert ok is False
+
+    def test_enumerate_propagates_non_not_found_osError(self):
+        """Broad OSError during enumeration must propagate, not return {}.
+
+        Suppressing permission errors here and returning {} would make the
+        backup snapshot falsely report "no FSO entries", and a later restore
+        would clear live state. Bubble up so detect() can drop the section.
+        """
+        def fail_open(*_a, **_kw):
+            err = OSError("access denied")
+            err.winerror = 5  # ERROR_ACCESS_DENIED
+            raise err
+
+        with patch("abso.settings.registry.winreg.OpenKey", fail_open):
+            handler = RegistrySettingsHandler()
+            with pytest.raises(OSError):
+                handler._enumerate_fullscreen_optimizations()
+
+    def test_enumerate_returns_empty_when_layers_key_missing(self):
+        """A real not-found should still produce an empty dict (new install)."""
+
+        def fail_open(*_a, **_kw):
+            raise FileNotFoundError("Layers key missing")
+
+        with patch("abso.settings.registry.winreg.OpenKey", fail_open):
+            handler = RegistrySettingsHandler()
+            assert handler._enumerate_fullscreen_optimizations() == {}
+
+    def test_detect_omits_fullscreen_optimizations_on_enumeration_failure(self):
+        """detect() must drop fullscreen_optimizations when enumeration can't be proven."""
+
+        def fail_open(*_a, **_kw):
+            err = OSError("transient failure")
+            err.winerror = 5
+            raise err
+
+        with (
+            patch("abso.settings.registry.winreg.OpenKey", fail_open),
+            patch.object(
+                RegistrySettingsHandler, "_get_system_responsiveness", return_value=0
+            ),
+            patch.object(
+                RegistrySettingsHandler, "_get_network_throttling", return_value=0
+            ),
+            patch.object(
+                RegistrySettingsHandler, "_get_game_priority", return_value={}
+            ),
+            patch.object(
+                RegistrySettingsHandler,
+                "_get_win32_priority_separation",
+                return_value=0x2A,
+            ),
+        ):
+            handler = RegistrySettingsHandler()
+            detected = handler.detect()
+
+        assert "fullscreen_optimizations" not in detected
+
+    def test_restore_aggregates_per_exe_failures(self):
+        """Per-exe write failures must propagate as RegistryWriteError."""
+
+        def fail_set(*_a, **_kw):
+            raise Exception("registry write failed")
+
+        with (
+            patch.object(
+                RegistrySettingsHandler,
+                "_enumerate_fullscreen_optimizations",
+                return_value={},
+            ),
+            patch.object(
+                RegistrySettingsHandler,
+                "_set_fullscreen_optimization",
+                side_effect=fail_set,
+            ),
+        ):
+            handler = RegistrySettingsHandler()
+            with pytest.raises(RegistryWriteError):
+                handler._restore_fullscreen_optimizations(
+                    {"A.exe": True, "B.exe": True}
+                )
+
+    def test_restore_returns_false_when_fso_restore_raises(self):
+        """Top-level restore() must surface fullscreen_optimizations failure as False."""
+
+        def fail_set(*_a, **_kw):
+            raise Exception("write failed")
+
+        with (
+            patch.object(
+                RegistrySettingsHandler,
+                "_enumerate_fullscreen_optimizations",
+                return_value={},
+            ),
+            patch.object(
+                RegistrySettingsHandler,
+                "_set_fullscreen_optimization",
+                side_effect=fail_set,
+            ),
+        ):
+            handler = RegistrySettingsHandler()
+            ok = handler.restore({"fullscreen_optimizations": {"X.exe": True}})
+        assert ok is False
+
 
 class TestRegistrySettingsHandlerVerify:
     """Tests for verify_active()."""

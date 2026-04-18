@@ -68,6 +68,8 @@ def inject_fullscreen_optimizations(
     executables; this helper keeps the routing in one place so every
     profile base inherits the behavior consistently.
     """
+    import logging
+
     if handler_name != "RegistrySettingsHandler":
         return settings
 
@@ -76,9 +78,33 @@ def inject_fullscreen_optimizations(
         return settings
 
     merged = {k: v for k, v in settings.items()} if settings else {}
-    existing = dict(merged.get("fullscreen_optimizations") or {})
+    raw_existing = merged.get("fullscreen_optimizations")
+
+    if raw_existing is None:
+        existing: dict[str, bool] = {}
+    elif isinstance(raw_existing, dict):
+        existing = {
+            str(exe): bool(flag)
+            for exe, flag in raw_existing.items()
+            if isinstance(exe, str) and exe.strip()
+        }
+    else:
+        # Do not silently drop the malformed value - log it so the profile
+        # author can fix the declaration, then fall back to an empty dict
+        # so the profile-declared overrides still take effect.
+        logging.getLogger(__name__).warning(
+            "RegistrySettingsHandler.fullscreen_optimizations had unexpected type %s for profile %s; ignoring existing value",
+            type(raw_existing).__name__,
+            getattr(profile, "profile_id", "<unknown>"),
+        )
+        existing = {}
+
     # Profile-declared overrides win over any base defaults.
-    existing.update({str(exe): bool(disabled) for exe, disabled in overrides.items()})
+    for exe, disabled in overrides.items():
+        if not isinstance(exe, str) or not exe.strip():
+            continue
+        existing[str(exe)] = bool(disabled)
+
     merged["fullscreen_optimizations"] = existing
     return merged
 

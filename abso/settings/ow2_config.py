@@ -474,12 +474,20 @@ class OW2ConfigHandler(SettingsHandler):
         """
         try:
             content = ini_path.read_text(encoding="utf-8", errors="replace")
-        except OSError:
-            return []
+        except OSError as e:
+            return [
+                f"OW2 config could not be re-read after write ({e}); "
+                "unable to verify values landed - re-apply and check OW2 "
+                "in-game Display settings before launch."
+            ]
 
         actual = self._parse_render_section(content.splitlines())
         if not actual:
-            return []
+            return [
+                "OW2 config had no [Render.X] section after write; "
+                "the file may have been truncated or overwritten - "
+                "close OW2 and re-apply."
+            ]
 
         ini_to_profile = {v: k for k, v in self.MUTABLE_SETTINGS.items()}
         drift: list[str] = []
