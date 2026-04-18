@@ -273,3 +273,54 @@ def test_audit_flags_suboptimal_settings(tmp_path: Path) -> None:
     assert "OW2 Reduce Buffering disabled" in titles
     assert "OW2 Triple Buffering enabled" in titles
     assert "OW2 Dynamic Render Scale enabled" in titles
+
+
+def test_apply_surfaces_post_write_window_mode_drift(tmp_path: Path) -> None:
+    """If OW2 overwrites WindowMode after ABSO writes, apply must surface it.
+
+    Simulates the real failure mode: ABSO writes the INI, then something
+    (OW2 itself, or the user in-game) rewrites WindowMode back to 1. The
+    handler should report the drift via notices so the caller can flag it
+    instead of silently accepting a profile that won't actually engage the
+    exclusive-fullscreen path.
+    """
+    ini_path = tmp_path / "Settings_v0.ini"
+    _write_settings_ini(ini_path, SAMPLE_INI)
+
+    real_write_text = Path.write_text
+
+    def sabotage_write_text(self, content, *args, **kwargs):
+        # Let the handler's write land, then simulate OW2 flipping WindowMode
+        # back to borderless before the post-apply drift check runs.
+        result = real_write_text(self, content, *args, **kwargs)
+        if self == ini_path:
+            mutated = self.read_text(encoding="utf-8").replace(
+                'WindowMode = "0"',
+                'WindowMode = "1"',
+            )
+            real_write_text(self, mutated, encoding="utf-8")
+        return result
+
+    with (
+        patch("abso.settings.ow2_config._get_ow2_settings_path", return_value=ini_path),
+        patch.object(Path, "write_text", sabotage_write_text),
+    ):
+        handler = OW2ConfigHandler()
+        result = handler.apply({"window_mode": 0})
+
+    assert result["success"] is True
+    notices = result.get("notices") or []
+    assert any("window_mode" in n and "drifted" in n for n in notices), notices
+
+
+def test_apply_reports_no_drift_when_write_holds(tmp_path: Path) -> None:
+    """Happy path: no sabotage, no drift notices."""
+    ini_path = tmp_path / "Settings_v0.ini"
+    _write_settings_ini(ini_path, SAMPLE_INI)
+
+    with patch("abso.settings.ow2_config._get_ow2_settings_path", return_value=ini_path):
+        handler = OW2ConfigHandler()
+        result = handler.apply({"window_mode": 0})
+
+    assert result["success"] is True
+    assert "notices" not in result or not result["notices"]

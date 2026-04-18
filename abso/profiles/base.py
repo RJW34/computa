@@ -289,6 +289,26 @@ class BaseProfile(ABC):
         return self.uses_fullscreen_only_vrr_path
 
     @property
+    def fullscreen_optimizations_per_exe(self) -> dict[str, bool]:
+        """Per-executable Fullscreen Optimizations (FSO) overrides.
+
+        Maps an executable name (or full path) to a bool:
+          - ``True``  = disable FSO (write ``DISABLEDXMAXIMIZEDWINDOWEDMODE``
+            into ``HKCU\\...\\AppCompatFlags\\Layers``), forcing Windows to
+            keep the app on the true exclusive-fullscreen path and out of
+            the composited FSO borderless shim.
+          - ``False`` = clear any prior FSO-disable entry for that exe so
+            borderless/capture variants are not fighting a stale flag from
+            a previously-applied exclusive profile.
+
+        Override in strict exclusive-fullscreen profiles to prevent
+        silent fallback to borderless (the compositor adds ~3-7% FPS cost
+        on high-refresh VRR setups) and in borderless capture variants to
+        make the hand-off deterministic when users switch lanes.
+        """
+        return {}
+
+    @property
     def overlay_compatible_fallback_profile_id(self) -> str | None:
         """Optional fallback profile to suggest when overlays block a strict path."""
         return None

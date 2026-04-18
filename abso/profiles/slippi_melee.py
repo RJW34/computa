@@ -45,6 +45,14 @@ class SlippiMeleeProfile(EmulatorLatencyBaseProfile):
         return ["Slippi Dolphin.exe"]
 
     @property
+    def fullscreen_optimizations_per_exe(self) -> dict[str, bool]:
+        # Slippi runs exclusive fullscreen for lowest scanout latency. Disable
+        # FSO per-exe so Dolphin isn't silently bumped into the composited
+        # borderless path - that compositor adds a ~1-frame latency tax that
+        # matters for 6-frame rollback tolerances.
+        return {exe: True for exe in self.executable_hints}
+
+    @property
     def allow_unverified_nvidia_profile_reuse(self) -> bool:
         """Allow safe reuse of stable ABSO-managed Slippi driver profiles."""
         return True

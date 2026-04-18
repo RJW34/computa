@@ -796,3 +796,84 @@ class TestAllProfilesLoad:
         for handler in profile.get_handlers():
             settings = profile.get_settings(handler.__class__.__name__)
             assert isinstance(settings, dict)
+
+
+class TestFullscreenOptimizationsPerExe:
+    """Profile-declared FSO per-exe overrides must flow into RegistrySettingsHandler."""
+
+    def test_base_profile_default_is_empty(self):
+        """Profiles that don't opt in should surface no FSO overrides."""
+        profile = PokemonAutoChessProfile()
+        assert profile.fullscreen_optimizations_per_exe == {}
+        registry_settings = profile.get_settings("RegistrySettingsHandler") or {}
+        assert "fullscreen_optimizations" not in registry_settings
+
+    def test_overwatch2_exclusive_variants_disable_fso(self):
+        """All exclusive-fullscreen OW2 variants must disable FSO for Overwatch.exe."""
+        for profile_cls in (
+            Overwatch2Profile,
+            Overwatch2GSyncProfile,
+            Overwatch2GSyncHDRProfile,
+        ):
+            profile = profile_cls()
+            assert profile.fullscreen_optimizations_per_exe == {"Overwatch.exe": True}
+            registry_settings = profile.get_settings("RegistrySettingsHandler")
+            assert registry_settings["fullscreen_optimizations"] == {"Overwatch.exe": True}
+
+    def test_overwatch2_capture_variants_clear_fso(self):
+        """Capture/borderless OW2 variants must clear any prior FSO disable."""
+        for profile_cls in (
+            Overwatch2GSyncCaptureProfile,
+            Overwatch2GSyncHDRCaptureProfile,
+        ):
+            profile = profile_cls()
+            assert profile.fullscreen_optimizations_per_exe == {"Overwatch.exe": False}
+            registry_settings = profile.get_settings("RegistrySettingsHandler")
+            assert registry_settings["fullscreen_optimizations"] == {"Overwatch.exe": False}
+
+    def test_fortnite_variants_disable_fso_for_all_shipping_binaries(self):
+        """Fortnite's competitive lane is exclusive-fullscreen; all aliases must be locked."""
+        for profile_cls in (FortniteProfile, FortniteHDRProfile):
+            profile = profile_cls()
+            flags = profile.fullscreen_optimizations_per_exe
+            assert "FortniteClient-Win64-Shipping.exe" in flags
+            assert all(v is True for v in flags.values())
+
+    def test_marvel_rivals_variants_disable_fso(self):
+        """Marvel Rivals SDR and HDR variants both run exclusive-fullscreen."""
+        for profile_cls in (MarvelRivalsSDRProfile, MarvelRivalsHDRProfile):
+            profile = profile_cls()
+            flags = profile.fullscreen_optimizations_per_exe
+            assert flags.get("Marvel-Win64-Shipping.exe") is True
+
+    def test_rivals2_family_disables_fso(self):
+        """Every Rivals 2 variant ships fullscreen_mode=0 and wants true exclusive."""
+        for profile_cls in (
+            Rivals2Profile,
+            Rivals2OfflineProfile,
+            Rivals2OnlineProfile,
+            Rivals2GSyncProfile,
+            Rivals2OnlineGSyncProfile,
+        ):
+            profile = profile_cls()
+            flags = profile.fullscreen_optimizations_per_exe
+            assert flags.get("Rivals2-Win64-Shipping.exe") is True
+
+    def test_slippi_family_disables_fso(self):
+        """All Slippi variants should disable FSO for Slippi Dolphin.exe and Dolphin.exe."""
+        for profile_cls in (
+            SlippiMeleeProfile,
+            SlippiMeleeUniversalProfile,
+            SlippiMeleeConsoleParityProfile,
+        ):
+            profile = profile_cls()
+            flags = profile.fullscreen_optimizations_per_exe
+            assert flags.get("Slippi Dolphin.exe") is True
+            assert flags.get("Dolphin.exe") is True
+
+    def test_diablo4_variants_disable_fso(self):
+        """Diablo 4 HDR and SDR lanes both want the true exclusive path for native HDR."""
+        for profile_cls in (Diablo4Profile, Diablo4SDRProfile):
+            profile = profile_cls()
+            flags = profile.fullscreen_optimizations_per_exe
+            assert flags.get("Diablo IV.exe") is True

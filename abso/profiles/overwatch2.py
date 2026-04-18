@@ -87,6 +87,13 @@ class Overwatch2Profile(_Overwatch2BaseProfile):
     def description(self) -> str:
         return "Minimum latency no-sync profile (Reflex OFF, VSync OFF, VRR OFF)"
 
+    @property
+    def fullscreen_optimizations_per_exe(self) -> dict[str, bool]:
+        # Force true exclusive fullscreen at the OS layer so Windows cannot
+        # silently shunt Overwatch into the composited FSO borderless path
+        # if the in-game WindowMode ever drifts back to 1.
+        return {"Overwatch.exe": True}
+
     def _variant_overrides(self) -> dict[str, dict[str, Any]]:
         return {
             "NvidiaSettingsHandler": {
@@ -183,6 +190,13 @@ class Overwatch2GSyncProfile(_Overwatch2BaseProfile):
     @property
     def requires_confirmed_vrr_support(self) -> bool:
         return True
+
+    @property
+    def fullscreen_optimizations_per_exe(self) -> dict[str, bool]:
+        # Strict fullscreen VRR lane: disable FSO per-exe so Windows holds the
+        # true exclusive path and the refresh-3 cap stays cap-bound at ~297
+        # instead of paying the compositor tax if OW2 drifts to borderless.
+        return {"Overwatch.exe": True}
 
     @property
     def display_path_requirements(self) -> DisplayPathRequirements:
@@ -298,6 +312,14 @@ class Overwatch2GSyncHDRProfile(_Overwatch2BaseProfile):
     @property
     def requires_confirmed_vrr_support(self) -> bool:
         return True
+
+    @property
+    def fullscreen_optimizations_per_exe(self) -> dict[str, bool]:
+        # Native HDR strict lane: FSO must stay disabled per-exe. Otherwise
+        # Windows composites OW2's HDR tone map through DWM (borderless FSO)
+        # and the GPU pays the compositor cost on top of the real HDR
+        # pipeline - which is what flips the cap-bound 297 back to ~276.
+        return {"Overwatch.exe": True}
 
     @property
     def display_path_requirements(self) -> DisplayPathRequirements:
@@ -446,6 +468,13 @@ class Overwatch2GSyncCaptureProfile(_Overwatch2BaseProfile):
     def requires_confirmed_vrr_support(self) -> bool:
         return True
 
+    @property
+    def fullscreen_optimizations_per_exe(self) -> dict[str, bool]:
+        # Capture lane intentionally runs the borderless FSO path. Clear any
+        # per-exe FSO-disable flag a previous exclusive profile may have left
+        # behind, so borderless G-SYNC can engage cleanly.
+        return {"Overwatch.exe": False}
+
     def _variant_overrides(self) -> dict[str, dict[str, Any]]:
         return {
             "WindowsSettingsHandler": {
@@ -540,6 +569,13 @@ class Overwatch2GSyncHDRCaptureProfile(_Overwatch2BaseProfile):
     @property
     def requires_confirmed_vrr_support(self) -> bool:
         return True
+
+    @property
+    def fullscreen_optimizations_per_exe(self) -> dict[str, bool]:
+        # HDR capture lane: intentionally borderless FSO. Clear any stale FSO
+        # disable left by a prior exclusive-HDR apply so the composited HDR
+        # path can engage without fighting an OS-level exclusive lock.
+        return {"Overwatch.exe": False}
 
     def _base_overrides(self) -> dict[str, dict[str, Any]]:
         base = super()._base_overrides()

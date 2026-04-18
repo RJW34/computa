@@ -5,7 +5,10 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, Literal
 
 from abso.profiles.base import BaseProfile
-from abso.profiles.profile_bases import merge_settings_map
+from abso.profiles.profile_bases import (
+    inject_fullscreen_optimizations,
+    merge_settings_map,
+)
 
 if TYPE_CHECKING:
     from abso.settings.base import SettingsHandler
@@ -33,6 +36,13 @@ class _Diablo4BaseProfile(BaseProfile):
     @property
     def requires_confirmed_vrr_support(self) -> bool:
         return True
+
+    @property
+    def fullscreen_optimizations_per_exe(self) -> dict[str, bool]:
+        # D4's native HDR VRR lane wants the true exclusive path so the HDR
+        # tone map runs in the game, not in DWM. Disable FSO per-exe to keep
+        # the GPU off the compositor's borderless HDR shim.
+        return {"Diablo IV.exe": True}
 
     @property
     def nvidia_profile_name(self) -> str | None:
@@ -123,7 +133,9 @@ class _Diablo4BaseProfile(BaseProfile):
         }
 
         settings_map = merge_settings_map(settings_map, self._variant_overrides())
-        return settings_map.get(handler_name, {})
+        settings = settings_map.get(handler_name, {})
+        settings = inject_fullscreen_optimizations(self, handler_name, settings)
+        return settings
 
     def _common_in_game_settings(self) -> list[dict[str, str]]:
         return [

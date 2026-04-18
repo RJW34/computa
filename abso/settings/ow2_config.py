@@ -267,12 +267,21 @@ class OW2ConfigHandler(SettingsHandler):
                     len(appended_keys),
                 )
 
-            return {
+            notices: list[str] = []
+            drift = self._detect_post_apply_drift(ini_path, replacements)
+            if drift:
+                notices.extend(drift)
+                logger.warning("OW2 config drift after write: %s", "; ".join(drift))
+
+            result: dict[str, Any] = {
                 "success": True,
                 "error": None,
                 "requires_reboot": False,
                 "applied": sorted(changed_keys | appended_keys),
             }
+            if notices:
+                result["notices"] = notices
+            return result
         except Exception as e:
             return {
                 "success": False,
@@ -449,6 +458,42 @@ class OW2ConfigHandler(SettingsHandler):
                 appended.add(ini_key)
 
         return lines, changed, appended
+
+    def _detect_post_apply_drift(
+        self,
+        ini_path: Path,
+        replacements: dict[str, str],
+    ) -> list[str]:
+        """Re-read the INI and list any keys that didn't land as requested.
+
+        OW2 can overwrite Settings_v0.ini on exit (and on some multi-monitor
+        configurations it reverts ``WindowMode`` back to borderless on launch).
+        Surface a clear notice so the caller can tell the user instead of
+        silently accepting drift the next time they wonder why their cap is
+        cap-bound but they're still GPU-bound.
+        """
+        try:
+            content = ini_path.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            return []
+
+        actual = self._parse_render_section(content.splitlines())
+        if not actual:
+            return []
+
+        ini_to_profile = {v: k for k, v in self.MUTABLE_SETTINGS.items()}
+        drift: list[str] = []
+        for ini_key, target_value in replacements.items():
+            current_value = actual.get(ini_key)
+            if current_value is None or current_value == target_value:
+                continue
+            profile_key = ini_to_profile.get(ini_key, ini_key)
+            drift.append(
+                f"OW2 {profile_key} drifted to {current_value!r} "
+                f"(expected {target_value!r}) - close OW2 and re-apply, "
+                f"or verify in-game Display Mode matches this profile."
+            )
+        return drift
 
     def _snapshot_protected(self, lines: list[str]) -> dict[str, str | None]:
         """Capture current values of protected keys across all sections."""

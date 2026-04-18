@@ -56,6 +56,33 @@ def inject_nvidia_profile_identity(
     return merged
 
 
+def inject_fullscreen_optimizations(
+    profile: BaseProfile,
+    handler_name: str,
+    settings: dict[str, Any],
+) -> dict[str, Any]:
+    """Merge per-exe FSO overrides into RegistrySettingsHandler settings.
+
+    The profile declares ``fullscreen_optimizations_per_exe`` to force
+    exclusive-fullscreen (or clear a prior exclusive lock) for specific
+    executables; this helper keeps the routing in one place so every
+    profile base inherits the behavior consistently.
+    """
+    if handler_name != "RegistrySettingsHandler":
+        return settings
+
+    overrides = profile.fullscreen_optimizations_per_exe
+    if not overrides:
+        return settings
+
+    merged = {k: v for k, v in settings.items()} if settings else {}
+    existing = dict(merged.get("fullscreen_optimizations") or {})
+    # Profile-declared overrides win over any base defaults.
+    existing.update({str(exe): bool(disabled) for exe, disabled in overrides.items()})
+    merged["fullscreen_optimizations"] = existing
+    return merged
+
+
 class Rivals2BaseProfile(BaseProfile):
     """Shared base for Rivals 2 profiles."""
 
@@ -71,6 +98,19 @@ class Rivals2BaseProfile(BaseProfile):
     def nvidia_binding_executables(self) -> list[str]:
         """Bind the stable NVIDIA family to the real shipping binary only."""
         return ["Rivals2-Win64-Shipping.exe"]
+
+    @property
+    def fullscreen_optimizations_per_exe(self) -> dict[str, bool]:
+        # Every Rivals 2 variant ships fullscreen_mode=0 in its GameUserSettings,
+        # so the whole family wants Windows to keep the real shipping binary on
+        # the true exclusive path. Disable FSO per-exe for the shipping binary
+        # and the legacy detection aliases.
+        exe_names = {
+            "Rivals2-Win64-Shipping.exe",
+            "RivalsofAether2.exe",
+            "Rivals2.exe",
+        }
+        return {exe: True for exe in exe_names}
 
     @property
     def allow_unverified_nvidia_profile_reuse(self) -> bool:
@@ -256,7 +296,10 @@ class Rivals2BaseProfile(BaseProfile):
 
     def get_settings(self, handler_name: str) -> dict[str, Any]:
         settings_map = merge_settings_map(self._base_settings(), self._settings_overrides())
-        return inject_nvidia_profile_identity(self, handler_name, settings_map.get(handler_name, {}))
+        settings = settings_map.get(handler_name, {})
+        settings = inject_nvidia_profile_identity(self, handler_name, settings)
+        settings = inject_fullscreen_optimizations(self, handler_name, settings)
+        return settings
 
 
 class EmulatorLatencyBaseProfile(BaseProfile):
@@ -390,7 +433,10 @@ class EmulatorLatencyBaseProfile(BaseProfile):
 
     def get_settings(self, handler_name: str) -> dict[str, Any]:
         settings_map = merge_settings_map(self._base_settings(), self._settings_overrides())
-        return inject_nvidia_profile_identity(self, handler_name, settings_map.get(handler_name, {}))
+        settings = settings_map.get(handler_name, {})
+        settings = inject_nvidia_profile_identity(self, handler_name, settings)
+        settings = inject_fullscreen_optimizations(self, handler_name, settings)
+        return settings
 
 
 class WebGLBaseProfile(BaseProfile):
@@ -484,7 +530,10 @@ class WebGLBaseProfile(BaseProfile):
 
     def get_settings(self, handler_name: str) -> dict[str, Any]:
         settings_map = merge_settings_map(self._base_settings(), self._settings_overrides())
-        return inject_nvidia_profile_identity(self, handler_name, settings_map.get(handler_name, {}))
+        settings = settings_map.get(handler_name, {})
+        settings = inject_nvidia_profile_identity(self, handler_name, settings)
+        settings = inject_fullscreen_optimizations(self, handler_name, settings)
+        return settings
 
 
 class ReflexShooterBaseProfile(BaseProfile):
@@ -613,4 +662,7 @@ class ReflexShooterBaseProfile(BaseProfile):
 
     def get_settings(self, handler_name: str) -> dict[str, Any]:
         settings_map = merge_settings_map(self._base_settings(), self._settings_overrides())
-        return inject_nvidia_profile_identity(self, handler_name, settings_map.get(handler_name, {}))
+        settings = settings_map.get(handler_name, {})
+        settings = inject_nvidia_profile_identity(self, handler_name, settings)
+        settings = inject_fullscreen_optimizations(self, handler_name, settings)
+        return settings

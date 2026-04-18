@@ -341,6 +341,100 @@ class TestRegistrySettingsHandlerPrivateMethods:
         mock_validate.assert_called_once()
 
 
+class TestRegistrySettingsHandlerFullscreenOptimization:
+    """Tests for _set_fullscreen_optimization preservation behavior."""
+
+    def _patched_writer(self):
+        """Capture SetValueEx/DeleteValue writes against a stub registry."""
+        state: dict[str, object] = {}
+
+        def open_or_create_key(hive, path):
+            return ("FAKE_KEY", path)
+
+        def query_value(_key, name):
+            if name not in state:
+                raise FileNotFoundError(name)
+            return state[name], 1  # REG_SZ = 1
+
+        def set_value(_key, name, _reserved, _type, value):
+            state[name] = value
+
+        def delete_value(_key, name):
+            if name not in state:
+                raise FileNotFoundError(name)
+            del state[name]
+
+        return state, open_or_create_key, query_value, set_value, delete_value
+
+    def test_disable_fso_adds_token_preserving_other_layers(self):
+        state, open_key, query, setval, delval = self._patched_writer()
+        state["C:\\Games\\Overwatch.exe"] = "~ HIGHDPIAWARE RUNASINVOKER"
+
+        with (
+            patch("abso.settings.registry.winreg.CreateKey", open_key),
+            patch("abso.settings.registry.winreg.QueryValueEx", query),
+            patch("abso.settings.registry.winreg.SetValueEx", setval),
+            patch("abso.settings.registry.winreg.DeleteValue", delval),
+            patch("abso.settings.registry.winreg.CloseKey"),
+        ):
+            handler = RegistrySettingsHandler()
+            handler._set_fullscreen_optimization("C:\\Games\\Overwatch.exe", True)
+
+        value = state["C:\\Games\\Overwatch.exe"]
+        assert value.startswith("~ ")
+        tokens = value.split()[1:]
+        assert set(tokens) == {"HIGHDPIAWARE", "RUNASINVOKER", "DISABLEDXMAXIMIZEDWINDOWEDMODE"}
+
+    def test_enable_fso_removes_token_preserving_other_layers(self):
+        state, open_key, query, setval, delval = self._patched_writer()
+        state["C:\\Games\\Overwatch.exe"] = "~ HIGHDPIAWARE DISABLEDXMAXIMIZEDWINDOWEDMODE"
+
+        with (
+            patch("abso.settings.registry.winreg.CreateKey", open_key),
+            patch("abso.settings.registry.winreg.QueryValueEx", query),
+            patch("abso.settings.registry.winreg.SetValueEx", setval),
+            patch("abso.settings.registry.winreg.DeleteValue", delval),
+            patch("abso.settings.registry.winreg.CloseKey"),
+        ):
+            handler = RegistrySettingsHandler()
+            handler._set_fullscreen_optimization("C:\\Games\\Overwatch.exe", False)
+
+        value = state["C:\\Games\\Overwatch.exe"]
+        assert "DISABLEDXMAXIMIZEDWINDOWEDMODE" not in value
+        assert "HIGHDPIAWARE" in value
+
+    def test_enable_fso_with_only_fso_token_deletes_value(self):
+        state, open_key, query, setval, delval = self._patched_writer()
+        state["Overwatch.exe"] = "~ DISABLEDXMAXIMIZEDWINDOWEDMODE"
+
+        with (
+            patch("abso.settings.registry.winreg.CreateKey", open_key),
+            patch("abso.settings.registry.winreg.QueryValueEx", query),
+            patch("abso.settings.registry.winreg.SetValueEx", setval),
+            patch("abso.settings.registry.winreg.DeleteValue", delval),
+            patch("abso.settings.registry.winreg.CloseKey"),
+        ):
+            handler = RegistrySettingsHandler()
+            handler._set_fullscreen_optimization("Overwatch.exe", False)
+
+        assert "Overwatch.exe" not in state
+
+    def test_disable_fso_without_existing_entry_writes_clean_value(self):
+        state, open_key, query, setval, delval = self._patched_writer()
+
+        with (
+            patch("abso.settings.registry.winreg.CreateKey", open_key),
+            patch("abso.settings.registry.winreg.QueryValueEx", query),
+            patch("abso.settings.registry.winreg.SetValueEx", setval),
+            patch("abso.settings.registry.winreg.DeleteValue", delval),
+            patch("abso.settings.registry.winreg.CloseKey"),
+        ):
+            handler = RegistrySettingsHandler()
+            handler._set_fullscreen_optimization("Overwatch.exe", True)
+
+        assert state["Overwatch.exe"] == "~ DISABLEDXMAXIMIZEDWINDOWEDMODE"
+
+
 class TestRegistrySettingsHandlerVerify:
     """Tests for verify_active()."""
 

@@ -490,6 +490,12 @@ class RegistrySettingsHandler(SettingsHandler):
     def _set_fullscreen_optimization(self, exe_path: str, disabled: bool) -> None:
         """Set fullscreen optimization for an executable.
 
+        Preserves any existing AppCompat layers (HIGHDPIAWARE, RUNASINVOKER,
+        PROCESSORAFFINITYMASK, etc.) for the same exe - only the
+        DISABLEDXMAXIMIZEDWINDOWEDMODE token is toggled based on *disabled*.
+        If no other tokens remain after clearing, the value is deleted so
+        the key stays tidy.
+
         Args:
             exe_path: Full path to the executable (e.g., "C:\\Games\\game.exe").
             disabled: True to disable fullscreen optimizations.
@@ -501,37 +507,47 @@ class RegistrySettingsHandler(SettingsHandler):
         # Validate the executable path to prevent registry injection
         validate_executable_path(exe_path)
 
+        fso_token = "DISABLEDXMAXIMIZEDWINDOWEDMODE"
+
         try:
-            key = winreg.OpenKey(
-                winreg.HKEY_CURRENT_USER,
-                self.APPCOMPAT_KEY,
-                0,
-                winreg.KEY_ALL_ACCESS
-            )
-            try:
-                if disabled:
-                    winreg.SetValueEx(
-                        key,
-                        exe_path,
-                        0,
-                        winreg.REG_SZ,
-                        "~ DISABLEDXMAXIMIZEDWINDOWEDMODE"
-                    )
-                else:
-                    with contextlib.suppress(FileNotFoundError):
-                        winreg.DeleteValue(key, exe_path)
-            finally:
-                winreg.CloseKey(key)
+            # CreateKey to tolerate the parent key not existing on fresh installs.
+            key = winreg.CreateKey(winreg.HKEY_CURRENT_USER, self.APPCOMPAT_KEY)
+        except OSError as e:
+            raise RegistryWriteError(
+                f"Failed to open AppCompatFlags\\Layers for {exe_path}",
+                details=str(e),
+            ) from e
+
+        try:
+            existing = ""
+            with contextlib.suppress(OSError):
+                existing = str(winreg.QueryValueEx(key, exe_path)[0])
+
+            # Tokens are whitespace-separated; the leading "~" is the
+            # AppCompat layer marker (kept if any tokens remain).
+            tokens = [t for t in existing.split() if t and t != "~"]
+            tokens = [t for t in tokens if t.upper() != fso_token]
+            if disabled:
+                tokens.append(fso_token)
+
+            if tokens:
+                new_value = "~ " + " ".join(tokens)
+                winreg.SetValueEx(key, exe_path, 0, winreg.REG_SZ, new_value)
+            else:
+                with contextlib.suppress(FileNotFoundError):
+                    winreg.DeleteValue(key, exe_path)
         except PermissionError as e:
             raise RegistryWriteError(
                 f"Failed to set fullscreen optimization for {exe_path}",
-                details=f"Permission denied. ({e})"
+                details=f"Permission denied. ({e})",
             ) from e
         except OSError as e:
             raise RegistryWriteError(
                 f"Failed to set fullscreen optimization for {exe_path}",
-                details=str(e)
+                details=str(e),
             ) from e
+        finally:
+            winreg.CloseKey(key)
 
     def _get_fullscreen_optimization(self, exe_path: str) -> bool | None:
         """Return True when fullscreen optimizations are disabled for an executable."""

@@ -23,6 +23,13 @@ class _MarvelRivalsBaseProfile(ReflexShooterBaseProfile):
         return ["Marvel-Win64-Shipping.exe"]
 
     @property
+    def fullscreen_optimizations_per_exe(self) -> dict[str, bool]:
+        # Marvel Rivals competitive lane uses fullscreen_mode=0 (exclusive).
+        # Disable FSO per-exe so the game cannot silently run through the
+        # DWM compositor's borderless FSO shim and give up Reflex headroom.
+        return {exe: True for exe in self.executable_hints}
+
+    @property
     def graphics_api(self) -> Literal["dx11", "dx12", "vulkan", "opengl", "unknown"]:
         return "dx12"
 

@@ -20,6 +20,14 @@ class _FortniteBaseProfile(ReflexShooterBaseProfile):
         ]
 
     @property
+    def fullscreen_optimizations_per_exe(self) -> dict[str, bool]:
+        # Competitive Fortnite runs exclusive-fullscreen (fullscreen_mode=0 in
+        # GameUserSettings.ini). Disable FSO per-exe so Windows doesn't shunt
+        # the shipping binary into the composited borderless path and steal
+        # FPS from the Reflex/DX12 presentation path.
+        return {exe: True for exe in self.executable_hints}
+
+    @property
     def nvidia_profile_name(self) -> str | None:
         return "Fortnite"
 
