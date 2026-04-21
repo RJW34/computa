@@ -492,8 +492,10 @@ class DiagnosticsSettingsHandler(SettingsHandler):
             return
         rated_max = max(rated)
         configured_max = max(configured)
-        # If configured is significantly below rated, XMP/EXPO is likely off.
-        if configured_max and rated_max and configured_max < rated_max * 0.8:
+        # If configured is significantly below rated (>= 15% gap), XMP/EXPO
+        # is likely off. DDR5-6000 falling back to JEDEC 4800 (0.80 ratio)
+        # is the canonical "XMP disabled" case we want to flag.
+        if configured_max and rated_max and configured_max <= rated_max * 0.85:
             issues.append(
                 Issue(
                     title="RAM appears to be running below its rated speed",

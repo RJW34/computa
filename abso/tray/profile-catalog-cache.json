@@ -270,7 +270,7 @@
         {
             "id": "fortnite",
             "display_name": "Fortnite - SDR",
-            "description": "Competitive SDR Fortnite profile with Reflex and a no-sync latency path",
+            "description": "Competitive SDR Fortnite profile with a no-sync latency path. Keeps driver LLM off for Reflex; enable Reflex On + Boost in-game.",
             "optimization_target": "low_latency_high_fps",
             "application_scope": "system_plus_native_config",
             "executables": [
@@ -294,14 +294,14 @@
             ],
             "has_in_game_settings": true,
             "tray_category": "Shooter",
-            "tray_subtitle": "SDR | Reflex ON+Boost | No Sync",
-            "tray_description": "Competitive SDR Fortnite profile with Reflex and a no-sync latency path",
+            "tray_subtitle": "SDR | Reflex (set in-game) | No Sync",
+            "tray_description": "Competitive SDR Fortnite profile with a no-sync latency path. Keeps driver LLM off for Reflex; enable Reflex On + Boost in-game.",
             "sync_mode": "agnostic"
         },
         {
             "id": "fortnite-hdr",
             "display_name": "Fortnite - HDR",
-            "description": "Competitive Fortnite HDR profile with Reflex and a no-sync latency path",
+            "description": "Competitive Fortnite HDR profile with a no-sync latency path. Keeps driver LLM off for Reflex; enable Reflex On + Boost in-game.",
             "optimization_target": "low_latency_high_fps",
             "application_scope": "system_plus_native_config",
             "executables": [
@@ -325,8 +325,8 @@
             ],
             "has_in_game_settings": true,
             "tray_category": "Shooter",
-            "tray_subtitle": "HDR ON | Reflex ON+Boost | No Sync",
-            "tray_description": "Competitive Fortnite HDR profile with Reflex and a no-sync latency path",
+            "tray_subtitle": "HDR ON | Reflex (set in-game) | No Sync",
+            "tray_description": "Competitive Fortnite HDR profile with a no-sync latency path. Keeps driver LLM off for Reflex; enable Reflex On + Boost in-game.",
             "sync_mode": "agnostic"
         },
         {
@@ -418,7 +418,7 @@
         {
             "id": "overwatch2-gsync",
             "display_name": "Overwatch 2 - GSYNC",
-            "description": "Low latency VRR profile (Reflex, VSync safety net, G-SYNC ON)",
+            "description": "Low latency VRR profile (VSync safety net, G-SYNC ON). Keeps driver LLM off for Reflex; enable Reflex On + Boost in-game.",
             "optimization_target": "low_latency_high_fps",
             "application_scope": "system_plus_native_config",
             "executables": [
@@ -439,8 +439,8 @@
             ],
             "has_in_game_settings": true,
             "tray_category": "Shooter",
-            "tray_subtitle": "Strict Exclusive | Reflex ON+Boost | G-SYNC ON",
-            "tray_description": "Low latency VRR profile (Reflex, VSync safety net, G-SYNC ON)",
+            "tray_subtitle": "Strict Exclusive | Reflex (set in-game) | G-SYNC ON",
+            "tray_description": "Low latency VRR profile (VSync safety net, G-SYNC ON). Keeps driver LLM off for Reflex; enable Reflex On + Boost in-game.",
             "sync_mode": "on"
         },
         {
@@ -467,7 +467,7 @@
             ],
             "has_in_game_settings": true,
             "tray_category": "Shooter",
-            "tray_subtitle": "Strict HDR Exclusive | Reflex ON+Boost | G-SYNC ON",
+            "tray_subtitle": "Strict HDR Exclusive | Reflex (set in-game) | G-SYNC ON",
             "tray_description": "Tear-free low latency VRR with native HDR (OLED/Mini-LED)",
             "sync_mode": "on"
         },
