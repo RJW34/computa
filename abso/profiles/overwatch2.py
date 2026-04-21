@@ -281,7 +281,7 @@ class Overwatch2GSyncProfile(_Overwatch2BaseProfile):
 
     @property
     def display_name(self) -> str:
-        return "Overwatch 2 - GSYNC"
+        return "Overwatch 2 - GSYNC SDR"
 
     @property
     def description(self) -> str:
@@ -561,7 +561,7 @@ class Overwatch2GSyncCaptureProfile(_Overwatch2BaseProfile):
 
     @property
     def display_name(self) -> str:
-        return "Overwatch 2 - GSYNC Capture-Safe"
+        return "Overwatch 2 - GSYNC SDR Capture-Safe"
 
     @property
     def description(self) -> str:

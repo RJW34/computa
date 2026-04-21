@@ -164,7 +164,7 @@ PROFILE_CATALOG: OrderedDict[str, ProfileCatalogEntry] = OrderedDict(
         "overwatch2-gsync": ProfileCatalogEntry(
             profile_class=Overwatch2GSyncProfile,
             tray_category="Shooter",
-            tray_subtitle="Strict Exclusive | Reflex (set in-game) | G-SYNC ON",
+            tray_subtitle="Strict SDR Exclusive | Reflex (set in-game) | G-SYNC ON",
             sync_mode="on",
         ),
         "overwatch2-gsync-hdr": ProfileCatalogEntry(
@@ -176,7 +176,7 @@ PROFILE_CATALOG: OrderedDict[str, ProfileCatalogEntry] = OrderedDict(
         "overwatch2-gsync-capture": ProfileCatalogEntry(
             profile_class=Overwatch2GSyncCaptureProfile,
             tray_category="Shooter",
-            tray_subtitle="Capture-Safe | Borderless VRR | Medal/Discord Friendly",
+            tray_subtitle="SDR Capture-Safe | Borderless VRR | Medal/Discord Friendly",
             tray_description=(
                 "Borderless/windowed G-SYNC profile for the active gaming display. "
                 "Keeps Medal, Discord, and similar capture overlays compatible."

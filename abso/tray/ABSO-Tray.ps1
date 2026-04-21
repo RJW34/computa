@@ -946,8 +946,8 @@ $script:FallbackProfiles = [ordered]@{
         SyncMode = "off"
     }
     "overwatch2-gsync"  = @{
-        Name     = "Overwatch 2 - GSYNC"
-        Sub      = "Reflex ON+Boost | VSync Safety Net | G-SYNC ON"
+        Name     = "Overwatch 2 - GSYNC SDR"
+        Sub      = "Strict SDR Exclusive | Reflex (set in-game) | G-SYNC ON"
         Cat      = "Shooter"
         Desc     = "Low latency VRR profile (Reflex, VSync safety net, G-SYNC ON)"
         Exes     = @("Overwatch.exe")

@@ -1,6 +1,6 @@
 {
     "version":  2,
-    "saved_at":  "2026-04-21T14:53:49.7611023-04:00",
+    "saved_at":  "2026-04-21T16:09:59.1596934-04:00",
     "profiles":  [
                      {
                          "id":  "slippi-melee",
@@ -445,7 +445,7 @@
                      },
                      {
                          "id":  "overwatch2-gsync",
-                         "display_name":  "Overwatch 2 - GSYNC",
+                         "display_name":  "Overwatch 2 - GSYNC SDR",
                          "description":  "Low latency VRR profile (VSync safety net, G-SYNC ON). Keeps driver LLM off for Reflex; enable Reflex On + Boost in-game.",
                          "optimization_target":  "low_latency_high_fps",
                          "application_scope":  "system_plus_native_config",
@@ -467,7 +467,7 @@
                                       ],
                          "has_in_game_settings":  true,
                          "tray_category":  "Shooter",
-                         "tray_subtitle":  "Strict Exclusive | Reflex (set in-game) | G-SYNC ON",
+                         "tray_subtitle":  "Strict SDR Exclusive | Reflex (set in-game) | G-SYNC ON",
                          "tray_description":  "Low latency VRR profile (VSync safety net, G-SYNC ON). Keeps driver LLM off for Reflex; enable Reflex On + Boost in-game.",
                          "sync_mode":  "on"
                      },
@@ -501,7 +501,7 @@
                      },
                      {
                          "id":  "overwatch2-gsync-capture",
-                         "display_name":  "Overwatch 2 - GSYNC Capture-Safe",
+                         "display_name":  "Overwatch 2 - GSYNC SDR Capture-Safe",
                          "description":  "Borderless/windowed VRR path for clipping, overlays, and capture apps",
                          "optimization_target":  "low_latency_high_fps",
                          "application_scope":  "system_plus_native_config",
@@ -523,7 +523,7 @@
                                       ],
                          "has_in_game_settings":  true,
                          "tray_category":  "Shooter",
-                         "tray_subtitle":  "Capture-Safe | Borderless VRR | Medal/Discord Friendly",
+                         "tray_subtitle":  "SDR Capture-Safe | Borderless VRR | Medal/Discord Friendly",
                          "tray_description":  "Borderless/windowed G-SYNC profile for the active gaming display. Keeps Medal, Discord, and similar capture overlays compatible.",
                          "sync_mode":  "on"
                      },

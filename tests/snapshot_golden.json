@@ -1110,7 +1110,7 @@
   "overwatch2-gsync": {
     "allows_aggressive_settings": false,
     "application_scope": "system_plus_native_config",
-    "display_name": "Overwatch 2 - GSYNC",
+    "display_name": "Overwatch 2 - GSYNC SDR",
     "graphics_api": "dx11",
     "handlers": [
       "WindowsSettingsHandler",
@@ -1261,7 +1261,7 @@
   "overwatch2-gsync-capture": {
     "allows_aggressive_settings": false,
     "application_scope": "system_plus_native_config",
-    "display_name": "Overwatch 2 - GSYNC Capture-Safe",
+    "display_name": "Overwatch 2 - GSYNC SDR Capture-Safe",
     "graphics_api": "dx11",
     "handlers": [
       "WindowsSettingsHandler",
