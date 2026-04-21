@@ -15,6 +15,7 @@ from abso.profiles.overwatch2 import (
     Overwatch2GSyncHDRCaptureProfile,
     Overwatch2GSyncHDRProfile,
     Overwatch2GSyncProfile,
+    Overwatch2NoSyncHDRProfile,
     Overwatch2Profile,
 )
 from abso.profiles.pacdeluxe import PACDeluxeProfile
@@ -53,6 +54,7 @@ __all__ = [
     "MarvelRivalsSDRProfile",
     "MarvelRivalsHDRProfile",
     "Overwatch2Profile",
+    "Overwatch2NoSyncHDRProfile",
     "Overwatch2GSyncProfile",
     "Overwatch2GSyncHDRProfile",
     "Overwatch2GSyncCaptureProfile",

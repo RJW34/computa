@@ -164,6 +164,20 @@
       }
     },
     {
+      "id": "apply-overwatch2-hdr",
+      "profile_id": "overwatch2-hdr",
+      "kind": "apply_profile",
+      "assumptions": [
+        "administrator",
+        "nvidia_gpu",
+        "hdr_capable"
+      ],
+      "expected": {
+        "transaction_state": "committed",
+        "apply_success": true
+      }
+    },
+    {
       "id": "apply-overwatch2-gsync",
       "profile_id": "overwatch2-gsync",
       "kind": "apply_profile",

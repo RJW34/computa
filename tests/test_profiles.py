@@ -15,6 +15,7 @@ from abso.profiles.overwatch2 import (
     Overwatch2GSyncHDRCaptureProfile,
     Overwatch2GSyncHDRProfile,
     Overwatch2GSyncProfile,
+    Overwatch2NoSyncHDRProfile,
     Overwatch2Profile,
 )
 from abso.profiles.pokemon_auto_chess import PokemonAutoChessProfile
@@ -80,11 +81,28 @@ class TestProfileLoading:
     def test_overwatch2_profiles_load(self):
         """Test all Overwatch 2 profiles can be instantiated."""
         no_sync = Overwatch2Profile()
+        no_sync_hdr = Overwatch2NoSyncHDRProfile()
         gsync = Overwatch2GSyncProfile()
         gsync_hdr = Overwatch2GSyncHDRProfile()
         gsync_capture = Overwatch2GSyncCaptureProfile()
         gsync_hdr_capture = Overwatch2GSyncHDRCaptureProfile()
         assert no_sync.profile_id == "overwatch2"
+        assert no_sync.display_name == "Overwatch 2 - No Sync SDR"
+        assert no_sync.is_sdr_only is True
+        assert no_sync_hdr.profile_id == "overwatch2-hdr"
+        assert no_sync_hdr.display_name == "Overwatch 2 - No Sync HDR"
+        assert no_sync_hdr.is_sdr_only is False
+        # HDR no-sync reuses the no-sync NVIDIA preset and leaves VRR off.
+        assert (
+            no_sync_hdr.get_settings("NvidiaSettingsHandler")["preset"]
+            == "reflex_no_sync"
+        )
+        ow2_hdr = no_sync_hdr.get_settings("OW2ConfigHandler")
+        assert ow2_hdr["hdr"] is True
+        assert ow2_hdr["window_mode"] == 0
+        windows_hdr = no_sync_hdr.get_settings("WindowsSettingsHandler")
+        assert windows_hdr["hdr"] is True
+        assert windows_hdr["auto_hdr"] is False
         assert gsync.profile_id == "overwatch2-gsync"
         assert gsync_hdr.profile_id == "overwatch2-gsync-hdr"
         assert gsync_capture.profile_id == "overwatch2-gsync-capture"

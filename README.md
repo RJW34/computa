@@ -119,7 +119,7 @@ python -m abso restore 20240115_143022  # Specific backup
 | `rivals2-online-gsync` | Rivals of Aether 2 | Rollback-safe VRR online |
 | `fortnite` / `fortnite-hdr` | Fortnite | Reflex no-sync latency (SDR / HDR) |
 | `marvel-rivals-sdr` / `marvel-rivals-hdr` | Marvel Rivals | Reflex VRR (SDR / HDR) |
-| `overwatch2` | Overwatch 2 (No-Sync) | Minimum latency no-sync |
+| `overwatch2` / `overwatch2-hdr` | Overwatch 2 (No Sync) | Minimum latency no-sync (SDR / HDR) |
 | `overwatch2-gsync` / `overwatch2-gsync-hdr` | Overwatch 2 (G-SYNC) | Tear-free low latency VRR (SDR / HDR) |
 | `overwatch2-gsync-capture` / `overwatch2-gsync-hdr-capture` | Overwatch 2 (G-SYNC) | Borderless VRR path for capture/overlay workflows |
 | `diablo4` / `diablo4-sdr` | Diablo 4 | Balanced performance (HDR / SDR) |

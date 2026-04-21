@@ -20,7 +20,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **rivals2-gsync** / **rivals2-online-gsync** — Rivals 2 VRR lanes (offline vs online)
 - **fortnite** / **fortnite-hdr** — Fortnite Reflex path
 - **marvel-rivals-sdr** / **marvel-rivals-hdr** — Marvel Rivals Reflex path
-- **overwatch2** / **overwatch2-gsync** / **overwatch2-gsync-hdr** — OW2 no-sync + strict fullscreen G-SYNC lanes
+- **overwatch2** / **overwatch2-hdr** — OW2 no-sync lanes (SDR / HDR) for absolute minimum latency
+- **overwatch2-gsync** / **overwatch2-gsync-hdr** — Strict fullscreen G-SYNC lanes (SDR / HDR)
 - **overwatch2-gsync-capture** / **overwatch2-gsync-hdr-capture** — Borderless OW2 G-SYNC for capture/overlay workflows
 - **diablo4** / **diablo4-sdr** — Diablo 4 (balanced ARPG)
 - **pokemon-auto-chess** — Browser game optimization

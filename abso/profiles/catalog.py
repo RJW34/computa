@@ -19,6 +19,7 @@ from abso.profiles.overwatch2 import (
     Overwatch2GSyncHDRCaptureProfile,
     Overwatch2GSyncHDRProfile,
     Overwatch2GSyncProfile,
+    Overwatch2NoSyncHDRProfile,
     Overwatch2Profile,
 )
 from abso.profiles.pacdeluxe import PACDeluxeProfile
@@ -147,7 +148,17 @@ PROFILE_CATALOG: OrderedDict[str, ProfileCatalogEntry] = OrderedDict(
         "overwatch2": ProfileCatalogEntry(
             profile_class=Overwatch2Profile,
             tray_category="Shooter",
-            tray_subtitle="Reflex OFF | VSync OFF | G-SYNC OFF",
+            tray_subtitle="No Sync SDR | Reflex OFF | VSync OFF | G-SYNC OFF",
+            sync_mode="off",
+        ),
+        "overwatch2-hdr": ProfileCatalogEntry(
+            profile_class=Overwatch2NoSyncHDRProfile,
+            tray_category="Shooter",
+            tray_subtitle="No Sync HDR | Reflex OFF | VSync OFF | G-SYNC OFF",
+            tray_description=(
+                "Minimum-latency no-sync Overwatch 2 with native HDR for "
+                "OLED / Mini-LED. Same sync/VRR contract as the SDR variant."
+            ),
             sync_mode="off",
         ),
         "overwatch2-gsync": ProfileCatalogEntry(

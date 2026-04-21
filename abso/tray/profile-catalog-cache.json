@@ -389,8 +389,8 @@
         },
         {
             "id": "overwatch2",
-            "display_name": "Overwatch 2 - No-Sync",
-            "description": "Minimum latency no-sync profile (Reflex OFF, VSync OFF, VRR OFF)",
+            "display_name": "Overwatch 2 - No Sync SDR",
+            "description": "Minimum latency no-sync SDR profile (Reflex OFF, VSync OFF, VRR OFF)",
             "optimization_target": "low_latency_high_fps",
             "application_scope": "system_plus_native_config",
             "executables": [
@@ -411,8 +411,36 @@
             ],
             "has_in_game_settings": true,
             "tray_category": "Shooter",
-            "tray_subtitle": "Reflex OFF | VSync OFF | G-SYNC OFF",
-            "tray_description": "Minimum latency no-sync profile (Reflex OFF, VSync OFF, VRR OFF)",
+            "tray_subtitle": "No Sync SDR | Reflex OFF | VSync OFF | G-SYNC OFF",
+            "tray_description": "Minimum latency no-sync SDR profile (Reflex OFF, VSync OFF, VRR OFF)",
+            "sync_mode": "off"
+        },
+        {
+            "id": "overwatch2-hdr",
+            "display_name": "Overwatch 2 - No Sync HDR",
+            "description": "Minimum latency no-sync HDR profile (Reflex OFF, VSync OFF, VRR OFF). Native HDR for OLED / Mini-LED displays.",
+            "optimization_target": "low_latency_high_fps",
+            "application_scope": "system_plus_native_config",
+            "executables": [
+                "Overwatch.exe"
+            ],
+            "handlers": [
+                "WindowsSettingsHandler",
+                "PowerSettingsHandler",
+                "RegistrySettingsHandler",
+                "NvidiaSettingsHandler",
+                "NetworkSettingsHandler",
+                "MouseSettingsHandler",
+                "GraphicsSettingsHandler",
+                "ProcessPriorityHandler",
+                "CpuAffinityHandler",
+                "ColorProfileSettingsHandler",
+                "OW2ConfigHandler"
+            ],
+            "has_in_game_settings": true,
+            "tray_category": "Shooter",
+            "tray_subtitle": "No Sync HDR | Reflex OFF | VSync OFF | G-SYNC OFF",
+            "tray_description": "Minimum-latency no-sync Overwatch 2 with native HDR for OLED / Mini-LED. Same sync/VRR contract as the SDR variant.",
             "sync_mode": "off"
         },
         {

@@ -79,10 +79,12 @@ class _Overwatch2BaseProfile(ReflexShooterBaseProfile):
 
 
 class Overwatch2Profile(_Overwatch2BaseProfile):
-    """Overwatch 2 no-sync profile.
+    """Overwatch 2 no-sync SDR profile.
 
-    This is the absolute minimum-latency variant. It explicitly disables VRR/G-SYNC
-    per-app so behavior is deterministic even when users have global VRR enabled.
+    Absolute minimum-latency variant on the SDR path. Explicitly disables
+    VRR/G-SYNC per-app so behavior is deterministic even when users have
+    global VRR enabled. For the HDR counterpart see
+    :class:`Overwatch2NoSyncHDRProfile`.
     """
 
     @property
@@ -91,11 +93,16 @@ class Overwatch2Profile(_Overwatch2BaseProfile):
 
     @property
     def display_name(self) -> str:
-        return "Overwatch 2 - No-Sync"
+        return "Overwatch 2 - No Sync SDR"
 
     @property
     def description(self) -> str:
-        return "Minimum latency no-sync profile (Reflex OFF, VSync OFF, VRR OFF)"
+        return "Minimum latency no-sync SDR profile (Reflex OFF, VSync OFF, VRR OFF)"
+
+    @property
+    def is_sdr_only(self) -> bool:
+        # Explicit SDR variant. HDR is handled by Overwatch2NoSyncHDRProfile.
+        return True
 
     @property
     def fullscreen_optimizations_per_exe(self) -> dict[str, bool]:
@@ -176,6 +183,89 @@ class Overwatch2Profile(_Overwatch2BaseProfile):
                 "reason": "Improves frame-time consistency in team fights.",
             },
         ]
+
+
+class Overwatch2NoSyncHDRProfile(Overwatch2Profile):
+    """Overwatch 2 no-sync HDR profile.
+
+    Same absolute-minimum-latency no-sync contract as
+    :class:`Overwatch2Profile`, but with OW2's native HDR pipeline enabled
+    for OLED / Mini-LED displays. VRR remains off per the no-sync policy:
+    HDR here is a color/dynamic-range decision, not a sync decision.
+    """
+
+    @property
+    def profile_id(self) -> str:
+        return "overwatch2-hdr"
+
+    @property
+    def display_name(self) -> str:
+        return "Overwatch 2 - No Sync HDR"
+
+    @property
+    def description(self) -> str:
+        return (
+            "Minimum latency no-sync HDR profile (Reflex OFF, VSync OFF, VRR OFF). "
+            "Native HDR for OLED / Mini-LED displays."
+        )
+
+    @property
+    def is_sdr_only(self) -> bool:
+        return False
+
+    def _base_overrides(self) -> dict[str, dict[str, Any]]:
+        # Start from the shared OW2 base, then flip the two HDR knobs and add
+        # a native ICC color profile. We deliberately keep every other no-sync
+        # behavior identical to the SDR variant.
+        base = super()._base_overrides()
+        ow2_base = dict(base.get("OW2ConfigHandler", {}))
+        ow2_base["hdr"] = True  # Native HDR tone mapping in-engine
+        base["OW2ConfigHandler"] = ow2_base
+        base["WindowsSettingsHandler"] = {
+            "hdr": True,
+            "auto_hdr": False,  # OW2 has native HDR; don't layer Auto HDR on top
+        }
+        base["ColorProfileSettingsHandler"] = {
+            "icc_profile": "native",
+            "digital_vibrance": 50,
+            "show_osd_guidance": True,
+            "game_type": "competitive_fps",
+        }
+        return base
+
+    def get_in_game_settings(self) -> list[dict[str, str]]:
+        # Start from the SDR no-sync guidance, then append HDR-specific
+        # calibration rows so the user has one authoritative list.
+        entries = list(super().get_in_game_settings())
+        entries.extend(
+            [
+                {
+                    "category": "Display",
+                    "setting": "HDR Mode",
+                    "value": "On",
+                    "reason": "Native HDR output for OLED / Mini-LED displays.",
+                },
+                {
+                    "category": "Display",
+                    "setting": "HDR Paper White Nits",
+                    "value": "~200 (calibrate to taste)",
+                    "reason": "Controls SDR-content brightness under HDR. ~200 nits is a good OLED starting point.",
+                },
+                {
+                    "category": "Display",
+                    "setting": "HDR Max Display Brightness",
+                    "value": "Match monitor peak (e.g. 1000+ nits OLED)",
+                    "reason": "Set to your display's actual peak brightness for correct tone mapping.",
+                },
+                {
+                    "category": "Display",
+                    "setting": "HDR UI Brightness",
+                    "value": "Adjust to taste",
+                    "reason": "OW2-specific slider for HUD brightness under HDR.",
+                },
+            ]
+        )
+        return entries
 
 
 class Overwatch2GSyncProfile(_Overwatch2BaseProfile):

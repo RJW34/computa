@@ -961,7 +961,7 @@
   "overwatch2": {
     "allows_aggressive_settings": false,
     "application_scope": "system_plus_native_config",
-    "display_name": "Overwatch 2 - No-Sync",
+    "display_name": "Overwatch 2 - No Sync SDR",
     "graphics_api": "dx11",
     "handlers": [
       "WindowsSettingsHandler",
@@ -1023,7 +1023,7 @@
     "include_legacy_tweaks": false,
     "is_emulator_profile": false,
     "is_online_profile": false,
-    "is_sdr_only": false,
+    "is_sdr_only": true,
     "network_scope": "none",
     "optimization_target": "low_latency_high_fps",
     "requires_reflex": true,
@@ -1750,6 +1750,179 @@
         "max_refresh_rate": true,
         "vrr_optimize": true,
         "windowed_optimizations": true
+      }
+    }
+  },
+  "overwatch2-hdr": {
+    "allows_aggressive_settings": false,
+    "application_scope": "system_plus_native_config",
+    "display_name": "Overwatch 2 - No Sync HDR",
+    "graphics_api": "dx11",
+    "handlers": [
+      "WindowsSettingsHandler",
+      "PowerSettingsHandler",
+      "RegistrySettingsHandler",
+      "NvidiaSettingsHandler",
+      "NetworkSettingsHandler",
+      "MouseSettingsHandler",
+      "GraphicsSettingsHandler",
+      "ProcessPriorityHandler",
+      "CpuAffinityHandler",
+      "ColorProfileSettingsHandler",
+      "OW2ConfigHandler"
+    ],
+    "in_game_settings": [
+      {
+        "category": "Display",
+        "reason": "No-sync: exclusive fullscreen avoids compositor overhead. FPS cap difference only matters under VRR.",
+        "setting": "Display Mode",
+        "value": "Fullscreen (Exclusive)"
+      },
+      {
+        "category": "Display",
+        "reason": "No-sync mode removes sync queueing latency.",
+        "setting": "VSync",
+        "value": "Off"
+      },
+      {
+        "category": "Display",
+        "reason": "On a high-end GPU at 1440p Low, the GPU is not saturated - Reflex throttles CPU frame submission without benefit, costing about 60 FPS. Higher uncapped FPS means lower latency than Reflex queue management. If your GPU is saturated (GPU usage above 90%), switch to On+Boost instead.",
+        "setting": "NVIDIA Reflex Low Latency",
+        "value": "Off (high-end GPU) / On+Boost (mid-range GPU)"
+      },
+      {
+        "category": "Display",
+        "reason": "No-sync profile: maximum FPS equals minimum click-to-pixel latency.",
+        "setting": "Frame Rate Cap",
+        "value": "Uncapped (600)"
+      },
+      {
+        "category": "Display",
+        "reason": "Essential with Reflex OFF - limits pre-render buffer to 1 frame. Only mechanism keeping render queue shallow.",
+        "setting": "Reduce Buffering",
+        "value": "On"
+      },
+      {
+        "category": "Graphics",
+        "reason": "Avoid frametime variance from dynamic scaling.",
+        "setting": "Dynamic Render Scale",
+        "value": "Off"
+      },
+      {
+        "category": "Graphics",
+        "reason": "Improves frame-time consistency in team fights.",
+        "setting": "Shadows / Effects",
+        "value": "Low"
+      },
+      {
+        "category": "Display",
+        "reason": "Native HDR output for OLED / Mini-LED displays.",
+        "setting": "HDR Mode",
+        "value": "On"
+      },
+      {
+        "category": "Display",
+        "reason": "Controls SDR-content brightness under HDR. ~200 nits is a good OLED starting point.",
+        "setting": "HDR Paper White Nits",
+        "value": "~200 (calibrate to taste)"
+      },
+      {
+        "category": "Display",
+        "reason": "Set to your display's actual peak brightness for correct tone mapping.",
+        "setting": "HDR Max Display Brightness",
+        "value": "Match monitor peak (e.g. 1000+ nits OLED)"
+      },
+      {
+        "category": "Display",
+        "reason": "OW2-specific slider for HUD brightness under HDR.",
+        "setting": "HDR UI Brightness",
+        "value": "Adjust to taste"
+      }
+    ],
+    "include_legacy_tweaks": false,
+    "is_emulator_profile": false,
+    "is_online_profile": false,
+    "is_sdr_only": false,
+    "network_scope": "none",
+    "optimization_target": "low_latency_high_fps",
+    "requires_reflex": true,
+    "settings": {
+      "ColorProfileSettingsHandler": {
+        "digital_vibrance": 50,
+        "game_type": "competitive_fps",
+        "icc_profile": "native",
+        "show_osd_guidance": true
+      },
+      "CpuAffinityHandler": {
+        "strategy": null
+      },
+      "GraphicsSettingsHandler": {
+        "disable_global_fso": true
+      },
+      "MouseSettingsHandler": {
+        "disable_acceleration": true,
+        "set_linear_curve": true
+      },
+      "NetworkSettingsHandler": {
+        "disable_nagle": false,
+        "preset": "default"
+      },
+      "NvidiaSettingsHandler": {
+        "global_vrr_mode": "off",
+        "preset": "reflex_no_sync",
+        "profile_name": "Overwatch 2"
+      },
+      "OW2ConfigHandler": {
+        "aa_detail": 0,
+        "dynamic_render_scale": false,
+        "dynamic_render_scale_v2": false,
+        "effects_quality": 1,
+        "frame_rate_cap": 600,
+        "gfx_preset": 1,
+        "hdr": true,
+        "model_quality": 1,
+        "reduce_buffering": true,
+        "render_scale": 0,
+        "show_fps": true,
+        "show_latency": true,
+        "texture_detail": 1,
+        "triple_buffering": false,
+        "upscaling": false,
+        "vsync": false,
+        "window_mode": 0
+      },
+      "PowerSettingsHandler": {
+        "active_plan": "ultimate_performance",
+        "disable_pcie_power_saving": true,
+        "disable_usb_suspend": true,
+        "ensure_ultimate_performance": true,
+        "processor_max_performance": true
+      },
+      "ProcessPriorityHandler": {
+        "cpu_priority": 3,
+        "io_priority": 3
+      },
+      "RegistrySettingsHandler": {
+        "fullscreen_optimizations": {
+          "Overwatch.exe": true
+        },
+        "game_priority": {
+          "gpu_priority": 8,
+          "priority": 6,
+          "scheduling_category": "High"
+        },
+        "win32_priority_separation": 42
+      },
+      "WindowsSettingsHandler": {
+        "auto_hdr": false,
+        "game_bar": false,
+        "game_dvr": false,
+        "game_mode": true,
+        "hags": true,
+        "hdr": true,
+        "max_refresh_rate": true,
+        "vrr_optimize": false,
+        "windowed_optimizations": false
       }
     }
   },
