@@ -122,7 +122,7 @@ Profiles use predefined NVIDIA presets that configure multiple driver settings:
 
 ### 1. Super Smash Bros. Melee (Slippi)
 
-**Profile IDs:** `slippi-melee`, `slippi-melee-oled`, `slippi-melee-vrr`
+**Profile IDs:** `slippi-melee`, `slippi-melee-console-parity`, `slippi-melee-universal`
 **Executables:** `Slippi Dolphin.exe`, `Dolphin.exe`
 **Optimization Target:** Minimum latency for competitive play
 
@@ -197,14 +197,17 @@ Profiles use predefined NVIDIA presets that configure multiple driver settings:
 - High refresh benefits from faster pixel refresh, NOT from VRR
 - Tearing is minimal at high refresh rates - tears move faster
 
-#### OLED Variant (`slippi-melee-oled`)
-Identical to base profile. HDR remains **disabled** because Melee is SDR content - enabling HDR causes washed-out colors.
+#### Variants
+- `slippi-melee-console-parity` — 60Hz + VSync for console-parity feel.
+- `slippi-melee-universal` — Lowest latency with HAGS kept on (no reboot required to re-apply).
+
+HDR remains **disabled** on every Slippi variant because Melee is SDR content.
 
 ---
 
 ### 2. Rivals of Aether 2
 
-**Profile IDs:** `rivals2`, `rivals2-oled`, `rivals2-oled-vrr`, `rivals2-oled-vrr-multimon`, `rivals2-offline`, `rivals2-online`
+**Profile IDs:** `rivals2-offline`, `rivals2-online`, `rivals2-gsync`, `rivals2-online-gsync`
 **Executables:** `Rivals2-Win64-Shipping.exe`, `RivalsofAether2.exe`, `Rivals2.exe`
 **Optimization Target:** Minimum latency for competitive platform fighting
 
@@ -334,7 +337,7 @@ If experiencing micro-stuttering:
 
 ### 3. Diablo 4
 
-**Profile IDs:** `diablo4`, `diablo4-oled`, `diablo4-oled-vrr`
+**Profile IDs:** `diablo4`, `diablo4-sdr`
 **Executables:** `Diablo IV.exe`
 **Optimization Target:** Balanced (stable FPS with visual quality)
 
@@ -377,17 +380,14 @@ If experiencing micro-stuttering:
 | DLSS/FSR | Quality or Balanced | Good quality + performance |
 | Effects | Medium-High | High can cause drops in combat |
 
-#### OLED VRR Variant (`diablo4-oled-vrr`)
-Uses `vrr_diablo4` preset with:
-- Native HDR **enabled** (Diablo 4 has excellent HDR)
-- Reflex **On + Boost** in-game
-- Threaded Optimization **Off**
+#### SDR Variant (`diablo4-sdr`)
+Same optimization target as `diablo4`, with HDR disabled for users on SDR displays or those who prefer SDR tone-mapping. Reflex **On + Boost** in-game and Threaded Optimization **Off** both still apply.
 
 ---
 
 ### 4. SSBU / HewDraw Remix (Ryujinx)
 
-**Profile IDs:** `ryujinx-ssbu`, `ryujinx-ssbu-oled`, `ryujinx-ssbu-vrr`
+**Profile IDs:** `ryujinx-ssbu`
 **Executables:** `Ryujinx.exe`, `Ryujinx.Ava.exe`, `Ryujinx.Headless.SDL2.exe`
 **Optimization Target:** Minimum latency for competitive SSBU/HDR
 
@@ -446,7 +446,7 @@ Uses `vrr_diablo4` preset with:
 
 ### 5. Pokemon Auto Chess (Browser)
 
-**Profile ID:** `pokemon-auto-chess`, `pokemon-auto-chess-oled`
+**Profile ID:** `pokemon-auto-chess`
 **Executables:** `chrome.exe`, `msedge.exe`, `firefox.exe`, `brave.exe`
 **Optimization Target:** Balanced (stable WebGL performance)
 
@@ -487,7 +487,7 @@ Uses `vrr_diablo4` preset with:
 
 ### 6. PACDeluxe (Tauri Desktop Client)
 
-**Profile ID:** `pacdeluxe`, `pacdeluxe-oled`
+**Profile ID:** `pacdeluxe`
 **Executables:** `pac-deluxe.exe`, `msedgewebview2.exe`
 **Optimization Target:** Smooth framerate for WebGL auto-battler
 
@@ -524,7 +524,7 @@ Uses `vrr_diablo4` preset with:
 
 ### 7. Productivity (OLED + HDR)
 
-**Profile ID:** `productivity-oled`
+**Profile ID:** `productivity`
 **Executables:** Code.exe, devenv.exe, chrome.exe, firefox.exe, msedge.exe, etc.
 **Optimization Target:** Productivity (NOT gaming)
 
@@ -669,7 +669,7 @@ ABSO creates timestamped backups before any changes:
 | Diablo 4 | `diablo4` | Balanced preset |
 | SSBU/HDR (Ryujinx) | `ryujinx-ssbu` | Vulkan + PPTC |
 | Pokemon Auto Chess | `pokemon-auto-chess` | Browser optimizations |
-| Productivity | `productivity-oled` | HDR + VRR enabled |
+| Productivity | `productivity` | HDR + VRR enabled |
 
 ---
 

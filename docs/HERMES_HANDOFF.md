@@ -15,15 +15,15 @@ Raise A.B.S.O. from its current baseline to `A` grades across the board by execu
 
 ## Read In This Order
 
-1. [README.md](/c:/Users/mtoli/Documents/Code/windowsoptimizerabso/README.md)
-2. [docs/QUALITY_RUBRIC.md](/c:/Users/mtoli/Documents/Code/windowsoptimizerabso/docs/QUALITY_RUBRIC.md)
-3. [docs/REMEDIATION_ROADMAP.md](/c:/Users/mtoli/Documents/Code/windowsoptimizerabso/docs/REMEDIATION_ROADMAP.md)
-4. [docs/NEXT_IMPLEMENTATION_PHASE.md](/c:/Users/mtoli/Documents/Code/windowsoptimizerabso/docs/NEXT_IMPLEMENTATION_PHASE.md)
-5. [docs/NVAPI_INTEGRATION_PLAN.md](/c:/Users/mtoli/Documents/Code/windowsoptimizerabso/docs/NVAPI_INTEGRATION_PLAN.md)
+1. [README.md](../README.md)
+2. [docs/QUALITY_RUBRIC.md](./QUALITY_RUBRIC.md)
+3. [docs/REMEDIATION_ROADMAP.md](./REMEDIATION_ROADMAP.md)
+4. [docs/NEXT_IMPLEMENTATION_PHASE.md](./NEXT_IMPLEMENTATION_PHASE.md)
+5. [docs/NVAPI_INTEGRATION_PLAN.md](./NVAPI_INTEGRATION_PLAN.md)
 
 Optional historical context:
 
-- [CLAUDE_AGENT_HANDOFF.md](/c:/Users/mtoli/Documents/Code/windowsoptimizerabso/CLAUDE_AGENT_HANDOFF.md)
+- [CLAUDE_AGENT_HANDOFF.md](../CLAUDE_AGENT_HANDOFF.md)
 
 ## Current Project Reality
 

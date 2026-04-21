@@ -297,9 +297,25 @@ abso report <profile>    # Generate in-game settings markdown
 - Intel GPU support
 - Linux / SteamOS support
 - Automatic game detection and profile switching
-- Modifying in-game settings or game files directly
 - Overclocking
 - BIOS-level optimizations
+- Changing in-game controls, keybinds, sensitivity, crosshair, or other
+  player-expression settings (these remain fully owned by the player)
+
+### 9.1 Native Game Config Scope
+
+ABSO *does* edit native per-game config files where doing so is the only way to
+pin latency-relevant engine settings (e.g. fullscreen mode, engine VSync,
+raw input, frame rate limits). Rules:
+
+- Only performance/latency-path settings are written. Controls, keybinds,
+  sensitivity, crosshair, audio, and other player-expression settings are
+  preserved as-is.
+- Every native config write goes through a per-game handler with backup +
+  restore support, and is gated by the same validation pipeline as registry
+  and NVIDIA writes.
+- Online/rollback profiles must not write engine settings that could affect
+  competitive integrity or trigger anti-cheat heuristics.
 
 ---
 

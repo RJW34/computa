@@ -191,7 +191,7 @@ Applies a game optimization profile.
 ```python
 result = applier.apply_profile("slippi-melee")
 if result.success:
-    print("Profile applied successfully!")
+    print("Profile apply completed. Run 'abso verify slippi-melee' to confirm handler state.")
     if result.requires_reboot:
         print("Please reboot for changes to take effect.")
 else:

@@ -67,6 +67,17 @@ class TimerSettingsHandler(SettingsHandler):
         """
         return False
 
+    @property
+    def restore_guarantee(self) -> str:
+        """Timer resolution is ephemeral.
+
+        NtSetTimerResolution requests evaporate when the requesting process
+        exits, so by the time a restore runs there is no persistent state
+        to put back. Declaring "ephemeral" here lets BackupManager report
+        honest summaries instead of lying about a full-guarantee restore.
+        """
+        return "ephemeral"
+
     def _load_ntdll(self) -> bool:
         """Load ntdll.dll for timer resolution functions.
 

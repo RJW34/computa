@@ -235,7 +235,7 @@ class CpuAffinityHandler(SettingsHandler):
             data: Backup payload previously returned by :meth:`backup`.
 
         Returns:
-            ``True`` if every executable was restored successfully.
+            ``True`` if every executable's restore completed without failure.
         """
         try:
             exe_data: dict[str, Any] = data.get("executables", {})

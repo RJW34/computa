@@ -287,10 +287,11 @@ def run_apply_profile(profile_id: str) -> None:
 
     if fail_count == 0:
         console.print(Panel(
-            f"[green]Profile '{profile_id}' applied successfully![/green]\n\n"
+            f"[green]Profile '{profile_id}' apply completed.[/green]\n\n"
             f"[dim]Backup ID: {backup_id}[/dim]\n"
+            f"[dim]Run 'abso verify {profile_id}' to confirm handler state.[/dim]\n"
             f"[dim]Use 'Restore Backup' to undo changes if needed.[/dim]",
-            title="[green]Success[/green]",
+            title="[green]Apply Completed[/green]",
             border_style="green"
         ))
     else:
@@ -486,7 +487,7 @@ def run_restore_backup() -> None:
         try:
             restore_summary = backup_manager.restore_backup(selected_backup)
             if restore_summary.complete:
-                progress.update(task, description="[green]\u2713[/green] Backup restored successfully!")
+                progress.update(task, description="[green]\u2713[/green] Restore completed for fully restorable handlers")
             else:
                 incomplete = restore_summary.failed_components + restore_summary.skipped_components
                 handlers = ", ".join(item["handler"] for item in incomplete)

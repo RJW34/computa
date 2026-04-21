@@ -348,7 +348,10 @@ class TestRegistrySettingsHandlerFullscreenOptimization:
         """Capture SetValueEx/DeleteValue writes against a stub registry."""
         state: dict[str, object] = {}
 
-        def open_or_create_key(hive, path):
+        def open_or_create_key(hive, path, *_args, **_kwargs):
+            # Accepts the 4-arg winreg.OpenKey signature (hive, path, reserved,
+            # access_mask) used by _enumerate_fullscreen_optimizations as well
+            # as the 2-arg winreg.CreateKey signature used by _set_fullscreen_optimization.
             return ("FAKE_KEY", path)
 
         def query_value(_key, name):

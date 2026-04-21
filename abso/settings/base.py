@@ -73,8 +73,15 @@ class SettingsHandler(ABC):
 
         Returns:
             "full" when ABSO can restore the handler end to end,
-            "partial" when restore is best-effort, or
+            "partial" when restore is best-effort,
+            "ephemeral" when the handler's state naturally reverts at
+                process exit so there is nothing to restore (e.g. timer
+                resolution via NtSetTimerResolution), or
             "none" when ABSO cannot safely promise automatic restore.
+
+        The backup manager treats "ephemeral" and "none" as non-blocking
+        when a restore summary reports them as skipped — there is no state
+        to restore that the user cares about.
         """
         return "full"
 

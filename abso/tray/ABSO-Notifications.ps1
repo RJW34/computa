@@ -1,311 +1,751 @@
-# ABSO-Notifications.ps1 - v2.0 Enhanced notification system for A.B.S.O. tray
-# Custom dark-themed toast notifications, animated progress overlay,
-# fade-in/fade-out transitions, DWM integration
+# ABSO-Notifications.ps1 - v3.0 "Battle Station HUD" notifications
+#
+# Distinctive toast system for the A.B.S.O. tray. Replaces the generic
+# dark-panel v2 design with a cockpit/telemetry aesthetic:
+#
+#   * Bahnschrift SemiBold Condensed titles (condensed DIN, Win10+)
+#   * Cascadia Mono metadata row (Win11 native, falls back to Consolas)
+#   * Phosphor HUD palette with sharp accents on cool neutral surfaces
+#   * 2-char category badge block instead of generic status dot
+#   * Segmented dismiss bar (HUD countdown), not smooth shrink
+#   * Stacked queue (up to 3 visible, FIFO + Error priority, dedup window)
+#   * Slide-in / slide-up motion signatures
+#   * Low-alpha diagonal crosshatch background texture
+#   * Per-toast isolated state (no single-slot stomp)
+#
+# Public API preserved: Show-ThemedToast, Close-ThemedToast,
+# Show-ProgressOverlay, Update-ProgressOverlay, Close-ProgressOverlay,
+# Show-ABSONotification, New-StatusBarItem.
 
 # ============================================================================
-# THEMED TOAST NOTIFICATIONS (replaces balloon tips)
+# STATE
 # ============================================================================
 
-$script:ToastForm = $null
-$script:ToastDismissTimer = $null
-$script:ToastFadeTimer = $null
-$script:ToastDismissBarTimer = $null
-$script:ToastDismissBar = $null
+# Each active toast is a hashtable:
+#   Form, TitleLabel, BodyLabel, MetaLabel, DismissBar, DismissBarTimer,
+#   FadeTimer, LifetimeTimer, ReflowTimer, TargetY, CurrentY, Height,
+#   CreatedAt, Accent, Key
+$script:ActiveToasts      = [System.Collections.Generic.List[object]]::new()
+$script:ToastQueue        = [System.Collections.Generic.Queue[object]]::new()
+$script:ToastDedupMap     = @{}   # key -> last shown DateTime
+$script:ToastMaxVisible   = 3
+$script:ToastSlotGap      = 6
+$script:ToastRightMargin  = 16
+$script:ToastBottomMargin = 16
+$script:ToastWidth        = 396
+$script:ToastDedupWindowMs = 2000
 
-function Show-ThemedToast {
-    <#
-    .SYNOPSIS
-    Shows a modern dark-themed floating toast notification.
-    Replaces standard balloon tips with a visually consistent panel.
-    .PARAMETER Title
-    Toast title text.
-    .PARAMETER Message
-    Toast body message.
-    .PARAMETER Type
-    One of: Info, Warning, Error, Success. Controls accent color.
-    .PARAMETER Duration
-    Auto-dismiss time in milliseconds (default 4000).
-    #>
+# Font cache (resolve once with fallback chain)
+$script:ToastFont_Title = $null
+$script:ToastFont_Body  = $null
+$script:ToastFont_Meta  = $null
+$script:ToastFont_Badge = $null
+$script:ToastFont_Close = $null
+
+function _Resolve-ToastFont {
     param(
-        [string]$Title = "A.B.S.O.",
-        [string]$Message = "",
-        [ValidateSet("Info", "Warning", "Error", "Success")]
-        [string]$Type = "Info",
-        [int]$Duration = 4000
+        [string[]]$Families,
+        [float]$Size,
+        [System.Drawing.FontStyle]$Style = [System.Drawing.FontStyle]::Regular
     )
-
-    Close-ThemedToast
-
-    # Accent color per notification type
-    $accentColor = switch ($Type) {
-        "Success" { [System.Drawing.Color]::FromArgb(255, 80, 210, 120) }
-        "Warning" { [System.Drawing.Color]::FromArgb(255, 240, 180, 60) }
-        "Error"   { [System.Drawing.Color]::FromArgb(255, 220, 75, 75) }
-        default   { [System.Drawing.Color]::FromArgb(255, 90, 160, 235) }
+    foreach ($family in $Families) {
+        try {
+            $f = New-Object System.Drawing.Font($family, $Size, $Style)
+            # WinForms silently substitutes Microsoft Sans Serif when a family
+            # is unknown; detect that and skip to the next candidate.
+            if ($f.FontFamily.Name -ieq $family -or $f.FontFamily.Name -ieq ($family -split ' ')[0]) {
+                return $f
+            }
+            # If substitution landed on the generic family, still accept if
+            # the root family (e.g. "Bahnschrift") resolved.
+            if ($f.Name -and $f.Name -ilike "$(($family -split ' ')[0])*") {
+                return $f
+            }
+            $f.Dispose()
+        } catch {}
     }
+    # Last-resort: Segoe UI at the given size
+    return New-Object System.Drawing.Font("Segoe UI", $Size, $Style)
+}
 
-    # Symbol per type
-    $symbol = switch ($Type) {
-        "Success" { [string][char]0x2713 }
-        "Warning" { "!" }
-        "Error"   { [string][char]0x2717 }
-        default   { "i" }
+function _Ensure-ToastFonts {
+    if ($null -ne $script:ToastFont_Title) { return }
+    $script:ToastFont_Title = _Resolve-ToastFont `
+        -Families @("Bahnschrift SemiBold Condensed","Bahnschrift Condensed","Bahnschrift","Segoe UI Semibold") `
+        -Size 13.0 -Style ([System.Drawing.FontStyle]::Bold)
+    $script:ToastFont_Body  = _Resolve-ToastFont -Families @("Segoe UI") -Size 9.5
+    $script:ToastFont_Meta  = _Resolve-ToastFont -Families @("Cascadia Mono","Consolas") -Size 8.0
+    $script:ToastFont_Badge = _Resolve-ToastFont `
+        -Families @("Bahnschrift SemiBold Condensed","Bahnschrift Condensed","Bahnschrift","Segoe UI Semibold") `
+        -Size 10.5 -Style ([System.Drawing.FontStyle]::Bold)
+    $script:ToastFont_Close = _Resolve-ToastFont -Families @("Segoe UI") -Size 11.0
+}
+
+# ============================================================================
+# PALETTE / TYPE METADATA
+# ============================================================================
+
+function _Get-ToastTypeMeta {
+    param([string]$Type)
+    # Accent color + category badge tag. Cool HUD/phosphor palette.
+    switch ($Type) {
+        "Success" {
+            return @{
+                Accent    = [System.Drawing.Color]::FromArgb(255, 87, 255, 164)
+                AccentDim = [System.Drawing.Color]::FromArgb(70, 87, 255, 164)
+                Tag       = "OK"
+                Priority  = 2
+            }
+        }
+        "Warning" {
+            return @{
+                Accent    = [System.Drawing.Color]::FromArgb(255, 255, 181, 71)
+                AccentDim = [System.Drawing.Color]::FromArgb(70, 255, 181, 71)
+                Tag       = "!"
+                Priority  = 3
+            }
+        }
+        "Error" {
+            return @{
+                Accent    = [System.Drawing.Color]::FromArgb(255, 255, 77, 94)
+                AccentDim = [System.Drawing.Color]::FromArgb(70, 255, 77, 94)
+                Tag       = "X!"
+                Priority  = 4
+            }
+        }
+        default {
+            return @{
+                Accent    = [System.Drawing.Color]::FromArgb(255, 0, 212, 255)
+                AccentDim = [System.Drawing.Color]::FromArgb(70, 0, 212, 255)
+                Tag       = "i"
+                Priority  = 1
+            }
+        }
     }
+}
 
-    # Calculate form height based on message length
-    $msgLines = [Math]::Ceiling($Message.Length / 48)
-    $formHeight = [Math]::Max(88, 58 + ($msgLines * 18))
-    $formHeight = [Math]::Min($formHeight, 160)
+# ============================================================================
+# SMART TITLE / METADATA DERIVATION
+# ============================================================================
+
+function _Derive-ToastTitle {
+    param([string]$RawTitle, [string]$Message, [string]$Type)
+    # If caller gave us the generic brand-only title, synthesize a better one
+    # from context instead of wasting the headline slot on "A.B.S.O.".
+    $trim = "$RawTitle".Trim()
+    $genericTitles = @("A.B.S.O.", "A.B.S.O", "ABSO", "")
+    if ($genericTitles -notcontains $trim -and $trim -inotlike "A.B.S.O.*") {
+        return $trim
+    }
+    if ($trim -ilike "A.B.S.O.*") {
+        # Strip the brand prefix and keep the suffix ("A.B.S.O. Audit" -> "AUDIT")
+        $suffix = ($trim -replace '^A\.B\.S\.O\.?\s*', '').Trim()
+        if ($suffix) { return $suffix.ToUpper() }
+    }
+    # Synthesize from message: first sentence, capped, upper-cased.
+    $msg = "$Message".Trim()
+    if (-not $msg) {
+        if ($Type -eq "Success") { return "COMPLETE" }
+        elseif ($Type -eq "Warning") { return "HEADS UP" }
+        elseif ($Type -eq "Error") { return "FAILURE" }
+        else { return "STATUS" }
+    }
+    # Take the first clause up to the first punctuation break.
+    $clause = ($msg -split '[.!?:|]',2)[0].Trim()
+    if ($clause.Length -gt 42) { $clause = $clause.Substring(0, 42).Trim() + [char]0x2026 }
+    return $clause.ToUpper()
+}
+
+function _Format-ToastMeta {
+    param([string]$Meta)
+    $time = (Get-Date).ToString("HH:mm:ss")
+    if ($Meta) {
+        return ("{0}  {1}  {2}" -f $time, [char]0x00B7, $Meta)
+    }
+    return $time
+}
+
+# ============================================================================
+# SLOT LAYOUT
+# ============================================================================
+
+function _Compute-ToastTargetY {
+    param([int]$IndexFromBottom, [int]$Height)
+    $screen = [System.Windows.Forms.Screen]::PrimaryScreen.WorkingArea
+    $yBottom = $screen.Bottom - $script:ToastBottomMargin
+    # Sum heights of toasts below this slot (indexFromBottom == 0 means bottom slot)
+    $accum = 0
+    for ($i = 0; $i -lt $IndexFromBottom; $i++) {
+        if ($i -lt $script:ActiveToasts.Count) {
+            $accum += ($script:ActiveToasts[$i].Height + $script:ToastSlotGap)
+        } else {
+            $accum += ($Height + $script:ToastSlotGap)
+        }
+    }
+    return ($yBottom - $Height - $accum)
+}
+
+function _Reflow-ToastStack {
+    # Animate each active toast to its correct slot Y.
+    for ($i = 0; $i -lt $script:ActiveToasts.Count; $i++) {
+        $t = $script:ActiveToasts[$i]
+        if (-not $t.Form -or $t.Form.IsDisposed) { continue }
+        $targetY = _Compute-ToastTargetY -IndexFromBottom $i -Height $t.Height
+        $t.TargetY = $targetY
+        if ($t.ReflowTimer) {
+            try { $t.ReflowTimer.Stop(); $t.ReflowTimer.Dispose() } catch {}
+        }
+        $timer = New-Object System.Windows.Forms.Timer
+        $timer.Interval = 14
+        $state = @{ Toast = $t; Timer = $timer }
+        $timer.Add_Tick({
+            try {
+                $local = $this.Tag
+                $tt = $local.Toast
+                if (-not $tt.Form -or $tt.Form.IsDisposed) { $local.Timer.Stop(); $local.Timer.Dispose(); return }
+                $diff = $tt.TargetY - $tt.CurrentY
+                if ([Math]::Abs($diff) -le 1) {
+                    $tt.CurrentY = $tt.TargetY
+                    $tt.Form.Top = [int]$tt.TargetY
+                    $local.Timer.Stop(); $local.Timer.Dispose()
+                    return
+                }
+                $step = [Math]::Sign($diff) * [Math]::Max(1, [Math]::Ceiling([Math]::Abs($diff) * 0.28))
+                $tt.CurrentY = $tt.CurrentY + $step
+                $tt.Form.Top = [int]$tt.CurrentY
+            } catch { try { $this.Stop(); $this.Dispose() } catch {} }
+        })
+        $timer.Tag = $state
+        $t.ReflowTimer = $timer
+        $timer.Start()
+    }
+}
+
+# ============================================================================
+# TEXTURE / PAINT HELPERS
+# ============================================================================
+
+function _Paint-ToastPanel {
+    param(
+        [System.Drawing.Graphics]$g,
+        [int]$Width,
+        [int]$Height,
+        [hashtable]$Meta
+    )
+    $g.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
+
+    # Panel background with subtle cool gradient
+    try {
+        $panelBrush = New-Object System.Drawing.Drawing2D.LinearGradientBrush(
+            (New-Object System.Drawing.Rectangle(0, 0, $Width, $Height)),
+            [System.Drawing.Color]::FromArgb(255, 11, 13, 16),
+            [System.Drawing.Color]::FromArgb(255, 15, 20, 26),
+            [System.Drawing.Drawing2D.LinearGradientMode]::Vertical
+        )
+        $g.FillRectangle($panelBrush, 0, 0, $Width, $Height)
+        $panelBrush.Dispose()
+    } catch {}
+
+    # Diagonal crosshatch texture (very low alpha)
+    $hatchPen = New-Object System.Drawing.Pen(
+        [System.Drawing.Color]::FromArgb(6, 255, 255, 255), 1
+    )
+    for ($x = -$Height; $x -lt $Width; $x += 7) {
+        $g.DrawLine($hatchPen, $x, 0, ($x + $Height), $Height)
+    }
+    $hatchPen.Dispose()
+
+    # Outer border (thin, accent-tinted)
+    $borderPen = New-Object System.Drawing.Pen($Meta.AccentDim, 1)
+    $g.DrawRectangle($borderPen, 0, 0, ($Width - 1), ($Height - 1))
+    $borderPen.Dispose()
+
+    # Top stripe with tick marks (HUD signature)
+    $topBrush = New-Object System.Drawing.SolidBrush(
+        [System.Drawing.Color]::FromArgb(220, $Meta.Accent.R, $Meta.Accent.G, $Meta.Accent.B)
+    )
+    $g.FillRectangle($topBrush, 0, 0, $Width, 2)
+    $topBrush.Dispose()
+    # Tick-mark breaks on top stripe
+    $tickBrush = New-Object System.Drawing.SolidBrush(
+        [System.Drawing.Color]::FromArgb(255, 11, 13, 16)
+    )
+    for ($tx = 44; $tx -lt $Width; $tx += 28) {
+        $g.FillRectangle($tickBrush, $tx, 0, 1, 2)
+    }
+    $tickBrush.Dispose()
+
+    # Left accent rail (vertical 3px)
+    $railBrush = New-Object System.Drawing.SolidBrush(
+        [System.Drawing.Color]::FromArgb(220, $Meta.Accent.R, $Meta.Accent.G, $Meta.Accent.B)
+    )
+    $g.FillRectangle($railBrush, 0, 2, 3, ($Height - 4))
+    $railBrush.Dispose()
+
+    # Badge block (solid accent block, 40x40, left-aligned below top stripe)
+    $badgeBrush = New-Object System.Drawing.SolidBrush($Meta.Accent)
+    $g.FillRectangle($badgeBrush, 6, 10, 40, 40)
+    $badgeBrush.Dispose()
+
+    # Badge inner shadow edge (subtle, to give depth)
+    $shadowPen = New-Object System.Drawing.Pen(
+        [System.Drawing.Color]::FromArgb(60, 0, 0, 0), 1
+    )
+    $g.DrawRectangle($shadowPen, 6, 10, 39, 39)
+    $shadowPen.Dispose()
+
+    # Badge tag text (rendered via label for font smoothing; see _Build-ToastForm)
+}
+
+# ============================================================================
+# FORM CONSTRUCTION
+# ============================================================================
+
+function _Build-ToastForm {
+    param(
+        [string]$Title,
+        [string]$Message,
+        [string]$MetaText,
+        [hashtable]$TypeMeta
+    )
+    _Ensure-ToastFonts
+
+    # Measure message to size the form height. Body area width = total - 60 (badge col) - 14 (right margin).
+    $bodyWidth = $script:ToastWidth - 62 - 14
+    $msgLines = [Math]::Max(1, [Math]::Ceiling($Message.Length / 54.0))
+    if ($msgLines -gt 3) { $msgLines = 3 }
+    $bodyHeight = [Math]::Max(18, $msgLines * 16)
+    $height = 24 + 22 + $bodyHeight + 18 + 6     # top stripe + title row + body + meta + bottom bar
+    $height = [Math]::Max($height, 88)
+    $height = [Math]::Min($height, 160)
 
     $form = New-Object System.Windows.Forms.Form
     $form.Text = ""
     $form.FormBorderStyle = [System.Windows.Forms.FormBorderStyle]::None
-    $form.BackColor = [System.Drawing.Color]::FromArgb(255, 26, 26, 30)
-    $form.Size = New-Object System.Drawing.Size(380, $formHeight)
+    $form.BackColor = [System.Drawing.Color]::FromArgb(255, 11, 13, 16)
+    $form.Size = New-Object System.Drawing.Size($script:ToastWidth, $height)
     $form.StartPosition = [System.Windows.Forms.FormStartPosition]::Manual
     $form.TopMost = $true
     $form.ShowInTaskbar = $false
     $form.Opacity = 0
 
-    # Position bottom-right above taskbar
-    $screen = [System.Windows.Forms.Screen]::PrimaryScreen.WorkingArea
-    $form.Location = New-Object System.Drawing.Point(
-        ($screen.Right - $form.Width - 16),
-        ($screen.Bottom - $form.Height - 16)
-    )
-
-    # Custom paint: border, accent lines, status dot with glow
-    $capturedAccent = $accentColor
-    $capturedHeight = $formHeight
+    # Captured for paint closure
+    $capturedW = $script:ToastWidth
+    $capturedH = $height
+    $capturedMeta = $TypeMeta
     $form.Add_Paint({
         param($s, $e)
-        $g = $e.Graphics
-        $g.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
-
-        # Outer border with subtle accent tint
-        $borderPen = New-Object System.Drawing.Pen(
-            [System.Drawing.Color]::FromArgb(35, $capturedAccent.R, $capturedAccent.G, $capturedAccent.B), 1
-        )
-        $g.DrawRectangle($borderPen, 0, 0, ($s.Width - 1), ($s.Height - 1))
-        $borderPen.Dispose()
-
-        # Top accent gradient line (bright left -> fade right)
-        try {
-            $topBrush = New-Object System.Drawing.Drawing2D.LinearGradientBrush(
-                (New-Object System.Drawing.Point(0, 0)),
-                (New-Object System.Drawing.Point($s.Width, 0)),
-                [System.Drawing.Color]::FromArgb(220, $capturedAccent.R, $capturedAccent.G, $capturedAccent.B),
-                [System.Drawing.Color]::FromArgb(15, $capturedAccent.R, $capturedAccent.G, $capturedAccent.B)
-            )
-            $g.FillRectangle($topBrush, 0, 0, $s.Width, 2)
-            $topBrush.Dispose()
-        } catch {
-            $topPen = New-Object System.Drawing.Pen(
-                [System.Drawing.Color]::FromArgb(160, $capturedAccent.R, $capturedAccent.G, $capturedAccent.B), 2
-            )
-            $g.DrawLine($topPen, 0, 0, $s.Width, 0)
-            $topPen.Dispose()
-        }
-
-        # Left accent bar (vertical gradient: bright center -> fade edges)
-        try {
-            $leftBrush = New-Object System.Drawing.Drawing2D.LinearGradientBrush(
-                (New-Object System.Drawing.Point(0, 4)),
-                (New-Object System.Drawing.Point(0, ($capturedHeight - 4))),
-                [System.Drawing.Color]::FromArgb(30, $capturedAccent.R, $capturedAccent.G, $capturedAccent.B),
-                [System.Drawing.Color]::FromArgb(30, $capturedAccent.R, $capturedAccent.G, $capturedAccent.B)
-            )
-            $blend = New-Object System.Drawing.Drawing2D.ColorBlend(3)
-            $blend.Colors = @(
-                [System.Drawing.Color]::FromArgb(30, $capturedAccent.R, $capturedAccent.G, $capturedAccent.B),
-                [System.Drawing.Color]::FromArgb(180, $capturedAccent.R, $capturedAccent.G, $capturedAccent.B),
-                [System.Drawing.Color]::FromArgb(30, $capturedAccent.R, $capturedAccent.G, $capturedAccent.B)
-            )
-            $blend.Positions = @([float]0.0, [float]0.4, [float]1.0)
-            $leftBrush.InterpolationColors = $blend
-            $g.FillRectangle($leftBrush, 0, 3, 3, ($capturedHeight - 6))
-            $leftBrush.Dispose()
-        } catch {
-            $barBrush = New-Object System.Drawing.SolidBrush(
-                [System.Drawing.Color]::FromArgb(140, $capturedAccent.R, $capturedAccent.G, $capturedAccent.B)
-            )
-            $g.FillRectangle($barBrush, 0, 3, 3, ($capturedHeight - 6))
-            $barBrush.Dispose()
-        }
-
-        # Status dot glow (larger, semi-transparent)
-        $glowBrush = New-Object System.Drawing.SolidBrush(
-            [System.Drawing.Color]::FromArgb(25, $capturedAccent.R, $capturedAccent.G, $capturedAccent.B)
-        )
-        $g.FillEllipse($glowBrush, 10, 12, 18, 18)
-        $glowBrush.Dispose()
-
-        # Status dot (solid)
-        $dotBrush = New-Object System.Drawing.SolidBrush($capturedAccent)
-        $g.FillEllipse($dotBrush, 15, 17, 8, 8)
-        $dotBrush.Dispose()
-
-        # Dot highlight (specular)
-        $specBrush = New-Object System.Drawing.SolidBrush(
-            [System.Drawing.Color]::FromArgb(80, 255, 255, 255)
-        )
-        $g.FillEllipse($specBrush, 16, 18, 3, 3)
-        $specBrush.Dispose()
+        _Paint-ToastPanel -g $e.Graphics -Width $capturedW -Height $capturedH -Meta $capturedMeta
     }.GetNewClosure())
 
-    # Title label
+    # Badge tag label (white text on accent block)
+    $badgeLabel = New-Object System.Windows.Forms.Label
+    $badgeLabel.Text = $TypeMeta.Tag
+    $badgeLabel.Font = $script:ToastFont_Badge
+    $badgeLabel.ForeColor = [System.Drawing.Color]::FromArgb(255, 11, 13, 16)
+    $badgeLabel.BackColor = [System.Drawing.Color]::Transparent
+    $badgeLabel.TextAlign = [System.Drawing.ContentAlignment]::MiddleCenter
+    $badgeLabel.Location = New-Object System.Drawing.Point(6, 10)
+    $badgeLabel.Size = New-Object System.Drawing.Size(40, 40)
+    $form.Controls.Add($badgeLabel)
+
+    # Title label (uppercase, condensed, bold)
     $titleLabel = New-Object System.Windows.Forms.Label
-    $titleLabel.Text = $Title
-    $titleLabel.ForeColor = [System.Drawing.Color]::FromArgb(255, 240, 240, 245)
-    $titleLabel.Font = New-Object System.Drawing.Font("Segoe UI Semibold", 10)
-    $titleLabel.Location = New-Object System.Drawing.Point(32, 10)
-    $titleLabel.Size = New-Object System.Drawing.Size(332, 22)
+    $titleLabel.Text = $Title.ToUpper()
+    $titleLabel.Font = $script:ToastFont_Title
+    $titleLabel.ForeColor = [System.Drawing.Color]::FromArgb(255, 232, 236, 243)
     $titleLabel.BackColor = [System.Drawing.Color]::Transparent
+    $titleLabel.Location = New-Object System.Drawing.Point(60, 8)
+    $titleLabel.Size = New-Object System.Drawing.Size(($script:ToastWidth - 60 - 30), 22)
+    $titleLabel.AutoEllipsis = $true
     $form.Controls.Add($titleLabel)
 
-    # Message label
-    $msgLabel = New-Object System.Windows.Forms.Label
-    $msgLabel.Text = $Message
-    $msgLabel.ForeColor = [System.Drawing.Color]::FromArgb(255, 165, 165, 175)
-    $msgLabel.Font = New-Object System.Drawing.Font("Segoe UI", 9)
-    $msgLabel.Location = New-Object System.Drawing.Point(32, 34)
-    $msgLabel.Size = New-Object System.Drawing.Size(334, ($formHeight - 48))
-    $msgLabel.BackColor = [System.Drawing.Color]::Transparent
-    $form.Controls.Add($msgLabel)
+    # Close glyph (right-aligned)
+    $closeLabel = New-Object System.Windows.Forms.Label
+    $closeLabel.Text = [string][char]0x00D7   # multiplication sign as close glyph
+    $closeLabel.Font = $script:ToastFont_Close
+    $closeLabel.ForeColor = [System.Drawing.Color]::FromArgb(180, 120, 128, 140)
+    $closeLabel.BackColor = [System.Drawing.Color]::Transparent
+    $closeLabel.TextAlign = [System.Drawing.ContentAlignment]::MiddleCenter
+    $closeLabel.Location = New-Object System.Drawing.Point(($script:ToastWidth - 24), 10)
+    $closeLabel.Size = New-Object System.Drawing.Size(18, 18)
+    $closeLabel.Cursor = [System.Windows.Forms.Cursors]::Hand
+    $closeLabel.Add_MouseEnter({ $this.ForeColor = [System.Drawing.Color]::FromArgb(255, 232, 236, 243) })
+    $closeLabel.Add_MouseLeave({ $this.ForeColor = [System.Drawing.Color]::FromArgb(180, 120, 128, 140) })
+    $form.Controls.Add($closeLabel)
 
-    # Dismiss countdown bar at the very bottom
-    $dismissBar = New-Object System.Windows.Forms.Panel
-    $dismissBar.Location = New-Object System.Drawing.Point(0, ($formHeight - 3))
-    $dismissBar.Size = New-Object System.Drawing.Size(380, 3)
-    $dismissBar.BackColor = [System.Drawing.Color]::FromArgb(100, $accentColor.R, $accentColor.G, $accentColor.B)
-    $form.Controls.Add($dismissBar)
-    $script:ToastDismissBar = $dismissBar
+    # Body label
+    $bodyLabel = New-Object System.Windows.Forms.Label
+    $bodyLabel.Text = $Message
+    $bodyLabel.Font = $script:ToastFont_Body
+    $bodyLabel.ForeColor = [System.Drawing.Color]::FromArgb(255, 166, 171, 182)
+    $bodyLabel.BackColor = [System.Drawing.Color]::Transparent
+    $bodyLabel.Location = New-Object System.Drawing.Point(60, 32)
+    $bodyLabel.Size = New-Object System.Drawing.Size($bodyWidth, $bodyHeight)
+    $form.Controls.Add($bodyLabel)
 
-    # Click to dismiss
-    $form.Add_Click({ Close-ThemedToast })
-    $titleLabel.Add_Click({ Close-ThemedToast })
-    $msgLabel.Add_Click({ Close-ThemedToast })
+    # Metadata label (monospaced, dim)
+    $metaLabel = New-Object System.Windows.Forms.Label
+    $metaLabel.Text = $MetaText
+    $metaLabel.Font = $script:ToastFont_Meta
+    $metaLabel.ForeColor = [System.Drawing.Color]::FromArgb(255, 96, 102, 111)
+    $metaLabel.BackColor = [System.Drawing.Color]::Transparent
+    $metaLabel.Location = New-Object System.Drawing.Point(60, ($height - 24))
+    $metaLabel.Size = New-Object System.Drawing.Size(($script:ToastWidth - 60 - 14), 14)
+    $form.Controls.Add($metaLabel)
 
-    $script:ToastForm = $form
+    # Segmented dismiss bar (24 discrete blocks) along the bottom
+    $dismissHost = New-Object System.Windows.Forms.Panel
+    $dismissHost.Location = New-Object System.Drawing.Point(3, ($height - 3))
+    $dismissHost.Size = New-Object System.Drawing.Size(($script:ToastWidth - 6), 3)
+    $dismissHost.BackColor = [System.Drawing.Color]::FromArgb(255, 22, 26, 32)
+    $form.Controls.Add($dismissHost)
+
+    return @{
+        Form        = $form
+        TitleLabel  = $titleLabel
+        BodyLabel   = $bodyLabel
+        MetaLabel   = $metaLabel
+        CloseLabel  = $closeLabel
+        BadgeLabel  = $badgeLabel
+        DismissHost = $dismissHost
+        Height      = $height
+    }
+}
+
+# ============================================================================
+# PUBLIC: Show-ThemedToast
+# ============================================================================
+
+function Show-ThemedToast {
+    <#
+    .SYNOPSIS
+    Shows a HUD-style notification. Supports stacking, queueing, dedup.
+
+    .PARAMETER Title
+    Toast headline. If the caller passes the generic "A.B.S.O." brand,
+    a contextual title is synthesized from the message instead.
+
+    .PARAMETER Message
+    Body text.
+
+    .PARAMETER Type
+    Info | Success | Warning | Error
+
+    .PARAMETER Duration
+    Lifetime in milliseconds before auto-dismiss (default 4500).
+
+    .PARAMETER MetaText
+    Optional metadata for the bottom row (timestamp is always prepended).
+    #>
+    param(
+        [string]$Title = "A.B.S.O.",
+        [string]$Message = "",
+        [ValidateSet("Info","Warning","Error","Success")]
+        [string]$Type = "Info",
+        [int]$Duration = 4500,
+        [string]$MetaText = ""
+    )
+
+    try {
+        $typeMeta  = _Get-ToastTypeMeta -Type $Type
+        $realTitle = _Derive-ToastTitle -RawTitle $Title -Message $Message -Type $Type
+        $meta      = _Format-ToastMeta -Meta $MetaText
+        $key       = "$Type|$realTitle|$Message"
+
+        # Dedup: if this exact key appeared within the dedup window, drop it
+        $nowMs = [DateTimeOffset]::Now.ToUnixTimeMilliseconds()
+        if ($script:ToastDedupMap.ContainsKey($key)) {
+            $last = $script:ToastDedupMap[$key]
+            if (($nowMs - $last) -lt $script:ToastDedupWindowMs) {
+                if (Get-Command Write-TrayLog -ErrorAction SilentlyContinue) {
+                    Write-TrayLog "Toast dedup: suppressed '$realTitle' within ${script:ToastDedupWindowMs}ms" -Level "INFO"
+                }
+                return
+            }
+        }
+        $script:ToastDedupMap[$key] = $nowMs
+
+        # Log every surfaced toast
+        if (Get-Command Write-TrayLog -ErrorAction SilentlyContinue) {
+            Write-TrayLog "Toast[$Type] $realTitle :: $Message" -Level "INFO"
+        }
+
+        # Enqueue if at capacity (unless this is an Error, which preempts
+        # the oldest Info/Success to make sure critical signals surface).
+        if ($script:ActiveToasts.Count -ge $script:ToastMaxVisible) {
+            if ($typeMeta.Priority -ge 4) {
+                $bumpIndex = -1
+                for ($i = 0; $i -lt $script:ActiveToasts.Count; $i++) {
+                    $p = (_Get-ToastTypeMeta -Type $script:ActiveToasts[$i].Type).Priority
+                    if ($p -le 2) { $bumpIndex = $i; break }
+                }
+                if ($bumpIndex -ge 0) {
+                    _Dismiss-ActiveToast -Toast $script:ActiveToasts[$bumpIndex] -Fast
+                } else {
+                    $script:ToastQueue.Enqueue(@{
+                        Title = $realTitle; Message = $Message; Type = $Type
+                        Duration = $Duration; MetaText = $MetaText
+                    })
+                    return
+                }
+            } else {
+                $script:ToastQueue.Enqueue(@{
+                    Title = $realTitle; Message = $Message; Type = $Type
+                    Duration = $Duration; MetaText = $MetaText
+                })
+                return
+            }
+        }
+
+        _Spawn-Toast -Title $realTitle -Message $Message -Type $Type `
+            -TypeMeta $typeMeta -MetaText $meta -Duration $Duration -Key $key
+    } catch {
+        if (Get-Command Write-TrayLog -ErrorAction SilentlyContinue) {
+            Write-TrayLog "Show-ThemedToast failed: $($_.Exception.Message)" -Level "ERROR"
+        }
+    }
+}
+
+function _Spawn-Toast {
+    param(
+        [string]$Title, [string]$Message, [string]$Type,
+        [hashtable]$TypeMeta, [string]$MetaText, [int]$Duration, [string]$Key
+    )
+
+    $built = _Build-ToastForm -Title $Title -Message $Message -MetaText $MetaText -TypeMeta $TypeMeta
+    $form = $built.Form
+
+    # Slot index = ActiveToasts.Count (this toast will become the new bottom slot)
+    $slotIndex = $script:ActiveToasts.Count
+    $targetY = _Compute-ToastTargetY -IndexFromBottom $slotIndex -Height $built.Height
+
+    # Slide-in start: 28px to the right of target, opacity 0
+    $screen = [System.Windows.Forms.Screen]::PrimaryScreen.WorkingArea
+    $targetX = $screen.Right - $script:ToastWidth - $script:ToastRightMargin
+    $form.Location = New-Object System.Drawing.Point(($targetX + 28), $targetY)
+
+    $toast = @{
+        Form           = $form
+        TitleLabel     = $built.TitleLabel
+        BodyLabel      = $built.BodyLabel
+        MetaLabel      = $built.MetaLabel
+        CloseLabel     = $built.CloseLabel
+        BadgeLabel     = $built.BadgeLabel
+        DismissHost    = $built.DismissHost
+        Height         = $built.Height
+        CurrentY       = $targetY
+        TargetY        = $targetY
+        Accent         = $TypeMeta.Accent
+        Type           = $Type
+        Key            = $Key
+        Duration       = $Duration
+        CreatedAt      = Get-Date
+        FadeTimer      = $null
+        LifetimeTimer  = $null
+        DismissBarTimer= $null
+        ReflowTimer    = $null
+        SlideTimer     = $null
+        DismissRects   = @()   # holds the 24 segment rectangles
+        Dismissing     = $false
+    }
+
+    # Click-anywhere-to-dismiss on form and text labels
+    $closeHandler = { _Dismiss-ActiveToast -Toast $toast }.GetNewClosure()
+    $form.Add_Click($closeHandler)
+    $built.TitleLabel.Add_Click($closeHandler)
+    $built.BodyLabel.Add_Click($closeHandler)
+    $built.MetaLabel.Add_Click($closeHandler)
+    $built.BadgeLabel.Add_Click($closeHandler)
+    $built.CloseLabel.Add_Click($closeHandler)
+
     $form.Show()
 
-    # Apply DWM effects (rounded corners, dark mode, shadow)
+    # DWM effects (rounded corners, dark mode, accent border)
     try {
         if ("DwmHelper" -as [type]) {
             Apply-DwmWindowEffects -Form $form -CornerStyle 3 -BorderColorRGB @(
-                $accentColor.R, $accentColor.G, $accentColor.B
+                $TypeMeta.Accent.R, $TypeMeta.Accent.G, $TypeMeta.Accent.B
             )
         }
     } catch {}
 
-    # Fade-in animation: opacity 0 -> 0.97
-    $script:ToastFadeTimer = New-Object System.Windows.Forms.Timer
-    $script:ToastFadeTimer.Interval = 16
-    $script:ToastFadeTimer.Add_Tick({
-        try {
-            if ($script:ToastForm -and -not $script:ToastForm.IsDisposed) {
-                $newOpacity = $script:ToastForm.Opacity + 0.10
-                if ($newOpacity -ge 0.97) {
-                    $script:ToastForm.Opacity = 0.97
-                    $script:ToastFadeTimer.Stop()
-                }
-                else {
-                    $script:ToastForm.Opacity = $newOpacity
-                }
-            }
-            else {
-                $script:ToastFadeTimer.Stop()
-            }
-        } catch { try { $script:ToastFadeTimer.Stop() } catch {} }
-    })
-    $script:ToastFadeTimer.Start()
+    $script:ActiveToasts.Add($toast) | Out-Null
 
-    # Auto-dismiss timer
-    $script:ToastDismissTimer = New-Object System.Windows.Forms.Timer
-    $script:ToastDismissTimer.Interval = $Duration
-    $script:ToastDismissTimer.Add_Tick({
-        try {
-            $script:ToastDismissTimer.Stop()
-            # Start fade-out
-            if ($script:ToastFadeTimer) {
-                try { $script:ToastFadeTimer.Stop(); $script:ToastFadeTimer.Dispose() } catch {}
-            }
-            $script:ToastFadeTimer = New-Object System.Windows.Forms.Timer
-            $script:ToastFadeTimer.Interval = 16
-            $script:ToastFadeTimer.Add_Tick({
-                try {
-                    if ($script:ToastForm -and -not $script:ToastForm.IsDisposed) {
-                        $newOpacity = $script:ToastForm.Opacity - 0.08
-                        if ($newOpacity -le 0.02) {
-                            Close-ThemedToast
-                        }
-                        else {
-                            $script:ToastForm.Opacity = $newOpacity
-                        }
-                    }
-                    else {
-                        $script:ToastFadeTimer.Stop()
-                    }
-                } catch { try { $script:ToastFadeTimer.Stop() } catch {} }
-            })
-            $script:ToastFadeTimer.Start()
-        } catch { try { $script:ToastDismissTimer.Stop() } catch {} }
-    })
-    $script:ToastDismissTimer.Start()
+    # Kick off the entry animation (slide-in from +28 with fade)
+    _Animate-ToastEntry -Toast $toast -TargetX $targetX
 
-    # Dismiss bar countdown animation (shrinks from full width to 0)
-    $script:ToastDismissBarTimer = New-Object System.Windows.Forms.Timer
-    $script:ToastDismissBarTimer.Interval = 50
-    $script:ToastDismissBarStart = Get-Date
-    $script:ToastDismissBarDuration = $Duration
-    $capturedDismissBar = $dismissBar
-    $script:ToastDismissBarTimer.Add_Tick({
+    # Segmented dismiss bar animation (24 blocks fill over duration)
+    _Start-DismissBar -Toast $toast
+
+    # Lifetime -> auto-dismiss
+    $lt = New-Object System.Windows.Forms.Timer
+    $lt.Interval = $Duration
+    $lt.Tag = $toast
+    $lt.Add_Tick({
         try {
-            $elapsed = ((Get-Date) - $script:ToastDismissBarStart).TotalMilliseconds
-            $pct = 1.0 - [Math]::Min(1.0, $elapsed / $script:ToastDismissBarDuration)
-            $newWidth = [Math]::Max(0, [int]($pct * 380))
-            if ($capturedDismissBar -and -not $capturedDismissBar.IsDisposed) {
-                $capturedDismissBar.Size = New-Object System.Drawing.Size($newWidth, 3)
-            }
-            if ($pct -le 0) {
-                $script:ToastDismissBarTimer.Stop()
-            }
-        } catch { try { $script:ToastDismissBarTimer.Stop() } catch {} }
+            $this.Stop(); $this.Dispose()
+            $t = $this.Tag
+            if ($t -and -not $t.Dismissing) { _Dismiss-ActiveToast -Toast $t }
+        } catch {}
     })
-    $script:ToastDismissBarTimer.Start()
+    $lt.Start()
+    $toast.LifetimeTimer = $lt
 }
+
+# ============================================================================
+# ANIMATION
+# ============================================================================
+
+function _Animate-ToastEntry {
+    param([hashtable]$Toast, [int]$TargetX)
+    $steps = 14        # ~14 * 14ms = 196ms
+    $step  = [ref]0
+    $timer = New-Object System.Windows.Forms.Timer
+    $timer.Interval = 14
+    $state = @{ Toast = $Toast; Step = $step; Steps = $steps; TargetX = $TargetX }
+    $timer.Tag = $state
+    $timer.Add_Tick({
+        try {
+            $local = $this.Tag
+            $tt = $local.Toast
+            if (-not $tt.Form -or $tt.Form.IsDisposed) { $this.Stop(); $this.Dispose(); return }
+            $local.Step.Value++
+            $raw = [double]$local.Step.Value / $local.Steps
+            if ($raw -ge 1) { $raw = 1 }
+            # Ease-out cubic
+            $eased = 1 - [Math]::Pow(1 - $raw, 3)
+            $x = [int]($local.TargetX + ((1 - $eased) * 28))
+            $tt.Form.Left = $x
+            $tt.Form.Opacity = [Math]::Min(0.97, $eased * 0.97 + 0.02)
+            if ($raw -ge 1) { $this.Stop(); $this.Dispose() }
+        } catch { try { $this.Stop(); $this.Dispose() } catch {} }
+    })
+    $Toast.SlideTimer = $timer
+    $timer.Start()
+}
+
+function _Start-DismissBar {
+    param([hashtable]$Toast)
+    # Pre-build 24 small panels; reveal them one at a time.
+    # (Local name is $barHost -- $host is a read-only automatic in PS.)
+    $barHost = $Toast.DismissHost
+    $total = 24
+    $width = $barHost.Width
+    $segW = [Math]::Max(1, [Math]::Floor(($width - ($total - 1) * 1) / $total))
+    $rects = @()
+    for ($i = 0; $i -lt $total; $i++) {
+        $seg = New-Object System.Windows.Forms.Panel
+        $seg.Size = New-Object System.Drawing.Size($segW, 3)
+        $seg.Location = New-Object System.Drawing.Point(($i * ($segW + 1)), 0)
+        $seg.BackColor = [System.Drawing.Color]::FromArgb(255, 22, 26, 32)
+        $barHost.Controls.Add($seg)
+        $rects += $seg
+    }
+    $Toast.DismissRects = $rects
+
+    $tickMs = [Math]::Max(30, [int]($Toast.Duration / $total))
+    $interval = New-Object System.Windows.Forms.Timer
+    $interval.Interval = $tickMs
+    $state = @{ Toast = $Toast; Index = [ref]0; Accent = $Toast.Accent; Timer = $interval }
+    $interval.Tag = $state
+    $interval.Add_Tick({
+        try {
+            $local = $this.Tag
+            $tt = $local.Toast
+            if (-not $tt.Form -or $tt.Form.IsDisposed) { $this.Stop(); $this.Dispose(); return }
+            $i = $local.Index.Value
+            if ($i -ge $tt.DismissRects.Count) { $this.Stop(); $this.Dispose(); return }
+            $seg = $tt.DismissRects[$i]
+            if ($seg -and -not $seg.IsDisposed) {
+                $seg.BackColor = $local.Accent
+            }
+            $local.Index.Value++
+        } catch { try { $this.Stop(); $this.Dispose() } catch {} }
+    })
+    $Toast.DismissBarTimer = $interval
+    $interval.Start()
+}
+
+function _Dismiss-ActiveToast {
+    param([hashtable]$Toast, [switch]$Fast)
+    if (-not $Toast -or $Toast.Dismissing) { return }
+    $Toast.Dismissing = $true
+
+    foreach ($key in @("LifetimeTimer","DismissBarTimer","SlideTimer","ReflowTimer")) {
+        if ($Toast[$key]) {
+            try { $Toast[$key].Stop(); $Toast[$key].Dispose() } catch {}
+            $Toast[$key] = $null
+        }
+    }
+
+    $steps = if ($Fast) { 6 } else { 12 }
+    $step  = [ref]0
+    $fade  = New-Object System.Windows.Forms.Timer
+    $fade.Interval = 14
+    $startY = $Toast.CurrentY
+    $state = @{ Toast = $Toast; Step = $step; Steps = $steps; StartY = $startY }
+    $fade.Tag = $state
+    $fade.Add_Tick({
+        try {
+            $local = $this.Tag
+            $tt = $local.Toast
+            if (-not $tt.Form -or $tt.Form.IsDisposed) { $this.Stop(); $this.Dispose(); return }
+            $local.Step.Value++
+            $raw = [double]$local.Step.Value / $local.Steps
+            if ($raw -ge 1) { $raw = 1 }
+            $eased = 1 - [Math]::Pow(1 - $raw, 2)
+            $tt.Form.Top = [int]($local.StartY - ($eased * 8))
+            $tt.Form.Opacity = [Math]::Max(0, 0.97 - $eased * 0.97)
+            if ($raw -ge 1) {
+                $this.Stop(); $this.Dispose()
+                try { $tt.Form.Hide() } catch {}
+                try { $tt.Form.Close() } catch {}
+                try { $tt.Form.Dispose() } catch {}
+                # Remove from active list and drain queue
+                if ($script:ActiveToasts.Contains($tt)) {
+                    $null = $script:ActiveToasts.Remove($tt)
+                }
+                _Reflow-ToastStack
+                _Drain-ToastQueue
+            }
+        } catch { try { $this.Stop(); $this.Dispose() } catch {} }
+    })
+    $Toast.FadeTimer = $fade
+    $fade.Start()
+}
+
+function _Drain-ToastQueue {
+    while ($script:ToastQueue.Count -gt 0 -and $script:ActiveToasts.Count -lt $script:ToastMaxVisible) {
+        $q = $script:ToastQueue.Dequeue()
+        $typeMeta = _Get-ToastTypeMeta -Type $q.Type
+        $meta = _Format-ToastMeta -Meta $q.MetaText
+        $key = "$($q.Type)|$($q.Title)|$($q.Message)"
+        _Spawn-Toast -Title $q.Title -Message $q.Message -Type $q.Type `
+            -TypeMeta $typeMeta -MetaText $meta -Duration $q.Duration -Key $key
+    }
+}
+
+# ============================================================================
+# PUBLIC: Close-ThemedToast (clears all)
+# ============================================================================
 
 function Close-ThemedToast {
     <#
     .SYNOPSIS
-    Closes and disposes the themed toast notification and all associated timers.
+    Dismisses every active toast and empties the pending queue.
+    Safe to call from shutdown paths.
     #>
-    if ($script:ToastDismissBarTimer) {
-        try { $script:ToastDismissBarTimer.Stop(); $script:ToastDismissBarTimer.Dispose() } catch {}
-        $script:ToastDismissBarTimer = $null
+    try { $script:ToastQueue.Clear() } catch {}
+    $snapshot = @()
+    foreach ($t in $script:ActiveToasts) { $snapshot += ,$t }
+    foreach ($t in $snapshot) {
+        try { _Dismiss-ActiveToast -Toast $t -Fast } catch {}
     }
-    if ($script:ToastFadeTimer) {
-        try { $script:ToastFadeTimer.Stop(); $script:ToastFadeTimer.Dispose() } catch {}
-        $script:ToastFadeTimer = $null
-    }
-    if ($script:ToastDismissTimer) {
-        try { $script:ToastDismissTimer.Stop(); $script:ToastDismissTimer.Dispose() } catch {}
-        $script:ToastDismissTimer = $null
-    }
-    if ($script:ToastForm -and -not $script:ToastForm.IsDisposed) {
-        try {
-            $script:ToastForm.Hide()
-            [System.Windows.Forms.Application]::DoEvents()
-            $script:ToastForm.Close()
-            $script:ToastForm.Dispose()
-        } catch {}
-        $script:ToastForm = $null
-    }
-    $script:ToastDismissBar = $null
 }
 
 # ============================================================================
-# PROGRESS OVERLAY (Enhanced v2.0)
+# PROGRESS OVERLAY (palette re-skinned to match HUD; structure preserved)
 # ============================================================================
 
 $script:ProgressForm = $null
@@ -314,220 +754,172 @@ $script:ProgressBar = $null
 $script:ProgressTimer = $null
 $script:ProgressAngle = 0
 $script:ProgressShimmerOffset = 0
+$script:ProgressElapsedTimer = $null
+$script:ProgressStartTime = $null
 
 function Show-ProgressOverlay {
     <#
     .SYNOPSIS
-    Shows a modern floating progress window during profile application.
-    Features gradient shimmer progress bar, fade-in animation, DWM effects.
-    .PARAMETER Title
-    The title text (e.g. "Applying Rivals 2: Online")
-    .PARAMETER StepText
-    The current step text (e.g. "Applying NVIDIA settings...")
+    Shows a HUD-styled progress panel during profile application.
+    .PARAMETER Title   Headline (e.g. "Applying Rivals 2: Online")
+    .PARAMETER StepText Current step text
     #>
     param(
-        [string]$Title = "Applying Profile...",
+        [string]$Title = "APPLYING PROFILE",
         [string]$StepText = "Initializing..."
     )
-
     Close-ProgressOverlay
+    _Ensure-ToastFonts
+
+    $accentR = 0;    $accentG = 212;   $accentB = 255   # HUD cyan to match toasts
 
     $form = New-Object System.Windows.Forms.Form
     $form.Text = ""
     $form.FormBorderStyle = [System.Windows.Forms.FormBorderStyle]::None
-    $form.BackColor = [System.Drawing.Color]::FromArgb(255, 22, 22, 26)
-    $form.Size = New-Object System.Drawing.Size(380, 140)
+    $form.BackColor = [System.Drawing.Color]::FromArgb(255, 11, 13, 16)
+    $form.Size = New-Object System.Drawing.Size(400, 150)
     $form.StartPosition = [System.Windows.Forms.FormStartPosition]::Manual
     $form.TopMost = $true
     $form.ShowInTaskbar = $false
     $form.Opacity = 0
 
-    # Position bottom-right above taskbar
     $screen = [System.Windows.Forms.Screen]::PrimaryScreen.WorkingArea
     $form.Location = New-Object System.Drawing.Point(
         ($screen.Right - $form.Width - 16),
         ($screen.Bottom - $form.Height - 16)
     )
 
-    # Custom paint: border, accent lines, animated spinner dot
     $form.Add_Paint({
         param($s, $e)
         $g = $e.Graphics
         $g.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
 
-        # Outer border with purple tint
-        $borderPen = New-Object System.Drawing.Pen(
-            [System.Drawing.Color]::FromArgb(45, 145, 120, 225), 1
+        # Background + hatch
+        $panelBrush = New-Object System.Drawing.Drawing2D.LinearGradientBrush(
+            (New-Object System.Drawing.Rectangle(0, 0, $s.Width, $s.Height)),
+            [System.Drawing.Color]::FromArgb(255, 11, 13, 16),
+            [System.Drawing.Color]::FromArgb(255, 15, 20, 26),
+            [System.Drawing.Drawing2D.LinearGradientMode]::Vertical
         )
+        $g.FillRectangle($panelBrush, 0, 0, $s.Width, $s.Height)
+        $panelBrush.Dispose()
+        $hatchPen = New-Object System.Drawing.Pen([System.Drawing.Color]::FromArgb(6,255,255,255),1)
+        for ($x = -$s.Height; $x -lt $s.Width; $x += 7) {
+            $g.DrawLine($hatchPen, $x, 0, ($x + $s.Height), $s.Height)
+        }
+        $hatchPen.Dispose()
+
+        # Accent border + top stripe with tick breaks
+        $borderPen = New-Object System.Drawing.Pen([System.Drawing.Color]::FromArgb(70,0,212,255), 1)
         $g.DrawRectangle($borderPen, 0, 0, ($s.Width - 1), ($s.Height - 1))
         $borderPen.Dispose()
+        $topBrush = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::FromArgb(220,0,212,255))
+        $g.FillRectangle($topBrush, 0, 0, $s.Width, 2)
+        $topBrush.Dispose()
+        $tickBrush = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::FromArgb(255,11,13,16))
+        for ($tx = 44; $tx -lt $s.Width; $tx += 28) { $g.FillRectangle($tickBrush, $tx, 0, 1, 2) }
+        $tickBrush.Dispose()
 
-        # Top accent gradient (purple)
-        try {
-            $topBrush = New-Object System.Drawing.Drawing2D.LinearGradientBrush(
-                (New-Object System.Drawing.Point(0, 0)),
-                (New-Object System.Drawing.Point($s.Width, 0)),
-                [System.Drawing.Color]::FromArgb(200, 145, 120, 225),
-                [System.Drawing.Color]::FromArgb(10, 145, 120, 225)
-            )
-            $g.FillRectangle($topBrush, 0, 0, $s.Width, 2)
-            $topBrush.Dispose()
-        } catch {
-            $topPen = New-Object System.Drawing.Pen(
-                [System.Drawing.Color]::FromArgb(140, 145, 120, 225), 2
-            )
-            $g.DrawLine($topPen, 1, 0, ($s.Width - 2), 0)
-            $topPen.Dispose()
-        }
+        # Left rail
+        $railBrush = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::FromArgb(220,0,212,255))
+        $g.FillRectangle($railBrush, 0, 2, 3, ($s.Height - 4))
+        $railBrush.Dispose()
 
-        # Left accent bar
-        $leftBrush = New-Object System.Drawing.SolidBrush(
-            [System.Drawing.Color]::FromArgb(100, 145, 120, 225)
-        )
-        $g.FillRectangle($leftBrush, 0, 2, 3, ($s.Height - 4))
-        $leftBrush.Dispose()
-
-        # Animated spinner dot
+        # Animated orbit spinner
         $spinAngle = $script:ProgressAngle * [Math]::PI / 180.0
-        $cx = 20
-        $cy = 22
-        $spinR = 5
-        $dotX = $cx + [Math]::Cos($spinAngle) * $spinR
-        $dotY = $cy + [Math]::Sin($spinAngle) * $spinR
-        $dotBrush = New-Object System.Drawing.SolidBrush(
-            [System.Drawing.Color]::FromArgb(255, 145, 120, 225)
-        )
-        $g.FillEllipse($dotBrush, ($dotX - 3), ($dotY - 3), 6, 6)
-        $dotBrush.Dispose()
-        # Faded trail dots
-        for ($i = 1; $i -le 3; $i++) {
-            $trailAngle = ($script:ProgressAngle - $i * 30) * [Math]::PI / 180.0
-            $tx = $cx + [Math]::Cos($trailAngle) * $spinR
-            $ty = $cy + [Math]::Sin($trailAngle) * $spinR
-            $alpha = [Math]::Max(10, 160 - $i * 50)
-            $trailBrush = New-Object System.Drawing.SolidBrush(
-                [System.Drawing.Color]::FromArgb($alpha, 145, 120, 225)
+        $cx = 28; $cy = 26; $rOrbit = 8
+        for ($i = 3; $i -ge 0; $i--) {
+            $a = ($script:ProgressAngle - $i * 26) * [Math]::PI / 180.0
+            $ox = $cx + [Math]::Cos($a) * $rOrbit
+            $oy = $cy + [Math]::Sin($a) * $rOrbit
+            $alpha = [Math]::Max(30, 220 - $i * 55)
+            $size  = [Math]::Max(3, 6 - $i)
+            $brush = New-Object System.Drawing.SolidBrush(
+                [System.Drawing.Color]::FromArgb($alpha, 0, 212, 255)
             )
-            $trailSize = [Math]::Max(2, 5 - $i)
-            $g.FillEllipse($trailBrush, ($tx - $trailSize/2), ($ty - $trailSize/2), $trailSize, $trailSize)
-            $trailBrush.Dispose()
+            $g.FillEllipse($brush, ($ox - $size/2), ($oy - $size/2), $size, $size)
+            $brush.Dispose()
         }
     })
 
-    # Title label (gold accent)
+    # Title label (Bahnschrift SemiBold Condensed, uppercase, cyan-tinted)
     $titleLabel = New-Object System.Windows.Forms.Label
-    $titleLabel.Text = $Title
-    $titleLabel.ForeColor = [System.Drawing.Color]::FromArgb(255, 230, 190, 70)
-    $titleLabel.Font = New-Object System.Drawing.Font("Segoe UI Semibold", 10.5)
-    $titleLabel.Location = New-Object System.Drawing.Point(34, 10)
-    $titleLabel.Size = New-Object System.Drawing.Size(330, 24)
+    $titleLabel.Text = $Title.ToUpper()
+    $titleLabel.ForeColor = [System.Drawing.Color]::FromArgb(255, 232, 236, 243)
+    $titleLabel.Font = $script:ToastFont_Title
+    $titleLabel.Location = New-Object System.Drawing.Point(50, 10)
+    $titleLabel.Size = New-Object System.Drawing.Size(340, 22)
     $titleLabel.BackColor = [System.Drawing.Color]::Transparent
     $form.Controls.Add($titleLabel)
 
-    # Step label
+    # Step label (Segoe UI, dim)
     $stepLabel = New-Object System.Windows.Forms.Label
     $stepLabel.Text = $StepText
-    $stepLabel.ForeColor = [System.Drawing.Color]::FromArgb(255, 160, 160, 170)
-    $stepLabel.Font = New-Object System.Drawing.Font("Segoe UI", 9)
-    $stepLabel.Location = New-Object System.Drawing.Point(16, 46)
-    $stepLabel.Size = New-Object System.Drawing.Size(348, 20)
+    $stepLabel.ForeColor = [System.Drawing.Color]::FromArgb(255, 166, 171, 182)
+    $stepLabel.Font = $script:ToastFont_Body
+    $stepLabel.Location = New-Object System.Drawing.Point(50, 38)
+    $stepLabel.Size = New-Object System.Drawing.Size(340, 20)
     $stepLabel.BackColor = [System.Drawing.Color]::Transparent
     $form.Controls.Add($stepLabel)
 
-    # Progress bar track (dark well)
+    # Progress bar track + fill (indeterminate oscillator)
     $progressTrack = New-Object System.Windows.Forms.Panel
-    $progressTrack.Location = New-Object System.Drawing.Point(16, 80)
-    $progressTrack.Size = New-Object System.Drawing.Size(348, 6)
-    $progressTrack.BackColor = [System.Drawing.Color]::FromArgb(255, 36, 36, 42)
+    $progressTrack.Location = New-Object System.Drawing.Point(16, 78)
+    $progressTrack.Size = New-Object System.Drawing.Size(368, 6)
+    $progressTrack.BackColor = [System.Drawing.Color]::FromArgb(255, 22, 26, 32)
 
-    # Track paint with rounded ends
-    $progressTrack.Add_Paint({
-        param($s, $e)
-        $g = $e.Graphics
-        $g.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
-        $brush = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::FromArgb(255, 36, 36, 42))
-        $r = 3
-        $d = $r * 2
-        $path = New-Object System.Drawing.Drawing2D.GraphicsPath
-        $rect = New-Object System.Drawing.Rectangle(0, 0, ($s.Width - 1), ($s.Height - 1))
-        $path.AddArc($rect.X, $rect.Y, $d, $d, 180, 90)
-        $path.AddArc(($rect.Right - $d), $rect.Y, $d, $d, 270, 90)
-        $path.AddArc(($rect.Right - $d), ($rect.Bottom - $d), $d, $d, 0, 90)
-        $path.AddArc($rect.X, ($rect.Bottom - $d), $d, $d, 90, 90)
-        $path.CloseFigure()
-        $g.FillPath($brush, $path)
-        $path.Dispose()
-        $brush.Dispose()
-    })
-
-    # Progress bar fill (gradient purple with shimmer)
     $progressFill = New-Object System.Windows.Forms.Panel
     $progressFill.Location = New-Object System.Drawing.Point(0, 0)
     $progressFill.Size = New-Object System.Drawing.Size(0, 6)
     $progressFill.BackColor = [System.Drawing.Color]::Transparent
-    $capturedFill = $progressFill
     $progressFill.Add_Paint({
         param($s, $e)
         if ($s.Width -le 1) { return }
         $g = $e.Graphics
-        $g.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
         try {
-            $fillBrush = New-Object System.Drawing.Drawing2D.LinearGradientBrush(
+            $fill = New-Object System.Drawing.Drawing2D.LinearGradientBrush(
                 (New-Object System.Drawing.Rectangle(0, 0, [Math]::Max(2, $s.Width), $s.Height)),
-                [System.Drawing.Color]::FromArgb(255, 120, 95, 210),
-                [System.Drawing.Color]::FromArgb(255, 175, 145, 240),
+                [System.Drawing.Color]::FromArgb(255, 0, 150, 200),
+                [System.Drawing.Color]::FromArgb(255, 80, 230, 255),
                 [System.Drawing.Drawing2D.LinearGradientMode]::Horizontal
             )
-            $g.FillRectangle($fillBrush, 0, 0, $s.Width, $s.Height)
-            $fillBrush.Dispose()
+            $g.FillRectangle($fill, 0, 0, $s.Width, $s.Height)
+            $fill.Dispose()
         } catch {
-            $fallback = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::FromArgb(255, 145, 120, 225))
-            $g.FillRectangle($fallback, 0, 0, $s.Width, $s.Height)
-            $fallback.Dispose()
+            $solid = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::FromArgb(255,0,212,255))
+            $g.FillRectangle($solid, 0, 0, $s.Width, $s.Height)
+            $solid.Dispose()
         }
-
-        # Shimmer highlight overlay
-        $shimmerX = $script:ProgressShimmerOffset
-        if ($shimmerX -lt $s.Width) {
-            $shimmerBrush = New-Object System.Drawing.SolidBrush(
-                [System.Drawing.Color]::FromArgb(50, 255, 255, 255)
-            )
-            $g.FillRectangle($shimmerBrush, $shimmerX, 0, [Math]::Min(60, $s.Width - $shimmerX), $s.Height)
-            $shimmerBrush.Dispose()
+        $shX = $script:ProgressShimmerOffset
+        if ($shX -lt $s.Width) {
+            $sh = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::FromArgb(60,255,255,255))
+            $g.FillRectangle($sh, $shX, 0, [Math]::Min(60, $s.Width - $shX), $s.Height)
+            $sh.Dispose()
         }
     })
     $progressTrack.Controls.Add($progressFill)
     $form.Controls.Add($progressTrack)
 
-    # Animation timer (spinner + indeterminate progress bar + shimmer)
+    # Animation timer
     $timer = New-Object System.Windows.Forms.Timer
     $script:ProgressTimer = $timer
-    $timer.Interval = 50
+    $timer.Interval = 45
     $script:ProgressAngle = 0
     $script:ProgressShimmerOffset = -60
     $timer.Add_Tick({
         try {
-            $script:ProgressAngle = ($script:ProgressAngle + 8) % 360
-
+            $script:ProgressAngle = ($script:ProgressAngle + 9) % 360
             if ($script:ProgressForm -and $script:ProgressBar -and -not $script:ProgressForm.IsDisposed) {
-                # Indeterminate bar: slides back and forth
-                $barWidth = 100
-                $maxX = 348
+                $barWidth = 110
+                $maxX = 368
                 $cycle = ($script:ProgressAngle * 2) % ($maxX * 2)
                 $x = if ($cycle -lt $maxX) { $cycle } else { $maxX * 2 - $cycle }
                 $x = [int]$x
-                if (($x + $barWidth) -gt $maxX) {
-                    $barWidth = $maxX - $x
-                }
+                if (($x + $barWidth) -gt $maxX) { $barWidth = $maxX - $x }
                 $script:ProgressBar.Location = New-Object System.Drawing.Point($x, 0)
                 $script:ProgressBar.Size = New-Object System.Drawing.Size([Math]::Max(1, $barWidth), 6)
-
-                # Shimmer effect
                 $script:ProgressShimmerOffset += 4
-                if ($script:ProgressShimmerOffset -gt $barWidth + 60) {
-                    $script:ProgressShimmerOffset = -60
-                }
-
+                if ($script:ProgressShimmerOffset -gt $barWidth + 60) { $script:ProgressShimmerOffset = -60 }
                 $script:ProgressBar.Invalidate()
                 $script:ProgressForm.Invalidate()
             }
@@ -535,91 +927,73 @@ function Show-ProgressOverlay {
     })
     $timer.Start()
 
-    # Cancel link
-    $cancelLabel = New-Object System.Windows.Forms.Label
-    $cancelLabel.Text = "Cancel"
-    $cancelLabel.ForeColor = [System.Drawing.Color]::FromArgb(255, 100, 100, 110)
-    $cancelLabel.Font = New-Object System.Drawing.Font("Segoe UI", 8)
-    $cancelLabel.Location = New-Object System.Drawing.Point(316, 106)
-    $cancelLabel.Size = New-Object System.Drawing.Size(50, 20)
-    $cancelLabel.BackColor = [System.Drawing.Color]::Transparent
-    $cancelLabel.Cursor = [System.Windows.Forms.Cursors]::Hand
-    $cancelLabel.TextAlign = [System.Drawing.ContentAlignment]::MiddleRight
-    $cancelLabel.Add_MouseEnter({ $this.ForeColor = [System.Drawing.Color]::FromArgb(255, 220, 75, 75) })
-    $cancelLabel.Add_MouseLeave({ $this.ForeColor = [System.Drawing.Color]::FromArgb(255, 100, 100, 110) })
-    $form.Controls.Add($cancelLabel)
-
-    # Elapsed time label
+    # Elapsed time (monospace)
     $elapsedLabel = New-Object System.Windows.Forms.Label
-    $elapsedLabel.Text = "0s"
-    $elapsedLabel.ForeColor = [System.Drawing.Color]::FromArgb(255, 80, 80, 88)
-    $elapsedLabel.Font = New-Object System.Drawing.Font("Consolas", 7.5)
+    $elapsedLabel.Text = "0.0s"
+    $elapsedLabel.ForeColor = [System.Drawing.Color]::FromArgb(255, 96, 102, 111)
+    $elapsedLabel.Font = $script:ToastFont_Meta
     $elapsedLabel.Location = New-Object System.Drawing.Point(16, 108)
     $elapsedLabel.Size = New-Object System.Drawing.Size(80, 16)
     $elapsedLabel.BackColor = [System.Drawing.Color]::Transparent
     $form.Controls.Add($elapsedLabel)
 
-    # Elapsed time updater (piggybacked on main animation timer via a secondary timer)
+    $cancelLabel = New-Object System.Windows.Forms.Label
+    $cancelLabel.Text = "CANCEL"
+    $cancelLabel.ForeColor = [System.Drawing.Color]::FromArgb(255, 96, 102, 111)
+    $cancelLabel.Font = $script:ToastFont_Badge
+    $cancelLabel.Location = New-Object System.Drawing.Point(330, 106)
+    $cancelLabel.Size = New-Object System.Drawing.Size(60, 20)
+    $cancelLabel.BackColor = [System.Drawing.Color]::Transparent
+    $cancelLabel.Cursor = [System.Windows.Forms.Cursors]::Hand
+    $cancelLabel.TextAlign = [System.Drawing.ContentAlignment]::MiddleRight
+    $cancelLabel.Add_MouseEnter({ $this.ForeColor = [System.Drawing.Color]::FromArgb(255,255,77,94) })
+    $cancelLabel.Add_MouseLeave({ $this.ForeColor = [System.Drawing.Color]::FromArgb(255,96,102,111) })
+    $form.Controls.Add($cancelLabel)
+
     $script:ProgressStartTime = Get-Date
     $elapsedTimer = New-Object System.Windows.Forms.Timer
-    $elapsedTimer.Interval = 1000
-    $capturedElapsed = $elapsedLabel
+    $elapsedTimer.Interval = 100
+    $captured = $elapsedLabel
     $elapsedTimer.Add_Tick({
         try {
-            if ($capturedElapsed -and -not $capturedElapsed.IsDisposed) {
-                $seconds = [int]((Get-Date) - $script:ProgressStartTime).TotalSeconds
-                $capturedElapsed.Text = "${seconds}s"
+            if ($captured -and -not $captured.IsDisposed) {
+                $s = ((Get-Date) - $script:ProgressStartTime).TotalSeconds
+                $captured.Text = ("{0:N1}s" -f $s)
             }
         } catch { try { $elapsedTimer.Stop() } catch {} }
     })
     $elapsedTimer.Start()
     $script:ProgressElapsedTimer = $elapsedTimer
 
-    $script:ProgressForm = $form
+    $script:ProgressForm  = $form
     $script:ProgressLabel = $stepLabel
-    $script:ProgressBar = $progressFill
+    $script:ProgressBar   = $progressFill
 
     $form.Show()
 
-    # Apply DWM effects
     try {
         if ("DwmHelper" -as [type]) {
-            Apply-DwmWindowEffects -Form $form -CornerStyle 3 -BorderColorRGB @(145, 120, 225)
+            Apply-DwmWindowEffects -Form $form -CornerStyle 3 -BorderColorRGB @($accentR, $accentG, $accentB)
         }
     } catch {}
 
-    # Fade-in animation
-    $fadeInTimer = New-Object System.Windows.Forms.Timer
-    $fadeInTimer.Interval = 16
-    $fadeInTimer.Add_Tick({
+    # Fade in
+    $fadeIn = New-Object System.Windows.Forms.Timer
+    $fadeIn.Interval = 14
+    $fadeIn.Add_Tick({
         try {
             if ($script:ProgressForm -and -not $script:ProgressForm.IsDisposed) {
-                $newOp = $script:ProgressForm.Opacity + 0.12
-                if ($newOp -ge 0.97) {
-                    $script:ProgressForm.Opacity = 0.97
-                    $fadeInTimer.Stop()
-                    $fadeInTimer.Dispose()
-                }
-                else {
-                    $script:ProgressForm.Opacity = $newOp
-                }
-            }
-            else {
-                $fadeInTimer.Stop()
-                $fadeInTimer.Dispose()
-            }
-        } catch { try { $fadeInTimer.Stop(); $fadeInTimer.Dispose() } catch {} }
+                $op = $script:ProgressForm.Opacity + 0.12
+                if ($op -ge 0.97) { $script:ProgressForm.Opacity = 0.97; $this.Stop(); $this.Dispose() }
+                else              { $script:ProgressForm.Opacity = $op }
+            } else { $this.Stop(); $this.Dispose() }
+        } catch { try { $this.Stop(); $this.Dispose() } catch {} }
     })
-    $fadeInTimer.Start()
+    $fadeIn.Start()
 }
 
 function Update-ProgressOverlay {
-    <#
-    .SYNOPSIS
-    Updates the step text in the progress overlay.
-    #>
     param([string]$StepText)
-
     if ($script:ProgressForm -and $script:ProgressLabel -and -not $script:ProgressForm.IsDisposed) {
         $script:ProgressLabel.Text = $StepText
         $script:ProgressForm.Refresh()
@@ -627,17 +1001,12 @@ function Update-ProgressOverlay {
 }
 
 function Close-ProgressOverlay {
-    <#
-    .SYNOPSIS
-    Closes and disposes the progress overlay and all timers.
-    #>
     if ($script:ProgressElapsedTimer) {
         try { $script:ProgressElapsedTimer.Stop(); $script:ProgressElapsedTimer.Dispose() } catch {}
         $script:ProgressElapsedTimer = $null
     }
     if ($script:ProgressTimer) {
-        $script:ProgressTimer.Stop()
-        $script:ProgressTimer.Dispose()
+        try { $script:ProgressTimer.Stop(); $script:ProgressTimer.Dispose() } catch {}
         $script:ProgressTimer = $null
     }
     if ($script:ProgressForm) {
@@ -654,74 +1023,51 @@ function Close-ProgressOverlay {
         $script:ProgressForm = $null
     }
     $script:ProgressLabel = $null
-    $script:ProgressBar = $null
+    $script:ProgressBar   = $null
 }
 
 # ============================================================================
-# TOAST NOTIFICATIONS (Legacy-compatible wrapper)
+# Legacy compat
 # ============================================================================
 
 function Show-ABSONotification {
-    <#
-    .SYNOPSIS
-    Shows a themed toast notification (v2.0). Legacy-compatible signature.
-    .PARAMETER Title
-    Notification title.
-    .PARAMETER Message
-    Notification message body.
-    .PARAMETER Type
-    One of: Info, Warning, Error, Success
-    .PARAMETER NotifyIcon
-    The NotifyIcon instance (used to update tooltip text).
-    .PARAMETER Duration
-    Duration in milliseconds (default 4000).
-    #>
     param(
         [string]$Title,
         [string]$Message,
-        [ValidateSet("Info", "Warning", "Error", "Success")]
+        [ValidateSet("Info","Warning","Error","Success")]
         [string]$Type = "Info",
         [System.Windows.Forms.NotifyIcon]$NotifyIcon,
-        [int]$Duration = 4000
+        [int]$Duration = 4500,
+        [string]$MetaText = ""
     )
-
-    # Update tooltip text on the tray icon
     if ($NotifyIcon) {
         $maxLen = [Math]::Min(63, "$Title - $Message".Length)
         $NotifyIcon.Text = "$Title - $Message".Substring(0, $maxLen)
     }
-
-    Show-ThemedToast -Title $Title -Message $Message -Type $Type -Duration $Duration
+    Show-ThemedToast -Title $Title -Message $Message -Type $Type -Duration $Duration -MetaText $MetaText
 }
 
 # ============================================================================
-# STATUS BAR
+# Status bar (unchanged behavior, re-skinned palette)
 # ============================================================================
 
 function New-StatusBarItem {
-    <#
-    .SYNOPSIS
-    Creates a status bar menu item showing last action, current game, etc.
-    #>
     param(
         [string]$LastAction = "Ready",
         [string]$LastActionTime = "",
         [string]$CurrentGame = "",
         [string]$BackupTime = ""
     )
-
     $parts = @()
-    if ($LastAction) { $parts += $LastAction }
+    if ($LastAction)  { $parts += $LastAction }
     if ($CurrentGame) { $parts += "Game: $CurrentGame" }
-    if ($BackupTime) { $parts += "Backup: $BackupTime" }
-
+    if ($BackupTime)  { $parts += "Backup: $BackupTime" }
     $text = $parts -join "  |  "
-
     $item = New-Object System.Windows.Forms.ToolStripMenuItem
     $item.Text = "  $text"
     $item.Enabled = $false
-    $item.BackColor = [System.Drawing.Color]::FromArgb(255, 24, 24, 28)
-    $item.ForeColor = [System.Drawing.Color]::FromArgb(255, 100, 100, 110)
-    $item.Font = New-Object System.Drawing.Font("Consolas", 7.5)
+    $item.BackColor = [System.Drawing.Color]::FromArgb(255, 15, 20, 26)
+    $item.ForeColor = [System.Drawing.Color]::FromArgb(255, 96, 102, 111)
+    $item.Font = New-Object System.Drawing.Font("Cascadia Mono", 7.5)
     return $item
 }

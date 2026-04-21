@@ -644,6 +644,47 @@ function Write-TrayLog {
     catch {}
 }
 
+function Invoke-JsonSafe {
+    <#
+    .SYNOPSIS
+    Parse JSON text without crashing the tray on malformed input.
+
+    .DESCRIPTION
+    The Python CLI normally emits clean JSON, but any stderr leak, partial
+    write, or encoding hiccup used to propagate as an unhandled
+    ConvertFrom-Json exception and take the tray with it. This helper
+    returns $null on parse failure and logs a bounded preview of the
+    offending text so the failure is diagnosable from the tray log.
+
+    .PARAMETER Text
+    Raw string to parse.
+
+    .PARAMETER Source
+    Short label (e.g. 'ApplyProfile', 'Audit', 'Restore') recorded in the
+    log so the operator can tell which call site produced the malformed
+    payload.
+    #>
+    param(
+        [string]$Text,
+        [string]$Source = "unknown"
+    )
+    if ([string]::IsNullOrWhiteSpace($Text)) {
+        Write-TrayLog "Invoke-JsonSafe[$Source]: empty or whitespace input" -Level "WARN"
+        return $null
+    }
+    try {
+        return ($Text | ConvertFrom-Json -ErrorAction Stop)
+    }
+    catch {
+        $preview = $Text.Trim()
+        if ($preview.Length -gt 400) {
+            $preview = $preview.Substring(0, 400) + "...<truncated>"
+        }
+        Write-TrayLog "Invoke-JsonSafe[$Source]: parse failed: $($_.Exception.Message) | first 400 chars: $preview" -Level "ERROR"
+        return $null
+    }
+}
+
 # ============================================================================
 # NOTIFICATION SYSTEM
 # ============================================================================
@@ -663,12 +704,10 @@ function Show-Notification {
     $script:notifyIcon.Text = "$Title - $Message".Substring(0, $maxLen)
 
     if ($script:EnableBalloonNotifications) {
-        # Map "Info" -> "Info" for toast (toast also accepts "Success")
-        $toastType = switch ($Type) {
-            "Warning" { "Warning" }
-            "Error"   { "Error" }
-            default   { "Info" }
-        }
+        # Pass Type through verbatim. Prior versions mapped Success -> Info,
+        # which meant every "successful apply" toast was rendering as the
+        # blue Info variant instead of the green phosphor Success accent.
+        $toastType = if ($Type -in @("Info","Warning","Error","Success")) { $Type } else { "Info" }
         Show-ThemedToast -Title $Title -Message $Message -Type $toastType
     }
 }
@@ -1269,7 +1308,10 @@ function Fetch-ProfileAliasMapFromCli {
         $proc = Start-Process -FilePath $script:PythonExe -ArgumentList "-m", "abso", "profile-aliases", "--json" `
             -NoNewWindow -PassThru -WorkingDirectory $script:ProjectRoot `
             -RedirectStandardOutput $tempFile -RedirectStandardError $errFile
-        $proc.WaitForExit(10000)
+        # WaitForExit(timeout) returns Boolean; [void] prevents it from polluting
+        # the function's output stream (which would turn the returned hashtable
+        # into a 2-element Object[] array).
+        [void]$proc.WaitForExit(10000)
         if (-not $proc.HasExited) {
             Write-TrayLog "Profile alias refresh timed out after 10s, killing process" -Level "WARN"
             $proc.Kill()
@@ -2147,7 +2189,8 @@ function Apply-Profile {
 
         if (-not $rawOutput) { throw "No output from CLI" }
 
-        $json = $rawOutput | ConvertFrom-Json
+        $json = Invoke-JsonSafe -Text $rawOutput -Source 'ApplyProfile'
+        if ($null -eq $json) { throw "Apply CLI returned malformed JSON (see tray log for payload preview)" }
 
         $failedHandlers = @()
         if ($json.data -and $json.data.results) {
@@ -2205,8 +2248,8 @@ function Apply-Profile {
                 Update-ProgressOverlay -StepText "Profile applied with notices"
             }
             else {
-                Write-TrayLog "Profile applied successfully: $ProfileId"
-                Update-ProgressOverlay -StepText "Profile applied successfully!"
+                Write-TrayLog "Profile apply completed: $ProfileId"
+                Update-ProgressOverlay -StepText "Profile apply completed"
             }
 
             Start-Sleep -Milliseconds 500
@@ -2583,8 +2626,8 @@ function Run-Audit {
         if ($errOutput) { Write-TrayLog "Audit CLI stderr: $errOutput" -Level "WARN" }
 
         if ($rawOutput) {
-            $json = $rawOutput | ConvertFrom-Json
-            if ($json.success -and $json.data) {
+            $json = Invoke-JsonSafe -Text $rawOutput -Source 'Audit'
+            if ($null -ne $json -and $json.success -and $json.data) {
                 $issues = if ($json.data -is [System.Array]) { @($json.data) } else { @($json.data.issues) }
                 $issueCount = if ($issues) { $issues.Count } else { 0 }
                 $script:AuditIssueCount = $issueCount
@@ -3660,16 +3703,29 @@ public class HotkeyMessageWindow : NativeWindow {
                 $out = Get-Content $tf -Raw -ErrorAction SilentlyContinue
                 Remove-Item $tf -Force -ErrorAction SilentlyContinue
                 if ($out) {
-                    $j = $out | ConvertFrom-Json
-                    if ($j.success) {
+                    $j = Invoke-JsonSafe -Text $out -Source 'RestoreBackup'
+                    if ($null -ne $j -and $j.success) {
                         Show-Notification -Title "A.B.S.O." -Message "Restored from: $capturedName" -Type "Info"
                         $script:activeProfile = $null
                         Set-IconState -State "Idle"
                         Update-MenuState
                     }
+                    elseif ($null -eq $j) {
+                        Write-TrayLog "Restore '$capturedName': CLI produced unparseable JSON" -Level "ERROR"
+                        Show-Notification -Title "A.B.S.O." -Message "Restore failed (bad CLI response - see tray log)" -Type "Error"
+                    }
+                    else {
+                        $restoreErr = if ($j.error) { $j.error } else { "unknown CLI error" }
+                        Write-TrayLog "Restore '$capturedName' reported failure: $restoreErr" -Level "ERROR"
+                        Show-Notification -Title "A.B.S.O." -Message "Restore failed: $restoreErr" -Type "Error"
+                    }
+                } else {
+                    Write-TrayLog "Restore '$capturedName': CLI produced no output" -Level "ERROR"
+                    Show-Notification -Title "A.B.S.O." -Message "Restore failed (no CLI output)" -Type "Error"
                 }
             } catch {
-                Show-Notification -Title "A.B.S.O." -Message "Restore failed" -Type "Error"
+                Write-TrayLog "Restore '$capturedName' threw: $($_.Exception.Message)" -Level "ERROR"
+                Show-Notification -Title "A.B.S.O." -Message "Restore failed: $($_.Exception.Message)" -Type "Error"
             }
         }.GetNewClosure())
         $backupsItem.DropDownItems.Add($bItem) | Out-Null

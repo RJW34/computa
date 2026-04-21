@@ -600,7 +600,6 @@
                 "WindowsSettingsHandler",
                 "RegistrySettingsHandler",
                 "NvidiaSettingsHandler",
-                "MouseSettingsHandler",
                 "GraphicsSettingsHandler",
                 "ColorProfileSettingsHandler"
             ],

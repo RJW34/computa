@@ -32,7 +32,7 @@ Use these ownership buckets even if one person is wearing all of them:
 
 The current next-phase execution plan is tracked separately in:
 
-- [docs/NEXT_IMPLEMENTATION_PHASE.md](/c:/Users/mtoli/Documents/Code/windowsoptimizerabso/docs/NEXT_IMPLEMENTATION_PHASE.md)
+- [docs/NEXT_IMPLEMENTATION_PHASE.md](./NEXT_IMPLEMENTATION_PHASE.md)
 
 That document exists because the project has now cleared most of the highest-risk UX/truth issues and the highest-value open work is narrower:
 
@@ -88,9 +88,9 @@ Owner: `UX & Tray`
 
 Files:
 
-- [abso/tray/ABSO-Tray.ps1](/c:/Users/mtoli/Documents/Code/windowsoptimizerabso/abso/tray/ABSO-Tray.ps1)
-- [gui/src/components/StatusBar.tsx](/c:/Users/mtoli/Documents/Code/windowsoptimizerabso/gui/src/components/StatusBar.tsx)
-- [gui/src/pages/AuditDetails.tsx](/c:/Users/mtoli/Documents/Code/windowsoptimizerabso/gui/src/pages/AuditDetails.tsx)
+- [abso/tray/ABSO-Tray.ps1](../abso/tray/ABSO-Tray.ps1)
+- [gui/src/components/StatusBar.tsx](../gui/src/components/StatusBar.tsx)
+- [gui/src/pages/AuditDetails.tsx](../gui/src/pages/AuditDetails.tsx)
 
 Tasks:
 
@@ -110,10 +110,10 @@ Owner: `UX & Tray`
 
 Files:
 
-- [gui/src/pages/ProfileWizard.tsx](/c:/Users/mtoli/Documents/Code/windowsoptimizerabso/gui/src/pages/ProfileWizard.tsx)
-- [gui/src/lib/api.ts](/c:/Users/mtoli/Documents/Code/windowsoptimizerabso/gui/src/lib/api.ts)
-- [gui/src/lib/types.ts](/c:/Users/mtoli/Documents/Code/windowsoptimizerabso/gui/src/lib/types.ts)
-- [abso/main.py](/c:/Users/mtoli/Documents/Code/windowsoptimizerabso/abso/main.py)
+- [gui/src/pages/ProfileWizard.tsx](../gui/src/pages/ProfileWizard.tsx)
+- [gui/src/lib/api.ts](../gui/src/lib/api.ts)
+- [gui/src/lib/types.ts](../gui/src/lib/types.ts)
+- [abso/main.py](../abso/main.py)
 
 Tasks:
 
@@ -144,10 +144,10 @@ Owner: `Core Systems`
 
 Files:
 
-- [abso/settings/base.py](/c:/Users/mtoli/Documents/Code/windowsoptimizerabso/abso/settings/base.py)
-- [abso/core/applier.py](/c:/Users/mtoli/Documents/Code/windowsoptimizerabso/abso/core/applier.py)
-- [abso/core/backup.py](/c:/Users/mtoli/Documents/Code/windowsoptimizerabso/abso/core/backup.py)
-- [abso/core/transaction.py](/c:/Users/mtoli/Documents/Code/windowsoptimizerabso/abso/core/transaction.py)
+- [abso/settings/base.py](../abso/settings/base.py)
+- [abso/core/applier.py](../abso/core/applier.py)
+- [abso/core/backup.py](../abso/core/backup.py)
+- [abso/core/transaction.py](../abso/core/transaction.py)
 
 Tasks:
 
@@ -167,9 +167,9 @@ Owner: `Core Systems`
 
 Files:
 
-- [abso/core/transaction.py](/c:/Users/mtoli/Documents/Code/windowsoptimizerabso/abso/core/transaction.py)
-- [abso/core/compliance.py](/c:/Users/mtoli/Documents/Code/windowsoptimizerabso/abso/core/compliance.py)
-- [abso/main.py](/c:/Users/mtoli/Documents/Code/windowsoptimizerabso/abso/main.py)
+- [abso/core/transaction.py](../abso/core/transaction.py)
+- [abso/core/compliance.py](../abso/core/compliance.py)
+- [abso/main.py](../abso/main.py)
 
 Tasks:
 
@@ -199,8 +199,8 @@ Owner: `Handlers`
 
 Files:
 
-- [abso/settings/network.py](/c:/Users/mtoli/Documents/Code/windowsoptimizerabso/abso/settings/network.py)
-- [tests/test_handlers/test_network.py](/c:/Users/mtoli/Documents/Code/windowsoptimizerabso/tests/test_handlers/test_network.py)
+- [abso/settings/network.py](../abso/settings/network.py)
+- [tests/test_handlers/test_network.py](../tests/test_handlers/test_network.py)
 
 Tasks:
 
@@ -218,10 +218,10 @@ Owner: `Handlers`
 
 Files:
 
-- [abso/settings/process_priority.py](/c:/Users/mtoli/Documents/Code/windowsoptimizerabso/abso/settings/process_priority.py)
-- [abso/settings/power.py](/c:/Users/mtoli/Documents/Code/windowsoptimizerabso/abso/settings/power.py)
-- [abso/settings/graphics.py](/c:/Users/mtoli/Documents/Code/windowsoptimizerabso/abso/settings/graphics.py)
-- [abso/settings/timer.py](/c:/Users/mtoli/Documents/Code/windowsoptimizerabso/abso/settings/timer.py)
+- [abso/settings/process_priority.py](../abso/settings/process_priority.py)
+- [abso/settings/power.py](../abso/settings/power.py)
+- [abso/settings/graphics.py](../abso/settings/graphics.py)
+- [abso/settings/timer.py](../abso/settings/timer.py)
 - matching tests
 
 Tasks:
@@ -241,8 +241,8 @@ Owner: `Core Systems` + `Handlers`
 
 Files:
 
-- [abso/settings/nvidia/__init__.py](/c:/Users/mtoli/Documents/Code/windowsoptimizerabso/abso/settings/nvidia/__init__.py)
-- [docs/NVAPI_INTEGRATION_PLAN.md](/c:/Users/mtoli/Documents/Code/windowsoptimizerabso/docs/NVAPI_INTEGRATION_PLAN.md)
+- [abso/settings/nvidia/__init__.py](../abso/settings/nvidia/__init__.py)
+- [docs/NVAPI_INTEGRATION_PLAN.md](./NVAPI_INTEGRATION_PLAN.md)
 
 Decision:
 
@@ -270,11 +270,11 @@ Owner: `Handlers`
 
 Files:
 
-- [abso/settings/nvidia/__init__.py](/c:/Users/mtoli/Documents/Code/windowsoptimizerabso/abso/settings/nvidia/__init__.py)
-- [abso/settings/network.py](/c:/Users/mtoli/Documents/Code/windowsoptimizerabso/abso/settings/network.py)
-- [abso/settings/power.py](/c:/Users/mtoli/Documents/Code/windowsoptimizerabso/abso/settings/power.py)
-- [abso/settings/process_priority.py](/c:/Users/mtoli/Documents/Code/windowsoptimizerabso/abso/settings/process_priority.py)
-- [abso/settings/color.py](/c:/Users/mtoli/Documents/Code/windowsoptimizerabso/abso/settings/color.py)
+- [abso/settings/nvidia/__init__.py](../abso/settings/nvidia/__init__.py)
+- [abso/settings/network.py](../abso/settings/network.py)
+- [abso/settings/power.py](../abso/settings/power.py)
+- [abso/settings/process_priority.py](../abso/settings/process_priority.py)
+- [abso/settings/color.py](../abso/settings/color.py)
 
 Tasks:
 
@@ -292,8 +292,8 @@ Owner: `Core Systems`
 
 Files:
 
-- [abso/core/compliance.py](/c:/Users/mtoli/Documents/Code/windowsoptimizerabso/abso/core/compliance.py)
-- [abso/core/transaction.py](/c:/Users/mtoli/Documents/Code/windowsoptimizerabso/abso/core/transaction.py)
+- [abso/core/compliance.py](../abso/core/compliance.py)
+- [abso/core/transaction.py](../abso/core/transaction.py)
 
 Tasks:
 
@@ -323,7 +323,7 @@ Owner: `Profiles & Evidence`
 Files:
 
 - `abso/manifests/profile_contracts/`
-- [abso/profiles/catalog.py](/c:/Users/mtoli/Documents/Code/windowsoptimizerabso/abso/profiles/catalog.py)
+- [abso/profiles/catalog.py](../abso/profiles/catalog.py)
 - `tests/test_profile_contracts.py`
 
 Each profile contract must declare:
@@ -348,7 +348,7 @@ Owner: `Profiles & Evidence`
 
 Files:
 
-- profile definitions under [abso/profiles](/c:/Users/mtoli/Documents/Code/windowsoptimizerabso/abso/profiles)
+- profile definitions under [abso/profiles](../abso/profiles)
 - profile contract files
 
 Tasks:
@@ -379,7 +379,7 @@ Files:
 
 - `docs/PROFILE_ACCEPTANCE.md`
 - `reports/benchmarks/`
-- benchmark helpers under [abso/core](/c:/Users/mtoli/Documents/Code/windowsoptimizerabso/abso/core)
+- benchmark helpers under [abso/core](../abso/core)
 
 Metrics:
 
@@ -433,11 +433,11 @@ Owner: `Core Systems` + `UX & Tray`
 
 Files:
 
-- [abso/main.py](/c:/Users/mtoli/Documents/Code/windowsoptimizerabso/abso/main.py)
-- [gui/src/lib/api.ts](/c:/Users/mtoli/Documents/Code/windowsoptimizerabso/gui/src/lib/api.ts)
-- [gui/src/lib/types.ts](/c:/Users/mtoli/Documents/Code/windowsoptimizerabso/gui/src/lib/types.ts)
-- [gui/src-tauri/src/main.rs](/c:/Users/mtoli/Documents/Code/windowsoptimizerabso/gui/src-tauri/src/main.rs)
-- [abso/tray/ABSO-Tray.ps1](/c:/Users/mtoli/Documents/Code/windowsoptimizerabso/abso/tray/ABSO-Tray.ps1)
+- [abso/main.py](../abso/main.py)
+- [gui/src/lib/api.ts](../gui/src/lib/api.ts)
+- [gui/src/lib/types.ts](../gui/src/lib/types.ts)
+- [gui/src-tauri/src/main.rs](../gui/src-tauri/src/main.rs)
+- [abso/tray/ABSO-Tray.ps1](../abso/tray/ABSO-Tray.ps1)
 
 Tasks:
 

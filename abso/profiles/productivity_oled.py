@@ -59,17 +59,17 @@ class ProductivityOLEDProfile(BaseProfile):
     def get_handlers(self) -> list[SettingsHandler]:
         from abso.settings.color import ColorProfileSettingsHandler
         from abso.settings.graphics import GraphicsSettingsHandler
-        from abso.settings.mouse import MouseSettingsHandler
         from abso.settings.nvidia import NvidiaSettingsHandler
         from abso.settings.registry import RegistrySettingsHandler
         from abso.settings.windows import WindowsSettingsHandler
 
-        # Minimal handlers - no power handler to avoid switching power plans
+        # Minimal handlers - no power handler (would switch power plans) and
+        # no mouse handler (changing desktop mouse feel outside a game is out
+        # of scope for a productivity profile).
         return [
             WindowsSettingsHandler(),
             RegistrySettingsHandler(),
             NvidiaSettingsHandler(),
-            MouseSettingsHandler(),
             GraphicsSettingsHandler(),
             ColorProfileSettingsHandler(),
         ]
@@ -102,19 +102,17 @@ class ProductivityOLEDProfile(BaseProfile):
                 },
             },
             "NvidiaSettingsHandler": {
-                # Balanced explicit settings - smooth visuals with adaptive vsync
-                "low_latency_mode": "on",
-                "power_management": "prefer_max_performance",
+                # Balanced explicit settings - smooth visuals with adaptive vsync.
+                # No Low Latency Mode and no Prefer Max Performance: productivity
+                # wants lower heat/noise and default driver pacing, not
+                # latency-favoring clocks.
+                "low_latency_mode": "off",
+                "power_management": "adaptive",
                 "vsync": "adaptive",
                 "max_frame_rate": "off",
                 "shader_cache": "unlimited",
                 "threaded_optimization": "auto",
                 "vrr_app_override": "allow",
-            },
-            "MouseSettingsHandler": {
-                # Keep consistent mouse behavior
-                "disable_acceleration": True,
-                "set_linear_curve": True,
             },
             "GraphicsSettingsHandler": {
                 # Keep FSO enabled - works well with modern apps

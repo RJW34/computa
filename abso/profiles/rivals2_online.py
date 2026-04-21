@@ -100,6 +100,13 @@ class Rivals2OnlineProfile(Rivals2BaseProfile):
             "WindowsSettingsHandler": {
                 "max_refresh_rate": True,  # Set display to max refresh rate for current resolution
             },
+            "RegistrySettingsHandler": {
+                # Downgrade from the aggressive 0x2A (+2 foreground boost) to
+                # 0x26 (+1 boost). Rollback netcode needs deterministic timing
+                # more than it needs maximum foreground favoritism; starving
+                # background kernel work risks stalls that break resync windows.
+                "win32_priority_separation": 0x26,
+            },
             "NvidiaSettingsHandler": {
                 # ONLINE profile: Conservative settings for rollback stability
                 # Per rollback.md canonical spec - frame pacing stability > absolute latency

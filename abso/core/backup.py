@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import json
 import logging
+import os
+import shutil
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -13,6 +15,7 @@ from abso.core.exceptions import (
     BackupCorruptedError,
     BackupNotFoundError,
 )
+from abso.utils.atomic_io import atomic_write_json, cleanup_partial
 
 if TYPE_CHECKING:
     from abso.settings.base import SettingsHandler
@@ -20,6 +23,11 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 DEFAULT_MAX_BACKUPS = 20
+
+# Handlers declaring this restore_guarantee cannot be restored end-to-end
+# (e.g. timer resolution reverts on process exit, so there is nothing to
+# restore). Their skip/fail in a restore summary is not a blocking issue.
+_NON_BLOCKING_GUARANTEES = frozenset({"none", "ephemeral"})
 
 
 @dataclass
@@ -33,7 +41,7 @@ class BackupRestoreSummary:
 
     @property
     def complete(self) -> bool:
-        """Whether every backed-up component was restored successfully."""
+        """Whether every backed-up component's restore completed without failure."""
         return not self.skipped_components and not self.failed_components
 
     @property
@@ -147,6 +155,12 @@ class BackupManager:
     ) -> str:
         """Create a new backup of current settings.
 
+        The backup is staged in ``<backup_dir>/<ts>.partial`` and renamed to
+        ``<backup_dir>/<ts>`` only after every handler has run and the
+        manifest has been written atomically. A crash mid-backup leaves the
+        ``.partial`` directory behind, which ``list_backups`` ignores and
+        ``cleanup_partial`` reaps.
+
         Args:
             profile_id: Profile being applied (for metadata tracking).
             backup_type: Type of backup (e.g. "pre_apply", "manual").
@@ -154,90 +168,109 @@ class BackupManager:
         Returns:
             Backup ID (timestamp string).
         """
+        # Clear any orphan staging dirs from previous crashes before starting.
+        cleanup_partial(self.backup_dir)
+
         timestamp = datetime.now().strftime("%Y-%m-%d_%H%M%S")
-        backup_path = self.backup_dir / timestamp
-        backup_path.mkdir(parents=True, exist_ok=True)
+        final_path = self.backup_dir / timestamp
+        staging_path = self.backup_dir / f"{timestamp}.partial"
+
+        # Unique timestamp collision safety (sub-second reapplies in tests).
+        collision_guard = 0
+        while staging_path.exists() or final_path.exists():
+            collision_guard += 1
+            staging_path = self.backup_dir / f"{timestamp}-{collision_guard}.partial"
+            final_path = self.backup_dir / f"{timestamp}-{collision_guard}"
+            if collision_guard > 1000:
+                raise BackupCorruptedError(
+                    "Unable to allocate unique backup timestamp",
+                    details=str(self.backup_dir),
+                )
+
+        staging_path.mkdir(parents=True, exist_ok=True)
 
         manifest: dict[str, Any] = {
-            "timestamp": timestamp,
+            "timestamp": final_path.name,
             "created_at": datetime.now().isoformat(),
             "profile_id": profile_id,
             "backup_type": backup_type,
             "components": {},
         }
 
-        for handler in self._handlers:
-            handler_name = handler.__class__.__name__
-            restore_guarantee = str(getattr(handler, "restore_guarantee", "full"))
+        try:
+            for handler in self._handlers:
+                handler_name = handler.__class__.__name__
+                restore_guarantee = str(getattr(handler, "restore_guarantee", "full"))
 
-            try:
-                data = handler.backup()
+                try:
+                    data = handler.backup()
 
-                # Save component backup
-                component_path = backup_path / f"{handler_name}.json"
-                component_path.write_text(
-                    json.dumps(data, indent=2),
-                    encoding="utf-8"
-                )
+                    component_path = staging_path / f"{handler_name}.json"
+                    atomic_write_json(component_path, data, indent=2)
 
-                component_success = True
-                component_note = None
-                if isinstance(data, dict):
-                    component_success = bool(data.get("success", True))
-                    component_note = data.get("note") or data.get("error")
+                    component_success = True
+                    component_note = None
+                    if isinstance(data, dict):
+                        component_success = bool(data.get("success", True))
+                        component_note = data.get("note") or data.get("error")
 
-                manifest["components"][handler_name] = {
-                    "file": f"{handler_name}.json",
-                    "success": component_success,
-                    "restore_guarantee": restore_guarantee,
-                }
+                    manifest["components"][handler_name] = {
+                        "file": f"{handler_name}.json",
+                        "success": component_success,
+                        "restore_guarantee": restore_guarantee,
+                    }
 
-                if component_note:
-                    manifest["components"][handler_name]["note"] = str(component_note)
+                    if component_note:
+                        manifest["components"][handler_name]["note"] = str(component_note)
 
-                if component_success:
-                    logger.info(f"Backed up {handler_name}")
-                else:
-                    logger.warning(
-                        "Backed up %s with restore unavailable: %s",
-                        handler_name,
-                        component_note or "No restore path was reported",
-                    )
+                    if component_success:
+                        logger.info(f"Backed up {handler_name}")
+                    else:
+                        logger.warning(
+                            "Backed up %s with restore unavailable: %s",
+                            handler_name,
+                            component_note or "No restore path was reported",
+                        )
 
-            except PermissionError as e:
-                logger.error(f"Permission denied backing up {handler_name}: {e}")
-                manifest["components"][handler_name] = {
-                    "file": None,
-                    "success": False,
-                    "restore_guarantee": restore_guarantee,
-                    "error": f"Permission denied: {e}",
-                }
-            except OSError as e:
-                logger.error(f"OS error backing up {handler_name}: {e}")
-                manifest["components"][handler_name] = {
-                    "file": None,
-                    "success": False,
-                    "restore_guarantee": restore_guarantee,
-                    "error": f"OS error: {e}",
-                }
-            except (ValueError, TypeError) as e:
-                logger.error(f"Data error backing up {handler_name}: {e}")
-                manifest["components"][handler_name] = {
-                    "file": None,
-                    "success": False,
-                    "restore_guarantee": restore_guarantee,
-                    "error": f"Data error: {e}",
-                }
+                except PermissionError as e:
+                    logger.error(f"Permission denied backing up {handler_name}: {e}")
+                    manifest["components"][handler_name] = {
+                        "file": None,
+                        "success": False,
+                        "restore_guarantee": restore_guarantee,
+                        "error": f"Permission denied: {e}",
+                    }
+                except OSError as e:
+                    logger.error(f"OS error backing up {handler_name}: {e}")
+                    manifest["components"][handler_name] = {
+                        "file": None,
+                        "success": False,
+                        "restore_guarantee": restore_guarantee,
+                        "error": f"OS error: {e}",
+                    }
+                except (ValueError, TypeError) as e:
+                    logger.error(f"Data error backing up {handler_name}: {e}")
+                    manifest["components"][handler_name] = {
+                        "file": None,
+                        "success": False,
+                        "restore_guarantee": restore_guarantee,
+                        "error": f"Data error: {e}",
+                    }
 
-        # Save manifest
-        manifest_path = backup_path / "manifest.json"
-        manifest_path.write_text(
-            json.dumps(manifest, indent=2),
-            encoding="utf-8"
-        )
+            manifest_path = staging_path / "manifest.json"
+            atomic_write_json(manifest_path, manifest, indent=2)
+        except BaseException:
+            # Any failure between mkdir(staging) and the rename leaves a
+            # .partial dir; clean it up rather than rely on the next run.
+            shutil.rmtree(staging_path, ignore_errors=True)
+            raise
 
-        logger.info(f"Backup created: {timestamp}")
-        return timestamp
+        # Commit: rename the staging dir to its final name.  os.replace
+        # requires the target not to exist, which is guaranteed above.
+        os.replace(staging_path, final_path)
+
+        logger.info(f"Backup created: {final_path.name}")
+        return final_path.name
 
     def restore_backup(self, backup_id: str) -> BackupRestoreSummary:
         """Restore settings from a backup.
@@ -285,7 +318,7 @@ class BackupManager:
         for handler_name, component_info in manifest["components"].items():
             handler = handler_map.get(handler_name)
             restore_guarantee = self._resolve_restore_guarantee(component_info, handler)
-            is_blocking = restore_guarantee != "none"
+            is_blocking = restore_guarantee not in _NON_BLOCKING_GUARANTEES
             if not component_info.get("success", False):
                 detail = str(
                     component_info.get("error")

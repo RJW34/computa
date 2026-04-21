@@ -128,6 +128,9 @@
         "io_priority": 2
       },
       "RegistrySettingsHandler": {
+        "fullscreen_optimizations": {
+          "Diablo IV.exe": true
+        },
         "game_priority": {
           "gpu_priority": 8,
           "priority": 6,
@@ -266,6 +269,9 @@
         "io_priority": 2
       },
       "RegistrySettingsHandler": {
+        "fullscreen_optimizations": {
+          "Diablo IV.exe": true
+        },
         "game_priority": {
           "gpu_priority": 8,
           "priority": 6,
@@ -426,6 +432,12 @@
         "io_priority": 3
       },
       "RegistrySettingsHandler": {
+        "fullscreen_optimizations": {
+          "FortniteClient-Win64-Shipping.exe": true,
+          "FortniteClient-Win64-Shipping_BE.exe": true,
+          "FortniteClient-Win64-Shipping_EAC.exe": true,
+          "FortniteClient-Win64-Shipping_EAC_EOS.exe": true
+        },
         "game_priority": {
           "gpu_priority": 8,
           "priority": 6,
@@ -594,6 +606,12 @@
         "io_priority": 3
       },
       "RegistrySettingsHandler": {
+        "fullscreen_optimizations": {
+          "FortniteClient-Win64-Shipping.exe": true,
+          "FortniteClient-Win64-Shipping_BE.exe": true,
+          "FortniteClient-Win64-Shipping_EAC.exe": true,
+          "FortniteClient-Win64-Shipping_EAC_EOS.exe": true
+        },
         "game_priority": {
           "gpu_priority": 8,
           "priority": 6,
@@ -754,6 +772,10 @@
         "io_priority": 3
       },
       "RegistrySettingsHandler": {
+        "fullscreen_optimizations": {
+          "Marvel-Win64-Shipping.exe": true,
+          "Marvel.exe": true
+        },
         "game_priority": {
           "gpu_priority": 8,
           "priority": 6,
@@ -914,6 +936,10 @@
         "io_priority": 3
       },
       "RegistrySettingsHandler": {
+        "fullscreen_optimizations": {
+          "Marvel-Win64-Shipping.exe": true,
+          "Marvel.exe": true
+        },
         "game_priority": {
           "gpu_priority": 8,
           "priority": 6,
@@ -1060,6 +1086,9 @@
         "io_priority": 3
       },
       "RegistrySettingsHandler": {
+        "fullscreen_optimizations": {
+          "Overwatch.exe": true
+        },
         "game_priority": {
           "gpu_priority": 8,
           "priority": 6,
@@ -1208,6 +1237,9 @@
         "io_priority": 3
       },
       "RegistrySettingsHandler": {
+        "fullscreen_optimizations": {
+          "Overwatch.exe": true
+        },
         "game_priority": {
           "gpu_priority": 8,
           "priority": 6,
@@ -1356,6 +1388,9 @@
         "io_priority": 3
       },
       "RegistrySettingsHandler": {
+        "fullscreen_optimizations": {
+          "Overwatch.exe": false
+        },
         "game_priority": {
           "gpu_priority": 8,
           "priority": 6,
@@ -1528,6 +1563,9 @@
         "io_priority": 3
       },
       "RegistrySettingsHandler": {
+        "fullscreen_optimizations": {
+          "Overwatch.exe": true
+        },
         "game_priority": {
           "gpu_priority": 8,
           "priority": 6,
@@ -1694,6 +1732,9 @@
         "io_priority": 3
       },
       "RegistrySettingsHandler": {
+        "fullscreen_optimizations": {
+          "Overwatch.exe": false
+        },
         "game_priority": {
           "gpu_priority": 8,
           "priority": 6,
@@ -2024,7 +2065,6 @@
       "WindowsSettingsHandler",
       "RegistrySettingsHandler",
       "NvidiaSettingsHandler",
-      "MouseSettingsHandler",
       "GraphicsSettingsHandler",
       "ColorProfileSettingsHandler"
     ],
@@ -2131,14 +2171,10 @@
       "GraphicsSettingsHandler": {
         "disable_global_fso": false
       },
-      "MouseSettingsHandler": {
-        "disable_acceleration": true,
-        "set_linear_curve": true
-      },
       "NvidiaSettingsHandler": {
-        "low_latency_mode": "on",
+        "low_latency_mode": "off",
         "max_frame_rate": "off",
-        "power_management": "prefer_max_performance",
+        "power_management": "adaptive",
         "shader_cache": "unlimited",
         "threaded_optimization": "auto",
         "vrr_app_override": "allow",
@@ -2296,6 +2332,11 @@
         "io_priority": 3
       },
       "RegistrySettingsHandler": {
+        "fullscreen_optimizations": {
+          "Rivals2-Win64-Shipping.exe": true,
+          "Rivals2.exe": true,
+          "RivalsofAether2.exe": true
+        },
         "game_priority": {
           "gpu_priority": 8,
           "priority": 6,
@@ -2457,6 +2498,11 @@
         "io_priority": 3
       },
       "RegistrySettingsHandler": {
+        "fullscreen_optimizations": {
+          "Rivals2-Win64-Shipping.exe": true,
+          "Rivals2.exe": true,
+          "RivalsofAether2.exe": true
+        },
         "game_priority": {
           "gpu_priority": 8,
           "priority": 6,
@@ -2632,12 +2678,17 @@
         "io_priority": 2
       },
       "RegistrySettingsHandler": {
+        "fullscreen_optimizations": {
+          "Rivals2-Win64-Shipping.exe": true,
+          "Rivals2.exe": true,
+          "RivalsofAether2.exe": true
+        },
         "game_priority": {
           "gpu_priority": 8,
           "priority": 6,
           "scheduling_category": "High"
         },
-        "win32_priority_separation": 42
+        "win32_priority_separation": 38
       },
       "Rivals2ConfigHandler": {
         "frame_rate_limit": 999,
@@ -2789,6 +2840,11 @@
         "io_priority": 2
       },
       "RegistrySettingsHandler": {
+        "fullscreen_optimizations": {
+          "Rivals2-Win64-Shipping.exe": true,
+          "Rivals2.exe": true,
+          "RivalsofAether2.exe": true
+        },
         "game_priority": {
           "gpu_priority": 8,
           "priority": 6,
@@ -3396,6 +3452,10 @@
         "io_priority": 3
       },
       "RegistrySettingsHandler": {
+        "fullscreen_optimizations": {
+          "Dolphin.exe": true,
+          "Slippi Dolphin.exe": true
+        },
         "game_priority": {
           "gpu_priority": 8,
           "priority": 6,
@@ -3555,6 +3615,10 @@
         "io_priority": 3
       },
       "RegistrySettingsHandler": {
+        "fullscreen_optimizations": {
+          "Dolphin.exe": true,
+          "Slippi Dolphin.exe": true
+        },
         "game_priority": {
           "gpu_priority": 8,
           "priority": 6,
@@ -3876,6 +3940,10 @@
         "io_priority": 3
       },
       "RegistrySettingsHandler": {
+        "fullscreen_optimizations": {
+          "Dolphin.exe": true,
+          "Slippi Dolphin.exe": true
+        },
         "game_priority": {
           "gpu_priority": 8,
           "priority": 6,

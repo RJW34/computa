@@ -97,7 +97,14 @@ function Read-TrayConfig {
 function Save-TrayConfig {
     <#
     .SYNOPSIS
-    Saves the tray config to disk.
+    Saves the tray config to disk atomically.
+
+    .DESCRIPTION
+    Writes the serialized JSON to a temp sibling file, then Move-Item -Force
+    swaps it into place. A crash or abrupt kill mid-write leaves either the
+    prior config (if the rename never happened) or the new one — never a
+    half-written file that the next Read-TrayConfig would flag as corrupt
+    and reset to defaults. Fixes the favorites/hotkey-loss class of bug.
     #>
     param([hashtable]$Config)
 
@@ -105,16 +112,29 @@ function Save-TrayConfig {
         New-Item -Path $script:ConfigDir -ItemType Directory -Force -ErrorAction SilentlyContinue | Out-Null
     }
 
+    $tmpFile = "$($script:ConfigFile).tmp-$([Guid]::NewGuid().ToString('N').Substring(0,8))"
     try {
-        $Config | ConvertTo-Json -Depth 6 | Set-Content $script:ConfigFile -Force -ErrorAction Stop
+        $jsonText = $Config | ConvertTo-Json -Depth 6
+        # Write UTF-8 without BOM — Python consumers read plain UTF-8.
+        [System.IO.File]::WriteAllText(
+            $tmpFile,
+            $jsonText,
+            (New-Object System.Text.UTF8Encoding($false))
+        )
+        Move-Item -LiteralPath $tmpFile -Destination $script:ConfigFile -Force -ErrorAction Stop
     }
     catch {
-        $errMsg = "Failed to save config: $($_.Exception.Message)"
+        $errMsg = "Failed to save config atomically: $($_.Exception.Message)"
         Write-Warning "ABSO: $errMsg"
-        # Write to log if available (function may be called before log is set up)
         if (Get-Command Write-TrayLog -ErrorAction SilentlyContinue) {
             Write-TrayLog $errMsg -Level "ERROR"
         }
+        # Clean up stray temp file so we don't accumulate .tmp-* siblings.
+        try {
+            if (Test-Path -LiteralPath $tmpFile) {
+                Remove-Item -LiteralPath $tmpFile -Force -ErrorAction SilentlyContinue
+            }
+        } catch {}
     }
 }
 

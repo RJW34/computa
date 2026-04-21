@@ -346,52 +346,6 @@ class MultiMonitorDetector:
             ))
 
     def get_mpo_recommendation(self, result: MultiMonitorResult) -> dict[str, Any]:
-        """Get MPO setting recommendation based on display environment.
-
-        Multiplane Overlays cause black flashes and pixel corruption on
-        multi-monitor setups when the DWM compositor rearranges hardware
-        overlay planes during focus transitions between monitors.  This is
-        worst with VRR/G-Sync (driver renegotiates VRR handshake on focus
-        change) and mixed refresh rates (compositor reconfigures per-monitor
-        timing).
-
-        Returns:
-            Dict with ``disable_mpo`` bool and human-readable ``reason``.
-        """
-        env = result.environment
-
-        if not env.is_multi_monitor:
-            return {
-                "disable_mpo": False,
-                "reason": "Single monitor — no cross-monitor MPO glitch risk",
-            }
-
-        vrr_monitors = [m for m in env.monitors if m.is_vrr_capable]
-        if vrr_monitors:
-            return {
-                "disable_mpo": True,
-                "reason": (
-                    "Multi-monitor with VRR-capable display(s) — disabling MPO "
-                    "to prevent black flashes during monitor focus transitions"
-                ),
-            }
-
-        if env.has_mixed_refresh:
-            return {
-                "disable_mpo": True,
-                "reason": (
-                    f"Mixed refresh rates ({env.min_refresh:.0f}Hz–{env.max_refresh:.0f}Hz) — "
-                    f"disabling MPO to prevent compositor glitches during "
-                    f"monitor focus transitions"
-                ),
-            }
-
-        return {
-            "disable_mpo": False,
-            "reason": "Multi-monitor with uniform refresh and no VRR — MPO safe",
-        }
-
-    def get_mpo_recommendation(self, result: MultiMonitorResult) -> dict[str, Any]:
         """Get MPO guidance based on display environment.
 
         ABSO no longer auto-disables MPO based on topology detection alone.

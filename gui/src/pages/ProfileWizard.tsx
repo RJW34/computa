@@ -558,19 +558,19 @@ export function ProfileWizard() {
               {committedWithWarnings
                 ? 'Committed With Warnings'
                 : appliedWithCautions
-                  ? 'Applied With Cautions'
+                  ? 'Apply Completed With Cautions'
                   : appliedWithNotices
-                    ? 'Applied With Notices'
-                    : 'Profile Applied'}
+                    ? 'Apply Completed With Notices'
+                    : 'Apply Completed'}
             </h2>
             <p className="text-muted-foreground">
               {committedWithWarnings
-                ? `${selectedProfile?.display_name} applied successfully, but ABSO recorded warning conditions you should review.`
+                ? `${selectedProfile?.display_name} apply completed, but ABSO recorded warning conditions you should review. Run 'abso verify' to confirm handler state.`
                 : appliedWithCautions
-                  ? `${selectedProfile?.display_name} applied successfully, with environmental cautions worth keeping in mind.`
+                  ? `${selectedProfile?.display_name} apply completed, with environmental cautions worth keeping in mind.`
                   : appliedWithNotices
-                    ? `${selectedProfile?.display_name} applied successfully, with additional notices recorded by ABSO.`
-                    : `${selectedProfile?.display_name} was applied successfully.`}
+                    ? `${selectedProfile?.display_name} apply completed, with additional notices recorded by ABSO.`
+                    : `${selectedProfile?.display_name} apply completed. Run 'abso verify' to confirm handler state.`}
             </p>
 
             <Card className="text-left">

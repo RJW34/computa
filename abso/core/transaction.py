@@ -104,11 +104,28 @@ class ProfileTransactionManager:
         applier: ProfileApplier | None = None,
         compliance_engine: ComplianceEngine | None = None,
         auto_rollback_on_critical: bool = True,
+        auto_rollback_on_partial_apply: bool = True,
     ) -> None:
+        """Initialize the transaction manager.
+
+        Args:
+            backup_dir: Directory where pre-apply snapshots live.
+            applier: Optional ProfileApplier override (tests inject a mock).
+            compliance_engine: Optional ComplianceEngine override.
+            auto_rollback_on_critical: Roll back when compliance detects a
+                critical issue after apply.
+            auto_rollback_on_partial_apply: Roll back when the apply loop
+                actually mutated state (``applied_settings`` is non-empty)
+                but returned ``success=False``. This prevents leaving the
+                system in a half-applied profile state — the class of bug
+                that used to force users to run ``abso restore latest`` by
+                hand after a single handler failure.
+        """
         self.backup_dir = backup_dir
         self.applier = applier or ProfileApplier()
         self.compliance_engine = compliance_engine or ComplianceEngine()
         self.auto_rollback_on_critical = auto_rollback_on_critical
+        self.auto_rollback_on_partial_apply = auto_rollback_on_partial_apply
 
     def execute(self, profile_id: str, create_backup: bool = True) -> TransactionResult:
         """Run full transactional apply flow."""
@@ -304,14 +321,35 @@ class ProfileTransactionManager:
 
         rollback_target_id = rollback_backup_id or tx.backup_id
         rollback_manager = rollback_backup_manager or backup_manager
-        if has_critical and self.auto_rollback_on_critical and rollback_target_id and rollback_manager:
+
+        partial_apply_failure = (
+            tx.apply_result is not None
+            and not tx.apply_result.success
+            and bool(tx.apply_result.applied_settings)
+        )
+
+        should_rollback = bool(
+            rollback_target_id
+            and rollback_manager
+            and (
+                (has_critical and self.auto_rollback_on_critical)
+                or (partial_apply_failure and self.auto_rollback_on_partial_apply)
+            )
+        )
+
+        if should_rollback:
+            rollback_reason = (
+                "Critical compliance failure"
+                if has_critical
+                else f"Partial apply failure ({len(tx.apply_result.applied_settings)} handler(s) mutated state before failure)"
+            )
             tx.state = "rolling_back"
             try:
                 restore_summary = rollback_manager.restore_backup(rollback_target_id)
-                if restore_summary.complete:
+                if restore_summary.complete or not restore_summary.has_blocking_issues:
                     tx.rollback_performed = True
                     tx.state = "rolled_back"
-                    tx.error = "Critical compliance failure; restored backup automatically."
+                    tx.error = f"{rollback_reason}; restored backup automatically."
                     tx.add_checkpoint("rollback", "ok", f"Restored backup {rollback_target_id}")
                 else:
                     tx.rollback_performed = False
@@ -319,12 +357,13 @@ class ProfileTransactionManager:
                         "Rollback incomplete for handlers: "
                         + _summarize_restore_issues(
                             restore_summary.skipped_components
-                            + restore_summary.failed_components
+                            + restore_summary.failed_components,
+                            blocking_only=True,
                         )
                     )
                     tx.state = "failed"
                     tx.error = (
-                        "Critical compliance failure and rollback was incomplete: "
+                        f"{rollback_reason} and rollback was incomplete: "
                         f"{tx.rollback_error}"
                     )
                     tx.add_checkpoint("rollback", "failed", tx.error)
@@ -332,7 +371,7 @@ class ProfileTransactionManager:
                 tx.rollback_error = str(e)
                 tx.state = "failed"
                 tx.error = (
-                    "Critical compliance failure and rollback failed: "
+                    f"{rollback_reason} and rollback failed: "
                     f"{tx.rollback_error}"
                 )
                 tx.add_checkpoint("rollback", "failed", tx.error)

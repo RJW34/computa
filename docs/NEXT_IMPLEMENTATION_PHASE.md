@@ -23,26 +23,26 @@ These facts were re-verified from the current working repo and current local mac
 
 ### Families already using explicit game/emulator config handlers
 
-- Overwatch 2 via [OW2ConfigHandler](/c:/Users/mtoli/Documents/Code/windowsoptimizerabso/abso/profiles/overwatch2.py)
-- Rivals 2 via [Rivals2ConfigHandler](/c:/Users/mtoli/Documents/Code/windowsoptimizerabso/abso/profiles/profile_bases.py)
-- Slippi via [DolphinConfigHandler](/c:/Users/mtoli/Documents/Code/windowsoptimizerabso/abso/profiles/slippi_melee.py)
-- Fortnite via [FortniteConfigHandler](/c:/Users/mtoli/Documents/Code/windowsoptimizerabso/abso/profiles/fortnite.py)
-- Marvel Rivals via [MarvelRivalsConfigHandler](/c:/Users/mtoli/Documents/Code/windowsoptimizerabso/abso/profiles/marvel_rivals.py)
+- Overwatch 2 via [OW2ConfigHandler](../abso/profiles/overwatch2.py)
+- Rivals 2 via [Rivals2ConfigHandler](../abso/profiles/profile_bases.py)
+- Slippi via [DolphinConfigHandler](../abso/profiles/slippi_melee.py)
+- Fortnite via [FortniteConfigHandler](../abso/profiles/fortnite.py)
+- Marvel Rivals via [MarvelRivalsConfigHandler](../abso/profiles/marvel_rivals.py)
 
 ### Shipped families still missing explicit game/emulator config enforcement
 
 - Diablo 4:
-  - current profile stack in [diablo4.py](/c:/Users/mtoli/Documents/Code/windowsoptimizerabso/abso/profiles/diablo4.py)
-  - current local game prefs expose native HDR, refresh, VSync, and Reflex in [LocalPrefs.txt](/c:/Users/mtoli/Documents/Diablo%20IV/LocalPrefs.txt)
+  - current profile stack in [diablo4.py](../abso/profiles/diablo4.py)
+  - current local game prefs expose native HDR, refresh, VSync, and Reflex in `%USERPROFILE%\Documents\Diablo IV\LocalPrefs.txt`
 - Ryujinx SSBU / HewDraw Remix:
-  - current profile stack in [ryujinx_ssbu.py](/c:/Users/mtoli/Documents/Code/windowsoptimizerabso/abso/profiles/ryujinx_ssbu.py)
-  - still inherits the generic emulator base without emulator config enforcement in [profile_bases.py](/c:/Users/mtoli/Documents/Code/windowsoptimizerabso/abso/profiles/profile_bases.py)
+  - current profile stack in [ryujinx_ssbu.py](../abso/profiles/ryujinx_ssbu.py)
+  - still inherits the generic emulator base without emulator config enforcement in [profile_bases.py](../abso/profiles/profile_bases.py)
 
 ### Post-apply proof is still narrower than the product goal
 
-- `verify_profile()` only checks handlers that implement `verify_active` in [applier.py](/c:/Users/mtoli/Documents/Code/windowsoptimizerabso/abso/core/applier.py#L707).
-- Compliance only treats a narrow subset of verify mismatches as critical in [compliance.py](/c:/Users/mtoli/Documents/Code/windowsoptimizerabso/abso/core/compliance.py#L81).
-- NVIDIA is still intentionally non-restorable in [abso/settings/nvidia/__init__.py](/c:/Users/mtoli/Documents/Code/windowsoptimizerabso/abso/settings/nvidia/__init__.py#L89).
+- `verify_profile()` only checks handlers that implement `verify_active` in [applier.py](../abso/core/applier.py#L707).
+- Compliance only treats a narrow subset of verify mismatches as critical in [compliance.py](../abso/core/compliance.py#L81).
+- NVIDIA is still intentionally non-restorable in [abso/settings/nvidia/__init__.py](../abso/settings/nvidia/__init__.py#L89).
 
 ## Phase Goal
 
@@ -109,15 +109,15 @@ Expected grade lift:
 Files:
 
 - `abso/settings/diablo4_config.py`
-- [abso/profiles/diablo4.py](/c:/Users/mtoli/Documents/Code/windowsoptimizerabso/abso/profiles/diablo4.py)
-- [abso/profiles/catalog.py](/c:/Users/mtoli/Documents/Code/windowsoptimizerabso/abso/profiles/catalog.py)
-- [abso/tray/ABSO-Tray.ps1](/c:/Users/mtoli/Documents/Code/windowsoptimizerabso/abso/tray/ABSO-Tray.ps1)
+- [abso/profiles/diablo4.py](../abso/profiles/diablo4.py)
+- [abso/profiles/catalog.py](../abso/profiles/catalog.py)
+- [abso/tray/ABSO-Tray.ps1](../abso/tray/ABSO-Tray.ps1)
 - `tests/test_handlers/test_diablo4_config.py`
-- [tests/test_profiles.py](/c:/Users/mtoli/Documents/Code/windowsoptimizerabso/tests/test_profiles.py)
+- [tests/test_profiles.py](../tests/test_profiles.py)
 
 Local evidence already verified:
 
-- [LocalPrefs.txt](/c:/Users/mtoli/Documents/Diablo%20IV/LocalPrefs.txt) currently exposes:
+- `%USERPROFILE%\Documents\Diablo IV\LocalPrefs.txt` currently exposes:
   - `DisplayModeWindowMode`
   - `DisplayModeRefreshRate`
   - `DisplayModeColorSpace`
@@ -156,9 +156,9 @@ Expected grade lift:
 
 Files:
 
-- [abso/profiles/ryujinx_ssbu.py](/c:/Users/mtoli/Documents/Code/windowsoptimizerabso/abso/profiles/ryujinx_ssbu.py)
+- [abso/profiles/ryujinx_ssbu.py](../abso/profiles/ryujinx_ssbu.py)
 - candidate handler file under `abso/settings/`
-- [abso/profiles/catalog.py](/c:/Users/mtoli/Documents/Code/windowsoptimizerabso/abso/profiles/catalog.py)
+- [abso/profiles/catalog.py](../abso/profiles/catalog.py)
 - tests
 
 Tasks:
@@ -188,17 +188,17 @@ Expected grade lift:
 
 Priority handlers:
 
-- [PowerSettingsHandler](/c:/Users/mtoli/Documents/Code/windowsoptimizerabso/abso/settings/power.py)
-- [NetworkSettingsHandler](/c:/Users/mtoli/Documents/Code/windowsoptimizerabso/abso/settings/network.py)
-- [ProcessPriorityHandler](/c:/Users/mtoli/Documents/Code/windowsoptimizerabso/abso/settings/process_priority.py)
-- [RegistrySettingsHandler](/c:/Users/mtoli/Documents/Code/windowsoptimizerabso/abso/settings/registry.py)
-- [MouseSettingsHandler](/c:/Users/mtoli/Documents/Code/windowsoptimizerabso/abso/settings/mouse.py)
-- [ColorProfileSettingsHandler](/c:/Users/mtoli/Documents/Code/windowsoptimizerabso/abso/settings/color.py)
+- [PowerSettingsHandler](../abso/settings/power.py)
+- [NetworkSettingsHandler](../abso/settings/network.py)
+- [ProcessPriorityHandler](../abso/settings/process_priority.py)
+- [RegistrySettingsHandler](../abso/settings/registry.py)
+- [MouseSettingsHandler](../abso/settings/mouse.py)
+- [ColorProfileSettingsHandler](../abso/settings/color.py)
 
 Tasks:
 
 - add `verify_active` to the handlers that are still apply-only
-- update [compliance.py](/c:/Users/mtoli/Documents/Code/windowsoptimizerabso/abso/core/compliance.py) to classify new criticality correctly
+- update [compliance.py](../abso/core/compliance.py) to classify new criticality correctly
 - make family-specific criticality data-driven, not just handler-name-driven
 
 Acceptance:
@@ -230,15 +230,15 @@ At minimum:
 2. `npm run lint`
 3. `npm run build`
 4. `cargo check`
-5. PowerShell parse for [ABSO-Tray.ps1](/c:/Users/mtoli/Documents/Code/windowsoptimizerabso/abso/tray/ABSO-Tray.ps1) if tray/catalog metadata changed
+5. PowerShell parse for [ABSO-Tray.ps1](../abso/tray/ABSO-Tray.ps1) if tray/catalog metadata changed
 
 For handler slices:
 
 1. focused handler tests
-2. [tests/test_profiles.py](/c:/Users/mtoli/Documents/Code/windowsoptimizerabso/tests/test_profiles.py)
-3. [tests/test_profiles_catalog.py](/c:/Users/mtoli/Documents/Code/windowsoptimizerabso/tests/test_profiles_catalog.py)
-4. [tests/test_tray_profile_catalog_cache.py](/c:/Users/mtoli/Documents/Code/windowsoptimizerabso/tests/test_tray_profile_catalog_cache.py)
-5. [tests/test_snapshot.py](/c:/Users/mtoli/Documents/Code/windowsoptimizerabso/tests/test_snapshot.py)
+2. [tests/test_profiles.py](../tests/test_profiles.py)
+3. [tests/test_profiles_catalog.py](../tests/test_profiles_catalog.py)
+4. [tests/test_tray_profile_catalog_cache.py](../tests/test_tray_profile_catalog_cache.py)
+5. [tests/test_snapshot.py](../tests/test_snapshot.py)
 
 ## Validation Host Rules
 

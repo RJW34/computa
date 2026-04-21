@@ -26,6 +26,7 @@ from abso.profiles.catalog import (
     resolve_profile_id,
 )
 from abso.utils.admin import is_admin
+from abso.utils.atomic_io import atomic_write_json
 
 console = Console()
 
@@ -72,9 +73,7 @@ def set_current_profile(
         "reboot_pending": requires_reboot,
         "reboot_reasons": reboot_reasons or [],
     }
-    tmp = STATE_FILE.with_suffix(".tmp")
-    tmp.write_text(json.dumps(state, indent=2))
-    os.replace(tmp, STATE_FILE)
+    atomic_write_json(STATE_FILE, state, indent=2)
 
 
 def clear_reboot_pending() -> None:
@@ -85,9 +84,7 @@ def clear_reboot_pending() -> None:
         state = json.loads(STATE_FILE.read_text())
         state["reboot_pending"] = False
         state["reboot_reasons"] = []
-        tmp = STATE_FILE.with_suffix(".tmp")
-        tmp.write_text(json.dumps(state, indent=2))
-        os.replace(tmp, STATE_FILE)
+        atomic_write_json(STATE_FILE, state, indent=2)
     except (json.JSONDecodeError, OSError):
         pass
 
@@ -822,7 +819,10 @@ def apply(profile_name: str, no_backup: bool, benchmark: bool, json_output: bool
             elif apply_summary_level == "notice":
                 console.print(f"\n[green]Profile '{profile_name}' applied with notices.[/green]")
             else:
-                console.print(f"\n[green]Profile '{profile_name}' applied successfully![/green]")
+                console.print(
+                    f"\n[green]Profile '{profile_name}' apply completed.[/green] "
+                    f"[dim]Run 'abso verify {profile_name}' to confirm handler state.[/dim]"
+                )
 
             if result.requires_reboot and result.reboot_reasons:
                 console.print("[yellow]Note: The following changes require a reboot to take effect:[/yellow]")
@@ -1075,7 +1075,10 @@ def reapply(json_output: bool) -> None:
             elif summary_level == "notice":
                 console.print(f"\n[green]Profile '{current_profile}' re-applied with notices.[/green]")
             else:
-                console.print(f"\n[green]Profile '{current_profile}' re-applied successfully![/green]")
+                console.print(
+                    f"\n[green]Profile '{current_profile}' re-apply completed.[/green] "
+                    f"[dim]Run 'abso verify {current_profile}' to confirm handler state.[/dim]"
+                )
             warning_prefix = "Caution" if summary_level == "caution" else "Warning"
             for warning in result.warnings:
                 console.print(f"[yellow]{warning_prefix}: {warning}[/yellow]")
@@ -1182,11 +1185,13 @@ def restore(backup_id: str, json_output: bool) -> None:
             output_json({
                 "success": True,
                 "backup_id": backup_id,
-                "message": "Backup restored successfully",
+                "message": "Restore completed for fully restorable handlers",
                 "restore_summary": restore_summary,
             })
             return
-        console.print(f"\n[green]Backup '{backup_id}' restored successfully![/green]")
+        console.print(
+            f"\n[green]Backup '{backup_id}' restore completed for fully restorable handlers.[/green]"
+        )
         console.print("[yellow]Note: Some changes may require a reboot to take effect.[/yellow]")
         console.print("[dim]If restoring to previously-active settings, no reboot is needed.[/dim]")
     except FileNotFoundError:
@@ -2069,7 +2074,7 @@ def debloat(tier: int, dry_run: bool, json_output: bool) -> None:
         if json_output:
             output_json(result)
         elif result.get("success"):
-            console.print(f"[green]Debloat tier {tier} applied successfully.[/green]")
+            console.print(f"[green]Debloat tier {tier} apply completed.[/green]")
             if result.get("applied"):
                 for item in result["applied"]:
                     console.print(f"  [green]✓[/green] {item}")

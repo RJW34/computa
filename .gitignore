@@ -67,4 +67,5 @@ IMPROVEMENT_PLAN.md
 
 # Local runtime state
 .abso_state.json
+.power_switcher_state.json
 state/citadel_status.json
