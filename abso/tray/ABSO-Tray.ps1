@@ -800,32 +800,32 @@ $script:FallbackProfiles = [ordered]@{
 
     # --- Fighting Games: Rivals 2 ---
     "rivals2-offline"   = @{
-        Name     = "Rivals 2: Offline / Training"
-        Sub      = "LLM ON | No Sync | Uncapped"
+        Name     = "Rivals 2 - Offline No Sync"
+        Sub      = "No Sync | LLM ON | Uncapped | Offline Only"
         Cat      = "Fighting"
         Desc     = "Maximum latency reduction for training/local play (NOT for online)"
         Exes     = @("Rivals2-Win64-Shipping.exe", "RivalsofAether2.exe", "Rivals2.exe")
         SyncMode = "off"
     }
     "rivals2-online"    = @{
-        Name     = "Rivals 2: Online / Matchmaking"
-        Sub      = "LLM ON | Uncapped | Rollback-Safe"
+        Name     = "Rivals 2 - Online No Sync"
+        Sub      = "No Sync | LLM ON | Rollback-Safe"
         Cat      = "Fighting"
         Desc     = "Stable rollback-safe settings for online play (prioritizes stability)"
         Exes     = @("Rivals2-Win64-Shipping.exe", "RivalsofAether2.exe", "Rivals2.exe")
         SyncMode = "off"
     }
     "rivals2-gsync" = @{
-        Name     = "Rivals 2: G-SYNC"
-        Sub      = "LLM ON | G-SYNC ON | VSync Safety Net"
+        Name     = "Rivals 2 - Offline GSYNC"
+        Sub      = "G-SYNC ON | LLM ON | VSync Safety Net | Offline Only"
         Cat      = "Fighting"
         Desc     = "Low latency VRR profile (G-SYNC ON, VSync safety net)"
         Exes     = @("Rivals2-Win64-Shipping.exe", "RivalsofAether2.exe", "Rivals2.exe")
         SyncMode = "on"
     }
     "rivals2-online-gsync" = @{
-        Name     = "Rivals 2: Online G-SYNC"
-        Sub      = "G-SYNC ON | Rollback-Safe | VRR"
+        Name     = "Rivals 2 - Online GSYNC"
+        Sub      = "G-SYNC ON | LLM ON | Rollback-Safe"
         Cat      = "Fighting"
         Desc     = "Rollback-safe VRR profile (G-SYNC ON, stability-focused)"
         Exes     = @("Rivals2-Win64-Shipping.exe", "RivalsofAether2.exe", "Rivals2.exe")

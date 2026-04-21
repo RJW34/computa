@@ -36,7 +36,7 @@ class Rivals2GSyncProfile(Rivals2BaseProfile):
 
     @property
     def display_name(self) -> str:
-        return "Rivals 2: G-SYNC"
+        return "Rivals 2 - Offline GSYNC"
 
     @property
     def description(self) -> str:
@@ -184,7 +184,7 @@ class Rivals2OnlineGSyncProfile(Rivals2BaseProfile):
 
     @property
     def display_name(self) -> str:
-        return "Rivals 2: Online G-SYNC"
+        return "Rivals 2 - Online GSYNC"
 
     @property
     def description(self) -> str:

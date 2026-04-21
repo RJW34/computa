@@ -80,25 +80,25 @@ PROFILE_CATALOG: OrderedDict[str, ProfileCatalogEntry] = OrderedDict(
         "rivals2-offline": ProfileCatalogEntry(
             profile_class=Rivals2OfflineProfile,
             tray_category="Fighting",
-            tray_subtitle="LLM ON | No Sync | Uncapped",
+            tray_subtitle="No Sync | LLM ON | Uncapped | Offline Only",
             sync_mode="off",
         ),
         "rivals2-online": ProfileCatalogEntry(
             profile_class=Rivals2OnlineProfile,
             tray_category="Fighting",
-            tray_subtitle="LLM ON | Uncapped | Rollback-Safe",
+            tray_subtitle="No Sync | LLM ON | Rollback-Safe",
             sync_mode="off",
         ),
         "rivals2-gsync": ProfileCatalogEntry(
             profile_class=Rivals2GSyncProfile,
             tray_category="Fighting",
-            tray_subtitle="LLM ON | G-SYNC ON | VSync Safety Net",
+            tray_subtitle="G-SYNC ON | LLM ON | VSync Safety Net | Offline Only",
             sync_mode="on",
         ),
         "rivals2-online-gsync": ProfileCatalogEntry(
             profile_class=Rivals2OnlineGSyncProfile,
             tray_category="Fighting",
-            tray_subtitle="G-SYNC ON | Rollback-Safe | VRR",
+            tray_subtitle="G-SYNC ON | LLM ON | Rollback-Safe",
             sync_mode="on",
         ),
         "diablo4": ProfileCatalogEntry(

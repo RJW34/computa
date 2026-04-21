@@ -291,7 +291,7 @@ If experiencing micro-stuttering:
 
 ---
 
-### 2a. Rivals 2: Offline / Training Profile
+### 2a. Rivals 2 - Offline No Sync Profile
 
 **Profile ID:** `rivals2-offline`
 **Use Case:** Training mode, local versus, CPU matches, replay review
@@ -309,7 +309,7 @@ If experiencing micro-stuttering:
 
 ---
 
-### 2b. Rivals 2: Online / Matchmaking Profile
+### 2b. Rivals 2 - Online No Sync Profile
 
 **Profile ID:** `rivals2-online`
 **Use Case:** Ranked, unranked, any rollback-enabled session

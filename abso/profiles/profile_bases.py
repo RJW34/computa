@@ -183,6 +183,8 @@ class Rivals2BaseProfile(BaseProfile):
         """Legacy/custom NVIDIA profile names worth reusing when already bound."""
         if self.is_online_profile:
             candidates = [
+                "Rivals 2 - Online No Sync",
+                "Rivals 2 - Online GSYNC",
                 "Rivals 2: Online / Matchmaking",
                 "Rivals 2: Online G-SYNC",
                 "Rivals 2 (Streaming)",
@@ -191,6 +193,8 @@ class Rivals2BaseProfile(BaseProfile):
             candidates = [
                 "Rivals2-Win64-Shipping.exe",
                 "Rivals of Aether 2",
+                "Rivals 2 - Offline No Sync",
+                "Rivals 2 - Offline GSYNC",
                 "Rivals 2: Offline / Training",
                 "Rivals 2: G-SYNC",
                 "Rivals 2: 300Hz Maximum",

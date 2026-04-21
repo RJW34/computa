@@ -59,7 +59,7 @@ class Rivals2OnlineProfile(Rivals2BaseProfile):
 
     @property
     def display_name(self) -> str:
-        return "Rivals 2: Online / Matchmaking"
+        return "Rivals 2 - Online No Sync"
 
     @property
     def description(self) -> str:

@@ -44,7 +44,7 @@ class Rivals2OfflineProfile(Rivals2BaseProfile):
 
     @property
     def display_name(self) -> str:
-        return "Rivals 2: Offline / Training"
+        return "Rivals 2 - Offline No Sync"
 
     @property
     def description(self) -> str:

@@ -1,690 +1,690 @@
 {
-    "version": 2,
-    "saved_at": "2026-04-17T17:12:50.295059-04:00",
-    "profiles": [
-        {
-            "id": "slippi-melee",
-            "display_name": "Super Smash Bros. Melee (Slippi)",
-            "description": "Ultra-low latency optimization for competitive Melee",
-            "optimization_target": "minimum_latency",
-            "application_scope": "system_plus_native_config",
-            "executables": [
-                "Slippi Dolphin.exe",
-                "Dolphin.exe"
-            ],
-            "handlers": [
-                "WindowsSettingsHandler",
-                "PowerSettingsHandler",
-                "RegistrySettingsHandler",
-                "NvidiaSettingsHandler",
-                "NetworkSettingsHandler",
-                "MouseSettingsHandler",
-                "GraphicsSettingsHandler",
-                "ProcessPriorityHandler",
-                "CpuAffinityHandler",
-                "ColorProfileSettingsHandler",
-                "DolphinConfigHandler"
-            ],
-            "has_in_game_settings": true,
-            "tray_category": "Fighting",
-            "tray_subtitle": "Competitive | No Sync | Backend-Aware",
-            "tray_description": "Ultra-low latency optimization for competitive Melee",
-            "sync_mode": "off"
-        },
-        {
-            "id": "slippi-melee-console-parity",
-            "display_name": "Super Smash Bros. Melee (Slippi Console-Parity)",
-            "description": "Console-like frame pacing and presentation for offline practice",
-            "optimization_target": "balanced",
-            "application_scope": "system_plus_native_config",
-            "executables": [
-                "Slippi Dolphin.exe",
-                "Dolphin.exe"
-            ],
-            "handlers": [
-                "WindowsSettingsHandler",
-                "PowerSettingsHandler",
-                "RegistrySettingsHandler",
-                "NvidiaSettingsHandler",
-                "NetworkSettingsHandler",
-                "MouseSettingsHandler",
-                "GraphicsSettingsHandler",
-                "ProcessPriorityHandler",
-                "CpuAffinityHandler",
-                "ColorProfileSettingsHandler",
-                "DolphinConfigHandler"
-            ],
-            "has_in_game_settings": true,
-            "tray_category": "Fighting",
-            "tray_subtitle": "Console-Parity | 60Hz + VSync | LLM OFF",
-            "tray_description": "Console-like frame pacing and presentation for offline practice",
-            "sync_mode": "on"
-        },
-        {
-            "id": "slippi-melee-universal",
-            "display_name": "Super Smash Bros. Melee (Slippi Universal)",
-            "description": "Lowest latency, fixed HAGS on (no reboot), no-sync competitive path",
-            "optimization_target": "minimum_latency",
-            "application_scope": "system_plus_native_config",
-            "executables": [
-                "Slippi Dolphin.exe",
-                "Dolphin.exe"
-            ],
-            "handlers": [
-                "WindowsSettingsHandler",
-                "PowerSettingsHandler",
-                "RegistrySettingsHandler",
-                "NvidiaSettingsHandler",
-                "NetworkSettingsHandler",
-                "MouseSettingsHandler",
-                "GraphicsSettingsHandler",
-                "ProcessPriorityHandler",
-                "CpuAffinityHandler",
-                "ColorProfileSettingsHandler",
-                "DolphinConfigHandler"
-            ],
-            "has_in_game_settings": true,
-            "tray_category": "Fighting",
-            "tray_subtitle": "Lowest Latency | HAGS ON | No Sync",
-            "tray_description": "Absolute minimum latency with HAGS kept on so re-applying does not require a reboot. VSync OFF, G-SYNC/VRR OFF.",
-            "sync_mode": "off"
-        },
-        {
-            "id": "rivals2-offline",
-            "display_name": "Rivals 2: Offline / Training",
-            "description": "Maximum latency reduction for training/local play (NOT for online)",
-            "optimization_target": "minimum_latency_offline",
-            "application_scope": "system_plus_native_config",
-            "executables": [
-                "Rivals2-Win64-Shipping.exe",
-                "RivalsofAether2.exe",
-                "Rivals2.exe"
-            ],
-            "handlers": [
-                "WindowsSettingsHandler",
-                "PowerSettingsHandler",
-                "RegistrySettingsHandler",
-                "NvidiaSettingsHandler",
-                "NvidiaNotificationHandler",
-                "NetworkSettingsHandler",
-                "MouseSettingsHandler",
-                "GraphicsSettingsHandler",
-                "ProcessPriorityHandler",
-                "CpuAffinityHandler",
-                "Rivals2ConfigHandler",
-                "ColorProfileSettingsHandler"
-            ],
-            "has_in_game_settings": true,
-            "tray_category": "Fighting",
-            "tray_subtitle": "LLM ON | No Sync | Uncapped",
-            "tray_description": "Maximum latency reduction for training/local play (NOT for online)",
-            "sync_mode": "off"
-        },
-        {
-            "id": "rivals2-online",
-            "display_name": "Rivals 2: Online / Matchmaking",
-            "description": "Stable rollback-safe settings for online play (prioritizes stability)",
-            "optimization_target": "stable_online",
-            "application_scope": "system_plus_native_config",
-            "executables": [
-                "Rivals2-Win64-Shipping.exe",
-                "RivalsofAether2.exe",
-                "Rivals2.exe"
-            ],
-            "handlers": [
-                "WindowsSettingsHandler",
-                "PowerSettingsHandler",
-                "RegistrySettingsHandler",
-                "NvidiaSettingsHandler",
-                "NvidiaNotificationHandler",
-                "NetworkSettingsHandler",
-                "MouseSettingsHandler",
-                "GraphicsSettingsHandler",
-                "ProcessPriorityHandler",
-                "CpuAffinityHandler",
-                "Rivals2ConfigHandler",
-                "ColorProfileSettingsHandler"
-            ],
-            "has_in_game_settings": true,
-            "tray_category": "Fighting",
-            "tray_subtitle": "LLM ON | Uncapped | Rollback-Safe",
-            "tray_description": "Stable rollback-safe settings for online play (prioritizes stability)",
-            "sync_mode": "off"
-        },
-        {
-            "id": "rivals2-gsync",
-            "display_name": "Rivals 2: G-SYNC",
-            "description": "Low latency VRR profile (G-SYNC ON, VSync safety net)",
-            "optimization_target": "low_latency_vrr",
-            "application_scope": "system_plus_native_config",
-            "executables": [
-                "Rivals2-Win64-Shipping.exe",
-                "RivalsofAether2.exe",
-                "Rivals2.exe"
-            ],
-            "handlers": [
-                "WindowsSettingsHandler",
-                "PowerSettingsHandler",
-                "RegistrySettingsHandler",
-                "NvidiaSettingsHandler",
-                "NvidiaNotificationHandler",
-                "NetworkSettingsHandler",
-                "MouseSettingsHandler",
-                "GraphicsSettingsHandler",
-                "ProcessPriorityHandler",
-                "CpuAffinityHandler",
-                "Rivals2ConfigHandler",
-                "ColorProfileSettingsHandler"
-            ],
-            "has_in_game_settings": true,
-            "tray_category": "Fighting",
-            "tray_subtitle": "LLM ON | G-SYNC ON | VSync Safety Net",
-            "tray_description": "Low latency VRR profile (G-SYNC ON, VSync safety net)",
-            "sync_mode": "on"
-        },
-        {
-            "id": "rivals2-online-gsync",
-            "display_name": "Rivals 2: Online G-SYNC",
-            "description": "Rollback-safe VRR profile (G-SYNC ON, stability-focused)",
-            "optimization_target": "stable_online_vrr",
-            "application_scope": "system_plus_native_config",
-            "executables": [
-                "Rivals2-Win64-Shipping.exe",
-                "RivalsofAether2.exe",
-                "Rivals2.exe"
-            ],
-            "handlers": [
-                "WindowsSettingsHandler",
-                "PowerSettingsHandler",
-                "RegistrySettingsHandler",
-                "NvidiaSettingsHandler",
-                "NvidiaNotificationHandler",
-                "NetworkSettingsHandler",
-                "MouseSettingsHandler",
-                "GraphicsSettingsHandler",
-                "ProcessPriorityHandler",
-                "CpuAffinityHandler",
-                "Rivals2ConfigHandler",
-                "ColorProfileSettingsHandler"
-            ],
-            "has_in_game_settings": true,
-            "tray_category": "Fighting",
-            "tray_subtitle": "G-SYNC ON | Rollback-Safe | VRR",
-            "tray_description": "Rollback-safe VRR profile (G-SYNC ON, stability-focused)",
-            "sync_mode": "on"
-        },
-        {
-            "id": "diablo4",
-            "display_name": "Diablo 4 - HDR",
-            "description": "Balanced Diablo 4 HDR profile with native LocalPrefs enforcement for Reflex, HDR, and VRR",
-            "optimization_target": "balanced",
-            "application_scope": "system_plus_native_config",
-            "executables": [
-                "Diablo IV.exe"
-            ],
-            "handlers": [
-                "WindowsSettingsHandler",
-                "PowerSettingsHandler",
-                "RegistrySettingsHandler",
-                "NvidiaSettingsHandler",
-                "NetworkSettingsHandler",
-                "MouseSettingsHandler",
-                "GraphicsSettingsHandler",
-                "ProcessPriorityHandler",
-                "ColorProfileSettingsHandler",
-                "Diablo4ConfigHandler"
-            ],
-            "has_in_game_settings": true,
-            "tray_category": "ARPG",
-            "tray_subtitle": "HDR ON | Reflex ON | LLM OFF",
-            "tray_description": "Balanced Diablo 4 HDR profile with native LocalPrefs enforcement for Reflex, HDR, and VRR",
-            "sync_mode": "on"
-        },
-        {
-            "id": "diablo4-sdr",
-            "display_name": "Diablo 4 - SDR",
-            "description": "Balanced Diablo 4 SDR profile with native LocalPrefs enforcement for Reflex and VRR",
-            "optimization_target": "balanced",
-            "application_scope": "system_plus_native_config",
-            "executables": [
-                "Diablo IV.exe"
-            ],
-            "handlers": [
-                "WindowsSettingsHandler",
-                "PowerSettingsHandler",
-                "RegistrySettingsHandler",
-                "NvidiaSettingsHandler",
-                "NetworkSettingsHandler",
-                "MouseSettingsHandler",
-                "GraphicsSettingsHandler",
-                "ProcessPriorityHandler",
-                "ColorProfileSettingsHandler",
-                "Diablo4ConfigHandler"
-            ],
-            "has_in_game_settings": true,
-            "tray_category": "ARPG",
-            "tray_subtitle": "SDR | Reflex ON | VRR",
-            "tray_description": "Balanced Diablo 4 SDR profile with native LocalPrefs enforcement for Reflex and VRR",
-            "sync_mode": "on"
-        },
-        {
-            "id": "fortnite",
-            "display_name": "Fortnite - SDR",
-            "description": "Competitive SDR Fortnite profile with a no-sync latency path. Keeps driver LLM off for Reflex; enable Reflex On + Boost in-game.",
-            "optimization_target": "low_latency_high_fps",
-            "application_scope": "system_plus_native_config",
-            "executables": [
-                "FortniteClient-Win64-Shipping.exe",
-                "FortniteClient-Win64-Shipping_EAC.exe",
-                "FortniteClient-Win64-Shipping_BE.exe",
-                "FortniteClient-Win64-Shipping_EAC_EOS.exe"
-            ],
-            "handlers": [
-                "WindowsSettingsHandler",
-                "PowerSettingsHandler",
-                "RegistrySettingsHandler",
-                "NvidiaSettingsHandler",
-                "NetworkSettingsHandler",
-                "MouseSettingsHandler",
-                "GraphicsSettingsHandler",
-                "ProcessPriorityHandler",
-                "CpuAffinityHandler",
-                "ColorProfileSettingsHandler",
-                "FortniteConfigHandler"
-            ],
-            "has_in_game_settings": true,
-            "tray_category": "Shooter",
-            "tray_subtitle": "SDR | Reflex (set in-game) | No Sync",
-            "tray_description": "Competitive SDR Fortnite profile with a no-sync latency path. Keeps driver LLM off for Reflex; enable Reflex On + Boost in-game.",
-            "sync_mode": "agnostic"
-        },
-        {
-            "id": "fortnite-hdr",
-            "display_name": "Fortnite - HDR",
-            "description": "Competitive Fortnite HDR profile with a no-sync latency path. Keeps driver LLM off for Reflex; enable Reflex On + Boost in-game.",
-            "optimization_target": "low_latency_high_fps",
-            "application_scope": "system_plus_native_config",
-            "executables": [
-                "FortniteClient-Win64-Shipping.exe",
-                "FortniteClient-Win64-Shipping_EAC.exe",
-                "FortniteClient-Win64-Shipping_BE.exe",
-                "FortniteClient-Win64-Shipping_EAC_EOS.exe"
-            ],
-            "handlers": [
-                "WindowsSettingsHandler",
-                "PowerSettingsHandler",
-                "RegistrySettingsHandler",
-                "NvidiaSettingsHandler",
-                "NetworkSettingsHandler",
-                "MouseSettingsHandler",
-                "GraphicsSettingsHandler",
-                "ProcessPriorityHandler",
-                "CpuAffinityHandler",
-                "ColorProfileSettingsHandler",
-                "FortniteConfigHandler"
-            ],
-            "has_in_game_settings": true,
-            "tray_category": "Shooter",
-            "tray_subtitle": "HDR ON | Reflex (set in-game) | No Sync",
-            "tray_description": "Competitive Fortnite HDR profile with a no-sync latency path. Keeps driver LLM off for Reflex; enable Reflex On + Boost in-game.",
-            "sync_mode": "agnostic"
-        },
-        {
-            "id": "marvel-rivals-sdr",
-            "display_name": "Marvel Rivals - SDR",
-            "description": "Best-performance SDR profile for 1440p high-refresh competitive play",
-            "optimization_target": "low_latency_high_fps",
-            "application_scope": "system_plus_native_config",
-            "executables": [
-                "Marvel.exe",
-                "Marvel-Win64-Shipping.exe"
-            ],
-            "handlers": [
-                "WindowsSettingsHandler",
-                "PowerSettingsHandler",
-                "RegistrySettingsHandler",
-                "NvidiaSettingsHandler",
-                "NetworkSettingsHandler",
-                "MouseSettingsHandler",
-                "GraphicsSettingsHandler",
-                "ProcessPriorityHandler",
-                "CpuAffinityHandler",
-                "ColorProfileSettingsHandler",
-                "MarvelRivalsConfigHandler"
-            ],
-            "has_in_game_settings": true,
-            "tray_category": "Shooter",
-            "tray_subtitle": "SDR | Reflex ON+Boost | G-SYNC ON",
-            "tray_description": "Performance-first SDR Marvel Rivals profile. Uses Reflex + VRR and keeps engine-specific options in the native config handler.",
-            "sync_mode": "on"
-        },
-        {
-            "id": "marvel-rivals-hdr",
-            "display_name": "Marvel Rivals - HDR",
-            "description": "Best-performance HDR profile for OLED / high-refresh competitive play",
-            "optimization_target": "low_latency_high_fps",
-            "application_scope": "system_plus_native_config",
-            "executables": [
-                "Marvel.exe",
-                "Marvel-Win64-Shipping.exe"
-            ],
-            "handlers": [
-                "WindowsSettingsHandler",
-                "PowerSettingsHandler",
-                "RegistrySettingsHandler",
-                "NvidiaSettingsHandler",
-                "NetworkSettingsHandler",
-                "MouseSettingsHandler",
-                "GraphicsSettingsHandler",
-                "ProcessPriorityHandler",
-                "CpuAffinityHandler",
-                "ColorProfileSettingsHandler",
-                "MarvelRivalsConfigHandler"
-            ],
-            "has_in_game_settings": true,
-            "tray_category": "Shooter",
-            "tray_subtitle": "HDR ON | Reflex ON+Boost | G-SYNC ON",
-            "tray_description": "Performance-first HDR Marvel Rivals profile. Uses Reflex + VRR and keeps engine-specific options in the native config handler.",
-            "sync_mode": "on"
-        },
-        {
-            "id": "overwatch2",
-            "display_name": "Overwatch 2 - No Sync SDR",
-            "description": "Minimum latency no-sync SDR profile (Reflex OFF, VSync OFF, VRR OFF)",
-            "optimization_target": "low_latency_high_fps",
-            "application_scope": "system_plus_native_config",
-            "executables": [
-                "Overwatch.exe"
-            ],
-            "handlers": [
-                "WindowsSettingsHandler",
-                "PowerSettingsHandler",
-                "RegistrySettingsHandler",
-                "NvidiaSettingsHandler",
-                "NetworkSettingsHandler",
-                "MouseSettingsHandler",
-                "GraphicsSettingsHandler",
-                "ProcessPriorityHandler",
-                "CpuAffinityHandler",
-                "ColorProfileSettingsHandler",
-                "OW2ConfigHandler"
-            ],
-            "has_in_game_settings": true,
-            "tray_category": "Shooter",
-            "tray_subtitle": "No Sync SDR | Reflex OFF | VSync OFF | G-SYNC OFF",
-            "tray_description": "Minimum latency no-sync SDR profile (Reflex OFF, VSync OFF, VRR OFF)",
-            "sync_mode": "off"
-        },
-        {
-            "id": "overwatch2-hdr",
-            "display_name": "Overwatch 2 - No Sync HDR",
-            "description": "Minimum latency no-sync HDR profile (Reflex OFF, VSync OFF, VRR OFF). Native HDR for OLED / Mini-LED displays.",
-            "optimization_target": "low_latency_high_fps",
-            "application_scope": "system_plus_native_config",
-            "executables": [
-                "Overwatch.exe"
-            ],
-            "handlers": [
-                "WindowsSettingsHandler",
-                "PowerSettingsHandler",
-                "RegistrySettingsHandler",
-                "NvidiaSettingsHandler",
-                "NetworkSettingsHandler",
-                "MouseSettingsHandler",
-                "GraphicsSettingsHandler",
-                "ProcessPriorityHandler",
-                "CpuAffinityHandler",
-                "ColorProfileSettingsHandler",
-                "OW2ConfigHandler"
-            ],
-            "has_in_game_settings": true,
-            "tray_category": "Shooter",
-            "tray_subtitle": "No Sync HDR | Reflex OFF | VSync OFF | G-SYNC OFF",
-            "tray_description": "Minimum-latency no-sync Overwatch 2 with native HDR for OLED / Mini-LED. Same sync/VRR contract as the SDR variant.",
-            "sync_mode": "off"
-        },
-        {
-            "id": "overwatch2-gsync",
-            "display_name": "Overwatch 2 - GSYNC",
-            "description": "Low latency VRR profile (VSync safety net, G-SYNC ON). Keeps driver LLM off for Reflex; enable Reflex On + Boost in-game.",
-            "optimization_target": "low_latency_high_fps",
-            "application_scope": "system_plus_native_config",
-            "executables": [
-                "Overwatch.exe"
-            ],
-            "handlers": [
-                "WindowsSettingsHandler",
-                "PowerSettingsHandler",
-                "RegistrySettingsHandler",
-                "NvidiaSettingsHandler",
-                "NetworkSettingsHandler",
-                "MouseSettingsHandler",
-                "GraphicsSettingsHandler",
-                "ProcessPriorityHandler",
-                "CpuAffinityHandler",
-                "ColorProfileSettingsHandler",
-                "OW2ConfigHandler"
-            ],
-            "has_in_game_settings": true,
-            "tray_category": "Shooter",
-            "tray_subtitle": "Strict Exclusive | Reflex (set in-game) | G-SYNC ON",
-            "tray_description": "Low latency VRR profile (VSync safety net, G-SYNC ON). Keeps driver LLM off for Reflex; enable Reflex On + Boost in-game.",
-            "sync_mode": "on"
-        },
-        {
-            "id": "overwatch2-gsync-hdr",
-            "display_name": "Overwatch 2 - GSYNC HDR",
-            "description": "Tear-free low latency VRR with native HDR (OLED/Mini-LED)",
-            "optimization_target": "low_latency_high_fps",
-            "application_scope": "system_plus_native_config",
-            "executables": [
-                "Overwatch.exe"
-            ],
-            "handlers": [
-                "WindowsSettingsHandler",
-                "PowerSettingsHandler",
-                "RegistrySettingsHandler",
-                "NvidiaSettingsHandler",
-                "NetworkSettingsHandler",
-                "MouseSettingsHandler",
-                "GraphicsSettingsHandler",
-                "ProcessPriorityHandler",
-                "CpuAffinityHandler",
-                "ColorProfileSettingsHandler",
-                "OW2ConfigHandler"
-            ],
-            "has_in_game_settings": true,
-            "tray_category": "Shooter",
-            "tray_subtitle": "Strict HDR Exclusive | Reflex (set in-game) | G-SYNC ON",
-            "tray_description": "Tear-free low latency VRR with native HDR (OLED/Mini-LED)",
-            "sync_mode": "on"
-        },
-        {
-            "id": "overwatch2-gsync-capture",
-            "display_name": "Overwatch 2 - GSYNC Capture-Safe",
-            "description": "Borderless/windowed VRR path for clipping, overlays, and capture apps",
-            "optimization_target": "low_latency_high_fps",
-            "application_scope": "system_plus_native_config",
-            "executables": [
-                "Overwatch.exe"
-            ],
-            "handlers": [
-                "WindowsSettingsHandler",
-                "PowerSettingsHandler",
-                "RegistrySettingsHandler",
-                "NvidiaSettingsHandler",
-                "NetworkSettingsHandler",
-                "MouseSettingsHandler",
-                "GraphicsSettingsHandler",
-                "ProcessPriorityHandler",
-                "CpuAffinityHandler",
-                "ColorProfileSettingsHandler",
-                "OW2ConfigHandler"
-            ],
-            "has_in_game_settings": true,
-            "tray_category": "Shooter",
-            "tray_subtitle": "Capture-Safe | Borderless VRR | Medal/Discord Friendly",
-            "tray_description": "Borderless/windowed G-SYNC profile for the active gaming display. Keeps Medal, Discord, and similar capture overlays compatible.",
-            "sync_mode": "on"
-        },
-        {
-            "id": "overwatch2-gsync-hdr-capture",
-            "display_name": "Overwatch 2 - GSYNC HDR Capture-Safe",
-            "description": "Borderless/windowed HDR VRR path for clipping, overlays, and capture apps",
-            "optimization_target": "low_latency_high_fps",
-            "application_scope": "system_plus_native_config",
-            "executables": [
-                "Overwatch.exe"
-            ],
-            "handlers": [
-                "WindowsSettingsHandler",
-                "PowerSettingsHandler",
-                "RegistrySettingsHandler",
-                "NvidiaSettingsHandler",
-                "NetworkSettingsHandler",
-                "MouseSettingsHandler",
-                "GraphicsSettingsHandler",
-                "ProcessPriorityHandler",
-                "CpuAffinityHandler",
-                "ColorProfileSettingsHandler",
-                "OW2ConfigHandler"
-            ],
-            "has_in_game_settings": true,
-            "tray_category": "Shooter",
-            "tray_subtitle": "HDR Capture-Safe | Borderless VRR | Overlay Friendly",
-            "tray_description": "HDR borderless/windowed G-SYNC profile for the active gaming display. Best fit when you want HDR plus Medal/Discord-style capture workflows.",
-            "sync_mode": "on"
-        },
-        {
-            "id": "pokemon-auto-chess",
-            "display_name": "Pokemon Auto Chess",
-            "description": "WebGL browser game optimization for stable performance",
-            "optimization_target": "balanced",
-            "application_scope": "system_only",
-            "executables": [
-                "chrome.exe",
-                "msedge.exe",
-                "firefox.exe",
-                "brave.exe"
-            ],
-            "handlers": [
-                "WindowsSettingsHandler",
-                "PowerSettingsHandler",
-                "RegistrySettingsHandler",
-                "NvidiaSettingsHandler",
-                "NetworkSettingsHandler",
-                "GraphicsSettingsHandler",
-                "ProcessPriorityHandler",
-                "ColorProfileSettingsHandler"
-            ],
-            "has_in_game_settings": true,
-            "tray_category": "Other",
-            "tray_subtitle": "LLM ON | Browser WebGL",
-            "tray_description": "WebGL browser game optimization for stable performance",
-            "sync_mode": "agnostic"
-        },
-        {
-            "id": "pacdeluxe",
-            "display_name": "PACDeluxe (Pokemon Auto Chess)",
-            "description": "Native Tauri client optimization for smooth WebGL auto-battler gameplay",
-            "optimization_target": "smooth_framerate",
-            "application_scope": "system_only",
-            "executables": [
-                "pac-deluxe.exe",
-                "msedgewebview2.exe"
-            ],
-            "handlers": [
-                "WindowsSettingsHandler",
-                "PowerSettingsHandler",
-                "RegistrySettingsHandler",
-                "NvidiaSettingsHandler",
-                "NetworkSettingsHandler",
-                "GraphicsSettingsHandler",
-                "ProcessPriorityHandler",
-                "ColorProfileSettingsHandler"
-            ],
-            "has_in_game_settings": true,
-            "tray_category": "Other",
-            "tray_subtitle": "LLM ON | Tauri + WebView2 | Adaptive VSync",
-            "tray_description": "Native Tauri client optimization for smooth WebGL auto-battler gameplay",
-            "sync_mode": "agnostic"
-        },
-        {
-            "id": "productivity",
-            "display_name": "Desktop / Productivity",
-            "description": "Multi-monitor browsing and coding with HDR enabled",
-            "optimization_target": "productivity",
-            "application_scope": "system_only",
-            "executables": [
-                "Code.exe",
-                "devenv.exe",
-                "chrome.exe",
-                "firefox.exe",
-                "msedge.exe",
-                "WindowsTerminal.exe",
-                "idea64.exe"
-            ],
-            "handlers": [
-                "WindowsSettingsHandler",
-                "RegistrySettingsHandler",
-                "NvidiaSettingsHandler",
-                "GraphicsSettingsHandler",
-                "ColorProfileSettingsHandler"
-            ],
-            "has_in_game_settings": true,
-            "tray_category": "Productivity",
-            "tray_subtitle": "HDR ON | Adaptive VSync | VRR (if enabled)",
-            "tray_description": "Multi-monitor browsing and coding with HDR enabled",
-            "sync_mode": "agnostic"
-        },
-        {
-            "id": "ryujinx-ssbu",
-            "display_name": "SSBU / HewDraw Remix (Ryujinx)",
-            "description": "Ultra-low latency system path for competitive SSBU/HDR with manual emulator tuning",
-            "optimization_target": "minimum_latency",
-            "application_scope": "system_only",
-            "executables": [
-                "Ryujinx.exe",
-                "Ryujinx.Ava.exe",
-                "Ryujinx.Headless.SDL2.exe",
-                "Ryubing.exe"
-            ],
-            "handlers": [
-                "WindowsSettingsHandler",
-                "PowerSettingsHandler",
-                "RegistrySettingsHandler",
-                "NvidiaSettingsHandler",
-                "NetworkSettingsHandler",
-                "MouseSettingsHandler",
-                "GraphicsSettingsHandler",
-                "ProcessPriorityHandler",
-                "CpuAffinityHandler",
-                "ColorProfileSettingsHandler"
-            ],
-            "has_in_game_settings": true,
-            "tray_category": "Fighting",
-            "tray_subtitle": "Vulkan | Fixed 60fps | HAGS ON | LLM OFF",
-            "tray_description": "Low-latency Ryujinx system path for SSBU/HewDraw Remix. ABSO handles the OS/driver side, but emulator settings still need to be configured manually.",
-            "sync_mode": "off"
-        }
-    ],
-    "aliases": {
-        "rivals2": "rivals2-offline",
-        "rivals2-300hz-max": "rivals2-offline",
-        "rivals2-tournament-sim-144hz": "rivals2-offline",
-        "rivals2-offline-hdr": "rivals2-offline",
-        "rivals2-online-hdr": "rivals2-online",
-        "rivals2-gsync-hdr": "rivals2-gsync",
-        "rivals2-online-gsync-hdr": "rivals2-online-gsync",
-        "fortnite-streaming": "fortnite",
-        "fortnite-streaming-hdr": "fortnite-hdr",
-        "overwatch2-gsync-streaming": "overwatch2-gsync",
-        "overwatch2-gsync-hdr-streaming": "overwatch2-gsync-hdr",
-        "pacdeluxe-streaming": "pacdeluxe",
-        "ryujinx-ssbu-streaming": "ryujinx-ssbu",
-        "rivals2-streaming": "rivals2-online",
-        "rivals2-streaming-hdr": "rivals2-online",
-        "slippi-melee-streaming": "slippi-melee",
-        "slippi-melee-vrr-lab": "slippi-melee"
-    }
+    "version":  2,
+    "saved_at":  "2026-04-21T14:53:49.7611023-04:00",
+    "profiles":  [
+                     {
+                         "id":  "slippi-melee",
+                         "display_name":  "Super Smash Bros. Melee (Slippi)",
+                         "description":  "Ultra-low latency optimization for competitive Melee",
+                         "optimization_target":  "minimum_latency",
+                         "application_scope":  "system_plus_native_config",
+                         "executables":  [
+                                             "Slippi Dolphin.exe",
+                                             "Dolphin.exe"
+                                         ],
+                         "handlers":  [
+                                          "WindowsSettingsHandler",
+                                          "PowerSettingsHandler",
+                                          "RegistrySettingsHandler",
+                                          "NvidiaSettingsHandler",
+                                          "NetworkSettingsHandler",
+                                          "MouseSettingsHandler",
+                                          "GraphicsSettingsHandler",
+                                          "ProcessPriorityHandler",
+                                          "CpuAffinityHandler",
+                                          "ColorProfileSettingsHandler",
+                                          "DolphinConfigHandler"
+                                      ],
+                         "has_in_game_settings":  true,
+                         "tray_category":  "Fighting",
+                         "tray_subtitle":  "Competitive | No Sync | Backend-Aware",
+                         "tray_description":  "Ultra-low latency optimization for competitive Melee",
+                         "sync_mode":  "off"
+                     },
+                     {
+                         "id":  "slippi-melee-console-parity",
+                         "display_name":  "Super Smash Bros. Melee (Slippi Console-Parity)",
+                         "description":  "Console-like frame pacing and presentation for offline practice",
+                         "optimization_target":  "balanced",
+                         "application_scope":  "system_plus_native_config",
+                         "executables":  [
+                                             "Slippi Dolphin.exe",
+                                             "Dolphin.exe"
+                                         ],
+                         "handlers":  [
+                                          "WindowsSettingsHandler",
+                                          "PowerSettingsHandler",
+                                          "RegistrySettingsHandler",
+                                          "NvidiaSettingsHandler",
+                                          "NetworkSettingsHandler",
+                                          "MouseSettingsHandler",
+                                          "GraphicsSettingsHandler",
+                                          "ProcessPriorityHandler",
+                                          "CpuAffinityHandler",
+                                          "ColorProfileSettingsHandler",
+                                          "DolphinConfigHandler"
+                                      ],
+                         "has_in_game_settings":  true,
+                         "tray_category":  "Fighting",
+                         "tray_subtitle":  "Console-Parity | 60Hz + VSync | LLM OFF",
+                         "tray_description":  "Console-like frame pacing and presentation for offline practice",
+                         "sync_mode":  "on"
+                     },
+                     {
+                         "id":  "slippi-melee-universal",
+                         "display_name":  "Super Smash Bros. Melee (Slippi Universal)",
+                         "description":  "Lowest latency, fixed HAGS on (no reboot), no-sync competitive path",
+                         "optimization_target":  "minimum_latency",
+                         "application_scope":  "system_plus_native_config",
+                         "executables":  [
+                                             "Slippi Dolphin.exe",
+                                             "Dolphin.exe"
+                                         ],
+                         "handlers":  [
+                                          "WindowsSettingsHandler",
+                                          "PowerSettingsHandler",
+                                          "RegistrySettingsHandler",
+                                          "NvidiaSettingsHandler",
+                                          "NetworkSettingsHandler",
+                                          "MouseSettingsHandler",
+                                          "GraphicsSettingsHandler",
+                                          "ProcessPriorityHandler",
+                                          "CpuAffinityHandler",
+                                          "ColorProfileSettingsHandler",
+                                          "DolphinConfigHandler"
+                                      ],
+                         "has_in_game_settings":  true,
+                         "tray_category":  "Fighting",
+                         "tray_subtitle":  "Lowest Latency | HAGS ON | No Sync",
+                         "tray_description":  "Absolute minimum latency with HAGS kept on so re-applying does not require a reboot. VSync OFF, G-SYNC/VRR OFF.",
+                         "sync_mode":  "off"
+                     },
+                     {
+                         "id":  "rivals2-offline",
+                         "display_name":  "Rivals 2 - Offline No Sync",
+                         "description":  "Maximum latency reduction for training/local play (NOT for online)",
+                         "optimization_target":  "minimum_latency_offline",
+                         "application_scope":  "system_plus_native_config",
+                         "executables":  [
+                                             "Rivals2-Win64-Shipping.exe",
+                                             "RivalsofAether2.exe",
+                                             "Rivals2.exe"
+                                         ],
+                         "handlers":  [
+                                          "WindowsSettingsHandler",
+                                          "PowerSettingsHandler",
+                                          "RegistrySettingsHandler",
+                                          "NvidiaSettingsHandler",
+                                          "NvidiaNotificationHandler",
+                                          "NetworkSettingsHandler",
+                                          "MouseSettingsHandler",
+                                          "GraphicsSettingsHandler",
+                                          "ProcessPriorityHandler",
+                                          "CpuAffinityHandler",
+                                          "Rivals2ConfigHandler",
+                                          "ColorProfileSettingsHandler"
+                                      ],
+                         "has_in_game_settings":  true,
+                         "tray_category":  "Fighting",
+                         "tray_subtitle":  "No Sync | LLM ON | Uncapped | Offline Only",
+                         "tray_description":  "Maximum latency reduction for training/local play (NOT for online)",
+                         "sync_mode":  "off"
+                     },
+                     {
+                         "id":  "rivals2-online",
+                         "display_name":  "Rivals 2 - Online No Sync",
+                         "description":  "Stable rollback-safe settings for online play (prioritizes stability)",
+                         "optimization_target":  "stable_online",
+                         "application_scope":  "system_plus_native_config",
+                         "executables":  [
+                                             "Rivals2-Win64-Shipping.exe",
+                                             "RivalsofAether2.exe",
+                                             "Rivals2.exe"
+                                         ],
+                         "handlers":  [
+                                          "WindowsSettingsHandler",
+                                          "PowerSettingsHandler",
+                                          "RegistrySettingsHandler",
+                                          "NvidiaSettingsHandler",
+                                          "NvidiaNotificationHandler",
+                                          "NetworkSettingsHandler",
+                                          "MouseSettingsHandler",
+                                          "GraphicsSettingsHandler",
+                                          "ProcessPriorityHandler",
+                                          "CpuAffinityHandler",
+                                          "Rivals2ConfigHandler",
+                                          "ColorProfileSettingsHandler"
+                                      ],
+                         "has_in_game_settings":  true,
+                         "tray_category":  "Fighting",
+                         "tray_subtitle":  "No Sync | LLM ON | Rollback-Safe",
+                         "tray_description":  "Stable rollback-safe settings for online play (prioritizes stability)",
+                         "sync_mode":  "off"
+                     },
+                     {
+                         "id":  "rivals2-gsync",
+                         "display_name":  "Rivals 2 - Offline GSYNC",
+                         "description":  "Low latency VRR profile (G-SYNC ON, VSync safety net)",
+                         "optimization_target":  "low_latency_vrr",
+                         "application_scope":  "system_plus_native_config",
+                         "executables":  [
+                                             "Rivals2-Win64-Shipping.exe",
+                                             "RivalsofAether2.exe",
+                                             "Rivals2.exe"
+                                         ],
+                         "handlers":  [
+                                          "WindowsSettingsHandler",
+                                          "PowerSettingsHandler",
+                                          "RegistrySettingsHandler",
+                                          "NvidiaSettingsHandler",
+                                          "NvidiaNotificationHandler",
+                                          "NetworkSettingsHandler",
+                                          "MouseSettingsHandler",
+                                          "GraphicsSettingsHandler",
+                                          "ProcessPriorityHandler",
+                                          "CpuAffinityHandler",
+                                          "Rivals2ConfigHandler",
+                                          "ColorProfileSettingsHandler"
+                                      ],
+                         "has_in_game_settings":  true,
+                         "tray_category":  "Fighting",
+                         "tray_subtitle":  "G-SYNC ON | LLM ON | VSync Safety Net | Offline Only",
+                         "tray_description":  "Low latency VRR profile (G-SYNC ON, VSync safety net)",
+                         "sync_mode":  "on"
+                     },
+                     {
+                         "id":  "rivals2-online-gsync",
+                         "display_name":  "Rivals 2 - Online GSYNC",
+                         "description":  "Rollback-safe VRR profile (G-SYNC ON, stability-focused)",
+                         "optimization_target":  "stable_online_vrr",
+                         "application_scope":  "system_plus_native_config",
+                         "executables":  [
+                                             "Rivals2-Win64-Shipping.exe",
+                                             "RivalsofAether2.exe",
+                                             "Rivals2.exe"
+                                         ],
+                         "handlers":  [
+                                          "WindowsSettingsHandler",
+                                          "PowerSettingsHandler",
+                                          "RegistrySettingsHandler",
+                                          "NvidiaSettingsHandler",
+                                          "NvidiaNotificationHandler",
+                                          "NetworkSettingsHandler",
+                                          "MouseSettingsHandler",
+                                          "GraphicsSettingsHandler",
+                                          "ProcessPriorityHandler",
+                                          "CpuAffinityHandler",
+                                          "Rivals2ConfigHandler",
+                                          "ColorProfileSettingsHandler"
+                                      ],
+                         "has_in_game_settings":  true,
+                         "tray_category":  "Fighting",
+                         "tray_subtitle":  "G-SYNC ON | LLM ON | Rollback-Safe",
+                         "tray_description":  "Rollback-safe VRR profile (G-SYNC ON, stability-focused)",
+                         "sync_mode":  "on"
+                     },
+                     {
+                         "id":  "diablo4",
+                         "display_name":  "Diablo 4 - HDR",
+                         "description":  "Balanced Diablo 4 HDR profile with native LocalPrefs enforcement for Reflex, HDR, and VRR",
+                         "optimization_target":  "balanced",
+                         "application_scope":  "system_plus_native_config",
+                         "executables":  [
+                                             "Diablo IV.exe"
+                                         ],
+                         "handlers":  [
+                                          "WindowsSettingsHandler",
+                                          "PowerSettingsHandler",
+                                          "RegistrySettingsHandler",
+                                          "NvidiaSettingsHandler",
+                                          "NetworkSettingsHandler",
+                                          "MouseSettingsHandler",
+                                          "GraphicsSettingsHandler",
+                                          "ProcessPriorityHandler",
+                                          "ColorProfileSettingsHandler",
+                                          "Diablo4ConfigHandler"
+                                      ],
+                         "has_in_game_settings":  true,
+                         "tray_category":  "ARPG",
+                         "tray_subtitle":  "HDR ON | Reflex ON | LLM OFF",
+                         "tray_description":  "Balanced Diablo 4 HDR profile with native LocalPrefs enforcement for Reflex, HDR, and VRR",
+                         "sync_mode":  "on"
+                     },
+                     {
+                         "id":  "diablo4-sdr",
+                         "display_name":  "Diablo 4 - SDR",
+                         "description":  "Balanced Diablo 4 SDR profile with native LocalPrefs enforcement for Reflex and VRR",
+                         "optimization_target":  "balanced",
+                         "application_scope":  "system_plus_native_config",
+                         "executables":  [
+                                             "Diablo IV.exe"
+                                         ],
+                         "handlers":  [
+                                          "WindowsSettingsHandler",
+                                          "PowerSettingsHandler",
+                                          "RegistrySettingsHandler",
+                                          "NvidiaSettingsHandler",
+                                          "NetworkSettingsHandler",
+                                          "MouseSettingsHandler",
+                                          "GraphicsSettingsHandler",
+                                          "ProcessPriorityHandler",
+                                          "ColorProfileSettingsHandler",
+                                          "Diablo4ConfigHandler"
+                                      ],
+                         "has_in_game_settings":  true,
+                         "tray_category":  "ARPG",
+                         "tray_subtitle":  "SDR | Reflex ON | VRR",
+                         "tray_description":  "Balanced Diablo 4 SDR profile with native LocalPrefs enforcement for Reflex and VRR",
+                         "sync_mode":  "on"
+                     },
+                     {
+                         "id":  "fortnite",
+                         "display_name":  "Fortnite - SDR",
+                         "description":  "Competitive SDR Fortnite profile with a no-sync latency path. Keeps driver LLM off for Reflex; enable Reflex On + Boost in-game.",
+                         "optimization_target":  "low_latency_high_fps",
+                         "application_scope":  "system_plus_native_config",
+                         "executables":  [
+                                             "FortniteClient-Win64-Shipping.exe",
+                                             "FortniteClient-Win64-Shipping_EAC.exe",
+                                             "FortniteClient-Win64-Shipping_BE.exe",
+                                             "FortniteClient-Win64-Shipping_EAC_EOS.exe"
+                                         ],
+                         "handlers":  [
+                                          "WindowsSettingsHandler",
+                                          "PowerSettingsHandler",
+                                          "RegistrySettingsHandler",
+                                          "NvidiaSettingsHandler",
+                                          "NetworkSettingsHandler",
+                                          "MouseSettingsHandler",
+                                          "GraphicsSettingsHandler",
+                                          "ProcessPriorityHandler",
+                                          "CpuAffinityHandler",
+                                          "ColorProfileSettingsHandler",
+                                          "FortniteConfigHandler"
+                                      ],
+                         "has_in_game_settings":  true,
+                         "tray_category":  "Shooter",
+                         "tray_subtitle":  "SDR | Reflex (set in-game) | No Sync",
+                         "tray_description":  "Competitive SDR Fortnite profile with a no-sync latency path. Keeps driver LLM off for Reflex; enable Reflex On + Boost in-game.",
+                         "sync_mode":  "agnostic"
+                     },
+                     {
+                         "id":  "fortnite-hdr",
+                         "display_name":  "Fortnite - HDR",
+                         "description":  "Competitive Fortnite HDR profile with a no-sync latency path. Keeps driver LLM off for Reflex; enable Reflex On + Boost in-game.",
+                         "optimization_target":  "low_latency_high_fps",
+                         "application_scope":  "system_plus_native_config",
+                         "executables":  [
+                                             "FortniteClient-Win64-Shipping.exe",
+                                             "FortniteClient-Win64-Shipping_EAC.exe",
+                                             "FortniteClient-Win64-Shipping_BE.exe",
+                                             "FortniteClient-Win64-Shipping_EAC_EOS.exe"
+                                         ],
+                         "handlers":  [
+                                          "WindowsSettingsHandler",
+                                          "PowerSettingsHandler",
+                                          "RegistrySettingsHandler",
+                                          "NvidiaSettingsHandler",
+                                          "NetworkSettingsHandler",
+                                          "MouseSettingsHandler",
+                                          "GraphicsSettingsHandler",
+                                          "ProcessPriorityHandler",
+                                          "CpuAffinityHandler",
+                                          "ColorProfileSettingsHandler",
+                                          "FortniteConfigHandler"
+                                      ],
+                         "has_in_game_settings":  true,
+                         "tray_category":  "Shooter",
+                         "tray_subtitle":  "HDR ON | Reflex (set in-game) | No Sync",
+                         "tray_description":  "Competitive Fortnite HDR profile with a no-sync latency path. Keeps driver LLM off for Reflex; enable Reflex On + Boost in-game.",
+                         "sync_mode":  "agnostic"
+                     },
+                     {
+                         "id":  "marvel-rivals-sdr",
+                         "display_name":  "Marvel Rivals - SDR",
+                         "description":  "Best-performance SDR profile for 1440p high-refresh competitive play",
+                         "optimization_target":  "low_latency_high_fps",
+                         "application_scope":  "system_plus_native_config",
+                         "executables":  [
+                                             "Marvel.exe",
+                                             "Marvel-Win64-Shipping.exe"
+                                         ],
+                         "handlers":  [
+                                          "WindowsSettingsHandler",
+                                          "PowerSettingsHandler",
+                                          "RegistrySettingsHandler",
+                                          "NvidiaSettingsHandler",
+                                          "NetworkSettingsHandler",
+                                          "MouseSettingsHandler",
+                                          "GraphicsSettingsHandler",
+                                          "ProcessPriorityHandler",
+                                          "CpuAffinityHandler",
+                                          "ColorProfileSettingsHandler",
+                                          "MarvelRivalsConfigHandler"
+                                      ],
+                         "has_in_game_settings":  true,
+                         "tray_category":  "Shooter",
+                         "tray_subtitle":  "SDR | Reflex ON+Boost | G-SYNC ON",
+                         "tray_description":  "Performance-first SDR Marvel Rivals profile. Uses Reflex + VRR and keeps engine-specific options in the native config handler.",
+                         "sync_mode":  "on"
+                     },
+                     {
+                         "id":  "marvel-rivals-hdr",
+                         "display_name":  "Marvel Rivals - HDR",
+                         "description":  "Best-performance HDR profile for OLED / high-refresh competitive play",
+                         "optimization_target":  "low_latency_high_fps",
+                         "application_scope":  "system_plus_native_config",
+                         "executables":  [
+                                             "Marvel.exe",
+                                             "Marvel-Win64-Shipping.exe"
+                                         ],
+                         "handlers":  [
+                                          "WindowsSettingsHandler",
+                                          "PowerSettingsHandler",
+                                          "RegistrySettingsHandler",
+                                          "NvidiaSettingsHandler",
+                                          "NetworkSettingsHandler",
+                                          "MouseSettingsHandler",
+                                          "GraphicsSettingsHandler",
+                                          "ProcessPriorityHandler",
+                                          "CpuAffinityHandler",
+                                          "ColorProfileSettingsHandler",
+                                          "MarvelRivalsConfigHandler"
+                                      ],
+                         "has_in_game_settings":  true,
+                         "tray_category":  "Shooter",
+                         "tray_subtitle":  "HDR ON | Reflex ON+Boost | G-SYNC ON",
+                         "tray_description":  "Performance-first HDR Marvel Rivals profile. Uses Reflex + VRR and keeps engine-specific options in the native config handler.",
+                         "sync_mode":  "on"
+                     },
+                     {
+                         "id":  "overwatch2",
+                         "display_name":  "Overwatch 2 - No Sync SDR",
+                         "description":  "Minimum latency no-sync SDR profile (Reflex OFF, VSync OFF, VRR OFF)",
+                         "optimization_target":  "low_latency_high_fps",
+                         "application_scope":  "system_plus_native_config",
+                         "executables":  [
+                                             "Overwatch.exe"
+                                         ],
+                         "handlers":  [
+                                          "WindowsSettingsHandler",
+                                          "PowerSettingsHandler",
+                                          "RegistrySettingsHandler",
+                                          "NvidiaSettingsHandler",
+                                          "NetworkSettingsHandler",
+                                          "MouseSettingsHandler",
+                                          "GraphicsSettingsHandler",
+                                          "ProcessPriorityHandler",
+                                          "CpuAffinityHandler",
+                                          "ColorProfileSettingsHandler",
+                                          "OW2ConfigHandler"
+                                      ],
+                         "has_in_game_settings":  true,
+                         "tray_category":  "Shooter",
+                         "tray_subtitle":  "No Sync SDR | Reflex OFF | VSync OFF | G-SYNC OFF",
+                         "tray_description":  "Minimum latency no-sync SDR profile (Reflex OFF, VSync OFF, VRR OFF)",
+                         "sync_mode":  "off"
+                     },
+                     {
+                         "id":  "overwatch2-hdr",
+                         "display_name":  "Overwatch 2 - No Sync HDR",
+                         "description":  "Minimum latency no-sync HDR profile (Reflex OFF, VSync OFF, VRR OFF). Native HDR for OLED / Mini-LED displays.",
+                         "optimization_target":  "low_latency_high_fps",
+                         "application_scope":  "system_plus_native_config",
+                         "executables":  [
+                                             "Overwatch.exe"
+                                         ],
+                         "handlers":  [
+                                          "WindowsSettingsHandler",
+                                          "PowerSettingsHandler",
+                                          "RegistrySettingsHandler",
+                                          "NvidiaSettingsHandler",
+                                          "NetworkSettingsHandler",
+                                          "MouseSettingsHandler",
+                                          "GraphicsSettingsHandler",
+                                          "ProcessPriorityHandler",
+                                          "CpuAffinityHandler",
+                                          "ColorProfileSettingsHandler",
+                                          "OW2ConfigHandler"
+                                      ],
+                         "has_in_game_settings":  true,
+                         "tray_category":  "Shooter",
+                         "tray_subtitle":  "No Sync HDR | Reflex OFF | VSync OFF | G-SYNC OFF",
+                         "tray_description":  "Minimum-latency no-sync Overwatch 2 with native HDR for OLED / Mini-LED. Same sync/VRR contract as the SDR variant.",
+                         "sync_mode":  "off"
+                     },
+                     {
+                         "id":  "overwatch2-gsync",
+                         "display_name":  "Overwatch 2 - GSYNC",
+                         "description":  "Low latency VRR profile (VSync safety net, G-SYNC ON). Keeps driver LLM off for Reflex; enable Reflex On + Boost in-game.",
+                         "optimization_target":  "low_latency_high_fps",
+                         "application_scope":  "system_plus_native_config",
+                         "executables":  [
+                                             "Overwatch.exe"
+                                         ],
+                         "handlers":  [
+                                          "WindowsSettingsHandler",
+                                          "PowerSettingsHandler",
+                                          "RegistrySettingsHandler",
+                                          "NvidiaSettingsHandler",
+                                          "NetworkSettingsHandler",
+                                          "MouseSettingsHandler",
+                                          "GraphicsSettingsHandler",
+                                          "ProcessPriorityHandler",
+                                          "CpuAffinityHandler",
+                                          "ColorProfileSettingsHandler",
+                                          "OW2ConfigHandler"
+                                      ],
+                         "has_in_game_settings":  true,
+                         "tray_category":  "Shooter",
+                         "tray_subtitle":  "Strict Exclusive | Reflex (set in-game) | G-SYNC ON",
+                         "tray_description":  "Low latency VRR profile (VSync safety net, G-SYNC ON). Keeps driver LLM off for Reflex; enable Reflex On + Boost in-game.",
+                         "sync_mode":  "on"
+                     },
+                     {
+                         "id":  "overwatch2-gsync-hdr",
+                         "display_name":  "Overwatch 2 - GSYNC HDR",
+                         "description":  "Tear-free low latency VRR with native HDR (OLED/Mini-LED)",
+                         "optimization_target":  "low_latency_high_fps",
+                         "application_scope":  "system_plus_native_config",
+                         "executables":  [
+                                             "Overwatch.exe"
+                                         ],
+                         "handlers":  [
+                                          "WindowsSettingsHandler",
+                                          "PowerSettingsHandler",
+                                          "RegistrySettingsHandler",
+                                          "NvidiaSettingsHandler",
+                                          "NetworkSettingsHandler",
+                                          "MouseSettingsHandler",
+                                          "GraphicsSettingsHandler",
+                                          "ProcessPriorityHandler",
+                                          "CpuAffinityHandler",
+                                          "ColorProfileSettingsHandler",
+                                          "OW2ConfigHandler"
+                                      ],
+                         "has_in_game_settings":  true,
+                         "tray_category":  "Shooter",
+                         "tray_subtitle":  "Strict HDR Exclusive | Reflex (set in-game) | G-SYNC ON",
+                         "tray_description":  "Tear-free low latency VRR with native HDR (OLED/Mini-LED)",
+                         "sync_mode":  "on"
+                     },
+                     {
+                         "id":  "overwatch2-gsync-capture",
+                         "display_name":  "Overwatch 2 - GSYNC Capture-Safe",
+                         "description":  "Borderless/windowed VRR path for clipping, overlays, and capture apps",
+                         "optimization_target":  "low_latency_high_fps",
+                         "application_scope":  "system_plus_native_config",
+                         "executables":  [
+                                             "Overwatch.exe"
+                                         ],
+                         "handlers":  [
+                                          "WindowsSettingsHandler",
+                                          "PowerSettingsHandler",
+                                          "RegistrySettingsHandler",
+                                          "NvidiaSettingsHandler",
+                                          "NetworkSettingsHandler",
+                                          "MouseSettingsHandler",
+                                          "GraphicsSettingsHandler",
+                                          "ProcessPriorityHandler",
+                                          "CpuAffinityHandler",
+                                          "ColorProfileSettingsHandler",
+                                          "OW2ConfigHandler"
+                                      ],
+                         "has_in_game_settings":  true,
+                         "tray_category":  "Shooter",
+                         "tray_subtitle":  "Capture-Safe | Borderless VRR | Medal/Discord Friendly",
+                         "tray_description":  "Borderless/windowed G-SYNC profile for the active gaming display. Keeps Medal, Discord, and similar capture overlays compatible.",
+                         "sync_mode":  "on"
+                     },
+                     {
+                         "id":  "overwatch2-gsync-hdr-capture",
+                         "display_name":  "Overwatch 2 - GSYNC HDR Capture-Safe",
+                         "description":  "Borderless/windowed HDR VRR path for clipping, overlays, and capture apps",
+                         "optimization_target":  "low_latency_high_fps",
+                         "application_scope":  "system_plus_native_config",
+                         "executables":  [
+                                             "Overwatch.exe"
+                                         ],
+                         "handlers":  [
+                                          "WindowsSettingsHandler",
+                                          "PowerSettingsHandler",
+                                          "RegistrySettingsHandler",
+                                          "NvidiaSettingsHandler",
+                                          "NetworkSettingsHandler",
+                                          "MouseSettingsHandler",
+                                          "GraphicsSettingsHandler",
+                                          "ProcessPriorityHandler",
+                                          "CpuAffinityHandler",
+                                          "ColorProfileSettingsHandler",
+                                          "OW2ConfigHandler"
+                                      ],
+                         "has_in_game_settings":  true,
+                         "tray_category":  "Shooter",
+                         "tray_subtitle":  "HDR Capture-Safe | Borderless VRR | Overlay Friendly",
+                         "tray_description":  "HDR borderless/windowed G-SYNC profile for the active gaming display. Best fit when you want HDR plus Medal/Discord-style capture workflows.",
+                         "sync_mode":  "on"
+                     },
+                     {
+                         "id":  "pokemon-auto-chess",
+                         "display_name":  "Pokemon Auto Chess",
+                         "description":  "WebGL browser game optimization for stable performance",
+                         "optimization_target":  "balanced",
+                         "application_scope":  "system_only",
+                         "executables":  [
+                                             "chrome.exe",
+                                             "msedge.exe",
+                                             "firefox.exe",
+                                             "brave.exe"
+                                         ],
+                         "handlers":  [
+                                          "WindowsSettingsHandler",
+                                          "PowerSettingsHandler",
+                                          "RegistrySettingsHandler",
+                                          "NvidiaSettingsHandler",
+                                          "NetworkSettingsHandler",
+                                          "GraphicsSettingsHandler",
+                                          "ProcessPriorityHandler",
+                                          "ColorProfileSettingsHandler"
+                                      ],
+                         "has_in_game_settings":  true,
+                         "tray_category":  "Other",
+                         "tray_subtitle":  "LLM ON | Browser WebGL",
+                         "tray_description":  "WebGL browser game optimization for stable performance",
+                         "sync_mode":  "agnostic"
+                     },
+                     {
+                         "id":  "pacdeluxe",
+                         "display_name":  "PACDeluxe (Pokemon Auto Chess)",
+                         "description":  "Native Tauri client optimization for smooth WebGL auto-battler gameplay",
+                         "optimization_target":  "smooth_framerate",
+                         "application_scope":  "system_only",
+                         "executables":  [
+                                             "pac-deluxe.exe",
+                                             "msedgewebview2.exe"
+                                         ],
+                         "handlers":  [
+                                          "WindowsSettingsHandler",
+                                          "PowerSettingsHandler",
+                                          "RegistrySettingsHandler",
+                                          "NvidiaSettingsHandler",
+                                          "NetworkSettingsHandler",
+                                          "GraphicsSettingsHandler",
+                                          "ProcessPriorityHandler",
+                                          "ColorProfileSettingsHandler"
+                                      ],
+                         "has_in_game_settings":  true,
+                         "tray_category":  "Other",
+                         "tray_subtitle":  "LLM ON | Tauri + WebView2 | Adaptive VSync",
+                         "tray_description":  "Native Tauri client optimization for smooth WebGL auto-battler gameplay",
+                         "sync_mode":  "agnostic"
+                     },
+                     {
+                         "id":  "productivity",
+                         "display_name":  "Desktop / Productivity",
+                         "description":  "Multi-monitor browsing and coding with HDR enabled",
+                         "optimization_target":  "productivity",
+                         "application_scope":  "system_only",
+                         "executables":  [
+                                             "Code.exe",
+                                             "devenv.exe",
+                                             "chrome.exe",
+                                             "firefox.exe",
+                                             "msedge.exe",
+                                             "WindowsTerminal.exe",
+                                             "idea64.exe"
+                                         ],
+                         "handlers":  [
+                                          "WindowsSettingsHandler",
+                                          "RegistrySettingsHandler",
+                                          "NvidiaSettingsHandler",
+                                          "GraphicsSettingsHandler",
+                                          "ColorProfileSettingsHandler"
+                                      ],
+                         "has_in_game_settings":  true,
+                         "tray_category":  "Productivity",
+                         "tray_subtitle":  "HDR ON | Adaptive VSync | VRR (if enabled)",
+                         "tray_description":  "Multi-monitor browsing and coding with HDR enabled",
+                         "sync_mode":  "agnostic"
+                     },
+                     {
+                         "id":  "ryujinx-ssbu",
+                         "display_name":  "SSBU / HewDraw Remix (Ryujinx)",
+                         "description":  "Ultra-low latency system path for competitive SSBU/HDR with manual emulator tuning",
+                         "optimization_target":  "minimum_latency",
+                         "application_scope":  "system_only",
+                         "executables":  [
+                                             "Ryujinx.exe",
+                                             "Ryujinx.Ava.exe",
+                                             "Ryujinx.Headless.SDL2.exe",
+                                             "Ryubing.exe"
+                                         ],
+                         "handlers":  [
+                                          "WindowsSettingsHandler",
+                                          "PowerSettingsHandler",
+                                          "RegistrySettingsHandler",
+                                          "NvidiaSettingsHandler",
+                                          "NetworkSettingsHandler",
+                                          "MouseSettingsHandler",
+                                          "GraphicsSettingsHandler",
+                                          "ProcessPriorityHandler",
+                                          "CpuAffinityHandler",
+                                          "ColorProfileSettingsHandler"
+                                      ],
+                         "has_in_game_settings":  true,
+                         "tray_category":  "Fighting",
+                         "tray_subtitle":  "Vulkan | Fixed 60fps | HAGS ON | LLM OFF",
+                         "tray_description":  "Low-latency Ryujinx system path for SSBU/HewDraw Remix. ABSO handles the OS/driver side, but emulator settings still need to be configured manually.",
+                         "sync_mode":  "off"
+                     }
+                 ],
+    "aliases":  {
+                    "fortnite-streaming":  "fortnite",
+                    "fortnite-streaming-hdr":  "fortnite-hdr",
+                    "overwatch2-gsync-hdr-streaming":  "overwatch2-gsync-hdr",
+                    "overwatch2-gsync-streaming":  "overwatch2-gsync",
+                    "pacdeluxe-streaming":  "pacdeluxe",
+                    "rivals2":  "rivals2-offline",
+                    "rivals2-300hz-max":  "rivals2-offline",
+                    "rivals2-gsync-hdr":  "rivals2-gsync",
+                    "rivals2-offline-hdr":  "rivals2-offline",
+                    "rivals2-online-gsync-hdr":  "rivals2-online-gsync",
+                    "rivals2-online-hdr":  "rivals2-online",
+                    "rivals2-streaming":  "rivals2-online",
+                    "rivals2-streaming-hdr":  "rivals2-online",
+                    "rivals2-tournament-sim-144hz":  "rivals2-offline",
+                    "ryujinx-ssbu-streaming":  "ryujinx-ssbu",
+                    "slippi-melee-streaming":  "slippi-melee",
+                    "slippi-melee-vrr-lab":  "slippi-melee"
+                }
 }

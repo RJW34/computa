@@ -2374,7 +2374,7 @@
   "rivals2-gsync": {
     "allows_aggressive_settings": false,
     "application_scope": "system_plus_native_config",
-    "display_name": "Rivals 2: G-SYNC",
+    "display_name": "Rivals 2 - Offline GSYNC",
     "graphics_api": "dx12",
     "handlers": [
       "WindowsSettingsHandler",
@@ -2484,6 +2484,8 @@
         "profile_aliases": [
           "Rivals2-Win64-Shipping.exe",
           "Rivals of Aether 2",
+          "Rivals 2 - Offline No Sync",
+          "Rivals 2 - Offline GSYNC",
           "Rivals 2: Offline / Training",
           "Rivals 2: G-SYNC",
           "Rivals 2: 300Hz Maximum",
@@ -2538,7 +2540,7 @@
   "rivals2-offline": {
     "allows_aggressive_settings": true,
     "application_scope": "system_plus_native_config",
-    "display_name": "Rivals 2: Offline / Training",
+    "display_name": "Rivals 2 - Offline No Sync",
     "graphics_api": "dx12",
     "handlers": [
       "WindowsSettingsHandler",
@@ -2643,6 +2645,8 @@
         "profile_aliases": [
           "Rivals2-Win64-Shipping.exe",
           "Rivals of Aether 2",
+          "Rivals 2 - Offline No Sync",
+          "Rivals 2 - Offline GSYNC",
           "Rivals 2: Offline / Training",
           "Rivals 2: G-SYNC",
           "Rivals 2: 300Hz Maximum",
@@ -2704,7 +2708,7 @@
   "rivals2-online": {
     "allows_aggressive_settings": false,
     "application_scope": "system_plus_native_config",
-    "display_name": "Rivals 2: Online / Matchmaking",
+    "display_name": "Rivals 2 - Online No Sync",
     "graphics_api": "dx12",
     "handlers": [
       "WindowsSettingsHandler",
@@ -2825,6 +2829,8 @@
         "max_frame_rate": "off",
         "power_management": "prefer_max_performance",
         "profile_aliases": [
+          "Rivals 2 - Online No Sync",
+          "Rivals 2 - Online GSYNC",
           "Rivals 2: Online / Matchmaking",
           "Rivals 2: Online G-SYNC",
           "Rivals 2 (Streaming)"
@@ -2884,7 +2890,7 @@
   "rivals2-online-gsync": {
     "allows_aggressive_settings": false,
     "application_scope": "system_plus_native_config",
-    "display_name": "Rivals 2: Online G-SYNC",
+    "display_name": "Rivals 2 - Online GSYNC",
     "graphics_api": "dx12",
     "handlers": [
       "WindowsSettingsHandler",
@@ -2992,6 +2998,8 @@
         "global_vrr_mode": "fullscreen_only",
         "preset": "vrr_fighting_game",
         "profile_aliases": [
+          "Rivals 2 - Online No Sync",
+          "Rivals 2 - Online GSYNC",
           "Rivals 2: Online / Matchmaking",
           "Rivals 2: Online G-SYNC",
           "Rivals 2 (Streaming)"
