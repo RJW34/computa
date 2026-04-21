@@ -22,6 +22,12 @@ class EvidenceTier(Enum):
     """Consistent community testing but no vendor documentation.
     Examples: HAGS per-backend toggle, threaded optimization for emulators."""
 
+    EXPERIMENTAL = "experimental"
+    """Documented kernel/driver behavior but measured gaming impact is
+    hardware, driver, or workload dependent. Real downside risk worth
+    surfacing to the user.
+    Examples: Win32PrioritySeparation, IFEO high CPU priority for game exes."""
+
     LEGACY_UNVERIFIED = "legacy_unverified"
     """Common in optimization guides but no evidence of effect on modern
     Windows 11 with current hardware. May be placebo.
@@ -36,6 +42,7 @@ class EvidenceTier(Enum):
         labels = {
             EvidenceTier.VERIFIED: "Verified",
             EvidenceTier.EMPIRICAL: "Empirical",
+            EvidenceTier.EXPERIMENTAL: "Experimental",
             EvidenceTier.LEGACY_UNVERIFIED: "Legacy/Unverified",
             EvidenceTier.COSMETIC: "Cosmetic",
         }

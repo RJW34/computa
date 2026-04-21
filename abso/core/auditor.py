@@ -19,6 +19,7 @@ def _get_handlers() -> list[SettingsHandler]:
     This avoids circular import issues between core and settings modules.
     """
     from abso.settings.audio import AudioSettingsHandler
+    from abso.settings.diagnostics import DiagnosticsSettingsHandler
     from abso.settings.graphics import GraphicsSettingsHandler
     from abso.settings.memory import MemorySettingsHandler
     from abso.settings.mouse import MouseSettingsHandler
@@ -31,6 +32,7 @@ def _get_handlers() -> list[SettingsHandler]:
     from abso.settings.tasks import TasksSettingsHandler
     from abso.settings.timer import TimerSettingsHandler
     from abso.settings.updates import UpdatesSettingsHandler
+    from abso.settings.vbs_optin import VBSOptInHandler
     from abso.settings.visual import VisualSettingsHandler
     from abso.settings.windows import WindowsSettingsHandler
 
@@ -50,6 +52,13 @@ def _get_handlers() -> list[SettingsHandler]:
         StorageSettingsHandler(),
         AudioSettingsHandler(),
         UpdatesSettingsHandler(),
+        # Audit-only diagnostics — GPU prefs, overlays, update activity,
+        # driver freshness, XMP/EXPO, Resizable BAR, DirectStorage,
+        # multi-monitor refresh mix.
+        DiagnosticsSettingsHandler(),
+        # Opt-in VBS/HVCI/VMP status surfacing. Never mutates state unless
+        # called with explicit acknowledgement.
+        VBSOptInHandler(),
     ]
 
 

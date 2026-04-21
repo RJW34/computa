@@ -29,12 +29,24 @@ class ProcessPriorityHandler(SettingsHandler):
     HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Image File Execution Options\\{exe}\\PerfOptions
 
     Available settings:
-    - CpuPriorityClass: 1=Idle, 2=Normal, 3=High, 4=Realtime (use 3 for games)
+    - CpuPriorityClass: 1=Idle, 2=Normal, 3=High, 4=Realtime (ABSO uses 3 at most)
     - IoPriority: 0=Very Low, 1=Low, 2=Normal, 3=High
     - PagePriority: 0-5 (memory page priority)
 
-    Note: Realtime CPU priority (4) can cause system instability and is not recommended.
-    GPU scheduling priority is handled via MMCSS/RegistrySettingsHandler, not IFEO.
+    Tradeoffs to be aware of:
+
+    - "Realtime" (4) can starve the OS, audio, and anti-cheat; ABSO never writes it.
+    - Even "High" (3) is not a universal win. It can starve audio threads, OBS
+      capture, launcher overlays, and some anti-cheat helper processes. Certain
+      anti-cheat engines also treat IFEO changes as suspicious. Think of this
+      as an experimental tradeoff per-game, not a guaranteed FPS boost.
+    - GPU scheduling priority is handled via MMCSS / ``RegistrySettingsHandler``,
+      not IFEO. The ``GpuPriority`` value here only affects the PerfOptions
+      hint used by the app, not the global scheduler.
+
+    ABSO gaming profiles apply at most CPU priority 3 (High) and IO priority 3
+    (High). Users who hit stability, audio, or capture problems can drop to 2
+    (Normal) via profile overrides without losing the rest of the profile.
     """
 
     IFEO_KEY = r"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Image File Execution Options"

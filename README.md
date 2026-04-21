@@ -127,24 +127,23 @@ python -m abso restore 20240115_143022  # Specific backup
 
 ## What Gets Optimized
 
-A.B.S.O. applies optimizations across multiple system areas:
+A.B.S.O. applies optimizations across multiple system areas. Exact settings vary by profile; the list below describes what built-in profiles actually touch today.
 
 ### Windows Settings
 - Game Mode enabled
-- Game Bar/DVR disabled
-- Hardware-Accelerated GPU Scheduling (HAGS)
-- Visual effects optimized for performance
+- Game Bar / Game DVR disabled (per-user registry toggles; background capture policy is not globally enforced)
+- Hardware-Accelerated GPU Scheduling (HAGS) enabled on most gaming profiles (hardware/driver dependent; requires reboot on first change)
+- Windowed-game optimizations (FSO per-executable) tuned per profile
 
 ### Power Settings
 - Ultimate Performance power plan
 - USB selective suspend disabled
-- PCIe power saving disabled
+- PCIe link-state power saving disabled
 - Processor performance maximized
 
 ### Graphics Settings
-- Fullscreen Optimizations disabled
-- Multi-Plane Overlay (MPO) disabled
-- DWM optimizations
+- Per-executable Fullscreen Optimizations (FSO) forced on or off to match each profile's presentation path (exclusive fullscreen vs composited borderless)
+- Multi-Plane Overlay (MPO) is **not** disabled by default. ABSO only touches MPO in profiles where MPO compositor behavior was specifically measured to interfere; most profiles leave MPO enabled because it is required for G-SYNC/VRR on Windows 11 24H2+
 
 ### Input Settings
 - Mouse acceleration disabled
@@ -152,23 +151,27 @@ A.B.S.O. applies optimizations across multiple system areas:
 - Enhanced pointer precision disabled
 
 ### Network Settings
-- Nagle's algorithm disabled
-- TCP auto-tuning optimized
-- Network throttling disabled
+- Built-in profiles use the `default` network preset and do **not** disable Nagle, TCP auto-tuning, or ECN. Microsoft documents TCP receive-window autotuning default `normal` as a TCP throughput win, and most competitive gameplay traffic is UDP so Nagle/TCP tweaks don't meaningfully affect gameplay latency
+- TCP tuning (Nagle / autotuning / ECN / timestamps) is available as an opt-in preset but is not part of any built-in profile
+- Network throttling index changes (`NetworkThrottlingIndex = 0xFFFFFFFF`) are only applied under the opt-in legacy-tweaks flag
 
 ### System Scheduler
-- Process priority boosted for games
-- System responsiveness tuned
-- Scheduler quantum optimized
+- Process priority boosted for the game's executable(s) via IFEO (risk-managed: can conflict with anti-cheat, audio, OBS, and launchers)
+- `Win32PrioritySeparation = 0x2A` is applied in most gaming base profiles; this is an old global tweak whose measured effect varies and should be considered experimental
+- `SystemResponsiveness = 0` is only applied under the opt-in legacy-tweaks flag
 
 ### Background Services
-- Telemetry services disabled
-- Search indexer paused
-- Xbox background services managed
+- ABSO does **not** disable telemetry, search indexer, or Xbox background services by default. Broad service disabling is out of scope because it causes brittle systems and has no reliable gaming win on modern Windows 11
 
 ### Memory Management
-- Paging executive kept in RAM
-- Large system cache disabled for gaming
+- `LargeSystemCache` and `DisablePagingExecutive` are only applied under the opt-in legacy-tweaks flag. They are not default for any built-in gaming profile
+
+### NVIDIA / VRR
+- Per-application NVIDIA driver profile (via NPI / NVAPI DRS) with Low Latency Mode, VSync, Power Management, Max Frame Rate, and VRR App Override tuned per profile
+- Native Reflex is preferred over driver Low Latency Mode whenever the game supports Reflex (CoD, Apex, Valorant, Fortnite, Overwatch 2, Diablo 4, Marvel Rivals). ABSO keeps driver LLM off for those games; the Reflex toggle itself must still be enabled in-game
+
+### VBS / HVCI / Virtualization-Based Security
+- ABSO does **not** silently disable Memory Integrity (HVCI), Virtual Machine Platform, or hypervisor launch state. Disabling VBS is a security tradeoff and is only available through an explicit opt-in flow with warnings and a restore path
 
 ## Safety Features
 
@@ -226,8 +229,9 @@ A.B.S.O. needs administrator access to modify system settings. Right-click your 
 
 Some optimizations require a system reboot **the first time they're applied**:
 - HAGS changes
-- Memory management settings (DisablePagingExecutive)
-- MPO (Multi-Plane Overlay) changes
+- VBS / Memory Integrity (HVCI) state changes (opt-in only)
+- Memory management settings (`DisablePagingExecutive`, opt-in legacy tweaks)
+- MPO (Multi-Plane Overlay) changes, when a profile opts into toggling MPO
 
 **Important:** Once you've applied a profile and rebooted, switching between profiles typically does NOT require another reboot. The kernel-level settings persist in the registry, so subsequent profile switches are instant.
 

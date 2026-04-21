@@ -61,6 +61,7 @@ class Diablo4ConfigHandler(SettingsHandler):
     })
 
     AUTO_REFRESH_RATE_KEY = "auto_refresh_rate"
+    AUTO_VRR_FPS_CAP_KEY = "auto_vrr_fps_cap"
 
     def detect(self) -> dict[str, Any]:
         """Detect current Diablo IV LocalPrefs.txt values."""
@@ -122,35 +123,52 @@ class Diablo4ConfigHandler(SettingsHandler):
                 category="game_config",
             ))
 
-        if current.get("limit_foreground_fps") is True:
-            issues.append(Issue(
-                title="Diablo IV foreground FPS cap still enabled",
-                severity="info",
-                current_value=str(current.get("foreground_fps_limit", "Limited")),
-                optimal_value="Unlimited",
-                explanation="This Diablo IV profile keeps the foreground cap disabled and lets VRR/driver policy lead.",
-                category="game_config",
-            ))
-
         return issues
 
     def apply(self, settings: dict[str, Any]) -> dict[str, Any]:
         """Apply native Diablo IV LocalPrefs.txt values."""
         requested = dict(settings)
+        notices: list[str] = []
 
-        if requested.pop(self.AUTO_REFRESH_RATE_KEY, False):
+        auto_refresh = requested.pop(self.AUTO_REFRESH_RATE_KEY, False)
+        auto_vrr_cap = requested.pop(self.AUTO_VRR_FPS_CAP_KEY, False)
+
+        refresh_hz: float | None = None
+        if auto_refresh or auto_vrr_cap:
             try:
                 from abso.settings.nvidia import NvidiaSettingsHandler
 
                 refresh_hz = NvidiaSettingsHandler()._detect_primary_refresh_rate()
-                if refresh_hz and refresh_hz > 0:
-                    requested["refresh_rate"] = int(round(refresh_hz))
-                    logger.info(
-                        "Diablo IV auto refresh rate: %d Hz",
-                        requested["refresh_rate"],
-                    )
             except Exception as e:
-                logger.warning("Diablo IV auto refresh rate detection failed: %s", e)
+                logger.warning("Diablo IV auto-detect refresh rate failed: %s", e)
+
+        if auto_refresh and refresh_hz and refresh_hz > 0:
+            requested["refresh_rate"] = int(round(refresh_hz))
+            logger.info(
+                "Diablo IV auto refresh rate: %d Hz",
+                requested["refresh_rate"],
+            )
+
+        if auto_vrr_cap:
+            # Prefer in-game limiter per Blur Busters G-SYNC 101: in-game caps have
+            # lower latency than driver/NVCP caps. If we can't compute refresh - 3,
+            # surface a notice so the caller can fall back to the NVIDIA driver cap.
+            if refresh_hz and refresh_hz > 0:
+                from abso.core.vrr import get_vrr_fps_cap
+
+                cap = get_vrr_fps_cap(refresh_hz)
+                requested["limit_foreground_fps"] = True
+                requested["foreground_fps_limit"] = cap
+                logger.info(
+                    "Diablo IV auto VRR FPS cap: %d (from %.2f Hz)", cap, refresh_hz,
+                )
+            else:
+                notices.append(
+                    "Diablo IV auto_vrr_fps_cap skipped: refresh rate detection "
+                    "failed. In-game foreground cap was NOT set; fall back to the "
+                    "NVIDIA driver cap (NvidiaSettingsHandler.auto_vrr_fps_cap) "
+                    "or set refresh_rate + foreground_fps_limit manually."
+                )
 
         invalid_keys = sorted(set(requested.keys()) - set(self.MUTABLE_SETTINGS_TO_PREFS))
         if invalid_keys:
@@ -162,12 +180,21 @@ class Diablo4ConfigHandler(SettingsHandler):
 
         prefs_path = _get_diablo4_local_prefs_path()
         if not prefs_path:
-            return {
+            result: dict[str, Any] = {
                 "success": True,
                 "error": None,
                 "requires_reboot": False,
                 "skipped": "Diablo IV LocalPrefs.txt not found",
             }
+            if auto_vrr_cap:
+                notices.append(
+                    "Diablo IV LocalPrefs.txt not found; auto_vrr_fps_cap could "
+                    "not be enforced in-game. The NVIDIA driver cap (if enabled) "
+                    "will remain the limiter."
+                )
+            if notices:
+                result["notices"] = notices
+            return result
 
         try:
             content = prefs_path.read_text(encoding="utf-8", errors="replace")
@@ -181,12 +208,15 @@ class Diablo4ConfigHandler(SettingsHandler):
                 }
 
             if not replacements:
-                return {
+                result = {
                     "success": True,
                     "error": None,
                     "requires_reboot": False,
                     "applied": [],
                 }
+                if notices:
+                    result["notices"] = notices
+                return result
 
             patched_lines, changed_keys, appended_keys = self._apply_replacements(lines, replacements)
 
@@ -199,12 +229,15 @@ class Diablo4ConfigHandler(SettingsHandler):
                     len(appended_keys),
                 )
 
-            return {
+            result = {
                 "success": True,
                 "error": None,
                 "requires_reboot": False,
                 "applied": sorted(changed_keys | appended_keys),
             }
+            if notices:
+                result["notices"] = notices
+            return result
         except Exception as e:
             return {
                 "success": False,
@@ -221,15 +254,26 @@ class Diablo4ConfigHandler(SettingsHandler):
             return results
 
         requested = dict(settings)
-        if requested.pop(self.AUTO_REFRESH_RATE_KEY, False):
+        auto_refresh = requested.pop(self.AUTO_REFRESH_RATE_KEY, False)
+        auto_vrr_cap = requested.pop(self.AUTO_VRR_FPS_CAP_KEY, False)
+
+        refresh_hz: float | None = None
+        if auto_refresh or auto_vrr_cap:
             try:
                 from abso.settings.nvidia import NvidiaSettingsHandler
 
                 refresh_hz = NvidiaSettingsHandler()._detect_primary_refresh_rate()
-                if refresh_hz and refresh_hz > 0:
-                    requested["refresh_rate"] = int(round(refresh_hz))
             except Exception:
                 pass
+
+        if auto_refresh and refresh_hz and refresh_hz > 0:
+            requested["refresh_rate"] = int(round(refresh_hz))
+
+        if auto_vrr_cap and refresh_hz and refresh_hz > 0:
+            from abso.core.vrr import get_vrr_fps_cap
+
+            requested["limit_foreground_fps"] = True
+            requested["foreground_fps_limit"] = get_vrr_fps_cap(refresh_hz)
 
         for key, target in requested.items():
             current_value = current.get(key)

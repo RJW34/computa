@@ -49,9 +49,9 @@
       },
       {
         "category": "Display",
-        "reason": "ABSO now disables Diablo 4's foreground limiter and keeps the VRR/driver path authoritative.",
+        "reason": "ABSO writes LimitForegroundFPS=1 and MaxForegroundFPS=refresh-3 into LocalPrefs.txt. In-game limiter owns the VRR cap per Blur Busters G-SYNC 101; the NVIDIA driver cap is off.",
         "setting": "Foreground FPS Limit",
-        "value": "Unlimited"
+        "value": "Refresh rate - 3 (e.g., 141 @ 144Hz, 237 @ 240Hz, 297 @ 300Hz)"
       },
       {
         "category": "Graphics",
@@ -88,14 +88,13 @@
       },
       "Diablo4ConfigHandler": {
         "auto_refresh_rate": true,
+        "auto_vrr_fps_cap": true,
         "background_fps_limit": 60,
-        "foreground_fps_limit": 0,
         "hdr_black_point": 0.0001,
         "hdr_brightness": 250.0,
         "hdr_output": true,
         "hdr_white_point": 1000.0,
         "limit_background_fps": true,
-        "limit_foreground_fps": false,
         "reflex": true,
         "vsync": false,
         "window_mode": 1
@@ -112,7 +111,7 @@
         "preset": "default"
       },
       "NvidiaSettingsHandler": {
-        "auto_vrr_fps_cap": true,
+        "auto_vrr_fps_cap": false,
         "global_vrr_mode": "fullscreen_only",
         "preset": "vrr_diablo4",
         "vsync": "on"
@@ -193,9 +192,9 @@
       },
       {
         "category": "Display",
-        "reason": "ABSO now disables Diablo 4's foreground limiter and keeps the VRR/driver path authoritative.",
+        "reason": "ABSO writes LimitForegroundFPS=1 and MaxForegroundFPS=refresh-3 into LocalPrefs.txt. In-game limiter owns the VRR cap per Blur Busters G-SYNC 101; the NVIDIA driver cap is off.",
         "setting": "Foreground FPS Limit",
-        "value": "Unlimited"
+        "value": "Refresh rate - 3 (e.g., 141 @ 144Hz, 237 @ 240Hz, 297 @ 300Hz)"
       },
       {
         "category": "Graphics",
@@ -232,11 +231,10 @@
       },
       "Diablo4ConfigHandler": {
         "auto_refresh_rate": true,
+        "auto_vrr_fps_cap": true,
         "background_fps_limit": 60,
-        "foreground_fps_limit": 0,
         "hdr_output": false,
         "limit_background_fps": true,
-        "limit_foreground_fps": false,
         "reflex": true,
         "vsync": false,
         "window_mode": 1
@@ -253,7 +251,7 @@
         "preset": "default"
       },
       "NvidiaSettingsHandler": {
-        "auto_vrr_fps_cap": true,
+        "auto_vrr_fps_cap": false,
         "global_vrr_mode": "fullscreen_only",
         "preset": "vrr_diablo4",
         "vsync": "on"
@@ -329,9 +327,9 @@
       },
       {
         "category": "Display",
-        "reason": "Reflex should own render-queue control. ABSO keeps driver LLM off to avoid overlap.",
+        "reason": "Fortnite's Reflex toggle lives in Fortnite's settings, not in a stable config key ABSO can write. ABSO keeps driver LLM off so Reflex owns render-queue control.",
         "setting": "NVIDIA Reflex Low Latency",
-        "value": "On + Boost"
+        "value": "On + Boost (must be enabled manually in-game)"
       },
       {
         "category": "Display",
@@ -503,9 +501,9 @@
       },
       {
         "category": "Display",
-        "reason": "Reflex should own render-queue control. ABSO keeps driver LLM off to avoid overlap.",
+        "reason": "Fortnite's Reflex toggle lives in Fortnite's settings, not in a stable config key ABSO can write. ABSO keeps driver LLM off so Reflex owns render-queue control.",
         "setting": "NVIDIA Reflex Low Latency",
-        "value": "On + Boost"
+        "value": "On + Boost (must be enabled manually in-game)"
       },
       {
         "category": "Display",
@@ -1142,9 +1140,9 @@
       },
       {
         "category": "Display",
-        "reason": "Native Reflex should own queue control.",
+        "reason": "OW2's Reflex toggle is not written by ABSO (Settings_v0.ini's Reflex key is not stable across patches). ABSO keeps driver LLM off so Reflex owns render-queue control once you enable it in-game.",
         "setting": "NVIDIA Reflex Low Latency",
-        "value": "Enabled + Boost"
+        "value": "Enabled + Boost (must be enabled manually in-game)"
       },
       {
         "category": "Display",
@@ -1293,9 +1291,9 @@
       },
       {
         "category": "Display",
-        "reason": "Native Reflex should own queue control.",
+        "reason": "OW2's Reflex toggle is not written by ABSO (Settings_v0.ini's Reflex key is not stable across patches). ABSO keeps driver LLM off so Reflex owns render-queue control once you enable it in-game.",
         "setting": "NVIDIA Reflex Low Latency",
-        "value": "Enabled + Boost"
+        "value": "Enabled + Boost (must be enabled manually in-game)"
       },
       {
         "category": "Display",
@@ -1444,9 +1442,9 @@
       },
       {
         "category": "Display",
-        "reason": "Native Reflex should own queue control.",
+        "reason": "OW2's Reflex toggle is not written by ABSO (Settings_v0.ini's Reflex key is not stable across patches). ABSO keeps driver LLM off so Reflex owns render-queue control once you enable it in-game.",
         "setting": "NVIDIA Reflex Low Latency",
-        "value": "Enabled + Boost"
+        "value": "Enabled + Boost (must be enabled manually in-game)"
       },
       {
         "category": "Display",
@@ -1619,9 +1617,9 @@
       },
       {
         "category": "Display",
-        "reason": "Native Reflex should own queue control.",
+        "reason": "OW2's Reflex toggle is not written by ABSO (Settings_v0.ini's Reflex key is not stable across patches). ABSO keeps driver LLM off so Reflex owns render-queue control once you enable it in-game.",
         "setting": "NVIDIA Reflex Low Latency",
-        "value": "Enabled + Boost"
+        "value": "Enabled + Boost (must be enabled manually in-game)"
       },
       {
         "category": "Display",

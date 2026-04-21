@@ -280,8 +280,11 @@ class TestProfileSettings:
         profile = Diablo4Profile()
         settings = profile.get_settings("NvidiaSettingsHandler")
 
-        # Diablo 4 has native Reflex — uses vrr_diablo4 preset (LLM OFF)
+        # Diablo 4 has native Reflex — uses vrr_diablo4 preset (LLM OFF).
+        # Driver-side FPS cap is intentionally OFF; the in-game Foreground FPS
+        # limiter is the single VRR cap per Blur Busters G-SYNC 101.
         assert settings["preset"] == "vrr_diablo4"
+        assert settings["auto_vrr_fps_cap"] is False
 
     def test_diablo4_variants_drive_native_game_config(self):
         """Diablo IV variants should enforce the matching LocalPrefs path."""
@@ -298,11 +301,15 @@ class TestProfileSettings:
         assert hdr_config["window_mode"] == 1
         assert hdr_config["reflex"] is True
         assert hdr_config["auto_refresh_rate"] is True
-        assert hdr_config["limit_foreground_fps"] is False
+        # In-game foreground cap at refresh - 3 is the single VRR limiter.
+        assert hdr_config["auto_vrr_fps_cap"] is True
+        assert "limit_foreground_fps" not in hdr_config
+        assert "foreground_fps_limit" not in hdr_config
         assert hdr_config["hdr_output"] is True
 
         assert sdr_windows["hdr"] is False
         assert sdr_config["window_mode"] == 1
+        assert sdr_config["auto_vrr_fps_cap"] is True
         assert sdr_config["hdr_output"] is False
 
     def test_pokemon_auto_chess_nvidia_settings(self):
@@ -877,3 +884,157 @@ class TestFullscreenOptimizationsPerExe:
             profile = profile_cls()
             flags = profile.fullscreen_optimizations_per_exe
             assert flags.get("Diablo IV.exe") is True
+
+
+class TestSingleLimiterPolicy:
+    """Invariant: no profile layers an in-game and a driver FPS cap without opt-in.
+
+    Blur Busters G-SYNC 101 recommends a single authoritative limiter (in-game
+    preferred). ABSO enforces this via ``BaseProfile.allow_dual_limiter``:
+    profiles that deliberately layer both an NVIDIA driver ``auto_vrr_fps_cap``
+    and a native game-config ``auto_vrr_fps_cap`` must opt in explicitly and
+    document the rationale in-code.
+    """
+
+    GAME_CONFIG_HANDLERS = (
+        "OW2ConfigHandler",
+        "MarvelRivalsConfigHandler",
+        "Rivals2ConfigHandler",
+        "Diablo4ConfigHandler",
+        "FortniteConfigHandler",
+    )
+
+    def test_no_implicit_dual_limiter(self) -> None:
+        """Flag any built-in profile with both caps enabled and no opt-in."""
+        violations: list[str] = []
+        for profile in get_all_profiles().values():
+            nvidia_settings = profile.get_settings("NvidiaSettingsHandler")
+            driver_cap = bool(nvidia_settings.get("auto_vrr_fps_cap"))
+            if not driver_cap:
+                continue
+
+            game_caps: list[str] = []
+            for handler in self.GAME_CONFIG_HANDLERS:
+                handler_settings = profile.get_settings(handler)
+                if handler_settings.get("auto_vrr_fps_cap"):
+                    game_caps.append(handler)
+
+            if game_caps and not profile.allow_dual_limiter:
+                violations.append(
+                    f"{profile.profile_id}: driver auto_vrr_fps_cap=True "
+                    f"AND {', '.join(game_caps)}.auto_vrr_fps_cap=True "
+                    "without allow_dual_limiter override"
+                )
+
+        assert not violations, (
+            "Single-limiter policy violations:\n  "
+            + "\n  ".join(violations)
+        )
+
+    def test_diablo4_uses_single_in_game_limiter(self) -> None:
+        """Diablo 4 profiles own a single in-game limiter (driver cap off)."""
+        for profile_cls in (Diablo4Profile, Diablo4SDRProfile):
+            profile = profile_cls()
+            nvidia = profile.get_settings("NvidiaSettingsHandler")
+            d4 = profile.get_settings("Diablo4ConfigHandler")
+            assert nvidia["auto_vrr_fps_cap"] is False, profile_cls.__name__
+            assert d4["auto_vrr_fps_cap"] is True, profile_cls.__name__
+            assert profile.allow_dual_limiter is False, profile_cls.__name__
+
+
+class TestReflexContract:
+    """Invariant: Reflex-requiring profiles must be honest about enforcement.
+
+    ``BaseProfile.requires_reflex`` means "this game uses Reflex, so driver LLM
+    should stay off." It does NOT mean ABSO enables Reflex for the user. Only
+    profiles whose config handler writes the in-game Reflex key can set
+    ``enforces_reflex_in_config = True``. Profiles without that enforcement
+    must not advertise Reflex as "applied" in their description or in-game
+    text.
+    """
+
+    CONFIG_HANDLER_REFLEX_KEYS: dict[str, tuple[str, ...]] = {
+        "Diablo4ConfigHandler": ("reflex",),
+        "MarvelRivalsConfigHandler": ("nvidia_reflex",),
+        "OW2ConfigHandler": (),
+        "FortniteConfigHandler": (),
+        "Rivals2ConfigHandler": (),
+    }
+
+    def test_enforces_reflex_claim_matches_implementation(self) -> None:
+        """enforces_reflex_in_config must be True iff a handler writes Reflex."""
+        mismatches: list[str] = []
+        for profile in get_all_profiles().values():
+            if not profile.requires_reflex:
+                continue
+
+            wrote_reflex = False
+            for handler_name, reflex_keys in self.CONFIG_HANDLER_REFLEX_KEYS.items():
+                settings = profile.get_settings(handler_name)
+                if any(k in settings for k in reflex_keys):
+                    wrote_reflex = True
+                    break
+
+            if profile.enforces_reflex_in_config != wrote_reflex:
+                mismatches.append(
+                    f"{profile.profile_id}: enforces_reflex_in_config="
+                    f"{profile.enforces_reflex_in_config} but handler writes "
+                    f"Reflex = {wrote_reflex}"
+                )
+
+        assert not mismatches, (
+            "Reflex contract mismatches:\n  " + "\n  ".join(mismatches)
+        )
+
+    def test_reflex_not_claimed_when_not_enforced(self) -> None:
+        """Profiles that don't enforce Reflex must not claim it is 'applied'."""
+        violations: list[str] = []
+        banned_fragments = (
+            "reflex applied",
+            "reflex on+boost by abso",
+            "abso enables reflex",
+            "abso applies reflex",
+        )
+        # Explicit "Reflex is OFF" entries are honest non-enforcement statements
+        # (e.g., OW2 no-sync is tuned around LLM-on with Reflex OFF). They should
+        # not be forced to include "manually" — they are not claiming enforcement.
+        reflex_off_markers = ("off", "disabled", "do not enable")
+
+        for profile in get_all_profiles().values():
+            if not profile.requires_reflex:
+                continue
+            if profile.enforces_reflex_in_config:
+                continue
+
+            # Description and in-game guidance must acknowledge manual setup.
+            text = (profile.description or "").lower()
+            for fragment in banned_fragments:
+                if fragment in text:
+                    violations.append(
+                        f"{profile.profile_id}.description claims Reflex "
+                        f"enforcement: contains {fragment!r}"
+                    )
+
+            for entry in profile.get_in_game_settings():
+                if "reflex" not in entry.get("setting", "").lower():
+                    continue
+
+                value = entry.get("value", "").lower()
+                reason = entry.get("reason", "").lower()
+
+                explicitly_off = any(
+                    marker in value for marker in reflex_off_markers
+                )
+                says_manually = "manually" in value or "manually" in reason
+
+                if not explicitly_off and not says_manually:
+                    violations.append(
+                        f"{profile.profile_id} Reflex in-game entry must "
+                        "mention manual setup (value or reason), OR state "
+                        "Reflex is OFF: "
+                        f"{entry!r}"
+                    )
+
+        assert not violations, (
+            "Reflex honesty violations:\n  " + "\n  ".join(violations)
+        )

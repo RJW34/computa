@@ -136,6 +136,88 @@ def test_verify_active_reports_mismatch(tmp_path: Path) -> None:
     assert verify["settings"]["reflex"]["active"] is False
 
 
+def test_apply_auto_vrr_fps_cap_writes_refresh_minus_three(tmp_path: Path) -> None:
+    """auto_vrr_fps_cap should enable the in-game limiter at refresh - 3."""
+    prefs_path = tmp_path / "Documents" / "Diablo IV" / "LocalPrefs.txt"
+    _write_local_prefs(
+        prefs_path,
+        "\n".join(
+            [
+                'DisplayModeWindowMode "1"',
+                'LimitForegroundFPS "0"',
+                'MaxForegroundFPS "0"',
+            ]
+        )
+        + "\n",
+    )
+
+    with (
+        patch("abso.settings.diablo4_config._get_diablo4_local_prefs_path", return_value=prefs_path),
+        patch(
+            "abso.settings.nvidia.NvidiaSettingsHandler._detect_primary_refresh_rate",
+            return_value=240,
+        ),
+    ):
+        result = Diablo4ConfigHandler().apply({"auto_vrr_fps_cap": True})
+
+    assert result["success"] is True
+    content = prefs_path.read_text(encoding="utf-8")
+    assert 'LimitForegroundFPS "1"' in content
+    assert 'MaxForegroundFPS "237"' in content
+
+
+def test_apply_auto_vrr_fps_cap_without_refresh_emits_notice(tmp_path: Path) -> None:
+    """Refresh detect failure should skip the in-game cap and surface a notice."""
+    prefs_path = tmp_path / "Documents" / "Diablo IV" / "LocalPrefs.txt"
+    _write_local_prefs(
+        prefs_path,
+        "\n".join(
+            [
+                'DisplayModeWindowMode "1"',
+                'LimitForegroundFPS "0"',
+                'MaxForegroundFPS "0"',
+            ]
+        )
+        + "\n",
+    )
+
+    with (
+        patch("abso.settings.diablo4_config._get_diablo4_local_prefs_path", return_value=prefs_path),
+        patch(
+            "abso.settings.nvidia.NvidiaSettingsHandler._detect_primary_refresh_rate",
+            return_value=None,
+        ),
+    ):
+        result = Diablo4ConfigHandler().apply({"auto_vrr_fps_cap": True})
+
+    assert result["success"] is True
+    assert "notices" in result
+    assert any("auto_vrr_fps_cap" in notice for notice in result["notices"])
+    content = prefs_path.read_text(encoding="utf-8")
+    # Unchanged — the in-game cap was not overwritten when detection failed.
+    assert 'LimitForegroundFPS "0"' in content
+    assert 'MaxForegroundFPS "0"' in content
+
+
+def test_apply_auto_vrr_fps_cap_without_local_prefs_emits_fallback_notice(
+    tmp_path: Path,
+) -> None:
+    """Missing LocalPrefs.txt should surface a fallback notice mentioning the driver cap."""
+    with (
+        patch("abso.settings.diablo4_config._get_diablo4_local_prefs_path", return_value=None),
+        patch(
+            "abso.settings.nvidia.NvidiaSettingsHandler._detect_primary_refresh_rate",
+            return_value=300,
+        ),
+    ):
+        result = Diablo4ConfigHandler().apply({"auto_vrr_fps_cap": True})
+
+    assert result["success"] is True
+    assert result.get("skipped")
+    assert "notices" in result
+    assert any("driver cap" in notice.lower() for notice in result["notices"])
+
+
 def test_restore_rewrites_backed_up_file(tmp_path: Path) -> None:
     prefs_path = tmp_path / "Documents" / "Diablo IV" / "LocalPrefs.txt"
     _write_local_prefs(prefs_path, 'DisplayModeWindowMode "1"\n')

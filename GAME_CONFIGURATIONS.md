@@ -88,14 +88,16 @@ Profiles use predefined NVIDIA presets that configure multiple driver settings:
 - *Note: FPS cap at refresh_rate - 3 required*
 
 ### `vrr_diablo4`
-**Use:** Diablo 4 with native NVIDIA Reflex
+**Use:** Diablo 4 with native NVIDIA Reflex on a VRR display
 - Low Latency Mode: **Off** (Reflex handles this)
 - VSync: **Off**
 - Power Management: **Prefer Maximum Performance**
 - Shader Cache: **Unlimited**
 - Threaded Optimization: **Off**
 - Triple Buffering: **Off**
-- *Enable Reflex "On + Boost" in-game*
+- FPS cap: **In-game** per Blur Busters G-SYNC 101. ABSO writes `LimitForegroundFPS = 1` and `MaxForegroundFPS = refresh − 3` into `LocalPrefs.txt` via `Diablo4ConfigHandler.auto_vrr_fps_cap`. The NVIDIA driver cap (Max Frame Rate) is off — single limiter owned by the in-game path.
+- If `LocalPrefs.txt` is not present at apply time, the applier surfaces a notice so you can opt into the NVIDIA driver cap as a fallback.
+- Reflex "On" is written into `LocalPrefs.txt` by the Diablo 4 config handler. Upgrade to "On + Boost" manually in-game if your GPU has the headroom; ABSO keeps driver LLM off either way.
 
 ### `reflex_game`
 **Use:** Games with native NVIDIA Reflex (CoD, Apex, Valorant, etc.)
@@ -381,7 +383,7 @@ If experiencing micro-stuttering:
 | Effects | Medium-High | High can cause drops in combat |
 
 #### SDR Variant (`diablo4-sdr`)
-Same optimization target as `diablo4`, with HDR disabled for users on SDR displays or those who prefer SDR tone-mapping. Reflex **On + Boost** in-game and Threaded Optimization **Off** both still apply.
+Same optimization target as `diablo4`, with HDR disabled for users on SDR displays or those who prefer SDR tone-mapping. ABSO writes Reflex **On** in LocalPrefs.txt (upgrade to **On + Boost** manually in-game if desired) and Threaded Optimization **Off** still applies.
 
 ---
 
@@ -579,15 +581,17 @@ These settings appear in most/all gaming profiles:
 ### Windows Settings
 | Setting | Value | Reason |
 |---------|-------|--------|
-| Game Mode | On | Prioritizes game processes |
-| Game Bar | Off | Reduces overlay overhead |
-| Game DVR | Off | Prevents background recording |
+| Game Mode | On | Signals the process scheduler to prioritize the game |
+| Game Bar | Off | Reduces overlay overhead (per-user toggle only) |
+| Game DVR | Off | Prevents background capture on the per-user key; background capture policy is not globally enforced |
 
 ### Network Settings
-| Setting | Value | Reason |
-|---------|-------|--------|
-| Nagle's Algorithm | Disabled | Reduces network latency |
-| Preset | Gaming | TCP optimizations |
+| Setting | Default for built-in profiles | Notes |
+|---------|-------------------------------|-------|
+| Nagle's Algorithm | **Not modified** | Most competitive game traffic is UDP; Nagle has no effect there. Optional `gaming` preset available for users who specifically want to tweak TCP. |
+| TCP auto-tuning | **Not modified** | Microsoft documents the default `normal` as a throughput win. ABSO does not disable it by default. |
+| ECN capability | **Not modified** | Opt-in via TCP preset; not recommended as a universal latency fix. |
+| Network Throttling Index | Unchanged by default; `0xFFFFFFFF` only under opt-in legacy tweaks | Legacy tweak; measurable impact on modern Windows 11 is not well-established. |
 
 ### Mouse Settings
 | Setting | Value | Reason |
@@ -596,17 +600,18 @@ These settings appear in most/all gaming profiles:
 | Linear Curve | Enabled | 1:1 input mapping |
 
 ### Memory Settings
-| Setting | Value | Reason |
-|---------|-------|--------|
-| Large System Cache | 0 | Optimize for applications |
-| Disable Paging Executive | 1 | Keep kernel in RAM |
+| Setting | Default for built-in profiles | Notes |
+|---------|-------------------------------|-------|
+| Large System Cache | Unchanged | Only written under opt-in legacy tweaks. Modern Windows 11 memory manager does not benefit from this toggle for gaming. |
+| Disable Paging Executive | Unchanged | Only written under opt-in legacy tweaks. |
 
 ### Registry Settings
-| Setting | Value | Reason |
-|---------|-------|--------|
-| System Responsiveness | 0 | Maximum game priority |
-| Network Throttling | 0xFFFFFFFF | Disabled |
-| Win32PrioritySeparation | 0x2A | Short fixed quantum, max foreground boost |
+| Setting | Default for built-in profiles | Notes |
+|---------|-------------------------------|-------|
+| System Responsiveness | Unchanged | `0` is only written under opt-in legacy tweaks; aggressive value is known to starve audio/capture. |
+| Network Throttling Index | Unchanged | See network notes above. |
+| `Win32PrioritySeparation` | `0x2A` in most gaming base profiles | Short fixed quantum + max foreground boost. Treat as **experimental** — the measured effect is hardware/workload dependent and can interact badly with real-time audio, OBS, and anti-cheat. |
+| Game Priority (MMCSS) | `GPU Priority = 8`, `Priority = 6`, `Scheduling Category = High` | Applied via `HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Multimedia\SystemProfile\Tasks\Games`. |
 
 ---
 
@@ -627,19 +632,21 @@ Is the game FIXED framerate (e.g., 60fps emulator)?
 ```
 
 ### Low Latency Mode Notes
-- **Only works in DX9/DX11** - limited effect in DX12/Vulkan
-- **"Ultra" auto-caps FPS** - use "On" with manual caps
-- **Can cause stutter** on some systems - try "Off" or Pre-Rendered Frames = 2
-- **Never combine with NVIDIA Reflex** - causes conflicts
+- **DX9/DX11:** Supported. **DX12:** Supported in NVIDIA driver 551.23 and newer. **Vulkan:** Still not supported in the same way; rely on the game/engine instead.
+- **"Ultra" auto-caps FPS** - use "On" with a manual cap when you want to control the cap yourself
+- **Can cause stutter** on some systems - try "Off" or set Pre-Rendered Frames to 2 via NPI
+- **Never combine with NVIDIA Reflex** - when a game exposes Reflex, keep driver LLM off and let Reflex own the render queue
 
 ### HAGS (Hardware Accelerated GPU Scheduling)
-- **Enable for:** DX12 games, Vulkan games, emulators using DX12/Vulkan
-- **Can cause issues with:** Some DX11 games
-- **Test both:** If experiencing stutter, try toggling HAGS
+- Microsoft positions HAGS as an opt-in scheduler modernization, not a universal gaming boost. Results vary by GPU, driver, and game.
+- ABSO's default for most gaming profiles is **On**, but this is a per-profile tradeoff — not a claim that HAGS always wins.
+- First toggle requires a reboot. Subsequent profile switches do not.
+- If you hit stutter, frame pacing regressions, or driver-level issues, test both HAGS states for your specific game/driver combination.
 
 ### VRR Optimize (Windows Setting)
-- **Almost always OFF for gaming** - adds latency even in exclusive fullscreen
-- **Only ON for:** Productivity/desktop use where smooth scrolling matters
+- ABSO disables Windows "Optimizations for windowed games / VRR Optimize" on most competitive gaming profiles because those profiles target the exclusive-fullscreen path.
+- This is not universal Windows 11 guidance. Microsoft specifically positions windowed-game optimizations as a latency and feature win (Auto HDR, VRR) for DX10/DX11 windowed and borderless games, so the `-capture` / borderless profiles and the `productivity` profile leave it alone or enable it.
+- The right setting depends on the game's presentation mode and your workflow.
 
 ### HDR
 - **Only enable if:** Game has native HDR support

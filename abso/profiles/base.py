@@ -113,6 +113,23 @@ class BaseProfile(ABC):
         return False
 
     @property
+    def enforces_reflex_in_config(self) -> bool:
+        """Whether ABSO actually writes the NVIDIA Reflex toggle into game config.
+
+        ``requires_reflex`` only states that the game supports Reflex and that
+        ABSO should keep driver LLM off. It does not imply ABSO enables Reflex
+        for the user. Only profiles whose associated config handler writes the
+        in-game Reflex key (e.g. Diablo4ConfigHandler.reflex,
+        MarvelRivalsConfigHandler.nvidia_reflex) should override this to True.
+
+        Profiles where ``requires_reflex`` is True but
+        ``enforces_reflex_in_config`` is False MUST tell the user to enable
+        Reflex manually in-game — both in the description and in-game
+        guidance text. The Reflex-contract invariant test enforces this.
+        """
+        return False
+
+    @property
     def requires_confirmed_vrr_support(self) -> bool:
         """Whether profile should only run when VRR/G-SYNC support is confirmed.
 
@@ -231,6 +248,25 @@ class BaseProfile(ABC):
         profile.
         """
         return list(self.executable_hints)
+
+    @property
+    def allow_dual_limiter(self) -> bool:
+        """Whether this profile deliberately layers an in-game and driver FPS cap.
+
+        Blur Busters G-SYNC 101 recommends a single authoritative limiter
+        (in-game preferred, driver/RTSS as fallback). ABSO enforces that policy
+        via a profile invariant test: a profile must not set both
+        ``NvidiaSettingsHandler.auto_vrr_fps_cap`` and a native game-config
+        ``auto_vrr_fps_cap`` unless it overrides this property to ``True`` and
+        documents why in-code.
+
+        Typical acceptable reason: the game's native config file is known to
+        drift (e.g., the game rewrites the INI on exit or on multi-monitor
+        changes), so the driver cap is kept as a safety net that catches the
+        drift. Both caps compute the same value (refresh - 3), so the effective
+        cap is deterministic.
+        """
+        return False
 
     @property
     def allow_unverified_nvidia_profile_reuse(self) -> bool:

@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 
 class NetworkSettingsHandler(SettingsHandler):
-    """Handles network-related gaming optimizations.
+    """Handles network-related tweaks available as an opt-in preset.
 
     Manages:
     - Nagle's Algorithm (TCP delay)
@@ -25,25 +25,52 @@ class NetworkSettingsHandler(SettingsHandler):
     - RSS (Receive Side Scaling)
     - Network adapter settings (via netsh)
 
+    Scope: these are **opt-in** tweaks. Built-in profiles default to
+    ``preset: "default"`` and do not mutate global TCP state. Most
+    competitive gameplay traffic is UDP, where Nagle and TCP autotuning
+    have no effect on in-game latency. Surface-level "disable all TCP
+    things for gaming" guides are not aligned with current Microsoft
+    documentation.
+
     Technical notes:
-    - TCP Auto-Tuning dynamically adjusts receive window. Disabling can reduce
-      latency but may hurt throughput on high-latency connections.
-    - ECN (Explicit Congestion Notification) adds overhead. Disabling is safe.
-    - RSS distributes network processing across CPU cores. Generally beneficial.
+    - **Nagle**: Only affects TCP. Disabling lowers small-packet TCP delay
+      for TCP-based traffic (matchmaking, chat, login), not UDP gameplay.
+      Some security tools may interact poorly with per-interface
+      TCPNoDelay/TcpAckFrequency writes.
+    - **TCP Auto-Tuning**: Microsoft documents the default ``normal`` as a
+      TCP throughput win on modern Windows. Disabling is not a general
+      gaming latency fix and can hurt downloads/streaming.
+    - **ECN**: Adds a small handshake cost. Some middleboxes drop ECN-marked
+      packets. Not recommended as a universal latency tweak.
+    - **RSS**: Distributes network processing across CPU cores. Generally
+      beneficial and ABSO leaves it enabled.
     """
 
     TCPIP_PARAMS_KEY = r"SYSTEM\CurrentControlSet\Services\Tcpip\Parameters"
     INTERFACES_KEY = r"SYSTEM\CurrentControlSet\Services\Tcpip\Parameters\Interfaces"
 
-    # TCP global settings managed via netsh
+    # TCP global settings managed via netsh.
+    #
+    # ``gaming_value`` here is the value the opt-in ``preset: "gaming"``
+    # applies on request. It is NOT what built-in profiles do by default —
+    # those use ``preset: "default"`` and leave these settings alone. These
+    # descriptions avoid blanket "safe to disable" claims because modern
+    # Windows networking does not behave that way in practice.
     TCP_GLOBAL_SETTINGS = {
         "autotuninglevel": {
             "gaming_value": "disabled",
-            "description": "TCP receive window auto-tuning. Disable for lower latency.",
+            "description": (
+                "TCP receive window auto-tuning. Microsoft recommends "
+                "'normal' for TCP throughput; only disable if you have a "
+                "specific measured reason."
+            ),
         },
         "ecncapability": {
             "gaming_value": "disabled",
-            "description": "Explicit Congestion Notification. Adds overhead.",
+            "description": (
+                "Explicit Congestion Notification. Small handshake overhead; "
+                "some middleboxes drop ECN-marked packets."
+            ),
         },
         "rss": {
             "gaming_value": "enabled",
@@ -51,7 +78,7 @@ class NetworkSettingsHandler(SettingsHandler):
         },
         "timestamps": {
             "gaming_value": "disabled",
-            "description": "TCP timestamps. Small overhead, rarely needed.",
+            "description": "TCP timestamps. Small overhead, rarely matters for gaming.",
         },
     }
 
@@ -94,32 +121,12 @@ class NetworkSettingsHandler(SettingsHandler):
         # Check TCP global settings
         tcp_global = current.get("tcp_global", {})
 
-        # Check auto-tuning
-        auto_tuning = tcp_global.get("autotuninglevel", "").lower()
-        if auto_tuning and auto_tuning != "disabled":
-            issues.append(Issue(
-                title="TCP Auto-Tuning is enabled",
-                severity="info",
-                current_value=auto_tuning.capitalize(),
-                optimal_value="Disabled",
-                explanation=(
-                    "TCP Auto-Tuning dynamically adjusts receive window size. "
-                    "Disabling can reduce latency for gaming but may hurt download speeds."
-                ),
-                category="network",
-            ))
-
-        # Check ECN
-        ecn = tcp_global.get("ecncapability", "").lower()
-        if ecn and ecn != "disabled":
-            issues.append(Issue(
-                title="ECN Capability is enabled",
-                severity="info",
-                current_value=ecn.capitalize(),
-                optimal_value="Disabled",
-                explanation="ECN adds packet overhead. Disabling is safe and reduces latency.",
-                category="network",
-            ))
+        # NOTE: we intentionally no longer flag TCP Auto-Tuning or ECN as
+        # suboptimal. Microsoft documents TCP receive-window autotuning
+        # default 'normal' as a TCP throughput win. Most gameplay traffic is
+        # UDP, and ECN/autotuning are not universally "safe to disable"
+        # latency wins. ABSO surfaces these only when the user opts into the
+        # TCP 'gaming' preset; they are not a default-profile audit finding.
 
         return issues
 

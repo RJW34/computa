@@ -24,6 +24,13 @@ class Rivals2GSyncProfile(Rivals2BaseProfile):
     """
 
     @property
+    def allow_dual_limiter(self) -> bool:
+        # Rivals 2 GameUserSettings.ini is known to be rewritten by the game
+        # on exit, so ABSO keeps the NVIDIA driver cap as a safety net in
+        # addition to the in-game cap. Both resolve to refresh - 3.
+        return True
+
+    @property
     def profile_id(self) -> str:
         return "rivals2-gsync"
 
@@ -163,6 +170,13 @@ class Rivals2OnlineGSyncProfile(Rivals2BaseProfile):
     for SnapNet rollback netcode. Threaded optimization forced off to prevent
     UE5 driver contention.
     """
+
+    @property
+    def allow_dual_limiter(self) -> bool:
+        # Same rationale as Rivals2GSyncProfile: UE5 rewrites
+        # GameUserSettings.ini on exit, so ABSO keeps the driver cap as a
+        # safety net alongside the in-game cap. Both resolve to refresh - 3.
+        return True
 
     @property
     def profile_id(self) -> str:

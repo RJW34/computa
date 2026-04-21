@@ -131,22 +131,30 @@ class RegistrySettingsHandler(SettingsHandler):
                 evidence_tier=EvidenceTier.VERIFIED,
             ))
 
-        # Win32PrioritySeparation (scheduler quantum) — documented kernel behavior
+        # Win32PrioritySeparation (scheduler quantum). Documented kernel
+        # behavior, but the measured effect on modern hybrid CPUs is
+        # workload-dependent and can interact badly with real-time audio,
+        # capture software, and anti-cheat. ABSO surfaces the state as
+        # informational only and does not grade a non-gaming value as a
+        # "problem".
         priority_sep = current.get("win32_priority_separation")
         if priority_sep is not None and priority_sep != self.WIN32_PRIORITY_GAMING:
             issues.append(Issue(
-                title="Windows scheduler not optimized for gaming",
+                title="Windows scheduler quantum is not set to ABSO gaming value",
                 severity="info",
                 current_value=f"0x{priority_sep:02X}" if priority_sep else "Unknown",
                 optimal_value=f"0x{self.WIN32_PRIORITY_GAMING:02X}",
                 explanation=(
                     "Win32PrioritySeparation controls CPU time slice allocation. "
-                    "0x2A uses short fixed quantum with max foreground boost, "
-                    "giving the active game more responsive CPU scheduling. "
-                    "Documented in Windows Internals (Russinovich)."
+                    "ABSO's gaming profiles set 0x2A (short fixed quantum with max "
+                    "foreground boost). This is a documented kernel control "
+                    "(Windows Internals, Russinovich) but its measured gaming "
+                    "impact is hardware and workload dependent — treat as an "
+                    "experimental tradeoff, not a guaranteed win. Can interact "
+                    "with real-time audio, OBS capture, and some anti-cheat."
                 ),
                 category="registry",
-                evidence_tier=EvidenceTier.VERIFIED,
+                evidence_tier=EvidenceTier.EXPERIMENTAL,
             ))
 
         return issues

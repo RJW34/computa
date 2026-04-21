@@ -224,18 +224,30 @@ class WindowsSettingsHandler(SettingsHandler):
                 category="windows",
             ))
 
-        # VBS check
+        # VBS surfacing. ABSO does NOT advertise a universal "disable for
+        # FPS" recommendation: independent testing shows VBS/HVCI can cost
+        # measurable performance in some gaming configurations (Tom's
+        # Hardware, Neowin), but disabling VBS reduces Windows' security
+        # posture (Credential Guard, Memory Integrity) and is a tradeoff
+        # users must make explicitly. ABSO's opt-in max-performance flow
+        # (see ``abso.settings.vbs_optin``) is the only path that disables
+        # VBS; the audit output just reports current state.
         if current.get("vbs"):
             issues.append(Issue(
                 title="VBS / Memory Integrity is enabled",
                 severity="info",
                 current_value="Enabled",
-                optimal_value="Disabled (for max performance)",
+                optimal_value="Enabled (security tradeoff — opt-in disable available)",
                 explanation=(
-                    "VBS/Memory Integrity adds a virtualization layer that increases CPU instruction "
-                    "latency. Independent testing (Tom's Hardware, Neowin) shows 5-15% FPS impact in "
-                    "games, with ~8% typical. Requires reboot. Security tradeoff — disable only on "
-                    "dedicated gaming machines."
+                    "VBS/Memory Integrity adds a virtualization layer that can cost "
+                    "measurable gaming performance on some configurations (5-15% FPS "
+                    "has been reported in independent testing, workload dependent). "
+                    "Disabling it is a security tradeoff: VBS protects credentials, "
+                    "kernel memory integrity, and hypervisor-protected code "
+                    "integrity. ABSO does not silently disable VBS. If you want to "
+                    "trade security for performance, use the explicit opt-in "
+                    "max-performance flow; it requires a reboot and provides a "
+                    "reversible restore path."
                 ),
                 category="windows",
             ))

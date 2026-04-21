@@ -72,9 +72,13 @@ class GraphicsSettingsHandler(SettingsHandler):
                 current_value="Enabled (default)",
                 optimal_value="Keep enabled for VRR/G-Sync",
                 explanation=(
-                    "MPO is REQUIRED for VRR/G-Sync to work properly. Disabling MPO breaks "
-                    "variable refresh rate. Only disable if you experience severe stuttering "
-                    "AND don't use G-Sync/VRR. Most users should leave MPO enabled."
+                    "MPO (Multi-Plane Overlay) is the expected default on modern "
+                    "Windows 11. It is effectively required for G-SYNC/VRR on "
+                    "Windows 11 24H2+: disabling MPO on 24H2+ is known to break "
+                    "the VRR path. On earlier builds there are historical MPO "
+                    "compositor stutter bugs with specific GPU/driver combos, "
+                    "so keep MPO enabled unless a specific measured problem "
+                    "requires disabling it for that profile."
                 ),
                 category="graphics",
             ))
@@ -88,9 +92,16 @@ class GraphicsSettingsHandler(SettingsHandler):
                 current_value="Enabled" if game_dvr_behavior != 2 else "Disabled",
                 optimal_value="Disabled (GameDVR_FSEBehavior=2)",
                 explanation=(
-                    "Fullscreen Optimizations run games in borderless windowed mode for "
-                    "faster alt-tabbing. This adds ~1 frame of latency. Disabling forces "
-                    "true exclusive fullscreen for games that support it."
+                    "Windows 'Optimizations for windowed games' (Fullscreen "
+                    "Optimizations) runs DX10/DX11 games on the DWM composited "
+                    "borderless path instead of true exclusive fullscreen. "
+                    "Microsoft positions this as a latency and feature win "
+                    "(Auto HDR / VRR) for windowed/borderless games, so it is "
+                    "not a universal 'turn off for gaming' toggle. ABSO sets "
+                    "this per-executable via profile-specific overrides instead "
+                    "of relying on a global disable. Leave the global state "
+                    "alone unless you know you want every DX10/DX11 game on the "
+                    "exclusive path."
                 ),
                 category="graphics",
             ))

@@ -30,6 +30,13 @@ class _Diablo4BaseProfile(BaseProfile):
         return True
 
     @property
+    def enforces_reflex_in_config(self) -> bool:
+        # Diablo4ConfigHandler writes the native Reflex key into
+        # LocalPrefs.txt so the toggle is set without the user needing to
+        # launch the game first.
+        return True
+
+    @property
     def executable_hints(self) -> list[str]:
         return ["Diablo IV.exe"]
 
@@ -102,7 +109,10 @@ class _Diablo4BaseProfile(BaseProfile):
             "NvidiaSettingsHandler": {
                 "preset": "vrr_diablo4",
                 "vsync": "on",
-                "auto_vrr_fps_cap": True,
+                # Driver cap intentionally disabled. Diablo 4's native Foreground FPS
+                # limiter (written by Diablo4ConfigHandler.auto_vrr_fps_cap) is the
+                # single authoritative limiter per Blur Busters G-SYNC 101.
+                "auto_vrr_fps_cap": False,
                 "global_vrr_mode": "fullscreen_only",
             },
             "NetworkSettingsHandler": {
@@ -125,8 +135,11 @@ class _Diablo4BaseProfile(BaseProfile):
                 "vsync": False,
                 "reflex": True,
                 "auto_refresh_rate": True,
-                "limit_foreground_fps": False,
-                "foreground_fps_limit": 0,
+                # In-game foreground cap at refresh - 3 via auto_vrr_fps_cap.
+                # This is the single VRR limiter; the NVIDIA driver cap is off.
+                # Blur Busters G-SYNC 101: in-game limiter has lower latency
+                # than driver / NVCP / RTSS caps when the game exposes one.
+                "auto_vrr_fps_cap": True,
                 "limit_background_fps": True,
                 "background_fps_limit": 60,
             },
@@ -160,8 +173,8 @@ class _Diablo4BaseProfile(BaseProfile):
             {
                 "category": "Display",
                 "setting": "Foreground FPS Limit",
-                "value": "Unlimited",
-                "reason": "ABSO now disables Diablo 4's foreground limiter and keeps the VRR/driver path authoritative.",
+                "value": "Refresh rate - 3 (e.g., 141 @ 144Hz, 237 @ 240Hz, 297 @ 300Hz)",
+                "reason": "ABSO writes LimitForegroundFPS=1 and MaxForegroundFPS=refresh-3 into LocalPrefs.txt. In-game limiter owns the VRR cap per Blur Busters G-SYNC 101; the NVIDIA driver cap is off.",
             },
             {
                 "category": "Graphics",

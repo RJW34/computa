@@ -39,11 +39,12 @@ There is no unified way to:
 
 ## 4. Design Principles
 
-1. **Aggressive by default** — Optimize for competitive performance (latency) unless otherwise specified
-2. **Safety through rollback** — Always backup before changes; one-click restore
-3. **Transparency** — Explain *why* each setting matters, not just *what* to change
-4. **Auto-detect everything possible** — Only prompt user when detection fails
-5. **Game-aware** — Different games have different optimal configurations
+1. **Aggressive where the evidence supports it** — Optimize for competitive performance (latency) on well-evidenced tweaks. Do not chase myth tweaks, and do not disable security features or broad Windows services in default profiles just to move benchmark numbers.
+2. **Safety through rollback** — Always backup before changes; one-click restore. Reversibility is non-negotiable for every setting ABSO writes.
+3. **Transparency** — Explain *why* each setting matters, not just *what* to change. Cite sources where the claim is non-obvious. Never advertise behavior the code doesn't actually implement.
+4. **Auto-detect everything possible** — Only prompt the user when detection fails.
+5. **Game-aware** — Different games have different optimal configurations. Per-profile tradeoffs beat universal "boost" claims.
+6. **Security tradeoffs are explicit, not silent** — VBS/HVCI/VMP, broad service disabling, and any other change that reduces the system's security posture must be gated behind an explicit opt-in flow with warnings, reboot requirements, and a restore path.
 
 ---
 
@@ -207,8 +208,9 @@ Before applying any changes:
 - **Captures:** Disable background recording
 
 ### 6.5 Virtualization-Based Security (VBS) / Core Isolation
-- Memory Integrity (HVCI): Disable for max performance
-- VBS status detection
+- VBS / HVCI / Virtual Machine Platform state detection and audit surfacing
+- Disabling VBS, HVCI, or VMP is **opt-in only** via an explicit max-performance flow. Default gaming profiles never silently reduce the system's security posture. Any opt-in must warn about the security tradeoff, require a reboot, and provide a reversible restore path.
+- Reference: Microsoft and Tom's Hardware have documented measurable gaming perf impact from HVCI on some configurations, but the decision is a security vs. performance tradeoff the user must make explicitly.
 
 ### 6.6 Power Management
 - Power plan selection (Ultimate Performance standard; High Performance fallback)
@@ -225,25 +227,20 @@ Before applying any changes:
 | `HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management` | Various memory tweaks |
 | `HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Multimedia\SystemProfile` | Multimedia scheduling priority |
 | `HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Multimedia\SystemProfile\Tasks\Games` | Game priority settings |
-| Timer resolution (`NtSetTimerResolution`) | Force 0.5ms timer resolution |
-| Disable Nagle's algorithm | Network latency reduction |
+| Timer resolution (`NtSetTimerResolution`) | Per-process and ephemeral on Windows 10 2004+; session-scoped only when a profile opts in. |
+| Disable Nagle's algorithm | Opt-in only (see 6.9). Most gameplay is UDP, so this is not a default gaming tweak. |
 | `HKCU\Control Panel\Desktop` | Menu show delay, etc. |
 | Fullscreen optimizations disable flag | Per-executable |
 
 ### 6.8 Background Process Management
-- Identify and optionally disable/suspend non-essential processes
-- Xbox services
-- Windows Search indexing (pause during gaming)
-- Telemetry services
-- Sysmain (Superfetch)
-- Windows Update (pause during gaming)
+- Surface non-essential processes in audit output. Broad disabling (telemetry, Xbox services, Sysmain, Search indexer, Windows Update) is **out of scope** for default gaming profiles — it breaks Windows more often than it helps FPS on modern 11.
+- If implemented at all, these are per-session opt-in pauses, not permanent disables, and must support full restoration.
 
 ### 6.9 Network / Latency Tweaks
-- Nagle's algorithm (disable for lower latency)
-- Network Throttling Index
-- TCP auto-tuning level
-- DNS optimization
-- Adapter-specific settings (interrupt moderation, RSS, etc.)
+- Built-in profiles default to OS network configuration. TCP-layer tweaks (Nagle, autotuning, ECN, timestamps, network throttling) are available as an **opt-in** preset only.
+- Most competitive gameplay is UDP, where Nagle and TCP autotuning have no effect. These tweaks are not sold as general gaming latency fixes.
+- Adapter-specific settings (interrupt moderation, RSS) remain out of scope for default profiles and are surfaced only in audit output.
+- Reference: Microsoft documents TCP receive-window autotuning default `normal` as a TCP throughput win; disabling it as a blanket gaming tweak is discouraged.
 
 ### 6.10 Emulator-Specific (Slippi Dolphin)
 - Dolphin graphics backend (Vulkan vs OpenGL vs D3D)

@@ -37,10 +37,25 @@ class _MarvelRivalsBaseProfile(ReflexShooterBaseProfile):
     def requires_confirmed_vrr_support(self) -> bool:
         return True
 
+    @property
+    def enforces_reflex_in_config(self) -> bool:
+        # MarvelRivalsConfigHandler writes bNvidiaReflex into
+        # GameUserSettings.ini so the in-game Reflex toggle is pre-set.
+        return True
+
     def get_handlers(self):
         from abso.settings.marvel_rivals_config import MarvelRivalsConfigHandler
 
         return [*super().get_handlers(), MarvelRivalsConfigHandler()]
+
+    @property
+    def allow_dual_limiter(self) -> bool:
+        # Marvel Rivals lanes deliberately layer the in-game cap (authoritative,
+        # Blur Busters-preferred) with the NVIDIA driver cap (safety net).
+        # Both resolve to refresh - 3 so the effective cap is deterministic;
+        # the driver cap catches any GameUserSettings drift the game writes
+        # back on exit.
+        return True
 
     def _shared_overrides(self) -> dict[str, dict[str, Any]]:
         return {

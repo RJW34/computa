@@ -4,6 +4,7 @@ This index is the shortest path to the documents that currently matter.
 
 ## Start Here
 
+- [Opus 4.7 xhigh Handoff](./OPUS_4_7_XHIGH_HANDOFF.md)
 - [HERMES Handoff](./HERMES_HANDOFF.md)
 - [Quality Rubric](./QUALITY_RUBRIC.md)
 - [Remediation Roadmap](./REMEDIATION_ROADMAP.md)

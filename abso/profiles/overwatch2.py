@@ -30,6 +30,16 @@ class _Overwatch2BaseProfile(ReflexShooterBaseProfile):
         handlers.append(OW2ConfigHandler())
         return handlers
 
+    @property
+    def allow_dual_limiter(self) -> bool:
+        # OW2's G-SYNC variants deliberately layer the in-game cap (authoritative,
+        # lowest latency per Blur Busters) and the NVIDIA driver cap (safety net).
+        # Both resolve to refresh - 3 and catch each other when Settings_v0.ini
+        # drifts — OW2 is known to rewrite the INI on exit and on multi-monitor
+        # changes. The no-sync variant sets neither cap, so this opt-in is
+        # harmless there.
+        return True
+
     def _base_overrides(self) -> dict[str, dict[str, Any]]:
         return {
             "WindowsSettingsHandler": {
@@ -185,7 +195,10 @@ class Overwatch2GSyncProfile(_Overwatch2BaseProfile):
 
     @property
     def description(self) -> str:
-        return "Low latency VRR profile (Reflex, VSync safety net, G-SYNC ON)"
+        return (
+            "Low latency VRR profile (VSync safety net, G-SYNC ON). "
+            "Keeps driver LLM off for Reflex; enable Reflex On + Boost in-game."
+        )
 
     @property
     def requires_confirmed_vrr_support(self) -> bool:
@@ -255,8 +268,8 @@ class Overwatch2GSyncProfile(_Overwatch2BaseProfile):
             {
                 "category": "Display",
                 "setting": "NVIDIA Reflex Low Latency",
-                "value": "Enabled + Boost",
-                "reason": "Native Reflex should own queue control.",
+                "value": "Enabled + Boost (must be enabled manually in-game)",
+                "reason": "OW2's Reflex toggle is not written by ABSO (Settings_v0.ini's Reflex key is not stable across patches). ABSO keeps driver LLM off so Reflex owns render-queue control once you enable it in-game.",
             },
             {
                 "category": "Display",
@@ -390,8 +403,8 @@ class Overwatch2GSyncHDRProfile(_Overwatch2BaseProfile):
             {
                 "category": "Display",
                 "setting": "NVIDIA Reflex Low Latency",
-                "value": "Enabled + Boost",
-                "reason": "Native Reflex should own queue control.",
+                "value": "Enabled + Boost (must be enabled manually in-game)",
+                "reason": "OW2's Reflex toggle is not written by ABSO (Settings_v0.ini's Reflex key is not stable across patches). ABSO keeps driver LLM off so Reflex owns render-queue control once you enable it in-game.",
             },
             {
                 "category": "Display",
@@ -521,8 +534,8 @@ class Overwatch2GSyncCaptureProfile(_Overwatch2BaseProfile):
             {
                 "category": "Display",
                 "setting": "NVIDIA Reflex Low Latency",
-                "value": "Enabled + Boost",
-                "reason": "Native Reflex should own queue control.",
+                "value": "Enabled + Boost (must be enabled manually in-game)",
+                "reason": "OW2's Reflex toggle is not written by ABSO (Settings_v0.ini's Reflex key is not stable across patches). ABSO keeps driver LLM off so Reflex owns render-queue control once you enable it in-game.",
             },
             {
                 "category": "Display",
@@ -639,8 +652,8 @@ class Overwatch2GSyncHDRCaptureProfile(_Overwatch2BaseProfile):
             {
                 "category": "Display",
                 "setting": "NVIDIA Reflex Low Latency",
-                "value": "Enabled + Boost",
-                "reason": "Native Reflex should own queue control.",
+                "value": "Enabled + Boost (must be enabled manually in-game)",
+                "reason": "OW2's Reflex toggle is not written by ABSO (Settings_v0.ini's Reflex key is not stable across patches). ABSO keeps driver LLM off so Reflex owns render-queue control once you enable it in-game.",
             },
             {
                 "category": "Display",

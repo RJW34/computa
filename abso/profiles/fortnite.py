@@ -80,8 +80,8 @@ class _FortniteBaseProfile(ReflexShooterBaseProfile):
             {
                 "category": "Display",
                 "setting": "NVIDIA Reflex Low Latency",
-                "value": "On + Boost",
-                "reason": "Reflex should own render-queue control. ABSO keeps driver LLM off to avoid overlap.",
+                "value": "On + Boost (must be enabled manually in-game)",
+                "reason": "Fortnite's Reflex toggle lives in Fortnite's settings, not in a stable config key ABSO can write. ABSO keeps driver LLM off so Reflex owns render-queue control.",
             },
             {
                 "category": "Display",
@@ -141,7 +141,10 @@ class FortniteProfile(_FortniteBaseProfile):
 
     @property
     def description(self) -> str:
-        return "Competitive SDR Fortnite profile with Reflex and a no-sync latency path"
+        return (
+            "Competitive SDR Fortnite profile with a no-sync latency path. "
+            "Keeps driver LLM off for Reflex; enable Reflex On + Boost in-game."
+        )
 
     @property
     def is_sdr_only(self) -> bool:
@@ -190,7 +193,10 @@ class FortniteHDRProfile(_FortniteBaseProfile):
 
     @property
     def description(self) -> str:
-        return "Competitive Fortnite HDR profile with Reflex and a no-sync latency path"
+        return (
+            "Competitive Fortnite HDR profile with a no-sync latency path. "
+            "Keeps driver LLM off for Reflex; enable Reflex On + Boost in-game."
+        )
 
     @property
     def is_sdr_only(self) -> bool:

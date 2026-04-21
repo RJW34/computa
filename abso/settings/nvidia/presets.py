@@ -172,27 +172,39 @@ NVIDIA_PRESETS: dict[str, dict[str, Any]] = {
             "low_latency_mode": "off",  # OFF - Diablo 4 has native Reflex, don't conflict
             "power_management": "prefer_max_performance",
             "vsync": "off",  # OFF - G-Sync handles sync
-            "max_frame_rate": "off",  # Use in-game limiter (297 for 300Hz)
+            # Max Frame Rate is set by the Diablo 4 profile via auto_vrr_fps_cap.
+            # That path calls NvidiaSettingsHandler to compute refresh - 3 at apply time.
+            "max_frame_rate": "off",
             "shader_cache": "unlimited",
             "threaded_optimization": "off",  # OFF - reduces render latency
             "triple_buffering": "off",  # OFF - reduces latency
         },
         "notes": {
             "reflex": (
-                "Enable NVIDIA Reflex 'On + Boost' in Diablo 4 graphics settings. "
-                "Native Reflex is more effective than driver Low Latency Mode."
+                "ABSO writes NVIDIA Reflex 'On' into LocalPrefs.txt via the "
+                "Diablo4ConfigHandler so the in-game toggle is pre-set without "
+                "launching the game. If your GPU has headroom you can upgrade "
+                "to 'On + Boost' manually in Diablo 4's in-game graphics "
+                "settings; ABSO keeps driver LLM off either way."
             ),
             "fps_cap": (
-                "Set in-game Max Foreground FPS to refresh_rate - 3 (e.g., 297 for 300Hz). "
-                "In-game limiter has lower latency than NVCP/RTSS limiters."
+                "Single-limiter policy per Blur Busters G-SYNC 101: the Diablo 4 "
+                "profile uses Diablo 4's in-game Foreground FPS limiter "
+                "(LimitForegroundFPS=1, MaxForegroundFPS=refresh-3) as the only "
+                "cap. The NVIDIA driver Max Frame Rate is intentionally off. "
+                "If LocalPrefs.txt is not present at apply time the in-game cap "
+                "cannot be written; the applier surfaces a notice so the user "
+                "can enable NvidiaSettingsHandler.auto_vrr_fps_cap as a fallback."
             ),
             "system_requirements": (
-                "HAGS=ON, VBS=OFF, Windows VRR=OFF, MPO=ENABLED. "
-                "Uninstall GeForce Experience for lowest overhead."
+                "HAGS=ON (per-profile default; reboot-relevant), "
+                "VBS/HVCI tradeoff is opt-in, "
+                "MPO enabled (required for G-SYNC/VRR on Windows 11 24H2+)."
             ),
             "hdr": (
-                "Diablo 4 has excellent native HDR. Keep HDR enabled on OLED. "
-                "Set HDR Paper White Nits and Max Nits appropriately for your display."
+                "Diablo 4 has excellent native HDR. The Diablo 4 HDR profile keeps "
+                "HDR enabled and writes sane native HDR baselines into "
+                "LocalPrefs.txt. Fine-tune HDR Paper White / Max Nits for your panel."
             ),
         },
     },

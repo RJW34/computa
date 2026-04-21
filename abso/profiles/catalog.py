@@ -115,13 +115,13 @@ PROFILE_CATALOG: OrderedDict[str, ProfileCatalogEntry] = OrderedDict(
         "fortnite": ProfileCatalogEntry(
             profile_class=FortniteProfile,
             tray_category="Shooter",
-            tray_subtitle="SDR | Reflex ON+Boost | No Sync",
+            tray_subtitle="SDR | Reflex (set in-game) | No Sync",
             sync_mode="agnostic",
         ),
         "fortnite-hdr": ProfileCatalogEntry(
             profile_class=FortniteHDRProfile,
             tray_category="Shooter",
-            tray_subtitle="HDR ON | Reflex ON+Boost | No Sync",
+            tray_subtitle="HDR ON | Reflex (set in-game) | No Sync",
             sync_mode="agnostic",
         ),
         "marvel-rivals-sdr": ProfileCatalogEntry(
@@ -153,13 +153,13 @@ PROFILE_CATALOG: OrderedDict[str, ProfileCatalogEntry] = OrderedDict(
         "overwatch2-gsync": ProfileCatalogEntry(
             profile_class=Overwatch2GSyncProfile,
             tray_category="Shooter",
-            tray_subtitle="Strict Exclusive | Reflex ON+Boost | G-SYNC ON",
+            tray_subtitle="Strict Exclusive | Reflex (set in-game) | G-SYNC ON",
             sync_mode="on",
         ),
         "overwatch2-gsync-hdr": ProfileCatalogEntry(
             profile_class=Overwatch2GSyncHDRProfile,
             tray_category="Shooter",
-            tray_subtitle="Strict HDR Exclusive | Reflex ON+Boost | G-SYNC ON",
+            tray_subtitle="Strict HDR Exclusive | Reflex (set in-game) | G-SYNC ON",
             sync_mode="on",
         ),
         "overwatch2-gsync-capture": ProfileCatalogEntry(
