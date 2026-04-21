@@ -121,9 +121,19 @@ def json_error(message: str, exit_code: int = 1) -> None:
     sys.exit(exit_code)
 
 
-def _describe_restore_summary(summary: dict[str, Any]) -> str | None:
-    """Build a concise message for an incomplete restore summary."""
+def _describe_restore_summary(
+    summary: dict[str, Any], *, blocking_only: bool = False
+) -> str | None:
+    """Build a concise message for an incomplete restore summary.
+
+    When ``blocking_only`` is True, non-blocking entries (handlers whose
+    ``restore_guarantee`` is ``"none"`` or ``"ephemeral"``) are ignored —
+    they do not represent broken promises and so should not be reported
+    as failures to the user.
+    """
     incomplete = summary.get("failed_components", []) + summary.get("skipped_components", [])
+    if blocking_only:
+        incomplete = [item for item in incomplete if bool(item.get("blocking", True))]
     if not incomplete:
         return None
 
@@ -1166,8 +1176,14 @@ def restore(backup_id: str, json_output: bool) -> None:
 
     try:
         restore_summary = backup_manager.restore_backup(backup_id).to_dict()
-        restore_error = _describe_restore_summary(restore_summary)
-        if restore_error:
+        # Only surface an error when a handler ABSO actually promises to
+        # restore failed. Skips from ``restore_guarantee="none"`` /
+        # ``"ephemeral"`` handlers (e.g. timer resolution, which reverts on
+        # process exit) are non-blocking and must not fail the restore.
+        if restore_summary.get("has_blocking_issues"):
+            restore_error = _describe_restore_summary(
+                restore_summary, blocking_only=True
+            )
             if json_output:
                 output_json({
                     "success": False,
@@ -1178,6 +1194,8 @@ def restore(backup_id: str, json_output: bool) -> None:
                 return
             console.print(f"[red]{restore_error}[/red]")
             for item in restore_summary["failed_components"] + restore_summary["skipped_components"]:
+                if not bool(item.get("blocking", True)):
+                    continue
                 console.print(f"  [red]- {item['handler']}: {item.get('detail', item['reason'])}[/red]")
             sys.exit(1)
         clear_current_profile()

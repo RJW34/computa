@@ -695,7 +695,7 @@ function Show-Notification {
     param(
         [string]$Title,
         [string]$Message,
-        [ValidateSet("Info", "Warning", "Error")]
+        [ValidateSet("Info", "Warning", "Error", "Success")]
         [string]$Type = "Info"
     )
 
@@ -2423,7 +2423,8 @@ function Restore-Settings {
 
         if (-not $rawOutput) { throw "No output" }
 
-        $json = $rawOutput | ConvertFrom-Json
+        $json = Invoke-JsonSafe -Text $rawOutput -Source 'Restore'
+        if ($null -eq $json) { throw "Restore CLI returned malformed JSON (see tray log for payload preview)" }
 
         $exitCodeOk = ($null -eq $exitCode -or $exitCode -eq 0)
         if ($null -eq $exitCode) {
