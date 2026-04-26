@@ -294,6 +294,7 @@ class ProfileLinter:
         windows_settings = settings_map.get("WindowsSettingsHandler", {})
         graphics_settings = settings_map.get("GraphicsSettingsHandler", {})
         color_settings = settings_map.get("ColorProfileSettingsHandler", {})
+        display_range_settings = settings_map.get("DisplayColorRangeHandler", {})
 
         if not windows_settings and not graphics_settings:
             return
@@ -343,6 +344,19 @@ class ProfileLinter:
                     "distort tone mapping."
                 ),
                 setting_path="ColorProfileSettingsHandler.icc_profile",
+            ))
+
+        # Check 1d: HDR profiles should not force Limited (TV) RGB range.
+        if hdr and display_range_settings.get("dynamic_range") == "limited":
+            result.add_issue(LintIssue(
+                code="DISPLAY_HDR_LIMITED_RANGE",
+                severity=LintSeverity.ERROR,
+                message="HDR profile cannot use Limited (TV) RGB range",
+                details=(
+                    "HDR output requires Full RGB to preserve the full dynamic range. "
+                    "Set dynamic_range='full' or 'auto' on DisplayColorRangeHandler."
+                ),
+                setting_path="DisplayColorRangeHandler.dynamic_range",
             ))
 
         # Check 2: VRR Optimize ON for latency-critical profiles

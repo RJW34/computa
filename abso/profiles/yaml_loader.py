@@ -47,6 +47,10 @@ _VALID_TRAY_CATEGORIES: set[TrayCategory] = {
 
 _VALID_SYNC_MODES: set[SyncMode] = {"on", "off", "agnostic"}
 
+# YAML profile loading uses yaml.safe_load (no arbitrary code execution), but
+# the metadata fields below feed online-safety checks (e.g. is_online_profile
+# gates RollbackGuard). Treat YAML profile files as TRUSTED CONFIGURATION —
+# they should never be loaded from unverified sources.
 _METADATA_PROPERTIES: set[str] = {
     "is_online_profile",
     "is_emulator_profile",
@@ -69,6 +73,7 @@ class BalancedBaseProfile(BaseProfile):
 
     def get_handlers(self) -> list[SettingsHandler]:
         from abso.settings.color import ColorProfileSettingsHandler
+        from abso.settings.display_range import DisplayColorRangeHandler
         from abso.settings.graphics import GraphicsSettingsHandler
         from abso.settings.memory import MemorySettingsHandler
         from abso.settings.mouse import MouseSettingsHandler
@@ -95,6 +100,7 @@ class BalancedBaseProfile(BaseProfile):
         handlers += [
             ProcessPriorityHandler(self.executable_hints),
             ColorProfileSettingsHandler(),
+            DisplayColorRangeHandler(),
         ]
         return handlers
 
@@ -141,6 +147,9 @@ class BalancedBaseProfile(BaseProfile):
                 "digital_vibrance": 50,
                 "show_osd_guidance": True,
                 "game_type": "balanced",
+            },
+            "DisplayColorRangeHandler": {
+                "dynamic_range": "full",
             },
         }
 

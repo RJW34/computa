@@ -1,5 +1,7 @@
 """Settings handler modules."""
 
+MONITOR_DATA_STORE_KEY = r"SYSTEM\CurrentControlSet\Control\GraphicsDrivers\MonitorDataStore"
+
 from abso.settings.base import SettingsHandler
 from abso.settings.cnm import CNMSettingsHandler
 from abso.settings.diablo4_config import Diablo4ConfigHandler
@@ -12,6 +14,7 @@ from abso.settings.timer import TimerSettingsHandler
 from abso.settings.windows import WindowsSettingsHandler
 
 __all__ = [
+    "MONITOR_DATA_STORE_KEY",
     "SettingsHandler",
     "WindowsSettingsHandler",
     "PowerSettingsHandler",

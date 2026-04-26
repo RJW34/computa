@@ -58,6 +58,7 @@ class ProductivityOLEDProfile(BaseProfile):
 
     def get_handlers(self) -> list[SettingsHandler]:
         from abso.settings.color import ColorProfileSettingsHandler
+        from abso.settings.display_range import DisplayColorRangeHandler
         from abso.settings.graphics import GraphicsSettingsHandler
         from abso.settings.nvidia import NvidiaSettingsHandler
         from abso.settings.registry import RegistrySettingsHandler
@@ -72,6 +73,7 @@ class ProductivityOLEDProfile(BaseProfile):
             NvidiaSettingsHandler(),
             GraphicsSettingsHandler(),
             ColorProfileSettingsHandler(),
+            DisplayColorRangeHandler(),
         ]
 
     def get_settings(self, handler_name: str) -> dict[str, Any]:
@@ -85,10 +87,18 @@ class ProductivityOLEDProfile(BaseProfile):
                 "hags": True,
                 # HDR enabled for OLED
                 "hdr": True,
+                # Wide Color Gamut ON — required on Win11 24H2+ to pair with
+                # HDR so SDR desktop content renders in OLED's wide gamut
+                # rather than sRGB (otherwise the desktop looks washed out).
+                "advanced_color": True,
                 "auto_hdr": False,  # Not gaming, no need for Auto HDR
                 "windowed_optimizations": True,  # Beneficial for desktop apps
                 # VRR ON - smooth scrolling benefit
                 "vrr_optimize": True,
+                # Paper-white ≈ 200 nits under HDR on OLED.
+                # Driver installs reset this slider; asserting it here
+                # keeps the SDR desktop looking right on every profile apply.
+                "sdr_white_level_nits": 200,
             },
             # PowerSettingsHandler intentionally excluded - keep current power plan
             "RegistrySettingsHandler": {
@@ -117,12 +127,20 @@ class ProductivityOLEDProfile(BaseProfile):
             "GraphicsSettingsHandler": {
                 # Keep FSO enabled - works well with modern apps
                 "disable_global_fso": False,
+                # Windows 11 24H2+ Auto Color Management can silently turn on
+                # after display re-enumeration (common after NVIDIA driver
+                # installs) and clamp the wide-gamut OLED desktop to sRGB.
+                # Assert it off so a calibrated OLED keeps its native look.
+                "disable_auto_color_management": True,
             },
             "ColorProfileSettingsHandler": {
                 "icc_profile": "native",      # Keep calibrated profile
                 "digital_vibrance": 50,
                 "show_osd_guidance": True,
                 "game_type": "productivity",
+            },
+            "DisplayColorRangeHandler": {
+                "dynamic_range": "full",
             },
         }
 

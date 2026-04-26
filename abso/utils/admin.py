@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import ctypes
 import logging
+import subprocess
 import sys
 
 logger = logging.getLogger(__name__)
@@ -34,12 +35,14 @@ def ensure_admin() -> None:
     logger.info("Requesting admin elevation...")
 
     try:
-        # Re-run the script with admin privileges
+        # list2cmdline applies the Windows quoting rules so paths with spaces
+        # (e.g. "C:\Users\Name With Space\...") survive the re-launch.
+        params = subprocess.list2cmdline(sys.argv[1:])
         ctypes.windll.shell32.ShellExecuteW(
             None,
             "runas",
             sys.executable,
-            " ".join(sys.argv),
+            params,
             None,
             1  # SW_SHOWNORMAL
         )
@@ -47,23 +50,3 @@ def ensure_admin() -> None:
     except Exception as e:
         logger.error(f"Failed to elevate: {e}")
         raise RuntimeError("Admin privileges required but elevation failed") from e
-
-
-def run_elevated(command: str) -> int:
-    """Run a command with elevated privileges.
-
-    Args:
-        command: Command to run.
-
-    Returns:
-        Exit code from ShellExecuteW (>32 means success).
-    """
-    result = ctypes.windll.shell32.ShellExecuteW(
-        None,
-        "runas",
-        "cmd.exe",
-        f"/c {command}",
-        None,
-        0  # SW_HIDE
-    )
-    return result

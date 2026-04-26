@@ -199,7 +199,7 @@ class ProfileApplier:
         )
 
         # === PHASE 0/1: Display prep + capability graph ===
-        preparation = self._prepared_profiles.pop(profile_name, None)
+        preparation = self._prepared_profiles.get(profile_name, None)
         if preparation is None:
             preparation = self._prepare_profile_environment(profile_name, profile)
 
@@ -664,7 +664,7 @@ class ProfileApplier:
                 ["tasklist", "/fo", "csv", "/nh"],
                 capture_output=True,
                 text=True,
-                timeout=10,
+                timeout=30,
             )
             if result.returncode == 0:
                 running_procs = result.stdout.lower()
@@ -676,7 +676,10 @@ class ProfileApplier:
                         )
                         logger.warning(f"Game executable running during apply: {exe}")
         except Exception as e:
-            logger.debug(f"Game-running detection failed: {e}")
+            logger.warning(
+                f"Could not determine if game is running (tasklist timed out); "
+                f"assuming safe to apply: {e}"
+            )
 
         return warnings
 
@@ -705,6 +708,7 @@ class ProfileApplier:
             "TimerSettingsHandler": "timer",
             "MouseSettingsHandler": "mouse",
             "ColorProfileSettingsHandler": "color",
+            "DisplayColorRangeHandler": "display_color_range",
         }
 
         attr_name = handler_to_attr.get(handler_name)

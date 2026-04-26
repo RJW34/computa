@@ -105,7 +105,7 @@ class SettingsHandler:
 - `is_emulator_profile` — Whether this is for an emulator
 - `optimization_target` — What the profile optimizes for
 
-**Backup System** — Creates timestamped folders in `/backups/` with manifest.json tracking all components. All 15 settings handlers are backed up.
+**Backup System** — Creates timestamped folders in `/backups/` with manifest.json tracking all components. Every state-mutating settings handler is backed up; the canonical list is `_get_backup_handlers()` in `abso/core/backup.py`.
 
 **Validation Pipeline** — Profile application runs through:
 1. ProfileLinter (static validation)
@@ -141,10 +141,9 @@ class SettingsHandler:
 - Scheduler: `HKLM\SYSTEM\CurrentControlSet\Control\PriorityControl\Win32PrioritySeparation`
 
 ### Tray App
-- Requires admin elevation (auto-elevates)
-- Single instance enforced via mutex
-- Game watcher monitors for game start/exit
-- 30-minute timeout on watcher if game never starts
+- Requires admin elevation (auto-elevates via UAC; uses `-ExecutionPolicy Bypass` to re-launch under a single-user trust model)
+- Single instance enforced via named mutex (`Global\ABSO_Tray_SingleInstance_v2`)
+- Game watcher monitors for game start/exit and adapts process priorities (no fixed wall-clock timeout — runs until tray exits)
 
 ## Code Style
 

@@ -223,7 +223,12 @@ class Overwatch2NoSyncHDRProfile(Overwatch2Profile):
         base["OW2ConfigHandler"] = ow2_base
         base["WindowsSettingsHandler"] = {
             "hdr": True,
+            "advanced_color": True,  # WCG on — required on Win11 24H2+ split stack
             "auto_hdr": False,  # OW2 has native HDR; don't layer Auto HDR on top
+            # Paper-white ≈ 200 nits under HDR on OLED / Mini-LED. Driver
+            # installs reset this slider; asserting it here restores the
+            # correct SDR-in-HDR tone-mapping on every profile apply.
+            "sdr_white_level_nits": 200,
         }
         base["ColorProfileSettingsHandler"] = {
             "icc_profile": "native",
@@ -231,6 +236,13 @@ class Overwatch2NoSyncHDRProfile(Overwatch2Profile):
             "show_osd_guidance": True,
             "game_type": "competitive_fps",
         }
+        # Disable Auto Color Management on wide-gamut displays. Windows 11
+        # 24H2+ can silently re-enable ACM after display re-enumeration
+        # (NVIDIA driver installs trigger this), producing a washed-out
+        # clamped-to-sRGB desktop. Gaming HDR profiles want un-clamped.
+        existing_graphics = dict(base.get("GraphicsSettingsHandler", {}))
+        existing_graphics["disable_auto_color_management"] = True
+        base["GraphicsSettingsHandler"] = existing_graphics
         return base
 
     def get_in_game_settings(self) -> list[dict[str, str]]:
@@ -441,7 +453,12 @@ class Overwatch2GSyncHDRProfile(_Overwatch2BaseProfile):
         base.update({
             "WindowsSettingsHandler": {
                 "hdr": True,
+                "advanced_color": True,  # Win11 24H2+ WCG pairing
                 "auto_hdr": False,
+                # Paper-white ≈ 200 nits under HDR on OLED / Mini-LED.
+                # Driver installs reset this slider; asserting it here
+                # restores the correct SDR-in-HDR tone-mapping.
+                "sdr_white_level_nits": 200,
             },
             "ColorProfileSettingsHandler": {
                 "icc_profile": "native",
@@ -460,6 +477,8 @@ class Overwatch2GSyncHDRProfile(_Overwatch2BaseProfile):
         return {
             "GraphicsSettingsHandler": {
                 "disable_mpo": False,
+                # Assert ACM off — see _base_overrides comment.
+                "disable_auto_color_management": True,
             },
             "NvidiaSettingsHandler": {
                 "preset": "reflex_gsync",
@@ -587,6 +606,9 @@ class Overwatch2GSyncCaptureProfile(_Overwatch2BaseProfile):
             "GraphicsSettingsHandler": {
                 "disable_global_fso": False,
                 "disable_mpo": False,
+                # SDR capture lane still wants ACM off — OBS/capture clients
+                # expect un-clamped source colors for their own color pipeline.
+                "disable_auto_color_management": True,
             },
             "NvidiaSettingsHandler": {
                 "preset": "reflex_gsync",
@@ -685,7 +707,10 @@ class Overwatch2GSyncHDRCaptureProfile(_Overwatch2BaseProfile):
         base.update({
             "WindowsSettingsHandler": {
                 "hdr": True,
+                "advanced_color": True,  # Win11 24H2+ WCG pairing
                 "auto_hdr": False,
+                # Match the strict-HDR lane's paper-white.
+                "sdr_white_level_nits": 200,
             },
             "ColorProfileSettingsHandler": {
                 "icc_profile": "native",
@@ -709,6 +734,9 @@ class Overwatch2GSyncHDRCaptureProfile(_Overwatch2BaseProfile):
             "GraphicsSettingsHandler": {
                 "disable_global_fso": False,
                 "disable_mpo": False,
+                # HDR capture lane still wants ACM off to keep un-clamped
+                # wide-gamut going to the capture source.
+                "disable_auto_color_management": True,
             },
             "NvidiaSettingsHandler": {
                 "preset": "reflex_gsync",

@@ -206,7 +206,17 @@ class FortniteHDRProfile(_FortniteBaseProfile):
         return {
             "WindowsSettingsHandler": {
                 "hdr": True,
+                "advanced_color": True,  # Win11 24H2+ WCG pairing
                 "auto_hdr": False,
+                # Paper-white ≈ 200 nits under HDR on OLED / Mini-LED.
+                # Driver installs reset this slider; asserting it here
+                # restores the correct SDR-in-HDR tone-mapping.
+                "sdr_white_level_nits": 200,
+            },
+            "GraphicsSettingsHandler": {
+                # Assert ACM off so Windows can't silently clamp wide-gamut
+                # to sRGB after a driver re-enumeration.
+                "disable_auto_color_management": True,
             },
             "ColorProfileSettingsHandler": {
                 "icc_profile": "native",

@@ -58,6 +58,7 @@ class _Diablo4BaseProfile(BaseProfile):
     def get_handlers(self) -> list[SettingsHandler]:
         from abso.settings.color import ColorProfileSettingsHandler
         from abso.settings.diablo4_config import Diablo4ConfigHandler
+        from abso.settings.display_range import DisplayColorRangeHandler
         from abso.settings.graphics import GraphicsSettingsHandler
         from abso.settings.mouse import MouseSettingsHandler
         from abso.settings.network import NetworkSettingsHandler
@@ -77,6 +78,7 @@ class _Diablo4BaseProfile(BaseProfile):
             GraphicsSettingsHandler(),
             ProcessPriorityHandler(["Diablo IV.exe"]),
             ColorProfileSettingsHandler(),
+            DisplayColorRangeHandler(),
             Diablo4ConfigHandler(),
         ]
 
@@ -142,6 +144,9 @@ class _Diablo4BaseProfile(BaseProfile):
                 "auto_vrr_fps_cap": True,
                 "limit_background_fps": True,
                 "background_fps_limit": 60,
+            },
+            "DisplayColorRangeHandler": {
+                "dynamic_range": "full",
             },
         }
 
@@ -220,7 +225,18 @@ class Diablo4Profile(_Diablo4BaseProfile):
         return {
             "WindowsSettingsHandler": {
                 "hdr": True,
+                "advanced_color": True,  # Win11 24H2+ WCG pairing
                 "auto_hdr": False,
+                # Paper-white ≈ 250 nits matches this profile's Diablo 4
+                # in-game HDR brightness target for cinematic playback.
+                "sdr_white_level_nits": 250,
+            },
+            "GraphicsSettingsHandler": {
+                # Windows 11 24H2+ can silently re-enable ACM on wide-gamut
+                # displays (especially after NVIDIA driver installs), which
+                # clamps SDR content to sRGB system-wide and washes out the
+                # cinematic look this profile targets. Assert ACM off.
+                "disable_auto_color_management": True,
             },
             "Diablo4ConfigHandler": {
                 "hdr_output": True,

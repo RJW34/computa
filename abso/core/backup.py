@@ -72,7 +72,10 @@ def _get_backup_handlers() -> list[SettingsHandler]:
     from abso.settings.audio import AudioSettingsHandler
     from abso.settings.cnm import CNMSettingsHandler
     from abso.settings.color import ColorProfileSettingsHandler
+    from abso.settings.cpu_affinity import CpuAffinityHandler
+    from abso.settings.debloat import DebloatHandler
     from abso.settings.dolphin import DolphinConfigHandler
+    from abso.settings.display_range import DisplayColorRangeHandler
     from abso.settings.graphics import GraphicsSettingsHandler
     from abso.settings.memory import MemorySettingsHandler
     from abso.settings.mouse import MouseSettingsHandler
@@ -85,6 +88,7 @@ def _get_backup_handlers() -> list[SettingsHandler]:
     from abso.settings.registry import RegistrySettingsHandler
     from abso.settings.rivals2_config import Rivals2ConfigHandler
     from abso.settings.services import ServicesSettingsHandler
+    from abso.settings.standby_list import StandbyListHandler
     from abso.settings.storage import StorageSettingsHandler
     from abso.settings.tasks import TasksSettingsHandler
     from abso.settings.timer import TimerSettingsHandler
@@ -118,6 +122,10 @@ def _get_backup_handlers() -> list[SettingsHandler]:
         ProcessPriorityHandler(),
         CNMSettingsHandler(),
         ColorProfileSettingsHandler(),
+        DisplayColorRangeHandler(),
+        CpuAffinityHandler(),
+        StandbyListHandler(),
+        DebloatHandler(),
     ]
 
 

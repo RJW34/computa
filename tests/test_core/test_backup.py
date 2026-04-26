@@ -330,7 +330,7 @@ class TestListBackups:
             manager = BackupManager(tmp_path)
 
             manager.create_backup()
-            time.sleep(1.1)  # Need > 1 second for different timestamp
+            time.sleep(1.1)  # 1-second timestamp resolution needs >1s gap
             manager.create_backup()
 
             backups = manager.list_backups()
@@ -344,7 +344,7 @@ class TestListBackups:
             manager = BackupManager(tmp_path)
 
             id1 = manager.create_backup()
-            time.sleep(1.1)  # Need > 1 second for different timestamp
+            time.sleep(1.1)  # 1-second timestamp resolution needs >1s gap
             id2 = manager.create_backup()
 
             backups = manager.list_backups()

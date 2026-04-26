@@ -107,6 +107,15 @@ class FallbackController:
             return False
 
         try:
+            if self.state_file.stat().st_size > 1024 * 1024:
+                logger.warning("fallback state file unexpectedly large; ignoring")
+                self.state = FallbackState()
+                return False
+        except OSError as e:
+            logger.error(f"Failed to stat fallback state: {e}")
+            return False
+
+        try:
             with open(self.state_file, "r", encoding="utf-8") as f:
                 data = json.load(f)
             self.state = FallbackState.from_dict(data)

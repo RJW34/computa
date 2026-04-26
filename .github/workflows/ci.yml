@@ -101,4 +101,4 @@ jobs:
 
       - name: Run mypy
         run: |
-          mypy abso/ --ignore-missing-imports --no-error-summary || true
+          mypy abso/ --ignore-missing-imports --no-error-summary

@@ -14,6 +14,7 @@
       "GraphicsSettingsHandler",
       "ProcessPriorityHandler",
       "ColorProfileSettingsHandler",
+      "DisplayColorRangeHandler",
       "Diablo4ConfigHandler"
     ],
     "in_game_settings": [
@@ -99,7 +100,11 @@
         "vsync": false,
         "window_mode": 1
       },
+      "DisplayColorRangeHandler": {
+        "dynamic_range": "full"
+      },
       "GraphicsSettingsHandler": {
+        "disable_auto_color_management": true,
         "disable_global_fso": false
       },
       "MouseSettingsHandler": {
@@ -137,6 +142,7 @@
         }
       },
       "WindowsSettingsHandler": {
+        "advanced_color": true,
         "auto_hdr": false,
         "game_bar": false,
         "game_dvr": false,
@@ -144,6 +150,7 @@
         "hags": true,
         "hdr": true,
         "max_refresh_rate": true,
+        "sdr_white_level_nits": 250,
         "windowed_optimizations": false
       }
     }
@@ -163,6 +170,7 @@
       "GraphicsSettingsHandler",
       "ProcessPriorityHandler",
       "ColorProfileSettingsHandler",
+      "DisplayColorRangeHandler",
       "Diablo4ConfigHandler"
     ],
     "in_game_settings": [
@@ -239,6 +247,9 @@
         "vsync": false,
         "window_mode": 1
       },
+      "DisplayColorRangeHandler": {
+        "dynamic_range": "full"
+      },
       "GraphicsSettingsHandler": {
         "disable_global_fso": false
       },
@@ -304,6 +315,7 @@
       "ProcessPriorityHandler",
       "CpuAffinityHandler",
       "ColorProfileSettingsHandler",
+      "DisplayColorRangeHandler",
       "FortniteConfigHandler"
     ],
     "in_game_settings": [
@@ -391,6 +403,9 @@
       "CpuAffinityHandler": {
         "strategy": null
       },
+      "DisplayColorRangeHandler": {
+        "dynamic_range": "full"
+      },
       "FortniteConfigHandler": {
         "frame_rate_limit": 0,
         "fullscreen_mode": 0,
@@ -472,6 +487,7 @@
       "ProcessPriorityHandler",
       "CpuAffinityHandler",
       "ColorProfileSettingsHandler",
+      "DisplayColorRangeHandler",
       "FortniteConfigHandler"
     ],
     "in_game_settings": [
@@ -565,6 +581,9 @@
       "CpuAffinityHandler": {
         "strategy": null
       },
+      "DisplayColorRangeHandler": {
+        "dynamic_range": "full"
+      },
       "FortniteConfigHandler": {
         "frame_rate_limit": 0,
         "fullscreen_mode": 0,
@@ -573,6 +592,7 @@
         "vsync": false
       },
       "GraphicsSettingsHandler": {
+        "disable_auto_color_management": true,
         "disable_global_fso": true
       },
       "MouseSettingsHandler": {
@@ -618,6 +638,7 @@
         "win32_priority_separation": 42
       },
       "WindowsSettingsHandler": {
+        "advanced_color": true,
         "auto_hdr": false,
         "game_bar": false,
         "game_dvr": false,
@@ -625,6 +646,7 @@
         "hags": true,
         "hdr": true,
         "max_refresh_rate": true,
+        "sdr_white_level_nits": 200,
         "vrr_optimize": false,
         "windowed_optimizations": false
       }
@@ -646,6 +668,7 @@
       "ProcessPriorityHandler",
       "CpuAffinityHandler",
       "ColorProfileSettingsHandler",
+      "DisplayColorRangeHandler",
       "MarvelRivalsConfigHandler"
     ],
     "in_game_settings": [
@@ -733,7 +756,11 @@
       "CpuAffinityHandler": {
         "strategy": null
       },
+      "DisplayColorRangeHandler": {
+        "dynamic_range": "full"
+      },
       "GraphicsSettingsHandler": {
+        "disable_auto_color_management": true,
         "disable_global_fso": true
       },
       "MarvelRivalsConfigHandler": {
@@ -782,6 +809,7 @@
         "win32_priority_separation": 42
       },
       "WindowsSettingsHandler": {
+        "advanced_color": true,
         "auto_hdr": false,
         "game_bar": false,
         "game_dvr": false,
@@ -789,6 +817,7 @@
         "hags": true,
         "hdr": true,
         "max_refresh_rate": true,
+        "sdr_white_level_nits": 200,
         "vrr_optimize": false,
         "windowed_optimizations": false
       }
@@ -810,6 +839,7 @@
       "ProcessPriorityHandler",
       "CpuAffinityHandler",
       "ColorProfileSettingsHandler",
+      "DisplayColorRangeHandler",
       "MarvelRivalsConfigHandler"
     ],
     "in_game_settings": [
@@ -897,6 +927,9 @@
       "CpuAffinityHandler": {
         "strategy": null
       },
+      "DisplayColorRangeHandler": {
+        "dynamic_range": "full"
+      },
       "GraphicsSettingsHandler": {
         "disable_global_fso": true
       },
@@ -974,6 +1007,7 @@
       "ProcessPriorityHandler",
       "CpuAffinityHandler",
       "ColorProfileSettingsHandler",
+      "DisplayColorRangeHandler",
       "OW2ConfigHandler"
     ],
     "in_game_settings": [
@@ -1036,6 +1070,9 @@
       },
       "CpuAffinityHandler": {
         "strategy": null
+      },
+      "DisplayColorRangeHandler": {
+        "dynamic_range": "full"
       },
       "GraphicsSettingsHandler": {
         "disable_global_fso": true
@@ -1123,6 +1160,7 @@
       "ProcessPriorityHandler",
       "CpuAffinityHandler",
       "ColorProfileSettingsHandler",
+      "DisplayColorRangeHandler",
       "OW2ConfigHandler"
     ],
     "in_game_settings": [
@@ -1185,6 +1223,9 @@
       },
       "CpuAffinityHandler": {
         "strategy": null
+      },
+      "DisplayColorRangeHandler": {
+        "dynamic_range": "full"
       },
       "GraphicsSettingsHandler": {
         "disable_global_fso": true,
@@ -1274,6 +1315,7 @@
       "ProcessPriorityHandler",
       "CpuAffinityHandler",
       "ColorProfileSettingsHandler",
+      "DisplayColorRangeHandler",
       "OW2ConfigHandler"
     ],
     "in_game_settings": [
@@ -1337,7 +1379,11 @@
       "CpuAffinityHandler": {
         "strategy": null
       },
+      "DisplayColorRangeHandler": {
+        "dynamic_range": "full"
+      },
       "GraphicsSettingsHandler": {
+        "disable_auto_color_management": true,
         "disable_global_fso": false,
         "disable_mpo": false
       },
@@ -1425,6 +1471,7 @@
       "ProcessPriorityHandler",
       "CpuAffinityHandler",
       "ColorProfileSettingsHandler",
+      "DisplayColorRangeHandler",
       "OW2ConfigHandler"
     ],
     "in_game_settings": [
@@ -1512,7 +1559,11 @@
       "CpuAffinityHandler": {
         "strategy": null
       },
+      "DisplayColorRangeHandler": {
+        "dynamic_range": "full"
+      },
       "GraphicsSettingsHandler": {
+        "disable_auto_color_management": true,
         "disable_global_fso": true,
         "disable_mpo": false
       },
@@ -1572,6 +1623,7 @@
         "win32_priority_separation": 42
       },
       "WindowsSettingsHandler": {
+        "advanced_color": true,
         "auto_hdr": false,
         "game_bar": false,
         "game_dvr": false,
@@ -1579,6 +1631,7 @@
         "hags": true,
         "hdr": true,
         "max_refresh_rate": true,
+        "sdr_white_level_nits": 200,
         "vrr_optimize": false,
         "windowed_optimizations": false
       }
@@ -1600,6 +1653,7 @@
       "ProcessPriorityHandler",
       "CpuAffinityHandler",
       "ColorProfileSettingsHandler",
+      "DisplayColorRangeHandler",
       "OW2ConfigHandler"
     ],
     "in_game_settings": [
@@ -1681,7 +1735,11 @@
       "CpuAffinityHandler": {
         "strategy": null
       },
+      "DisplayColorRangeHandler": {
+        "dynamic_range": "full"
+      },
       "GraphicsSettingsHandler": {
+        "disable_auto_color_management": true,
         "disable_global_fso": false,
         "disable_mpo": false
       },
@@ -1741,6 +1799,7 @@
         "win32_priority_separation": 42
       },
       "WindowsSettingsHandler": {
+        "advanced_color": true,
         "auto_hdr": false,
         "game_bar": false,
         "game_dvr": false,
@@ -1748,6 +1807,7 @@
         "hags": true,
         "hdr": true,
         "max_refresh_rate": true,
+        "sdr_white_level_nits": 200,
         "vrr_optimize": true,
         "windowed_optimizations": true
       }
@@ -1769,6 +1829,7 @@
       "ProcessPriorityHandler",
       "CpuAffinityHandler",
       "ColorProfileSettingsHandler",
+      "DisplayColorRangeHandler",
       "OW2ConfigHandler"
     ],
     "in_game_settings": [
@@ -1856,7 +1917,11 @@
       "CpuAffinityHandler": {
         "strategy": null
       },
+      "DisplayColorRangeHandler": {
+        "dynamic_range": "full"
+      },
       "GraphicsSettingsHandler": {
+        "disable_auto_color_management": true,
         "disable_global_fso": true
       },
       "MouseSettingsHandler": {
@@ -1914,6 +1979,7 @@
         "win32_priority_separation": 42
       },
       "WindowsSettingsHandler": {
+        "advanced_color": true,
         "auto_hdr": false,
         "game_bar": false,
         "game_dvr": false,
@@ -1921,6 +1987,7 @@
         "hags": true,
         "hdr": true,
         "max_refresh_rate": true,
+        "sdr_white_level_nits": 200,
         "vrr_optimize": false,
         "windowed_optimizations": false
       }
@@ -1939,7 +2006,8 @@
       "NetworkSettingsHandler",
       "GraphicsSettingsHandler",
       "ProcessPriorityHandler",
-      "ColorProfileSettingsHandler"
+      "ColorProfileSettingsHandler",
+      "DisplayColorRangeHandler"
     ],
     "in_game_settings": [
       {
@@ -2053,6 +2121,9 @@
         "icc_profile": "srgb",
         "show_osd_guidance": true
       },
+      "DisplayColorRangeHandler": {
+        "dynamic_range": "full"
+      },
       "GraphicsSettingsHandler": {
         "disable_global_fso": false
       },
@@ -2107,7 +2178,8 @@
       "NetworkSettingsHandler",
       "GraphicsSettingsHandler",
       "ProcessPriorityHandler",
-      "ColorProfileSettingsHandler"
+      "ColorProfileSettingsHandler",
+      "DisplayColorRangeHandler"
     ],
     "in_game_settings": [
       {
@@ -2185,6 +2257,9 @@
         "icc_profile": "srgb",
         "show_osd_guidance": true
       },
+      "DisplayColorRangeHandler": {
+        "dynamic_range": "full"
+      },
       "GraphicsSettingsHandler": {
         "disable_global_fso": false
       },
@@ -2237,7 +2312,8 @@
       "RegistrySettingsHandler",
       "NvidiaSettingsHandler",
       "GraphicsSettingsHandler",
-      "ColorProfileSettingsHandler"
+      "ColorProfileSettingsHandler",
+      "DisplayColorRangeHandler"
     ],
     "in_game_settings": [
       {
@@ -2339,7 +2415,11 @@
         "icc_profile": "native",
         "show_osd_guidance": true
       },
+      "DisplayColorRangeHandler": {
+        "dynamic_range": "full"
+      },
       "GraphicsSettingsHandler": {
+        "disable_auto_color_management": true,
         "disable_global_fso": false
       },
       "NvidiaSettingsHandler": {
@@ -2360,12 +2440,14 @@
         "system_responsiveness": 20
       },
       "WindowsSettingsHandler": {
+        "advanced_color": true,
         "auto_hdr": false,
         "game_bar": false,
         "game_dvr": false,
         "game_mode": true,
         "hags": true,
         "hdr": true,
+        "sdr_white_level_nits": 200,
         "vrr_optimize": true,
         "windowed_optimizations": true
       }
@@ -2388,7 +2470,8 @@
       "ProcessPriorityHandler",
       "CpuAffinityHandler",
       "Rivals2ConfigHandler",
-      "ColorProfileSettingsHandler"
+      "ColorProfileSettingsHandler",
+      "DisplayColorRangeHandler"
     ],
     "in_game_settings": [
       {
@@ -2462,6 +2545,9 @@
       },
       "CpuAffinityHandler": {
         "strategy": null
+      },
+      "DisplayColorRangeHandler": {
+        "dynamic_range": "full"
       },
       "GraphicsSettingsHandler": {
         "disable_global_fso": true
@@ -2554,7 +2640,8 @@
       "ProcessPriorityHandler",
       "CpuAffinityHandler",
       "Rivals2ConfigHandler",
-      "ColorProfileSettingsHandler"
+      "ColorProfileSettingsHandler",
+      "DisplayColorRangeHandler"
     ],
     "in_game_settings": [
       {
@@ -2622,6 +2709,9 @@
       },
       "CpuAffinityHandler": {
         "strategy": null
+      },
+      "DisplayColorRangeHandler": {
+        "dynamic_range": "full"
       },
       "GraphicsSettingsHandler": {
         "disable_global_fso": true
@@ -2722,7 +2812,8 @@
       "ProcessPriorityHandler",
       "CpuAffinityHandler",
       "Rivals2ConfigHandler",
-      "ColorProfileSettingsHandler"
+      "ColorProfileSettingsHandler",
+      "DisplayColorRangeHandler"
     ],
     "in_game_settings": [
       {
@@ -2808,6 +2899,9 @@
       },
       "CpuAffinityHandler": {
         "strategy": null
+      },
+      "DisplayColorRangeHandler": {
+        "dynamic_range": "full"
       },
       "GraphicsSettingsHandler": {
         "disable_global_fso": true
@@ -2904,7 +2998,8 @@
       "ProcessPriorityHandler",
       "CpuAffinityHandler",
       "Rivals2ConfigHandler",
-      "ColorProfileSettingsHandler"
+      "ColorProfileSettingsHandler",
+      "DisplayColorRangeHandler"
     ],
     "in_game_settings": [
       {
@@ -2978,6 +3073,9 @@
       },
       "CpuAffinityHandler": {
         "strategy": null
+      },
+      "DisplayColorRangeHandler": {
+        "dynamic_range": "full"
       },
       "GraphicsSettingsHandler": {
         "disable_global_fso": true
@@ -3066,7 +3164,8 @@
       "GraphicsSettingsHandler",
       "ProcessPriorityHandler",
       "CpuAffinityHandler",
-      "ColorProfileSettingsHandler"
+      "ColorProfileSettingsHandler",
+      "DisplayColorRangeHandler"
     ],
     "in_game_settings": [
       {
@@ -3273,6 +3372,9 @@
       "CpuAffinityHandler": {
         "strategy": null
       },
+      "DisplayColorRangeHandler": {
+        "dynamic_range": "full"
+      },
       "GraphicsSettingsHandler": {
         "disable_global_fso": true
       },
@@ -3346,6 +3448,7 @@
       "ProcessPriorityHandler",
       "CpuAffinityHandler",
       "ColorProfileSettingsHandler",
+      "DisplayColorRangeHandler",
       "DolphinConfigHandler"
     ],
     "in_game_settings": [
@@ -3577,6 +3680,9 @@
       "CpuAffinityHandler": {
         "strategy": null
       },
+      "DisplayColorRangeHandler": {
+        "dynamic_range": "full"
+      },
       "DolphinConfigHandler": {
         "backend_multithreading": "False",
         "efb_scale": "1",
@@ -3671,6 +3777,7 @@
       "ProcessPriorityHandler",
       "CpuAffinityHandler",
       "ColorProfileSettingsHandler",
+      "DisplayColorRangeHandler",
       "DolphinConfigHandler"
     ],
     "in_game_settings": [
@@ -3739,6 +3846,9 @@
       },
       "CpuAffinityHandler": {
         "strategy": null
+      },
+      "DisplayColorRangeHandler": {
+        "dynamic_range": "full"
       },
       "DolphinConfigHandler": {
         "backend_multithreading": "False",
@@ -3834,6 +3944,7 @@
       "ProcessPriorityHandler",
       "CpuAffinityHandler",
       "ColorProfileSettingsHandler",
+      "DisplayColorRangeHandler",
       "DolphinConfigHandler"
     ],
     "in_game_settings": [
@@ -4064,6 +4175,9 @@
       },
       "CpuAffinityHandler": {
         "strategy": null
+      },
+      "DisplayColorRangeHandler": {
+        "dynamic_range": "full"
       },
       "DolphinConfigHandler": {
         "backend_multithreading": "False",

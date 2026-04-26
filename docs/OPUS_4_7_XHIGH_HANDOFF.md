@@ -32,7 +32,7 @@ Codex completed the research/audit portion and did not implement behavior change
 1. `docs/OPUS_4_7_XHIGH_HANDOFF.md`
 2. `docs/HERMES_HANDOFF.md`
 3. `README.md`
-4. `PRD.MD`
+4. `PRD.md`
 5. `GAME_CONFIGURATIONS.md`
 6. `abso/profiles/base.py`
 7. `abso/profiles/profile_bases.py`
@@ -138,7 +138,7 @@ These were checked during the audit on April 21, 2026. Refresh before using them
 - `README.md`
   - Remove or qualify stale claims around MPO, Nagle, TCP autotuning, services, and memory/cache tweaks.
   - Verified stale as of 2026-04-21: `README.md:146` ("Multi-Plane Overlay (MPO) disabled") and `README.md:155` ("Nagle's algorithm disabled") under the generic Graphics/Network sections, plus "Telemetry services disabled" under Background Services — none of these are implemented by any current built-in profile.
-- `PRD.MD` and `GAME_CONFIGURATIONS.md`
+- `PRD.md` and `GAME_CONFIGURATIONS.md`
   - Same truth-pass scope as README. Scan for MPO, Nagle, telemetry, services, LargeSystemCache, and universal-HAGS claims.
 - `abso/profiles/profile_bases.py`
   - Base Windows, graphics, registry, network, process priority defaults.
@@ -176,7 +176,7 @@ These were checked during the audit on April 21, 2026. Refresh before using them
 ## Recommended Implementation Order
 
 1. Documentation truth pass.
-   - Update `README.md`, `PRD.MD`, `GAME_CONFIGURATIONS.md`, and any profile copy so claims match actual applied settings.
+   - Update `README.md`, `PRD.md`, `GAME_CONFIGURATIONS.md`, and any profile copy so claims match actual applied settings.
    - Confirm `docs/NEXT_IMPLEMENTATION_PHASE.md` reflects current scope; update or retire if stale.
    - Also reconcile the `vrr_diablo4` preset notes with whichever limiter strategy finding #2 converges on, so docs-vs-code does not re-drift on the next profile edit.
    - This is low-risk and stops the app from promising unsupported tweaks.

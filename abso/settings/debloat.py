@@ -42,6 +42,25 @@ REG_TYPE_MAP: dict[str, int] = {
     "EXPAND_SZ": winreg.REG_EXPAND_SZ,
 }
 
+# Substrings that indicate persistence / privilege-escalation hot spots in HKLM.
+# A user-supplied debloat YAML must never write to these paths even if the
+# tweak is technically valid Windows configuration.
+_BLOCKED_HKLM_SUBSTRINGS: tuple[str, ...] = (
+    r"\Run",
+    r"\RunOnce",
+    r"Image File Execution Options",
+    r"Winlogon",
+    r"\Services\\",
+    r"Schedule\\TaskCache",
+    r"Policies\\Microsoft\\Windows\\System\\Scripts",
+)
+
+
+def _is_blocked_hklm_path(key: str) -> bool:
+    """True if `key` matches a known persistence/escalation pattern under HKLM."""
+    norm = key.replace("/", "\\")
+    return any(pattern.lower() in norm.lower() for pattern in _BLOCKED_HKLM_SUBSTRINGS)
+
 
 @dataclass(frozen=True)
 class RegistryTweak:
@@ -265,6 +284,12 @@ class DebloatHandler(SettingsHandler):
         reg_type = REG_TYPE_MAP.get(tweak.reg_type, winreg.REG_DWORD)
         if hive_int is None:
             raise ValueError(f"Unknown hive {tweak.hive!r}")
+
+        if tweak.hive == "HKLM" and _is_blocked_hklm_path(tweak.key):
+            raise ValueError(
+                f"Refusing to write debloat tweak {tweak.name!r} to "
+                f"persistence-sensitive HKLM path: {tweak.key}"
+            )
 
         with winreg.CreateKeyEx(hive_int, tweak.key, 0, winreg.KEY_SET_VALUE) as key:
             winreg.SetValueEx(key, tweak.value, 0, reg_type, value)

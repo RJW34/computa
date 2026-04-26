@@ -1,6 +1,6 @@
 {
     "version":  2,
-    "saved_at":  "2026-04-21T16:09:59.1596934-04:00",
+    "saved_at":  "2026-04-26T04:20:57.6094988-04:00",
     "profiles":  [
                      {
                          "id":  "slippi-melee",
@@ -23,6 +23,7 @@
                                           "ProcessPriorityHandler",
                                           "CpuAffinityHandler",
                                           "ColorProfileSettingsHandler",
+                                          "DisplayColorRangeHandler",
                                           "DolphinConfigHandler"
                                       ],
                          "has_in_game_settings":  true,
@@ -52,6 +53,7 @@
                                           "ProcessPriorityHandler",
                                           "CpuAffinityHandler",
                                           "ColorProfileSettingsHandler",
+                                          "DisplayColorRangeHandler",
                                           "DolphinConfigHandler"
                                       ],
                          "has_in_game_settings":  true,
@@ -81,6 +83,7 @@
                                           "ProcessPriorityHandler",
                                           "CpuAffinityHandler",
                                           "ColorProfileSettingsHandler",
+                                          "DisplayColorRangeHandler",
                                           "DolphinConfigHandler"
                                       ],
                          "has_in_game_settings":  true,
@@ -112,7 +115,8 @@
                                           "ProcessPriorityHandler",
                                           "CpuAffinityHandler",
                                           "Rivals2ConfigHandler",
-                                          "ColorProfileSettingsHandler"
+                                          "ColorProfileSettingsHandler",
+                                          "DisplayColorRangeHandler"
                                       ],
                          "has_in_game_settings":  true,
                          "tray_category":  "Fighting",
@@ -143,7 +147,8 @@
                                           "ProcessPriorityHandler",
                                           "CpuAffinityHandler",
                                           "Rivals2ConfigHandler",
-                                          "ColorProfileSettingsHandler"
+                                          "ColorProfileSettingsHandler",
+                                          "DisplayColorRangeHandler"
                                       ],
                          "has_in_game_settings":  true,
                          "tray_category":  "Fighting",
@@ -174,7 +179,8 @@
                                           "ProcessPriorityHandler",
                                           "CpuAffinityHandler",
                                           "Rivals2ConfigHandler",
-                                          "ColorProfileSettingsHandler"
+                                          "ColorProfileSettingsHandler",
+                                          "DisplayColorRangeHandler"
                                       ],
                          "has_in_game_settings":  true,
                          "tray_category":  "Fighting",
@@ -205,7 +211,8 @@
                                           "ProcessPriorityHandler",
                                           "CpuAffinityHandler",
                                           "Rivals2ConfigHandler",
-                                          "ColorProfileSettingsHandler"
+                                          "ColorProfileSettingsHandler",
+                                          "DisplayColorRangeHandler"
                                       ],
                          "has_in_game_settings":  true,
                          "tray_category":  "Fighting",
@@ -232,11 +239,12 @@
                                           "GraphicsSettingsHandler",
                                           "ProcessPriorityHandler",
                                           "ColorProfileSettingsHandler",
+                                          "DisplayColorRangeHandler",
                                           "Diablo4ConfigHandler"
                                       ],
                          "has_in_game_settings":  true,
                          "tray_category":  "ARPG",
-                         "tray_subtitle":  "HDR ON | Reflex ON | LLM OFF",
+                         "tray_subtitle":  "HDR ON | Reflex ON | G-SYNC ON | LLM OFF",
                          "tray_description":  "Balanced Diablo 4 HDR profile with native LocalPrefs enforcement for Reflex, HDR, and VRR",
                          "sync_mode":  "on"
                      },
@@ -259,6 +267,7 @@
                                           "GraphicsSettingsHandler",
                                           "ProcessPriorityHandler",
                                           "ColorProfileSettingsHandler",
+                                          "DisplayColorRangeHandler",
                                           "Diablo4ConfigHandler"
                                       ],
                          "has_in_game_settings":  true,
@@ -290,6 +299,7 @@
                                           "ProcessPriorityHandler",
                                           "CpuAffinityHandler",
                                           "ColorProfileSettingsHandler",
+                                          "DisplayColorRangeHandler",
                                           "FortniteConfigHandler"
                                       ],
                          "has_in_game_settings":  true,
@@ -321,6 +331,7 @@
                                           "ProcessPriorityHandler",
                                           "CpuAffinityHandler",
                                           "ColorProfileSettingsHandler",
+                                          "DisplayColorRangeHandler",
                                           "FortniteConfigHandler"
                                       ],
                          "has_in_game_settings":  true,
@@ -350,6 +361,7 @@
                                           "ProcessPriorityHandler",
                                           "CpuAffinityHandler",
                                           "ColorProfileSettingsHandler",
+                                          "DisplayColorRangeHandler",
                                           "MarvelRivalsConfigHandler"
                                       ],
                          "has_in_game_settings":  true,
@@ -379,6 +391,7 @@
                                           "ProcessPriorityHandler",
                                           "CpuAffinityHandler",
                                           "ColorProfileSettingsHandler",
+                                          "DisplayColorRangeHandler",
                                           "MarvelRivalsConfigHandler"
                                       ],
                          "has_in_game_settings":  true,
@@ -407,6 +420,7 @@
                                           "ProcessPriorityHandler",
                                           "CpuAffinityHandler",
                                           "ColorProfileSettingsHandler",
+                                          "DisplayColorRangeHandler",
                                           "OW2ConfigHandler"
                                       ],
                          "has_in_game_settings":  true,
@@ -435,6 +449,7 @@
                                           "ProcessPriorityHandler",
                                           "CpuAffinityHandler",
                                           "ColorProfileSettingsHandler",
+                                          "DisplayColorRangeHandler",
                                           "OW2ConfigHandler"
                                       ],
                          "has_in_game_settings":  true,
@@ -463,6 +478,7 @@
                                           "ProcessPriorityHandler",
                                           "CpuAffinityHandler",
                                           "ColorProfileSettingsHandler",
+                                          "DisplayColorRangeHandler",
                                           "OW2ConfigHandler"
                                       ],
                          "has_in_game_settings":  true,
@@ -491,6 +507,7 @@
                                           "ProcessPriorityHandler",
                                           "CpuAffinityHandler",
                                           "ColorProfileSettingsHandler",
+                                          "DisplayColorRangeHandler",
                                           "OW2ConfigHandler"
                                       ],
                          "has_in_game_settings":  true,
@@ -519,6 +536,7 @@
                                           "ProcessPriorityHandler",
                                           "CpuAffinityHandler",
                                           "ColorProfileSettingsHandler",
+                                          "DisplayColorRangeHandler",
                                           "OW2ConfigHandler"
                                       ],
                          "has_in_game_settings":  true,
@@ -547,6 +565,7 @@
                                           "ProcessPriorityHandler",
                                           "CpuAffinityHandler",
                                           "ColorProfileSettingsHandler",
+                                          "DisplayColorRangeHandler",
                                           "OW2ConfigHandler"
                                       ],
                          "has_in_game_settings":  true,
@@ -575,7 +594,8 @@
                                           "NetworkSettingsHandler",
                                           "GraphicsSettingsHandler",
                                           "ProcessPriorityHandler",
-                                          "ColorProfileSettingsHandler"
+                                          "ColorProfileSettingsHandler",
+                                          "DisplayColorRangeHandler"
                                       ],
                          "has_in_game_settings":  true,
                          "tray_category":  "Other",
@@ -601,7 +621,8 @@
                                           "NetworkSettingsHandler",
                                           "GraphicsSettingsHandler",
                                           "ProcessPriorityHandler",
-                                          "ColorProfileSettingsHandler"
+                                          "ColorProfileSettingsHandler",
+                                          "DisplayColorRangeHandler"
                                       ],
                          "has_in_game_settings":  true,
                          "tray_category":  "Other",
@@ -629,7 +650,8 @@
                                           "RegistrySettingsHandler",
                                           "NvidiaSettingsHandler",
                                           "GraphicsSettingsHandler",
-                                          "ColorProfileSettingsHandler"
+                                          "ColorProfileSettingsHandler",
+                                          "DisplayColorRangeHandler"
                                       ],
                          "has_in_game_settings":  true,
                          "tray_category":  "Productivity",
@@ -659,7 +681,8 @@
                                           "GraphicsSettingsHandler",
                                           "ProcessPriorityHandler",
                                           "CpuAffinityHandler",
-                                          "ColorProfileSettingsHandler"
+                                          "ColorProfileSettingsHandler",
+                                          "DisplayColorRangeHandler"
                                       ],
                          "has_in_game_settings":  true,
                          "tray_category":  "Fighting",

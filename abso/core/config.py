@@ -94,6 +94,7 @@ class ProfileOverrides:
     timer: dict[str, Any] = field(default_factory=dict)
     mouse: dict[str, Any] = field(default_factory=dict)
     color: dict[str, Any] = field(default_factory=dict)
+    display_color_range: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -183,6 +184,7 @@ class ConfigManager:
         "ProcessPriorityHandler",
         "CNMSettingsHandler",
         "ColorProfileSettingsHandler",
+        "DisplayColorRangeHandler",
         "CpuAffinityHandler",
         "StandbyListHandler",
         "DebloatHandler",

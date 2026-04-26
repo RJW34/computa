@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from abso.utils.admin import ensure_admin, is_admin, run_elevated
+from abso.utils.admin import ensure_admin, is_admin
 
 
 class TestIsAdmin:
@@ -66,37 +66,12 @@ class TestEnsureAdmin:
         with pytest.raises(RuntimeError, match="Admin privileges required"):
             ensure_admin()
 
-
-class TestRunElevated:
-    """Tests for run_elevated function."""
-
+    @patch("sys.exit")
     @patch("ctypes.windll.shell32.ShellExecuteW", return_value=42)
-    def test_returns_exit_code(self, mock_execute):
-        """Test returns exit code from ShellExecuteW."""
-        result = run_elevated("echo test")
-        assert result == 42
-
-    @patch("ctypes.windll.shell32.ShellExecuteW", return_value=42)
-    def test_calls_shell_execute_with_runas(self, mock_execute):
-        """Test calls ShellExecuteW with runas verb."""
-        run_elevated("echo test")
-
-        mock_execute.assert_called_once()
-        call_args = mock_execute.call_args[0]
-        assert call_args[1] == "runas"
-
-    @patch("ctypes.windll.shell32.ShellExecuteW", return_value=42)
-    def test_wraps_command_in_cmd(self, mock_execute):
-        """Test wraps command in cmd.exe /c."""
-        run_elevated("my_command arg1 arg2")
-
-        call_args = mock_execute.call_args[0]
-        assert call_args[2] == "cmd.exe"
-        assert "/c my_command arg1 arg2" in call_args[3]
-
-    @patch("ctypes.windll.shell32.ShellExecuteW", return_value=5)
-    def test_returns_low_value_on_failure(self, mock_execute):
-        """Test returns low value (<= 32) on failure."""
-        result = run_elevated("invalid command")
-        # Values <= 32 indicate failure
-        assert result == 5
+    @patch("abso.utils.admin.is_admin", return_value=False)
+    def test_quotes_argv_with_spaces(self, mock_is_admin, mock_execute, mock_exit):
+        """Args with spaces survive the re-launch via list2cmdline quoting."""
+        with patch.object(sys, "argv", ["abso", "apply", r"C:\Path With Space\profile.yaml"]):
+            ensure_admin()
+        params = mock_execute.call_args[0][3]
+        assert '"C:\\Path With Space\\profile.yaml"' in params

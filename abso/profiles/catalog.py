@@ -104,7 +104,7 @@ PROFILE_CATALOG: OrderedDict[str, ProfileCatalogEntry] = OrderedDict(
         "diablo4": ProfileCatalogEntry(
             profile_class=Diablo4Profile,
             tray_category="ARPG",
-            tray_subtitle="HDR ON | Reflex ON | LLM OFF",
+            tray_subtitle="HDR ON | Reflex ON | G-SYNC ON | LLM OFF",
             sync_mode="on",
         ),
         "diablo4-sdr": ProfileCatalogEntry(

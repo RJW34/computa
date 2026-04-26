@@ -210,6 +210,7 @@ class Rivals2BaseProfile(BaseProfile):
     def get_handlers(self) -> list[SettingsHandler]:
         from abso.settings.color import ColorProfileSettingsHandler
         from abso.settings.cpu_affinity import CpuAffinityHandler
+        from abso.settings.display_range import DisplayColorRangeHandler
         from abso.settings.graphics import GraphicsSettingsHandler
         from abso.settings.memory import MemorySettingsHandler
         from abso.settings.mouse import MouseSettingsHandler
@@ -250,6 +251,7 @@ class Rivals2BaseProfile(BaseProfile):
             handlers.append(Rivals2ConfigHandler())
 
         handlers.append(ColorProfileSettingsHandler())
+        handlers.append(DisplayColorRangeHandler())
         return handlers
 
     def _base_settings(self) -> dict[str, dict[str, Any]]:
@@ -308,6 +310,9 @@ class Rivals2BaseProfile(BaseProfile):
                 "show_osd_guidance": True,
                 "game_type": "competitive_fps",
             },
+            "DisplayColorRangeHandler": {
+                "dynamic_range": "full",
+            },
         }
 
         # Legacy/unverified settings — opt-in only
@@ -350,6 +355,7 @@ class EmulatorLatencyBaseProfile(BaseProfile):
     def get_handlers(self) -> list[SettingsHandler]:
         from abso.settings.color import ColorProfileSettingsHandler
         from abso.settings.cpu_affinity import CpuAffinityHandler
+        from abso.settings.display_range import DisplayColorRangeHandler
         from abso.settings.graphics import GraphicsSettingsHandler
         from abso.settings.memory import MemorySettingsHandler
         from abso.settings.mouse import MouseSettingsHandler
@@ -377,6 +383,7 @@ class EmulatorLatencyBaseProfile(BaseProfile):
             ProcessPriorityHandler(self.executable_hints),
             CpuAffinityHandler(self.executable_hints),
             ColorProfileSettingsHandler(),
+            DisplayColorRangeHandler(),
         ]
 
         handlers.extend(self._additional_handlers())
@@ -445,6 +452,9 @@ class EmulatorLatencyBaseProfile(BaseProfile):
                 "show_osd_guidance": True,
                 "game_type": "emulator",
             },
+            "DisplayColorRangeHandler": {
+                "dynamic_range": "full",
+            },
         }
 
         # Legacy/unverified settings — opt-in only
@@ -474,6 +484,7 @@ class WebGLBaseProfile(BaseProfile):
 
     def get_handlers(self) -> list[SettingsHandler]:
         from abso.settings.color import ColorProfileSettingsHandler
+        from abso.settings.display_range import DisplayColorRangeHandler
         from abso.settings.graphics import GraphicsSettingsHandler
         from abso.settings.memory import MemorySettingsHandler
         from abso.settings.network import NetworkSettingsHandler
@@ -498,6 +509,7 @@ class WebGLBaseProfile(BaseProfile):
         handlers += [
             ProcessPriorityHandler(self.executable_hints),
             ColorProfileSettingsHandler(),
+            DisplayColorRangeHandler(),
         ]
         return handlers
 
@@ -542,6 +554,9 @@ class WebGLBaseProfile(BaseProfile):
                 "show_osd_guidance": True,
                 "game_type": "casual",
             },
+            "DisplayColorRangeHandler": {
+                "dynamic_range": "full",
+            },
         }
 
         # Legacy/unverified settings — opt-in only
@@ -584,6 +599,7 @@ class ReflexShooterBaseProfile(BaseProfile):
     def get_handlers(self) -> list[SettingsHandler]:
         from abso.settings.color import ColorProfileSettingsHandler
         from abso.settings.cpu_affinity import CpuAffinityHandler
+        from abso.settings.display_range import DisplayColorRangeHandler
         from abso.settings.graphics import GraphicsSettingsHandler
         from abso.settings.memory import MemorySettingsHandler
         from abso.settings.mouse import MouseSettingsHandler
@@ -611,6 +627,7 @@ class ReflexShooterBaseProfile(BaseProfile):
             ProcessPriorityHandler(self.executable_hints),
             CpuAffinityHandler(self.executable_hints),
             ColorProfileSettingsHandler(),
+            DisplayColorRangeHandler(),
         ]
         return handlers
 
@@ -673,6 +690,9 @@ class ReflexShooterBaseProfile(BaseProfile):
                 "digital_vibrance": 50,
                 "show_osd_guidance": True,
                 "game_type": "competitive_fps",
+            },
+            "DisplayColorRangeHandler": {
+                "dynamic_range": "full",
             },
         }
 

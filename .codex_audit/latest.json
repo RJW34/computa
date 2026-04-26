@@ -1,19 +1,13 @@
 {
-  "ts": "2026-04-18T05:55:00-04:00",
+  "ts": "2026-04-21T15:20:00-04:00",
   "verdict": "APPROVED_WITH_NOTES",
   "files": [
-    "abso/profiles/base.py",
-    "abso/profiles/profile_bases.py",
+    "abso/profiles/catalog.py",
     "abso/profiles/overwatch2.py",
-    "abso/profiles/fortnite.py",
-    "abso/profiles/marvel_rivals.py",
-    "abso/profiles/slippi_melee.py",
-    "abso/profiles/diablo4.py",
-    "abso/settings/ow2_config.py",
-    "abso/settings/registry.py",
-    "tests/test_profiles.py",
-    "tests/test_handlers/test_ow2_config.py",
-    "tests/test_handlers/test_registry_settings.py"
+    "abso/tray/ABSO-Tray.ps1",
+    "abso/tray/profile-catalog-cache.json",
+    "tests/snapshot_golden.json"
   ],
-  "notes": "Three audit rounds on the OW2 FPS-regression root-cause fix (per-exe AppCompat FSO disable + OW2 drift detection). Round 1 BLOCKED on (a) restore_map missing fullscreen_optimizations key, (b) broad OSError suppression in _set_fullscreen_optimization silently dropping AppCompat tokens. Round 2 BLOCKED on (a) _enumerate_fullscreen_optimizations reintroducing broad OSError suppression which would destroy current state on later restore, (b) per-exe restore failures logged but not propagated so restore() falsely reported success. Round 3 BLOCKED on (a) non-dict backup payload returning silently in _restore_fullscreen_optimizations, (b) pre-existing restore tests mocked EnumValue exhaustion with plain OSError instead of winerror==259 (ERROR_NO_MORE_ITEMS). All issues resolved. Final APPROVED_WITH_NOTES: (1) inject_fullscreen_optimizations logs at WARNING on non-dict existing value - verified in source, (2) OW2 drift notices flow through applier.py:344-345 into result.notices which the tray and CLI already surface - verified. Push is clear."
+  "commits": ["f7ed867"],
+  "notes": "OW2 G-SYNC display-name rename: added 'SDR' token to overwatch2-gsync and overwatch2-gsync-capture for parallelism with their HDR siblings. Same readability issue as the prior Rivals 2 rename. Zero DRS binding impact — OW2 uses the built-in 'Overwatch 2' driver preset, not display-name aliases (confirmed full inheritance chain: base.py, profile_bases.py ReflexShooterBaseProfile, _Overwatch2BaseProfile). All old-string refs in test mocks/fixtures and code comments are inert (confirmed no display_name equality assertions). pytest: 1212 passed. Pre-existing note: overwatch2-gsync-capture absent from PowerShell $script:FallbackProfiles — only surfaces if both CLI and cache fail; not a regression introduced here. Codex agent acd90012c19f099c5."
 }

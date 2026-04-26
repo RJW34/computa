@@ -20,6 +20,7 @@ def _get_handlers() -> list[SettingsHandler]:
     """
     from abso.settings.audio import AudioSettingsHandler
     from abso.settings.diagnostics import DiagnosticsSettingsHandler
+    from abso.settings.display_range import DisplayColorRangeHandler
     from abso.settings.graphics import GraphicsSettingsHandler
     from abso.settings.memory import MemorySettingsHandler
     from abso.settings.mouse import MouseSettingsHandler
@@ -52,6 +53,9 @@ def _get_handlers() -> list[SettingsHandler]:
         StorageSettingsHandler(),
         AudioSettingsHandler(),
         UpdatesSettingsHandler(),
+        # Flags PC monitors stuck on Limited RGB / TV range (classic
+        # "washed out after NVIDIA driver update" symptom).
+        DisplayColorRangeHandler(),
         # Audit-only diagnostics — GPU prefs, overlays, update activity,
         # driver freshness, XMP/EXPO, Resizable BAR, DirectStorage,
         # multi-monitor refresh mix.

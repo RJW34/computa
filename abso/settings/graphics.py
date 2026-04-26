@@ -8,6 +8,7 @@ import winreg
 from typing import Any
 
 from abso.core.models import Issue
+from abso.settings import MONITOR_DATA_STORE_KEY as _MONITOR_DATA_STORE_KEY
 from abso.settings.base import SettingsHandler
 
 logger = logging.getLogger(__name__)
@@ -45,7 +46,7 @@ class GraphicsSettingsHandler(SettingsHandler):
     GAME_CONFIG_KEY = r"System\GameConfigStore"
     EXPLORER_ADVANCED_KEY = r"Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced"
     COLOR_MANAGEMENT_KEY = r"Software\Microsoft\Windows\CurrentVersion\ColorManagement"
-    MONITOR_DATA_STORE_KEY = r"SYSTEM\CurrentControlSet\Control\GraphicsDrivers\MonitorDataStore"
+    MONITOR_DATA_STORE_KEY = _MONITOR_DATA_STORE_KEY
 
     def detect(self) -> dict[str, Any]:
         """Detect current graphics settings."""
@@ -154,6 +155,20 @@ class GraphicsSettingsHandler(SettingsHandler):
 
             if "game_dvr_behavior" in settings:
                 self._set_game_dvr_behavior(settings["game_dvr_behavior"])
+
+            if "disable_auto_color_management" in settings:
+                # ACM = Windows 11 24H2+ Auto Color Management. When it turns
+                # on for a wide-gamut display (OLED/Mini-LED/DCI-P3), Windows
+                # clamps SDR content to sRGB gamut system-wide, which on
+                # panels previously used un-clamped produces a washed-out /
+                # desaturated look. Windows updates and display re-enumeration
+                # (e.g. after NVIDIA driver installs) can silently re-enable
+                # it, so gaming profiles re-assert this on every apply.
+                disable = bool(settings["disable_auto_color_management"])
+                acm_result = self._set_auto_color_management(not disable)
+                if acm_result.get("errors"):
+                    for err in acm_result["errors"]:
+                        errors.append(f"ACM: {err}")
 
         except PermissionError as e:
             errors.append(f"Permission denied: {e}")
@@ -448,5 +463,112 @@ class GraphicsSettingsHandler(SettingsHandler):
                 winreg.CloseKey(key)
         except Exception as e:
             logger.debug(f"Failed to enumerate monitors for ACM: {e}")
+
+        return result
+
+    def _set_auto_color_management(self, enabled: bool) -> dict[str, Any]:
+        """Set Auto Color Management on/off for every enumerated monitor.
+
+        Writes:
+            HKLM\\...\\MonitorDataStore\\{monitor_id}\\AutoColorManagementEnabled
+                (per-monitor, authoritative)
+            HKCU\\...\\ColorManagement\\AutoColorManagement
+                (user-scope global, lower precedence)
+
+        Both get the same value (1 when enabled, 0 when disabled). The
+        per-monitor keys are what Windows' desktop compositor actually
+        reads; the global HKCU key is a user-preference fallback that
+        Windows uses when no per-monitor setting exists yet. We write both
+        so a future display re-enumeration can't silently default back on.
+
+        Returns dict with applied_count / skipped_count / errors so the
+        caller can log and surface partial failures without flipping
+        overall handler success.
+        """
+        value = 1 if enabled else 0
+        result: dict[str, Any] = {
+            "success": True,
+            "applied_count": 0,
+            "skipped_count": 0,
+            "errors": [],
+        }
+
+        # Per-monitor: iterate MonitorDataStore and write into each subkey.
+        try:
+            with winreg.OpenKey(
+                winreg.HKEY_LOCAL_MACHINE,
+                self.MONITOR_DATA_STORE_KEY,
+                0,
+                winreg.KEY_READ,
+            ) as root:
+                monitor_ids: list[str] = []
+                i = 0
+                while True:
+                    try:
+                        monitor_ids.append(winreg.EnumKey(root, i))
+                        i += 1
+                    except OSError:
+                        break
+
+            for monitor_id in monitor_ids:
+                sub_path = f"{self.MONITOR_DATA_STORE_KEY}\\{monitor_id}"
+                try:
+                    with winreg.OpenKey(
+                        winreg.HKEY_LOCAL_MACHINE,
+                        sub_path,
+                        0,
+                        winreg.KEY_ALL_ACCESS,
+                    ) as sub:
+                        # Read current value so we don't noisily rewrite.
+                        try:
+                            current = winreg.QueryValueEx(
+                                sub, "AutoColorManagementEnabled"
+                            )[0]
+                        except FileNotFoundError:
+                            current = None
+                        if current == value:
+                            result["skipped_count"] += 1
+                            continue
+                        winreg.SetValueEx(
+                            sub,
+                            "AutoColorManagementEnabled",
+                            0,
+                            winreg.REG_DWORD,
+                            value,
+                        )
+                        result["applied_count"] += 1
+                        logger.info(
+                            "ACM set to %d for monitor %s (was %s)",
+                            value, monitor_id, current,
+                        )
+                except PermissionError as e:
+                    result["errors"].append(f"{monitor_id}: permission denied ({e})")
+                    result["success"] = False
+                except Exception as e:
+                    # Partial failures on individual monitors are recorded
+                    # but don't fail the whole operation — ACM is best-effort
+                    # across monitors, and anti-cheat style per-path quirks
+                    # can block specific subkeys on some systems.
+                    result["errors"].append(f"{monitor_id}: {e}")
+        except Exception as e:
+            # Enumeration itself failed — MonitorDataStore missing or locked.
+            result["errors"].append(f"Enumerate monitors: {e}")
+            result["success"] = False
+
+        # Global HKCU: write the user-scope fallback too.
+        try:
+            with winreg.CreateKeyEx(
+                winreg.HKEY_CURRENT_USER,
+                self.COLOR_MANAGEMENT_KEY,
+                0,
+                winreg.KEY_ALL_ACCESS,
+            ) as key:
+                winreg.SetValueEx(
+                    key, "AutoColorManagement", 0, winreg.REG_DWORD, value
+                )
+        except Exception as e:
+            # HKCU write failing is non-fatal if the per-monitor writes
+            # succeeded — those are authoritative.
+            result["errors"].append(f"HKCU global: {e}")
 
         return result

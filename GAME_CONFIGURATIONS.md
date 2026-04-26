@@ -1,6 +1,6 @@
 # A.B.S.O. Game Configuration Reference
 
-**Version:** January 2026
+**Version:** April 2026
 **Purpose:** Complete documentation of game optimization profiles for external review
 
 ---

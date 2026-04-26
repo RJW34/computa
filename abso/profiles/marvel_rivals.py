@@ -216,7 +216,17 @@ class MarvelRivalsHDRProfile(_MarvelRivalsBaseProfile):
         return {
             "WindowsSettingsHandler": {
                 "hdr": True,
+                "advanced_color": True,  # Win11 24H2+ WCG pairing
                 "auto_hdr": False,
+                # Paper-white ≈ 200 nits under HDR on OLED / Mini-LED.
+                # Driver installs reset this slider; asserting it here
+                # restores the correct SDR-in-HDR tone-mapping.
+                "sdr_white_level_nits": 200,
+            },
+            "GraphicsSettingsHandler": {
+                # Keep ACM off so wide-gamut colors aren't clamped to sRGB
+                # system-wide by Windows 11 24H2+ Auto Color Management.
+                "disable_auto_color_management": True,
             },
             "ColorProfileSettingsHandler": {
                 "icc_profile": "native",
