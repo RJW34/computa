@@ -4,12 +4,6 @@
 Set objShell = CreateObject("WScript.Shell")
 Set objFSO = CreateObject("Scripting.FileSystemObject")
 
-If UCase(objShell.ExpandEnvironmentStrings("%COMPUTERNAME%")) = "MIRAIDON" Then
-    If objShell.ExpandEnvironmentStrings("%ABSO_ALLOW_BACKGROUND_TRAY%") <> "1" Then
-        WScript.Quit 0
-    End If
-End If
-
 ' Get script directory
 strScriptDir = objFSO.GetParentFolderName(WScript.ScriptFullName)
 strPS1Path = objFSO.BuildPath(strScriptDir, "ABSO-Tray.ps1")
