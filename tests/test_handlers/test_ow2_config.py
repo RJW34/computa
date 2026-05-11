@@ -232,6 +232,84 @@ def test_backup_restore_round_trip(tmp_path: Path) -> None:
         assert restored == SAMPLE_INI
 
 
+def test_restore_preserves_current_keybinds_from_stale_backup(tmp_path: Path) -> None:
+    """Baseline restores must not revert user keybinds from an older backup."""
+    backup_ini = """\
+[Render.13]
+WindowMode = "0"
+KeyBinds = "old-bindings"
+KeyBindsV2 = "old-bindings-v2"
+MouseSensitivity = "10.00"
+
+[Sound.1]
+MasterVolume = "40"
+"""
+    current_ini = """\
+[Render.13]
+WindowMode = "1"
+KeyBinds = "current-bindings"
+KeyBindsV2 = "current-bindings-v2"
+MouseSensitivity = "7.50"
+
+[Sound.1]
+MasterVolume = "20"
+"""
+    ini_path = tmp_path / "Settings_v0.ini"
+    _write_settings_ini(ini_path, current_ini)
+
+    with patch("abso.settings.ow2_config._get_ow2_settings_path", return_value=ini_path):
+        handler = OW2ConfigHandler()
+        ok = handler.restore({
+            "config_found": True,
+            "config_path": str(ini_path),
+            "file_content": backup_ini,
+        })
+
+    assert ok is True
+    restored = ini_path.read_text(encoding="utf-8")
+    assert 'WindowMode = "0"' in restored  # backup restore still restores render baseline
+    assert 'MasterVolume = "40"' in restored
+    assert 'KeyBinds = "current-bindings"' in restored
+    assert 'KeyBindsV2 = "current-bindings-v2"' in restored
+    assert 'MouseSensitivity = "7.50"' in restored
+    assert "old-bindings" not in restored
+    assert 'MouseSensitivity = "10.00"' not in restored
+
+
+def test_restore_adds_current_keybind_when_backup_lacks_new_key(tmp_path: Path) -> None:
+    """If OW2 adds a protected key after the backup, keep the live value."""
+    backup_ini = """\
+[Render.13]
+WindowMode = "0"
+
+[Sound.1]
+MasterVolume = "40"
+"""
+    current_ini = """\
+[Render.13]
+WindowMode = "1"
+KeyBindsV2 = "current-new-format"
+
+[Sound.1]
+MasterVolume = "20"
+"""
+    ini_path = tmp_path / "Settings_v0.ini"
+    _write_settings_ini(ini_path, current_ini)
+
+    with patch("abso.settings.ow2_config._get_ow2_settings_path", return_value=ini_path):
+        handler = OW2ConfigHandler()
+        ok = handler.restore({
+            "config_found": True,
+            "config_path": str(ini_path),
+            "file_content": backup_ini,
+        })
+
+    assert ok is True
+    restored = ini_path.read_text(encoding="utf-8")
+    assert 'WindowMode = "0"' in restored
+    assert 'KeyBindsV2 = "current-new-format"' in restored
+
+
 def test_apply_idempotent(tmp_path: Path) -> None:
     """Applying the same settings twice should be safe and report no changes."""
     ini_path = tmp_path / "Settings_v0.ini"

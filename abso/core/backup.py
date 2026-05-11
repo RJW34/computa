@@ -74,15 +74,19 @@ def _get_backup_handlers() -> list[SettingsHandler]:
     from abso.settings.color import ColorProfileSettingsHandler
     from abso.settings.cpu_affinity import CpuAffinityHandler
     from abso.settings.debloat import DebloatHandler
+    from abso.settings.diablo4_config import Diablo4ConfigHandler
     from abso.settings.dolphin import DolphinConfigHandler
     from abso.settings.display_range import DisplayColorRangeHandler
+    from abso.settings.fortnite_config import FortniteConfigHandler
     from abso.settings.graphics import GraphicsSettingsHandler
+    from abso.settings.marvel_rivals_config import MarvelRivalsConfigHandler
     from abso.settings.memory import MemorySettingsHandler
     from abso.settings.mouse import MouseSettingsHandler
     from abso.settings.network import NetworkSettingsHandler
     from abso.settings.nvidia import NvidiaSettingsHandler
     from abso.settings.nvidia_notifications import NvidiaNotificationHandler
     from abso.settings.obs import OBSSettingsHandler
+    from abso.settings.ow2_config import OW2ConfigHandler
     from abso.settings.power import PowerSettingsHandler
     from abso.settings.process_priority import ProcessPriorityHandler
     from abso.settings.registry import RegistrySettingsHandler
@@ -115,7 +119,11 @@ def _get_backup_handlers() -> list[SettingsHandler]:
         AudioSettingsHandler(),
         UpdatesSettingsHandler(),
         # Profile-specific handlers (prevent settings leak between profiles)
+        Diablo4ConfigHandler(),
         DolphinConfigHandler(),
+        FortniteConfigHandler(),
+        MarvelRivalsConfigHandler(),
+        OW2ConfigHandler(),
         Rivals2ConfigHandler(),
         NvidiaNotificationHandler(),
         OBSSettingsHandler(),

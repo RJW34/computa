@@ -107,20 +107,53 @@ def test_get_tray_processes_parses_single_object():
     assert processes[0]["ProcessId"] == 1234
 
 
+def test_get_tray_processes_excludes_own_probe_command():
+    """The process query must not count the probing PowerShell host as tray."""
+    with patch("abso.tray.subprocess.run") as mock_run:
+        mock_run.return_value.returncode = 0
+        mock_run.return_value.stdout = ""
+        get_tray_processes()
+
+    ps_command = mock_run.call_args[0][0][-1]
+    assert "$_.ProcessId -ne $PID" in ps_command
+    assert "$_.CommandLine -notlike '*Get-CimInstance Win32_Process*'" in ps_command
+
+
 def test_is_tray_running_true_when_process_found():
     """is_tray_running should return true when tray process list is non-empty."""
     with patch("abso.tray.get_tray_processes", return_value=[{"ProcessId": 1}]):
-        assert is_tray_running() is True
+        with patch("abso.tray._tray_mutex_exists", return_value=False):
+            assert is_tray_running() is True
+
+
+def test_is_tray_running_true_when_mutex_exists():
+    """Elevated tray hosts can hide command lines, so the mutex is authoritative."""
+    with patch("abso.tray.get_tray_processes", return_value=[]):
+        with patch("abso.tray._tray_mutex_exists", return_value=True):
+            assert is_tray_running() is True
+
+
+def test_is_tray_running_false_when_no_process_or_mutex():
+    """Tray runtime should be false only when both probes are empty."""
+    with patch("abso.tray.get_tray_processes", return_value=[]):
+        with patch("abso.tray._tray_mutex_exists", return_value=False):
+            assert is_tray_running() is False
 
 
 def test_ensure_tray_running_starts_when_missing():
     """ensure_tray_running should attempt startup when requested."""
-    with patch("abso.tray.is_tray_running", side_effect=[False, True]):
+    with patch(
+        "abso.tray._tray_runtime_snapshot",
+        side_effect=[
+            {"running": False, "mutex_exists": False, "processes": []},
+            {"running": True, "mutex_exists": True, "processes": []},
+        ],
+    ):
         with patch("abso.tray.start_tray") as mock_start:
-            with patch("abso.tray.get_tray_processes", return_value=[{"ProcessId": 1}]):
-                result = ensure_tray_running(start_if_missing=True)
+            result = ensure_tray_running(start_if_missing=True)
 
     mock_start.assert_called_once()
     assert result["running_before"] is False
     assert result["started"] is True
     assert result["running_after"] is True
+    assert result["mutex_exists"] is True

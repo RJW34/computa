@@ -1,6 +1,7 @@
 """CLI entry point for ABSO."""
 
 import json
+import logging
 import os
 import re
 import subprocess
@@ -29,6 +30,7 @@ from abso.utils.admin import is_admin
 from abso.utils.atomic_io import atomic_write_json
 
 console = Console()
+logger = logging.getLogger(__name__)
 
 # Paths - handle both development and PyInstaller bundled modes
 def get_data_dir() -> Path:
@@ -55,6 +57,90 @@ REPORTS_DIR = ROOT_DIR / "reports"
 STATE_FILE = ROOT_DIR / ".abso_state.json"
 
 
+def _local_appdata_state_file() -> Path:
+    """Return the packaged-app state-file location used by tray/GUI clients."""
+    local_appdata = os.environ.get("LOCALAPPDATA")
+    if local_appdata:
+        app_data = Path(local_appdata)
+    else:
+        app_data = Path.home() / "AppData" / "Local"
+    return app_data / "AdaptiveBattleStationOptimizer" / ".abso_state.json"
+
+
+def _state_file_targets() -> list[Path]:
+    """Return state file paths that should stay in sync.
+
+    In packaged mode ROOT_DIR already points at LocalAppData, so there is only
+    one target. In development mode, mirror the repo state into LocalAppData so
+    the PowerShell tray and backend CLI see the same active profile.
+    """
+    targets = [STATE_FILE]
+
+    try:
+        default_dev_state = Path(__file__).resolve().parent.parent / ".abso_state.json"
+        is_default_dev_state = (
+            not getattr(sys, "frozen", False)
+            and STATE_FILE.resolve() == default_dev_state.resolve()
+        )
+        if is_default_dev_state:
+            local_state = _local_appdata_state_file()
+            if local_state.resolve() != STATE_FILE.resolve():
+                targets.append(local_state)
+    except OSError:
+        pass
+
+    return targets
+
+
+def _sanitize_state_snapshot(state: dict[str, Any]) -> dict[str, Any]:
+    """Return the public active-profile state shape with canonical profile id."""
+    return {
+        "current_profile": resolve_profile_id(state.get("current_profile")),
+        "applied_at": state.get("applied_at"),
+        "reboot_pending": bool(state.get("reboot_pending", False)),
+        "reboot_reasons": list(state.get("reboot_reasons") or []),
+    }
+
+
+def _read_state_file(path: Path) -> dict[str, Any] | None:
+    """Read and sanitize one state-file candidate."""
+    if not path.exists():
+        return None
+    try:
+        state = json.loads(path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return None
+    if not isinstance(state, dict):
+        return None
+    return _sanitize_state_snapshot(state)
+
+
+def _state_sort_value(path: Path, state: dict[str, Any]) -> float:
+    """Return a comparable freshness value for a state candidate."""
+    applied_at = state.get("applied_at")
+    if applied_at:
+        try:
+            return datetime.fromisoformat(str(applied_at).replace("Z", "+00:00")).timestamp()
+        except (TypeError, ValueError, OSError):
+            pass
+    try:
+        return path.stat().st_mtime
+    except OSError:
+        return 0.0
+
+
+def _write_state_snapshot(state: dict[str, Any]) -> None:
+    """Write active-profile state to primary and mirrored targets."""
+    targets = _state_file_targets()
+    atomic_write_json(targets[0], state, indent=2)
+
+    for target in targets[1:]:
+        try:
+            atomic_write_json(target, state, indent=2)
+        except OSError as exc:
+            logger.warning("Failed to mirror state file to %s: %s", target, exc)
+
+
 def get_current_profile() -> str | None:
     """Get the currently active profile from state file."""
     return _read_state_snapshot().get("current_profile")
@@ -73,26 +159,32 @@ def set_current_profile(
         "reboot_pending": requires_reboot,
         "reboot_reasons": reboot_reasons or [],
     }
-    atomic_write_json(STATE_FILE, state, indent=2)
+    _write_state_snapshot(state)
 
 
 def clear_reboot_pending() -> None:
     """Clear the reboot-pending flag from state file."""
-    if not STATE_FILE.exists():
+    if not any(path.exists() for path in _state_file_targets()):
         return
     try:
-        state = json.loads(STATE_FILE.read_text())
+        state = _read_state_snapshot()
         state["reboot_pending"] = False
         state["reboot_reasons"] = []
-        atomic_write_json(STATE_FILE, state, indent=2)
+        _write_state_snapshot(state)
     except (json.JSONDecodeError, OSError):
         pass
 
 
 def clear_current_profile() -> None:
     """Clear the active profile state file after a restore/reset."""
-    if STATE_FILE.exists():
-        STATE_FILE.unlink()
+    for index, path in enumerate(_state_file_targets()):
+        try:
+            if path.exists():
+                path.unlink()
+        except OSError as exc:
+            if index == 0:
+                raise
+            logger.warning("Failed to remove mirrored state file %s: %s", path, exc)
 
 
 def json_serial(obj: Any) -> Any:
@@ -149,20 +241,18 @@ def _read_state_snapshot() -> dict[str, Any]:
         "reboot_pending": False,
         "reboot_reasons": [],
     }
-    if not STATE_FILE.exists():
+    candidates: list[tuple[float, dict[str, Any]]] = []
+    for path in _state_file_targets():
+        state = _read_state_file(path)
+        if state is None:
+            continue
+        candidates.append((_state_sort_value(path, state), state))
+
+    if not candidates:
         return default_state
 
-    try:
-        state = json.loads(STATE_FILE.read_text())
-    except (json.JSONDecodeError, OSError):
-        return default_state
-
-    return {
-        "current_profile": resolve_profile_id(state.get("current_profile")),
-        "applied_at": state.get("applied_at"),
-        "reboot_pending": bool(state.get("reboot_pending", False)),
-        "reboot_reasons": list(state.get("reboot_reasons") or []),
-    }
+    candidates.sort(key=lambda item: item[0], reverse=True)
+    return candidates[0][1]
 
 
 def _append_unique_message(messages: list[str], message: str | None) -> None:

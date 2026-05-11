@@ -53,6 +53,45 @@ def test_apply_updates_allowed_keys(tmp_path: Path) -> None:
     assert "HDRDisplayOutputNits=800" in content
 
 
+def test_apply_updates_only_fortnite_settings_section_when_present(tmp_path: Path) -> None:
+    config_dir = tmp_path / "FortniteGame" / "Saved" / "Config" / "WindowsClient"
+    ini_path = config_dir / "GameUserSettings.ini"
+    _write_game_user_settings(
+        ini_path,
+        "\n".join(
+            [
+                "[/Script/Other.Settings]",
+                "PreferredFullscreenMode=2",
+                "bUseVSync=True",
+                "[/Script/FortniteGame.FortGameUserSettings]",
+                "PreferredFullscreenMode=1",
+                "LastConfirmedFullscreenMode=1",
+                "bUseVSync=True",
+                "[/Script/Another.Settings]",
+                "PreferredFullscreenMode=2",
+            ]
+        )
+        + "\n",
+    )
+
+    with patch.object(FortniteConfigHandler, "_get_config_dir", return_value=config_dir):
+        handler = FortniteConfigHandler()
+        result = handler.apply({"fullscreen_mode": 0, "vsync": False})
+
+    assert result["success"] is True
+    assert ini_path.read_text(encoding="utf-8").splitlines() == [
+        "[/Script/Other.Settings]",
+        "PreferredFullscreenMode=2",
+        "bUseVSync=True",
+        "[/Script/FortniteGame.FortGameUserSettings]",
+        "PreferredFullscreenMode=0",
+        "LastConfirmedFullscreenMode=0",
+        "bUseVSync=False",
+        "[/Script/Another.Settings]",
+        "PreferredFullscreenMode=2",
+    ]
+
+
 def test_detect_and_verify_active_read_current_values(tmp_path: Path) -> None:
     config_dir = tmp_path / "FortniteGame" / "Saved" / "Config" / "WindowsClient"
     ini_path = config_dir / "GameUserSettings.ini"

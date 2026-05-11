@@ -21,6 +21,7 @@ class UEGameUserSettingsHandler(SettingsHandler):
     """Generic handler for Unreal Engine GameUserSettings.ini mutation."""
 
     CONFIG_FILENAME = "GameUserSettings.ini"
+    TARGET_SECTION_NAME: str | None = None
     MUTABLE_SETTINGS_TO_INI: dict[str, str] = {}
     PROTECTED_INI_KEYS: set[str] = set()
     BOOL_SETTINGS: frozenset[str] = frozenset({
@@ -52,16 +53,16 @@ class UEGameUserSettingsHandler(SettingsHandler):
 
         try:
             content = ini_path.read_text(encoding="utf-8", errors="replace")
-            lines = content.splitlines()
+            assignments = parse_ini_assignments(
+                content.splitlines(),
+                section_name=self.TARGET_SECTION_NAME,
+            )
 
-            for line in lines:
-                stripped = line.strip()
-                for profile_key, ini_key in self.MUTABLE_SETTINGS_TO_INI.items():
-                    prefix = f"{ini_key}="
-                    if not stripped.startswith(prefix):
-                        continue
-                    raw_value = stripped.split("=", 1)[1]
-                    result[profile_key] = self._coerce_detected(profile_key, raw_value)
+            for profile_key, ini_key in self.MUTABLE_SETTINGS_TO_INI.items():
+                raw_value = assignments.get(ini_key)
+                if raw_value is None:
+                    continue
+                result[profile_key] = self._coerce_detected(profile_key, raw_value)
         except Exception as e:
             logger.error("Failed to read UE config %s: %s", ini_path, e)
 
@@ -149,13 +150,20 @@ class UEGameUserSettingsHandler(SettingsHandler):
                     "applied": [],
                 }
 
-            original_assignments = parse_ini_assignments(lines)
+            original_assignments = parse_ini_assignments(
+                lines,
+                section_name=self.TARGET_SECTION_NAME,
+            )
             patch_result = apply_ini_key_patch(
                 lines=lines,
                 replacements=replacements,
                 append_missing=True,
+                section_name=self.TARGET_SECTION_NAME,
             )
-            new_assignments = parse_ini_assignments(patch_result.lines)
+            new_assignments = parse_ini_assignments(
+                patch_result.lines,
+                section_name=self.TARGET_SECTION_NAME,
+            )
 
             protected_mutations = []
             for key in self.PROTECTED_INI_KEYS:

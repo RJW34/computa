@@ -28,6 +28,10 @@ def test_apply_updates_allowed_keys_and_reflex(tmp_path: Path) -> None:
                 "bUseHDRDisplayOutput=False",
                 "HDRDisplayOutputNits=1000",
                 "bNvidiaReflex=False",
+                "bUseDynamicResolution=True",
+                "bDlssFrameGeneration=True",
+                "bFSRFrameGeneration=True",
+                "bXeFrameGeneration=True",
             ]
         )
         + "\n",
@@ -43,6 +47,10 @@ def test_apply_updates_allowed_keys_and_reflex(tmp_path: Path) -> None:
                 "hdr_output": True,
                 "hdr_nits": 1000,
                 "nvidia_reflex": True,
+                "dynamic_resolution": False,
+                "dlss_frame_generation": False,
+                "fsr_frame_generation": False,
+                "xe_frame_generation": False,
             }
         )
 
@@ -56,6 +64,59 @@ def test_apply_updates_allowed_keys_and_reflex(tmp_path: Path) -> None:
     assert "bUseHDRDisplayOutput=True" in content
     assert "HDRDisplayOutputNits=1000" in content
     assert "bNvidiaReflex=True" in content
+    assert "bUseDynamicResolution=False" in content
+    assert "bDlssFrameGeneration=False" in content
+    assert "bFSRFrameGeneration=False" in content
+    assert "bXeFrameGeneration=False" in content
+
+
+def test_apply_updates_only_marvel_settings_section_when_present(tmp_path: Path) -> None:
+    config_dir = tmp_path / "Marvel" / "Saved" / "Config" / "Windows"
+    ini_path = config_dir / "GameUserSettings.ini"
+    _write_game_user_settings(
+        ini_path,
+        "\n".join(
+            [
+                "[/Script/Other.Settings]",
+                "FullscreenMode=2",
+                "bDlssFrameGeneration=True",
+                "[/Script/Marvel.MarvelGameUserSettings]",
+                "FullscreenMode=1",
+                "bDlssFrameGeneration=True",
+                "bUseDynamicResolution=True",
+                "[/Script/Another.Settings]",
+                "FullscreenMode=2",
+                "bDlssFrameGeneration=True",
+            ]
+        )
+        + "\n",
+    )
+
+    with patch.object(MarvelRivalsConfigHandler, "_get_config_dir", return_value=config_dir):
+        handler = MarvelRivalsConfigHandler()
+        result = handler.apply(
+            {
+                "fullscreen_mode": 0,
+                "dlss_frame_generation": False,
+                "dynamic_resolution": False,
+            }
+        )
+
+    assert result["success"] is True
+    assert ini_path.read_text(encoding="utf-8").splitlines() == [
+        "[/Script/Other.Settings]",
+        "FullscreenMode=2",
+        "bDlssFrameGeneration=True",
+        "[/Script/Marvel.MarvelGameUserSettings]",
+        "FullscreenMode=0",
+        "bDlssFrameGeneration=False",
+        "bUseDynamicResolution=False",
+        "LastConfirmedFullscreenMode=0",
+        "PreferredFullscreenMode=0",
+        "[/Script/Another.Settings]",
+        "FullscreenMode=2",
+        "bDlssFrameGeneration=True",
+    ]
 
 
 def test_apply_auto_vrr_fps_cap_uses_detected_refresh(tmp_path: Path) -> None:
@@ -101,6 +162,10 @@ def test_detect_and_verify_active_read_current_values(tmp_path: Path) -> None:
                 "bUseHDRDisplayOutput=True",
                 "HDRDisplayOutputNits=1000",
                 "bNvidiaReflex=True",
+                "bUseDynamicResolution=False",
+                "bDlssFrameGeneration=False",
+                "bFSRFrameGeneration=False",
+                "bXeFrameGeneration=False",
             ]
         )
         + "\n",
@@ -117,6 +182,10 @@ def test_detect_and_verify_active_read_current_values(tmp_path: Path) -> None:
                 "hdr_output": True,
                 "hdr_nits": 1000,
                 "nvidia_reflex": True,
+                "dynamic_resolution": False,
+                "dlss_frame_generation": False,
+                "fsr_frame_generation": False,
+                "xe_frame_generation": False,
             }
         )
 
@@ -126,4 +195,8 @@ def test_detect_and_verify_active_read_current_values(tmp_path: Path) -> None:
     assert detected["hdr_output"] is True
     assert detected["hdr_nits"] == 1000
     assert detected["nvidia_reflex"] is True
+    assert detected["dynamic_resolution"] is False
+    assert detected["dlss_frame_generation"] is False
+    assert detected["fsr_frame_generation"] is False
+    assert detected["xe_frame_generation"] is False
     assert verify["all_active"] is True

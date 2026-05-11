@@ -50,10 +50,20 @@ class TimerSettingsHandler(SettingsHandler):
     RESOLUTION_1MS = 10000       # 1.0ms
     RESOLUTION_0_5MS = 5000      # 0.5ms (minimum on most systems)
 
+    # NTSTATUS values we treat as non-fatal capability gates rather than errors.
+    # STATUS_PRIVILEGE_NOT_HELD fires on Win11 25H2+ when a process lacks the
+    # SeIncreaseBasePriorityPrivilege needed for sub-millisecond timer
+    # resolution under the tightened kernel policy. Logging it as warning per
+    # apply was noisy; we now report it once and skip subsequent calls.
+    _STATUS_PRIVILEGE_NOT_HELD = -1073741243  # 0xC0000061 signed
+
     def __init__(self) -> None:
         """Initialize timer settings handler."""
         self._ntdll: ctypes.WinDLL | None = None
         self._original_resolution: int | None = None
+        # Per-process gate: once the kernel rejects with PRIVILEGE_NOT_HELD,
+        # further calls would also fail. Avoid re-spamming the stderr stream.
+        self._privilege_blocked: bool = False
         self._load_ntdll()
 
     @property
@@ -135,6 +145,8 @@ class TimerSettingsHandler(SettingsHandler):
         """
         if not self._ntdll:
             return None
+        if self._privilege_blocked:
+            return None
 
         try:
             current = ctypes.c_ulong()
@@ -148,9 +160,20 @@ class TimerSettingsHandler(SettingsHandler):
 
             if status == 0:  # STATUS_SUCCESS
                 return current.value
-            else:
-                logger.warning(f"NtSetTimerResolution returned status: {status}")
+            if status == self._STATUS_PRIVILEGE_NOT_HELD:
+                # 25H2 tightened kernel-side privilege checks for the timer
+                # resolution API. We can't grant the privilege from inside
+                # this process; log once and stop retrying so apply pipelines
+                # don't accumulate a warning per profile switch.
+                self._privilege_blocked = True
+                logger.info(
+                    "NtSetTimerResolution: STATUS_PRIVILEGE_NOT_HELD on this "
+                    "kernel — skipping further timer resolution writes. "
+                    "Modern games still raise their own resolution at launch."
+                )
                 return None
+            logger.warning(f"NtSetTimerResolution returned status: {status}")
+            return None
 
         except Exception as e:
             logger.error(f"Failed to set timer resolution: {e}")
@@ -297,6 +320,21 @@ class TimerSettingsHandler(SettingsHandler):
             # Set the new resolution
             actual = self._set_timer_resolution(target, enable=True)
             if actual is None:
+                if self._privilege_blocked:
+                    # Capability gate, not a failure. Apply still succeeds —
+                    # the user-perceived effect (timer res raised during
+                    # games) is achieved by games themselves at launch.
+                    return {
+                        "success": True,
+                        "error": None,
+                        "requires_reboot": False,
+                        "skipped": (
+                            "NtSetTimerResolution requires a privilege the "
+                            "current kernel/policy is not granting "
+                            "(STATUS_PRIVILEGE_NOT_HELD); games still raise "
+                            "timer resolution on their own at launch."
+                        ),
+                    }
                 errors.append("Failed to set timer resolution")
             else:
                 logger.info(
@@ -466,6 +504,13 @@ class TimerResolutionGuard:
             )
             if status == 0:
                 return cur.value
+            if status == TimerSettingsHandler._STATUS_PRIVILEGE_NOT_HELD:
+                logger.info(
+                    "TimerResolutionGuard: STATUS_PRIVILEGE_NOT_HELD on this "
+                    "kernel; running with the system default resolution "
+                    "instead of a held override."
+                )
+                return None
             logger.warning("NtSetTimerResolution status: %s", status)
             return None
         except Exception as e:

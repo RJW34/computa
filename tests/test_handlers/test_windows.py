@@ -1,11 +1,19 @@
 """Tests for WindowsSettingsHandler."""
 
+import ctypes
 import winreg
 from unittest.mock import MagicMock, patch
 
 import pytest
 
-from abso.settings.windows import WindowsSettingsHandler
+from abso.settings.windows import (
+    DISPLAYCONFIG_ADVANCED_COLOR_MODE_HDR,
+    DISPLAYCONFIG_ADVANCED_COLOR_MODE_SDR,
+    DISPLAYCONFIG_DEVICE_INFO_GET_ADVANCED_COLOR_INFO,
+    DISPLAYCONFIG_DEVICE_INFO_GET_ADVANCED_COLOR_INFO_2,
+    WindowsSettingsHandler,
+    _LUID,
+)
 
 
 class TestWindowsDetect:
@@ -48,7 +56,10 @@ class TestWindowsDetect:
             "available": True,
             "hdr_capable_count": 1,
             "hdr_enabled_count": 1,
+            "hdr_active_count": 1,
             "any_enabled": True,
+            "any_active": True,
+            "per_target": [{"target_id": 1, "hdr_user_enabled": True, "hdr_active": True}],
         }
         mock_auto_hdr.return_value = False
         mock_windowed_optimizations.return_value = False
@@ -75,8 +86,11 @@ class TestWindowsDetect:
         assert "hags" in result
         assert "vbs" in result
         assert "hdr" in result
+        assert "hdr_active" in result
         assert "hdr_capable_count" in result
         assert "hdr_enabled_count" in result
+        assert "hdr_active_count" in result
+        assert "hdr_per_target" in result
         assert "auto_hdr" in result
         assert "windowed_optimizations" in result
         assert "vrr_optimize" in result
@@ -125,7 +139,9 @@ class TestWindowsDetect:
             "available": False,
             "hdr_capable_count": 0,
             "hdr_enabled_count": 0,
+            "hdr_active_count": 0,
             "any_enabled": False,
+            "any_active": False,
         }
         mock_auto_hdr.return_value = None
         mock_windowed_optimizations.return_value = None
@@ -181,7 +197,9 @@ class TestWindowsDetect:
             "available": False,
             "hdr_capable_count": 0,
             "hdr_enabled_count": 0,
+            "hdr_active_count": 0,
             "any_enabled": False,
+            "any_active": False,
         }
         mock_auto_hdr.return_value = None
         mock_windowed_optimizations.return_value = None
@@ -422,7 +440,7 @@ class TestWindowsApply:
         result = handler.apply({"hdr": True})
 
         assert result["success"] is True
-        assert "HDR: enabled on 1 monitor(s)" in result["applied"]
+        assert "HDR: active on 1 monitor(s) (1 with Use HDR enabled)" in result["applied"]
 
     @patch.object(WindowsSettingsHandler, "detect")
     @patch.object(WindowsSettingsHandler, "_set_hdr")
@@ -543,6 +561,109 @@ class TestWindowsBackupRestore:
         assert result is False
 
 
+class TestWindowsVerifyActive:
+    """Tests for WindowsSettingsHandler.verify_active display readback."""
+
+    @patch.object(WindowsSettingsHandler, "detect")
+    def test_verify_active_includes_hdr_and_color_state(self, mock_detect):
+        mock_detect.return_value = {
+            "hags": True,
+            "vbs": False,
+            "hdr": True,
+            "hdr_active": True,
+            "auto_hdr": False,
+            "advanced_color": True,
+            "sdr_white_level_nits": 200.4,
+        }
+
+        handler = WindowsSettingsHandler()
+        result = handler.verify_active(
+            {
+                "hags": True,
+                "vbs": False,
+                "hdr": True,
+                "auto_hdr": False,
+                "advanced_color": True,
+                "sdr_white_level_nits": 200,
+            }
+        )
+
+        assert result["all_active"] is True
+        assert result["settings"]["hdr"]["active"] is True
+        assert result["settings"]["auto_hdr"]["active"] is True
+        assert result["settings"]["advanced_color"]["active"] is True
+        assert result["settings"]["sdr_white_level_nits"]["active"] is True
+
+    @patch.object(WindowsSettingsHandler, "detect")
+    def test_verify_active_flags_hdr_swap_failure(self, mock_detect):
+        mock_detect.return_value = {
+            "hags": True,
+            "vbs": False,
+            "hdr": False,
+            "hdr_active": False,
+            "auto_hdr": False,
+            "advanced_color": False,
+            "sdr_white_level_nits": None,
+        }
+
+        handler = WindowsSettingsHandler()
+        result = handler.verify_active(
+            {
+                "hdr": True,
+                "auto_hdr": False,
+                "advanced_color": True,
+                "sdr_white_level_nits": 200,
+            }
+        )
+
+        assert result["all_active"] is False
+        assert result["settings"]["hdr"]["active"] is False
+        assert result["settings"]["advanced_color"]["active"] is False
+        assert result["settings"]["sdr_white_level_nits"]["active"] is False
+
+    @patch.object(WindowsSettingsHandler, "detect")
+    def test_verify_active_flags_hdr_user_enabled_but_inactive(self, mock_detect):
+        """Use HDR can be on while the live compositor mode is still SDR."""
+        mock_detect.return_value = {
+            "hdr": True,
+            "hdr_active": False,
+        }
+
+        handler = WindowsSettingsHandler()
+        result = handler.verify_active({"hdr": True})
+
+        assert result["all_active"] is False
+        assert result["settings"]["hdr"]["current"] == {
+            "user_enabled": True,
+            "active": False,
+        }
+        assert result["settings"]["hdr"]["active"] is False
+
+    @patch.object(WindowsSettingsHandler, "detect")
+    def test_verify_active_passes_when_active_matches_even_if_user_enabled_stuck(
+        self, mock_detect,
+    ):
+        """HDR=off profile must pass verify when the live compositor is SDR,
+        even if a secondary HDR-capable target still has 'Use HDR' set in
+        the registry. The per-monitor user_enabled bit is sticky on Win11
+        25H2 multi-monitor setups and is not load-bearing for user-visible
+        HDR state."""
+        mock_detect.return_value = {
+            "hdr": True,  # stuck user_enabled on a secondary HDR-capable monitor
+            "hdr_active": False,  # live compositor is SDR (what the user sees)
+        }
+
+        handler = WindowsSettingsHandler()
+        result = handler.verify_active({"hdr": False})
+
+        assert result["all_active"] is True
+        assert result["settings"]["hdr"]["active"] is True
+        assert result["settings"]["hdr"]["current"] == {
+            "user_enabled": True,
+            "active": False,
+        }
+
+
 class TestWindowsHdrCapability:
     """Tests for HDR capability detection."""
 
@@ -568,6 +689,62 @@ class TestWindowsHdrCapability:
         # Unknown monitor with AdvancedColorSupported=1
         result = handler._is_monitor_hdr_capable("UNKNOWN_MONITOR")
         assert result is True
+
+
+class TestWindowsHdrInfo2Readback:
+    """Tests for Win11 HDR/WCG split-state readback."""
+
+    @patch.object(WindowsSettingsHandler, "_get_active_display_targets")
+    @patch("abso.settings.windows.ctypes.windll.user32.DisplayConfigGetDeviceInfo")
+    def test_hdr_summary_uses_info2_user_enabled_and_active_mode(
+        self, mock_get_info, mock_targets,
+    ):
+        mock_targets.return_value = [(_LUID(0, 0), 1)]
+
+        def fake_get_info(ptr):
+            obj = ptr._obj
+            assert obj.header.type == DISPLAYCONFIG_DEVICE_INFO_GET_ADVANCED_COLOR_INFO_2
+            obj.value = 0x01 | 0x02 | 0x10 | 0x20  # supported, active-color, HDR supported, Use HDR on
+            obj.activeColorMode = DISPLAYCONFIG_ADVANCED_COLOR_MODE_SDR
+            return 0
+
+        mock_get_info.side_effect = fake_get_info
+
+        handler = WindowsSettingsHandler()
+        result = handler._get_hdr_state_summary()
+
+        assert result["available"] is True
+        assert result["hdr_capable_count"] == 1
+        assert result["hdr_enabled_count"] == 1
+        assert result["hdr_active_count"] == 0
+        assert result["any_enabled"] is True
+        assert result["any_active"] is False
+        assert result["per_target"][0]["api"] == "advanced_color_info_2"
+
+    @patch.object(WindowsSettingsHandler, "_get_active_display_targets")
+    @patch("abso.settings.windows.ctypes.windll.user32.DisplayConfigGetDeviceInfo")
+    def test_hdr_summary_falls_back_to_legacy_advanced_color(
+        self, mock_get_info, mock_targets,
+    ):
+        mock_targets.return_value = [(_LUID(0, 0), 1)]
+
+        def fake_get_info(ptr):
+            obj = ptr._obj
+            if obj.header.type == DISPLAYCONFIG_DEVICE_INFO_GET_ADVANCED_COLOR_INFO_2:
+                return 87
+            assert obj.header.type == DISPLAYCONFIG_DEVICE_INFO_GET_ADVANCED_COLOR_INFO
+            obj.value = 0x03
+            return 0
+
+        mock_get_info.side_effect = fake_get_info
+
+        handler = WindowsSettingsHandler()
+        result = handler._get_hdr_state_summary()
+
+        assert result["hdr_capable_count"] == 1
+        assert result["hdr_enabled_count"] == 1
+        assert result["hdr_active_count"] == 1
+        assert result["per_target"][0]["api"] == "advanced_color_info_legacy"
 
 
 class TestWindowsRefreshRate:
@@ -850,7 +1027,11 @@ class TestAdvancedColor:
     ):
         """advanced_color without hdr should preserve the current live HDR state."""
         mock_detect.return_value = {}
-        mock_hdr_summary.return_value = {"available": True, "any_enabled": True}
+        mock_hdr_summary.return_value = {
+            "available": True,
+            "any_enabled": True,
+            "any_active": True,
+        }
         mock_refresh.return_value = {
             "success": True, "applied_count": 1, "skipped_count": 0,
             "errors": [], "cycle_ran": True, "final_state": {},
@@ -882,6 +1063,127 @@ class TestAdvancedColor:
         assert result.get("success", True) is True
         assert result.get("errors", []) == []
         assert any("warning" in msg.lower() for msg in result.get("applied", []))
+
+    @patch.object(WindowsSettingsHandler, "_set_advanced_color_with_refresh")
+    @patch.object(WindowsSettingsHandler, "detect")
+    def test_apply_advanced_color_treats_hdr_errors_as_blocking(
+        self, mock_detect, mock_refresh,
+    ):
+        """HDR failures inside the combined WCG/HDR path must fail apply."""
+        mock_detect.return_value = {}
+        mock_refresh.return_value = {
+            "success": False,
+            "applied_count": 0,
+            "skipped_count": 0,
+            "errors": ["MONITOR_01: WCG permission denied"],
+            "critical_errors": ["HDR enable: live path stayed SDR"],
+            "cycle_ran": True,
+            "final_state": {},
+        }
+
+        handler = WindowsSettingsHandler()
+        result = handler.apply({"advanced_color": True, "hdr": True})
+
+        assert result["success"] is False
+        assert "HDR enable: live path stayed SDR" in (result["error"] or "")
+        assert any("Advanced color: warning" in item for item in result["applied"])
+
+    @patch.object(WindowsSettingsHandler, "_DWM_REFRESH_WAIT_SECONDS", 0)
+    @patch.object(WindowsSettingsHandler, "_write_hdr_enabled_registry")
+    @patch.object(WindowsSettingsHandler, "_get_advanced_color")
+    @patch.object(WindowsSettingsHandler, "_get_hdr_state_summary")
+    @patch.object(WindowsSettingsHandler, "_set_advanced_color")
+    @patch.object(WindowsSettingsHandler, "_set_hdr")
+    def test_refresh_cycle_does_not_escalate_transient_step1_failure_when_target_hdr_on(
+        self,
+        mock_set_hdr,
+        mock_set_adv,
+        mock_hdr_summary,
+        mock_get_adv,
+        mock_write_reg,
+    ):
+        """Regression: the overwatch2-gsync-hdr-capture re-apply failure.
+
+        target_hdr=True. Pre-state: HDR is currently OFF (so cycle runs).
+        Step 1 (_set_hdr(False)) "fails" because the secondary HDR-capable
+        target's user_enabled bit didn't flip even though active=0. The
+        cycle MUST NOT promote this transient teardown error to a
+        critical_errors entry, because step 2 overwrites the HDR registry
+        intent and step 4 turns HDR back on.
+        """
+        mock_hdr_summary.return_value = {
+            "available": True,
+            "any_active": False,  # forces cycle to run (mismatch with target_hdr=True)
+            "hdr_capable_count": 2,
+            "hdr_enabled_count": 1,
+            "hdr_active_count": 0,
+            "any_enabled": True,
+        }
+        # Step 1: _set_hdr(False) "fails" with the sticky-user_enabled error.
+        # Step 4: _set_hdr(True) succeeds.
+        mock_set_hdr.side_effect = [
+            {"success": False, "errors": ["sticky user_enabled bit on secondary"]},
+            {"success": True, "errors": []},
+        ]
+        mock_set_adv.return_value = {
+            "success": True, "applied_count": 1, "skipped_count": 0, "errors": [],
+        }
+        mock_get_adv.return_value = {"any_enabled": True}
+
+        handler = WindowsSettingsHandler()
+        result = handler._set_advanced_color_with_refresh(
+            target_advanced_color=True, target_hdr=True,
+        )
+
+        assert result["critical_errors"] == [], (
+            f"Transient step-1 teardown failure must not escalate; got "
+            f"critical_errors={result['critical_errors']}"
+        )
+        # The transient error is still surfaced as informational so the tray
+        # log shows it, but result['success'] stays True (overall cycle ok).
+        assert result["success"] is True
+        assert any("HDR teardown" in e for e in result.get("errors", []))
+
+    @patch.object(WindowsSettingsHandler, "_DWM_REFRESH_WAIT_SECONDS", 0)
+    @patch.object(WindowsSettingsHandler, "_write_hdr_enabled_registry")
+    @patch.object(WindowsSettingsHandler, "_get_advanced_color")
+    @patch.object(WindowsSettingsHandler, "_get_hdr_state_summary")
+    @patch.object(WindowsSettingsHandler, "_set_advanced_color")
+    @patch.object(WindowsSettingsHandler, "_set_hdr")
+    def test_refresh_cycle_escalates_step1_failure_when_target_hdr_off(
+        self,
+        mock_set_hdr,
+        mock_set_adv,
+        mock_hdr_summary,
+        mock_get_adv,
+        mock_write_reg,
+    ):
+        """target_hdr=False: step 1 IS the final state. A genuine disable
+        failure (compositor still active) must escalate to critical_errors."""
+        mock_hdr_summary.return_value = {
+            "available": True,
+            "any_active": True,  # forces cycle (need to disable)
+            "hdr_capable_count": 1,
+            "hdr_enabled_count": 1,
+            "hdr_active_count": 1,
+            "any_enabled": True,
+        }
+        mock_set_hdr.return_value = {
+            "success": False,
+            "errors": ["HDR active mode did not move to off"],
+        }
+        mock_set_adv.return_value = {
+            "success": True, "applied_count": 0, "skipped_count": 1, "errors": [],
+        }
+        mock_get_adv.return_value = {"any_enabled": False}
+
+        handler = WindowsSettingsHandler()
+        result = handler._set_advanced_color_with_refresh(
+            target_advanced_color=False, target_hdr=False,
+        )
+
+        assert result["success"] is False
+        assert any("HDR disable" in e for e in result["critical_errors"])
 
     @patch("abso.settings.windows.winreg")
     def test_set_advanced_color_writes_all_enumerated_monitors(self, mock_winreg):
@@ -922,53 +1224,246 @@ class TestAdvancedColor:
             assert args[4] == 1
 
 
-class TestHdrRegistryBasedSet:
-    """Guards against regressing the _set_hdr → registry-check + verify fix.
+class TestHdrLiveStateBasedSet:
+    """Guards the active-display HDR apply path.
 
-    The bug: on Win11 24H2+, legacy DisplayConfig GET type 9 bit 1 means WCG
-    (not HDR). _set_hdr used that bit to decide "already in target state",
-    producing false positives when WCG was on but HDR was off — so the SET
-    was skipped and the profile's HDR request silently didn't land.
+    Registry MonitorDataStore can contain stale inactive monitors. _set_hdr
+    must decide success/failure from the active target's type-15 HDR state,
+    using registry writes only as a fallback when the live path does not move.
     """
 
     @patch.object(WindowsSettingsHandler, "_write_hdr_enabled_registry")
     @patch.object(WindowsSettingsHandler, "_get_active_display_targets")
-    @patch.object(WindowsSettingsHandler, "_get_registry_hdr_enabled_per_monitor")
-    def test_set_hdr_short_circuits_when_registry_already_matches(
-        self, mock_reg, mock_targets, mock_write_reg,
+    @patch.object(WindowsSettingsHandler, "_get_hdr_state_summary")
+    def test_set_hdr_short_circuits_when_live_path_already_on(
+        self, mock_live, mock_targets, mock_write_reg,
     ):
-        """If every HDR-capable monitor already shows target state in registry,
-        _set_hdr must skip the SET (fast path, no disconnect)."""
-        mock_reg.return_value = {"MON_A": True, "MON_B": True}
-        mock_targets.return_value = []  # shouldn't be called
+        mock_live.return_value = {
+            "available": True,
+            "any_enabled": True,
+            "any_active": True,
+            "hdr_capable_count": 1,
+            "hdr_enabled_count": 1,
+            "hdr_active_count": 1,
+        }
 
         handler = WindowsSettingsHandler()
         result = handler._set_hdr(True)
 
         assert result["success"] is True
-        assert result["hdr_enabled_count"] == 2
-        # No enumeration of active targets since we short-circuited.
+        assert result["hdr_active_count"] == 1
         mock_targets.assert_not_called()
         mock_write_reg.assert_not_called()
 
-    @patch.object(WindowsSettingsHandler, "_get_registry_hdr_enabled_per_monitor")
-    def test_set_hdr_uses_registry_not_legacy_bit1(self, mock_reg):
-        """_set_hdr must use registry HDREnabled as source of truth for the
-        "already correct" check. Using legacy type 9 bit 1 (which on 24H2+
-        means WCG) caused the original silent-no-op regression."""
-        # Mixed state: MON_A is on, MON_B is off. Target = True.
-        mock_reg.return_value = {"MON_A": True, "MON_B": False}
+    @patch.object(WindowsSettingsHandler, "_write_hdr_enabled_registry")
+    @patch.object(WindowsSettingsHandler, "_get_active_display_targets")
+    @patch.object(WindowsSettingsHandler, "_get_hdr_state_summary")
+    def test_set_hdr_disable_short_circuits_when_live_path_already_off(
+        self, mock_live, mock_targets, mock_write_reg,
+    ):
+        mock_live.return_value = {
+            "available": True,
+            "any_enabled": False,
+            "any_active": False,
+            "hdr_capable_count": 1,
+            "hdr_enabled_count": 0,
+            "hdr_active_count": 0,
+        }
 
         handler = WindowsSettingsHandler()
-        # Fast-path short-circuit only fires when ALL registry entries
-        # match target. Mixed state must NOT short-circuit.
-        with patch.object(handler, "_get_active_display_targets") as tgt:
-            tgt.return_value = []  # forces no-targets error path
-            result = handler._set_hdr(True)
+        result = handler._set_hdr(False)
 
-        # Either it tried and failed (no targets), or it did real work.
-        # Crucially, registry was read to drive the decision.
-        assert mock_reg.called
+        assert result["success"] is True
+        mock_targets.assert_not_called()
+        mock_write_reg.assert_not_called()
+
+    @patch.object(WindowsSettingsHandler, "_get_active_display_targets")
+    @patch.object(WindowsSettingsHandler, "_get_hdr_state_summary")
+    def test_set_hdr_tries_when_user_enabled_but_live_path_sdr(
+        self, mock_live, mock_targets,
+    ):
+        mock_live.return_value = {
+            "available": True,
+            "any_enabled": True,
+            "any_active": False,
+            "hdr_capable_count": 1,
+            "hdr_enabled_count": 1,
+            "hdr_active_count": 0,
+        }
+        mock_targets.return_value = []
+
+        handler = WindowsSettingsHandler()
+        result = handler._set_hdr(True)
+
+        assert result["success"] is False
+        assert "No active display targets found" in result["errors"]
+        mock_targets.assert_called_once()
+
+    @patch.object(WindowsSettingsHandler, "_DWM_REFRESH_WAIT_SECONDS", 0)
+    @patch.object(WindowsSettingsHandler, "_kick_display_config_database_reapply", return_value=True)
+    @patch.object(WindowsSettingsHandler, "_write_hdr_enabled_registry")
+    @patch.object(WindowsSettingsHandler, "_get_hdr_state_summary")
+    @patch.object(WindowsSettingsHandler, "_get_active_display_targets")
+    @patch("abso.settings.windows.ctypes.windll.user32.DisplayConfigSetDeviceInfo")
+    def test_set_hdr_kicks_database_when_live_path_stays_sdr(
+        self,
+        mock_set_device,
+        mock_targets,
+        mock_live,
+        mock_write_reg,
+        mock_kick,
+    ):
+        """Live SDR after SET_HDR_STATE gets a registry write + database kick."""
+        mock_set_device.return_value = 0
+        mock_targets.return_value = [(_LUID(0, 0), 1)]
+        mock_live.side_effect = [
+            {
+                "available": True,
+                "any_enabled": False,
+                "any_active": False,
+                "hdr_capable_count": 1,
+                "hdr_enabled_count": 0,
+                "hdr_active_count": 0,
+            },
+            {
+                "available": True,
+                "any_enabled": False,
+                "any_active": False,
+                "hdr_capable_count": 1,
+                "hdr_enabled_count": 0,
+                "hdr_active_count": 0,
+            },
+            {
+                "available": True,
+                "any_enabled": True,
+                "any_active": True,
+                "hdr_capable_count": 1,
+                "hdr_enabled_count": 1,
+                "hdr_active_count": 1,
+            },
+        ]
+
+        handler = WindowsSettingsHandler()
+        result = handler._set_hdr(True)
+
+        assert result["success"] is True
+        assert result["hdr_enabled_count"] == 1
+        assert result["hdr_active_count"] == 1
+        mock_write_reg.assert_called_once_with(True)
+        mock_kick.assert_called_once()
+
+    @patch.object(WindowsSettingsHandler, "_DWM_REFRESH_WAIT_SECONDS", 0)
+    @patch.object(WindowsSettingsHandler, "_write_hdr_enabled_registry")
+    @patch.object(WindowsSettingsHandler, "_get_hdr_state_summary")
+    @patch.object(WindowsSettingsHandler, "_get_active_display_targets")
+    @patch("abso.settings.windows.ctypes.windll.user32.DisplayConfigSetDeviceInfo")
+    def test_set_hdr_disable_succeeds_when_active_drops_even_if_secondary_user_enabled_sticks(
+        self,
+        mock_set_device,
+        mock_targets,
+        mock_live,
+        mock_write_reg,
+    ):
+        """The user-visible failure on overwatch2-gsync-hdr-capture.
+
+        SET_HDR_STATE successfully brings the active display path to SDR
+        (any_active=False) but on a multi-monitor setup the secondary HDR-
+        capable target keeps its 'Use HDR' user_enabled bit. Apply MUST NOT
+        fail in this state — the user's screen is correctly in SDR."""
+        mock_set_device.return_value = 0
+        mock_targets.return_value = [(_LUID(0, 0), 1)]
+        mock_live.side_effect = [
+            # Pre-state: HDR is active. We need to disable.
+            {
+                "available": True,
+                "any_enabled": True,
+                "any_active": True,
+                "hdr_capable_count": 2,
+                "hdr_enabled_count": 2,
+                "hdr_active_count": 1,
+            },
+            # Post-SET: compositor is SDR, but secondary user_enabled stuck.
+            {
+                "available": True,
+                "any_enabled": True,
+                "any_active": False,
+                "hdr_capable_count": 2,
+                "hdr_enabled_count": 1,
+                "hdr_active_count": 0,
+            },
+        ]
+
+        handler = WindowsSettingsHandler()
+        result = handler._set_hdr(False)
+
+        assert result["success"] is True, (
+            f"Disable must succeed when active mode is SDR; got errors={result.get('errors')}"
+        )
+        assert result["hdr_active_count"] == 0
+        notices = result.get("notices") or []
+        assert any("Use HDR" in n for n in notices), (
+            f"Sticky secondary user_enabled bit should be reported as a notice; got {notices}"
+        )
+
+    @patch.object(WindowsSettingsHandler, "_DWM_REFRESH_WAIT_SECONDS", 0)
+    @patch.object(WindowsSettingsHandler, "_kick_display_config_database_reapply", return_value=True)
+    @patch.object(WindowsSettingsHandler, "_write_hdr_enabled_registry")
+    @patch.object(WindowsSettingsHandler, "_get_hdr_state_summary")
+    @patch.object(WindowsSettingsHandler, "_get_active_display_targets")
+    @patch("abso.settings.windows.ctypes.windll.user32.DisplayConfigSetDeviceInfo")
+    def test_set_hdr_disable_still_fails_when_active_mode_stays_on(
+        self,
+        mock_set_device,
+        mock_targets,
+        mock_live,
+        mock_write_reg,
+        mock_kick,
+    ):
+        """A genuine HDR-disable failure (compositor still in HDR) must still fail."""
+        mock_set_device.return_value = 0
+        mock_targets.return_value = [(_LUID(0, 0), 1)]
+        # Pre-state has HDR active; SET silently no-ops; kick fails to recover.
+        stuck_state = {
+            "available": True,
+            "any_enabled": True,
+            "any_active": True,
+            "hdr_capable_count": 1,
+            "hdr_enabled_count": 1,
+            "hdr_active_count": 1,
+        }
+        mock_live.side_effect = [stuck_state, stuck_state, stuck_state]
+
+        handler = WindowsSettingsHandler()
+        result = handler._set_hdr(False)
+
+        assert result["success"] is False
+        assert any("HDR active mode" in e or "HDR disable" in e for e in result["errors"]), (
+            f"Expected an active-mode failure; got {result['errors']}"
+        )
+
+    @patch.object(WindowsSettingsHandler, "_write_hdr_enabled_registry")
+    @patch.object(WindowsSettingsHandler, "_get_active_display_targets")
+    @patch.object(WindowsSettingsHandler, "_get_hdr_state_summary")
+    def test_set_hdr_disable_short_circuits_when_active_already_off_even_if_user_enabled_stuck(
+        self, mock_live, mock_targets, mock_write_reg,
+    ):
+        """Fast-path skip: active==0 satisfies a disable request, regardless of
+        sticky per-monitor user_enabled bits."""
+        mock_live.return_value = {
+            "available": True,
+            "any_enabled": True,  # stuck on a secondary HDR-capable target
+            "any_active": False,
+            "hdr_capable_count": 2,
+            "hdr_enabled_count": 1,
+            "hdr_active_count": 0,
+        }
+
+        handler = WindowsSettingsHandler()
+        result = handler._set_hdr(False)
+
+        assert result["success"] is True
+        mock_targets.assert_not_called()
+        mock_write_reg.assert_not_called()
 
 
 class TestHdrProfilesWCGIntegration:

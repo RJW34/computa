@@ -11,6 +11,7 @@ from abso.settings.ue_game_user_settings import UEGameUserSettingsHandler
 class MarvelRivalsConfigHandler(UEGameUserSettingsHandler):
     """Enforce Marvel Rivals display settings from GameUserSettings.ini."""
 
+    TARGET_SECTION_NAME = "/Script/Marvel.MarvelGameUserSettings"
     MUTABLE_SETTINGS_TO_INI = {
         "fullscreen_mode": "FullscreenMode",
         "vsync": "bUseVSync",
@@ -18,8 +19,18 @@ class MarvelRivalsConfigHandler(UEGameUserSettingsHandler):
         "hdr_output": "bUseHDRDisplayOutput",
         "hdr_nits": "HDRDisplayOutputNits",
         "nvidia_reflex": "bNvidiaReflex",
+        "dynamic_resolution": "bUseDynamicResolution",
+        "dlss_frame_generation": "bDlssFrameGeneration",
+        "fsr_frame_generation": "bFSRFrameGeneration",
+        "xe_frame_generation": "bXeFrameGeneration",
     }
-    BOOL_SETTINGS = UEGameUserSettingsHandler.BOOL_SETTINGS | frozenset({"nvidia_reflex"})
+    BOOL_SETTINGS = UEGameUserSettingsHandler.BOOL_SETTINGS | frozenset({
+        "nvidia_reflex",
+        "dynamic_resolution",
+        "dlss_frame_generation",
+        "fsr_frame_generation",
+        "xe_frame_generation",
+    })
     MIRROR_FULLSCREEN_MODE_KEYS = ("LastConfirmedFullscreenMode", "PreferredFullscreenMode")
 
     def _get_config_dir(self) -> Path | None:

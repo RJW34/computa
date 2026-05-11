@@ -177,7 +177,11 @@ class ConfigManager:
         "AudioSettingsHandler",
         "UpdatesSettingsHandler",
         # Profile-specific handlers
+        "Diablo4ConfigHandler",
         "DolphinConfigHandler",
+        "FortniteConfigHandler",
+        "MarvelRivalsConfigHandler",
+        "OW2ConfigHandler",
         "Rivals2ConfigHandler",
         "NvidiaNotificationHandler",
         "OBSSettingsHandler",

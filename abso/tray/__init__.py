@@ -28,6 +28,8 @@ import json
 import time
 from pathlib import Path
 
+TRAY_MUTEX_NAME = "Global\\ABSO_Tray_SingleInstance_v2"
+
 
 def get_tray_dir() -> Path:
     """Get the tray scripts directory."""
@@ -96,11 +98,41 @@ def get_startup_status() -> dict[str, object]:
     return json.loads(result.stdout.strip() or "{}")
 
 
+def _tray_mutex_exists() -> bool:
+    """Return True when the tray's single-instance mutex is currently owned."""
+    if sys.platform != "win32":
+        return False
+
+    try:
+        import ctypes
+        from ctypes import wintypes
+
+        kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+        kernel32.OpenMutexW.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.LPCWSTR]
+        kernel32.OpenMutexW.restype = wintypes.HANDLE
+        kernel32.CloseHandle.argtypes = [wintypes.HANDLE]
+        kernel32.CloseHandle.restype = wintypes.BOOL
+        synchronize = 0x00100000
+        handle = kernel32.OpenMutexW(synchronize, False, TRAY_MUTEX_NAME)
+        if not handle:
+            return False
+        kernel32.CloseHandle(handle)
+        return True
+    except Exception:
+        return False
+
+
 def get_tray_processes() -> list[dict[str, object]]:
     """Return running PowerShell processes that host ABSO tray."""
     ps_command = (
-        "Get-CimInstance Win32_Process -Filter \"Name='powershell.exe'\" "
-        "| Where-Object { $_.CommandLine -match 'ABSO-Tray.ps1' } "
+        "Get-CimInstance Win32_Process "
+        "| Where-Object { "
+        "$_.ProcessId -ne $PID -and "
+        "($_.Name -eq 'powershell.exe' -or $_.Name -eq 'pwsh.exe') -and "
+        "$_.CommandLine -and "
+        "$_.CommandLine -like '*ABSO-Tray.ps1*' -and "
+        "$_.CommandLine -notlike '*Get-CimInstance Win32_Process*' "
+        "} "
         "| Select-Object ProcessId, Name, CommandLine "
         "| ConvertTo-Json -Compress"
     )
@@ -129,14 +161,25 @@ def get_tray_processes() -> list[dict[str, object]]:
     return []
 
 
+def _tray_runtime_snapshot() -> dict[str, object]:
+    processes = get_tray_processes()
+    mutex_exists = _tray_mutex_exists()
+    return {
+        "running": mutex_exists or bool(processes),
+        "mutex_exists": mutex_exists,
+        "processes": processes,
+    }
+
+
 def is_tray_running() -> bool:
     """Return True when at least one tray host process is detected."""
-    return len(get_tray_processes()) > 0
+    return bool(_tray_runtime_snapshot()["running"])
 
 
 def ensure_tray_running(start_if_missing: bool = False) -> dict[str, object]:
     """Check tray process and optionally start it when missing."""
-    running_before = is_tray_running()
+    before = _tray_runtime_snapshot()
+    running_before = bool(before["running"])
     started = False
     error: str | None = None
 
@@ -148,13 +191,15 @@ def ensure_tray_running(start_if_missing: bool = False) -> dict[str, object]:
         except Exception as e:
             error = str(e)
 
-    running_after = is_tray_running()
+    after = _tray_runtime_snapshot()
+    running_after = bool(after["running"])
     return {
         "running_before": running_before,
         "started": started,
         "running_after": running_after,
+        "mutex_exists": after["mutex_exists"],
         "error": error,
-        "processes": get_tray_processes() if running_after else [],
+        "processes": after["processes"] if running_after else [],
     }
 
 

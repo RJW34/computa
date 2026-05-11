@@ -871,17 +871,17 @@ $script:FallbackProfiles = [ordered]@{
     # --- ARPG ---
     "diablo4"           = @{
         Name     = "Diablo 4 - HDR"
-        Sub      = "HDR ON | Reflex ON+Boost | LLM OFF"
+        Sub      = "HDR ON | Reflex ON | G-SYNC ON | LLM OFF"
         Cat      = "ARPG"
-        Desc     = "Balanced Diablo 4 HDR profile with Reflex and VRR"
+        Desc     = "Balanced Diablo 4 HDR profile with native LocalPrefs enforcement for Reflex, HDR, and VRR"
         Exes     = @("Diablo IV.exe")
         SyncMode = "on"
     }
     "diablo4-sdr"       = @{
         Name     = "Diablo 4 - SDR"
-        Sub      = "SDR | Reflex ON+Boost | VRR"
+        Sub      = "SDR | Reflex ON | VRR"
         Cat      = "ARPG"
-        Desc     = "Balanced Diablo 4 SDR profile with Reflex and VRR"
+        Desc     = "Balanced Diablo 4 SDR profile with native LocalPrefs enforcement for Reflex and VRR"
         Exes     = @("Diablo IV.exe")
         SyncMode = "on"
     }
@@ -889,9 +889,9 @@ $script:FallbackProfiles = [ordered]@{
     # --- Shooter ---
     "fortnite"          = @{
         Name     = "Fortnite - SDR"
-        Sub      = "SDR | Reflex ON+Boost | No Sync"
+        Sub      = "SDR | Reflex (set in-game) | No Sync"
         Cat      = "Shooter"
-        Desc     = "Competitive SDR Fortnite profile with Reflex and a no-sync latency path"
+        Desc     = "Competitive SDR Fortnite profile with a no-sync latency path. Keeps driver LLM off for Reflex; enable Reflex On + Boost in-game."
         Exes     = @(
             "FortniteClient-Win64-Shipping.exe",
             "FortniteClient-Win64-Shipping_EAC.exe",
@@ -902,9 +902,9 @@ $script:FallbackProfiles = [ordered]@{
     }
     "fortnite-hdr"      = @{
         Name     = "Fortnite - HDR"
-        Sub      = "HDR ON | Reflex ON+Boost | No Sync"
+        Sub      = "HDR ON | Reflex (set in-game) | No Sync"
         Cat      = "Shooter"
-        Desc     = "Competitive Fortnite HDR profile with Reflex and a no-sync latency path"
+        Desc     = "Competitive Fortnite HDR profile with a no-sync latency path. Keeps driver LLM off for Reflex; enable Reflex On + Boost in-game."
         Exes     = @(
             "FortniteClient-Win64-Shipping.exe",
             "FortniteClient-Win64-Shipping_EAC.exe",
@@ -2317,44 +2317,6 @@ function Apply-Profile {
             }
             $script:LastActionTime = Get-Date -Format "HH:mm"
 
-            # Power plan switching: save current plan and switch to gaming plan
-            # if this profile has a power_plan_on_launch metadata field.
-            try {
-                $powerPlan = $profile.power_plan_on_launch
-                if (-not $powerPlan) {
-                    # Default: competitive profiles use Ultimate Performance
-                    $opt = $profile.OptTarget
-                    if ($opt -and ($opt -match "latency|fps|tournament")) {
-                        $powerPlan = "ultimate_performance"
-                    }
-                }
-                if ($powerPlan) {
-                    # Save current plan for restoration
-                    $currentPlan = (powercfg /getactivescheme 2>$null) -replace '.*GUID:\s*(\S+).*','$1'
-                    if ($currentPlan -and $currentPlan -match '^[0-9a-f\-]+$') {
-                        $stateFile = Join-Path $script:ProjectRoot ".power_switcher_state.json"
-                        $stateJson = @{ pre_game_plan_guid = $currentPlan; game_plan_name = $powerPlan; game_exe = $ProfileId } | ConvertTo-Json
-                        [System.IO.File]::WriteAllText($stateFile, $stateJson, [System.Text.UTF8Encoding]::new($false))
-                        Write-TrayLog "Saved pre-game power plan: $currentPlan"
-                    }
-                    # Find and activate the gaming plan
-                    $plans = powercfg /list 2>$null
-                    $targetGuid = $null
-                    foreach ($line in $plans) {
-                        if ($line -match "ultimate" -and $line -match '(\{?[0-9a-f\-]+\}?)') {
-                            $targetGuid = $Matches[1] -replace '[{}]',''
-                            break
-                        }
-                    }
-                    if ($targetGuid) {
-                        powercfg /setactive $targetGuid 2>$null
-                        Write-TrayLog "Switched to power plan: $powerPlan ($targetGuid)"
-                    }
-                }
-            } catch {
-                Write-TrayLog "Power plan switch failed: $($_.Exception.Message)" -Level "WARN"
-            }
-
             # Record in history and persist the last known active state for startup arbitration.
             $script:TrayConfig = Add-ProfileHistory -ProfileId $ProfileId -ProfileName $profile.Name -Config $script:TrayConfig
 
@@ -3089,20 +3051,17 @@ function Start-TrayApp {
     }
     $script:profileMenuItems = @()
 
-    # Power plan crash recovery: if a gaming power plan was active when
-    # the tray or system crashed, restore the pre-game plan.
+    # Sweep any orphan power-switcher state file left over from older builds
+    # whose Apply-Profile wrote a pre-game plan GUID. The writer was removed
+    # so there is no recovery to do; the stale file is just clutter.
     try {
         $powerStateFile = Join-Path $script:ProjectRoot ".power_switcher_state.json"
         if (Test-Path $powerStateFile) {
-            $powerState = Get-Content $powerStateFile -Raw | ConvertFrom-Json
-            if ($powerState.pre_game_plan_guid) {
-                powercfg /setactive $powerState.pre_game_plan_guid 2>$null
-                Write-TrayLog "Power plan crash recovery: restored $($powerState.pre_game_plan_guid)"
-                Remove-Item $powerStateFile -Force -ErrorAction SilentlyContinue
-            }
+            Remove-Item $powerStateFile -Force -ErrorAction SilentlyContinue
+            Write-TrayLog "Removed orphan .power_switcher_state.json from older tray build"
         }
     } catch {
-        Write-TrayLog "Power plan crash recovery failed: $($_.Exception.Message)" -Level "WARN"
+        Write-TrayLog "Power state cleanup failed: $($_.Exception.Message)" -Level "WARN"
     }
 
     # ═══════════════════════════════════════════════════════════════════════

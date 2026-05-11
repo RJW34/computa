@@ -49,7 +49,12 @@ DISPLAYCONFIG_DEVICE_INFO_GET_SDR_WHITE_LEVEL = 11  # SDR paper white under HDR
 # Type 10 now toggles WCG on 24H2, NOT HDR. Use type 16 for HDR on 24H2+.
 DISPLAYCONFIG_DEVICE_INFO_GET_ADVANCED_COLOR_INFO_2 = 15  # 24H2+
 DISPLAYCONFIG_DEVICE_INFO_SET_HDR_STATE = 16  # 24H2+
+DISPLAYCONFIG_DEVICE_INFO_SET_WCG_STATE = 17  # 24H2+
 DISPLAYCONFIG_DEVICE_INFO_SET_SDR_WHITE_LEVEL = 18  # SDR content brightness slider
+
+DISPLAYCONFIG_ADVANCED_COLOR_MODE_SDR = 0
+DISPLAYCONFIG_ADVANCED_COLOR_MODE_WCG = 1
+DISPLAYCONFIG_ADVANCED_COLOR_MODE_HDR = 2
 
 # SDR white level is stored/transmitted in units of nits * 1000 / 80:
 #   nits  -> SDRWhiteLevel
@@ -87,6 +92,23 @@ class DISPLAYCONFIG_GET_ADVANCED_COLOR_INFO(ctypes.Structure):
         ("value", wintypes.UINT),
         ("colorEncoding", wintypes.UINT),
         ("bitsPerColorChannel", wintypes.UINT),
+    ]
+
+
+class DISPLAYCONFIG_GET_ADVANCED_COLOR_INFO_2(ctypes.Structure):
+    """Win11 advanced color info with explicit HDR/WCG split.
+
+    The legacy type-9 struct only reports generic "advanced color" support and
+    activity. Win11's type-15 struct separates HDR user intent from the active
+    compositor mode, which avoids reporting WCG as HDR or missing a user-enabled
+    HDR toggle that is not currently active on the wire.
+    """
+    _fields_ = [
+        ("header", DISPLAYCONFIG_DEVICE_INFO_HEADER),
+        ("value", wintypes.UINT),
+        ("colorEncoding", wintypes.UINT),
+        ("bitsPerColorChannel", wintypes.UINT),
+        ("activeColorMode", wintypes.UINT),
     ]
 
 
@@ -244,8 +266,11 @@ class WindowsSettingsHandler(SettingsHandler):
             "hags": self._get_hags(),
             "vbs": self._get_vbs(),
             "hdr": hdr_state["any_enabled"] if hdr_state["available"] else None,
+            "hdr_active": hdr_state.get("any_active") if hdr_state["available"] else None,
             "hdr_capable_count": hdr_state["hdr_capable_count"] if hdr_state["available"] else None,
             "hdr_enabled_count": hdr_state["hdr_enabled_count"] if hdr_state["available"] else None,
+            "hdr_active_count": hdr_state.get("hdr_active_count") if hdr_state["available"] else None,
+            "hdr_per_target": hdr_state.get("per_target") if hdr_state["available"] else None,
             "auto_hdr": self._get_auto_hdr(),
             "advanced_color": advanced_color.get("any_enabled"),
             "advanced_color_per_monitor": advanced_color.get("per_monitor"),
@@ -446,6 +471,8 @@ class WindowsSettingsHandler(SettingsHandler):
                 # cosmetic setting must never roll a profile back.
                 for err in refresh_result.get("errors", []):
                     applied.append(f"Advanced color: warning ({err})")
+                for err in refresh_result.get("critical_errors", []):
+                    errors.append(str(err))
 
         if "hdr" in settings and not hdr_handled_by_refresh:
             hdr_result = self._set_hdr(settings["hdr"])
@@ -453,12 +480,21 @@ class WindowsSettingsHandler(SettingsHandler):
                 if settings["hdr"]:
                     hdr_capable_count = int(hdr_result.get("hdr_capable_count", 0) or 0)
                     hdr_enabled_count = int(hdr_result.get("hdr_enabled_count", 0) or 0)
+                    hdr_active_count = int(
+                        hdr_result.get("hdr_active_count", hdr_enabled_count) or 0
+                    )
                     if hdr_capable_count <= 0:
                         errors.append("HDR: no HDR-capable active displays were detected")
-                    elif hdr_enabled_count <= 0:
-                        errors.append("HDR: enable requested, but Windows reported 0 HDR-enabled displays")
+                    elif hdr_active_count <= 0:
+                        errors.append(
+                            "HDR: enable requested, but Windows reported 0 active HDR displays "
+                            f"({hdr_enabled_count} target(s) have Use HDR enabled)"
+                        )
                     else:
-                        applied.append(f"HDR: enabled on {hdr_enabled_count} monitor(s)")
+                        applied.append(
+                            f"HDR: active on {hdr_active_count} monitor(s) "
+                            f"({hdr_enabled_count} with Use HDR enabled)"
+                        )
                 else:
                     applied.append("HDR: disabled on all monitors")
             else:
@@ -552,12 +588,11 @@ class WindowsSettingsHandler(SettingsHandler):
         }
 
     def verify_active(self, settings: dict[str, Any]) -> dict[str, Any]:
-        """Verify that reboot-requiring settings are already active.
+        """Verify requested Windows settings against live/readback state.
 
-        Checks HAGS and VBS settings.
-
-        Returns:
-            Dict with 'all_active' bool and details for each setting.
+        This covers both reboot-gated settings and immediately visible display
+        state, so HDR profile swaps cannot silently pass verification when the
+        live display path remains SDR.
         """
         current = self.detect()
         results = {"all_active": True, "settings": {}}
@@ -583,6 +618,93 @@ class WindowsSettingsHandler(SettingsHandler):
             results["settings"]["vbs"] = {
                 "target": target,
                 "current": current_val if current_val is not None else "undetectable",
+                "active": is_active,
+            }
+            if not is_active:
+                results["all_active"] = False
+
+        if "hdr" in settings:
+            target = bool(settings["hdr"])
+            current_val = current.get("hdr")
+            active_val = current.get("hdr_active")
+            # Verify gates on the live compositor mode (what the user sees and
+            # what apps query). The per-monitor "Use HDR" user_enabled bit is
+            # reported alongside for diagnostics but never gates the result —
+            # it can persist on secondary HDR-capable targets that aren't on
+            # the active path.
+            if active_val is not None:
+                is_active = bool(active_val) == target
+            elif current_val is not None:
+                is_active = bool(current_val) == target
+            else:
+                is_active = not target
+            current_report: Any
+            if active_val is not None and current_val is not None and bool(active_val) != bool(current_val):
+                current_report = {
+                    "user_enabled": bool(current_val),
+                    "active": bool(active_val),
+                }
+            elif current_val is not None:
+                current_report = bool(current_val)
+            elif active_val is not None:
+                current_report = {
+                    "user_enabled": "undetectable",
+                    "active": bool(active_val),
+                }
+            else:
+                current_report = "undetectable"
+            results["settings"]["hdr"] = {
+                "target": target,
+                "current": current_report,
+                "active": is_active,
+            }
+            if not is_active:
+                results["all_active"] = False
+
+        if "auto_hdr" in settings:
+            target = bool(settings["auto_hdr"])
+            current_val = current.get("auto_hdr")
+            if current_val is None:
+                is_active = not target
+            else:
+                is_active = bool(current_val) == target
+            results["settings"]["auto_hdr"] = {
+                "target": target,
+                "current": current_val if current_val is not None else "undetectable",
+                "active": is_active,
+            }
+            if not is_active:
+                results["all_active"] = False
+
+        if "advanced_color" in settings:
+            target = bool(settings["advanced_color"])
+            current_val = current.get("advanced_color")
+            if current_val is None:
+                is_active = not target
+            else:
+                is_active = bool(current_val) == target
+            results["settings"]["advanced_color"] = {
+                "target": target,
+                "current": current_val if current_val is not None else "undetectable",
+                "active": is_active,
+            }
+            if not is_active:
+                results["all_active"] = False
+
+        if settings.get("sdr_white_level_nits") is not None:
+            try:
+                target_nits = float(settings["sdr_white_level_nits"])
+            except (TypeError, ValueError):
+                target_nits = None
+            current_nits = current.get("sdr_white_level_nits")
+            is_active = (
+                target_nits is not None
+                and current_nits is not None
+                and abs(float(current_nits) - target_nits) <= 1.0
+            )
+            results["settings"]["sdr_white_level_nits"] = {
+                "target": target_nits if target_nits is not None else settings["sdr_white_level_nits"],
+                "current": current_nits if current_nits is not None else "undetectable",
                 "active": is_active,
             }
             if not is_active:
@@ -833,13 +955,78 @@ class WindowsSettingsHandler(SettingsHandler):
         except Exception:
             return False
 
+    def _get_target_hdr_info(self, adapter_id: Any, target_id: int) -> dict[str, Any] | None:
+        """Read HDR/WCG state for one active display target.
+
+        Prefer Win11's type-15 query because it has explicit HDR user intent
+        and active color mode fields. Fall back to legacy type 9 on older
+        builds where "advanced color enabled" was the only available signal.
+        """
+        user32 = ctypes.windll.user32
+
+        info2 = DISPLAYCONFIG_GET_ADVANCED_COLOR_INFO_2()
+        info2.header.type = DISPLAYCONFIG_DEVICE_INFO_GET_ADVANCED_COLOR_INFO_2
+        info2.header.size = ctypes.sizeof(info2)
+        info2.header.adapterId = adapter_id
+        info2.header.id = target_id
+        status2 = user32.DisplayConfigGetDeviceInfo(ctypes.byref(info2))
+        if status2 == 0:
+            value = int(info2.value)
+            active_mode = int(info2.activeColorMode)
+            return {
+                "api": "advanced_color_info_2",
+                "target_id": int(target_id),
+                "raw_value": value,
+                "advanced_color_supported": bool(value & 0x01),
+                "advanced_color_active": bool(value & 0x02),
+                "advanced_color_limited_by_policy": bool(value & 0x08),
+                "hdr_supported": bool(value & 0x10),
+                "hdr_user_enabled": bool(value & 0x20),
+                "wcg_supported": bool(value & 0x40),
+                "wcg_user_enabled": bool(value & 0x80),
+                "active_color_mode": active_mode,
+                "hdr_active": active_mode == DISPLAYCONFIG_ADVANCED_COLOR_MODE_HDR,
+            }
+
+        legacy = DISPLAYCONFIG_GET_ADVANCED_COLOR_INFO()
+        legacy.header.type = DISPLAYCONFIG_DEVICE_INFO_GET_ADVANCED_COLOR_INFO
+        legacy.header.size = ctypes.sizeof(legacy)
+        legacy.header.adapterId = adapter_id
+        legacy.header.id = target_id
+        status = user32.DisplayConfigGetDeviceInfo(ctypes.byref(legacy))
+        if status != 0:
+            return None
+
+        # Legacy Windows exposed "advanced color" as the HDR path. We cannot
+        # distinguish user intent from active compositor mode here, so both
+        # fields intentionally carry the same best-effort signal.
+        value = int(legacy.value)
+        enabled = bool(value & 0x02)
+        return {
+            "api": "advanced_color_info_legacy",
+            "target_id": int(target_id),
+            "raw_value": value,
+            "advanced_color_supported": bool(value & 0x01),
+            "advanced_color_active": enabled,
+            "advanced_color_limited_by_policy": bool(value & 0x08),
+            "hdr_supported": bool(value & 0x01),
+            "hdr_user_enabled": enabled,
+            "wcg_supported": None,
+            "wcg_user_enabled": None,
+            "active_color_mode": None,
+            "hdr_active": enabled,
+        }
+
     def _get_hdr_state_summary(self) -> dict[str, Any]:
-        """Summarize active-target HDR capability and enabled state."""
+        """Summarize active-target HDR capability, intent, and live mode."""
         summary: dict[str, Any] = {
             "available": False,
             "hdr_capable_count": 0,
             "hdr_enabled_count": 0,
+            "hdr_active_count": 0,
             "any_enabled": False,
+            "any_active": False,
+            "per_target": [],
         }
 
         try:
@@ -849,24 +1036,20 @@ class WindowsSettingsHandler(SettingsHandler):
 
             summary["available"] = True
             for adapter_id, target_id in targets:
-                info = DISPLAYCONFIG_GET_ADVANCED_COLOR_INFO()
-                info.header.type = DISPLAYCONFIG_DEVICE_INFO_GET_ADVANCED_COLOR_INFO
-                info.header.size = ctypes.sizeof(info)
-                info.header.adapterId = adapter_id
-                info.header.id = target_id
-
-                status = ctypes.windll.user32.DisplayConfigGetDeviceInfo(
-                    ctypes.byref(info)
-                )
-                if status != 0:
+                info = self._get_target_hdr_info(adapter_id, target_id)
+                if info is None:
                     continue
 
-                if info.value & 0x01:
+                summary["per_target"].append(info)
+                if info.get("hdr_supported"):
                     summary["hdr_capable_count"] += 1
-                if info.value & 0x02:
+                if info.get("hdr_user_enabled"):
                     summary["hdr_enabled_count"] += 1
+                if info.get("hdr_active"):
+                    summary["hdr_active_count"] += 1
 
             summary["any_enabled"] = summary["hdr_enabled_count"] > 0
+            summary["any_active"] = summary["hdr_active_count"] > 0
             return summary
         except Exception as e:
             logger.debug(f"HDR state summary failed: {e}")
@@ -921,23 +1104,23 @@ class WindowsSettingsHandler(SettingsHandler):
         return out
 
     def _set_hdr(self, enabled: bool) -> dict[str, Any]:
-        """Set Windows HDR state with registry-based pre-check, verify, and
-        fallback.
+        """Set Windows HDR state using the active-display compositor mode as truth.
 
         Design:
-            1. Read HDREnabled from registry per-monitor. If ALL HDR-capable
-               targets already match ``enabled``, skip the SET entirely —
-               this is the "already in target state" fast path, but based on
-               the registry's authoritative HDR flag rather than the legacy
-               type 9 bit 1 which on Win11 24H2+ means WCG.
-            2. Otherwise, issue DisplayConfigSetDeviceInfo with type 16
+            1. Read the live active-target state with type 15 when available.
+               Registry MonitorDataStore contains historical monitors, so it
+               cannot decide whether the current display path is already right.
+            2. Issue DisplayConfigSetDeviceInfo with type 16
                (SET_HDR_STATE) per target, falling back to type 10
                (SET_ADVANCED_COLOR_STATE) on pre-24H2 builds.
-            3. Verify-after-write: re-read registry HDREnabled. If it still
-               doesn't match ``enabled``, SET_HDR_STATE silently no-opped
-               (a known Win11 25H2 quirk). Fall back to writing HDREnabled
-               directly to registry + letting the next WCG refresh-cycle or
-               compositor event pick it up.
+            3. Verify the live active color mode. If SET_HDR_STATE silently
+               no-opped (known Win11 25H2 behavior), write registry intent and
+               kick SetDisplayConfig so DWM re-reads the display database.
+
+        Success criterion is the user-perceived state — the active compositor
+        mode on the live path. The ``user_enabled`` ("Use HDR") registry bit
+        can stay set on a secondary HDR-capable target that isn't currently
+        in HDR mode. That is not a failure; report it as a notice.
 
         Returns the standard ``success / hdr_capable_count / hdr_enabled_count
         / errors`` dict used by apply()'s logging.
@@ -949,29 +1132,27 @@ class WindowsSettingsHandler(SettingsHandler):
             "errors": [],
         }
 
-        # Step 1: authoritative registry-based "already correct" check.
-        reg_state_before = self._get_registry_hdr_enabled_per_monitor()
-        hdr_capable_monitors = list(reg_state_before.keys())
-        result["hdr_capable_count"] = len(hdr_capable_monitors)
+        live_before = self._get_hdr_state_summary()
+        result["hdr_capable_count"] = live_before.get("hdr_capable_count", 0)
+        result["hdr_enabled_count"] = live_before.get("hdr_enabled_count", 0)
+        result["hdr_active_count"] = live_before.get(
+            "hdr_active_count", result["hdr_enabled_count"]
+        )
 
-        # Fast-path skip ONLY when disabling. The registry is not a reliable
-        # signal that the live display path is in HDR mode (Win11 25H2 silent
-        # no-op leaves registry=1 with live=SDR), so skipping the SET on
-        # "already enabled" can hide a stuck-SDR state from the live-state
-        # verification at the end of this function. Skipping on "already
-        # disabled" is safe because nothing downstream needs an enabled path.
-        if not enabled and hdr_capable_monitors and all(
-            reg_state_before[m] is False for m in hdr_capable_monitors
+        if (
+            live_before.get("available")
+            and live_before.get("hdr_capable_count", 0) > 0
+            and bool(live_before.get("any_active")) == enabled
         ):
             logger.debug(
-                "HDR already disabled in registry for %d monitor(s); skipping SET",
-                len(hdr_capable_monitors),
+                "HDR active mode already %s on the live display path; skipping SET",
+                "on" if enabled else "off",
             )
             return result
 
         # Step 2: SET_HDR_STATE per active target. We don't short-circuit on
-        # per-target state here — we send the SET to everything, because the
-        # type 9 GET bit 1 is unreliable on 24H2+ for deciding HDR state.
+        # registry state here — MonitorDataStore contains inactive historical
+        # displays and can disagree with the target that is actually connected.
         try:
             targets = self._get_active_display_targets()
             if not targets:
@@ -1025,53 +1206,7 @@ class WindowsSettingsHandler(SettingsHandler):
             result["errors"].append(msg)
             result["success"] = False
 
-        # Step 3: verify-after-write. Read registry HDREnabled back and
-        # detect the silent-no-op case (API returned 0 but state didn't flip).
-        reg_state_after = self._get_registry_hdr_enabled_per_monitor()
-        mismatch = [
-            m for m in reg_state_after
-            if reg_state_after[m] != enabled
-        ]
-
-        if mismatch:
-            # Silent commit failure fallback: write HDREnabled directly to
-            # registry, then ALSO call SetDisplayConfig(SDC_APPLY |
-            # SDC_USE_DATABASE_CURRENT) which re-applies the saved display
-            # database — this kicks DWM to re-read MonitorDataStore so the
-            # live path actually flips to HDR. Without the kick, the registry
-            # value persists but the active color mode stays SDR (verified
-            # on Win11 25H2 build 26200).
-            logger.warning(
-                "HDR SET silently no-opped for %d monitor(s): %s. "
-                "Writing registry + kicking SetDisplayConfig to force "
-                "live re-read.",
-                len(mismatch), mismatch,
-            )
-            self._write_hdr_enabled_registry(enabled)
-            try:
-                kick_status = ctypes.windll.user32.SetDisplayConfig(
-                    0, None, 0, None, _SDC_APPLY | _SDC_USE_DATABASE_CURRENT
-                )
-                if kick_status != 0:
-                    logger.warning(
-                        "SetDisplayConfig kick returned non-zero status %s; "
-                        "live HDR re-apply may still need a manual "
-                        "refresh-rate cycle.",
-                        kick_status,
-                    )
-                else:
-                    logger.info(
-                        "SetDisplayConfig database re-apply succeeded; "
-                        "DWM should pick up HDREnabled within a few hundred ms."
-                    )
-            except Exception as kick_exc:
-                logger.warning("SetDisplayConfig kick failed: %s", kick_exc)
-            # Keep success=True so the compliance engine doesn't roll the
-            # profile back over a known Win11 quirk. Surface as a note.
-            result.setdefault("notices", []).append(
-                "HDR SET silently no-opped on Win11 25H2; registry written "
-                "and SetDisplayConfig kicked for live re-read"
-            )
+        time.sleep(self._DWM_REFRESH_WAIT_SECONDS)
 
         # Final live-state verification. The registry/MonitorDataStore values
         # can be force-written by the silent-no-op fallback, so they are not
@@ -1080,19 +1215,58 @@ class WindowsSettingsHandler(SettingsHandler):
         # apps see, and what the user perceives as "HDR is on / off".
         live_summary = self._get_hdr_state_summary()
         live_enabled_count = live_summary.get("hdr_enabled_count", 0)
+        live_active_count = live_summary.get("hdr_active_count", live_enabled_count)
         live_capable_count = live_summary.get("hdr_capable_count", 0)
         result["hdr_enabled_count"] = live_enabled_count
+        result["hdr_active_count"] = live_active_count
         result["hdr_capable_count"] = live_capable_count
 
-        if enabled and live_capable_count > 0 and live_enabled_count == 0:
+        # The live active compositor mode is what the user perceives and what
+        # apps see. The user_enabled registry bit can persist on secondary
+        # HDR-capable monitors that aren't currently on the active path; that
+        # is informational only, never a failure.
+        live_active_matches_target = bool(live_summary.get("any_active")) == enabled
+        live_user_enabled_matches_target = bool(live_summary.get("any_enabled")) == enabled
+
+        if live_capable_count > 0 and not live_active_matches_target:
+            # Registry can already contain HDREnabled=1 from a previous
+            # stale apply while the live path is still SDR (or vice versa).
+            # SET_HDR_STATE can silently no-op in that case. Write the intended
+            # HDREnabled value and ask DWM to re-read the display database
+            # before declaring a failure.
+            logger.warning(
+                "HDR active mode did not match target after SET_HDR_STATE "
+                "(target=%s, user_enabled_count=%s, active_count=%s). "
+                "Writing registry intent and kicking SetDisplayConfig.",
+                enabled, live_enabled_count, live_active_count,
+            )
+            self._write_hdr_enabled_registry(enabled)
+            if self._kick_display_config_database_reapply():
+                time.sleep(self._DWM_REFRESH_WAIT_SECONDS)
+                live_summary = self._get_hdr_state_summary()
+                live_enabled_count = live_summary.get("hdr_enabled_count", 0)
+                live_active_count = live_summary.get("hdr_active_count", live_enabled_count)
+                live_capable_count = live_summary.get("hdr_capable_count", 0)
+                result["hdr_enabled_count"] = live_enabled_count
+                result["hdr_active_count"] = live_active_count
+                result["hdr_capable_count"] = live_capable_count
+                live_active_matches_target = bool(live_summary.get("any_active")) == enabled
+                live_user_enabled_matches_target = bool(live_summary.get("any_enabled")) == enabled
+                if live_active_matches_target:
+                    result.setdefault("notices", []).append(
+                        "HDR live state recovered after SetDisplayConfig "
+                        "database re-apply"
+                    )
+
+        if enabled and live_capable_count > 0 and live_active_count == 0:
             # Desired HDR ON, monitors report capable, but live state is SDR
-            # everywhere. Every user-mode API path was tried; surface this as
-            # a real failure with actionable guidance instead of "success
-            # with note", which silently misled users prior to this check.
+            # everywhere. Every user-mode API path was tried; surface as a
+            # real failure with actionable guidance.
             msg = (
                 "HDR could not be activated on the live display path "
                 f"({live_capable_count} HDR-capable target(s) detected, "
-                "0 currently in HDR mode). The OS-side registry intent has "
+                f"{live_enabled_count} target(s) have Use HDR enabled, "
+                "0 currently in HDR active mode). The OS-side registry intent has "
                 "been written. Open Windows Settings -> Display and toggle "
                 "'Use HDR' on for the HDR-capable monitor, then re-apply "
                 "this profile. (Known Win11 25H2 quirk: SET_HDR_STATE can "
@@ -1102,8 +1276,52 @@ class WindowsSettingsHandler(SettingsHandler):
             logger.error(msg)
             result["errors"].append(msg)
             result["success"] = False
+        elif not enabled and live_active_count > 0:
+            # Desired HDR OFF, but the compositor is still in HDR active mode.
+            # This is a real failure: the user's screen would still look HDR.
+            msg = (
+                "HDR disable was requested, but Windows still reports "
+                f"{live_active_count} target(s) in HDR active mode."
+            )
+            logger.error(msg)
+            result["errors"].append(msg)
+            result["success"] = False
+        elif not live_user_enabled_matches_target and live_capable_count > 0:
+            # Compositor is in the requested mode, but the per-monitor "Use HDR"
+            # registry bit is stuck (typically a secondary HDR-capable target
+            # the user hasn't manually toggled). Surface as a notice — the
+            # user-perceived display state matches the request.
+            result.setdefault("notices", []).append(
+                f"HDR {'enable' if enabled else 'disable'} active on the live "
+                f"display path, but {live_enabled_count} target(s) still report "
+                "'Use HDR' enabled at the OS level. This is cosmetic only — "
+                "toggle 'Use HDR' off for that monitor in Windows Settings if "
+                "you want it fully cleared."
+            )
 
         return result
+
+    def _kick_display_config_database_reapply(self) -> bool:
+        """Ask DWM to re-read the saved display database after registry HDR writes."""
+        try:
+            kick_status = ctypes.windll.user32.SetDisplayConfig(
+                0, None, 0, None, _SDC_APPLY | _SDC_USE_DATABASE_CURRENT
+            )
+            if kick_status != 0:
+                logger.warning(
+                    "SetDisplayConfig kick returned non-zero status %s; live "
+                    "HDR re-apply may still need a manual refresh-rate cycle.",
+                    kick_status,
+                )
+                return False
+            logger.info(
+                "SetDisplayConfig database re-apply succeeded; DWM should "
+                "pick up HDREnabled within a few hundred ms."
+            )
+            return True
+        except Exception as kick_exc:
+            logger.warning("SetDisplayConfig kick failed: %s", kick_exc)
+            return False
 
     # =========================================================================
     # SDR content brightness under HDR (Windows 11 "SDR content brightness" slider)
@@ -1138,18 +1356,12 @@ class WindowsSettingsHandler(SettingsHandler):
                 return out
 
             out["available"] = True
-            user32 = ctypes.windll.user32
             values: list[float] = []
 
             for adapter_id, target_id in targets:
                 # Need to know HDR state to decide whether the level is valid.
-                info = DISPLAYCONFIG_GET_ADVANCED_COLOR_INFO()
-                info.header.type = DISPLAYCONFIG_DEVICE_INFO_GET_ADVANCED_COLOR_INFO
-                info.header.size = ctypes.sizeof(info)
-                info.header.adapterId = adapter_id
-                info.header.id = target_id
-                status = user32.DisplayConfigGetDeviceInfo(ctypes.byref(info))
-                hdr_enabled = status == 0 and bool(info.value & 0x02)
+                target_hdr = self._get_target_hdr_info(adapter_id, target_id)
+                hdr_enabled = bool(target_hdr and target_hdr.get("hdr_active"))
 
                 if not hdr_enabled:
                     out["per_target"].append({
@@ -1276,13 +1488,8 @@ class WindowsSettingsHandler(SettingsHandler):
             for adapter_id, target_id in targets:
                 # Skip monitors with HDR off — the SET call will fail and there
                 # is no slider to move on an SDR output.
-                info = DISPLAYCONFIG_GET_ADVANCED_COLOR_INFO()
-                info.header.type = DISPLAYCONFIG_DEVICE_INFO_GET_ADVANCED_COLOR_INFO
-                info.header.size = ctypes.sizeof(info)
-                info.header.adapterId = adapter_id
-                info.header.id = target_id
-                status = user32.DisplayConfigGetDeviceInfo(ctypes.byref(info))
-                if status != 0 or not (info.value & 0x02):
+                target_hdr = self._get_target_hdr_info(adapter_id, target_id)
+                if not (target_hdr and target_hdr.get("hdr_active")):
                     result["skipped_count"] += 1
                     continue
 
@@ -1592,6 +1799,7 @@ class WindowsSettingsHandler(SettingsHandler):
             "applied_count": 0,
             "skipped_count": 0,
             "errors": [],
+            "critical_errors": [],
             "cycle_ran": False,
             "final_state": {},
         }
@@ -1603,7 +1811,7 @@ class WindowsSettingsHandler(SettingsHandler):
         # actively turned OFF as a side effect of an apply that was supposed
         # to be a no-op. Only cycle when we genuinely need to flip HDR.
         live_pre = self._get_hdr_state_summary()
-        live_hdr_on = bool(live_pre.get("any_enabled"))
+        live_hdr_on = bool(live_pre.get("any_active"))
         skip_hdr_cycle = live_hdr_on == bool(target_hdr)
         if skip_hdr_cycle:
             logger.info(
@@ -1613,11 +1821,34 @@ class WindowsSettingsHandler(SettingsHandler):
                 "on" if target_hdr else "off",
             )
         else:
-            # Step 1: HDR OFF — compositor releases HDR state, DWM will re-read on enable.
+            # Step 1: HDR OFF.
+            #
+            # When target_hdr=True this is a transient teardown to release the
+            # compositor's HDR pipeline so DWM re-reads MonitorDataStore on the
+            # subsequent step-4 enable. Step 2 will overwrite the HDR registry
+            # intent regardless, so a stuck per-monitor user_enabled bit during
+            # the teardown is not load-bearing — surface as informational only.
+            #
+            # When target_hdr=False this step IS the final state. A failure to
+            # leave the compositor in SDR is a real failure: escalate.
+            step1_is_final = not target_hdr
             try:
-                self._set_hdr(False)
+                hdr_off_result = self._set_hdr(False)
+                if not hdr_off_result.get("success", False):
+                    if step1_is_final:
+                        result["success"] = False
+                        for err in hdr_off_result.get("errors", []) or []:
+                            result["critical_errors"].append(f"HDR disable: {err}")
+                    else:
+                        for err in hdr_off_result.get("errors", []) or []:
+                            result["errors"].append(f"HDR teardown: {err}")
             except Exception as exc:
-                logger.debug("HDR OFF during WCG refresh failed: %s", exc)
+                logger.warning("HDR OFF during WCG refresh failed: %s", exc)
+                if step1_is_final:
+                    result["success"] = False
+                    result["critical_errors"].append(f"HDR disable crashed: {exc}")
+                else:
+                    result["errors"].append(f"HDR teardown crashed: {exc}")
 
         # Step 2: write WCG + HDR registry intent while compositor is quiescent.
         adv_result = self._set_advanced_color(target_advanced_color)
@@ -1641,11 +1872,16 @@ class WindowsSettingsHandler(SettingsHandler):
             result["cycle_ran"] = False  # skipped — live state was already correct
         elif target_hdr:
             try:
-                self._set_hdr(True)
+                hdr_on_result = self._set_hdr(True)
+                if not hdr_on_result.get("success", False):
+                    result["success"] = False
+                    for err in hdr_on_result.get("errors", []) or []:
+                        result["critical_errors"].append(f"HDR enable: {err}")
                 result["cycle_ran"] = True
             except Exception as exc:
                 logger.warning("HDR ON during WCG refresh failed: %s", exc)
-                result["errors"].append(f"HDR re-enable: {exc}")
+                result["success"] = False
+                result["critical_errors"].append(f"HDR enable crashed: {exc}")
         else:
             result["cycle_ran"] = True  # cycle = off-only when HDR intended off
 
@@ -1654,9 +1890,11 @@ class WindowsSettingsHandler(SettingsHandler):
         # mismatches because some targets have silent-commit quirks.
         time.sleep(self._DWM_REFRESH_WAIT_SECONDS)
         final_advanced = self._get_advanced_color()
+        final_hdr = self._get_hdr_state_summary()
         result["final_state"] = {
             "advanced_color_registry_any_enabled": final_advanced.get("any_enabled"),
-            "hdr_any_enabled": self._get_hdr_state_summary().get("any_enabled"),
+            "hdr_any_enabled": final_hdr.get("any_enabled"),
+            "hdr_any_active": final_hdr.get("any_active"),
         }
         return result
 

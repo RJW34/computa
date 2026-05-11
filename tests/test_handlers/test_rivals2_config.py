@@ -63,6 +63,46 @@ def test_apply_updates_allowed_keys_and_preserves_protected_keys(tmp_path: Path)
     assert "HDRDisplayOutputNits=1000" in content
 
 
+def test_apply_updates_only_engine_settings_section_when_present(tmp_path: Path) -> None:
+    config_dir = tmp_path / "Rivals2" / "Saved" / "Config" / "Windows"
+    ini_path = config_dir / "GameUserSettings.ini"
+    _write_game_user_settings(
+        ini_path,
+        "\n".join(
+            [
+                "[/Script/Rivals2.PlayerSettings]",
+                "PlayerTag=goofy",
+                "FullscreenMode=2",
+                "[/Script/Engine.GameUserSettings]",
+                "FullscreenMode=1",
+                "bUseVSync=True",
+                "bUseRawInput=False",
+                "[/Script/Another.Settings]",
+                "FullscreenMode=2",
+            ]
+        )
+        + "\n",
+    )
+
+    with patch("abso.settings.rivals2_config._get_rivals2_config_dir", return_value=config_dir):
+        handler = Rivals2ConfigHandler()
+        result = handler.apply({"fullscreen_mode": 0, "vsync": False, "raw_input": True})
+
+    assert result["success"] is True
+    assert ini_path.read_text(encoding="utf-8").splitlines() == [
+        "[/Script/Rivals2.PlayerSettings]",
+        "PlayerTag=goofy",
+        "FullscreenMode=2",
+        "[/Script/Engine.GameUserSettings]",
+        "FullscreenMode=0",
+        "bUseVSync=False",
+        "bUseRawInput=True",
+        "LastConfirmedFullscreenMode=0",
+        "[/Script/Another.Settings]",
+        "FullscreenMode=2",
+    ]
+
+
 def test_verify_active_reports_mismatch(tmp_path: Path) -> None:
     config_dir = tmp_path / "Rivals2" / "Saved" / "Config" / "Windows"
     ini_path = config_dir / "GameUserSettings.ini"
@@ -140,3 +180,103 @@ def test_detect_reads_hdr_settings(tmp_path: Path) -> None:
 
     assert detected["hdr_output"] is True
     assert detected["hdr_nits"] == 1000
+
+
+def test_backup_restore_round_trip_preserves_unknown_control_keys(tmp_path: Path) -> None:
+    config_dir = tmp_path / "Rivals2" / "Saved" / "Config" / "Windows"
+    ini_path = config_dir / "GameUserSettings.ini"
+    original = "\n".join(
+        [
+            "[/Script/Rivals2.PlayerSettings]",
+            "PlayerTag=goofy",
+            "DefaultControlScheme=custom-layout",
+            "UnknownControllerBinding=abc123",
+            "[/Script/Engine.GameUserSettings]",
+            "FullscreenMode=1",
+            "bUseVSync=True",
+            "bUseRawInput=False",
+        ]
+    ) + "\n"
+    _write_game_user_settings(ini_path, original)
+
+    with patch("abso.settings.rivals2_config._get_rivals2_config_dir", return_value=config_dir):
+        handler = Rivals2ConfigHandler()
+        backup = handler.backup()
+        result = handler.apply({"fullscreen_mode": 0, "vsync": False, "raw_input": True})
+
+        assert backup["config_found"] is True
+        assert result["success"] is True
+
+        restored = handler.restore(backup)
+
+    assert restored is True
+    assert ini_path.read_text(encoding="utf-8") == original
+
+
+def test_restore_falls_back_to_legacy_detect_payload(tmp_path: Path) -> None:
+    """Older baseline backups stored detected fields without ``file_content``.
+
+    Those payloads must still restore successfully so that a baseline
+    restore (Phase 0 of a profile-switch transaction) does not abort with
+    "Handler returned False" against pre-existing user backups.
+    """
+    config_dir = tmp_path / "Rivals2" / "Saved" / "Config" / "Windows"
+    ini_path = config_dir / "GameUserSettings.ini"
+    _write_game_user_settings(
+        ini_path,
+        "\n".join(
+            [
+                "[/Script/Engine.GameUserSettings]",
+                "FullscreenMode=1",
+                "bUseVSync=True",
+                "bUseRawInput=False",
+                "FrameRateLimit=240.000000",
+            ]
+        )
+        + "\n",
+    )
+
+    legacy_payload = {
+        "config_found": True,
+        "config_path": str(ini_path),
+        "fullscreen_mode": 0,
+        "vsync": False,
+        "raw_input": True,
+        "frame_rate_limit": 999,
+        "hdr_output": False,
+        "hdr_nits": 1000,
+    }
+
+    with patch(
+        "abso.settings.rivals2_config._get_rivals2_config_dir",
+        return_value=config_dir,
+    ):
+        handler = Rivals2ConfigHandler()
+        restored = handler.restore(legacy_payload)
+
+    assert restored is True
+    content = ini_path.read_text(encoding="utf-8")
+    assert "FullscreenMode=0" in content
+    assert "bUseVSync=False" in content
+    assert "bUseRawInput=True" in content
+    assert "FrameRateLimit=999" in content
+
+
+def test_restore_legacy_payload_when_game_uninstalled_is_noop(tmp_path: Path) -> None:
+    """A legacy payload must not fail when the live config no longer exists."""
+    config_dir = tmp_path / "missing"
+    legacy_payload = {
+        "config_found": True,
+        "config_path": str(config_dir / "GameUserSettings.ini"),
+        "fullscreen_mode": 0,
+        "vsync": False,
+    }
+
+    with patch(
+        "abso.settings.rivals2_config._get_rivals2_config_dir",
+        return_value=None,
+    ):
+        handler = Rivals2ConfigHandler()
+        restored = handler.restore(legacy_payload)
+
+    assert restored is True

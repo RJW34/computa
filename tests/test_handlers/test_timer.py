@@ -152,6 +152,51 @@ class TestTimerApply:
         assert result["success"] is False
         assert result["error"] is not None
 
+    def test_set_timer_resolution_gates_on_privilege_not_held(self):
+        """STATUS_PRIVILEGE_NOT_HELD must be downgraded from warning to a one-shot
+        info, and subsequent calls must short-circuit so the per-apply log
+        doesn't fill with the same kernel-policy message."""
+        from unittest.mock import MagicMock
+
+        handler = TimerSettingsHandler()
+        # Bypass real ntdll load by injecting a mock that returns the
+        # 25H2 privilege-not-held NTSTATUS.
+        mock_ntdll = MagicMock()
+        mock_ntdll.NtSetTimerResolution.return_value = (
+            TimerSettingsHandler._STATUS_PRIVILEGE_NOT_HELD
+        )
+        handler._ntdll = mock_ntdll
+
+        first = handler._set_timer_resolution(5000, enable=True)
+        second = handler._set_timer_resolution(5000, enable=True)
+
+        assert first is None and second is None
+        assert handler._privilege_blocked is True
+        # Only the first call reaches ntdll; subsequent ones short-circuit.
+        assert mock_ntdll.NtSetTimerResolution.call_count == 1
+
+    def test_apply_returns_skipped_under_privilege_gate(self):
+        """Apply must report skipped (not failed) when the kernel refuses the
+        timer call, so profile applies are not rolled back over a capability
+        the user cannot grant from inside Python."""
+        from unittest.mock import MagicMock
+
+        handler = TimerSettingsHandler()
+        mock_ntdll = MagicMock()
+        mock_ntdll.NtSetTimerResolution.return_value = (
+            TimerSettingsHandler._STATUS_PRIVILEGE_NOT_HELD
+        )
+        # NtQueryTimerResolution returns 0 (success) with arbitrary current
+        # values so _query_timer_resolution does not crash the apply path.
+        mock_ntdll.NtQueryTimerResolution.return_value = 0
+        handler._ntdll = mock_ntdll
+
+        result = handler.apply({"resolution_ms": 0.5})
+
+        assert result["success"] is True
+        assert "skipped" in result
+        assert "PRIVILEGE_NOT_HELD" in result["skipped"]
+
 
 class TestTimerBackupRestore:
     """Tests for backup() and restore() methods."""

@@ -567,12 +567,20 @@ class TestProfileSettings:
         assert sdr_config["fullscreen_mode"] == 0
         assert sdr_config["vsync"] is False
         assert sdr_config["nvidia_reflex"] is True
+        assert sdr_config["dynamic_resolution"] is False
+        assert sdr_config["dlss_frame_generation"] is False
+        assert sdr_config["fsr_frame_generation"] is False
+        assert sdr_config["xe_frame_generation"] is False
         assert sdr_config["auto_vrr_fps_cap"] is True
         assert sdr_config["hdr_output"] is False
 
         assert hdr_config["fullscreen_mode"] == 0
         assert hdr_config["vsync"] is False
         assert hdr_config["nvidia_reflex"] is True
+        assert hdr_config["dynamic_resolution"] is False
+        assert hdr_config["dlss_frame_generation"] is False
+        assert hdr_config["fsr_frame_generation"] is False
+        assert hdr_config["xe_frame_generation"] is False
         assert hdr_config["auto_vrr_fps_cap"] is True
         assert hdr_config["hdr_output"] is True
 

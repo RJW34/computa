@@ -6,6 +6,7 @@ from unittest.mock import MagicMock, patch
 
 from click.testing import CliRunner
 
+import abso.main as abso_main
 from abso.core.applier import ApplyResult
 from abso.main import _determine_apply_summary_level, cli
 
@@ -205,7 +206,7 @@ class TestCLIApply:
 
     @patch("abso.main.ProfileTransactionManager")
     @patch("abso.main.is_admin", return_value=True)
-    def test_apply_json_uses_transaction_manager(self, mock_is_admin, mock_tx_manager_cls):
+    def test_apply_json_uses_transaction_manager(self, mock_is_admin, mock_tx_manager_cls, tmp_path):
         """JSON apply should use transactional execution and return transaction metadata."""
         tx_result = MagicMock()
         tx_result.success = True
@@ -257,7 +258,9 @@ class TestCLIApply:
         mock_manager.execute.return_value = tx_result
 
         runner = CliRunner()
-        result = runner.invoke(cli, ["apply", "slippi-melee", "--json", "--no-backup"])
+        state_file = tmp_path / ".abso_state.json"
+        with patch("abso.main.STATE_FILE", state_file):
+            result = runner.invoke(cli, ["apply", "slippi-melee", "--json", "--no-backup"])
 
         assert result.exit_code == 0
         payload = json.loads(result.output)
@@ -321,6 +324,7 @@ class TestCLIApply:
         self,
         mock_is_admin,
         mock_tx_manager_cls,
+        tmp_path,
     ):
         """Successful applies with soft environment cautions should not be promoted to warning severity."""
         tx_result = MagicMock()
@@ -363,7 +367,9 @@ class TestCLIApply:
         mock_manager.execute.return_value = tx_result
 
         runner = CliRunner()
-        result = runner.invoke(cli, ["apply", "overwatch2-gsync-hdr", "--json", "--no-backup"])
+        state_file = tmp_path / ".abso_state.json"
+        with patch("abso.main.STATE_FILE", state_file):
+            result = runner.invoke(cli, ["apply", "overwatch2-gsync-hdr", "--json", "--no-backup"])
 
         assert result.exit_code == 0
         payload = json.loads(result.output)
@@ -397,6 +403,31 @@ class TestCLIApply:
             "reboot_pending": True,
             "reboot_reasons": ["HAGS toggle"],
         }
+
+    def test_state_helpers_keep_mirrored_targets_in_sync(self, tmp_path):
+        """Backend active-profile state should be mirrored for tray startup readers."""
+        primary = tmp_path / "project" / ".abso_state.json"
+        mirror = tmp_path / "local" / "AdaptiveBattleStationOptimizer" / ".abso_state.json"
+
+        with patch("abso.main._state_file_targets", return_value=[primary, mirror]):
+            abso_main.set_current_profile(
+                "overwatch2-gsync",
+                requires_reboot=True,
+                reboot_reasons=["HAGS toggle"],
+            )
+
+            primary_state = json.loads(primary.read_text(encoding="utf-8"))
+            mirror_state = json.loads(mirror.read_text(encoding="utf-8"))
+            assert primary_state == mirror_state
+            assert primary_state["current_profile"] == "overwatch2-gsync"
+
+            abso_main.clear_reboot_pending()
+            assert json.loads(primary.read_text(encoding="utf-8"))["reboot_pending"] is False
+            assert json.loads(mirror.read_text(encoding="utf-8"))["reboot_pending"] is False
+
+            abso_main.clear_current_profile()
+            assert not primary.exists()
+            assert not mirror.exists()
 
 
 class TestCLILaunch:
@@ -462,10 +493,12 @@ class TestCLILaunch:
 
         runner = CliRunner()
         launch_path = tmp_path / "Slippi Dolphin.exe"
-        result = runner.invoke(
-            cli,
-            ["launch", "slippi-melee", "--json", "--launch-path", str(launch_path)],
-        )
+        state_file = tmp_path / ".abso_state.json"
+        with patch("abso.main.STATE_FILE", state_file):
+            result = runner.invoke(
+                cli,
+                ["launch", "slippi-melee", "--json", "--launch-path", str(launch_path)],
+            )
 
         assert result.exit_code == 0
         payload = json.loads(result.output)

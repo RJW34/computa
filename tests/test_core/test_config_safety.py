@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from abso.core.config_safety import (
     apply_ini_key_patch,
+    find_ini_section_bounds,
     parse_ini_assignments,
     validate_allowed_keys,
 )
@@ -48,3 +49,53 @@ def test_apply_ini_key_patch_updates_and_appends() -> None:
     assert "PlayerTag=goofy" in result.lines
     assert "FullscreenMode=0" in result.lines
     assert "bUseRawInput=True" in result.lines
+
+
+def test_apply_ini_key_patch_scopes_to_named_section() -> None:
+    lines = [
+        "[/Script/Other.Settings]",
+        "FullscreenMode=2",
+        "PlayerTag=goofy",
+        "[/Script/Engine.GameUserSettings]",
+        "FullscreenMode=1",
+        "bUseVSync=True",
+        "[/Script/Another.Section]",
+        "FullscreenMode=2",
+    ]
+
+    assert find_ini_section_bounds(lines, "/Script/Engine.GameUserSettings") == (4, 6)
+
+    result = apply_ini_key_patch(
+        lines,
+        {
+            "FullscreenMode": "0",
+            "bUseVSync": "False",
+            "FrameRateLimit": "297",
+        },
+        append_missing=True,
+        section_name="/Script/Engine.GameUserSettings",
+    )
+
+    assert result.changed_keys == {"FullscreenMode", "bUseVSync"}
+    assert result.appended_keys == {"FrameRateLimit"}
+    assert result.lines == [
+        "[/Script/Other.Settings]",
+        "FullscreenMode=2",
+        "PlayerTag=goofy",
+        "[/Script/Engine.GameUserSettings]",
+        "FullscreenMode=0",
+        "bUseVSync=False",
+        "FrameRateLimit=297",
+        "[/Script/Another.Section]",
+        "FullscreenMode=2",
+    ]
+
+    parsed = parse_ini_assignments(
+        result.lines,
+        section_name="/Script/Engine.GameUserSettings",
+    )
+    assert parsed == {
+        "FullscreenMode": "0",
+        "bUseVSync": "False",
+        "FrameRateLimit": "297",
+    }

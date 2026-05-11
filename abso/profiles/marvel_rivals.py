@@ -69,6 +69,10 @@ class _MarvelRivalsBaseProfile(ReflexShooterBaseProfile):
                 "fullscreen_mode": 0,
                 "vsync": False,
                 "nvidia_reflex": True,
+                "dynamic_resolution": False,
+                "dlss_frame_generation": False,
+                "fsr_frame_generation": False,
+                "xe_frame_generation": False,
                 "auto_vrr_fps_cap": True,
             },
         }
@@ -108,8 +112,14 @@ class _MarvelRivalsBaseProfile(ReflexShooterBaseProfile):
             {
                 "category": "Display",
                 "setting": "Frame Generation",
-                "value": "Off for ranked / competitive",
-                "reason": "Frame generation lifts reported FPS, but it is not the cleanest low-latency path for a competitive shooter.",
+                "value": "Off for ranked / competitive (enforced for DLSS/FSR/Xe FG)",
+                "reason": "Frame generation raises displayed FPS, but native rendered frames with Reflex are the cleaner low-latency path for a competitive shooter.",
+            },
+            {
+                "category": "Display",
+                "setting": "Dynamic Resolution",
+                "value": "Off",
+                "reason": "Keeps the render path deterministic so the VRR cap and in-game frame pacing remain predictable.",
             },
             {
                 "category": "Graphics",

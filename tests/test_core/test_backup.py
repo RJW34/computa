@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from abso.core.backup import BackupManager
+from abso.core.backup import BackupManager, _get_backup_handlers
 from abso.core.exceptions import BackupCorruptedError, BackupNotFoundError
 
 
@@ -28,6 +28,18 @@ class TestBackupManagerInit:
         with patch("abso.core.backup._get_backup_handlers", return_value=[mock_handler]):
             manager = BackupManager(tmp_path)
             assert len(manager._handlers) == 1
+
+    def test_default_backup_handlers_include_native_game_config_handlers(self):
+        """Native game config handlers must be backed up before profile swaps."""
+        handler_names = {handler.__class__.__name__ for handler in _get_backup_handlers()}
+
+        assert {
+            "Diablo4ConfigHandler",
+            "FortniteConfigHandler",
+            "MarvelRivalsConfigHandler",
+            "OW2ConfigHandler",
+            "Rivals2ConfigHandler",
+        } <= handler_names
 
 
 class TestCreateBackup:

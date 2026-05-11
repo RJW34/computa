@@ -51,6 +51,8 @@ class Rivals2ConfigHandler(SettingsHandler):
     - Raw input for best input latency
     """
 
+    TARGET_SECTION_NAME = "/Script/Engine.GameUserSettings"
+
     MUTABLE_SETTINGS_TO_INI: dict[str, str] = {
         "fullscreen_mode": "FullscreenMode",
         "vsync": "bUseVSync",
@@ -73,42 +75,49 @@ class Rivals2ConfigHandler(SettingsHandler):
         "ProfileName",
     }
 
-    def detect(self) -> dict[str, Any]:
-        """Detect current Rivals 2 game config settings."""
+    def _get_config_path(self) -> Path | None:
         config_dir = _get_rivals2_config_dir()
         if not config_dir:
-            return {"config_found": False}
+            return None
 
         ini_path = config_dir / "GameUserSettings.ini"
         if not ini_path.is_file():
+            return None
+        return ini_path
+
+    def detect(self) -> dict[str, Any]:
+        """Detect current Rivals 2 game config settings."""
+        ini_path = self._get_config_path()
+        if not ini_path:
             return {"config_found": False}
 
         result: dict[str, Any] = {"config_found": True, "config_path": str(ini_path)}
 
         try:
             content = ini_path.read_text(encoding="utf-8", errors="replace")
-            lines = content.splitlines()
+            assignments = parse_ini_assignments(
+                content.splitlines(),
+                section_name=self.TARGET_SECTION_NAME,
+            )
 
-            for line in lines:
-                stripped = line.strip()
-                if stripped.startswith("FullscreenMode="):
-                    result["fullscreen_mode"] = int(stripped.split("=", 1)[1])
-                elif stripped.startswith("bUseVSync="):
-                    result["vsync"] = stripped.split("=", 1)[1].lower() == "true"
-                elif stripped.startswith("bUseRawInput="):
-                    result["raw_input"] = stripped.split("=", 1)[1].lower() == "true"
-                elif stripped.startswith("FrameRateLimit="):
-                    try:
-                        result["frame_rate_limit"] = int(float(stripped.split("=", 1)[1]))
-                    except ValueError:
-                        logger.debug("Rivals 2 frame rate limit value was non-numeric")
-                elif stripped.startswith("bUseHDRDisplayOutput="):
-                    result["hdr_output"] = stripped.split("=", 1)[1].lower() == "true"
-                elif stripped.startswith("HDRDisplayOutputNits="):
-                    try:
-                        result["hdr_nits"] = int(float(stripped.split("=", 1)[1]))
-                    except ValueError:
-                        logger.debug("Rivals 2 HDR nits value was non-numeric")
+            if "FullscreenMode" in assignments:
+                result["fullscreen_mode"] = int(float(assignments["FullscreenMode"]))
+            if "bUseVSync" in assignments:
+                result["vsync"] = assignments["bUseVSync"].lower() == "true"
+            if "bUseRawInput" in assignments:
+                result["raw_input"] = assignments["bUseRawInput"].lower() == "true"
+            if "FrameRateLimit" in assignments:
+                try:
+                    result["frame_rate_limit"] = int(float(assignments["FrameRateLimit"]))
+                except ValueError:
+                    logger.debug("Rivals 2 frame rate limit value was non-numeric")
+            if "bUseHDRDisplayOutput" in assignments:
+                result["hdr_output"] = assignments["bUseHDRDisplayOutput"].lower() == "true"
+            if "HDRDisplayOutputNits" in assignments:
+                try:
+                    result["hdr_nits"] = int(float(assignments["HDRDisplayOutputNits"]))
+                except ValueError:
+                    logger.debug("Rivals 2 HDR nits value was non-numeric")
         except Exception as e:
             logger.error(f"Failed to read Rivals 2 config: {e}")
 
@@ -182,22 +191,13 @@ class Rivals2ConfigHandler(SettingsHandler):
                 "requires_reboot": False,
             }
 
-        config_dir = _get_rivals2_config_dir()
-        if not config_dir:
+        ini_path = self._get_config_path()
+        if not ini_path:
             return {
                 "success": True,
                 "error": None,
                 "requires_reboot": False,
-                "skipped": "Rivals 2 config directory not found (game may not be installed)",
-            }
-
-        ini_path = config_dir / "GameUserSettings.ini"
-        if not ini_path.is_file():
-            return {
-                "success": True,
-                "error": None,
-                "requires_reboot": False,
-                "skipped": "GameUserSettings.ini not found",
+                "skipped": "Rivals 2 GameUserSettings.ini not found",
             }
 
         try:
@@ -219,13 +219,20 @@ class Rivals2ConfigHandler(SettingsHandler):
                     "applied": [],
                 }
 
-            original_assignments = parse_ini_assignments(lines)
+            original_assignments = parse_ini_assignments(
+                lines,
+                section_name=self.TARGET_SECTION_NAME,
+            )
             patch_result = apply_ini_key_patch(
                 lines=lines,
                 replacements=replacements,
                 append_missing=True,
+                section_name=self.TARGET_SECTION_NAME,
             )
-            new_assignments = parse_ini_assignments(patch_result.lines)
+            new_assignments = parse_ini_assignments(
+                patch_result.lines,
+                section_name=self.TARGET_SECTION_NAME,
+            )
 
             protected_mutations = []
             for key in self.PROTECTED_INI_KEYS:
@@ -268,6 +275,18 @@ class Rivals2ConfigHandler(SettingsHandler):
 
     def verify_active(self, settings: dict[str, Any]) -> dict[str, Any]:
         """Verify requested Rivals 2 config values are active."""
+        settings = dict(settings)
+        if settings.pop("auto_vrr_fps_cap", False):
+            try:
+                from abso.core.vrr import get_vrr_fps_cap
+                from abso.settings.nvidia import NvidiaSettingsHandler
+
+                refresh_hz = NvidiaSettingsHandler()._detect_primary_refresh_rate()
+                if refresh_hz and refresh_hz > 0:
+                    settings["frame_rate_limit"] = get_vrr_fps_cap(refresh_hz)
+            except Exception as e:
+                logger.warning("Rivals 2 auto VRR FPS cap verification failed: %s", e)
+
         current = self.detect()
         results: dict[str, Any] = {"all_active": True, "settings": {}}
 
@@ -292,32 +311,68 @@ class Rivals2ConfigHandler(SettingsHandler):
         return results
 
     def backup(self) -> dict[str, Any]:
-        """Backup current Rivals 2 config."""
-        return self.detect()
+        """Back up the full Rivals 2 config file for lossless restore."""
+        ini_path = self._get_config_path()
+        if not ini_path:
+            return {"config_found": False}
+
+        try:
+            return {
+                "config_found": True,
+                "config_path": str(ini_path),
+                "file_content": ini_path.read_text(encoding="utf-8", errors="replace"),
+            }
+        except Exception as e:
+            logger.error("Failed to back up Rivals 2 config %s: %s", ini_path, e)
+            return {"config_found": False}
 
     def restore(self, data: dict[str, Any]) -> bool:
-        """Restore Rivals 2 config from backup."""
+        """Restore Rivals 2 config from a backup payload.
+
+        New backups store the full INI under ``file_content``. Older backups
+        (taken before the full-file format) only persisted detected values,
+        so we fall back to re-applying those detected fields rather than
+        failing the baseline restore.
+        """
         if not data.get("config_found"):
             return True  # Nothing to restore
 
-        settings = {}
-        if "fullscreen_mode" in data:
-            settings["fullscreen_mode"] = data["fullscreen_mode"]
-        if "vsync" in data:
-            settings["vsync"] = data["vsync"]
-        if "raw_input" in data:
-            settings["raw_input"] = data["raw_input"]
-        if "frame_rate_limit" in data:
-            settings["frame_rate_limit"] = data["frame_rate_limit"]
-        if "hdr_output" in data:
-            settings["hdr_output"] = data["hdr_output"]
-        if "hdr_nits" in data:
-            settings["hdr_nits"] = data["hdr_nits"]
+        file_content = data.get("file_content")
+        if file_content is None:
+            return self._restore_from_legacy_payload(data)
 
-        if settings:
-            result = self.apply(settings)
-            return result.get("success", False)
-        return True
+        config_path = data.get("config_path")
+        if not config_path:
+            return False
+
+        try:
+            ini_path = Path(config_path)
+            ini_path.parent.mkdir(parents=True, exist_ok=True)
+            ini_path.write_text(file_content, encoding="utf-8")
+            return True
+        except OSError as e:
+            logger.error("Failed to restore Rivals 2 config %s: %s", config_path, e)
+            return False
+
+    def _restore_from_legacy_payload(self, data: dict[str, Any]) -> bool:
+        """Re-apply detected fields from a pre-full-file backup payload."""
+        legacy_keys = (
+            "fullscreen_mode",
+            "vsync",
+            "raw_input",
+            "frame_rate_limit",
+            "hdr_output",
+            "hdr_nits",
+        )
+        settings = {key: data[key] for key in legacy_keys if key in data}
+        if not settings:
+            return True
+
+        if self._get_config_path() is None:
+            return True
+
+        result = self.apply(settings)
+        return bool(result.get("success", False))
 
     def _build_replacements(self, settings: dict[str, Any]) -> tuple[dict[str, str], list[str]]:
         """Build INI replacements and collect conversion errors."""

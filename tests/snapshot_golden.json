@@ -710,9 +710,15 @@
       },
       {
         "category": "Display",
-        "reason": "Frame generation lifts reported FPS, but it is not the cleanest low-latency path for a competitive shooter.",
+        "reason": "Frame generation raises displayed FPS, but native rendered frames with Reflex are the cleaner low-latency path for a competitive shooter.",
         "setting": "Frame Generation",
-        "value": "Off for ranked / competitive"
+        "value": "Off for ranked / competitive (enforced for DLSS/FSR/Xe FG)"
+      },
+      {
+        "category": "Display",
+        "reason": "Keeps the render path deterministic so the VRR cap and in-game frame pacing remain predictable.",
+        "setting": "Dynamic Resolution",
+        "value": "Off"
       },
       {
         "category": "Graphics",
@@ -765,11 +771,15 @@
       },
       "MarvelRivalsConfigHandler": {
         "auto_vrr_fps_cap": true,
+        "dlss_frame_generation": false,
+        "dynamic_resolution": false,
+        "fsr_frame_generation": false,
         "fullscreen_mode": 0,
         "hdr_nits": 1000,
         "hdr_output": true,
         "nvidia_reflex": true,
-        "vsync": false
+        "vsync": false,
+        "xe_frame_generation": false
       },
       "MouseSettingsHandler": {
         "disable_acceleration": true,
@@ -881,9 +891,15 @@
       },
       {
         "category": "Display",
-        "reason": "Frame generation lifts reported FPS, but it is not the cleanest low-latency path for a competitive shooter.",
+        "reason": "Frame generation raises displayed FPS, but native rendered frames with Reflex are the cleaner low-latency path for a competitive shooter.",
         "setting": "Frame Generation",
-        "value": "Off for ranked / competitive"
+        "value": "Off for ranked / competitive (enforced for DLSS/FSR/Xe FG)"
+      },
+      {
+        "category": "Display",
+        "reason": "Keeps the render path deterministic so the VRR cap and in-game frame pacing remain predictable.",
+        "setting": "Dynamic Resolution",
+        "value": "Off"
       },
       {
         "category": "Graphics",
@@ -935,11 +951,15 @@
       },
       "MarvelRivalsConfigHandler": {
         "auto_vrr_fps_cap": true,
+        "dlss_frame_generation": false,
+        "dynamic_resolution": false,
+        "fsr_frame_generation": false,
         "fullscreen_mode": 0,
         "hdr_nits": 1000,
         "hdr_output": false,
         "nvidia_reflex": true,
-        "vsync": false
+        "vsync": false,
+        "xe_frame_generation": false
       },
       "MouseSettingsHandler": {
         "disable_acceleration": true,
