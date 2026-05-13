@@ -2,6 +2,16 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+> **Read [`docs/AGENT_PROTOCOL.md`](docs/AGENT_PROTOCOL.md) first.** That
+> document is the single forward-looking source of truth for: reading
+> order, machine roles, live-PC test policy, the patterns introduced by
+> recent refactors (central handler registry, `is_critical_verify`,
+> `OsRelease`, `hardware_db`, KB checker discipline, detect-only
+> handlers for feature-flag rollouts), the current open backlog, and
+> the cp1252 console-encoding rules for user-visible strings.
+> Everything below is the short-form summary; the protocol document is
+> the authoritative spec.
+
 ## Project Overview
 
 **A.B.S.O.** (**A**daptive **B**attle **S**tation **O**ptimizer) is a CLI-first Windows 11 gaming optimization tool that:
@@ -58,34 +68,51 @@ powershell -File abso\tray\ABSO-Tray.ps1
 
 ```
 abso/
-├── main.py              # CLI entry (Click-based)
+├── main.py                 # CLI entry (Click-based)
 ├── core/
-│   ├── detector.py      # Hardware detection (WMI, nvidia-smi, pynvml)
-│   ├── auditor.py       # Scans settings, compares to optimal
-│   ├── applier.py       # Applies profile settings with validation pipeline
-│   ├── backup.py        # Timestamped backup/restore system
-│   ├── linter.py        # ProfileLinter - static validation
-│   ├── rollback_guard.py # RollbackGuard - online netcode protection
-│   ├── stability_gate.py # StabilityGate - gated aggressive settings
-│   └── ...              # Other validation subsystems
+│   ├── detector.py         # Hardware detection (WMI, nvidia-smi, pynvml)
+│   ├── auditor.py          # Scans settings, compares to optimal
+│   ├── applier.py          # Applies profile settings with validation pipeline
+│   ├── backup.py           # Timestamped backup/restore system
+│   ├── compliance.py       # Post-apply compliance / severity escalation
+│   ├── capabilities.py     # Profile preflight: VRR / HDR / OS-build / monitor checks
+│   ├── handler_registry.py # Central HandlerEntry registry (audit + backup tags)
+│   ├── kb_checker.py       # Known-bad Windows updates + supersession tracking
+│   ├── bios_detector.py    # BIOS/firmware + Secure Boot cert state
+│   ├── linter.py           # ProfileLinter - static validation
+│   ├── rollback_guard.py   # RollbackGuard - online netcode protection
+│   ├── stability_gate.py   # StabilityGate - gated aggressive settings
+│   └── ...                 # Other validation subsystems
+├── data/
+│   ├── hardware_db.py      # OEM / chassis / G-Sync model lookup tables
+│   ├── monitor_osd.py      # Per-monitor OSD recommendations
+│   └── debloat_tweaks.yaml # Opt-in debloat preset definitions
 ├── profiles/
-│   ├── base.py          # Base profile class with validation metadata
-│   └── <game>.py        # Game-specific profiles (data + logic)
-├── settings/            # One module per settings domain (15 handlers)
-│   ├── nvidia.py        # Nvidia Profile Inspector integration
-│   ├── windows.py       # Game Mode, HAGS, VBS
-│   ├── registry.py      # Registry read/write with validation
-│   ├── power.py         # Power plan management (powercfg)
-│   ├── network.py       # Nagle, TCP optimizations
-│   ├── services.py      # Windows services control
-│   ├── mouse.py         # Mouse acceleration settings
-│   └── ...              # 8 more handlers
+│   ├── base.py             # BaseProfile (+ xbox_mode / ai_agents / min_os_build fields)
+│   ├── profile_bases.py    # ReflexShooter / EmulatorLatency / Rivals2 base classes
+│   └── <game>.py           # Game-specific profiles (data + logic)
+├── settings/               # One module per settings domain
+│   ├── base.py             # SettingsHandler interface (+ is_critical_verify)
+│   ├── nvidia/             # Nvidia Profile Inspector + NVAPI DRS package
+│   ├── windows.py          # Game Mode, HAGS, VBS, HDR, FSO
+│   ├── registry.py         # Registry read/write (+ WIN32_PRIORITY_* constants)
+│   ├── power.py            # Power plan management (powercfg)
+│   ├── network.py          # Nagle, TCP optimizations
+│   ├── services.py         # Windows services control
+│   ├── mouse.py            # Mouse acceleration settings
+│   ├── xbox_mode.py        # 25H2 Xbox Mode rollout (detect-only)
+│   ├── ai_agents.py        # 25H2 AI taskbar agents rollout (detect-only)
+│   └── ...                 # ~25 handlers total
 ├── tray/
-│   ├── ABSO-Tray.ps1    # System tray app (PowerShell)
-│   └── ABSO-Watcher.ps1 # Game process monitor
+│   ├── ABSO-Tray.ps1       # System tray app (PowerShell)
+│   └── ABSO-Watcher.ps1    # Game process monitor
 └── utils/
-    ├── admin.py         # UAC elevation handling
-    └── wmi_helper.py    # WMI query utilities
+    ├── admin.py            # UAC elevation handling
+    ├── os_release.py       # OsRelease.at_least(build, ubr) — single source of truth
+    ├── registry.py         # Safe registry read/write helpers
+    ├── validation.py       # Input validation helpers
+    ├── atomic_io.py        # Atomic JSON write helpers
+    └── verify.py           # Post-apply verification helpers
 ```
 
 ### Key Design Patterns
@@ -105,7 +132,12 @@ class SettingsHandler:
 - `is_emulator_profile` — Whether this is for an emulator
 - `optimization_target` — What the profile optimizes for
 
-**Backup System** — Creates timestamped folders in `/backups/` with manifest.json tracking all components. Every state-mutating settings handler is backed up; the canonical list is `_get_backup_handlers()` in `abso/core/backup.py`.
+**Backup System** — Creates timestamped folders in `/backups/` (format
+`YYYY-MM-DD_HHMMSS`) with `manifest.json` tracking all components.
+Every state-mutating settings handler is backed up; the canonical list
+is the `audit + backup` set in `abso/core/handler_registry.py`. Adding
+a handler is one `HandlerEntry` row there — both auditor and backup
+pipelines pick it up automatically.
 
 **Validation Pipeline** — Profile application runs through:
 1. ProfileLinter (static validation)

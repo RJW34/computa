@@ -1,4 +1,11 @@
-# Next Implementation Phase
+# Next Implementation Phase (2026-04-08)
+
+> **ARCHIVED 2026-05-13.** This document is frozen to the April 8, 2026
+> execution phase. PR-17 (Diablo 4) and PR-20 (verification expansion)
+> are complete; PR-19 (Ryujinx) remains open and is tracked in
+> **[`docs/AGENT_PROTOCOL.md`](../AGENT_PROTOCOL.md) §6**. CoD
+> references inside have no corresponding profile in the catalog —
+> that family was never shipped.
 
 This document turns the April 8, 2026 whole-product audit into the next concrete execution phase.
 

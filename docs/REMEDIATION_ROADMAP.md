@@ -1,5 +1,13 @@
 # A.B.S.O. Remediation Roadmap
 
+> **Status update 2026-05-13.** Phase 4 (Deep Verification Coverage) is
+> partially complete — see PR-09 below. The forward-looking backlog
+> (open vs. closed PRs) is consolidated in
+> **[`docs/AGENT_PROTOCOL.md`](./AGENT_PROTOCOL.md) §6**. The historical
+> machine-role split mentioning `MAGNETON` is superseded by Agent
+> Protocol §2 — the implementation+validation+signoff host is
+> `MIRAIDON`.
+
 This roadmap is the execution plan for raising A.B.S.O. from its March 26, 2026 baseline (`C+` overall) to `A` grades across the board.
 
 The emphasis is not "more features." The emphasis is:
@@ -138,7 +146,7 @@ Expected grade lift:
 - Mechanical Correctness: `B-` -> `B+`
 - Safety And Rollback: `C` -> `B-`
 
-### PR-03: Introduce handler capability metadata
+### PR-03: Introduce handler capability metadata (partial)
 
 Owner: `Core Systems`
 
@@ -148,18 +156,22 @@ Files:
 - [abso/core/applier.py](../abso/core/applier.py)
 - [abso/core/backup.py](../abso/core/backup.py)
 - [abso/core/transaction.py](../abso/core/transaction.py)
+- [abso/core/handler_registry.py](../abso/core/handler_registry.py)
 
-Tasks:
+Progress as of 2026-05-13:
 
-- Add explicit capability fields for apply/backup/restore/verify support.
-- Replace implicit backup truth inference with contract-based behavior.
-- Surface capability data in transaction output where relevant.
+- ✅ `is_critical_verify` property (see PR-09).
+- ✅ Central handler registry with `HandlerEntry(audit=..., backup=...)`
+  flags replaces the parallel handler lists that used to live in
+  `auditor.py` / `backup.py`.
+- ✅ `restore_guarantee` property already exists on `SettingsHandler`
+  with `full` / `partial` / `ephemeral` / `none` semantics.
 
-Acceptance:
+Still open:
 
-- Every handler declares capability metadata.
-- Backup and transaction code consume capability metadata, not payload guesswork.
-- Tests enforce handler metadata presence.
+- Add `supports_apply` / `supports_backup` / `supports_restore` /
+  `supports_verify` / `verification_scope` properties as enumerated in
+  `docs/QUALITY_RUBRIC.md` § "Handler Capability Contract".
 
 ### PR-04: Enforce contract-aware transaction semantics
 
@@ -286,25 +298,30 @@ Acceptance:
 - High-impact handlers support post-apply verification.
 - Verification tests cover true success, mismatch, and detection failure.
 
-### PR-09: Expand compliance severity model
+### PR-09: Expand compliance severity model ✅ (done 2026-05-13)
 
 Owner: `Core Systems`
 
 Files:
 
 - [abso/core/compliance.py](../abso/core/compliance.py)
-- [abso/core/transaction.py](../abso/core/transaction.py)
+- [abso/settings/base.py](../abso/settings/base.py)
+- [abso/core/handler_registry.py](../abso/core/handler_registry.py)
 
-Tasks:
+Completed in commit `b1f5397`:
 
-- Make criticality data-driven instead of hardcoded to a narrow handler list.
-- Treat VRR/HDR/NVIDIA mismatches as critical for profiles that depend on them.
-- Distinguish `unverified` from `verified mismatch`.
+- Hardcoded `CRITICAL_VERIFY_HANDLERS` class-name set replaced with
+  the `SettingsHandler.is_critical_verify` property.
+- `ComplianceEngine` resolves the critical-handler set lazily from
+  the central handler registry; cached per-process.
+- 13 handlers (Windows, NVIDIA, Power, Registry, Network, Mouse,
+  Graphics, ProcessPriority, and 5 per-game config handlers)
+  override `is_critical_verify = True`.
 
-Acceptance:
+Still open (deferred to a separate slice):
 
-- Compliance output is specific enough to drive honest UX.
-- Critical profile paths fail on unresolved verification gaps.
+- Distinguish `unverified` from `verified mismatch` in compliance
+  output. Currently both surface as the same `VERIFY_MISMATCH` code.
 
 ## Phase 5: Profile Contracts And Evidence
 

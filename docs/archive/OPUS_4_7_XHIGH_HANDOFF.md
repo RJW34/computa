@@ -1,5 +1,12 @@
 # Opus 4.7 xhigh Handoff
 
+> **ARCHIVED 2026-05-13.** This handoff is frozen to the April 21, 2026
+> gaming-performance audit. Most of its findings have since been
+> remediated; references to `PRD.md` and `GAME_CONFIGURATIONS.md` point
+> to docs that no longer exist. Read
+> **[`docs/AGENT_PROTOCOL.md`](../AGENT_PROTOCOL.md)** for the current
+> forward-looking protocol.
+
 This is the start-here handoff for continuing the April 21, 2026 gaming-performance profile audit.
 
 Target agent: Opus 4.7 xhigh, or the nearest available high-reasoning implementation agent.

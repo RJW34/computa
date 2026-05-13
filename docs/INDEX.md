@@ -1,27 +1,43 @@
 # Docs Index
 
-This index is the shortest path to the documents that currently matter.
+This index points to the documents that are current and load-bearing.
+Anything not listed here is either in `docs/archive/` (frozen historical
+context) or is a focused-scope note that you can ignore unless you're
+actively working on that area.
 
 ## Start Here
 
-- [Opus 4.7 xhigh Handoff](./OPUS_4_7_XHIGH_HANDOFF.md)
-- [HERMES Handoff](./HERMES_HANDOFF.md)
-- [Quality Rubric](./QUALITY_RUBRIC.md)
-- [Remediation Roadmap](./REMEDIATION_ROADMAP.md)
-- [Next Implementation Phase](./NEXT_IMPLEMENTATION_PHASE.md)
+- **[Agent Protocol](./AGENT_PROTOCOL.md)** — single forward-looking
+  document for any agent picking up work. Reading order, machine roles,
+  live-PC test policy, current patterns, open backlog.
 
-## Technical Planning
+## Standards & Plan
 
-- [NVAPI Integration Plan](./NVAPI_INTEGRATION_PLAN.md)
+- [Quality Rubric](./QUALITY_RUBRIC.md) — shipping bar, forbidden claims,
+  handler capability contract, release gates.
+- [Remediation Roadmap](./REMEDIATION_ROADMAP.md) — long-running grade-
+  lift plan. Completed PRs are marked inline; see Agent Protocol §6 for
+  the current open backlog.
+
+## Reference
+
 - [API Reference](./API.md)
 - [Troubleshooting](./TROUBLESHOOTING.md)
+- [NVAPI Integration Plan](./NVAPI_INTEGRATION_PLAN.md)
 
 ## Research Notes
 
 - [VRR Latency Research Notes](./research/vrr-latency-research-notes.md)
 - [Dolphin Latency Research Notes](./research/dolphin-latency-research-notes.md)
 
-## Historical / Narrow-Scope Notes
+## Focused-Scope Notes
 
 - [Multimon Gaming Idea](./MULTIMON_GAMING_IDEA.md)
 - [Rivals 2 VRR Optimal Config](./rivals2-vrr-optimal-config.md)
+- [OW2 Keybinds Format](./ow2-keybinds-format.md)
+
+## Archive
+
+Frozen handoffs and superseded plans live in `docs/archive/`. They are
+preserved for history but should not be used as a current-state
+reference — the Agent Protocol document above wins on conflicts.

@@ -1,5 +1,11 @@
 # HERMES Handoff
 
+> **ARCHIVED 2026-05-13.** This handoff is frozen to its original
+> remediation context. Machine names (`MAGNETON`), PR slice numbering,
+> and "current state" references inside are historical and should not
+> be relied on. Read **[`docs/AGENT_PROTOCOL.md`](../AGENT_PROTOCOL.md)**
+> for the current forward-looking protocol.
+
 This is the start-here document for a long-running remediation effort on A.B.S.O.
 
 If you are HERMES, read this file first, then follow the reading order below.

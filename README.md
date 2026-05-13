@@ -16,10 +16,10 @@ A.B.S.O. is a CLI-first Windows 11 gaming optimization tool that automatically d
 
 ## Quality Bar
 
-A.B.S.O. is being hardened against a stricter product standard than a typical tweak tool. The current quality rubric and remediation roadmap live here:
+A.B.S.O. is being hardened against a stricter product standard than a typical tweak tool. The current quality rubric, agent protocol, and remediation roadmap live here:
 
+- [`docs/AGENT_PROTOCOL.md`](docs/AGENT_PROTOCOL.md) — forward-looking start-here for any agent
 - [`docs/INDEX.md`](docs/INDEX.md)
-- [`docs/HERMES_HANDOFF.md`](docs/HERMES_HANDOFF.md)
 - [`docs/QUALITY_RUBRIC.md`](docs/QUALITY_RUBRIC.md)
 - [`docs/REMEDIATION_ROADMAP.md`](docs/REMEDIATION_ROADMAP.md)
 
@@ -190,8 +190,8 @@ python -m abso restore latest
 Or list and restore a specific backup:
 
 ```powershell
-# Backups are named by timestamp: YYYYMMDD_HHMMSS
-python -m abso restore 20240115_143022
+# Backups are named by timestamp: YYYY-MM-DD_HHMMSS
+python -m abso restore 2026-05-13_181906
 ```
 
 ### Skip Backup (Not Recommended)
@@ -254,34 +254,45 @@ If automatic restore fails:
 
 ```
 abso/
-├── main.py              # CLI entry point
-├── interactive.py       # Interactive menu system
+├── main.py                 # CLI entry point
+├── interactive.py          # Interactive menu system
 ├── core/
-│   ├── detector.py      # Hardware detection
-│   ├── auditor.py       # Configuration auditing
-│   ├── applier.py       # Profile application
-│   └── backup.py        # Backup/restore system
-├── profiles/
-│   ├── base.py          # Base profile class
-│   ├── slippi_melee.py  # Slippi Melee profile
-│   ├── rivals2.py       # Rivals of Aether 2 profile
-│   ├── fortnite.py      # Fortnite profile
-│   └── diablo4.py       # Diablo 4 profile
-├── settings/            # Settings handlers
-│   ├── windows.py       # Windows settings
-│   ├── power.py         # Power plan settings
-│   ├── nvidia.py        # NVIDIA settings
-│   ├── registry.py      # Registry tweaks
-│   ├── network.py       # Network optimizations
-│   ├── mouse.py         # Mouse/input settings
-│   ├── graphics.py      # Graphics settings
-│   ├── services.py      # Windows services
-│   ├── memory.py        # Memory management
+│   ├── detector.py         # Hardware detection
+│   ├── auditor.py          # Configuration auditing
+│   ├── applier.py          # Profile application
+│   ├── backup.py           # Backup/restore system
+│   ├── handler_registry.py # Central registry (one HandlerEntry per handler)
+│   ├── compliance.py       # Post-apply compliance / severity escalation
+│   ├── kb_checker.py       # Known-bad Windows updates + supersession
+│   ├── bios_detector.py    # BIOS/firmware + Secure Boot cert state
 │   └── ...
+├── data/
+│   ├── hardware_db.py      # OEM / chassis / G-Sync model tables
+│   ├── monitor_osd.py      # Per-monitor OSD recommendations
+│   └── debloat_tweaks.yaml
+├── profiles/
+│   ├── base.py             # Base profile class
+│   ├── profile_bases.py    # Reflex / Emulator / Rivals2 family bases
+│   └── <game>.py           # Game-specific profiles
+├── settings/               # Settings handlers (~25)
+│   ├── base.py             # SettingsHandler interface
+│   ├── windows.py          # Windows settings
+│   ├── power.py            # Power plan settings
+│   ├── nvidia/             # NVIDIA package (NPI + NVAPI DRS)
+│   ├── registry.py         # Registry tweaks
+│   ├── xbox_mode.py        # 25H2 Xbox Mode rollout (detect-only)
+│   ├── ai_agents.py        # 25H2 AI taskbar agents (detect-only)
+│   └── ...
+├── tray/                   # PowerShell tray app
 └── utils/
-    ├── admin.py         # Admin elevation
-    └── wmi_helper.py    # WMI utilities
+    ├── admin.py            # Admin elevation
+    ├── os_release.py       # OsRelease single source of truth
+    ├── registry.py         # Safe registry helpers
+    └── atomic_io.py        # Atomic JSON I/O
 ```
+
+For agents picking up this project, the canonical entry point is
+[`docs/AGENT_PROTOCOL.md`](docs/AGENT_PROTOCOL.md).
 
 ## License
 

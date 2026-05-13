@@ -8,35 +8,87 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
-### Added
-- Game detection system - detects games from Steam, Epic, Battle.net, standalone
-- `abso games` command to list detected games and suggest profiles
-- `abso timer` command with `--resolution` and `--keep-alive` options
-- `abso config` command to create/manage `abso.yaml` configuration
-- Profile customization via `abso.yaml` (override settings without editing code)
-- Handler disabling via `disabled_handlers` config option
-- G-Sync/VRR detection improvements:
-  - Known G-Sync monitor database matching
-  - EDID FreeSync range parsing
-  - NVIDIA registry queries
-  - High refresh rate heuristics
-- GitHub Actions CI pipeline (`ci.yml`)
-- Pre-commit hooks (Black, Ruff, pytest)
-- `pyproject.toml` for modern Python packaging
-- Type checking with mypy (30+ type annotations added)
-- Handler unit tests (graphics, memory, mouse, network, power, services, timer)
-- CLI smoke tests for all commands
-- Test count: 274 -> 359 tests
+### Added (2026-05 — Win11 25H2 26200.8457 cumulative adaptation)
+- `abso/utils/os_release.py` — `OsRelease` snapshot with
+  `at_least(build, ubr)` build-floor comparisons; cached per-process.
+- `abso/settings/xbox_mode.py` — detect-only handler for the Xbox Mode
+  rollout in KB5089549. `apply()` refuses until Microsoft documents
+  stable registry keys.
+- `abso/settings/ai_agents.py` — detect-only handler for the "Agents
+  on the Taskbar" rollout in KB5089549; surfaces Copilot policy state
+  as an adjacent signal.
+- `core/bios_detector.py::SecureBootCertState` — reads `SecureBoot\
+  Servicing` for the June 2026 PCA2023 / UEFI CA 2023 cert rollout.
+  Recommendation impact escalates past 2026-06-01.
+- `core/kb_checker.py` — `superseded_by`, `fixed_in_build`,
+  `discovered_in_build` fields plus `LAST_REVIEWED_UTC` staleness
+  cadence. KB5083769 entry auto-suppresses when KB5089549 is present.
+- `BaseProfile` fields: `min_os_build`, `validated_os_build`,
+  `xbox_mode`, `ai_agents`. Reflex shooters / emulators / Rivals 2
+  declare `xbox_mode="off"`, `ai_agents="off"`; Diablo 4 declares
+  `ai_agents="off"`.
+- `core/capabilities.py` — `OS_BUILD_BELOW_FLOOR`,
+  `OS_BUILD_UNTESTED_ON_PROFILE`, `OS_RELEASE_UNAVAILABLE` findings.
+- `core/linter.py::_check_xbox_mode_conflicts` — fails closed when a
+  profile declares `xbox_mode="on"` against a fullscreen-only VRR
+  contract.
+- `docs/AGENT_PROTOCOL.md` — single forward-looking entry point for
+  future agents.
+
+### Added (2026-05 — crude duplication refactor)
+- `abso/core/handler_registry.py` — central `HandlerEntry` registry
+  with `audit` / `backup` tags. Replaces the parallel handler lists
+  that used to live in `auditor._get_handlers()` and
+  `backup._get_backup_handlers()`.
+- `abso/data/hardware_db.py` — extracted OEM / chassis / G-Sync
+  reference tables that were inline in `core/detector.py`.
+- `SettingsHandler.is_critical_verify` property. `ComplianceEngine`
+  resolves the critical-handler set lazily from the registry instead
+  of carrying a hardcoded class-name set.
+- Module-level `WIN32_PRIORITY_GAMING_OFFLINE` (`0x2A`) and
+  `WIN32_PRIORITY_GAMING_ONLINE` (`0x26`) named constants exported
+  from `abso/settings/registry.py`. All callers updated.
+- 9 new tests in `tests/test_core/test_handler_registry.py`
+  + targeted live registry probes for the May 2026 surfaces.
+- Test count: 1331 → 1340 tests.
 
 ### Changed
-- Refactored `nvidia.py` (822 lines) into `abso/settings/nvidia/` package:
-  - `__init__.py` - Main handler
-  - `npi.py` - NPI executable operations
-  - `profiles.py` - NIP file generation
-  - `presets.py` - Setting IDs and presets
-  - `parsing.py` - XML parsing utilities
-- Game Detection and Profile Customization documentation in TECHNICAL_REFERENCE.md
-- Timer CLI documentation in TECHNICAL_REFERENCE.md
+- `core/detector.py` slimmed from 1539 → 1408 lines (data tables
+  moved out to `abso/data/hardware_db.py`).
+- `core/bios_detector.py::_read_reg_dword` / `_read_reg_value` are
+  now thin wrappers over `abso.utils.registry.read_registry_dword` /
+  `read_registry_value` (40 lines of duplicate winreg glue removed).
+- `ComplianceEngine.CRITICAL_VERIFY_HANDLERS` removed; replaced by
+  property-driven resolution.
+- README project-structure section updated to match current layout
+  (`nvidia/` package, `data/`, `utils/os_release.py`, etc.).
+- Three dated handoff docs moved to `docs/archive/` with deprecation
+  banners; `docs/AGENT_PROTOCOL.md` is the current entry point.
+
+### Fixed
+- Em-dash / en-dash in user-visible CLI strings (cp1252 mojibake in
+  `abso bios` and `abso audit` output). `bios_detector.py` and
+  `multimon_detector.py` strings replaced with hyphens.
+
+### Earlier in this cycle
+- Game detection system — detects games from Steam, Epic, Battle.net,
+  standalone.
+- `abso games` command to list detected games and suggest profiles.
+- `abso timer` command with `--resolution` and `--keep-alive` options.
+- `abso config` command to create/manage `abso.yaml` configuration.
+- Profile customization via `abso.yaml`.
+- Handler disabling via `disabled_handlers` config option.
+- G-Sync/VRR detection improvements: known monitor database matching,
+  EDID FreeSync range parsing, NVIDIA registry queries, refresh-rate
+  heuristics.
+- GitHub Actions CI pipeline (`ci.yml`); pre-commit hooks (Black,
+  Ruff, pytest); `pyproject.toml` modern packaging; mypy annotations.
+- Handler unit tests across the full handler set; CLI smoke tests.
+
+### Changed (earlier)
+- Refactored `nvidia.py` (822 lines) into `abso/settings/nvidia/`
+  package: `__init__.py`, `npi.py`, `profiles.py`, `presets.py`,
+  `parsing.py`.
 
 ---
 
