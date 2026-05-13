@@ -85,6 +85,23 @@ class SettingsHandler(ABC):
         """
         return "full"
 
+    @property
+    def is_critical_verify(self) -> bool:
+        """Whether post-apply verify mismatches must escalate to CRITICAL.
+
+        Handlers that touch system-wide state where a divergence between
+        the desired and observed value indicates a genuine apply failure
+        (Windows core, NVIDIA driver, power plan, network/registry, mouse,
+        graphics, process priority, the per-game config handlers) override
+        this to True. Detect-only and best-effort handlers leave the
+        default — their verify mismatches surface as WARNING, not CRITICAL.
+
+        ABSO's ComplianceEngine reads this property instead of carrying a
+        hardcoded class-name set so handler renames don't quietly downgrade
+        criticality.
+        """
+        return False
+
     def preflight(self, settings: dict[str, Any]) -> dict[str, Any]:
         """Validate prerequisites before apply side effects begin.
 

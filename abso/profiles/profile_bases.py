@@ -5,6 +5,10 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, Literal
 
 from abso.profiles.base import BaseProfile
+from abso.settings.registry import (
+    WIN32_PRIORITY_GAMING_OFFLINE,
+    WIN32_PRIORITY_GAMING_ONLINE,
+)
 
 if TYPE_CHECKING:
     from abso.settings.base import SettingsHandler
@@ -285,7 +289,7 @@ class Rivals2BaseProfile(BaseProfile):
                 "processor_max_performance": True,
             },
             "RegistrySettingsHandler": {
-                "win32_priority_separation": 0x2A,
+                "win32_priority_separation": WIN32_PRIORITY_GAMING_OFFLINE,
                 "game_priority": {
                     "gpu_priority": 8,
                     "priority": 6,
@@ -433,7 +437,7 @@ class EmulatorLatencyBaseProfile(BaseProfile):
                 "processor_max_performance": True,
             },
             "RegistrySettingsHandler": {
-                "win32_priority_separation": 0x2A,
+                "win32_priority_separation": WIN32_PRIORITY_GAMING_OFFLINE,
                 "game_priority": {
                     "gpu_priority": 8,
                     "priority": 6,
@@ -549,7 +553,7 @@ class WebGLBaseProfile(BaseProfile):
                 "processor_max_performance": True,
             },
             "RegistrySettingsHandler": {
-                "win32_priority_separation": 0x26,
+                "win32_priority_separation": WIN32_PRIORITY_GAMING_ONLINE,
                 "game_priority": {
                     "gpu_priority": 8,
                     "priority": 4,
@@ -685,7 +689,7 @@ class ReflexShooterBaseProfile(BaseProfile):
                 "processor_max_performance": True,
             },
             "RegistrySettingsHandler": {
-                "win32_priority_separation": 0x2A,
+                "win32_priority_separation": WIN32_PRIORITY_GAMING_OFFLINE,
                 "game_priority": {
                     "gpu_priority": 8,
                     "priority": 6,

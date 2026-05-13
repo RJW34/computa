@@ -240,6 +240,8 @@ class WindowsSettingsHandler(SettingsHandler):
     - Display refresh rate optimization
     """
 
+    is_critical_verify = True
+
     # Registry paths
     GAME_BAR_KEY = r"Software\Microsoft\GameBar"
     GAME_DVR_KEY = r"Software\Microsoft\Windows\CurrentVersion\GameDVR"

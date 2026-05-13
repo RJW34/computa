@@ -11,6 +11,8 @@ from abso.settings.ue_game_user_settings import UEGameUserSettingsHandler
 class FortniteConfigHandler(UEGameUserSettingsHandler):
     """Enforce Fortnite display settings from GameUserSettings.ini."""
 
+    is_critical_verify = True
+
     TARGET_SECTION_NAME = "/Script/FortniteGame.FortGameUserSettings"
     MUTABLE_SETTINGS_TO_INI = {
         "fullscreen_mode": "PreferredFullscreenMode",

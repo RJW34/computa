@@ -51,6 +51,8 @@ class Rivals2ConfigHandler(SettingsHandler):
     - Raw input for best input latency
     """
 
+    is_critical_verify = True
+
     TARGET_SECTION_NAME = "/Script/Engine.GameUserSettings"
 
     MUTABLE_SETTINGS_TO_INI: dict[str, str] = {

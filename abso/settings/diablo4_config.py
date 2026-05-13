@@ -30,6 +30,8 @@ def _get_diablo4_local_prefs_path() -> Path | None:
 class Diablo4ConfigHandler(SettingsHandler):
     """Enforce Diablo IV's native LocalPrefs.txt settings."""
 
+    is_critical_verify = True
+
     _KV_RE = re.compile(r'^\s*([A-Za-z0-9_]+)\s+"([^"]*)"\s*$')
 
     MUTABLE_SETTINGS_TO_PREFS: dict[str, str] = {

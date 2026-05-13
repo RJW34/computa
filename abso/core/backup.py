@@ -63,86 +63,15 @@ class BackupRestoreSummary:
 
 
 def _get_backup_handlers() -> list[SettingsHandler]:
-    """Lazily import and instantiate settings handlers for backup.
+    """Return the backup handler set from the central registry.
 
-    This avoids circular import issues between core and settings modules.
-    All handlers that are used for audit are also backed up to ensure
-    complete restore capability.
+    Profile-specific config handlers are tagged ``backup=True``,
+    ``audit=False`` in :mod:`abso.core.handler_registry` so settings
+    don't leak between profiles on restore.
     """
-    from abso.settings.ai_agents import AIAgentsSettingsHandler
-    from abso.settings.audio import AudioSettingsHandler
-    from abso.settings.cnm import CNMSettingsHandler
-    from abso.settings.color import ColorProfileSettingsHandler
-    from abso.settings.cpu_affinity import CpuAffinityHandler
-    from abso.settings.debloat import DebloatHandler
-    from abso.settings.diablo4_config import Diablo4ConfigHandler
-    from abso.settings.dolphin import DolphinConfigHandler
-    from abso.settings.display_range import DisplayColorRangeHandler
-    from abso.settings.fortnite_config import FortniteConfigHandler
-    from abso.settings.graphics import GraphicsSettingsHandler
-    from abso.settings.marvel_rivals_config import MarvelRivalsConfigHandler
-    from abso.settings.memory import MemorySettingsHandler
-    from abso.settings.mouse import MouseSettingsHandler
-    from abso.settings.network import NetworkSettingsHandler
-    from abso.settings.nvidia import NvidiaSettingsHandler
-    from abso.settings.nvidia_notifications import NvidiaNotificationHandler
-    from abso.settings.obs import OBSSettingsHandler
-    from abso.settings.ow2_config import OW2ConfigHandler
-    from abso.settings.power import PowerSettingsHandler
-    from abso.settings.process_priority import ProcessPriorityHandler
-    from abso.settings.registry import RegistrySettingsHandler
-    from abso.settings.rivals2_config import Rivals2ConfigHandler
-    from abso.settings.services import ServicesSettingsHandler
-    from abso.settings.standby_list import StandbyListHandler
-    from abso.settings.storage import StorageSettingsHandler
-    from abso.settings.tasks import TasksSettingsHandler
-    from abso.settings.timer import TimerSettingsHandler
-    from abso.settings.updates import UpdatesSettingsHandler
-    from abso.settings.visual import VisualSettingsHandler
-    from abso.settings.windows import WindowsSettingsHandler
-    from abso.settings.xbox_mode import XboxModeSettingsHandler
+    from abso.core.handler_registry import get_backup_handlers
 
-    return [
-        # Core handlers (always needed)
-        WindowsSettingsHandler(),
-        PowerSettingsHandler(),
-        RegistrySettingsHandler(),
-        NvidiaSettingsHandler(),
-        TimerSettingsHandler(),
-        # Additional handlers for complete backup coverage
-        MouseSettingsHandler(),
-        GraphicsSettingsHandler(),
-        ServicesSettingsHandler(),
-        TasksSettingsHandler(),
-        MemorySettingsHandler(),
-        NetworkSettingsHandler(),
-        VisualSettingsHandler(),
-        StorageSettingsHandler(),
-        AudioSettingsHandler(),
-        UpdatesSettingsHandler(),
-        # Profile-specific handlers (prevent settings leak between profiles)
-        Diablo4ConfigHandler(),
-        DolphinConfigHandler(),
-        FortniteConfigHandler(),
-        MarvelRivalsConfigHandler(),
-        OW2ConfigHandler(),
-        Rivals2ConfigHandler(),
-        NvidiaNotificationHandler(),
-        OBSSettingsHandler(),
-        ProcessPriorityHandler(),
-        CNMSettingsHandler(),
-        ColorProfileSettingsHandler(),
-        DisplayColorRangeHandler(),
-        CpuAffinityHandler(),
-        StandbyListHandler(),
-        DebloatHandler(),
-        # Detect-only — captures rollout state so backups have an audit
-        # trail of what Xbox Mode / AI Agents looked like at apply time.
-        # restore_guarantee == "none" so a skipped restore here is
-        # non-blocking.
-        XboxModeSettingsHandler(),
-        AIAgentsSettingsHandler(),
-    ]
+    return get_backup_handlers()
 
 
 class BackupManager:

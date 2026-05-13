@@ -11,6 +11,8 @@ from abso.settings.ue_game_user_settings import UEGameUserSettingsHandler
 class MarvelRivalsConfigHandler(UEGameUserSettingsHandler):
     """Enforce Marvel Rivals display settings from GameUserSettings.ini."""
 
+    is_critical_verify = True
+
     TARGET_SECTION_NAME = "/Script/Marvel.MarvelGameUserSettings"
     MUTABLE_SETTINGS_TO_INI = {
         "fullscreen_mode": "FullscreenMode",

@@ -14,62 +14,10 @@ logger = logging.getLogger(__name__)
 
 
 def _get_handlers() -> list[SettingsHandler]:
-    """Lazily import and instantiate settings handlers.
+    """Return the audit handler set from the central registry."""
+    from abso.core.handler_registry import get_audit_handlers
 
-    This avoids circular import issues between core and settings modules.
-    """
-    from abso.settings.ai_agents import AIAgentsSettingsHandler
-    from abso.settings.audio import AudioSettingsHandler
-    from abso.settings.diagnostics import DiagnosticsSettingsHandler
-    from abso.settings.display_range import DisplayColorRangeHandler
-    from abso.settings.graphics import GraphicsSettingsHandler
-    from abso.settings.memory import MemorySettingsHandler
-    from abso.settings.mouse import MouseSettingsHandler
-    from abso.settings.network import NetworkSettingsHandler
-    from abso.settings.nvidia import NvidiaSettingsHandler
-    from abso.settings.power import PowerSettingsHandler
-    from abso.settings.registry import RegistrySettingsHandler
-    from abso.settings.services import ServicesSettingsHandler
-    from abso.settings.storage import StorageSettingsHandler
-    from abso.settings.tasks import TasksSettingsHandler
-    from abso.settings.timer import TimerSettingsHandler
-    from abso.settings.updates import UpdatesSettingsHandler
-    from abso.settings.vbs_optin import VBSOptInHandler
-    from abso.settings.visual import VisualSettingsHandler
-    from abso.settings.windows import WindowsSettingsHandler
-    from abso.settings.xbox_mode import XboxModeSettingsHandler
-
-    return [
-        WindowsSettingsHandler(),
-        PowerSettingsHandler(),
-        RegistrySettingsHandler(),
-        NvidiaSettingsHandler(),
-        TimerSettingsHandler(),
-        MouseSettingsHandler(),
-        GraphicsSettingsHandler(),
-        ServicesSettingsHandler(),
-        TasksSettingsHandler(),
-        MemorySettingsHandler(),
-        NetworkSettingsHandler(),
-        VisualSettingsHandler(),
-        StorageSettingsHandler(),
-        AudioSettingsHandler(),
-        UpdatesSettingsHandler(),
-        # Flags PC monitors stuck on Limited RGB / TV range (classic
-        # "washed out after NVIDIA driver update" symptom).
-        DisplayColorRangeHandler(),
-        # Audit-only diagnostics — GPU prefs, overlays, update activity,
-        # driver freshness, XMP/EXPO, Resizable BAR, DirectStorage,
-        # multi-monitor refresh mix.
-        DiagnosticsSettingsHandler(),
-        # Opt-in VBS/HVCI/VMP status surfacing. Never mutates state unless
-        # called with explicit acknowledgement.
-        VBSOptInHandler(),
-        # 25H2 26200.8457+ feature-flag rollouts. Detect-only until the
-        # registry surface stabilizes; safe to audit on every system.
-        XboxModeSettingsHandler(),
-        AIAgentsSettingsHandler(),
-    ]
+    return get_audit_handlers()
 
 
 class ConfigurationAuditor:

@@ -22,6 +22,8 @@ class PowerSettingsHandler(SettingsHandler):
     - Power-related subgroup settings
     """
 
+    is_critical_verify = True
+
     # Known power plan GUIDs
     BALANCED_GUID = "381b4222-f694-41f0-9685-ff5bb260df2e"
     HIGH_PERFORMANCE_GUID = "8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c"

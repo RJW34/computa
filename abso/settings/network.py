@@ -25,6 +25,9 @@ class NetworkSettingsHandler(SettingsHandler):
     - RSS (Receive Side Scaling)
     - Network adapter settings (via netsh)
 
+    A verify-mismatch here means a netsh / registry write didn't stick;
+    that's actionable and must surface as CRITICAL.
+
     Scope: these are **opt-in** tweaks. Built-in profiles default to
     ``preset: "default"`` and do not mutate global TCP state. Most
     competitive gameplay traffic is UDP, where Nagle and TCP autotuning
@@ -45,6 +48,8 @@ class NetworkSettingsHandler(SettingsHandler):
     - **RSS**: Distributes network processing across CPU cores. Generally
       beneficial and ABSO leaves it enabled.
     """
+
+    is_critical_verify = True
 
     TCPIP_PARAMS_KEY = r"SYSTEM\CurrentControlSet\Services\Tcpip\Parameters"
     INTERFACES_KEY = r"SYSTEM\CurrentControlSet\Services\Tcpip\Parameters\Interfaces"

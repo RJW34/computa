@@ -39,6 +39,7 @@ from __future__ import annotations
 from typing import Any, Literal
 
 from abso.profiles.profile_bases import Rivals2BaseProfile
+from abso.settings.registry import WIN32_PRIORITY_GAMING_ONLINE
 
 
 
@@ -101,11 +102,12 @@ class Rivals2OnlineProfile(Rivals2BaseProfile):
                 "max_refresh_rate": True,  # Set display to max refresh rate for current resolution
             },
             "RegistrySettingsHandler": {
-                # Downgrade from the aggressive 0x2A (+2 foreground boost) to
-                # 0x26 (+1 boost). Rollback netcode needs deterministic timing
-                # more than it needs maximum foreground favoritism; starving
-                # background kernel work risks stalls that break resync windows.
-                "win32_priority_separation": 0x26,
+                # Downgrade from the aggressive WIN32_PRIORITY_GAMING_OFFLINE
+                # (+2 foreground boost) to WIN32_PRIORITY_GAMING_ONLINE (+1
+                # boost). Rollback netcode needs deterministic timing more than
+                # it needs maximum foreground favoritism; starving background
+                # kernel work risks stalls that break resync windows.
+                "win32_priority_separation": WIN32_PRIORITY_GAMING_ONLINE,
             },
             "NvidiaSettingsHandler": {
                 # ONLINE profile: Conservative settings for rollback stability

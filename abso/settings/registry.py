@@ -19,6 +19,30 @@ from abso.utils.validation import (
 logger = logging.getLogger(__name__)
 
 
+# ---------------------------------------------------------------------------
+# Win32PrioritySeparation named constants (module-level for import-by-name).
+#
+# The PriorityControl\Win32PrioritySeparation DWORD is a 6-bit packed value:
+#   Bits 5-4: Quantum length (0/1=default, 2=short, 3=long)
+#   Bits 3-2: Quantum type   (0/1=default, 2=fixed, 3=variable)
+#   Bits 1-0: Foreground boost (0=none, 1=min, 2=max)
+# Reference: Windows Internals (Russinovich), "Master Your Quantum" (MSDN archive)
+# ---------------------------------------------------------------------------
+
+#: Windows desktop default — short, variable, max foreground boost.
+WIN32_PRIORITY_DESKTOP_DEFAULT = 0x26
+
+#: Online-safe gaming quantum — short variable quantum, +1 foreground boost.
+#: Used by rollback-netcode profiles where deterministic timing matters more
+#: than the extra foreground boost.
+WIN32_PRIORITY_GAMING_ONLINE = 0x26
+
+#: Aggressive gaming quantum — short FIXED quantum, max foreground boost.
+#: Best single-player / offline latency; ABSO's stability gate may downgrade
+#: this to ``WIN32_PRIORITY_GAMING_ONLINE`` for rollback profiles.
+WIN32_PRIORITY_GAMING_OFFLINE = 0x2A
+
+
 class RegistrySettingsHandler(SettingsHandler):
     """Handles registry-based gaming optimizations.
 
@@ -29,28 +53,17 @@ class RegistrySettingsHandler(SettingsHandler):
     - Windows scheduler (Win32PrioritySeparation)
     """
 
+    is_critical_verify = True
+
     # Registry paths
     MULTIMEDIA_KEY = r"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Multimedia\SystemProfile"
     GAMES_TASK_KEY = r"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Multimedia\SystemProfile\Tasks\Games"
     APPCOMPAT_KEY = r"Software\Microsoft\Windows NT\CurrentVersion\AppCompatFlags\Layers"
     PRIORITY_CONTROL_KEY = r"SYSTEM\CurrentControlSet\Control\PriorityControl"
 
-    # Win32PrioritySeparation values
-    # Format: 0xAABBCC where (6-bit value):
-    #   Bits 5-4 (AA): Quantum length (0/1=default, 2=short, 3=long)
-    #   Bits 3-2 (BB): Quantum type (0/1=default, 2=fixed, 3=variable)
-    #   Bits 1-0 (CC): Foreground boost (0=none, 1=minimum, 2=maximum)
-    # Ref: Windows Internals (Russinovich), "Master Your Quantum" (MSDN archive)
-    #
-    # Common values:
-    # 0x26 (38) = Short, variable, max boost (Windows desktop default)
-    # 0x28 (40) = Short, variable, no boost
-    # 0x2A (42) = Short, fixed, max boost (recommended for gaming)
-    #
-    # Short fixed quantum with max foreground boost gives games more responsive
-    # CPU scheduling while prioritizing the active window.
-    WIN32_PRIORITY_DEFAULT = 0x26  # Windows default for desktop
-    WIN32_PRIORITY_GAMING = 0x2A   # Short fixed quantum, max foreground boost
+    # Legacy class-level aliases retained so existing imports keep working.
+    WIN32_PRIORITY_DEFAULT = WIN32_PRIORITY_DESKTOP_DEFAULT
+    WIN32_PRIORITY_GAMING = WIN32_PRIORITY_GAMING_OFFLINE
 
     def detect(self) -> dict[str, Any]:
         """Detect current registry gaming settings."""

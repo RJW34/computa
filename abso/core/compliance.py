@@ -6,11 +6,14 @@ criticality for commit/rollback decisions.
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
 
 from abso.core.applier import ApplyResult
+
+logger = logging.getLogger(__name__)
 
 
 class ComplianceSeverity(Enum):
@@ -75,24 +78,50 @@ class ComplianceReport:
 
 
 class ComplianceEngine:
-    """Evaluates post-apply compliance and criticality."""
+    """Evaluates post-apply compliance and criticality.
 
-    # Handlers where verify mismatches are treated as critical by default.
-    CRITICAL_VERIFY_HANDLERS: set[str] = {
-        "WindowsSettingsHandler",
-        "NvidiaSettingsHandler",
-        "PowerSettingsHandler",
-        "RegistrySettingsHandler",
-        "NetworkSettingsHandler",
-        "MouseSettingsHandler",
-        "ProcessPriorityHandler",
-        "GraphicsSettingsHandler",
-        "OW2ConfigHandler",
-        "Rivals2ConfigHandler",
-        "FortniteConfigHandler",
-        "MarvelRivalsConfigHandler",
-        "Diablo4ConfigHandler",
-    }
+    Criticality of a post-apply verify mismatch is derived from
+    ``SettingsHandler.is_critical_verify`` instead of a hardcoded
+    class-name set, so handler renames cannot silently downgrade
+    severity. The resolved set is cached per process.
+    """
+
+    _critical_handler_names: set[str] | None = None
+
+    @classmethod
+    def _resolve_critical_handler_names(cls) -> set[str]:
+        """Build the critical-verify class-name set lazily from the handler factory."""
+        if cls._critical_handler_names is not None:
+            return cls._critical_handler_names
+
+        names: set[str] = set()
+        try:
+            from abso.core.backup import _get_backup_handlers
+
+            for handler in _get_backup_handlers():
+                try:
+                    if getattr(handler, "is_critical_verify", False):
+                        names.add(handler.__class__.__name__)
+                except Exception as exc:  # noqa: BLE001 — never let one handler poison the set
+                    logger.debug(
+                        "Skipping handler %s while resolving critical-verify set: %s",
+                        handler.__class__.__name__,
+                        exc,
+                    )
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(
+                "Failed to resolve critical-verify handler set; falling back to "
+                "ConfigHandler suffix heuristic: %s",
+                exc,
+            )
+
+        cls._critical_handler_names = names
+        return names
+
+    @classmethod
+    def invalidate_critical_handler_cache(cls) -> None:
+        """Drop the cached set so the next call re-derives it (tests only)."""
+        cls._critical_handler_names = None
 
     def evaluate(
         self,
@@ -127,6 +156,7 @@ class ComplianceEngine:
             )
 
         if verify_result:
+            critical_names = self._resolve_critical_handler_names()
             handlers = verify_result.get("handlers", {})
             for handler_name, handler_data in handlers.items():
                 if not isinstance(handler_data, dict):
@@ -138,7 +168,7 @@ class ComplianceEngine:
 
                 severity = ComplianceSeverity.WARNING
                 if (
-                    handler_name in self.CRITICAL_VERIFY_HANDLERS
+                    handler_name in critical_names
                     or handler_name.endswith("ConfigHandler")
                 ):
                     severity = ComplianceSeverity.CRITICAL

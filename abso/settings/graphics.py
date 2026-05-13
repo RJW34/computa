@@ -37,6 +37,8 @@ class GraphicsSettingsHandler(SettingsHandler):
     - Switching between profiles that share the same MPO setting won't require a reboot
     """
 
+    is_critical_verify = True
+
     # Registry paths
     DWM_KEY = r"SOFTWARE\Microsoft\Windows\Dwm"
     # MPO disable: Windows 11 24H2+ requires DisableOverlays under GraphicsDrivers.

@@ -427,14 +427,19 @@ class ProfileLinter:
             ))
 
         # Check 2: Aggressive quantum settings for online play
+        from abso.settings.registry import WIN32_PRIORITY_GAMING_OFFLINE
+
         win32_priority = registry_settings.get("win32_priority_separation", 0)
-        if win32_priority == 0x2A and profile.optimization_target == "stable_online":
+        if (
+            win32_priority == WIN32_PRIORITY_GAMING_OFFLINE
+            and profile.optimization_target == "stable_online"
+        ):
             result.add_issue(LintIssue(
                 code="REGISTRY_QUANTUM_ONLINE",
                 severity=LintSeverity.INFO,
-                message="Fixed quantum (0x2A) used for online profile",
+                message=f"Fixed quantum (0x{WIN32_PRIORITY_GAMING_OFFLINE:02X}) used for online profile",
                 details=(
-                    "Win32PrioritySeparation=0x2A uses fixed short quantum. "
+                    "Win32PrioritySeparation uses fixed short quantum. "
                     "This is optimal for latency but may reduce timing flexibility "
                     "for rollback netcode. Monitor for issues."
                 ),

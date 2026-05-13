@@ -33,6 +33,9 @@ class ProcessPriorityHandler(SettingsHandler):
     - IoPriority: 0=Very Low, 1=Low, 2=Normal, 3=High
     - PagePriority: 0-5 (memory page priority)
 
+    Mark this handler as critical-verify because IFEO mismatches mean the
+    game launched with the wrong priority — a direct latency regression.
+
     Tradeoffs to be aware of:
 
     - "Realtime" (4) can starve the OS, audio, and anti-cheat; ABSO never writes it.
@@ -48,6 +51,8 @@ class ProcessPriorityHandler(SettingsHandler):
     (High). Users who hit stability, audio, or capture problems can drop to 2
     (Normal) via profile overrides without losing the rest of the profile.
     """
+
+    is_critical_verify = True
 
     IFEO_KEY = r"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Image File Execution Options"
 

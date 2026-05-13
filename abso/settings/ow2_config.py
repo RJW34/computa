@@ -56,6 +56,8 @@ class OW2ConfigHandler(SettingsHandler):
     ``%USERPROFILE%\\Documents\\Overwatch\\Settings\\Settings_v0.ini``.
     """
 
+    is_critical_verify = True
+
     # Matches versioned render section headers like [Render.13]
     RENDER_SECTION_RE = re.compile(r"^\[Render\.\d+\]$")
 

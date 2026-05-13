@@ -28,6 +28,8 @@ class MouseSettingsHandler(SettingsHandler):
       - Default Windows curve applies acceleration
     """
 
+    is_critical_verify = True
+
     # Registry paths
     MOUSE_KEY = r"Control Panel\Mouse"
 

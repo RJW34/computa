@@ -10,6 +10,15 @@ from ctypes import wintypes
 from dataclasses import dataclass
 from typing import Any
 
+from abso.data.hardware_db import (
+    GENERIC_SMBIOS_PLACEHOLDERS,
+    GSYNC_NATIVE_PATTERNS,
+    GSYNC_ULTIMATE_PATTERNS,
+    MOTHERBOARD_MODEL_PATTERNS,
+    OEM_MANUFACTURERS,
+    OEM_MOTHERBOARD_LOOKUP,
+    SMBIOS_CHASSIS_TYPES,
+)
 from abso.utils.os_release import detect_os_release
 
 logger = logging.getLogger(__name__)
@@ -564,7 +573,8 @@ def _is_known_gsync_monitor(monitor_name: str) -> tuple[bool, str | None]:
     """Check if monitor name matches known G-Sync monitor patterns.
 
     DEPRECATED: This hardcoded list is a last-resort fallback. Prefer EDID
-    parsing and NVIDIA registry/DRS detection for VRR discovery.
+    parsing and NVIDIA registry/DRS detection for VRR discovery. The
+    pattern tables live in :mod:`abso.data.hardware_db`.
 
     Args:
         monitor_name: The monitor name/model string.
@@ -575,25 +585,11 @@ def _is_known_gsync_monitor(monitor_name: str) -> tuple[bool, str | None]:
     """
     name_upper = monitor_name.upper()
 
-    # Known G-Sync Ultimate monitors (native module)
-    gsync_ultimate_patterns = [
-        "PG27UQ", "PG65UQ", "X27", "X35",  # ASUS ROG Swift
-        "27GN950", "38GN950",  # LG UltraGear
-        "AW5520QF", "AW2721D",  # Alienware
-    ]
-
-    # Known G-Sync (native module) monitors
-    gsync_native_patterns = [
-        "PG279Q", "PG278Q", "PG248Q", "PG258Q",  # ASUS ROG Swift
-        "XB271HU", "XB270HU", "XB280HK",  # Acer Predator
-        "27GK750F",  # LG
-    ]
-
-    for pattern in gsync_ultimate_patterns:
+    for pattern in GSYNC_ULTIMATE_PATTERNS:
         if pattern in name_upper:
             return True, "gsync_ultimate"
 
-    for pattern in gsync_native_patterns:
+    for pattern in GSYNC_NATIVE_PATTERNS:
         if pattern in name_upper:
             return True, "gsync_native"
 
@@ -734,71 +730,8 @@ class HardwareDetector:
             "prebuilt_name": None,  # Friendly name if identified
         }
 
-        # Known OEM manufacturers (pre-built systems)
-        oem_manufacturers = {
-            "dell", "dell inc.", "dell inc",
-            "hp", "hewlett-packard", "hewlett packard",
-            "lenovo",
-            "acer", "acer inc.",
-            "asus", "asustek computer inc.", "asustek",
-            "msi", "micro-star international",
-            "alienware",
-            "razer", "razer inc.",
-            "samsung", "samsung electronics",
-            "lg", "lg electronics",
-            "microsoft", "microsoft corporation",
-            "apple", "apple inc.",
-            "intel", "intel corporation",
-            "nzxt",
-            "corsair",
-            "ibuypower", "ibuypower inc",
-            "cyberpower", "cyberpowerpc",
-            "origin pc", "origin",
-            "maingear",
-            "digital storm",
-            "falcon northwest",
-        }
-
-        # Chassis type mapping (from SMBIOS spec)
-        chassis_types = {
-            1: "Other",
-            2: "Unknown",
-            3: "Desktop",
-            4: "Low Profile Desktop",
-            5: "Pizza Box",
-            6: "Mini Tower",
-            7: "Tower",
-            8: "Portable",
-            9: "Laptop",
-            10: "Notebook",
-            11: "Hand Held",
-            12: "Docking Station",
-            13: "All in One",
-            14: "Sub Notebook",
-            15: "Space-saving",
-            16: "Lunch Box",
-            17: "Main Server Chassis",
-            18: "Expansion Chassis",
-            19: "SubChassis",
-            20: "Bus Expansion Chassis",
-            21: "Peripheral Chassis",
-            22: "RAID Chassis",
-            23: "Rack Mount Chassis",
-            24: "Sealed-case PC",
-            25: "Multi-system chassis",
-            26: "Compact PCI",
-            27: "Advanced TCA",
-            28: "Blade",
-            29: "Blade Enclosure",
-            30: "Tablet",
-            31: "Convertible",
-            32: "Detachable",
-            33: "IoT Gateway",
-            34: "Embedded PC",
-            35: "Mini PC",
-            36: "Stick PC",
-        }
-
+        # OEM / chassis / motherboard reference tables live in
+        # abso.data.hardware_db so this method stays focused on flow.
         try:
             # Query Win32_ComputerSystem for main system info
             for system in wmi_conn.Win32_ComputerSystem():
@@ -851,7 +784,9 @@ class HardwareDetector:
                 if enclosure.ChassisTypes:
                     # ChassisTypes is an array, take the first value
                     chassis_code = enclosure.ChassisTypes[0]
-                    result["chassis_type"] = chassis_types.get(chassis_code, f"Unknown ({chassis_code})")
+                    result["chassis_type"] = SMBIOS_CHASSIS_TYPES.get(
+                        chassis_code, f"Unknown ({chassis_code})"
+                    )
                 break
 
         except AttributeError as e:
@@ -859,47 +794,12 @@ class HardwareDetector:
         except RuntimeError as e:
             logger.error(f"Win32_SystemEnclosure query failed: {e}")
 
-        # Known OEM motherboard models that map to specific pre-built systems
-        # Format: (motherboard_pattern, manufacturer, prebuilt_name)
-        # Patterns are matched case-insensitively against motherboard_model
-        oem_motherboard_lookup = [
-            # MSI Aegis series
-            ("pro b760-vc wifi 7 bulk", "MSI", "MSI Aegis R2 14th"),
-            ("pro b760-vc wifi bulk", "MSI", "MSI Aegis R2"),
-            ("pro b760m-vc wifi bulk", "MSI", "MSI Aegis R2 (Micro-ATX)"),
-            ("pro b660-vc wifi bulk", "MSI", "MSI Aegis R"),
-            ("pro z790-vc wifi bulk", "MSI", "MSI Aegis RS 14th"),
-            ("pro z690-vc wifi bulk", "MSI", "MSI Aegis RS"),
-            # MSI Trident series
-            ("pro b760-vc wifi 7 trident", "MSI", "MSI Trident"),
-            # MSI Infinite series
-            ("pro b760 infinite", "MSI", "MSI Infinite"),
-            # Dell (often use internal codenames)
-            ("0crh6c", "Dell", "Dell Desktop"),
-            ("optiplex", "Dell", "Dell OptiPlex"),
-            ("xps", "Dell", "Dell XPS"),
-            ("alienware", "Dell", "Alienware"),
-            # HP
-            ("omen", "HP", "HP OMEN"),
-            ("pavilion", "HP", "HP Pavilion"),
-            ("envy", "HP", "HP ENVY"),
-            # Lenovo
-            ("legion", "Lenovo", "Lenovo Legion"),
-            ("ideacentre", "Lenovo", "Lenovo IdeaCentre"),
-            ("thinkcentre", "Lenovo", "Lenovo ThinkCentre"),
-            # ASUS ROG pre-builts
-            ("rog strix ga", "ASUS", "ASUS ROG Strix GA"),
-            ("rog strix gt", "ASUS", "ASUS ROG Strix GT"),
-            # Generic OEM indicator - any "BULK" suffix motherboard
-            ("bulk", None, None),  # Generic OEM, no specific name
-        ]
-
         # Check motherboard against known OEM lookup table
         mobo_model_lower = (result["motherboard_model"] or "").lower()
         prebuilt_from_mobo = None
         prebuilt_name_from_mobo = None
 
-        for pattern, mfr, name in oem_motherboard_lookup:
+        for pattern, mfr, name in OEM_MOTHERBOARD_LOOKUP:
             if pattern in mobo_model_lower:
                 prebuilt_from_mobo = mfr or result["manufacturer"]
                 prebuilt_name_from_mobo = name
@@ -922,32 +822,11 @@ class HardwareDetector:
         system_sku_lower = (result["system_sku"] or "").lower()
 
         # Check against known OEM list
-        is_known_oem = any(oem in manufacturer_lower for oem in oem_manufacturers)
+        is_known_oem = any(oem in manufacturer_lower for oem in OEM_MANUFACTURERS)
 
-        # Check for generic/custom build indicators in model
-        generic_indicators = [
-            "to be filled",
-            "default string",
-            "system manufacturer",
-            "system product name",
-            "not applicable",
-            "n/a",
-            "oem",
-            "o.e.m.",
-        ]
-        has_generic_model = any(ind in model_lower for ind in generic_indicators)
-        has_generic_family = any(ind in system_family_lower for ind in generic_indicators)
-        has_generic_sku = any(ind in system_sku_lower for ind in generic_indicators)
-
-        # Motherboard model patterns (indicates custom build, not pre-built)
-        # These are internal motherboard codes, not consumer product names
-        motherboard_model_patterns = [
-            "ms-",  # MSI motherboard codes (MS-7D98, etc.)
-            "rog ", "rog-", "prime ", "tuf ", "proart ",  # ASUS lines
-            "meg ", "mpg ", "mag ", "pro ",  # MSI lines
-            "aorus", "gaming x", "eagle",  # Gigabyte lines
-            "-cf", "-f", "-e", "-a", "-i", "-p",  # Common motherboard suffixes
-        ]
+        has_generic_model = any(ind in model_lower for ind in GENERIC_SMBIOS_PLACEHOLDERS)
+        has_generic_family = any(ind in system_family_lower for ind in GENERIC_SMBIOS_PLACEHOLDERS)
+        has_generic_sku = any(ind in system_sku_lower for ind in GENERIC_SMBIOS_PLACEHOLDERS)
 
         # Check if the system model looks like a motherboard model
         model_is_motherboard = (
@@ -955,7 +834,7 @@ class HardwareDetector:
             (mobo_model_lower and model_lower and
              (model_lower in mobo_model_lower or mobo_model_lower in model_lower)) or
             # Model matches motherboard patterns
-            any(pattern in model_lower for pattern in motherboard_model_patterns)
+            any(pattern in model_lower for pattern in MOTHERBOARD_MODEL_PATTERNS)
         )
 
         # It's a pre-built if:

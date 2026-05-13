@@ -11,6 +11,11 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import TYPE_CHECKING, Any
 
+from abso.settings.registry import (
+    WIN32_PRIORITY_GAMING_OFFLINE,
+    WIN32_PRIORITY_GAMING_ONLINE,
+)
+
 if TYPE_CHECKING:
     from abso.core.fallback_controller import FallbackController
     from abso.core.linter import LintResult
@@ -106,8 +111,8 @@ class StabilityGate:
         GatedSetting(
             handler="RegistrySettingsHandler",
             setting="win32_priority_separation",
-            aggressive_value=0x2A,
-            safe_value=0x26,
+            aggressive_value=WIN32_PRIORITY_GAMING_OFFLINE,
+            safe_value=WIN32_PRIORITY_GAMING_ONLINE,
             description="Fixed short quantum with max foreground boost",
             allowed_targets={"minimum_latency", "minimum_latency_offline", "low_latency_high_fps", "stable_online"},
         ),

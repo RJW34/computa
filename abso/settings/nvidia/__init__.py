@@ -74,6 +74,8 @@ class NvidiaSettingsHandler(SettingsHandler):
     Download from: https://github.com/Orbmu2k/nvidiaProfileInspector
     """
 
+    is_critical_verify = True
+
     # Backup directory for exported profiles
     BACKUP_DIR: Path = Path(tempfile.gettempdir()) / "abso_nvidia_backups"
 

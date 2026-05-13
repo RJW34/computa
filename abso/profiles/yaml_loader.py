@@ -22,6 +22,7 @@ from abso.profiles.profile_bases import (
     WebGLBaseProfile,
     merge_settings_map,
 )
+from abso.settings.registry import WIN32_PRIORITY_GAMING_ONLINE
 
 if TYPE_CHECKING:
     from abso.settings.base import SettingsHandler
@@ -119,7 +120,7 @@ class BalancedBaseProfile(BaseProfile):
                 "processor_max_performance": True,
             },
             "RegistrySettingsHandler": {
-                "win32_priority_separation": 0x26,
+                "win32_priority_separation": WIN32_PRIORITY_GAMING_ONLINE,
                 "game_priority": {
                     "gpu_priority": 8,
                     "priority": 6,

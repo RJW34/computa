@@ -19,7 +19,9 @@ from dataclasses import dataclass, field
 from datetime import date
 from typing import Literal
 
+from abso.core.exceptions import RegistryReadError
 from abso.core.models import EvidenceTier
+from abso.utils.registry import read_registry_dword, read_registry_value
 
 logger = logging.getLogger(__name__)
 
@@ -192,18 +194,15 @@ class BiosDetector:
     ) -> int | None:
         """Read a DWORD value from the registry.
 
-        Returns None if the key/value does not exist or cannot be read.
+        Thin wrapper over :func:`abso.utils.registry.read_registry_dword`
+        that demotes permission/OS errors to ``None`` so best-effort BIOS
+        detection never throws upward. Missing keys/values also return
+        ``None`` via the default.
         """
         try:
-            with winreg.OpenKey(hive, subkey, 0, winreg.KEY_READ) as key:
-                data, reg_type = winreg.QueryValueEx(key, value_name)
-                if reg_type == winreg.REG_DWORD:
-                    return data
-                return None
-        except FileNotFoundError:
-            return None
-        except OSError as e:
-            logger.debug("Registry read failed for %s\\%s: %s", subkey, value_name, e)
+            return read_registry_dword(hive, subkey, value_name, default=None)
+        except RegistryReadError as exc:
+            logger.debug("Registry DWORD read failed for %s\\%s: %s", subkey, value_name, exc)
             return None
 
     @staticmethod
@@ -212,15 +211,11 @@ class BiosDetector:
         subkey: str,
         value_name: str,
     ) -> object | None:
-        """Read any registry value. Returns the data or None on failure."""
+        """Read any registry value (returns ``None`` on failure or absence)."""
         try:
-            with winreg.OpenKey(hive, subkey, 0, winreg.KEY_READ) as key:
-                data, _ = winreg.QueryValueEx(key, value_name)
-                return data
-        except FileNotFoundError:
-            return None
-        except OSError as e:
-            logger.debug("Registry read failed for %s\\%s: %s", subkey, value_name, e)
+            return read_registry_value(hive, subkey, value_name, default=None)
+        except RegistryReadError as exc:
+            logger.debug("Registry read failed for %s\\%s: %s", subkey, value_name, exc)
             return None
 
     # ------------------------------------------------------------------
