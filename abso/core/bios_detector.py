@@ -679,7 +679,7 @@ class BiosDetector:
                 "the change. Without it, signed boot components may stop "
                 "loading once the 2011 certs expire."
             )
-            current_value = "Updated — reboot pending"
+            current_value = "Updated - reboot pending"
             recommended = "Reboot to finalize cert installation"
         else:
             title = "Pending Secure Boot certificate rollout"

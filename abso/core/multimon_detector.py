@@ -321,7 +321,7 @@ class MultiMonitorDetector:
                 triggers.append("VRR/G-Sync active")
             if env.has_mixed_refresh:
                 triggers.append(
-                    f"mixed refresh ({env.min_refresh:.0f}Hz\u2013{env.max_refresh:.0f}Hz)"
+                    f"mixed refresh ({env.min_refresh:.0f}Hz - {env.max_refresh:.0f}Hz)"
                 )
             result.warnings.append(MultiMonitorWarning(
                 code="MULTIMON_MPO_GLITCH_RISK",
