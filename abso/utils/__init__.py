@@ -1,6 +1,7 @@
 """Utility modules."""
 
 from abso.utils.admin import ensure_admin, is_admin
+from abso.utils.os_release import OsRelease, detect_os_release, invalidate_cache
 from abso.utils.registry import (
     delete_registry_value,
     key_exists,
@@ -23,6 +24,10 @@ __all__ = [
     # Admin utilities
     "is_admin",
     "ensure_admin",
+    # OS release introspection
+    "OsRelease",
+    "detect_os_release",
+    "invalidate_cache",
     # Registry utilities
     "read_registry_value",
     "write_registry_value",

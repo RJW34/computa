@@ -355,6 +355,53 @@ class BaseProfile(ABC):
         return bool(self.display_path_requirements.require_overlay_free_path)
 
     @property
+    def min_os_build(self) -> tuple[int, int] | None:
+        """Minimum (build, ubr) required to apply this profile.
+
+        Return ``None`` (default) if the profile does not require a
+        specific Windows build. When set, the capability engine blocks
+        apply on older builds with the ``OS_BUILD_BELOW_FLOOR`` finding.
+        """
+        return None
+
+    @property
+    def validated_os_build(self) -> tuple[int, int] | None:
+        """Last (build, ubr) where this profile was end-to-end validated.
+
+        Set this when bumping a profile that targets surfaces known to
+        shift across Patch Tuesdays (HDR, HAGS, Xbox Mode, etc.). The
+        capability engine surfaces an info finding when the user is on a
+        newer build than the recorded validation point.
+        """
+        return None
+
+    @property
+    def xbox_mode(self) -> Literal["off", "on", "leave"]:
+        """Desired Xbox Mode state for this profile.
+
+        Xbox Mode (Win11 25H2 26200.8457+) replaces Game Mode + Full Screen
+        Experience. Latency, Reflex, and capture workflows generally want
+        it off; productivity / casual profiles can ``leave`` it alone.
+
+        Default: ``"leave"`` — the apply path is wired in Phase 3 and only
+        actuates when the profile explicitly overrides this.
+        """
+        return "leave"
+
+    @property
+    def ai_agents(self) -> Literal["off", "on", "leave"]:
+        """Desired Agents-on-the-Taskbar state for this profile.
+
+        AI agents (Researcher etc.) run background work that can cost a
+        latency-sensitive session frame-time stability. Reflex paths,
+        emulators, and capture lanes set this to ``"off"``.
+
+        Default: ``"leave"`` — Phase 3 wires the apply path; until then
+        the value is purely informational.
+        """
+        return "leave"
+
+    @property
     def application_scope(self) -> Literal["system_only", "system_plus_native_config"]:
         """Describe how much of the profile ABSO can enforce directly.
 

@@ -1,12 +1,17 @@
 """Tests for KB checker module."""
 
+from datetime import datetime, timedelta, timezone
 from unittest.mock import MagicMock, patch
 
 from abso.core.kb_checker import (
     KNOWN_BAD_KBS,
+    LAST_REVIEWED_UTC,
+    STALENESS_DAYS,
     ProblematicKB,
     check_problematic_kbs,
     get_installed_kbs,
+    is_review_stale,
+    list_review_staleness,
     uninstall_kb,
 )
 
@@ -101,9 +106,50 @@ class TestProblematicKB:
         assert len(KNOWN_BAD_KBS) > 0
 
     def test_kb_fields(self):
-        kb = KNOWN_BAD_KBS[0]
-        assert kb.kb_id.startswith("KB")
-        assert kb.title
-        assert kb.severity in ("critical", "warning")
-        assert kb.affected
-        assert kb.fix_action == "uninstall"
+        for kb in KNOWN_BAD_KBS:
+            assert kb.kb_id.startswith("KB")
+            assert kb.title
+            assert kb.severity in ("critical", "warning")
+            assert kb.affected
+            assert kb.fix_action in ("uninstall", "install_kb", "advisory")
+
+    def test_bitlocker_pcr7_entry_present(self):
+        ids = {kb.kb_id for kb in KNOWN_BAD_KBS}
+        assert "KB5083769" in ids
+
+    def test_supersession_filters_patched_machines(self):
+        """KB5083769 must not flag if KB5089549 is also installed."""
+        result = check_problematic_kbs(["KB5083769", "KB5089549"])
+        assert all(kb.kb_id != "KB5083769" for kb in result)
+
+    def test_supersession_filters_via_build_floor(self):
+        """KB5083769 must not flag if the OS is already at or beyond the fix build."""
+        result = check_problematic_kbs(
+            ["KB5083769"],
+            build_revision=(26200, 8457),
+        )
+        assert all(kb.kb_id != "KB5083769" for kb in result)
+
+    def test_pre_fix_build_still_flags_regression(self):
+        """Older build without supersession KB must still surface the warning."""
+        result = check_problematic_kbs(
+            ["KB5083769"],
+            build_revision=(26200, 8246),
+        )
+        assert any(kb.kb_id == "KB5083769" for kb in result)
+
+
+class TestReviewStaleness:
+    """Tests for the LAST_REVIEWED_UTC freshness heuristic."""
+
+    def test_fresh_review_is_not_stale(self):
+        assert is_review_stale(LAST_REVIEWED_UTC + timedelta(days=1)) is False
+
+    def test_review_becomes_stale_past_window(self):
+        far_future = LAST_REVIEWED_UTC + timedelta(days=STALENESS_DAYS + 5)
+        assert is_review_stale(far_future) is True
+
+    def test_naive_datetime_treated_as_utc(self):
+        naive = (LAST_REVIEWED_UTC + timedelta(days=10)).replace(tzinfo=None)
+        # Should not raise; should still compute a non-negative day count.
+        assert list_review_staleness(naive) >= 0

@@ -10,6 +10,8 @@ from ctypes import wintypes
 from dataclasses import dataclass
 from typing import Any
 
+from abso.utils.os_release import detect_os_release
+
 logger = logging.getLogger(__name__)
 
 
@@ -1518,28 +1520,16 @@ class HardwareDetector:
             Windows version dict or None if detection fails.
         """
         try:
-            import winreg
-
-            key = winreg.OpenKey(
-                winreg.HKEY_LOCAL_MACHINE,
-                r"SOFTWARE\Microsoft\Windows NT\CurrentVersion",
-            )
-
-            try:
-                display_version = winreg.QueryValueEx(key, "DisplayVersion")[0]
-            except FileNotFoundError:
-                display_version = "Unknown"
-
-            try:
-                build = winreg.QueryValueEx(key, "CurrentBuildNumber")[0]
-            except FileNotFoundError:
-                build = "Unknown"
-
-            winreg.CloseKey(key)
-
+            release = detect_os_release(cached=False)
+            if release.build == 0:
+                return None
             return {
-                "display_version": display_version,
-                "build": build,
+                "display_version": release.display_version or "Unknown",
+                "build": str(release.build) if release.build else "Unknown",
+                "ubr": release.ubr,
+                "build_revision": f"{release.build}.{release.ubr}",
+                "edition_id": release.edition_id or None,
+                "installation_type": release.installation_type or None,
             }
         except OSError as e:
             logger.error(f"Windows version detection failed (registry error): {e}")

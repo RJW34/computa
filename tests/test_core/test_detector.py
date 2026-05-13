@@ -232,32 +232,41 @@ class TestDetectMonitors:
 class TestDetectWindowsVersion:
     """Tests for Windows version detection."""
 
-    @patch("abso.core.detector.winreg.OpenKey")
-    @patch("abso.core.detector.winreg.QueryValueEx")
-    @patch("abso.core.detector.winreg.CloseKey")
-    def test_detect_windows_version_success(
-        self, mock_close, mock_query, mock_open
-    ):
-        """Test Windows version detection success."""
-        mock_query.side_effect = [
-            ("23H2", 1),  # DisplayVersion
-            ("22631", 1),  # CurrentBuildNumber
-        ]
+    def test_detect_windows_version_success(self):
+        """Test Windows version detection delegates to OsRelease cleanly."""
+        from abso.utils.os_release import OsRelease
 
-        detector = HardwareDetector()
-        result = detector.detect_windows_version()
+        with patch(
+            "abso.core.detector.detect_os_release",
+            return_value=OsRelease(
+                product_name="Windows 10 Pro",
+                display_version="23H2",
+                edition_id="Professional",
+                installation_type="Client",
+                build=22631,
+                ubr=4317,
+            ),
+        ):
+            detector = HardwareDetector()
+            result = detector.detect_windows_version()
 
         assert result is not None
         assert result["display_version"] == "23H2"
         assert result["build"] == "22631"
+        assert result["ubr"] == 4317
+        assert result["build_revision"] == "22631.4317"
+        assert result["edition_id"] == "Professional"
 
-    @patch("abso.core.detector.winreg.OpenKey")
-    def test_detect_windows_version_registry_error(self, mock_open):
-        """Test Windows version detection handles registry errors."""
-        mock_open.side_effect = OSError("Access denied")
+    def test_detect_windows_version_returns_none_when_unreadable(self):
+        """Zeroed OsRelease means registry was unreachable; surface None."""
+        from abso.utils.os_release import OsRelease
 
-        detector = HardwareDetector()
-        result = detector.detect_windows_version()
+        with patch(
+            "abso.core.detector.detect_os_release",
+            return_value=OsRelease("", "", "", "", 0, 0),
+        ):
+            detector = HardwareDetector()
+            result = detector.detect_windows_version()
 
         assert result is None
 

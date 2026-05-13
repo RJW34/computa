@@ -16,6 +16,7 @@ from __future__ import annotations
 import logging
 import winreg
 from dataclasses import dataclass, field
+from datetime import date
 from typing import Literal
 
 from abso.core.models import EvidenceTier
@@ -29,8 +30,17 @@ _GPU_CLASS_GUID = r"SYSTEM\CurrentControlSet\Control\Class\{4d36e968-e325-11ce-b
 _DEVICE_GUARD_KEY = r"SYSTEM\CurrentControlSet\Control\DeviceGuard"
 _HVCI_KEY = r"SYSTEM\CurrentControlSet\Control\DeviceGuard\Scenarios\HypervisorEnforcedCodeIntegrity"
 
-# Secure Boot registry path
+# Secure Boot registry paths.
+# State: whether Secure Boot is on at all.
+# Servicing: post-KB5089549 (May 2026) rollout of the PCA2023 / UEFI CA 2023
+#            certificates that supersede the 2011 certs expiring June 2026.
 _SECURE_BOOT_KEY = r"SYSTEM\CurrentControlSet\Control\SecureBoot\State"
+_SECURE_BOOT_SERVICING_KEY = r"SYSTEM\CurrentControlSet\Control\SecureBoot\Servicing"
+
+# The original 2011 Secure Boot certs expire starting June 2026. ABSO escalates
+# the cert warning from informational to critical once we are inside the
+# rollout window.
+SECURE_BOOT_CERT_EXPIRY_DATE = date(2026, 6, 1)
 
 # JEDEC base speeds (MHz) for DDR generations.
 # If the current speed matches one of these, XMP/EXPO is likely not active.
@@ -48,6 +58,42 @@ class BiosRecommendation:
     evidence_tier: EvidenceTier
     current_value: str
     recommended_value: str
+
+
+CertRolloutStatus = Literal[
+    "updated",
+    "updated_reboot_pending",
+    "pending",
+    "not_applicable",
+    "unknown",
+]
+
+
+@dataclass(frozen=True)
+class SecureBootCertState:
+    """Snapshot of the June 2026 Secure Boot certificate rollout.
+
+    Microsoft is replacing the 2011 PCA / UEFI CA certificates with
+    PCA2023 / UEFI CA 2023 ahead of the original certs' expiry in June 2026.
+    Devices that fail to receive the new certs may lose the ability to boot
+    signed components after expiry.
+
+    The progress is exposed via ``SecureBoot\\Servicing`` registry values
+    populated by KB5089549 (May 2026) and later cumulatives. Field names
+    mirror the raw registry values so future debugging is grep-able.
+    """
+
+    enabled: Literal["enabled", "disabled", "unknown"]
+    capable: int | None  # WindowsUEFICA2023Capable (0/1/2)
+    status_raw: str | None  # UEFICA2023Status: "Updated" | "Pending" | ...
+    reboot_pending: bool  # RebootRequested3POROMDB == 1
+    confidence: str | None  # "High Confidence" etc. — Microsoft's targeting signal
+    rollout_status: CertRolloutStatus
+
+    @property
+    def needs_action(self) -> bool:
+        """Whether the user should take action before the cert expiry window."""
+        return self.rollout_status in {"pending", "updated_reboot_pending", "unknown"}
 
 
 @dataclass
@@ -68,6 +114,7 @@ class BiosFirmwareInfo:
 
     # Secure Boot
     secure_boot: Literal["enabled", "disabled", "unknown"] = "unknown"
+    secure_boot_cert: SecureBootCertState | None = None
 
     # TPM
     tpm_present: bool = False
@@ -360,6 +407,69 @@ class BiosDetector:
             return "unknown"
         return "enabled" if val == 1 else "disabled"
 
+    def detect_secure_boot_cert_state(
+        self,
+        secure_boot: Literal["enabled", "disabled", "unknown"] | None = None,
+    ) -> SecureBootCertState:
+        """Detect the June 2026 Secure Boot cert rollout state.
+
+        Reads ``HKLM\\SYSTEM\\CurrentControlSet\\Control\\SecureBoot\\Servicing``
+        for the PCA2023 / UEFI CA 2023 enrollment signals published by
+        KB5089549 (May 2026) and later cumulatives.
+
+        Args:
+            secure_boot: Pre-detected Secure Boot enable state, to avoid an
+                extra registry read when callers already have it.
+        """
+        sb_state: Literal["enabled", "disabled", "unknown"] = (
+            secure_boot if secure_boot is not None else self.detect_secure_boot()
+        )
+
+        capable = self._read_reg_dword(
+            winreg.HKEY_LOCAL_MACHINE,
+            _SECURE_BOOT_SERVICING_KEY,
+            "WindowsUEFICA2023Capable",
+        )
+        status_raw_obj = self._read_reg_value(
+            winreg.HKEY_LOCAL_MACHINE,
+            _SECURE_BOOT_SERVICING_KEY,
+            "UEFICA2023Status",
+        )
+        status_raw = str(status_raw_obj) if status_raw_obj is not None else None
+        confidence_obj = self._read_reg_value(
+            winreg.HKEY_LOCAL_MACHINE,
+            _SECURE_BOOT_SERVICING_KEY,
+            "ConfidenceLevel",
+        )
+        confidence = str(confidence_obj) if confidence_obj is not None else None
+        reboot_dword = self._read_reg_dword(
+            winreg.HKEY_LOCAL_MACHINE,
+            _SECURE_BOOT_SERVICING_KEY,
+            "RebootRequested3POROMDB",
+        )
+        reboot_pending = bool(reboot_dword) if reboot_dword is not None else False
+
+        rollout_status: CertRolloutStatus
+        if sb_state == "disabled":
+            rollout_status = "not_applicable"
+        elif status_raw is None and capable is None:
+            rollout_status = "unknown"
+        elif status_raw is not None and status_raw.strip().lower() == "updated":
+            rollout_status = (
+                "updated_reboot_pending" if reboot_pending else "updated"
+            )
+        else:
+            rollout_status = "pending"
+
+        return SecureBootCertState(
+            enabled=sb_state,
+            capable=capable,
+            status_raw=status_raw,
+            reboot_pending=reboot_pending,
+            confidence=confidence,
+            rollout_status=rollout_status,
+        )
+
     def detect_tpm(self) -> tuple[bool, str | None]:
         """Detect TPM presence and version via WMI.
 
@@ -413,6 +523,7 @@ class BiosDetector:
         vbs_status, memory_integrity = self.detect_vbs()
 
         secure_boot = self.detect_secure_boot()
+        secure_boot_cert = self.detect_secure_boot_cert_state(secure_boot)
 
         tpm_present, tpm_version = self.detect_tpm()
 
@@ -424,6 +535,7 @@ class BiosDetector:
             vbs_status=vbs_status,
             memory_integrity=memory_integrity,
             secure_boot=secure_boot,
+            secure_boot_cert=secure_boot_cert,
             tpm_present=tpm_present,
             tpm_version=tpm_version,
         )
@@ -525,6 +637,11 @@ class BiosDetector:
                 recommended_value=f"{feature_str} disabled",
             ))
 
+        # Secure Boot cert rollout (June 2026 expiry)
+        cert_rec = self._secure_boot_cert_recommendation(info.secure_boot_cert)
+        if cert_rec is not None:
+            recommendations.append(cert_rec)
+
         # Sort by impact: high > medium > low
         impact_order = {"high": 0, "medium": 1, "low": 2}
         recommendations.sort(key=lambda r: impact_order.get(r.impact, 3))
@@ -533,3 +650,60 @@ class BiosDetector:
         info.recommendations = recommendations
 
         return recommendations
+
+    @staticmethod
+    def _secure_boot_cert_recommendation(
+        cert: SecureBootCertState | None,
+        today: date | None = None,
+    ) -> BiosRecommendation | None:
+        """Build a recommendation for the 2026 Secure Boot cert rollout.
+
+        Surfaces:
+          * ``updated_reboot_pending`` → user must reboot to finalize the
+            cert install. High impact within the expiry window.
+          * ``pending`` / ``unknown`` → cert has not yet been delivered. The
+            user should let Windows Update run before the expiry date.
+        """
+        if cert is None:
+            return None
+        if cert.enabled == "disabled":
+            return None
+        if cert.rollout_status in ("not_applicable", "updated"):
+            return None
+
+        current = today or date.today()
+        in_expiry_window = current >= SECURE_BOOT_CERT_EXPIRY_DATE
+        impact: Literal["high", "medium", "low"] = "high" if in_expiry_window else "medium"
+
+        if cert.rollout_status == "updated_reboot_pending":
+            title = "Reboot to finalize new Secure Boot certificates"
+            explanation = (
+                "Windows has delivered the PCA2023 / UEFI CA 2023 "
+                "certificates that replace the 2011 Secure Boot certs "
+                "expiring in June 2026, but a reboot is required to commit "
+                "the change. Without it, signed boot components may stop "
+                "loading once the 2011 certs expire."
+            )
+            current_value = "Updated — reboot pending"
+            recommended = "Reboot to finalize cert installation"
+        else:
+            title = "Pending Secure Boot certificate rollout"
+            explanation = (
+                "The 2011 Secure Boot certificates begin expiring in June "
+                "2026. Microsoft is rolling out replacement certificates via "
+                "Windows Update. This device has not yet been confirmed as "
+                "having received them. Keep Windows Update enabled; the "
+                "rollout is signal-driven and may take additional update "
+                "cycles to reach this device."
+            )
+            current_value = cert.status_raw or "Not yet delivered"
+            recommended = "Updated"
+
+        return BiosRecommendation(
+            title=title,
+            explanation=explanation,
+            impact=impact,
+            evidence_tier=EvidenceTier.VERIFIED,
+            current_value=current_value,
+            recommended_value=recommended,
+        )

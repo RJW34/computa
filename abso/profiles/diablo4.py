@@ -55,6 +55,13 @@ class _Diablo4BaseProfile(BaseProfile):
     def nvidia_profile_name(self) -> str | None:
         return "Diablo IV"
 
+    @property
+    def ai_agents(self) -> Literal["off", "on", "leave"]:
+        # ARPG is latency-tolerant for input but the HDR tone-map pipeline
+        # is still sensitive to background jitter — keep agents off during
+        # the gaming session.
+        return "off"
+
     def get_handlers(self) -> list[SettingsHandler]:
         from abso.settings.color import ColorProfileSettingsHandler
         from abso.settings.diablo4_config import Diablo4ConfigHandler

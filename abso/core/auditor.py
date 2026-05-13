@@ -18,6 +18,7 @@ def _get_handlers() -> list[SettingsHandler]:
 
     This avoids circular import issues between core and settings modules.
     """
+    from abso.settings.ai_agents import AIAgentsSettingsHandler
     from abso.settings.audio import AudioSettingsHandler
     from abso.settings.diagnostics import DiagnosticsSettingsHandler
     from abso.settings.display_range import DisplayColorRangeHandler
@@ -36,6 +37,7 @@ def _get_handlers() -> list[SettingsHandler]:
     from abso.settings.vbs_optin import VBSOptInHandler
     from abso.settings.visual import VisualSettingsHandler
     from abso.settings.windows import WindowsSettingsHandler
+    from abso.settings.xbox_mode import XboxModeSettingsHandler
 
     return [
         WindowsSettingsHandler(),
@@ -63,6 +65,10 @@ def _get_handlers() -> list[SettingsHandler]:
         # Opt-in VBS/HVCI/VMP status surfacing. Never mutates state unless
         # called with explicit acknowledgement.
         VBSOptInHandler(),
+        # 25H2 26200.8457+ feature-flag rollouts. Detect-only until the
+        # registry surface stabilizes; safe to audit on every system.
+        XboxModeSettingsHandler(),
+        AIAgentsSettingsHandler(),
     ]
 
 
@@ -117,19 +123,59 @@ class ConfigurationAuditor:
                     category="system",
                 ))
 
-        # Check for problematic Windows updates
+        # Check for problematic Windows updates (build-aware so superseded
+        # regressions stay quiet on patched machines).
         try:
-            from abso.core.kb_checker import check_problematic_kbs
+            from abso.core.kb_checker import (
+                check_problematic_kbs,
+                is_review_stale,
+                list_review_staleness,
+            )
+            from abso.utils.os_release import detect_os_release
 
-            bad_kbs = check_problematic_kbs()
+            release = detect_os_release()
+            build_revision = (
+                release.build_revision if release.build else None
+            )
+            bad_kbs = check_problematic_kbs(build_revision=build_revision)
             for kb in bad_kbs:
+                if kb.fix_action == "install_kb" and kb.superseded_by:
+                    optimal = f"Install {kb.superseded_by}"
+                    remediation = (
+                        f"Install {kb.superseded_by} (or a newer cumulative) "
+                        f"to patch the regression."
+                    )
+                elif kb.fix_action == "advisory":
+                    optimal = "No action required"
+                    remediation = "Advisory only — surfaced for visibility."
+                else:
+                    optimal = f"Uninstall {kb.kb_id}"
+                    remediation = (
+                        "Run 'abso setup' or uninstall manually via Windows Update."
+                    )
                 all_issues.append(Issue(
                     title=f"Problematic update installed: {kb.kb_id} — {kb.title}",
                     severity=kb.severity,
                     current_value=f"{kb.kb_id} installed ({kb.affected})",
-                    optimal_value=f"Uninstall {kb.kb_id}",
-                    explanation=f"This Windows update is known to cause: {kb.affected}. "
-                                f"Run 'abso setup' or uninstall manually via Windows Update.",
+                    optimal_value=optimal,
+                    explanation=(
+                        f"This Windows update is known to cause: {kb.affected}. "
+                        f"{remediation}"
+                    ),
+                    category="windows_update",
+                ))
+            if is_review_stale():
+                days = list_review_staleness()
+                all_issues.append(Issue(
+                    title="KB known-bad list review is overdue",
+                    severity="info",
+                    current_value=f"Last reviewed {days} days ago",
+                    optimal_value="Review within 60 days of each Patch Tuesday",
+                    explanation=(
+                        "ABSO's known-bad KB list has not been refreshed "
+                        "recently. New cumulative-update regressions may not "
+                        "yet be tracked."
+                    ),
                     category="windows_update",
                 ))
         except Exception as e:

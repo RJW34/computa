@@ -121,6 +121,16 @@ class Rivals2BaseProfile(BaseProfile):
         ]
 
     @property
+    def xbox_mode(self) -> Literal["off", "on", "leave"]:
+        # Rivals 2 family ships fullscreen_mode=0; the Xbox Mode shell layer
+        # actively conflicts with the exclusive-fullscreen FSO override.
+        return "off"
+
+    @property
+    def ai_agents(self) -> Literal["off", "on", "leave"]:
+        return "off"
+
+    @property
     def nvidia_binding_executables(self) -> list[str]:
         """Bind the stable NVIDIA family to the real shipping binary only."""
         return ["Rivals2-Win64-Shipping.exe"]
@@ -351,6 +361,16 @@ class EmulatorLatencyBaseProfile(BaseProfile):
     @property
     def allows_aggressive_settings(self) -> bool:
         return True
+
+    @property
+    def xbox_mode(self) -> Literal["off", "on", "leave"]:
+        # Slippi/Ryujinx run on tight fixed-rate budgets; shell-side mode
+        # transitions break frame pacing.
+        return "off"
+
+    @property
+    def ai_agents(self) -> Literal["off", "on", "leave"]:
+        return "off"
 
     def get_handlers(self) -> list[SettingsHandler]:
         from abso.settings.color import ColorProfileSettingsHandler
@@ -595,6 +615,18 @@ class ReflexShooterBaseProfile(BaseProfile):
     @property
     def graphics_api(self) -> Literal["dx11", "dx12", "vulkan", "opengl", "unknown"]:
         return "dx12"
+
+    @property
+    def xbox_mode(self) -> Literal["off", "on", "leave"]:
+        # Reflex / FSE path: Xbox Mode's shell-side compositor swap is the
+        # opposite of what we want. Keep it off across SDR/HDR/capture lanes.
+        return "off"
+
+    @property
+    def ai_agents(self) -> Literal["off", "on", "leave"]:
+        # Background agents (notably Researcher) wake schedulers mid-frame.
+        # Reflex profiles cannot tolerate that jitter budget.
+        return "off"
 
     def get_handlers(self) -> list[SettingsHandler]:
         from abso.settings.color import ColorProfileSettingsHandler

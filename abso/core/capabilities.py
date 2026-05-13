@@ -10,8 +10,28 @@ from abso.core.detector import HardwareDetector
 from abso.core.multimon_detector import MultiMonitorDetector, MultiMonitorResult
 from abso.profiles.base import BaseProfile
 from abso.settings.windows import WindowsSettingsHandler
+from abso.utils.os_release import OsRelease, detect_os_release
 
 logger = logging.getLogger(__name__)
+
+
+def _coerce_build_pair(value: Any) -> tuple[int, int] | None:
+    """Normalize a profile build-pair declaration to ``(build, ubr)``.
+
+    Profiles may return ``None``, a 2-tuple of ints, or a Mock instance in
+    tests. Anything that does not match the expected shape is treated as
+    unset so capability checks never crash on a malformed profile.
+    """
+    if value is None:
+        return None
+    if isinstance(value, tuple) and len(value) == 2:
+        try:
+            build = int(value[0])
+            ubr = int(value[1])
+        except (TypeError, ValueError):
+            return None
+        return (build, ubr)
+    return None
 
 
 @dataclass
@@ -96,6 +116,7 @@ class CapabilityEngine:
         monitors = self._safe_detect_monitors(report)
         gpu = self._safe_detect_gpu(report)
 
+        self._check_os_build_requirements(profile, report)
         self._check_vrr_requirements(profile, monitors, report)
         self._check_gpu_vendor(profile, gpu, report)
         self._check_monitor_presence(profile, monitors, report)
@@ -104,6 +125,80 @@ class CapabilityEngine:
         self._check_explicit_refresh_requirements(profile, monitors, report)
 
         return report
+
+    def _check_os_build_requirements(
+        self,
+        profile: BaseProfile,
+        report: CapabilityReport,
+    ) -> None:
+        """Evaluate ``min_os_build`` and ``validated_os_build`` against the OS.
+
+        Profiles can declare:
+          * ``min_os_build``: blocker if the current OS is older.
+          * ``validated_os_build``: info finding when the OS is newer than
+            the build the profile was last validated against (so users see
+            the gap without being blocked).
+        """
+        min_build = _coerce_build_pair(getattr(profile, "min_os_build", None))
+        validated = _coerce_build_pair(getattr(profile, "validated_os_build", None))
+        if min_build is None and validated is None:
+            return
+
+        try:
+            release: OsRelease = detect_os_release()
+        except Exception as e:
+            logger.warning("Capability OS release detection failed: %s", e)
+            report.findings.append(
+                CapabilityFinding(
+                    code="DETECT_OS_RELEASE_FAILED",
+                    severity="warning",
+                    message="OS release detection failed",
+                    details=str(e),
+                )
+            )
+            return
+
+        if release.build == 0:
+            report.findings.append(
+                CapabilityFinding(
+                    code="OS_RELEASE_UNAVAILABLE",
+                    severity="warning",
+                    message="OS build/UBR could not be read; build-floor checks skipped.",
+                )
+            )
+            return
+
+        if min_build is not None and not release.at_least(*min_build):
+            min_build_str = f"{min_build[0]}.{min_build[1]}"
+            current_str = f"{release.build}.{release.ubr}"
+            report.findings.append(
+                CapabilityFinding(
+                    code="OS_BUILD_BELOW_FLOOR",
+                    severity="blocker",
+                    message=(
+                        f"Profile requires Windows build {min_build_str} or newer "
+                        f"but this system reports {current_str}."
+                    ),
+                )
+            )
+
+        if (
+            validated is not None
+            and release.build_revision > validated
+        ):
+            validated_str = f"{validated[0]}.{validated[1]}"
+            current_str = f"{release.build}.{release.ubr}"
+            report.findings.append(
+                CapabilityFinding(
+                    code="OS_BUILD_UNTESTED_ON_PROFILE",
+                    severity="info",
+                    message=(
+                        f"Profile last validated on Windows {validated_str}; "
+                        f"running on {current_str}. Behavior should match but "
+                        "has not been re-verified on this build."
+                    ),
+                )
+            )
 
     def _safe_detect_multimon(
         self,

@@ -142,6 +142,7 @@ class ProfileLinter:
         self._check_presentation_guidance(profile, settings_map, result)
         self._check_power_sanity(profile, settings_map, result)
         self._check_emulator_vrr(profile, settings_map, result)
+        self._check_xbox_mode_conflicts(profile, result)
 
         # Log results
         if result.has_errors:
@@ -665,3 +666,41 @@ class ProfileLinter:
         has_hdr = any(ind in name_lower or ind in desc_lower for ind in hdr_indicators)
 
         return has_sdr and not has_hdr
+
+    def _check_xbox_mode_conflicts(
+        self,
+        profile: BaseProfile,
+        result: LintResult,
+    ) -> None:
+        """Catch profile declarations that conflict with the Xbox Mode shell.
+
+        Xbox Mode (Win11 25H2 26200.8457+) is a streamlined fullscreen shell
+        that swaps the compositor topology. It is incompatible with the
+        strict fullscreen-only VRR path ABSO uses for OW2 G-SYNC and
+        Diablo 4 HDR — those profiles disable per-exe Fullscreen
+        Optimizations to keep the GPU on the true exclusive path.
+
+        Hard error:
+        - ``xbox_mode == "on"`` + ``uses_fullscreen_only_vrr_path == True``.
+          The shell-layer path competes with the exclusive contract; one of
+          the two must give.
+        """
+        xbox_mode = getattr(profile, "xbox_mode", "leave")
+        if xbox_mode != "on":
+            return
+        if not getattr(profile, "uses_fullscreen_only_vrr_path", False):
+            return
+
+        result.add_issue(LintIssue(
+            code="XBOX_MODE_FSE_CONFLICT",
+            severity=LintSeverity.ERROR,
+            message="Xbox Mode 'on' is incompatible with fullscreen-only VRR profiles",
+            details=(
+                "This profile relies on the strict fullscreen-only VRR path "
+                "(per-exe FSO disabled, exclusive-fullscreen compositor). "
+                "Xbox Mode rewrites that compositor topology and breaks the "
+                "exclusive contract. Either set xbox_mode='off' or 'leave', "
+                "or remove the strict fullscreen-only VRR requirement."
+            ),
+            setting_path="BaseProfile.xbox_mode",
+        ))

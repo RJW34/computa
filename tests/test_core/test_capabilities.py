@@ -4,23 +4,92 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
+from abso.core import capabilities as cap_mod
 from abso.core.capabilities import CapabilityEngine
 from abso.core.multimon_detector import DisplayEnvironment, MultiMonitorResult
 from abso.profiles.base import DisplayPathRequirements
+from abso.utils.os_release import OsRelease
 
 
 def _make_profile(
     profile_id: str,
     requires_confirmed_vrr_support: bool = False,
     settings_map: dict[str, dict[str, object]] | None = None,
+    min_os_build: tuple[int, int] | None = None,
+    validated_os_build: tuple[int, int] | None = None,
 ) -> MagicMock:
     profile = MagicMock()
     profile.profile_id = profile_id
     profile.requires_confirmed_vrr_support = requires_confirmed_vrr_support
     profile.display_path_requirements = DisplayPathRequirements()
+    profile.min_os_build = min_os_build
+    profile.validated_os_build = validated_os_build
     settings_map = settings_map or {}
     profile.get_settings.side_effect = lambda handler_name: settings_map.get(handler_name, {})
     return profile
+
+
+def _release(build: int, ubr: int) -> OsRelease:
+    return OsRelease(
+        product_name="Windows 10 Home",
+        display_version="25H2",
+        edition_id="Core",
+        installation_type="Client",
+        build=build,
+        ubr=ubr,
+    )
+
+
+def test_min_os_build_blocks_on_older_build() -> None:
+    detector = MagicMock()
+    detector.detect_monitors.return_value = []
+    detector.detect_gpu.return_value = {"name": "NVIDIA GeForce RTX 4090"}
+    profile = _make_profile("future-profile", min_os_build=(26200, 8457))
+
+    with patch.object(cap_mod, "detect_os_release", return_value=_release(26200, 1234)):
+        report = CapabilityEngine(detector).evaluate(profile)
+
+    assert any(f.code == "OS_BUILD_BELOW_FLOOR" for f in report.findings)
+    assert report.has_blockers is True
+
+
+def test_min_os_build_passes_when_at_floor() -> None:
+    detector = MagicMock()
+    detector.detect_monitors.return_value = [
+        {"name": "Primary", "vrr_supported": True, "is_primary": True}
+    ]
+    detector.detect_gpu.return_value = {"name": "NVIDIA GeForce RTX 4090"}
+    profile = _make_profile("future-profile", min_os_build=(26200, 8457))
+
+    with patch.object(cap_mod, "detect_os_release", return_value=_release(26200, 8457)):
+        report = CapabilityEngine(detector).evaluate(profile)
+
+    assert not any(f.code == "OS_BUILD_BELOW_FLOOR" for f in report.findings)
+
+
+def test_validated_os_build_surfaces_info_on_newer_os() -> None:
+    detector = MagicMock()
+    detector.detect_monitors.return_value = []
+    detector.detect_gpu.return_value = {"name": "NVIDIA GeForce RTX 4090"}
+    profile = _make_profile("legacy-profile", validated_os_build=(26200, 8246))
+
+    with patch.object(cap_mod, "detect_os_release", return_value=_release(26200, 8457)):
+        report = CapabilityEngine(detector).evaluate(profile)
+
+    assert any(f.code == "OS_BUILD_UNTESTED_ON_PROFILE" for f in report.findings)
+    assert not any(f.severity == "blocker" and f.code == "OS_BUILD_UNTESTED_ON_PROFILE" for f in report.findings)
+
+
+def test_unreadable_os_release_logs_warning_finding() -> None:
+    detector = MagicMock()
+    detector.detect_monitors.return_value = []
+    detector.detect_gpu.return_value = {"name": "NVIDIA GeForce RTX 4090"}
+    profile = _make_profile("future-profile", min_os_build=(26200, 8457))
+
+    with patch.object(cap_mod, "detect_os_release", return_value=_release(0, 0)):
+        report = CapabilityEngine(detector).evaluate(profile)
+
+    assert any(f.code == "OS_RELEASE_UNAVAILABLE" for f in report.findings)
 
 
 def test_capability_blocks_vrr_profile_when_no_monitor_data() -> None:

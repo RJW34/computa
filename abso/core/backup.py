@@ -69,6 +69,7 @@ def _get_backup_handlers() -> list[SettingsHandler]:
     All handlers that are used for audit are also backed up to ensure
     complete restore capability.
     """
+    from abso.settings.ai_agents import AIAgentsSettingsHandler
     from abso.settings.audio import AudioSettingsHandler
     from abso.settings.cnm import CNMSettingsHandler
     from abso.settings.color import ColorProfileSettingsHandler
@@ -99,6 +100,7 @@ def _get_backup_handlers() -> list[SettingsHandler]:
     from abso.settings.updates import UpdatesSettingsHandler
     from abso.settings.visual import VisualSettingsHandler
     from abso.settings.windows import WindowsSettingsHandler
+    from abso.settings.xbox_mode import XboxModeSettingsHandler
 
     return [
         # Core handlers (always needed)
@@ -134,6 +136,12 @@ def _get_backup_handlers() -> list[SettingsHandler]:
         CpuAffinityHandler(),
         StandbyListHandler(),
         DebloatHandler(),
+        # Detect-only — captures rollout state so backups have an audit
+        # trail of what Xbox Mode / AI Agents looked like at apply time.
+        # restore_guarantee == "none" so a skipped restore here is
+        # non-blocking.
+        XboxModeSettingsHandler(),
+        AIAgentsSettingsHandler(),
     ]
 
 
