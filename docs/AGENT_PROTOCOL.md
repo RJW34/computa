@@ -214,8 +214,9 @@ code.
 
 ## 6. Backlog: what's actually open right now
 
-Updated 2026-05-13 after the May 2026 cumulative adaptation + crude-
-duplication refactor.
+Updated 2026-05-21 after the launch-time process janitor +
+Deadlock + HDR-Slippi merge (commit `2d7005c`) and the OW2 latency-
+stack audit done the same evening.
 
 ### Real open work
 
@@ -234,6 +235,111 @@ duplication refactor.
 - **Benchmark artifacts** — no profile currently has a benchmark
   artifact in `reports/benchmarks/`. Required before any profile can
   legitimately be called `optimal` per the quality rubric.
+
+### 6.1 OW2 / Reflex latency-stack closure (audit 2026-05-21)
+
+Standing audit against `overwatch2-gsync-hdr` after the launch-time
+process janitor landed. These are the knobs ABSO still does not tune
+that would measurably move click-to-photon latency on a competitive
+RTX 4070 / 14th-gen / 240 Hz OLED rig. Ordered by impact. Most of
+these benefit every Reflex shooter profile (Marvel Rivals, Deadlock,
+Fortnite, Rivals 2 G-SYNC), not just OW2 — wire them through
+`BaseProfile` traits, not into OW2 specifically.
+
+**High impact:**
+
+1. **GPU MSI mode** — write `MSISupported = 1` under
+   `HKLM\SYSTEM\CurrentControlSet\Enum\PCI\<GPU>\Device Parameters\
+   Interrupt Management\MessageSignaledInterruptProperties`. Real
+   input-to-photon delta on some boards. Needs a new
+   `InterruptModeHandler` with audit + backup + verify; must resolve
+   the GPU instance path via WMI (`Win32_PnPEntity` GUID class
+   `4d36e968`). Reboot required.
+2. **NIC driver tuning** — Interrupt moderation off, RSS on, EEE
+   off, flow control off, larger receive/transmit buffers. Per-NIC
+   (Intel I225-V vs Realtek vs Killer). ABSO has `network.py` for
+   TCP/Nagle but no NIC-driver layer. New `NicDriverHandler`
+   keyed off `Get-NetAdapterAdvancedProperty`; gate behind a
+   `nic_tuning` profile trait so productivity / browser profiles
+   skip it.
+3. **Focus Assist auto-set during game session** — force "Alarms
+   only" while the active profile's game binary is alive; restore
+   on exit. Belongs in the tray's `LaunchSanitizer` next to the
+   process sweep, not in a handler. Registry key:
+   `HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Notifications\
+   Settings\Windows.SystemToast.FocusAssist` (volatile across Win11
+   builds — guard with `OsRelease.at_least`).
+4. **Windows Defender exclusions for game install folders** — adds
+   the game's install dir to `Add-MpPreference -ExclusionPath` so
+   real-time AV scans do not fire on shader-cache writes during
+   play. Discovery via `core/game_detector.py` which already
+   resolves install paths per platform. Reverse on profile exit
+   or `restore latest`. Must guard against the user running a
+   non-Defender AV — detect via `Get-MpComputerStatus`.
+5. **Audio engine APO chain** — Disable audio enhancements
+   (`HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\MMDevices\
+   Audio\Render\<deviceId>\FxProperties` — `{1da5d803-...},5 = 0`),
+   disable spatial sound, pin default sample rate to 48 kHz. Pairs
+   with the existing Nahimic / Sonic Studio process-level kill in
+   the janitor's always-safe tier. New `AudioEngineHandler`.
+
+**Medium impact:**
+
+6. **Game DVR registry hard-off** —
+   `HKCU\System\GameConfigStore\GameDVR_Enabled = 0`,
+   `HKCU\SOFTWARE\Microsoft\GameBar\AutoGameModeEnabled = 1`,
+   `UseNexusForGameBarEnabled = 0`. Defensive — the janitor kills
+   the *processes* but does not disarm the *setting*, so Windows
+   respawns them next session. Likely belongs in
+   `settings/windows.py` next to the existing Game Mode handling.
+7. **Pagefile sizing** — pin to a fixed min/max via
+   `wmic computersystem set AutomaticManagedPagefile=False` +
+   `wmic pagefileset` set to a fixed size (recommend 1.5x RAM
+   minimum, 2x maximum, capped at 32 GB). Avoids runtime resize
+   stutter. New `PagefileHandler`; restore symmetry must capture
+   the original auto-managed state.
+8. **Memory hygiene** — `Set-MMAgent -PageCombining $false`,
+   `-MemoryCompression $false` on 32 GB+ rigs. Detect RAM via
+   existing `HardwareDetector` and gate the apply on a minimum
+   floor.
+9. **Hyper-V root** — `bcdedit /set hypervisorlaunchtype off`,
+   separate from VBS. Some configurations leave the root partition
+   active even with VBS off. Reboot required. Surfaces in
+   `bios_detector.py` already? Verify; if not, add an audit
+   finding that escalates when VBS is off but `hypervisorlaunchtype
+   = auto`.
+10. **Dynamic tick / HPET** — `bcdedit /set disabledynamictick yes`,
+    `bcdedit /deletevalue useplatformclock`. Mostly placebo on
+    Win11 24H2+ but still in tuning guides. Land as an *audit-only*
+    finding first; do not auto-apply until a benchmark artifact
+    proves a frame-time delta on this hardware.
+
+**Pattern for the OW2 closure work:**
+
+- New handlers register one `HandlerEntry` in
+  `abso/core/handler_registry.py`, override
+  `is_critical_verify` if a verify miss should escalate.
+- Backup symmetry is non-negotiable per `REMEDIATION_ROADMAP.md`
+  PR-06. Every handler must capture pre-apply state and round-trip
+  through `restore latest`.
+- Profile opt-in via new `BaseProfile` traits (e.g.
+  `requires_msi_mode_gpu`, `nic_tuning_scope`, `audio_engine_strict`).
+  Default to most aggressive for Reflex-shooter VRR strict lanes,
+  off for productivity / browser / capture-safe variants.
+- Tests: unit coverage for handler + a profile-level invariant test
+  that the strict OW2/Deadlock/Marvel-Rivals/Diablo-4 G-SYNC lanes
+  all turn the new knob on.
+
+**Out of scope for the latency closure:**
+
+- BIOS-level knobs (XMP/EXPO, resizable BAR, C-states, Above-4G).
+  Already surfaced via `bios_detector.py` recommendations; ABSO
+  cannot apply these and should not pretend to.
+- Mouse polling rate, monitor overdrive — surfaced via
+  `monitor_osd.py` recommendations; firmware-side.
+- OW2 INI keys we deliberately do not write
+  (`Reflex`, `MaxThreads`, `WorkerThreads`) — Blizzard rotates them
+  across patches. Documented in `Overwatch2GSyncProfile.get_in_game_settings()`.
 
 ### Closed by recent work (do not re-open)
 
