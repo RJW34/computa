@@ -96,9 +96,14 @@ class TestCLILaunchKillset:
         assert "Overwatch.exe" in data["executables"]
         assert data["include_opt_in"] is False
         assert "Medal.exe" in data["resolved"]
-        # Without --include-opt-in the resolved list must NOT contain opt-in
-        # tier images, so cloud sync stays alive.
-        assert "OneDrive.exe" not in data["resolved"]
+        # OneDrive moved to always-safe in the May 2026 aggressive-sweep
+        # expansion, so it now resolves even without --include-opt-in.
+        assert "OneDrive.exe" in data["resolved"]
+        # Without --include-opt-in the resolved list must NOT contain
+        # opt-in-tier images. SearchIndexer stays in opt-in (its absence
+        # mid-match would surprise users who rely on instant Start-menu
+        # search after exiting a game).
+        assert "SearchIndexer.exe" not in data["resolved"]
 
     def test_launch_killset_with_opt_in_includes_sync_daemons(self):
         runner = CliRunner()
@@ -107,7 +112,11 @@ class TestCLILaunchKillset:
         )
         assert result.exit_code == 0, result.output
         payload = json.loads(result.output)
+        # OneDrive remains killed under --include-opt-in (it now lives in
+        # always-safe), and the previously opt-in-only Search* daemons
+        # also drop.
         assert "OneDrive.exe" in payload["data"]["resolved"]
+        assert "SearchIndexer.exe" in payload["data"]["resolved"]
 
     def test_launch_killset_for_productivity_is_empty(self):
         runner = CliRunner()

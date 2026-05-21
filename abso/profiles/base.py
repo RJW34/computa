@@ -358,25 +358,22 @@ class BaseProfile(ABC):
     def launch_process_killset(self) -> "LaunchKillset":
         """Processes the launch-time janitor may stop while this profile's game is alive.
 
-        The default derivation is data-driven from existing profile traits — no
-        per-profile override is required for ABSO's built-in lanes:
+        Data-driven from existing profile traits; built-in lanes do not need
+        a per-profile override:
 
-        - ``productivity`` profiles return an empty killset (the user is
-          working in those apps; killing overlays would be disruptive).
-        - Browser-game profiles (``pokemon-auto-chess``, ``pacdeluxe``) return
-          a narrow always-safe overlay set and an opt-in sync/RGB tier; cloud
-          sync running while a Tauri/web client is in fullscreen is the most
-          common latency offender.
-        - Strict overlay-free profiles (fullscreen-only G-SYNC lanes like
-          ``overwatch2-gsync-hdr`` and ``deadlock-gsync``) get the full
-          always-safe killset plus the broader opt-in tier.
-        - All other gaming profiles (no-sync, capture-safe, emulator, online,
-          ARPG, Reflex shooters) get the default always-safe killset; opt-in
-          stays off so the launch sweep cannot pause OneDrive uploads or kill
-          Logitech G HUB without the user opting in via the tray.
+        - ``productivity`` returns an empty killset (the user is actively in
+          these apps; killing their overlays would be disruptive).
+        - Every other profile (Reflex shooters, no-sync, capture-safe,
+          emulator, online, ARPG, browser-game) returns the always-safe
+          killset PLUS the opt-in tier. ABSO is aggressive by default on any
+          gaming profile so cloud sync, LLM runtimes, peripheral RGB daemons,
+          and OEM updaters cannot eat frame-time mid-session.
 
-        Profiles can override this when they need to deviate (e.g. a streaming
-        variant that should keep OBS alive even on a strict path).
+        User per-machine overrides from ``abso.yaml::process_overrides.kill``
+        are appended to ``always_safe`` so they apply to every gaming profile.
+        The complementary ``process_overrides.protect`` list is enforced by
+        :class:`ProcessJanitor`, not here, so it survives even if a profile
+        mis-declares its killset.
 
         Returns:
             ``LaunchKillset`` resolved against this profile's traits.
@@ -385,6 +382,7 @@ class BaseProfile(ABC):
             ALWAYS_SAFE_LAUNCH_KILLSET,
             OPT_IN_LAUNCH_KILLSET,
             LaunchKillset,
+            _load_user_process_overrides,
         )
 
         target = (self.optimization_target or "").lower()
@@ -395,12 +393,23 @@ class BaseProfile(ABC):
         if target == "productivity":
             return LaunchKillset()
 
-        strict = bool(self.display_path_requirements.require_overlay_free_path)
+        _user_protect, user_kill = _load_user_process_overrides()
 
-        always_safe = tuple(ALWAYS_SAFE_LAUNCH_KILLSET)
-        opt_in = tuple(OPT_IN_LAUNCH_KILLSET) if strict else ()
+        # Deduplicate while preserving order (built-in items first, then the
+        # user's per-machine additions).
+        seen: set[str] = set()
+        merged_always_safe: list[str] = []
+        for image in tuple(ALWAYS_SAFE_LAUNCH_KILLSET) + user_kill:
+            key = image.lower()
+            if key in seen:
+                continue
+            seen.add(key)
+            merged_always_safe.append(image)
 
-        return LaunchKillset(always_safe=always_safe, opt_in=opt_in)
+        return LaunchKillset(
+            always_safe=tuple(merged_always_safe),
+            opt_in=tuple(OPT_IN_LAUNCH_KILLSET),
+        )
 
     @property
     def min_os_build(self) -> tuple[int, int] | None:

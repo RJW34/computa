@@ -53,66 +53,98 @@ class ProcessSweepResult:
         }
 
 
-# Overlay / capture / OSD / vendor processes that latency-sensitive profiles
-# should always be safe to kill mid-session. Killing these does not lose user
-# data; they typically respawn on next desktop interaction.
+# Processes ABSO will stop on every latency-sensitive profile sweep. These
+# are either overlays/OSDs that cost frame-time, vendor daemons whose
+# absence is confirmed safe for typical gaming hardware, or background
+# clients with no in-game role. Killing these does not lose user data:
+# overlays respawn on next desktop interaction, sync clients resume on
+# next launch, and LLM/peripheral daemons can be re-launched by the user
+# after the session.
 ALWAYS_SAFE_LAUNCH_KILLSET: tuple[str, ...] = (
-    # NVIDIA capture + overlay
+    # --- NVIDIA capture + overlay ---
     "NVIDIA Share.exe",
     "NVIDIA Overlay.exe",
-    "nvcontainer.exe",  # Only the user-session container - service handler runs in services.msc
-    # Steam overlay (not Steam itself)
+    "nvcontainer.exe",  # User-session container only; the service runs separately.
+    # --- Steam overlay (not Steam itself, which is protected) ---
     "GameOverlayUI.exe",
-    # Xbox Game Bar
+    # --- Xbox Game Bar ---
     "GameBar.exe",
     "GameBarFTServer.exe",
     "gamebarpresencewriter.exe",
-    # Discord in-game overlay (NOT Discord itself - voice/text stay alive)
+    # --- Discord in-game overlay (Discord itself is protected for teammate comms) ---
     "DiscordHookHelper.exe",
     "DiscordHookHelper64.exe",
-    # RTSS / MSI Afterburner OSD
+    # --- RTSS / Afterburner OSD ---
     "RTSS.exe",
     "RTSSHooksLoader.exe",
     "RTSSHooksLoader64.exe",
     "MSIAfterburner.exe",
     "EVGAPrecision_X1.exe",
-    # Capture clients
+    # --- Capture clients (use capture-safe profile variants if you need OBS/Medal alive) ---
     "obs64.exe",
     "obs32.exe",
     "Medal.exe",
     "MedalEncoder.exe",
-    # Audio enhancement DPC offenders
+    # --- Audio enhancement DPC offenders ---
     "NahimicService.exe",
     "NahimicSvc64.exe",
     "NahimicSvc32.exe",
     "Sonic Studio 3.exe",
-    # Browser PiP / hardware-accel overlay that injects into fullscreen games
+    # --- Browser PiP / streaming overlays that inject into fullscreen ---
     "GeForceNOW.exe",
+    # --- LLM runtimes ---
+    # Local LLM hosts have no role on a gaming-only PC. User explicitly called
+    # this out; the dev-LLM workflows live on other machines.
+    "ollama.exe",
+    "ollama_runner.exe",
+    "ollama_llama_server.exe",
+    "lmstudio.exe",
+    "LM Studio.exe",
+    "lms.exe",
+    "GPT4All.exe",
+    "Jan.exe",
+    "cortex.exe",
+    "llamafile.exe",
+    # --- Cloud sync ---
+    # Sync uploads cause disk + network spikes mid-match. User opted in to
+    # killing these globally; they resume automatically next session.
+    "OneDrive.exe",
+    "Dropbox.exe",
+    "DropboxUpdate.exe",
+    "GoogleDriveFS.exe",
+    "googledrivesync.exe",
+    # --- Peripheral vendor daemons (verified non-essential for user's hardware) ---
+    # Logitech G502 stores DPI/buttons in onboard memory after first save;
+    # G HUB is only required for LIGHTSYNC RGB animations, which do not
+    # matter mid-game.
+    "lghub.exe",
+    "lghub_agent.exe",
+    "lghub_updater.exe",
+    "LogiAiPromptBuilder.exe",
+    # Corsair K70 Lux RGB: HID typing always works without iCUE; RGB reverts
+    # to last hardware profile.
+    "iCUE.exe",
+    "LCore.exe",
+    "CorsairService.exe",
 )
 
 
-# Background daemons that may genuinely matter to the user (cloud sync mid-
-# upload, OEM RGB hotkeys, vendor updaters). Only swept when the profile or
-# tray config explicitly opts in.
+# Background daemons that may matter on machines with other hardware
+# (Razer / ASUS peripherals, Adobe creative suite, NVIDIA Experience
+# overlay calibration). Off by default for non-strict profiles; strict
+# G-SYNC and Reflex profiles include them automatically.
 OPT_IN_LAUNCH_KILLSET: tuple[str, ...] = (
-    # Cloud sync
-    "OneDrive.exe",
-    "Dropbox.exe",
-    "GoogleDriveFS.exe",
-    # Vendor updaters
+    # NVIDIA updaters (separate from the always-safe overlay container)
     "GeForce Experience.exe",
     "NVIDIA Web Helper.exe",
+    # Adobe creative suite background services
     "AdobeUpdateService.exe",
     "Adobe Desktop Service.exe",
     "Creative Cloud.exe",
-    # OEM RGB / peripheral daemons
+    # Razer / ASUS RGB + macro daemons (user may not have these; safe on this PC)
     "Razer Synapse 3.exe",
     "RzSynapse.exe",
     "RazerCortex.exe",
-    "lghub.exe",
-    "lghub_agent.exe",
-    "LCore.exe",
-    "iCUE.exe",
     "ArmouryCrate.exe",
     "ArmourySocketServer.exe",
     "ROGLiveService.exe",
@@ -124,12 +156,17 @@ OPT_IN_LAUNCH_KILLSET: tuple[str, ...] = (
 
 
 # Image names we will NEVER auto-kill regardless of caller request. Anti-cheat,
-# game launchers, and ABSO itself live here. If a caller passes one of these
-# in the killset, the janitor skips it and emits a warning.
+# game launchers, ABSO itself, and the user's interactive / agentic workflow
+# (editors, terminals, Discord, dev tooling) live here. If a caller passes one
+# of these in the killset, the janitor skips it and emits a warning.
+#
+# This list is the safety net: even a misconfigured profile or a stale tray
+# config cannot kill an in-progress Claude Code session, an open VS Code
+# window, or Discord voice chat.
 NEVER_KILL_IMAGES: frozenset[str] = frozenset(
     name.lower()
     for name in (
-        # Anti-cheat
+        # --- Anti-cheat ---
         "EasyAntiCheat.exe",
         "EasyAntiCheat_EOS.exe",
         "EasyAntiCheat_launcher.exe",
@@ -137,7 +174,7 @@ NEVER_KILL_IMAGES: frozenset[str] = frozenset(
         "BEServiceLauncher.exe",
         "vgc.exe",
         "vgtray.exe",
-        # Launchers the games depend on
+        # --- Launchers the games depend on ---
         "Steam.exe",
         "steamwebhelper.exe",
         "Battle.net.exe",
@@ -146,13 +183,13 @@ NEVER_KILL_IMAGES: frozenset[str] = frozenset(
         "EpicGamesLauncher.exe",
         "EpicWebHelper.exe",
         "RiotClientServices.exe",
-        # ABSO + tray (cannot kill self)
+        # --- ABSO + tray + interpreter (cannot kill self) ---
         "abso.exe",
         "python.exe",
         "pythonw.exe",
         "powershell.exe",
         "pwsh.exe",
-        # Critical Windows infrastructure
+        # --- Critical Windows infrastructure ---
         "explorer.exe",
         "dwm.exe",
         "csrss.exe",
@@ -163,15 +200,108 @@ NEVER_KILL_IMAGES: frozenset[str] = frozenset(
         "smss.exe",
         "wininit.exe",
         "audiodg.exe",
+        # --- Code editors / IDEs (agentic work in progress) ---
+        # VS Code family
+        "Code.exe",
+        "Code - Insiders.exe",
+        "Code-Insiders.exe",
+        # Cursor / Windsurf (AI-powered editors)
+        "Cursor.exe",
+        "Windsurf.exe",
+        # JetBrains family (each IDE has a 64-bit and unsuffixed launcher)
+        "idea64.exe", "idea.exe",
+        "pycharm64.exe", "pycharm.exe",
+        "webstorm64.exe", "webstorm.exe",
+        "clion64.exe", "clion.exe",
+        "goland64.exe", "goland.exe",
+        "rider64.exe", "rider.exe",
+        "phpstorm64.exe", "phpstorm.exe",
+        "rubymine64.exe", "rubymine.exe",
+        "datagrip64.exe", "datagrip.exe",
+        "studio64.exe", "studio.exe",  # Android Studio
+        # Other editors
+        "devenv.exe",  # Visual Studio
+        "sublime_text.exe",
+        "notepad++.exe",
+        "Zed.exe",
+        # --- Terminals (interactive sessions / agentic CLIs) ---
+        "WindowsTerminal.exe",
+        "OpenConsole.exe",
+        "wezterm-gui.exe",
+        "wezterm.exe",
+        "alacritty.exe",
+        "cmd.exe",
+        # --- WSL ---
+        "wsl.exe",
+        "wslhost.exe",
+        "wslservice.exe",
+        "wslg.exe",
+        # --- Docker ---
+        "Docker Desktop.exe",
+        "dockerd.exe",
+        "com.docker.proxy.exe",
+        "com.docker.service.exe",
+        "com.docker.backend.exe",
+        # --- Discord (teammate comms — overlay helpers ARE killed, app stays) ---
+        "Discord.exe",
+        "DiscordPTB.exe",
+        "DiscordCanary.exe",
+        "DiscordDevelopment.exe",
+        "Discord Updater.exe",
+        # --- Dev tooling (in-flight git ops, agentic CLIs, build tools) ---
+        "git.exe",
+        "gh.exe",
+        "claude.exe",
+        "node.exe",
+        "npm.exe",
+        "cargo.exe",
+        "rustc.exe",
     )
 )
+
+
+def _load_user_process_overrides() -> tuple[frozenset[str], tuple[str, ...]]:
+    """Read per-machine process overrides from ``abso.yaml``.
+
+    Returns a ``(protect, kill)`` pair where ``protect`` is a lowercased
+    frozenset that should augment :data:`NEVER_KILL_IMAGES`, and ``kill``
+    is a tuple that should append to the always-safe sweep list. Both are
+    empty if the config file is absent or has no ``process_overrides``
+    section.
+
+    Failures are silent (return empty) so a malformed user config never
+    breaks the janitor on a live machine.
+    """
+    try:
+        from abso.core.config import get_config
+
+        config = get_config()
+        overrides = getattr(config, "process_overrides", None)
+        if overrides is None:
+            return frozenset(), ()
+        protect_raw = list(getattr(overrides, "protect", []) or [])
+        kill_raw = list(getattr(overrides, "kill", []) or [])
+    except Exception as exc:
+        logger.debug("Skipping user process overrides (load failed): %s", exc)
+        return frozenset(), ()
+
+    protect = frozenset(
+        str(name).strip().lower() for name in protect_raw if str(name).strip()
+    )
+    kill = tuple(
+        str(name).strip() for name in kill_raw if str(name).strip()
+    )
+    return protect, kill
 
 
 class ProcessJanitor:
     """Stops latency-impacting processes against a profile-supplied killset."""
 
     def __init__(self) -> None:
-        self._never_kill = NEVER_KILL_IMAGES
+        user_protect, _ = _load_user_process_overrides()
+        # Merge built-in NEVER_KILL with user-declared protect list so a
+        # misconfigured profile + an in-flight agentic editor cannot collide.
+        self._never_kill = NEVER_KILL_IMAGES | user_protect
 
     def sweep(self, image_names: list[str], *, dry_run: bool = False) -> ProcessSweepResult:
         """Sweep the given process image names.

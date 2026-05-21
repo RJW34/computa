@@ -98,6 +98,28 @@ class ProfileOverrides:
 
 
 @dataclass
+class ProcessOverridesConfig:
+    """Per-machine launch-time process sweep overrides.
+
+    ``protect`` augments the built-in :data:`NEVER_KILL_IMAGES` set. Items
+    listed here are guaranteed never to be killed by the launch sanitizer,
+    even if a profile killset mistakenly includes them. Use this for
+    peripheral software your specific hardware actually needs (e.g.
+    ``["lghub.exe"]`` if your mouse loses functionality without G HUB).
+
+    ``kill`` appends to every gaming profile's always-safe killset. Use
+    this for personal background apps that should always die at game time
+    (e.g. ``["MyNotesApp.exe", "BackgroundSyncTool.exe"]``).
+
+    Both lists are case-insensitive on the protect side and case-preserving
+    on the kill side (taskkill /IM is case-insensitive on Windows).
+    """
+
+    protect: list[str] = field(default_factory=list)
+    kill: list[str] = field(default_factory=list)
+
+
+@dataclass
 class ABSOConfig:
     """ABSO configuration settings.
 
@@ -125,6 +147,7 @@ class ABSOConfig:
     color: ColorConfig = field(default_factory=ColorConfig)
     standby_list: StandbyListConfig = field(default_factory=StandbyListConfig)
     cpu_balancer: CpuBalancerConfig = field(default_factory=CpuBalancerConfig)
+    process_overrides: ProcessOverridesConfig = field(default_factory=ProcessOverridesConfig)
 
     def __post_init__(self) -> None:
         """Convert nested dicts to typed config objects."""
@@ -144,6 +167,8 @@ class ABSOConfig:
             self.standby_list = StandbyListConfig(**self.standby_list)
         if isinstance(self.cpu_balancer, dict):
             self.cpu_balancer = CpuBalancerConfig(**self.cpu_balancer)
+        if isinstance(self.process_overrides, dict):
+            self.process_overrides = ProcessOverridesConfig(**self.process_overrides)
 
 
 # Derived from ABSOConfig dataclass fields — never manually maintained.
@@ -365,6 +390,21 @@ confirm_destructive: true
 #   icc_profile: srgb           # srgb, native, or ICC filename
 #   manage_vibrance: true       # false = never touch vibrance
 #   manage_icc: true            # false = never touch ICC profiles
+
+# Per-machine launch-time process sweep overrides.
+#   protect: process image names that must NEVER be killed by the launch
+#            sanitizer, even if a profile killset includes them. Use this
+#            for peripheral SW your hardware actually requires (e.g. add
+#            lghub.exe if your mouse loses functionality without G HUB).
+#   kill:    process image names to ALWAYS kill at game time, on top of
+#            ABSO's built-in always-safe list. Use this for personal apps
+#            you never want running during gameplay.
+# process_overrides:
+#   protect:
+#     - lghub.exe       # only if your specific Logi peripheral needs it
+#     - iCUE.exe        # only if your Corsair RGB profile requires it
+#   kill:
+#     - SomePersonalApp.exe
 """
         try:
             self.config_path.write_text(default_yaml, encoding="utf-8")
@@ -472,6 +512,7 @@ confirm_destructive: true
             "color",
             "standby_list",
             "cpu_balancer",
+            "process_overrides",
         }
 
         unknown_keys = set(data.keys()) - known_keys
