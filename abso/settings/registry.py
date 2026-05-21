@@ -102,7 +102,7 @@ class RegistrySettingsHandler(SettingsHandler):
                 optimal_value="10",
                 explanation=(
                     "MMCSS scheduling hint for background CPU reservation. "
-                    "Effect on modern Windows 11 is undocumented — MMCSS was redesigned "
+                    "Effect on modern Windows 11 is undocumented; MMCSS was redesigned "
                     "in Win10+. May have no measurable impact on current systems. "
                     "Opt-in via include_legacy_tweaks."
                 ),
@@ -119,7 +119,7 @@ class RegistrySettingsHandler(SettingsHandler):
                 current_value=f"0x{throttling:08X}" if throttling else "Unknown",
                 optimal_value="0xFFFFFFFF (disabled)",
                 explanation=(
-                    "Multimedia network throttling index — originally designed for "
+                    "Multimedia network throttling index, originally designed for "
                     "Vista-era media streaming. Microsoft has not documented its effect "
                     "on Windows 10/11 network stacks. Likely no measurable impact. "
                     "Opt-in via include_legacy_tweaks."
@@ -162,7 +162,7 @@ class RegistrySettingsHandler(SettingsHandler):
                     "ABSO's gaming profiles set 0x2A (short fixed quantum with max "
                     "foreground boost). This is a documented kernel control "
                     "(Windows Internals, Russinovich) but its measured gaming "
-                    "impact is hardware and workload dependent — treat as an "
+                    "impact is hardware and workload dependent; treat as an "
                     "experimental tradeoff, not a guaranteed win. Can interact "
                     "with real-time audio, OBS capture, and some anti-cheat."
                 ),

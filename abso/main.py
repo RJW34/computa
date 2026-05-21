@@ -382,7 +382,7 @@ def setup() -> None:
     """
     if not is_admin():
         console.print("[red]Setup wizard requires admin privileges.[/red]")
-        console.print("Please run from an elevated (admin) terminal.")
+        console.print("Please run from an elevated terminal.")
         raise SystemExit(1)
     from abso.core.setup_wizard import SetupWizard
     SetupWizard().run()
@@ -820,7 +820,7 @@ def apply(profile_name: str, no_backup: bool, benchmark: bool, json_output: bool
         if no_backup:
             console.print("[yellow]Warning: Skipping backup as requested.[/yellow]\n")
         else:
-            console.print("[yellow]Creating backup before applying changes...[/yellow]")
+            console.print("[yellow]Creating backup...[/yellow]")
 
     # --- Benchmark: capture baseline before apply ---
     benchmark_baseline = None
@@ -848,10 +848,10 @@ def apply(profile_name: str, no_backup: bool, benchmark: bool, json_output: bool
                 baseline_capture = bench.capture(benchmark_exe, duration=30)
                 benchmark_baseline = bench.analyze(baseline_capture)
             elif not json_output:
-                console.print("[dim]Game not running — skipping benchmark baseline[/dim]")
+                console.print("[dim]Game not running - skipping benchmark baseline[/dim]")
         except PresentMonNotFoundError:
             if not json_output:
-                console.print("[dim]PresentMon not found — skipping benchmark[/dim]")
+                console.print("[dim]PresentMon not found - skipping benchmark[/dim]")
             benchmark = False
         except Exception as e:
             if not json_output:
@@ -925,13 +925,13 @@ def apply(profile_name: str, no_backup: bool, benchmark: bool, json_output: bool
                 )
 
             if result.requires_reboot and result.reboot_reasons:
-                console.print("[yellow]Note: The following changes require a reboot to take effect:[/yellow]")
+                console.print("[yellow]Reboot required for:[/yellow]")
                 for reason in result.reboot_reasons:
                     console.print(f"  [yellow]- {reason}[/yellow]")
-                console.print(f"[dim]Run 'abso verify {profile_name}' to check if reboot is still needed.[/dim]")
+                console.print(f"[dim]Run 'abso verify {profile_name}' to re-check after reboot.[/dim]")
             elif result.requires_reboot:
-                console.print("[yellow]Note: Some changes may require a reboot to take effect.[/yellow]")
-                console.print(f"[dim]Run 'abso verify {profile_name}' to check if reboot is still needed.[/dim]")
+                console.print("[yellow]Some changes may require a reboot.[/yellow]")
+                console.print(f"[dim]Run 'abso verify {profile_name}' to re-check after reboot.[/dim]")
 
             warning_prefix = "Caution" if apply_summary_level == "caution" else "Warning"
             for warning in apply_warnings:
@@ -1118,7 +1118,7 @@ def launch(
         console.print("[red]Launch flow failed.[/red]")
 
     if tx.success and apply_result and apply_result.success and not launch_result.restored:
-        console.print("[yellow]Profile settings may still be active because apply succeeded before launch failed.[/yellow]")
+        console.print("[yellow]Profile settings remain applied; the apply step finished before launch failed.[/yellow]")
 
     sys.exit(1)
 
@@ -1223,7 +1223,6 @@ def verify(profile_name: str, json_output: bool) -> None:
 
         if all_active:
             console.print("\n[green]All verifiable settings are active.[/green]")
-            console.print("[dim]No outstanding verification mismatches were detected.[/dim]")
         else:
             console.print("\n[yellow]Some settings are not yet in the intended state:[/yellow]")
 
@@ -1300,8 +1299,8 @@ def restore(backup_id: str, json_output: bool) -> None:
         console.print(
             f"\n[green]Backup '{backup_id}' restore completed for fully restorable handlers.[/green]"
         )
-        console.print("[yellow]Note: Some changes may require a reboot to take effect.[/yellow]")
-        console.print("[dim]If restoring to previously-active settings, no reboot is needed.[/dim]")
+        console.print("[yellow]Some changes may require a reboot.[/yellow]")
+        console.print("[dim]Restoring to previously-active settings does not need a reboot.[/dim]")
     except FileNotFoundError:
         if json_output:
             json_error(f"Backup '{backup_id}' not found")
@@ -1500,7 +1499,7 @@ def timer(resolution: float, keep_alive: bool, status: bool, json_output: bool) 
                 console.print("[green]Timer resolution released.[/green]")
         else:
             console.print("[dim]Note: Resolution will revert when this process exits.[/dim]")
-            console.print("[dim]Use --keep-alive to maintain continuously.[/dim]")
+            console.print("[dim]Use --keep-alive to hold the resolution.[/dim]")
     else:
         if json_output:
             json_error(f"Failed to set timer resolution: {result.get('error')}")
@@ -2071,7 +2070,7 @@ sync_mode: off
 """
     output_path.write_text(yaml_content, encoding="utf-8")
     console.print(f"[green]Profile created: {output_path}[/green]")
-    console.print(f"Edit the YAML to customize settings, then restart the tray or run [bold]abso profiles[/bold] to verify.")
+    console.print("Edit the YAML to customize, then run [bold]abso profiles[/bold] to confirm it loads.")
 
 
 def _base_to_preset(base: str) -> str:
@@ -2146,7 +2145,7 @@ def debloat(tier: int, dry_run: bool, json_output: bool) -> None:
 
     Tier 1: Safe telemetry/privacy tweaks (always reversible).
     Tier 2: Moderate tweaks including background app control.
-    Tier 3: Aggressive — removes bloatware appx packages (partially irreversible).
+    Tier 3: Aggressive - removes bloatware appx packages (partially irreversible).
     """
     if not is_admin():
         if json_output:
@@ -2167,9 +2166,9 @@ def debloat(tier: int, dry_run: bool, json_output: bool) -> None:
                      "optimal": i.optimal_value} for i in issues
                 ]})
             else:
-                console.print(Panel(f"Debloat Tier {tier} — Dry Run ({len(issues)} items)", style="bold yellow"))
+                console.print(Panel(f"Debloat Tier {tier} - Dry Run ({len(issues)} items)", style="bold yellow"))
                 for issue in issues:
-                    console.print(f"  [yellow]{issue.title}[/yellow]: {issue.current_value} → {issue.optimal_value}")
+                    console.print(f"  [yellow]{issue.title}[/yellow]: {issue.current_value} -> {issue.optimal_value}")
             return
 
         if not json_output:
@@ -2185,7 +2184,7 @@ def debloat(tier: int, dry_run: bool, json_output: bool) -> None:
             console.print(f"[green]Debloat tier {tier} apply completed.[/green]")
             if result.get("applied"):
                 for item in result["applied"]:
-                    console.print(f"  [green]✓[/green] {item}")
+                    console.print(f"  [green]+[/green] {item}")
         else:
             console.print(f"[red]Debloat failed: {result.get('error')}[/red]")
             sys.exit(1)

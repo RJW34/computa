@@ -57,7 +57,7 @@ const ADVANCED_SETTINGS = [
       {
         id: 'vbs',
         label: 'VBS / Memory Integrity',
-        description: 'Security feature with ~5% performance cost',
+        description: 'Security feature; ~1-7% gaming cost on modern hardware',
         default: false,
       },
       {
@@ -69,8 +69,8 @@ const ADVANCED_SETTINGS = [
       {
         id: 'mpo',
         label: 'Multi-Plane Overlay',
-        description: 'Can cause stutter in some games',
-        default: false,
+        description: 'Required for G-SYNC/VRR on Windows 11 24H2+',
+        default: true,
       },
     ],
   },
@@ -123,10 +123,10 @@ export function SettingsEditor() {
               <ShieldAlert className="h-5 w-5 text-warning flex-shrink-0 mt-0.5" />
               <div className="space-y-3">
                 <div>
-                  <p className="font-medium">Direct per-setting apply is intentionally disabled.</p>
+                  <p className="font-medium">Per-setting apply is disabled.</p>
                   <p className="text-sm text-muted-foreground">
-                    This page now shows the targets ABSO profiles aim for. We only apply settings
-                    through the profile pipeline so backup, validation, and rollback stay honest.
+                    This page shows the targets profiles aim for. Apply runs through the profile
+                    pipeline so backup, validation, and rollback stay accurate.
                   </p>
                 </div>
                 <div className="flex flex-wrap gap-2">

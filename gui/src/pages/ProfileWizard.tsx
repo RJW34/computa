@@ -380,8 +380,8 @@ export function ProfileWizard() {
                 <h4 className="font-medium">Backend Application Scope</h4>
                 <p className="text-sm text-muted-foreground">
                   {selectedProfile.application_scope === 'system_plus_native_config'
-                    ? 'ABSO will apply both machine-level settings and a title-specific config handler for this profile.'
-                    : 'ABSO will apply the machine-level path for this profile, but the title itself still relies on manual in-game guidance.'}
+                    ? 'Applies machine-level settings and a title-specific config handler.'
+                    : 'Applies machine-level settings only; the title still relies on manual in-game configuration.'}
                 </p>
                 <ul className="text-sm text-muted-foreground space-y-1">
                   {(selectedProfile.handlers || []).map((handlerName) => (
@@ -410,8 +410,8 @@ export function ProfileWizard() {
                 <h4 className="font-medium">In-Game Guidance</h4>
                 <p className="text-sm text-muted-foreground">
                   {selectedProfile.has_in_game_settings
-                    ? 'This profile includes an in-game settings report. ABSO will load the generated report after a successful apply.'
-                    : 'This profile does not currently publish an in-game settings report.'}
+                    ? 'An in-game settings report loads after a successful apply.'
+                    : 'No in-game settings report for this profile.'}
                 </p>
               </CardContent>
             </Card>
@@ -421,8 +421,7 @@ export function ProfileWizard() {
         {wizardStep === 2 && (
           <div className="space-y-4">
             <p className="text-muted-foreground mb-4">
-              Before applying changes, ABSO can create a backup so you can restore your
-              previous settings if needed.
+              ABSO can create a backup first so you can roll back if needed.
             </p>
 
             <Card
@@ -447,7 +446,7 @@ export function ProfileWizard() {
                   <div>
                     <h4 className="font-medium">Create backup before applying (Recommended)</h4>
                     <p className="text-sm text-muted-foreground">
-                      The profile pipeline will save a restore point automatically.
+                      A restore point is saved automatically.
                     </p>
                   </div>
                 </div>
@@ -476,7 +475,7 @@ export function ProfileWizard() {
                   <div>
                     <h4 className="font-medium">Skip backup</h4>
                     <p className="text-sm text-warning">
-                      Undo will be unavailable if you skip backup creation.
+                      Undo will be unavailable.
                     </p>
                   </div>
                 </div>
@@ -521,18 +520,17 @@ export function ProfileWizard() {
                     <span className="font-medium">Running backend profile pipeline...</span>
                   </div>
                   <div className="text-sm text-muted-foreground space-y-2">
-                    <p>Backup creation: {createBackup ? 'enabled' : 'disabled'}.</p>
+                    <p>Backup: {createBackup ? 'enabled' : 'skipped'}.</p>
                     <p>
-                      This screen updates when the backend finishes. Live per-handler progress is
-                      not surfaced here yet, so ABSO does not fake stage-by-stage completion.
+                      This screen updates when the backend finishes. Per-handler progress is not
+                      yet streamed live.
                     </p>
                   </div>
                 </CardContent>
               </Card>
             ) : !applyError && (
               <p className="text-muted-foreground">
-                Click Apply Now to run the full backend profile pipeline for{' '}
-                {selectedProfile?.display_name}.
+                Click Apply Now to run the profile pipeline for {selectedProfile?.display_name}.
               </p>
             )}
           </div>
@@ -556,21 +554,21 @@ export function ProfileWizard() {
             </div>
             <h2 className="text-2xl font-semibold">
               {committedWithWarnings
-                ? 'Committed With Warnings'
+                ? 'Completed With Warnings'
                 : appliedWithCautions
-                  ? 'Apply Completed With Cautions'
+                  ? 'Completed With Cautions'
                   : appliedWithNotices
-                    ? 'Apply Completed With Notices'
+                    ? 'Completed With Notices'
                     : 'Apply Completed'}
             </h2>
             <p className="text-muted-foreground">
               {committedWithWarnings
-                ? `${selectedProfile?.display_name} apply completed, but ABSO recorded warning conditions you should review. Run 'abso verify' to confirm handler state.`
+                ? `${selectedProfile?.display_name} applied with warnings worth reviewing. Run 'abso verify' to confirm handler state.`
                 : appliedWithCautions
-                  ? `${selectedProfile?.display_name} apply completed, with environmental cautions worth keeping in mind.`
+                  ? `${selectedProfile?.display_name} applied with environmental cautions worth noting.`
                   : appliedWithNotices
-                    ? `${selectedProfile?.display_name} apply completed, with additional notices recorded by ABSO.`
-                    : `${selectedProfile?.display_name} apply completed. Run 'abso verify' to confirm handler state.`}
+                    ? `${selectedProfile?.display_name} applied with notices below.`
+                    : `${selectedProfile?.display_name} applied. Run 'abso verify' to confirm handler state.`}
             </p>
 
             <Card className="text-left">
@@ -579,7 +577,7 @@ export function ProfileWizard() {
                 <p className="text-sm text-muted-foreground">
                   {appliedBackupId
                     ? `Backup created: ${appliedBackupId}`
-                    : 'No backup was created for this apply.'}
+                    : 'No backup created.'}
                 </p>
               </CardContent>
             </Card>
@@ -596,7 +594,7 @@ export function ProfileWizard() {
                     </ul>
                   ) : (
                     <p className="text-sm text-muted-foreground">
-                      The backend reported that some changes may require a reboot.
+                      Some changes may require a reboot.
                     </p>
                   )}
                 </CardContent>
@@ -629,7 +627,7 @@ export function ProfileWizard() {
                   <h4 className="font-medium">Notices</h4>
                   <ul className="text-sm text-muted-foreground space-y-1">
                     {applyNotices.map((notice) => (
-                      <li key={notice}>â€¢ {notice}</li>
+                      <li key={notice}>• {notice}</li>
                     ))}
                   </ul>
                 </CardContent>
@@ -646,7 +644,7 @@ export function ProfileWizard() {
                 {selectedProfile?.has_in_game_settings ? (
                   <>
                     <p className="text-sm text-muted-foreground">
-                      This is the actual generated report for the selected profile.
+                      Generated for this profile.
                     </p>
                     <div className="bg-muted rounded-md p-4 font-mono text-sm whitespace-pre-wrap max-h-80 overflow-auto">
                       {reportError
@@ -696,7 +694,7 @@ export function ProfileWizard() {
                 )}
                 {appliedBackupId ? 'Undo (Restore)' : 'Undo Unavailable'}
               </Button>
-              <Button onClick={handleDone}>Done (Go Home)</Button>
+              <Button onClick={handleDone}>Done</Button>
             </div>
           </div>
         )}

@@ -2,7 +2,7 @@ import * as React from 'react';
 import { Header } from '@/components/Header';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Copy, FileDown, Gamepad2 } from 'lucide-react';
+import { Copy, Gamepad2 } from 'lucide-react';
 import { useAppStore } from '@/stores/appStore';
 import * as api from '@/lib/api';
 
@@ -108,10 +108,6 @@ export function Reports() {
               <Button variant="outline" onClick={handleCopy} disabled={!reportContent}>
                 <Copy className="h-4 w-4 mr-2" />
                 Copy to Clipboard
-              </Button>
-              <Button variant="outline" disabled>
-                <FileDown className="h-4 w-4 mr-2" />
-                Export as PDF
               </Button>
             </div>
           </CardContent>

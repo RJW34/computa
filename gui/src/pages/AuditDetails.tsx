@@ -202,7 +202,7 @@ export function AuditDetails() {
 
         {filteredIssues.length > 0 && (
           <div className="mt-6 rounded-lg border bg-muted/40 px-4 py-3 text-sm text-muted-foreground">
-            Automatic per-issue fixing is not available from this screen. Use the profile pipeline or review profile-driven targets instead.
+            Per-issue fixing is not exposed here. Apply a profile to remediate, or review the profile-driven targets.
             <div className="mt-3 flex flex-wrap gap-2">
               <Button size="sm" onClick={() => setPage('profile-wizard')}>
                 Apply a Profile

@@ -81,7 +81,7 @@ class MemorySettingsHandler(SettingsHandler):
                 explanation=(
                     "DisablePagingExecutive keeps kernel code in physical RAM. "
                     "On systems with 16GB+ RAM (standard for gaming PCs), "
-                    "Windows already keeps the kernel resident — this setting "
+                    "Windows already keeps the kernel resident, so this setting "
                     "has no measurable effect. Requires reboot. "
                     "Opt-in via include_legacy_tweaks."
                 ),

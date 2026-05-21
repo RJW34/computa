@@ -503,7 +503,7 @@ class AmdSettingsHandler(SettingsHandler):
             applied.append(label)
             logger.info("Set AMD driver %s = %d", reg_name, value)
         except PermissionError as exc:
-            msg = f"{label}: Permission denied — run as administrator ({exc})"
+            msg = f"{label}: Permission denied; run as administrator ({exc})"
             errors.append(msg)
             logger.error("Failed to set AMD driver %s: %s", reg_name, exc)
         except OSError as exc:

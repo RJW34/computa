@@ -36,7 +36,7 @@ export function BackupManager() {
       setActiveProfile(null);
       await api.setActiveProfileBackend(null);
       await loadBackups();
-      setActionMessage(`Restored backup ${backupId}. Active profile state was cleared.`);
+      setActionMessage(`Restored backup ${backupId}. Active profile cleared.`);
     } catch (error) {
       setActionError(error instanceof Error ? error.message : 'Failed to restore backup');
     } finally {

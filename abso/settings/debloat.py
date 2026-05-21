@@ -469,7 +469,7 @@ class DebloatHandler(SettingsHandler):
             if cur_val is None:
                 # Key doesn't exist — treat as needing the tweak
                 issues.append(Issue(
-                    title=f"[Debloat T{tweak.tier}] {tweak.name} — not configured",
+                    title=f"[Debloat T{tweak.tier}] {tweak.name} (not configured)",
                     severity="info",
                     current_value="(not set)",
                     optimal_value=str(tweak.desired),

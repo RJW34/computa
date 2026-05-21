@@ -501,7 +501,7 @@ class DiagnosticsSettingsHandler(SettingsHandler):
                     title="RAM appears to be running below its rated speed",
                     severity="info",
                     current_value=f"{configured_max} MT/s (configured)",
-                    optimal_value=f"{rated_max} MT/s (rated — enable XMP / EXPO in BIOS)",
+                    optimal_value=f"{rated_max} MT/s (rated; enable XMP / EXPO in BIOS)",
                     explanation=(
                         "DDR4 XMP or DDR5 EXPO/DOCP profiles must be enabled in BIOS "
                         "for RAM to run at its advertised speed. ABSO cannot toggle "

@@ -85,9 +85,8 @@ export function TimerResolution() {
                   latency, use Nvidia Reflex or frame queue management.
                 </p>
                 <p className="text-muted-foreground mt-2">
-                  The GUI currently exposes timer status only. A one-shot timer request would
-                  revert as soon as the command exits, so we do not present a fake “Apply”
-                  control here until a persistent desktop-owned timer service exists.
+                  Read-only here. A one-shot request would revert as soon as the command exits,
+                  so no Apply control is exposed until a persistent timer service exists.
                 </p>
               </div>
             </div>

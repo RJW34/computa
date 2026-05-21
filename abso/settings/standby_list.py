@@ -292,7 +292,7 @@ class StandbyListHandler(SettingsHandler):
 
         if available_mb < _LOW_AVAILABLE_MB:
             issues.append(Issue(
-                title="Low available memory — standby list may need purging",
+                title="Low available memory - standby list may need purging",
                 severity="info",
                 current_value=f"{available_mb} MB available of {total_mb} MB",
                 optimal_value=f">= {_LOW_AVAILABLE_MB} MB available",
