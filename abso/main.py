@@ -320,6 +320,64 @@ def _run_post_apply_sweep(
         }
 
 
+def _enforce_running_process_priority(profile: Any) -> dict[str, Any] | None:
+    """Re-assert IFEO process priority on running game instances.
+
+    ABSO writes ``CpuPriorityClass=3`` to IFEO ``PerfOptions`` at apply
+    time. Windows usually honors this at process creation, but some
+    hardened games (Overwatch 2 in particular, presumably via its
+    anti-cheat) explicitly call ``SetPriorityClass(NORMAL)`` on startup
+    and override the IFEO hint - the live process ends up at Normal
+    despite the registry saying High.
+
+    This helper enumerates the profile's executable hints, looks for the
+    declared CPU priority in any ``ProcessPriorityHandler`` configured by
+    the profile, and re-asserts the priority via PowerShell on every
+    matching running process. It is idempotent (no-op if priority is
+    already correct) and non-fatal (errors are returned in the payload).
+
+    Returns ``None`` if the profile has no ProcessPriorityHandler or no
+    executables, otherwise a result dict with ``priority_name``,
+    ``targeted`` (the exes acted on), and ``errors``.
+    """
+    try:
+        executables = list(getattr(profile, "executable_hints", []) or [])
+        if not executables:
+            return None
+
+        from abso.settings.process_priority import ProcessPriorityHandler
+
+        # Find the priority that the profile itself declares for its handler,
+        # falling back to High (the gaming default) if the profile doesn't
+        # have a ProcessPriorityHandler entry.
+        priority_settings = profile.get_settings("ProcessPriorityHandler") or {}
+        cpu_priority = priority_settings.get("cpu_priority", ProcessPriorityHandler.CPU_PRIORITY_HIGH)
+
+        handler = ProcessPriorityHandler(executables)
+        handler._set_running_processes_priority(cpu_priority)
+
+        priority_map = {
+            ProcessPriorityHandler.CPU_PRIORITY_IDLE: "Idle",
+            ProcessPriorityHandler.CPU_PRIORITY_NORMAL: "Normal",
+            ProcessPriorityHandler.CPU_PRIORITY_HIGH: "High",
+            ProcessPriorityHandler.CPU_PRIORITY_REALTIME: "RealTime",
+        }
+        return {
+            "targeted": executables,
+            "cpu_priority": cpu_priority,
+            "priority_name": priority_map.get(cpu_priority, "High"),
+            "errors": [],
+        }
+    except Exception as exc:
+        logger.warning("Live priority enforcement failed: %s", exc)
+        return {
+            "targeted": [],
+            "cpu_priority": None,
+            "priority_name": None,
+            "errors": [str(exc)],
+        }
+
+
 def _collect_apply_warnings(
     tx: ProfileTransactionManager | Any,
     result: Any | None,
@@ -2414,6 +2472,17 @@ def launch_sweep(profile_name: str, include_opt_in: bool, dry_run: bool, json_ou
     sweep_result = janitor.sweep(resolved, dry_run=dry_run)
     result_dict = sweep_result.to_dict()
 
+    # Re-assert process priority on already-running game instances. ABSO
+    # writes CpuPriorityClass to IFEO/PerfOptions at apply time, but some
+    # hardened games (Overwatch 2 in particular, via its anti-cheat) call
+    # SetPriorityClass(NORMAL) on startup and override the IFEO hint. The
+    # tray invokes launch-sweep on game-detect and periodically while the
+    # game is alive, so this is the right place to enforce priority on the
+    # live process. Idempotent and non-fatal.
+    priority_enforcement: dict[str, Any] | None = None
+    if not dry_run:
+        priority_enforcement = _enforce_running_process_priority(profile)
+
     if json_output:
         output_json(
             {
@@ -2421,6 +2490,7 @@ def launch_sweep(profile_name: str, include_opt_in: bool, dry_run: bool, json_ou
                 "include_opt_in": include_opt_in,
                 "dry_run": dry_run,
                 "result": result_dict,
+                "priority_enforcement": priority_enforcement,
             }
         )
         return
@@ -2440,6 +2510,11 @@ def launch_sweep(profile_name: str, include_opt_in: bool, dry_run: bool, json_ou
     if sweep_result.warnings:
         for warning in sweep_result.warnings:
             console.print(f"[yellow]Warning:[/yellow] {warning}")
+    if priority_enforcement and priority_enforcement.get("targeted"):
+        targeted = priority_enforcement["targeted"]
+        console.print(
+            f"[dim]Re-asserted '{priority_enforcement.get('priority_name', 'High')}' priority on {len(targeted)} live process target(s): {', '.join(targeted)}[/dim]"
+        )
 
 
 def main() -> None:
