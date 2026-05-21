@@ -41,6 +41,48 @@
       }
     },
     {
+      "id": "apply-slippi-melee-hdr",
+      "profile_id": "slippi-melee-hdr",
+      "kind": "apply_profile",
+      "assumptions": [
+        "administrator",
+        "nvidia_gpu",
+        "hdr_capable"
+      ],
+      "expected": {
+        "transaction_state": "committed",
+        "apply_success": true
+      }
+    },
+    {
+      "id": "apply-slippi-melee-universal-hdr",
+      "profile_id": "slippi-melee-universal-hdr",
+      "kind": "apply_profile",
+      "assumptions": [
+        "administrator",
+        "nvidia_gpu",
+        "hdr_capable"
+      ],
+      "expected": {
+        "transaction_state": "committed",
+        "apply_success": true
+      }
+    },
+    {
+      "id": "apply-slippi-melee-console-parity-hdr",
+      "profile_id": "slippi-melee-console-parity-hdr",
+      "kind": "apply_profile",
+      "assumptions": [
+        "administrator",
+        "nvidia_gpu",
+        "hdr_capable"
+      ],
+      "expected": {
+        "transaction_state": "committed",
+        "apply_success": true
+      }
+    },
+    {
       "id": "apply-rivals2-offline",
       "profile_id": "rivals2-offline",
       "kind": "apply_profile",
@@ -117,6 +159,62 @@
         "administrator",
         "nvidia_gpu",
         "vrr_confirmed"
+      ],
+      "expected": {
+        "transaction_state": "committed",
+        "apply_success": true
+      }
+    },
+    {
+      "id": "apply-deadlock",
+      "profile_id": "deadlock",
+      "kind": "apply_profile",
+      "assumptions": [
+        "administrator",
+        "nvidia_gpu"
+      ],
+      "expected": {
+        "transaction_state": "committed",
+        "apply_success": true
+      }
+    },
+    {
+      "id": "apply-deadlock-hdr",
+      "profile_id": "deadlock-hdr",
+      "kind": "apply_profile",
+      "assumptions": [
+        "administrator",
+        "nvidia_gpu",
+        "hdr_capable"
+      ],
+      "expected": {
+        "transaction_state": "committed",
+        "apply_success": true
+      }
+    },
+    {
+      "id": "apply-deadlock-gsync",
+      "profile_id": "deadlock-gsync",
+      "kind": "apply_profile",
+      "assumptions": [
+        "administrator",
+        "nvidia_gpu",
+        "vrr_confirmed"
+      ],
+      "expected": {
+        "transaction_state": "committed",
+        "apply_success": true
+      }
+    },
+    {
+      "id": "apply-deadlock-gsync-hdr",
+      "profile_id": "deadlock-gsync-hdr",
+      "kind": "apply_profile",
+      "assumptions": [
+        "administrator",
+        "nvidia_gpu",
+        "vrr_confirmed",
+        "hdr_capable"
       ],
       "expected": {
         "transaction_state": "committed",

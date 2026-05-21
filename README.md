@@ -110,9 +110,9 @@ python -m abso restore 20240115_143022  # Specific backup
 
 | Profile | Game | Focus |
 |---------|------|-------|
-| `slippi-melee` | Super Smash Bros. Melee (Slippi) | Ultra-low latency |
-| `slippi-melee-console-parity` | Super Smash Bros. Melee (Slippi) | Console-like pacing/feel |
-| `slippi-melee-universal` | Super Smash Bros. Melee (Slippi) | Lowest latency with fixed HAGS (no reboot) |
+| `slippi-melee` / `slippi-melee-hdr` | Super Smash Bros. Melee (Slippi) | Ultra-low latency (SDR / HDR) |
+| `slippi-melee-console-parity` / `slippi-melee-console-parity-hdr` | Super Smash Bros. Melee (Slippi) | Console-like pacing/feel (SDR / HDR) |
+| `slippi-melee-universal` / `slippi-melee-universal-hdr` | Super Smash Bros. Melee (Slippi) | Lowest latency with fixed HAGS (no reboot) (SDR / HDR) |
 | `rivals2-offline` | Rivals of Aether 2 | Offline no-sync latency |
 | `rivals2-online` | Rivals of Aether 2 | Rollback-safe online play |
 | `rivals2-gsync` | Rivals of Aether 2 | Low-latency VRR offline |

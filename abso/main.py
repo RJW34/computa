@@ -2230,6 +2230,145 @@ def cpu_balance(pid: int, system_threshold: int, process_threshold: int, poll_in
     balancer.run()
 
 
+@cli.command("launch-killset")
+@click.argument("profile_name")
+@click.option("--include-opt-in", is_flag=True, help="Include the opt-in tier (cloud sync, OEM RGB, etc.)")
+@click.option("--json", "json_output", is_flag=True, help="Output as JSON for GUI integration")
+def launch_killset(profile_name: str, include_opt_in: bool, json_output: bool) -> None:
+    """Print the launch-time process killset for a profile (read-only).
+
+    Used by the tray watcher to discover which background processes the
+    launch-time janitor would stop while this profile's game is alive. No
+    system state is changed by this command.
+    """
+    canonical = resolve_profile_id(profile_name) or profile_name
+    profile_classes = {entry["id"]: entry for entry in get_profile_manifest()}
+    if canonical not in profile_classes:
+        if json_output:
+            json_error(f"Unknown profile: {profile_name}")
+        else:
+            console.print(f"[red]Unknown profile: {profile_name}[/red]")
+        sys.exit(1)
+
+    from abso.profiles.catalog import get_profile_instances
+
+    profile = get_profile_instances().get(canonical)
+    if profile is None:
+        if json_output:
+            json_error(f"Profile instance unavailable: {canonical}")
+        else:
+            console.print(f"[red]Profile instance unavailable: {canonical}[/red]")
+        sys.exit(1)
+
+    killset = profile.launch_process_killset()
+    resolved = killset.resolve(include_opt_in=include_opt_in)
+
+    if json_output:
+        output_json(
+            {
+                "profile": canonical,
+                "executables": profile.executable_hints,
+                "killset": killset.to_dict(),
+                "resolved": resolved,
+                "include_opt_in": include_opt_in,
+            }
+        )
+        return
+
+    console.print(Panel(f"Launch killset: {canonical}", style="bold blue"))
+    console.print(f"Game executables: {', '.join(profile.executable_hints) or '(none)'}")
+    console.print(f"\nAlways-safe images ({len(killset.always_safe)}):")
+    for image in killset.always_safe:
+        console.print(f"  - {image}")
+    if killset.opt_in:
+        marker = "kill" if include_opt_in else "hold"
+        console.print(f"\nOpt-in images ({len(killset.opt_in)}) [{marker}]:")
+        for image in killset.opt_in:
+            console.print(f"  - {image}")
+
+
+@cli.command("launch-sweep")
+@click.argument("profile_name")
+@click.option("--include-opt-in", is_flag=True, help="Also stop opt-in tier (cloud sync, OEM RGB, etc.)")
+@click.option("--dry-run", is_flag=True, help="Report what would be stopped without invoking taskkill")
+@click.option("--json", "json_output", is_flag=True, help="Output as JSON for GUI integration")
+def launch_sweep(profile_name: str, include_opt_in: bool, dry_run: bool, json_output: bool) -> None:
+    """Sweep launch-time killset processes for an active profile.
+
+    Intended to be called by the tray watcher when the profile's game binary
+    is first detected running, and periodically while alive. Stops latency-
+    impacting overlay / capture / vendor processes from the always-safe tier
+    by default; pass ``--include-opt-in`` to also stop cloud-sync and OEM RGB
+    daemons.
+    """
+    canonical = resolve_profile_id(profile_name) or profile_name
+    from abso.core.process_janitor import ProcessJanitor
+    from abso.profiles.catalog import get_profile_instances
+
+    profile = get_profile_instances().get(canonical)
+    if profile is None:
+        if json_output:
+            json_error(f"Unknown profile: {profile_name}")
+        else:
+            console.print(f"[red]Unknown profile: {profile_name}[/red]")
+        sys.exit(1)
+
+    killset = profile.launch_process_killset()
+    resolved = killset.resolve(include_opt_in=include_opt_in)
+
+    if not resolved:
+        payload = {
+            "profile": canonical,
+            "include_opt_in": include_opt_in,
+            "dry_run": dry_run,
+            "result": {
+                "attempted": [],
+                "stopped": [],
+                "not_running": [],
+                "failed": [],
+                "notices": [f"No launch killset images defined for profile '{canonical}'."],
+                "warnings": [],
+                "changed": False,
+            },
+        }
+        if json_output:
+            output_json(payload)
+        else:
+            console.print(f"[yellow]{payload['result']['notices'][0]}[/yellow]")
+        return
+
+    janitor = ProcessJanitor()
+    sweep_result = janitor.sweep(resolved, dry_run=dry_run)
+    result_dict = sweep_result.to_dict()
+
+    if json_output:
+        output_json(
+            {
+                "profile": canonical,
+                "include_opt_in": include_opt_in,
+                "dry_run": dry_run,
+                "result": result_dict,
+            }
+        )
+        return
+
+    title = f"Launch sweep: {canonical} ({'dry-run' if dry_run else 'live'})"
+    console.print(Panel(title, style="bold blue"))
+    if sweep_result.stopped:
+        console.print(f"[green]Stopped ({len(sweep_result.stopped)}):[/green]")
+        for image in sweep_result.stopped:
+            console.print(f"  - {image}")
+    if sweep_result.not_running:
+        console.print(f"[dim]Not running ({len(sweep_result.not_running)}): {', '.join(sweep_result.not_running)}[/dim]")
+    if sweep_result.failed:
+        console.print(f"[red]Failed ({len(sweep_result.failed)}):[/red]")
+        for image in sweep_result.failed:
+            console.print(f"  - {image}")
+    if sweep_result.warnings:
+        for warning in sweep_result.warnings:
+            console.print(f"[yellow]Warning:[/yellow] {warning}")
+
+
 def main() -> None:
     """Main entry point."""
     cli()

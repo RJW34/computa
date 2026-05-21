@@ -7,6 +7,12 @@ from abso.profiles.catalog import (
     get_profile_manifest,
     resolve_profile_id,
 )
+from abso.profiles.deadlock import (
+    DeadlockGSyncHDRProfile,
+    DeadlockGSyncProfile,
+    DeadlockHDRProfile,
+    DeadlockProfile,
+)
 from abso.profiles.diablo4 import Diablo4Profile, Diablo4SDRProfile
 from abso.profiles.fortnite import FortniteHDRProfile, FortniteProfile
 from abso.profiles.marvel_rivals import MarvelRivalsHDRProfile, MarvelRivalsSDRProfile
@@ -31,16 +37,22 @@ from abso.profiles.rivals2_offline import Rivals2OfflineProfile
 from abso.profiles.rivals2_online import Rivals2OnlineProfile
 from abso.profiles.ryujinx_ssbu import RyujinxSSBUProfile
 from abso.profiles.slippi_melee import (
+    SlippiMeleeConsoleParityHDRProfile,
     SlippiMeleeConsoleParityProfile,
+    SlippiMeleeHDRProfile,
     SlippiMeleeProfile,
+    SlippiMeleeUniversalHDRProfile,
     SlippiMeleeUniversalProfile,
 )
 
 __all__ = [
     "BaseProfile",
     "SlippiMeleeConsoleParityProfile",
+    "SlippiMeleeConsoleParityHDRProfile",
     "SlippiMeleeProfile",
+    "SlippiMeleeHDRProfile",
     "SlippiMeleeUniversalProfile",
+    "SlippiMeleeUniversalHDRProfile",
     "Rivals2Profile",
     "Rivals2OfflineProfile",
     "Rivals2OnlineProfile",
@@ -59,6 +71,10 @@ __all__ = [
     "Overwatch2GSyncHDRProfile",
     "Overwatch2GSyncCaptureProfile",
     "Overwatch2GSyncHDRCaptureProfile",
+    "DeadlockProfile",
+    "DeadlockHDRProfile",
+    "DeadlockGSyncProfile",
+    "DeadlockGSyncHDRProfile",
     "PokemonAutoChessProfile",
     "PACDeluxeProfile",
     "ProductivityOLEDProfile",

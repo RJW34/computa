@@ -1088,14 +1088,45 @@ function Convert-CatalogEntriesToProfileMap {
             ""
         }
 
+        # Launch-time process janitor killset comes from the Python catalog
+        # so the tray never has to hardcode game-specific overlay/sync lists.
+        # Both tiers default to empty arrays when the catalog entry is older
+        # than the launch-sanitizer feature.
+        $alwaysSafe = @()
+        $optIn = @()
+        if ($entry.launch_process_killset) {
+            if ($entry.launch_process_killset.always_safe) {
+                foreach ($img in @($entry.launch_process_killset.always_safe)) {
+                    if (-not [string]::IsNullOrWhiteSpace("$img")) {
+                        $alwaysSafe += "$img"
+                    }
+                }
+            }
+            if ($entry.launch_process_killset.opt_in) {
+                foreach ($img in @($entry.launch_process_killset.opt_in)) {
+                    if (-not [string]::IsNullOrWhiteSpace("$img")) {
+                        $optIn += "$img"
+                    }
+                }
+            }
+        }
+
+        $requiresOverlayFree = $false
+        if ($null -ne $entry.requires_overlay_free_path) {
+            try { $requiresOverlayFree = [bool]$entry.requires_overlay_free_path } catch {}
+        }
+
         $profiles[$id] = @{
-            Name      = $name
-            Sub       = $sub
-            Cat       = $cat
-            Desc      = $desc
-            Exes      = $exeHints
-            SyncMode  = $syncMode
-            OptTarget = $optTarget
+            Name                  = $name
+            Sub                   = $sub
+            Cat                   = $cat
+            Desc                  = $desc
+            Exes                  = $exeHints
+            SyncMode              = $syncMode
+            OptTarget             = $optTarget
+            KillsetAlwaysSafe     = $alwaysSafe
+            KillsetOptIn          = $optIn
+            RequiresOverlayFree   = $requiresOverlayFree
         }
     }
 
@@ -2987,6 +3018,277 @@ function Stop-ProcessGuardTimer {
 }
 
 # ============================================================================
+# LAUNCH SANITIZER - Kill latency-impacting overlays/capture/sync daemons
+# whenever the active profile's game binary is detected running.
+# ============================================================================
+#
+# Where ProcessGuard demotes Discord priority continuously, LaunchSanitizer
+# only fires while the active profile's game is alive. It calls the Python
+# CLI `launch-sweep` against the per-profile killset (overlays, RTSS, Medal,
+# Xbox Game Bar, audio-enhancer DPC offenders) so anything that wakes up or
+# respawns mid-session is caught without the user having to babysit.
+#
+# Sweep tier:
+#   - always-safe: applied automatically (overlays/capture/OSDs/DPC offenders)
+#   - opt-in:      cloud sync + OEM RGB. Off unless TrayConfig flag is true.
+#
+# Cadence:
+#   - idle (no game alive): 30s tick to keep tray overhead near zero
+#   - active (game alive):  10s tick to catch respawns quickly
+#
+# Per-profile launch killset comes from $script:Profiles[<id>].KillsetAlwaysSafe
+# which is populated by the catalog cache - no game-specific lists live in the
+# tray itself.
+
+$script:LaunchSanitizerIdleIntervalMs   = 30000
+$script:LaunchSanitizerActiveIntervalMs = 10000
+$script:LaunchSanitizerTimer = $null
+$script:LaunchSanitizerActiveProfileId = $null
+$script:LaunchSanitizerLastSweepStopped = @{}
+$script:LaunchSanitizerGameWasAlive = $false
+
+function Get-ActiveProfileKillsetSummary {
+    <#
+    .SYNOPSIS
+    Returns a quick summary of the launch killset for the currently active profile.
+    Used by the QuickPanel / log on startup so the user can confirm the wiring
+    survived a profile cache regeneration.
+    #>
+    $profileId = $script:activeProfile
+    if ([string]::IsNullOrWhiteSpace($profileId)) { return $null }
+    $profile = $script:Profiles[$profileId]
+    if (-not $profile) { return $null }
+    return [pscustomobject]@{
+        ProfileId    = $profileId
+        Exes         = @($profile.Exes)
+        AlwaysSafe   = @($profile.KillsetAlwaysSafe)
+        OptIn        = @($profile.KillsetOptIn)
+        StrictPath   = [bool]$profile.RequiresOverlayFree
+    }
+}
+
+function Test-IsActiveProfileGameRunning {
+    <#
+    .SYNOPSIS
+    Returns $true if any of the active profile's game executables are alive.
+    Strips .exe before calling Get-Process because Get-Process matches by
+    base name (no extension).
+    #>
+    $summary = Get-ActiveProfileKillsetSummary
+    if (-not $summary -or -not $summary.Exes -or $summary.Exes.Count -eq 0) {
+        return $false
+    }
+    $baseNames = @()
+    foreach ($exe in $summary.Exes) {
+        if ([string]::IsNullOrWhiteSpace("$exe")) { continue }
+        $name = "$exe"
+        if ($name.ToLowerInvariant().EndsWith(".exe")) {
+            $name = $name.Substring(0, $name.Length - 4)
+        }
+        $baseNames += $name
+    }
+    if ($baseNames.Count -eq 0) { return $false }
+
+    $procs = Get-Process -Name $baseNames -ErrorAction SilentlyContinue
+    if ($procs) {
+        # Dispose handles right away - PS holds them open otherwise
+        foreach ($p in @($procs)) {
+            try { $p.Dispose() } catch {}
+        }
+        return $true
+    }
+    return $false
+}
+
+function Invoke-LaunchSweepCli {
+    <#
+    .SYNOPSIS
+    Calls `python -m abso launch-sweep <profile> --json` and returns the parsed
+    JSON payload (or $null on failure). Honors the IncludeOptIn flag derived
+    from TrayConfig.aggressiveProcessJanitor.
+    #>
+    param(
+        [Parameter(Mandatory = $true)][string]$ProfileId,
+        [bool]$IncludeOptIn = $false
+    )
+
+    if (-not $script:PythonExe) {
+        Write-TrayLog "LaunchSanitizer: PythonExe unresolved; skipping sweep" -Level "WARN"
+        return $null
+    }
+
+    $arguments = @("-m", "abso", "launch-sweep", $ProfileId, "--json")
+    if ($IncludeOptIn) {
+        $arguments += "--include-opt-in"
+    }
+
+    try {
+        $proc = Start-Process -FilePath $script:PythonExe `
+            -ArgumentList $arguments `
+            -NoNewWindow -Wait -PassThru `
+            -RedirectStandardOutput "$env:TEMP\abso_launch_sweep.stdout" `
+            -RedirectStandardError "$env:TEMP\abso_launch_sweep.stderr"
+
+        $stdout = ""
+        if (Test-Path "$env:TEMP\abso_launch_sweep.stdout") {
+            $stdout = Get-Content "$env:TEMP\abso_launch_sweep.stdout" -Raw -ErrorAction SilentlyContinue
+            Remove-Item "$env:TEMP\abso_launch_sweep.stdout" -Force -ErrorAction SilentlyContinue
+        }
+        if (Test-Path "$env:TEMP\abso_launch_sweep.stderr") {
+            $stderr = Get-Content "$env:TEMP\abso_launch_sweep.stderr" -Raw -ErrorAction SilentlyContinue
+            Remove-Item "$env:TEMP\abso_launch_sweep.stderr" -Force -ErrorAction SilentlyContinue
+            if ($stderr) {
+                Write-TrayLog "LaunchSanitizer stderr: $stderr" -Level "WARN"
+            }
+        }
+
+        if ($proc.ExitCode -ne 0) {
+            Write-TrayLog "LaunchSanitizer: launch-sweep exited $($proc.ExitCode)" -Level "WARN"
+        }
+
+        return Invoke-JsonSafe -Text $stdout -Source "LaunchSweep"
+    }
+    catch {
+        Write-TrayLog "LaunchSanitizer: failed to invoke launch-sweep: $($_.Exception.Message)" -Level "WARN"
+        return $null
+    }
+}
+
+function Invoke-LaunchSanitizerTick {
+    <#
+    .SYNOPSIS
+    One tick of the launch sanitizer. Idempotent and cheap when the active
+    profile's game is not running.
+    #>
+    try {
+        $profileId = $script:activeProfile
+        if ([string]::IsNullOrWhiteSpace($profileId)) {
+            $script:LaunchSanitizerActiveProfileId = $null
+            $script:LaunchSanitizerGameWasAlive = $false
+            if ($script:LaunchSanitizerTimer -and $script:LaunchSanitizerTimer.Interval -ne $script:LaunchSanitizerIdleIntervalMs) {
+                $script:LaunchSanitizerTimer.Interval = $script:LaunchSanitizerIdleIntervalMs
+            }
+            return
+        }
+
+        $profile = $script:Profiles[$profileId]
+        if (-not $profile -or -not $profile.KillsetAlwaysSafe -or $profile.KillsetAlwaysSafe.Count -eq 0) {
+            # Profile defines no killset (productivity etc.) - nothing to do.
+            $script:LaunchSanitizerActiveProfileId = $profileId
+            $script:LaunchSanitizerGameWasAlive = $false
+            if ($script:LaunchSanitizerTimer -and $script:LaunchSanitizerTimer.Interval -ne $script:LaunchSanitizerIdleIntervalMs) {
+                $script:LaunchSanitizerTimer.Interval = $script:LaunchSanitizerIdleIntervalMs
+            }
+            return
+        }
+
+        $gameAlive = Test-IsActiveProfileGameRunning
+
+        if (-not $gameAlive) {
+            if ($script:LaunchSanitizerGameWasAlive) {
+                Write-TrayLog "LaunchSanitizer: $profileId game exited; resuming idle cadence"
+                $script:LaunchSanitizerLastSweepStopped = @{}
+            }
+            $script:LaunchSanitizerGameWasAlive = $false
+            $script:LaunchSanitizerActiveProfileId = $profileId
+            if ($script:LaunchSanitizerTimer -and $script:LaunchSanitizerTimer.Interval -ne $script:LaunchSanitizerIdleIntervalMs) {
+                $script:LaunchSanitizerTimer.Interval = $script:LaunchSanitizerIdleIntervalMs
+            }
+            return
+        }
+
+        $includeOptIn = $false
+        if ($script:TrayConfig -and $script:TrayConfig.aggressiveProcessJanitor) {
+            $includeOptIn = [bool]$script:TrayConfig.aggressiveProcessJanitor
+        }
+
+        # First detection of game-alive transitions logs a banner so the user
+        # can correlate it with their session in the log.
+        $isFirstDetection = -not $script:LaunchSanitizerGameWasAlive
+        if ($isFirstDetection) {
+            $exeList = ($profile.Exes -join ", ")
+            $tier = if ($includeOptIn) { "always-safe + opt-in" } else { "always-safe" }
+            Write-TrayLog "LaunchSanitizer: game detected for '$profileId' ($exeList) - sweeping $tier killset"
+        }
+
+        $payload = Invoke-LaunchSweepCli -ProfileId $profileId -IncludeOptIn $includeOptIn
+
+        if ($payload -and $payload.result) {
+            $stopped = @()
+            if ($payload.result.stopped) { $stopped = @($payload.result.stopped) }
+
+            foreach ($img in $stopped) {
+                if (-not $script:LaunchSanitizerLastSweepStopped.ContainsKey("$img")) {
+                    $script:LaunchSanitizerLastSweepStopped["$img"] = $true
+                    Write-TrayLog "LaunchSanitizer: stopped $img during '$profileId' session"
+                }
+            }
+
+            if ($payload.result.warnings) {
+                foreach ($warning in @($payload.result.warnings)) {
+                    Write-TrayLog "LaunchSanitizer warning: $warning" -Level "WARN"
+                }
+            }
+
+            # Surface a single toast on the FIRST sweep that actually stops
+            # something, so the user knows the launch sanitizer did its job.
+            # Subsequent ticks (e.g. Medal respawn) stay quiet in the log.
+            if ($isFirstDetection -and $stopped.Count -gt 0) {
+                $summary = $stopped -join ", "
+                if ($summary.Length -gt 80) {
+                    $summary = $summary.Substring(0, 80) + "..."
+                }
+                try {
+                    Show-Notification -Title "A.B.S.O. Launch Sanitizer" `
+                        -Message "Stopped: $summary" `
+                        -Type "Success"
+                } catch {
+                    Write-TrayLog "LaunchSanitizer: notification failed: $($_.Exception.Message)" -Level "WARN"
+                }
+            }
+        }
+
+        $script:LaunchSanitizerActiveProfileId = $profileId
+        $script:LaunchSanitizerGameWasAlive = $true
+        if ($script:LaunchSanitizerTimer -and $script:LaunchSanitizerTimer.Interval -ne $script:LaunchSanitizerActiveIntervalMs) {
+            $script:LaunchSanitizerTimer.Interval = $script:LaunchSanitizerActiveIntervalMs
+        }
+    }
+    catch {
+        Write-TrayLog "LaunchSanitizer tick error: $($_.Exception.Message)" -Level "WARN"
+    }
+}
+
+function Start-LaunchSanitizerTimer {
+    if ($script:LaunchSanitizerTimer) {
+        try { $script:LaunchSanitizerTimer.Stop() } catch {}
+        try { $script:LaunchSanitizerTimer.Dispose() } catch {}
+    }
+
+    $script:LaunchSanitizerTimer = New-Object System.Windows.Forms.Timer
+    $script:LaunchSanitizerTimer.Interval = $script:LaunchSanitizerIdleIntervalMs
+    $script:LaunchSanitizerTimer.Add_Tick({
+        try { Invoke-LaunchSanitizerTick } catch {
+            try { Write-TrayLog "LaunchSanitizer outer tick error: $($_.Exception.Message)" -Level "WARN" } catch {}
+        }
+    })
+    $script:LaunchSanitizerTimer.Start()
+    Write-TrayLog "LaunchSanitizer started (idle: $($script:LaunchSanitizerIdleIntervalMs)ms, active: $($script:LaunchSanitizerActiveIntervalMs)ms)"
+
+    # Fire one immediate tick so a game that was already running when the tray
+    # started gets sanitized without waiting 30 seconds.
+    try { Invoke-LaunchSanitizerTick } catch {}
+}
+
+function Stop-LaunchSanitizerTimer {
+    if ($script:LaunchSanitizerTimer) {
+        try { $script:LaunchSanitizerTimer.Stop() } catch {}
+        try { $script:LaunchSanitizerTimer.Dispose() } catch {}
+        $script:LaunchSanitizerTimer = $null
+    }
+}
+
+# ============================================================================
 # MAIN
 # ============================================================================
 
@@ -4016,6 +4318,9 @@ public class HotkeyMessageWindow : NativeWindow {
     # ─── PROCESS GUARD (demote Discord etc. from RealTime) ───
     Start-ProcessGuardTimer
 
+    # ─── LAUNCH SANITIZER (kill overlays/capture/sync while game is alive) ───
+    Start-LaunchSanitizerTimer
+
     [System.Windows.Forms.Application]::Run()
     $script:notifyIcon.Visible = $false
     $script:notifyIcon.Dispose()
@@ -4044,6 +4349,7 @@ catch {
     catch {}
 }
 finally {
+    Stop-LaunchSanitizerTimer
     Stop-ProcessGuardTimer
     if ($script:StartupIconHealTimer) {
         try { $script:StartupIconHealTimer.Stop() } catch {}

@@ -7,10 +7,91 @@ import re
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
 
-from abso.profiles.profile_bases import EmulatorLatencyBaseProfile
+from abso.profiles.profile_bases import (
+    EmulatorLatencyBaseProfile,
+    merge_settings_map,
+)
 
 if TYPE_CHECKING:
     from abso.settings.base import SettingsHandler
+
+
+# Dolphin/Slippi renders SDR; the HDR variants run the game as SDR-in-HDR via
+# Windows HDR composition for users who get eye-strain relief from HDR
+# desktop tone-mapping. The latency cost vs the pure-SDR exclusive lane is
+# small but nonzero, so the HDR siblings inherit every other latency choice
+# from their SDR parents unchanged.
+_HDR_OVERRIDES: dict[str, dict[str, Any]] = {
+    "WindowsSettingsHandler": {
+        "hdr": True,
+        "advanced_color": True,  # Win11 24H2+ WCG pairing
+        "auto_hdr": False,  # Dolphin renders true SDR; Auto HDR would inject fake HDR
+        # 200 nits paper-white is the standard OLED / Mini-LED starting point
+        # for SDR-in-HDR. Driver installs reset this slider; asserting it
+        # restores correct tone-mapping so Dolphin doesn't render blown-out.
+        "sdr_white_level_nits": 200,
+    },
+    "GraphicsSettingsHandler": {
+        # Keep ACM off so the HDR path tone-maps from the source gamut rather
+        # than being clamped to sRGB system-wide by Win11 24H2+ Auto Color
+        # Management.
+        "disable_auto_color_management": True,
+    },
+    "ColorProfileSettingsHandler": {
+        # On the HDR path the OS owns gamut, so steer ABSO's color handler
+        # to native instead of the sRGB clamp the SDR variants use.
+        "icc_profile": "native",
+    },
+}
+
+
+def _hdr_in_game_guidance() -> list[dict[str, str]]:
+    """Manual setup notes specific to running Dolphin/Slippi as SDR-in-HDR."""
+    return [
+        {
+            "category": "Windows HDR",
+            "setting": "Use HDR (Settings > System > Display)",
+            "value": "On",
+            "reason": (
+                "Dolphin/Slippi renders SDR. With Windows HDR on, the OS tone-maps "
+                "Dolphin's SDR output through the HDR pipeline, which is what gives "
+                "the lower-strain look. Leave HDR enabled at the OS level before launching Slippi."
+            ),
+        },
+        {
+            "category": "Windows HDR",
+            "setting": "SDR content brightness",
+            "value": "Tune until Dolphin matches your preferred SDR brightness",
+            "reason": (
+                "ABSO sets the SDR-in-HDR paper-white slider to 200 nits as a starting "
+                "point. Move it up or down until the Dolphin window looks right for your "
+                "panel and ambient light. This is the slider that controls how bright "
+                "Dolphin appears inside the HDR desktop."
+            ),
+        },
+        {
+            "category": "Windows HDR",
+            "setting": "Auto HDR",
+            "value": "Off",
+            "reason": (
+                "Auto HDR forces a fake HDR expansion on SDR content. Dolphin already runs "
+                "fine through native SDR-in-HDR tone-mapping; leaving Auto HDR off keeps "
+                "color accurate."
+            ),
+        },
+        {
+            "category": "Display",
+            "setting": "Exclusive Fullscreen vs SDR-in-HDR latency",
+            "value": "Accept a small HDR composition cost",
+            "reason": (
+                "When Windows is in HDR mode, even 'exclusive fullscreen' SDR apps go through "
+                "the HDR composition path. The added latency is small (sub-frame on a high-refresh "
+                "display) but it's not zero. The HDR variant is for sessions where eye-strain relief "
+                "matters more than absolute click-to-pixel latency; switch back to the SDR sibling "
+                "for tournament/practice where every microsecond counts."
+            ),
+        },
+    ]
 
 
 class SlippiMeleeProfile(EmulatorLatencyBaseProfile):
@@ -653,3 +734,110 @@ class SlippiMeleeConsoleParityProfile(SlippiMeleeProfile):
         ]
 
 
+class SlippiMeleeHDRProfile(SlippiMeleeProfile):
+    """Competitive Slippi profile with Windows HDR on for eye-strain relief.
+
+    Dolphin/Slippi renders SDR; this variant runs the game as SDR-in-HDR via
+    Windows HDR composition. Every latency choice from the base
+    SlippiMeleeProfile is preserved (VSync OFF, backend-aware LLM, exclusive
+    fullscreen, native EFB). The only difference is that Windows HDR is
+    enabled and ACM is disabled, which costs a small amount of composition
+    latency in exchange for the lower-strain HDR desktop look.
+    """
+
+    @property
+    def profile_id(self) -> str:
+        return "slippi-melee-hdr"
+
+    @property
+    def display_name(self) -> str:
+        return "Super Smash Bros. Melee (Slippi HDR)"
+
+    @property
+    def description(self) -> str:
+        return (
+            "Eye-strain-friendly HDR variant of the competitive Slippi profile. "
+            "Same no-sync latency contract; Dolphin renders SDR through Windows HDR."
+        )
+
+    @property
+    def is_sdr_only(self) -> bool:
+        return False
+
+    def _settings_overrides(self) -> dict[str, dict[str, Any]]:
+        return merge_settings_map(super()._settings_overrides(), _HDR_OVERRIDES)
+
+    def get_in_game_settings(self) -> list[dict[str, str]]:
+        return [*_hdr_in_game_guidance(), *super().get_in_game_settings()]
+
+
+class SlippiMeleeUniversalHDRProfile(SlippiMeleeUniversalProfile):
+    """Universal (HAGS-fixed, no-reboot) Slippi profile with Windows HDR on.
+
+    Mirrors SlippiMeleeUniversalProfile - HAGS stays True regardless of
+    Dolphin backend so re-applying never triggers a reboot. HDR is added on
+    top via the standard Windows HDR composition path so the day-to-day
+    "flip in and out" workflow keeps eye-strain relief without losing the
+    no-reboot ergonomics.
+    """
+
+    @property
+    def profile_id(self) -> str:
+        return "slippi-melee-universal-hdr"
+
+    @property
+    def display_name(self) -> str:
+        return "Super Smash Bros. Melee (Slippi Universal HDR)"
+
+    @property
+    def description(self) -> str:
+        return (
+            "HDR variant of the universal Slippi profile. Fixed HAGS on (no reboot), "
+            "no-sync latency contract, Windows HDR for eye-strain relief."
+        )
+
+    @property
+    def is_sdr_only(self) -> bool:
+        return False
+
+    def _settings_overrides(self) -> dict[str, dict[str, Any]]:
+        return merge_settings_map(super()._settings_overrides(), _HDR_OVERRIDES)
+
+    def get_in_game_settings(self) -> list[dict[str, str]]:
+        return [*_hdr_in_game_guidance(), *super().get_in_game_settings()]
+
+
+class SlippiMeleeConsoleParityHDRProfile(SlippiMeleeConsoleParityProfile):
+    """Console-parity Slippi profile with Windows HDR on for eye-strain relief.
+
+    Mirrors SlippiMeleeConsoleParityProfile - 60 Hz refresh, VSync on for
+    stable cadence, no aggressive presentation shortcuts. HDR is added on
+    top via the standard Windows HDR composition path. Best fit for offline
+    practice sessions where you want console-like feel plus the lower-strain
+    HDR desktop look.
+    """
+
+    @property
+    def profile_id(self) -> str:
+        return "slippi-melee-console-parity-hdr"
+
+    @property
+    def display_name(self) -> str:
+        return "Super Smash Bros. Melee (Slippi Console-Parity HDR)"
+
+    @property
+    def description(self) -> str:
+        return (
+            "HDR variant of the console-parity Slippi profile. 60 Hz + VSync on, "
+            "Windows HDR for eye-strain relief on offline practice sessions."
+        )
+
+    @property
+    def is_sdr_only(self) -> bool:
+        return False
+
+    def _settings_overrides(self) -> dict[str, dict[str, Any]]:
+        return merge_settings_map(super()._settings_overrides(), _HDR_OVERRIDES)
+
+    def get_in_game_settings(self) -> list[dict[str, str]]:
+        return [*_hdr_in_game_guidance(), *super().get_in_game_settings()]

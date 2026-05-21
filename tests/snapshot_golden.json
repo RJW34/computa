@@ -1,4 +1,616 @@
 {
+  "deadlock": {
+    "allows_aggressive_settings": false,
+    "application_scope": "system_only",
+    "display_name": "Deadlock - No Sync SDR",
+    "graphics_api": "dx11",
+    "handlers": [
+      "WindowsSettingsHandler",
+      "PowerSettingsHandler",
+      "RegistrySettingsHandler",
+      "NvidiaSettingsHandler",
+      "NetworkSettingsHandler",
+      "MouseSettingsHandler",
+      "GraphicsSettingsHandler",
+      "ProcessPriorityHandler",
+      "CpuAffinityHandler",
+      "ColorProfileSettingsHandler",
+      "DisplayColorRangeHandler"
+    ],
+    "in_game_settings": [
+      {
+        "category": "Display",
+        "reason": "Use this variant when you want the cleaner SDR path or do not have HDR active.",
+        "setting": "HDR",
+        "value": "Off"
+      },
+      {
+        "category": "Display",
+        "reason": "Matches the profile's sRGB clamp and avoids wide-gamut oversaturation in SDR.",
+        "setting": "Color Space",
+        "value": "SDR / default gamut"
+      },
+      {
+        "category": "Display",
+        "reason": "No-sync lane: exclusive fullscreen avoids the DWM compositor tax and keeps the Source 2 present path deterministic.",
+        "setting": "Display Mode",
+        "value": "Fullscreen (Exclusive)"
+      },
+      {
+        "category": "Display",
+        "reason": "No-sync mode removes sync queueing latency.",
+        "setting": "VSync",
+        "value": "Off"
+      },
+      {
+        "category": "Display",
+        "reason": "Deadlock supports Reflex in its video settings. ABSO does not write the Source 2 video config; the in-game toggle has to be flipped manually. ABSO keeps driver LLM off so Reflex owns render-queue control.",
+        "setting": "NVIDIA Reflex Low Latency",
+        "value": "On + Boost (must be enabled manually in-game)"
+      },
+      {
+        "category": "Display",
+        "reason": "No-sync lane: maximum FPS minimizes click-to-pixel latency. Cap only if your GPU runs hot or coil whine becomes an issue.",
+        "setting": "Frame Rate Cap",
+        "value": "Uncapped (or your monitor's refresh rate)"
+      },
+      {
+        "category": "Graphics",
+        "reason": "Use upscaling only when the GPU cannot hold the target FPS native; otherwise keep the native render path for the cleanest pixel pipeline.",
+        "setting": "Upscaling",
+        "value": "DLSS Quality / FSR Quality if GPU-bound, otherwise Native"
+      },
+      {
+        "category": "Graphics",
+        "reason": "Team-fight effects are the most common source of frame-time spikes in Source 2 hero shooters; competitive-low keeps the frame queue clean.",
+        "setting": "Shadow / Effects / Post Processing",
+        "value": "Low"
+      },
+      {
+        "category": "Graphics",
+        "reason": "Reduces visual noise and preserves target clarity during fast camera movement.",
+        "setting": "Motion Blur / Film Grain / Chromatic Aberration",
+        "value": "Off"
+      }
+    ],
+    "include_legacy_tweaks": false,
+    "is_emulator_profile": false,
+    "is_online_profile": false,
+    "is_sdr_only": true,
+    "network_scope": "none",
+    "optimization_target": "low_latency_high_fps",
+    "requires_reflex": true,
+    "settings": {
+      "ColorProfileSettingsHandler": {
+        "digital_vibrance": 50,
+        "game_type": "competitive_fps",
+        "icc_profile": "srgb",
+        "show_osd_guidance": true
+      },
+      "CpuAffinityHandler": {
+        "strategy": null
+      },
+      "DisplayColorRangeHandler": {
+        "dynamic_range": "full"
+      },
+      "GraphicsSettingsHandler": {
+        "disable_global_fso": true
+      },
+      "MouseSettingsHandler": {
+        "disable_acceleration": true,
+        "set_linear_curve": true
+      },
+      "NetworkSettingsHandler": {
+        "disable_nagle": false,
+        "preset": "default"
+      },
+      "NvidiaSettingsHandler": {
+        "global_vrr_mode": "off",
+        "preset": "reflex_no_sync",
+        "profile_aliases": [
+          "project8.exe",
+          "deadlock.exe",
+          "Deadlock (Playtest)"
+        ],
+        "profile_name": "Deadlock"
+      },
+      "PowerSettingsHandler": {
+        "active_plan": "ultimate_performance",
+        "disable_pcie_power_saving": true,
+        "disable_usb_suspend": true,
+        "ensure_ultimate_performance": true,
+        "processor_max_performance": true
+      },
+      "ProcessPriorityHandler": {
+        "cpu_priority": 3,
+        "io_priority": 3
+      },
+      "RegistrySettingsHandler": {
+        "fullscreen_optimizations": {
+          "deadlock.exe": true,
+          "project8.exe": true
+        },
+        "game_priority": {
+          "gpu_priority": 8,
+          "priority": 6,
+          "scheduling_category": "High"
+        },
+        "win32_priority_separation": 42
+      },
+      "WindowsSettingsHandler": {
+        "auto_hdr": false,
+        "game_bar": false,
+        "game_dvr": false,
+        "game_mode": true,
+        "hags": true,
+        "hdr": false,
+        "max_refresh_rate": true,
+        "vrr_optimize": false,
+        "windowed_optimizations": false
+      }
+    }
+  },
+  "deadlock-gsync": {
+    "allows_aggressive_settings": false,
+    "application_scope": "system_only",
+    "display_name": "Deadlock - GSYNC SDR",
+    "graphics_api": "dx11",
+    "handlers": [
+      "WindowsSettingsHandler",
+      "PowerSettingsHandler",
+      "RegistrySettingsHandler",
+      "NvidiaSettingsHandler",
+      "NetworkSettingsHandler",
+      "MouseSettingsHandler",
+      "GraphicsSettingsHandler",
+      "ProcessPriorityHandler",
+      "CpuAffinityHandler",
+      "ColorProfileSettingsHandler",
+      "DisplayColorRangeHandler"
+    ],
+    "in_game_settings": [
+      {
+        "category": "Display",
+        "reason": "Use this variant when you want the cleaner SDR path or do not have HDR active.",
+        "setting": "HDR",
+        "value": "Off"
+      },
+      {
+        "category": "Display",
+        "reason": "Matches the profile's sRGB clamp and avoids wide-gamut oversaturation in SDR.",
+        "setting": "Color Space",
+        "value": "SDR / default gamut"
+      },
+      {
+        "category": "Display",
+        "reason": "This profile is tuned for fullscreen-only G-SYNC. Do not switch to borderless/windowed mode after launch.",
+        "setting": "Display Mode",
+        "value": "Fullscreen (Exclusive)"
+      },
+      {
+        "category": "Display",
+        "reason": "Use NVCP VSync as the VRR safety net; keep the in-game toggle off.",
+        "setting": "VSync",
+        "value": "Off (in-game)"
+      },
+      {
+        "category": "Display",
+        "reason": "Deadlock supports Reflex in its video settings. ABSO does not write the Source 2 video config; the in-game toggle has to be flipped manually. ABSO keeps driver LLM off so Reflex owns render-queue control.",
+        "setting": "NVIDIA Reflex Low Latency",
+        "value": "On + Boost (must be enabled manually in-game)"
+      },
+      {
+        "category": "Display",
+        "reason": "Set by ABSO via NVCP to keep VSync from engaging while preserving VRR.",
+        "setting": "Frame Rate Cap",
+        "value": "Auto (refresh rate - 3)"
+      },
+      {
+        "category": "Graphics",
+        "reason": "Use upscaling only when the GPU cannot hold the VRR cap native; otherwise keep the native render path.",
+        "setting": "Upscaling",
+        "value": "DLSS Quality / FSR Quality if GPU-bound, otherwise Native"
+      },
+      {
+        "category": "Graphics",
+        "reason": "Heavy team fights are where Source 2 hero shooters spike frame times; competitive-low keeps the VRR window clean.",
+        "setting": "Shadow / Effects / Post Processing",
+        "value": "Low"
+      },
+      {
+        "category": "Graphics",
+        "reason": "Reduces visual noise and preserves target clarity during fast tracking.",
+        "setting": "Motion Blur / Film Grain / Chromatic Aberration",
+        "value": "Off"
+      }
+    ],
+    "include_legacy_tweaks": false,
+    "is_emulator_profile": false,
+    "is_online_profile": false,
+    "is_sdr_only": true,
+    "network_scope": "none",
+    "optimization_target": "low_latency_high_fps",
+    "requires_reflex": true,
+    "settings": {
+      "ColorProfileSettingsHandler": {
+        "digital_vibrance": 45,
+        "game_type": "competitive_fps",
+        "icc_profile": "srgb",
+        "show_osd_guidance": true
+      },
+      "CpuAffinityHandler": {
+        "strategy": null
+      },
+      "DisplayColorRangeHandler": {
+        "dynamic_range": "full"
+      },
+      "GraphicsSettingsHandler": {
+        "disable_global_fso": true
+      },
+      "MouseSettingsHandler": {
+        "disable_acceleration": true,
+        "set_linear_curve": true
+      },
+      "NetworkSettingsHandler": {
+        "disable_nagle": false,
+        "preset": "default"
+      },
+      "NvidiaSettingsHandler": {
+        "auto_vrr_fps_cap": true,
+        "global_vrr_mode": "fullscreen_only",
+        "preset": "reflex_gsync",
+        "profile_aliases": [
+          "project8.exe",
+          "deadlock.exe",
+          "Deadlock (Playtest)"
+        ],
+        "profile_name": "Deadlock"
+      },
+      "PowerSettingsHandler": {
+        "active_plan": "ultimate_performance",
+        "disable_pcie_power_saving": true,
+        "disable_usb_suspend": true,
+        "ensure_ultimate_performance": true,
+        "processor_max_performance": true
+      },
+      "ProcessPriorityHandler": {
+        "cpu_priority": 3,
+        "io_priority": 3
+      },
+      "RegistrySettingsHandler": {
+        "fullscreen_optimizations": {
+          "deadlock.exe": true,
+          "project8.exe": true
+        },
+        "game_priority": {
+          "gpu_priority": 8,
+          "priority": 6,
+          "scheduling_category": "High"
+        },
+        "win32_priority_separation": 42
+      },
+      "WindowsSettingsHandler": {
+        "auto_hdr": false,
+        "game_bar": false,
+        "game_dvr": false,
+        "game_mode": true,
+        "hags": true,
+        "hdr": false,
+        "max_refresh_rate": true,
+        "vrr_optimize": false,
+        "windowed_optimizations": false
+      }
+    }
+  },
+  "deadlock-gsync-hdr": {
+    "allows_aggressive_settings": false,
+    "application_scope": "system_only",
+    "display_name": "Deadlock - GSYNC HDR",
+    "graphics_api": "dx11",
+    "handlers": [
+      "WindowsSettingsHandler",
+      "PowerSettingsHandler",
+      "RegistrySettingsHandler",
+      "NvidiaSettingsHandler",
+      "NetworkSettingsHandler",
+      "MouseSettingsHandler",
+      "GraphicsSettingsHandler",
+      "ProcessPriorityHandler",
+      "CpuAffinityHandler",
+      "ColorProfileSettingsHandler",
+      "DisplayColorRangeHandler"
+    ],
+    "in_game_settings": [
+      {
+        "category": "Display",
+        "reason": "Use Deadlock's HDR output when the active display path supports native HDR. If Deadlock has not yet shipped an HDR toggle, leave it off and rely on the Windows HDR path.",
+        "setting": "HDR",
+        "value": "On (if Deadlock exposes the toggle in this build)"
+      },
+      {
+        "category": "Display",
+        "reason": "Tune once for your display; do not crank brightness past your panel's real peak or you trade visibility for raw nits.",
+        "setting": "HDR Calibration",
+        "value": "Calibrate paper white / peak brightness in-game or via Windows HDR Calibration"
+      },
+      {
+        "category": "Display",
+        "reason": "This profile is tuned for fullscreen-only G-SYNC. Do not switch to borderless/windowed mode after launch.",
+        "setting": "Display Mode",
+        "value": "Fullscreen (Exclusive)"
+      },
+      {
+        "category": "Display",
+        "reason": "Use NVCP VSync as the VRR safety net; keep the in-game toggle off.",
+        "setting": "VSync",
+        "value": "Off (in-game)"
+      },
+      {
+        "category": "Display",
+        "reason": "Deadlock supports Reflex in its video settings. ABSO does not write the Source 2 video config; the in-game toggle has to be flipped manually. ABSO keeps driver LLM off so Reflex owns render-queue control.",
+        "setting": "NVIDIA Reflex Low Latency",
+        "value": "On + Boost (must be enabled manually in-game)"
+      },
+      {
+        "category": "Display",
+        "reason": "Set by ABSO via NVCP to keep VSync from engaging while preserving VRR.",
+        "setting": "Frame Rate Cap",
+        "value": "Auto (refresh rate - 3)"
+      },
+      {
+        "category": "Graphics",
+        "reason": "Use upscaling only when the GPU cannot hold the VRR cap native; otherwise keep the native render path.",
+        "setting": "Upscaling",
+        "value": "DLSS Quality / FSR Quality if GPU-bound, otherwise Native"
+      },
+      {
+        "category": "Graphics",
+        "reason": "Heavy team fights are where Source 2 hero shooters spike frame times; competitive-low keeps the VRR window clean.",
+        "setting": "Shadow / Effects / Post Processing",
+        "value": "Low"
+      },
+      {
+        "category": "Graphics",
+        "reason": "Reduces visual noise and preserves target clarity during fast tracking.",
+        "setting": "Motion Blur / Film Grain / Chromatic Aberration",
+        "value": "Off"
+      }
+    ],
+    "include_legacy_tweaks": false,
+    "is_emulator_profile": false,
+    "is_online_profile": false,
+    "is_sdr_only": false,
+    "network_scope": "none",
+    "optimization_target": "low_latency_high_fps",
+    "requires_reflex": true,
+    "settings": {
+      "ColorProfileSettingsHandler": {
+        "digital_vibrance": 50,
+        "game_type": "competitive_fps",
+        "icc_profile": "native",
+        "show_osd_guidance": true
+      },
+      "CpuAffinityHandler": {
+        "strategy": null
+      },
+      "DisplayColorRangeHandler": {
+        "dynamic_range": "full"
+      },
+      "GraphicsSettingsHandler": {
+        "disable_auto_color_management": true,
+        "disable_global_fso": true
+      },
+      "MouseSettingsHandler": {
+        "disable_acceleration": true,
+        "set_linear_curve": true
+      },
+      "NetworkSettingsHandler": {
+        "disable_nagle": false,
+        "preset": "default"
+      },
+      "NvidiaSettingsHandler": {
+        "auto_vrr_fps_cap": true,
+        "global_vrr_mode": "fullscreen_only",
+        "preset": "reflex_gsync",
+        "profile_aliases": [
+          "project8.exe",
+          "deadlock.exe",
+          "Deadlock (Playtest)"
+        ],
+        "profile_name": "Deadlock"
+      },
+      "PowerSettingsHandler": {
+        "active_plan": "ultimate_performance",
+        "disable_pcie_power_saving": true,
+        "disable_usb_suspend": true,
+        "ensure_ultimate_performance": true,
+        "processor_max_performance": true
+      },
+      "ProcessPriorityHandler": {
+        "cpu_priority": 3,
+        "io_priority": 3
+      },
+      "RegistrySettingsHandler": {
+        "fullscreen_optimizations": {
+          "deadlock.exe": true,
+          "project8.exe": true
+        },
+        "game_priority": {
+          "gpu_priority": 8,
+          "priority": 6,
+          "scheduling_category": "High"
+        },
+        "win32_priority_separation": 42
+      },
+      "WindowsSettingsHandler": {
+        "advanced_color": true,
+        "auto_hdr": false,
+        "game_bar": false,
+        "game_dvr": false,
+        "game_mode": true,
+        "hags": true,
+        "hdr": true,
+        "max_refresh_rate": true,
+        "sdr_white_level_nits": 200,
+        "vrr_optimize": false,
+        "windowed_optimizations": false
+      }
+    }
+  },
+  "deadlock-hdr": {
+    "allows_aggressive_settings": false,
+    "application_scope": "system_only",
+    "display_name": "Deadlock - No Sync HDR",
+    "graphics_api": "dx11",
+    "handlers": [
+      "WindowsSettingsHandler",
+      "PowerSettingsHandler",
+      "RegistrySettingsHandler",
+      "NvidiaSettingsHandler",
+      "NetworkSettingsHandler",
+      "MouseSettingsHandler",
+      "GraphicsSettingsHandler",
+      "ProcessPriorityHandler",
+      "CpuAffinityHandler",
+      "ColorProfileSettingsHandler",
+      "DisplayColorRangeHandler"
+    ],
+    "in_game_settings": [
+      {
+        "category": "Display",
+        "reason": "Use Deadlock's HDR output when the active display path supports native HDR. If Deadlock has not yet shipped an HDR toggle, leave it off and rely on the Windows HDR path.",
+        "setting": "HDR",
+        "value": "On (if Deadlock exposes the toggle in this build)"
+      },
+      {
+        "category": "Display",
+        "reason": "Tune once for your display; do not crank brightness past your panel's real peak or you trade visibility for raw nits.",
+        "setting": "HDR Calibration",
+        "value": "Calibrate paper white / peak brightness in-game or via Windows HDR Calibration"
+      },
+      {
+        "category": "Display",
+        "reason": "No-sync lane: exclusive fullscreen avoids the DWM compositor tax and keeps the Source 2 present path deterministic.",
+        "setting": "Display Mode",
+        "value": "Fullscreen (Exclusive)"
+      },
+      {
+        "category": "Display",
+        "reason": "No-sync mode removes sync queueing latency.",
+        "setting": "VSync",
+        "value": "Off"
+      },
+      {
+        "category": "Display",
+        "reason": "Deadlock supports Reflex in its video settings. ABSO does not write the Source 2 video config; the in-game toggle has to be flipped manually. ABSO keeps driver LLM off so Reflex owns render-queue control.",
+        "setting": "NVIDIA Reflex Low Latency",
+        "value": "On + Boost (must be enabled manually in-game)"
+      },
+      {
+        "category": "Display",
+        "reason": "No-sync lane: maximum FPS minimizes click-to-pixel latency. Cap only if your GPU runs hot or coil whine becomes an issue.",
+        "setting": "Frame Rate Cap",
+        "value": "Uncapped (or your monitor's refresh rate)"
+      },
+      {
+        "category": "Graphics",
+        "reason": "Use upscaling only when the GPU cannot hold the target FPS native; otherwise keep the native render path for the cleanest pixel pipeline.",
+        "setting": "Upscaling",
+        "value": "DLSS Quality / FSR Quality if GPU-bound, otherwise Native"
+      },
+      {
+        "category": "Graphics",
+        "reason": "Team-fight effects are the most common source of frame-time spikes in Source 2 hero shooters; competitive-low keeps the frame queue clean.",
+        "setting": "Shadow / Effects / Post Processing",
+        "value": "Low"
+      },
+      {
+        "category": "Graphics",
+        "reason": "Reduces visual noise and preserves target clarity during fast camera movement.",
+        "setting": "Motion Blur / Film Grain / Chromatic Aberration",
+        "value": "Off"
+      }
+    ],
+    "include_legacy_tweaks": false,
+    "is_emulator_profile": false,
+    "is_online_profile": false,
+    "is_sdr_only": false,
+    "network_scope": "none",
+    "optimization_target": "low_latency_high_fps",
+    "requires_reflex": true,
+    "settings": {
+      "ColorProfileSettingsHandler": {
+        "digital_vibrance": 50,
+        "game_type": "competitive_fps",
+        "icc_profile": "native",
+        "show_osd_guidance": true
+      },
+      "CpuAffinityHandler": {
+        "strategy": null
+      },
+      "DisplayColorRangeHandler": {
+        "dynamic_range": "full"
+      },
+      "GraphicsSettingsHandler": {
+        "disable_auto_color_management": true,
+        "disable_global_fso": true
+      },
+      "MouseSettingsHandler": {
+        "disable_acceleration": true,
+        "set_linear_curve": true
+      },
+      "NetworkSettingsHandler": {
+        "disable_nagle": false,
+        "preset": "default"
+      },
+      "NvidiaSettingsHandler": {
+        "global_vrr_mode": "off",
+        "preset": "reflex_no_sync",
+        "profile_aliases": [
+          "project8.exe",
+          "deadlock.exe",
+          "Deadlock (Playtest)"
+        ],
+        "profile_name": "Deadlock"
+      },
+      "PowerSettingsHandler": {
+        "active_plan": "ultimate_performance",
+        "disable_pcie_power_saving": true,
+        "disable_usb_suspend": true,
+        "ensure_ultimate_performance": true,
+        "processor_max_performance": true
+      },
+      "ProcessPriorityHandler": {
+        "cpu_priority": 3,
+        "io_priority": 3
+      },
+      "RegistrySettingsHandler": {
+        "fullscreen_optimizations": {
+          "deadlock.exe": true,
+          "project8.exe": true
+        },
+        "game_priority": {
+          "gpu_priority": 8,
+          "priority": 6,
+          "scheduling_category": "High"
+        },
+        "win32_priority_separation": 42
+      },
+      "WindowsSettingsHandler": {
+        "advanced_color": true,
+        "auto_hdr": false,
+        "game_bar": false,
+        "game_dvr": false,
+        "game_mode": true,
+        "hags": true,
+        "hdr": true,
+        "max_refresh_rate": true,
+        "sdr_white_level_nits": 200,
+        "vrr_optimize": false,
+        "windowed_optimizations": false
+      }
+    }
+  },
   "diablo4": {
     "allows_aggressive_settings": false,
     "application_scope": "system_plus_native_config",
@@ -3948,6 +4560,556 @@
       }
     }
   },
+  "slippi-melee-console-parity-hdr": {
+    "allows_aggressive_settings": true,
+    "application_scope": "system_plus_native_config",
+    "display_name": "Super Smash Bros. Melee (Slippi Console-Parity HDR)",
+    "graphics_api": "unknown",
+    "handlers": [
+      "WindowsSettingsHandler",
+      "PowerSettingsHandler",
+      "RegistrySettingsHandler",
+      "NvidiaSettingsHandler",
+      "NetworkSettingsHandler",
+      "MouseSettingsHandler",
+      "GraphicsSettingsHandler",
+      "ProcessPriorityHandler",
+      "CpuAffinityHandler",
+      "ColorProfileSettingsHandler",
+      "DisplayColorRangeHandler",
+      "DolphinConfigHandler"
+    ],
+    "in_game_settings": [
+      {
+        "category": "Windows HDR",
+        "reason": "Dolphin/Slippi renders SDR. With Windows HDR on, the OS tone-maps Dolphin's SDR output through the HDR pipeline, which is what gives the lower-strain look. Leave HDR enabled at the OS level before launching Slippi.",
+        "setting": "Use HDR (Settings > System > Display)",
+        "value": "On"
+      },
+      {
+        "category": "Windows HDR",
+        "reason": "ABSO sets the SDR-in-HDR paper-white slider to 200 nits as a starting point. Move it up or down until the Dolphin window looks right for your panel and ambient light. This is the slider that controls how bright Dolphin appears inside the HDR desktop.",
+        "setting": "SDR content brightness",
+        "value": "Tune until Dolphin matches your preferred SDR brightness"
+      },
+      {
+        "category": "Windows HDR",
+        "reason": "Auto HDR forces a fake HDR expansion on SDR content. Dolphin already runs fine through native SDR-in-HDR tone-mapping; leaving Auto HDR off keeps color accurate.",
+        "setting": "Auto HDR",
+        "value": "Off"
+      },
+      {
+        "category": "Display",
+        "reason": "When Windows is in HDR mode, even 'exclusive fullscreen' SDR apps go through the HDR composition path. The added latency is small (sub-frame on a high-refresh display) but it's not zero. The HDR variant is for sessions where eye-strain relief matters more than absolute click-to-pixel latency; switch back to the SDR sibling for tournament/practice where every microsecond counts.",
+        "setting": "Exclusive Fullscreen vs SDR-in-HDR latency",
+        "value": "Accept a small HDR composition cost"
+      },
+      {
+        "category": "Profile Goal",
+        "reason": "Use this when you want closer console-like presentation cadence on an LCD/OLED, not maximum latency reduction.",
+        "setting": "Target",
+        "value": "Console-like pacing and feel (offline)"
+      },
+      {
+        "category": "Nvidia Control Panel",
+        "reason": "Keeps presentation cadence stable and tear-free for practice sessions where feel consistency is preferred over absolute minimum latency.",
+        "setting": "V-SYNC (global/per-game)",
+        "value": "On"
+      },
+      {
+        "category": "Nvidia Control Panel",
+        "reason": "Avoids aggressive queue reduction. This profile intentionally favors consistent frame pacing over minimum queue depth.",
+        "setting": "Low Latency Mode",
+        "value": "Off"
+      },
+      {
+        "category": "Windows Display",
+        "reason": "The profile forces 60 Hz output for stricter console-style cadence on flat panels. Switch back to high refresh when using the competitive profile.",
+        "setting": "Desktop Refresh Rate",
+        "value": "60 Hz"
+      },
+      {
+        "category": "Graphics",
+        "reason": "Keep VSync enabled in Dolphin for stable, console-style frame presentation.",
+        "setting": "Dolphin VSync",
+        "value": "On"
+      },
+      {
+        "category": "Dolphin.ini [Core]",
+        "reason": "Disables aggressive latency-cutting presentation path to preserve a more console-like feel.",
+        "setting": "RushPresentation",
+        "value": "False"
+      },
+      {
+        "category": "Dolphin.ini [Core]",
+        "reason": "Keep Slippi defaults unless you are running controlled local tests and explicitly understand the compatibility/latency tradeoff.",
+        "setting": "ImmediateXFBEnable",
+        "value": "True (Slippi default)"
+      },
+      {
+        "category": "Display",
+        "reason": "Melee is fixed 60fps. VRR is not required for this parity profile and can alter pacing feel.",
+        "setting": "G-SYNC / VRR",
+        "value": "Off"
+      }
+    ],
+    "include_legacy_tweaks": false,
+    "is_emulator_profile": true,
+    "is_online_profile": false,
+    "is_sdr_only": false,
+    "network_scope": "none",
+    "optimization_target": "balanced",
+    "requires_reflex": false,
+    "settings": {
+      "ColorProfileSettingsHandler": {
+        "digital_vibrance": 50,
+        "game_type": "emulator",
+        "icc_profile": "native",
+        "show_osd_guidance": true
+      },
+      "CpuAffinityHandler": {
+        "strategy": null
+      },
+      "DisplayColorRangeHandler": {
+        "dynamic_range": "full"
+      },
+      "DolphinConfigHandler": {
+        "backend_multithreading": "False",
+        "efb_scale": "1",
+        "immediate_xfb_enable": "True",
+        "reduce_timing_dispersion": "True",
+        "rush_presentation": "False",
+        "smooth_presentation": "False",
+        "sync_gpu": "False",
+        "texture_scaling_factor": "1",
+        "timing_variance": "8",
+        "use_deposterize": "False",
+        "use_scaling_filter": "False",
+        "vsync": "True"
+      },
+      "GraphicsSettingsHandler": {
+        "disable_auto_color_management": true,
+        "disable_global_fso": true
+      },
+      "MouseSettingsHandler": {
+        "disable_acceleration": true,
+        "set_linear_curve": true
+      },
+      "NetworkSettingsHandler": {
+        "disable_nagle": false,
+        "preset": "default"
+      },
+      "NvidiaSettingsHandler": {
+        "global_vrr_mode": "off",
+        "low_latency_mode": "off",
+        "max_frame_rate": "off",
+        "power_management": "prefer_max_performance",
+        "profile_aliases": [
+          "Super Smash Bros. Melee (Slippi Universal)",
+          "Super Smash Bros. Melee (Slippi Console-Parity)"
+        ],
+        "profile_name": "Super Smash Bros. Melee (Slippi)",
+        "shader_cache": "unlimited",
+        "threaded_optimization": "off",
+        "triple_buffering": "off",
+        "vrr_app_override": "force_off",
+        "vsync": "on",
+        "vsync_tear_control": "disable"
+      },
+      "PowerSettingsHandler": {
+        "active_plan": "ultimate_performance",
+        "disable_pcie_power_saving": true,
+        "disable_usb_suspend": true,
+        "ensure_ultimate_performance": true,
+        "processor_max_performance": true
+      },
+      "ProcessPriorityHandler": {
+        "cpu_priority": 3,
+        "io_priority": 3
+      },
+      "RegistrySettingsHandler": {
+        "fullscreen_optimizations": {
+          "Dolphin.exe": true,
+          "Slippi Dolphin.exe": true
+        },
+        "game_priority": {
+          "gpu_priority": 8,
+          "priority": 6,
+          "scheduling_category": "High"
+        },
+        "win32_priority_separation": 42
+      },
+      "WindowsSettingsHandler": {
+        "advanced_color": true,
+        "auto_hdr": false,
+        "game_bar": false,
+        "game_dvr": false,
+        "game_mode": true,
+        "hags": true,
+        "hdr": true,
+        "refresh_rate": 60,
+        "sdr_white_level_nits": 200,
+        "vrr_optimize": false,
+        "windowed_optimizations": false
+      }
+    }
+  },
+  "slippi-melee-hdr": {
+    "allows_aggressive_settings": true,
+    "application_scope": "system_plus_native_config",
+    "display_name": "Super Smash Bros. Melee (Slippi HDR)",
+    "graphics_api": "unknown",
+    "handlers": [
+      "WindowsSettingsHandler",
+      "PowerSettingsHandler",
+      "RegistrySettingsHandler",
+      "NvidiaSettingsHandler",
+      "NetworkSettingsHandler",
+      "MouseSettingsHandler",
+      "GraphicsSettingsHandler",
+      "ProcessPriorityHandler",
+      "CpuAffinityHandler",
+      "ColorProfileSettingsHandler",
+      "DisplayColorRangeHandler",
+      "DolphinConfigHandler"
+    ],
+    "in_game_settings": [
+      {
+        "category": "Windows HDR",
+        "reason": "Dolphin/Slippi renders SDR. With Windows HDR on, the OS tone-maps Dolphin's SDR output through the HDR pipeline, which is what gives the lower-strain look. Leave HDR enabled at the OS level before launching Slippi.",
+        "setting": "Use HDR (Settings > System > Display)",
+        "value": "On"
+      },
+      {
+        "category": "Windows HDR",
+        "reason": "ABSO sets the SDR-in-HDR paper-white slider to 200 nits as a starting point. Move it up or down until the Dolphin window looks right for your panel and ambient light. This is the slider that controls how bright Dolphin appears inside the HDR desktop.",
+        "setting": "SDR content brightness",
+        "value": "Tune until Dolphin matches your preferred SDR brightness"
+      },
+      {
+        "category": "Windows HDR",
+        "reason": "Auto HDR forces a fake HDR expansion on SDR content. Dolphin already runs fine through native SDR-in-HDR tone-mapping; leaving Auto HDR off keeps color accurate.",
+        "setting": "Auto HDR",
+        "value": "Off"
+      },
+      {
+        "category": "Display",
+        "reason": "When Windows is in HDR mode, even 'exclusive fullscreen' SDR apps go through the HDR composition path. The added latency is small (sub-frame on a high-refresh display) but it's not zero. The HDR variant is for sessions where eye-strain relief matters more than absolute click-to-pixel latency; switch back to the SDR sibling for tournament/practice where every microsecond counts.",
+        "setting": "Exclusive Fullscreen vs SDR-in-HDR latency",
+        "value": "Accept a small HDR composition cost"
+      },
+      {
+        "category": "Windows Settings",
+        "reason": "HAGS is adapted to Dolphin backend: disable for DX11/OpenGL paths, enable for DX12/Vulkan paths.",
+        "setting": "Hardware Accelerated GPU Scheduling (HAGS)",
+        "value": "Backend-aware (DX11/OpenGL: Off, DX12/Vulkan: On)"
+      },
+      {
+        "category": "Windows Settings",
+        "reason": "VRROptimizeEnable=1 keeps Windows compositor logic in the path. Disabling may reduce latency for fixed-framerate emulators.",
+        "setting": "VRR Optimize",
+        "value": "Off (critical!)"
+      },
+      {
+        "category": "Nvidia Control Panel",
+        "reason": "Melee runs at fixed 60fps - G-SYNC adds overhead syncing to a constant rate. Disabling removes ~1-2ms+ of sync latency. High refresh still helps via reduced scanout latency even without VRR.",
+        "setting": "G-SYNC",
+        "value": "Off"
+      },
+      {
+        "category": "Nvidia Control Panel",
+        "reason": "Disabling V-SYNC eliminates frame queue latency entirely. May cause tearing, but competitive players prioritize input latency.",
+        "setting": "V-SYNC (global/per-game)",
+        "value": "Off"
+      },
+      {
+        "category": "Nvidia Control Panel",
+        "reason": "Driver LLM remains useful on DX11, and newer NVIDIA drivers also support DX12. Vulkan/OpenGL paths do not expose the same queue control benefit.",
+        "setting": "Low Latency Mode",
+        "value": "Backend-aware (DX11/DX12: On, Vulkan/OpenGL: Off)"
+      },
+      {
+        "category": "Nvidia Control Panel",
+        "reason": "Reduces driver threading overhead for emulation workloads.",
+        "setting": "Threaded Optimization",
+        "value": "Off"
+      },
+      {
+        "category": "Nvidia Control Panel",
+        "reason": "Only works with VSync and adds latency.",
+        "setting": "Triple Buffering",
+        "value": "Off"
+      },
+      {
+        "category": "Nvidia Control Panel",
+        "reason": "No artificial frame limiting.",
+        "setting": "Max Frame Rate",
+        "value": "Off"
+      },
+      {
+        "category": "Graphics",
+        "reason": "Official Dolphin guidance still points most NVIDIA/AMD users to Vulkan first. DX12 is still worth A/B testing if Vulkan misbehaves or if HAGS + DX12 performs better on your exact system.",
+        "setting": "Backend",
+        "value": "Vulkan first, then test DX12"
+      },
+      {
+        "category": "Graphics",
+        "reason": "Disable Dolphin's V-SYNC. No sync anywhere for minimum latency (tearing acceptable).",
+        "setting": "VSync",
+        "value": "Off"
+      },
+      {
+        "category": "Graphics",
+        "reason": "Lower latency than borderless windowed.",
+        "setting": "Fullscreen Mode",
+        "value": "Exclusive Fullscreen"
+      },
+      {
+        "category": "Graphics",
+        "reason": "Lower resolution = lower render latency. Tested: dropping resolution reduced render latency from 0.3ms to 0.1ms. Melee is a 2001 game - it doesn't need 4K. Prioritize latency over visuals.",
+        "setting": "Internal Resolution",
+        "value": "Native (1x) or 2x max"
+      },
+      {
+        "category": "GFX.ini [Settings]",
+        "reason": "Native resolution = lowest render latency. Higher res adds GPU work. Tested: EFBScale 2 added measurable latency vs EFBScale 1.",
+        "setting": "EFBScale",
+        "value": "1 (Native)"
+      },
+      {
+        "category": "GFX.ini [Settings]",
+        "reason": "Reduces driver threading overhead.",
+        "setting": "BackendMultithreading",
+        "value": "False"
+      },
+      {
+        "category": "GFX.ini [Enhancements]",
+        "reason": "Scaling adds GPU overhead.",
+        "setting": "UseScalingFilter",
+        "value": "False"
+      },
+      {
+        "category": "GFX.ini [Enhancements]",
+        "reason": "Post-processing adds GPU overhead.",
+        "setting": "UseDePosterize",
+        "value": "False"
+      },
+      {
+        "category": "GFX.ini [Enhancements]",
+        "reason": "Texture upscaling adds GPU overhead.",
+        "setting": "TextureScalingFactor",
+        "value": "1"
+      },
+      {
+        "category": "GFX.ini [Hacks]",
+        "reason": "EFB access is slow - disable for performance.",
+        "setting": "EFBAccessEnable",
+        "value": "False"
+      },
+      {
+        "category": "GFX.ini [Hacks]",
+        "reason": "Offloads texture decoding to GPU.",
+        "setting": "EnableGPUTextureDecoding",
+        "value": "True"
+      },
+      {
+        "category": "Dolphin.ini [Core]",
+        "reason": "Ishiiruka-specific: reduces frame timing variance.",
+        "setting": "TimingVariance",
+        "value": "8"
+      },
+      {
+        "category": "Dolphin.ini [Core]",
+        "reason": "Ishiiruka-specific: tighter frame timing.",
+        "setting": "ReduceTimingDispersion",
+        "value": "True"
+      },
+      {
+        "category": "Dolphin.ini [Core]",
+        "reason": "GPU sync adds latency - disable.",
+        "setting": "SyncGPU",
+        "value": "False"
+      },
+      {
+        "category": "Dolphin.ini [Core]",
+        "reason": "Immediately Present XFB - skips frame buffer queue for lower latency.",
+        "setting": "ImmediateXFBEnable",
+        "value": "True (default for Melee)"
+      },
+      {
+        "category": "Dolphin.ini [Core]",
+        "reason": "Rush Frame Presentation can lower latency on some systems, but the gain varies a lot. This profile keeps it off by default so the no-sync path stays deterministic unless you explicitly A/B test it.",
+        "setting": "RushPresentation",
+        "value": "Off by default (manual A/B test)"
+      },
+      {
+        "category": "Dolphin.ini [Core]",
+        "reason": "Keep smoothing off for the competitive no-sync path.",
+        "setting": "SmoothPresentation",
+        "value": "False"
+      },
+      {
+        "category": "Dolphin.ini [Core]",
+        "reason": "Audio time stretching adds processing overhead.",
+        "setting": "TimeStretching",
+        "value": "False"
+      },
+      {
+        "category": "Game Settings (GALE01.ini)",
+        "reason": "Memory Management Unit emulation adds overhead - not needed for Melee.",
+        "setting": "MMU",
+        "value": "False"
+      },
+      {
+        "category": "Game Settings (GALE01.ini)",
+        "reason": "Floating point result flags add CPU overhead - not needed for Melee.",
+        "setting": "FPRF",
+        "value": "False"
+      },
+      {
+        "category": "Audio",
+        "reason": "Exclusive mode bypasses Windows audio mixer for lowest latency.",
+        "setting": "Backend",
+        "value": "Exclusive WASAPI (Ishiiruka) / Cubeb (Mainline)"
+      },
+      {
+        "category": "Audio",
+        "reason": "Lower is better, but too low causes crackling.",
+        "setting": "Latency",
+        "value": "Lowest stable setting"
+      },
+      {
+        "category": "Controller",
+        "reason": "Not PC mode. Native adapter support has lower latency.",
+        "setting": "Adapter Mode",
+        "value": "Wii U / Switch mode"
+      },
+      {
+        "category": "Controller",
+        "reason": "Allows input when alt-tabbed.",
+        "setting": "Background Input",
+        "value": "On"
+      },
+      {
+        "category": "Display Info",
+        "reason": "60fps @ 60Hz = ~17ms scanout, 60fps @ 240Hz = ~4ms scanout. This benefit is from faster pixel refresh, NOT from VRR. Use your monitor's max refresh rate with G-Sync/VSync OFF for minimum latency.",
+        "setting": "High refresh benefit",
+        "value": "Reduced scanout latency (no G-Sync needed)"
+      },
+      {
+        "category": "Display Info",
+        "reason": "With 60fps on a high refresh display, tears are small and fast-moving. The latency reduction far outweighs the visual artifact for competitive play.",
+        "setting": "Tearing",
+        "value": "May occur but minimal impact"
+      },
+      {
+        "category": "Important",
+        "reason": "Latency improvements depend on your specific GPU, CPU, drivers, and settings. Always test configurations rather than assuming one setting is universally best. The settings above are starting points - experiment to find what works for you.",
+        "setting": "System Variance Disclaimer",
+        "value": "Results vary by system"
+      }
+    ],
+    "include_legacy_tweaks": false,
+    "is_emulator_profile": true,
+    "is_online_profile": false,
+    "is_sdr_only": false,
+    "network_scope": "none",
+    "optimization_target": "minimum_latency",
+    "requires_reflex": false,
+    "settings": {
+      "ColorProfileSettingsHandler": {
+        "digital_vibrance": 50,
+        "game_type": "emulator",
+        "icc_profile": "native",
+        "show_osd_guidance": true
+      },
+      "CpuAffinityHandler": {
+        "strategy": null
+      },
+      "DisplayColorRangeHandler": {
+        "dynamic_range": "full"
+      },
+      "DolphinConfigHandler": {
+        "backend_multithreading": "False",
+        "efb_scale": "1",
+        "immediate_xfb_enable": "True",
+        "reduce_timing_dispersion": "True",
+        "rush_presentation": "False",
+        "smooth_presentation": "False",
+        "sync_gpu": "False",
+        "texture_scaling_factor": "1",
+        "timing_variance": "8",
+        "use_deposterize": "False",
+        "use_scaling_filter": "False",
+        "vsync": "False"
+      },
+      "GraphicsSettingsHandler": {
+        "disable_auto_color_management": true,
+        "disable_global_fso": true
+      },
+      "MouseSettingsHandler": {
+        "disable_acceleration": true,
+        "set_linear_curve": true
+      },
+      "NetworkSettingsHandler": {
+        "disable_nagle": false,
+        "preset": "default"
+      },
+      "NvidiaSettingsHandler": {
+        "global_vrr_mode": "off",
+        "low_latency_mode": "on",
+        "max_frame_rate": "off",
+        "power_management": "prefer_max_performance",
+        "profile_aliases": [
+          "Super Smash Bros. Melee (Slippi Universal)",
+          "Super Smash Bros. Melee (Slippi Console-Parity)"
+        ],
+        "profile_name": "Super Smash Bros. Melee (Slippi)",
+        "shader_cache": "unlimited",
+        "threaded_optimization": "off",
+        "triple_buffering": "off",
+        "vrr_app_override": "force_off",
+        "vsync": "off",
+        "vsync_tear_control": "disable"
+      },
+      "PowerSettingsHandler": {
+        "active_plan": "ultimate_performance",
+        "disable_pcie_power_saving": true,
+        "disable_usb_suspend": true,
+        "ensure_ultimate_performance": true,
+        "processor_max_performance": true
+      },
+      "ProcessPriorityHandler": {
+        "cpu_priority": 3,
+        "io_priority": 3
+      },
+      "RegistrySettingsHandler": {
+        "fullscreen_optimizations": {
+          "Dolphin.exe": true,
+          "Slippi Dolphin.exe": true
+        },
+        "game_priority": {
+          "gpu_priority": 8,
+          "priority": 6,
+          "scheduling_category": "High"
+        },
+        "win32_priority_separation": 42
+      },
+      "WindowsSettingsHandler": {
+        "advanced_color": true,
+        "auto_hdr": false,
+        "game_bar": false,
+        "game_dvr": false,
+        "game_mode": true,
+        "hags": true,
+        "hdr": true,
+        "max_refresh_rate": true,
+        "sdr_white_level_nits": 200,
+        "vrr_optimize": false,
+        "windowed_optimizations": false
+      }
+    }
+  },
   "slippi-melee-universal": {
     "allows_aggressive_settings": true,
     "application_scope": "system_plus_native_config",
@@ -4272,6 +5434,362 @@
         "hags": true,
         "hdr": false,
         "max_refresh_rate": true,
+        "vrr_optimize": false,
+        "windowed_optimizations": false
+      }
+    }
+  },
+  "slippi-melee-universal-hdr": {
+    "allows_aggressive_settings": true,
+    "application_scope": "system_plus_native_config",
+    "display_name": "Super Smash Bros. Melee (Slippi Universal HDR)",
+    "graphics_api": "unknown",
+    "handlers": [
+      "WindowsSettingsHandler",
+      "PowerSettingsHandler",
+      "RegistrySettingsHandler",
+      "NvidiaSettingsHandler",
+      "NetworkSettingsHandler",
+      "MouseSettingsHandler",
+      "GraphicsSettingsHandler",
+      "ProcessPriorityHandler",
+      "CpuAffinityHandler",
+      "ColorProfileSettingsHandler",
+      "DisplayColorRangeHandler",
+      "DolphinConfigHandler"
+    ],
+    "in_game_settings": [
+      {
+        "category": "Windows HDR",
+        "reason": "Dolphin/Slippi renders SDR. With Windows HDR on, the OS tone-maps Dolphin's SDR output through the HDR pipeline, which is what gives the lower-strain look. Leave HDR enabled at the OS level before launching Slippi.",
+        "setting": "Use HDR (Settings > System > Display)",
+        "value": "On"
+      },
+      {
+        "category": "Windows HDR",
+        "reason": "ABSO sets the SDR-in-HDR paper-white slider to 200 nits as a starting point. Move it up or down until the Dolphin window looks right for your panel and ambient light. This is the slider that controls how bright Dolphin appears inside the HDR desktop.",
+        "setting": "SDR content brightness",
+        "value": "Tune until Dolphin matches your preferred SDR brightness"
+      },
+      {
+        "category": "Windows HDR",
+        "reason": "Auto HDR forces a fake HDR expansion on SDR content. Dolphin already runs fine through native SDR-in-HDR tone-mapping; leaving Auto HDR off keeps color accurate.",
+        "setting": "Auto HDR",
+        "value": "Off"
+      },
+      {
+        "category": "Display",
+        "reason": "When Windows is in HDR mode, even 'exclusive fullscreen' SDR apps go through the HDR composition path. The added latency is small (sub-frame on a high-refresh display) but it's not zero. The HDR variant is for sessions where eye-strain relief matters more than absolute click-to-pixel latency; switch back to the SDR sibling for tournament/practice where every microsecond counts.",
+        "setting": "Exclusive Fullscreen vs SDR-in-HDR latency",
+        "value": "Accept a small HDR composition cost"
+      },
+      {
+        "category": "Windows Settings",
+        "reason": "HAGS is fixed to True regardless of Dolphin backend. This avoids reboot requirements when switching backends or re-applying the profile. Dolphin's own latency features (ImmediateXFB, RushPresentation) provide far more latency reduction than HAGS state changes.",
+        "setting": "Hardware Accelerated GPU Scheduling (HAGS)",
+        "value": "On (always - no reboot on re-apply)"
+      },
+      {
+        "category": "Windows Settings",
+        "reason": "VRROptimizeEnable=1 keeps Windows compositor logic in the path. Disabling may reduce latency for fixed-framerate emulators.",
+        "setting": "VRR Optimize",
+        "value": "Off (critical!)"
+      },
+      {
+        "category": "Nvidia Control Panel",
+        "reason": "Melee runs at fixed 60fps - G-SYNC adds overhead syncing to a constant rate. Disabling removes ~1-2ms+ of sync latency. High refresh still helps via reduced scanout latency even without VRR.",
+        "setting": "G-SYNC",
+        "value": "Off"
+      },
+      {
+        "category": "Nvidia Control Panel",
+        "reason": "Disabling V-SYNC eliminates frame queue latency entirely. May cause tearing, but competitive players prioritize input latency.",
+        "setting": "V-SYNC (global/per-game)",
+        "value": "Off"
+      },
+      {
+        "category": "Nvidia Control Panel",
+        "reason": "Driver LLM remains useful on DX11, and newer NVIDIA drivers also support DX12. Vulkan/OpenGL paths do not expose the same queue control benefit.",
+        "setting": "Low Latency Mode",
+        "value": "Backend-aware (DX11/DX12: On, Vulkan/OpenGL: Off)"
+      },
+      {
+        "category": "Nvidia Control Panel",
+        "reason": "Reduces driver threading overhead for emulation workloads.",
+        "setting": "Threaded Optimization",
+        "value": "Off"
+      },
+      {
+        "category": "Nvidia Control Panel",
+        "reason": "Only works with VSync and adds latency.",
+        "setting": "Triple Buffering",
+        "value": "Off"
+      },
+      {
+        "category": "Nvidia Control Panel",
+        "reason": "No artificial frame limiting.",
+        "setting": "Max Frame Rate",
+        "value": "Off"
+      },
+      {
+        "category": "Graphics",
+        "reason": "Official Dolphin guidance still points most NVIDIA/AMD users to Vulkan first. DX12 is still worth A/B testing if Vulkan misbehaves or if HAGS + DX12 performs better on your exact system.",
+        "setting": "Backend",
+        "value": "Vulkan first, then test DX12"
+      },
+      {
+        "category": "Graphics",
+        "reason": "Disable Dolphin's V-SYNC. No sync anywhere for minimum latency (tearing acceptable).",
+        "setting": "VSync",
+        "value": "Off"
+      },
+      {
+        "category": "Graphics",
+        "reason": "Lower latency than borderless windowed.",
+        "setting": "Fullscreen Mode",
+        "value": "Exclusive Fullscreen"
+      },
+      {
+        "category": "Graphics",
+        "reason": "Lower resolution = lower render latency. Tested: dropping resolution reduced render latency from 0.3ms to 0.1ms. Melee is a 2001 game - it doesn't need 4K. Prioritize latency over visuals.",
+        "setting": "Internal Resolution",
+        "value": "Native (1x) or 2x max"
+      },
+      {
+        "category": "GFX.ini [Settings]",
+        "reason": "Native resolution = lowest render latency. Higher res adds GPU work. Tested: EFBScale 2 added measurable latency vs EFBScale 1.",
+        "setting": "EFBScale",
+        "value": "1 (Native)"
+      },
+      {
+        "category": "GFX.ini [Settings]",
+        "reason": "Reduces driver threading overhead.",
+        "setting": "BackendMultithreading",
+        "value": "False"
+      },
+      {
+        "category": "GFX.ini [Enhancements]",
+        "reason": "Scaling adds GPU overhead.",
+        "setting": "UseScalingFilter",
+        "value": "False"
+      },
+      {
+        "category": "GFX.ini [Enhancements]",
+        "reason": "Post-processing adds GPU overhead.",
+        "setting": "UseDePosterize",
+        "value": "False"
+      },
+      {
+        "category": "GFX.ini [Enhancements]",
+        "reason": "Texture upscaling adds GPU overhead.",
+        "setting": "TextureScalingFactor",
+        "value": "1"
+      },
+      {
+        "category": "GFX.ini [Hacks]",
+        "reason": "EFB access is slow - disable for performance.",
+        "setting": "EFBAccessEnable",
+        "value": "False"
+      },
+      {
+        "category": "GFX.ini [Hacks]",
+        "reason": "Offloads texture decoding to GPU.",
+        "setting": "EnableGPUTextureDecoding",
+        "value": "True"
+      },
+      {
+        "category": "Dolphin.ini [Core]",
+        "reason": "Ishiiruka-specific: reduces frame timing variance.",
+        "setting": "TimingVariance",
+        "value": "8"
+      },
+      {
+        "category": "Dolphin.ini [Core]",
+        "reason": "Ishiiruka-specific: tighter frame timing.",
+        "setting": "ReduceTimingDispersion",
+        "value": "True"
+      },
+      {
+        "category": "Dolphin.ini [Core]",
+        "reason": "GPU sync adds latency - disable.",
+        "setting": "SyncGPU",
+        "value": "False"
+      },
+      {
+        "category": "Dolphin.ini [Core]",
+        "reason": "Immediately Present XFB - skips frame buffer queue for lower latency.",
+        "setting": "ImmediateXFBEnable",
+        "value": "True (default for Melee)"
+      },
+      {
+        "category": "Dolphin.ini [Core]",
+        "reason": "Rush Frame Presentation can lower latency on some systems, but the gain varies a lot. This profile keeps it off by default so the no-sync path stays deterministic unless you explicitly A/B test it.",
+        "setting": "RushPresentation",
+        "value": "Off by default (manual A/B test)"
+      },
+      {
+        "category": "Dolphin.ini [Core]",
+        "reason": "Keep smoothing off for the competitive no-sync path.",
+        "setting": "SmoothPresentation",
+        "value": "False"
+      },
+      {
+        "category": "Dolphin.ini [Core]",
+        "reason": "Audio time stretching adds processing overhead.",
+        "setting": "TimeStretching",
+        "value": "False"
+      },
+      {
+        "category": "Game Settings (GALE01.ini)",
+        "reason": "Memory Management Unit emulation adds overhead - not needed for Melee.",
+        "setting": "MMU",
+        "value": "False"
+      },
+      {
+        "category": "Game Settings (GALE01.ini)",
+        "reason": "Floating point result flags add CPU overhead - not needed for Melee.",
+        "setting": "FPRF",
+        "value": "False"
+      },
+      {
+        "category": "Audio",
+        "reason": "Exclusive mode bypasses Windows audio mixer for lowest latency.",
+        "setting": "Backend",
+        "value": "Exclusive WASAPI (Ishiiruka) / Cubeb (Mainline)"
+      },
+      {
+        "category": "Audio",
+        "reason": "Lower is better, but too low causes crackling.",
+        "setting": "Latency",
+        "value": "Lowest stable setting"
+      },
+      {
+        "category": "Controller",
+        "reason": "Not PC mode. Native adapter support has lower latency.",
+        "setting": "Adapter Mode",
+        "value": "Wii U / Switch mode"
+      },
+      {
+        "category": "Controller",
+        "reason": "Allows input when alt-tabbed.",
+        "setting": "Background Input",
+        "value": "On"
+      },
+      {
+        "category": "Display Info",
+        "reason": "60fps @ 60Hz = ~17ms scanout, 60fps @ 240Hz = ~4ms scanout. This benefit is from faster pixel refresh, NOT from VRR. Use your monitor's max refresh rate with G-Sync/VSync OFF for minimum latency.",
+        "setting": "High refresh benefit",
+        "value": "Reduced scanout latency (no G-Sync needed)"
+      },
+      {
+        "category": "Display Info",
+        "reason": "With 60fps on a high refresh display, tears are small and fast-moving. The latency reduction far outweighs the visual artifact for competitive play.",
+        "setting": "Tearing",
+        "value": "May occur but minimal impact"
+      },
+      {
+        "category": "Important",
+        "reason": "Latency improvements depend on your specific GPU, CPU, drivers, and settings. Always test configurations rather than assuming one setting is universally best. The settings above are starting points - experiment to find what works for you.",
+        "setting": "System Variance Disclaimer",
+        "value": "Results vary by system"
+      }
+    ],
+    "include_legacy_tweaks": false,
+    "is_emulator_profile": true,
+    "is_online_profile": false,
+    "is_sdr_only": false,
+    "network_scope": "none",
+    "optimization_target": "minimum_latency",
+    "requires_reflex": false,
+    "settings": {
+      "ColorProfileSettingsHandler": {
+        "digital_vibrance": 50,
+        "game_type": "emulator",
+        "icc_profile": "native",
+        "show_osd_guidance": true
+      },
+      "CpuAffinityHandler": {
+        "strategy": null
+      },
+      "DisplayColorRangeHandler": {
+        "dynamic_range": "full"
+      },
+      "DolphinConfigHandler": {
+        "backend_multithreading": "False",
+        "efb_scale": "1",
+        "immediate_xfb_enable": "True",
+        "reduce_timing_dispersion": "True",
+        "rush_presentation": "False",
+        "smooth_presentation": "False",
+        "sync_gpu": "False",
+        "texture_scaling_factor": "1",
+        "timing_variance": "8",
+        "use_deposterize": "False",
+        "use_scaling_filter": "False",
+        "vsync": "False"
+      },
+      "GraphicsSettingsHandler": {
+        "disable_auto_color_management": true,
+        "disable_global_fso": true
+      },
+      "MouseSettingsHandler": {
+        "disable_acceleration": true,
+        "set_linear_curve": true
+      },
+      "NetworkSettingsHandler": {
+        "disable_nagle": false,
+        "preset": "default"
+      },
+      "NvidiaSettingsHandler": {
+        "global_vrr_mode": "off",
+        "low_latency_mode": "on",
+        "max_frame_rate": "off",
+        "power_management": "prefer_max_performance",
+        "profile_aliases": [
+          "Super Smash Bros. Melee (Slippi Universal)",
+          "Super Smash Bros. Melee (Slippi Console-Parity)"
+        ],
+        "profile_name": "Super Smash Bros. Melee (Slippi)",
+        "shader_cache": "unlimited",
+        "threaded_optimization": "off",
+        "triple_buffering": "off",
+        "vrr_app_override": "force_off",
+        "vsync": "off",
+        "vsync_tear_control": "disable"
+      },
+      "PowerSettingsHandler": {
+        "active_plan": "ultimate_performance",
+        "disable_pcie_power_saving": true,
+        "disable_usb_suspend": true,
+        "ensure_ultimate_performance": true,
+        "processor_max_performance": true
+      },
+      "ProcessPriorityHandler": {
+        "cpu_priority": 3,
+        "io_priority": 3
+      },
+      "RegistrySettingsHandler": {
+        "fullscreen_optimizations": {
+          "Dolphin.exe": true,
+          "Slippi Dolphin.exe": true
+        },
+        "game_priority": {
+          "gpu_priority": 8,
+          "priority": 6,
+          "scheduling_category": "High"
+        },
+        "win32_priority_separation": 42
+      },
+      "WindowsSettingsHandler": {
+        "advanced_color": true,
+        "auto_hdr": false,
+        "game_bar": false,
+        "game_dvr": false,
+        "game_mode": true,
+        "hags": true,
+        "hdr": true,
+        "max_refresh_rate": true,
+        "sdr_white_level_nits": 200,
         "vrr_optimize": false,
         "windowed_optimizations": false
       }

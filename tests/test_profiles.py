@@ -7,6 +7,12 @@ from unittest.mock import patch
 import pytest
 
 from abso.profiles import get_all_profiles
+from abso.profiles.deadlock import (
+    DeadlockGSyncHDRProfile,
+    DeadlockGSyncProfile,
+    DeadlockHDRProfile,
+    DeadlockProfile,
+)
 from abso.profiles.diablo4 import Diablo4Profile, Diablo4SDRProfile
 from abso.profiles.fortnite import FortniteHDRProfile, FortniteProfile
 from abso.profiles.marvel_rivals import MarvelRivalsHDRProfile, MarvelRivalsSDRProfile
@@ -27,8 +33,11 @@ from abso.profiles.rivals2_gsync import (
 from abso.profiles.rivals2_offline import Rivals2OfflineProfile
 from abso.profiles.rivals2_online import Rivals2OnlineProfile
 from abso.profiles.slippi_melee import (
+    SlippiMeleeConsoleParityHDRProfile,
     SlippiMeleeConsoleParityProfile,
+    SlippiMeleeHDRProfile,
     SlippiMeleeProfile,
+    SlippiMeleeUniversalHDRProfile,
     SlippiMeleeUniversalProfile,
 )
 
@@ -53,6 +62,24 @@ class TestProfileLoading:
         profile = SlippiMeleeUniversalProfile()
         assert profile.profile_id == "slippi-melee-universal"
         assert "Universal" in profile.display_name
+
+    def test_slippi_hdr_profiles_load(self):
+        """Slippi should expose HDR siblings for all three SDR variants."""
+        base_hdr = SlippiMeleeHDRProfile()
+        universal_hdr = SlippiMeleeUniversalHDRProfile()
+        parity_hdr = SlippiMeleeConsoleParityHDRProfile()
+
+        assert base_hdr.profile_id == "slippi-melee-hdr"
+        assert "HDR" in base_hdr.display_name
+        assert base_hdr.is_sdr_only is False
+
+        assert universal_hdr.profile_id == "slippi-melee-universal-hdr"
+        assert "Universal HDR" in universal_hdr.display_name
+        assert universal_hdr.is_sdr_only is False
+
+        assert parity_hdr.profile_id == "slippi-melee-console-parity-hdr"
+        assert "Console-Parity HDR" in parity_hdr.display_name
+        assert parity_hdr.is_sdr_only is False
 
     def test_diablo4_profile_loads(self):
         """Diablo 4 should expose explicit HDR and SDR variants."""
@@ -107,6 +134,125 @@ class TestProfileLoading:
         assert gsync_hdr.profile_id == "overwatch2-gsync-hdr"
         assert gsync_capture.profile_id == "overwatch2-gsync-capture"
         assert gsync_hdr_capture.profile_id == "overwatch2-gsync-hdr-capture"
+
+    def test_deadlock_profiles_load(self):
+        """Deadlock should expose the full GSYNC x HDR matrix (4 variants)."""
+        no_sync = DeadlockProfile()
+        no_sync_hdr = DeadlockHDRProfile()
+        gsync = DeadlockGSyncProfile()
+        gsync_hdr = DeadlockGSyncHDRProfile()
+
+        assert no_sync.profile_id == "deadlock"
+        assert no_sync.display_name == "Deadlock - No Sync SDR"
+        assert no_sync.is_sdr_only is True
+
+        assert no_sync_hdr.profile_id == "deadlock-hdr"
+        assert no_sync_hdr.display_name == "Deadlock - No Sync HDR"
+        assert no_sync_hdr.is_sdr_only is False
+
+        assert gsync.profile_id == "deadlock-gsync"
+        assert gsync.display_name == "Deadlock - GSYNC SDR"
+        assert gsync.is_sdr_only is True
+        assert gsync.requires_confirmed_vrr_support is True
+
+        assert gsync_hdr.profile_id == "deadlock-gsync-hdr"
+        assert gsync_hdr.display_name == "Deadlock - GSYNC HDR"
+        assert gsync_hdr.is_sdr_only is False
+        assert gsync_hdr.requires_confirmed_vrr_support is True
+
+    def test_deadlock_executable_hints_cover_playtest_and_launch_binaries(self):
+        """Deadlock detection should track both project8.exe and deadlock.exe."""
+        for profile_cls in (
+            DeadlockProfile,
+            DeadlockHDRProfile,
+            DeadlockGSyncProfile,
+            DeadlockGSyncHDRProfile,
+        ):
+            profile = profile_cls()
+            assert "project8.exe" in profile.executable_hints
+            assert "deadlock.exe" in profile.executable_hints
+            assert "project8.exe" in profile.nvidia_binding_executables
+            assert "deadlock.exe" in profile.nvidia_binding_executables
+
+    def test_deadlock_no_sync_nvidia_settings(self):
+        """Deadlock no-sync variants should disable global VRR and use reflex_no_sync preset."""
+        for profile_cls in (DeadlockProfile, DeadlockHDRProfile):
+            profile = profile_cls()
+            settings = profile.get_settings("NvidiaSettingsHandler")
+            assert settings["preset"] == "reflex_no_sync", profile_cls.__name__
+            assert settings["profile_name"] == "Deadlock", profile_cls.__name__
+            assert settings["global_vrr_mode"] == "off", profile_cls.__name__
+
+    def test_deadlock_gsync_nvidia_settings(self):
+        """Deadlock G-SYNC variants should run reflex_gsync on the strict VRR path."""
+        for profile_cls in (DeadlockGSyncProfile, DeadlockGSyncHDRProfile):
+            profile = profile_cls()
+            settings = profile.get_settings("NvidiaSettingsHandler")
+            assert settings["preset"] == "reflex_gsync", profile_cls.__name__
+            assert settings["profile_name"] == "Deadlock", profile_cls.__name__
+            assert settings["auto_vrr_fps_cap"] is True, profile_cls.__name__
+            assert settings["global_vrr_mode"] == "fullscreen_only", profile_cls.__name__
+
+    def test_deadlock_hdr_variants_enable_hdr_and_disable_auto_hdr(self):
+        """Both HDR variants should enable native HDR with Auto HDR off and ACM disabled."""
+        for profile_cls in (DeadlockHDRProfile, DeadlockGSyncHDRProfile):
+            profile = profile_cls()
+            win = profile.get_settings("WindowsSettingsHandler")
+            graphics = profile.get_settings("GraphicsSettingsHandler")
+            color = profile.get_settings("ColorProfileSettingsHandler")
+            assert win["hdr"] is True, profile_cls.__name__
+            assert win["auto_hdr"] is False, profile_cls.__name__
+            assert win["advanced_color"] is True, profile_cls.__name__
+            assert graphics["disable_auto_color_management"] is True, profile_cls.__name__
+            assert color["icc_profile"] == "native", profile_cls.__name__
+
+    def test_deadlock_sdr_variants_disable_hdr(self):
+        """SDR variants should keep HDR off and use the sRGB color path."""
+        for profile_cls in (DeadlockProfile, DeadlockGSyncProfile):
+            profile = profile_cls()
+            win = profile.get_settings("WindowsSettingsHandler")
+            color = profile.get_settings("ColorProfileSettingsHandler")
+            assert win["hdr"] is False, profile_cls.__name__
+            assert win["auto_hdr"] is False, profile_cls.__name__
+            assert color["icc_profile"] == "srgb", profile_cls.__name__
+
+    def test_deadlock_variants_disable_fso_for_both_binaries(self):
+        """Every Deadlock variant runs exclusive fullscreen; FSO must be disabled per-exe."""
+        for profile_cls in (
+            DeadlockProfile,
+            DeadlockHDRProfile,
+            DeadlockGSyncProfile,
+            DeadlockGSyncHDRProfile,
+        ):
+            profile = profile_cls()
+            flags = profile.fullscreen_optimizations_per_exe
+            assert flags.get("project8.exe") is True, profile_cls.__name__
+            assert flags.get("deadlock.exe") is True, profile_cls.__name__
+            registry_settings = profile.get_settings("RegistrySettingsHandler")
+            assert registry_settings["fullscreen_optimizations"]["project8.exe"] is True
+            assert registry_settings["fullscreen_optimizations"]["deadlock.exe"] is True
+
+    def test_deadlock_gsync_variants_inherit_strict_display_path_contract(self):
+        """G-SYNC Deadlock variants should match OW2/Marvel Rivals strict fullscreen contract."""
+        for profile_cls in (DeadlockGSyncProfile, DeadlockGSyncHDRProfile):
+            profile = profile_cls()
+            assert profile.uses_fullscreen_only_vrr_path is True, profile_cls.__name__
+            assert profile.display_path_requirements.require_overlay_free_path is True
+            assert profile.requires_exact_nvidia_binding is True, profile_cls.__name__
+            assert profile.auto_disable_blocking_overlays is True, profile_cls.__name__
+
+    def test_deadlock_is_system_only_until_native_config_handler_lands(self):
+        """ABSO does not yet write Deadlock's Source 2 config; scope should reflect that."""
+        for profile_cls in (
+            DeadlockProfile,
+            DeadlockHDRProfile,
+            DeadlockGSyncProfile,
+            DeadlockGSyncHDRProfile,
+        ):
+            profile = profile_cls()
+            assert profile.application_scope == "system_only", profile_cls.__name__
+            assert profile.enforces_reflex_in_config is False, profile_cls.__name__
+            assert profile.requires_reflex is True, profile_cls.__name__
 
     def test_marvel_rivals_profiles_load(self):
         """Test both Marvel Rivals variants can be instantiated."""
@@ -292,6 +438,66 @@ class TestProfileSettings:
         profile = SlippiMeleeConsoleParityProfile()
         settings = profile.get_settings("WindowsSettingsHandler")
         assert settings["refresh_rate"] == 60
+
+    def test_slippi_hdr_variants_enable_hdr_and_disable_acm(self):
+        """All three Slippi HDR siblings should enable native HDR + WCG and disable Auto HDR / ACM."""
+        for profile_cls in (
+            SlippiMeleeHDRProfile,
+            SlippiMeleeUniversalHDRProfile,
+            SlippiMeleeConsoleParityHDRProfile,
+        ):
+            profile = profile_cls()
+            win = profile.get_settings("WindowsSettingsHandler")
+            graphics = profile.get_settings("GraphicsSettingsHandler")
+            color = profile.get_settings("ColorProfileSettingsHandler")
+            assert win["hdr"] is True, profile_cls.__name__
+            assert win["advanced_color"] is True, profile_cls.__name__
+            assert win["auto_hdr"] is False, profile_cls.__name__
+            assert win["sdr_white_level_nits"] == 200, profile_cls.__name__
+            assert graphics["disable_auto_color_management"] is True, profile_cls.__name__
+            assert color["icc_profile"] == "native", profile_cls.__name__
+
+    def test_slippi_hdr_variants_preserve_sdr_latency_choices(self):
+        """HDR variants must inherit every latency choice from their SDR parents unchanged."""
+        # No-sync competitive: backend-aware LLM, VSync OFF, exclusive fullscreen
+        base_sdr = SlippiMeleeProfile()
+        base_hdr = SlippiMeleeHDRProfile()
+        for handler in (
+            "NvidiaSettingsHandler",
+            "DolphinConfigHandler",
+            "RegistrySettingsHandler",
+            "PowerSettingsHandler",
+        ):
+            assert base_hdr.get_settings(handler) == base_sdr.get_settings(handler), handler
+
+        # Universal: HAGS stays True regardless of backend on the HDR sibling too
+        universal_hdr = SlippiMeleeUniversalHDRProfile()
+        with patch.object(universal_hdr, "_detect_dolphin_backend", return_value="dx11"):
+            win = universal_hdr.get_settings("WindowsSettingsHandler")
+        assert win["hags"] is True
+        assert win["hdr"] is True
+
+        # Console-parity: 60 Hz + VSync cadence is preserved
+        parity_hdr = SlippiMeleeConsoleParityHDRProfile()
+        parity_win = parity_hdr.get_settings("WindowsSettingsHandler")
+        parity_nv = parity_hdr.get_settings("NvidiaSettingsHandler")
+        assert parity_win["refresh_rate"] == 60
+        assert parity_win["hdr"] is True
+        assert parity_nv["vsync"] == "on"
+        assert parity_nv["low_latency_mode"] == "off"
+
+    def test_slippi_hdr_in_game_guidance_includes_paper_white(self):
+        """HDR profiles must surface the SDR-in-HDR paper-white setup note."""
+        for profile_cls in (
+            SlippiMeleeHDRProfile,
+            SlippiMeleeUniversalHDRProfile,
+            SlippiMeleeConsoleParityHDRProfile,
+        ):
+            profile = profile_cls()
+            guidance = profile.get_in_game_settings()
+            settings_named = {entry.get("setting") for entry in guidance}
+            assert "SDR content brightness" in settings_named, profile_cls.__name__
+            assert "Use HDR (Settings > System > Display)" in settings_named, profile_cls.__name__
 
     def test_diablo4_nvidia_settings(self):
         """Test Diablo4Profile returns Nvidia settings with Reflex preset (LLM OFF)."""
@@ -898,6 +1104,9 @@ class TestFullscreenOptimizationsPerExe:
             SlippiMeleeProfile,
             SlippiMeleeUniversalProfile,
             SlippiMeleeConsoleParityProfile,
+            SlippiMeleeHDRProfile,
+            SlippiMeleeUniversalHDRProfile,
+            SlippiMeleeConsoleParityHDRProfile,
         ):
             profile = profile_cls()
             flags = profile.fullscreen_optimizations_per_exe

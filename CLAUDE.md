@@ -26,6 +26,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Available Profiles
 
 - **slippi-melee** / **slippi-melee-console-parity** / **slippi-melee-universal** — Slippi Dolphin (SSBM) variants
+- **slippi-melee-hdr** / **slippi-melee-console-parity-hdr** / **slippi-melee-universal-hdr** — Slippi variants with Windows HDR on for eye-strain relief (Dolphin renders SDR through the HDR composition path)
 - **rivals2-offline** / **rivals2-online** — Rivals 2 no-sync offline vs rollback-safe online
 - **rivals2-gsync** / **rivals2-online-gsync** — Rivals 2 VRR lanes (offline vs online)
 - **fortnite** / **fortnite-hdr** — Fortnite Reflex path

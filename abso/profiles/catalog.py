@@ -11,6 +11,12 @@ from dataclasses import dataclass
 from typing import Any, Literal
 
 from abso.profiles.base import BaseProfile
+from abso.profiles.deadlock import (
+    DeadlockGSyncHDRProfile,
+    DeadlockGSyncProfile,
+    DeadlockHDRProfile,
+    DeadlockProfile,
+)
 from abso.profiles.diablo4 import Diablo4Profile, Diablo4SDRProfile
 from abso.profiles.fortnite import FortniteHDRProfile, FortniteProfile
 from abso.profiles.marvel_rivals import MarvelRivalsHDRProfile, MarvelRivalsSDRProfile
@@ -33,8 +39,11 @@ from abso.profiles.rivals2_offline import Rivals2OfflineProfile
 from abso.profiles.rivals2_online import Rivals2OnlineProfile
 from abso.profiles.ryujinx_ssbu import RyujinxSSBUProfile
 from abso.profiles.slippi_melee import (
+    SlippiMeleeConsoleParityHDRProfile,
     SlippiMeleeConsoleParityProfile,
+    SlippiMeleeHDRProfile,
     SlippiMeleeProfile,
+    SlippiMeleeUniversalHDRProfile,
     SlippiMeleeUniversalProfile,
 )
 
@@ -61,10 +70,31 @@ PROFILE_CATALOG: OrderedDict[str, ProfileCatalogEntry] = OrderedDict(
             tray_subtitle="Competitive | No Sync | Backend-Aware",
             sync_mode="off",
         ),
+        "slippi-melee-hdr": ProfileCatalogEntry(
+            profile_class=SlippiMeleeHDRProfile,
+            tray_category="Fighting",
+            tray_subtitle="Competitive HDR | No Sync | Eye-Strain Relief",
+            tray_description=(
+                "Competitive Slippi profile with Windows HDR on. Dolphin renders SDR through "
+                "the HDR composition path; small latency cost in exchange for the lower-strain "
+                "HDR desktop look."
+            ),
+            sync_mode="off",
+        ),
         "slippi-melee-console-parity": ProfileCatalogEntry(
             profile_class=SlippiMeleeConsoleParityProfile,
             tray_category="Fighting",
             tray_subtitle="Console-Parity | 60Hz + VSync | LLM OFF",
+            sync_mode="on",
+        ),
+        "slippi-melee-console-parity-hdr": ProfileCatalogEntry(
+            profile_class=SlippiMeleeConsoleParityHDRProfile,
+            tray_category="Fighting",
+            tray_subtitle="Console-Parity HDR | 60Hz + VSync | Eye-Strain Relief",
+            tray_description=(
+                "Console-parity Slippi profile with Windows HDR on. 60 Hz + VSync cadence "
+                "preserved; Dolphin renders SDR through the HDR composition path."
+            ),
             sync_mode="on",
         ),
         "slippi-melee-universal": ProfileCatalogEntry(
@@ -74,6 +104,16 @@ PROFILE_CATALOG: OrderedDict[str, ProfileCatalogEntry] = OrderedDict(
             tray_description=(
                 "Absolute minimum latency with HAGS kept on so re-applying does not require "
                 "a reboot. VSync OFF, G-SYNC/VRR OFF."
+            ),
+            sync_mode="off",
+        ),
+        "slippi-melee-universal-hdr": ProfileCatalogEntry(
+            profile_class=SlippiMeleeUniversalHDRProfile,
+            tray_category="Fighting",
+            tray_subtitle="Universal HDR | HAGS ON | No Sync | Eye-Strain Relief",
+            tray_description=(
+                "Universal HDR Slippi profile. Fixed HAGS on (no reboot on re-apply), no-sync "
+                "latency contract, Windows HDR for daily eye-strain relief."
             ),
             sync_mode="off",
         ),
@@ -142,6 +182,46 @@ PROFILE_CATALOG: OrderedDict[str, ProfileCatalogEntry] = OrderedDict(
             tray_description=(
                 "Performance-first HDR Marvel Rivals profile. Uses Reflex + VRR and keeps "
                 "engine-specific options in the native config handler."
+            ),
+            sync_mode="on",
+        ),
+        "deadlock": ProfileCatalogEntry(
+            profile_class=DeadlockProfile,
+            tray_category="Shooter",
+            tray_subtitle="No Sync SDR | Reflex (set in-game) | VSync OFF | G-SYNC OFF",
+            tray_description=(
+                "Minimum-latency no-sync Deadlock profile. ABSO tunes the OS/driver path; "
+                "enable Reflex On + Boost manually in Deadlock's video settings."
+            ),
+            sync_mode="off",
+        ),
+        "deadlock-hdr": ProfileCatalogEntry(
+            profile_class=DeadlockHDRProfile,
+            tray_category="Shooter",
+            tray_subtitle="No Sync HDR | Reflex (set in-game) | VSync OFF | G-SYNC OFF",
+            tray_description=(
+                "Minimum-latency no-sync Deadlock with native HDR for OLED / Mini-LED. "
+                "Same sync/VRR contract as the SDR variant."
+            ),
+            sync_mode="off",
+        ),
+        "deadlock-gsync": ProfileCatalogEntry(
+            profile_class=DeadlockGSyncProfile,
+            tray_category="Shooter",
+            tray_subtitle="Strict SDR Exclusive | Reflex (set in-game) | G-SYNC ON",
+            tray_description=(
+                "Tear-free low-latency VRR Deadlock profile on the strict fullscreen-only "
+                "G-SYNC path. Enable Reflex On + Boost manually in-game."
+            ),
+            sync_mode="on",
+        ),
+        "deadlock-gsync-hdr": ProfileCatalogEntry(
+            profile_class=DeadlockGSyncHDRProfile,
+            tray_category="Shooter",
+            tray_subtitle="Strict HDR Exclusive | Reflex (set in-game) | G-SYNC ON",
+            tray_description=(
+                "Tear-free low-latency VRR Deadlock with native HDR (OLED / Mini-LED) on "
+                "the strict fullscreen-only G-SYNC path."
             ),
             sync_mode="on",
         ),
@@ -323,6 +403,10 @@ def get_profile_manifest() -> list[dict[str, Any]]:
                 "tray_subtitle": entry.tray_subtitle,
                 "tray_description": entry.tray_description or profile.description,
                 "sync_mode": entry.sync_mode,
+                "launch_process_killset": profile.launch_process_killset().to_dict(),
+                "requires_overlay_free_path": bool(
+                    profile.display_path_requirements.require_overlay_free_path
+                ),
             }
         )
     return manifest

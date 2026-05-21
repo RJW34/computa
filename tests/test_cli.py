@@ -74,6 +74,86 @@ class TestCLIProfiles:
         assert "slippi" in result.output.lower() or "melee" in result.output.lower()
 
 
+class TestCLILaunchKillset:
+    """Test launch-killset / launch-sweep tray-facing commands."""
+
+    def test_launch_killset_help(self):
+        runner = CliRunner()
+        result = runner.invoke(cli, ["launch-killset", "--help"])
+        assert result.exit_code == 0
+
+    def test_launch_killset_json_for_strict_profile(self):
+        runner = CliRunner()
+        result = runner.invoke(cli, ["launch-killset", "overwatch2-gsync-hdr", "--json"])
+        assert result.exit_code == 0, result.output
+
+        payload = json.loads(result.output)
+        assert payload["success"] is True
+        data = payload["data"]
+        assert data["profile"] == "overwatch2-gsync-hdr"
+        assert data["killset"]["always_safe"], data
+        assert data["killset"]["opt_in"], "Strict profile should populate opt-in tier"
+        assert "Overwatch.exe" in data["executables"]
+        assert data["include_opt_in"] is False
+        assert "Medal.exe" in data["resolved"]
+        # Without --include-opt-in the resolved list must NOT contain opt-in
+        # tier images, so cloud sync stays alive.
+        assert "OneDrive.exe" not in data["resolved"]
+
+    def test_launch_killset_with_opt_in_includes_sync_daemons(self):
+        runner = CliRunner()
+        result = runner.invoke(
+            cli, ["launch-killset", "overwatch2-gsync-hdr", "--include-opt-in", "--json"]
+        )
+        assert result.exit_code == 0, result.output
+        payload = json.loads(result.output)
+        assert "OneDrive.exe" in payload["data"]["resolved"]
+
+    def test_launch_killset_for_productivity_is_empty(self):
+        runner = CliRunner()
+        result = runner.invoke(cli, ["launch-killset", "productivity", "--json"])
+        assert result.exit_code == 0, result.output
+        payload = json.loads(result.output)
+        assert payload["data"]["killset"]["always_safe"] == []
+        assert payload["data"]["killset"]["opt_in"] == []
+        assert payload["data"]["resolved"] == []
+
+    def test_launch_killset_unknown_profile_errors(self):
+        runner = CliRunner()
+        result = runner.invoke(
+            cli, ["launch-killset", "nonexistent-profile-xyz", "--json"]
+        )
+        assert result.exit_code == 1
+
+    def test_launch_sweep_dry_run_does_not_touch_processes(self):
+        """Dry-run must never call _stop_process_image even if a process is up."""
+        runner = CliRunner()
+        with patch(
+            "abso.core.process_janitor.ProcessJanitor._stop_process_image"
+        ) as mock_stop, patch(
+            "abso.core.process_janitor.ProcessJanitor._is_process_running",
+            return_value=True,
+        ):
+            result = runner.invoke(
+                cli,
+                ["launch-sweep", "overwatch2-gsync-hdr", "--dry-run", "--json"],
+            )
+
+        assert result.exit_code == 0, result.output
+        mock_stop.assert_not_called()
+        payload = json.loads(result.output)
+        assert payload["data"]["dry_run"] is True
+        assert payload["data"]["result"]["stopped"] == []
+
+    def test_launch_sweep_for_productivity_returns_empty_result(self):
+        runner = CliRunner()
+        result = runner.invoke(cli, ["launch-sweep", "productivity", "--json"])
+        assert result.exit_code == 0, result.output
+        payload = json.loads(result.output)
+        assert payload["data"]["result"]["attempted"] == []
+        assert payload["data"]["result"]["stopped"] == []
+
+
 class TestApplySummaryLevel:
     """Test shared apply summary severity classification."""
 

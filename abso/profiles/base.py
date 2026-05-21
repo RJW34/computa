@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Literal
 
 if TYPE_CHECKING:
+    from abso.core.process_janitor import LaunchKillset
     from abso.settings.base import SettingsHandler
 
 
@@ -353,6 +354,53 @@ class BaseProfile(ABC):
     def auto_disable_blocking_overlays(self) -> bool:
         """Whether ABSO should try to shut down blocking overlays automatically."""
         return bool(self.display_path_requirements.require_overlay_free_path)
+
+    def launch_process_killset(self) -> "LaunchKillset":
+        """Processes the launch-time janitor may stop while this profile's game is alive.
+
+        The default derivation is data-driven from existing profile traits — no
+        per-profile override is required for ABSO's built-in lanes:
+
+        - ``productivity`` profiles return an empty killset (the user is
+          working in those apps; killing overlays would be disruptive).
+        - Browser-game profiles (``pokemon-auto-chess``, ``pacdeluxe``) return
+          a narrow always-safe overlay set and an opt-in sync/RGB tier; cloud
+          sync running while a Tauri/web client is in fullscreen is the most
+          common latency offender.
+        - Strict overlay-free profiles (fullscreen-only G-SYNC lanes like
+          ``overwatch2-gsync-hdr`` and ``deadlock-gsync``) get the full
+          always-safe killset plus the broader opt-in tier.
+        - All other gaming profiles (no-sync, capture-safe, emulator, online,
+          ARPG, Reflex shooters) get the default always-safe killset; opt-in
+          stays off so the launch sweep cannot pause OneDrive uploads or kill
+          Logitech G HUB without the user opting in via the tray.
+
+        Profiles can override this when they need to deviate (e.g. a streaming
+        variant that should keep OBS alive even on a strict path).
+
+        Returns:
+            ``LaunchKillset`` resolved against this profile's traits.
+        """
+        from abso.core.process_janitor import (
+            ALWAYS_SAFE_LAUNCH_KILLSET,
+            OPT_IN_LAUNCH_KILLSET,
+            LaunchKillset,
+        )
+
+        target = (self.optimization_target or "").lower()
+
+        # Productivity intentionally returns an empty killset: nothing on the
+        # always-safe list is "background" when the user is actively using
+        # Discord/OBS/Medal at the desktop level.
+        if target == "productivity":
+            return LaunchKillset()
+
+        strict = bool(self.display_path_requirements.require_overlay_free_path)
+
+        always_safe = tuple(ALWAYS_SAFE_LAUNCH_KILLSET)
+        opt_in = tuple(OPT_IN_LAUNCH_KILLSET) if strict else ()
+
+        return LaunchKillset(always_safe=always_safe, opt_in=opt_in)
 
     @property
     def min_os_build(self) -> tuple[int, int] | None:

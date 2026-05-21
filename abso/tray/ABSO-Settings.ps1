@@ -28,6 +28,12 @@ function Get-DefaultConfig {
         profileHistory  = @()
         lastProfileState = $null
         lastStartupResolution = $null
+        # When true, the launch sanitizer also stops the opt-in tier:
+        # cloud sync daemons (OneDrive, Dropbox) and OEM RGB daemons
+        # (Razer Synapse, Logitech G HUB, iCUE, Armoury Crate). Default
+        # OFF so the user does not lose mid-session cloud uploads or RGB
+        # hotkey control without explicitly opting in.
+        aggressiveProcessJanitor = $false
     }
 }
 
