@@ -207,11 +207,13 @@ def test_strict_profiles_advertise_overlay_free_path_in_manifest() -> None:
     [
         # LLM runtimes the user explicitly called out
         "ollama.exe",
+        "ollama app.exe",  # Windows tray icon (with space) - distinct from CLI
         "ollama_runner.exe",
         "lmstudio.exe",
         "LM Studio.exe",
         "GPT4All.exe",
         "Jan.exe",
+        "AnythingLLM.exe",
         # Cloud sync (moved up from opt-in)
         "OneDrive.exe",
         "Dropbox.exe",
@@ -221,6 +223,23 @@ def test_strict_profiles_advertise_overlay_free_path_in_manifest() -> None:
         "lghub_agent.exe",
         "iCUE.exe",
         "LCore.exe",
+        # VPN clients (user explicitly called out Tailscale; same category for the rest)
+        "tailscale-ipn.exe",
+        "tailscale.exe",
+        "tailscaled.exe",
+        "wireguard.exe",
+        "openvpn-gui.exe",
+        "NordVPN.exe",
+        "ExpressVPN.exe",
+        "ProtonVPN.exe",
+        # Chat clients other than Discord
+        "slack.exe",
+        "Teams.exe",
+        "ms-teams.exe",
+        "Zoom.exe",
+        "Signal.exe",
+        "Telegram.exe",
+        "WhatsApp.exe",
     ],
 )
 def test_aggressive_targets_are_in_always_safe(image: str) -> None:
@@ -254,8 +273,13 @@ def test_aggressive_targets_are_in_always_safe(image: str) -> None:
         "DiscordCanary.exe",
         # Dev tooling
         "claude.exe",
+        "codex.exe",
         "git.exe",
         "gh.exe",
+        # Game / emulator launchers
+        "Slippi Launcher.exe",
+        "Slippi Dolphin.exe",
+        "Ryujinx.exe",
     ],
 )
 def test_protected_processes_are_never_killable(image: str) -> None:

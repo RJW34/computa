@@ -96,6 +96,7 @@ ALWAYS_SAFE_LAUNCH_KILLSET: tuple[str, ...] = (
     # Local LLM hosts have no role on a gaming-only PC. User explicitly called
     # this out; the dev-LLM workflows live on other machines.
     "ollama.exe",
+    "ollama app.exe",  # Windows tray icon for Ollama - separate binary from the CLI
     "ollama_runner.exe",
     "ollama_llama_server.exe",
     "lmstudio.exe",
@@ -105,6 +106,48 @@ ALWAYS_SAFE_LAUNCH_KILLSET: tuple[str, ...] = (
     "Jan.exe",
     "cortex.exe",
     "llamafile.exe",
+    "AnythingLLM.exe",
+    "Open WebUI.exe",
+    # --- VPN clients ---
+    # VPN clients add a virtual NIC + encryption pipeline that increases tail
+    # latency on competitive game traffic. User explicitly called out
+    # Tailscale; the rest follow the same category.
+    "tailscale-ipn.exe",
+    "tailscale.exe",
+    "tailscaled.exe",
+    "tailscale-tray.exe",
+    "ZeroTier One.exe",
+    "zerotier_desktop_ui.exe",
+    "wireguard.exe",
+    "openvpn-gui.exe",
+    "openvpn.exe",
+    "NordVPN.exe",
+    "nordvpn-service.exe",
+    "ExpressVPN.exe",
+    "ProtonVPN.exe",
+    "ProtonVPNService.exe",
+    "Mullvad VPN.exe",
+    "mullvad-daemon.exe",
+    "Windscribe.exe",
+    "AirVPN.exe",
+    # --- Chat clients other than Discord (Discord stays protected for teammates) ---
+    # Slack/Teams/Zoom run heavy Electron/Chromium backends that consume CPU
+    # and RAM during gameplay. If you need them up during play, add them to
+    # process_overrides.protect in abso.yaml.
+    "Slack.exe",
+    "ms-teams.exe",
+    "Teams.exe",
+    "msteams.exe",
+    "Zoom.exe",
+    "Zoom Meetings.exe",
+    "CptHost.exe",
+    "Signal.exe",
+    "Telegram.exe",
+    "WhatsApp.exe",
+    "Skype.exe",
+    # --- Crash reporters / telemetry helpers (typical bloatware tray icons) ---
+    "CrashMailer.exe",
+    "CrashMailer_64.exe",
     # --- Cloud sync ---
     # Sync uploads cause disk + network spikes mid-match. User opted in to
     # killing these globally; they resume automatically next session.
@@ -183,6 +226,10 @@ NEVER_KILL_IMAGES: frozenset[str] = frozenset(
         "EpicGamesLauncher.exe",
         "EpicWebHelper.exe",
         "RiotClientServices.exe",
+        "Slippi Launcher.exe",  # Slippi Dolphin launcher (drives Melee setup)
+        "Slippi Dolphin.exe",
+        "Ryujinx.exe",
+        "Ryubing.exe",
         # --- ABSO + tray + interpreter (cannot kill self) ---
         "abso.exe",
         "python.exe",
@@ -252,6 +299,7 @@ NEVER_KILL_IMAGES: frozenset[str] = frozenset(
         "git.exe",
         "gh.exe",
         "claude.exe",
+        "codex.exe",   # OpenAI/Codex CLI - same agentic-work category as claude.exe
         "node.exe",
         "npm.exe",
         "cargo.exe",

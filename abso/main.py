@@ -267,6 +267,59 @@ def _append_unique_message(messages: list[str], message: str | None) -> None:
     messages.append(normalized)
 
 
+def _run_post_apply_sweep(
+    profile_name: str,
+    tx: ProfileTransactionManager | Any,
+    result: Any | None,
+) -> dict[str, Any] | None:
+    """Run the launch-time process janitor sweep after a successful apply.
+
+    The LaunchSanitizer tray-side timer only fires when the active profile's
+    game binary is detected running. Users who apply a profile but have not
+    yet launched the game would otherwise see latency vampires (Ollama,
+    Tailscale, cloud sync) still alive in the tray. Running the sweep here -
+    in the apply pipeline - makes 'apply' mean 'prepare the PC now' instead
+    of 'prepare the PC the moment the game launches'.
+
+    Returns a sweep result dict for JSON serialization, or ``None`` if the
+    apply was not successful (nothing to do) or the profile declares an empty
+    killset (productivity / no-op cases). Exceptions are swallowed and
+    returned in the payload so apply itself stays authoritative.
+
+    Uses ``include_opt_in=True`` for maximum aggression because the user
+    explicitly initiated the apply action.
+    """
+    if not (tx.success and result and result.success):
+        return None
+
+    try:
+        from abso.core.process_janitor import ProcessJanitor
+        from abso.profiles.catalog import get_profile_instances
+
+        canonical = resolve_profile_id(profile_name) or profile_name
+        profile = get_profile_instances().get(canonical)
+        if profile is None:
+            return None
+
+        killset = profile.launch_process_killset()
+        resolved = killset.resolve(include_opt_in=True)
+        if not resolved:
+            return None
+
+        janitor = ProcessJanitor()
+        sweep = janitor.sweep(resolved, dry_run=False)
+        return sweep.to_dict()
+    except Exception as exc:
+        logger.warning("Post-apply launch sweep failed: %s", exc)
+        return {
+            "stopped": [],
+            "not_running": [],
+            "failed": [],
+            "warnings": [f"Post-apply sweep failed: {exc}"],
+            "error": str(exc),
+        }
+
+
 def _collect_apply_warnings(
     tx: ProfileTransactionManager | Any,
     result: Any | None,
@@ -866,6 +919,11 @@ def apply(profile_name: str, no_backup: bool, benchmark: bool, json_output: bool
         apply_notices = _collect_apply_notices(result)
         apply_summary_level = _determine_apply_summary_level(apply_warnings, apply_notices)
 
+        # Run the launch-time process janitor right now so the user does not
+        # have to wait for the LaunchSanitizer tray timer (which only fires
+        # when the game binary itself is detected running).
+        launch_sweep = _run_post_apply_sweep(profile_name, tx, result)
+
         if json_output:
             if tx.success and result and result.success:
                 set_current_profile(
@@ -900,6 +958,7 @@ def apply(profile_name: str, no_backup: bool, benchmark: bool, json_output: bool
                 ],
                 "transaction": tx.to_dict(),
                 "compliance": tx.compliance_report.to_dict() if tx.compliance_report else None,
+                "launch_sweep": launch_sweep,
             }, success=tx.success)
             return
 
@@ -938,6 +997,21 @@ def apply(profile_name: str, no_backup: bool, benchmark: bool, json_output: bool
                 console.print(f"[yellow]{warning_prefix}: {warning}[/yellow]")
             for notice in apply_notices:
                 console.print(f"[cyan]Note: {notice}[/cyan]")
+
+            # Surface the post-apply launch sweep so users see what got
+            # stopped without having to look at tray logs.
+            if launch_sweep:
+                stopped = launch_sweep.get("stopped") or []
+                sweep_warnings = launch_sweep.get("warnings") or []
+                if stopped:
+                    console.print(
+                        f"\n[green]Stopped {len(stopped)} background process(es):[/green]"
+                    )
+                    for image in stopped:
+                        console.print(f"  [green]-[/green] {image}")
+                if sweep_warnings:
+                    for warning in sweep_warnings:
+                        console.print(f"[yellow]Sweep warning: {warning}[/yellow]")
 
             if result.in_game_settings:
                 # Actually generate the report file
