@@ -89,11 +89,13 @@ class Rivals2GSyncProfile(Rivals2BaseProfile):
             {
                 "category": "=== G-SYNC PROFILE ===",
                 "setting": "Overview",
-                "value": "G-SYNC ON, VSync ON (NVCP), FPS cap at refresh-3",
+                "value": "G-SYNC ON, VSync ON (NVCP), refresh-scaled FPS cap",
                 "reason": (
-                    "Tear-free low-latency VRR profile. VSync acts as safety net only — "
+                    "Tear-free low-latency VRR profile. VSync acts as safety net only - "
                     "never activates with FPS capped below refresh rate. "
-                    "For 300Hz: cap at 297. For 240Hz: cap at 237. For 144Hz: cap at 141."
+                    "For 300Hz: cap at 285. For 240Hz: cap at 233. For 144Hz: cap at 141. "
+                    "(Cap scales with refresh per Blur Busters' 2026 guidance: -3 below 200Hz, "
+                    "0.97x at 200-300Hz, 0.95x at 300Hz+.)"
                 ),
             },
             {

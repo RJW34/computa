@@ -61,7 +61,25 @@ class VRRConfig:
     fps_cap_method: FrameLimiterType
 
 
-# FPS cap presets for VRR (refresh_rate - 3)
+# FPS cap presets for VRR.
+#
+# Updated 2026-05 to scale the margin with refresh rate, matching Blur
+# Busters' current G-SYNC 101 guidance. The legacy "refresh - 3" rule was
+# correct for 60-200Hz displays but too tight for high-refresh: frame-time
+# variance at 240Hz+ can exceed a 3-fps headroom, briefly hitting the
+# refresh ceiling and letting V-SYNC engage. NVIDIA Reflex's own empirical
+# safety margins (224 at 240Hz, 276 at 300Hz, 327 at 360Hz) demonstrate
+# the same scaling.
+#
+# Formula:
+#   refresh < 200    -> refresh - 3              (~1.5-5% margin)
+#   200 <= refresh < 300 -> round(refresh * 0.97)  (~3% margin)
+#   refresh >= 300   -> round(refresh * 0.95)    (~5% margin)
+#
+# Note: for Reflex-enabled games on G-SYNC, Reflex's own auto-cap is
+# always more aggressive than this formula and will preempt it - so this
+# value matters primarily for non-Reflex titles (Rivals 2, emulators,
+# older games). See vrr.py:get_vrr_fps_cap docstring.
 VRR_FPS_CAPS: dict[int, int] = {
     60: 57,
     75: 72,
@@ -70,14 +88,14 @@ VRR_FPS_CAPS: dict[int, int] = {
     144: 141,
     165: 162,
     180: 177,
-    200: 197,
-    240: 237,
-    280: 277,
-    300: 297,
-    360: 357,
-    390: 387,
-    480: 477,
-    500: 497,
+    200: 194,    # was 197; refresh - 3 still close, but 0.97 scaling is cleaner
+    240: 233,    # was 237; 0.97 scaling, matches Reflex's 224 cap behavior
+    280: 272,    # was 277
+    300: 285,    # was 297; 0.95 scaling, Reflex caps at 276 anyway
+    360: 342,    # was 357; 0.95 scaling, Reflex caps at 327
+    390: 371,    # was 387
+    480: 456,    # was 477
+    500: 475,    # was 497
 }
 
 # Common in-game FPS cap presets (for games without custom values)
@@ -87,8 +105,20 @@ COMMON_FPS_PRESETS = [30, 60, 120, 144, 165, 240, 300, 360]
 def get_vrr_fps_cap(refresh_rate: int | float) -> int:
     """Calculate optimal FPS cap for VRR displays.
 
-    The "3 frames below" rule: Cap FPS at minimum 3 below refresh rate
-    to ensure VRR stays engaged and V-SYNC never activates.
+    Uses a refresh-scaled margin matching current Blur Busters G-SYNC 101
+    guidance (updated 2026-05). The legacy "refresh - 3" rule was correct
+    for 60-200Hz but too tight for high-refresh - frame-time variance at
+    240Hz+ can exceed a 3-fps headroom, letting V-SYNC engage briefly.
+
+    Scaling:
+        refresh < 200       -> refresh - 3       (~1.5-5% margin)
+        200 <= refresh < 300 -> refresh * 0.97   (~3% margin)
+        refresh >= 300      -> refresh * 0.95    (~5% margin)
+
+    NVIDIA Reflex (when enabled on a G-SYNC game) applies its own
+    auto-cap that is always more aggressive than this (e.g. 276 at 300Hz
+    vs this function's 285), so for Reflex-enabled titles the in-game /
+    NVCP cap this function returns is informational - Reflex preempts it.
 
     Accepts float inputs (e.g. 299.99) and rounds to the nearest integer
     before lookup so fractional Hz values from CCD/pixel-clock detection
@@ -101,11 +131,16 @@ def get_vrr_fps_cap(refresh_rate: int | float) -> int:
         Optimal FPS cap value.
     """
     refresh_rate = round(float(refresh_rate))
-    # Use preset if available
+    # Use preset table when available so common refresh rates return
+    # consistent, hand-reviewed values.
     if refresh_rate in VRR_FPS_CAPS:
         return VRR_FPS_CAPS[refresh_rate]
-    # Otherwise calculate
-    return refresh_rate - 3
+    # Otherwise compute from the scaled formula.
+    if refresh_rate < 200:
+        return refresh_rate - 3
+    if refresh_rate < 300:
+        return round(refresh_rate * 0.97)
+    return round(refresh_rate * 0.95)
 
 
 def get_best_ingame_preset(refresh_rate: int, available_presets: list[int] | None = None) -> int | None:

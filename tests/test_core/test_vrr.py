@@ -20,21 +20,37 @@ from abso.core.vrr import (
 class TestVRRFPSCap:
     """Tests for VRR FPS cap calculations."""
 
-    def test_get_vrr_fps_cap_common_refresh_rates(self):
-        """Test FPS cap for common refresh rates."""
+    def test_get_vrr_fps_cap_low_refresh_uses_minus_three(self):
+        """For refresh < 200Hz, the legacy refresh-3 rule still applies."""
         assert get_vrr_fps_cap(60) == 57
         assert get_vrr_fps_cap(120) == 117
         assert get_vrr_fps_cap(144) == 141
         assert get_vrr_fps_cap(165) == 162
-        assert get_vrr_fps_cap(240) == 237
-        assert get_vrr_fps_cap(300) == 297
-        assert get_vrr_fps_cap(360) == 357
+
+    def test_get_vrr_fps_cap_high_refresh_uses_scaled_margin(self):
+        """For 200Hz+, margin scales (Blur Busters 2026 guidance).
+
+        At high refresh the legacy -3 rule is too tight; frame-time variance
+        can briefly hit the ceiling. Modern guidance uses 3-5% margin so
+        VRR stays engaged.
+        """
+        assert get_vrr_fps_cap(240) == 233  # was 237, now refresh * 0.97
+        assert get_vrr_fps_cap(280) == 272  # was 277, now refresh * 0.97
+        assert get_vrr_fps_cap(300) == 285  # was 297, now refresh * 0.95
+        assert get_vrr_fps_cap(360) == 342  # was 357, now refresh * 0.95
+        assert get_vrr_fps_cap(480) == 456  # was 477, now refresh * 0.95
 
     def test_get_vrr_fps_cap_fallback_calculation(self):
-        """Test FPS cap calculation for non-preset refresh rates."""
-        # Non-preset values should use refresh - 3
+        """Non-preset values fall through to the scaled formula."""
+        # Below 200Hz still uses refresh - 3
         assert get_vrr_fps_cap(85) == 82
         assert get_vrr_fps_cap(155) == 152
+        # 200-300Hz range falls back to 0.97 scaling for non-preset rates
+        assert get_vrr_fps_cap(220) == round(220 * 0.97)  # 213
+        assert get_vrr_fps_cap(250) == round(250 * 0.97)  # 243
+        # 300Hz+ range falls back to 0.95 scaling
+        assert get_vrr_fps_cap(320) == round(320 * 0.95)  # 304
+        assert get_vrr_fps_cap(540) == round(540 * 0.95)  # 513
 
     def test_vrr_fps_caps_dict_has_common_values(self):
         """Test that VRR_FPS_CAPS contains expected presets."""
@@ -103,10 +119,10 @@ class TestLimiterRecommendation:
             ingame_allows_custom=False,
             has_reflex=False,
             refresh_rate=300,
-            available_presets=[60, 120],  # 120 is far from 297
+            available_presets=[60, 120],  # 120 is far from 285 (new 300Hz cap)
         )
         assert result["limiter"] == FrameLimiterType.RTSS
-        assert result["fps_cap"] == 297
+        assert result["fps_cap"] == 285  # 300Hz cap updated 2026-05 (was 297)
 
     def test_reflex_when_no_ingame_limiter(self):
         """Test Reflex recommended when no in-game limiter but Reflex available."""
