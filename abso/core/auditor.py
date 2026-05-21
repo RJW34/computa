@@ -71,6 +71,42 @@ class ConfigurationAuditor:
                     category="system",
                 ))
 
+        # Surface a single info banner when the OS is on the Experimental
+        # (Future Platforms) Canary 29xxx branch. ABSO's detect / audit /
+        # backup paths are validated against the 25H2 Germanium track and
+        # have only best-effort awareness of the future-platforms surface,
+        # so the user should know findings here may shift as the branch
+        # settles. We emit one Issue; per-handler caveats live in the
+        # handlers themselves.
+        try:
+            from abso.utils.os_release import detect_os_release
+
+            release = detect_os_release()
+            if release.is_experimental_future_platform:
+                all_issues.append(Issue(
+                    title="Running on Experimental (Future Platforms) Insider build",
+                    severity="info",
+                    current_value=(
+                        f"Build {release.build}.{release.ubr} "
+                        f"({release.release_branch})"
+                    ),
+                    optimal_value="Validated build family: Win11 25H2 (26200.x)",
+                    explanation=(
+                        "This OS is on the Canary 29xxx series that Microsoft "
+                        "labels as not matched to any specific Windows "
+                        "release (pre-27H2 / Strontium candidate). ABSO will "
+                        "still detect, audit, and back up known surfaces, "
+                        "but registry-key guesses for new features (Xbox "
+                        "Mode, AI agents, Shared Audio) may drift until the "
+                        "branch stabilizes. Treat audit findings here as "
+                        "best-effort and report drift via the project "
+                        "backlog."
+                    ),
+                    category="os_release",
+                ))
+        except Exception as e:
+            logger.error(f"Experimental-build banner check failed: {e}")
+
         # Check for problematic Windows updates (build-aware so superseded
         # regressions stay quiet on patched machines).
         try:

@@ -8,6 +8,25 @@ import pytest
 
 from abso.core.auditor import ConfigurationAuditor
 from abso.core.models import Issue
+from abso.utils.os_release import OsRelease
+
+
+def _quiet_os_release() -> OsRelease:
+    """Return an OsRelease that suppresses the experimental-branch banner.
+
+    Build is well below the 29000 future-platforms floor so
+    ``is_experimental_future_platform`` is False, keeping ``audit_all``
+    deterministic across host machines (including this repo's primary
+    dev box once it moved to the Canary 29xxx series).
+    """
+    return OsRelease(
+        product_name="Windows 10 Home",
+        display_version="25H2",
+        edition_id="Core",
+        installation_type="Client",
+        build=26200,
+        ubr=8457,
+    )
 
 
 class TestConfigurationAuditorInit:
@@ -30,6 +49,24 @@ class TestConfigurationAuditorInit:
 
 class TestAuditAll:
     """Tests for audit_all method."""
+
+    @pytest.fixture(autouse=True)
+    def _quiet_audit_side_effects(self):
+        """Suppress the experimental-branch banner and KB checks during tests.
+
+        ``audit_all`` independently consults ``detect_os_release`` and the
+        KB checker regardless of the patched handler set. Both are imported
+        *inside* the function body, so the patches must target the source
+        modules (the names are not bound at ``abso.core.auditor`` module
+        level). On a Canary 29xxx host the banner otherwise fires and
+        inflates issue counts.
+        """
+        with (
+            patch("abso.utils.os_release.detect_os_release", return_value=_quiet_os_release()) as _release,  # noqa: F841
+            patch("abso.core.kb_checker.check_problematic_kbs", return_value=[]) as _kbs,  # noqa: F841
+            patch("abso.core.kb_checker.is_review_stale", return_value=False) as _stale,  # noqa: F841
+        ):
+            yield
 
     def test_audit_all_returns_issues(self):
         """Test audit_all returns list of issues."""

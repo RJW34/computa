@@ -23,6 +23,17 @@ logger = logging.getLogger(__name__)
 _REG_PATH: Final = r"SOFTWARE\Microsoft\Windows NT\CurrentVersion"
 _cache: "OsRelease | None" = None
 
+# Build floor for the Experimental (Future Platforms) Canary 29xxx series.
+# Microsoft split the experimental channel in February 2026 (build 29531+);
+# anything at or above this floor is on the future-platforms branch that is
+# expected to eventually feed 27H2 (Strontium). The branch is explicitly
+# "not matched to any specific release of Windows" per the Insider release
+# notes, so feature surface here is volatile.
+_FUTURE_PLATFORMS_BUILD_FLOOR: Final = 29000
+
+# Build floor where Win11 25H2 (Germanium-track GA) became identifiable.
+_25H2_BUILD_FLOOR: Final = 26200
+
 
 @dataclass(frozen=True)
 class OsRelease:
@@ -57,7 +68,36 @@ class OsRelease:
     @property
     def is_25h2_or_newer(self) -> bool:
         """Whether this OS is Win11 25H2 or any later release."""
-        return self.build >= 26200
+        return self.build >= _25H2_BUILD_FLOOR
+
+    @property
+    def is_experimental_future_platform(self) -> bool:
+        """Whether this OS is on the Canary 29xxx / Experimental future track.
+
+        These builds are pre-27H2 (Strontium) candidates. Microsoft labels
+        them as not matched to any specific Windows release, so ABSO treats
+        them as best-effort: detection still runs, but audit findings and
+        registry-surface guesses may be wrong until the branch settles.
+        """
+        return self.build >= _FUTURE_PLATFORMS_BUILD_FLOOR
+
+    @property
+    def release_branch(self) -> str:
+        """Coarse-grained branch label for reports and banners.
+
+        Returns one of:
+          * ``"experimental_future_platforms"`` — Canary 29xxx / pre-27H2
+          * ``"25h2_track"`` — Germanium-track 25H2 / 26H1 / 26H2 builds
+          * ``"pre_25h2"`` — Win11 24H2 or earlier
+          * ``"unknown"`` — registry was unreadable
+        """
+        if self.build == 0:
+            return "unknown"
+        if self.is_experimental_future_platform:
+            return "experimental_future_platforms"
+        if self.is_25h2_or_newer:
+            return "25h2_track"
+        return "pre_25h2"
 
     def at_least(self, build: int, ubr: int = 0) -> bool:
         """Whether this release is at or above the given (build, ubr) floor."""
@@ -77,6 +117,8 @@ class OsRelease:
             "build": self.build,
             "ubr": self.ubr,
             "build_revision": f"{self.build}.{self.ubr}",
+            "release_branch": self.release_branch,
+            "is_experimental_future_platform": self.is_experimental_future_platform,
         }
 
 

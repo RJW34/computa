@@ -80,6 +80,48 @@ def test_validated_os_build_surfaces_info_on_newer_os() -> None:
     assert not any(f.severity == "blocker" and f.code == "OS_BUILD_UNTESTED_ON_PROFILE" for f in report.findings)
 
 
+def _experimental_release(build: int = 29591, ubr: int = 1000) -> OsRelease:
+    """OsRelease snapshot above the 29000 experimental-platforms floor."""
+    return OsRelease(
+        product_name="Windows 10 Home",
+        display_version="Dev",
+        edition_id="Core",
+        installation_type="Client",
+        build=build,
+        ubr=ubr,
+    )
+
+
+def test_experimental_branch_emits_info_finding_on_29xxx() -> None:
+    """Canary 29xxx hosts get an info caveat in profile preflight."""
+    detector = MagicMock()
+    detector.detect_monitors.return_value = []
+    detector.detect_gpu.return_value = {"name": "NVIDIA GeForce RTX 4090"}
+    profile = _make_profile("future-profile")
+
+    with patch.object(cap_mod, "detect_os_release", return_value=_experimental_release()):
+        report = CapabilityEngine(detector).evaluate(profile)
+
+    experimental = [f for f in report.findings if f.code == "OS_EXPERIMENTAL_FUTURE_PLATFORMS"]
+    assert len(experimental) == 1
+    assert experimental[0].severity == "info"
+    assert "29591.1000" in experimental[0].message
+    assert report.has_blockers is False
+
+
+def test_experimental_branch_silent_on_25h2_host() -> None:
+    """Stable 25H2 hosts do not get the experimental caveat."""
+    detector = MagicMock()
+    detector.detect_monitors.return_value = []
+    detector.detect_gpu.return_value = {"name": "NVIDIA GeForce RTX 4090"}
+    profile = _make_profile("future-profile")
+
+    with patch.object(cap_mod, "detect_os_release", return_value=_release(26200, 8457)):
+        report = CapabilityEngine(detector).evaluate(profile)
+
+    assert not any(f.code == "OS_EXPERIMENTAL_FUTURE_PLATFORMS" for f in report.findings)
+
+
 def test_unreadable_os_release_logs_warning_finding() -> None:
     detector = MagicMock()
     detector.detect_monitors.return_value = []

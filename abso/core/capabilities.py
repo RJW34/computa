@@ -117,6 +117,7 @@ class CapabilityEngine:
         gpu = self._safe_detect_gpu(report)
 
         self._check_os_build_requirements(profile, report)
+        self._check_experimental_branch(report)
         self._check_vrr_requirements(profile, monitors, report)
         self._check_gpu_vendor(profile, gpu, report)
         self._check_monitor_presence(profile, monitors, report)
@@ -125,6 +126,39 @@ class CapabilityEngine:
         self._check_explicit_refresh_requirements(profile, monitors, report)
 
         return report
+
+    def _check_experimental_branch(self, report: CapabilityReport) -> None:
+        """Surface an info finding when the OS is on the Experimental track.
+
+        The auditor emits a banner for the Canary 29xxx / Experimental
+        (Future Platforms) branch; profile preflight should mirror that
+        caveat so users who run ``apply <profile>`` without first running
+        ``audit`` still see it. This is informational only - the user has
+        opted into the pre-release branch and ABSO does not block apply
+        because of it.
+        """
+        try:
+            release = detect_os_release()
+        except Exception as e:
+            logger.warning("Capability experimental-branch check failed: %s", e)
+            return
+
+        if not release.is_experimental_future_platform:
+            return
+
+        report.findings.append(
+            CapabilityFinding(
+                code="OS_EXPERIMENTAL_FUTURE_PLATFORMS",
+                severity="info",
+                message=(
+                    f"Running on Experimental (Future Platforms) Insider build "
+                    f"{release.build}.{release.ubr} ({release.release_branch}). "
+                    "Profile is validated against the 25H2 Germanium track; "
+                    "feature-flag surfaces (Xbox Mode, AI agents, Shared Audio) "
+                    "may shift on this branch."
+                ),
+            )
+        )
 
     def _check_os_build_requirements(
         self,

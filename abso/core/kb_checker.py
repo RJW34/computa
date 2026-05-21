@@ -32,7 +32,11 @@ from datetime import datetime, timezone
 logger = logging.getLogger(__name__)
 
 # Bump this whenever KNOWN_BAD_KBS or the surrounding audit logic is touched.
-LAST_REVIEWED_UTC = datetime(2026, 5, 13, tzinfo=timezone.utc)
+# 2026-05-21: reviewed Insider build 29591.1000 (Experimental Future Platforms,
+# Canary 29xxx) release notes. No gaming-impacting regressions called out;
+# the branch is pre-27H2 (Strontium) and not yet a GA candidate. No new
+# KNOWN_BAD_KBS entries added.
+LAST_REVIEWED_UTC = datetime(2026, 5, 21, tzinfo=timezone.utc)
 
 # Audit flags the list as stale beyond this window since LAST_REVIEWED_UTC.
 STALENESS_DAYS = 60

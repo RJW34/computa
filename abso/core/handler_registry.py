@@ -86,9 +86,11 @@ def _all_entries() -> list[HandlerEntry]:
     from abso.settings.rivals2_config import Rivals2ConfigHandler
     from abso.settings.standby_list import StandbyListHandler
 
-    # 25H2 feature-flag rollout surfaces — detect-only, audited, backed
-    # up (restore_guarantee = "none" so backup-restore stays non-blocking).
+    # 25H2 + Experimental Future Platforms feature-flag rollout surfaces.
+    # All detect-only, audited, backed up; restore_guarantee = "none" keeps
+    # backup-restore non-blocking even when the rollout is gated off.
     from abso.settings.ai_agents import AIAgentsSettingsHandler
+    from abso.settings.shared_audio import SharedAudioSettingsHandler
     from abso.settings.xbox_mode import XboxModeSettingsHandler
 
     return [
@@ -145,7 +147,7 @@ def _all_entries() -> list[HandlerEntry]:
         HandlerEntry(StandbyListHandler, audit=False, backup=True),
         HandlerEntry(DebloatHandler, audit=False, backup=True),
 
-        # --- 25H2 feature-flag rollouts ---
+        # --- 25H2 + Experimental Future Platforms feature-flag rollouts ---
         HandlerEntry(
             XboxModeSettingsHandler,
             audit=True,
@@ -157,6 +159,12 @@ def _all_entries() -> list[HandlerEntry]:
             audit=True,
             backup=True,
             notes="Detect-only; restore_guarantee='none' keeps backup-restore non-blocking.",
+        ),
+        HandlerEntry(
+            SharedAudioSettingsHandler,
+            audit=True,
+            backup=True,
+            notes="Detect-only Shared Audio (BT LE Audio broadcast); 29xxx-aware.",
         ),
     ]
 

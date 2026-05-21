@@ -341,6 +341,70 @@ Fortnite, Rivals 2 G-SYNC), not just OW2 — wire them through
   (`Reflex`, `MaxThreads`, `WorkerThreads`) — Blizzard rotates them
   across patches. Documented in `Overwatch2GSyncProfile.get_in_game_settings()`.
 
+### 6.2 Experimental (Future Platforms) / Canary 29xxx scaffolding (planted 2026-05-21)
+
+The user is installing Win11 Insider Preview build 29591.1000 on the
+Canary 29xxx / Experimental (Future Platforms) channel — the
+pre-27H2 (Strontium) branch. ABSO's existing detection paths target
+the 25H2 Germanium track and have only best-effort awareness of the
+new branch. To keep the tool functional after reboot, this commit
+plants:
+
+- `OsRelease.is_experimental_future_platform` (build >= 29000),
+  `release_branch` label, and `_FUTURE_PLATFORMS_BUILD_FLOOR` constant
+  in `abso/utils/os_release.py`. `to_dict()` includes the branch.
+- `abso/settings/shared_audio.py` — detect-only handler for Shared
+  Audio (BT LE Audio broadcast). Matches the xbox_mode / ai_agents
+  pattern: probes candidate registry paths, returns
+  `feature_present: False` when none match, refuses to apply, and
+  reports `restore_guarantee = "none"`. Registered in the central
+  handler registry.
+- `ConfigurationAuditor.audit_all()` now emits a single info banner
+  Issue (category `os_release`) when the OS is on the
+  experimental/future-platforms branch, so audit output is explicitly
+  caveat'd.
+- `kb_checker.LAST_REVIEWED_UTC` bumped to 2026-05-21 with a comment
+  noting the 29591.1000 review (no gaming-impacting regressions).
+
+**What still needs follow-up once the user reboots into 29591.1000:**
+
+1. **Live smoke pass** — run `python -m abso detect`, `python -m abso
+   audit`, `python -m abso bios`, `python -m abso backup-create` on
+   the experimental build. Confirm the new banner fires, no handler
+   crashes on the new build number, and the backup manifest still
+   accepts the SharedAudio handler.
+2. **Shared Audio key surface** — the candidate paths in
+   `_SHARED_AUDIO_HKCU_CANDIDATES` / `_SHARED_AUDIO_HKLM_CANDIDATES`
+   are guesses. After enabling Shared Audio via Quick Settings on the
+   live machine, dump the BT-related registry to find the real keys,
+   then update the candidate list (or wire the apply path).
+3. **NPU detection** — build 29591.1000 added NPU columns to Task
+   Manager. `HardwareDetector` does not currently surface NPU
+   presence. Out of scope for the current rig (RTX 4070 / 14th-gen
+   with no NPU), but record as a future detection extension if the
+   user moves to a Copilot+ machine.
+4. **Xbox Mode / AI Agents revalidation** — these handlers fire on
+   any build >= 26100.8457, which 29591 satisfies. Their candidate
+   registry paths were chosen on the 25H2 branch and may need
+   additional candidates once the experimental branch reveals where
+   the keys actually live.
+5. **Update channel awareness** — the auditor banner is currently
+   purely informational. If the user wants stricter behavior (e.g.
+   refusing to apply latency-critical profiles on an experimental
+   build), gate that in `core/capabilities.py` next to the existing
+   `min_os_build` / `validated_os_build` checks rather than in the
+   auditor.
+
+**Out of scope here:**
+
+- Forking profile metadata for the future-platforms branch. The
+  current `min_os_build` check on profiles still works — they just
+  apply to a build the user accepts is pre-release. Do not split the
+  profile catalog by branch.
+- Renaming `is_25h2_or_newer`. The semantic is still correct
+  (`build >= 26200` — 29591 satisfies it) and callers use it as a
+  lower bound.
+
 ### Closed by recent work (do not re-open)
 
 - ~~PR-09 in `REMEDIATION_ROADMAP.md` — make criticality data-driven~~
