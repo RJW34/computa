@@ -376,8 +376,8 @@ class Overwatch2GSyncProfile(_Overwatch2BaseProfile):
             {
                 "category": "Display",
                 "setting": "Frame Rate Cap",
-                "value": "Auto (refresh - 3)",
-                "reason": "Set by ABSO to keep NVCP VSync from engaging while preserving VRR.",
+                "value": "Auto (refresh-scaled: e.g. 285 @ 300Hz, 233 @ 240Hz, 141 @ 144Hz)",
+                "reason": "Set by ABSO using Blur Busters' 2026 scaled-margin formula (-3 below 200Hz, *0.97 at 200-299Hz, *0.95 at 300Hz+). Keeps NVCP VSync from engaging while preserving VRR.",
             },
             {
                 "category": "Display",
@@ -518,8 +518,8 @@ class Overwatch2GSyncHDRProfile(_Overwatch2BaseProfile):
             {
                 "category": "Display",
                 "setting": "Frame Rate Cap",
-                "value": "Auto (refresh - 3)",
-                "reason": "Set by ABSO to keep NVCP VSync from engaging while preserving VRR.",
+                "value": "Auto (refresh-scaled: e.g. 285 @ 300Hz, 233 @ 240Hz, 141 @ 144Hz)",
+                "reason": "Set by ABSO using Blur Busters' 2026 scaled-margin formula (-3 below 200Hz, *0.97 at 200-299Hz, *0.95 at 300Hz+). Keeps NVCP VSync from engaging while preserving VRR.",
             },
             {
                 "category": "Display",
@@ -573,6 +573,15 @@ class Overwatch2GSyncCaptureProfile(_Overwatch2BaseProfile):
     overlays can coexist with VRR more predictably than the strict
     fullscreen-exclusive esports path.
     """
+
+    @property
+    def is_capture_safe(self) -> bool:
+        # The whole point of this lane: keep the capture / overlay /
+        # peripheral stack alive. BaseProfile.launch_process_killset
+        # filters CAPTURE_ALLOWED_IMAGES out of the killset when this
+        # returns True so Medal, Discord overlay helpers, RTSS, OBS,
+        # NVIDIA Share / Overlay, G HUB, and iCUE are not stopped.
+        return True
 
     @property
     def profile_id(self) -> str:
@@ -652,8 +661,8 @@ class Overwatch2GSyncCaptureProfile(_Overwatch2BaseProfile):
             {
                 "category": "Display",
                 "setting": "Frame Rate Cap",
-                "value": "Auto (refresh - 3)",
-                "reason": "Set by ABSO for stable windowed G-SYNC behavior below refresh.",
+                "value": "Auto (refresh-scaled: e.g. 285 @ 300Hz, 233 @ 240Hz, 141 @ 144Hz)",
+                "reason": "Set by ABSO using Blur Busters' 2026 scaled-margin formula for stable windowed G-SYNC behavior below refresh.",
             },
             {
                 "category": "Display",
@@ -678,6 +687,11 @@ class Overwatch2GSyncCaptureProfile(_Overwatch2BaseProfile):
 
 class Overwatch2GSyncHDRCaptureProfile(_Overwatch2BaseProfile):
     """Capture-safe HDR Overwatch 2 VRR profile."""
+
+    @property
+    def is_capture_safe(self) -> bool:
+        # See Overwatch2GSyncCaptureProfile.is_capture_safe.
+        return True
 
     @property
     def profile_id(self) -> str:
@@ -776,8 +790,8 @@ class Overwatch2GSyncHDRCaptureProfile(_Overwatch2BaseProfile):
             {
                 "category": "Display",
                 "setting": "Frame Rate Cap",
-                "value": "Auto (refresh - 3)",
-                "reason": "Set by ABSO for stable windowed G-SYNC behavior below refresh.",
+                "value": "Auto (refresh-scaled: e.g. 285 @ 300Hz, 233 @ 240Hz, 141 @ 144Hz)",
+                "reason": "Set by ABSO using Blur Busters' 2026 scaled-margin formula for stable windowed G-SYNC behavior below refresh.",
             },
             {
                 "category": "Display",

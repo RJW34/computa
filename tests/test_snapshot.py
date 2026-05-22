@@ -18,6 +18,12 @@ from typing import Any
 
 import pytest
 
+# Force canonical import order so this test passes when collected first.
+# The applier -> catalog -> profile_bases -> settings -> core -> applier
+# cycle raises ImportError otherwise. The production CLI side-steps it
+# via abso.main entry order.
+import abso.main  # noqa: F401
+
 GOLDEN_FILE = Path(__file__).parent / "snapshot_golden.json"
 
 

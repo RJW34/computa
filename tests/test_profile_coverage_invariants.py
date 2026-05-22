@@ -331,3 +331,119 @@ def test_handler_class_names_match_imported_classes(profiles_by_id) -> None:
             except Exception as exc:
                 failures.append(f"{profile_id}: handler {cls.__name__} not importable: {exc}")
     assert not failures, "Handler class identity failures:\n  " + "\n  ".join(failures)
+
+
+# ---------------------------------------------------------------------------
+# Profile-pair consistency: strict variants must honor their "leaner" promise
+# ---------------------------------------------------------------------------
+
+def test_strict_gaming_profiles_enable_borderless_optimizations(profiles_by_id) -> None:
+    """Strict/no-sync gaming profiles must set the Win11 borderless flags True.
+
+    Setting these to False (the historical default before 2026-05) caused a
+    silent latency cliff when the user manually switched in-game display
+    mode to Borderless on a strict profile - Windows fell back to the
+    legacy BLT swap chain path. True is a true no-op in real exclusive
+    fullscreen and a multi-ms win in borderless, restoring the natural
+    "strict >= capture in any display mode" ordering.
+
+    See abso/profiles/profile_bases.py for the rationale comment.
+    """
+    keys = ("windowed_optimizations", "vrr_optimize")
+    failures: list[str] = []
+    for profile_id, profile in profiles_by_id.items():
+        # Skip productivity (uses its own handler set with different intent)
+        # and browser-game profiles (no fullscreen contract to honor).
+        target = (profile.optimization_target or "").lower()
+        if target in {"productivity", "browser_game"}:
+            continue
+        windows_settings = profile.get_settings("WindowsSettingsHandler") or {}
+        for key in keys:
+            if key not in windows_settings:
+                continue
+            if windows_settings.get(key) is not True:
+                failures.append(
+                    f"{profile_id}: WindowsSettingsHandler.{key} is "
+                    f"{windows_settings.get(key)!r} (expected True so strict-"
+                    f"variant ordering holds across display modes)"
+                )
+    assert not failures, (
+        "Gaming profiles with borderless-pessimistic Win11 settings:\n  "
+        + "\n  ".join(failures)
+    )
+
+
+def test_capture_safe_profiles_actually_preserve_capture_stack(profiles_by_id) -> None:
+    """Profiles flagged is_capture_safe must NOT include CAPTURE_ALLOWED_IMAGES
+    in their launch killset.
+
+    Otherwise the profile name is hypocritical: it advertises "capture-safe"
+    while the launch-sweep at game-detect kills Medal, Discord overlay,
+    OBS, RTSS, G HUB, iCUE, etc.
+    """
+    from abso.core.process_janitor import CAPTURE_ALLOWED_IMAGES
+
+    failures: list[str] = []
+    capture_profile_ids: list[str] = []
+    for profile_id, profile in profiles_by_id.items():
+        if not getattr(profile, "is_capture_safe", False):
+            continue
+        capture_profile_ids.append(profile_id)
+        killset = profile.launch_process_killset()
+        all_images = {img.lower() for img in killset.always_safe} | {
+            img.lower() for img in killset.opt_in
+        }
+        leaked = all_images & CAPTURE_ALLOWED_IMAGES
+        if leaked:
+            failures.append(
+                f"{profile_id}: killset still contains capture/overlay "
+                f"images {sorted(leaked)} despite is_capture_safe=True"
+            )
+
+    # Sanity: there must be at least one is_capture_safe profile or this
+    # test silently passes when nothing has the trait.
+    assert capture_profile_ids, (
+        "No profiles flagged is_capture_safe - the trait exists but no "
+        "profile uses it. This test would silently pass forever."
+    )
+    assert not failures, (
+        "Capture-safe profiles still killing their own promised stack:\n  "
+        + "\n  ".join(failures)
+    )
+
+
+def test_non_capture_profiles_still_kill_capture_stack(profiles_by_id) -> None:
+    """The capture-allowed filter must ONLY apply to is_capture_safe=True.
+
+    Other gaming profiles must continue to stop Medal/OBS/etc for the
+    latency win - that's their entire reason for not being marked
+    capture-safe.
+    """
+    from abso.core.process_janitor import CAPTURE_ALLOWED_IMAGES
+
+    failures: list[str] = []
+    for profile_id, profile in profiles_by_id.items():
+        target = (profile.optimization_target or "").lower()
+        if target == "productivity":
+            continue
+        if getattr(profile, "is_capture_safe", False):
+            continue
+        killset = profile.launch_process_killset()
+        all_images = {img.lower() for img in killset.always_safe} | {
+            img.lower() for img in killset.opt_in
+        }
+        # At least one canonical capture/overlay image MUST be present to
+        # prove the filter only fires for capture-safe profiles.
+        # We pick a representative trio that should always be in the
+        # full killset: Medal, the Discord overlay helper, and RTSS.
+        canonical_capture_targets = {
+            "medal.exe", "discordhookhelper64.exe", "rtss.exe",
+        }
+        present = all_images & canonical_capture_targets
+        if not present:
+            failures.append(
+                f"{profile_id}: not capture-safe but killset is missing all "
+                f"of {sorted(canonical_capture_targets)} - is the filter "
+                f"leaking outside is_capture_safe=True?"
+            )
+    assert not failures, "Non-capture profiles missing capture-stack kills:\n  " + "\n  ".join(failures)

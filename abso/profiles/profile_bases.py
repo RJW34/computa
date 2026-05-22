@@ -278,8 +278,21 @@ class Rivals2BaseProfile(BaseProfile):
                 "hags": True,
                 "hdr": False,
                 "auto_hdr": False,
-                "windowed_optimizations": False,
-                "vrr_optimize": False,
+                # Win11 borderless-compositor settings. Kept True universally
+                # (was False prior to 2026-05-21) so the profile honors its
+                # ordering contract: strict / no-sync variants are at-least-
+                # as-fast as capture variants regardless of in-game display
+                # mode. True is a true no-op in real exclusive fullscreen
+                # (DX11 swap chain doesn't go through Windows' upgrade path)
+                # and a multi-ms win in borderless (flip-model upgrade + VRR-
+                # aware compositing). The <1ms compositor-stays-warm cost in
+                # exclusive (see windows.py::_get_vrr_optimize comment) is
+                # accepted in exchange for not silently falling off a latency
+                # cliff when the user is in borderless. Users committed to
+                # pure-exclusive can override to False via abso.yaml
+                # profile_overrides.windows.{windowed_optimizations,vrr_optimize}.
+                "windowed_optimizations": True,
+                "vrr_optimize": True,
             },
             "PowerSettingsHandler": {
                 "ensure_ultimate_performance": True,
@@ -426,8 +439,21 @@ class EmulatorLatencyBaseProfile(BaseProfile):
                 "hags": True,
                 "hdr": False,
                 "auto_hdr": False,
-                "windowed_optimizations": False,
-                "vrr_optimize": False,
+                # Win11 borderless-compositor settings. Kept True universally
+                # (was False prior to 2026-05-21) so the profile honors its
+                # ordering contract: strict / no-sync variants are at-least-
+                # as-fast as capture variants regardless of in-game display
+                # mode. True is a true no-op in real exclusive fullscreen
+                # (DX11 swap chain doesn't go through Windows' upgrade path)
+                # and a multi-ms win in borderless (flip-model upgrade + VRR-
+                # aware compositing). The <1ms compositor-stays-warm cost in
+                # exclusive (see windows.py::_get_vrr_optimize comment) is
+                # accepted in exchange for not silently falling off a latency
+                # cliff when the user is in borderless. Users committed to
+                # pure-exclusive can override to False via abso.yaml
+                # profile_overrides.windows.{windowed_optimizations,vrr_optimize}.
+                "windowed_optimizations": True,
+                "vrr_optimize": True,
             },
             "PowerSettingsHandler": {
                 "ensure_ultimate_performance": True,
@@ -677,8 +703,21 @@ class ReflexShooterBaseProfile(BaseProfile):
                 "hags": True,
                 "hdr": False,
                 "auto_hdr": False,
-                "windowed_optimizations": False,
-                "vrr_optimize": False,
+                # Win11 borderless-compositor settings. Kept True universally
+                # (was False prior to 2026-05-21) so the profile honors its
+                # ordering contract: strict / no-sync variants are at-least-
+                # as-fast as capture variants regardless of in-game display
+                # mode. True is a true no-op in real exclusive fullscreen
+                # (DX11 swap chain doesn't go through Windows' upgrade path)
+                # and a multi-ms win in borderless (flip-model upgrade + VRR-
+                # aware compositing). The <1ms compositor-stays-warm cost in
+                # exclusive (see windows.py::_get_vrr_optimize comment) is
+                # accepted in exchange for not silently falling off a latency
+                # cliff when the user is in borderless. Users committed to
+                # pure-exclusive can override to False via abso.yaml
+                # profile_overrides.windows.{windowed_optimizations,vrr_optimize}.
+                "windowed_optimizations": True,
+                "vrr_optimize": True,
                 "max_refresh_rate": True,
             },
             "PowerSettingsHandler": {

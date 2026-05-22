@@ -128,8 +128,10 @@ class Rivals2GSyncProfile(Rivals2BaseProfile):
                 "setting": "Max Frame Rate",
                 "value": "Refresh rate - 3 (auto-set by ABSO)",
                 "reason": (
-                    "ABSO auto-detects your refresh rate and caps at refresh-3. "
-                    "Keeps G-SYNC active and VSync from engaging."
+                    "ABSO auto-detects your refresh rate and applies the Blur "
+                    "Busters 2026 scaled-margin cap (e.g. 285 @ 300Hz, 233 @ "
+                    "240Hz, 141 @ 144Hz). Keeps G-SYNC active and VSync from "
+                    "engaging."
                 ),
             },
             {

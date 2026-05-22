@@ -99,7 +99,11 @@ class _Diablo4BaseProfile(BaseProfile):
                 "game_bar": False,
                 "game_dvr": False,
                 "hags": True,
-                "windowed_optimizations": False,
+                # Win11 borderless-compositor settings: kept True so the
+                # Diablo 4 profile honors its ordering contract across
+                # display modes (see profile_bases.py for full rationale).
+                "windowed_optimizations": True,
+                "vrr_optimize": True,
                 "max_refresh_rate": True,
             },
             "PowerSettingsHandler": {
@@ -185,8 +189,8 @@ class _Diablo4BaseProfile(BaseProfile):
             {
                 "category": "Display",
                 "setting": "Foreground FPS Limit",
-                "value": "Refresh rate - 3 (e.g., 141 @ 144Hz, 237 @ 240Hz, 297 @ 300Hz)",
-                "reason": "ABSO writes LimitForegroundFPS=1 and MaxForegroundFPS=refresh-3 into LocalPrefs.txt. In-game limiter owns the VRR cap per Blur Busters G-SYNC 101; the NVIDIA driver cap is off.",
+                "value": "Refresh-scaled (e.g., 141 @ 144Hz, 233 @ 240Hz, 285 @ 300Hz)",
+                "reason": "ABSO writes LimitForegroundFPS=1 and MaxForegroundFPS=<scaled> into LocalPrefs.txt using Blur Busters' 2026 scaled-margin formula (-3 below 200Hz, *0.97 at 200-299Hz, *0.95 at 300Hz+). In-game limiter owns the VRR cap per Blur Busters G-SYNC 101; the NVIDIA driver cap is off.",
             },
             {
                 "category": "Graphics",

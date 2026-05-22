@@ -106,8 +106,8 @@ class _MarvelRivalsBaseProfile(ReflexShooterBaseProfile):
             {
                 "category": "Display",
                 "setting": "Frame Rate Limit",
-                "value": "Auto (refresh rate - 3)",
-                "reason": "Keeps G-SYNC active and prevents NVCP VSync from engaging while preserving tear-free latency.",
+                "value": "Auto (refresh-scaled: e.g. 285 @ 300Hz, 233 @ 240Hz, 141 @ 144Hz)",
+                "reason": "Set by ABSO using Blur Busters' 2026 scaled-margin formula. Keeps G-SYNC active and prevents NVCP VSync from engaging while preserving tear-free latency.",
             },
             {
                 "category": "Display",

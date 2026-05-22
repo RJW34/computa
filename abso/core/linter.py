@@ -360,26 +360,17 @@ class ProfileLinter:
                 setting_path="DisplayColorRangeHandler.dynamic_range",
             ))
 
-        # Check 2: VRR Optimize ON for latency-critical profiles
-        # Exception: VRR profiles need vrr_optimize for borderless windowed G-SYNC,
-        # where the FPS cap gain outweighs the ~0.1ms compositor overhead.
-        is_latency_critical = profile.optimization_target in {
-            "minimum_latency",
-            "minimum_latency_offline",
-            "low_latency_high_fps",
-        }
-        if vrr_optimize and is_latency_critical and not profile.requires_confirmed_vrr_support:
-            result.add_issue(LintIssue(
-                code="WINDOWS_VRR_OPTIMIZE_LATENCY",
-                severity=LintSeverity.ERROR,
-                message="VRR Optimize adds latency to latency-critical profiles",
-                details=(
-                    "VRR Optimize keeps Windows compositor logic active even in "
-                    "exclusive fullscreen, adding ~0.1ms+ latency. Set vrr_optimize=False "
-                    "for latency-critical profiles."
-                ),
-                setting_path="WindowsSettingsHandler.vrr_optimize",
-            ))
+        # Retired 2026-05-21: the WINDOWS_VRR_OPTIMIZE_LATENCY rule used to
+        # flag vrr_optimize=True on latency-critical profiles, citing the
+        # ~0.1ms compositor-stays-warm cost in exclusive fullscreen. Today's
+        # design decision (see profile_bases.py docstring on _base_settings)
+        # reversed this: True is now the universal default because the sub-ms
+        # exclusive cost is asymmetrically dwarfed by the multi-ms benefit
+        # when the user is in borderless. False would re-open the silent
+        # latency cliff users hit when manually switching display mode mid-
+        # session. Users committed to pure-exclusive can opt out via
+        # abso.yaml profile_overrides.windows.vrr_optimize=False; the
+        # decision is theirs, not the linter's.
 
         # Check 3: HAGS warning on DX11-only titles (info only)
         # This is hardware/game dependent, so just info
