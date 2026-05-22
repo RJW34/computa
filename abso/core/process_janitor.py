@@ -198,6 +198,53 @@ OPT_IN_LAUNCH_KILLSET: tuple[str, ...] = (
 )
 
 
+# Process images the "capture-safe" profile variants intentionally preserve.
+# These are the tools whose entire purpose is to coexist with the running
+# game: capture clients, in-game overlays, frame-time OSDs, peripheral
+# RGB/macro daemons. The general always-safe killset stops them because
+# they cost frame-time, but a profile labeled "-capture" promises the
+# user it will not interfere with the clipping / overlay / peripheral
+# stack - so the capture variants filter these out of their killset.
+#
+# This list intentionally does NOT include LLM runtimes, cloud sync,
+# VPN clients, or chat-other-than-Discord. Those are always-safe to
+# stop on any gaming profile regardless of capture intent.
+CAPTURE_ALLOWED_IMAGES: frozenset[str] = frozenset(
+    name.lower()
+    for name in (
+        # Steam overlay (friends list, screenshot, in-game messages)
+        "GameOverlayUI.exe",
+        # Discord in-game overlay
+        "DiscordHookHelper.exe",
+        "DiscordHookHelper64.exe",
+        # Frame-time / FPS / OSD overlays
+        "RTSS.exe",
+        "RTSSHooksLoader.exe",
+        "RTSSHooksLoader64.exe",
+        "MSIAfterburner.exe",
+        "EVGAPrecision_X1.exe",
+        # Capture clients
+        "obs64.exe",
+        "obs32.exe",
+        "Medal.exe",
+        "MedalEncoder.exe",
+        # NVIDIA capture / overlay (ShadowPlay)
+        "NVIDIA Share.exe",
+        "NVIDIA Overlay.exe",
+        "nvcontainer.exe",
+        # Peripheral RGB / macro daemons (user may want LIGHTSYNC etc.
+        # alive during a recorded session)
+        "lghub.exe",
+        "lghub_agent.exe",
+        "lghub_updater.exe",
+        "LogiAiPromptBuilder.exe",
+        "iCUE.exe",
+        "LCore.exe",
+        "CorsairService.exe",
+    )
+)
+
+
 # Image names we will NEVER auto-kill regardless of caller request. Anti-cheat,
 # game launchers, ABSO itself, and the user's interactive / agentic workflow
 # (editors, terminals, Discord, dev tooling) live here. If a caller passes one

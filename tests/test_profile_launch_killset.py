@@ -136,19 +136,41 @@ def test_non_strict_gaming_profiles_now_get_full_killset(profile_id, profiles_by
         "overwatch2-gsync-hdr-capture",
     ],
 )
-def test_capture_safe_profiles_also_get_full_killset(profile_id, profiles_by_id) -> None:
-    """Capture-safe variants still get both tiers in their declared killset.
+def test_capture_safe_profiles_get_filtered_killset(profile_id, profiles_by_id) -> None:
+    """Capture-safe profiles filter the capture/overlay/peripheral stack out.
 
-    The killset declares what is *safe* to kill; the tray's tick logic
-    decides *when* to invoke the sweep. Capture profiles do not request the
-    overlay-free contract, so the tray refrains from auto-killing OBS / Medal
-    even though those images are in the always-safe list.
+    Updated 2026-05-21: previously the killset was full and the tray's
+    tick logic was the only thing keeping overlays alive. That was
+    hypocritical - launch-sweep killed Medal/Discord overlay/OBS at
+    game-detect anyway. The is_capture_safe trait now filters
+    CAPTURE_ALLOWED_IMAGES out of the killset entirely so the capture
+    promise is honored at the data layer, not just the policy layer.
+
+    Non-capture entries (LLM runtimes, cloud sync, VPN, non-Discord chat,
+    audio enhancements, crash reporters) still die because they are not
+    capture-related.
     """
+    from abso.core.process_janitor import CAPTURE_ALLOWED_IMAGES
+
     profile = profiles_by_id[profile_id]
     killset = profile.launch_process_killset()
 
-    assert killset.always_safe == tuple(ALWAYS_SAFE_LAUNCH_KILLSET)
-    assert killset.opt_in == tuple(OPT_IN_LAUNCH_KILLSET)
+    expected_always_safe = tuple(
+        img for img in ALWAYS_SAFE_LAUNCH_KILLSET
+        if img.lower() not in CAPTURE_ALLOWED_IMAGES
+    )
+    expected_opt_in = tuple(
+        img for img in OPT_IN_LAUNCH_KILLSET
+        if img.lower() not in CAPTURE_ALLOWED_IMAGES
+    )
+    assert killset.always_safe == expected_always_safe
+    assert killset.opt_in == expected_opt_in
+
+    # Sanity: at least one canonical capture image was actually filtered.
+    all_killset_lower = {img.lower() for img in killset.always_safe + killset.opt_in}
+    assert "medal.exe" not in all_killset_lower
+    assert "discordhookhelper64.exe" not in all_killset_lower
+    assert "rtss.exe" not in all_killset_lower
 
 
 def test_pokemon_auto_chess_browser_profile_gets_full_killset(profiles_by_id) -> None:

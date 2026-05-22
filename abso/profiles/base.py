@@ -355,6 +355,22 @@ class BaseProfile(ABC):
         """Whether ABSO should try to shut down blocking overlays automatically."""
         return bool(self.display_path_requirements.require_overlay_free_path)
 
+    @property
+    def is_capture_safe(self) -> bool:
+        """Whether this profile is explicitly designed to coexist with the
+        capture / overlay / peripheral stack.
+
+        When True, the launch-time killset is filtered to exclude every
+        image in :data:`CAPTURE_ALLOWED_IMAGES` (Discord overlay helpers,
+        Medal, OBS, RTSS, NVIDIA Share/Overlay, GameOverlayUI, G HUB,
+        iCUE, etc.) so those tools stay alive during play. LLM runtimes,
+        cloud sync, VPN clients, and non-Discord chat are still killed.
+
+        Default False - the standard "strict" / no-sync / G-SYNC lanes
+        deliberately kill overlays for the latency benefit.
+        """
+        return False
+
     def launch_process_killset(self) -> "LaunchKillset":
         """Processes the launch-time janitor may stop while this profile's game is alive.
 
@@ -363,11 +379,14 @@ class BaseProfile(ABC):
 
         - ``productivity`` returns an empty killset (the user is actively in
           these apps; killing their overlays would be disruptive).
-        - Every other profile (Reflex shooters, no-sync, capture-safe,
-          emulator, online, ARPG, browser-game) returns the always-safe
-          killset PLUS the opt-in tier. ABSO is aggressive by default on any
-          gaming profile so cloud sync, LLM runtimes, peripheral RGB daemons,
-          and OEM updaters cannot eat frame-time mid-session.
+        - Profiles flagged ``is_capture_safe`` filter out
+          :data:`CAPTURE_ALLOWED_IMAGES` so Medal / Discord overlay / OBS /
+          peripheral RGB stay alive during play.
+        - Every other profile (Reflex shooters, no-sync, emulator, online,
+          ARPG, browser-game) returns the always-safe killset PLUS the
+          opt-in tier. ABSO is aggressive by default on any gaming profile
+          so cloud sync, LLM runtimes, peripheral RGB daemons, and OEM
+          updaters cannot eat frame-time mid-session.
 
         User per-machine overrides from ``abso.yaml::process_overrides.kill``
         are appended to ``always_safe`` so they apply to every gaming profile.
@@ -380,6 +399,7 @@ class BaseProfile(ABC):
         """
         from abso.core.process_janitor import (
             ALWAYS_SAFE_LAUNCH_KILLSET,
+            CAPTURE_ALLOWED_IMAGES,
             OPT_IN_LAUNCH_KILLSET,
             LaunchKillset,
             _load_user_process_overrides,
@@ -395,20 +415,38 @@ class BaseProfile(ABC):
 
         _user_protect, user_kill = _load_user_process_overrides()
 
+        # Capture-safe profiles deliberately preserve the capture / overlay
+        # / peripheral stack so the profile name honors what it promises.
+        # All other categories (LLM, cloud sync, VPN, chat-other-than-
+        # Discord, audio enhancements) still die because they are not what
+        # "capture-safe" is for.
+        capture_filter = (
+            CAPTURE_ALLOWED_IMAGES if self.is_capture_safe else frozenset()
+        )
+
         # Deduplicate while preserving order (built-in items first, then the
-        # user's per-machine additions).
+        # user's per-machine additions). Capture-allowed entries are filtered
+        # out entirely when is_capture_safe is True.
         seen: set[str] = set()
         merged_always_safe: list[str] = []
         for image in tuple(ALWAYS_SAFE_LAUNCH_KILLSET) + user_kill:
             key = image.lower()
             if key in seen:
                 continue
+            if key in capture_filter:
+                continue
             seen.add(key)
             merged_always_safe.append(image)
 
+        filtered_opt_in = tuple(
+            image
+            for image in OPT_IN_LAUNCH_KILLSET
+            if image.lower() not in capture_filter
+        )
+
         return LaunchKillset(
             always_safe=tuple(merged_always_safe),
-            opt_in=tuple(OPT_IN_LAUNCH_KILLSET),
+            opt_in=filtered_opt_in,
         )
 
     @property

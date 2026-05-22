@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "saved_at": "2026-05-21T22:37:53.865902+00:00",
+  "saved_at": "2026-05-22T00:31:33.922649+00:00",
   "profiles": [
     {
       "id": "slippi-melee",
@@ -3152,24 +3152,9 @@
       "sync_mode": "on",
       "launch_process_killset": {
         "always_safe": [
-          "NVIDIA Share.exe",
-          "NVIDIA Overlay.exe",
-          "nvcontainer.exe",
-          "GameOverlayUI.exe",
           "GameBar.exe",
           "GameBarFTServer.exe",
           "gamebarpresencewriter.exe",
-          "DiscordHookHelper.exe",
-          "DiscordHookHelper64.exe",
-          "RTSS.exe",
-          "RTSSHooksLoader.exe",
-          "RTSSHooksLoader64.exe",
-          "MSIAfterburner.exe",
-          "EVGAPrecision_X1.exe",
-          "obs64.exe",
-          "obs32.exe",
-          "Medal.exe",
-          "MedalEncoder.exe",
           "NahimicService.exe",
           "NahimicSvc64.exe",
           "NahimicSvc32.exe",
@@ -3223,14 +3208,7 @@
           "Dropbox.exe",
           "DropboxUpdate.exe",
           "GoogleDriveFS.exe",
-          "googledrivesync.exe",
-          "lghub.exe",
-          "lghub_agent.exe",
-          "lghub_updater.exe",
-          "LogiAiPromptBuilder.exe",
-          "iCUE.exe",
-          "LCore.exe",
-          "CorsairService.exe"
+          "googledrivesync.exe"
         ],
         "opt_in": [
           "GeForce Experience.exe",
@@ -3281,24 +3259,9 @@
       "sync_mode": "on",
       "launch_process_killset": {
         "always_safe": [
-          "NVIDIA Share.exe",
-          "NVIDIA Overlay.exe",
-          "nvcontainer.exe",
-          "GameOverlayUI.exe",
           "GameBar.exe",
           "GameBarFTServer.exe",
           "gamebarpresencewriter.exe",
-          "DiscordHookHelper.exe",
-          "DiscordHookHelper64.exe",
-          "RTSS.exe",
-          "RTSSHooksLoader.exe",
-          "RTSSHooksLoader64.exe",
-          "MSIAfterburner.exe",
-          "EVGAPrecision_X1.exe",
-          "obs64.exe",
-          "obs32.exe",
-          "Medal.exe",
-          "MedalEncoder.exe",
           "NahimicService.exe",
           "NahimicSvc64.exe",
           "NahimicSvc32.exe",
@@ -3352,14 +3315,7 @@
           "Dropbox.exe",
           "DropboxUpdate.exe",
           "GoogleDriveFS.exe",
-          "googledrivesync.exe",
-          "lghub.exe",
-          "lghub_agent.exe",
-          "lghub_updater.exe",
-          "LogiAiPromptBuilder.exe",
-          "iCUE.exe",
-          "LCore.exe",
-          "CorsairService.exe"
+          "googledrivesync.exe"
         ],
         "opt_in": [
           "GeForce Experience.exe",

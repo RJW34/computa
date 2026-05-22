@@ -145,8 +145,8 @@
         "hags": true,
         "hdr": false,
         "max_refresh_rate": true,
-        "vrr_optimize": false,
-        "windowed_optimizations": false
+        "vrr_optimize": true,
+        "windowed_optimizations": true
       }
     }
   },
@@ -201,9 +201,9 @@
       },
       {
         "category": "Display",
-        "reason": "Set by ABSO via NVCP to keep VSync from engaging while preserving VRR.",
+        "reason": "Set by ABSO via NVCP using Blur Busters' 2026 scaled-margin formula. Keeps VSync from engaging while preserving VRR.",
         "setting": "Frame Rate Cap",
-        "value": "Auto (refresh rate - 3)"
+        "value": "Auto (refresh-scaled: e.g. 285 @ 300Hz, 233 @ 240Hz, 141 @ 144Hz)"
       },
       {
         "category": "Graphics",
@@ -297,8 +297,8 @@
         "hags": true,
         "hdr": false,
         "max_refresh_rate": true,
-        "vrr_optimize": false,
-        "windowed_optimizations": false
+        "vrr_optimize": true,
+        "windowed_optimizations": true
       }
     }
   },
@@ -353,9 +353,9 @@
       },
       {
         "category": "Display",
-        "reason": "Set by ABSO via NVCP to keep VSync from engaging while preserving VRR.",
+        "reason": "Set by ABSO via NVCP using Blur Busters' 2026 scaled-margin formula. Keeps VSync from engaging while preserving VRR.",
         "setting": "Frame Rate Cap",
-        "value": "Auto (refresh rate - 3)"
+        "value": "Auto (refresh-scaled: e.g. 285 @ 300Hz, 233 @ 240Hz, 141 @ 144Hz)"
       },
       {
         "category": "Graphics",
@@ -452,8 +452,8 @@
         "hdr": true,
         "max_refresh_rate": true,
         "sdr_white_level_nits": 200,
-        "vrr_optimize": false,
-        "windowed_optimizations": false
+        "vrr_optimize": true,
+        "windowed_optimizations": true
       }
     }
   },
@@ -606,8 +606,8 @@
         "hdr": true,
         "max_refresh_rate": true,
         "sdr_white_level_nits": 200,
-        "vrr_optimize": false,
-        "windowed_optimizations": false
+        "vrr_optimize": true,
+        "windowed_optimizations": true
       }
     }
   },
@@ -662,9 +662,9 @@
       },
       {
         "category": "Display",
-        "reason": "ABSO writes LimitForegroundFPS=1 and MaxForegroundFPS=refresh-3 into LocalPrefs.txt. In-game limiter owns the VRR cap per Blur Busters G-SYNC 101; the NVIDIA driver cap is off.",
+        "reason": "ABSO writes LimitForegroundFPS=1 and MaxForegroundFPS=<scaled> into LocalPrefs.txt using Blur Busters' 2026 scaled-margin formula (-3 below 200Hz, *0.97 at 200-299Hz, *0.95 at 300Hz+). In-game limiter owns the VRR cap per Blur Busters G-SYNC 101; the NVIDIA driver cap is off.",
         "setting": "Foreground FPS Limit",
-        "value": "Refresh rate - 3 (e.g., 141 @ 144Hz, 237 @ 240Hz, 297 @ 300Hz)"
+        "value": "Refresh-scaled (e.g., 141 @ 144Hz, 233 @ 240Hz, 285 @ 300Hz)"
       },
       {
         "category": "Graphics",
@@ -763,7 +763,8 @@
         "hdr": true,
         "max_refresh_rate": true,
         "sdr_white_level_nits": 250,
-        "windowed_optimizations": false
+        "vrr_optimize": true,
+        "windowed_optimizations": true
       }
     }
   },
@@ -812,9 +813,9 @@
       },
       {
         "category": "Display",
-        "reason": "ABSO writes LimitForegroundFPS=1 and MaxForegroundFPS=refresh-3 into LocalPrefs.txt. In-game limiter owns the VRR cap per Blur Busters G-SYNC 101; the NVIDIA driver cap is off.",
+        "reason": "ABSO writes LimitForegroundFPS=1 and MaxForegroundFPS=<scaled> into LocalPrefs.txt using Blur Busters' 2026 scaled-margin formula (-3 below 200Hz, *0.97 at 200-299Hz, *0.95 at 300Hz+). In-game limiter owns the VRR cap per Blur Busters G-SYNC 101; the NVIDIA driver cap is off.",
         "setting": "Foreground FPS Limit",
-        "value": "Refresh rate - 3 (e.g., 141 @ 144Hz, 237 @ 240Hz, 297 @ 300Hz)"
+        "value": "Refresh-scaled (e.g., 141 @ 144Hz, 233 @ 240Hz, 285 @ 300Hz)"
       },
       {
         "category": "Graphics",
@@ -907,7 +908,8 @@
         "hags": true,
         "hdr": false,
         "max_refresh_rate": true,
-        "windowed_optimizations": false
+        "vrr_optimize": true,
+        "windowed_optimizations": true
       }
     }
   },
@@ -1078,8 +1080,8 @@
         "hags": true,
         "hdr": false,
         "max_refresh_rate": true,
-        "vrr_optimize": false,
-        "windowed_optimizations": false
+        "vrr_optimize": true,
+        "windowed_optimizations": true
       }
     }
   },
@@ -1259,8 +1261,8 @@
         "hdr": true,
         "max_refresh_rate": true,
         "sdr_white_level_nits": 200,
-        "vrr_optimize": false,
-        "windowed_optimizations": false
+        "vrr_optimize": true,
+        "windowed_optimizations": true
       }
     }
   },
@@ -1316,9 +1318,9 @@
       },
       {
         "category": "Display",
-        "reason": "Keeps G-SYNC active and prevents NVCP VSync from engaging while preserving tear-free latency.",
+        "reason": "Set by ABSO using Blur Busters' 2026 scaled-margin formula. Keeps G-SYNC active and prevents NVCP VSync from engaging while preserving tear-free latency.",
         "setting": "Frame Rate Limit",
-        "value": "Auto (refresh rate - 3)"
+        "value": "Auto (refresh-scaled: e.g. 285 @ 300Hz, 233 @ 240Hz, 141 @ 144Hz)"
       },
       {
         "category": "Display",
@@ -1440,8 +1442,8 @@
         "hdr": true,
         "max_refresh_rate": true,
         "sdr_white_level_nits": 200,
-        "vrr_optimize": false,
-        "windowed_optimizations": false
+        "vrr_optimize": true,
+        "windowed_optimizations": true
       }
     }
   },
@@ -1497,9 +1499,9 @@
       },
       {
         "category": "Display",
-        "reason": "Keeps G-SYNC active and prevents NVCP VSync from engaging while preserving tear-free latency.",
+        "reason": "Set by ABSO using Blur Busters' 2026 scaled-margin formula. Keeps G-SYNC active and prevents NVCP VSync from engaging while preserving tear-free latency.",
         "setting": "Frame Rate Limit",
-        "value": "Auto (refresh rate - 3)"
+        "value": "Auto (refresh-scaled: e.g. 285 @ 300Hz, 233 @ 240Hz, 141 @ 144Hz)"
       },
       {
         "category": "Display",
@@ -1618,8 +1620,8 @@
         "hags": true,
         "hdr": false,
         "max_refresh_rate": true,
-        "vrr_optimize": false,
-        "windowed_optimizations": false
+        "vrr_optimize": true,
+        "windowed_optimizations": true
       }
     }
   },
@@ -1771,8 +1773,8 @@
         "hags": true,
         "hdr": false,
         "max_refresh_rate": true,
-        "vrr_optimize": false,
-        "windowed_optimizations": false
+        "vrr_optimize": true,
+        "windowed_optimizations": true
       }
     }
   },
@@ -1816,9 +1818,9 @@
       },
       {
         "category": "Display",
-        "reason": "Set by ABSO to keep NVCP VSync from engaging while preserving VRR.",
+        "reason": "Set by ABSO using Blur Busters' 2026 scaled-margin formula (-3 below 200Hz, *0.97 at 200-299Hz, *0.95 at 300Hz+). Keeps NVCP VSync from engaging while preserving VRR.",
         "setting": "Frame Rate Cap",
-        "value": "Auto (refresh - 3)"
+        "value": "Auto (refresh-scaled: e.g. 285 @ 300Hz, 233 @ 240Hz, 141 @ 144Hz)"
       },
       {
         "category": "Display",
@@ -1926,8 +1928,8 @@
         "hags": true,
         "hdr": false,
         "max_refresh_rate": true,
-        "vrr_optimize": false,
-        "windowed_optimizations": false
+        "vrr_optimize": true,
+        "windowed_optimizations": true
       }
     }
   },
@@ -1971,9 +1973,9 @@
       },
       {
         "category": "Display",
-        "reason": "Set by ABSO for stable windowed G-SYNC behavior below refresh.",
+        "reason": "Set by ABSO using Blur Busters' 2026 scaled-margin formula for stable windowed G-SYNC behavior below refresh.",
         "setting": "Frame Rate Cap",
-        "value": "Auto (refresh - 3)"
+        "value": "Auto (refresh-scaled: e.g. 285 @ 300Hz, 233 @ 240Hz, 141 @ 144Hz)"
       },
       {
         "category": "Display",
@@ -2127,9 +2129,9 @@
       },
       {
         "category": "Display",
-        "reason": "Set by ABSO to keep NVCP VSync from engaging while preserving VRR.",
+        "reason": "Set by ABSO using Blur Busters' 2026 scaled-margin formula (-3 below 200Hz, *0.97 at 200-299Hz, *0.95 at 300Hz+). Keeps NVCP VSync from engaging while preserving VRR.",
         "setting": "Frame Rate Cap",
-        "value": "Auto (refresh - 3)"
+        "value": "Auto (refresh-scaled: e.g. 285 @ 300Hz, 233 @ 240Hz, 141 @ 144Hz)"
       },
       {
         "category": "Display",
@@ -2264,8 +2266,8 @@
         "hdr": true,
         "max_refresh_rate": true,
         "sdr_white_level_nits": 200,
-        "vrr_optimize": false,
-        "windowed_optimizations": false
+        "vrr_optimize": true,
+        "windowed_optimizations": true
       }
     }
   },
@@ -2309,9 +2311,9 @@
       },
       {
         "category": "Display",
-        "reason": "Set by ABSO for stable windowed G-SYNC behavior below refresh.",
+        "reason": "Set by ABSO using Blur Busters' 2026 scaled-margin formula for stable windowed G-SYNC behavior below refresh.",
         "setting": "Frame Rate Cap",
-        "value": "Auto (refresh - 3)"
+        "value": "Auto (refresh-scaled: e.g. 285 @ 300Hz, 233 @ 240Hz, 141 @ 144Hz)"
       },
       {
         "category": "Display",
@@ -2620,8 +2622,8 @@
         "hdr": true,
         "max_refresh_rate": true,
         "sdr_white_level_nits": 200,
-        "vrr_optimize": false,
-        "windowed_optimizations": false
+        "vrr_optimize": true,
+        "windowed_optimizations": true
       }
     }
   },
@@ -3132,7 +3134,7 @@
       },
       {
         "category": "NVIDIA Control Panel",
-        "reason": "ABSO auto-detects your refresh rate and caps at refresh-3. Keeps G-SYNC active and VSync from engaging.",
+        "reason": "ABSO auto-detects your refresh rate and applies the Blur Busters 2026 scaled-margin cap (e.g. 285 @ 300Hz, 233 @ 240Hz, 141 @ 144Hz). Keeps G-SYNC active and VSync from engaging.",
         "setting": "Max Frame Rate",
         "value": "Refresh rate - 3 (auto-set by ABSO)"
       },
@@ -3250,8 +3252,8 @@
         "hags": true,
         "hdr": false,
         "max_refresh_rate": true,
-        "vrr_optimize": false,
-        "windowed_optimizations": false
+        "vrr_optimize": true,
+        "windowed_optimizations": true
       }
     }
   },
@@ -3422,8 +3424,8 @@
         "hags": true,
         "hdr": false,
         "max_refresh_rate": true,
-        "vrr_optimize": false,
-        "windowed_optimizations": false
+        "vrr_optimize": true,
+        "windowed_optimizations": true
       }
     }
   },
@@ -3608,8 +3610,8 @@
         "hags": true,
         "hdr": false,
         "max_refresh_rate": true,
-        "vrr_optimize": false,
-        "windowed_optimizations": false
+        "vrr_optimize": true,
+        "windowed_optimizations": true
       }
     }
   },
@@ -3776,8 +3778,8 @@
         "hags": true,
         "hdr": false,
         "max_refresh_rate": true,
-        "vrr_optimize": false,
-        "windowed_optimizations": false
+        "vrr_optimize": true,
+        "windowed_optimizations": true
       }
     }
   },
@@ -4059,8 +4061,8 @@
         "game_mode": true,
         "hags": true,
         "hdr": false,
-        "vrr_optimize": false,
-        "windowed_optimizations": false
+        "vrr_optimize": true,
+        "windowed_optimizations": true
       }
     }
   },
@@ -4388,8 +4390,8 @@
         "hags": true,
         "hdr": false,
         "max_refresh_rate": true,
-        "vrr_optimize": false,
-        "windowed_optimizations": false
+        "vrr_optimize": true,
+        "windowed_optimizations": true
       }
     }
   },
@@ -4555,8 +4557,8 @@
         "hags": true,
         "hdr": false,
         "refresh_rate": 60,
-        "vrr_optimize": false,
-        "windowed_optimizations": false
+        "vrr_optimize": true,
+        "windowed_optimizations": true
       }
     }
   },
@@ -4749,8 +4751,8 @@
         "hdr": true,
         "refresh_rate": 60,
         "sdr_white_level_nits": 200,
-        "vrr_optimize": false,
-        "windowed_optimizations": false
+        "vrr_optimize": true,
+        "windowed_optimizations": true
       }
     }
   },
@@ -5105,8 +5107,8 @@
         "hdr": true,
         "max_refresh_rate": true,
         "sdr_white_level_nits": 200,
-        "vrr_optimize": false,
-        "windowed_optimizations": false
+        "vrr_optimize": true,
+        "windowed_optimizations": true
       }
     }
   },
@@ -5434,8 +5436,8 @@
         "hags": true,
         "hdr": false,
         "max_refresh_rate": true,
-        "vrr_optimize": false,
-        "windowed_optimizations": false
+        "vrr_optimize": true,
+        "windowed_optimizations": true
       }
     }
   },
@@ -5790,8 +5792,8 @@
         "hdr": true,
         "max_refresh_rate": true,
         "sdr_white_level_nits": 200,
-        "vrr_optimize": false,
-        "windowed_optimizations": false
+        "vrr_optimize": true,
+        "windowed_optimizations": true
       }
     }
   }
