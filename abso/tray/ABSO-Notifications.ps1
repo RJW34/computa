@@ -34,9 +34,9 @@ $script:ToastMaxVisible    = 3
 $script:ToastSlotGap       = 8
 $script:ToastRightMargin   = 18
 $script:ToastBottomMargin  = 18
-$script:ToastWidth         = 420
+$script:ToastWidth         = 480   # production messages are 300-500ch; 420 was too narrow
 $script:ToastDedupWindowMs = 2000
-$script:ToastChapterSeq    = 0   # monotonic "chapter" counter for the corner mark
+$script:ToastChapterSeq    = 0     # monotonic "chapter" counter for the corner mark
 
 # ============================================================================
 # PHOSPHOR PALETTE
@@ -98,7 +98,7 @@ function _Ensure-Fonts {
         -Size 8.0 -Style ([System.Drawing.FontStyle]::Bold)
     $script:Font_Title   = _Resolve-Font `
         -Families @("Bahnschrift SemiBold Condensed", "Bahnschrift Condensed", "Bahnschrift", "Segoe UI Semibold") `
-        -Size 14.5 -Style ([System.Drawing.FontStyle]::Bold)
+        -Size 15.5 -Style ([System.Drawing.FontStyle]::Bold)
     $script:Font_Body    = _Resolve-Font `
         -Families @("Cascadia Code", "Cascadia Mono", "Consolas") `
         -Size 9.0 -Style ([System.Drawing.FontStyle]::Regular)
@@ -136,6 +136,35 @@ function _Detect-RefreshRate {
 $script:RefreshRate   = _Detect-RefreshRate
 $script:FrameInterval = [Math]::Max(8, [int]([Math]::Floor(1000.0 / $script:RefreshRate)))
 $script:HzBadgeText   = "{0}Hz" -f $script:RefreshRate
+
+# ============================================================================
+# Z-ORDER HARDENING (Win32 SetWindowPos)
+# ============================================================================
+#
+# WinForms `Form.TopMost = $true` competes with other TopMost apps and Discord
+# in particular periodically re-asserts itself, painting over our toast and
+# progress overlay. SetWindowPos with HWND_TOPMOST + NOACTIVATE flags is the
+# stronger assertion; a periodic 600ms re-call keeps us above other contenders.
+if (-not ("AbsoZOrder" -as [type])) {
+    Add-Type -TypeDefinition @"
+using System;
+using System.Runtime.InteropServices;
+public static class AbsoZOrder {
+    [DllImport("user32.dll")]
+    public static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter,
+        int X, int Y, int cx, int cy, uint uFlags);
+    public static readonly IntPtr HWND_TOPMOST = new IntPtr(-1);
+    public const uint SWP_NOMOVE       = 0x0002;
+    public const uint SWP_NOSIZE       = 0x0001;
+    public const uint SWP_NOACTIVATE   = 0x0010;
+    public const uint SWP_SHOWWINDOW   = 0x0040;
+    public static void ForceTopmost(IntPtr hWnd) {
+        SetWindowPos(hWnd, HWND_TOPMOST, 0, 0, 0, 0,
+            SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+    }
+}
+"@ -ErrorAction SilentlyContinue
+}
 
 # ============================================================================
 # STATE METADATA (accent, eyebrow tag, priority, audio sentinel)
@@ -179,32 +208,76 @@ function _Get-ToastTypeMeta {
 # TITLE + METADATA DERIVATION
 # ============================================================================
 
+function _Smart-Truncate {
+    <#
+    .SYNOPSIS
+    Truncate at the LAST word boundary before $MaxLen, appending an ellipsis.
+    Beats brute-character cuts that leave words split or parens unclosed.
+    #>
+    param([string]$Text, [int]$MaxLen)
+    if (-not $Text) { return "" }
+    $t = $Text.Trim()
+    if ($t.Length -le $MaxLen) { return $t }
+    $cut = $t.Substring(0, $MaxLen)
+    $space = $cut.LastIndexOf(' ')
+    if ($space -gt ($MaxLen / 2)) { $cut = $cut.Substring(0, $space) }
+    return $cut.TrimEnd(' ', ',', ';', ':', '|', '-', '/') + [char]0x2026
+}
+
 function _Derive-ToastTitle {
     param([string]$RawTitle, [string]$Message, [string]$Type)
-    # Editorial titles use sentence case, not all-caps shouting. We strip the
-    # generic "A.B.S.O." brand prefix and let the eyebrow above carry brand,
-    # while the title gets to be a real headline.
+    # Production titles look like "Overwatch 2 - GSYNC HDR (Strict HDR Exclusive | Reflex | G-SYNC ON)".
+    # Cutting at 56 chars leaves unclosed parens. Cut at the first " (" or " |"
+    # boundary so we keep the profile name intact and drop the mode list.
     $trim = "$RawTitle".Trim()
     $genericTitles = @("A.B.S.O.", "A.B.S.O", "ABSO", "")
+    $title = $null
     if ($genericTitles -notcontains $trim -and $trim -inotlike "A.B.S.O.*") {
-        return $trim
+        $title = $trim
     }
-    if ($trim -ilike "A.B.S.O.*") {
+    elseif ($trim -ilike "A.B.S.O.*") {
         $suffix = ($trim -replace '^A\.B\.S\.O\.?\s*', '').Trim()
-        if ($suffix) { return $suffix }
+        if ($suffix) { $title = $suffix }
     }
-    $msg = "$Message".Trim()
-    if (-not $msg) {
-        switch ($Type) {
-            "Success" { return "Done" }
-            "Warning" { return "Heads up" }
-            "Error"   { return "Something went wrong" }
-            default   { return "Status update" }
+    if (-not $title) {
+        $msg = "$Message".Trim()
+        if (-not $msg) {
+            switch ($Type) {
+                "Success" { return "Done" }
+                "Warning" { return "Heads up" }
+                "Error"   { return "Something went wrong" }
+                default   { return "Status update" }
+            }
         }
+        $title = ($msg -split '[.!?:|]', 2)[0].Trim()
     }
-    $clause = ($msg -split '[.!?:|]', 2)[0].Trim()
-    if ($clause.Length -gt 56) { $clause = $clause.Substring(0, 56).Trim() + [char]0x2026 }
-    return $clause
+    # Strip a parenthesized mode list ("(Strict HDR | Reflex | G-SYNC ON)") - too long for a headline.
+    $title = ($title -replace '\s*\([^()]*\)\s*$', '').Trim()
+    # If the headline still has " | " separators, keep only the first segment.
+    if ($title -match '\s\|\s') {
+        $title = ($title -split '\s\|\s', 2)[0].Trim()
+    }
+    return (_Smart-Truncate -Text $title -MaxLen 62)
+}
+
+function _Derive-ToastBody {
+    <#
+    .SYNOPSIS
+    Trim the production body to a single legible block: take the first
+    sentence, cap at ~220 chars, end at a word boundary. Long pipe-separated
+    detail lists are clipped here because the toast can't show them all.
+    #>
+    param([string]$Message)
+    if (-not $Message) { return "" }
+    $m = "$Message".Trim()
+    # If the message has a clear first sentence (ending in . ! or ?), prefer that
+    # WHEN the sentence is reasonably substantive (>= 30 chars) - otherwise the
+    # message body is probably just one fact that happens to end mid-sentence.
+    $firstStop = [Regex]::Match($m, '^[^.!?]{30,}[.!?](\s|$)')
+    if ($firstStop.Success -and $firstStop.Length -lt 240) {
+        $m = $firstStop.Value.Trim()
+    }
+    return (_Smart-Truncate -Text $m -MaxLen 220)
 }
 
 function _Format-ToastFooter {
@@ -402,22 +475,35 @@ function _Build-ToastForm {
     _Ensure-Fonts
 
     # Layout constants (single source of truth so paint + control placement agree).
-    # Tuned for Sitka Banner 13.5pt headline + Sitka Text 9.5pt body on Win11 DPI.
-    $gutterX   = 26
+    # Tuned for Bahnschrift SemiBold Condensed 15.5pt headline + Cascadia Code 9pt body on Win11 DPI.
+    $gutterX   = 28
     $eyebrowY  = 14
     $titleY    = 32
-    $ruleY     = 62
-    $bodyY     = 74
+    $ruleY     = 68    # was 62; needs more clearance under the bolder Bahnschrift 15.5pt
+    $bodyY     = 82    # was 74; matches rule offset + 14
     $footerH   = 18
-    $bodyWidth = $script:ToastWidth - $gutterX - 18
+    $bodyWidth = $script:ToastWidth - $gutterX - 20
 
-    # Wrap-aware height estimate (Sitka Text at 9.5pt ~ 16px/line, ~52ch/line)
-    $msgLines   = [Math]::Max(1, [Math]::Ceiling($Message.Length / 52.0))
-    if ($msgLines -gt 3) { $msgLines = 3 }
-    $bodyHeight = $msgLines * 17
-    $height     = $bodyY + $bodyHeight + 12 + $footerH + 8
-    $height     = [Math]::Max($height, 118)
-    $height     = [Math]::Min($height, 178)
+    # Wrap-aware height: use GDI+ MeasureString against the real body font and
+    # width so multi-line wrap is sized accurately for Cascadia Code, which is
+    # wider per character than serif estimates suggested.
+    $bodyHeight = 16
+    try {
+        $tmpBmp = New-Object System.Drawing.Bitmap 1, 1
+        $tmpG   = [System.Drawing.Graphics]::FromImage($tmpBmp)
+        $sz     = $tmpG.MeasureString($Message, $script:Font_Body,
+            [System.Drawing.SizeF]::new([float]$bodyWidth, 9999.0))
+        $tmpG.Dispose(); $tmpBmp.Dispose()
+        $bodyHeight = [Math]::Max(16, [int][Math]::Ceiling($sz.Height) + 2)
+    } catch {
+        $bodyHeight = [Math]::Min(85, [Math]::Max(16,
+            [int][Math]::Ceiling($Message.Length / 56.0) * 17))
+    }
+    $bodyHeight = [Math]::Min($bodyHeight, 85)   # hard cap = ~5 lines
+
+    $height = $bodyY + $bodyHeight + 14 + $footerH + 10
+    $height = [Math]::Max($height, 124)
+    $height = [Math]::Min($height, 210)
 
     $form = New-Object System.Windows.Forms.Form
     $form.Text             = ""
@@ -555,8 +641,9 @@ function Show-ThemedToast {
     try {
         $typeMeta  = _Get-ToastTypeMeta -Type $Type
         $realTitle = _Derive-ToastTitle -RawTitle $Title -Message $Message -Type $Type
+        $realBody  = _Derive-ToastBody  -Message $Message
         $footer    = _Format-ToastFooter -Meta $MetaText
-        $key       = "$Type|$realTitle|$Message"
+        $key       = "$Type|$realTitle|$realBody"
 
         $nowMs = [DateTimeOffset]::Now.ToUnixTimeMilliseconds()
         if ($script:ToastDedupMap.ContainsKey($key)) {
@@ -586,7 +673,7 @@ function Show-ThemedToast {
                     _Dismiss-ActiveToast -Toast $script:ActiveToasts[$bumpIndex] -Fast
                 } else {
                     $script:ToastQueue.Enqueue(@{
-                        Title = $realTitle; Message = $Message; Type = $Type
+                        Title = $realTitle; Message = $realBody; Type = $Type
                         Duration = $Duration; MetaText = $MetaText
                     })
                     return
@@ -600,7 +687,7 @@ function Show-ThemedToast {
             }
         }
 
-        _Spawn-Toast -Title $realTitle -Message $Message -Type $Type `
+        _Spawn-Toast -Title $realTitle -Message $realBody -Type $Type `
             -TypeMeta $typeMeta -FooterText $footer -Duration $Duration -Key $key
     } catch {
         if (Get-Command Write-TrayLog -ErrorAction SilentlyContinue) {
@@ -670,6 +757,11 @@ function _Spawn-Toast {
                 $TypeMeta.Accent.R, $TypeMeta.Accent.G, $TypeMeta.Accent.B
             )
         }
+    } catch {}
+
+    # Explicit Win32 TOPMOST assertion - beats Discord and other competing topmost windows
+    try {
+        if ("AbsoZOrder" -as [type]) { [AbsoZOrder]::ForceTopmost($form.Handle) }
     } catch {}
 
     $script:ActiveToasts.Add($toast) | Out-Null
@@ -1157,6 +1249,24 @@ function Show-ProgressOverlay {
         }
     } catch {}
 
+    # Explicit Win32 TOPMOST + periodic re-assertion. Discord and other apps
+    # that also set TopMost can paint over us; this asserts every 600ms.
+    try {
+        if ("AbsoZOrder" -as [type]) { [AbsoZOrder]::ForceTopmost($form.Handle) }
+    } catch {}
+    $script:ProgressTopmostTimer = New-Object System.Windows.Forms.Timer
+    $script:ProgressTopmostTimer.Interval = 600
+    $script:ProgressTopmostTimer.Add_Tick({
+        try {
+            if ($script:ProgressForm -and -not $script:ProgressForm.IsDisposed) {
+                if ("AbsoZOrder" -as [type]) { [AbsoZOrder]::ForceTopmost($script:ProgressForm.Handle) }
+            } else {
+                $this.Stop(); $this.Dispose()
+            }
+        } catch { try { $this.Stop(); $this.Dispose() } catch {} }
+    })
+    $script:ProgressTopmostTimer.Start()
+
     # Fade-in at monitor refresh rate
     $fadeIn = New-Object System.Windows.Forms.Timer
     $fadeIn.Interval = $script:FrameInterval
@@ -1188,6 +1298,10 @@ function Close-ProgressOverlay {
     if ($script:ProgressTimer) {
         try { $script:ProgressTimer.Stop(); $script:ProgressTimer.Dispose() } catch {}
         $script:ProgressTimer = $null
+    }
+    if ($script:ProgressTopmostTimer) {
+        try { $script:ProgressTopmostTimer.Stop(); $script:ProgressTopmostTimer.Dispose() } catch {}
+        $script:ProgressTopmostTimer = $null
     }
     if ($script:ProgressForm) {
         try {

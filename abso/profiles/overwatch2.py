@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import logging
+import re
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
 
 from abso.profiles.base import DisplayPathRequirements
@@ -9,6 +12,8 @@ from abso.profiles.profile_bases import ReflexShooterBaseProfile
 
 if TYPE_CHECKING:
     from abso.settings.base import SettingsHandler
+
+_logger = logging.getLogger(__name__)
 
 
 class _Overwatch2BaseProfile(ReflexShooterBaseProfile):
@@ -22,6 +27,148 @@ class _Overwatch2BaseProfile(ReflexShooterBaseProfile):
     def graphics_api(self) -> Literal["dx11", "dx12", "vulkan", "opengl", "unknown"]:
         # Overwatch 2 uses DX11 in most competitive configurations.
         return "dx11"
+
+    # ------------------------------------------------------------------
+    # Dual-install Overwatch.exe discovery (Battle.net + Steam coexistence)
+    # ------------------------------------------------------------------
+    #
+    # Users routinely have both a Battle.net OW2 install and a Steam OW2
+    # install (different account regions, shared accounts, etc). They each
+    # spawn an Overwatch.exe process from a DIFFERENT full path. Some of
+    # the per-exe registry-based handlers we use match by name (IFEO,
+    # NVIDIA profile_name binding) and naturally cover both. But the
+    # AppCompatFlags\Layers FSO-disable token is matched by Windows on
+    # the FULL PATH at process creation - a bare "Overwatch.exe" value
+    # name is registered but doesn't apply.
+    #
+    # We resolve both install paths via Blizzard's HKLM install key and
+    # Steam's libraryfolders.vdf scan, then emit FSO entries for the bare
+    # name AND each discovered path so whichever launcher you boot from,
+    # the FSO state matches the profile's intent.
+
+    @staticmethod
+    def _battle_net_overwatch_path() -> str | None:
+        """Resolve Battle.net's Overwatch install path.
+
+        Tries (in order):
+          1. Windows Uninstall registry entry written by Battle.net's installer,
+             which is the canonical source and is present on every modern
+             Battle.net install (DisplayIcon points right at Overwatch.exe).
+          2. Legacy Blizzard Entertainment\\Overwatch InstallPath value, kept
+             as a fallback for older / non-standard installs.
+        """
+        try:
+            import winreg
+        except ImportError:
+            return None
+
+        # 1) Uninstall key (canonical): DisplayIcon or InstallLocation
+        for hive, sub in (
+            (winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\Overwatch"),
+            (winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\Overwatch"),
+        ):
+            try:
+                with winreg.OpenKey(hive, sub) as key:
+                    # DisplayIcon is usually a literal Overwatch.exe path
+                    try:
+                        icon = winreg.QueryValueEx(key, "DisplayIcon")[0]
+                        if icon and Path(icon).exists() and icon.lower().endswith("overwatch.exe"):
+                            return str(Path(icon))
+                    except OSError:
+                        pass
+                    # Fallback to InstallLocation + standard subdir
+                    try:
+                        install_location = winreg.QueryValueEx(key, "InstallLocation")[0]
+                        for candidate in (
+                            Path(install_location) / "_retail_" / "Overwatch.exe",
+                            Path(install_location) / "Overwatch.exe",
+                        ):
+                            if candidate.exists():
+                                return str(candidate)
+                    except OSError:
+                        pass
+            except OSError:
+                continue
+
+        # 2) Legacy Blizzard Entertainment\\Overwatch InstallPath
+        for hive, sub in (
+            (winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\WOW6432Node\Blizzard Entertainment\Overwatch"),
+            (winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\Blizzard Entertainment\Overwatch"),
+        ):
+            try:
+                with winreg.OpenKey(hive, sub) as key:
+                    install_path = winreg.QueryValueEx(key, "InstallPath")[0]
+                    for candidate in (
+                        Path(install_path) / "_retail_" / "Overwatch.exe",
+                        Path(install_path) / "Overwatch.exe",
+                    ):
+                        if candidate.exists():
+                            return str(candidate)
+            except OSError:
+                continue
+        return None
+
+    @staticmethod
+    def _steam_libraries() -> list[Path]:
+        """Return all Steam library roots known to the local Steam install."""
+        libs: list[Path] = []
+        try:
+            import winreg
+            with winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\Valve\Steam") as key:
+                steam_path = Path(winreg.QueryValueEx(key, "SteamPath")[0])
+                if steam_path.exists():
+                    libs.append(steam_path)
+                vdf = steam_path / "steamapps" / "libraryfolders.vdf"
+                if vdf.exists():
+                    text = vdf.read_text(encoding="utf-8", errors="ignore")
+                    for match in re.finditer(r'"path"\s+"([^"]+)"', text):
+                        candidate = Path(match.group(1).replace(r"\\", "\\"))
+                        if candidate.exists() and candidate not in libs:
+                            libs.append(candidate)
+        except (OSError, ImportError):
+            pass
+        return libs
+
+    @classmethod
+    def _steam_overwatch_paths(cls) -> list[str]:
+        """Find Overwatch.exe inside any Steam library."""
+        hits: list[str] = []
+        for lib in cls._steam_libraries():
+            for sub in ("Overwatch 2", "Overwatch"):
+                for candidate in (
+                    lib / "steamapps" / "common" / sub / "_retail_" / "Overwatch.exe",
+                    lib / "steamapps" / "common" / sub / "Overwatch.exe",
+                ):
+                    if candidate.exists():
+                        hits.append(str(candidate))
+        return hits
+
+    @classmethod
+    def _overwatch_install_paths(cls) -> list[str]:
+        """All Overwatch.exe install paths visible on this machine, de-duplicated."""
+        paths: list[str] = []
+        bnet = cls._battle_net_overwatch_path()
+        if bnet:
+            paths.append(bnet)
+        for steam_path in cls._steam_overwatch_paths():
+            if steam_path not in paths:
+                paths.append(steam_path)
+        if paths:
+            _logger.info("OW2 install paths discovered: %s", paths)
+        return paths
+
+    def _fso_dict(self, *, disabled: bool) -> dict[str, bool]:
+        """Build the per-exe FSO dict covering bare name AND every discovered full path.
+
+        The bare-name entry is kept for forward compatibility with any
+        future Windows shim engine fallback that does name-matching. The
+        discovered full paths are what actually takes effect today on
+        per-launcher process creation.
+        """
+        result: dict[str, bool] = {"Overwatch.exe": disabled}
+        for full_path in self._overwatch_install_paths():
+            result[full_path] = disabled
+        return result
 
     def get_handlers(self) -> list[SettingsHandler]:
         from abso.settings.ow2_config import OW2ConfigHandler
@@ -93,7 +240,7 @@ class Overwatch2Profile(_Overwatch2BaseProfile):
 
     @property
     def display_name(self) -> str:
-        return "Overwatch 2 - No Sync SDR"
+        return "Overwatch 2 - Competitive No-Sync SDR"
 
     @property
     def description(self) -> str:
@@ -108,8 +255,10 @@ class Overwatch2Profile(_Overwatch2BaseProfile):
     def fullscreen_optimizations_per_exe(self) -> dict[str, bool]:
         # Force true exclusive fullscreen at the OS layer so Windows cannot
         # silently shunt Overwatch into the composited FSO borderless path
-        # if the in-game WindowMode ever drifts back to 1.
-        return {"Overwatch.exe": True}
+        # if the in-game WindowMode ever drifts back to 1. _fso_dict covers
+        # both Battle.net and Steam install paths so whichever launcher
+        # spawns Overwatch.exe gets the FSO disable.
+        return self._fso_dict(disabled=True)
 
     def _variant_overrides(self) -> dict[str, dict[str, Any]]:
         return {
@@ -200,7 +349,7 @@ class Overwatch2NoSyncHDRProfile(Overwatch2Profile):
 
     @property
     def display_name(self) -> str:
-        return "Overwatch 2 - No Sync HDR"
+        return "Overwatch 2 - Competitive No-Sync HDR"
 
     @property
     def description(self) -> str:
@@ -293,7 +442,7 @@ class Overwatch2GSyncProfile(_Overwatch2BaseProfile):
 
     @property
     def display_name(self) -> str:
-        return "Overwatch 2 - GSYNC SDR"
+        return "Overwatch 2 - Competitive GSYNC SDR"
 
     @property
     def description(self) -> str:
@@ -311,7 +460,8 @@ class Overwatch2GSyncProfile(_Overwatch2BaseProfile):
         # Strict fullscreen VRR lane: disable FSO per-exe so Windows holds the
         # true exclusive path and the refresh-3 cap stays cap-bound at ~297
         # instead of paying the compositor tax if OW2 drifts to borderless.
-        return {"Overwatch.exe": True}
+        # _fso_dict covers both Battle.net and Steam install paths.
+        return self._fso_dict(disabled=True)
 
     @property
     def display_path_requirements(self) -> DisplayPathRequirements:
@@ -418,7 +568,7 @@ class Overwatch2GSyncHDRProfile(_Overwatch2BaseProfile):
 
     @property
     def display_name(self) -> str:
-        return "Overwatch 2 - GSYNC HDR"
+        return "Overwatch 2 - Competitive GSYNC HDR"
 
     @property
     def description(self) -> str:
@@ -434,7 +584,8 @@ class Overwatch2GSyncHDRProfile(_Overwatch2BaseProfile):
         # Windows composites OW2's HDR tone map through DWM (borderless FSO)
         # and the GPU pays the compositor cost on top of the real HDR
         # pipeline - which is what flips the cap-bound 297 back to ~276.
-        return {"Overwatch.exe": True}
+        # _fso_dict covers both Battle.net and Steam install paths.
+        return self._fso_dict(disabled=True)
 
     @property
     def display_path_requirements(self) -> DisplayPathRequirements:
@@ -589,7 +740,7 @@ class Overwatch2GSyncCaptureProfile(_Overwatch2BaseProfile):
 
     @property
     def display_name(self) -> str:
-        return "Overwatch 2 - GSYNC SDR Capture-Safe"
+        return "Overwatch 2 - Capture-Safe GSYNC SDR (Borderless)"
 
     @property
     def description(self) -> str:
@@ -603,8 +754,9 @@ class Overwatch2GSyncCaptureProfile(_Overwatch2BaseProfile):
     def fullscreen_optimizations_per_exe(self) -> dict[str, bool]:
         # Capture lane intentionally runs the borderless FSO path. Clear any
         # per-exe FSO-disable flag a previous exclusive profile may have left
-        # behind, so borderless G-SYNC can engage cleanly.
-        return {"Overwatch.exe": False}
+        # behind, so borderless G-SYNC can engage cleanly. Cleared for both
+        # Battle.net and Steam install paths via _fso_dict.
+        return self._fso_dict(disabled=False)
 
     def _variant_overrides(self) -> dict[str, dict[str, Any]]:
         return {
@@ -699,7 +851,7 @@ class Overwatch2GSyncHDRCaptureProfile(_Overwatch2BaseProfile):
 
     @property
     def display_name(self) -> str:
-        return "Overwatch 2 - GSYNC HDR Capture-Safe"
+        return "Overwatch 2 - Capture-Safe GSYNC HDR (Borderless)"
 
     @property
     def description(self) -> str:
@@ -714,7 +866,8 @@ class Overwatch2GSyncHDRCaptureProfile(_Overwatch2BaseProfile):
         # HDR capture lane: intentionally borderless FSO. Clear any stale FSO
         # disable left by a prior exclusive-HDR apply so the composited HDR
         # path can engage without fighting an OS-level exclusive lock.
-        return {"Overwatch.exe": False}
+        # Cleared for both Battle.net and Steam install paths via _fso_dict.
+        return self._fso_dict(disabled=False)
 
     def _base_overrides(self) -> dict[str, dict[str, Any]]:
         base = super()._base_overrides()

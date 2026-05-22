@@ -943,7 +943,7 @@ $script:FallbackProfiles = [ordered]@{
         SyncMode = "on"
     }
     "overwatch2"        = @{
-        Name     = "Overwatch 2 - No Sync SDR"
+        Name     = "Overwatch 2 - Competitive No-Sync SDR"
         Sub      = "No Sync SDR | Reflex OFF | VSync OFF | G-SYNC OFF"
         Cat      = "Shooter"
         Desc     = "Minimum latency no-sync SDR profile (Reflex OFF, VSync OFF, VRR OFF)"
@@ -951,7 +951,7 @@ $script:FallbackProfiles = [ordered]@{
         SyncMode = "off"
     }
     "overwatch2-hdr"    = @{
-        Name     = "Overwatch 2 - No Sync HDR"
+        Name     = "Overwatch 2 - Competitive No-Sync HDR"
         Sub      = "No Sync HDR | Reflex OFF | VSync OFF | G-SYNC OFF"
         Cat      = "Shooter"
         Desc     = "Minimum latency no-sync HDR profile. Native HDR for OLED / Mini-LED displays; same sync/VRR contract as the SDR variant."
@@ -959,7 +959,7 @@ $script:FallbackProfiles = [ordered]@{
         SyncMode = "off"
     }
     "overwatch2-gsync"  = @{
-        Name     = "Overwatch 2 - GSYNC SDR"
+        Name     = "Overwatch 2 - Competitive GSYNC SDR"
         Sub      = "Strict SDR Exclusive | Reflex (set in-game) | G-SYNC ON"
         Cat      = "Shooter"
         Desc     = "Low latency VRR profile (Reflex, VSync safety net, G-SYNC ON)"
@@ -967,7 +967,7 @@ $script:FallbackProfiles = [ordered]@{
         SyncMode = "on"
     }
     "overwatch2-gsync-hdr" = @{
-        Name     = "Overwatch 2 - GSYNC HDR"
+        Name     = "Overwatch 2 - Competitive GSYNC HDR"
         Sub      = "HDR ON | Reflex ON+Boost | G-SYNC ON"
         Cat      = "Shooter"
         Desc     = "Tear-free low latency VRR with native HDR (OLED/Mini-LED)"
@@ -2434,13 +2434,28 @@ function Apply-Profile {
             $applyWarnings = Get-ApplyWarningMessages -Json $json
             $applyNotices = Get-ApplyNoticeMessages -Json $json
             $applySummaryLevel = Get-ApplySummaryLevel -Json $json
-            $warningLabel = if ($applySummaryLevel -eq "caution") { "Caution" } else { "Warning" }
-            $warningSummary = Get-WarningSummaryText -Warnings $applyWarnings -Label $warningLabel
-            $noticeSummary = Get-NoticeSummaryText -Notices $applyNotices
-            $msg = "$($profile.Name) ($($profile.Sub))"
-            if ($json.data.requires_reboot) { $msg += " - Restart required" }
-            if ($warningSummary) { $msg += " | $warningSummary" }
-            if ($noticeSummary) { $msg += " | $noticeSummary" }
+            # Build the toast body separately from the title. The TITLE is now
+            # the bare profile display name (clean, no parens, no pipes); the
+            # BODY is one human sentence. Warnings/notices append AT MOST one
+            # caveat sentence - the full list goes to the tray log, not the toast.
+            $toastTitle = $profile.Name
+            $msg = "Applied. $($profile.Sub)."
+            $extras = @()
+            if ($json.data.requires_reboot) { $extras += "Restart required to take full effect" }
+            if ($applyWarnings.Count -gt 0) {
+                $label = if ($applySummaryLevel -eq "caution") { "Caution" } else { "Warning" }
+                $extras += ("${label}: " + $applyWarnings[0])
+            }
+            if ($applyNotices.Count -gt 0 -and $applyWarnings.Count -eq 0) {
+                $extras += ("Note: " + $applyNotices[0])
+            }
+            if ($extras.Count -gt 0) {
+                $msg += " " + ($extras[0])
+            }
+            $extraCount = ($applyWarnings.Count + $applyNotices.Count) - 1
+            if ($extraCount -gt 0 -and $json.data.requires_reboot) { $extraCount += 0 }
+            # Trim trailing whitespace/punctuation drift
+            $msg = $msg.Trim()
 
             if ($applySummaryLevel -eq "warning") {
                 Write-TrayLog "Profile committed with warnings: $ProfileId" -Level "WARN"
@@ -2483,31 +2498,31 @@ function Apply-Profile {
             }
 
             if ($needsNoSyncOsdReminder -and -not $ddciHandled) {
-                $msg += " | Reminder: Turn OFF Adaptive Sync/FreeSync in monitor OSD for strict No-Sync mode."
+                $msg = "Applied. Turn OFF Adaptive Sync/FreeSync in monitor OSD for strict No-Sync mode."
                 Play-VrrWarningSound
                 Write-TrayLog "No-Sync OSD reminder shown for transition: $previousProfileId -> $ProfileId"
                 Play-ApplySuccessIconAnimation
-                Show-ThemedToast -Title "A.B.S.O." -Message $msg -Type "Warning" -Duration 6000
+                Show-ThemedToast -Title $toastTitle -Message $msg -Type "Warning" -Duration 6000 -MetaText $ProfileId
             }
             elseif ($applySummaryLevel -eq "warning") {
                 Play-SuccessSound
                 Play-ApplySuccessIconAnimation
-                Show-ThemedToast -Title "A.B.S.O." -Message $msg -Type "Warning" -Duration 6000
+                Show-ThemedToast -Title $toastTitle -Message $msg -Type "Warning" -Duration 6000 -MetaText $ProfileId
             }
             elseif ($applySummaryLevel -eq "caution") {
                 Play-SuccessSound
                 Play-ApplySuccessIconAnimation
-                Show-ThemedToast -Title "A.B.S.O." -Message $msg -Type "Success" -Duration 6000
+                Show-ThemedToast -Title $toastTitle -Message $msg -Type "Success" -Duration 6000 -MetaText $ProfileId
             }
             elseif ($applyNotices.Count -gt 0) {
                 Play-SuccessSound
                 Play-ApplySuccessIconAnimation
-                Show-ThemedToast -Title "A.B.S.O." -Message $msg -Type "Success" -Duration 6000
+                Show-ThemedToast -Title $toastTitle -Message $msg -Type "Success" -Duration 6000 -MetaText $ProfileId
             }
             else {
                 Play-SuccessSound
                 Play-ApplySuccessIconAnimation
-                Show-ThemedToast -Title "A.B.S.O." -Message $msg -Type "Success"
+                Show-ThemedToast -Title $toastTitle -Message $msg -Type "Success" -MetaText $ProfileId
             }
 
             $script:activeProfile = $ProfileId
