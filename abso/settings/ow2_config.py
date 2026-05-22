@@ -50,7 +50,7 @@ def _get_ow2_settings_path() -> Path | None:
 # ---------------------------------------------------------------------------
 
 class OW2ConfigHandler(SettingsHandler):
-    """Enforces OW2 render settings for optimal latency.
+    """Enforces OW2 render settings for ABSO profiles.
 
     Patches values inside the ``[Render.X]`` section of
     ``%USERPROFILE%\\Documents\\Overwatch\\Settings\\Settings_v0.ini``.
@@ -135,7 +135,7 @@ class OW2ConfigHandler(SettingsHandler):
         return result
 
     def audit(self) -> list[Issue]:
-        """Check for sub-optimal latency settings in OW2 config."""
+        """Check for OW2 config settings that conflict with ABSO profiles."""
         issues: list[Issue] = []
         current = self.detect()
 

@@ -117,7 +117,7 @@ pip install -r requirements.txt
    set PATH=%PATH%;C:\Program Files\NVIDIA Corporation\NVSMI
    ```
 
-2. **AMD GPU:** Currently optimized for Nvidia GPUs. WMI fallback should detect AMD cards.
+2. **AMD GPU:** Most driver-profile automation is NVIDIA-focused today. WMI fallback should detect AMD cards.
 
 3. **Integrated Graphics:** Intel/AMD integrated graphics may show minimal info.
 

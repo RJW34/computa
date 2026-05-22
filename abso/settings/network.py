@@ -110,15 +110,15 @@ class NetworkSettingsHandler(SettingsHandler):
 
         if nagle_enabled:
             issues.append(Issue(
-                title="Nagle's Algorithm may be enabled",
+                title="Nagle TCP delay setting is at Windows default",
                 severity="info",
                 current_value="Default (enabled)",
-                optimal_value="Disabled (TCPNoDelay=1)",
+                optimal_value="Profile-dependent / opt-in only",
                 explanation=(
-                    "Nagle buffers small TCP packets before sending (up to ~40ms). "
-                    "Note: most competitive games (OW2, Fortnite, Rivals 2, Valorant) "
-                    "use UDP for gameplay, where Nagle has no effect. Disabling it "
-                    "only helps TCP-based traffic (login, chat, matchmaking)."
+                    "Nagle affects TCP small-packet behavior; most live game traffic "
+                    "for the built-in competitive profiles is UDP, where this registry "
+                    "tweak has no effect. ABSO leaves it at default unless a profile "
+                    "or user opt-in has measured a TCP-specific reason to change it."
                 ),
                 category="network",
             ))
@@ -148,7 +148,7 @@ class NetworkSettingsHandler(SettingsHandler):
 
         Or use preset:
         {
-            "preset": "gaming"  # Applies all gaming-optimized settings
+            "preset": "gaming"  # Applies the opt-in TCP tuning set
         }
         """
         errors: list[str] = []

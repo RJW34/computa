@@ -295,7 +295,7 @@ class MultiMonitorDetector:
                 recommendation=(
                     "Multi-monitor setups may prevent true exclusive fullscreen. "
                     "Some games fall back to borderless windowed. Consider disabling "
-                    "secondary monitors for minimum latency."
+                    "secondary monitors for the strict fullscreen path."
                 ),
             ))
             result.exclusive_fullscreen_safe = False
@@ -308,7 +308,7 @@ class MultiMonitorDetector:
                 message=f"Active overlays: {overlays_str}",
                 recommendation=(
                     "Overlays can prevent exclusive fullscreen and add compositor latency. "
-                    "Disable overlays for minimum latency gaming."
+                    "Disable overlays for the strict fullscreen path."
                 ),
             ))
             result.exclusive_fullscreen_safe = False
@@ -339,8 +339,8 @@ class MultiMonitorDetector:
                 code="MULTIMON_GFE_DETECTED",
                 message="GeForce Experience detected",
                 recommendation=(
-                    "GeForce Experience adds overhead and can interfere with exclusive "
-                    "fullscreen. Consider uninstalling GFE for lowest latency. "
+                    "GeForce Experience can add overlay hooks and interfere with exclusive "
+                    "fullscreen. Consider disabling or uninstalling GFE for strict profiles. "
                     "NVIDIA drivers work fine without GFE."
                 ),
             ))

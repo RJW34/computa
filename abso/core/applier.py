@@ -548,6 +548,9 @@ class ProfileApplier:
                 if profile.allow_unverified_nvidia_profile_reuse:
                     settings.setdefault("allow_unverified_existing_profile_reuse", True)
 
+            if isinstance(profile, BaseProfile):
+                settings = profile.resolve_runtime_settings(handler_name, settings.copy())
+
             final_settings[handler_name] = settings
 
         return final_settings

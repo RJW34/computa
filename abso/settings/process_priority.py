@@ -9,7 +9,7 @@ import winreg
 from typing import Any
 
 from abso.core.exceptions import RegistryWriteError
-from abso.core.models import Issue
+from abso.core.models import EvidenceTier, Issue
 from abso.settings.base import SettingsHandler
 from abso.utils.validation import (
     validate_executable_name,
@@ -105,29 +105,34 @@ class ProcessPriorityHandler(SettingsHandler):
             cpu_priority = exe_settings.get("cpu_priority")
             if cpu_priority is None or cpu_priority < self.CPU_PRIORITY_HIGH:
                 issues.append(Issue(
-                    title=f"CPU priority not optimized for {exe}",
+                    title=f"CPU priority is not at ABSO profile target for {exe}",
                     severity="info",
                     current_value=str(cpu_priority) if cpu_priority is not None else "Not set",
                     optimal_value=str(self.CPU_PRIORITY_HIGH),
                     explanation=(
-                        f"High CPU priority ensures {exe} gets CPU time before normal "
-                        "priority processes. Avoids stuttering from background tasks."
+                        f"High CPU priority can reduce contention for {exe} when "
+                        "background work is active, but it is not a guaranteed FPS "
+                        "or latency win and can interfere with audio, capture, "
+                        "launcher, or anti-cheat helpers on some systems."
                     ),
                     category="process_priority",
+                    evidence_tier=EvidenceTier.EXPERIMENTAL,
                 ))
 
             io_priority = exe_settings.get("io_priority")
             if io_priority is None or io_priority < self.IO_PRIORITY_NORMAL:
                 issues.append(Issue(
-                    title=f"I/O priority not optimized for {exe}",
+                    title=f"I/O priority is not at ABSO profile target for {exe}",
                     severity="info",
                     current_value=str(io_priority) if io_priority is not None else "Not set",
                     optimal_value=str(self.IO_PRIORITY_NORMAL),
                     explanation=(
-                        f"Normal I/O priority helps {exe} avoid background storage contention "
-                        "without over-claiming unsupported IFEO GPU tweaks."
+                        f"Normal I/O priority keeps {exe} from being below normal "
+                        "priority for storage work. It is an experimental contention "
+                        "guard, not a proven standalone performance improvement."
                     ),
                     category="process_priority",
+                    evidence_tier=EvidenceTier.EXPERIMENTAL,
                 ))
 
         return issues
@@ -295,9 +300,9 @@ class ProcessPriorityHandler(SettingsHandler):
             self.executables.append(exe_name)
 
     def set_gaming_priorities(self, exe_name: str) -> dict[str, Any]:
-        """Set optimal gaming priorities for an executable.
+        """Set ABSO gaming priority targets for an executable.
 
-        This is a convenience method that applies recommended settings.
+        This is a convenience method that applies the handler defaults.
 
         Args:
             exe_name: Executable name (e.g., "game.exe").

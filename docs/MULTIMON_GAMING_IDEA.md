@@ -2,19 +2,19 @@
 
 ## Concept
 
-Allow gaming on primary monitor while using secondary monitors freely, without breaking out of the game or losing optimization benefits.
+Allow gaming on primary monitor while using secondary monitors freely, without breaking out of the game or losing profile-managed settings.
 
-**User Goal:** Exclusive fullscreen latency benefits + cursor freedom across monitors + other apps running on secondary displays.
+**User Goal:** A low-friction fullscreen-like path + cursor freedom across monitors + other apps running on secondary displays.
 
 ## Technical Reality
 
 True exclusive fullscreen is fundamentally incompatible with multi-monitor cursor freedom. The game has exclusive control of the display adapter output - Windows can't render a cross-monitor cursor.
 
-**However:** Modern Windows 11 + HAGS + VRR gets borderless within ~1-2ms of exclusive fullscreen.
+**However:** Modern Windows 11 + HAGS + VRR can make borderless practical for many games; exact latency cost must be measured per game/display.
 
-## Proposed Solution: Optimized Borderless Profile
+## Proposed Solution: Borderless Profile Variant
 
-Create profile variants that use optimized borderless instead of exclusive fullscreen:
+Create profile variants that use a managed borderless path instead of exclusive fullscreen:
 
 ```
 rivals2-online           -> rivals2-online-multimon

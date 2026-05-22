@@ -7,7 +7,7 @@ OS/driver/display state and surface manual in-game guidance for the
 Reflex/VRR settings themselves.
 
 The variant matrix mirrors Overwatch 2's core four:
-  - ``deadlock``            -> No-sync SDR (minimum-latency lane)
+  - ``deadlock``            -> No-sync SDR (latency-focused lane)
   - ``deadlock-hdr``        -> No-sync HDR (OLED / Mini-LED)
   - ``deadlock-gsync``      -> Strict fullscreen-only G-SYNC SDR
   - ``deadlock-gsync-hdr``  -> Strict fullscreen-only G-SYNC HDR
@@ -40,7 +40,10 @@ class _DeadlockBaseProfile(ReflexShooterBaseProfile):
 
     @property
     def nvidia_binding_executables(self) -> list[str]:
-        return list(_DEADLOCK_EXECUTABLES)
+        # Current playtest shipping binary. Keep executable_hints broader for
+        # process detection, but strict NVIDIA binding should target one real
+        # game binary instead of every future/legacy alias.
+        return ["project8.exe"]
 
     @property
     def nvidia_profile_name(self) -> str | None:
@@ -92,7 +95,7 @@ class _DeadlockBaseProfile(ReflexShooterBaseProfile):
                 "category": "Display",
                 "setting": "VSync",
                 "value": "Off",
-                "reason": "No-sync mode removes sync queueing latency.",
+                "reason": "No-sync mode avoids the VSync/VRR queueing path and accepts tearing.",
             },
             {
                 "category": "Display",
@@ -104,7 +107,7 @@ class _DeadlockBaseProfile(ReflexShooterBaseProfile):
                 "category": "Display",
                 "setting": "Frame Rate Cap",
                 "value": "Uncapped (or your monitor's refresh rate)",
-                "reason": "No-sync lane: maximum FPS minimizes click-to-pixel latency. Cap only if your GPU runs hot or coil whine becomes an issue.",
+                "reason": "No-sync lane: higher uncapped FPS can reduce frame time when the game can sustain it. Cap if heat, noise, or pacing gets worse.",
             },
             {
                 "category": "Graphics",
@@ -211,7 +214,7 @@ class _DeadlockBaseProfile(ReflexShooterBaseProfile):
 
 
 class DeadlockProfile(_DeadlockBaseProfile):
-    """Deadlock no-sync SDR profile (minimum latency lane)."""
+    """Deadlock no-sync SDR profile (latency-focused lane)."""
 
     @property
     def profile_id(self) -> str:
@@ -224,7 +227,7 @@ class DeadlockProfile(_DeadlockBaseProfile):
     @property
     def description(self) -> str:
         return (
-            "Minimum latency no-sync SDR Deadlock profile (VSync OFF, VRR OFF). "
+            "Latency-focused no-sync SDR Deadlock profile (VSync OFF, VRR OFF). "
             "Keeps driver LLM off for Reflex; enable Reflex On + Boost in-game."
         )
 
@@ -278,7 +281,7 @@ class DeadlockHDRProfile(_DeadlockBaseProfile):
     @property
     def description(self) -> str:
         return (
-            "Minimum latency no-sync HDR Deadlock profile (VSync OFF, VRR OFF). "
+            "Latency-focused no-sync HDR Deadlock profile (VSync OFF, VRR OFF). "
             "Native HDR for OLED / Mini-LED; enable Reflex On + Boost in-game."
         )
 

@@ -1041,6 +1041,30 @@ class TestNvidiaPreflight:
         assert result["success"] is True
         assert any("Proceeding with stable NVIDIA profile reuse" in notice for notice in result["notices"])
 
+    @patch("abso.settings.nvidia.nvapi_drs.DRSProfileManager.probe_profile_binding")
+    def test_preflight_allows_missing_profile_when_probe_says_safe_to_create(self, mock_probe):
+        mock_probe.return_value = {
+            "app_binding_exact": False,
+            "app_binding_safe": True,
+            "app_binding_state": "profile_missing",
+            "app_binding_note": (
+                "NVIDIA profile 'Diablo IV' does not exist yet. No requested "
+                "executable is currently owned by another NVIDIA profile, so "
+                "ABSO can create and bind it during apply."
+            ),
+        }
+
+        handler = NvidiaSettingsHandler()
+        result = handler.preflight({
+            "preset": "vrr_diablo4",
+            "executables": ["Diablo IV.exe"],
+            "profile_name": "Diablo IV",
+            "require_exact_binding": True,
+        })
+
+        assert result["success"] is True
+        assert any("Diablo IV" in notice for notice in result["notices"])
+
 
 class TestNvidiaBackwardsCompatibility:
     """Tests for backwards compatibility methods."""

@@ -124,7 +124,7 @@ class TestDefaults:
 
     def test_system_responsiveness_values(self):
         """Test system responsiveness default values."""
-        assert Defaults.SYSTEM_RESPONSIVENESS_GAMING == 0
+        assert Defaults.SYSTEM_RESPONSIVENESS_GAMING == 10
         assert Defaults.SYSTEM_RESPONSIVENESS_DEFAULT == 20
 
     def test_network_throttling_values(self):

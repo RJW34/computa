@@ -269,7 +269,8 @@ class Rivals2BaseProfile(BaseProfile):
         return handlers
 
     def _base_settings(self) -> dict[str, dict[str, Any]]:
-        # Verified settings — documented, measurable effect
+        # Profile defaults. Evidence and tradeoffs vary by setting; legacy
+        # tweaks remain opt-in.
         settings: dict[str, dict[str, Any]] = {
             "WindowsSettingsHandler": {
                 "game_mode": True,
@@ -278,21 +279,11 @@ class Rivals2BaseProfile(BaseProfile):
                 "hags": True,
                 "hdr": False,
                 "auto_hdr": False,
-                # Win11 borderless-compositor settings. Kept True universally
-                # (was False prior to 2026-05-21) so the profile honors its
-                # ordering contract: strict / no-sync variants are at-least-
-                # as-fast as capture variants regardless of in-game display
-                # mode. True is a true no-op in real exclusive fullscreen
-                # (DX11 swap chain doesn't go through Windows' upgrade path)
-                # and a multi-ms win in borderless (flip-model upgrade + VRR-
-                # aware compositing). The <1ms compositor-stays-warm cost in
-                # exclusive (see windows.py::_get_vrr_optimize comment) is
-                # accepted in exchange for not silently falling off a latency
-                # cliff when the user is in borderless. Users committed to
-                # pure-exclusive can override to False via abso.yaml
-                # profile_overrides.windows.{windowed_optimizations,vrr_optimize}.
-                "windowed_optimizations": True,
-                "vrr_optimize": True,
+                # Strict fullscreen/no-sync Rivals profiles do not force the
+                # Win11 windowed compositor path. Capture/borderless variants
+                # opt into these flags explicitly.
+                "windowed_optimizations": False,
+                "vrr_optimize": False,
             },
             "PowerSettingsHandler": {
                 "ensure_ultimate_performance": True,
@@ -430,7 +421,8 @@ class EmulatorLatencyBaseProfile(BaseProfile):
         return []
 
     def _base_settings(self) -> dict[str, dict[str, Any]]:
-        # Verified settings — documented, measurable effect
+        # Profile defaults. Evidence and tradeoffs vary by setting; legacy
+        # tweaks remain opt-in.
         settings: dict[str, dict[str, Any]] = {
             "WindowsSettingsHandler": {
                 "game_mode": True,
@@ -439,21 +431,11 @@ class EmulatorLatencyBaseProfile(BaseProfile):
                 "hags": True,
                 "hdr": False,
                 "auto_hdr": False,
-                # Win11 borderless-compositor settings. Kept True universally
-                # (was False prior to 2026-05-21) so the profile honors its
-                # ordering contract: strict / no-sync variants are at-least-
-                # as-fast as capture variants regardless of in-game display
-                # mode. True is a true no-op in real exclusive fullscreen
-                # (DX11 swap chain doesn't go through Windows' upgrade path)
-                # and a multi-ms win in borderless (flip-model upgrade + VRR-
-                # aware compositing). The <1ms compositor-stays-warm cost in
-                # exclusive (see windows.py::_get_vrr_optimize comment) is
-                # accepted in exchange for not silently falling off a latency
-                # cliff when the user is in borderless. Users committed to
-                # pure-exclusive can override to False via abso.yaml
-                # profile_overrides.windows.{windowed_optimizations,vrr_optimize}.
-                "windowed_optimizations": True,
-                "vrr_optimize": True,
+                # Emulator/no-sync profiles keep the Win11 windowed compositor
+                # path off by default. Console-parity/capture variants can
+                # enable it explicitly when their presentation path requires it.
+                "windowed_optimizations": False,
+                "vrr_optimize": False,
             },
             "PowerSettingsHandler": {
                 "ensure_ultimate_performance": True,
@@ -481,10 +463,9 @@ class EmulatorLatencyBaseProfile(BaseProfile):
             },
             "GraphicsSettingsHandler": {
                 "disable_global_fso": True,
-                # MPO is NOT disabled by default — it's required for G-SYNC/VRR
-                # and toggling it requires a reboot. Only disable MPO in profiles
-                # that explicitly need it (e.g., no-sync exclusive fullscreen profiles
-                # where MPO compositor interference is measured and confirmed).
+                # MPO is not disabled by default. Toggling it requires a reboot
+                # and can alter the VRR/compositor path on some systems, so only
+                # disable it for a measured profile-specific issue.
             },
             "ProcessPriorityHandler": {
                 "cpu_priority": 3,
@@ -564,7 +545,8 @@ class WebGLBaseProfile(BaseProfile):
         return handlers
 
     def _base_settings(self) -> dict[str, dict[str, Any]]:
-        # Verified settings — documented, measurable effect
+        # Profile defaults. Evidence and tradeoffs vary by setting; legacy
+        # tweaks remain opt-in.
         settings: dict[str, dict[str, Any]] = {
             "WindowsSettingsHandler": {
                 "game_mode": True,
@@ -694,7 +676,8 @@ class ReflexShooterBaseProfile(BaseProfile):
         return handlers
 
     def _base_settings(self) -> dict[str, dict[str, Any]]:
-        # Verified settings — documented, measurable effect
+        # Profile defaults. Evidence and tradeoffs vary by setting; legacy
+        # tweaks remain opt-in.
         settings: dict[str, dict[str, Any]] = {
             "WindowsSettingsHandler": {
                 "game_mode": True,
@@ -703,21 +686,10 @@ class ReflexShooterBaseProfile(BaseProfile):
                 "hags": True,
                 "hdr": False,
                 "auto_hdr": False,
-                # Win11 borderless-compositor settings. Kept True universally
-                # (was False prior to 2026-05-21) so the profile honors its
-                # ordering contract: strict / no-sync variants are at-least-
-                # as-fast as capture variants regardless of in-game display
-                # mode. True is a true no-op in real exclusive fullscreen
-                # (DX11 swap chain doesn't go through Windows' upgrade path)
-                # and a multi-ms win in borderless (flip-model upgrade + VRR-
-                # aware compositing). The <1ms compositor-stays-warm cost in
-                # exclusive (see windows.py::_get_vrr_optimize comment) is
-                # accepted in exchange for not silently falling off a latency
-                # cliff when the user is in borderless. Users committed to
-                # pure-exclusive can override to False via abso.yaml
-                # profile_overrides.windows.{windowed_optimizations,vrr_optimize}.
-                "windowed_optimizations": True,
-                "vrr_optimize": True,
+                # Strict Reflex shooter profiles keep the Win11 windowed
+                # compositor path off. Capture/borderless variants opt in.
+                "windowed_optimizations": False,
+                "vrr_optimize": False,
                 "max_refresh_rate": True,
             },
             "PowerSettingsHandler": {

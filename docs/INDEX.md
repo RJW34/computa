@@ -33,7 +33,7 @@ actively working on that area.
 ## Focused-Scope Notes
 
 - [Multimon Gaming Idea](./MULTIMON_GAMING_IDEA.md)
-- [Rivals 2 VRR Optimal Config](./rivals2-vrr-optimal-config.md)
+- [Deprecated Rivals 2 VRR Snapshot](./rivals2-vrr-optimal-config.md)
 - [OW2 Keybinds Format](./ow2-keybinds-format.md)
 
 ## Archive

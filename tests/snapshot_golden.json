@@ -38,7 +38,7 @@
       },
       {
         "category": "Display",
-        "reason": "No-sync mode removes sync queueing latency.",
+        "reason": "No-sync mode avoids the VSync/VRR queueing path and accepts tearing.",
         "setting": "VSync",
         "value": "Off"
       },
@@ -50,7 +50,7 @@
       },
       {
         "category": "Display",
-        "reason": "No-sync lane: maximum FPS minimizes click-to-pixel latency. Cap only if your GPU runs hot or coil whine becomes an issue.",
+        "reason": "No-sync lane: higher uncapped FPS can reduce frame time when the game can sustain it. Cap if heat, noise, or pacing gets worse.",
         "setting": "Frame Rate Cap",
         "value": "Uncapped (or your monitor's refresh rate)"
       },
@@ -145,8 +145,8 @@
         "hags": true,
         "hdr": false,
         "max_refresh_rate": true,
-        "vrr_optimize": true,
-        "windowed_optimizations": true
+        "vrr_optimize": false,
+        "windowed_optimizations": false
       }
     }
   },
@@ -297,8 +297,8 @@
         "hags": true,
         "hdr": false,
         "max_refresh_rate": true,
-        "vrr_optimize": true,
-        "windowed_optimizations": true
+        "vrr_optimize": false,
+        "windowed_optimizations": false
       }
     }
   },
@@ -452,8 +452,8 @@
         "hdr": true,
         "max_refresh_rate": true,
         "sdr_white_level_nits": 200,
-        "vrr_optimize": true,
-        "windowed_optimizations": true
+        "vrr_optimize": false,
+        "windowed_optimizations": false
       }
     }
   },
@@ -496,7 +496,7 @@
       },
       {
         "category": "Display",
-        "reason": "No-sync mode removes sync queueing latency.",
+        "reason": "No-sync mode avoids the VSync/VRR queueing path and accepts tearing.",
         "setting": "VSync",
         "value": "Off"
       },
@@ -508,7 +508,7 @@
       },
       {
         "category": "Display",
-        "reason": "No-sync lane: maximum FPS minimizes click-to-pixel latency. Cap only if your GPU runs hot or coil whine becomes an issue.",
+        "reason": "No-sync lane: higher uncapped FPS can reduce frame time when the game can sustain it. Cap if heat, noise, or pacing gets worse.",
         "setting": "Frame Rate Cap",
         "value": "Uncapped (or your monitor's refresh rate)"
       },
@@ -606,8 +606,8 @@
         "hdr": true,
         "max_refresh_rate": true,
         "sdr_white_level_nits": 200,
-        "vrr_optimize": true,
-        "windowed_optimizations": true
+        "vrr_optimize": false,
+        "windowed_optimizations": false
       }
     }
   },
@@ -763,8 +763,8 @@
         "hdr": true,
         "max_refresh_rate": true,
         "sdr_white_level_nits": 250,
-        "vrr_optimize": true,
-        "windowed_optimizations": true
+        "vrr_optimize": false,
+        "windowed_optimizations": false
       }
     }
   },
@@ -908,8 +908,8 @@
         "hags": true,
         "hdr": false,
         "max_refresh_rate": true,
-        "vrr_optimize": true,
-        "windowed_optimizations": true
+        "vrr_optimize": false,
+        "windowed_optimizations": false
       }
     }
   },
@@ -1080,8 +1080,8 @@
         "hags": true,
         "hdr": false,
         "max_refresh_rate": true,
-        "vrr_optimize": true,
-        "windowed_optimizations": true
+        "vrr_optimize": false,
+        "windowed_optimizations": false
       }
     }
   },
@@ -1261,8 +1261,8 @@
         "hdr": true,
         "max_refresh_rate": true,
         "sdr_white_level_nits": 200,
-        "vrr_optimize": true,
-        "windowed_optimizations": true
+        "vrr_optimize": false,
+        "windowed_optimizations": false
       }
     }
   },
@@ -1442,8 +1442,8 @@
         "hdr": true,
         "max_refresh_rate": true,
         "sdr_white_level_nits": 200,
-        "vrr_optimize": true,
-        "windowed_optimizations": true
+        "vrr_optimize": false,
+        "windowed_optimizations": false
       }
     }
   },
@@ -1620,8 +1620,8 @@
         "hags": true,
         "hdr": false,
         "max_refresh_rate": true,
-        "vrr_optimize": true,
-        "windowed_optimizations": true
+        "vrr_optimize": false,
+        "windowed_optimizations": false
       }
     }
   },
@@ -1653,19 +1653,19 @@
       },
       {
         "category": "Display",
-        "reason": "No-sync mode removes sync queueing latency.",
+        "reason": "No-sync mode avoids the VSync/VRR queueing path and accepts tearing.",
         "setting": "VSync",
         "value": "Off"
       },
       {
         "category": "Display",
-        "reason": "On a high-end GPU at 1440p Low, the GPU is not saturated - Reflex throttles CPU frame submission without benefit, costing about 60 FPS. Higher uncapped FPS means lower latency than Reflex queue management. If your GPU is saturated (GPU usage above 90%), switch to On+Boost instead.",
+        "reason": "On a high-end GPU at 1440p Low, the GPU is not saturated - Reflex throttles CPU frame submission without benefit, costing about 60 FPS. Higher uncapped FPS can reduce frame time when the system can sustain it. If your GPU is saturated (GPU usage above 90%), switch to On+Boost instead.",
         "setting": "NVIDIA Reflex Low Latency",
         "value": "Off (high-end GPU) / On+Boost (mid-range GPU)"
       },
       {
         "category": "Display",
-        "reason": "No-sync profile: maximum FPS equals minimum click-to-pixel latency.",
+        "reason": "No-sync profile: uncapped FPS reduces frame time when the game can sustain it.",
         "setting": "Frame Rate Cap",
         "value": "Uncapped (600)"
       },
@@ -1773,8 +1773,8 @@
         "hags": true,
         "hdr": false,
         "max_refresh_rate": true,
-        "vrr_optimize": true,
-        "windowed_optimizations": true
+        "vrr_optimize": false,
+        "windowed_optimizations": false
       }
     }
   },
@@ -1836,7 +1836,7 @@
       },
       {
         "category": "Graphics",
-        "reason": "Minimizes frame spikes during heavy ability usage.",
+        "reason": "Reduces frame-time spikes during heavy ability usage.",
         "setting": "Shadows / Effects",
         "value": "Low"
       }
@@ -1928,8 +1928,8 @@
         "hags": true,
         "hdr": false,
         "max_refresh_rate": true,
-        "vrr_optimize": true,
-        "windowed_optimizations": true
+        "vrr_optimize": false,
+        "windowed_optimizations": false
       }
     }
   },
@@ -1955,7 +1955,7 @@
     "in_game_settings": [
       {
         "category": "Display",
-        "reason": "Capture-safe path: keeps Medal/Discord/OBS overlays compatible while using the windowed G-SYNC path. Use the strict fullscreen profile if you want the absolute lowest latency and no overlays.",
+        "reason": "Capture-safe path: keeps Medal/Discord/OBS overlays compatible while using the windowed G-SYNC path. Use the strict fullscreen profile for the leaner no-overlay path.",
         "setting": "Display Mode",
         "value": "Borderless / Windowed Fullscreen"
       },
@@ -1991,7 +1991,7 @@
       },
       {
         "category": "Graphics",
-        "reason": "Minimizes frame spikes during heavy team fights and capture load.",
+        "reason": "Reduces frame-time spikes during heavy team fights and capture load.",
         "setting": "Shadows / Effects",
         "value": "Low"
       }
@@ -2171,7 +2171,7 @@
       },
       {
         "category": "Graphics",
-        "reason": "Minimizes frame spikes during heavy ability usage.",
+        "reason": "Reduces frame-time spikes during heavy ability usage.",
         "setting": "Shadows / Effects",
         "value": "Low"
       }
@@ -2266,8 +2266,8 @@
         "hdr": true,
         "max_refresh_rate": true,
         "sdr_white_level_nits": 200,
-        "vrr_optimize": true,
-        "windowed_optimizations": true
+        "vrr_optimize": false,
+        "windowed_optimizations": false
       }
     }
   },
@@ -2347,7 +2347,7 @@
       },
       {
         "category": "Graphics",
-        "reason": "Minimizes frame spikes during heavy team fights and capture load.",
+        "reason": "Reduces frame-time spikes during heavy team fights and capture load.",
         "setting": "Shadows / Effects",
         "value": "Low"
       }
@@ -2475,19 +2475,19 @@
       },
       {
         "category": "Display",
-        "reason": "No-sync mode removes sync queueing latency.",
+        "reason": "No-sync mode avoids the VSync/VRR queueing path and accepts tearing.",
         "setting": "VSync",
         "value": "Off"
       },
       {
         "category": "Display",
-        "reason": "On a high-end GPU at 1440p Low, the GPU is not saturated - Reflex throttles CPU frame submission without benefit, costing about 60 FPS. Higher uncapped FPS means lower latency than Reflex queue management. If your GPU is saturated (GPU usage above 90%), switch to On+Boost instead.",
+        "reason": "On a high-end GPU at 1440p Low, the GPU is not saturated - Reflex throttles CPU frame submission without benefit, costing about 60 FPS. Higher uncapped FPS can reduce frame time when the system can sustain it. If your GPU is saturated (GPU usage above 90%), switch to On+Boost instead.",
         "setting": "NVIDIA Reflex Low Latency",
         "value": "Off (high-end GPU) / On+Boost (mid-range GPU)"
       },
       {
         "category": "Display",
-        "reason": "No-sync profile: maximum FPS equals minimum click-to-pixel latency.",
+        "reason": "No-sync profile: uncapped FPS reduces frame time when the game can sustain it.",
         "setting": "Frame Rate Cap",
         "value": "Uncapped (600)"
       },
@@ -2622,8 +2622,8 @@
         "hdr": true,
         "max_refresh_rate": true,
         "sdr_white_level_nits": 200,
-        "vrr_optimize": true,
-        "windowed_optimizations": true
+        "vrr_optimize": false,
+        "windowed_optimizations": false
       }
     }
   },
@@ -2688,9 +2688,9 @@
       },
       {
         "category": "Nvidia Control Panel",
-        "reason": "Adaptive VSync prevents tearing without constant latency penalty. Use 'Off' if you prefer lowest latency and can tolerate minor tearing.",
+        "reason": "Adaptive VSync prevents tearing without constant latency penalty. Use 'Off' if you prefer the no-sync path and can tolerate minor tearing.",
         "setting": "Vertical Sync",
-        "value": "Adaptive (or Off for lowest latency)"
+        "value": "Adaptive (or Off for no-sync tearing)"
       },
       {
         "category": "Nvidia Control Panel",
@@ -3252,8 +3252,8 @@
         "hags": true,
         "hdr": false,
         "max_refresh_rate": true,
-        "vrr_optimize": true,
-        "windowed_optimizations": true
+        "vrr_optimize": false,
+        "windowed_optimizations": false
       }
     }
   },
@@ -3286,19 +3286,19 @@
       },
       {
         "category": "NVIDIA Control Panel",
-        "reason": "No sync overhead for minimum latency. Tearing is acceptable offline.",
+        "reason": "Avoids the VRR queueing path. Tearing is acceptable offline.",
         "setting": "G-SYNC",
         "value": "Off"
       },
       {
         "category": "NVIDIA Control Panel",
-        "reason": "No sync \u2014 minimum latency path.",
+        "reason": "No-sync path: accepts tearing to avoid VSync queueing.",
         "setting": "Vertical Sync",
         "value": "Off"
       },
       {
         "category": "NVIDIA Control Panel",
-        "reason": "Reduces pre-render queue to 1 frame. Ultra has no effect in DX12/UE5 (only works in DX9/DX11).",
+        "reason": "Driver LLM can reduce render queueing in supported paths. DX12/UE5 behavior is game-controlled enough that ABSO does not claim a fixed latency win.",
         "setting": "Low Latency Mode",
         "value": "On"
       },
@@ -3424,8 +3424,8 @@
         "hags": true,
         "hdr": false,
         "max_refresh_rate": true,
-        "vrr_optimize": true,
-        "windowed_optimizations": true
+        "vrr_optimize": false,
+        "windowed_optimizations": false
       }
     }
   },
@@ -3610,8 +3610,8 @@
         "hags": true,
         "hdr": false,
         "max_refresh_rate": true,
-        "vrr_optimize": true,
-        "windowed_optimizations": true
+        "vrr_optimize": false,
+        "windowed_optimizations": false
       }
     }
   },
@@ -3778,8 +3778,8 @@
         "hags": true,
         "hdr": false,
         "max_refresh_rate": true,
-        "vrr_optimize": true,
-        "windowed_optimizations": true
+        "vrr_optimize": false,
+        "windowed_optimizations": false
       }
     }
   },
@@ -3822,19 +3822,19 @@
       },
       {
         "category": "=== NVIDIA CONTROL PANEL ===",
-        "reason": "SSBU runs at fixed 60fps - G-SYNC adds overhead syncing to a constant rate. Disabling removes sync latency. High refresh still helps via reduced scanout.",
+        "reason": "SSBU runs at fixed 60fps, so this no-sync profile disables VRR. High refresh still helps via reduced scanout.",
         "setting": "G-SYNC",
         "value": "Off"
       },
       {
         "category": "NVCP",
-        "reason": "Disabling V-SYNC eliminates frame queue latency. May cause minor tearing.",
+        "reason": "Disabling V-SYNC avoids the VSync queueing path and may cause tearing.",
         "setting": "V-SYNC",
         "value": "Off"
       },
       {
         "category": "NVCP",
-        "reason": "LLM has no effect on Vulkan render queues (only works in DX9/DX11). Setting to Off for accuracy. Ryujinx manages its own frame pacing.",
+        "reason": "Driver LLM is not the controlling queue path for Vulkan. Ryujinx manages its own frame pacing.",
         "setting": "Low Latency Mode",
         "value": "Off"
       },
@@ -3864,13 +3864,13 @@
       },
       {
         "category": "Ryujinx Graphics",
-        "reason": "Disable VSync in Ryujinx for minimum latency. Let NVCP handle sync (which we also disable).",
+        "reason": "Disable VSync in Ryujinx for the no-sync path; NVCP sync is disabled too.",
         "setting": "Enable VSync",
         "value": "Off"
       },
       {
         "category": "Ryujinx Graphics",
-        "reason": "Lower resolution = lower render latency. For competitive play, prioritize latency over visuals. Native or 2x is recommended.",
+        "reason": "Lower resolution reduces GPU work and can reduce render time. Native or 2x is the latency-focused default.",
         "setting": "Resolution Scale",
         "value": "Native (1x) or 2x max"
       },
@@ -3882,7 +3882,7 @@
       },
       {
         "category": "Ryujinx Graphics",
-        "reason": "AA adds GPU overhead. Disable for minimum latency.",
+        "reason": "AA adds GPU overhead. Disable for the latency-focused path.",
         "setting": "Anti-Aliasing",
         "value": "None"
       },
@@ -4061,8 +4061,8 @@
         "game_mode": true,
         "hags": true,
         "hdr": false,
-        "vrr_optimize": true,
-        "windowed_optimizations": true
+        "vrr_optimize": false,
+        "windowed_optimizations": false
       }
     }
   },
@@ -4100,19 +4100,19 @@
       },
       {
         "category": "Nvidia Control Panel",
-        "reason": "Melee runs at fixed 60fps - G-SYNC adds overhead syncing to a constant rate. Disabling removes ~1-2ms+ of sync latency. High refresh still helps via reduced scanout latency even without VRR.",
+        "reason": "Melee runs at fixed 60fps, so this no-sync profile disables VRR. High refresh still helps via reduced scanout latency even without VRR.",
         "setting": "G-SYNC",
         "value": "Off"
       },
       {
         "category": "Nvidia Control Panel",
-        "reason": "Disabling V-SYNC eliminates frame queue latency entirely. May cause tearing, but competitive players prioritize input latency.",
+        "reason": "Disabling V-SYNC avoids the VSync queueing path and may cause tearing.",
         "setting": "V-SYNC (global/per-game)",
         "value": "Off"
       },
       {
         "category": "Nvidia Control Panel",
-        "reason": "Driver LLM remains useful on DX11, and newer NVIDIA drivers also support DX12. Vulkan/OpenGL paths do not expose the same queue control benefit.",
+        "reason": "Driver LLM is most predictable on DX11. DX12 behavior is more driver/game dependent; Vulkan/OpenGL paths do not expose the same queue-control benefit.",
         "setting": "Low Latency Mode",
         "value": "Backend-aware (DX11/DX12: On, Vulkan/OpenGL: Off)"
       },
@@ -4142,25 +4142,25 @@
       },
       {
         "category": "Graphics",
-        "reason": "Disable Dolphin's V-SYNC. No sync anywhere for minimum latency (tearing acceptable).",
+        "reason": "Disable Dolphin's V-SYNC for the no-sync path (tearing acceptable).",
         "setting": "VSync",
         "value": "Off"
       },
       {
         "category": "Graphics",
-        "reason": "Lower latency than borderless windowed.",
+        "reason": "Matches the strict fullscreen path this profile configures.",
         "setting": "Fullscreen Mode",
         "value": "Exclusive Fullscreen"
       },
       {
         "category": "Graphics",
-        "reason": "Lower resolution = lower render latency. Tested: dropping resolution reduced render latency from 0.3ms to 0.1ms. Melee is a 2001 game - it doesn't need 4K. Prioritize latency over visuals.",
+        "reason": "Lower resolution reduces GPU work and can reduce render time. Melee is a 2001 game; native or modest scaling is the safer latency-focused default.",
         "setting": "Internal Resolution",
         "value": "Native (1x) or 2x max"
       },
       {
         "category": "GFX.ini [Settings]",
-        "reason": "Native resolution = lowest render latency. Higher res adds GPU work. Tested: EFBScale 2 added measurable latency vs EFBScale 1.",
+        "reason": "Native resolution keeps GPU work low. Higher EFB scales add render work.",
         "setting": "EFBScale",
         "value": "1 (Native)"
       },
@@ -4256,7 +4256,7 @@
       },
       {
         "category": "Audio",
-        "reason": "Exclusive mode bypasses Windows audio mixer for lowest latency.",
+        "reason": "Exclusive mode bypasses the Windows audio mixer and can reduce audio path latency.",
         "setting": "Backend",
         "value": "Exclusive WASAPI (Ishiiruka) / Cubeb (Mainline)"
       },
@@ -4280,13 +4280,13 @@
       },
       {
         "category": "Display Info",
-        "reason": "60fps @ 60Hz = ~17ms scanout, 60fps @ 240Hz = ~4ms scanout. This benefit is from faster pixel refresh, NOT from VRR. Use your monitor's max refresh rate with G-Sync/VSync OFF for minimum latency.",
+        "reason": "60fps @ 60Hz = ~17ms scanout, 60fps @ 240Hz = ~4ms scanout. This benefit is from faster pixel refresh, NOT from VRR. Use your monitor's max refresh rate with G-Sync/VSync OFF for the no-sync path.",
         "setting": "High refresh benefit",
         "value": "Reduced scanout latency (no G-Sync needed)"
       },
       {
         "category": "Display Info",
-        "reason": "With 60fps on a high refresh display, tears are small and fast-moving. The latency reduction far outweighs the visual artifact for competitive play.",
+        "reason": "With 60fps on a high refresh display, tears are small and fast-moving. The tradeoff may be acceptable for competitive play if you tolerate tearing.",
         "setting": "Tearing",
         "value": "May occur but minimal impact"
       },
@@ -4390,8 +4390,8 @@
         "hags": true,
         "hdr": false,
         "max_refresh_rate": true,
-        "vrr_optimize": true,
-        "windowed_optimizations": true
+        "vrr_optimize": false,
+        "windowed_optimizations": false
       }
     }
   },
@@ -4417,13 +4417,13 @@
     "in_game_settings": [
       {
         "category": "Profile Goal",
-        "reason": "Use this when you want closer console-like presentation cadence on an LCD/OLED, not maximum latency reduction.",
+        "reason": "Use this when you want closer console-like presentation cadence on an LCD/OLED, not the aggressive no-sync path.",
         "setting": "Target",
         "value": "Console-like pacing and feel (offline)"
       },
       {
         "category": "Nvidia Control Panel",
-        "reason": "Keeps presentation cadence stable and tear-free for practice sessions where feel consistency is preferred over absolute minimum latency.",
+        "reason": "Keeps presentation cadence stable and tear-free for practice sessions where feel consistency is preferred over the no-sync latency-focused path.",
         "setting": "V-SYNC (global/per-game)",
         "value": "On"
       },
@@ -4557,8 +4557,8 @@
         "hags": true,
         "hdr": false,
         "refresh_rate": 60,
-        "vrr_optimize": true,
-        "windowed_optimizations": true
+        "vrr_optimize": false,
+        "windowed_optimizations": false
       }
     }
   },
@@ -4602,19 +4602,19 @@
       },
       {
         "category": "Display",
-        "reason": "When Windows is in HDR mode, even 'exclusive fullscreen' SDR apps go through the HDR composition path. The added latency is small (sub-frame on a high-refresh display) but it's not zero. The HDR variant is for sessions where eye-strain relief matters more than absolute click-to-pixel latency; switch back to the SDR sibling for tournament/practice where every microsecond counts.",
+        "reason": "When Windows is in HDR mode, even 'exclusive fullscreen' SDR apps go through the HDR composition path. The added latency is small (sub-frame on a high-refresh display) but it's not zero. The HDR variant is for sessions where eye-strain relief matters more than the leanest no-sync path; switch back to the SDR sibling for tournament/practice where latency is the priority.",
         "setting": "Exclusive Fullscreen vs SDR-in-HDR latency",
         "value": "Accept a small HDR composition cost"
       },
       {
         "category": "Profile Goal",
-        "reason": "Use this when you want closer console-like presentation cadence on an LCD/OLED, not maximum latency reduction.",
+        "reason": "Use this when you want closer console-like presentation cadence on an LCD/OLED, not the aggressive no-sync path.",
         "setting": "Target",
         "value": "Console-like pacing and feel (offline)"
       },
       {
         "category": "Nvidia Control Panel",
-        "reason": "Keeps presentation cadence stable and tear-free for practice sessions where feel consistency is preferred over absolute minimum latency.",
+        "reason": "Keeps presentation cadence stable and tear-free for practice sessions where feel consistency is preferred over the no-sync latency-focused path.",
         "setting": "V-SYNC (global/per-game)",
         "value": "On"
       },
@@ -4751,8 +4751,8 @@
         "hdr": true,
         "refresh_rate": 60,
         "sdr_white_level_nits": 200,
-        "vrr_optimize": true,
-        "windowed_optimizations": true
+        "vrr_optimize": false,
+        "windowed_optimizations": false
       }
     }
   },
@@ -4796,7 +4796,7 @@
       },
       {
         "category": "Display",
-        "reason": "When Windows is in HDR mode, even 'exclusive fullscreen' SDR apps go through the HDR composition path. The added latency is small (sub-frame on a high-refresh display) but it's not zero. The HDR variant is for sessions where eye-strain relief matters more than absolute click-to-pixel latency; switch back to the SDR sibling for tournament/practice where every microsecond counts.",
+        "reason": "When Windows is in HDR mode, even 'exclusive fullscreen' SDR apps go through the HDR composition path. The added latency is small (sub-frame on a high-refresh display) but it's not zero. The HDR variant is for sessions where eye-strain relief matters more than the leanest no-sync path; switch back to the SDR sibling for tournament/practice where latency is the priority.",
         "setting": "Exclusive Fullscreen vs SDR-in-HDR latency",
         "value": "Accept a small HDR composition cost"
       },
@@ -4814,19 +4814,19 @@
       },
       {
         "category": "Nvidia Control Panel",
-        "reason": "Melee runs at fixed 60fps - G-SYNC adds overhead syncing to a constant rate. Disabling removes ~1-2ms+ of sync latency. High refresh still helps via reduced scanout latency even without VRR.",
+        "reason": "Melee runs at fixed 60fps, so this no-sync profile disables VRR. High refresh still helps via reduced scanout latency even without VRR.",
         "setting": "G-SYNC",
         "value": "Off"
       },
       {
         "category": "Nvidia Control Panel",
-        "reason": "Disabling V-SYNC eliminates frame queue latency entirely. May cause tearing, but competitive players prioritize input latency.",
+        "reason": "Disabling V-SYNC avoids the VSync queueing path and may cause tearing.",
         "setting": "V-SYNC (global/per-game)",
         "value": "Off"
       },
       {
         "category": "Nvidia Control Panel",
-        "reason": "Driver LLM remains useful on DX11, and newer NVIDIA drivers also support DX12. Vulkan/OpenGL paths do not expose the same queue control benefit.",
+        "reason": "Driver LLM is most predictable on DX11. DX12 behavior is more driver/game dependent; Vulkan/OpenGL paths do not expose the same queue-control benefit.",
         "setting": "Low Latency Mode",
         "value": "Backend-aware (DX11/DX12: On, Vulkan/OpenGL: Off)"
       },
@@ -4856,25 +4856,25 @@
       },
       {
         "category": "Graphics",
-        "reason": "Disable Dolphin's V-SYNC. No sync anywhere for minimum latency (tearing acceptable).",
+        "reason": "Disable Dolphin's V-SYNC for the no-sync path (tearing acceptable).",
         "setting": "VSync",
         "value": "Off"
       },
       {
         "category": "Graphics",
-        "reason": "Lower latency than borderless windowed.",
+        "reason": "Matches the strict fullscreen path this profile configures.",
         "setting": "Fullscreen Mode",
         "value": "Exclusive Fullscreen"
       },
       {
         "category": "Graphics",
-        "reason": "Lower resolution = lower render latency. Tested: dropping resolution reduced render latency from 0.3ms to 0.1ms. Melee is a 2001 game - it doesn't need 4K. Prioritize latency over visuals.",
+        "reason": "Lower resolution reduces GPU work and can reduce render time. Melee is a 2001 game; native or modest scaling is the safer latency-focused default.",
         "setting": "Internal Resolution",
         "value": "Native (1x) or 2x max"
       },
       {
         "category": "GFX.ini [Settings]",
-        "reason": "Native resolution = lowest render latency. Higher res adds GPU work. Tested: EFBScale 2 added measurable latency vs EFBScale 1.",
+        "reason": "Native resolution keeps GPU work low. Higher EFB scales add render work.",
         "setting": "EFBScale",
         "value": "1 (Native)"
       },
@@ -4970,7 +4970,7 @@
       },
       {
         "category": "Audio",
-        "reason": "Exclusive mode bypasses Windows audio mixer for lowest latency.",
+        "reason": "Exclusive mode bypasses the Windows audio mixer and can reduce audio path latency.",
         "setting": "Backend",
         "value": "Exclusive WASAPI (Ishiiruka) / Cubeb (Mainline)"
       },
@@ -4994,13 +4994,13 @@
       },
       {
         "category": "Display Info",
-        "reason": "60fps @ 60Hz = ~17ms scanout, 60fps @ 240Hz = ~4ms scanout. This benefit is from faster pixel refresh, NOT from VRR. Use your monitor's max refresh rate with G-Sync/VSync OFF for minimum latency.",
+        "reason": "60fps @ 60Hz = ~17ms scanout, 60fps @ 240Hz = ~4ms scanout. This benefit is from faster pixel refresh, NOT from VRR. Use your monitor's max refresh rate with G-Sync/VSync OFF for the no-sync path.",
         "setting": "High refresh benefit",
         "value": "Reduced scanout latency (no G-Sync needed)"
       },
       {
         "category": "Display Info",
-        "reason": "With 60fps on a high refresh display, tears are small and fast-moving. The latency reduction far outweighs the visual artifact for competitive play.",
+        "reason": "With 60fps on a high refresh display, tears are small and fast-moving. The tradeoff may be acceptable for competitive play if you tolerate tearing.",
         "setting": "Tearing",
         "value": "May occur but minimal impact"
       },
@@ -5107,8 +5107,8 @@
         "hdr": true,
         "max_refresh_rate": true,
         "sdr_white_level_nits": 200,
-        "vrr_optimize": true,
-        "windowed_optimizations": true
+        "vrr_optimize": false,
+        "windowed_optimizations": false
       }
     }
   },
@@ -5146,19 +5146,19 @@
       },
       {
         "category": "Nvidia Control Panel",
-        "reason": "Melee runs at fixed 60fps - G-SYNC adds overhead syncing to a constant rate. Disabling removes ~1-2ms+ of sync latency. High refresh still helps via reduced scanout latency even without VRR.",
+        "reason": "Melee runs at fixed 60fps, so this no-sync profile disables VRR. High refresh still helps via reduced scanout latency even without VRR.",
         "setting": "G-SYNC",
         "value": "Off"
       },
       {
         "category": "Nvidia Control Panel",
-        "reason": "Disabling V-SYNC eliminates frame queue latency entirely. May cause tearing, but competitive players prioritize input latency.",
+        "reason": "Disabling V-SYNC avoids the VSync queueing path and may cause tearing.",
         "setting": "V-SYNC (global/per-game)",
         "value": "Off"
       },
       {
         "category": "Nvidia Control Panel",
-        "reason": "Driver LLM remains useful on DX11, and newer NVIDIA drivers also support DX12. Vulkan/OpenGL paths do not expose the same queue control benefit.",
+        "reason": "Driver LLM is most predictable on DX11. DX12 behavior is more driver/game dependent; Vulkan/OpenGL paths do not expose the same queue-control benefit.",
         "setting": "Low Latency Mode",
         "value": "Backend-aware (DX11/DX12: On, Vulkan/OpenGL: Off)"
       },
@@ -5188,25 +5188,25 @@
       },
       {
         "category": "Graphics",
-        "reason": "Disable Dolphin's V-SYNC. No sync anywhere for minimum latency (tearing acceptable).",
+        "reason": "Disable Dolphin's V-SYNC for the no-sync path (tearing acceptable).",
         "setting": "VSync",
         "value": "Off"
       },
       {
         "category": "Graphics",
-        "reason": "Lower latency than borderless windowed.",
+        "reason": "Matches the strict fullscreen path this profile configures.",
         "setting": "Fullscreen Mode",
         "value": "Exclusive Fullscreen"
       },
       {
         "category": "Graphics",
-        "reason": "Lower resolution = lower render latency. Tested: dropping resolution reduced render latency from 0.3ms to 0.1ms. Melee is a 2001 game - it doesn't need 4K. Prioritize latency over visuals.",
+        "reason": "Lower resolution reduces GPU work and can reduce render time. Melee is a 2001 game; native or modest scaling is the safer latency-focused default.",
         "setting": "Internal Resolution",
         "value": "Native (1x) or 2x max"
       },
       {
         "category": "GFX.ini [Settings]",
-        "reason": "Native resolution = lowest render latency. Higher res adds GPU work. Tested: EFBScale 2 added measurable latency vs EFBScale 1.",
+        "reason": "Native resolution keeps GPU work low. Higher EFB scales add render work.",
         "setting": "EFBScale",
         "value": "1 (Native)"
       },
@@ -5302,7 +5302,7 @@
       },
       {
         "category": "Audio",
-        "reason": "Exclusive mode bypasses Windows audio mixer for lowest latency.",
+        "reason": "Exclusive mode bypasses the Windows audio mixer and can reduce audio path latency.",
         "setting": "Backend",
         "value": "Exclusive WASAPI (Ishiiruka) / Cubeb (Mainline)"
       },
@@ -5326,13 +5326,13 @@
       },
       {
         "category": "Display Info",
-        "reason": "60fps @ 60Hz = ~17ms scanout, 60fps @ 240Hz = ~4ms scanout. This benefit is from faster pixel refresh, NOT from VRR. Use your monitor's max refresh rate with G-Sync/VSync OFF for minimum latency.",
+        "reason": "60fps @ 60Hz = ~17ms scanout, 60fps @ 240Hz = ~4ms scanout. This benefit is from faster pixel refresh, NOT from VRR. Use your monitor's max refresh rate with G-Sync/VSync OFF for the no-sync path.",
         "setting": "High refresh benefit",
         "value": "Reduced scanout latency (no G-Sync needed)"
       },
       {
         "category": "Display Info",
-        "reason": "With 60fps on a high refresh display, tears are small and fast-moving. The latency reduction far outweighs the visual artifact for competitive play.",
+        "reason": "With 60fps on a high refresh display, tears are small and fast-moving. The tradeoff may be acceptable for competitive play if you tolerate tearing.",
         "setting": "Tearing",
         "value": "May occur but minimal impact"
       },
@@ -5436,8 +5436,8 @@
         "hags": true,
         "hdr": false,
         "max_refresh_rate": true,
-        "vrr_optimize": true,
-        "windowed_optimizations": true
+        "vrr_optimize": false,
+        "windowed_optimizations": false
       }
     }
   },
@@ -5481,7 +5481,7 @@
       },
       {
         "category": "Display",
-        "reason": "When Windows is in HDR mode, even 'exclusive fullscreen' SDR apps go through the HDR composition path. The added latency is small (sub-frame on a high-refresh display) but it's not zero. The HDR variant is for sessions where eye-strain relief matters more than absolute click-to-pixel latency; switch back to the SDR sibling for tournament/practice where every microsecond counts.",
+        "reason": "When Windows is in HDR mode, even 'exclusive fullscreen' SDR apps go through the HDR composition path. The added latency is small (sub-frame on a high-refresh display) but it's not zero. The HDR variant is for sessions where eye-strain relief matters more than the leanest no-sync path; switch back to the SDR sibling for tournament/practice where latency is the priority.",
         "setting": "Exclusive Fullscreen vs SDR-in-HDR latency",
         "value": "Accept a small HDR composition cost"
       },
@@ -5499,19 +5499,19 @@
       },
       {
         "category": "Nvidia Control Panel",
-        "reason": "Melee runs at fixed 60fps - G-SYNC adds overhead syncing to a constant rate. Disabling removes ~1-2ms+ of sync latency. High refresh still helps via reduced scanout latency even without VRR.",
+        "reason": "Melee runs at fixed 60fps, so this no-sync profile disables VRR. High refresh still helps via reduced scanout latency even without VRR.",
         "setting": "G-SYNC",
         "value": "Off"
       },
       {
         "category": "Nvidia Control Panel",
-        "reason": "Disabling V-SYNC eliminates frame queue latency entirely. May cause tearing, but competitive players prioritize input latency.",
+        "reason": "Disabling V-SYNC avoids the VSync queueing path and may cause tearing.",
         "setting": "V-SYNC (global/per-game)",
         "value": "Off"
       },
       {
         "category": "Nvidia Control Panel",
-        "reason": "Driver LLM remains useful on DX11, and newer NVIDIA drivers also support DX12. Vulkan/OpenGL paths do not expose the same queue control benefit.",
+        "reason": "Driver LLM is most predictable on DX11. DX12 behavior is more driver/game dependent; Vulkan/OpenGL paths do not expose the same queue-control benefit.",
         "setting": "Low Latency Mode",
         "value": "Backend-aware (DX11/DX12: On, Vulkan/OpenGL: Off)"
       },
@@ -5541,25 +5541,25 @@
       },
       {
         "category": "Graphics",
-        "reason": "Disable Dolphin's V-SYNC. No sync anywhere for minimum latency (tearing acceptable).",
+        "reason": "Disable Dolphin's V-SYNC for the no-sync path (tearing acceptable).",
         "setting": "VSync",
         "value": "Off"
       },
       {
         "category": "Graphics",
-        "reason": "Lower latency than borderless windowed.",
+        "reason": "Matches the strict fullscreen path this profile configures.",
         "setting": "Fullscreen Mode",
         "value": "Exclusive Fullscreen"
       },
       {
         "category": "Graphics",
-        "reason": "Lower resolution = lower render latency. Tested: dropping resolution reduced render latency from 0.3ms to 0.1ms. Melee is a 2001 game - it doesn't need 4K. Prioritize latency over visuals.",
+        "reason": "Lower resolution reduces GPU work and can reduce render time. Melee is a 2001 game; native or modest scaling is the safer latency-focused default.",
         "setting": "Internal Resolution",
         "value": "Native (1x) or 2x max"
       },
       {
         "category": "GFX.ini [Settings]",
-        "reason": "Native resolution = lowest render latency. Higher res adds GPU work. Tested: EFBScale 2 added measurable latency vs EFBScale 1.",
+        "reason": "Native resolution keeps GPU work low. Higher EFB scales add render work.",
         "setting": "EFBScale",
         "value": "1 (Native)"
       },
@@ -5655,7 +5655,7 @@
       },
       {
         "category": "Audio",
-        "reason": "Exclusive mode bypasses Windows audio mixer for lowest latency.",
+        "reason": "Exclusive mode bypasses the Windows audio mixer and can reduce audio path latency.",
         "setting": "Backend",
         "value": "Exclusive WASAPI (Ishiiruka) / Cubeb (Mainline)"
       },
@@ -5679,13 +5679,13 @@
       },
       {
         "category": "Display Info",
-        "reason": "60fps @ 60Hz = ~17ms scanout, 60fps @ 240Hz = ~4ms scanout. This benefit is from faster pixel refresh, NOT from VRR. Use your monitor's max refresh rate with G-Sync/VSync OFF for minimum latency.",
+        "reason": "60fps @ 60Hz = ~17ms scanout, 60fps @ 240Hz = ~4ms scanout. This benefit is from faster pixel refresh, NOT from VRR. Use your monitor's max refresh rate with G-Sync/VSync OFF for the no-sync path.",
         "setting": "High refresh benefit",
         "value": "Reduced scanout latency (no G-Sync needed)"
       },
       {
         "category": "Display Info",
-        "reason": "With 60fps on a high refresh display, tears are small and fast-moving. The latency reduction far outweighs the visual artifact for competitive play.",
+        "reason": "With 60fps on a high refresh display, tears are small and fast-moving. The tradeoff may be acceptable for competitive play if you tolerate tearing.",
         "setting": "Tearing",
         "value": "May occur but minimal impact"
       },
@@ -5792,8 +5792,8 @@
         "hdr": true,
         "max_refresh_rate": true,
         "sdr_white_level_nits": 200,
-        "vrr_optimize": true,
-        "windowed_optimizations": true
+        "vrr_optimize": false,
+        "windowed_optimizations": false
       }
     }
   }

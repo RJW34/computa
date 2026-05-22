@@ -30,7 +30,7 @@ class DolphinConfigHandler(SettingsHandler):
     """Handler for Dolphin/Slippi configuration files.
 
     Slippi Launcher tends to overwrite certain Dolphin settings on launch.
-    This handler ensures optimal latency settings are applied to the config
+    This handler applies ABSO profile targets to the config
     files before the game is launched.
     """
 
@@ -141,7 +141,7 @@ class DolphinConfigHandler(SettingsHandler):
         return updated, None, True
 
     def apply(self, settings: dict[str, Any]) -> dict[str, Any]:
-        """Apply optimal Dolphin configuration settings.
+        """Apply Dolphin configuration targets.
 
         Args:
             settings: Dict with target values for each setting.
@@ -215,7 +215,7 @@ class DolphinConfigHandler(SettingsHandler):
         if changes_made:
             logger.info(f"Dolphin config fixes applied: {changes_made}")
         else:
-            logger.info("Dolphin configs already optimal")
+            logger.info("Dolphin configs already match ABSO targets")
 
         return {
             "success": True,

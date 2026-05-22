@@ -8,7 +8,7 @@ from abso.profiles.profile_bases import WebGLBaseProfile
 
 
 class PACDeluxeProfile(WebGLBaseProfile):
-    """Optimization profile for PACDeluxe native desktop client.
+    """Profile for PACDeluxe native desktop client.
 
     Focus: Smooth WebGL performance with stable frame pacing for the
     Tauri-wrapped Pokemon Auto Chess auto-battler.
@@ -21,8 +21,8 @@ class PACDeluxeProfile(WebGLBaseProfile):
     - DWM transition animations disabled
     - Priority boost disabled for consistent timing
 
-    This profile complements those internal optimizations with system-level
-    settings for optimal WebGL rendering and network performance.
+    This profile complements those internal choices with system-level
+    settings for stable WebGL rendering and default network behavior.
 
     Game: https://github.com/keldaanCommunity/pokemonAutoChess
     Client: https://github.com/RJW34/PACDeluxe
@@ -38,7 +38,7 @@ class PACDeluxeProfile(WebGLBaseProfile):
 
     @property
     def description(self) -> str:
-        return "Native Tauri client optimization for smooth WebGL auto-battler gameplay"
+        return "Native Tauri client profile for smooth WebGL auto-battler gameplay"
 
     @property
     def optimization_target(self) -> str:
@@ -138,10 +138,10 @@ class PACDeluxeProfile(WebGLBaseProfile):
             {
                 "category": "Nvidia Control Panel",
                 "setting": "Vertical Sync",
-                "value": "Adaptive (or Off for lowest latency)",
+                "value": "Adaptive (or Off for no-sync tearing)",
                 "reason": (
                     "Adaptive VSync prevents tearing without constant latency penalty. "
-                    "Use 'Off' if you prefer lowest latency and can tolerate minor tearing."
+                    "Use 'Off' if you prefer the no-sync path and can tolerate minor tearing."
                 ),
             },
             {

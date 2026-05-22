@@ -100,9 +100,9 @@ PROFILE_CATALOG: OrderedDict[str, ProfileCatalogEntry] = OrderedDict(
         "slippi-melee-universal": ProfileCatalogEntry(
             profile_class=SlippiMeleeUniversalProfile,
             tray_category="Fighting",
-            tray_subtitle="Lowest Latency | HAGS ON | No Sync",
+            tray_subtitle="No Sync | HAGS ON | Reapply-Friendly",
             tray_description=(
-                "Absolute minimum latency with HAGS kept on so re-applying does not require "
+                "No-sync Slippi profile with HAGS kept on so re-applying does not require "
                 "a reboot. VSync OFF, G-SYNC/VRR OFF."
             ),
             sync_mode="off",

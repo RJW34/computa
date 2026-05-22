@@ -87,17 +87,17 @@ def _hdr_in_game_guidance() -> list[dict[str, str]]:
                 "When Windows is in HDR mode, even 'exclusive fullscreen' SDR apps go through "
                 "the HDR composition path. The added latency is small (sub-frame on a high-refresh "
                 "display) but it's not zero. The HDR variant is for sessions where eye-strain relief "
-                "matters more than absolute click-to-pixel latency; switch back to the SDR sibling "
-                "for tournament/practice where every microsecond counts."
+                "matters more than the leanest no-sync path; switch back to the SDR sibling "
+                "for tournament/practice where latency is the priority."
             ),
         },
     ]
 
 
 class SlippiMeleeProfile(EmulatorLatencyBaseProfile):
-    """Optimization profile for Super Smash Bros. Melee via Slippi Dolphin.
+    """Profile for Super Smash Bros. Melee via Slippi Dolphin.
 
-    Focus: Ultra-low input latency for competitive play.
+    Focus: latency-focused no-sync settings for competitive play.
     """
 
     @property
@@ -110,7 +110,7 @@ class SlippiMeleeProfile(EmulatorLatencyBaseProfile):
 
     @property
     def description(self) -> str:
-        return "Ultra-low latency optimization for competitive Melee"
+        return "Latency-focused no-sync profile for competitive Melee"
 
     @property
     def optimization_target(self) -> str:
@@ -128,9 +128,8 @@ class SlippiMeleeProfile(EmulatorLatencyBaseProfile):
     @property
     def fullscreen_optimizations_per_exe(self) -> dict[str, bool]:
         # Slippi runs exclusive fullscreen for lowest scanout latency. Disable
-        # FSO per-exe so Dolphin isn't silently bumped into the composited
-        # borderless path - that compositor adds a ~1-frame latency tax that
-        # matters for 6-frame rollback tolerances.
+        # FSO per-exe so Dolphin is not silently bumped into the composited
+        # borderless path for the strict no-sync profile.
         return {exe: True for exe in self.executable_hints}
 
     @property
@@ -164,11 +163,11 @@ class SlippiMeleeProfile(EmulatorLatencyBaseProfile):
     def _settings_overrides(self) -> dict[str, dict[str, Any]]:
         return {
             "WindowsSettingsHandler": {
-                # Use max refresh rate for minimum scanout latency
+                # Use max refresh rate for lower scanout time.
                 "max_refresh_rate": True,
             },
             "NvidiaSettingsHandler": {
-                # Absolute minimum latency - no sync overhead
+                # No-sync presentation path for fixed-60 emulator play.
                 # Per rollback.md canonical spec for Slippi/SSBM
                 "low_latency_mode": "on",  # ON recommended; Ultra optional (test both)
                 "vsync": "off",  # OFF - removes sync latency entirely
@@ -187,7 +186,7 @@ class SlippiMeleeProfile(EmulatorLatencyBaseProfile):
             "DolphinConfigHandler": {
                 # Fix Slippi Dolphin configs that get overwritten by Slippi Launcher
                 # These are applied every time the profile is activated
-                "efb_scale": "1",  # Native resolution for lowest latency
+                "efb_scale": "1",  # Native resolution keeps GPU work low.
                 "texture_scaling_factor": "1",  # No texture upscaling
                 "use_scaling_filter": "False",  # No scaling filter
                 "use_deposterize": "False",  # No post-processing
@@ -255,12 +254,12 @@ class SlippiMeleeProfile(EmulatorLatencyBaseProfile):
     def get_in_game_settings(self) -> list[dict[str, str]]:
         """Get recommended Dolphin and NVCP settings.
 
-        Optimized for absolute minimum latency in competitive Melee.
+        Latency-focused no-sync settings for competitive Melee.
         Key notes:
         - Backend: Experiment with Vulkan and DX12 (Vulkan often best on NVIDIA/AMD)
         - HAGS: Generally helps with DX12; results vary by system
         - LLM: On recommended; Ultra may work but test for your setup
-        - Lower internal resolution = measurably lower render latency
+        - Lower internal resolution reduces GPU work and can reduce render time
         - G-Sync/VSync disabled - fixed 60fps games don't benefit from VRR
         - Results vary by system - always test configurations
         """
@@ -291,8 +290,8 @@ class SlippiMeleeProfile(EmulatorLatencyBaseProfile):
                 "setting": "G-SYNC",
                 "value": "Off",
                 "reason": (
-                    "Melee runs at fixed 60fps - G-SYNC adds overhead syncing to a constant rate. "
-                    "Disabling removes ~1-2ms+ of sync latency. High refresh still helps via "
+                    "Melee runs at fixed 60fps, so this no-sync profile disables VRR. "
+                    "High refresh still helps via "
                     "reduced scanout latency even without VRR."
                 ),
             },
@@ -301,8 +300,7 @@ class SlippiMeleeProfile(EmulatorLatencyBaseProfile):
                 "setting": "V-SYNC (global/per-game)",
                 "value": "Off",
                 "reason": (
-                    "Disabling V-SYNC eliminates frame queue latency entirely. "
-                    "May cause tearing, but competitive players prioritize input latency."
+                    "Disabling V-SYNC avoids the VSync queueing path and may cause tearing."
                 ),
             },
             {
@@ -310,8 +308,9 @@ class SlippiMeleeProfile(EmulatorLatencyBaseProfile):
                 "setting": "Low Latency Mode",
                 "value": "Backend-aware (DX11/DX12: On, Vulkan/OpenGL: Off)",
                 "reason": (
-                    "Driver LLM remains useful on DX11, and newer NVIDIA drivers also support "
-                    "DX12. Vulkan/OpenGL paths do not expose the same queue control benefit."
+                    "Driver LLM is most predictable on DX11. DX12 behavior is more "
+                    "driver/game dependent; Vulkan/OpenGL paths do not expose the same "
+                    "queue-control benefit."
                 ),
             },
             {
@@ -348,22 +347,22 @@ class SlippiMeleeProfile(EmulatorLatencyBaseProfile):
                 "category": "Graphics",
                 "setting": "VSync",
                 "value": "Off",
-                "reason": "Disable Dolphin's V-SYNC. No sync anywhere for minimum latency (tearing acceptable).",
+                "reason": "Disable Dolphin's V-SYNC for the no-sync path (tearing acceptable).",
             },
             {
                 "category": "Graphics",
                 "setting": "Fullscreen Mode",
                 "value": "Exclusive Fullscreen",
-                "reason": "Lower latency than borderless windowed.",
+                "reason": "Matches the strict fullscreen path this profile configures.",
             },
             {
                 "category": "Graphics",
                 "setting": "Internal Resolution",
                 "value": "Native (1x) or 2x max",
                 "reason": (
-                    "Lower resolution = lower render latency. Tested: dropping resolution "
-                    "reduced render latency from 0.3ms to 0.1ms. Melee is a 2001 game - "
-                    "it doesn't need 4K. Prioritize latency over visuals."
+                    "Lower resolution reduces GPU work and can reduce render time. "
+                    "Melee is a 2001 game; native or modest scaling is the safer "
+                    "latency-focused default."
                 ),
             },
 
@@ -374,8 +373,7 @@ class SlippiMeleeProfile(EmulatorLatencyBaseProfile):
                 "setting": "EFBScale",
                 "value": "1 (Native)",
                 "reason": (
-                    "Native resolution = lowest render latency. Higher res adds GPU work. "
-                    "Tested: EFBScale 2 added measurable latency vs EFBScale 1."
+                    "Native resolution keeps GPU work low. Higher EFB scales add render work."
                 ),
             },
             {
@@ -478,7 +476,7 @@ class SlippiMeleeProfile(EmulatorLatencyBaseProfile):
                 "category": "Audio",
                 "setting": "Backend",
                 "value": "Exclusive WASAPI (Ishiiruka) / Cubeb (Mainline)",
-                "reason": "Exclusive mode bypasses Windows audio mixer for lowest latency.",
+                "reason": "Exclusive mode bypasses the Windows audio mixer and can reduce audio path latency.",
             },
             {
                 "category": "Audio",
@@ -509,7 +507,7 @@ class SlippiMeleeProfile(EmulatorLatencyBaseProfile):
                 "reason": (
                     "60fps @ 60Hz = ~17ms scanout, 60fps @ 240Hz = ~4ms scanout. "
                     "This benefit is from faster pixel refresh, NOT from VRR. "
-                    "Use your monitor's max refresh rate with G-Sync/VSync OFF for minimum latency."
+                    "Use your monitor's max refresh rate with G-Sync/VSync OFF for the no-sync path."
                 ),
             },
             {
@@ -518,7 +516,7 @@ class SlippiMeleeProfile(EmulatorLatencyBaseProfile):
                 "value": "May occur but minimal impact",
                 "reason": (
                     "With 60fps on a high refresh display, tears are small and fast-moving. "
-                    "The latency reduction far outweighs the visual artifact for competitive play."
+                    "The tradeoff may be acceptable for competitive play if you tolerate tearing."
                 ),
             },
 
@@ -537,7 +535,7 @@ class SlippiMeleeProfile(EmulatorLatencyBaseProfile):
 
 
 class SlippiMeleeUniversalProfile(SlippiMeleeProfile):
-    """Lowest-latency Slippi profile with fixed HAGS (no reboot required).
+    """No-sync Slippi profile with fixed HAGS (no reboot required).
 
     Unlike the base slippi-melee profile which toggles HAGS based on
     Dolphin backend (DX11/OpenGL: off, DX12/Vulkan: on), this profile
@@ -545,7 +543,7 @@ class SlippiMeleeUniversalProfile(SlippiMeleeProfile):
     system restart, matching how Overwatch 2 and other modern titles
     treat HAGS as a fixed system-level setting.
 
-    Optimized for the competitive no-sync path while keeping HAGS fixed.
+    Tuned for the competitive no-sync path while keeping HAGS fixed.
     Dolphin's own latency features (Immediately Present XFB, Rush Frame
     Presentation) provide far greater latency reduction than any HAGS
     toggle, so fixing HAGS=True avoids unnecessary reboots with no
@@ -562,7 +560,7 @@ class SlippiMeleeUniversalProfile(SlippiMeleeProfile):
 
     @property
     def description(self) -> str:
-        return "Lowest latency, fixed HAGS on (no reboot), no-sync competitive path"
+        return "No-sync competitive path with HAGS fixed on to avoid reapply reboots"
 
     @property
     def optimization_target(self) -> str:
@@ -670,7 +668,7 @@ class SlippiMeleeConsoleParityProfile(SlippiMeleeProfile):
                 "value": "Console-like pacing and feel (offline)",
                 "reason": (
                     "Use this when you want closer console-like presentation cadence on an LCD/OLED, "
-                    "not maximum latency reduction."
+                    "not the aggressive no-sync path."
                 ),
             },
             {
@@ -679,7 +677,7 @@ class SlippiMeleeConsoleParityProfile(SlippiMeleeProfile):
                 "value": "On",
                 "reason": (
                     "Keeps presentation cadence stable and tear-free for practice sessions where feel "
-                    "consistency is preferred over absolute minimum latency."
+                    "consistency is preferred over the no-sync latency-focused path."
                 ),
             },
             {

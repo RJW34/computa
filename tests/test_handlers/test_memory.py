@@ -60,8 +60,8 @@ class TestMemoryAudit:
         assert cache_issues[0].severity == "info"
 
     @patch.object(MemorySettingsHandler, "detect")
-    def test_audit_paging_enabled_creates_info(self, mock_detect):
-        """Test audit creates info when kernel paging is enabled."""
+    def test_audit_legacy_kernel_residency_missing_creates_info(self, mock_detect):
+        """Test audit creates info when legacy kernel-residency tweak is absent."""
         mock_detect.return_value = {
             "large_system_cache": 0,
             "disable_paging_executive": 0,  # Paging allowed
@@ -71,13 +71,14 @@ class TestMemoryAudit:
         handler = MemorySettingsHandler()
         issues = handler.audit()
 
-        paging_issues = [i for i in issues if "paging" in i.title.lower()]
+        paging_issues = [i for i in issues if "kernel-residency" in i.title.lower()]
         assert len(paging_issues) == 1
         assert paging_issues[0].severity == "info"
+        assert paging_issues[0].optimal_value == "Leave default unless explicitly testing legacy tweak"
 
     @patch.object(MemorySettingsHandler, "detect")
-    def test_audit_optimal_settings_minimal_issues(self, mock_detect):
-        """Test audit returns minimal issues when settings are optimal."""
+    def test_audit_profile_target_settings_minimal_issues(self, mock_detect):
+        """Test audit returns minimal issues when settings match the profile target."""
         mock_detect.return_value = {
             "large_system_cache": 0,
             "disable_paging_executive": 1,
@@ -87,7 +88,7 @@ class TestMemoryAudit:
         handler = MemorySettingsHandler()
         issues = handler.audit()
 
-        # Should have no issues when optimal
+        # Should have no issues when values match the explicit profile target.
         assert len(issues) == 0
 
 

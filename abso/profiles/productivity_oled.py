@@ -1,6 +1,6 @@
 """Productivity profile - OLED with HDR for browsing and coding.
 
-Optimized for multi-monitor productivity work with HDR enabled.
+Tuned for multi-monitor productivity work with HDR enabled.
 Unlike gaming profiles, this prioritizes system responsiveness,
 smooth scrolling, and keeps background services running.
 """

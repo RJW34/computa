@@ -337,38 +337,52 @@ def test_handler_class_names_match_imported_classes(profiles_by_id) -> None:
 # Profile-pair consistency: strict variants must honor their "leaner" promise
 # ---------------------------------------------------------------------------
 
-def test_strict_gaming_profiles_enable_borderless_optimizations(profiles_by_id) -> None:
-    """Strict/no-sync gaming profiles must set the Win11 borderless flags True.
-
-    Setting these to False (the historical default before 2026-05) caused a
-    silent latency cliff when the user manually switched in-game display
-    mode to Borderless on a strict profile - Windows fell back to the
-    legacy BLT swap chain path. True is a true no-op in real exclusive
-    fullscreen and a multi-ms win in borderless, restoring the natural
-    "strict >= capture in any display mode" ordering.
-
-    See abso/profiles/profile_bases.py for the rationale comment.
-    """
+def test_strict_gaming_profiles_do_not_force_windowed_compositor_flags(profiles_by_id) -> None:
+    """Strict/no-sync gaming profiles must not silently opt into borderless flags."""
     keys = ("windowed_optimizations", "vrr_optimize")
     failures: list[str] = []
     for profile_id, profile in profiles_by_id.items():
-        # Skip productivity (uses its own handler set with different intent)
-        # and browser-game profiles (no fullscreen contract to honor).
         target = (profile.optimization_target or "").lower()
+        # Skip non-strict profile families and explicit capture/borderless lanes.
         if target in {"productivity", "browser_game"}:
             continue
+        if getattr(profile, "is_capture_safe", False):
+            continue
+
         windows_settings = profile.get_settings("WindowsSettingsHandler") or {}
         for key in keys:
             if key not in windows_settings:
                 continue
+            if windows_settings.get(key) is not False:
+                failures.append(
+                    f"{profile_id}: WindowsSettingsHandler.{key} is "
+                    f"{windows_settings.get(key)!r} (strict profiles should "
+                    f"leave the windowed compositor path off unless a "
+                    f"borderless/capture variant opts in)"
+                )
+    assert not failures, (
+        "Strict gaming profiles forcing Win11 windowed compositor flags:\n  "
+        + "\n  ".join(failures)
+    )
+
+
+def test_capture_safe_profiles_enable_windowed_compositor_flags(profiles_by_id) -> None:
+    """Capture-safe profiles must configure the borderless/windowed VRR path explicitly."""
+    keys = ("windowed_optimizations", "vrr_optimize")
+    failures: list[str] = []
+    for profile_id, profile in profiles_by_id.items():
+        if not getattr(profile, "is_capture_safe", False):
+            continue
+        windows_settings = profile.get_settings("WindowsSettingsHandler") or {}
+        for key in keys:
             if windows_settings.get(key) is not True:
                 failures.append(
                     f"{profile_id}: WindowsSettingsHandler.{key} is "
-                    f"{windows_settings.get(key)!r} (expected True so strict-"
-                    f"variant ordering holds across display modes)"
+                    f"{windows_settings.get(key)!r} (capture-safe profiles "
+                    f"need the windowed compositor path enabled)"
                 )
     assert not failures, (
-        "Gaming profiles with borderless-pessimistic Win11 settings:\n  "
+        "Capture-safe profiles missing Win11 windowed compositor flags:\n  "
         + "\n  ".join(failures)
     )
 

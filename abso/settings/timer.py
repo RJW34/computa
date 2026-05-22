@@ -402,7 +402,7 @@ class TimerSettingsHandler(SettingsHandler):
             return False
 
     def set_gaming_resolution(self, target_ms: float = 0.5) -> bool:
-        """Convenience method to set gaming-optimized timer resolution.
+        """Convenience method to set ABSO's gaming timer target.
 
         Args:
             target_ms: Target resolution in milliseconds. Default 0.5ms.

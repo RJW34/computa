@@ -70,20 +70,19 @@ class MemorySettingsHandler(SettingsHandler):
                 evidence_tier=EvidenceTier.LEGACY_UNVERIFIED,
             ))
 
-        # Disable Paging Executive — no-op with 16GB+ RAM
+        # Disable Paging Executive - legacy tweak, not a default target.
         disable_paging = current.get("disable_paging_executive")
         if disable_paging is None or disable_paging != 1:
             issues.append(Issue(
-                title="Kernel paging is enabled",
+                title="Legacy kernel-residency tweak is not enabled",
                 severity="info",
                 current_value="Enabled (kernel can be paged to disk)",
-                optimal_value="Disabled (keep kernel in RAM)",
+                optimal_value="Leave default unless explicitly testing legacy tweak",
                 explanation=(
-                    "DisablePagingExecutive keeps kernel code in physical RAM. "
-                    "On systems with 16GB+ RAM (standard for gaming PCs), "
-                    "Windows already keeps the kernel resident, so this setting "
-                    "has no measurable effect. Requires reboot. "
-                    "Opt-in via include_legacy_tweaks."
+                    "DisablePagingExecutive is a legacy gaming-guide tweak. On "
+                    "modern systems with adequate RAM, ABSO has no project evidence "
+                    "that forcing it improves game performance, and changing it "
+                    "requires a reboot. Opt in only through include_legacy_tweaks."
                 ),
                 category="memory",
                 evidence_tier=EvidenceTier.LEGACY_UNVERIFIED,

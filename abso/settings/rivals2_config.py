@@ -1,6 +1,6 @@
 """Rivals of Aether 2 game config handler.
 
-Manages Rivals 2-specific game configuration files to enforce optimal settings
+Manages Rivals 2-specific game configuration files to enforce ABSO profile targets
 like exclusive fullscreen mode and raw input.
 """
 
@@ -43,10 +43,10 @@ def _get_rivals2_config_dir() -> Path | None:
 
 
 class Rivals2ConfigHandler(SettingsHandler):
-    """Enforces Rivals 2 game config settings for optimal performance.
+    """Enforces Rivals 2 game config settings for ABSO profiles.
 
     Manages the game's GameUserSettings.ini to enforce:
-    - Exclusive fullscreen mode (lowest latency)
+    - Exclusive fullscreen mode for strict profiles
     - VSync off (handled by NVCP instead)
     - Raw input for best input latency
     """
@@ -141,8 +141,8 @@ class Rivals2ConfigHandler(SettingsHandler):
                 current_value=mode_names.get(current["fullscreen_mode"], f"Unknown ({current['fullscreen_mode']})"),
                 optimal_value="Exclusive Fullscreen (0)",
                 explanation=(
-                    "Exclusive fullscreen provides the lowest input latency. "
-                    "Borderless windowed adds ~1 frame of latency through DWM composition."
+                    "This strict Rivals 2 profile expects exclusive fullscreen. "
+                    "Use a capture/borderless profile if you want the windowed path."
                 ),
                 category="game_config",
             ))

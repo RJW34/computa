@@ -1592,10 +1592,38 @@ class DRSProfileManager:
 
                 profile = drs.find_profile_by_name(selected_profile_name)
                 if not profile:
+                    owner_profile_names = {
+                        exe: self._get_application_owner_profile_name(drs, exe)
+                        for exe in executables
+                    }
+                    conflicting_owner_profiles = {
+                        exe: owner
+                        for exe, owner in owner_profile_names.items()
+                        if owner and owner != selected_profile_name
+                    }
+                    if owner_profile_names:
+                        results["app_binding_owner_profiles"] = {
+                            exe: owner for exe, owner in owner_profile_names.items() if owner
+                        }
+                    if conflicting_owner_profiles:
+                        results["app_binding_state"] = "bound_elsewhere"
+                        results["app_binding_conflicts"] = conflicting_owner_profiles
+                        conflicts = ", ".join(
+                            f"{exe} -> {owner}"
+                            for exe, owner in conflicting_owner_profiles.items()
+                        )
+                        results["app_binding_note"] = (
+                            f"NVIDIA profile '{selected_profile_name}' does not exist yet, "
+                            f"and requested executable ownership conflicts were found: {conflicts}."
+                        )
+                        return results
+
                     results["app_binding_state"] = "profile_missing"
+                    results["app_binding_safe"] = True
                     results["app_binding_note"] = (
-                        f"NVIDIA profile '{selected_profile_name}' does not exist yet, so ABSO cannot "
-                        "prove exact executable ownership safely."
+                        f"NVIDIA profile '{selected_profile_name}' does not exist yet. "
+                        "No requested executable is currently owned by another NVIDIA profile, "
+                        "so ABSO can create and bind it during apply."
                     )
                     return results
 

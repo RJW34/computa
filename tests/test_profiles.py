@@ -160,8 +160,8 @@ class TestProfileLoading:
         assert gsync_hdr.is_sdr_only is False
         assert gsync_hdr.requires_confirmed_vrr_support is True
 
-    def test_deadlock_executable_hints_cover_playtest_and_launch_binaries(self):
-        """Deadlock detection should track both project8.exe and deadlock.exe."""
+    def test_deadlock_detection_tracks_aliases_but_binding_targets_current_binary(self):
+        """Deadlock detection can be broad; strict NVIDIA binding must stay narrow."""
         for profile_cls in (
             DeadlockProfile,
             DeadlockHDRProfile,
@@ -171,8 +171,7 @@ class TestProfileLoading:
             profile = profile_cls()
             assert "project8.exe" in profile.executable_hints
             assert "deadlock.exe" in profile.executable_hints
-            assert "project8.exe" in profile.nvidia_binding_executables
-            assert "deadlock.exe" in profile.nvidia_binding_executables
+            assert profile.nvidia_binding_executables == ["project8.exe"]
 
     def test_deadlock_no_sync_nvidia_settings(self):
         """Deadlock no-sync variants should disable global VRR and use reflex_no_sync preset."""

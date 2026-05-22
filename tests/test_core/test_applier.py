@@ -9,6 +9,7 @@ import pytest
 from abso.core.applier import ApplyResult, ProfileApplier
 from abso.core.exceptions import ProfileNotFoundError
 from abso.core.multimon_detector import DisplayEnvironment, MultiMonitorResult
+from abso.profiles.overwatch2 import Overwatch2Profile
 
 
 class TestApplyResultDataclass:
@@ -275,6 +276,27 @@ class TestApplyProfile:
         assert final["NvidiaSettingsHandler"]["profile_aliases"] == ["Rivals 2: Online G-SYNC"]
         assert final["NvidiaSettingsHandler"]["require_exact_binding"] is True
         assert final["NvidiaSettingsHandler"]["allow_unverified_existing_profile_reuse"] is True
+
+    def test_finalize_expands_overwatch_fso_paths_at_runtime_only(self):
+        """OW2 snapshots stay deterministic while apply/verify gets full FSO paths."""
+        profile = Overwatch2Profile()
+        settings = profile.get_settings("RegistrySettingsHandler")
+
+        assert settings["fullscreen_optimizations"] == {"Overwatch.exe": True}
+
+        applier = ProfileApplier()
+        local_path = r"C:\Games\Overwatch\_retail_\Overwatch.exe"
+        with patch.object(profile, "_overwatch_install_paths", return_value=[local_path]):
+            final = applier._finalize_handler_settings(
+                profile,
+                profile.profile_id,
+                {"RegistrySettingsHandler": settings},
+                None,
+            )
+
+        fso = final["RegistrySettingsHandler"]["fullscreen_optimizations"]
+        assert fso["Overwatch.exe"] is True
+        assert fso[local_path] is True
 
     def test_apply_profile_blocks_on_profile_contract_violation(self):
         """Profile-specific validation must abort before handlers run."""

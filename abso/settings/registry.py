@@ -96,7 +96,7 @@ class RegistrySettingsHandler(SettingsHandler):
         responsiveness = current.get("system_responsiveness")
         if responsiveness is not None and responsiveness != 10:
             issues.append(Issue(
-                title="System Responsiveness not optimized for gaming",
+                title="Legacy SystemResponsiveness is not at ABSO target",
                 severity="info",
                 current_value=str(responsiveness),
                 optimal_value="10",
@@ -114,7 +114,7 @@ class RegistrySettingsHandler(SettingsHandler):
         throttling = current.get("network_throttling")
         if throttling is not None and throttling != 0xFFFFFFFF:
             issues.append(Issue(
-                title="Network throttling is enabled",
+                title="Legacy NetworkThrottlingIndex is at Windows default",
                 severity="info",
                 current_value=f"0x{throttling:08X}" if throttling else "Unknown",
                 optimal_value="0xFFFFFFFF (disabled)",
@@ -132,7 +132,7 @@ class RegistrySettingsHandler(SettingsHandler):
         game_priority = current.get("game_priority", {})
         if game_priority.get("priority") != 6:
             issues.append(Issue(
-                title="Game process priority not optimized",
+                title="MMCSS Games task priority is not at ABSO target",
                 severity="info",
                 current_value=str(game_priority.get("priority", "Unknown")),
                 optimal_value="6",

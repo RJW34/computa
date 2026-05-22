@@ -1,4 +1,4 @@
-# Fix Slippi Dolphin configs for minimum latency
+# Fix Slippi Dolphin configs for ABSO's no-sync Slippi baseline
 # Run this before launching Slippi if the launcher has overwritten settings
 
 $ErrorActionPreference = "Stop"
@@ -46,7 +46,7 @@ if (Test-Path $gfxIni) {
         Set-Content $gfxIni $gfx -NoNewline
         Write-Host "[OK] GFX.ini updated" -ForegroundColor Green
     } else {
-        Write-Host "[OK] GFX.ini already optimal" -ForegroundColor Green
+        Write-Host "[OK] GFX.ini already at ABSO target" -ForegroundColor Green
     }
 } else {
     Write-Host "[WARN] GFX.ini not found" -ForegroundColor Red
@@ -68,11 +68,11 @@ if (Test-Path $dolphinIni) {
         Set-Content $dolphinIni $dolphin -NoNewline
         Write-Host "[OK] Dolphin.ini updated" -ForegroundColor Green
     } else {
-        Write-Host "[OK] Dolphin.ini already optimal" -ForegroundColor Green
+        Write-Host "[OK] Dolphin.ini already at ABSO target" -ForegroundColor Green
     }
 } else {
     Write-Host "[WARN] Dolphin.ini not found" -ForegroundColor Red
 }
 
 Write-Host "`n=== Done ===" -ForegroundColor Cyan
-Write-Host "Slippi configs are now optimized for minimum latency."
+Write-Host "Slippi configs now match ABSO's no-sync Slippi baseline."

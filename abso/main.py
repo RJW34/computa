@@ -750,6 +750,7 @@ def audit(verbose: bool, json_output: bool) -> None:
                 "title": issue.title,
                 "severity": issue.severity,
                 "current_value": issue.current_value,
+                "target_value": issue.optimal_value,
                 "optimal_value": issue.optimal_value,
                 "explanation": issue.explanation,
                 "category": getattr(issue, "category", "general"),
@@ -777,7 +778,7 @@ def audit(verbose: bool, json_output: bool) -> None:
 
         console.print(f"[{severity_color}][{issue.severity.upper()}][/{severity_color}] {issue.title}")
         console.print(f"  Current: {issue.current_value}")
-        console.print(f"  Optimal: {issue.optimal_value}")
+        console.print(f"  Target: {issue.optimal_value}")
 
         if verbose and issue.explanation:
             console.print(f"  [dim]{issue.explanation}[/dim]")
@@ -2297,7 +2298,7 @@ def debloat(tier: int, dry_run: bool, json_output: bool) -> None:
             if json_output:
                 output_json({"tier": tier, "issues": [
                     {"title": i.title, "severity": i.severity, "current": i.current_value,
-                     "optimal": i.optimal_value} for i in issues
+                     "target": i.optimal_value, "optimal": i.optimal_value} for i in issues
                 ]})
             else:
                 console.print(Panel(f"Debloat Tier {tier} - Dry Run ({len(issues)} items)", style="bold yellow"))

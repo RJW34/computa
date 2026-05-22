@@ -136,7 +136,7 @@ issues = auditor.audit_all()
 for issue in issues:
     print(f"[{issue.severity}] {issue.title}")
     print(f"  Current: {issue.current_value}")
-    print(f"  Optimal: {issue.optimal_value}")
+    print(f"  Target: {issue.optimal_value}")
 ```
 
 ##### `audit_category(category: str) -> list[Issue]`
@@ -453,7 +453,7 @@ class Issue:
     title: str
     severity: Literal["critical", "warning", "info"]
     current_value: str
-    optimal_value: str
+    optimal_value: str  # Backward-compatible field; display as "target" in UI.
     explanation: str | None = None
     category: str = "general"
 ```

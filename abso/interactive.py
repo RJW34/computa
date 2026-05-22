@@ -18,6 +18,7 @@ from abso.core.applier import ProfileApplier
 from abso.core.auditor import ConfigurationAuditor
 from abso.core.backup import BackupManager
 from abso.core.detector import HardwareDetector
+from abso.core.transaction import ProfileTransactionManager
 from abso.utils.admin import ensure_admin, is_admin
 
 console = Console()
@@ -186,7 +187,7 @@ def run_audit(verbose: bool = True) -> None:
             for issue in severity_issues:
                 console.print(f"[{color}]{icon}[/{color}] [bold]{issue.title}[/bold]")
                 console.print(f"    Current: [red]{issue.current_value}[/red]")
-                console.print(f"    Optimal: [green]{issue.optimal_value}[/green]")
+                console.print(f"    Target: [green]{issue.optimal_value}[/green]")
                 if verbose and issue.explanation:
                     console.print(f"    [dim]{issue.explanation}[/dim]")
                 console.print()
@@ -202,7 +203,7 @@ def run_apply_profile(profile_id: str) -> None:
     # Get profile info
     try:
         profile = applier._get_profile(profile_id)
-    except ValueError as e:
+    except Exception as e:
         console.print(f"[red]Error:[/red] {e}")
         return
 
@@ -229,15 +230,21 @@ def run_apply_profile(profile_id: str) -> None:
 
     console.print()
 
-    # Confirm before applying
     if not is_admin():
-        console.print("[yellow]Warning:[/yellow] Running without admin privileges. Some changes may fail.\n")
+        console.print(Panel(
+            "[red]Administrator privileges are required to apply a profile.[/red]\n\n"
+            "Run ABSO as Administrator so backup, preflight, apply, verify, and rollback "
+            "all operate through the same protected transaction path.",
+            title="[red]Apply Blocked[/red]",
+            border_style="red",
+        ))
+        Prompt.ask("[dim]Press Enter to continue[/dim]", default="")
+        return
 
     if not Confirm.ask("[bold]Proceed with applying this profile?[/bold]", default=True):
         console.print("[dim]Cancelled.[/dim]")
         return
 
-    # Create backup first
     console.print()
     BACKUPS_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -246,69 +253,71 @@ def run_apply_profile(profile_id: str) -> None:
         TextColumn("[progress.description]{task.description}"),
         console=console
     ) as progress:
-        # Backup
-        backup_task = progress.add_task("Creating backup...", total=None)
-        backup_manager = BackupManager(BACKUPS_DIR)
-        backup_id = backup_manager.create_backup()
-        progress.update(backup_task, description=f"[green]\u2713[/green] Backup created: {backup_id}")
-        progress.stop_task(backup_task)
-
-        # Apply each handler
-        results: list[tuple[str, bool, str | None]] = []
-        for handler in handlers:
-            handler_name = handler.__class__.__name__.replace("SettingsHandler", "").replace("Handler", "")
-            settings = profile.get_settings(handler.__class__.__name__)
-
-            if not settings:
-                continue
-
-            task = progress.add_task(f"Applying {handler_name}...", total=None)
-
-            try:
-                result = handler.apply(settings)
-                if result.get("success"):
-                    progress.update(task, description=f"[green]\u2713[/green] {handler_name}")
-                    results.append((handler_name, True, None))
-                else:
-                    progress.update(task, description=f"[yellow]\u26A0[/yellow] {handler_name}: {result.get('error', 'Unknown error')}")
-                    results.append((handler_name, False, result.get("error")))
-            except Exception as e:
-                progress.update(task, description=f"[red]\u2717[/red] {handler_name}: {e}")
-                results.append((handler_name, False, str(e)))
-
-            progress.stop_task(task)
-            time.sleep(0.1)  # Small delay for visual feedback
+        task = progress.add_task("Running transactional apply...", total=None)
+        tx_manager = ProfileTransactionManager(BACKUPS_DIR, applier=applier)
+        tx = tx_manager.execute(profile_id=profile_id, create_backup=True)
+        if tx.success:
+            progress.update(task, description="[green][OK][/green] Transaction committed")
+        else:
+            progress.update(task, description="[red][X][/red] Transaction failed")
+        progress.stop_task(task)
 
     console.print()
 
-    # Summary
-    success_count = sum(1 for _, success, _ in results if success)
-    fail_count = sum(1 for _, success, _ in results if not success)
+    result = tx.apply_result
 
-    if fail_count == 0:
+    if tx.success and result and result.success:
+        try:
+            from abso.main import set_current_profile
+
+            set_current_profile(
+                profile_id,
+                requires_reboot=result.requires_reboot,
+                reboot_reasons=result.reboot_reasons,
+            )
+        except Exception as e:
+            console.print(f"[yellow]Warning:[/yellow] Could not persist active profile state: {e}")
+
         console.print(Panel(
             f"[green]Profile '{profile_id}' apply completed.[/green]\n\n"
-            f"[dim]Backup ID: {backup_id}[/dim]\n"
+            f"[dim]Backup ID: {tx.backup_id or 'not created'}[/dim]\n"
             f"[dim]Run 'abso verify {profile_id}' to confirm handler state.[/dim]\n"
             f"[dim]Use 'Restore Backup' to undo changes if needed.[/dim]",
             title="[green]Apply Completed[/green]",
             border_style="green"
         ))
-    else:
-        console.print(Panel(
-            f"[yellow]Profile partially applied.[/yellow]\n\n"
-            f"[green]{success_count} succeeded[/green], [red]{fail_count} failed[/red]\n\n"
-            f"[dim]Some changes may require administrator privileges.[/dim]",
-            title="[yellow]Partial Success[/yellow]",
-            border_style="yellow"
-        ))
 
-    # Check if reboot required
-    console.print()
-    console.print("[yellow]Note:[/yellow] Some changes may require a reboot to take effect.")
+        for warning in result.warnings:
+            console.print(f"[yellow]Warning:[/yellow] {warning}")
+        for notice in result.notices:
+            console.print(f"[cyan]Note:[/cyan] {notice}")
+    else:
+        failed_settings = result.failed_settings if result else []
+        console.print(Panel(
+            f"[red]Profile apply did not commit.[/red]\n\n"
+            f"[dim]{tx.error or (result.error if result else 'Unknown error')}[/dim]",
+            title="[red]Apply Failed[/red]",
+            border_style="red"
+        ))
+        for failed in failed_settings:
+            console.print(f"[red]Failed:[/red] {failed}")
+        if tx.rollback_performed:
+            console.print("[yellow]Rollback:[/yellow] Pre-apply snapshot restored automatically.")
+        elif tx.rollback_error:
+            console.print(f"[red]Rollback failed:[/red] {tx.rollback_error}")
+
+    for checkpoint in tx.checkpoints:
+        console.print(f"[dim]{checkpoint.phase}: {checkpoint.status} - {checkpoint.message}[/dim]")
+
+    if result and result.requires_reboot:
+        console.print()
+        if result.reboot_reasons:
+            console.print("[yellow]Reboot required for:[/yellow] " + ", ".join(result.reboot_reasons))
+        else:
+            console.print("[yellow]Some changes may require a reboot.[/yellow]")
 
     # Generate in-game settings report
-    if profile.has_in_game_settings():
+    if tx.success and result and result.success and profile.has_in_game_settings():
         console.print()
         if Confirm.ask("Generate in-game settings recommendations?", default=True):
             REPORTS_DIR.mkdir(parents=True, exist_ok=True)
@@ -591,7 +600,7 @@ def run_interactive() -> None:
         elif choice == "q":
             clear_screen()
             console.print("[bold cyan]Thanks for using ABSO![/bold cyan]")
-            console.print("[dim]Your settings have been optimized for gaming.[/dim]")
+            console.print("[dim]No further changes were made.[/dim]")
             console.print()
             break
 

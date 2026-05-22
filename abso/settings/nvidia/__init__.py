@@ -132,7 +132,7 @@ class NvidiaSettingsHandler(SettingsHandler):
                 title="Nvidia Profile Inspector not found",
                 severity="info",
                 current_value="Not installed",
-                optimal_value="Installed and configured",
+                optimal_value="Installed only if NVIDIA profile management is needed",
                 explanation=(
                     "NPI is required for full Nvidia 3D settings management. "
                     "Download from: https://github.com/Orbmu2k/nvidiaProfileInspector"
@@ -143,7 +143,7 @@ class NvidiaSettingsHandler(SettingsHandler):
 
         # Note: We cannot read current Nvidia 3D settings without triggering NPI GUI
         # (NPI doesn't support headless export). Skip detailed settings audit —
-        # applying a profile is how users get optimal settings.
+        # applying a profile is how users get profile-specific driver targets.
         return issues
 
     @staticmethod

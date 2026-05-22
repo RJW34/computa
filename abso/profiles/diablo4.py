@@ -99,11 +99,11 @@ class _Diablo4BaseProfile(BaseProfile):
                 "game_bar": False,
                 "game_dvr": False,
                 "hags": True,
-                # Win11 borderless-compositor settings: kept True so the
-                # Diablo 4 profile honors its ordering contract across
-                # display modes (see profile_bases.py for full rationale).
-                "windowed_optimizations": True,
-                "vrr_optimize": True,
+                # Diablo 4 profile targets fullscreen-only VRR. Do not force
+                # the Win11 windowed compositor path unless a future borderless
+                # variant opts in explicitly.
+                "windowed_optimizations": False,
+                "vrr_optimize": False,
                 "max_refresh_rate": True,
             },
             "PowerSettingsHandler": {

@@ -123,10 +123,10 @@ class RegistryValues:
 # =============================================================================
 
 class Defaults:
-    """Default and optimal values for settings."""
+    """Legacy default/target values for settings."""
 
-    # System Responsiveness (0 = gaming optimized, 20 = default)
-    SYSTEM_RESPONSIVENESS_GAMING = 0
+    # System Responsiveness (ABSO legacy target = 10, Windows desktop default often = 20)
+    SYSTEM_RESPONSIVENESS_GAMING = 10
     SYSTEM_RESPONSIVENESS_DEFAULT = 20
 
     # Network Throttling (-1 = disabled, 10 = default in Mbps)

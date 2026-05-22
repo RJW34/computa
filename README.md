@@ -2,9 +2,9 @@
 
 **Adaptive Battle Station Optimizer**
 
-A.B.S.O. is a CLI-first Windows 11 gaming optimization tool that automatically detects your hardware, audits your system configuration, and applies game-specific optimization profiles for competitive gaming.
+A.B.S.O. is a CLI-first Windows 11 gaming tuning tool that automatically detects your hardware, audits your system configuration, and applies game-specific profiles for competitive gaming.
 
-> **A.B.S.O.** stands for **A**daptive **B**attle **S**tation **O**ptimizer - your intelligent companion for achieving peak gaming performance on Windows.
+> **A.B.S.O.** stands for **A**daptive **B**attle **S**tation **O**ptimizer - an evidence-aware Windows gaming profile tool.
 
 ## Features
 
@@ -110,22 +110,22 @@ python -m abso restore 20240115_143022  # Specific backup
 
 | Profile | Game | Focus |
 |---------|------|-------|
-| `slippi-melee` / `slippi-melee-hdr` | Super Smash Bros. Melee (Slippi) | Ultra-low latency (SDR / HDR) |
+| `slippi-melee` / `slippi-melee-hdr` | Super Smash Bros. Melee (Slippi) | Latency-focused no-sync (SDR / HDR) |
 | `slippi-melee-console-parity` / `slippi-melee-console-parity-hdr` | Super Smash Bros. Melee (Slippi) | Console-like pacing/feel (SDR / HDR) |
-| `slippi-melee-universal` / `slippi-melee-universal-hdr` | Super Smash Bros. Melee (Slippi) | Lowest latency with fixed HAGS (no reboot) (SDR / HDR) |
+| `slippi-melee-universal` / `slippi-melee-universal-hdr` | Super Smash Bros. Melee (Slippi) | No-sync with fixed HAGS state (SDR / HDR) |
 | `rivals2-offline` | Rivals of Aether 2 | Offline no-sync latency |
 | `rivals2-online` | Rivals of Aether 2 | Rollback-safe online play |
 | `rivals2-gsync` | Rivals of Aether 2 | Low-latency VRR offline |
 | `rivals2-online-gsync` | Rivals of Aether 2 | Rollback-safe VRR online |
 | `fortnite` / `fortnite-hdr` | Fortnite | Reflex no-sync latency (SDR / HDR) |
 | `marvel-rivals-sdr` / `marvel-rivals-hdr` | Marvel Rivals | Reflex VRR (SDR / HDR) |
-| `overwatch2` / `overwatch2-hdr` | Overwatch 2 (No Sync) | Minimum latency no-sync (SDR / HDR) |
+| `overwatch2` / `overwatch2-hdr` | Overwatch 2 (No Sync) | Latency-focused no-sync (SDR / HDR) |
 | `overwatch2-gsync` / `overwatch2-gsync-hdr` | Overwatch 2 (G-SYNC) | Tear-free low latency VRR (SDR / HDR) |
 | `overwatch2-gsync-capture` / `overwatch2-gsync-hdr-capture` | Overwatch 2 (G-SYNC) | Borderless VRR path for capture/overlay workflows |
 | `diablo4` / `diablo4-sdr` | Diablo 4 | Balanced performance (HDR / SDR) |
 | `ryujinx-ssbu` | Ryujinx (SSBU) | Low-latency emulator system path |
 
-## What Gets Optimized
+## What Profiles Change
 
 A.B.S.O. applies optimizations across multiple system areas. Exact settings vary by profile; the list below describes what built-in profiles actually touch today.
 
@@ -139,11 +139,11 @@ A.B.S.O. applies optimizations across multiple system areas. Exact settings vary
 - Ultimate Performance power plan
 - USB selective suspend disabled
 - PCIe link-state power saving disabled
-- Processor performance maximized
+- Processor maximum state set to 100%; selected offline profiles may also raise minimum processor state
 
 ### Graphics Settings
 - Per-executable Fullscreen Optimizations (FSO) forced on or off to match each profile's presentation path (exclusive fullscreen vs composited borderless)
-- Multi-Plane Overlay (MPO) is **not** disabled by default. ABSO only touches MPO in profiles where MPO compositor behavior was specifically measured to interfere; most profiles leave MPO enabled because it is required for G-SYNC/VRR on Windows 11 24H2+
+- Multi-Plane Overlay (MPO) is **not** disabled by default. Most profiles leave MPO enabled because disabling it can alter or break the Windows 11 VRR/compositor path on some systems
 
 ### Input Settings
 - Mouse acceleration disabled
@@ -158,7 +158,7 @@ A.B.S.O. applies optimizations across multiple system areas. Exact settings vary
 ### System Scheduler
 - Process priority boosted for the game's executable(s) via IFEO (risk-managed: can conflict with anti-cheat, audio, OBS, and launchers)
 - `Win32PrioritySeparation = 0x2A` is applied in most gaming base profiles; this is an old global tweak whose measured effect varies and should be considered experimental
-- `SystemResponsiveness = 0` is only applied under the opt-in legacy-tweaks flag
+- `SystemResponsiveness = 10` is only applied under the opt-in legacy-tweaks flag
 
 ### Background Services
 - ABSO does **not** disable telemetry, search indexer, or Xbox background services by default. Broad service disabling is out of scope because it causes brittle systems and has no reliable gaming win on modern Windows 11

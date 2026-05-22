@@ -8,12 +8,12 @@ from abso.profiles.profile_bases import WebGLBaseProfile
 
 
 class PokemonAutoChessProfile(WebGLBaseProfile):
-    """Optimization profile for Pokemon Auto Chess (browser-based WebGL).
+    """Profile for Pokemon Auto Chess (browser-based WebGL).
 
     Focus: Stable WebGL performance in Chrome/browser with smooth frame pacing.
 
     Pokemon Auto Chess is an auto-battler that runs in the browser using WebGL.
-    Unlike competitive games, it doesn't require ultra-low latency but benefits
+    Unlike competitive games, it does not need a strict no-sync latency path but benefits
     from stable GPU performance and reduced background interference.
 
     Game: https://github.com/keldaanCommunity/pokemonAutoChess
@@ -29,7 +29,7 @@ class PokemonAutoChessProfile(WebGLBaseProfile):
 
     @property
     def description(self) -> str:
-        return "WebGL browser game optimization for stable performance"
+        return "WebGL browser game profile for stable performance"
 
     @property
     def optimization_target(self) -> str:

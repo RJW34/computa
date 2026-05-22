@@ -359,17 +359,9 @@ class ProfileLinter:
                 setting_path="DisplayColorRangeHandler.dynamic_range",
             ))
 
-        # Retired 2026-05-21: the WINDOWS_VRR_OPTIMIZE_LATENCY rule used to
-        # flag vrr_optimize=True on latency-critical profiles, citing the
-        # ~0.1ms compositor-stays-warm cost in exclusive fullscreen. Today's
-        # design decision (see profile_bases.py docstring on _base_settings)
-        # reversed this: True is now the universal default because the sub-ms
-        # exclusive cost is asymmetrically dwarfed by the multi-ms benefit
-        # when the user is in borderless. False would re-open the silent
-        # latency cliff users hit when manually switching display mode mid-
-        # session. Users committed to pure-exclusive can opt out via
-        # abso.yaml profile_overrides.windows.vrr_optimize=False; the
-        # decision is theirs, not the linter's.
+        # Strict/no-sync profiles keep vrr_optimize=False by profile contract.
+        # Borderless/capture profiles opt into the windowed compositor path
+        # explicitly and are checked by _check_presentation_guidance().
 
         # Check 3: HAGS warning on DX11-only titles (info only)
         # This is hardware/game dependent, so just info
@@ -398,6 +390,7 @@ class ProfileLinter:
         - Disable Paging Executive only if RAM >= 32GB
         """
         memory_settings = settings_map.get("MemorySettingsHandler", {})
+        registry_settings = settings_map.get("RegistrySettingsHandler", {})
 
         # Check 1: Disable Paging Executive with insufficient RAM
         disable_paging = memory_settings.get("disable_paging_executive", 0)
@@ -428,7 +421,7 @@ class ProfileLinter:
                 message=f"Fixed quantum (0x{WIN32_PRIORITY_GAMING_OFFLINE:02X}) used for online profile",
                 details=(
                     "Win32PrioritySeparation uses fixed short quantum. "
-                    "This is optimal for latency but may reduce timing flexibility "
+                    "This is a latency-focused scheduler tradeoff and may reduce timing flexibility "
                     "for rollback netcode. Monitor for issues."
                 ),
                 setting_path="RegistrySettingsHandler.win32_priority_separation",
@@ -619,7 +612,7 @@ class ProfileLinter:
                 details=(
                     "This emulator runs at a fixed framerate (60fps). G-Sync/VRR "
                     "adds overhead when syncing to a constant rate. Consider using "
-                    "preset='minimum_latency' with G-Sync disabled for lowest latency."
+                    "preset='minimum_latency' with G-Sync disabled for the no-sync path."
                 ),
                 setting_path="NvidiaSettingsHandler.preset",
             ))

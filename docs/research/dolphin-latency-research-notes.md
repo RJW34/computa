@@ -19,7 +19,7 @@ A major latency feature added to Dolphin in late 2025, developed in collaboratio
 | Configuration | Estimated End-to-End Latency |
 |---------------|------------------------------|
 | Console (CRT) | ~33-50ms (game logic + frame buffer + CRT scanout) |
-| Dolphin (Optimized) | ~25-40ms (varies by system) |
+| Dolphin (tuned profile path) | ~25-40ms (varies by system) |
 | Rush Presentation | May reduce by 8-14ms (test for your system) |
 
 **Note:** CRT phosphor response is near-instantaneous (~0ms pixel response). The
@@ -168,9 +168,9 @@ VSync = False
 
 ## Latency Budget Comparison
 
-### Slippi Dolphin (Optimized) vs Console
+### Slippi Dolphin (Tuned Profile Path) vs Console
 
-| Component | Console (CRT) | Dolphin (Optimized, 240Hz LCD) |
+| Component | Console (CRT) | Dolphin (tuned, 240Hz LCD) |
 |-----------|---------------|--------------------------------|
 | Game Logic | 16.7ms (1 frame @ 60fps) | 16.7ms (1 frame @ 60fps) |
 | Frame Buffer | ~8ms (console frame buffer) | ~0ms (Immediate XFB) |

@@ -368,7 +368,7 @@ confirm_destructive: true
 #   my-game:
 #     display_name: "My Custom Game"
 #     description: "Custom profile for my game"
-#     optimization_target: "Ultra-low latency"
+#     optimization_target: "latency-focused no-sync"
 #     handlers:
 #       WindowsSettingsHandler:
 #         game_mode: true

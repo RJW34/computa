@@ -1,7 +1,7 @@
 """CPU affinity and core isolation settings handler.
 
 Detects CPU topology (P-cores vs E-cores on Intel hybrid, CCDs on AMD Zen),
-audits whether game executables are pinned to optimal cores, and applies
+audits whether game executables are pinned to requested cores, and applies
 affinity masks via PowerShell and AppCompatFlags registry entries.
 """
 
@@ -58,8 +58,8 @@ class CpuAffinityHandler(SettingsHandler):
 
     Strategies:
       * ``p_cores_only`` -- restrict the process to performance cores
-        (optimal on Intel hybrid CPUs to avoid the scheduler bouncing
-        threads onto efficiency cores mid-frame).
+        (experimental on Intel hybrid CPUs; can reduce scheduler movement
+        but may also block Thread Director from making better decisions).
       * ``all_cores`` -- use every available logical processor.
       * ``custom`` -- caller supplies an explicit ``affinity_mask``.
 
@@ -124,15 +124,15 @@ class CpuAffinityHandler(SettingsHandler):
                     title=f"No CPU affinity set for {exe} on hybrid CPU",
                     severity="warning",
                     current_value="Not set (all cores)",
-                    optimal_value=f"P-cores only (mask 0x{p_mask:X})",
+                    optimal_value=f"Profile-dependent; P-cores only mask 0x{p_mask:X}",
                     explanation=(
                         "On Intel hybrid CPUs the Windows scheduler may "
                         "migrate game threads to efficiency cores, causing "
-                        "frame-time spikes.  Pinning to P-cores prevents "
-                        "this."
+                        "frame-time spikes. Pinning to P-cores is an "
+                        "experimental profile tradeoff, not a universal win."
                     ),
                     category="cpu_affinity",
-                    evidence_tier=EvidenceTier.VERIFIED,
+                    evidence_tier=EvidenceTier.EXPERIMENTAL,
                 ))
 
             # -- Game currently running on E-cores ------------------------

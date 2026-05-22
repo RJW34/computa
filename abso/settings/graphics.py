@@ -70,41 +70,35 @@ class GraphicsSettingsHandler(SettingsHandler):
         # Only flag as issue if user reports stuttering
         if not current.get("mpo_disabled"):
             issues.append(Issue(
-                title="Multi-Plane Overlay (MPO) is enabled",
+                title="MPO is enabled (expected default)",
                 severity="info",
                 current_value="Enabled (default)",
                 optimal_value="Keep enabled for VRR/G-Sync",
                 explanation=(
                     "MPO (Multi-Plane Overlay) is the expected default on modern "
-                    "Windows 11. It is effectively required for G-SYNC/VRR on "
-                    "Windows 11 24H2+: disabling MPO on 24H2+ is known to break "
-                    "the VRR path. On earlier builds there are historical MPO "
-                    "compositor stutter bugs with specific GPU/driver combos, "
-                    "so keep MPO enabled unless a specific measured problem "
-                    "requires disabling it for that profile."
+                    "Windows 11. ABSO keeps it enabled for VRR profiles because "
+                    "disabling MPO can alter or break the VRR/compositor path on "
+                    "some GPU, driver, and Windows build combinations. Disable it "
+                    "only for a specific measured compositor problem."
                 ),
                 category="graphics",
             ))
 
         # Check global FSO status
         game_dvr_behavior = current.get("game_dvr_behavior")
-        if game_dvr_behavior != 2:
+        if game_dvr_behavior == 2:
             issues.append(Issue(
-                title="Global Fullscreen Optimizations enabled",
+                title="Global Fullscreen Optimizations are forcibly disabled",
                 severity="info",
-                current_value="Enabled" if game_dvr_behavior != 2 else "Disabled",
-                optimal_value="Disabled (GameDVR_FSEBehavior=2)",
+                current_value="Disabled",
+                optimal_value="Profile-managed per-exe policy",
                 explanation=(
                     "Windows 'Optimizations for windowed games' (Fullscreen "
-                    "Optimizations) runs DX10/DX11 games on the DWM composited "
-                    "borderless path instead of true exclusive fullscreen. "
-                    "Microsoft positions this as a latency and feature win "
-                    "(Auto HDR / VRR) for windowed/borderless games, so it is "
-                    "not a universal 'turn off for gaming' toggle. ABSO sets "
-                    "this per-executable via profile-specific overrides instead "
-                    "of relying on a global disable. Leave the global state "
-                    "alone unless you know you want every DX10/DX11 game on the "
-                    "exclusive path."
+                    "Optimizations) is not a universal off-for-gaming toggle. "
+                    "Microsoft documents it as a DX10/DX11 windowed/borderless "
+                    "performance and feature path. ABSO uses per-executable FSO "
+                    "overrides for strict profiles and clears them for capture "
+                    "profiles, so a global disable can conflict with those lanes."
                 ),
                 category="graphics",
             ))
@@ -123,10 +117,10 @@ class GraphicsSettingsHandler(SettingsHandler):
                 current_value=f"Enabled on {len(acm_enabled_monitors)} monitor(s)",
                 optimal_value="Disabled",
                 explanation=(
-                    "Auto Color Management adds color profile processing to the display "
-                    "pipeline, which can introduce latency and color inconsistencies in "
-                    "games. Disable via Settings > Display > Advanced display for each "
-                    "monitor. This is mainly useful for color-accurate creative work."
+                    "Auto Color Management changes the display color-management path. "
+                    "That can be desirable for color-accurate creative work, but gaming "
+                    "profiles that manage HDR/ICC state may prefer a fixed unmanaged "
+                    "path to avoid unexpected gamut or SDR clamp changes."
                 ),
                 category="graphics",
             ))

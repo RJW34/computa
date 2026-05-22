@@ -24,7 +24,7 @@ class MouseSettingsHandler(SettingsHandler):
     - MouseSpeed: 0 = acceleration off, 1 = acceleration on, 2 = double acceleration
     - MouseThreshold1/2: Acceleration thresholds (0,0 = disabled)
     - SmoothMouseXCurve/YCurve: 5 points defining acceleration curve
-      - Linear (1:1) curve is optimal for gaming
+      - Linear (1:1) curve is the ABSO target for aim consistency
       - Default Windows curve applies acceleration
     """
 

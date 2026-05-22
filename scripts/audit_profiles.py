@@ -20,7 +20,12 @@ from __future__ import annotations
 
 import sys
 from collections import defaultdict
+from pathlib import Path
 from typing import Any
+
+ROOT_DIR = Path(__file__).resolve().parents[1]
+if str(ROOT_DIR) not in sys.path:
+    sys.path.insert(0, str(ROOT_DIR))
 
 from abso.core.applier import ProfileApplier
 from abso.profiles.catalog import PROFILE_CATALOG
@@ -177,7 +182,7 @@ def main() -> int:
             issues.append(r)
 
     print("=" * 80)
-    print(f"PROFILE AUDIT  —  {len(results)} profiles  ({len(clean)} clean / {len(issues)} with issues)")
+    print(f"PROFILE AUDIT - {len(results)} profiles ({len(clean)} clean / {len(issues)} with issues)")
     print("=" * 80)
 
     if clean:

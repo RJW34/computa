@@ -8,10 +8,10 @@ from abso.profiles.profile_bases import EmulatorLatencyBaseProfile
 
 
 class RyujinxSSBUProfile(EmulatorLatencyBaseProfile):
-    """Optimization profile for SSBU/HewDraw Remix via Ryujinx or forks.
+    """Profile for SSBU/HewDraw Remix via Ryujinx or forks.
 
-    Focus: Ultra-low input latency for competitive platform fighting.
-    SSBU runs at 60fps, similar to Melee optimization goals.
+    Focus: latency-focused no-sync settings for competitive platform fighting.
+    SSBU runs at 60fps, similar to Melee profile goals.
 
     HewDraw Remix (HDR) is a comprehensive gameplay mod that makes
     SSBU play more like traditional platform fighters with enhanced
@@ -32,7 +32,7 @@ class RyujinxSSBUProfile(EmulatorLatencyBaseProfile):
 
     @property
     def description(self) -> str:
-        return "Ultra-low latency system path for competitive SSBU/HDR with manual emulator tuning"
+        return "Latency-focused no-sync system path for competitive SSBU/HDR with manual emulator tuning"
 
     @property
     def optimization_target(self) -> str:
@@ -55,12 +55,11 @@ class RyujinxSSBUProfile(EmulatorLatencyBaseProfile):
     def _settings_overrides(self) -> dict[str, dict[str, Any]]:
         return {
             "NvidiaSettingsHandler": {
-                # Absolute minimum latency - no sync overhead
-                # SSBU is 60fps like Melee, same optimization approach
-                # Ryujinx uses Vulkan — LLM has no effect (DX9/DX11 only).
+                # No-sync presentation path for fixed-60 emulator play.
+                # Ryujinx uses Vulkan, where driver LLM is not the controlling path.
                 "low_latency_mode": "off",  # OFF — no benefit on Vulkan render queues
                 "power_management": "prefer_max_performance",
-                "vsync": "off",  # No sync latency
+                "vsync": "off",  # No-sync path
                 "vsync_tear_control": "disable",
                 "vrr_app_override": "force_off",  # Fixed 60fps, no VRR benefit
                 "global_vrr_mode": "off",  # Enforce global VRR off for clean no-sync transitions
@@ -73,7 +72,7 @@ class RyujinxSSBUProfile(EmulatorLatencyBaseProfile):
     def get_in_game_settings(self) -> list[dict[str, str]]:
         """Get recommended Ryujinx and system settings.
 
-        Optimized for minimum latency in competitive SSBU/HewDraw Remix.
+        Latency-focused no-sync settings for competitive SSBU/HewDraw Remix.
         SSBU runs at 60fps - similar optimization approach to Melee.
         """
         return [
@@ -109,23 +108,23 @@ class RyujinxSSBUProfile(EmulatorLatencyBaseProfile):
                 "setting": "G-SYNC",
                 "value": "Off",
                 "reason": (
-                    "SSBU runs at fixed 60fps - G-SYNC adds overhead syncing to a constant rate. "
-                    "Disabling removes sync latency. High refresh still helps via reduced scanout."
+                    "SSBU runs at fixed 60fps, so this no-sync profile disables VRR. "
+                    "High refresh still helps via reduced scanout."
                 ),
             },
             {
                 "category": "NVCP",
                 "setting": "V-SYNC",
                 "value": "Off",
-                "reason": "Disabling V-SYNC eliminates frame queue latency. May cause minor tearing.",
+                "reason": "Disabling V-SYNC avoids the VSync queueing path and may cause tearing.",
             },
             {
                 "category": "NVCP",
                 "setting": "Low Latency Mode",
                 "value": "Off",
                 "reason": (
-                    "LLM has no effect on Vulkan render queues (only works in DX9/DX11). "
-                    "Setting to Off for accuracy. Ryujinx manages its own frame pacing."
+                    "Driver LLM is not the controlling queue path for Vulkan. "
+                    "Ryujinx manages its own frame pacing."
                 ),
             },
             {
@@ -164,15 +163,15 @@ class RyujinxSSBUProfile(EmulatorLatencyBaseProfile):
                 "category": "Ryujinx Graphics",
                 "setting": "Enable VSync",
                 "value": "Off",
-                "reason": "Disable VSync in Ryujinx for minimum latency. Let NVCP handle sync (which we also disable).",
+                "reason": "Disable VSync in Ryujinx for the no-sync path; NVCP sync is disabled too.",
             },
             {
                 "category": "Ryujinx Graphics",
                 "setting": "Resolution Scale",
                 "value": "Native (1x) or 2x max",
                 "reason": (
-                    "Lower resolution = lower render latency. For competitive play, "
-                    "prioritize latency over visuals. Native or 2x is recommended."
+                    "Lower resolution reduces GPU work and can reduce render time. "
+                    "Native or 2x is the latency-focused default."
                 ),
             },
             {
@@ -185,7 +184,7 @@ class RyujinxSSBUProfile(EmulatorLatencyBaseProfile):
                 "category": "Ryujinx Graphics",
                 "setting": "Anti-Aliasing",
                 "value": "None",
-                "reason": "AA adds GPU overhead. Disable for minimum latency.",
+                "reason": "AA adds GPU overhead. Disable for the latency-focused path.",
             },
             {
                 "category": "Ryujinx Graphics",

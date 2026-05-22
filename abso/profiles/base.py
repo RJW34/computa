@@ -338,12 +338,25 @@ class BaseProfile(ABC):
             borderless/capture variants are not fighting a stale flag from
             a previously-applied exclusive profile.
 
-        Override in strict exclusive-fullscreen profiles to prevent
-        silent fallback to borderless (the compositor adds ~3-7% FPS cost
-        on high-refresh VRR setups) and in borderless capture variants to
-        make the hand-off deterministic when users switch lanes.
+        Override in strict exclusive-fullscreen profiles that need an
+        AppCompat FSO policy, and in borderless/capture variants that need
+        stale FSO-disable entries cleared when users switch lanes.
         """
         return {}
+
+    def resolve_runtime_settings(
+        self,
+        handler_name: str,
+        settings: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Return apply/verify settings after machine-local expansion.
+
+        ``get_settings`` must stay deterministic so snapshots, manifests,
+        and tray catalog output do not depend on the current PC. Profiles
+        that need live machine discovery, such as expanding a game install
+        path into an AppCompat registry value, can override this hook.
+        """
+        return settings
 
     @property
     def overlay_compatible_fallback_profile_id(self) -> str | None:

@@ -126,21 +126,21 @@ NvAPI_DRS_SaveSettings(NvDRSSessionHandle hSession)
 
 ### Phase 3: Full Audit Capability (Priority: MEDIUM)
 
-**Goal:** Compare current settings against optimal and report issues.
+**Goal:** Compare current settings against profile targets and report issues.
 
 ```python
 def audit(self) -> list[Issue]:
     current = self.detect()["3d_settings"]
-    optimal = OPTIMAL_GAMING_SETTINGS
+    targets = PROFILE_TARGET_SETTINGS
 
     issues = []
-    for setting, optimal_value in optimal.items():
+    for setting, target_value in targets.items():
         current_value = current.get(setting)
-        if current_value != optimal_value:
+        if current_value != target_value:
             issues.append(Issue(
-                title=f"{setting} not optimal",
+                title=f"{setting} not at profile target",
                 current_value=current_value,
-                optimal_value=optimal_value,
+                optimal_value=target_value,
                 # ...
             ))
     return issues
@@ -249,7 +249,7 @@ abso/settings/nvidia/
 
 - **Phase 3 (Full Audit):** 2-3 hours
   - Audit logic: 1h
-  - Optimal settings research: 1h
+  - Profile target research: 1h
   - Testing: 1h
 
 ## References

@@ -272,6 +272,64 @@ class TestRunApplyProfile:
             interactive.run_apply_profile("test")
             # Should not apply since user cancelled
 
+    @patch("abso.interactive.Prompt.ask", return_value="")
+    @patch("abso.interactive.Confirm.ask", return_value=True)
+    @patch("abso.interactive.is_admin", return_value=True)
+    @patch("abso.interactive.ProfileTransactionManager")
+    @patch("abso.interactive.ProfileApplier")
+    def test_apply_profile_uses_transaction_manager(
+        self,
+        mock_applier_class,
+        mock_tx_manager_class,
+        mock_is_admin,
+        mock_confirm,
+        mock_prompt,
+    ):
+        """Interactive apply must use the transactional apply path."""
+        mock_handler = MagicMock()
+        mock_handler.__class__.__name__ = "WindowsSettingsHandler"
+        mock_handler.apply.return_value = {"success": True}
+
+        mock_profile = MagicMock()
+        mock_profile.display_name = "Test"
+        mock_profile.description = "Test desc"
+        mock_profile.optimization_target = "latency"
+        mock_profile.get_handlers.return_value = [mock_handler]
+        mock_profile.get_settings.return_value = {"game_mode": True}
+        mock_profile.has_in_game_settings.return_value = False
+
+        mock_applier = MagicMock()
+        mock_applier._get_profile.return_value = mock_profile
+        mock_applier_class.return_value = mock_applier
+
+        mock_result = MagicMock()
+        mock_result.success = True
+        mock_result.requires_reboot = False
+        mock_result.reboot_reasons = []
+        mock_result.warnings = []
+        mock_result.notices = []
+
+        mock_tx = MagicMock()
+        mock_tx.success = True
+        mock_tx.apply_result = mock_result
+        mock_tx.backup_id = "backup-test"
+        mock_tx.checkpoints = []
+
+        mock_tx_manager = MagicMock()
+        mock_tx_manager.execute.return_value = mock_tx
+        mock_tx_manager_class.return_value = mock_tx_manager
+
+        with (
+            patch.object(interactive.console, "print"),
+            patch("abso.main.set_current_profile") as mock_set_current_profile,
+        ):
+            interactive.run_apply_profile("test")
+
+        mock_tx_manager_class.assert_called_once_with(interactive.BACKUPS_DIR, applier=mock_applier)
+        mock_tx_manager.execute.assert_called_once_with(profile_id="test", create_backup=True)
+        mock_handler.apply.assert_not_called()
+        mock_set_current_profile.assert_called_once()
+
 
 class TestRunInteractive:
     """Tests for run_interactive main loop."""

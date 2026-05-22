@@ -41,10 +41,10 @@ class _Overwatch2BaseProfile(ReflexShooterBaseProfile):
     # the FULL PATH at process creation - a bare "Overwatch.exe" value
     # name is registered but doesn't apply.
     #
-    # We resolve both install paths via Blizzard's HKLM install key and
-    # Steam's libraryfolders.vdf scan, then emit FSO entries for the bare
-    # name AND each discovered path so whichever launcher you boot from,
-    # the FSO state matches the profile's intent.
+    # get_settings() must stay deterministic for snapshots and tray catalog
+    # generation, so the profile declares only the stable executable name.
+    # At apply/verify time resolve_runtime_settings() expands that entry to
+    # any Battle.net and Steam paths visible on the current PC.
 
     @staticmethod
     def _battle_net_overwatch_path() -> str | None:
@@ -158,17 +158,36 @@ class _Overwatch2BaseProfile(ReflexShooterBaseProfile):
         return paths
 
     def _fso_dict(self, *, disabled: bool) -> dict[str, bool]:
-        """Build the per-exe FSO dict covering bare name AND every discovered full path.
+        """Build the deterministic profile FSO declaration."""
+        return {"Overwatch.exe": disabled}
 
-        The bare-name entry is kept for forward compatibility with any
-        future Windows shim engine fallback that does name-matching. The
-        discovered full paths are what actually takes effect today on
-        per-launcher process creation.
-        """
-        result: dict[str, bool] = {"Overwatch.exe": disabled}
+    def resolve_runtime_settings(
+        self,
+        handler_name: str,
+        settings: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Expand OW2 FSO settings to local install paths at apply/verify time."""
+        if handler_name != "RegistrySettingsHandler":
+            return settings
+
+        raw_fso = settings.get("fullscreen_optimizations")
+        if not isinstance(raw_fso, dict):
+            return settings
+
+        if "Overwatch.exe" not in raw_fso:
+            return settings
+
+        merged = settings.copy()
+        expanded = {
+            str(exe): bool(disabled)
+            for exe, disabled in raw_fso.items()
+            if isinstance(exe, str) and exe.strip()
+        }
+        desired_state = expanded["Overwatch.exe"]
         for full_path in self._overwatch_install_paths():
-            result[full_path] = disabled
-        return result
+            expanded.setdefault(full_path, desired_state)
+        merged["fullscreen_optimizations"] = expanded
+        return merged
 
     def get_handlers(self) -> list[SettingsHandler]:
         from abso.settings.ow2_config import OW2ConfigHandler
@@ -180,7 +199,7 @@ class _Overwatch2BaseProfile(ReflexShooterBaseProfile):
     @property
     def allow_dual_limiter(self) -> bool:
         # OW2's G-SYNC variants deliberately layer the in-game cap (authoritative,
-        # lowest latency per Blur Busters) and the NVIDIA driver cap (safety net).
+        # preferred by Blur Busters when stable) and the NVIDIA driver cap (safety net).
         # Both resolve to refresh - 3 and catch each other when Settings_v0.ini
         # drifts — OW2 is known to rewrite the INI on exit and on multi-monitor
         # changes. The no-sync variant sets neither cap, so this opt-in is
@@ -228,10 +247,9 @@ class _Overwatch2BaseProfile(ReflexShooterBaseProfile):
 class Overwatch2Profile(_Overwatch2BaseProfile):
     """Overwatch 2 no-sync SDR profile.
 
-    Absolute minimum-latency variant on the SDR path. Explicitly disables
-    VRR/G-SYNC per-app so behavior is deterministic even when users have
-    global VRR enabled. For the HDR counterpart see
-    :class:`Overwatch2NoSyncHDRProfile`.
+    Latency-focused SDR path. Explicitly disables VRR/G-SYNC per-app so
+    behavior is deterministic even when users have global VRR enabled. For
+    the HDR counterpart see :class:`Overwatch2NoSyncHDRProfile`.
     """
 
     @property
@@ -240,11 +258,11 @@ class Overwatch2Profile(_Overwatch2BaseProfile):
 
     @property
     def display_name(self) -> str:
-        return "Overwatch 2 - Competitive No-Sync SDR"
+        return "Overwatch 2 - No Sync SDR"
 
     @property
     def description(self) -> str:
-        return "Minimum latency no-sync SDR profile (Reflex OFF, VSync OFF, VRR OFF)"
+        return "Latency-focused no-sync SDR profile (Reflex OFF, VSync OFF, VRR OFF)"
 
     @property
     def is_sdr_only(self) -> bool:
@@ -255,9 +273,8 @@ class Overwatch2Profile(_Overwatch2BaseProfile):
     def fullscreen_optimizations_per_exe(self) -> dict[str, bool]:
         # Force true exclusive fullscreen at the OS layer so Windows cannot
         # silently shunt Overwatch into the composited FSO borderless path
-        # if the in-game WindowMode ever drifts back to 1. _fso_dict covers
-        # both Battle.net and Steam install paths so whichever launcher
-        # spawns Overwatch.exe gets the FSO disable.
+        # if the in-game WindowMode ever drifts back to 1. Full launcher
+        # paths are expanded only at apply/verify time so snapshots stay stable.
         return self._fso_dict(disabled=True)
 
     def _variant_overrides(self) -> dict[str, dict[str, Any]]:
@@ -274,7 +291,7 @@ class Overwatch2Profile(_Overwatch2BaseProfile):
             "OW2ConfigHandler": {
                 # No-sync: exclusive fullscreen for cleanest presentation path.
                 "window_mode": 0,
-                # Uncapped for minimum latency (600 = OW2 max).
+                # Uncapped no-sync path (600 = OW2 max).
                 "frame_rate_cap": 600,
             },
         }
@@ -291,7 +308,7 @@ class Overwatch2Profile(_Overwatch2BaseProfile):
                 "category": "Display",
                 "setting": "VSync",
                 "value": "Off",
-                "reason": "No-sync mode removes sync queueing latency.",
+                "reason": "No-sync mode avoids the VSync/VRR queueing path and accepts tearing.",
             },
             {
                 "category": "Display",
@@ -300,7 +317,7 @@ class Overwatch2Profile(_Overwatch2BaseProfile):
                 "reason": (
                     "On a high-end GPU at 1440p Low, the GPU is not saturated - Reflex "
                     "throttles CPU frame submission without benefit, costing about 60 FPS. "
-                    "Higher uncapped FPS means lower latency than Reflex queue management. "
+                    "Higher uncapped FPS can reduce frame time when the system can sustain it. "
                     "If your GPU is saturated (GPU usage above 90%), switch to On+Boost instead."
                 ),
             },
@@ -308,7 +325,7 @@ class Overwatch2Profile(_Overwatch2BaseProfile):
                 "category": "Display",
                 "setting": "Frame Rate Cap",
                 "value": "Uncapped (600)",
-                "reason": "No-sync profile: maximum FPS equals minimum click-to-pixel latency.",
+                "reason": "No-sync profile: uncapped FPS reduces frame time when the game can sustain it.",
             },
             {
                 "category": "Display",
@@ -337,7 +354,7 @@ class Overwatch2Profile(_Overwatch2BaseProfile):
 class Overwatch2NoSyncHDRProfile(Overwatch2Profile):
     """Overwatch 2 no-sync HDR profile.
 
-    Same absolute-minimum-latency no-sync contract as
+    Same no-sync contract as
     :class:`Overwatch2Profile`, but with OW2's native HDR pipeline enabled
     for OLED / Mini-LED displays. VRR remains off per the no-sync policy:
     HDR here is a color/dynamic-range decision, not a sync decision.
@@ -349,12 +366,12 @@ class Overwatch2NoSyncHDRProfile(Overwatch2Profile):
 
     @property
     def display_name(self) -> str:
-        return "Overwatch 2 - Competitive No-Sync HDR"
+        return "Overwatch 2 - No Sync HDR"
 
     @property
     def description(self) -> str:
         return (
-            "Minimum latency no-sync HDR profile (Reflex OFF, VSync OFF, VRR OFF). "
+            "Latency-focused no-sync HDR profile (Reflex OFF, VSync OFF, VRR OFF). "
             "Native HDR for OLED / Mini-LED displays."
         )
 
@@ -442,7 +459,7 @@ class Overwatch2GSyncProfile(_Overwatch2BaseProfile):
 
     @property
     def display_name(self) -> str:
-        return "Overwatch 2 - Competitive GSYNC SDR"
+        return "Overwatch 2 - GSYNC SDR"
 
     @property
     def description(self) -> str:
@@ -459,8 +476,8 @@ class Overwatch2GSyncProfile(_Overwatch2BaseProfile):
     def fullscreen_optimizations_per_exe(self) -> dict[str, bool]:
         # Strict fullscreen VRR lane: disable FSO per-exe so Windows holds the
         # true exclusive path and the refresh-3 cap stays cap-bound at ~297
-        # instead of paying the compositor tax if OW2 drifts to borderless.
-        # _fso_dict covers both Battle.net and Steam install paths.
+        # instead of relying on the borderless fallback if OW2 drifts.
+        # Full launcher paths are expanded only at apply/verify time.
         return self._fso_dict(disabled=True)
 
     @property
@@ -545,7 +562,7 @@ class Overwatch2GSyncProfile(_Overwatch2BaseProfile):
                 "category": "Graphics",
                 "setting": "Shadows / Effects",
                 "value": "Low",
-                "reason": "Minimizes frame spikes during heavy ability usage.",
+                "reason": "Reduces frame-time spikes during heavy ability usage.",
             },
         ]
 
@@ -568,7 +585,7 @@ class Overwatch2GSyncHDRProfile(_Overwatch2BaseProfile):
 
     @property
     def display_name(self) -> str:
-        return "Overwatch 2 - Competitive GSYNC HDR"
+        return "Overwatch 2 - GSYNC HDR"
 
     @property
     def description(self) -> str:
@@ -582,9 +599,8 @@ class Overwatch2GSyncHDRProfile(_Overwatch2BaseProfile):
     def fullscreen_optimizations_per_exe(self) -> dict[str, bool]:
         # Native HDR strict lane: FSO must stay disabled per-exe. Otherwise
         # Windows composites OW2's HDR tone map through DWM (borderless FSO)
-        # and the GPU pays the compositor cost on top of the real HDR
-        # pipeline - which is what flips the cap-bound 297 back to ~276.
-        # _fso_dict covers both Battle.net and Steam install paths.
+        # and the GPU pays compositor overhead on top of the HDR pipeline.
+        # Full launcher paths are expanded only at apply/verify time.
         return self._fso_dict(disabled=True)
 
     @property
@@ -712,7 +728,7 @@ class Overwatch2GSyncHDRProfile(_Overwatch2BaseProfile):
                 "category": "Graphics",
                 "setting": "Shadows / Effects",
                 "value": "Low",
-                "reason": "Minimizes frame spikes during heavy ability usage.",
+                "reason": "Reduces frame-time spikes during heavy ability usage.",
             },
         ]
 
@@ -740,7 +756,7 @@ class Overwatch2GSyncCaptureProfile(_Overwatch2BaseProfile):
 
     @property
     def display_name(self) -> str:
-        return "Overwatch 2 - Capture-Safe GSYNC SDR (Borderless)"
+        return "Overwatch 2 - GSYNC SDR Capture-Safe"
 
     @property
     def description(self) -> str:
@@ -755,7 +771,7 @@ class Overwatch2GSyncCaptureProfile(_Overwatch2BaseProfile):
         # Capture lane intentionally runs the borderless FSO path. Clear any
         # per-exe FSO-disable flag a previous exclusive profile may have left
         # behind, so borderless G-SYNC can engage cleanly. Cleared for both
-        # Battle.net and Steam install paths via _fso_dict.
+        # Full launcher paths are expanded only at apply/verify time.
         return self._fso_dict(disabled=False)
 
     def _variant_overrides(self) -> dict[str, dict[str, Any]]:
@@ -794,8 +810,8 @@ class Overwatch2GSyncCaptureProfile(_Overwatch2BaseProfile):
                 "value": "Borderless / Windowed Fullscreen",
                 "reason": (
                     "Capture-safe path: keeps Medal/Discord/OBS overlays compatible while "
-                    "using the windowed G-SYNC path. Use the strict fullscreen profile if "
-                    "you want the absolute lowest latency and no overlays."
+                    "using the windowed G-SYNC path. Use the strict fullscreen profile for "
+                    "the leaner no-overlay path."
                 ),
             },
             {
@@ -832,7 +848,7 @@ class Overwatch2GSyncCaptureProfile(_Overwatch2BaseProfile):
                 "category": "Graphics",
                 "setting": "Shadows / Effects",
                 "value": "Low",
-                "reason": "Minimizes frame spikes during heavy team fights and capture load.",
+                "reason": "Reduces frame-time spikes during heavy team fights and capture load.",
             },
         ]
 
@@ -851,7 +867,7 @@ class Overwatch2GSyncHDRCaptureProfile(_Overwatch2BaseProfile):
 
     @property
     def display_name(self) -> str:
-        return "Overwatch 2 - Capture-Safe GSYNC HDR (Borderless)"
+        return "Overwatch 2 - GSYNC HDR Capture-Safe"
 
     @property
     def description(self) -> str:
@@ -866,7 +882,7 @@ class Overwatch2GSyncHDRCaptureProfile(_Overwatch2BaseProfile):
         # HDR capture lane: intentionally borderless FSO. Clear any stale FSO
         # disable left by a prior exclusive-HDR apply so the composited HDR
         # path can engage without fighting an OS-level exclusive lock.
-        # Cleared for both Battle.net and Steam install paths via _fso_dict.
+        # Full launcher paths are expanded only at apply/verify time.
         return self._fso_dict(disabled=False)
 
     def _base_overrides(self) -> dict[str, dict[str, Any]]:
@@ -980,6 +996,6 @@ class Overwatch2GSyncHDRCaptureProfile(_Overwatch2BaseProfile):
                 "category": "Graphics",
                 "setting": "Shadows / Effects",
                 "value": "Low",
-                "reason": "Minimizes frame spikes during heavy team fights and capture load.",
+                "reason": "Reduces frame-time spikes during heavy team fights and capture load.",
             },
         ]

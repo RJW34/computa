@@ -22,7 +22,7 @@ class AudioSettingsHandler(SettingsHandler):
     Technical notes:
     - Exclusive mode allows applications to bypass Windows audio mixing,
       reducing latency but preventing other apps from using audio.
-    - Most competitive gamers prefer exclusive mode for lowest latency.
+    - Some competitive players prefer exclusive mode to reduce audio path latency.
     - Changes to audio settings typically require application restart.
 
     Note: Per-device settings are managed through the Windows Sound control panel.
@@ -41,7 +41,7 @@ class AudioSettingsHandler(SettingsHandler):
         }
 
     def audit(self) -> list[Issue]:
-        """Audit audio settings for gaming optimization issues."""
+        """Audit audio settings for ABSO profile conflicts."""
         issues: list[Issue] = []
         current = self.detect()
 
@@ -63,7 +63,7 @@ class AudioSettingsHandler(SettingsHandler):
         return issues
 
     def apply(self, settings: dict[str, Any]) -> dict[str, Any]:
-        """Apply audio optimization settings.
+        """Apply audio settings.
 
         Settings format:
         {

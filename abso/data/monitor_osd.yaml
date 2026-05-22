@@ -1,6 +1,6 @@
 # Monitor OSD Recommendation Database
 # Community contributions welcome! Copy this file to ~/.abso/monitor_osd.yaml
-# and add your monitor's optimal settings.
+# and add your monitor's preferred settings.
 #
 # model_pattern: First 6-7 characters of Windows PnP Device ID
 #   Find yours: python -m abso detect (look at monitor IDs)
@@ -81,7 +81,7 @@ monitors:
       competitive_fps:
         - setting: "Preset Modes"
           value: "FPS"
-          reason: "Optimized color and response for competitive FPS."
+          reason: "Tuned color and response preset for competitive FPS."
         - setting: "Response Time"
           value: "Fast"
           reason: "Good pixel response without excessive overshoot."

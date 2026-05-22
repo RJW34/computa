@@ -458,9 +458,9 @@ class DiagnosticsSettingsHandler(SettingsHandler):
         version = info.get("driver_version") or ""
         if not version:
             return
-        # Treat the driver as fresh if the branch number is >= 550 (covers
-        # DX12 LLM support added in 551.23). This is a heuristic; the main
-        # point is to flag users stuck on very old drivers.
+        # Treat the driver as stale only on very old branches. This is a
+        # heuristic; the main point is to flag users likely missing recent
+        # Reflex/HAGS/VRR fixes.
         match = re.match(r"(\d+)\.(\d+)", version)
         if match:
             branch = int(match.group(1))
@@ -470,14 +470,14 @@ class DiagnosticsSettingsHandler(SettingsHandler):
                         title=f"NVIDIA driver branch {branch} is older than recommended",
                         severity="info",
                         current_value=version,
-                        optimal_value="Driver branch 550+ (for DX12 Ultra Low Latency Mode)",
+                        optimal_value="Recent Game Ready / Studio branch",
                         explanation=(
-                            "Older branches lack DX12 Ultra Low Latency Mode (added in "
-                            "551.23) and may ship with Reflex/HAGS issues that newer "
-                            "drivers have fixed."
+                            "Older branches may miss Reflex, HAGS, VRR, and game-profile "
+                            "fixes that newer drivers carry. This is a freshness heuristic, "
+                            "not proof that a specific driver increases FPS."
                         ),
                         category="diagnostics",
-                        evidence_tier=EvidenceTier.VERIFIED,
+                        evidence_tier=EvidenceTier.EMPIRICAL,
                     )
                 )
 

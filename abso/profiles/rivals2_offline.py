@@ -5,16 +5,16 @@ NO network rollback timing considerations.
 
 Goals:
 - Maximum frame pacing precision
-- Minimum end-to-end latency
+- Latency-focused no-sync presentation
 - Aggressive timing assumptions allowed
 
 NVCP Settings (per-game for Rivals2.exe):
-- V-Sync: OFF (no sync for minimum latency)
-- Low Latency Mode: ON (Ultra has no effect in DX12/UE5)
+- V-Sync: OFF (no sync, tearing accepted)
+- Low Latency Mode: ON (DX12/UE5 impact must be measured per driver/game)
 - Max Frame Rate: OFF (uncapped)
 - Power Management: Prefer Maximum Performance
 - Threaded Optimization: OFF (UE5 driver contention)
-- G-SYNC: OFF (no sync overhead)
+- G-SYNC: OFF (no VRR queueing path)
 
 External Tools: RTSS, frame pacing hooks ALLOWED.
 """
@@ -48,7 +48,7 @@ class Rivals2OfflineProfile(Rivals2BaseProfile):
 
     @property
     def description(self) -> str:
-        return "Maximum latency reduction for training/local play (NOT for online)"
+        return "Latency-focused no-sync profile for training/local play (NOT for online)"
 
     @property
     def optimization_target(self) -> str:
@@ -89,11 +89,11 @@ class Rivals2OfflineProfile(Rivals2BaseProfile):
                 "processor_min_state": 100,
             },
             "NvidiaSettingsHandler": {
-                # Rivals 2 is DX12/UE5 — LLM Ultra has no effect (DX9/DX11 only).
-                # Use LLM ON for pre-render queue reduction where it works.
+                # Rivals 2 is DX12/UE5. Driver LLM impact is less deterministic
+                # than DX11; use On rather than Ultra and measure locally.
                 "low_latency_mode": "on",
                 "power_management": "prefer_max_performance",
-                "vsync": "off",  # No sync — minimum latency, accept tearing
+                "vsync": "off",  # No sync, accept tearing
                 "vsync_tear_control": "disable",
                 "vrr_app_override": "force_off",  # No G-Sync overhead
                 "global_vrr_mode": "off",  # Enforce global VRR off for clean no-sync transitions
@@ -103,10 +103,10 @@ class Rivals2OfflineProfile(Rivals2BaseProfile):
                 "triple_buffering": "off",
             },
             "Rivals2ConfigHandler": {
-                "fullscreen_mode": 0,  # Exclusive fullscreen for lowest latency
+                "fullscreen_mode": 0,  # Exclusive fullscreen no-sync path
                 "vsync": False,  # In-game VSync OFF
                 "raw_input": True,  # Best input latency
-                "frame_rate_limit": 999,  # Uncapped - lowest latency no-sync path
+                "frame_rate_limit": 999,  # Uncapped no-sync path
                 "hdr_output": False,
             },
             "NvidiaNotificationHandler": {
@@ -127,21 +127,22 @@ class Rivals2OfflineProfile(Rivals2BaseProfile):
                 "category": "NVIDIA Control Panel",
                 "setting": "G-SYNC",
                 "value": "Off",
-                "reason": "No sync overhead for minimum latency. Tearing is acceptable offline.",
+                "reason": "Avoids the VRR queueing path. Tearing is acceptable offline.",
             },
             {
                 "category": "NVIDIA Control Panel",
                 "setting": "Vertical Sync",
                 "value": "Off",
-                "reason": "No sync — minimum latency path.",
+                "reason": "No-sync path: accepts tearing to avoid VSync queueing.",
             },
             {
                 "category": "NVIDIA Control Panel",
                 "setting": "Low Latency Mode",
                 "value": "On",
                 "reason": (
-                    "Reduces pre-render queue to 1 frame. Ultra has no effect in DX12/UE5 "
-                    "(only works in DX9/DX11)."
+                    "Driver LLM can reduce render queueing in supported paths. "
+                    "DX12/UE5 behavior is game-controlled enough that ABSO does "
+                    "not claim a fixed latency win."
                 ),
             },
             {

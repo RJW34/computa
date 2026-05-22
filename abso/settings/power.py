@@ -61,7 +61,11 @@ class PowerSettingsHandler(SettingsHandler):
                 severity="warning",
                 current_value=active_plan.get("name", "Unknown"),
                 optimal_value="Ultimate Performance (standard) or High Performance (fallback)",
-                explanation="Performance power plans prevent CPU throttling and power-saving delays.",
+                explanation=(
+                    "Performance power plans reduce Windows power-saving behavior "
+                    "that can matter under load. Benefit depends on CPU, firmware, "
+                    "cooling, and OEM policy, and it can increase power and noise."
+                ),
                 category="power",
             ))
 
@@ -72,7 +76,11 @@ class PowerSettingsHandler(SettingsHandler):
                 severity="info",
                 current_value="Not installed",
                 optimal_value="Available",
-                explanation="Ultimate Performance provides maximum performance for gaming. Can be enabled via powercfg.",
+                explanation=(
+                    "Ultimate Performance is an optional Windows power scheme that "
+                    "biases toward performance over efficiency. It is not a universal "
+                    "FPS gain, but it gives ABSO a consistent high-performance target."
+                ),
                 category="power",
             ))
 

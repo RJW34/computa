@@ -1,4 +1,4 @@
-﻿# Rivals 2 Optimal VRR Configuration
+﻿# Deprecated Rivals 2 VRR Snapshot
 
 > **DEPRECATED**: This document is an auto-generated snapshot from an earlier session and
 > contains inaccurate claims. The "~1.0ms display latency" figure is **physically
@@ -34,7 +34,7 @@ Generated: 2026-01-15 17:16:41
   - IoPriority: 3 (3=High)
 
 ## 3. Fullscreen Optimizations
-- **FSO: ENABLED** (no disable entries - optimal for VRR)
+- **FSO: ENABLED** (stale snapshot value - not the current ABSO Rivals 2 policy)
 
 ## 4. Windows Gaming Settings
 - Game Mode: ENABLED

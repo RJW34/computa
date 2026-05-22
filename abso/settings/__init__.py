@@ -1,28 +1,44 @@
-"""Settings handler modules."""
+"""Settings handler package.
+
+Keep this initializer lightweight. Eagerly importing concrete handlers here
+creates circular imports when profile catalog modules import individual
+settings submodules during startup.
+"""
+
+from __future__ import annotations
+
+from importlib import import_module
+from typing import Any
 
 MONITOR_DATA_STORE_KEY = r"SYSTEM\CurrentControlSet\Control\GraphicsDrivers\MonitorDataStore"
 
-from abso.settings.base import SettingsHandler
-from abso.settings.cnm import CNMSettingsHandler
-from abso.settings.diablo4_config import Diablo4ConfigHandler
-from abso.settings.network import NetworkSettingsHandler
-from abso.settings.nvidia import NvidiaSettingsHandler
-from abso.settings.obs import OBSSettingsHandler
-from abso.settings.power import PowerSettingsHandler
-from abso.settings.registry import RegistrySettingsHandler
-from abso.settings.timer import TimerSettingsHandler
-from abso.settings.windows import WindowsSettingsHandler
+_LAZY_EXPORTS = {
+    "SettingsHandler": ("abso.settings.base", "SettingsHandler"),
+    "WindowsSettingsHandler": ("abso.settings.windows", "WindowsSettingsHandler"),
+    "PowerSettingsHandler": ("abso.settings.power", "PowerSettingsHandler"),
+    "RegistrySettingsHandler": ("abso.settings.registry", "RegistrySettingsHandler"),
+    "NvidiaSettingsHandler": ("abso.settings.nvidia", "NvidiaSettingsHandler"),
+    "NetworkSettingsHandler": ("abso.settings.network", "NetworkSettingsHandler"),
+    "Diablo4ConfigHandler": ("abso.settings.diablo4_config", "Diablo4ConfigHandler"),
+    "TimerSettingsHandler": ("abso.settings.timer", "TimerSettingsHandler"),
+    "CNMSettingsHandler": ("abso.settings.cnm", "CNMSettingsHandler"),
+    "OBSSettingsHandler": ("abso.settings.obs", "OBSSettingsHandler"),
+}
+
+
+def __getattr__(name: str) -> Any:
+    """Lazily expose common handler classes for compatibility."""
+    try:
+        module_name, attr_name = _LAZY_EXPORTS[name]
+    except KeyError as exc:
+        raise AttributeError(name) from exc
+
+    value = getattr(import_module(module_name), attr_name)
+    globals()[name] = value
+    return value
+
 
 __all__ = [
     "MONITOR_DATA_STORE_KEY",
-    "SettingsHandler",
-    "WindowsSettingsHandler",
-    "PowerSettingsHandler",
-    "RegistrySettingsHandler",
-    "NvidiaSettingsHandler",
-    "NetworkSettingsHandler",
-    "Diablo4ConfigHandler",
-    "TimerSettingsHandler",
-    "CNMSettingsHandler",
-    "OBSSettingsHandler",
+    *_LAZY_EXPORTS.keys(),
 ]

@@ -1,6 +1,6 @@
-"""VRR (Variable Refresh Rate) optimization knowledge base.
+"""VRR (Variable Refresh Rate) tuning knowledge base.
 
-Contains data and logic for G-SYNC, FreeSync, and frame rate optimization
+Contains data and logic for G-SYNC, FreeSync, and frame rate caps
 based on Blur Busters G-SYNC 101 research.
 
 Source: https://blurbusters.com/gsync/gsync101-input-lag-tests-and-settings/
@@ -16,7 +16,7 @@ from typing import Any
 class SyncMethod(Enum):
     """Display synchronization methods."""
 
-    NONE = "none"  # No sync, tearing, lowest latency
+    NONE = "none"  # No sync, tearing accepted
     VSYNC_ONLY = "vsync_only"  # V-SYNC without VRR, high latency
     VRR = "vrr"  # G-SYNC/FreeSync, low latency tear-free
     VRR_VSYNC = "vrr_vsync"  # VRR + NVCP V-SYNC as safety net (recommended)
@@ -26,7 +26,7 @@ class SyncMethod(Enum):
 class FrameLimiterType(Enum):
     """Frame limiter types ranked by latency (best to worst)."""
 
-    IN_GAME = "in_game"  # Lowest latency
+    IN_GAME = "in_game"  # Usually preferred when stable
     REFLEX = "reflex"  # Engine-level, auto-adjusts
     RTSS = "rtss"  # Best frametime consistency
     NVCP = "nvcp"  # Affects power management, avoid
@@ -42,8 +42,8 @@ class GraphicsAPI(Enum):
     OPENGL = "opengl"
 
 
-# APIs that support NVIDIA Low Latency Mode
-LLM_SUPPORTED_APIS = {GraphicsAPI.DX9, GraphicsAPI.DX11, GraphicsAPI.DX12}
+# APIs where NVIDIA's driver Low Latency Mode is most predictable.
+LLM_SUPPORTED_APIS = {GraphicsAPI.DX9, GraphicsAPI.DX11}
 
 # APIs that should use Reflex instead of LLM
 REFLEX_PREFERRED_APIS = {GraphicsAPI.DX11, GraphicsAPI.DX12, GraphicsAPI.VULKAN}
@@ -103,7 +103,7 @@ COMMON_FPS_PRESETS = [30, 60, 120, 144, 165, 240, 300, 360]
 
 
 def get_vrr_fps_cap(refresh_rate: int | float) -> int:
-    """Calculate optimal FPS cap for VRR displays.
+    """Calculate ABSO's recommended FPS cap for VRR displays.
 
     Uses a refresh-scaled margin matching current Blur Busters G-SYNC 101
     guidance (updated 2026-05). The legacy "refresh - 3" rule was correct
@@ -128,7 +128,7 @@ def get_vrr_fps_cap(refresh_rate: int | float) -> int:
         refresh_rate: Monitor's maximum refresh rate in Hz.
 
     Returns:
-        Optimal FPS cap value.
+        Recommended FPS cap value.
     """
     refresh_rate = round(float(refresh_rate))
     # Use preset table when available so common refresh rates return
@@ -157,10 +157,10 @@ def get_best_ingame_preset(refresh_rate: int, available_presets: list[int] | Non
         Best preset value, or None if no suitable preset exists.
     """
     presets = available_presets or COMMON_FPS_PRESETS
-    optimal = get_vrr_fps_cap(refresh_rate)
+    recommended = get_vrr_fps_cap(refresh_rate)
 
-    # Find highest preset at or below optimal
-    valid = [p for p in presets if p <= optimal]
+    # Find highest preset at or below the recommended cap.
+    valid = [p for p in presets if p <= recommended]
     return max(valid) if valid else None
 
 
@@ -185,29 +185,29 @@ def get_limiter_recommendation(
     Returns:
         Dictionary with limiter type and recommended cap value.
     """
-    optimal_cap = get_vrr_fps_cap(refresh_rate)
+    recommended_cap = get_vrr_fps_cap(refresh_rate)
 
     if has_ingame_limiter:
         if ingame_allows_custom:
             return {
                 "limiter": FrameLimiterType.IN_GAME,
-                "fps_cap": optimal_cap,
-                "reason": "In-game limiter with custom values has lowest latency",
+                "fps_cap": recommended_cap,
+                "reason": "Use the in-game limiter when it supports stable custom values.",
             }
         else:
             # Preset-only limiter
             best_preset = get_best_ingame_preset(refresh_rate, available_presets)
-            if best_preset and (optimal_cap - best_preset) <= 10:
+            if best_preset and (recommended_cap - best_preset) <= 10:
                 return {
                     "limiter": FrameLimiterType.IN_GAME,
                     "fps_cap": best_preset,
-                    "reason": f"In-game preset {best_preset} is within acceptable range of optimal {optimal_cap}",
+                    "reason": f"In-game preset {best_preset} is within acceptable range of recommended cap {recommended_cap}",
                 }
             else:
                 return {
                     "limiter": FrameLimiterType.RTSS,
-                    "fps_cap": optimal_cap,
-                    "reason": f"In-game presets too far from optimal; use RTSS at {optimal_cap}",
+                    "fps_cap": recommended_cap,
+                    "reason": f"In-game presets too far from recommended cap; use RTSS at {recommended_cap}",
                 }
     elif has_reflex:
         return {
@@ -218,16 +218,16 @@ def get_limiter_recommendation(
     else:
         return {
             "limiter": FrameLimiterType.RTSS,
-            "fps_cap": optimal_cap,
-            "reason": f"No in-game limiter; use RTSS at {optimal_cap}",
+            "fps_cap": recommended_cap,
+            "reason": f"No in-game limiter; use RTSS at {recommended_cap}",
         }
 
 
 def get_llm_recommendation(api: GraphicsAPI, has_reflex: bool) -> dict[str, Any]:
     """Get Low Latency Mode recommendation based on graphics API.
 
-    LLM works on DX9/DX11 and modern NVIDIA drivers also support DX12.
-    When a game has Reflex, prefer Reflex instead of layering driver LLM.
+    Driver LLM is most predictable on DX9/DX11. When a game has Reflex,
+    prefer Reflex instead of layering driver LLM.
 
     Args:
         api: Graphics API the game uses.
@@ -245,7 +245,7 @@ def get_llm_recommendation(api: GraphicsAPI, has_reflex: bool) -> dict[str, Any]
     elif api in LLM_SUPPORTED_APIS:
         return {
             "low_latency_mode": "on",  # Not "ultra" - it overrides manual FPS caps
-            "reason": f"LLM 'On' recommended for {api.value}. Avoid 'Ultra' as it overrides manual FPS caps.",
+            "reason": f"LLM 'On' is the conservative driver setting for {api.value}. Avoid 'Ultra' as it can override manual FPS caps.",
         }
     else:
         return {
@@ -258,7 +258,7 @@ def get_fighting_game_config(
     refresh_rate: int,
     accept_tearing: bool = False,
 ) -> dict[str, Any]:
-    """Get optimal VRR config for fighting games (60Hz logic).
+    """Get ABSO's VRR/no-sync config for fighting games (60Hz logic).
 
     Fighting games run game logic at fixed 60Hz but benefit from
     high refresh for reduced scanout/display latency.
@@ -277,7 +277,7 @@ def get_fighting_game_config(
             "vsync_ingame": False,
             "low_latency_mode": "off",
             "fps_cap": None,
-            "reason": "Absolute minimum latency, tearing acceptable",
+            "reason": "No-sync path, tearing acceptable",
         }
     else:
         return {

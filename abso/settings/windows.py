@@ -2065,7 +2065,7 @@ class WindowsSettingsHandler(SettingsHandler):
     def _set_vrr_optimize(self, enabled: bool) -> dict[str, Any]:
         """Set VRR Optimize for windowed games (Windows 11).
 
-        IMPORTANT: For minimum latency, this should be DISABLED.
+        Strict fullscreen/no-sync profiles keep this disabled.
         VRROptimizeEnable=1 keeps compositor logic in the path even in
         exclusive fullscreen, which may add latency.
 

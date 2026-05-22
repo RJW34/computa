@@ -19,7 +19,7 @@ from abso.settings.base import SettingsHandler
 logger = logging.getLogger(__name__)
 
 
-# Optimal streaming settings for Twitch
+# Twitch streaming target settings
 OPTIMAL_STREAM_SETTINGS = {
     "rate_control": "CBR",
     "bitrate": 6000,
@@ -389,7 +389,7 @@ class OBSSettingsHandler(SettingsHandler):
         return issues
 
     def apply(self, settings: dict[str, Any]) -> dict[str, Any]:
-        """Apply optimized OBS settings.
+        """Apply OBS profile settings.
 
         Args:
             settings: Dictionary with:
@@ -572,9 +572,9 @@ class OBSSettingsHandler(SettingsHandler):
         resolution: tuple[int, int] = (1920, 1080),
         preset: str = "p5",
     ) -> dict[str, Any]:
-        """Apply optimized streaming preset to an OBS profile.
+        """Apply ABSO's streaming preset to an OBS profile.
 
-        Convenience method that applies recommended settings for Twitch streaming.
+        Convenience method that applies a conservative Twitch streaming baseline.
 
         Args:
             profile_name: OBS profile to modify (None = first profile)

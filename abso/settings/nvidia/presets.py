@@ -105,10 +105,11 @@ class NvidiaSettingValues:
 
 # Preset profiles for different optimization targets
 #
-# IMPORTANT: Low Latency Mode (LLM) works in DX9/DX11 and modern NVIDIA
-# drivers also support DX12. Vulkan still does not expose the same benefit.
-# If a game has NVIDIA Reflex, use Reflex instead of layering driver LLM.
-# LLM "Ultra" auto-caps FPS and overrides manual caps - use "On" with manual cap.
+# IMPORTANT: Driver Low Latency Mode (LLM) is most predictable on DX9/DX11.
+# NVIDIA documents DX12/Vulkan as game-controlled queueing paths for the
+# original driver feature, while Reflex is the preferred path when a game
+# implements it. LLM "Ultra" can interfere with manual caps - use "On" with
+# a manual cap unless a profile explicitly accepts that tradeoff.
 #
 # NOTE ON STUTTERING: LLM reduces the render queue (pre-rendered frames).
 # This CAN cause micro-stuttering on some systems, especially if CPU-bound or
@@ -122,9 +123,9 @@ class NvidiaSettingValues:
 # See: https://blurbusters.com/gsync/gsync101-input-lag-tests-and-settings/
 
 NVIDIA_PRESETS: dict[str, dict[str, Any]] = {
-    # === VRR-OPTIMIZED PRESETS (RECOMMENDED) ===
+    # === VRR PRESETS ===
     "vrr_optimal": {
-        "description": "Optimal VRR (G-SYNC/FreeSync) setup - tear-free, low latency",
+        "description": "VRR (G-SYNC/FreeSync) setup - tear-free, latency-aware",
         "settings": {
             "low_latency_mode": "on",  # Not Ultra - it overrides manual FPS caps
             "power_management": "prefer_max_performance",
@@ -135,11 +136,11 @@ NVIDIA_PRESETS: dict[str, dict[str, Any]] = {
         },
         "notes": {
             "fps_cap": "Set in-game or RTSS to refresh_rate - 3 (e.g., 141 for 144Hz)",
-            "api_support": "LLM works in DX9/DX11/DX12. Use Reflex when available; Vulkan still relies on the game/driver path instead.",
+            "api_support": "Driver LLM is most predictable on DX9/DX11. Use Reflex when available; DX12/Vulkan results depend more on the game path.",
         },
     },
     "vrr_fighting_game": {
-        "description": "Optimized for fighting games with VRR - tear-free, near-minimum latency",
+        "description": "VRR fighting-game setup - tear-free, capped latency path",
         "settings": {
             "low_latency_mode": "on",  # NOT Ultra - Ultra overrides manual FPS caps
             "power_management": "prefer_max_performance",
@@ -159,7 +160,7 @@ NVIDIA_PRESETS: dict[str, dict[str, Any]] = {
                 "60Hz-logic games still benefit from high refresh (reduced scanout latency). "
                 "300Hz and 240Hz both divide evenly into 60fps - no cadence judder."
             ),
-            "api_support": "Most modern fighting games use DX12/UE5. LLM can still help, but results vary more than classic DX11 paths and Rivals 2 still lacks Reflex.",
+            "api_support": "Most modern fighting games use DX12/UE5. Driver LLM is less deterministic there than classic DX11 paths; measure per game.",
             "stuttering": (
                 "If experiencing micro-stutter, try low_latency_mode='off' or use NPI "
                 "to set Max Pre-Rendered Frames to 2-3. Hardware-dependent - test both."
@@ -167,7 +168,7 @@ NVIDIA_PRESETS: dict[str, dict[str, Any]] = {
         },
     },
     "vrr_diablo4": {
-        "description": "VRR for Diablo 4 with native Reflex - ultra low latency ARPG",
+        "description": "VRR for Diablo 4 with native Reflex",
         "settings": {
             "low_latency_mode": "off",  # OFF - Diablo 4 has native Reflex, don't conflict
             "power_management": "prefer_max_performance",
@@ -199,7 +200,8 @@ NVIDIA_PRESETS: dict[str, dict[str, Any]] = {
             "system_requirements": (
                 "HAGS=ON (per-profile default; reboot-relevant), "
                 "VBS/HVCI tradeoff is opt-in, "
-                "MPO enabled (required for G-SYNC/VRR on Windows 11 24H2+)."
+                "MPO enabled by default because disabling it can alter the "
+                "Windows 11 VRR/compositor path on some systems."
             ),
             "hdr": (
                 "Diablo 4 has excellent native HDR. The Diablo 4 HDR profile keeps "
@@ -209,7 +211,7 @@ NVIDIA_PRESETS: dict[str, dict[str, Any]] = {
         },
     },
     "no_sync_fighting_game": {
-        "description": "Absolute minimum latency for fighting games - accepts tearing",
+        "description": "No-sync fighting-game setup - accepts tearing for a shorter presentation path",
         "settings": {
             "low_latency_mode": "on",  # 'On' by default - see stuttering note below
             "power_management": "prefer_max_performance",
@@ -226,8 +228,9 @@ NVIDIA_PRESETS: dict[str, dict[str, Any]] = {
                 "(tear lines move faster). Use for tournament/LAN settings only."
             ),
             "fighting_games": (
-                "Absolute minimum click-to-pixel latency. Saves ~1-3ms over VRR setup. "
-                "Worth it only if you can tolerate tearing and need every millisecond."
+                "Avoids sync/VRR queueing and accepts tearing. The exact latency "
+                "difference versus a VRR setup depends on the game, display, and "
+                "frame pacing, so ABSO does not claim a fixed millisecond gain."
             ),
             "stuttering": (
                 "If experiencing micro-stutter, try low_latency_mode='off' or use NPI "
@@ -244,7 +247,7 @@ NVIDIA_PRESETS: dict[str, dict[str, Any]] = {
 
     # === REFLEX-ENABLED GAMES ===
     "reflex_no_sync": {
-        "description": "Reflex game no-sync profile - minimum latency, tearing acceptable",
+        "description": "Reflex game no-sync profile - latency-focused, tearing acceptable",
         "settings": {
             "low_latency_mode": "off",  # Reflex replaces driver LLM
             "power_management": "prefer_max_performance",
@@ -257,7 +260,7 @@ NVIDIA_PRESETS: dict[str, dict[str, Any]] = {
             "vsync_tear_control": "disable",
         },
         "notes": {
-            "usage": "For competitive no-sync play where minimum latency is prioritized over tearing.",
+            "usage": "For competitive no-sync play where lower queueing is prioritized over tear-free output.",
             "reflex": "Set in-game NVIDIA Reflex to On + Boost.",
             "warning": "Will tear on high-motion scenes; this is expected for no-sync mode.",
         },
@@ -310,7 +313,7 @@ NVIDIA_PRESETS: dict[str, dict[str, Any]] = {
 
     # === LEGACY PRESETS (for non-VRR or specific scenarios) ===
     "minimum_latency": {
-        "description": "Absolute minimum latency - accepts tearing, no sync",
+        "description": "Legacy no-sync latency profile - accepts tearing",
         "settings": {
             "low_latency_mode": "ultra",  # Ultra is fine here since we're uncapped
             "power_management": "prefer_max_performance",
@@ -322,7 +325,7 @@ NVIDIA_PRESETS: dict[str, dict[str, Any]] = {
         },
         "notes": {
             "warning": "Causes screen tearing. Only use if tearing is acceptable.",
-            "api_support": "LLM Ultra works in DX9/DX11/DX12 (driver 551.23+). Vulkan unsupported.",
+            "api_support": "LLM Ultra is most predictable on DX9/DX11. DX12/Vulkan queueing is more game-controlled; measure before relying on it.",
             "gsync": "G-Sync disabled for this profile to eliminate VRR overhead.",
         },
     },

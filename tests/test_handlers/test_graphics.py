@@ -80,7 +80,7 @@ class TestGraphicsAudit:
         mock_detect.return_value = {
             "mpo_disabled": False,
             "global_fso_disabled": True,
-            "game_dvr_behavior": 2,
+            "game_dvr_behavior": 0,
             "hardware_cursor": True,
         }
 
@@ -92,25 +92,8 @@ class TestGraphicsAudit:
         assert mpo_issues[0].severity == "info"
 
     @patch.object(GraphicsSettingsHandler, "detect")
-    def test_audit_fso_enabled_creates_info(self, mock_detect):
-        """Test audit creates info issue when FSO is enabled."""
-        mock_detect.return_value = {
-            "mpo_disabled": True,
-            "global_fso_disabled": False,
-            "game_dvr_behavior": 0,
-            "hardware_cursor": True,
-        }
-
-        handler = GraphicsSettingsHandler()
-        issues = handler.audit()
-
-        fso_issues = [i for i in issues if "Fullscreen" in i.title]
-        assert len(fso_issues) == 1
-        assert fso_issues[0].severity == "info"
-
-    @patch.object(GraphicsSettingsHandler, "detect")
-    def test_audit_optimal_settings_minimal_issues(self, mock_detect):
-        """Test audit returns minimal issues when settings are optimal."""
+    def test_audit_global_fso_disabled_creates_info(self, mock_detect):
+        """Test audit creates info issue when global FSO is forcibly disabled."""
         mock_detect.return_value = {
             "mpo_disabled": True,
             "global_fso_disabled": True,
@@ -121,7 +104,25 @@ class TestGraphicsAudit:
         handler = GraphicsSettingsHandler()
         issues = handler.audit()
 
-        # Should have no issues when optimal
+        fso_issues = [i for i in issues if "Fullscreen" in i.title]
+        assert len(fso_issues) == 1
+        assert fso_issues[0].severity == "info"
+        assert fso_issues[0].optimal_value == "Profile-managed per-exe policy"
+
+    @patch.object(GraphicsSettingsHandler, "detect")
+    def test_audit_profile_managed_settings_minimal_issues(self, mock_detect):
+        """Test audit returns minimal issues for profile-managed graphics settings."""
+        mock_detect.return_value = {
+            "mpo_disabled": True,
+            "global_fso_disabled": False,
+            "game_dvr_behavior": 0,
+            "hardware_cursor": True,
+        }
+
+        handler = GraphicsSettingsHandler()
+        issues = handler.audit()
+
+        # Should have no issues when global FSO remains profile-managed.
         assert len(issues) == 0
 
 

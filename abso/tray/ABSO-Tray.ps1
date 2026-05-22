@@ -816,7 +816,7 @@ $script:FallbackProfiles = [ordered]@{
         Name     = "Rivals 2 - Offline No Sync"
         Sub      = "No Sync | LLM ON | Uncapped | Offline Only"
         Cat      = "Fighting"
-        Desc     = "Maximum latency reduction for training/local play (NOT for online)"
+        Desc     = "Latency-focused no-sync profile for training/local play (NOT for online)"
         Exes     = @("Rivals2-Win64-Shipping.exe", "RivalsofAether2.exe", "Rivals2.exe")
         SyncMode = "off"
     }
@@ -850,7 +850,7 @@ $script:FallbackProfiles = [ordered]@{
         Name     = "Super Smash Bros. Melee (Slippi)"
         Sub      = "Competitive | No Sync | Backend-Aware"
         Cat      = "Fighting"
-        Desc     = "Ultra-low latency optimization for competitive Melee"
+        Desc     = "Latency-focused no-sync profile for competitive Melee"
         Exes     = @("Slippi Dolphin.exe", "Dolphin.exe")
         SyncMode = "off"
     }
@@ -864,9 +864,9 @@ $script:FallbackProfiles = [ordered]@{
     }
     "slippi-melee-universal" = @{
         Name     = "Super Smash Bros. Melee (Slippi Universal)"
-        Sub      = "Lowest Latency | HAGS ON | No Sync"
+        Sub      = "No Sync | HAGS ON | Reapply-Friendly"
         Cat      = "Fighting"
-        Desc     = "Absolute minimum latency with HAGS kept on so re-applying does not require a reboot. VSync OFF, G-SYNC/VRR OFF."
+        Desc     = "No-sync Slippi profile with HAGS kept on so re-applying does not require a reboot. VSync OFF, G-SYNC/VRR OFF."
         Exes     = @("Slippi Dolphin.exe", "Dolphin.exe")
         SyncMode = "off"
     }
@@ -876,7 +876,7 @@ $script:FallbackProfiles = [ordered]@{
         Name     = "SSBU / HewDraw Remix (Ryujinx)"
         Sub      = "Vulkan | Fixed 60fps | HAGS ON | LLM OFF"
         Cat      = "Fighting"
-        Desc     = "Ultra-low latency optimization for competitive SSBU/HDR"
+        Desc     = "Latency-focused no-sync profile for competitive SSBU/HDR"
         Exes     = @("Ryujinx.exe", "Ryujinx.Ava.exe", "Ryujinx.Headless.SDL2.exe", "Ryubing.exe")
         SyncMode = "off"
     }
@@ -943,23 +943,23 @@ $script:FallbackProfiles = [ordered]@{
         SyncMode = "on"
     }
     "overwatch2"        = @{
-        Name     = "Overwatch 2 - Competitive No-Sync SDR"
+        Name     = "Overwatch 2 - No Sync SDR"
         Sub      = "No Sync SDR | Reflex OFF | VSync OFF | G-SYNC OFF"
         Cat      = "Shooter"
-        Desc     = "Minimum latency no-sync SDR profile (Reflex OFF, VSync OFF, VRR OFF)"
+        Desc     = "Latency-focused no-sync SDR profile (Reflex OFF, VSync OFF, VRR OFF)"
         Exes     = @("Overwatch.exe")
         SyncMode = "off"
     }
     "overwatch2-hdr"    = @{
-        Name     = "Overwatch 2 - Competitive No-Sync HDR"
+        Name     = "Overwatch 2 - No Sync HDR"
         Sub      = "No Sync HDR | Reflex OFF | VSync OFF | G-SYNC OFF"
         Cat      = "Shooter"
-        Desc     = "Minimum latency no-sync HDR profile. Native HDR for OLED / Mini-LED displays; same sync/VRR contract as the SDR variant."
+        Desc     = "Latency-focused no-sync HDR profile. Native HDR for OLED / Mini-LED displays; same sync/VRR contract as the SDR variant."
         Exes     = @("Overwatch.exe")
         SyncMode = "off"
     }
     "overwatch2-gsync"  = @{
-        Name     = "Overwatch 2 - Competitive GSYNC SDR"
+        Name     = "Overwatch 2 - GSYNC SDR"
         Sub      = "Strict SDR Exclusive | Reflex (set in-game) | G-SYNC ON"
         Cat      = "Shooter"
         Desc     = "Low latency VRR profile (Reflex, VSync safety net, G-SYNC ON)"
@@ -967,7 +967,7 @@ $script:FallbackProfiles = [ordered]@{
         SyncMode = "on"
     }
     "overwatch2-gsync-hdr" = @{
-        Name     = "Overwatch 2 - Competitive GSYNC HDR"
+        Name     = "Overwatch 2 - GSYNC HDR"
         Sub      = "HDR ON | Reflex ON+Boost | G-SYNC ON"
         Cat      = "Shooter"
         Desc     = "Tear-free low latency VRR with native HDR (OLED/Mini-LED)"

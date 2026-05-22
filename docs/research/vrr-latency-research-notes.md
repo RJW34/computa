@@ -1,7 +1,7 @@
 # VRR/G-SYNC Latency Research Notes
 
 ## Document Purpose
-Comprehensive research notes for fighting game latency optimization, specifically for Rivals of Aether 2 on 300Hz monitors. This document serves as a knowledge base for the A.B.S.O. project.
+Historical research notes for fighting game latency tuning, specifically for Rivals of Aether 2 on 300Hz monitors. This document is not release evidence by itself; product-facing claims still require benchmark artifacts and the quality rubric wins on conflicts.
 
 ---
 
@@ -21,7 +21,7 @@ Comprehensive research notes for fighting game latency optimization, specificall
 **For No-Sync (DEFAULT for Rivals 2):**
 - Monitor refresh rate DIRECTLY determines scanout time
 - 300Hz = 3.33ms scanout (faster) vs 240Hz = 4.17ms (slower)
-- **MUST use 300Hz for minimum latency**
+- 300Hz has lower scanout time than 240Hz in no-sync mode when the display path actually runs at 300Hz
 
 **For G-SYNC (Alternative):**
 - Scanout matches actual FPS, not monitor max
@@ -40,7 +40,9 @@ Comprehensive research notes for fighting game latency optimization, specificall
 | Frame cadence with 60fps logic | 240/60=4 (even) | 300/60=5 (even) | Tie |
 | V-SYNC ceiling risk | FPS spike triggers V-SYNC | More headroom | 300Hz |
 
-**Verdict:** Always use 300Hz. The only "benefit" of 240Hz is negligible power savings.
+**Verdict:** Prefer 300Hz for the ABSO no-sync/VRR test path unless a specific
+display, power, or stability issue is measured at that refresh rate. The only
+general 240Hz benefit identified here is lower power use.
 
 ---
 
@@ -77,7 +79,7 @@ Source: Blur Busters LDAT testing in Overwatch at 240Hz
 
 ---
 
-## G-SYNC Optimal Configuration
+## G-SYNC Recommended Configuration
 
 ### Blur Busters G-SYNC 101 Recommendations
 
@@ -98,9 +100,9 @@ In-Game:
 V-SYNC ON in NVCP with G-SYNC is NOT traditional V-SYNC:
 - Within VRR range: V-SYNC is inactive, G-SYNC handles sync
 - Above VRR ceiling: V-SYNC prevents tearing (safety net)
-- With proper FPS cap: V-SYNC **never activates**
+- With a stable FPS cap below the ceiling: V-SYNC should not engage during normal play
 
-**Common misconception:** "V-SYNC ON adds latency" — False when FPS is capped below refresh rate.
+**Common misconception:** "V-SYNC ON always adds latency" — too broad when FPS is capped below refresh rate in a VRR path.
 
 ### Why Low Latency Mode "On" not "Ultra"?
 
@@ -234,10 +236,10 @@ Based on testing across multiple systems and games:
 
 **Important:** Results are system-dependent. The configurations below are starting points - test both HAGS ON/OFF for your specific setup.
 
-### DEFAULT: No-Sync (Minimum Latency for Fighting Games)
+### DEFAULT: No-Sync (Tearing-Accepting Latency Path)
 
 ```
-Monitor: 300Hz (MUST be at max for fastest scanout)
+Monitor: 300Hz for the tested high-refresh path
 NVCP G-SYNC: OFF
 NVCP V-SYNC: OFF
 NVCP Low Latency Mode: On
@@ -249,14 +251,14 @@ Display Mode: Exclusive Fullscreen
 Windows VRR: Off
 ```
 
-**Expected latency:** Lowest possible (~3.3ms scanout, 0ms sync overhead)
+**Expected latency:** Low sync overhead with ~3.3ms scanout at 300Hz on the tested display path
 **Tearing:** Yes (barely visible at 300Hz - ~3.33ms tear lines)
-**Best for:** Fighting games where minimum latency is priority
+**Best for:** Fighting games where the no-sync latency path is priority
 
 **Why no-sync is default for Rivals 2:**
 - Fighting games prioritize input latency over visual polish
 - At 300Hz, tearing is barely perceptible
-- No sync overhead = absolute minimum click-to-pixel latency
+- No-sync avoids the VRR/VSync queueing path but accepts tearing; the exact latency difference must be measured per setup
 - Rivals 2 lacks Reflex, LLM has limited effect in DX12/UE5
 
 ### ALTERNATIVE: VRR/G-SYNC (Tear-Free)

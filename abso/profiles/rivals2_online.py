@@ -5,7 +5,7 @@ Rollback netcode behavior is AUTHORITATIVE for this profile.
 
 Per rollback.md canonical spec:
 - Optimization Class: Rollback-Safe Low Latency
-- Priority: Frame pacing stability > absolute latency
+- Priority: Frame pacing stability > raw latency
 
 Goals:
 - Deterministic stability for rollback netcode
@@ -111,14 +111,14 @@ class Rivals2OnlineProfile(Rivals2BaseProfile):
             },
             "NvidiaSettingsHandler": {
                 # ONLINE profile: Conservative settings for rollback stability
-                # Per rollback.md canonical spec - frame pacing stability > absolute latency
+                # Per rollback.md canonical spec - frame pacing stability > raw latency
                 "low_latency_mode": "on",  # ON, NOT Ultra! (Ultra can cause frame pacing issues, overrides FPS caps)
                 "power_management": "prefer_max_performance",
                 "vsync": "off",  # OFF - rollback netcode is timing-sensitive, not tear-sensitive
                 "vsync_tear_control": "disable",  # Explicit tear control off with VSync OFF
-                "vrr_app_override": "force_off",  # OFF - VRR adds ~2-5ms latency overhead
+                "vrr_app_override": "force_off",  # OFF for no-sync online path
                 "global_vrr_mode": "off",  # Enforce global VRR off for clean no-sync transitions
-                "max_frame_rate": "off",  # Uncapped � no external limiters for online play
+                "max_frame_rate": "off",  # Uncapped - no external limiters for online play
                 "shader_cache": "unlimited",
                 "threaded_optimization": "off",  # OFF - UE5 driver contention
                 "triple_buffering": "off",  # OFF - irrelevant without VSync
@@ -128,7 +128,7 @@ class Rivals2OnlineProfile(Rivals2BaseProfile):
                 "io_priority": 2,
             },
             "Rivals2ConfigHandler": {
-                "fullscreen_mode": 0,  # Exclusive fullscreen for lowest latency
+                "fullscreen_mode": 0,  # Exclusive fullscreen no-sync path
                 "vsync": False,  # In-game VSync OFF — driver handles sync
                 "raw_input": True,  # Best input latency
                 "frame_rate_limit": 999,  # Keep one authoritative uncapped in-game limiter

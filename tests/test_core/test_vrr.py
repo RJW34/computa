@@ -65,22 +65,22 @@ class TestBestInGamePreset:
 
     def test_get_best_ingame_preset_exact_match(self):
         """Test when refresh rate matches a preset exactly."""
-        # 144Hz monitor, 141 is optimal, 120 is best preset
-        assert get_best_ingame_preset(144) == 120  # 141 optimal, presets are 60,120,144
+        # 144Hz monitor, 141 is the VRR target, 120 is the best preset.
+        assert get_best_ingame_preset(144) == 120  # 141 target, presets are 60,120,144
 
     def test_get_best_ingame_preset_custom_presets(self):
         """Test with custom game presets."""
         # Rivals 2 presets
         rivals_presets = [60, 120, 144, 165, 240]
 
-        # 300Hz monitor -> 297 optimal -> 240 is best preset
+        # 300Hz monitor -> 285 target -> 240 is best preset
         assert get_best_ingame_preset(300, rivals_presets) == 240
 
-        # 165Hz monitor -> 162 optimal -> 144 is best preset
+        # 165Hz monitor -> 162 target -> 144 is best preset
         assert get_best_ingame_preset(165, rivals_presets) == 144
 
     def test_get_best_ingame_preset_no_valid_preset(self):
-        """Test when no preset is below optimal."""
+        """Test when no preset is below the VRR target."""
         # If minimum preset is 60 and refresh is 50Hz
         assert get_best_ingame_preset(50, [60, 120]) is None
 
@@ -99,8 +99,8 @@ class TestLimiterRecommendation:
         assert result["limiter"] == FrameLimiterType.IN_GAME
         assert result["fps_cap"] == 141
 
-    def test_ingame_preset_when_close_to_optimal(self):
-        """Test in-game preset used when within 10 FPS of optimal."""
+    def test_ingame_preset_when_close_to_vrr_target(self):
+        """Test in-game preset used when within 10 FPS of the VRR target."""
         result = get_limiter_recommendation(
             has_ingame_limiter=True,
             ingame_allows_custom=False,
@@ -108,12 +108,12 @@ class TestLimiterRecommendation:
             refresh_rate=144,
             available_presets=[60, 120, 135, 144],  # 135 is within 10 of 141
         )
-        # 141 is optimal, 135 is within 10 of that (141-135=6)
+        # 141 is the target, 135 is within 10 of that (141-135=6)
         assert result["limiter"] == FrameLimiterType.IN_GAME
         assert result["fps_cap"] == 135
 
     def test_rtss_when_preset_too_far(self):
-        """Test RTSS recommended when in-game presets are too far from optimal."""
+        """Test RTSS recommended when in-game presets are too far from the VRR target."""
         result = get_limiter_recommendation(
             has_ingame_limiter=True,
             ingame_allows_custom=False,
@@ -178,10 +178,11 @@ class TestLLMRecommendation:
         assert result["low_latency_mode"] == "off"
         assert result.get("use_reflex") is True
 
-    def test_llm_supported_in_dx12_without_reflex(self):
-        """Test LLM on for DX12 when Reflex is not available."""
+    def test_llm_not_assumed_for_dx12_without_reflex(self):
+        """Test driver LLM is not assumed useful for DX12 without Reflex."""
         result = get_llm_recommendation(GraphicsAPI.DX12, has_reflex=False)
-        assert result["low_latency_mode"] == "on"
+        assert result["low_latency_mode"] == "off"
+        assert "dx12" in result["reason"]
         assert "use_reflex" not in result or result.get("use_reflex") is not True
 
 

@@ -456,7 +456,7 @@ class DebloatHandler(SettingsHandler):
     def audit(self) -> list[Issue]:
         """Report which telemetry/privacy items are still enabled.
 
-        Returns one Issue per enabled/non-optimal item, tagged with its tier.
+        Returns one Issue per enabled/non-target item, tagged with its tier.
         Only items up to the configured tier are reported.
         """
         issues: list[Issue] = []

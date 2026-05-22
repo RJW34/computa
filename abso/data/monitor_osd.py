@@ -156,7 +156,7 @@ _BUILTIN_MONITOR_DB: list[MonitorOSDProfile] = [
                 OSDRecommendation(
                     setting="Preset Modes",
                     value="FPS",
-                    reason="Optimized color and response for competitive FPS.",
+                    reason="Tuned color and response preset for competitive FPS.",
                 ),
                 OSDRecommendation(
                     setting="Response Time",

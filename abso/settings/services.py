@@ -139,7 +139,7 @@ class ServicesSettingsHandler(SettingsHandler):
 
         Or use preset:
         {
-            "preset": "gaming"  # Applies optimal settings for all gaming services
+            "preset": "gaming"  # Applies ABSO's service baseline
         }
         """
         errors: list[str] = []
@@ -147,7 +147,7 @@ class ServicesSettingsHandler(SettingsHandler):
 
         try:
             if settings.get("preset") == "gaming":
-                # Apply optimal settings for all gaming services
+                # Apply ABSO's service baseline.
                 for service_name, config in self.GAMING_SERVICES.items():
                     optimal_start = cast(int, config["optimal_start_type"])
                     result = self._set_service_start_type(service_name, optimal_start)
