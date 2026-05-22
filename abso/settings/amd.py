@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import logging
 import winreg
-from functools import lru_cache
 from typing import Any
 
 from abso.core.models import EvidenceTier, Issue

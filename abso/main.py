@@ -956,7 +956,7 @@ def apply(profile_name: str, no_backup: bool, benchmark: bool, json_output: bool
             if benchmark_exe:
                 if not json_output:
                     console.print(f"[cyan]Capturing 30s baseline for {benchmark_exe}...[/cyan]")
-                baseline_capture = bench.capture(benchmark_exe, duration=30)
+                baseline_capture = bench.capture(benchmark_exe, duration_seconds=30)
                 benchmark_baseline = bench.analyze(baseline_capture)
             elif not json_output:
                 console.print("[dim]Game not running - skipping benchmark baseline[/dim]")
@@ -1082,7 +1082,7 @@ def apply(profile_name: str, no_backup: bool, benchmark: bool, json_output: bool
             if benchmark and benchmark_baseline and benchmark_exe:
                 try:
                     console.print(f"\n[cyan]Capturing 30s post-apply for {benchmark_exe}...[/cyan]")
-                    after_capture = bench.capture(benchmark_exe, duration=30)
+                    after_capture = bench.capture(benchmark_exe, duration_seconds=30)
                     after_analysis = bench.analyze(after_capture)
                     comparison = bench.compare(benchmark_baseline, after_analysis)
 
@@ -1106,16 +1106,18 @@ def apply(profile_name: str, no_backup: bool, benchmark: bool, json_output: bool
                     b, a = comparison.before, comparison.after
                     table.add_row("Avg FPS", f"{b.avg_fps:.1f}", f"{a.avg_fps:.1f}",
                                   _fmt_delta(a.avg_fps - b.avg_fps, True))
-                    table.add_row("1% Low", f"{b.fps_1_low:.1f}", f"{a.fps_1_low:.1f}",
-                                  _fmt_delta(a.fps_1_low - b.fps_1_low, True))
-                    table.add_row("0.1% Low", f"{b.fps_01_low:.1f}", f"{a.fps_01_low:.1f}",
-                                  _fmt_delta(a.fps_01_low - b.fps_01_low, True))
-                    table.add_row("Avg Frame Time", f"{b.avg_frametime_ms:.2f}ms", f"{a.avg_frametime_ms:.2f}ms",
-                                  _fmt_delta(a.avg_frametime_ms - b.avg_frametime_ms, False))
-                    table.add_row("P99 Frame Time", f"{b.p99_frametime_ms:.2f}ms", f"{a.p99_frametime_ms:.2f}ms",
-                                  _fmt_delta(a.p99_frametime_ms - b.p99_frametime_ms, False))
-                    table.add_row("Stdev", f"{b.stdev_frametime_ms:.2f}ms", f"{a.stdev_frametime_ms:.2f}ms",
-                                  _fmt_delta(a.stdev_frametime_ms - b.stdev_frametime_ms, False))
+                    table.add_row("1% Low FPS", f"{b.p1_low_fps:.1f}", f"{a.p1_low_fps:.1f}",
+                                  _fmt_delta(a.p1_low_fps - b.p1_low_fps, True))
+                    table.add_row("0.1% Low FPS", f"{b.p01_low_fps:.1f}", f"{a.p01_low_fps:.1f}",
+                                  _fmt_delta(a.p01_low_fps - b.p01_low_fps, True))
+                    table.add_row("Avg Frame Time", f"{b.avg_frame_time_ms:.2f}ms", f"{a.avg_frame_time_ms:.2f}ms",
+                                  _fmt_delta(a.avg_frame_time_ms - b.avg_frame_time_ms, False))
+                    table.add_row("P95 Frame Time", f"{b.p95_frame_time_ms:.2f}ms", f"{a.p95_frame_time_ms:.2f}ms",
+                                  _fmt_delta(a.p95_frame_time_ms - b.p95_frame_time_ms, False))
+                    table.add_row("P99 Frame Time", f"{b.p99_frame_time_ms:.2f}ms", f"{a.p99_frame_time_ms:.2f}ms",
+                                  _fmt_delta(a.p99_frame_time_ms - b.p99_frame_time_ms, False))
+                    table.add_row("Frame Time Stdev", f"{b.frame_time_stdev:.2f}ms", f"{a.frame_time_stdev:.2f}ms",
+                                  _fmt_delta(a.frame_time_stdev - b.frame_time_stdev, False))
 
                     console.print(table)
                 except Exception as e:

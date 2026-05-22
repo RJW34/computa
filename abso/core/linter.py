@@ -302,7 +302,6 @@ class ProfileLinter:
 
         hdr = windows_settings.get("hdr", False)
         auto_hdr = windows_settings.get("auto_hdr", False)
-        vrr_optimize = windows_settings.get("vrr_optimize", False)
         hags = windows_settings.get("hags", False)
 
         # Check 1: HDR enabled for SDR-only content
@@ -398,9 +397,7 @@ class ProfileLinter:
         Checks:
         - Disable Paging Executive only if RAM >= 32GB
         """
-        power_settings = settings_map.get("PowerSettingsHandler", {})
         memory_settings = settings_map.get("MemorySettingsHandler", {})
-        registry_settings = settings_map.get("RegistrySettingsHandler", {})
 
         # Check 1: Disable Paging Executive with insufficient RAM
         disable_paging = memory_settings.get("disable_paging_executive", 0)

@@ -4607,9 +4607,21 @@ finally {
     }
     if ($script:FontNormal) {
         try { $script:FontNormal.Dispose() } catch {}
+        $script:FontNormal = $null
     }
     if ($script:FontBold) {
         try { $script:FontBold.Dispose() } catch {}
+        $script:FontBold = $null
+    }
+    # Phosphor type-system fonts (added during the Tron HUD overhaul) -
+    # previously leaked on exit because the finally block only knew about
+    # the legacy FontNormal / FontBold pair.
+    foreach ($fontVar in @('FontEyebrow','FontHero','FontMono')) {
+        $fontObj = Get-Variable -Scope Script -Name $fontVar -ValueOnly -ErrorAction SilentlyContinue
+        if ($fontObj) {
+            try { $fontObj.Dispose() } catch {}
+            Set-Variable -Scope Script -Name $fontVar -Value $null
+        }
     }
     if ($script:mutex) {
         try { $script:mutex.ReleaseMutex() } catch {}

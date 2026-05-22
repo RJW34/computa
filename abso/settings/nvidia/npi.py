@@ -253,12 +253,16 @@ exit $p.ExitCode
         Returns:
             True if NPI was launched successfully.
         """
-        if not self.is_available():
+        if not self.is_available() or self.npi_path is None:
             logger.warning("NPI not available for app binding")
             return False
 
         try:
-            # Launch NPI (it will open to the GUI)
+            # Launch NPI (it will open to the GUI). is_available() above
+            # already proved npi_path is set + the file exists; the narrow
+            # None-check here is what keeps mypy honest and protects against
+            # races where _find_npi() succeeded but the file was deleted
+            # before we got here.
             logger.info(f"Launching NPI for app binding: {app_executable} -> {profile_name}")
             subprocess.Popen(
                 [str(self.npi_path.resolve())],

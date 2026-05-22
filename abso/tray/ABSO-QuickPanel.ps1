@@ -21,7 +21,6 @@ $script:QPPalette = @{
     Fog      = [System.Drawing.Color]::FromArgb(255, 95, 115, 130)
     Lagoon   = [System.Drawing.Color]::FromArgb(255, 0, 245, 212)   # phosphor cyan
     Rule     = [System.Drawing.Color]::FromArgb(70, 0, 245, 212)
-    Scanline = [System.Drawing.Color]::FromArgb(6, 255, 255, 255)
 }
 
 $script:QPFont_Eyebrow = $null

@@ -1484,7 +1484,6 @@ class WindowsSettingsHandler(SettingsHandler):
                 result["warnings"].append("No active display targets found")
                 return result
 
-            user32 = ctypes.windll.user32
             encoded = int(round(nits * SDR_WHITE_LEVEL_UNITS_PER_NIT))
 
             for adapter_id, target_id in targets:

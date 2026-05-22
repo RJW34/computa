@@ -517,16 +517,20 @@ def _detect_gsync_from_nvidia_registry() -> dict[str, Any]:
         for path in nv_profile_paths:
             try:
                 key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, path)
+            except FileNotFoundError:
+                continue
+            # CloseKey must run regardless of what QueryValueEx raises.
+            # The previous shape only closed on the FileNotFoundError path
+            # and leaked the handle for any other registry error.
+            try:
                 try:
-                    # Check for G-Sync enable flag
                     value, _ = winreg.QueryValueEx(key, "EnableGSync")
                     if value == 1:
                         result["gsync_enabled_globally"] = True
                 except FileNotFoundError:
                     pass
+            finally:
                 winreg.CloseKey(key)
-            except FileNotFoundError:
-                continue
 
         # Also check user-specific NVIDIA settings
         user_nv_paths = [
@@ -536,15 +540,17 @@ def _detect_gsync_from_nvidia_registry() -> dict[str, Any]:
         for path in user_nv_paths:
             try:
                 key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, path)
+            except FileNotFoundError:
+                continue
+            try:
                 try:
                     value, _ = winreg.QueryValueEx(key, "EnableGSync")
                     if value == 1:
                         result["gsync_enabled_globally"] = True
                 except FileNotFoundError:
                     pass
+            finally:
                 winreg.CloseKey(key)
-            except FileNotFoundError:
-                continue
 
     except OSError as e:
         logger.debug(f"G-Sync registry detection failed: {e}")

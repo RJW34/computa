@@ -13,7 +13,7 @@ import winreg
 from dataclasses import dataclass, field
 from typing import Any
 
-from abso.core.exceptions import RegistryReadError, RegistryWriteError
+from abso.core.exceptions import RegistryWriteError
 from abso.core.models import EvidenceTier, Issue
 from abso.settings.base import SettingsHandler
 from abso.utils.validation import validate_executable_name

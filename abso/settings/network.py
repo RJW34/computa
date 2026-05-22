@@ -123,9 +123,6 @@ class NetworkSettingsHandler(SettingsHandler):
                 category="network",
             ))
 
-        # Check TCP global settings
-        tcp_global = current.get("tcp_global", {})
-
         # NOTE: we intentionally no longer flag TCP Auto-Tuning or ECN as
         # suboptimal. Microsoft documents TCP receive-window autotuning
         # default 'normal' as a TCP throughput win. Most gameplay traffic is

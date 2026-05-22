@@ -393,7 +393,6 @@ class MouseSettingsHandler(SettingsHandler):
         """
         try:
             import ctypes
-            from ctypes import wintypes
 
             # Read current values to pass to SPI_SETMOUSE
             mouse_params = (ctypes.c_int * 3)(0, 0, 0)

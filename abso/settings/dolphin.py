@@ -21,7 +21,6 @@ import re
 from pathlib import Path
 from typing import Any
 
-from abso.core.models import Issue
 from abso.settings.base import SettingsHandler
 
 logger = logging.getLogger(__name__)

@@ -29,7 +29,9 @@
 
 $script:ActiveToasts       = [System.Collections.Generic.List[object]]::new()
 $script:ToastQueue         = [System.Collections.Generic.Queue[object]]::new()
+$script:ToastQueueMaxSize  = 16    # protect against runaway producers
 $script:ToastDedupMap      = @{}
+$script:ToastDedupMaxSize  = 200   # bounded eviction so the map doesn't grow forever
 $script:ToastMaxVisible    = 3
 $script:ToastSlotGap       = 8
 $script:ToastRightMargin   = 18
@@ -37,6 +39,25 @@ $script:ToastBottomMargin  = 18
 $script:ToastWidth         = 480   # production messages are 300-500ch; 420 was too narrow
 $script:ToastDedupWindowMs = 2000
 $script:ToastChapterSeq    = 0     # monotonic "chapter" counter for the corner mark
+
+function _Evict-DedupMap {
+    <#
+    .SYNOPSIS
+    Drop dedup entries older than the dedup window and, if still over the
+    size cap, drop the oldest entries until back under the cap. Called from
+    Show-ThemedToast before inserting a new key so the map stays bounded.
+    #>
+    if (-not $script:ToastDedupMap -or $script:ToastDedupMap.Count -le 16) { return }
+    $nowMs = [DateTimeOffset]::Now.ToUnixTimeMilliseconds()
+    $cutoff = $nowMs - ($script:ToastDedupWindowMs * 4)
+    $expired = @($script:ToastDedupMap.GetEnumerator() | Where-Object { $_.Value -lt $cutoff } | ForEach-Object { $_.Key })
+    foreach ($k in $expired) { $script:ToastDedupMap.Remove($k) }
+    if ($script:ToastDedupMap.Count -gt $script:ToastDedupMaxSize) {
+        $ordered = @($script:ToastDedupMap.GetEnumerator() | Sort-Object Value | ForEach-Object { $_.Key })
+        $surplus = $script:ToastDedupMap.Count - $script:ToastDedupMaxSize
+        for ($i = 0; $i -lt $surplus; $i++) { $script:ToastDedupMap.Remove($ordered[$i]) }
+    }
+}
 
 # ============================================================================
 # PHOSPHOR PALETTE
@@ -55,8 +76,6 @@ $script:Penumbra = @{
     Mist     = [System.Drawing.Color]::FromArgb(255, 150, 168, 180) # secondary text (slightly cooled)
     Fog      = [System.Drawing.Color]::FromArgb(255, 95, 115, 130)  # tertiary / mono
     Rule     = [System.Drawing.Color]::FromArgb(70, 0, 245, 212)    # phosphor hairline
-    Grain    = [System.Drawing.Color]::FromArgb(8, 255, 255, 255)   # noise speck
-    Scanline = [System.Drawing.Color]::FromArgb(6, 255, 255, 255)   # CRT scanline
     Lagoon   = [System.Drawing.Color]::FromArgb(255, 0, 245, 212)   # phosphor cyan (info / active) - primary brand
     Moss     = [System.Drawing.Color]::FromArgb(255, 139, 247, 168) # success - chartreuse phosphor
     Ochre    = [System.Drawing.Color]::FromArgb(255, 255, 187, 80)  # warning - amber CRT
@@ -352,25 +371,12 @@ function _Reflow-ToastStack {
 # ============================================================================
 # PANEL PAINT (Penumbra surface treatment)
 # ============================================================================
-
-# Deterministic noise seed so a given toast's grain doesn't shimmer on repaint
-$script:GrainCachePixels = $null
-function _Get-GrainPattern {
-    param([int]$Width, [int]$Height)
-    if ($script:GrainCachePixels -and
-        $script:GrainCachePixels.Width -eq $Width -and
-        $script:GrainCachePixels.Height -eq $Height) {
-        return $script:GrainCachePixels.Points
-    }
-    $rng = New-Object System.Random 1873
-    $points = New-Object System.Collections.Generic.List[System.Drawing.Point]
-    $count = [int](($Width * $Height) / 220)
-    for ($i = 0; $i -lt $count; $i++) {
-        $points.Add([System.Drawing.Point]::new($rng.Next($Width), $rng.Next($Height))) | Out-Null
-    }
-    $script:GrainCachePixels = @{ Width = $Width; Height = $Height; Points = $points }
-    return $points
-}
+#
+# Scanline + grain overlays were removed because they raised the form's
+# effective brightness above pure Ink-100 and the labels (which keep a
+# solid Ink-100 BackColor to avoid transparency-cache races) then rendered
+# as visibly darker rectangle cards. The helper that pre-generated grain
+# pixel positions and its cache went with them.
 
 function _Paint-ToastPanel {
     param(
@@ -644,6 +650,7 @@ function Show-ThemedToast {
                 return
             }
         }
+        _Evict-DedupMap
         $script:ToastDedupMap[$key] = $nowMs
 
         if (Get-Command Write-TrayLog -ErrorAction SilentlyContinue) {
@@ -651,6 +658,10 @@ function Show-ThemedToast {
         }
 
         if ($script:ActiveToasts.Count -ge $script:ToastMaxVisible) {
+            $queueItem = @{
+                Title = $realTitle; Message = $realBody; Type = $Type
+                Duration = $Duration; MetaText = $MetaText
+            }
             # Error preempts the oldest Info/Success so critical signals always surface
             if ($typeMeta.Priority -ge 4) {
                 $bumpIndex = -1
@@ -661,17 +672,23 @@ function Show-ThemedToast {
                 if ($bumpIndex -ge 0) {
                     _Dismiss-ActiveToast -Toast $script:ActiveToasts[$bumpIndex] -Fast
                 } else {
-                    $script:ToastQueue.Enqueue(@{
-                        Title = $realTitle; Message = $realBody; Type = $Type
-                        Duration = $Duration; MetaText = $MetaText
-                    })
+                    if ($script:ToastQueue.Count -ge $script:ToastQueueMaxSize) {
+                        if (Get-Command Write-TrayLog -ErrorAction SilentlyContinue) {
+                            Write-TrayLog "Toast queue at cap ($($script:ToastQueueMaxSize)); dropping '$realTitle'" -Level "WARN"
+                        }
+                        return
+                    }
+                    $script:ToastQueue.Enqueue($queueItem)
                     return
                 }
             } else {
-                $script:ToastQueue.Enqueue(@{
-                    Title = $realTitle; Message = $Message; Type = $Type
-                    Duration = $Duration; MetaText = $MetaText
-                })
+                if ($script:ToastQueue.Count -ge $script:ToastQueueMaxSize) {
+                    if (Get-Command Write-TrayLog -ErrorAction SilentlyContinue) {
+                        Write-TrayLog "Toast queue at cap ($($script:ToastQueueMaxSize)); dropping '$realTitle'" -Level "WARN"
+                    }
+                    return
+                }
+                $script:ToastQueue.Enqueue($queueItem)
                 return
             }
         }
@@ -1173,8 +1190,14 @@ function Show-ProgressOverlay {
     $timer.Tag = $angleStep
     $timer.Add_Tick({
         try {
+            # Form went away outside Close-ProgressOverlay (e.g. window
+            # forcibly destroyed): self-dispose so we don't leak a 125 Hz
+            # timer leaning on a dead form ref.
+            if (-not $script:ProgressForm -or $script:ProgressForm.IsDisposed) {
+                $this.Stop(); $this.Dispose(); return
+            }
             $script:ProgressAngle = ($script:ProgressAngle + $this.Tag) % 360
-            if ($script:ProgressForm -and $script:ProgressFill -and -not $script:ProgressForm.IsDisposed) {
+            if ($script:ProgressFill) {
                 $barWidth = 120
                 $maxX = $script:ProgressTrack.Width
                 $cycle = ($script:ProgressAngle * 2) % ($maxX * 2)
@@ -1188,21 +1211,22 @@ function Show-ProgressOverlay {
                 $script:ProgressFill.Invalidate()
                 $script:ProgressForm.Invalidate()
             }
-        } catch { try { $timer.Stop() } catch {} }
+        } catch { try { $this.Stop(); $this.Dispose() } catch {} }
     })
     $timer.Start()
 
     $script:ProgressStartTime = Get-Date
     $elapsedTimer = New-Object System.Windows.Forms.Timer
     $elapsedTimer.Interval = 100
-    $captured = $elapsedLabel
+    $capturedLabel = $elapsedLabel
     $elapsedTimer.Add_Tick({
         try {
-            if ($captured -and -not $captured.IsDisposed) {
-                $s = ((Get-Date) - $script:ProgressStartTime).TotalSeconds
-                $captured.Text = ("{0:N1}s" -f $s)
+            if (-not $capturedLabel -or $capturedLabel.IsDisposed) {
+                $this.Stop(); $this.Dispose(); return
             }
-        } catch { try { $elapsedTimer.Stop() } catch {} }
+            $s = ((Get-Date) - $script:ProgressStartTime).TotalSeconds
+            $capturedLabel.Text = ("{0:N1}s" -f $s)
+        } catch { try { $this.Stop(); $this.Dispose() } catch {} }
     })
     $elapsedTimer.Start()
     $script:ProgressElapsedTimer = $elapsedTimer

@@ -26,7 +26,6 @@ import signal
 import sys
 import time
 from pathlib import Path
-from typing import NoReturn
 
 # Ensure the project root is on sys.path when invoked with ``python -m``
 _project_root = str(Path(__file__).resolve().parents[2])

@@ -22,7 +22,6 @@ from abso.core.auditor import ConfigurationAuditor
 from abso.core.backup import BackupManager
 from abso.core.detector import HardwareDetector
 from abso.core.kb_checker import check_problematic_kbs, get_installed_kbs, uninstall_kb
-from abso.utils.admin import is_admin
 
 console = Console()
 
@@ -66,8 +65,9 @@ class SetupWizard:
         """Run the full setup wizard."""
         self._print_welcome()
 
-        # Step 1: Hardware detection
-        hardware = self._step_hardware_detection()
+        # Step 1: Hardware detection (printed inline; the result isn't
+        # passed to later steps - they each query what they need on their own.)
+        self._step_hardware_detection()
 
         # Step 2: KB check
         self._step_kb_check()
@@ -255,7 +255,7 @@ class SetupWizard:
         console.print()
 
         try:
-            from abso.core.game_detector import detect_installed_games, get_profile_suggestions
+            from abso.core.game_detector import get_profile_suggestions
 
             with Progress(
                 SpinnerColumn(),

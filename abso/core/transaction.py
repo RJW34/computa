@@ -338,6 +338,11 @@ class ProfileTransactionManager:
         )
 
         if should_rollback:
+            # should_rollback above only goes True when both vars are truthy,
+            # so these asserts are no-ops at runtime but they let mypy narrow
+            # the Optional types and protect future refactors from drift.
+            assert rollback_manager is not None
+            assert rollback_target_id is not None
             rollback_reason = (
                 "Critical compliance failure"
                 if has_critical

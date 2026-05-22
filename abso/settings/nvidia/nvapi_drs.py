@@ -29,11 +29,7 @@ from ctypes import (
     c_uint16,
     c_uint32,
     c_void_p,
-    c_wchar,
     c_wchar_p,
-    create_unicode_buffer,
-    pointer,
-    sizeof,
 )
 from dataclasses import dataclass
 from enum import IntEnum
@@ -907,7 +903,6 @@ class NVAPIDRS:
             (NVDRS_APPLICATION_V1, NVDRS_APPLICATION_VER1),
         ]
 
-        last_status = None
         for app_class, app_version in app_structs:
             app_info = app_class()
             app_info.version = app_version
@@ -938,7 +933,6 @@ class NVAPIDRS:
                 logger.debug(f"Application {app_name} already in a profile")
                 return
             elif status == NvAPIStatus.INCOMPATIBLE_STRUCT_VERSION:
-                last_status = status
                 continue  # Try older version
             else:
                 raise NVAPIError(f"Failed to add application '{app_name}'", status)
