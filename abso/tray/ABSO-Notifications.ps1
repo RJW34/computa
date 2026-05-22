@@ -383,28 +383,17 @@ function _Paint-ToastPanel {
     $g.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
     $g.TextRenderingHint = [System.Drawing.Text.TextRenderingHint]::ClearTypeGridFit
 
-    # 1) Solid base ink. Form.BackColor is already Ink-100; we still paint
-    #    explicitly so the panel composites identically whether or not the
-    #    form is fully invalidated. Labels use the same Ink-100 BackColor so
-    #    they blend invisibly into the base - no transparency-cache races.
+    # 1) Solid base ink. Labels use the same Ink-100 BackColor so they blend
+    #    invisibly into the base. Scanlines + film grain were tried as an
+    #    aesthetic overlay but they brightened the form's effective color
+    #    above pure Ink-100, which made the (still-pure-Ink-100) labels
+    #    render as darker rectangle cards cut into the brighter surface.
+    #    Removed for a flat-ink chassis - the L-brackets, rail, tick
+    #    perforations, accent outline, chapter mark, and Hz badge carry
+    #    enough HUD character without that compositing conflict.
     $baseBrush = New-Object System.Drawing.SolidBrush($script:Penumbra.Ink100)
     $g.FillRectangle($baseBrush, 0, 0, $Width, $Height)
     $baseBrush.Dispose()
-
-    # 2) CRT scanlines - 1px horizontal stripes every 3px
-    $scanBrush = New-Object System.Drawing.SolidBrush($script:Penumbra.Scanline)
-    for ($sy = 0; $sy -lt $Height; $sy += 3) {
-        $g.FillRectangle($scanBrush, 0, $sy, $Width, 1)
-    }
-    $scanBrush.Dispose()
-
-    # 3) Film-grain (very low alpha, deterministic per size)
-    $grainBrush = New-Object System.Drawing.SolidBrush($script:Penumbra.Grain)
-    $grainFn = Get-Command _Get-GrainPattern
-    foreach ($p in (& $grainFn -Width $Width -Height $Height)) {
-        $g.FillRectangle($grainBrush, $p.X, $p.Y, 1, 1)
-    }
-    $grainBrush.Dispose()
 
     # 4) Outline (full panel hairline in accent at low alpha)
     $outlinePen = New-Object System.Drawing.Pen(
@@ -1006,25 +995,11 @@ function Show-ProgressOverlay {
         $g.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
         $g.TextRenderingHint = [System.Drawing.Text.TextRenderingHint]::ClearTypeGridFit
 
-        # 1) Solid ink base (matches label backgrounds so labels blend invisibly)
+        # 1) Solid ink base (matches label backgrounds so labels blend invisibly).
+        #    Scanlines + grain removed - see _Paint-ToastPanel for the rationale.
         $baseBrush = New-Object System.Drawing.SolidBrush($script:Penumbra.Ink100)
         $g.FillRectangle($baseBrush, 0, 0, $capW, $capH)
         $baseBrush.Dispose()
-
-        # 2) CRT scanlines
-        $scanBrush = New-Object System.Drawing.SolidBrush($script:Penumbra.Scanline)
-        for ($sy = 0; $sy -lt $capH; $sy += 3) {
-            $g.FillRectangle($scanBrush, 0, $sy, $capW, 1)
-        }
-        $scanBrush.Dispose()
-
-        # 3) Film grain
-        $grainBrush = New-Object System.Drawing.SolidBrush($script:Penumbra.Grain)
-        $grainFn = Get-Command _Get-GrainPattern
-        foreach ($p in (& $grainFn -Width $capW -Height $capH)) {
-            $g.FillRectangle($grainBrush, $p.X, $p.Y, 1, 1)
-        }
-        $grainBrush.Dispose()
 
         # 4) Outline
         $outlinePen = New-Object System.Drawing.Pen(

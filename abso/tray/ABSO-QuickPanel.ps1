@@ -172,8 +172,11 @@ function Show-QuickPanel {
     })
     $form.Add_MouseUp({ $script:QP_Dragging = $false })
 
-    # Panel surface paint: solid Ink-100, CRT scanlines, L-corner brackets,
-    # outline, left phosphor rail, hairline rule under the header.
+    # Panel surface paint: solid Ink-100, L-corner brackets, outline, left
+    # phosphor rail, hairline rule under the header. Scanlines were removed
+    # because they brightened the form's effective color above pure Ink-100
+    # and made the (still-pure-Ink-100) label backgrounds render as darker
+    # rectangle cards cut into the lighter surface.
     $capW = $panelWidth
     $capH = $panelHeight
     $form.Add_Paint({
@@ -187,13 +190,6 @@ function Show-QuickPanel {
         $baseBrush = New-Object System.Drawing.SolidBrush($script:QPPalette.Ink100)
         $g.FillRectangle($baseBrush, 0, 0, $capW, $capH)
         $baseBrush.Dispose()
-
-        # 2) CRT scanlines - 1px horizontal stripes every 3px
-        $scanBrush = New-Object System.Drawing.SolidBrush($script:QPPalette.Scanline)
-        for ($sy = 0; $sy -lt $capH; $sy += 3) {
-            $g.FillRectangle($scanBrush, 0, $sy, $capW, 1)
-        }
-        $scanBrush.Dispose()
 
         # 3) Outline (full panel hairline in phosphor cyan at low alpha)
         $outlinePen = New-Object System.Drawing.Pen(
