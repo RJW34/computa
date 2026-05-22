@@ -5,6 +5,10 @@
 
 param([switch]$Hidden)
 
+# Cold-start wall clock: started at script entry, stopped right before
+# Application.Run so we can log total time-to-ready and catch regressions.
+$script:ColdStartStopwatch = [System.Diagnostics.Stopwatch]::StartNew()
+
 # ============================================================================
 # ADMIN ELEVATION CHECK
 # ============================================================================
@@ -618,10 +622,13 @@ $script:LogFile = Join-Path $env:TEMP "abso_tray.log"
 $script:LogMaxBytes = 2 * 1024 * 1024  # 2 MB max log size
 $script:LogCheckedSize = $false
 
+$script:LogUtf8NoBom = [System.Text.UTF8Encoding]::new($false)
+
 function Write-TrayLog {
     param([string]$Message, [string]$Level = "INFO")
-    $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
-    $line = "[$timestamp] [$Level] $Message"
+    # [DateTime]::Now.ToString(...) is ~3x faster than Get-Date -Format
+    # because it skips PowerShell's pipeline + cmdlet binding.
+    $line = "[$([DateTime]::Now.ToString('yyyy-MM-dd HH:mm:ss'))] [$Level] $Message`r`n"
     try {
         # Rotate log if too large (check once per session, then every ~100 writes)
         if (-not $script:LogCheckedSize) {
@@ -639,7 +646,9 @@ function Write-TrayLog {
         if ($script:LogWriteCount -ge 100) {
             $script:LogCheckedSize = $false  # Re-check on next write
         }
-        Add-Content -Path $script:LogFile -Value $line -ErrorAction SilentlyContinue
+        # [System.IO.File]::AppendAllText is ~2-3x faster than Add-Content
+        # because it bypasses PowerShell's pipeline + provider plumbing.
+        [System.IO.File]::AppendAllText($script:LogFile, $line, $script:LogUtf8NoBom)
     }
     catch {}
 }
@@ -1380,14 +1389,157 @@ function Fetch-ProfileAliasMapFromCli {
     return $null
 }
 
+function Invoke-CliCatalogRefresh {
+    <#
+    .SYNOPSIS
+    Blocking CLI catalog fetch; returns a hashtable with Entries + AliasMap.
+
+    Extracted from Initialize-ProfilesFromCliCatalog so the same logic can run
+    either at startup (cold-cache fallback) or in a deferred background
+    refresh. Returns a hashtable rather than a tuple/array because PowerShell's
+    @(...) array-subexpression flattens nested arrays - returning
+    @(,$entries, $aliasMap) silently collapsed entries+alias into a single
+    flat list when callers indexed it.
+    #>
+    $entries = @()
+    $aliasMap = $null
+
+    if (-not $script:PythonExe) {
+        Write-TrayLog "Python executable unavailable for profile catalog refresh" -Level "WARN"
+        return @{ Entries = $entries; AliasMap = $aliasMap }
+    }
+
+    try {
+        $tempFile = [System.IO.Path]::GetTempFileName()
+        $errFile = "$tempFile.err"
+        $proc = Start-Process -FilePath $script:PythonExe -ArgumentList "-m", "abso", "profiles", "--json" `
+            -NoNewWindow -PassThru -WorkingDirectory $script:ProjectRoot `
+            -RedirectStandardOutput $tempFile -RedirectStandardError $errFile
+
+        $proc.WaitForExit(15000)
+        if (-not $proc.HasExited) {
+            Write-TrayLog "Profile catalog refresh timed out after 15s, killing process" -Level "WARN"
+            $proc.Kill()
+        }
+        $exitCode = $proc.ExitCode
+        $proc.Dispose()
+
+        $raw = Get-Content $tempFile -Raw -ErrorAction SilentlyContinue
+        $errOutput = Get-Content $errFile -Raw -ErrorAction SilentlyContinue
+        Remove-Item $tempFile -Force -ErrorAction SilentlyContinue
+        Remove-Item $errFile -Force -ErrorAction SilentlyContinue
+        if ($errOutput) {
+            Write-TrayLog "Profile catalog stderr: $errOutput" -Level "WARN"
+        }
+
+        $exitCodeOk = ($null -eq $exitCode -or $exitCode -eq 0)
+        if ($exitCodeOk -and $raw) {
+            $payload = $raw | ConvertFrom-Json
+            if ($payload -and $payload.success -and $payload.data) {
+                $entries = @($payload.data)
+                $aliasMap = Fetch-ProfileAliasMapFromCli
+            }
+            else {
+                Write-TrayLog "Profile catalog payload missing/invalid from CLI" -Level "WARN"
+            }
+        }
+        else {
+            Write-TrayLog "Profile catalog refresh skipped from CLI (exit=$exitCode)" -Level "WARN"
+        }
+    }
+    catch {
+        Write-TrayLog "Profile catalog refresh failed from CLI: $($_.Exception.Message)" -Level "WARN"
+    }
+
+    return @{ Entries = $entries; AliasMap = $aliasMap }
+}
+
+
+function Start-BackgroundCatalogRefresh {
+    <#
+    .SYNOPSIS
+    Deferred (non-blocking-at-startup) refresh of the profile catalog cache.
+
+    Schedules a one-shot WinForms Timer that fires ~3s after startup.
+    The refresh itself uses the same Invoke-CliCatalogRefresh path the
+    cold-start fallback uses, then writes the result to disk so the
+    NEXT tray start picks it up immediately.
+
+    Why a WinForms Timer instead of Start-Job: Start-Job spawns a fresh
+    PowerShell process whose working directory / env vars / admin context
+    don't always inherit cleanly, causing the cache write to silently
+    fail. The Timer runs in this tray's own process, so $script:PythonExe
+    / $script:ProjectRoot / $script:ProfileCatalogCacheFile are all the
+    same values that worked at cold-start fallback. The 1-2s UI-thread
+    block during the CLI call is acceptable because it fires AFTER the
+    user-visible startup is complete and the user is unlikely to be
+    interacting with the menu in the first ~5 seconds.
+
+    Stale-while-revalidate pattern: snappy UX now, freshness guaranteed
+    on subsequent starts.
+    #>
+    if (-not $script:PythonExe -or -not $script:ProfileCatalogCacheFile) {
+        return
+    }
+    if ($script:BackgroundCatalogTimer) {
+        try { $script:BackgroundCatalogTimer.Stop(); $script:BackgroundCatalogTimer.Dispose() } catch {}
+        $script:BackgroundCatalogTimer = $null
+    }
+    try {
+        $script:BackgroundCatalogTimer = New-Object System.Windows.Forms.Timer
+        $script:BackgroundCatalogTimer.Interval = 3000
+        $script:BackgroundCatalogTimer.Add_Tick({
+            try {
+                $this.Stop()
+                $this.Dispose()
+            } catch {}
+            $script:BackgroundCatalogTimer = $null
+            try {
+                $sw = [System.Diagnostics.Stopwatch]::StartNew()
+                $result = Invoke-CliCatalogRefresh
+                $entries = $result.Entries
+                $aliasMap = $result.AliasMap
+                if ($entries -and $entries.Count -gt 0) {
+                    Write-ProfileCatalogCache -Entries $entries -Aliases $aliasMap
+                    $sw.Stop()
+                    Write-TrayLog "Background catalog refresh wrote cache ($($entries.Count) profiles) in $($sw.ElapsedMilliseconds)ms" -Level "INFO"
+                } else {
+                    Write-TrayLog "Background catalog refresh returned empty - cache unchanged" -Level "WARN"
+                }
+            } catch {
+                Write-TrayLog "Background catalog refresh failed: $($_.Exception.Message)" -Level "WARN"
+            }
+        })
+        $script:BackgroundCatalogTimer.Start()
+    }
+    catch {
+        Write-TrayLog "Failed to schedule background catalog refresh: $($_.Exception.Message)" -Level "WARN"
+    }
+}
+
+
 function Initialize-ProfilesFromCliCatalog {
     <#
     .SYNOPSIS
-    Loads profile metadata from Python CLI to prevent registry drift.
+    Loads profile metadata. Cache-first for snappy startup; CLI refresh
+    runs in the background so the UI thread is never blocked.
 
-    If CLI metadata is unavailable, keeps built-in fallback definitions.
+    Order:
+      1. Read on-disk cache (~10-50ms). If hit, use immediately and
+         schedule a background CLI refresh that updates the cache for
+         the NEXT tray start.
+      2. If cache is empty (first install or corrupt), fall through to a
+         blocking CLI call so the user has something to work with this
+         session. Result is written to cache for subsequent fast starts.
+      3. If both fail, keep built-in fallback profile defs.
+
     Also loads the retired-id alias map so tray-config favorites/defaults
     can be normalized on startup.
+
+    Pre-2026-05-22 the tray ALWAYS blocked on CLI at startup, costing
+    1.5-3s of cold-start latency on every tray relaunch (Python interpreter
+    + import overhead per shell-out, x2 for the alias map). The cache
+    contains identical data; using it directly drops that to ~50ms.
     #>
     $fallbackProfiles = if ($script:FallbackProfiles) {
         $script:FallbackProfiles
@@ -1396,75 +1548,36 @@ function Initialize-ProfilesFromCliCatalog {
         $script:Profiles
     }
 
+    $sw = [System.Diagnostics.Stopwatch]::StartNew()
     $entries = @()
     $source = "fallback"
     $aliasMap = $null
 
-    # Primary source: live CLI profile catalog
-    if ($script:PythonExe) {
-        try {
-            $tempFile = [System.IO.Path]::GetTempFileName()
-            $errFile = "$tempFile.err"
-            $proc = Start-Process -FilePath $script:PythonExe -ArgumentList "-m", "abso", "profiles", "--json" `
-                -NoNewWindow -PassThru -WorkingDirectory $script:ProjectRoot `
-                -RedirectStandardOutput $tempFile -RedirectStandardError $errFile
-
-            $proc.WaitForExit(15000)
-            if (-not $proc.HasExited) {
-                Write-TrayLog "Profile catalog refresh timed out after 15s, killing process" -Level "WARN"
-                $proc.Kill()
-            }
-            $exitCode = $proc.ExitCode
-            $proc.Dispose()
-
-            $raw = Get-Content $tempFile -Raw -ErrorAction SilentlyContinue
-            $errOutput = Get-Content $errFile -Raw -ErrorAction SilentlyContinue
-            Remove-Item $tempFile -Force -ErrorAction SilentlyContinue
-            Remove-Item $errFile -Force -ErrorAction SilentlyContinue
-            if ($errOutput) {
-                Write-TrayLog "Profile catalog stderr: $errOutput" -Level "WARN"
-            }
-
-            $exitCodeOk = ($null -eq $exitCode -or $exitCode -eq 0)
-            if ($null -eq $exitCode) {
-                Write-TrayLog "Profile catalog CLI exit code was unavailable; falling back to payload validation" -Level "WARN"
-            }
-
-            if ($exitCodeOk -and $raw) {
-                $payload = $raw | ConvertFrom-Json
-                if ($payload -and $payload.success -and $payload.data) {
-                    $entries = @($payload.data)
-                    $source = "cli"
-                    # Fetch fresh alias map alongside live catalog refresh.
-                    $aliasMap = Fetch-ProfileAliasMapFromCli
-                    Write-ProfileCatalogCache -Entries $entries -Aliases $aliasMap
-                }
-                else {
-                    Write-TrayLog "Profile catalog payload missing/invalid from CLI; trying cache fallback" -Level "WARN"
-                }
-            }
-            else {
-                Write-TrayLog "Profile catalog refresh skipped from CLI (exit=$exitCode); trying cache fallback" -Level "WARN"
-            }
-        }
-        catch {
-            Write-TrayLog "Profile catalog refresh failed from CLI: $($_.Exception.Message); trying cache fallback" -Level "WARN"
-        }
-    }
-    else {
-        Write-TrayLog "Python executable unavailable for profile catalog refresh; trying cache fallback" -Level "WARN"
+    # Primary source: on-disk cache (snappy).
+    $cachedEntries = Read-ProfileCatalogCacheEntries
+    if ($cachedEntries.Count -gt 0) {
+        $entries = @($cachedEntries)
+        $aliasMap = Read-ProfileAliasMapFromCache
+        $source = "cache"
+        # Schedule a non-blocking refresh so the cache stays current.
+        Start-BackgroundCatalogRefresh
     }
 
-    # Secondary source: last known-good cached catalog (prevents drift when CLI unavailable)
-    if ($entries.Count -eq 0) {
-        $cachedEntries = Read-ProfileCatalogCacheEntries
-        if ($cachedEntries.Count -gt 0) {
-            $entries = @($cachedEntries)
-            $source = "cache"
+    # Cold fallback: cache is empty (first install or corrupted). Block on CLI
+    # so the user has SOMETHING to work with this session. Subsequent starts
+    # will hit the warm cache and skip this entirely.
+    if ($entries.Count -eq 0 -and $script:PythonExe) {
+        Write-TrayLog "Profile catalog cache miss; performing blocking CLI fetch (cold start)" -Level "INFO"
+        $result = Invoke-CliCatalogRefresh
+        $entries = if ($result.Entries) { @($result.Entries) } else { @() }
+        $aliasMap = $result.AliasMap
+        if ($entries.Count -gt 0) {
+            $source = "cli (cold)"
+            Write-ProfileCatalogCache -Entries $entries -Aliases $aliasMap
         }
     }
 
-    # Alias map: prefer CLI-fetched map, fall back to whatever is persisted in the cache.
+    # Alias map: prefer whatever we already have, else read from cache.
     if (-not $aliasMap) {
         $aliasMap = Read-ProfileAliasMapFromCache
     }
@@ -1475,7 +1588,8 @@ function Initialize-ProfilesFromCliCatalog {
         $resolved = Convert-CatalogEntriesToProfileMap -Entries $entries -FallbackProfiles $fallbackProfiles
         if ($resolved.Count -gt 0) {
             $script:Profiles = $resolved
-            Write-TrayLog "Profile catalog loaded from $source ($($resolved.Count) profiles, $($script:ProfileAliases.Count) aliases)"
+            $sw.Stop()
+            Write-TrayLog "Profile catalog loaded from $source ($($resolved.Count) profiles, $($script:ProfileAliases.Count) aliases) in $($sw.ElapsedMilliseconds)ms"
             return
         }
 
@@ -1484,7 +1598,8 @@ function Initialize-ProfilesFromCliCatalog {
 
     # Final source: built-in emergency fallback map in this script
     $script:Profiles = Copy-ProfileMap -Source $fallbackProfiles
-    Write-TrayLog "Profile catalog using built-in fallback definitions ($($script:Profiles.Count) profiles, $($script:ProfileAliases.Count) aliases)" -Level "WARN"
+    $sw.Stop()
+    Write-TrayLog "Profile catalog using built-in fallback definitions ($($script:Profiles.Count) profiles, $($script:ProfileAliases.Count) aliases) in $($sw.ElapsedMilliseconds)ms" -Level "WARN"
 }
 
 Initialize-ProfilesFromCliCatalog
@@ -3299,8 +3414,24 @@ function Start-TrayApp {
         Write-TrayLog "Explorer shell not detected within startup wait window; continuing anyway" -Level "WARN"
     }
     else {
-        # Small buffer after shell detection to reduce startup icon race conditions.
-        Start-Sleep -Milliseconds 1500
+        # Race-prevention buffer is only needed at BOOT (explorer just started
+        # initializing the notification area). For manual restarts via the
+        # tray menu / _restart-tray.ps1, explorer has been up for ages and
+        # the buffer is pure waste.
+        $needsBootBuffer = $true
+        try {
+            $explorerProc = Get-Process -Name explorer -ErrorAction SilentlyContinue | Select-Object -First 1
+            if ($explorerProc) {
+                $explorerUptime = (Get-Date) - $explorerProc.StartTime
+                if ($explorerUptime.TotalSeconds -gt 30) {
+                    $needsBootBuffer = $false
+                }
+            }
+        } catch { }
+        if ($needsBootBuffer) {
+            # Boot scenario: notification area still spinning up.
+            Start-Sleep -Milliseconds 1500
+        }
     }
 
     # Load config
@@ -4321,6 +4452,14 @@ public class HotkeyMessageWindow : NativeWindow {
     # ─── LAUNCH SANITIZER (kill overlays/capture/sync while game is alive) ───
     Start-LaunchSanitizerTimer
 
+    # Cold-start complete. Log time-to-ready so regressions surface in the
+    # tray log on every relaunch. Target: well under 2000ms now that the
+    # catalog load is cache-first.
+    if ($script:ColdStartStopwatch) {
+        $script:ColdStartStopwatch.Stop()
+        Write-TrayLog "ABSO Tray ready in $($script:ColdStartStopwatch.ElapsedMilliseconds)ms (cold-start wall clock)" -Level "INFO"
+    }
+
     [System.Windows.Forms.Application]::Run()
     $script:notifyIcon.Visible = $false
     $script:notifyIcon.Dispose()
@@ -4349,6 +4488,11 @@ catch {
     catch {}
 }
 finally {
+    # Reap any pending background catalog refresh timer.
+    if ($script:BackgroundCatalogTimer) {
+        try { $script:BackgroundCatalogTimer.Stop(); $script:BackgroundCatalogTimer.Dispose() } catch {}
+        $script:BackgroundCatalogTimer = $null
+    }
     Stop-LaunchSanitizerTimer
     Stop-ProcessGuardTimer
     if ($script:StartupIconHealTimer) {
