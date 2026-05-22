@@ -587,31 +587,35 @@ function Test-SoundFilesExist {
 # DARK THEME COLORS
 # ============================================================================
 
+# Penumbra palette - editorial tech, ink + single-accent-per-state.
+# Key names retained from the previous palette so the rest of the tray
+# inherits the new look without touching 100+ callsites; the hex values
+# are completely refreshed.
 $script:Colors = @{
-    Background      = [System.Drawing.Color]::FromArgb(255, 26, 26, 30)
-    BackgroundDark  = [System.Drawing.Color]::FromArgb(255, 20, 20, 24)
-    BackgroundLight = [System.Drawing.Color]::FromArgb(255, 36, 36, 42)
-    Hover           = [System.Drawing.Color]::FromArgb(255, 44, 44, 50)
-    HoverBright     = [System.Drawing.Color]::FromArgb(255, 56, 56, 62)
-    Text            = [System.Drawing.Color]::FromArgb(255, 230, 230, 235)
-    TextDim         = [System.Drawing.Color]::FromArgb(255, 125, 125, 135)
-    TextDisabled    = [System.Drawing.Color]::FromArgb(255, 75, 75, 85)
-    Border          = [System.Drawing.Color]::FromArgb(255, 55, 55, 62)
-    Separator       = [System.Drawing.Color]::FromArgb(255, 48, 48, 55)
-    AccentGold      = [System.Drawing.Color]::FromArgb(255, 230, 190, 70)
-    AccentGreen     = [System.Drawing.Color]::FromArgb(255, 80, 210, 120)
-    AccentBlue      = [System.Drawing.Color]::FromArgb(255, 75, 155, 235)
-    AccentPurple    = [System.Drawing.Color]::FromArgb(255, 145, 120, 225)
-    AccentAmber     = [System.Drawing.Color]::FromArgb(255, 240, 170, 60)
-    AccentRed       = [System.Drawing.Color]::FromArgb(255, 220, 75, 75)
-    AccentTeal      = [System.Drawing.Color]::FromArgb(255, 70, 200, 200)
-    FavoriteStar    = [System.Drawing.Color]::FromArgb(255, 255, 215, 70)
-    CatFighting     = [System.Drawing.Color]::FromArgb(255, 235, 115, 115)
-    CatARPG         = [System.Drawing.Color]::FromArgb(255, 175, 145, 225)
-    CatShooter      = [System.Drawing.Color]::FromArgb(255, 115, 180, 225)
-    CatStreaming    = [System.Drawing.Color]::FromArgb(255, 70, 200, 200)
-    CatOther        = [System.Drawing.Color]::FromArgb(255, 145, 200, 145)
-    CatProd         = [System.Drawing.Color]::FromArgb(255, 220, 190, 115)
+    Background      = [System.Drawing.Color]::FromArgb(255, 14, 18, 26)    # ink-100
+    BackgroundDark  = [System.Drawing.Color]::FromArgb(255, 10, 14, 21)    # ink-000 (deepest)
+    BackgroundLight = [System.Drawing.Color]::FromArgb(255, 27, 34, 48)    # ink-300 elevated
+    Hover           = [System.Drawing.Color]::FromArgb(255, 36, 48, 71)    # ink-400 hover
+    HoverBright     = [System.Drawing.Color]::FromArgb(255, 47, 59, 83)    # ink-500 pressed
+    Text            = [System.Drawing.Color]::FromArgb(255, 232, 234, 240) # paper
+    TextDim         = [System.Drawing.Color]::FromArgb(255, 140, 149, 168) # mist
+    TextDisabled    = [System.Drawing.Color]::FromArgb(255, 90, 98, 118)   # fog
+    Border          = [System.Drawing.Color]::FromArgb(255, 31, 40, 57)    # rule-strong
+    Separator       = [System.Drawing.Color]::FromArgb(255, 26, 34, 51)    # rule-soft
+    AccentGold      = [System.Drawing.Color]::FromArgb(255, 0, 245, 212)  # phosphor cyan (primary; key name kept)
+    AccentGreen     = [System.Drawing.Color]::FromArgb(255, 123, 227, 158) # moss
+    AccentBlue      = [System.Drawing.Color]::FromArgb(255, 111, 184, 255) # azure
+    AccentPurple    = [System.Drawing.Color]::FromArgb(255, 183, 156, 255) # orchid
+    AccentAmber     = [System.Drawing.Color]::FromArgb(255, 229, 165, 71)  # ochre
+    AccentRed       = [System.Drawing.Color]::FromArgb(255, 255, 107, 107) # coral
+    AccentTeal      = [System.Drawing.Color]::FromArgb(255, 63, 184, 171)  # lagoon-dim
+    FavoriteStar    = [System.Drawing.Color]::FromArgb(255, 229, 165, 71)  # ochre (favorites read as 'curated')
+    CatFighting     = [System.Drawing.Color]::FromArgb(255, 255, 123, 123) # coral-warm
+    CatARPG         = [System.Drawing.Color]::FromArgb(255, 183, 156, 255) # orchid
+    CatShooter      = [System.Drawing.Color]::FromArgb(255, 111, 184, 255) # azure
+    CatStreaming    = [System.Drawing.Color]::FromArgb(255, 77, 216, 201)  # lagoon
+    CatOther        = [System.Drawing.Color]::FromArgb(255, 123, 227, 158) # moss
+    CatProd         = [System.Drawing.Color]::FromArgb(255, 229, 165, 71)  # ochre
 }
 
 # ============================================================================
@@ -1672,14 +1676,14 @@ using System.Windows.Forms;
 
 public class DarkThemeRenderer : ToolStripProfessionalRenderer
 {
-    // Core dark palette
-    private static readonly Color BgColor = Color.FromArgb(255, 26, 26, 30);
-    private static readonly Color BgDark = Color.FromArgb(255, 20, 20, 24);
-    private static readonly Color BgSubtle = Color.FromArgb(255, 32, 32, 36);
-    private static readonly Color SepColor = Color.FromArgb(255, 44, 44, 52);
-    private static readonly Color BorderColor = Color.FromArgb(255, 50, 50, 58);
-    private static readonly Color AccentGold = Color.FromArgb(255, 230, 190, 70);
-    private static readonly Color AccentGoldDim = Color.FromArgb(60, 230, 190, 70);
+    // Penumbra palette - editorial tech, deep ink with a single lagoon accent.
+    private static readonly Color BgColor = Color.FromArgb(255, 14, 18, 26);   // ink-100
+    private static readonly Color BgDark = Color.FromArgb(255, 10, 14, 21);    // ink-000
+    private static readonly Color BgSubtle = Color.FromArgb(255, 19, 24, 36);  // ink-200
+    private static readonly Color SepColor = Color.FromArgb(255, 26, 34, 51);  // rule-soft
+    private static readonly Color BorderColor = Color.FromArgb(255, 31, 40, 57); // rule-strong
+    private static readonly Color AccentGold = Color.FromArgb(255, 0, 245, 212);  // phosphor cyan (key name kept for diff hygiene)
+    private static readonly Color AccentGoldDim = Color.FromArgb(60, 0, 245, 212);
 
     public DarkThemeRenderer() : base(new DarkColorTable()) { }
 
@@ -1814,25 +1818,27 @@ public class DarkThemeRenderer : ToolStripProfessionalRenderer
                 g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
 
                 int textX = 28;
-                // Profile name in 10pt Bold, bright category color
+                // Profile name: editorial serif (Sitka Banner -> Cambria -> Constantia -> Georgia)
                 Color brightTint = Color.FromArgb(255,
                     Math.Min(255, tint.R + 40),
                     Math.Min(255, tint.G + 40),
                     Math.Min(255, tint.B + 40));
-                using (var font = new Font("Segoe UI", 10f, FontStyle.Bold))
+                Font heroFont = ResolveHeroFont(11.5f, FontStyle.Regular);
+                using (heroFont)
                 using (var brush = new SolidBrush(brightTint))
                 {
-                    g.DrawString(name, font, brush, textX, 6);
+                    g.DrawString(name, heroFont, brush, textX, 4);
                 }
 
-                // Subtitle in 7.5pt, dimmed category color
+                // Subtitle: tracked all-caps eyebrow in Bahnschrift Condensed
                 if (!string.IsNullOrEmpty(subtitle))
                 {
-                    Color dimTint = Color.FromArgb(160, tint.R, tint.G, tint.B);
-                    using (var font = new Font("Segoe UI", 7.5f))
+                    Color dimTint = Color.FromArgb(180, tint.R, tint.G, tint.B);
+                    Font eyebrowFont = ResolveEyebrowFont(7.0f);
+                    using (eyebrowFont)
                     using (var brush = new SolidBrush(dimTint))
                     {
-                        g.DrawString(subtitle, font, brush, textX, 26);
+                        g.DrawString(subtitle.ToUpperInvariant(), eyebrowFont, brush, textX, 28);
                     }
                 }
                 return;
@@ -2058,6 +2064,46 @@ public class DarkThemeRenderer : ToolStripProfessionalRenderer
         path.CloseFigure();
         return path;
     }
+
+    // Penumbra font resolvers. WinForms silently substitutes Microsoft Sans
+    // Serif for missing families, so each candidate is constructed and the
+    // resolved family is verified before returning.
+    private static readonly string[] HeroFontStack = new[] {
+        "Bahnschrift SemiBold Condensed", "Bahnschrift Condensed",
+        "Bahnschrift SemiBold", "Bahnschrift", "Segoe UI Semibold"
+    };
+    private static readonly string[] EyebrowFontStack = new[] {
+        "Bahnschrift SemiCondensed", "Bahnschrift Condensed",
+        "Bahnschrift", "Segoe UI Semibold"
+    };
+
+    private static Font ResolveFontStack(string[] families, float size, FontStyle style)
+    {
+        foreach (var fam in families)
+        {
+            try
+            {
+                var f = new Font(fam, size, style);
+                if (string.Equals(f.FontFamily.Name, fam, StringComparison.OrdinalIgnoreCase))
+                    return f;
+                string root = fam.Split(' ')[0];
+                if (f.FontFamily.Name.StartsWith(root, StringComparison.OrdinalIgnoreCase))
+                    return f;
+                f.Dispose();
+            }
+            catch {}
+        }
+        return new Font("Segoe UI", size, style);
+    }
+
+    public static Font ResolveHeroFont(float size, FontStyle style)
+    {
+        return ResolveFontStack(HeroFontStack, size, style);
+    }
+    public static Font ResolveEyebrowFont(float size)
+    {
+        return ResolveFontStack(EyebrowFontStack, size, FontStyle.Bold);
+    }
 }
 
 public class DarkColorTable : ProfessionalColorTable
@@ -2087,9 +2133,25 @@ public class DarkColorTable : ProfessionalColorTable
 # ICON STATE MANAGEMENT
 # ============================================================================
 
-# Cached shared fonts (disposed in finally block)
-$script:FontNormal = New-Object System.Drawing.Font("Segoe UI", 9)
-$script:FontBold = New-Object System.Drawing.Font("Segoe UI", 9, [System.Drawing.FontStyle]::Bold)
+# Cached shared fonts (disposed in finally block).
+# Penumbra type system: refined editorial serif for hero copy, condensed
+# tracked caps for eyebrows, monospace for telemetry.
+$script:FontNormal  = New-Object System.Drawing.Font("Segoe UI", 9)
+$script:FontBold    = New-Object System.Drawing.Font("Segoe UI", 9, [System.Drawing.FontStyle]::Bold)
+$script:FontEyebrow = [DarkThemeRenderer]::ResolveEyebrowFont(7.0)
+$script:FontHero    = [DarkThemeRenderer]::ResolveHeroFont(11.5, [System.Drawing.FontStyle]::Bold)
+$script:FontMono    = $null
+foreach ($mono in @("Cascadia Mono", "Cascadia Code", "Consolas")) {
+    try {
+        $candidate = New-Object System.Drawing.Font($mono, 7.75)
+        if ($candidate.FontFamily.Name -ieq $mono -or $candidate.Name -ilike "$mono*") {
+            $script:FontMono = $candidate
+            break
+        }
+        $candidate.Dispose()
+    } catch {}
+}
+if (-not $script:FontMono) { $script:FontMono = New-Object System.Drawing.Font("Consolas", 7.75) }
 
 $script:IconState = "Idle"
 $script:ApplyAnimTimer = $null
@@ -3615,11 +3677,11 @@ public class HotkeyMessageWindow : NativeWindow {
     # ─── HEADER ───
 
     $header = New-Object System.Windows.Forms.ToolStripMenuItem
-    $header.Text = "  A.B.S.O.  v$($script:AppVersion)"
+    $header.Text = "  A.B.S.O.   v$($script:AppVersion)"
     $header.Enabled = $false
     $header.BackColor = $script:Colors.BackgroundDark
     $header.ForeColor = $script:Colors.AccentGold
-    $header.Font = New-Object System.Drawing.Font("Segoe UI", 10, [System.Drawing.FontStyle]::Bold)
+    $header.Font = [DarkThemeRenderer]::ResolveHeroFont(11.0, [System.Drawing.FontStyle]::Bold)
     $menu.Items.Add($header) | Out-Null
 
     # ─── STATUS DASHBOARD ───
@@ -3652,8 +3714,8 @@ public class HotkeyMessageWindow : NativeWindow {
     $sysInfoItem.Text = $sysInfoText
     $sysInfoItem.Enabled = $false
     $sysInfoItem.BackColor = $script:Colors.BackgroundDark
-    $sysInfoItem.ForeColor = [System.Drawing.Color]::FromArgb(255, 90, 90, 100)
-    $sysInfoItem.Font = New-Object System.Drawing.Font("Consolas", 7.5)
+    $sysInfoItem.ForeColor = $script:Colors.TextDisabled
+    $sysInfoItem.Font = $script:FontMono
     $menu.Items.Add($sysInfoItem) | Out-Null
 
     # Audit status item (hidden until audit is run)
@@ -3672,7 +3734,7 @@ public class HotkeyMessageWindow : NativeWindow {
 
     $searchBox = New-Object System.Windows.Forms.ToolStripTextBox
     $searchBox.Size = New-Object System.Drawing.Size(250, 24)
-    $searchBox.BackColor = [System.Drawing.Color]::FromArgb(255, 45, 45, 50)
+    $searchBox.BackColor = $script:Colors.BackgroundLight
     $searchBox.ForeColor = $script:Colors.Text
     $searchBox.Font = New-Object System.Drawing.Font("Segoe UI", 9)
     $searchBox.ToolTipText = "Search profiles... (type to filter)"
@@ -3771,7 +3833,7 @@ public class HotkeyMessageWindow : NativeWindow {
         $favLabel.Enabled = $false
         $favLabel.BackColor = $script:Colors.Background
         $favLabel.ForeColor = $script:Colors.FavoriteStar
-        $favLabel.Font = New-Object System.Drawing.Font("Segoe UI", 7.5, [System.Drawing.FontStyle]::Bold)
+        $favLabel.Font = $script:FontEyebrow
         $menu.Items.Add($favLabel) | Out-Null
         $script:favSectionLabel = $favLabel
 
@@ -3805,7 +3867,7 @@ public class HotkeyMessageWindow : NativeWindow {
         $recentLabel.Enabled = $false
         $recentLabel.BackColor = $script:Colors.Background
         $recentLabel.ForeColor = $script:Colors.TextDim
-        $recentLabel.Font = New-Object System.Drawing.Font("Segoe UI", 7.5, [System.Drawing.FontStyle]::Bold)
+        $recentLabel.Font = $script:FontEyebrow
         $menu.Items.Add($recentLabel) | Out-Null
 
         $shownRecent = 0
@@ -3846,7 +3908,7 @@ public class HotkeyMessageWindow : NativeWindow {
     $profilesLabel.Enabled = $false
     $profilesLabel.BackColor = $script:Colors.BackgroundDark
     $profilesLabel.ForeColor = [System.Drawing.Color]::FromArgb(255, 100, 110, 130)
-    $profilesLabel.Font = New-Object System.Drawing.Font("Segoe UI", 7, [System.Drawing.FontStyle]::Bold)
+    $profilesLabel.Font = $script:FontEyebrow
     $menu.Items.Add($profilesLabel) | Out-Null
 
     # Helper to create a profile menu item (used in both direct items and submenus)
@@ -3954,7 +4016,7 @@ public class HotkeyMessageWindow : NativeWindow {
         $catItem.Enabled = $false
         $catItem.BackColor = $script:Colors.Background
         $catItem.ForeColor = $catColor
-        $catItem.Font = New-Object System.Drawing.Font("Segoe UI", 8.5, [System.Drawing.FontStyle]::Bold)
+        $catItem.Font = [DarkThemeRenderer]::ResolveEyebrowFont(8.0)
         $menu.Items.Add($catItem) | Out-Null
         $script:categoryHeaders += $catItem
 
@@ -4020,7 +4082,7 @@ public class HotkeyMessageWindow : NativeWindow {
         $streamingSubmenu.Image = New-CategoryBitmap -Category "Streaming" -Color $streamColor
         $streamingSubmenu.BackColor = $script:Colors.Background
         $streamingSubmenu.ForeColor = $streamColor
-        $streamingSubmenu.Font = New-Object System.Drawing.Font("Segoe UI", 8.5, [System.Drawing.FontStyle]::Bold)
+        $streamingSubmenu.Font = [DarkThemeRenderer]::ResolveEyebrowFont(8.0)
 
         foreach ($profId in $streamingProfiles) {
             $subItem = New-ProfileMenuItem -ProfileId $profId -InSubmenu $true

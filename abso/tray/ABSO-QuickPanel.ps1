@@ -1,18 +1,74 @@
-# ABSO-QuickPanel.ps1 - Floating quick-access panel for A.B.S.O. tray
-# Always-on-top mini panel with favorite profile buttons
+# ABSO-QuickPanel.ps1 - v3.0 "Phosphor" retro-gaming HUD quick-launch panel
+#
+# Tron / retro-arcade HUD aesthetic to match ABSO-Notifications.ps1 v5.0.
+# Phosphor cyan accent, Bahnschrift Condensed headlines, Cascadia Code body,
+# CRT scanlines, L-shaped corner brackets, solid Ink-100 label backgrounds
+# (no transparency races).
 
-$script:QuickPanelForm = $null
+$script:QuickPanelForm    = $null
 $script:QuickPanelVisible = $false
+
+# ============================================================================
+# PHOSPHOR PALETTE (mirrors $script:Penumbra in ABSO-Notifications.ps1)
+# ============================================================================
+$script:QPPalette = @{
+    Ink100   = [System.Drawing.Color]::FromArgb(255, 14, 18, 26)
+    Ink150   = [System.Drawing.Color]::FromArgb(255, 17, 21, 31)
+    Ink200   = [System.Drawing.Color]::FromArgb(255, 19, 24, 36)
+    Ink300   = [System.Drawing.Color]::FromArgb(255, 27, 34, 48)
+    Paper    = [System.Drawing.Color]::FromArgb(255, 232, 234, 240)
+    Mist     = [System.Drawing.Color]::FromArgb(255, 150, 168, 180)
+    Fog      = [System.Drawing.Color]::FromArgb(255, 95, 115, 130)
+    Lagoon   = [System.Drawing.Color]::FromArgb(255, 0, 245, 212)   # phosphor cyan
+    Rule     = [System.Drawing.Color]::FromArgb(70, 0, 245, 212)
+    Scanline = [System.Drawing.Color]::FromArgb(6, 255, 255, 255)
+}
+
+$script:QPFont_Eyebrow = $null
+$script:QPFont_Title   = $null
+$script:QPFont_Sub     = $null
+
+function _QP-Resolve-Font {
+    param([string[]]$Families, [float]$Size, [System.Drawing.FontStyle]$Style = [System.Drawing.FontStyle]::Regular)
+    foreach ($family in $Families) {
+        try {
+            $f = New-Object System.Drawing.Font($family, $Size, $Style)
+            if ($f.FontFamily.Name -ieq $family) { return $f }
+            $root = ($family -split ' ')[0]
+            if ($f.FontFamily.Name -ilike "$root*") { return $f }
+            $f.Dispose()
+        } catch {}
+    }
+    return New-Object System.Drawing.Font("Segoe UI", $Size, $Style)
+}
+
+function _QP-Ensure-Fonts {
+    if ($null -ne $script:QPFont_Title) { return }
+    # Bahnschrift SemiBold Condensed for the eyebrow tag (geometric HUD caps).
+    $script:QPFont_Eyebrow = _QP-Resolve-Font `
+        -Families @("Bahnschrift SemiBold Condensed","Bahnschrift Condensed","Bahnschrift","Segoe UI Semibold") `
+        -Size 7.5 -Style ([System.Drawing.FontStyle]::Bold)
+    # Bahnschrift SemiBold Condensed headline for profile names - matches the
+    # toast Title font family for visual continuity across the two surfaces.
+    $script:QPFont_Title   = _QP-Resolve-Font `
+        -Families @("Bahnschrift SemiBold Condensed","Bahnschrift Condensed","Bahnschrift","Segoe UI Semibold") `
+        -Size 11.5 -Style ([System.Drawing.FontStyle]::Bold)
+    # Cascadia Code for the sub-text - developer mono with slashed zero.
+    $script:QPFont_Sub     = _QP-Resolve-Font `
+        -Families @("Cascadia Code","Cascadia Mono","Consolas") `
+        -Size 8.0 -Style ([System.Drawing.FontStyle]::Regular)
+}
+
+# ============================================================================
+# IMAGE CLEANUP
+# ============================================================================
 
 function Clear-QuickPanelGeneratedImages {
     param([System.Windows.Forms.Control]$Root)
-
     if (-not $Root) { return }
-
     foreach ($child in @($Root.Controls)) {
         Clear-QuickPanelGeneratedImages -Root $child
     }
-
     if ($Root -is [System.Windows.Forms.PictureBox]) {
         $image = $Root.Image
         if ($image) {
@@ -22,31 +78,19 @@ function Clear-QuickPanelGeneratedImages {
     }
 }
 
-function Blend-QPColor {
-    param(
-        [System.Drawing.Color]$Base,
-        [System.Drawing.Color]$Overlay,
-        [double]$Ratio = 0.2
-    )
-    $ratio = [Math]::Max(0.0, [Math]::Min(1.0, $Ratio))
-    $r = [int]([Math]::Round($Base.R * (1 - $ratio) + $Overlay.R * $ratio))
-    $g = [int]([Math]::Round($Base.G * (1 - $ratio) + $Overlay.G * $ratio))
-    $b = [int]([Math]::Round($Base.B * (1 - $ratio) + $Overlay.B * $ratio))
-    return [System.Drawing.Color]::FromArgb(255, $r, $g, $b)
-}
+# ============================================================================
+# PUBLIC: Show-QuickPanel
+# ============================================================================
 
 function Show-QuickPanel {
     <#
     .SYNOPSIS
-    Shows the floating quick panel with favorite profile buttons.
-    .PARAMETER Favorites
-    Array of profile IDs that are favorited.
-    .PARAMETER Profiles
-    The full profiles hashtable.
-    .PARAMETER ActiveProfile
-    Currently active profile ID (or $null).
-    .PARAMETER OnApply
-    Scriptblock to call when a profile button is clicked. Receives profile ID.
+    Phosphor HUD card-stack of favorite profiles, always-on-top, draggable.
+
+    .PARAMETER Favorites    Array of profile IDs that are favorited.
+    .PARAMETER Profiles     The full profiles hashtable.
+    .PARAMETER ActiveProfile Currently active profile ID (or $null).
+    .PARAMETER OnApply      Scriptblock to call when a card is clicked. Receives profile ID.
     #>
     param(
         [string[]]$Favorites,
@@ -54,6 +98,8 @@ function Show-QuickPanel {
         [string]$ActiveProfile,
         [scriptblock]$OnApply
     )
+
+    _QP-Ensure-Fonts
 
     if ($script:QuickPanelForm -and -not $script:QuickPanelForm.IsDisposed) {
         try {
@@ -74,43 +120,42 @@ function Show-QuickPanel {
             $favProfiles += @{ Id = $fav; Profile = $Profiles[$fav] }
         }
     }
-
-    # Take top 3 favorites
-    if ($favProfiles.Count -gt 3) {
-        $favProfiles = $favProfiles[0..2]
-    }
-
+    if ($favProfiles.Count -gt 3) { $favProfiles = $favProfiles[0..2] }
     if ($favProfiles.Count -eq 0) { return }
 
-    $btnHeight = 44
-    $padding = 10
-    $panelWidth = 240
-    $panelHeight = $padding + ($favProfiles.Count * ($btnHeight + 5)) + $padding + 28  # +28 for header
+    # Phosphor HUD card dimensions
+    $panelWidth   = 280
+    $cardHeight   = 56
+    $cardGap      = 6
+    $padX         = 18
+    $padTop       = 14
+    $headerHeight = 38
+    $padBottom    = 14
+    $panelHeight  = $padTop + $headerHeight + ($favProfiles.Count * ($cardHeight + $cardGap)) - $cardGap + $padBottom
 
     $form = New-Object System.Windows.Forms.Form
-    $form.Text = ""
-    $form.FormBorderStyle = [System.Windows.Forms.FormBorderStyle]::None
-    $form.BackColor = [System.Drawing.Color]::FromArgb(255, 22, 22, 26)
-    $form.Size = New-Object System.Drawing.Size($panelWidth, $panelHeight)
-    $form.StartPosition = [System.Windows.Forms.FormStartPosition]::Manual
-    $form.TopMost = $true
-    $form.ShowInTaskbar = $false
-    $form.Opacity = 0
+    $form.Text             = ""
+    $form.FormBorderStyle  = [System.Windows.Forms.FormBorderStyle]::None
+    $form.BackColor        = $script:QPPalette.Ink100
+    $form.Size             = New-Object System.Drawing.Size($panelWidth, $panelHeight)
+    $form.StartPosition    = [System.Windows.Forms.FormStartPosition]::Manual
+    $form.TopMost          = $true
+    $form.ShowInTaskbar    = $false
+    $form.Opacity          = 0
 
-    # Position bottom-right
     $screen = [System.Windows.Forms.Screen]::PrimaryScreen.WorkingArea
     $form.Location = New-Object System.Drawing.Point(
-        ($screen.Right - $panelWidth - 16),
-        ($screen.Bottom - $panelHeight - 16)
+        ($screen.Right - $panelWidth - 18),
+        ($screen.Bottom - $panelHeight - 18)
     )
 
-    # Enable dragging
-    $script:QP_Dragging = $false
+    # Drag support
+    $script:QP_Dragging  = $false
     $script:QP_DragStart = [System.Drawing.Point]::Empty
     $form.Add_MouseDown({
         param($s, $e)
         if ($e.Button -eq [System.Windows.Forms.MouseButtons]::Left) {
-            $script:QP_Dragging = $true
+            $script:QP_Dragging  = $true
             $script:QP_DragStart = $e.Location
         }
     })
@@ -119,7 +164,6 @@ function Show-QuickPanel {
         if ($script:QP_Dragging) {
             $newX = $s.Location.X + $e.X - $script:QP_DragStart.X
             $newY = $s.Location.Y + $e.Y - $script:QP_DragStart.Y
-            # Clamp to screen bounds so the panel can't be dragged off-screen
             $screen = [System.Windows.Forms.Screen]::FromControl($s).WorkingArea
             $newX = [Math]::Max($screen.Left, [Math]::Min($newX, $screen.Right - $s.Width))
             $newY = [Math]::Max($screen.Top, [Math]::Min($newY, $screen.Bottom - $s.Height))
@@ -128,260 +172,270 @@ function Show-QuickPanel {
     })
     $form.Add_MouseUp({ $script:QP_Dragging = $false })
 
-    # Border paint with gradient top accent
+    # Panel surface paint: solid Ink-100, CRT scanlines, L-corner brackets,
+    # outline, left phosphor rail, hairline rule under the header.
+    $capW = $panelWidth
+    $capH = $panelHeight
     $form.Add_Paint({
         param($s, $e)
         $g = $e.Graphics
         $g.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
-        # Outer border
-        $borderPen = New-Object System.Drawing.Pen(
-            [System.Drawing.Color]::FromArgb(50, 220, 180, 70), 1
-        )
-        $g.DrawRectangle($borderPen, 0, 0, ($s.Width - 1), ($s.Height - 1))
-        $borderPen.Dispose()
-        # Top accent line (gold gradient)
-        $topPen = New-Object System.Drawing.Pen(
-            [System.Drawing.Color]::FromArgb(120, 230, 190, 70), 2
-        )
-        $g.DrawLine($topPen, 1, 0, ($s.Width - 2), 0)
-        $topPen.Dispose()
-        # Header background gradient
-        $headerBrush = New-Object System.Drawing.SolidBrush(
-            [System.Drawing.Color]::FromArgb(255, 18, 18, 22)
-        )
-        $g.FillRectangle($headerBrush, 1, 1, ($s.Width - 2), 26)
-        $headerBrush.Dispose()
+        $g.TextRenderingHint = [System.Drawing.Text.TextRenderingHint]::ClearTypeGridFit
 
-        # Subtle bottom edge on header
-        $edgePen = New-Object System.Drawing.Pen(
-            [System.Drawing.Color]::FromArgb(25, 230, 190, 70), 1
+        # 1) Solid Ink-100 base (matches Form.BackColor and label backgrounds
+        #    so labels composite invisibly into the surface)
+        $baseBrush = New-Object System.Drawing.SolidBrush($script:QPPalette.Ink100)
+        $g.FillRectangle($baseBrush, 0, 0, $capW, $capH)
+        $baseBrush.Dispose()
+
+        # 2) CRT scanlines - 1px horizontal stripes every 3px
+        $scanBrush = New-Object System.Drawing.SolidBrush($script:QPPalette.Scanline)
+        for ($sy = 0; $sy -lt $capH; $sy += 3) {
+            $g.FillRectangle($scanBrush, 0, $sy, $capW, 1)
+        }
+        $scanBrush.Dispose()
+
+        # 3) Outline (full panel hairline in phosphor cyan at low alpha)
+        $outlinePen = New-Object System.Drawing.Pen(
+            [System.Drawing.Color]::FromArgb(80, $script:QPPalette.Lagoon.R, $script:QPPalette.Lagoon.G, $script:QPPalette.Lagoon.B), 1
         )
-        $g.DrawLine($edgePen, 8, 27, ($s.Width - 8), 27)
-        $edgePen.Dispose()
-    })
+        $g.DrawRectangle($outlinePen, 0, 0, ($capW - 1), ($capH - 1))
+        $outlinePen.Dispose()
 
-    # Header
-    $headerLabel = New-Object System.Windows.Forms.Label
-    $headerLabel.Text = "A.B.S.O."
-    $headerLabel.ForeColor = [System.Drawing.Color]::FromArgb(255, 220, 180, 70)
-    $headerLabel.Font = New-Object System.Drawing.Font("Segoe UI", 8, [System.Drawing.FontStyle]::Bold)
-    $headerLabel.Location = New-Object System.Drawing.Point($padding, $padding)
-    $headerLabel.AutoSize = $true
-    $headerLabel.BackColor = [System.Drawing.Color]::Transparent
-    $form.Controls.Add($headerLabel)
+        # 4) Left accent rail - 6px solid phosphor + 1px feather
+        $strokeBrush = New-Object System.Drawing.SolidBrush($script:QPPalette.Lagoon)
+        $g.FillRectangle($strokeBrush, 0, 0, 6, $capH)
+        $strokeBrush.Dispose()
+        $featherBrush = New-Object System.Drawing.SolidBrush(
+            [System.Drawing.Color]::FromArgb(80, $script:QPPalette.Lagoon.R, $script:QPPalette.Lagoon.G, $script:QPPalette.Lagoon.B)
+        )
+        $g.FillRectangle($featherBrush, 6, 0, 1, $capH)
+        $featherBrush.Dispose()
+        # Tick perforations every 22px - dark notches across the rail
+        $tickBrush = New-Object System.Drawing.SolidBrush($script:QPPalette.Ink100)
+        for ($ty = 14; $ty -lt ($capH - 6); $ty += 22) {
+            $g.FillRectangle($tickBrush, 0, $ty, 6, 1)
+        }
+        $tickBrush.Dispose()
 
-    # Close button
+        # 5) L-shaped corner brackets in phosphor cyan (10px arms, 1.6px pen)
+        $bracketLen = 10
+        $bracketPen = New-Object System.Drawing.Pen($script:QPPalette.Lagoon, 1.6)
+        # Top-right: |_ shape
+        $bracketPen.StartCap = [System.Drawing.Drawing2D.LineCap]::Flat
+        $bracketPen.EndCap   = [System.Drawing.Drawing2D.LineCap]::Flat
+        $g.DrawLine($bracketPen, ($capW - $bracketLen - 2), 2, ($capW - 2), 2)
+        $g.DrawLine($bracketPen, ($capW - 2), 2, ($capW - 2), ($bracketLen + 2))
+        # Bottom-right: ^| shape
+        $g.DrawLine($bracketPen, ($capW - 2), ($capH - $bracketLen - 2), ($capW - 2), ($capH - 2))
+        $g.DrawLine($bracketPen, ($capW - $bracketLen - 2), ($capH - 2), ($capW - 2), ($capH - 2))
+        # Bottom-left horizontal arm (vertical is the accent rail itself)
+        $g.DrawLine($bracketPen, 6, ($capH - 2), ($bracketLen + 6), ($capH - 2))
+        $bracketPen.Dispose()
+
+        # 6) Header hairline rule beneath the eyebrow heading
+        $rulePen = New-Object System.Drawing.Pen($script:QPPalette.Ink300, 1)
+        $g.DrawLine($rulePen, $padX, ($padTop + $headerHeight - 4),
+            ($capW - $padX), ($padTop + $headerHeight - 4))
+        $rulePen.Dispose()
+    }.GetNewClosure())
+
+    # Header eyebrow ("FAVORITES / QUICK LAUNCH"). Solid Ink-100 BackColor on
+    # every label avoids the WinForms transparency race that produced solid
+    # rectangles when Discord popped over the toast surface.
+    $eyebrow = New-Object System.Windows.Forms.Label
+    $eyebrow.Text      = "FAVORITES / QUICK LAUNCH"
+    $eyebrow.Font      = $script:QPFont_Eyebrow
+    $eyebrow.ForeColor = $script:QPPalette.Lagoon
+    $eyebrow.BackColor = $script:QPPalette.Ink100
+    $eyebrow.Location  = New-Object System.Drawing.Point($padX, $padTop)
+    $eyebrow.Size      = New-Object System.Drawing.Size(($panelWidth - $padX * 2 - 24), 14)
+    $form.Controls.Add($eyebrow)
+
+    # Close affordance - phosphor cyan X (replaces the v2 gold/coral pair)
     $closeLabel = New-Object System.Windows.Forms.Label
-    $closeLabel.Text = "X"
-    $closeLabel.ForeColor = [System.Drawing.Color]::FromArgb(255, 100, 100, 100)
-    $closeLabel.Font = New-Object System.Drawing.Font("Segoe UI", 8, [System.Drawing.FontStyle]::Bold)
-    $closeLabel.Location = New-Object System.Drawing.Point(($panelWidth - 20), $padding)
-    $closeLabel.Size = New-Object System.Drawing.Size(14, 16)
-    $closeLabel.BackColor = [System.Drawing.Color]::Transparent
-    $closeLabel.Cursor = [System.Windows.Forms.Cursors]::Hand
+    $closeLabel.Text      = [string][char]0x00D7
+    $closeLabel.ForeColor = $script:QPPalette.Lagoon
+    $closeLabel.Font      = New-Object System.Drawing.Font("Segoe UI", 11)
+    $closeLabel.Location  = New-Object System.Drawing.Point(($panelWidth - $padX - 14), ($padTop - 4))
+    $closeLabel.Size      = New-Object System.Drawing.Size(16, 18)
+    $closeLabel.BackColor = $script:QPPalette.Ink100
+    $closeLabel.Cursor    = [System.Windows.Forms.Cursors]::Hand
     $closeLabel.TextAlign = [System.Drawing.ContentAlignment]::MiddleCenter
-    $closeLabel.Add_Click({
-        Close-QuickPanel
-    })
-    $closeLabel.Add_MouseEnter({ $this.ForeColor = [System.Drawing.Color]::FromArgb(255, 220, 70, 70) })
-    $closeLabel.Add_MouseLeave({ $this.ForeColor = [System.Drawing.Color]::FromArgb(255, 100, 100, 100) })
+    $closeLabel.Add_Click({ Close-QuickPanel })
+    $closeLabel.Add_MouseEnter({ $this.ForeColor = $script:QPPalette.Paper })
+    $closeLabel.Add_MouseLeave({ $this.ForeColor = $script:QPPalette.Lagoon })
     $form.Controls.Add($closeLabel)
 
-    # Profile buttons with sub-text
-    $y = $padding + 28
+    # Profile cards
+    $y = $padTop + $headerHeight
     foreach ($entry in $favProfiles) {
-        $catColor = $null
         $catName = $entry.Profile.Cat
-        if (Get-Command Get-CategoryColor -ErrorAction SilentlyContinue) {
-            $catColor = Get-CategoryColor -Category $catName -Fallback ([System.Drawing.Color]::FromArgb(255, 200, 200, 200))
-        }
-        else {
-            $catColor = [System.Drawing.Color]::FromArgb(255, 200, 200, 200)
-        }
-
+        $catColor = if (Get-Command Get-CategoryColor -ErrorAction SilentlyContinue) {
+            Get-CategoryColor -Category $catName -Fallback $script:QPPalette.Lagoon
+        } else { $script:QPPalette.Lagoon }
         $isActive = ($entry.Id -eq $ActiveProfile)
 
-        # Container panel for custom two-line button
-        $btnPanel = New-Object System.Windows.Forms.Panel
-        $btnPanel.Tag = $entry.Id
-        $btnPanel.Location = New-Object System.Drawing.Point($padding, $y)
-        $btnPanel.Size = New-Object System.Drawing.Size(($panelWidth - $padding * 2), $btnHeight)
-        $btnPanel.Cursor = [System.Windows.Forms.Cursors]::Hand
+        $card = New-Object System.Windows.Forms.Panel
+        $card.Tag      = $entry.Id
+        $card.Location = New-Object System.Drawing.Point($padX, $y)
+        $card.Size     = New-Object System.Drawing.Size(($panelWidth - $padX * 2), $cardHeight)
+        $card.Cursor   = [System.Windows.Forms.Cursors]::Hand
+        $card.BackColor = if ($isActive) { $script:QPPalette.Ink300 } else { $script:QPPalette.Ink200 }
 
-        if ($isActive) {
-            $btnPanel.BackColor = Blend-QPColor -Base ([System.Drawing.Color]::FromArgb(255, 22, 22, 26)) -Overlay $catColor -Ratio 0.22
-        }
-        else {
-            $btnPanel.BackColor = Blend-QPColor -Base ([System.Drawing.Color]::FromArgb(255, 32, 32, 38)) -Overlay $catColor -Ratio 0.06
-        }
-
-        # Custom paint for border + left accent bar
-        $capturedCatColor = $catColor
-        $capturedIsActive = $isActive
-        $btnPanel.Add_Paint({
+        $capCardColor = $catColor
+        $capCardActive = $isActive
+        $card.Add_Paint({
             param($s, $e)
             $g = $e.Graphics
             $g.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
-            # Border
-            $borderAlpha = if ($capturedIsActive) { 100 } else { 40 }
-            $borderPen = New-Object System.Drawing.Pen(
-                [System.Drawing.Color]::FromArgb($borderAlpha, $capturedCatColor.R, $capturedCatColor.G, $capturedCatColor.B), 1
+
+            # 3px left accent stroke - active = full saturation, inactive = subtle
+            $barAlpha = if ($capCardActive) { 220 } else { 80 }
+            $bar = New-Object System.Drawing.SolidBrush(
+                [System.Drawing.Color]::FromArgb($barAlpha, $capCardColor.R, $capCardColor.G, $capCardColor.B)
             )
-            $g.DrawRectangle($borderPen, 0, 0, ($s.Width - 1), ($s.Height - 1))
-            $borderPen.Dispose()
-            # Left accent bar
-            $barAlpha = if ($capturedIsActive) { 220 } else { 80 }
-            $barBrush = New-Object System.Drawing.SolidBrush(
-                [System.Drawing.Color]::FromArgb($barAlpha, $capturedCatColor.R, $capturedCatColor.G, $capturedCatColor.B)
+            $g.FillRectangle($bar, 0, 0, 3, $s.Height)
+            $bar.Dispose()
+
+            # Top-right indicator pip - 2x2 phosphor-cyan dot
+            $pipBrush = New-Object System.Drawing.SolidBrush($script:QPPalette.Lagoon)
+            $g.FillRectangle($pipBrush, ($s.Width - 5), 3, 2, 2)
+            $pipBrush.Dispose()
+
+            # Bottom hairline rule
+            $rulePen = New-Object System.Drawing.Pen(
+                [System.Drawing.Color]::FromArgb(50, 255, 255, 255), 1
             )
-            $g.FillRectangle($barBrush, 0, 2, 3, ($s.Height - 4))
-            $barBrush.Dispose()
-            # Active glow indicator
-            if ($capturedIsActive) {
-                $glowBrush = New-Object System.Drawing.SolidBrush(
-                    [System.Drawing.Color]::FromArgb(20, $capturedCatColor.R, $capturedCatColor.G, $capturedCatColor.B)
+            $g.DrawLine($rulePen, 12, ($s.Height - 1), ($s.Width - 8), ($s.Height - 1))
+            $rulePen.Dispose()
+
+            # Active indicator dot, right side
+            if ($capCardActive) {
+                $dotGlow = New-Object System.Drawing.SolidBrush(
+                    [System.Drawing.Color]::FromArgb(50, $capCardColor.R, $capCardColor.G, $capCardColor.B)
                 )
-                $g.FillRectangle($glowBrush, 0, 0, $s.Width, $s.Height)
-                $glowBrush.Dispose()
+                $g.FillEllipse($dotGlow, ($s.Width - 22), (($s.Height / 2) - 6), 12, 12)
+                $dotGlow.Dispose()
+                $dotBrush = New-Object System.Drawing.SolidBrush($capCardColor)
+                $g.FillEllipse($dotBrush, ($s.Width - 19), (($s.Height / 2) - 3), 6, 6)
+                $dotBrush.Dispose()
             }
         }.GetNewClosure())
 
-        # Category icon PictureBox
+        # Icon medallion (category/game bitmap, 20x20 centered vertically).
+        # Card background colors (Ink-200/Ink-300) are used for the picture
+        # box BackColor so the icon composites cleanly onto the card surface.
+        $cardBg = $card.BackColor
         $iconBox = New-Object System.Windows.Forms.PictureBox
-        $iconBox.Location = New-Object System.Drawing.Point(10, 14)
-        $iconBox.Size = New-Object System.Drawing.Size(16, 16)
+        $iconBox.Location = New-Object System.Drawing.Point(14, (($cardHeight / 2) - 10))
+        $iconBox.Size = New-Object System.Drawing.Size(20, 20)
         $iconBox.SizeMode = [System.Windows.Forms.PictureBoxSizeMode]::Zoom
-        $iconBox.BackColor = [System.Drawing.Color]::Transparent
+        $iconBox.BackColor = $cardBg
         $iconBox.Cursor = [System.Windows.Forms.Cursors]::Hand
         if (Get-Command New-CategoryBitmap -ErrorAction SilentlyContinue) {
             $iconBox.Image = New-CategoryBitmap -Category $catName -Color $catColor
         }
-        $btnPanel.Controls.Add($iconBox)
+        $card.Controls.Add($iconBox)
 
-        # Active glowing dot indicator
-        if ($isActive) {
-            $dotPanel = New-Object System.Windows.Forms.Panel
-            $dotPanel.Location = New-Object System.Drawing.Point(($panelWidth - $padding * 2 - 22), 16)
-            $dotPanel.Size = New-Object System.Drawing.Size(12, 12)
-            $dotPanel.BackColor = [System.Drawing.Color]::Transparent
-            $capturedDotColor = $catColor
-            $dotPanel.Add_Paint({
-                param($s, $e)
-                $dg = $e.Graphics
-                $dg.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
-                $glowB = New-Object System.Drawing.SolidBrush(
-                    [System.Drawing.Color]::FromArgb(40, $capturedDotColor.R, $capturedDotColor.G, $capturedDotColor.B)
-                )
-                $dg.FillEllipse($glowB, 0, 0, 11, 11)
-                $glowB.Dispose()
-                $dotB = New-Object System.Drawing.SolidBrush($capturedDotColor)
-                $dg.FillEllipse($dotB, 2, 2, 8, 8)
-                $dotB.Dispose()
-            }.GetNewClosure())
-            $btnPanel.Controls.Add($dotPanel)
-        }
-
-        # Profile name label (shifted right for icon)
+        # Profile name (Bahnschrift SemiBold Condensed HUD headline, paper)
         $nameLabel = New-Object System.Windows.Forms.Label
-        $nameLabel.Text = $entry.Profile.Name
-        $nameLabel.Location = New-Object System.Drawing.Point(32, 4)
-        $nameLabel.Size = New-Object System.Drawing.Size(($panelWidth - $padding * 2 - 38), 18)
-        $nameLabel.ForeColor = if ($isActive) {
-            [System.Drawing.Color]::FromArgb(255,
-                [Math]::Min(255, $catColor.R + 30),
-                [Math]::Min(255, $catColor.G + 30),
-                [Math]::Min(255, $catColor.B + 30)
-            )
-        } else { $catColor }
-        $nameLabel.Font = if ($isActive) {
-            New-Object System.Drawing.Font("Segoe UI", 8.5, [System.Drawing.FontStyle]::Bold)
-        } else {
-            New-Object System.Drawing.Font("Segoe UI", 8.5)
-        }
-        $nameLabel.BackColor = [System.Drawing.Color]::Transparent
-        $nameLabel.Cursor = [System.Windows.Forms.Cursors]::Hand
-        $btnPanel.Controls.Add($nameLabel)
+        $nameLabel.Text      = $entry.Profile.Name
+        $nameLabel.Location  = New-Object System.Drawing.Point(42, 8)
+        $nameLabel.Size      = New-Object System.Drawing.Size(($panelWidth - $padX * 2 - 70), 20)
+        $nameLabel.ForeColor = $script:QPPalette.Paper
+        $nameLabel.Font      = $script:QPFont_Title
+        $nameLabel.BackColor = $cardBg
+        $nameLabel.Cursor    = [System.Windows.Forms.Cursors]::Hand
+        $nameLabel.AutoEllipsis = $true
+        $card.Controls.Add($nameLabel)
 
-        # Sub-text label (profile settings summary)
-        $subLabel = New-Object System.Windows.Forms.Label
+        # Sub-text (Cascadia Code mist) - profile descriptor
         $subText = if ($entry.Profile.Sub) { $entry.Profile.Sub } else { $entry.Profile.Cat }
-        $subLabel.Text = $subText
-        $subLabel.Location = New-Object System.Drawing.Point(32, 22)
-        $subLabel.Size = New-Object System.Drawing.Size(($panelWidth - $padding * 2 - 38), 16)
-        $subLabel.ForeColor = [System.Drawing.Color]::FromArgb(160, $catColor.R, $catColor.G, $catColor.B)
-        $subLabel.Font = New-Object System.Drawing.Font("Segoe UI", 7)
-        $subLabel.BackColor = [System.Drawing.Color]::Transparent
-        $subLabel.Cursor = [System.Windows.Forms.Cursors]::Hand
-        $btnPanel.Controls.Add($subLabel)
+        $subLabel = New-Object System.Windows.Forms.Label
+        $subLabel.Text      = $subText
+        $subLabel.Location  = New-Object System.Drawing.Point(42, 30)
+        $subLabel.Size      = New-Object System.Drawing.Size(($panelWidth - $padX * 2 - 70), 16)
+        $subLabel.ForeColor = $script:QPPalette.Mist
+        $subLabel.Font      = $script:QPFont_Sub
+        $subLabel.BackColor = $cardBg
+        $subLabel.Cursor    = [System.Windows.Forms.Cursors]::Hand
+        $subLabel.AutoEllipsis = $true
+        $card.Controls.Add($subLabel)
 
-        # Hover effects for the panel
-        $hoverColor = Blend-QPColor -Base $btnPanel.BackColor -Overlay $catColor -Ratio 0.15
-        $normalColor = $btnPanel.BackColor
-        $capturedHoverColor = $hoverColor
-        $capturedNormalColor = $normalColor
-        $hoverAction = { $this.Parent.BackColor = $capturedHoverColor }.GetNewClosure()
-        $leaveAction = { $this.Parent.BackColor = $capturedNormalColor }.GetNewClosure()
-        $panelHoverAction = { $this.BackColor = $capturedHoverColor }.GetNewClosure()
-        $panelLeaveAction = { $this.BackColor = $capturedNormalColor }.GetNewClosure()
-
-        $nameLabel.Add_MouseEnter($hoverAction)
-        $nameLabel.Add_MouseLeave($leaveAction)
-        $subLabel.Add_MouseEnter($hoverAction)
-        $subLabel.Add_MouseLeave($leaveAction)
-        $iconBox.Add_MouseEnter($hoverAction)
-        $iconBox.Add_MouseLeave($leaveAction)
-        $btnPanel.Add_MouseEnter($panelHoverAction)
-        $btnPanel.Add_MouseLeave($panelLeaveAction)
-
-        # Click handlers
-        $capturedId = $entry.Id
-        $clickAction = {
-            if ($OnApply) { & $OnApply $capturedId }
+        # Hover lift: inactive Ink-200 -> Ink-300, active Ink-300 -> Ink-150-mix.
+        # Update label/icon BackColors too so they stay flush with the card.
+        $normalBg = $card.BackColor
+        $hoverBg  = if ($isActive) {
+            [System.Drawing.Color]::FromArgb(255, 38, 48, 66)
+        } else {
+            $script:QPPalette.Ink300
+        }
+        $capCard = $card
+        $capIcon = $iconBox
+        $capName = $nameLabel
+        $capSub  = $subLabel
+        $hoverIn  = {
+            $capCard.BackColor = $hoverBg
+            $capIcon.BackColor = $hoverBg
+            $capName.BackColor = $hoverBg
+            $capSub.BackColor  = $hoverBg
         }.GetNewClosure()
-        $btnPanel.Add_Click($clickAction)
-        $nameLabel.Add_Click($clickAction)
-        $subLabel.Add_Click($clickAction)
-        $iconBox.Add_Click($clickAction)
+        $hoverOut = {
+            $capCard.BackColor = $normalBg
+            $capIcon.BackColor = $normalBg
+            $capName.BackColor = $normalBg
+            $capSub.BackColor  = $normalBg
+        }.GetNewClosure()
+        $card.Add_MouseEnter($hoverIn)
+        $card.Add_MouseLeave($hoverOut)
+        $nameLabel.Add_MouseEnter($hoverIn); $nameLabel.Add_MouseLeave($hoverOut)
+        $subLabel.Add_MouseEnter($hoverIn);  $subLabel.Add_MouseLeave($hoverOut)
+        $iconBox.Add_MouseEnter($hoverIn);   $iconBox.Add_MouseLeave($hoverOut)
 
-        $form.Controls.Add($btnPanel)
-        $y += $btnHeight + 5
+        # Click handlers (apply profile)
+        $capId = $entry.Id
+        $click = { if ($OnApply) { & $OnApply $capId } }.GetNewClosure()
+        $card.Add_Click($click)
+        $nameLabel.Add_Click($click)
+        $subLabel.Add_Click($click)
+        $iconBox.Add_Click($click)
+
+        $form.Controls.Add($card)
+        $y += $cardHeight + $cardGap
     }
 
-    $script:QuickPanelForm = $form
+    $script:QuickPanelForm    = $form
     $script:QuickPanelVisible = $true
     $form.Show()
 
-    # Apply DWM rounded corners, dark mode, and shadow
+    # DWM rounded corners + dark mode + phosphor-cyan border
     try {
         if ("DwmHelper" -as [type]) {
-            Apply-DwmWindowEffects -Form $form -CornerStyle 3 -BorderColorRGB @(220, 180, 70)
+            Apply-DwmWindowEffects -Form $form -CornerStyle 3 -BorderColorRGB @(
+                $script:QPPalette.Lagoon.R, $script:QPPalette.Lagoon.G, $script:QPPalette.Lagoon.B
+            )
         }
     } catch {}
 
-    # Fade-in animation
-    $qpFadeTimer = New-Object System.Windows.Forms.Timer
-    $qpFadeTimer.Interval = 16
-    $capturedForm = $form
-    $qpFadeTimer.Add_Tick({
+    # Fade-in (cubic-out feels lighter than linear)
+    $qpFade = New-Object System.Windows.Forms.Timer
+    $qpFade.Interval = 14
+    $captured = $form
+    $qpFade.Add_Tick({
         try {
-            if ($capturedForm -and -not $capturedForm.IsDisposed) {
-                $newOp = $capturedForm.Opacity + 0.12
-                if ($newOp -ge 0.95) {
-                    $capturedForm.Opacity = 0.95
-                    $qpFadeTimer.Stop()
-                    $qpFadeTimer.Dispose()
+            if ($captured -and -not $captured.IsDisposed) {
+                $op = $captured.Opacity + 0.12
+                if ($op -ge 0.97) {
+                    $captured.Opacity = 0.97
+                    $qpFade.Stop(); $qpFade.Dispose()
+                } else {
+                    $captured.Opacity = $op
                 }
-                else {
-                    $capturedForm.Opacity = $newOp
-                }
-            }
-            else {
-                $qpFadeTimer.Stop()
-                $qpFadeTimer.Dispose()
-            }
-        } catch { try { $qpFadeTimer.Stop(); $qpFadeTimer.Dispose() } catch {} }
+            } else { $qpFade.Stop(); $qpFade.Dispose() }
+        } catch { try { $qpFade.Stop(); $qpFade.Dispose() } catch {} }
     })
-    $qpFadeTimer.Start()
+    $qpFade.Start()
 }
 
 function Close-QuickPanel {
@@ -392,7 +446,7 @@ function Close-QuickPanel {
     if ($script:QuickPanelForm -and -not $script:QuickPanelForm.IsDisposed) {
         try {
             Clear-QuickPanelGeneratedImages -Root $script:QuickPanelForm
-            $script:QuickPanelForm.Hide()  # Force desktop repaint before disposing
+            $script:QuickPanelForm.Hide()
             [System.Windows.Forms.Application]::DoEvents()
             $script:QuickPanelForm.Close()
             $script:QuickPanelForm.Dispose()
@@ -415,7 +469,6 @@ function Update-QuickPanel {
         [string]$ActiveProfile,
         [scriptblock]$OnApply
     )
-
     if ($script:QuickPanelVisible) {
         Show-QuickPanel -Favorites $Favorites -Profiles $Profiles -ActiveProfile $ActiveProfile -OnApply $OnApply
     }
