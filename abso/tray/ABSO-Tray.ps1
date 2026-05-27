@@ -698,6 +698,309 @@ function Invoke-JsonSafe {
     }
 }
 
+function Reset-ActiveProfileVerificationState {
+    $script:ActiveProfileVerificationStatus = $null
+    $script:ActiveProfilePendingApplySettings = @()
+    $script:ActiveProfilePendingRebootSettings = @()
+    $script:ActiveProfileMismatchedHandlers = @()
+    $script:ActiveProfileVerificationCheckedAt = $null
+    $script:ActiveProfileStateRebootPending = $false
+    $script:ActiveProfileStateRebootReasons = @()
+}
+
+function Get-ActiveProfilePendingApplyText {
+    if ($script:ActiveProfileVerificationStatus -ne "pending_apply") { return $null }
+    $pending = @($script:ActiveProfilePendingApplySettings)
+    if ($pending.Count -gt 0 -and -not [string]::IsNullOrWhiteSpace("$($pending[0])")) {
+        return "$($pending[0])"
+    }
+    return "profile verification"
+}
+
+function Get-ActiveProfileRebootPendingText {
+    if (
+        -not $script:ActiveProfileStateRebootPending -and
+        $script:ActiveProfileVerificationStatus -ne "pending_reboot"
+    ) {
+        return $null
+    }
+    $reasons = @($script:ActiveProfileStateRebootReasons)
+    if ($reasons.Count -gt 0 -and -not [string]::IsNullOrWhiteSpace("$($reasons[0])")) {
+        return "$($reasons[0])"
+    }
+    $pending = @($script:ActiveProfilePendingRebootSettings)
+    if ($pending.Count -gt 0 -and -not [string]::IsNullOrWhiteSpace("$($pending[0])")) {
+        return "$($pending[0])"
+    }
+    return "profile changes"
+}
+
+function Complete-SameActiveProfileSelectionIfHandled {
+    <#
+    .SYNOPSIS
+    Handles tray clicks on the already-active profile without redundant apply.
+
+    .DESCRIPTION
+    The active profile may already be fully verified or waiting only for a
+    reboot-gated compositor change. Re-running a full apply for that state can
+    rewrite display-sensitive settings and blank a secondary monitor. This
+    function turns those clicks into a no-op status notice, and routes the one
+    supported repair state through the narrow apply-pending path.
+    #>
+    param(
+        [string]$ProfileId,
+        [object]$Profile
+    )
+
+    $pendingApplyText = Get-ActiveProfilePendingApplyText
+    if (-not [string]::IsNullOrWhiteSpace($pendingApplyText)) {
+        Write-TrayLog "Profile '$ProfileId' is already active but needs pending fixes; using apply-pending instead of full apply"
+        Apply-PendingProfileFixes
+        return $true
+    }
+
+    $status = if ($script:ActiveProfileVerificationStatus) { "$($script:ActiveProfileVerificationStatus)" } else { "" }
+    $rebootText = Get-ActiveProfileRebootPendingText
+    $alreadyVerified = $status -in @("active", "pending_reboot")
+
+    if ($alreadyVerified -or -not [string]::IsNullOrWhiteSpace($rebootText)) {
+        Set-IconState -State "Active"
+        if (-not [string]::IsNullOrWhiteSpace($rebootText)) {
+            Write-TrayLog "Profile '$ProfileId' already verifies active; skipping apply. Restart required: $rebootText"
+            Show-Notification -Title $Profile.Name -Message "Already active. Restart required: $rebootText" -Type "Warning"
+            $script:LastAction = "Restart required: $rebootText"
+        }
+        else {
+            Write-TrayLog "Profile '$ProfileId' already verifies active; skipping redundant apply"
+            Show-Notification -Title $Profile.Name -Message "Already active." -Type "Info"
+            $script:LastAction = "Already active: $($Profile.Name)"
+        }
+        $script:LastActionTime = Get-Date -Format "HH:mm"
+        Update-MenuState
+        Start-ActiveProfileVerificationTimer -DelayMilliseconds 500
+        return $true
+    }
+
+    if ([string]::IsNullOrWhiteSpace($status)) {
+        Write-TrayLog "Profile '$ProfileId' is already active but verification has not completed; refreshing before any apply"
+        Show-Notification -Title $Profile.Name -Message "Verifying current profile before reapply." -Type "Info"
+        $script:LastAction = "Verifying: $($Profile.Name)"
+        $script:LastActionTime = Get-Date -Format "HH:mm"
+        Refresh-ActiveProfileVerificationState -Silent
+        return $true
+    }
+
+    return $false
+}
+
+function Refresh-ActiveProfileVerificationState {
+    <#
+    .SYNOPSIS
+    Refreshes the tray's read-only view of whether the remembered profile is actually active.
+
+    .DESCRIPTION
+    Calls `abso state --json --verify`, which performs verifier readback only.
+    This must not apply profiles, reset the display, or touch registry state.
+    #>
+    param([switch]$Silent)
+
+    Reset-ActiveProfileVerificationState
+
+    if ([string]::IsNullOrWhiteSpace([string]$script:activeProfile)) {
+        Update-MenuState
+        return
+    }
+
+    Start-ActiveProfileVerificationProcess -Silent:$Silent
+}
+
+function Stop-ActiveProfileVerificationRuntime {
+    param([switch]$KillProcess)
+
+    if ($script:ActiveProfileVerifyTimer) {
+        try { $script:ActiveProfileVerifyTimer.Stop(); $script:ActiveProfileVerifyTimer.Dispose() } catch {}
+        $script:ActiveProfileVerifyTimer = $null
+    }
+    if ($script:ActiveProfileVerifyPollTimer) {
+        try { $script:ActiveProfileVerifyPollTimer.Stop(); $script:ActiveProfileVerifyPollTimer.Dispose() } catch {}
+        $script:ActiveProfileVerifyPollTimer = $null
+    }
+    if ($script:ActiveProfileVerifyProc) {
+        try {
+            if ($KillProcess -and -not $script:ActiveProfileVerifyProc.HasExited) {
+                $script:ActiveProfileVerifyProc.Kill()
+            }
+        } catch {}
+        try { $script:ActiveProfileVerifyProc.Dispose() } catch {}
+        $script:ActiveProfileVerifyProc = $null
+    }
+    foreach ($path in @($script:ActiveProfileVerifyOutputFile, $script:ActiveProfileVerifyErrorFile)) {
+        if ($path) { Remove-Item $path -Force -ErrorAction SilentlyContinue }
+    }
+    $script:ActiveProfileVerifyOutputFile = $null
+    $script:ActiveProfileVerifyErrorFile = $null
+    $script:ActiveProfileVerifyStartedAt = $null
+    $script:ActiveProfileVerifySilent = $true
+}
+
+function Apply-ActiveProfileVerificationJson {
+    param(
+        [object]$Json,
+        [switch]$Silent
+    )
+
+    if ($null -eq $Json -or -not $Json.success -or -not $Json.data) {
+        throw "state --verify returned malformed or unsuccessful JSON"
+    }
+
+    $verification = $Json.data.verification
+    if (-not $verification) {
+        Write-TrayLog "State verification returned no verification block" -Level "WARN"
+        return
+    }
+
+    $verifiedProfile = if ($verification.profile) { "$($verification.profile)" } else { "" }
+    if ($verifiedProfile -and $verifiedProfile -ne "$script:activeProfile") {
+        Write-TrayLog "State verification profile '$verifiedProfile' does not match tray active profile '$script:activeProfile'" -Level "WARN"
+        return
+    }
+
+    $script:ActiveProfileVerificationStatus = if ($verification.status) { "$($verification.status)" } else { "unknown" }
+    $script:ActiveProfilePendingApplySettings = @($verification.pending_apply_settings)
+    $script:ActiveProfilePendingRebootSettings = @($verification.pending_reboot_gated_settings)
+    $script:ActiveProfileMismatchedHandlers = @($verification.mismatched_handlers)
+    $script:ActiveProfileVerificationCheckedAt = if ($verification.checked_at) { "$($verification.checked_at)" } else { (Get-Date).ToString("o") }
+    $script:ActiveProfileStateRebootPending = if ($Json.data.PSObject.Properties["reboot_pending"]) { [bool]$Json.data.reboot_pending } else { $false }
+    $script:ActiveProfileStateRebootReasons = if ($Json.data.PSObject.Properties["reboot_reasons"]) { @($Json.data.reboot_reasons) } else { @() }
+
+    if ($script:ActiveProfileVerificationStatus -eq "pending_apply") {
+        $pendingText = Get-ActiveProfilePendingApplyText
+        Write-TrayLog "Active profile needs apply before it is fully active: $pendingText" -Level "WARN"
+        $script:LastAction = "Needs apply: $pendingText"
+        $script:LastActionTime = Get-Date -Format "HH:mm"
+    }
+    elseif ($script:ActiveProfileStateRebootPending) {
+        $rebootText = Get-ActiveProfileRebootPendingText
+        Write-TrayLog "Active profile has pending reboot-gated changes: $rebootText" -Level "WARN"
+        $script:LastAction = "Restart required: $rebootText"
+        $script:LastActionTime = Get-Date -Format "HH:mm"
+    }
+    elseif (-not $Silent) {
+        Write-TrayLog "Active profile verification status: $script:ActiveProfileVerificationStatus"
+    }
+}
+
+function Start-ActiveProfileVerificationProcess {
+    <#
+    .SYNOPSIS
+    Starts read-only active-profile verification without blocking the WinForms UI thread.
+    #>
+    param([switch]$Silent)
+
+    Stop-ActiveProfileVerificationRuntime -KillProcess
+
+    if ([string]::IsNullOrWhiteSpace([string]$script:activeProfile)) {
+        Update-MenuState
+        return
+    }
+
+    try {
+        $script:ActiveProfileVerifyOutputFile = [System.IO.Path]::GetTempFileName()
+        $script:ActiveProfileVerifyErrorFile = "$($script:ActiveProfileVerifyOutputFile).err"
+        $script:ActiveProfileVerifyStartedAt = [DateTime]::UtcNow
+        $script:ActiveProfileVerifySilent = [bool]$Silent
+        $stateArgs = Get-AbsoBackendArgs -CommandArgs @("state", "--json", "--verify")
+
+        Write-TrayLog "Starting read-only state verification: $($script:PythonExe) $($stateArgs -join ' ')"
+        $script:ActiveProfileVerifyProc = Start-Process -FilePath $script:PythonExe -ArgumentList $stateArgs `
+            -NoNewWindow -PassThru -WorkingDirectory $script:ProjectRoot `
+            -RedirectStandardOutput $script:ActiveProfileVerifyOutputFile `
+            -RedirectStandardError $script:ActiveProfileVerifyErrorFile
+
+        $pollTimer = New-Object System.Windows.Forms.Timer
+        $pollTimer.Interval = 250
+        $pollTimer.Add_Tick({ Complete-ActiveProfileVerificationIfReady })
+        $script:ActiveProfileVerifyPollTimer = $pollTimer
+        $pollTimer.Start()
+    }
+    catch {
+        Write-TrayLog "State verification start failed: $($_.Exception.Message)" -Level "WARN"
+        Stop-ActiveProfileVerificationRuntime -KillProcess
+        Update-MenuState
+    }
+}
+
+function Complete-ActiveProfileVerificationIfReady {
+    $proc = $script:ActiveProfileVerifyProc
+    if (-not $proc) {
+        Stop-ActiveProfileVerificationRuntime
+        return
+    }
+
+    $elapsedSeconds = if ($script:ActiveProfileVerifyStartedAt) {
+        ([DateTime]::UtcNow - $script:ActiveProfileVerifyStartedAt).TotalSeconds
+    }
+    else {
+        0
+    }
+    if (-not $proc.HasExited -and $elapsedSeconds -lt 20) {
+        return
+    }
+
+    try {
+        if ($script:ActiveProfileVerifyPollTimer) {
+            $script:ActiveProfileVerifyPollTimer.Stop()
+        }
+
+        if (-not $proc.HasExited) {
+            try { $proc.Kill() } catch {}
+            throw "state --verify timed out after 20s"
+        }
+
+        $exitCode = $proc.ExitCode
+        $rawOutput = Get-Content $script:ActiveProfileVerifyOutputFile -Raw -ErrorAction SilentlyContinue
+        $errOutput = Get-Content $script:ActiveProfileVerifyErrorFile -Raw -ErrorAction SilentlyContinue
+        if ($errOutput) { Write-TrayLog "State verification stderr: $errOutput" -Level "WARN" }
+        if ($null -ne $exitCode -and $exitCode -ne 0) {
+            throw "state --verify failed with exit code $exitCode"
+        }
+        if (-not $rawOutput) { throw "state --verify returned no output" }
+
+        $json = Invoke-JsonSafe -Text $rawOutput -Source 'StateVerify'
+        Apply-ActiveProfileVerificationJson -Json $json -Silent:([bool]$script:ActiveProfileVerifySilent)
+    }
+    catch {
+        Write-TrayLog "State verification refresh failed: $($_.Exception.Message)" -Level "WARN"
+    }
+    finally {
+        Stop-ActiveProfileVerificationRuntime
+        Update-MenuState
+    }
+}
+
+function Start-ActiveProfileVerificationTimer {
+    param([int]$DelayMilliseconds = 1500)
+
+    if ($script:ActiveProfileVerifyTimer) {
+        try { $script:ActiveProfileVerifyTimer.Stop(); $script:ActiveProfileVerifyTimer.Dispose() } catch {}
+        $script:ActiveProfileVerifyTimer = $null
+    }
+    if ([string]::IsNullOrWhiteSpace([string]$script:activeProfile)) { return }
+
+    $timer = New-Object System.Windows.Forms.Timer
+    $timer.Interval = [Math]::Max(250, $DelayMilliseconds)
+    $timer.Add_Tick({
+        try {
+            $script:ActiveProfileVerifyTimer.Stop()
+            $script:ActiveProfileVerifyTimer.Dispose()
+        } catch {}
+        $script:ActiveProfileVerifyTimer = $null
+        Refresh-ActiveProfileVerificationState -Silent
+    })
+    $script:ActiveProfileVerifyTimer = $timer
+    $timer.Start()
+}
+
 # ============================================================================
 # NOTIFICATION SYSTEM
 # ============================================================================
@@ -752,63 +1055,142 @@ if (-not $script:createdNew) {
 
 $script:ProjectRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
 
-# Resolve full python path at startup.
-# Prefer the repo-local virtualenv so tray restarts always see the current workspace code.
+# Resolve the backend command at startup.
+# Prefer the installed packaged backend so tray restarts use the deployed build.
+# Fall back to source Python for development sessions.
 $script:PythonExe = $null
-$localVenvPython = Join-Path $script:ProjectRoot ".venv\Scripts\python.exe"
-if (Test-Path $localVenvPython) {
-    $script:PythonExe = $localVenvPython
+$script:AbsoBackendArgsPrefix = @()
+$installedBackend = Join-Path $env:LOCALAPPDATA "AdaptiveBattleStationOptimizer\abso.exe"
+if (Test-Path $installedBackend) {
+    $script:PythonExe = $installedBackend
 }
-
-# Fallback to PATH/global Python if no local virtualenv exists.
-if (-not $script:PythonExe) {
-    $script:PythonExe = (Get-Command python -ErrorAction SilentlyContinue).Source
-}
-if (-not $script:PythonExe) {
-    # Fallback: search common Python install paths across versions
-    $found = $false
-    foreach ($ver in @("Python313", "Python312", "Python311", "Python310", "Python39")) {
-        $candidate = Join-Path $env:LOCALAPPDATA "Programs\Python\$ver\python.exe"
-        if (Test-Path $candidate) {
-            $script:PythonExe = $candidate
-            $found = $true
-            break
-        }
+else {
+    $script:AbsoBackendArgsPrefix = @("-m", "abso")
+    $localVenvPython = Join-Path $script:ProjectRoot ".venv\Scripts\python.exe"
+    if (Test-Path $localVenvPython) {
+        $script:PythonExe = $localVenvPython
     }
-    if (-not $found) {
-        # Also check user PATH from registry (admin sessions lose inherited user PATH)
-        try {
-            $userPath = [Environment]::GetEnvironmentVariable("Path", "User")
-            if ($userPath) {
-                foreach ($dir in ($userPath -split ';')) {
-                    $candidate = Join-Path $dir "python.exe"
-                    if ($dir -and (Test-Path $candidate)) {
-                        $script:PythonExe = $candidate
-                        $found = $true
-                        break
+
+    # Fallback to PATH/global Python if no local virtualenv exists.
+    if (-not $script:PythonExe) {
+        $script:PythonExe = (Get-Command python -ErrorAction SilentlyContinue).Source
+    }
+    if (-not $script:PythonExe) {
+        # Fallback: search common Python install paths across versions
+        $found = $false
+        foreach ($ver in @("Python313", "Python312", "Python311", "Python310", "Python39")) {
+            $candidate = Join-Path $env:LOCALAPPDATA "Programs\Python\$ver\python.exe"
+            if (Test-Path $candidate) {
+                $script:PythonExe = $candidate
+                $found = $true
+                break
+            }
+        }
+        if (-not $found) {
+            # Also check user PATH from registry (admin sessions lose inherited user PATH)
+            try {
+                $userPath = [Environment]::GetEnvironmentVariable("Path", "User")
+                if ($userPath) {
+                    foreach ($dir in ($userPath -split ';')) {
+                        $candidate = Join-Path $dir "python.exe"
+                        if ($dir -and (Test-Path $candidate)) {
+                            $script:PythonExe = $candidate
+                            $found = $true
+                            break
+                        }
                     }
                 }
-            }
-        } catch {}
+            } catch {}
+        }
+        if (-not $found) { $script:PythonExe = "python" }  # last resort
     }
-    if (-not $found) { $script:PythonExe = "python" }  # last resort
 }
+
+function Get-AbsoBackendArgs {
+    param([string[]]$CommandArgs)
+
+    $allArgs = @()
+    if ($script:AbsoBackendArgsPrefix) {
+        $allArgs += $script:AbsoBackendArgsPrefix
+    }
+    $allArgs += $CommandArgs
+    return $allArgs
+}
+
+function Get-AbsoBackendCommandLine {
+    param([string[]]$CommandArgs)
+
+    return "$($script:PythonExe) $((Get-AbsoBackendArgs -CommandArgs $CommandArgs) -join ' ')"
+}
+
+$script:AppVersion = "2.5.0"
+
+Write-TrayLog "ABSO backend resolved: $(Get-AbsoBackendCommandLine -CommandArgs @('--version'))"
+
+function Write-TrayRuntimeMarker {
+    <#
+    .SYNOPSIS
+    Records the script version/hash that this running tray host loaded.
+
+    Health checks compare this marker with the installed sidecar script so a
+    file deploy cannot be mistaken for a live tray restart.
+    #>
+    try {
+        $appRoot = Join-Path ([Environment]::GetFolderPath("LocalApplicationData")) "AdaptiveBattleStationOptimizer"
+        if (-not (Test-Path -LiteralPath $appRoot)) {
+            New-Item -Path $appRoot -ItemType Directory -Force -ErrorAction Stop | Out-Null
+        }
+        $markerPath = Join-Path $appRoot "tray-runtime.json"
+        $scriptPath = if (-not [string]::IsNullOrWhiteSpace($PSCommandPath)) {
+            $PSCommandPath
+        }
+        else {
+            Join-Path $script:ScriptDir "ABSO-Tray.ps1"
+        }
+        $scriptHash = $null
+        $scriptLastWrite = $null
+        try {
+            $scriptHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $scriptPath -ErrorAction Stop).Hash.ToLowerInvariant()
+            $scriptLastWrite = (Get-Item -LiteralPath $scriptPath -ErrorAction Stop).LastWriteTimeUtc.ToString("o")
+        } catch {}
+
+        $payload = [ordered]@{
+            version = $script:AppVersion
+            pid = $PID
+            started_at_utc = [DateTime]::UtcNow.ToString("o")
+            script_path = $scriptPath
+            script_hash_sha256 = $scriptHash
+            script_last_write_utc = $scriptLastWrite
+            backend_command = Get-AbsoBackendCommandLine -CommandArgs @("--version")
+        }
+        $jsonText = $payload | ConvertTo-Json -Depth 4
+        [System.IO.File]::WriteAllText($markerPath, $jsonText, $script:LogUtf8NoBom)
+        Write-TrayLog "Tray runtime marker written: $markerPath"
+    }
+    catch {
+        Write-TrayLog "Tray runtime marker write failed: $($_.Exception.Message)" -Level "WARN"
+    }
+}
+
+Write-TrayRuntimeMarker
 
 # ============================================================================
 # PROFILE DEFINITIONS
 # ============================================================================
 
-$script:AppVersion = "2.5.0"
-
 $script:FallbackProfiles = [ordered]@{
     # --- Productivity ---
     "productivity" = @{
         Name     = "Desktop / Productivity"
-        Sub      = "HDR ON | Adaptive VSync | VRR (if enabled)"
-        Cat      = "Productivity"
-        Desc     = "Multi-monitor browsing and coding with HDR enabled"
+        Sub      = "SDR | HDR OFF | Adaptive VSync | VRR"
+        Cat      = "Desktop"
+        Desc     = "Multi-monitor browsing and coding (SDR). Turns Windows HDR off."
         Exes     = @("Code.exe", "devenv.exe", "chrome.exe", "firefox.exe", "msedge.exe", "WindowsTerminal.exe", "idea64.exe")
         SyncMode = "agnostic"
+        GameGroup = "productivity"
+        GroupName = "Desktop / Productivity"
+        Variant = "SDR"
+        Rank = 10
     }
 
     # --- Fighting Games: Rivals 2 ---
@@ -885,7 +1267,7 @@ $script:FallbackProfiles = [ordered]@{
     "diablo4"           = @{
         Name     = "Diablo 4 - HDR"
         Sub      = "HDR ON | Reflex ON | G-SYNC ON | LLM OFF"
-        Cat      = "ARPG"
+        Cat      = "RPGs"
         Desc     = "Balanced Diablo 4 HDR profile with native LocalPrefs enforcement for Reflex, HDR, and VRR"
         Exes     = @("Diablo IV.exe")
         SyncMode = "on"
@@ -893,7 +1275,7 @@ $script:FallbackProfiles = [ordered]@{
     "diablo4-sdr"       = @{
         Name     = "Diablo 4 - SDR"
         Sub      = "SDR | Reflex ON | VRR"
-        Cat      = "ARPG"
+        Cat      = "RPGs"
         Desc     = "Balanced Diablo 4 SDR profile with native LocalPrefs enforcement for Reflex and VRR"
         Exes     = @("Diablo IV.exe")
         SyncMode = "on"
@@ -903,7 +1285,7 @@ $script:FallbackProfiles = [ordered]@{
     "fortnite"          = @{
         Name     = "Fortnite - SDR"
         Sub      = "SDR | Reflex (set in-game) | No Sync"
-        Cat      = "Shooter"
+        Cat      = "Shooters"
         Desc     = "Competitive SDR Fortnite profile with a no-sync latency path. Keeps driver LLM off for Reflex; enable Reflex On + Boost in-game."
         Exes     = @(
             "FortniteClient-Win64-Shipping.exe",
@@ -911,12 +1293,12 @@ $script:FallbackProfiles = [ordered]@{
             "FortniteClient-Win64-Shipping_BE.exe",
             "FortniteClient-Win64-Shipping_EAC_EOS.exe"
         )
-        SyncMode = "agnostic"
+        SyncMode = "off"
     }
     "fortnite-hdr"      = @{
         Name     = "Fortnite - HDR"
         Sub      = "HDR ON | Reflex (set in-game) | No Sync"
-        Cat      = "Shooter"
+        Cat      = "Shooters"
         Desc     = "Competitive Fortnite HDR profile with a no-sync latency path. Keeps driver LLM off for Reflex; enable Reflex On + Boost in-game."
         Exes     = @(
             "FortniteClient-Win64-Shipping.exe",
@@ -924,12 +1306,12 @@ $script:FallbackProfiles = [ordered]@{
             "FortniteClient-Win64-Shipping_BE.exe",
             "FortniteClient-Win64-Shipping_EAC_EOS.exe"
         )
-        SyncMode = "agnostic"
+        SyncMode = "off"
     }
     "marvel-rivals-sdr" = @{
         Name     = "Marvel Rivals - SDR"
         Sub      = "SDR | Reflex ON+Boost | G-SYNC ON"
-        Cat      = "Shooter"
+        Cat      = "Shooters"
         Desc     = "Performance-first SDR Marvel Rivals profile. Uses Reflex + VRR and expects you to A/B the in-game Performance Optimization (Beta) toggle on your hardware."
         Exes     = @("Marvel.exe", "Marvel-Win64-Shipping.exe")
         SyncMode = "on"
@@ -937,7 +1319,7 @@ $script:FallbackProfiles = [ordered]@{
     "marvel-rivals-hdr" = @{
         Name     = "Marvel Rivals - HDR"
         Sub      = "HDR ON | Reflex ON+Boost | G-SYNC ON"
-        Cat      = "Shooter"
+        Cat      = "Shooters"
         Desc     = "Performance-first HDR Marvel Rivals profile. Uses Reflex + VRR and expects you to A/B the in-game Performance Optimization (Beta) toggle on your hardware."
         Exes     = @("Marvel.exe", "Marvel-Win64-Shipping.exe")
         SyncMode = "on"
@@ -945,7 +1327,7 @@ $script:FallbackProfiles = [ordered]@{
     "overwatch2"        = @{
         Name     = "Overwatch 2 - No Sync SDR"
         Sub      = "No Sync SDR | Reflex OFF | VSync OFF | G-SYNC OFF"
-        Cat      = "Shooter"
+        Cat      = "Shooters"
         Desc     = "Latency-focused no-sync SDR profile (Reflex OFF, VSync OFF, VRR OFF)"
         Exes     = @("Overwatch.exe")
         SyncMode = "off"
@@ -953,7 +1335,7 @@ $script:FallbackProfiles = [ordered]@{
     "overwatch2-hdr"    = @{
         Name     = "Overwatch 2 - No Sync HDR"
         Sub      = "No Sync HDR | Reflex OFF | VSync OFF | G-SYNC OFF"
-        Cat      = "Shooter"
+        Cat      = "Shooters"
         Desc     = "Latency-focused no-sync HDR profile. Native HDR for OLED / Mini-LED displays; same sync/VRR contract as the SDR variant."
         Exes     = @("Overwatch.exe")
         SyncMode = "off"
@@ -961,7 +1343,7 @@ $script:FallbackProfiles = [ordered]@{
     "overwatch2-gsync"  = @{
         Name     = "Overwatch 2 - GSYNC SDR"
         Sub      = "Strict SDR Exclusive | Reflex (set in-game) | G-SYNC ON"
-        Cat      = "Shooter"
+        Cat      = "Shooters"
         Desc     = "Low latency VRR profile (Reflex, VSync safety net, G-SYNC ON)"
         Exes     = @("Overwatch.exe")
         SyncMode = "on"
@@ -969,7 +1351,7 @@ $script:FallbackProfiles = [ordered]@{
     "overwatch2-gsync-hdr" = @{
         Name     = "Overwatch 2 - GSYNC HDR"
         Sub      = "HDR ON | Reflex ON+Boost | G-SYNC ON"
-        Cat      = "Shooter"
+        Cat      = "Shooters"
         Desc     = "Tear-free low latency VRR with native HDR (OLED/Mini-LED)"
         Exes     = @("Overwatch.exe")
         SyncMode = "on"
@@ -1005,8 +1387,8 @@ function Get-CategoryFromOptimizationTarget {
 
     $target = if ($null -eq $OptimizationTarget) { "" } else { "$OptimizationTarget" }
     switch ($target.ToLowerInvariant()) {
-        "productivity" { return "Productivity" }
-        "low_latency_high_fps" { return "Shooter" }
+        "productivity" { return "Desktop" }
+        "low_latency_high_fps" { return "Shooters" }
         "stable_online" { return "Fighting" }
         "stable_online_vrr" { return "Fighting" }
         "minimum_latency" { return "Fighting" }
@@ -1016,6 +1398,21 @@ function Get-CategoryFromOptimizationTarget {
         "balanced" { return "Other" }
         "smooth_framerate" { return "Other" }
         default { return "Other" }
+    }
+}
+
+function Normalize-TrayCategory {
+    param([string]$Category)
+
+    switch ("$Category") {
+        "Productivity" { return "Desktop" }
+        "Shooter" { return "Shooters" }
+        "ARPG" { return "RPGs" }
+        "Streaming" { return "Other" }
+        default {
+            if ([string]::IsNullOrWhiteSpace("$Category")) { return "Other" }
+            return "$Category"
+        }
     }
 }
 
@@ -1060,6 +1457,7 @@ function Convert-CatalogEntriesToProfileMap {
         else {
             Get-CategoryFromOptimizationTarget -OptimizationTarget "$($entry.optimization_target)"
         }
+        $cat = Normalize-TrayCategory -Category $cat
         $desc = if ($entry.tray_description) {
             "$($entry.tray_description)"
         }
@@ -1101,6 +1499,41 @@ function Convert-CatalogEntriesToProfileMap {
             ""
         }
 
+        $gameGroup = if ($entry.tray_group) {
+            "$($entry.tray_group)"
+        } elseif ($fallback -and $fallback.GameGroup) {
+            "$($fallback.GameGroup)"
+        } else {
+            $id
+        }
+        $groupName = if ($entry.tray_group_name) {
+            "$($entry.tray_group_name)"
+        } elseif ($fallback -and $fallback.GroupName) {
+            "$($fallback.GroupName)"
+        } else {
+            $name
+        }
+        $variant = if ($entry.tray_variant) {
+            "$($entry.tray_variant)"
+        } elseif ($fallback -and $fallback.Variant) {
+            "$($fallback.Variant)"
+        } else {
+            $name
+        }
+        $rank = if ($null -ne $entry.tray_rank) {
+            try { [int]$entry.tray_rank } catch { 100 }
+        } elseif ($fallback -and $fallback.Rank) {
+            try { [int]$fallback.Rank } catch { 100 }
+        } else {
+            100
+        }
+        $trayVisible = $true
+        if ($null -ne $entry.tray_visible) {
+            try { $trayVisible = [bool]$entry.tray_visible } catch { $trayVisible = $true }
+        } elseif ($fallback -and $null -ne $fallback.TrayVisible) {
+            try { $trayVisible = [bool]$fallback.TrayVisible } catch { $trayVisible = $true }
+        }
+
         # Launch-time process janitor killset comes from the Python catalog
         # so the tray never has to hardcode game-specific overlay/sync lists.
         # Both tiers default to empty arrays when the catalog entry is older
@@ -1137,6 +1570,11 @@ function Convert-CatalogEntriesToProfileMap {
             Exes                  = $exeHints
             SyncMode              = $syncMode
             OptTarget             = $optTarget
+            GameGroup             = $gameGroup
+            GroupName             = $groupName
+            Variant               = $variant
+            Rank                  = $rank
+            TrayVisible           = $trayVisible
             KillsetAlwaysSafe     = $alwaysSafe
             KillsetOptIn          = $optIn
             RequiresOverlayFree   = $requiresOverlayFree
@@ -1212,6 +1650,27 @@ function Write-ProfileCatalogCache {
     }
 
     try {
+        if (Test-Path $script:ProfileCatalogCacheFile) {
+            $existingEntries = Read-ProfileCatalogCacheEntries
+            $existingAliases = Read-ProfileAliasMapFromCache
+            $existingAliasOrdered = [ordered]@{}
+            if ($existingAliases) {
+                foreach ($key in ($existingAliases.Keys | Sort-Object)) {
+                    $existingAliasOrdered[$key] = "$($existingAliases[$key])"
+                }
+            }
+
+            $existingProfilesJson = ConvertTo-Json -InputObject @($existingEntries) -Depth 8 -Compress
+            $newProfilesJson = ConvertTo-Json -InputObject @($Entries) -Depth 8 -Compress
+            $existingAliasesJson = ConvertTo-Json -InputObject $existingAliasOrdered -Depth 8 -Compress
+            $newAliasesJson = ConvertTo-Json -InputObject $aliasOrdered -Depth 8 -Compress
+
+            if ($existingProfilesJson -eq $newProfilesJson -and $existingAliasesJson -eq $newAliasesJson) {
+                Write-TrayLog "Profile catalog cache unchanged; skipping write"
+                return
+            }
+        }
+
         $payload = [ordered]@{
             version = 2
             saved_at = (Get-Date).ToString("o")
@@ -1357,7 +1816,7 @@ function Fetch-ProfileAliasMapFromCli {
     try {
         $tempFile = [System.IO.Path]::GetTempFileName()
         $errFile = "$tempFile.err"
-        $proc = Start-Process -FilePath $script:PythonExe -ArgumentList "-m", "abso", "profile-aliases", "--json" `
+        $proc = Start-Process -FilePath $script:PythonExe -ArgumentList (Get-AbsoBackendArgs -CommandArgs @("profile-aliases", "--json")) `
             -NoNewWindow -PassThru -WorkingDirectory $script:ProjectRoot `
             -RedirectStandardOutput $tempFile -RedirectStandardError $errFile
         # WaitForExit(timeout) returns Boolean; [void] prevents it from polluting
@@ -1416,7 +1875,7 @@ function Invoke-CliCatalogRefresh {
     try {
         $tempFile = [System.IO.Path]::GetTempFileName()
         $errFile = "$tempFile.err"
-        $proc = Start-Process -FilePath $script:PythonExe -ArgumentList "-m", "abso", "profiles", "--json" `
+        $proc = Start-Process -FilePath $script:PythonExe -ArgumentList (Get-AbsoBackendArgs -CommandArgs @("profiles", "--json")) `
             -NoNewWindow -PassThru -WorkingDirectory $script:ProjectRoot `
             -RedirectStandardOutput $tempFile -RedirectStandardError $errFile
 
@@ -1609,7 +2068,7 @@ function Initialize-ProfilesFromCliCatalog {
 Initialize-ProfilesFromCliCatalog
 
 # Preferred order for known categories; any new ones sort alphabetically after
-$preferredCategoryOrder = @("Productivity", "Fighting", "ARPG", "Shooter", "Streaming", "Other")
+$preferredCategoryOrder = @("Desktop", "Fighting", "Shooters", "RPGs", "Other")
 $allCategories = $script:Profiles.Values | ForEach-Object { $_.Cat } | Select-Object -Unique
 $script:CategoryOrder = @()
 foreach ($cat in $preferredCategoryOrder) {
@@ -1619,9 +2078,12 @@ foreach ($cat in ($allCategories | Sort-Object)) {
     if ($script:CategoryOrder -notcontains $cat) { $script:CategoryOrder += $cat }
 }
 $script:CategoryColors = @{
+    "Desktop"      = $script:Colors.CatProd
     "Productivity" = $script:Colors.CatProd
     "Fighting"     = $script:Colors.CatFighting
+    "RPGs"         = $script:Colors.CatARPG
     "ARPG"         = $script:Colors.CatARPG
+    "Shooters"     = $script:Colors.CatShooter
     "Shooter"      = $script:Colors.CatShooter
     "Streaming"    = $script:Colors.CatStreaming
     "Other"        = $script:Colors.CatOther
@@ -2346,6 +2808,10 @@ function Apply-Profile {
     }
     $profile = $script:Profiles[$ProfileId]
     $previousProfileId = $script:activeProfile
+    $sameActiveProfile = (
+        -not [string]::IsNullOrWhiteSpace($previousProfileId) -and
+        $previousProfileId -eq $ProfileId
+    )
     $needsNoSyncOsdReminder = Test-NeedsNoSyncOsdReminder -FromProfileId $previousProfileId -ToProfileId $ProfileId
 
     if (-not $profile) {
@@ -2353,6 +2819,10 @@ function Apply-Profile {
         Play-FailSound
         Set-IconState -State "Error"
         Show-Notification -Title "A.B.S.O." -Message "Profile not found: $ProfileId" -Type "Error"
+        return
+    }
+
+    if ($sameActiveProfile -and (Complete-SameActiveProfileSelectionIfHandled -ProfileId $ProfileId -Profile $profile)) {
         return
     }
 
@@ -2369,8 +2839,16 @@ function Apply-Profile {
 
         Update-ProgressOverlay -StepText "Running profile application..."
 
-        Write-TrayLog "Running: $($script:PythonExe) -m abso apply $ProfileId --json"
-        $proc = Start-Process -FilePath $script:PythonExe -ArgumentList "-m", "abso", "apply", $ProfileId, "--json" `
+        if ($sameActiveProfile) {
+            $applyArgs = Get-AbsoBackendArgs -CommandArgs @("reapply", "--json")
+            Write-TrayLog "Profile '$ProfileId' is already active but verification status is '$script:ActiveProfileVerificationStatus'; using reapply instead of full apply"
+        }
+        else {
+            $applyArgs = Get-AbsoBackendArgs -CommandArgs @("apply", $ProfileId, "--json", "--no-fallback")
+        }
+
+        Write-TrayLog "Running: $($script:PythonExe) $($applyArgs -join ' ')"
+        $proc = Start-Process -FilePath $script:PythonExe -ArgumentList $applyArgs `
             -NoNewWindow -PassThru -WorkingDirectory $script:ProjectRoot `
             -RedirectStandardOutput $tempFile -RedirectStandardError $errFile
 
@@ -2431,6 +2909,29 @@ function Apply-Profile {
         )
 
         if ($applySucceeded) {
+            $appliedProfileId = $ProfileId
+            if ($json.data -and $json.data.profile) {
+                $appliedProfileId = "$($json.data.profile)"
+            }
+            $requestedProfileId = $ProfileId
+            if ($json.data -and $json.data.requested_profile) {
+                $requestedProfileId = "$($json.data.requested_profile)"
+            }
+            $fallbackApplied = $false
+            if ($json.data -and $null -ne $json.data.fallback_applied) {
+                $fallbackApplied = [bool]$json.data.fallback_applied
+            }
+            $appliedProfile = $profile
+            if ($script:Profiles.Contains($appliedProfileId)) {
+                $appliedProfile = $script:Profiles[$appliedProfileId]
+            }
+            $toastMetaText = $appliedProfileId
+            if ($fallbackApplied -and $requestedProfileId -ne $appliedProfileId) {
+                $toastMetaText = "$requestedProfileId -> $appliedProfileId"
+                Write-TrayLog "Profile fallback applied: requested=$requestedProfileId actual=$appliedProfileId"
+            }
+            $needsNoSyncOsdReminder = Test-NeedsNoSyncOsdReminder -FromProfileId $previousProfileId -ToProfileId $appliedProfileId
+
             $applyWarnings = Get-ApplyWarningMessages -Json $json
             $applyNotices = Get-ApplyNoticeMessages -Json $json
             $applySummaryLevel = Get-ApplySummaryLevel -Json $json
@@ -2438,10 +2939,13 @@ function Apply-Profile {
             # the bare profile display name (clean, no parens, no pipes); the
             # BODY is one human sentence. Warnings/notices append AT MOST one
             # caveat sentence - the full list goes to the tray log, not the toast.
-            $toastTitle = $profile.Name
-            $msg = "Applied. $($profile.Sub)."
+            $toastTitle = $appliedProfile.Name
+            $msg = "Applied. $($appliedProfile.Sub)."
             $extras = @()
             if ($json.data.requires_reboot) { $extras += "Restart required to take full effect" }
+            if ($fallbackApplied -and $requestedProfileId -ne $appliedProfileId) {
+                $extras += "Used a safe fallback for this display path"
+            }
             if ($applyWarnings.Count -gt 0) {
                 $label = if ($applySummaryLevel -eq "caution") { "Caution" } else { "Warning" }
                 $extras += ("${label}: " + $applyWarnings[0])
@@ -2458,28 +2962,28 @@ function Apply-Profile {
             $msg = $msg.Trim()
 
             if ($applySummaryLevel -eq "warning") {
-                Write-TrayLog "Profile committed with warnings: $ProfileId" -Level "WARN"
+                Write-TrayLog "Profile committed with warnings: $appliedProfileId" -Level "WARN"
                 foreach ($warning in $applyWarnings) {
-                    Write-TrayLog "Apply warning [$ProfileId]: $warning" -Level "WARN"
+                    Write-TrayLog "Apply warning [$appliedProfileId]: $warning" -Level "WARN"
                 }
                 Update-ProgressOverlay -StepText "Profile committed with warnings"
             }
             elseif ($applySummaryLevel -eq "caution") {
-                Write-TrayLog "Profile applied with cautions: $ProfileId"
+                Write-TrayLog "Profile applied with cautions: $appliedProfileId"
                 foreach ($warning in $applyWarnings) {
-                    Write-TrayLog "Apply caution [$ProfileId]: $warning"
+                    Write-TrayLog "Apply caution [$appliedProfileId]: $warning"
                 }
                 Update-ProgressOverlay -StepText "Profile applied with cautions"
             }
             elseif ($applyNotices.Count -gt 0) {
-                Write-TrayLog "Profile applied with notices: $ProfileId"
+                Write-TrayLog "Profile applied with notices: $appliedProfileId"
                 foreach ($notice in $applyNotices) {
-                    Write-TrayLog "Apply notice [$ProfileId]: $notice"
+                    Write-TrayLog "Apply notice [$appliedProfileId]: $notice"
                 }
                 Update-ProgressOverlay -StepText "Profile applied with notices"
             }
             else {
-                Write-TrayLog "Profile apply completed: $ProfileId"
+                Write-TrayLog "Profile apply completed: $appliedProfileId"
                 Update-ProgressOverlay -StepText "Profile apply completed"
             }
 
@@ -2500,51 +3004,52 @@ function Apply-Profile {
             if ($needsNoSyncOsdReminder -and -not $ddciHandled) {
                 $msg = "Applied. Turn OFF Adaptive Sync/FreeSync in monitor OSD for strict No-Sync mode."
                 Play-VrrWarningSound
-                Write-TrayLog "No-Sync OSD reminder shown for transition: $previousProfileId -> $ProfileId"
+                Write-TrayLog "No-Sync OSD reminder shown for transition: $previousProfileId -> $appliedProfileId"
                 Play-ApplySuccessIconAnimation
-                Show-ThemedToast -Title $toastTitle -Message $msg -Type "Warning" -Duration 6000 -MetaText $ProfileId
+                Show-ThemedToast -Title $toastTitle -Message $msg -Type "Warning" -Duration 6000 -MetaText $toastMetaText
             }
             elseif ($applySummaryLevel -eq "warning") {
                 Play-SuccessSound
                 Play-ApplySuccessIconAnimation
-                Show-ThemedToast -Title $toastTitle -Message $msg -Type "Warning" -Duration 6000 -MetaText $ProfileId
+                Show-ThemedToast -Title $toastTitle -Message $msg -Type "Warning" -Duration 6000 -MetaText $toastMetaText
             }
             elseif ($applySummaryLevel -eq "caution") {
                 Play-SuccessSound
                 Play-ApplySuccessIconAnimation
-                Show-ThemedToast -Title $toastTitle -Message $msg -Type "Success" -Duration 6000 -MetaText $ProfileId
+                Show-ThemedToast -Title $toastTitle -Message $msg -Type "Success" -Duration 6000 -MetaText $toastMetaText
             }
             elseif ($applyNotices.Count -gt 0) {
                 Play-SuccessSound
                 Play-ApplySuccessIconAnimation
-                Show-ThemedToast -Title $toastTitle -Message $msg -Type "Success" -Duration 6000 -MetaText $ProfileId
+                Show-ThemedToast -Title $toastTitle -Message $msg -Type "Success" -Duration 6000 -MetaText $toastMetaText
             }
             else {
                 Play-SuccessSound
                 Play-ApplySuccessIconAnimation
-                Show-ThemedToast -Title $toastTitle -Message $msg -Type "Success" -MetaText $ProfileId
+                Show-ThemedToast -Title $toastTitle -Message $msg -Type "Success" -MetaText $toastMetaText
             }
 
-            $script:activeProfile = $ProfileId
+            $script:activeProfile = $appliedProfileId
             $script:LastAction = if ($applySummaryLevel -eq "warning") {
-                "Applied w/ warnings: $($profile.Name)"
+                "Applied w/ warnings: $($appliedProfile.Name)"
             }
             elseif ($applySummaryLevel -eq "caution") {
-                "Applied w/ cautions: $($profile.Name)"
+                "Applied w/ cautions: $($appliedProfile.Name)"
             }
             elseif ($applyNotices.Count -gt 0) {
-                "Applied w/ notes: $($profile.Name)"
+                "Applied w/ notes: $($appliedProfile.Name)"
             }
             else {
-                "Applied: $($profile.Name)"
+                "Applied: $($appliedProfile.Name)"
             }
             $script:LastActionTime = Get-Date -Format "HH:mm"
 
             # Record in history and persist the last known active state for startup arbitration.
-            $script:TrayConfig = Add-ProfileHistory -ProfileId $ProfileId -ProfileName $profile.Name -Config $script:TrayConfig
+            $script:TrayConfig = Add-ProfileHistory -ProfileId $appliedProfileId -ProfileName $appliedProfile.Name -Config $script:TrayConfig
 
             Update-MenuState
             Update-QuickPanel -Favorites $script:TrayConfig.favorites -Profiles $script:Profiles -ActiveProfile $script:activeProfile -OnApply { param($id) Apply-Profile $id }
+            Start-ActiveProfileVerificationTimer -DelayMilliseconds 500
         }
         else {
             $err = Get-ApplyFailureMessage -Json $json -FailedHandlers $failedHandlers -ExitCode $exitCode
@@ -2577,6 +3082,153 @@ function Apply-Profile {
     }
 }
 
+function Apply-PendingProfileFixes {
+    param([switch]$Force)
+
+    if ([string]::IsNullOrWhiteSpace([string]$script:activeProfile)) {
+        Show-Notification -Title "A.B.S.O." -Message "No active profile to repair" -Type "Warning"
+        return
+    }
+
+    $pendingText = Get-ActiveProfilePendingApplyText
+    if ([string]::IsNullOrWhiteSpace($pendingText) -and -not $Force) {
+        Show-Notification -Title "A.B.S.O." -Message "No pending profile fixes found" -Type "Info"
+        return
+    }
+    if ([string]::IsNullOrWhiteSpace($pendingText)) {
+        $pendingText = "profile verification"
+    }
+
+    Write-TrayLog "Apply-PendingProfileFixes called for '$script:activeProfile' ($pendingText)"
+    Set-IconState -State "Applying"
+    $script:notifyIcon.Text = "A.B.S.O. - Applying pending fix..."
+    Show-ProgressOverlay -Title "Applying pending fix" -StepText $pendingText
+
+    $tempFile = [System.IO.Path]::GetTempFileName()
+    $errFile = "$tempFile.err"
+    try {
+        $args = Get-AbsoBackendArgs -CommandArgs @("apply-pending", $script:activeProfile, "--json")
+        Write-TrayLog "Running: $($script:PythonExe) $($args -join ' ')"
+        $proc = Start-Process -FilePath $script:PythonExe -ArgumentList $args `
+            -NoNewWindow -PassThru -WorkingDirectory $script:ProjectRoot `
+            -RedirectStandardOutput $tempFile -RedirectStandardError $errFile
+
+        $timeout = (Get-Date).AddSeconds(45)
+        while (-not $proc.HasExited -and (Get-Date) -lt $timeout) {
+            [System.Windows.Forms.Application]::DoEvents()
+            Start-Sleep -Milliseconds 100
+        }
+        if (-not $proc.HasExited) {
+            try { $proc.Kill() } catch {}
+            throw "apply-pending timed out after 45s"
+        }
+
+        $exitCode = $proc.ExitCode
+        $proc.Dispose()
+        $rawOutput = Get-Content $tempFile -Raw -ErrorAction SilentlyContinue
+        $errOutput = Get-Content $errFile -Raw -ErrorAction SilentlyContinue
+        if ($errOutput) { Write-TrayLog "apply-pending stderr: $errOutput" -Level "WARN" }
+        if (-not $rawOutput) { throw "apply-pending returned no output" }
+
+        $json = Invoke-JsonSafe -Text $rawOutput -Source 'ApplyPending'
+        if ($null -eq $json) { throw "apply-pending returned malformed JSON" }
+        $exitCodeOk = ($null -eq $exitCode -or $exitCode -eq 0)
+        if ($null -eq $exitCode) {
+            Write-TrayLog "apply-pending exit code was unavailable; falling back to JSON payload validation" -Level "WARN"
+        }
+        if (-not $exitCodeOk -or -not $json.success -or -not $json.data -or -not $json.data.success) {
+            $err = if ($json.data -and $json.data.error) { $json.data.error } elseif ($json.error) { $json.error } else { "unknown error" }
+            throw $err
+        }
+
+        Close-ProgressOverlay
+        $changedSettings = @($json.data.changed_settings)
+        $requiresReboot = if ($json.data.PSObject.Properties["requires_reboot"]) { [bool]$json.data.requires_reboot } else { $false }
+        if ($changedSettings.Count -gt 0) {
+            Write-TrayLog "Pending profile fix applied: $($changedSettings -join ', ')"
+            Play-SuccessSound
+            Play-ApplySuccessIconAnimation
+            $message = if ($requiresReboot) {
+                "Pending fix applied. Restart required."
+            }
+            else {
+                "Pending fix applied."
+            }
+            Show-ThemedToast -Title "A.B.S.O." -Message $message -Type "Success" -MetaText $script:activeProfile
+            $script:LastAction = if ($requiresReboot) { "Restart required: $pendingText" } else { "Fixed: $pendingText" }
+        }
+        else {
+            Write-TrayLog "apply-pending succeeded with no write needed"
+            Show-Notification -Title "A.B.S.O." -Message "No pending write was needed" -Type "Info"
+            $script:LastAction = "No pending fix needed"
+        }
+        $script:LastActionTime = Get-Date -Format "HH:mm"
+        Start-ActiveProfileVerificationTimer -DelayMilliseconds 500
+        Update-MenuState
+    }
+    catch {
+        Close-ProgressOverlay
+        Write-TrayLog "Apply-PendingProfileFixes failed: $($_.Exception.Message)" -Level "ERROR"
+        Play-FailSound
+        Set-IconState -State "Error"
+        Show-Notification -Title "A.B.S.O." -Message "Pending fix failed: $($_.Exception.Message)" -Type "Error"
+        $script:LastAction = "Pending fix failed: $($_.Exception.Message)"
+        $script:LastActionTime = Get-Date -Format "HH:mm"
+        Update-MenuState
+    }
+    finally {
+        Remove-Item $tempFile -Force -ErrorAction SilentlyContinue
+        Remove-Item $errFile -Force -ErrorAction SilentlyContinue
+    }
+}
+
+function Get-TrayCommandFilePath {
+    return (Join-Path (Get-InstalledAppRoot) "tray-command.json")
+}
+
+function Invoke-TrayCommandFile {
+    $commandPath = Get-TrayCommandFilePath
+    if (-not (Test-Path $commandPath)) { return }
+
+    try {
+        $raw = Get-Content $commandPath -Raw -ErrorAction Stop
+        Remove-Item $commandPath -Force -ErrorAction SilentlyContinue
+        $payload = Invoke-JsonSafe -Text $raw -Source 'TrayCommand'
+        if ($null -eq $payload) {
+            Write-TrayLog "Tray command file ignored: malformed JSON" -Level "WARN"
+            return
+        }
+
+        $command = if ($payload.command) { "$($payload.command)" } else { "" }
+        if ($command -notin @("apply_pending", "repair_startup")) {
+            Write-TrayLog "Tray command file ignored: unsupported command '$command'" -Level "WARN"
+            return
+        }
+
+        if ($command -eq "repair_startup") {
+            Write-TrayLog "Tray command file accepted: repair_startup"
+            [void](Repair-StartupRegistration -Force)
+            return
+        }
+
+        $requestedProfile = if ($payload.profile) { Resolve-ProfileAlias "$($payload.profile)" } else { $script:activeProfile }
+        if ([string]::IsNullOrWhiteSpace($requestedProfile)) {
+            Write-TrayLog "Tray command apply_pending ignored: no active/requested profile" -Level "WARN"
+            return
+        }
+        if ($requestedProfile -ne $script:activeProfile) {
+            Write-TrayLog "Tray command apply_pending ignored: requested '$requestedProfile' but active is '$script:activeProfile'" -Level "WARN"
+            return
+        }
+
+        Write-TrayLog "Tray command file accepted: apply_pending for '$requestedProfile'"
+        Apply-PendingProfileFixes -Force
+    }
+    catch {
+        Write-TrayLog "Tray command file failed: $($_.Exception.Message)" -Level "ERROR"
+    }
+}
+
 function Restore-Settings {
     Set-IconState -State "Applying"
     $script:notifyIcon.Text = "A.B.S.O. - Restoring..."
@@ -2586,7 +3238,7 @@ function Restore-Settings {
         $tempFile = [System.IO.Path]::GetTempFileName()
         $errFile = "$tempFile.err"
 
-        $proc = Start-Process -FilePath $script:PythonExe -ArgumentList "-m", "abso", "restore", "latest", "--json" `
+        $proc = Start-Process -FilePath $script:PythonExe -ArgumentList (Get-AbsoBackendArgs -CommandArgs @("restore", "latest", "--json")) `
             -NoNewWindow -PassThru -WorkingDirectory $script:ProjectRoot `
             -RedirectStandardOutput $tempFile -RedirectStandardError $errFile
 
@@ -2628,6 +3280,7 @@ function Restore-Settings {
             Close-ProgressOverlay
             Show-Notification -Title "A.B.S.O." -Message "Settings restored" -Type "Info"
             $script:activeProfile = $null
+            Reset-ActiveProfileVerificationState
             $script:LastAction = "Restored settings"
             $script:LastActionTime = Get-Date -Format "HH:mm"
             $script:TrayConfig = Set-LastProfileState -Config $script:TrayConfig -Status "restored" -Source "tray_restore"
@@ -2709,18 +3362,52 @@ function Update-MenuState {
         }
     }
     if ($script:restoreItem) { $script:restoreItem.Enabled = ($null -ne $script:activeProfile) }
+    if ($script:applyPendingItem) {
+        $pendingApplyTextForAction = Get-ActiveProfilePendingApplyText
+        $script:applyPendingItem.Enabled = (
+            $null -ne $script:activeProfile -and
+            -not [string]::IsNullOrWhiteSpace($pendingApplyTextForAction)
+        )
+        $script:applyPendingItem.Visible = $script:applyPendingItem.Enabled
+        if ($script:applyPendingItem.Enabled) {
+            $script:applyPendingItem.Text = "Apply Pending Fix: $pendingApplyTextForAction"
+        }
+        else {
+            $script:applyPendingItem.Text = "Apply Pending Fix"
+        }
+    }
 
     if ($script:activeProfile) {
         $p = $script:Profiles[$script:activeProfile]
-        $tooltipText = "A.B.S.O. - $($p.Name)"
+        $pendingApplyText = Get-ActiveProfilePendingApplyText
+        $rebootPendingText = Get-ActiveProfileRebootPendingText
+        $tooltipText = if ($pendingApplyText) {
+            "A.B.S.O. - Needs apply: $($p.Name)"
+        }
+        elseif ($rebootPendingText) {
+            "A.B.S.O. - Restart required: $($p.Name)"
+        }
+        else {
+            "A.B.S.O. - $($p.Name)"
+        }
         if ($tooltipText.Length -gt 63) {
             $tooltipText = $tooltipText.Substring(0, 60) + "..."
         }
         $script:notifyIcon.Text = $tooltipText
 
         if ($script:statusItem) {
-            $script:statusItem.Text = "$($p.Name)|$($p.Sub)"
-            $script:statusItem.ForeColor = Get-CategoryColor -Category $p.Cat -Fallback $script:Colors.AccentGreen
+            if ($pendingApplyText) {
+                $script:statusItem.Text = "$($p.Name)|Needs apply: $pendingApplyText"
+                $script:statusItem.ForeColor = $script:Colors.AccentAmber
+            }
+            elseif ($rebootPendingText) {
+                $script:statusItem.Text = "$($p.Name)|Restart required: $rebootPendingText"
+                $script:statusItem.ForeColor = $script:Colors.AccentAmber
+            }
+            else {
+                $script:statusItem.Text = "$($p.Name)|$($p.Sub)"
+                $script:statusItem.ForeColor = Get-CategoryColor -Category $p.Cat -Fallback $script:Colors.AccentGreen
+            }
         }
     }
     else {
@@ -2735,6 +3422,10 @@ function Update-MenuState {
     # Update status bar
     if ($script:statusBarItem) {
         $parts = @()
+        $pendingApplyText = Get-ActiveProfilePendingApplyText
+        $rebootPendingText = Get-ActiveProfileRebootPendingText
+        if ($pendingApplyText) { $parts += "Needs apply: $pendingApplyText" }
+        if ($rebootPendingText) { $parts += "Restart required: $rebootPendingText" }
         if ($script:LastAction) { $parts += $script:LastAction }
         if ($script:LastActionTime) { $parts += $script:LastActionTime }
         $backupTime = Get-LastBackupTime
@@ -2809,7 +3500,7 @@ function Run-Audit {
     try {
         $tempFile = [System.IO.Path]::GetTempFileName()
         $errFile = "$tempFile.err"
-        Start-Process -FilePath $script:PythonExe -ArgumentList "-m", "abso", "audit", "--json" `
+        Start-Process -FilePath $script:PythonExe -ArgumentList (Get-AbsoBackendArgs -CommandArgs @("audit", "--json")) `
             -NoNewWindow -Wait -WorkingDirectory $script:ProjectRoot `
             -RedirectStandardOutput $tempFile -RedirectStandardError $errFile
 
@@ -2900,6 +3591,20 @@ function Open-ProfilesFolder {
     Start-Process "explorer.exe" -ArgumentList $profilesDir
 }
 
+function Get-InstalledAppRoot {
+    $localRoot = if ($env:LOCALAPPDATA) {
+        $env:LOCALAPPDATA
+    }
+    else {
+        Join-Path $env:USERPROFILE "AppData\Local"
+    }
+    return (Join-Path $localRoot "AdaptiveBattleStationOptimizer")
+}
+
+function Get-InstalledTrayDir {
+    return (Join-Path (Get-InstalledAppRoot) "abso\tray")
+}
+
 function Get-StartupStatus {
     $legacyShortcutPath = [System.IO.Path]::Combine(
         [Environment]::GetFolderPath("Startup"),
@@ -2943,6 +3648,78 @@ function Get-StartupStatus {
         mode               = if ($legacyInstalled) { "startup_shortcut" } else { "none" }
         task_installed     = $false
         shortcut_installed = $legacyInstalled
+    }
+}
+
+function Get-InstalledStartupStatus {
+    $installedScript = Join-Path (Get-InstalledTrayDir) "Install-Startup.ps1"
+    if (-not (Test-Path $installedScript)) {
+        return $null
+    }
+
+    try {
+        $args = @(
+            "-NoProfile",
+            "-ExecutionPolicy", "Bypass",
+            "-File", $installedScript,
+            "-Status",
+            "-Json"
+        )
+        $raw = & powershell.exe @args
+        if ($LASTEXITCODE -eq 0 -and $raw) {
+            return ($raw | ConvertFrom-Json)
+        }
+        Write-TrayLog "Installed startup status check returned empty or exit code $LASTEXITCODE" -Level "WARN"
+    }
+    catch {
+        Write-TrayLog "Installed startup status check failed: $($_.Exception.Message)" -Level "WARN"
+    }
+
+    return $null
+}
+
+function Repair-StartupRegistration {
+    param([switch]$Force)
+
+    $installedScript = Join-Path (Get-InstalledTrayDir) "Install-Startup.ps1"
+    if (-not (Test-Path $installedScript)) {
+        Write-TrayLog "Startup repair skipped: installed startup script not found at $installedScript" -Level "WARN"
+        return $false
+    }
+
+    $before = Get-InstalledStartupStatus
+    if ((-not $Force) -and $before -and $before.task_action_path_current) {
+        Write-TrayLog "Startup repair skipped: scheduled task already points at installed tray assets"
+        return $true
+    }
+
+    try {
+        $args = @(
+            "-NoProfile",
+            "-ExecutionPolicy", "Bypass",
+            "-File", $installedScript,
+            "-Install",
+            "-Json"
+        )
+        $raw = & powershell.exe @args
+        if ($LASTEXITCODE -ne 0) {
+            throw "Installer exit code $LASTEXITCODE. Output: $raw"
+        }
+
+        $after = Get-InstalledStartupStatus
+        $repaired = [bool]($after -and $after.installed -and $after.task_action_path_current)
+        if ($repaired) {
+            Write-TrayLog "Startup repair completed: scheduled task now points at installed tray assets"
+            try { Set-StartupMenuState -StartupStatus (Get-StartupStatus) } catch {}
+            return $true
+        }
+
+        Write-TrayLog "Startup repair ran but task action is still not current" -Level "WARN"
+        return $false
+    }
+    catch {
+        Write-TrayLog "Startup repair failed: $($_.Exception.Message)" -Level "ERROR"
+        return $false
     }
 }
 
@@ -3028,13 +3805,54 @@ function Toggle-Startup {
     }
 }
 
+function Get-BackupTimestamp {
+    <#
+    .SYNOPSIS
+    Gets the logical backup creation time.
+
+    Prefer manifest `created_at`, then the timestamp-style directory name.
+    Filesystem CreationTime is only a fallback because copied/migrated backup
+    directories get fresh filesystem timestamps.
+    #>
+    param([System.IO.DirectoryInfo]$Directory)
+
+    if ($null -eq $Directory) {
+        return Get-Date -Date "1970-01-01"
+    }
+
+    $manifest = Join-Path $Directory.FullName "manifest.json"
+    if (Test-Path $manifest) {
+        try {
+            $mj = Get-Content $manifest -Raw -ErrorAction Stop | ConvertFrom-Json
+            if ($mj.created_at) {
+                return [DateTime]::Parse("$($mj.created_at)", [System.Globalization.CultureInfo]::InvariantCulture)
+            }
+        }
+        catch {
+            Write-TrayLog "Failed to read backup timestamp for '$($Directory.Name)': $($_.Exception.Message)" -Level "WARN"
+        }
+    }
+
+    try {
+        return [DateTime]::ParseExact($Directory.Name, "yyyy-MM-dd_HHmmss", [System.Globalization.CultureInfo]::InvariantCulture)
+    }
+    catch {
+        return $Directory.CreationTime
+    }
+}
+
+function Get-BackupPath {
+    return (Join-Path $script:ProjectRoot "backups")
+}
+
 function Get-LastBackupTime {
-    $backupsPath = Join-Path $script:ProjectRoot "backups"
+    $backupsPath = Get-BackupPath
     if (Test-Path $backupsPath) {
         $latest = Get-ChildItem $backupsPath -Directory -ErrorAction SilentlyContinue |
-            Sort-Object CreationTime -Descending | Select-Object -First 1
+            ForEach-Object { [PSCustomObject]@{ Directory = $_; Time = Get-BackupTimestamp -Directory $_ } } |
+            Sort-Object Time -Descending | Select-Object -First 1
         if ($latest) {
-            $age = (Get-Date) - $latest.CreationTime
+            $age = (Get-Date) - $latest.Time
             if ($age.TotalMinutes -lt 60) { return "$([int]$age.TotalMinutes)m ago" }
             elseif ($age.TotalHours -lt 24) { return "$([int]$age.TotalHours)h ago" }
             else { return "$([int]$age.TotalDays)d ago" }
@@ -3050,24 +3868,27 @@ function Get-RecentBackups {
     #>
     param([int]$Count = 5)
 
-    $backupsPath = Join-Path $script:ProjectRoot "backups"
+    $backupsPath = Get-BackupPath
     $result = @()
     if (Test-Path $backupsPath) {
         $dirs = Get-ChildItem $backupsPath -Directory -ErrorAction SilentlyContinue |
-            Sort-Object CreationTime -Descending | Select-Object -First $Count
-        foreach ($dir in $dirs) {
+            ForEach-Object { [PSCustomObject]@{ Directory = $_; Time = Get-BackupTimestamp -Directory $_ } } |
+            Sort-Object Time -Descending | Select-Object -First $Count
+        foreach ($entry in $dirs) {
+            $dir = $entry.Directory
+            $timestamp = $entry.Time
             $manifest = Join-Path $dir.FullName "manifest.json"
             $label = $dir.Name
             if (Test-Path $manifest) {
                 try {
                     $mj = Get-Content $manifest -Raw | ConvertFrom-Json
-                    if ($mj.profile_id) { $label = "$($mj.profile_id) - $($dir.CreationTime.ToString('MMM dd HH:mm'))" }
-                    else { $label = $dir.CreationTime.ToString("MMM dd HH:mm") }
+                    if ($mj.profile_id) { $label = "$($mj.profile_id) - $($timestamp.ToString('MMM dd HH:mm'))" }
+                    else { $label = $timestamp.ToString("MMM dd HH:mm") }
                 } catch {
-                    $label = $dir.CreationTime.ToString("MMM dd HH:mm")
+                    $label = $timestamp.ToString("MMM dd HH:mm")
                 }
             }
-            $result += @{ Path = $dir.FullName; Name = $dir.Name; Label = $label; Time = $dir.CreationTime }
+            $result += @{ Path = $dir.FullName; Name = $dir.Name; Label = $label; Time = $timestamp }
         }
     }
     return $result
@@ -3093,7 +3914,7 @@ function Find-Profiles {
 
     foreach ($id in $script:Profiles.Keys) {
         $p = $script:Profiles[$id]
-        $searchText = "$id $($p.Name) $($p.Sub) $($p.Cat) $($p.Desc)".ToLower()
+        $searchText = "$id $($p.Name) $($p.GroupName) $($p.Variant) $($p.Sub) $($p.Cat) $($p.Desc)".ToLower()
 
         # Exact substring match
         if ($searchText -like "*$q*") {
@@ -3295,7 +4116,7 @@ function Test-IsActiveProfileGameRunning {
 function Invoke-LaunchSweepCli {
     <#
     .SYNOPSIS
-    Calls `python -m abso launch-sweep <profile> --json` and returns the parsed
+    Calls the ABSO backend `launch-sweep <profile> --json` and returns the parsed
     JSON payload (or $null on failure). Honors the IncludeOptIn flag derived
     from TrayConfig.aggressiveProcessJanitor.
     #>
@@ -3309,7 +4130,7 @@ function Invoke-LaunchSweepCli {
         return $null
     }
 
-    $arguments = @("-m", "abso", "launch-sweep", $ProfileId, "--json")
+    $arguments = Get-AbsoBackendArgs -CommandArgs @("launch-sweep", $ProfileId, "--json")
     if ($IncludeOptIn) {
         $arguments += "--include-opt-in"
     }
@@ -3492,9 +4313,8 @@ function Start-TrayApp {
     }
     else {
         # Race-prevention buffer is only needed at BOOT (explorer just started
-        # initializing the notification area). For manual restarts via the
-        # tray menu / _restart-tray.ps1, explorer has been up for ages and
-        # the buffer is pure waste.
+        # initializing the notification area). For manual restarts via the tray
+        # menu, explorer has been up for ages and the buffer is pure waste.
         $needsBootBuffer = $true
         try {
             $explorerProc = Get-Process -Name explorer -ErrorAction SilentlyContinue | Select-Object -First 1
@@ -3547,6 +4367,16 @@ function Start-TrayApp {
         else {
             $script:activeProfile
         }
+        $stateSource = if ($startupProfile.source) { "$($startupProfile.source)" } else { "startup_restore" }
+        $restoreSource = Get-StartupRestoreStateSource -Source $stateSource
+        $stateTimestamp = if ($startupProfile.timestamp) { "$($startupProfile.timestamp)" } else { (Get-Date).ToString("o") }
+        $script:TrayConfig = Set-LastProfileState `
+            -Config $script:TrayConfig `
+            -Status "active" `
+            -ProfileId $script:activeProfile `
+            -ProfileName $startupProfileName `
+            -Source $restoreSource `
+            -Timestamp $stateTimestamp
         $script:LastAction = "Startup restore [$($startupProfile.source)]: $startupProfileName"
         $script:LastActionTime = Get-Date -Format "HH:mm"
         Write-TrayLog "Startup restore selected active profile '$($startupProfile.id)' from '$($startupProfile.source)' (decision=$($startupProfile.decision), timestamp=$($startupProfile.timestamp))"
@@ -3711,8 +4541,20 @@ public class HotkeyMessageWindow : NativeWindow {
     $script:statusItem.Margin = New-Object System.Windows.Forms.Padding(0)
     if ($script:activeProfile) {
         $ap = $script:Profiles[$script:activeProfile]
-        $script:statusItem.Text = "$($ap.Name)|$($ap.Sub)"
-        $script:statusItem.ForeColor = Get-CategoryColor -Category $ap.Cat -Fallback $script:Colors.AccentGreen
+        $pendingApplyText = Get-ActiveProfilePendingApplyText
+        $rebootPendingText = Get-ActiveProfileRebootPendingText
+        if ($pendingApplyText) {
+            $script:statusItem.Text = "$($ap.Name)|Needs apply: $pendingApplyText"
+            $script:statusItem.ForeColor = $script:Colors.AccentAmber
+        }
+        elseif ($rebootPendingText) {
+            $script:statusItem.Text = "$($ap.Name)|Restart required: $rebootPendingText"
+            $script:statusItem.ForeColor = $script:Colors.AccentAmber
+        }
+        else {
+            $script:statusItem.Text = "$($ap.Name)|$($ap.Sub)"
+            $script:statusItem.ForeColor = Get-CategoryColor -Category $ap.Cat -Fallback $script:Colors.AccentGreen
+        }
     }
     else {
         $script:statusItem.Text = "Ready|No profile active"
@@ -3813,23 +4655,53 @@ public class HotkeyMessageWindow : NativeWindow {
     })
     $menu.Items.Add($searchBox) | Out-Null
 
-    # --- Derive game groups from profile IDs ---
-    # Strip known variant suffixes to get the base game identifier.
-    # Order matters: longer suffixes before shorter ones that are substrings.
-    # Defined early so favorites/recent sections can use New-GameBitmap.
+    # --- Derive game groups from catalog metadata ---
+    # The Python manifest now carries explicit group/variant labels so games
+    # appear once with their SDR/HDR/sync options underneath. The suffix list
+    # remains only as a fallback for stale caches or user YAML profiles.
     $variantSuffixes = @(
-        "-online-gsync", "-tournament-sim-144hz", "-console-parity", "-gsync-hdr", "-300hz-max",
-        "-streaming", "-offline", "-online", "-vrr-lab", "-gsync", "-hdr", "-sdr",
-        "-universal"
+        "-online-gsync-hdr", "-gsync-hdr-capture", "-gsync-capture",
+        "-online-gsync", "-offline-gsync-hdr",
+        "-offline-hdr", "-online-hdr", "-console-parity-hdr",
+        "-universal-hdr", "-gsync-hdr", "-tournament-sim-144hz",
+        "-console-parity", "-300hz-max", "-streaming-hdr", "-streaming",
+        "-offline", "-online", "-vrr-lab", "-gsync", "-hdr", "-sdr",
+        "-universal", "-capture"
     )
 
     function Get-GameGroup {
         param([string]$ProfileId)
+        $profile = $script:Profiles[$ProfileId]
+        if ($profile -and -not [string]::IsNullOrWhiteSpace("$($profile.GameGroup)")) {
+            return "$($profile.GameGroup)"
+        }
         foreach ($suffix in $variantSuffixes) {
             if ($ProfileId.EndsWith($suffix)) {
                 return $ProfileId.Substring(0, $ProfileId.Length - $suffix.Length)
             }
         }
+        return $ProfileId
+    }
+
+    function Get-GameGroupName {
+        param([string]$ProfileId)
+        $profile = $script:Profiles[$ProfileId]
+        if ($profile -and -not [string]::IsNullOrWhiteSpace("$($profile.GroupName)")) {
+            return "$($profile.GroupName)"
+        }
+        if ($profile -and $profile.Name) {
+            return ("$($profile.Name)" -replace '(:|\s+-\s+).*$', '')
+        }
+        return $ProfileId
+    }
+
+    function Get-ProfileVariantLabel {
+        param([string]$ProfileId)
+        $profile = $script:Profiles[$ProfileId]
+        if ($profile -and -not [string]::IsNullOrWhiteSpace("$($profile.Variant)")) {
+            return "$($profile.Variant)"
+        }
+        if ($profile -and $profile.Name) { return "$($profile.Name)" }
         return $ProfileId
     }
 
@@ -3934,7 +4806,7 @@ public class HotkeyMessageWindow : NativeWindow {
         $catColor = Get-CategoryColor -Category $p.Cat -Fallback $script:Colors.Text
 
         $item = New-Object System.Windows.Forms.ToolStripMenuItem
-        $item.Text = $p.Name
+        $item.Text = if ($InSubmenu) { Get-ProfileVariantLabel -ProfileId $ProfileId } else { $p.Name }
 
         # Sync badge for variant items in submenus; game icon otherwise; category fallback
         $badgeSet = $false
@@ -3956,7 +4828,7 @@ public class HotkeyMessageWindow : NativeWindow {
         $item.ForeColor = $catColor
         $item.Font = New-Object System.Drawing.Font("Segoe UI", 9)
 
-        $tooltipText = "$($p.Sub)`n"
+        $tooltipText = "$($p.Name)`n$($p.Sub)`n"
         if ($p.Desc) { $tooltipText += "`n$($p.Desc)" }
         if ($isFav) { $tooltipText += "`n`n[Favorited]" }
         $item.ToolTipText = $tooltipText.Trim()
@@ -3969,19 +4841,15 @@ public class HotkeyMessageWindow : NativeWindow {
         return $item
     }
 
-    # Group non-streaming profiles by category, then by game group.
-    # Streaming profiles are collected into a single flyout submenu.
+    # Group visible profiles by category, then by game. Each game appears once;
+    # SDR/HDR/sync/capture variants live under that game's flyout.
     $catGameGroups = [ordered]@{}
-    $streamingProfiles = @()
 
     foreach ($id in $script:Profiles.Keys) {
         $p = $script:Profiles[$id]
-        if ($p.Cat -eq "Streaming") {
-            $streamingProfiles += $id
-            continue
-        }
+        if ($null -ne $p.TrayVisible -and -not [bool]$p.TrayVisible) { continue }
         $gameGroup = Get-GameGroup -ProfileId $id
-        $cat = $p.Cat
+        $cat = Normalize-TrayCategory -Category $p.Cat
         if (-not $catGameGroups.Contains($cat)) {
             $catGameGroups[$cat] = [ordered]@{}
         }
@@ -3994,30 +4862,15 @@ public class HotkeyMessageWindow : NativeWindow {
     $script:categoryHeaders = @()
     $script:gameGroupSubmenus = @()
 
-    # Merge ARPG + Other into a single "Other" section
-    # Build category order dynamically: use preferred order for known categories,
-    # append any new user-defined categories alphabetically (exclude merged/special ones)
-    $mergedExclude = @("ARPG", "Other", "Streaming")
-    $preferredMergedOrder = @("Productivity", "Fighting", "Shooter")
+    # Build category order dynamically: use preferred order for known
+    # categories, append any user-defined categories alphabetically.
+    $preferredMergedOrder = @("Desktop", "Fighting", "Shooters", "RPGs", "Other")
     $mergedCategoryOrder = @()
     foreach ($cat in $preferredMergedOrder) {
         if ($catGameGroups.Contains($cat)) { $mergedCategoryOrder += $cat }
     }
     foreach ($cat in ($catGameGroups.Keys | Sort-Object)) {
-        if ($mergedExclude -contains $cat) { continue }
         if ($mergedCategoryOrder -notcontains $cat) { $mergedCategoryOrder += $cat }
-    }
-    # Add ARPG/Other as merged
-    $mergedOther = @()
-    if ($catGameGroups.Contains("ARPG")) {
-        foreach ($gg in $catGameGroups["ARPG"].Keys) {
-            foreach ($profId in $catGameGroups["ARPG"][$gg]) { $mergedOther += $profId }
-        }
-    }
-    if ($catGameGroups.Contains("Other")) {
-        foreach ($gg in $catGameGroups["Other"].Keys) {
-            foreach ($profId in $catGameGroups["Other"][$gg]) { $mergedOther += $profId }
-        }
     }
 
     foreach ($cat in $mergedCategoryOrder) {
@@ -4035,8 +4888,25 @@ public class HotkeyMessageWindow : NativeWindow {
         $menu.Items.Add($catItem) | Out-Null
         $script:categoryHeaders += $catItem
 
+        $groupInfos = @()
         foreach ($gameGroup in $catGameGroups[$cat].Keys) {
-            $profileIds = $catGameGroups[$cat][$gameGroup]
+            $profileIds = @($catGameGroups[$cat][$gameGroup] | Sort-Object `
+                @{ Expression = { if ($script:Profiles[$_].Rank) { [int]$script:Profiles[$_].Rank } else { 100 } } }, `
+                @{ Expression = { Get-ProfileVariantLabel -ProfileId $_ } })
+            if ($profileIds.Count -eq 0) { continue }
+            $firstId = $profileIds[0]
+            $firstRank = if ($script:Profiles[$firstId].Rank) { [int]$script:Profiles[$firstId].Rank } else { 100 }
+            $groupInfos += [pscustomobject]@{
+                Key = $gameGroup
+                Name = Get-GameGroupName -ProfileId $firstId
+                Rank = $firstRank
+                ProfileIds = $profileIds
+            }
+        }
+
+        foreach ($groupInfo in ($groupInfos | Sort-Object Rank, Name)) {
+            $profileIds = @($groupInfo.ProfileIds)
+            $gameGroup = $groupInfo.Key
 
             if ($profileIds.Count -eq 1) {
                 # Single profile — show directly with optional sync badge
@@ -4046,9 +4916,8 @@ public class HotkeyMessageWindow : NativeWindow {
             }
             else {
                 # Multiple profiles — create a flyout submenu
-                $firstProfile = $script:Profiles[$profileIds[0]]
                 $submenuItem = New-Object System.Windows.Forms.ToolStripMenuItem
-                $submenuItem.Text = ($firstProfile.Name -replace '(:|\s+-\s+).*$', '')
+                $submenuItem.Text = $groupInfo.Name
                 $submenuItem.Tag = $cat
                 $submenuItem.Image = New-GameBitmap -GameGroup $gameGroup -Color $catColor -Category $cat
                 $submenuItem.BackColor = $script:Colors.Background
@@ -4065,48 +4934,6 @@ public class HotkeyMessageWindow : NativeWindow {
                 $script:gameGroupSubmenus += $submenuItem
             }
         }
-    }
-
-    # Merged ARPG + Other category
-    if ($mergedOther.Count -gt 0) {
-        $otherColor = if ($script:CategoryColors.ContainsKey("Other")) { $script:CategoryColors["Other"] } else { $script:Colors.Text }
-        $otherCatItem = New-Object System.Windows.Forms.ToolStripMenuItem
-        $otherCatItem.Text = "Other"
-        $otherCatItem.Tag = "Other"
-        $otherCatItem.Image = New-CategoryBitmap -Category "Other" -Color $otherColor
-        $otherCatItem.Enabled = $false
-        $otherCatItem.BackColor = $script:Colors.Background
-        $otherCatItem.ForeColor = $otherColor
-        $otherCatItem.Font = New-Object System.Drawing.Font("Segoe UI", 8.5, [System.Drawing.FontStyle]::Bold)
-        $menu.Items.Add($otherCatItem) | Out-Null
-        $script:categoryHeaders += $otherCatItem
-
-        foreach ($profId in $mergedOther) {
-            $item = New-ProfileMenuItem -ProfileId $profId
-            $menu.Items.Add($item) | Out-Null
-            $script:profileMenuItems += $item
-        }
-    }
-
-    # Streaming — single flyout submenu
-    if ($streamingProfiles.Count -gt 0) {
-        $streamColor = if ($script:CategoryColors.ContainsKey("Streaming")) { $script:CategoryColors["Streaming"] } else { $script:Colors.Text }
-        $streamingSubmenu = New-Object System.Windows.Forms.ToolStripMenuItem
-        $streamingSubmenu.Text = "Streaming"
-        $streamingSubmenu.Tag = "Streaming"
-        $streamingSubmenu.Image = New-CategoryBitmap -Category "Streaming" -Color $streamColor
-        $streamingSubmenu.BackColor = $script:Colors.Background
-        $streamingSubmenu.ForeColor = $streamColor
-        $streamingSubmenu.Font = [DarkThemeRenderer]::ResolveEyebrowFont(8.0)
-
-        foreach ($profId in $streamingProfiles) {
-            $subItem = New-ProfileMenuItem -ProfileId $profId -InSubmenu $true
-            $streamingSubmenu.DropDownItems.Add($subItem) | Out-Null
-            $script:profileMenuItems += $subItem
-        }
-
-        $menu.Items.Add($streamingSubmenu) | Out-Null
-        $script:gameGroupSubmenus += $streamingSubmenu
     }
 
     # ─── ACTIONS (flyout submenu) ───
@@ -4142,6 +4969,90 @@ public class HotkeyMessageWindow : NativeWindow {
     $auditItem.Add_Click({ Run-Audit })
     $actionsMenu.DropDownItems.Add($auditItem) | Out-Null
 
+    # Apply Pending Fix - targeted verifier remediation, not a full profile apply.
+    $script:applyPendingItem = New-Object System.Windows.Forms.ToolStripMenuItem
+    $script:applyPendingItem.Text = "Apply Pending Fix"
+    $script:applyPendingItem.Enabled = $false
+    $script:applyPendingItem.Visible = $false
+    $script:applyPendingItem.BackColor = $script:Colors.Background
+    $script:applyPendingItem.ForeColor = $script:Colors.AccentAmber
+    $script:applyPendingItem.Font = New-Object System.Drawing.Font("Segoe UI", 9)
+    $script:applyPendingItem.Image = New-ActionBitmap -Action "Apply" -Color $script:Colors.AccentAmber
+    $script:applyPendingItem.ToolTipText = "Apply verifier-reported pending fixes without backup, baseline restore, or display reset"
+    $script:applyPendingItem.Add_Click({ Apply-PendingProfileFixes })
+    $actionsMenu.DropDownItems.Add($script:applyPendingItem) | Out-Null
+
+    # Reset Display Pipeline - manual graphics-driver reset. Profile apply
+    # does not run disruptive display recovery automatically; this menu item
+    # is the explicit stale-color recovery action and requires confirmation.
+    $resetDisplayItem = New-Object System.Windows.Forms.ToolStripMenuItem
+    $resetDisplayItem.Text = "Reset Display Pipeline..."
+    $resetDisplayItem.BackColor = $script:Colors.Background
+    $resetDisplayItem.ForeColor = $script:Colors.AccentAmber
+    $resetDisplayItem.Font = New-Object System.Drawing.Font("Segoe UI", 9)
+    $resetDisplayItem.ToolTipText = "Advanced recovery: sends Ctrl+Win+Shift+B x2 and may blank monitors for a few seconds."
+    $resetDisplayItem.Add_Click({
+        Write-TrayLog "User invoked Reset Display Pipeline from tray menu"
+        $confirm = [System.Windows.Forms.MessageBox]::Show(
+            "This sends Ctrl+Win+Shift+B twice and can blank or disconnect monitors for a few seconds.`n`nUse only for explicit live display recovery, not routine profile verification.`n`nContinue?",
+            "A.B.S.O. Display Pipeline Reset",
+            [System.Windows.Forms.MessageBoxButtons]::YesNo,
+            [System.Windows.Forms.MessageBoxIcon]::Warning,
+            [System.Windows.Forms.MessageBoxDefaultButton]::Button2
+        )
+        if ($confirm -ne [System.Windows.Forms.DialogResult]::Yes) {
+            Write-TrayLog "User cancelled Reset Display Pipeline from confirmation dialog"
+            return
+        }
+        try {
+            $tf = [System.IO.Path]::GetTempFileName()
+            Start-Process -FilePath $script:PythonExe `
+                -ArgumentList (Get-AbsoBackendArgs -CommandArgs @("reset-display", "--method", "driver-hotkey", "--json")) `
+                -NoNewWindow -Wait -WorkingDirectory $script:ProjectRoot `
+                -RedirectStandardOutput $tf
+            $out = Get-Content $tf -Raw -ErrorAction SilentlyContinue
+            Remove-Item $tf -Force -ErrorAction SilentlyContinue
+            if ($out) {
+                $j = Invoke-JsonSafe -Text $out -Source 'ResetDisplay'
+                $result = $null
+                if ($null -ne $j -and $j.data -and $j.data.result) {
+                    $result = $j.data.result
+                }
+                elseif ($null -ne $j -and $j.result) {
+                    $result = $j.result
+                }
+                if ($null -ne $j -and $j.success -and $j.data -and $j.data.success -and $null -ne $result) {
+                    $count = $result.sent_count
+                    if (-not $count) { $count = 0 }
+                    Show-Notification -Title "A.B.S.O." `
+                        -Message "Display pipeline reset ($count combo(s) sent)" -Type "Info"
+                }
+                elseif ($null -eq $j) {
+                    Write-TrayLog "Reset Display: CLI produced unparseable JSON" -Level "ERROR"
+                    Show-Notification -Title "A.B.S.O." `
+                        -Message "Reset failed (bad CLI response - see tray log)" -Type "Error"
+                }
+                else {
+                    $err = if ($j.error) { $j.error } elseif ($j.data -and $j.data.result -and $j.data.result.error) { $j.data.result.error } else { "unknown CLI error" }
+                    Write-TrayLog "Reset Display reported failure: $err" -Level "ERROR"
+                    Show-Notification -Title "A.B.S.O." `
+                        -Message "Reset failed: $err" -Type "Error"
+                }
+            }
+            else {
+                Write-TrayLog "Reset Display: CLI produced no output" -Level "ERROR"
+                Show-Notification -Title "A.B.S.O." `
+                    -Message "Reset failed (no CLI output)" -Type "Error"
+            }
+        }
+        catch {
+            Write-TrayLog "Reset Display threw: $($_.Exception.Message)" -Level "ERROR"
+            Show-Notification -Title "A.B.S.O." `
+                -Message "Reset failed: $($_.Exception.Message)" -Type "Error"
+        }
+    })
+    $actionsMenu.DropDownItems.Add($resetDisplayItem) | Out-Null
+
     # Backups submenu (nested inside Actions)
     $backupTime = Get-LastBackupTime
     $backupsItem = New-Object System.Windows.Forms.ToolStripMenuItem
@@ -4175,7 +5086,7 @@ public class HotkeyMessageWindow : NativeWindow {
             $script:notifyIcon.Text = "A.B.S.O. - Restoring..."
             try {
                 $tf = [System.IO.Path]::GetTempFileName()
-                Start-Process -FilePath $script:PythonExe -ArgumentList "-m", "abso", "restore", $capturedName, "--json" `
+                Start-Process -FilePath $script:PythonExe -ArgumentList (Get-AbsoBackendArgs -CommandArgs @("restore", $capturedName, "--json")) `
                     -NoNewWindow -Wait -WorkingDirectory $script:ProjectRoot `
                     -RedirectStandardOutput $tf
                 $out = Get-Content $tf -Raw -ErrorAction SilentlyContinue
@@ -4283,7 +5194,7 @@ public class HotkeyMessageWindow : NativeWindow {
             Write-TrayLog "Clearing standby list..."
             $tempFile = [System.IO.Path]::GetTempFileName()
             $proc = Start-Process -FilePath $script:PythonExe `
-                -ArgumentList "-m", "abso", "memory-clear", "--json" `
+                -ArgumentList (Get-AbsoBackendArgs -CommandArgs @("memory-clear", "--json")) `
                 -NoNewWindow -PassThru -WorkingDirectory $script:ProjectRoot `
                 -RedirectStandardOutput $tempFile
             $proc.WaitForExit(15000)
@@ -4529,6 +5440,15 @@ public class HotkeyMessageWindow : NativeWindow {
     # ─── LAUNCH SANITIZER (kill overlays/capture/sync while game is alive) ───
     Start-LaunchSanitizerTimer
 
+    # Read-only post-startup verification so the tray distinguishes a remembered
+    # active profile from one that still needs an elevated apply/reboot step.
+    Start-ActiveProfileVerificationTimer -DelayMilliseconds 1500
+
+    # Narrow one-shot command file used by local automation to ask the already
+    # elevated tray to run vetted tray actions. Currently only supports the
+    # targeted apply-pending path; it cannot run arbitrary commands.
+    Invoke-TrayCommandFile
+
     # Cold-start complete. Log time-to-ready so regressions surface in the
     # tray log on every relaunch. Target: well under 2000ms now that the
     # catalog load is cache-first.
@@ -4580,6 +5500,7 @@ finally {
         $script:ApplyAnimTimer.Stop()
         $script:ApplyAnimTimer.Dispose()
     }
+    Stop-ActiveProfileVerificationRuntime -KillProcess
     # Unregister event subscriptions
     if ($script:MediaEndedSub) {
         try { Unregister-Event -SubscriptionId $script:MediaEndedSub.Id -ErrorAction SilentlyContinue } catch {}

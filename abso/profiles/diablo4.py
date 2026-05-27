@@ -6,8 +6,9 @@ from typing import TYPE_CHECKING, Any, Literal
 
 from abso.profiles.base import BaseProfile
 from abso.profiles.profile_bases import (
-    inject_fullscreen_optimizations,
-    merge_settings_map,
+    build_standard_handlers,
+    fso_overrides,
+    merged_handler_settings,
 )
 
 if TYPE_CHECKING:
@@ -49,7 +50,7 @@ class _Diablo4BaseProfile(BaseProfile):
         # D4's native HDR VRR lane wants the true exclusive path so the HDR
         # tone map runs in the game, not in DWM. Disable FSO per-exe to keep
         # the GPU off the compositor's borderless HDR shim.
-        return {"Diablo IV.exe": True}
+        return fso_overrides(self.executable_hints)
 
     @property
     def nvidia_profile_name(self) -> str | None:
@@ -63,37 +64,20 @@ class _Diablo4BaseProfile(BaseProfile):
         return "off"
 
     def get_handlers(self) -> list[SettingsHandler]:
-        from abso.settings.color import ColorProfileSettingsHandler
         from abso.settings.diablo4_config import Diablo4ConfigHandler
-        from abso.settings.display_range import DisplayColorRangeHandler
-        from abso.settings.graphics import GraphicsSettingsHandler
-        from abso.settings.mouse import MouseSettingsHandler
-        from abso.settings.network import NetworkSettingsHandler
-        from abso.settings.nvidia import NvidiaSettingsHandler
-        from abso.settings.power import PowerSettingsHandler
-        from abso.settings.process_priority import ProcessPriorityHandler
-        from abso.settings.registry import RegistrySettingsHandler
-        from abso.settings.windows import WindowsSettingsHandler
 
-        return [
-            WindowsSettingsHandler(),
-            PowerSettingsHandler(),
-            RegistrySettingsHandler(),
-            NvidiaSettingsHandler(),
-            NetworkSettingsHandler(),
-            MouseSettingsHandler(),
-            GraphicsSettingsHandler(),
-            ProcessPriorityHandler(["Diablo IV.exe"]),
-            ColorProfileSettingsHandler(),
-            DisplayColorRangeHandler(),
-            Diablo4ConfigHandler(),
-        ]
+        return build_standard_handlers(
+            self,
+            include_mouse=True,
+            include_cpu_affinity=False,
+            additional_handlers=[Diablo4ConfigHandler()],
+        )
 
     def _variant_overrides(self) -> dict[str, dict[str, Any]]:
         return {}
 
-    def get_settings(self, handler_name: str) -> dict[str, Any]:
-        settings_map: dict[str, dict[str, Any]] = {
+    def _base_settings(self) -> dict[str, dict[str, Any]]:
+        return {
             "WindowsSettingsHandler": {
                 "game_mode": True,
                 "game_bar": False,
@@ -161,10 +145,11 @@ class _Diablo4BaseProfile(BaseProfile):
             },
         }
 
-        settings_map = merge_settings_map(settings_map, self._variant_overrides())
-        settings = settings_map.get(handler_name, {})
-        settings = inject_fullscreen_optimizations(self, handler_name, settings)
-        return settings
+    def _settings_overrides(self) -> dict[str, dict[str, Any]]:
+        return self._variant_overrides()
+
+    def get_settings(self, handler_name: str) -> dict[str, Any]:
+        return merged_handler_settings(self, handler_name)
 
     def _common_in_game_settings(self) -> list[dict[str, str]]:
         return [

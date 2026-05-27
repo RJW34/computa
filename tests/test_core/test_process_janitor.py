@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
+from abso.core.overlay_policy import OVERLAY_PROCESS_IMAGES
 from abso.core.process_janitor import (
     ALWAYS_SAFE_LAUNCH_KILLSET,
     NEVER_KILL_IMAGES,
@@ -97,18 +98,7 @@ def test_always_safe_killset_includes_canonical_overlays() -> None:
     # The launch killset must cover the overlay surfaces that the apply-time
     # OverlayManager already targets, otherwise mid-session respawns slip
     # through after the apply-time sweep finishes.
-    for canonical_overlay in (
-        "NVIDIA Share.exe",
-        "GameOverlayUI.exe",
-        "GameBar.exe",
-        "GameBarFTServer.exe",
-        "DiscordHookHelper.exe",
-        "DiscordHookHelper64.exe",
-        "RTSS.exe",
-        "obs64.exe",
-        "Medal.exe",
-        "MedalEncoder.exe",
-    ):
+    for canonical_overlay in OVERLAY_PROCESS_IMAGES:
         assert canonical_overlay in ALWAYS_SAFE_LAUNCH_KILLSET, canonical_overlay
 
 
@@ -154,3 +144,15 @@ def test_sweep_result_to_dict_round_trips_lists() -> None:
     assert data["not_running"] == ["unused.exe"]
     assert data["stopped"] == []
     assert data["changed"] is False
+
+
+@patch("abso.core.process_janitor.subprocess.run")
+def test_is_process_running_uses_exact_tasklist_image_name(mock_subprocess_run) -> None:
+    mock_subprocess_run.return_value = MagicMock(
+        returncode=0,
+        stdout='"notmedal.exe","1111","Console","1","10000 K"\n',
+    )
+
+    janitor = ProcessJanitor()
+
+    assert janitor._is_process_running("Medal.exe") is False

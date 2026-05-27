@@ -38,9 +38,8 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-from abso.profiles.profile_bases import Rivals2BaseProfile
+from abso.profiles.profile_bases import Rivals2BaseProfile, merge_settings_map
 from abso.settings.registry import WIN32_PRIORITY_GAMING_ONLINE
-
 
 
 class Rivals2OnlineProfile(Rivals2BaseProfile):
@@ -79,6 +78,10 @@ class Rivals2OnlineProfile(Rivals2BaseProfile):
     @property
     def is_online_profile(self) -> bool:
         """This is explicitly an online rollback profile."""
+        return True
+
+    @property
+    def is_sdr_only(self) -> bool:
         return True
 
     @property
@@ -209,5 +212,37 @@ class Rivals2OnlineProfile(Rivals2BaseProfile):
                 "reason": "Rollback resync frames must not cause cascading frame loss.",
             },
         ]
+
+
+class Rivals2OnlineHDRProfile(Rivals2OnlineProfile):
+    """Rollback-safe online Rivals 2 profile with Windows HDR composition enabled."""
+
+    @property
+    def profile_id(self) -> str:
+        return "rivals2-online-hdr"
+
+    @property
+    def display_name(self) -> str:
+        return "Rivals 2 - Online No Sync HDR"
+
+    @property
+    def description(self) -> str:
+        return (
+            "Rollback-safe online Rivals 2 profile with Windows HDR composition. "
+            "Keeps no-sync rollback stability; Rivals 2 native HDR output stays off."
+        )
+
+    @property
+    def is_sdr_only(self) -> bool:
+        return False
+
+    def _settings_overrides(self) -> dict[str, dict[str, Any]]:
+        return merge_settings_map(
+            super()._settings_overrides(),
+            self.HDR_WINDOWS_COMPOSITION_OVERRIDES,
+        )
+
+    def get_in_game_settings(self) -> list[dict[str, str]]:
+        return [*self._rivals2_hdr_guidance(), *super().get_in_game_settings()]
 
 

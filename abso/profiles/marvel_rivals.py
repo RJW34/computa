@@ -4,7 +4,11 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-from abso.profiles.profile_bases import ReflexShooterBaseProfile, merge_settings_map
+from abso.profiles.profile_bases import (
+    ReflexShooterBaseProfile,
+    fso_overrides,
+    merge_settings_map,
+)
 
 
 class _MarvelRivalsBaseProfile(ReflexShooterBaseProfile):
@@ -27,7 +31,7 @@ class _MarvelRivalsBaseProfile(ReflexShooterBaseProfile):
         # Marvel Rivals competitive lane uses fullscreen_mode=0 (exclusive).
         # Disable FSO per-exe so the game cannot silently run through the
         # DWM compositor's borderless FSO shim and give up Reflex headroom.
-        return {exe: True for exe in self.executable_hints}
+        return fso_overrides(self.executable_hints)
 
     @property
     def graphics_api(self) -> Literal["dx11", "dx12", "vulkan", "opengl", "unknown"]:

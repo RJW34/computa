@@ -56,89 +56,129 @@ class PowerSettingsHandler(SettingsHandler):
 
         # Check if using a performance plan (by name or known GUID)
         if not self._is_performance_plan(active_plan):
-            issues.append(Issue(
-                title="Not using a performance power plan",
-                severity="warning",
-                current_value=active_plan.get("name", "Unknown"),
-                optimal_value="Ultimate Performance (standard) or High Performance (fallback)",
-                explanation=(
-                    "Performance power plans reduce Windows power-saving behavior "
-                    "that can matter under load. Benefit depends on CPU, firmware, "
-                    "cooling, and OEM policy, and it can increase power and noise."
-                ),
-                category="power",
-            ))
+            issues.append(
+                Issue(
+                    title="Not using a performance power plan",
+                    severity="warning",
+                    current_value=active_plan.get("name", "Unknown"),
+                    optimal_value="Ultimate Performance (standard) or High Performance (fallback)",
+                    explanation=(
+                        "Performance power plans reduce Windows power-saving behavior "
+                        "that can matter under load. Benefit depends on CPU, firmware, "
+                        "cooling, and OEM policy, and it can increase power and noise."
+                    ),
+                    category="power",
+                )
+            )
 
         # Check if Ultimate Performance is available
         if not current.get("has_ultimate_performance"):
-            issues.append(Issue(
-                title="Ultimate Performance plan not available",
-                severity="info",
-                current_value="Not installed",
-                optimal_value="Available",
-                explanation=(
-                    "Ultimate Performance is an optional Windows power scheme that "
-                    "biases toward performance over efficiency. It is not a universal "
-                    "FPS gain, but it gives ABSO a consistent high-performance target."
-                ),
-                category="power",
-            ))
+            issues.append(
+                Issue(
+                    title="Ultimate Performance plan not available",
+                    severity="info",
+                    current_value="Not installed",
+                    optimal_value="Available",
+                    explanation=(
+                        "Ultimate Performance is an optional Windows power scheme that "
+                        "biases toward performance over efficiency. It is not a universal "
+                        "FPS gain, but it gives ABSO a consistent high-performance target."
+                    ),
+                    category="power",
+                )
+            )
 
         return issues
 
     def apply(self, settings: dict[str, Any]) -> dict[str, Any]:
         """Apply power settings."""
         errors: list[str] = []
+        skipped: list[str] = []
+        applied: list[str] = []
+        changed_keys: list[str] = []
 
         try:
             # Create Ultimate Performance if requested and not present
             if settings.get("ensure_ultimate_performance") and not self._has_ultimate_performance():
                 self._create_ultimate_performance()
+                changed_keys.append("ensure_ultimate_performance")
+                applied.append("Ultimate Performance plan created")
+            elif settings.get("ensure_ultimate_performance"):
+                skipped.append("Ultimate Performance plan already available")
 
             # Set active plan
             if "active_plan" in settings:
-                plan_id = settings["active_plan"]
+                target_plan = str(settings["active_plan"])
+                current_active_plan = self._get_active_plan()
 
-                # Handle special names
-                if plan_id == "ultimate_performance":
-                    # Find the actual GUID on this system
-                    found_guid = self._find_ultimate_performance_guid()
-                    if found_guid:
-                        plan_id = found_guid
-                    else:
-                        # Create it if not found
-                        plan_id = self._create_ultimate_performance()
-                elif plan_id == "high_performance":
-                    plan_id = self.HIGH_PERFORMANCE_GUID
+                if self._plan_matches_target(current_active_plan, target_plan):
+                    skipped.append(f"Power plan already active: {target_plan}")
+                else:
+                    plan_id = target_plan
 
-                self._set_active_plan(plan_id)
+                    # Handle special names
+                    if plan_id == "ultimate_performance":
+                        # Find the actual GUID on this system
+                        found_guid = self._find_ultimate_performance_guid()
+                        if found_guid:
+                            plan_id = found_guid
+                        else:
+                            # Create it if not found
+                            plan_id = self._create_ultimate_performance()
+                    elif plan_id == "high_performance":
+                        plan_id = self.HIGH_PERFORMANCE_GUID
+                    elif plan_id == "balanced":
+                        plan_id = self.BALANCED_GUID
+
+                    self._set_active_plan(plan_id)
+                    changed_keys.append("active_plan")
+                    applied.append(f"Power plan set: {target_plan}")
+
+            power_setting_changes = 0
+
+            def set_power_setting_if_needed(
+                label: str, subgroup: str, setting: str, value: int
+            ) -> None:
+                nonlocal power_setting_changes
+
+                target_value = int(value)
+                current_value = self._get_power_setting(subgroup, setting)
+                if current_value == target_value:
+                    skipped.append(f"{label}: already {target_value}")
+                    return
+
+                self._set_power_setting(subgroup, setting, target_value, apply_changes=False)
+                power_setting_changes += 1
+                changed_keys.append(label)
+                applied.append(f"{label}: {target_value}")
 
             # Apply sub-settings for gaming
             if settings.get("disable_usb_suspend"):
-                self._set_power_setting(
-                    self.USB_SUBGROUP,
-                    self.USB_SELECTIVE_SUSPEND,
-                    0
+                set_power_setting_if_needed(
+                    "USB selective suspend", self.USB_SUBGROUP, self.USB_SELECTIVE_SUSPEND, 0
                 )
 
             if settings.get("disable_pcie_power_saving"):
-                self._set_power_setting(
-                    self.PCIE_SUBGROUP,
-                    self.PCIE_LINK_STATE,
-                    0
+                set_power_setting_if_needed(
+                    "PCIe link state power management", self.PCIE_SUBGROUP, self.PCIE_LINK_STATE, 0
                 )
 
             if settings.get("processor_max_performance"):
-                self._set_power_setting(
+                set_power_setting_if_needed(
+                    "Processor minimum state",
                     self.PROCESSOR_SUBGROUP,
                     self.PROCESSOR_MIN_STATE,
-                    settings.get("processor_min_state", 5)
+                    settings.get("processor_min_state", 5),
                 )
-                self._set_power_setting(
+                set_power_setting_if_needed(
+                    "Processor maximum state",
                     self.PROCESSOR_SUBGROUP,
                     self.PROCESSOR_MAX_STATE,
-                    100
+                    100,
                 )
+
+            if power_setting_changes:
+                self._apply_current_scheme()
 
         except Exception as e:
             errors.append(str(e))
@@ -147,6 +187,10 @@ class PowerSettingsHandler(SettingsHandler):
             "success": len(errors) == 0,
             "error": "; ".join(errors) if errors else None,
             "requires_reboot": False,
+            "applied": applied,
+            "skipped": skipped,
+            "changed": bool(changed_keys),
+            "changed_keys": changed_keys,
         }
 
     def backup(self) -> dict[str, Any]:
@@ -293,9 +337,7 @@ class PowerSettingsHandler(SettingsHandler):
             if result.returncode == 0:
                 # Parse output like: "Power Scheme GUID: xxx  (Name)"
                 match = re.search(
-                    r"GUID:\s*([a-f0-9-]+)\s*\(([^)]+)\)",
-                    result.stdout,
-                    re.IGNORECASE
+                    r"GUID:\s*([a-f0-9-]+)\s*\(([^)]+)\)", result.stdout, re.IGNORECASE
                 )
                 if match:
                     return {
@@ -315,14 +357,14 @@ class PowerSettingsHandler(SettingsHandler):
             result = self._run_powercfg("/list")
             if result.returncode == 0:
                 for match in re.finditer(
-                    r"GUID:\s*([a-f0-9-]+)\s*\(([^)]+)\)",
-                    result.stdout,
-                    re.IGNORECASE
+                    r"GUID:\s*([a-f0-9-]+)\s*\(([^)]+)\)", result.stdout, re.IGNORECASE
                 ):
-                    plans.append({
-                        "guid": match.group(1),
-                        "name": match.group(2).strip(),
-                    })
+                    plans.append(
+                        {
+                            "guid": match.group(1),
+                            "name": match.group(2).strip(),
+                        }
+                    )
         except Exception as e:
             logger.error(f"Failed to list plans: {e}")
 
@@ -366,10 +408,7 @@ class PowerSettingsHandler(SettingsHandler):
         Returns:
             The GUID of the newly created plan.
         """
-        result = self._run_powercfg(
-            "/duplicatescheme",
-            self.ULTIMATE_PERFORMANCE_TEMPLATE_GUID
-        )
+        result = self._run_powercfg("/duplicatescheme", self.ULTIMATE_PERFORMANCE_TEMPLATE_GUID)
         if result.returncode != 0:
             raise RuntimeError(f"Failed to create Ultimate Performance: {result.stderr}")
 
@@ -391,19 +430,26 @@ class PowerSettingsHandler(SettingsHandler):
         if result.returncode != 0:
             raise RuntimeError(f"Failed to set active plan: {result.stderr}")
 
-    def _set_power_setting(self, subgroup: str, setting: str, value: int) -> None:
+    def _set_power_setting(
+        self,
+        subgroup: str,
+        setting: str,
+        value: int,
+        *,
+        apply_changes: bool = True,
+    ) -> None:
         """Set a power setting value for the current scheme."""
         result = self._run_powercfg(
-            "/setacvalueindex",
-            "SCHEME_CURRENT",
-            subgroup,
-            setting,
-            str(value)
+            "/setacvalueindex", "SCHEME_CURRENT", subgroup, setting, str(value)
         )
         if result.returncode != 0:
             raise RuntimeError(f"Failed to set power setting: {result.stderr}")
 
-        # Apply changes
+        if apply_changes:
+            self._apply_current_scheme()
+
+    def _apply_current_scheme(self) -> None:
+        """Apply queued changes to the current power scheme."""
         apply_result = self._run_powercfg("/setactive", "SCHEME_CURRENT")
         if apply_result.returncode != 0:
             logger.warning(f"Failed to apply power setting changes: {apply_result.stderr}")
@@ -411,14 +457,11 @@ class PowerSettingsHandler(SettingsHandler):
     def _get_power_setting(self, subgroup: str, setting: str) -> int | None:
         """Get a power setting value for the current scheme via powercfg /query."""
         try:
-            result = self._run_powercfg(
-                "/query", "SCHEME_CURRENT", subgroup, setting
-            )
+            result = self._run_powercfg("/query", "SCHEME_CURRENT", subgroup, setting)
             if result.returncode == 0:
                 # Parse "Current AC Power Setting Index: 0x000000nn"
                 match = re.search(
-                    r"Current AC Power Setting Index:\s*0x([0-9a-fA-F]+)",
-                    result.stdout
+                    r"Current AC Power Setting Index:\s*0x([0-9a-fA-F]+)", result.stdout
                 )
                 if match:
                     return int(match.group(1), 16)
@@ -443,9 +486,6 @@ class PowerSettingsHandler(SettingsHandler):
                 or "high performance" in active_name
             )
         if target == "balanced":
-            return (
-                active_guid == self.BALANCED_GUID.lower()
-                or "balanced" in active_name
-            )
+            return active_guid == self.BALANCED_GUID.lower() or "balanced" in active_name
 
         return active_guid == target

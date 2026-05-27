@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
-from abso.settings.nvidia.nvapi_drs import DRSProfileManager, NVDRS_GLOBAL_PROFILE_NAME
+from abso.settings.nvidia.nvapi_drs import NVDRS_GLOBAL_PROFILE_NAME, DRSProfileManager
 
 
 def test_resolve_vsync_on_uses_nvapi_constant():

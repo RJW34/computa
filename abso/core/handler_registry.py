@@ -16,8 +16,9 @@ To register a new handler, add a single :class:`HandlerEntry` row below.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Callable
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from abso.settings.base import SettingsHandler
@@ -34,7 +35,7 @@ class HandlerEntry:
         notes: free-text rationale for unusual flags (e.g. audit-only).
     """
 
-    factory: Callable[[], "SettingsHandler"]
+    factory: Callable[[], SettingsHandler]
     audit: bool
     backup: bool
     notes: str | None = None
@@ -48,26 +49,11 @@ def _all_entries() -> list[HandlerEntry]:
     this refactor.
     """
     # Core system / shell handlers — audited and backed up.
+    # 25H2 + Experimental Future Platforms feature-flag rollout surfaces.
+    # All detect-only, audited, backed up; restore_guarantee = "none" keeps
+    # backup-restore non-blocking even when the rollout is gated off.
+    from abso.settings.ai_agents import AIAgentsSettingsHandler
     from abso.settings.audio import AudioSettingsHandler
-    from abso.settings.graphics import GraphicsSettingsHandler
-    from abso.settings.memory import MemorySettingsHandler
-    from abso.settings.mouse import MouseSettingsHandler
-    from abso.settings.network import NetworkSettingsHandler
-    from abso.settings.nvidia import NvidiaSettingsHandler
-    from abso.settings.power import PowerSettingsHandler
-    from abso.settings.registry import RegistrySettingsHandler
-    from abso.settings.services import ServicesSettingsHandler
-    from abso.settings.storage import StorageSettingsHandler
-    from abso.settings.tasks import TasksSettingsHandler
-    from abso.settings.timer import TimerSettingsHandler
-    from abso.settings.updates import UpdatesSettingsHandler
-    from abso.settings.visual import VisualSettingsHandler
-    from abso.settings.windows import WindowsSettingsHandler
-
-    # Audit-only diagnostics & opt-in surfaces.
-    from abso.settings.diagnostics import DiagnosticsSettingsHandler
-    from abso.settings.display_range import DisplayColorRangeHandler
-    from abso.settings.vbs_optin import VBSOptInHandler
 
     # Profile-specific config handlers — backed up so settings from one
     # game don't leak into another's restore.
@@ -76,21 +62,35 @@ def _all_entries() -> list[HandlerEntry]:
     from abso.settings.cpu_affinity import CpuAffinityHandler
     from abso.settings.debloat import DebloatHandler
     from abso.settings.diablo4_config import Diablo4ConfigHandler
+
+    # Audit-only diagnostics & opt-in surfaces.
+    from abso.settings.diagnostics import DiagnosticsSettingsHandler
+    from abso.settings.display_range import DisplayColorRangeHandler
     from abso.settings.dolphin import DolphinConfigHandler
     from abso.settings.fortnite_config import FortniteConfigHandler
+    from abso.settings.graphics import GraphicsSettingsHandler
     from abso.settings.marvel_rivals_config import MarvelRivalsConfigHandler
+    from abso.settings.memory import MemorySettingsHandler
+    from abso.settings.mouse import MouseSettingsHandler
+    from abso.settings.network import NetworkSettingsHandler
+    from abso.settings.nvidia import NvidiaSettingsHandler
     from abso.settings.nvidia_notifications import NvidiaNotificationHandler
     from abso.settings.obs import OBSSettingsHandler
     from abso.settings.ow2_config import OW2ConfigHandler
+    from abso.settings.power import PowerSettingsHandler
     from abso.settings.process_priority import ProcessPriorityHandler
+    from abso.settings.registry import RegistrySettingsHandler
     from abso.settings.rivals2_config import Rivals2ConfigHandler
-    from abso.settings.standby_list import StandbyListHandler
-
-    # 25H2 + Experimental Future Platforms feature-flag rollout surfaces.
-    # All detect-only, audited, backed up; restore_guarantee = "none" keeps
-    # backup-restore non-blocking even when the rollout is gated off.
-    from abso.settings.ai_agents import AIAgentsSettingsHandler
+    from abso.settings.services import ServicesSettingsHandler
     from abso.settings.shared_audio import SharedAudioSettingsHandler
+    from abso.settings.standby_list import StandbyListHandler
+    from abso.settings.storage import StorageSettingsHandler
+    from abso.settings.tasks import TasksSettingsHandler
+    from abso.settings.timer import TimerSettingsHandler
+    from abso.settings.updates import UpdatesSettingsHandler
+    from abso.settings.vbs_optin import VBSOptInHandler
+    from abso.settings.visual import VisualSettingsHandler
+    from abso.settings.windows import WindowsSettingsHandler
     from abso.settings.xbox_mode import XboxModeSettingsHandler
 
     return [
@@ -169,11 +169,11 @@ def _all_entries() -> list[HandlerEntry]:
     ]
 
 
-def get_audit_handlers() -> list["SettingsHandler"]:
+def get_audit_handlers() -> list[SettingsHandler]:
     """Construct one handler instance per registry entry tagged ``audit``."""
     return [entry.factory() for entry in _all_entries() if entry.audit]
 
 
-def get_backup_handlers() -> list["SettingsHandler"]:
+def get_backup_handlers() -> list[SettingsHandler]:
     """Construct one handler instance per registry entry tagged ``backup``."""
     return [entry.factory() for entry in _all_entries() if entry.backup]

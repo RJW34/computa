@@ -25,13 +25,16 @@ from abso.profiles.overwatch2 import (
     Overwatch2Profile,
 )
 from abso.profiles.pokemon_auto_chess import PokemonAutoChessProfile
+from abso.profiles.productivity_oled import ProductivityHDRProfile, ProductivityProfile
 from abso.profiles.rivals2 import Rivals2Profile
 from abso.profiles.rivals2_gsync import (
+    Rivals2GSyncHDRProfile,
     Rivals2GSyncProfile,
+    Rivals2OnlineGSyncHDRProfile,
     Rivals2OnlineGSyncProfile,
 )
-from abso.profiles.rivals2_offline import Rivals2OfflineProfile
-from abso.profiles.rivals2_online import Rivals2OnlineProfile
+from abso.profiles.rivals2_offline import Rivals2OfflineHDRProfile, Rivals2OfflineProfile
+from abso.profiles.rivals2_online import Rivals2OnlineHDRProfile, Rivals2OnlineProfile
 from abso.profiles.slippi_melee import (
     SlippiMeleeConsoleParityHDRProfile,
     SlippiMeleeConsoleParityProfile,
@@ -90,6 +93,19 @@ class TestProfileLoading:
         assert sdr.profile_id == "diablo4-sdr"
         assert sdr.display_name == "Diablo 4 - SDR"
 
+    def test_productivity_profiles_use_stable_nvidia_identity(self):
+        """Productivity SDR/HDR siblings should not rely on auto-generated NVIDIA profile names."""
+        sdr = ProductivityProfile()
+        hdr = ProductivityHDRProfile()
+        assert (
+            sdr.get_settings("NvidiaSettingsHandler")["profile_name"]
+            == "Productivity (SDR)"
+        )
+        assert (
+            hdr.get_settings("NvidiaSettingsHandler")["profile_name"]
+            == "Productivity (HDR)"
+        )
+
     def test_fortnite_profiles_load(self):
         """Fortnite should expose explicit SDR and HDR variants."""
         sdr = FortniteProfile()
@@ -127,6 +143,14 @@ class TestProfileLoading:
         ow2_hdr = no_sync_hdr.get_settings("OW2ConfigHandler")
         assert ow2_hdr["hdr"] is True
         assert ow2_hdr["window_mode"] == 0
+        assert ow2_hdr["fullscreen_window"] is False
+        assert ow2_hdr["fullscreen_window_enabled"] is True
+        assert ow2_hdr["windowed_fullscreen"] is False
+        ow2_capture = gsync_capture.get_settings("OW2ConfigHandler")
+        assert ow2_capture["window_mode"] == 1
+        assert ow2_capture["fullscreen_window"] is False
+        assert ow2_capture["fullscreen_window_enabled"] is False
+        assert ow2_capture["windowed_fullscreen"] is True
         windows_hdr = no_sync_hdr.get_settings("WindowsSettingsHandler")
         assert windows_hdr["hdr"] is True
         assert windows_hdr["auto_hdr"] is False
@@ -134,6 +158,11 @@ class TestProfileLoading:
         assert gsync_hdr.profile_id == "overwatch2-gsync-hdr"
         assert gsync_capture.profile_id == "overwatch2-gsync-capture"
         assert gsync_hdr_capture.profile_id == "overwatch2-gsync-hdr-capture"
+        assert gsync.mixed_refresh_safe_fallback_profile_id == "overwatch2-gsync-capture"
+        assert (
+            gsync_hdr.mixed_refresh_safe_fallback_profile_id
+            == "overwatch2-gsync-hdr-capture"
+        )
 
     def test_deadlock_profiles_load(self):
         """Deadlock should expose the full GSYNC x HDR matrix (4 variants)."""
@@ -159,6 +188,8 @@ class TestProfileLoading:
         assert gsync_hdr.display_name == "Deadlock - GSYNC HDR"
         assert gsync_hdr.is_sdr_only is False
         assert gsync_hdr.requires_confirmed_vrr_support is True
+        assert gsync.mixed_refresh_safe_fallback_profile_id == "deadlock"
+        assert gsync_hdr.mixed_refresh_safe_fallback_profile_id == "deadlock-hdr"
 
     def test_deadlock_detection_tracks_aliases_but_binding_targets_current_binary(self):
         """Deadlock detection can be broad; strict NVIDIA binding must stay narrow."""
@@ -263,16 +294,39 @@ class TestProfileLoading:
         assert "Marvel Rivals" in hdr.display_name
 
     def test_rivals2_consolidated_profiles_load(self):
-        """The canonical Rivals 2 matrix should expose the core SDR lanes."""
+        """The canonical Rivals 2 matrix should expose SDR and HDR lanes."""
         offline = Rivals2OfflineProfile()
+        offline_hdr = Rivals2OfflineHDRProfile()
         online = Rivals2OnlineProfile()
+        online_hdr = Rivals2OnlineHDRProfile()
         gsync = Rivals2GSyncProfile()
+        gsync_hdr = Rivals2GSyncHDRProfile()
         online_gsync = Rivals2OnlineGSyncProfile()
+        online_gsync_hdr = Rivals2OnlineGSyncHDRProfile()
 
         assert offline.profile_id == "rivals2-offline"
+        assert offline.is_sdr_only is True
+        assert offline_hdr.profile_id == "rivals2-offline-hdr"
+        assert offline_hdr.is_sdr_only is False
         assert online.profile_id == "rivals2-online"
+        assert online.is_sdr_only is True
+        assert online_hdr.profile_id == "rivals2-online-hdr"
+        assert online_hdr.is_sdr_only is False
         assert gsync.profile_id == "rivals2-gsync"
+        assert gsync.is_sdr_only is True
+        assert gsync_hdr.profile_id == "rivals2-gsync-hdr"
+        assert gsync_hdr.is_sdr_only is False
         assert online_gsync.profile_id == "rivals2-online-gsync"
+        assert online_gsync.is_sdr_only is True
+        assert online_gsync_hdr.profile_id == "rivals2-online-gsync-hdr"
+        assert online_gsync_hdr.is_sdr_only is False
+        assert gsync.mixed_refresh_safe_fallback_profile_id == "rivals2-offline"
+        assert gsync_hdr.mixed_refresh_safe_fallback_profile_id == "rivals2-offline-hdr"
+        assert online_gsync.mixed_refresh_safe_fallback_profile_id == "rivals2-online"
+        assert (
+            online_gsync_hdr.mixed_refresh_safe_fallback_profile_id
+            == "rivals2-online-hdr"
+        )
 
     def test_profiles_expose_canonical_nvidia_binding_executables(self):
         """NVIDIA binding should target canonical binaries, not broad detection aliases."""
@@ -439,7 +493,9 @@ class TestProfileSettings:
         assert settings["refresh_rate"] == 60
 
     def test_slippi_hdr_variants_enable_hdr_and_disable_acm(self):
-        """All three Slippi HDR siblings should enable native HDR + WCG and disable Auto HDR / ACM."""
+        """All three Slippi HDR siblings enable native HDR + WCG, disable Auto HDR / ACM,
+        and use the native ICC path (matches the OW2-HDR convention; empirically the
+        sRGB clamp looked MORE washed-out on the real LG-OLED + QD-OLED hardware)."""
         for profile_cls in (
             SlippiMeleeHDRProfile,
             SlippiMeleeUniversalHDRProfile,
@@ -507,6 +563,7 @@ class TestProfileSettings:
         # Driver-side FPS cap is intentionally OFF; the in-game Foreground FPS
         # limiter is the single VRR cap per Blur Busters G-SYNC 101.
         assert settings["preset"] == "vrr_diablo4"
+        assert settings["profile_name"] == "Diablo IV"
         assert settings["auto_vrr_fps_cap"] is False
 
     def test_diablo4_variants_drive_native_game_config(self):
@@ -642,15 +699,15 @@ class TestProfileSettings:
         assert capture.display_path_requirements.require_overlay_free_path is False
         assert hdr_capture.display_path_requirements.require_overlay_free_path is False
 
-    def test_overwatch2_capture_profile_does_not_require_exact_binding_preflight(self):
-        """Capture-safe OW2 should not hard-block on exact NVIDIA binding proof."""
+    def test_overwatch2_capture_profile_requires_exact_binding_preflight(self):
+        """Capture-safe OW2 still needs the real Overwatch NVIDIA profile binding."""
         strict = Overwatch2GSyncProfile()
         capture = Overwatch2GSyncCaptureProfile()
         hdr_capture = Overwatch2GSyncHDRCaptureProfile()
 
         assert strict.requires_exact_nvidia_binding is True
-        assert capture.requires_exact_nvidia_binding is False
-        assert hdr_capture.requires_exact_nvidia_binding is False
+        assert capture.requires_exact_nvidia_binding is True
+        assert hdr_capture.requires_exact_nvidia_binding is True
 
     def test_overwatch2_strict_profiles_auto_disable_blocking_overlays(self):
         """Strict exclusive OW2 profiles should auto-shut overlay blockers before failing."""
@@ -670,7 +727,9 @@ class TestProfileSettings:
             MarvelRivalsSDRProfile(),
             MarvelRivalsHDRProfile(),
             Rivals2GSyncProfile(),
+            Rivals2GSyncHDRProfile(),
             Rivals2OnlineGSyncProfile(),
+            Rivals2OnlineGSyncHDRProfile(),
         ]
 
         for profile in strict_profiles:
@@ -838,6 +897,7 @@ class TestProfileSettings:
 
         assert settings["profile_name"] == "Rivals 2"
         assert settings["preset"] == "vrr_fighting_game"
+        assert settings["threaded_optimization"] == "off"
         assert "Rivals2-Win64-Shipping.exe" in settings["profile_aliases"]
 
     def test_rivals2_online_gsync_nvidia_settings_use_stable_profile_identity(self):
@@ -848,6 +908,70 @@ class TestProfileSettings:
         assert settings["profile_name"] == "Rivals 2 Online"
         assert settings["preset"] == "vrr_fighting_game"
         assert "Rivals 2: Online / Matchmaking" in settings["profile_aliases"]
+
+    def test_rivals2_hdr_variants_enable_windows_hdr_not_native_hdr(self):
+        """Rivals 2 HDR lanes are Windows SDR-in-HDR composition, not native game HDR."""
+        for profile_cls in (
+            Rivals2OfflineHDRProfile,
+            Rivals2OnlineHDRProfile,
+            Rivals2GSyncHDRProfile,
+            Rivals2OnlineGSyncHDRProfile,
+        ):
+            profile = profile_cls()
+            win = profile.get_settings("WindowsSettingsHandler")
+            graphics = profile.get_settings("GraphicsSettingsHandler")
+            color = profile.get_settings("ColorProfileSettingsHandler")
+            config = profile.get_settings("Rivals2ConfigHandler")
+
+            assert win["hdr"] is True, profile_cls.__name__
+            assert win["advanced_color"] is True, profile_cls.__name__
+            assert win["auto_hdr"] is False, profile_cls.__name__
+            assert win["sdr_white_level_nits"] == 200, profile_cls.__name__
+            assert graphics["disable_auto_color_management"] is True, profile_cls.__name__
+            assert color["icc_profile"] == "native", profile_cls.__name__
+            assert color["digital_vibrance"] == 50, profile_cls.__name__
+            assert config["hdr_output"] is False, profile_cls.__name__
+
+    def test_rivals2_hdr_variants_preserve_parent_latency_knobs(self):
+        """HDR variants should differ from SDR only on Windows/color/HDR composition knobs."""
+        pairs = (
+            (Rivals2OfflineProfile(), Rivals2OfflineHDRProfile()),
+            (Rivals2OnlineProfile(), Rivals2OnlineHDRProfile()),
+            (Rivals2GSyncProfile(), Rivals2GSyncHDRProfile()),
+            (Rivals2OnlineGSyncProfile(), Rivals2OnlineGSyncHDRProfile()),
+        )
+        preserved_handlers = (
+            "NvidiaSettingsHandler",
+            "RegistrySettingsHandler",
+            "PowerSettingsHandler",
+            "ProcessPriorityHandler",
+            "Rivals2ConfigHandler",
+            "DisplayColorRangeHandler",
+        )
+
+        for sdr, hdr in pairs:
+            for handler in preserved_handlers:
+                assert hdr.get_settings(handler) == sdr.get_settings(handler), (
+                    hdr.profile_id,
+                    handler,
+                )
+
+    def test_rivals2_hdr_guidance_is_honest_about_native_hdr(self):
+        """HDR guidance should not claim native Rivals 2 HDR support."""
+        profile = Rivals2OfflineHDRProfile()
+        guidance = profile.get_in_game_settings()
+        settings_named = {entry.get("setting") for entry in guidance}
+        combined = " ".join(
+            f"{entry.get('value', '')} {entry.get('reason', '')}"
+            for entry in guidance
+        ).lower()
+
+        assert "Use HDR (Settings > System > Display)" in settings_named
+        assert "SDR content brightness" in settings_named
+        assert "HDR Output" in settings_named
+        assert "no native hdr support" in combined
+        assert "not native game hdr" in combined
+        assert "does not force unreal" in combined
 
     def test_rivals2_gsync_profile_sets_in_game_vrr_cap_automatically(self):
         """VRR Rivals profiles should drive the lower-latency in-game cap, not just NVCP."""
@@ -1089,9 +1213,13 @@ class TestFullscreenOptimizationsPerExe:
         for profile_cls in (
             Rivals2Profile,
             Rivals2OfflineProfile,
+            Rivals2OfflineHDRProfile,
             Rivals2OnlineProfile,
+            Rivals2OnlineHDRProfile,
             Rivals2GSyncProfile,
+            Rivals2GSyncHDRProfile,
             Rivals2OnlineGSyncProfile,
+            Rivals2OnlineGSyncHDRProfile,
         ):
             profile = profile_cls()
             flags = profile.fullscreen_optimizations_per_exe

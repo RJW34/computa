@@ -1,6 +1,5 @@
 """Tests for nvidia profiles module."""
 
-from pathlib import Path
 
 from abso.settings.nvidia.presets import NVIDIA_PRESETS
 from abso.settings.nvidia.profiles import (
@@ -248,7 +247,6 @@ class TestGeneratePresetProfile:
         """Test generates balanced preset."""
         path = generate_preset_profile("balanced")
         assert path.exists()
-        content = path.read_text(encoding="utf-16")
         assert "abso_balanced" in path.name
 
     def test_uses_preset_from_dict(self):

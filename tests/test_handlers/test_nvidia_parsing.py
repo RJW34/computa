@@ -1,9 +1,6 @@
 """Tests for nvidia parsing module."""
 
-from pathlib import Path
 from unittest.mock import patch
-
-import pytest
 
 from abso.settings.nvidia.parsing import (
     parse_frame_rate_value,

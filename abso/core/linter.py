@@ -223,23 +223,22 @@ class ProfileLinter:
         # Check 2: LLM Ultra + explicit FPS cap
         # Note: LLM Ultra and FPS cap CAN work together (Ultra handles queue, cap limits rate)
         # But for online profiles, LLM Ultra's timing isn't ideal for rollback netcode
-        if llm == "ultra" or preset in self.llm_ultra_presets:
-            if max_fps and max_fps != "off":
-                # Only warn for online profiles - offline can use aggressive settings
-                allows_aggressive = getattr(profile, "allows_aggressive_settings", False)
-                if not allows_aggressive:
-                    result.add_issue(LintIssue(
-                        code="NVIDIA_LLM_ULTRA_FPS_CAP",
-                        severity=LintSeverity.WARNING,
-                        message="LLM Ultra with FPS cap may have frame pacing quirks",
-                        details=(
-                            "Low Latency Mode 'Ultra' uses Just-In-Time frame submission "
-                            "which may interact unexpectedly with explicit FPS caps. "
-                            "For consistent online timing, use LLM='On' with your FPS cap. "
-                            "For offline/training, this combination is acceptable."
-                        ),
-                        setting_path="NvidiaSettingsHandler.max_frame_rate",
-                    ))
+        if (llm == "ultra" or preset in self.llm_ultra_presets) and max_fps and max_fps != "off":
+            # Only warn for online profiles - offline can use aggressive settings
+            allows_aggressive = getattr(profile, "allows_aggressive_settings", False)
+            if not allows_aggressive:
+                result.add_issue(LintIssue(
+                    code="NVIDIA_LLM_ULTRA_FPS_CAP",
+                    severity=LintSeverity.WARNING,
+                    message="LLM Ultra with FPS cap may have frame pacing quirks",
+                    details=(
+                        "Low Latency Mode 'Ultra' uses Just-In-Time frame submission "
+                        "which may interact unexpectedly with explicit FPS caps. "
+                        "For consistent online timing, use LLM='On' with your FPS cap. "
+                        "For offline/training, this combination is acceptable."
+                    ),
+                    setting_path="NvidiaSettingsHandler.max_frame_rate",
+                ))
 
         # Check 3: Fast Sync + rollback profile
         if vsync == "fast" and profile.optimization_target in self.rollback_targets:
@@ -332,16 +331,25 @@ class ProfileLinter:
                 setting_path="WindowsSettingsHandler.auto_hdr",
             ))
 
-        # Check 1c: Native HDR profiles should not clamp to sRGB.
+        # Check 1c: HDR profiles should not clamp SDR composition to sRGB.
+        #
+        # Empirically verified on a multi-display (LG OLED + AW QD-OLED)
+        # rig running Windows Insider build 29591 with NVIDIA 5xx drivers:
+        # icc='srgb' alongside hdr=True looks visibly MORE washed-out than
+        # icc='native' on wide-gamut panels, regardless of whether the
+        # game itself renders HDR or SDR. The OW2-HDR convention (icc=
+        # native) is the right choice for both true-HDR titles AND for
+        # SDR-rendering apps composited inside Windows HDR mode.
         if hdr and color_settings.get("icc_profile") == "srgb":
             result.add_issue(LintIssue(
                 code="COLOR_HDR_SRGB_CLAMP",
                 severity=LintSeverity.ERROR,
-                message="Native HDR profile cannot use an sRGB clamp color path",
+                message="HDR profile cannot use an sRGB clamp color path",
                 details=(
                     "HDR output needs the display's native wide-gamut path. "
-                    "Using icc_profile='srgb' under HDR can clamp color and "
-                    "distort tone mapping."
+                    "Using icc_profile='srgb' under HDR was empirically "
+                    "verified to look MORE washed-out than native on the "
+                    "LG OLED + QD-OLED multi-display reference rig."
                 ),
                 setting_path="ColorProfileSettingsHandler.icc_profile",
             ))

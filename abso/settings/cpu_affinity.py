@@ -7,6 +7,7 @@ affinity masks via PowerShell and AppCompatFlags registry entries.
 
 from __future__ import annotations
 
+import contextlib
 import logging
 import subprocess
 import winreg
@@ -309,18 +310,14 @@ class CpuAffinityHandler(SettingsHandler):
                 try:
                     # Read vendor on first core.
                     if core_id == 0:
-                        try:
+                        with contextlib.suppress(OSError):
                             topology.vendor = str(
                                 winreg.QueryValueEx(core_key, "VendorIdentifier")[0]
                             )
-                        except OSError:
-                            pass
-                        try:
+                        with contextlib.suppress(OSError):
                             topology.architecture = str(
                                 winreg.QueryValueEx(core_key, "Identifier")[0]
                             )
-                        except OSError:
-                            pass
 
                     # Read clock speed.
                     try:
@@ -563,12 +560,10 @@ class CpuAffinityHandler(SettingsHandler):
         try:
             # Read any existing flags for this executable.
             existing_flags = ""
-            try:
+            with contextlib.suppress(OSError):
                 existing_flags = str(
                     winreg.QueryValueEx(key, exe_name)[0]
                 )
-            except OSError:
-                pass
 
             # Strip old affinity flag if present, then append the new one.
             tokens = [
@@ -628,10 +623,8 @@ class CpuAffinityHandler(SettingsHandler):
                     key, exe_name, 0, winreg.REG_SZ, " ".join(remaining)
                 )
             else:
-                try:
+                with contextlib.suppress(OSError):
                     winreg.DeleteValue(key, exe_name)
-                except OSError:
-                    pass
 
             logger.info("Removed AppCompatFlags affinity for %s", exe_name)
         finally:

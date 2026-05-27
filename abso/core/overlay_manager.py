@@ -6,6 +6,12 @@ import logging
 import subprocess
 from dataclasses import dataclass, field
 
+from abso.core.overlay_policy import (
+    OVERLAY_PROCESS_MAP as SHARED_OVERLAY_PROCESS_MAP,
+)
+from abso.core.overlay_policy import unique_overlay_labels
+from abso.core.process_list import parse_tasklist_csv_images
+
 logger = logging.getLogger(__name__)
 
 
@@ -27,22 +33,13 @@ class OverlayRemediationResult:
 class OverlayManager:
     """Stops known overlay processes for strict exclusive-fullscreen profiles."""
 
-    OVERLAY_PROCESS_MAP: dict[str, tuple[str, ...]] = {
-        "NVIDIA Share Overlay": ("NVIDIA Share.exe",),
-        "Steam Overlay": ("GameOverlayUI.exe",),
-        "Xbox Game Bar": ("GameBar.exe",),
-        "Xbox Game Bar Server": ("GameBarFTServer.exe",),
-        "Discord Overlay": ("DiscordHookHelper.exe", "DiscordHookHelper64.exe"),
-        "RivaTuner Statistics Server": ("RTSS.exe",),
-        "OBS Studio": ("obs64.exe",),
-        "Medal Overlay": ("Medal.exe", "MedalEncoder.exe"),
-    }
+    OVERLAY_PROCESS_MAP = SHARED_OVERLAY_PROCESS_MAP
 
     def remediate(self, overlay_labels: list[str]) -> OverlayRemediationResult:
         """Attempt to stop overlay processes behind detected labels."""
         result = OverlayRemediationResult()
 
-        for label in self._unique_labels(overlay_labels):
+        for label in unique_overlay_labels(overlay_labels):
             result.attempted_labels.append(label)
             process_names = self.OVERLAY_PROCESS_MAP.get(label)
             if not process_names:
@@ -85,15 +82,6 @@ class OverlayManager:
 
         return result
 
-    @staticmethod
-    def _unique_labels(labels: list[str]) -> list[str]:
-        ordered: list[str] = []
-        for label in labels:
-            normalized = str(label or "").strip()
-            if normalized and normalized not in ordered:
-                ordered.append(normalized)
-        return ordered
-
     def _is_process_running(self, process_name: str) -> bool:
         try:
             result = subprocess.run(
@@ -105,8 +93,7 @@ class OverlayManager:
             if result.returncode != 0:
                 return False
 
-            output = (result.stdout or "").strip().lower()
-            return process_name.lower() in output
+            return process_name.lower() in parse_tasklist_csv_images(result.stdout or "")
         except Exception as e:
             logger.debug("Process existence check failed for %s: %s", process_name, e)
             return False

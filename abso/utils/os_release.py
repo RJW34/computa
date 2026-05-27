@@ -21,7 +21,7 @@ from typing import Final
 logger = logging.getLogger(__name__)
 
 _REG_PATH: Final = r"SOFTWARE\Microsoft\Windows NT\CurrentVersion"
-_cache: "OsRelease | None" = None
+_cache: OsRelease | None = None
 
 # Build floor for the Experimental (Future Platforms) Canary 29xxx series.
 # Microsoft split the experimental channel in February 2026 (build 29531+);

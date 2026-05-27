@@ -13,11 +13,44 @@ A.B.S.O. is a CLI-first Windows 11 gaming tuning tool that automatically detects
 - **Game Profiles** - Pre-configured optimization profiles for specific games
 - **Safe by Default** - Automatic backups before any changes
 - **Easy Restore** - One-click rollback to previous settings
+- **Live State Verification** - `state --json --verify`, `health --json`, and
+  targeted `apply-pending` checks for tray/GUI-safe remediation, including
+  tray runtime staleness detection after LocalAppData deploys and read-only
+  display-event evidence with optional channel-error reporting
+- **Passive Display Stability Diagnostics** - `display-diagnostics --json` and
+  `health --json` report active monitor topology, mixed-refresh/VRR risk
+  factors, active-profile reboot context, and whether clean event logs point
+  away from a physical disconnect
+- **Tray-Safe Reapply Flow** - selecting the already-active tray profile is
+  verify-gated to avoid redundant display/color writes
+- **Narrow Apply Preflight** - Windows settings probe only the requested
+  setting groups before apply, avoiding unrelated HDR/WCG/SDR-white/refresh
+  detection for registry-only toggles
+- **Narrow Profile Verification** - current-profile status verifies known
+  Game Mode, Game Bar/DVR, windowed VRR, and refresh-rate targets without
+  invoking unrelated Windows probes
+- **Grouped DirectX Readback** - Auto HDR, windowed optimizations, and VRR
+  optimize are parsed exactly from one registry read in hot detect/apply/verify
+  paths
+- **Deterministic DirectX Writes** - DirectX global settings preserve unknown
+  tokens while normalizing ABSO-owned Auto HDR/windowed/VRR flags to one clean
+  canonical set, not duplicate or conflicting pairs
+- **Backend No-Op Apply/Reapply Guard** - `apply <current-profile>` and
+  `reapply` verify first, skip the transaction when nothing is pending, or
+  route supported pending settings through targeted `apply-pending`
+- **No-Apply Launch Guard** - `launch <current-profile>` skips redundant apply
+  transactions when live verification is already clean
+- **Reboot-Gated Safety** - pending reboot-only verifier states are treated as
+  no-apply states instead of rerunning display-sensitive handlers
+- **Mixed-Monitor HDR Safety** - HDR profile writes skip known SDR-only active
+  targets instead of sending unnecessary display-config calls to every monitor
 
 ## Quality Bar
 
 A.B.S.O. is being hardened against a stricter product standard than a typical tweak tool. The current quality rubric, agent protocol, and remediation roadmap live here:
 
+- [`docs/CURRENT_AGENT_BRIEFING.md`](docs/CURRENT_AGENT_BRIEFING.md) — current machine state, verified local build/deploy status, and monitor-flicker precautions for zero-context agents
+- [`AGENTS.md`](AGENTS.md) — root-level zero-context entrypoint for Codex-style agents
 - [`docs/AGENT_PROTOCOL.md`](docs/AGENT_PROTOCOL.md) — forward-looking start-here for any agent
 - [`docs/INDEX.md`](docs/INDEX.md)
 - [`docs/QUALITY_RUBRIC.md`](docs/QUALITY_RUBRIC.md)
@@ -101,6 +134,20 @@ python -m abso apply rivals2-online
 python -m abso apply fortnite
 python -m abso apply diablo4
 
+# Check active profile health without changing display state
+python -m abso state --json --verify
+python -m abso health --json
+python -m abso health --json --full-verify  # Include full per-handler details
+python -m abso health --json --full-backups # Include recent backup rows
+
+# Sample only display flicker evidence without profile verification or writes
+python -m abso display-diagnostics --json
+python -m abso display-diagnostics --samples 6 --interval 10 --json
+python -m abso display-diagnostics --samples 6 --interval 10 --jsonl
+
+# Apply only supported missing pending settings, not a full profile
+python -m abso apply-pending overwatch2-gsync-hdr-capture --json
+
 # Restore from backup
 python -m abso restore latest
 python -m abso restore 20240115_143022  # Specific backup
@@ -108,22 +155,20 @@ python -m abso restore 20240115_143022  # Specific backup
 
 ## Available Game Profiles
 
-| Profile | Game | Focus |
-|---------|------|-------|
-| `slippi-melee` / `slippi-melee-hdr` | Super Smash Bros. Melee (Slippi) | Latency-focused no-sync (SDR / HDR) |
-| `slippi-melee-console-parity` / `slippi-melee-console-parity-hdr` | Super Smash Bros. Melee (Slippi) | Console-like pacing/feel (SDR / HDR) |
-| `slippi-melee-universal` / `slippi-melee-universal-hdr` | Super Smash Bros. Melee (Slippi) | No-sync with fixed HAGS state (SDR / HDR) |
-| `rivals2-offline` | Rivals of Aether 2 | Offline no-sync latency |
-| `rivals2-online` | Rivals of Aether 2 | Rollback-safe online play |
-| `rivals2-gsync` | Rivals of Aether 2 | Low-latency VRR offline |
-| `rivals2-online-gsync` | Rivals of Aether 2 | Rollback-safe VRR online |
-| `fortnite` / `fortnite-hdr` | Fortnite | Reflex no-sync latency (SDR / HDR) |
-| `marvel-rivals-sdr` / `marvel-rivals-hdr` | Marvel Rivals | Reflex VRR (SDR / HDR) |
-| `overwatch2` / `overwatch2-hdr` | Overwatch 2 (No Sync) | Latency-focused no-sync (SDR / HDR) |
-| `overwatch2-gsync` / `overwatch2-gsync-hdr` | Overwatch 2 (G-SYNC) | Tear-free low latency VRR (SDR / HDR) |
-| `overwatch2-gsync-capture` / `overwatch2-gsync-hdr-capture` | Overwatch 2 (G-SYNC) | Borderless VRR path for capture/overlay workflows |
-| `diablo4` / `diablo4-sdr` | Diablo 4 | Balanced performance (HDR / SDR) |
-| `ryujinx-ssbu` | Ryujinx (SSBU) | Low-latency emulator system path |
+The tray lists each game once, then shows the available variants inside that game's flyout.
+
+| Game / target | Variants | Profile IDs |
+|---------------|----------|-------------|
+| Desktop / Productivity | SDR, HDR | `productivity`, `productivity-hdr` |
+| Rivals 2 | Online No Sync, Online G-SYNC, Offline No Sync, Offline G-SYNC; each in SDR and Windows HDR composition | `rivals2-online`, `rivals2-online-hdr`, `rivals2-online-gsync`, `rivals2-online-gsync-hdr`, `rivals2-offline`, `rivals2-offline-hdr`, `rivals2-gsync`, `rivals2-gsync-hdr` |
+| Super Smash Bros. Melee (Slippi) | Competitive No Sync, Console-Parity 60 Hz, Universal No Sync; each in SDR and Windows HDR composition | `slippi-melee`, `slippi-melee-hdr`, `slippi-melee-console-parity`, `slippi-melee-console-parity-hdr`, `slippi-melee-universal`, `slippi-melee-universal-hdr` |
+| SSBU / HewDraw Remix (Ryujinx) | Low-latency emulator | `ryujinx-ssbu` |
+| Deadlock | No Sync and G-SYNC; each in SDR and Windows HDR composition | `deadlock`, `deadlock-hdr`, `deadlock-gsync`, `deadlock-gsync-hdr` |
+| Fortnite | No Sync in SDR or HDR | `fortnite`, `fortnite-hdr` |
+| Marvel Rivals | G-SYNC in SDR or HDR | `marvel-rivals-sdr`, `marvel-rivals-hdr` |
+| Overwatch 2 | No Sync, strict G-SYNC, and capture-safe G-SYNC; each in SDR or HDR | `overwatch2`, `overwatch2-hdr`, `overwatch2-gsync`, `overwatch2-gsync-hdr`, `overwatch2-gsync-capture`, `overwatch2-gsync-hdr-capture` |
+| Diablo 4 | HDR or SDR | `diablo4`, `diablo4-sdr` |
+| Pokemon Auto Chess | Browser WebGL or native PACDeluxe client | `pokemon-auto-chess`, `pacdeluxe` |
 
 ## What Profiles Change
 
@@ -144,6 +189,7 @@ A.B.S.O. applies optimizations across multiple system areas. Exact settings vary
 ### Graphics Settings
 - Per-executable Fullscreen Optimizations (FSO) forced on or off to match each profile's presentation path (exclusive fullscreen vs composited borderless)
 - Multi-Plane Overlay (MPO) is **not** disabled by default. Most profiles leave MPO enabled because disabling it can alter or break the Windows 11 VRR/compositor path on some systems
+- A local profile override may disable MPO for a specific capture-safe mixed-refresh setup. When that happens, `apply-pending` writes only the supported missing graphics target and marks the profile reboot-pending instead of re-running a full profile apply
 
 ### Input Settings
 - Mouse acceleration disabled
@@ -235,7 +281,7 @@ Some optimizations require a system reboot **the first time they're applied**:
 
 **Important:** Once you've applied a profile and rebooted, switching between profiles typically does NOT require another reboot. The kernel-level settings persist in the registry, so subsequent profile switches are instant.
 
-A.B.S.O. will notify you if a reboot may be required, but if you've previously applied the same profile and rebooted, you can skip the reboot.
+A.B.S.O. will notify you if a reboot may be required. Use `state --json --verify` or `health --json` to distinguish a missing pending apply from a reboot-gated setting whose registry target is already written.
 
 ### Restoring doesn't work
 
@@ -261,7 +307,12 @@ abso/
 │   ├── auditor.py          # Configuration auditing
 │   ├── applier.py          # Profile application
 │   ├── backup.py           # Backup/restore system
+│   ├── app_paths.py        # Installed LocalAppData paths
 │   ├── handler_registry.py # Central registry (one HandlerEntry per handler)
+│   ├── pending_apply.py    # Narrow targeted remediation path
+│   ├── profile_status.py   # Shared verification/status summaries
+│   ├── state_reconcile.py  # Reboot-pending reconciliation
+│   ├── state_store.py      # Active-profile state read/write helpers
 │   ├── compliance.py       # Post-apply compliance / severity escalation
 │   ├── kb_checker.py       # Known-bad Windows updates + supersession
 │   ├── bios_detector.py    # BIOS/firmware + Secure Boot cert state
@@ -291,8 +342,13 @@ abso/
     └── atomic_io.py        # Atomic JSON I/O
 ```
 
-For agents picking up this project, the canonical entry point is
-[`docs/AGENT_PROTOCOL.md`](docs/AGENT_PROTOCOL.md).
+For agents picking up this project on a **freshly cloned / new PC**, read
+[`docs/NEW_MACHINE_SETUP.md`](docs/NEW_MACHINE_SETUP.md) first. On an
+already-configured machine, read
+[`docs/CURRENT_AGENT_BRIEFING.md`](docs/CURRENT_AGENT_BRIEFING.md) first for
+the current live-PC state (machine-specific — re-verify on a fresh clone), then
+[`docs/AGENT_PROTOCOL.md`](docs/AGENT_PROTOCOL.md) for durable workflow and
+architecture rules.
 
 ## License
 

@@ -18,7 +18,11 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, Literal
 
 from abso.profiles.base import DisplayPathRequirements
-from abso.profiles.profile_bases import ReflexShooterBaseProfile, merge_settings_map
+from abso.profiles.profile_bases import (
+    ReflexShooterBaseProfile,
+    fso_overrides,
+    merge_settings_map,
+)
 
 if TYPE_CHECKING:
     from abso.settings.base import SettingsHandler
@@ -44,6 +48,13 @@ class _DeadlockBaseProfile(ReflexShooterBaseProfile):
         # process detection, but strict NVIDIA binding should target one real
         # game binary instead of every future/legacy alias.
         return ["project8.exe"]
+
+    @property
+    def fullscreen_optimizations_per_exe(self) -> dict[str, bool]:
+        # Every Deadlock lane runs exclusive fullscreen. Disable FSO per-exe
+        # for both playtest/final binary names so Windows cannot silently shunt
+        # the game into the composited borderless shim.
+        return fso_overrides(_DEADLOCK_EXECUTABLES)
 
     @property
     def nvidia_profile_name(self) -> str | None:
@@ -182,16 +193,27 @@ class _DeadlockBaseProfile(ReflexShooterBaseProfile):
     def _hdr_in_game_settings() -> list[dict[str, str]]:
         return [
             {
-                "category": "Display",
+                "category": "Display (Windows)",
                 "setting": "HDR",
-                "value": "On (if Deadlock exposes the toggle in this build)",
-                "reason": "Use Deadlock's HDR output when the active display path supports native HDR. If Deadlock has not yet shipped an HDR toggle, leave it off and rely on the Windows HDR path.",
+                "value": "On (set by this profile for desktop comfort)",
+                "reason": (
+                    "Deadlock has not shipped a native HDR toggle in the playtest "
+                    "builds this profile was authored against. Windows HDR is on "
+                    "to keep the OS composition path consistent for OLED owners; "
+                    "the game itself renders SDR and is composited into the HDR "
+                    "surface. If Deadlock ships an in-game HDR toggle later, "
+                    "enable it then - until then this is SDR-in-HDR composition."
+                ),
             },
             {
-                "category": "Display",
-                "setting": "HDR Calibration",
-                "value": "Calibrate paper white / peak brightness in-game or via Windows HDR Calibration",
-                "reason": "Tune once for your display; do not crank brightness past your panel's real peak or you trade visibility for raw nits.",
+                "category": "Display (Windows)",
+                "setting": "SDR content brightness",
+                "value": "200 nits starting point; tune to taste",
+                "reason": (
+                    "Settings > System > Display > HDR > SDR content brightness. "
+                    "This profile sets 200 nits as the OLED baseline. If the "
+                    "desktop reads dim, push it up to 240-280."
+                ),
             },
         ]
 
@@ -235,14 +257,6 @@ class DeadlockProfile(_DeadlockBaseProfile):
     def is_sdr_only(self) -> bool:
         return True
 
-    @property
-    def fullscreen_optimizations_per_exe(self) -> dict[str, bool]:
-        # No-sync lane runs exclusive fullscreen. Disable FSO per-exe so
-        # Windows cannot silently shunt Deadlock into the composited
-        # borderless FSO shim and pay the compositor tax on top of the
-        # native present path.
-        return {exe: True for exe in _DEADLOCK_EXECUTABLES}
-
     def _variant_overrides(self) -> dict[str, dict[str, Any]]:
         return {
             "NvidiaSettingsHandler": {
@@ -254,7 +268,7 @@ class DeadlockProfile(_DeadlockBaseProfile):
             },
             "ColorProfileSettingsHandler": {
                 "icc_profile": "srgb",
-                "digital_vibrance": 50,
+                "digital_vibrance": 45,
                 "show_osd_guidance": True,
                 "game_type": "competitive_fps",
             },
@@ -268,7 +282,16 @@ class DeadlockProfile(_DeadlockBaseProfile):
 
 
 class DeadlockHDRProfile(_DeadlockBaseProfile):
-    """Deadlock no-sync HDR profile (OLED / Mini-LED)."""
+    """Deadlock no-sync HDR profile (OS-level HDR for OLED / Mini-LED).
+
+    NOTE: As of the playtest builds available at profile-author time, Deadlock
+    has not shipped a native HDR toggle (Valve has not announced HDR support
+    for the Source 2 engine on Deadlock). This profile turns Windows HDR ON
+    for desktop comfort while the game itself renders SDR composited inside
+    the HDR surface - same posture as the Slippi HDR siblings. If Deadlock
+    ships native HDR later, the in-game guidance points users at the toggle;
+    until then this is functionally SDR-in-HDR composition.
+    """
 
     @property
     def profile_id(self) -> str:
@@ -281,18 +304,15 @@ class DeadlockHDRProfile(_DeadlockBaseProfile):
     @property
     def description(self) -> str:
         return (
-            "Latency-focused no-sync HDR Deadlock profile (VSync OFF, VRR OFF). "
-            "Native HDR for OLED / Mini-LED; enable Reflex On + Boost in-game."
+            "Latency-focused no-sync Deadlock profile with Windows HDR on for "
+            "OLED desktop comfort (VSync OFF, VRR OFF). Deadlock currently "
+            "renders SDR; HDR is for the OS composition path, not the game. "
+            "Enable Reflex On + Boost in-game."
         )
 
     @property
     def is_sdr_only(self) -> bool:
         return False
-
-    @property
-    def fullscreen_optimizations_per_exe(self) -> dict[str, bool]:
-        # Same exclusive-fullscreen contract as the SDR no-sync lane.
-        return {exe: True for exe in _DEADLOCK_EXECUTABLES}
 
     def _variant_overrides(self) -> dict[str, dict[str, Any]]:
         return {
@@ -357,20 +377,16 @@ class DeadlockGSyncProfile(_DeadlockBaseProfile):
         return True
 
     @property
-    def fullscreen_optimizations_per_exe(self) -> dict[str, bool]:
-        # Strict fullscreen VRR lane: disable FSO per-exe so Windows holds
-        # the true exclusive path and the refresh-3 cap stays cap-bound
-        # instead of paying the compositor tax if Deadlock drifts to
-        # borderless.
-        return {exe: True for exe in _DEADLOCK_EXECUTABLES}
-
-    @property
     def display_path_requirements(self) -> DisplayPathRequirements:
         return DisplayPathRequirements(require_overlay_free_path=True)
 
     @property
     def requires_exact_nvidia_binding(self) -> bool:
         return True
+
+    @property
+    def mixed_refresh_safe_fallback_profile_id(self) -> str:
+        return "deadlock"
 
     def _variant_overrides(self) -> dict[str, dict[str, Any]]:
         return {
@@ -401,7 +417,13 @@ class DeadlockGSyncProfile(_DeadlockBaseProfile):
 
 
 class DeadlockGSyncHDRProfile(_DeadlockBaseProfile):
-    """Deadlock G-SYNC HDR profile (strict fullscreen-only VRR, OLED / Mini-LED)."""
+    """Deadlock G-SYNC profile with Windows HDR on (strict fullscreen-only VRR).
+
+    NOTE: Same caveat as DeadlockHDRProfile - Deadlock has not shipped native
+    HDR in the playtest. Windows HDR is on for OLED desktop comfort, the game
+    itself renders SDR composited inside HDR. Switch back to deadlock-gsync
+    for the pure SDR lane if you don't want OS HDR on.
+    """
 
     @property
     def profile_id(self) -> str:
@@ -414,8 +436,10 @@ class DeadlockGSyncHDRProfile(_DeadlockBaseProfile):
     @property
     def description(self) -> str:
         return (
-            "Tear-free low latency VRR HDR Deadlock profile (VSync safety net, "
-            "G-SYNC ON). Native HDR for OLED / Mini-LED; enable Reflex On + Boost in-game."
+            "Tear-free low latency VRR Deadlock profile with Windows HDR on "
+            "for OLED desktop comfort (VSync safety net, G-SYNC ON). Deadlock "
+            "currently renders SDR; HDR is for the OS composition path. "
+            "Enable Reflex On + Boost in-game."
         )
 
     @property
@@ -427,19 +451,16 @@ class DeadlockGSyncHDRProfile(_DeadlockBaseProfile):
         return True
 
     @property
-    def fullscreen_optimizations_per_exe(self) -> dict[str, bool]:
-        # Native HDR strict lane: FSO must stay disabled per-exe. Otherwise
-        # Windows composites Deadlock's HDR path through DWM and the GPU
-        # pays the compositor cost on top of the real HDR pipeline.
-        return {exe: True for exe in _DEADLOCK_EXECUTABLES}
-
-    @property
     def display_path_requirements(self) -> DisplayPathRequirements:
         return DisplayPathRequirements(require_overlay_free_path=True)
 
     @property
     def requires_exact_nvidia_binding(self) -> bool:
         return True
+
+    @property
+    def mixed_refresh_safe_fallback_profile_id(self) -> str:
+        return "deadlock-hdr"
 
     def _variant_overrides(self) -> dict[str, dict[str, Any]]:
         return {

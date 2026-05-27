@@ -364,7 +364,7 @@ function New-CategoryIcon {
     Creates a small 16x16 icon for a profile category.
     Delegates to New-CategoryBitmap and converts the bitmap to an icon.
     .PARAMETER Category
-    One of: Fighting, ARPG, Shooter, Productivity, Streaming, Other
+    One of: Desktop, Fighting, Shooters, RPGs, Other (legacy category names are accepted)
     #>
     param([string]$Category)
 
@@ -384,7 +384,7 @@ function New-CategoryBitmap {
     Creates a 16x16 bitmap for a profile category using filled shapes with depth.
     Uses the three-layer depth system: shadow/glow, main fill with gradient, specular highlight.
     .PARAMETER Category
-    One of: Fighting, ARPG, Shooter, Productivity, Streaming, Other
+    One of: Desktop, Fighting, Shooters, RPGs, Other (legacy category names are accepted)
     .PARAMETER Color
     The category color for fills and strokes.
     #>
@@ -392,6 +392,14 @@ function New-CategoryBitmap {
         [string]$Category,
         [System.Drawing.Color]$Color = [System.Drawing.Color]::White
     )
+
+    $iconCategory = switch ($Category) {
+        "Desktop" { "Productivity" }
+        "Shooters" { "Shooter" }
+        "RPGs" { "ARPG" }
+        "Other Games" { "Other" }
+        default { $Category }
+    }
 
     $bmp = New-Object System.Drawing.Bitmap(16, 16)
     $g = [System.Drawing.Graphics]::FromImage($bmp)
@@ -416,7 +424,7 @@ function New-CategoryBitmap {
         [Math]::Max(0, [int]$Color.B - 60)
     )
 
-    switch ($Category) {
+    switch ($iconCategory) {
         "Fighting" {
             # Crossed blades — thick strokes with guards and pommels
             # Layer 1: Glow behind crossing point
@@ -1050,7 +1058,7 @@ function New-GameBitmap {
             $highlightBrush.Dispose()
             $g.Dispose()
             $bmp.Dispose()
-            return New-CategoryBitmap -Category "Productivity" -Color $Color
+            return New-CategoryBitmap -Category "Desktop" -Color $Color
         }
     }
 
@@ -1066,7 +1074,7 @@ function New-ActionBitmap {
     Creates a 16x16 bitmap for an action menu item using filled shapes with depth.
     Uses the three-layer depth system: shadow/glow, main fill, specular highlight.
     .PARAMETER Action
-    One of: Restore, Audit, Backups, QuickPanel, Settings, Exit
+    One of: Restore, Audit, Apply, Backups, QuickPanel, Settings, Exit
     .PARAMETER Color
     The accent color for this action icon.
     #>
@@ -1150,6 +1158,36 @@ function New-ActionBitmap {
 
             # Layer 3: Specular
             $g.FillEllipse($highlightBrush, 3, 2, 4, 3)
+        }
+        "Apply" {
+            # Small wrench/check hybrid for targeted remediation actions.
+            $g.FillEllipse($glowBrush, 1, 1, 14, 14)
+
+            $stemPen = New-Object System.Drawing.Pen($Color, 2.2)
+            $stemPen.StartCap = [System.Drawing.Drawing2D.LineCap]::Round
+            $stemPen.EndCap = [System.Drawing.Drawing2D.LineCap]::Round
+            $g.DrawLine($stemPen, 4, 12, 10, 6)
+            $stemPen.Dispose()
+
+            $headBrush = New-Object System.Drawing.SolidBrush($Color)
+            $g.FillEllipse($headBrush, 8, 2, 5, 5)
+            $headBrush.Dispose()
+
+            $cutBrush = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::Transparent)
+            $g.FillEllipse($cutBrush, 10, 3, 3, 3)
+            $cutBrush.Dispose()
+
+            $checkPen = New-Object System.Drawing.Pen($lighter, 1.8)
+            $checkPen.StartCap = [System.Drawing.Drawing2D.LineCap]::Round
+            $checkPen.EndCap = [System.Drawing.Drawing2D.LineCap]::Round
+            $g.DrawLines($checkPen, @(
+                (New-Object System.Drawing.PointF(2.5, 8.5)),
+                (New-Object System.Drawing.PointF(5.0, 11.0)),
+                (New-Object System.Drawing.PointF(8.5, 7.0))
+            ))
+            $checkPen.Dispose()
+
+            $g.FillEllipse($highlightBrush, 9, 2, 3, 2)
         }
         "Backups" {
             # Three stacked cards/layers with data lines

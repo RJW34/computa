@@ -224,7 +224,7 @@ class VBSOptInHandler(SettingsHandler):
                 winreg.HKEY_LOCAL_MACHINE, self.DEVICE_GUARD_KEY, 0, winreg.KEY_READ
             ) as key:
                 value, _ = winreg.QueryValueEx(key, "RequiredSecurityProperties")
-                return list(value) if isinstance(value, (list, tuple)) else [int(value)]
+                return list(value) if isinstance(value, list | tuple) else [int(value)]
         except FileNotFoundError:
             return None
         except OSError:

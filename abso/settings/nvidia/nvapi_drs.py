@@ -392,13 +392,13 @@ class NVAPIDRS:
     def _find_nvapi_dll(self) -> Path | None:
         """Find nvapi64.dll location."""
         # Check System32 first (most common)
-        system32 = Path(os.environ.get("SystemRoot", r"C:\Windows")) / "System32"
+        system32 = Path(os.environ.get("SYSTEMROOT", r"C:\Windows")) / "System32"
         nvapi_path = system32 / "nvapi64.dll"
         if nvapi_path.exists():
             return nvapi_path
 
         # Check driver store
-        driver_store = Path(os.environ.get("SystemRoot", r"C:\Windows")) / "System32" / "DriverStore" / "FileRepository"
+        driver_store = Path(os.environ.get("SYSTEMROOT", r"C:\Windows")) / "System32" / "DriverStore" / "FileRepository"
         if driver_store.exists():
             for folder in driver_store.iterdir():
                 if folder.is_dir() and folder.name.startswith("nv"):
@@ -460,7 +460,9 @@ class NVAPIDRS:
         try:
             self._nvapi = ctypes.WinDLL(str(nvapi_path))
         except OSError as e:
-            raise NVAPIError(f"Failed to load nvapi64.dll: {e}", NvAPIStatus.LIBRARY_NOT_FOUND)
+            raise NVAPIError(
+                f"Failed to load nvapi64.dll: {e}", NvAPIStatus.LIBRARY_NOT_FOUND
+            ) from e
 
         # NvAPI_Initialize - interface ID 0x0150E828
         try:
@@ -474,7 +476,7 @@ class NVAPIDRS:
             if status != NvAPIStatus.OK:
                 raise NVAPIError("NvAPI_Initialize failed", status)
         except Exception as e:
-            raise NVAPIError(f"Failed to initialize NVAPI: {e}")
+            raise NVAPIError(f"Failed to initialize NVAPI: {e}") from e
 
         self._initialized = True
         logger.info("NVAPI initialized successfully")
@@ -2059,8 +2061,10 @@ class DRSProfileManager:
                         numeric_value = int(value_lower, 16)
                     else:
                         numeric_value = int(value_lower)
-                except ValueError:
-                    raise ValueError(f"Invalid value '{value}' for setting '{setting_name}'")
+                except ValueError as e:
+                    raise ValueError(
+                        f"Invalid value '{value}' for setting '{setting_name}'"
+                    ) from e
         else:
             raise ValueError(f"Unsupported value type for setting '{setting_name}': {type(value)}")
 
@@ -2353,8 +2357,8 @@ class DRSProfileManager:
         Returns:
             True if NVCP was launched, False if not available.
         """
-        import subprocess
         import os
+        import subprocess
 
         # Try different methods to open NVCP
         nvcp_commands = [
@@ -2363,7 +2367,7 @@ class DRSProfileManager:
             # Direct NVCP launch via control panel
             ["control", "desk.cpl,,3"],
             # Try nvcplui.exe directly
-            [os.path.join(os.environ.get("ProgramFiles", "C:\\Program Files"),
+            [os.path.join(os.environ.get("PROGRAMFILES", "C:\\Program Files"),
                           "NVIDIA Corporation", "Control Panel Client", "nvcplui.exe")],
         ]
 

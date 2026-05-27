@@ -16,6 +16,8 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
+from abso.core.process_list import parse_tasklist_csv_processes
+
 logger = logging.getLogger(__name__)
 
 _POLL_INTERVAL_SECONDS: float = 3.0
@@ -316,20 +318,12 @@ class GameWatcher:
                 creationflags=subprocess.CREATE_NO_WINDOW,  # type: ignore[attr-defined]
             )
 
-            for line in result.stdout.strip().splitlines():
-                # Format: "name.exe","PID","Session Name","Session#","Mem Usage"
-                parts = line.split('","')
-                if len(parts) < 2:
+            for process in parse_tasklist_csv_processes(result.stdout or ""):
+                if process.pid is None:
                     continue
 
-                name = parts[0].strip('"')
-                try:
-                    pid = int(parts[1].strip('"'))
-                except (ValueError, IndexError):
-                    continue
-
-                if name.lower() in self._executable_names:
-                    matches[pid] = name
+                if process.image_name.lower() in self._executable_names:
+                    matches[process.pid] = process.image_name
 
         except (subprocess.TimeoutExpired, OSError) as exc:
             logger.error("tasklist polling failed: %s", exc)

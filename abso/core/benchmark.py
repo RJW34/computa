@@ -14,7 +14,7 @@ import statistics
 import subprocess
 import tempfile
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from abso.core.exceptions import ABSOError
@@ -374,7 +374,7 @@ class FrameTimeBenchmark:
 
         # Create a temp file for CSV output.  PresentMon writes to this path.
         tmp_dir = Path(tempfile.mkdtemp(prefix="abso_bench_"))
-        csv_path = tmp_dir / f"{process_name}_{int(datetime.now(tz=timezone.utc).timestamp())}.csv"
+        csv_path = tmp_dir / f"{process_name}_{int(datetime.now(tz=UTC).timestamp())}.csv"
 
         cmd: list[str] = [
             str(presentmon),
@@ -391,7 +391,7 @@ class FrameTimeBenchmark:
         )
         logger.debug("PresentMon command: %s", " ".join(cmd))
 
-        capture_start = datetime.now(tz=timezone.utc)
+        capture_start = datetime.now(tz=UTC)
 
         try:
             result = subprocess.run(

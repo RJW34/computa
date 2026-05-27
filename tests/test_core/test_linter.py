@@ -4,9 +4,7 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
-import pytest
-
-from abso.core.linter import LintSeverity, ProfileLinter
+from abso.core.linter import ProfileLinter
 from abso.profiles.catalog import get_profile_classes
 
 
@@ -254,6 +252,7 @@ class TestProfileLinterErrors:
         result = linter.lint(profile)
         assert result.has_errors
         assert any(e.code == "COLOR_HDR_SRGB_CLAMP" for e in result.errors)
+
 
     def test_vrr_profile_borderless_guidance_requires_matching_settings(self):
         linter = ProfileLinter()

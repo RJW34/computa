@@ -7,9 +7,19 @@ actively working on that area.
 
 ## Start Here
 
-- **[Agent Protocol](./AGENT_PROTOCOL.md)** — single forward-looking
-  document for any agent picking up work. Reading order, machine roles,
-  live-PC test policy, current patterns, open backlog.
+- **[New Machine Setup](./NEW_MACHINE_SETUP.md)** - **read first on a fresh
+  clone / new PC.** What ABSO is, dev-environment setup, how to establish this
+  machine's real state, and why the live-state docs may describe a different box.
+- **[`../AGENTS.md`](../AGENTS.md)** - root-level zero-context agent entrypoint
+  with the current safe command set and documentation reading order.
+- **[Current Agent Briefing](./CURRENT_AGENT_BRIEFING.md)** - latest
+  machine state, verified fixes, and monitor-flicker precautions. Machine-
+  specific; re-verify on a fresh clone before trusting its live-state claims.
+- **[Agent Protocol](./AGENT_PROTOCOL.md)** — durable workflow and
+  architecture guide for any agent picking up work. Reading order, machine
+  roles, live-PC test policy, current patterns, open backlog.
+- **[`../CLAUDE.md`](../CLAUDE.md)** - root-level Claude Code orientation.
+  It is intentionally short and points back to the briefing and protocol.
 
 ## Standards & Plan
 
@@ -33,11 +43,11 @@ actively working on that area.
 ## Focused-Scope Notes
 
 - [Multimon Gaming Idea](./MULTIMON_GAMING_IDEA.md)
-- [Deprecated Rivals 2 VRR Snapshot](./rivals2-vrr-optimal-config.md)
 - [OW2 Keybinds Format](./ow2-keybinds-format.md)
 
 ## Archive
 
 Frozen handoffs and superseded plans live in `docs/archive/`. They are
 preserved for history but should not be used as a current-state
-reference — the Agent Protocol document above wins on conflicts.
+reference. `CURRENT_AGENT_BRIEFING.md` wins for this PC's live state;
+`AGENT_PROTOCOL.md` wins for general process and repo policy.

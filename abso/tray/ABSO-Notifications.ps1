@@ -1002,73 +1002,98 @@ function Show-ProgressOverlay {
         ($screen.Bottom - $height - 18)
     )
 
-    $capAccent = $accent
-    $capW = $width
-    $capH = $height
-    $form.BackColor = $script:Penumbra.Ink100
+    $capAccent  = $accent
+    $capW       = $width
+    $capH       = $height
+    # Pin every script-scope value the Paint closure touches into local
+    # captures *before* GetNewClosure. WinForms invokes Add_Paint on a
+    # deferred WndProc dispatch where $script: hashtable lookups have
+    # occasionally returned $null on first paint — passing $null to
+    # SolidBrush(Color) raises "constructor not found" and WinForms then
+    # renders the broken-control placeholder (white panel, red diagonal X).
+    $capInk100  = $script:Penumbra.Ink100
+    $capFog     = $script:Penumbra.Fog
+    $capHzText  = $script:HzBadgeText
+    $capFontTag = $script:Font_Tag
+    $form.BackColor = $capInk100
     $form.Add_Paint({
         param($s, $e)
-        $g = $e.Graphics
-        $g.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
-        $g.TextRenderingHint = [System.Drawing.Text.TextRenderingHint]::ClearTypeGridFit
+        # Belt-and-suspenders: if anything in the chrome paint throws, eat
+        # the exception and at least leave a solid ink fill on the form.
+        # An unhandled throw here makes WinForms render the broken-control
+        # placeholder (white panel + diagonal red X) over the overlay even
+        # though all the child labels paint fine on top of it.
+        try {
+            $g = $e.Graphics
+            $g.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
+            $g.TextRenderingHint = [System.Drawing.Text.TextRenderingHint]::ClearTypeGridFit
 
-        # 1) Solid ink base (matches label backgrounds so labels blend invisibly).
-        #    Scanlines + grain removed - see _Paint-ToastPanel for the rationale.
-        $baseBrush = New-Object System.Drawing.SolidBrush($script:Penumbra.Ink100)
-        $g.FillRectangle($baseBrush, 0, 0, $capW, $capH)
-        $baseBrush.Dispose()
+            # 1) Solid ink base (matches label backgrounds so labels blend invisibly).
+            #    Scanlines + grain removed - see _Paint-ToastPanel for the rationale.
+            $baseBrush = New-Object System.Drawing.SolidBrush($capInk100)
+            $g.FillRectangle($baseBrush, 0, 0, $capW, $capH)
+            $baseBrush.Dispose()
 
-        # 4) Outline
-        $outlinePen = New-Object System.Drawing.Pen(
-            [System.Drawing.Color]::FromArgb(80, $capAccent.R, $capAccent.G, $capAccent.B), 1
-        )
-        $g.DrawRectangle($outlinePen, 0, 0, ($capW - 1), ($capH - 1))
-        $outlinePen.Dispose()
+            # 4) Outline
+            $outlinePen = New-Object System.Drawing.Pen(
+                [System.Drawing.Color]::FromArgb(80, $capAccent.R, $capAccent.G, $capAccent.B), 1
+            )
+            $g.DrawRectangle($outlinePen, 0, 0, ($capW - 1), ($capH - 1))
+            $outlinePen.Dispose()
 
-        # 5) Left accent rail (6px) with tick perforations
-        $strokeBrush = New-Object System.Drawing.SolidBrush($capAccent)
-        $g.FillRectangle($strokeBrush, 0, 0, 6, $capH)
-        $strokeBrush.Dispose()
-        $featherBrush = New-Object System.Drawing.SolidBrush(
-            [System.Drawing.Color]::FromArgb(80, $capAccent.R, $capAccent.G, $capAccent.B)
-        )
-        $g.FillRectangle($featherBrush, 6, 0, 1, $capH)
-        $featherBrush.Dispose()
-        $tickBrush = New-Object System.Drawing.SolidBrush($script:Penumbra.Ink100)
-        for ($ty = 14; $ty -lt ($capH - 6); $ty += 22) {
-            $g.FillRectangle($tickBrush, 0, $ty, 6, 1)
+            # 5) Left accent rail (6px) with tick perforations
+            $strokeBrush = New-Object System.Drawing.SolidBrush($capAccent)
+            $g.FillRectangle($strokeBrush, 0, 0, 6, $capH)
+            $strokeBrush.Dispose()
+            $featherBrush = New-Object System.Drawing.SolidBrush(
+                [System.Drawing.Color]::FromArgb(80, $capAccent.R, $capAccent.G, $capAccent.B)
+            )
+            $g.FillRectangle($featherBrush, 6, 0, 1, $capH)
+            $featherBrush.Dispose()
+            $tickBrush = New-Object System.Drawing.SolidBrush($capInk100)
+            for ($ty = 14; $ty -lt ($capH - 6); $ty += 22) {
+                $g.FillRectangle($tickBrush, 0, $ty, 6, 1)
+            }
+            $tickBrush.Dispose()
+
+            # 6) L-shaped corner brackets (TR + BL + BR)
+            $bracketLen = 10
+            $bracketPen = New-Object System.Drawing.Pen($capAccent, 1.6)
+            $g.DrawLine($bracketPen, ($capW - $bracketLen - 2), 2, ($capW - 2), 2)
+            $g.DrawLine($bracketPen, ($capW - 2), 2, ($capW - 2), ($bracketLen + 2))
+            $g.DrawLine($bracketPen, ($capW - 2), ($capH - $bracketLen - 2), ($capW - 2), ($capH - 2))
+            $g.DrawLine($bracketPen, ($capW - $bracketLen - 2), ($capH - 2), ($capW - 2), ($capH - 2))
+            $g.DrawLine($bracketPen, 6, ($capH - 2), ($bracketLen + 6), ($capH - 2))
+            $bracketPen.Dispose()
+
+            # 7) Rotating quarter-arc spinner (phosphor) in the top-right
+            $cx = $capW - 32; $cy = 24
+            $arcPen = New-Object System.Drawing.Pen($capAccent, 1.8)
+            $arcPen.StartCap = [System.Drawing.Drawing2D.LineCap]::Round
+            $arcPen.EndCap   = [System.Drawing.Drawing2D.LineCap]::Round
+            $g.DrawArc($arcPen, ($cx - 9), ($cy - 9), 18, 18, $script:ProgressAngle, 130)
+            $arcDimPen = New-Object System.Drawing.Pen(
+                [System.Drawing.Color]::FromArgb(70, $capAccent.R, $capAccent.G, $capAccent.B), 1.2
+            )
+            $g.DrawArc($arcDimPen, ($cx - 9), ($cy - 9), 18, 18, ($script:ProgressAngle + 180), 80)
+            $arcPen.Dispose()
+            $arcDimPen.Dispose()
+
+            # 8) Hz badge in the bottom-right corner (gamer flex)
+            $hzBrush = New-Object System.Drawing.SolidBrush($capFog)
+            $hzSize = $g.MeasureString($capHzText, $capFontTag)
+            $g.DrawString($capHzText, $capFontTag, $hzBrush,
+                ($capW - $hzSize.Width - 16), ($capH - $hzSize.Height - 10))
+            $hzBrush.Dispose()
+        } catch {
+            try {
+                $fallback = New-Object System.Drawing.SolidBrush(
+                    [System.Drawing.Color]::FromArgb(255, 12, 16, 20)
+                )
+                $e.Graphics.FillRectangle($fallback, 0, 0, $capW, $capH)
+                $fallback.Dispose()
+            } catch {}
         }
-        $tickBrush.Dispose()
-
-        # 6) L-shaped corner brackets (TR + BL + BR)
-        $bracketLen = 10
-        $bracketPen = New-Object System.Drawing.Pen($capAccent, 1.6)
-        $g.DrawLine($bracketPen, ($capW - $bracketLen - 2), 2, ($capW - 2), 2)
-        $g.DrawLine($bracketPen, ($capW - 2), 2, ($capW - 2), ($bracketLen + 2))
-        $g.DrawLine($bracketPen, ($capW - 2), ($capH - $bracketLen - 2), ($capW - 2), ($capH - 2))
-        $g.DrawLine($bracketPen, ($capW - $bracketLen - 2), ($capH - 2), ($capW - 2), ($capH - 2))
-        $g.DrawLine($bracketPen, 6, ($capH - 2), ($bracketLen + 6), ($capH - 2))
-        $bracketPen.Dispose()
-
-        # 7) Rotating quarter-arc spinner (phosphor) in the top-right
-        $cx = $capW - 32; $cy = 24
-        $arcPen = New-Object System.Drawing.Pen($capAccent, 1.8)
-        $arcPen.StartCap = [System.Drawing.Drawing2D.LineCap]::Round
-        $arcPen.EndCap   = [System.Drawing.Drawing2D.LineCap]::Round
-        $g.DrawArc($arcPen, ($cx - 9), ($cy - 9), 18, 18, $script:ProgressAngle, 130)
-        $arcDimPen = New-Object System.Drawing.Pen(
-            [System.Drawing.Color]::FromArgb(70, $capAccent.R, $capAccent.G, $capAccent.B), 1.2
-        )
-        $g.DrawArc($arcDimPen, ($cx - 9), ($cy - 9), 18, 18, ($script:ProgressAngle + 180), 80)
-        $arcPen.Dispose()
-        $arcDimPen.Dispose()
-
-        # 8) Hz badge in the bottom-right corner (gamer flex)
-        $hzBrush = New-Object System.Drawing.SolidBrush($script:Penumbra.Fog)
-        $hzSize = $g.MeasureString($script:HzBadgeText, $script:Font_Tag)
-        $g.DrawString($script:HzBadgeText, $script:Font_Tag, $hzBrush,
-            ($capW - $hzSize.Width - 16), ($capH - $hzSize.Height - 10))
-        $hzBrush.Dispose()
     }.GetNewClosure())
 
     # Eyebrow
@@ -1126,6 +1151,8 @@ function Show-ProgressOverlay {
     $progressFill.Location  = New-Object System.Drawing.Point(0, 0)
     $progressFill.Size      = New-Object System.Drawing.Size(0, 2)
     $progressFill.BackColor = [System.Drawing.Color]::Transparent
+    # Same null-safe capture pattern as the form Paint closure above.
+    $capLagoon = $script:Penumbra.Lagoon
     $progressFill.Add_Paint({
         param($s, $e)
         if ($s.Width -le 1) { return }
@@ -1133,14 +1160,14 @@ function Show-ProgressOverlay {
         try {
             $fill = New-Object System.Drawing.Drawing2D.LinearGradientBrush(
                 (New-Object System.Drawing.Rectangle(0, 0, [Math]::Max(2, $s.Width), $s.Height)),
-                [System.Drawing.Color]::FromArgb(180, $script:Penumbra.Lagoon.R, $script:Penumbra.Lagoon.G, $script:Penumbra.Lagoon.B),
-                $script:Penumbra.Lagoon,
+                [System.Drawing.Color]::FromArgb(180, $capLagoon.R, $capLagoon.G, $capLagoon.B),
+                $capLagoon,
                 [System.Drawing.Drawing2D.LinearGradientMode]::Horizontal
             )
             $g.FillRectangle($fill, 0, 0, $s.Width, $s.Height)
             $fill.Dispose()
         } catch {
-            $solid = New-Object System.Drawing.SolidBrush($script:Penumbra.Lagoon)
+            $solid = New-Object System.Drawing.SolidBrush($capLagoon)
             $g.FillRectangle($solid, 0, 0, $s.Width, $s.Height)
             $solid.Dispose()
         }
@@ -1152,7 +1179,7 @@ function Show-ProgressOverlay {
             $g.FillRectangle($sh, $shX, 0, [Math]::Min(60, $s.Width - $shX), $s.Height)
             $sh.Dispose()
         }
-    })
+    }.GetNewClosure())
     $progressTrack.Controls.Add($progressFill)
     $form.Controls.Add($progressTrack)
 

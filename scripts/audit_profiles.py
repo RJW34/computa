@@ -27,8 +27,8 @@ ROOT_DIR = Path(__file__).resolve().parents[1]
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
-from abso.core.applier import ProfileApplier
-from abso.profiles.catalog import PROFILE_CATALOG
+from abso.core.applier import ProfileApplier  # noqa: E402
+from abso.profiles.catalog import PROFILE_CATALOG  # noqa: E402
 
 
 def _fmt_handlers(handlers: list[str]) -> str:

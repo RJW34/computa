@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from abso.profiles.profile_bases import Rivals2BaseProfile
+from abso.profiles.profile_bases import Rivals2BaseProfile, merge_settings_map
 
 
 class Rivals2GSyncProfile(Rivals2BaseProfile):
@@ -27,7 +27,8 @@ class Rivals2GSyncProfile(Rivals2BaseProfile):
     def allow_dual_limiter(self) -> bool:
         # Rivals 2 GameUserSettings.ini is known to be rewritten by the game
         # on exit, so ABSO keeps the NVIDIA driver cap as a safety net in
-        # addition to the in-game cap. Both resolve to refresh - 3.
+        # addition to the in-game cap. Both resolve to the same
+        # refresh-scaled VRR cap.
         return True
 
     @property
@@ -51,12 +52,20 @@ class Rivals2GSyncProfile(Rivals2BaseProfile):
         return False
 
     @property
+    def is_sdr_only(self) -> bool:
+        return True
+
+    @property
     def requires_confirmed_vrr_support(self) -> bool:
         return True
 
     @property
     def include_nvidia_notifications(self) -> bool:
         return True
+
+    @property
+    def mixed_refresh_safe_fallback_profile_id(self) -> str:
+        return "rivals2-offline"
 
     def _settings_overrides(self) -> dict[str, dict[str, Any]]:
         return {
@@ -67,10 +76,13 @@ class Rivals2GSyncProfile(Rivals2BaseProfile):
                 # vrr_fighting_game: LLM on, VSync on (safety net), VRR allow,
                 # threaded opt on, max perf power, shader cache unlimited
                 "preset": "vrr_fighting_game",
-                # Auto-detect refresh rate and cap at refresh-3 for G-SYNC headroom
+                # Auto-detect refresh rate and cap below refresh for G-SYNC headroom
                 "auto_vrr_fps_cap": True,
                 # Ensure G-SYNC is enabled globally
                 "global_vrr_mode": "fullscreen_only",
+                # Keep UE5 driver threading consistent with the no-sync Rivals
+                # lanes; the generic fighting-game preset defaults this on.
+                "threaded_optimization": "off",
             },
             "Rivals2ConfigHandler": {
                 "fullscreen_mode": 0,  # Exclusive fullscreen for best VRR
@@ -126,7 +138,7 @@ class Rivals2GSyncProfile(Rivals2BaseProfile):
             {
                 "category": "NVIDIA Control Panel",
                 "setting": "Max Frame Rate",
-                "value": "Refresh rate - 3 (auto-set by ABSO)",
+                "value": "Refresh-scaled VRR cap (auto-set by ABSO)",
                 "reason": (
                     "ABSO auto-detects your refresh rate and applies the Blur "
                     "Busters 2026 scaled-margin cap (e.g. 285 @ 300Hz, 233 @ "
@@ -149,7 +161,7 @@ class Rivals2GSyncProfile(Rivals2BaseProfile):
             {
                 "category": "In-Game Video",
                 "setting": "Frame Rate Cap",
-                "value": "Refresh rate - 3 (e.g., 297 for 300Hz)",
+                "value": "Refresh-scaled VRR cap (e.g., 285 for 300Hz)",
                 "reason": (
                     "Must cap below refresh for G-SYNC to work properly. "
                     "In-game limiter has lower latency than NVCP/RTSS limiters."
@@ -167,6 +179,42 @@ class Rivals2GSyncProfile(Rivals2BaseProfile):
         ]
 
 
+class Rivals2GSyncHDRProfile(Rivals2GSyncProfile):
+    """Offline G-SYNC Rivals 2 profile with Windows HDR composition enabled."""
+
+    @property
+    def profile_id(self) -> str:
+        return "rivals2-gsync-hdr"
+
+    @property
+    def display_name(self) -> str:
+        return "Rivals 2 - Offline GSYNC HDR"
+
+    @property
+    def description(self) -> str:
+        return (
+            "Offline G-SYNC Rivals 2 profile with Windows HDR composition. "
+            "Keeps the strict VRR path; Rivals 2 native HDR output stays off."
+        )
+
+    @property
+    def is_sdr_only(self) -> bool:
+        return False
+
+    @property
+    def mixed_refresh_safe_fallback_profile_id(self) -> str:
+        return "rivals2-offline-hdr"
+
+    def _settings_overrides(self) -> dict[str, dict[str, Any]]:
+        return merge_settings_map(
+            super()._settings_overrides(),
+            self.HDR_WINDOWS_COMPOSITION_OVERRIDES,
+        )
+
+    def get_in_game_settings(self) -> list[dict[str, str]]:
+        return [*self._rivals2_hdr_guidance(), *super().get_in_game_settings()]
+
+
 class Rivals2OnlineGSyncProfile(Rivals2BaseProfile):
     """Rollback-safe G-SYNC profile for Rivals 2 online play.
 
@@ -179,7 +227,8 @@ class Rivals2OnlineGSyncProfile(Rivals2BaseProfile):
     def allow_dual_limiter(self) -> bool:
         # Same rationale as Rivals2GSyncProfile: UE5 rewrites
         # GameUserSettings.ini on exit, so ABSO keeps the driver cap as a
-        # safety net alongside the in-game cap. Both resolve to refresh - 3.
+        # safety net alongside the in-game cap. Both resolve to the same
+        # refresh-scaled VRR cap.
         return True
 
     @property
@@ -203,6 +252,10 @@ class Rivals2OnlineGSyncProfile(Rivals2BaseProfile):
         return True
 
     @property
+    def is_sdr_only(self) -> bool:
+        return True
+
+    @property
     def allows_aggressive_settings(self) -> bool:
         return False
 
@@ -213,6 +266,10 @@ class Rivals2OnlineGSyncProfile(Rivals2BaseProfile):
     @property
     def include_nvidia_notifications(self) -> bool:
         return True
+
+    @property
+    def mixed_refresh_safe_fallback_profile_id(self) -> str:
+        return "rivals2-online"
 
     def _settings_overrides(self) -> dict[str, dict[str, Any]]:
         return {
@@ -296,8 +353,11 @@ class Rivals2OnlineGSyncProfile(Rivals2BaseProfile):
             {
                 "category": "In-Game Video",
                 "setting": "Frame Rate Cap",
-                "value": "Refresh rate - 3",
-                "reason": "Keeps G-SYNC active. Use in-game cap for lowest limiter latency.",
+                "value": "Refresh-scaled VRR cap",
+                "reason": (
+                    "Keeps G-SYNC active and below the VSync ceiling. Use the "
+                    "in-game cap for lowest limiter latency."
+                ),
             },
             {
                 "category": "Validation",
@@ -306,5 +366,41 @@ class Rivals2OnlineGSyncProfile(Rivals2BaseProfile):
                 "reason": "G-SYNC smooths frame delivery. Conservative priority prevents timing contention.",
             },
         ]
+
+
+class Rivals2OnlineGSyncHDRProfile(Rivals2OnlineGSyncProfile):
+    """Rollback-safe online G-SYNC Rivals 2 profile with Windows HDR composition."""
+
+    @property
+    def profile_id(self) -> str:
+        return "rivals2-online-gsync-hdr"
+
+    @property
+    def display_name(self) -> str:
+        return "Rivals 2 - Online GSYNC HDR"
+
+    @property
+    def description(self) -> str:
+        return (
+            "Rollback-safe online G-SYNC Rivals 2 profile with Windows HDR composition. "
+            "Keeps the strict VRR stability path; Rivals 2 native HDR output stays off."
+        )
+
+    @property
+    def is_sdr_only(self) -> bool:
+        return False
+
+    @property
+    def mixed_refresh_safe_fallback_profile_id(self) -> str:
+        return "rivals2-online-hdr"
+
+    def _settings_overrides(self) -> dict[str, dict[str, Any]]:
+        return merge_settings_map(
+            super()._settings_overrides(),
+            self.HDR_WINDOWS_COMPOSITION_OVERRIDES,
+        )
+
+    def get_in_game_settings(self) -> list[dict[str, str]]:
+        return [*self._rivals2_hdr_guidance(), *super().get_in_game_settings()]
 
 

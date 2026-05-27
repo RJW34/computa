@@ -13,6 +13,10 @@ def _make_applier() -> MagicMock:
     applier = MagicMock()
     applier.PROFILES = {"test-profile": object()}
     applier.validate_profile_prerequisites.return_value = None
+    applier.get_prepared_transition_fallback.return_value = None
+    applier.get_prepared_failure_result.side_effect = lambda profile_id, error: ApplyResult(
+        success=False, error=error
+    )
     return applier
 
 
@@ -40,6 +44,14 @@ def _incomplete_restore_summary(*, blocking: bool) -> MagicMock:
     return summary
 
 
+def _non_critical_compliance_report() -> MagicMock:
+    report = MagicMock()
+    report.has_critical = False
+    report.warnings = []
+    report.to_dict.return_value = {"summary": {"critical": 0, "warning": 0}}
+    return report
+
+
 def test_transaction_commits_on_success_without_backup(tmp_path: Path) -> None:
     applier = _make_applier()
     applier.apply_profile.return_value = ApplyResult(
@@ -56,6 +68,79 @@ def test_transaction_commits_on_success_without_backup(tmp_path: Path) -> None:
     assert tx.rollback_performed is False
     assert any(cp.phase == "backup" and cp.status == "skipped" for cp in tx.checkpoints)
     assert any(cp.phase == "commit" and cp.status == "ok" for cp in tx.checkpoints)
+
+
+def test_transaction_does_not_rollback_failed_noop_handlers(tmp_path: Path) -> None:
+    """A later failure should not restore backups if prior successes were proven no-ops."""
+    applier = _make_applier()
+    applier.apply_profile.return_value = ApplyResult(
+        success=False,
+        error="late handler failure",
+        applied_settings=["WindowsSettingsHandler"],
+        changed_settings=[],
+        failed_settings=["NvidiaSettingsHandler: failed"],
+    )
+    applier.verify_profile.return_value = {"all_active": False, "handlers": {}}
+    compliance = MagicMock()
+    compliance.evaluate.return_value = _non_critical_compliance_report()
+
+    with patch("abso.core.transaction.BackupManager") as mock_backup_cls:
+        rollback_manager = MagicMock()
+        rollback_manager.create_backup.return_value = "rollback-123"
+        restore_manager = MagicMock()
+        restore_manager.get_baseline_backup.return_value = None
+        backup_manager = MagicMock()
+        backup_manager.create_backup.return_value = "backup-123"
+        mock_backup_cls.side_effect = [rollback_manager, restore_manager, backup_manager]
+
+        manager = ProfileTransactionManager(
+            tmp_path,
+            applier=applier,
+            compliance_engine=compliance,
+        )
+        tx = manager.execute("test-profile", create_backup=True)
+
+    rollback_manager.restore_backup.assert_not_called()
+    assert tx.rollback_performed is False
+    assert tx.state == "failed"
+    assert tx.error == "late handler failure"
+
+
+def test_transaction_rolls_back_failed_mutating_handlers(tmp_path: Path) -> None:
+    """Partial apply rollback still fires when a successful handler changed state."""
+    applier = _make_applier()
+    applier.apply_profile.return_value = ApplyResult(
+        success=False,
+        error="late handler failure",
+        applied_settings=["WindowsSettingsHandler"],
+        changed_settings=["WindowsSettingsHandler.hdr"],
+        failed_settings=["NvidiaSettingsHandler: failed"],
+    )
+    applier.verify_profile.return_value = {"all_active": False, "handlers": {}}
+    compliance = MagicMock()
+    compliance.evaluate.return_value = _non_critical_compliance_report()
+
+    with patch("abso.core.transaction.BackupManager") as mock_backup_cls:
+        rollback_manager = MagicMock()
+        rollback_manager.create_backup.return_value = "rollback-123"
+        rollback_manager.restore_backup.return_value = _complete_restore_summary()
+        restore_manager = MagicMock()
+        restore_manager.get_baseline_backup.return_value = None
+        backup_manager = MagicMock()
+        backup_manager.create_backup.return_value = "backup-123"
+        mock_backup_cls.side_effect = [rollback_manager, restore_manager, backup_manager]
+
+        manager = ProfileTransactionManager(
+            tmp_path,
+            applier=applier,
+            compliance_engine=compliance,
+        )
+        tx = manager.execute("test-profile", create_backup=True)
+
+    rollback_manager.restore_backup.assert_called_once_with("rollback-123")
+    assert tx.rollback_performed is True
+    assert tx.state == "rolled_back"
+    assert "Partial apply failure" in (tx.error or "")
 
 
 def test_transaction_rolls_back_on_critical_when_backup_available(tmp_path: Path) -> None:
@@ -115,10 +200,7 @@ def test_transaction_restores_baseline_before_apply(tmp_path: Path) -> None:
         tx = manager.execute("test-profile", create_backup=True)
 
         restore_manager.restore_backup.assert_called_once_with("old-backup")
-        assert any(
-            cp.phase == "baseline_restore" and cp.status == "ok"
-            for cp in tx.checkpoints
-        )
+        assert any(cp.phase == "baseline_restore" and cp.status == "ok" for cp in tx.checkpoints)
         assert tx.success is True
 
 
@@ -145,8 +227,7 @@ def test_transaction_skips_baseline_restore_when_no_backups(tmp_path: Path) -> N
 
         restore_manager.restore_backup.assert_not_called()
         assert any(
-            cp.phase == "baseline_restore" and cp.status == "skipped"
-            for cp in tx.checkpoints
+            cp.phase == "baseline_restore" and cp.status == "skipped" for cp in tx.checkpoints
         )
         assert tx.success is True
 
@@ -192,7 +273,9 @@ def test_transaction_fails_when_baseline_restore_raises(tmp_path: Path) -> None:
         manager = ProfileTransactionManager(tmp_path, applier=applier)
         tx = manager.execute("test-profile", create_backup=True)
 
-        assert any(cp.phase == "baseline_restore" and cp.status == "failed" for cp in tx.checkpoints)
+        assert any(
+            cp.phase == "baseline_restore" and cp.status == "failed" for cp in tx.checkpoints
+        )
         applier.apply_profile.assert_not_called()
         assert tx.success is False
 
@@ -247,7 +330,9 @@ def test_transaction_fails_for_blocking_baseline_restore_gaps(tmp_path: Path) ->
         manager = ProfileTransactionManager(tmp_path, applier=applier)
         tx = manager.execute("test-profile", create_backup=True)
 
-        assert any(cp.phase == "baseline_restore" and cp.status == "failed" for cp in tx.checkpoints)
+        assert any(
+            cp.phase == "baseline_restore" and cp.status == "failed" for cp in tx.checkpoints
+        )
         applier.apply_profile.assert_not_called()
         backup_manager.create_backup.assert_not_called()
         assert tx.success is False
@@ -334,4 +419,92 @@ def test_transaction_rejects_capability_blocker_before_touching_backups(tmp_path
     assert tx.error == (
         "This profile requires at least one HDR-capable active display, but none were detected."
     )
+    assert tx.apply_result is not None
+    assert tx.apply_result.error == tx.error
+    assert any(cp.phase == "validate" and cp.status == "failed" for cp in tx.checkpoints)
+
+
+def test_transaction_retries_capability_blocker_fallback_before_backups(tmp_path: Path) -> None:
+    applier = _make_applier()
+    applier.PROFILES = {"strict-profile": object(), "safe-profile": object()}
+    blocker = (
+        "This fullscreen-only VRR profile is blocked because the active display "
+        "path has 2 monitors with mixed refresh rates."
+    )
+
+    def validate(profile_id: str) -> str | None:
+        if profile_id == "strict-profile":
+            return blocker
+        return None
+
+    def prepared_fallback(profile_id: str) -> str | None:
+        if profile_id == "strict-profile":
+            return "safe-profile"
+        return None
+
+    applier.validate_profile_prerequisites.side_effect = validate
+    applier.get_prepared_transition_fallback.side_effect = prepared_fallback
+    applier.apply_profile.return_value = ApplyResult(
+        success=True,
+        applied_settings=["WindowsSettingsHandler"],
+    )
+    applier.verify_profile.return_value = {"all_active": True, "handlers": {}}
+
+    with patch("abso.core.transaction.BackupManager") as mock_backup_cls:
+        rollback_manager = MagicMock()
+        rollback_manager.create_backup.return_value = "rollback-safe"
+        restore_manager = MagicMock()
+        restore_manager.get_baseline_backup.return_value = None
+        backup_manager = MagicMock()
+        backup_manager.create_backup.return_value = "backup-safe"
+        mock_backup_cls.side_effect = [rollback_manager, restore_manager, backup_manager]
+
+        manager = ProfileTransactionManager(tmp_path, applier=applier)
+        tx = manager.execute("strict-profile", create_backup=True)
+
+    assert tx.success is True
+    assert tx.profile_id == "safe-profile"
+    assert tx.requested_profile_id == "strict-profile"
+    assert tx.fallback_chain == [
+        {"from": "strict-profile", "to": "safe-profile", "reason": blocker}
+    ]
+    applier.apply_profile.assert_called_once_with("safe-profile")
+    rollback_manager.create_backup.assert_called_once_with(
+        profile_id="safe-profile",
+        backup_type="pre_switch",
+    )
+    backup_manager.create_backup.assert_called_once_with(
+        profile_id="safe-profile",
+        backup_type="pre_apply",
+    )
+    assert any(cp.phase == "fallback" and cp.status == "ok" for cp in tx.checkpoints)
+
+
+def test_transaction_can_fail_capability_blocker_without_fallback(tmp_path: Path) -> None:
+    applier = _make_applier()
+    applier.PROFILES = {"strict-profile": object(), "safe-profile": object()}
+    blocker = (
+        "This fullscreen-only VRR profile is blocked because the active display "
+        "path has 2 monitors with mixed refresh rates."
+    )
+    applier.validate_profile_prerequisites.return_value = blocker
+    applier.get_prepared_transition_fallback.return_value = "safe-profile"
+
+    with patch("abso.core.transaction.BackupManager") as mock_backup_cls:
+        manager = ProfileTransactionManager(tmp_path, applier=applier)
+        tx = manager.execute(
+            "strict-profile",
+            create_backup=True,
+            allow_capability_fallback=False,
+        )
+
+    mock_backup_cls.assert_not_called()
+    applier.apply_profile.assert_not_called()
+    assert tx.success is False
+    assert tx.profile_id == "strict-profile"
+    assert tx.requested_profile_id == "strict-profile"
+    assert tx.fallback_chain == []
+    assert tx.error == blocker
+    assert tx.apply_result is not None
+    assert tx.apply_result.error == blocker
     assert any(cp.phase == "validate" and cp.status == "failed" for cp in tx.checkpoints)

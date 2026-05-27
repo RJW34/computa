@@ -17,11 +17,12 @@ from rich.prompt import Confirm, Prompt
 from rich.table import Table
 from rich.text import Text
 
+from abso.core.app_paths import app_data_dir
 from abso.core.applier import ProfileApplier
 from abso.core.auditor import ConfigurationAuditor
-from abso.core.backup import BackupManager
 from abso.core.detector import HardwareDetector
 from abso.core.kb_checker import check_problematic_kbs, get_installed_kbs, uninstall_kb
+from abso.core.transaction import ProfileTransactionManager
 
 console = Console()
 
@@ -31,11 +32,8 @@ def _get_data_dir() -> Path:
     import sys
 
     if getattr(sys, "frozen", False):
-        app_data = Path.home() / "AppData" / "Local" / "AdaptiveBattleStationOptimizer"
-        app_data.mkdir(parents=True, exist_ok=True)
-        return app_data
-    else:
-        return Path(__file__).parent.parent.parent
+        return app_data_dir(create=True)
+    return Path(__file__).parent.parent.parent
 
 
 def _get_state_file() -> Path:
@@ -349,33 +347,29 @@ class SetupWizard:
             TextColumn("[progress.description]{task.description}"),
             console=console,
         ) as progress:
-            # Backup
-            backup_task = progress.add_task("Creating backup...", total=None)
-            backup_manager = BackupManager(self.backups_dir)
-            backup_id = backup_manager.create_backup()
-            progress.update(backup_task, description=f"[green]Backup created: {backup_id}[/green]")
-            progress.stop_task(backup_task)
-
-            # Apply
-            apply_task = progress.add_task(f"Applying {profile_id}...", total=None)
-            applier = ProfileApplier()
+            apply_task = progress.add_task(f"Running transactional apply for {profile_id}...", total=None)
+            tx_manager = ProfileTransactionManager(self.backups_dir)
             try:
-                result = applier.apply_profile(profile_id)
-                if result.success:
-                    progress.update(apply_task, description=f"[green]Profile applied: {profile_id}[/green]")
-                    self.profile_applied = profile_id
+                tx = tx_manager.execute(profile_id=profile_id, create_backup=True)
+                result = tx.apply_result
+                actual_profile_id = tx.profile_id or profile_id
+                if tx.success and result and result.success:
+                    progress.update(
+                        apply_task,
+                        description=f"[green]Profile applied: {actual_profile_id}[/green]",
+                    )
+                    self.profile_applied = actual_profile_id
 
                     # Save state
                     state = {
-                        "current_profile": profile_id,
+                        "current_profile": actual_profile_id,
                         "applied_at": datetime.now().isoformat(),
+                        "reboot_pending": result.requires_reboot,
+                        "reboot_reasons": result.reboot_reasons,
                         "setup_completed": True,
                     }
                     try:
-                        self.state_file.parent.mkdir(parents=True, exist_ok=True)
-                        tmp = self.state_file.with_suffix(".tmp")
-                        tmp.write_text(json.dumps(state, indent=2))
-                        os.replace(tmp, self.state_file)
+                        self._write_setup_state(state)
                     except Exception as e:
                         logging.getLogger(__name__).error(f"Failed to save state: {e}")
 
@@ -383,13 +377,30 @@ class SetupWizard:
                         self.needs_reboot = True
                         self.reboot_reasons.append("Profile settings (HAGS, etc.)")
                 else:
-                    progress.update(apply_task, description=f"[red]Failed: {result.error}[/red]")
+                    error = tx.error or (result.error if result else "Unknown transaction error")
+                    progress.update(apply_task, description=f"[red]Failed: {error}[/red]")
             except Exception as e:
                 progress.update(apply_task, description=f"[red]Error: {e}[/red]")
 
             progress.stop_task(apply_task)
 
         console.print()
+
+    def _write_setup_state(self, state: dict) -> None:
+        """Write setup state through the shared active-profile state mirror."""
+        try:
+            from abso.main import STATE_FILE, _write_state_snapshot
+
+            if self.state_file.resolve() == STATE_FILE.resolve():
+                _write_state_snapshot(state)
+                return
+        except Exception:
+            pass
+
+        self.state_file.parent.mkdir(parents=True, exist_ok=True)
+        tmp = self.state_file.with_suffix(".tmp")
+        tmp.write_text(json.dumps(state, indent=2), encoding="utf-8")
+        os.replace(tmp, self.state_file)
 
     def _print_summary(self) -> None:
         lines = []

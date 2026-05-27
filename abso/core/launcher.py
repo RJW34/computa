@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import subprocess
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 from abso.core.backup import BackupManager
 from abso.core.exceptions import LaunchTargetNotFoundError, ProfileLaunchError
@@ -49,6 +50,8 @@ class LaunchResult:
     success: bool
     profile_id: str
     transaction: TransactionResult
+    requested_profile_id: str | None = None
+    fallback_chain: list[dict[str, str]] = field(default_factory=list)
     target: LaunchTarget | None = None
     launched: bool = False
     process_id: int | None = None
@@ -65,6 +68,9 @@ class LaunchResult:
         return {
             "success": self.success,
             "profile_id": self.profile_id,
+            "requested_profile_id": self.requested_profile_id,
+            "fallback_applied": bool(self.fallback_chain),
+            "fallback_chain": list(self.fallback_chain),
             "launched": self.launched,
             "process_id": self.process_id,
             "wait_requested": self.wait_requested,
@@ -199,7 +205,7 @@ def launch_profile(
     popen_factory: Callable[..., subprocess.Popen[Any]] = subprocess.Popen,
 ) -> LaunchResult:
     """Apply profile, launch target executable, and optionally restore on exit."""
-    canonical_profile_id = resolve_profile_id(profile_id) or profile_id
+    requested_profile_id = resolve_profile_id(profile_id) or profile_id
     if restore_on_exit and not wait:
         raise ProfileLaunchError(
             "restore_on_exit requires wait=True",
@@ -212,10 +218,15 @@ def launch_profile(
         )
 
     tx_manager = transaction_manager or ProfileTransactionManager(backup_dir)
-    tx = tx_manager.execute(profile_id=canonical_profile_id, create_backup=create_backup)
+    tx = tx_manager.execute(profile_id=requested_profile_id, create_backup=create_backup)
+    actual_profile_id = tx.profile_id or requested_profile_id
+    raw_fallback_chain = getattr(tx, "fallback_chain", None)
+    fallback_chain = raw_fallback_chain if isinstance(raw_fallback_chain, list) else []
     result = LaunchResult(
         success=False,
-        profile_id=canonical_profile_id,
+        profile_id=actual_profile_id,
+        requested_profile_id=requested_profile_id,
+        fallback_chain=fallback_chain,
         transaction=tx,
         wait_requested=wait,
     )
@@ -225,7 +236,7 @@ def launch_profile(
         return result
 
     try:
-        target = resolve_launch_target(profile_id=canonical_profile_id, launch_path=launch_path)
+        target = resolve_launch_target(profile_id=actual_profile_id, launch_path=launch_path)
     except LaunchTargetNotFoundError as e:
         result.error = str(e)
         if restore_on_exit and tx.backup_id:
@@ -267,6 +278,74 @@ def launch_profile(
     if restore_on_exit and not result.restored:
         result.success = False
     elif result.exit_code not in (None, 0):
+        result.warnings.append(f"Process exited with code {result.exit_code}.")
+
+    return result
+
+
+def launch_profile_without_apply(
+    profile_id: str,
+    *,
+    wait: bool = True,
+    launch_path: Path | None = None,
+    launch_args: list[str] | None = None,
+    popen_factory: Callable[..., subprocess.Popen[Any]] = subprocess.Popen,
+) -> LaunchResult:
+    """Launch a profile target when live verification already proved it active."""
+    profile_id = resolve_profile_id(profile_id) or profile_id
+    tx = TransactionResult(
+        success=True,
+        profile_id=profile_id,
+        requested_profile_id=profile_id,
+        state="skipped_apply",
+    )
+    tx.add_checkpoint(
+        "apply",
+        "skipped",
+        "Profile already verified active; launch skipped redundant apply.",
+    )
+    result = LaunchResult(
+        success=False,
+        profile_id=profile_id,
+        requested_profile_id=profile_id,
+        transaction=tx,
+        wait_requested=wait,
+    )
+
+    try:
+        target = resolve_launch_target(profile_id=profile_id, launch_path=launch_path)
+    except LaunchTargetNotFoundError as e:
+        result.error = str(e)
+        return result
+
+    result.target = target
+    result.warnings.extend(target.warnings)
+
+    args = [str(target.executable_path), *(launch_args or [])]
+    try:
+        process = popen_factory(
+            args,
+            cwd=str(target.executable_path.parent),
+        )
+    except OSError as e:
+        result.error = f"Launch failed: {e}"
+        return result
+
+    result.launched = True
+    result.process_id = process.pid
+    result.success = True
+
+    if not wait:
+        return result
+
+    try:
+        result.exit_code = process.wait()
+    except Exception as e:  # pragma: no cover - defensive wait handling
+        result.error = f"Failed while waiting for process exit: {e}"
+        result.success = False
+        return result
+
+    if result.exit_code not in (None, 0):
         result.warnings.append(f"Process exited with code {result.exit_code}.")
 
     return result

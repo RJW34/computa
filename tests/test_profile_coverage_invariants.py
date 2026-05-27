@@ -40,10 +40,8 @@ import pytest
 # is collected first (the production CLI entry side-steps it by going
 # through main()).
 import abso.main  # noqa: F401
-
 from abso.profiles.catalog import get_profile_instances
 from abso.settings.nvidia.presets import NVIDIA_PRESETS
-
 
 # Keys consumed by the NVIDIA handler via preset expansion or the
 # DRSProfileManager dispatch, which the heuristic source scanner can't
@@ -103,9 +101,9 @@ def _handler_known_keys(handler_obj: Any) -> set[str]:
         ):
             m = getattr(c, attr_name, None)
             if isinstance(m, dict):
-                keys.update(str(k) for k in m.keys())
+                keys.update(str(k) for k in m)
         bs = getattr(c, "BOOL_SETTINGS", None)
-        if isinstance(bs, (set, frozenset, list, tuple)):
+        if isinstance(bs, set | frozenset | list | tuple):
             keys.update(str(k) for k in bs)
 
         for _name, fn in vars(c).items():
@@ -169,7 +167,7 @@ def _settings_handler_names(profile: Any) -> set[str]:
         except Exception:
             continue
         if isinstance(payload, dict):
-            names.update(str(k) for k in payload.keys())
+            names.update(str(k) for k in payload)
     return names
 
 
@@ -264,7 +262,7 @@ def test_no_unknown_setting_keys(profiles_by_id) -> None:
             if not known:
                 # Couldn't introspect — skip rather than false-positive.
                 continue
-            for key in settings.keys():
+            for key in settings:
                 if key in known:
                     continue
                 failures.append(
@@ -433,7 +431,6 @@ def test_non_capture_profiles_still_kill_capture_stack(profiles_by_id) -> None:
     latency win - that's their entire reason for not being marked
     capture-safe.
     """
-    from abso.core.process_janitor import CAPTURE_ALLOWED_IMAGES
 
     failures: list[str] = []
     for profile_id, profile in profiles_by_id.items():

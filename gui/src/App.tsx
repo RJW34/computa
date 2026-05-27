@@ -30,7 +30,13 @@ function App() {
     const syncBackendState = async () => {
       try {
         const state = await api.getCurrentState();
-        setActiveProfile(state.current_profile, state.applied_at ?? undefined);
+        setActiveProfile(
+          state.current_profile,
+          state.applied_at ?? undefined,
+          state.verification ?? null,
+          state.reboot_pending,
+          state.reboot_reasons
+        );
       } catch (error) {
         console.warn('Failed to sync backend active-profile state:', error);
       }

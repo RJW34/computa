@@ -19,6 +19,7 @@ app can poll state without a full IPC channel.  Status values:
 from __future__ import annotations
 
 import argparse
+import contextlib
 import json
 import logging
 import os
@@ -62,10 +63,8 @@ def _write_final_status(process_name: str, reason: str) -> None:
         "status": "released",
         "exit_reason": reason,
     }
-    try:
+    with contextlib.suppress(Exception):
         STATUS_FILE.write_text(json.dumps(payload, indent=2), encoding="utf-8")
-    except Exception:
-        pass
 
 
 def main(

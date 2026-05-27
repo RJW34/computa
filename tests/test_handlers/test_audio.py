@@ -228,7 +228,7 @@ class TestAudioPrivateMethods:
             mock_query.return_value = (0, 1)  # Not active device
 
             handler = AudioSettingsHandler()
-            result = handler._get_audio_enhancements_disabled()
+            handler._get_audio_enhancements_disabled()
 
             # Should try to enumerate devices
             mock_enum.assert_called()

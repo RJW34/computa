@@ -215,6 +215,10 @@ def test_strict_profiles_advertise_overlay_free_path_in_manifest() -> None:
         "overwatch2-gsync-hdr",
         "deadlock-gsync",
         "deadlock-gsync-hdr",
+        "rivals2-gsync",
+        "rivals2-gsync-hdr",
+        "rivals2-online-gsync",
+        "rivals2-online-gsync-hdr",
     }
     for pid in strict_ids:
         assert manifest[pid]["requires_overlay_free_path"] is True, pid

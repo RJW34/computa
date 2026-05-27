@@ -265,13 +265,27 @@ def run_apply_profile(profile_id: str) -> None:
     console.print()
 
     result = tx.apply_result
+    tx_profile_id = getattr(tx, "profile_id", None)
+    actual_profile_id = (
+        tx_profile_id
+        if isinstance(tx_profile_id, str) and tx_profile_id.strip()
+        else profile_id
+    )
+    fallback_chain = getattr(tx, "fallback_chain", None)
+    fallback_applied = isinstance(fallback_chain, list) and bool(fallback_chain)
+    fallback_note = ""
+    if fallback_applied and actual_profile_id != profile_id:
+        fallback_note = (
+            f"\n[yellow]Requested '{profile_id}' was blocked; "
+            f"applied safe fallback '{actual_profile_id}' instead.[/yellow]\n"
+        )
 
     if tx.success and result and result.success:
         try:
             from abso.main import set_current_profile
 
             set_current_profile(
-                profile_id,
+                actual_profile_id,
                 requires_reboot=result.requires_reboot,
                 reboot_reasons=result.reboot_reasons,
             )
@@ -279,9 +293,10 @@ def run_apply_profile(profile_id: str) -> None:
             console.print(f"[yellow]Warning:[/yellow] Could not persist active profile state: {e}")
 
         console.print(Panel(
-            f"[green]Profile '{profile_id}' apply completed.[/green]\n\n"
+            f"[green]Profile '{actual_profile_id}' apply completed.[/green]\n"
+            f"{fallback_note}\n"
             f"[dim]Backup ID: {tx.backup_id or 'not created'}[/dim]\n"
-            f"[dim]Run 'abso verify {profile_id}' to confirm handler state.[/dim]\n"
+            f"[dim]Run 'abso verify {actual_profile_id}' to confirm handler state.[/dim]\n"
             f"[dim]Use 'Restore Backup' to undo changes if needed.[/dim]",
             title="[green]Apply Completed[/green]",
             border_style="green"
@@ -321,7 +336,7 @@ def run_apply_profile(profile_id: str) -> None:
         console.print()
         if Confirm.ask("Generate in-game settings recommendations?", default=True):
             REPORTS_DIR.mkdir(parents=True, exist_ok=True)
-            report_path = applier.generate_report(profile_id, REPORTS_DIR)
+            report_path = applier.generate_report(actual_profile_id, REPORTS_DIR)
             console.print(f"[green]\u2713[/green] Report saved to: [cyan]{report_path}[/cyan]")
 
     console.print()

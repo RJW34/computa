@@ -57,6 +57,11 @@ export interface Profile {
   tray_category?: string;
   tray_subtitle?: string;
   tray_description?: string;
+  tray_group?: string;
+  tray_group_name?: string;
+  tray_variant?: string;
+  tray_rank?: number;
+  tray_visible?: boolean;
   sync_mode?: 'on' | 'off' | 'agnostic';
 }
 
@@ -161,11 +166,23 @@ export interface ComplianceSummary {
   issues: ComplianceIssue[];
 }
 
+export interface BackendStateVerification {
+  checked_at: string;
+  profile: string;
+  all_active: boolean;
+  status: 'active' | 'pending_apply' | 'pending_reboot' | 'mismatch' | 'error';
+  pending_apply_settings: string[];
+  pending_reboot_gated_settings: string[];
+  mismatched_handlers: string[];
+  error?: string;
+}
+
 export interface BackendState {
   current_profile: string | null;
   applied_at: string | null;
   reboot_pending: boolean;
   reboot_reasons: string[];
+  verification?: BackendStateVerification;
 }
 
 export interface ApplyResult {

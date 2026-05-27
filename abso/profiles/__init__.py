@@ -30,11 +30,13 @@ from abso.profiles.productivity_oled import ProductivityOLEDProfile
 from abso.profiles.rivals2 import Rivals2Profile
 from abso.profiles.rivals2_300hz_max import Rivals2_300HzMaxProfile
 from abso.profiles.rivals2_gsync import (
+    Rivals2GSyncHDRProfile,
     Rivals2GSyncProfile,
+    Rivals2OnlineGSyncHDRProfile,
     Rivals2OnlineGSyncProfile,
 )
-from abso.profiles.rivals2_offline import Rivals2OfflineProfile
-from abso.profiles.rivals2_online import Rivals2OnlineProfile
+from abso.profiles.rivals2_offline import Rivals2OfflineHDRProfile, Rivals2OfflineProfile
+from abso.profiles.rivals2_online import Rivals2OnlineHDRProfile, Rivals2OnlineProfile
 from abso.profiles.ryujinx_ssbu import RyujinxSSBUProfile
 from abso.profiles.slippi_melee import (
     SlippiMeleeConsoleParityHDRProfile,
@@ -55,10 +57,14 @@ __all__ = [
     "SlippiMeleeUniversalHDRProfile",
     "Rivals2Profile",
     "Rivals2OfflineProfile",
+    "Rivals2OfflineHDRProfile",
     "Rivals2OnlineProfile",
+    "Rivals2OnlineHDRProfile",
     "Rivals2_300HzMaxProfile",
     "Rivals2GSyncProfile",
+    "Rivals2GSyncHDRProfile",
     "Rivals2OnlineGSyncProfile",
+    "Rivals2OnlineGSyncHDRProfile",
     "Diablo4Profile",
     "Diablo4SDRProfile",
     "FortniteProfile",

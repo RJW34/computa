@@ -2,15 +2,19 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-> **Read [`docs/AGENT_PROTOCOL.md`](docs/AGENT_PROTOCOL.md) first.** That
-> document is the single forward-looking source of truth for: reading
-> order, machine roles, live-PC test policy, the patterns introduced by
-> recent refactors (central handler registry, `is_critical_verify`,
-> `OsRelease`, `hardware_db`, KB checker discipline, detect-only
-> handlers for feature-flag rollouts), the current open backlog, and
-> the cp1252 console-encoding rules for user-visible strings.
-> Everything below is the short-form summary; the protocol document is
-> the authoritative spec.
+> **Freshly cloned onto a new PC? Read
+> [`docs/NEW_MACHINE_SETUP.md`](docs/NEW_MACHINE_SETUP.md) first** — it explains
+> what ABSO is, how to set up the dev environment, how to establish this
+> machine's real state, and why the live-state docs may describe a different box.
+>
+> **On an already-configured machine, read
+> [`docs/CURRENT_AGENT_BRIEFING.md`](docs/CURRENT_AGENT_BRIEFING.md) first, then
+> [`docs/AGENT_PROTOCOL.md`](docs/AGENT_PROTOCOL.md).** The briefing is the
+> live-machine truth for the active profile, installed build, monitor-flicker
+> status, LocalAppData deployment state, and reboot-gated work — but it is
+> machine-specific; on a fresh clone its live-state claims are history until
+> re-verified. The protocol is the durable workflow and architecture guide.
+> Everything below is a short-form orientation, not the authoritative source.
 
 ## Project Overview
 
@@ -25,20 +29,16 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Available Profiles
 
-- **slippi-melee** / **slippi-melee-console-parity** / **slippi-melee-universal** — Slippi Dolphin (SSBM) variants
-- **slippi-melee-hdr** / **slippi-melee-console-parity-hdr** / **slippi-melee-universal-hdr** — Slippi variants with Windows HDR on for eye-strain relief (Dolphin renders SDR through the HDR composition path)
-- **rivals2-offline** / **rivals2-online** — Rivals 2 no-sync offline vs rollback-safe online
-- **rivals2-gsync** / **rivals2-online-gsync** — Rivals 2 VRR lanes (offline vs online)
-- **fortnite** / **fortnite-hdr** — Fortnite Reflex path
-- **marvel-rivals-sdr** / **marvel-rivals-hdr** — Marvel Rivals Reflex path
-- **overwatch2** / **overwatch2-hdr** — OW2 no-sync lanes (SDR / HDR) for absolute minimum latency
-- **overwatch2-gsync** / **overwatch2-gsync-hdr** — Strict fullscreen G-SYNC lanes (SDR / HDR)
-- **overwatch2-gsync-capture** / **overwatch2-gsync-hdr-capture** — Borderless OW2 G-SYNC for capture/overlay workflows
-- **diablo4** / **diablo4-sdr** — Diablo 4 (balanced ARPG)
-- **pokemon-auto-chess** — Browser game optimization
-- **pacdeluxe** — Tauri client optimization
-- **productivity** — Non-gaming desktop work
-- **ryujinx-ssbu** — Switch emulation (SSBU)
+Do not keep a hand-written profile list in sync here. Use:
+
+```bash
+python -m abso profiles
+```
+
+The current catalog includes Desktop/Productivity, Rivals 2, Slippi Melee,
+Ryujinx SSBU, Deadlock, Fortnite, Marvel Rivals, Overwatch 2, Diablo 4,
+Pokemon Auto Chess, and PACDeluxe families, with SDR/HDR, no-sync, G-SYNC, and
+capture-safe variants where supported.
 
 ## Build & Run Commands
 
@@ -54,12 +54,22 @@ python -m abso audit               # Configuration audit
 python -m abso audit --verbose     # Detailed audit
 python -m abso apply <profile>     # Apply game profile
 python -m abso apply <profile> --no-backup  # Skip backup (not recommended)
+python -m abso state --json --verify
+python -m abso health --json
+python -m abso health --json --full-verify
+python -m abso health --json --full-backups
+python -m abso apply-pending <profile> --json
 python -m abso restore latest      # Restore last backup
 python -m abso profiles            # List available profiles
+
+# Local installed runtime deploy
+.\.venv\Scripts\python.exe build.py deploy             # Build CLI, then deploy to LocalAppData
+.\.venv\Scripts\python.exe build.py deploy-existing    # Deploy current dist\abso.exe
 
 # Run tests
 pytest tests/
 pytest tests/test_detector.py -v      # Single test file
+ruff check .
 
 # Tray app (PowerShell, requires admin)
 powershell -File abso\tray\ABSO-Tray.ps1
@@ -74,10 +84,16 @@ abso/
 │   ├── detector.py         # Hardware detection (WMI, nvidia-smi, pynvml)
 │   ├── auditor.py          # Scans settings, compares to optimal
 │   ├── applier.py          # Applies profile settings with validation pipeline
+│   ├── app_paths.py        # Installed LocalAppData path helpers
 │   ├── backup.py           # Timestamped backup/restore system
+│   ├── backup_actions.py   # Shared backup command actions
 │   ├── compliance.py       # Post-apply compliance / severity escalation
 │   ├── capabilities.py     # Profile preflight: VRR / HDR / OS-build / monitor checks
 │   ├── handler_registry.py # Central HandlerEntry registry (audit + backup tags)
+│   ├── pending_apply.py    # Narrow targeted remediation path
+│   ├── profile_status.py   # Shared state/verify summaries
+│   ├── state_reconcile.py  # Reboot-pending reconciliation
+│   ├── state_store.py      # Active-profile state read/write helpers
 │   ├── kb_checker.py       # Known-bad Windows updates + supersession tracking
 │   ├── bios_detector.py    # BIOS/firmware + Secure Boot cert state
 │   ├── linter.py           # ProfileLinter - static validation
@@ -147,6 +163,11 @@ pipelines pick it up automatically.
 4. StabilityGate (gate aggressive settings)
 5. NetworkScopeManager (per-game network tuning)
 
+**Targeted Pending Apply** — `apply-pending` is the safe repair path when
+`state --json --verify` reports supported missing settings. It must stay
+narrow: no full backup/baseline/display reset path, and no repeated full apply
+when the active profile is already verified.
+
 ## Critical Constraints
 
 1. **Always backup before apply** — Never modify system state without creating a restore point first (use `--no-backup` flag only if you understand the risks)
@@ -154,6 +175,18 @@ pipelines pick it up automatically.
 3. **Fail gracefully** — Registry/WMI errors must not crash the tool; log and continue
 4. **Idempotent operations** — Applying the same profile twice must be safe
 5. **Online safety** — Profiles with `is_online_profile=True` have stricter validation
+6. **Live monitor-flicker safety** — On this PC, do not run full profile apply,
+   live display reset, HDR cycling, DWM restart, or driver reset just because
+   the secondary monitor flickers. Read the current briefing first.
+7. **Local deploy discipline** — Use `.\.venv\Scripts\python.exe build.py
+   deploy` or `.\.venv\Scripts\python.exe build.py deploy-existing` so the
+   backend, installed GUI executable, GUI sidecars, tray assets, config, and
+   backup mirror stay aligned in LocalAppData. After tray script changes,
+   `health --json` may warn `tray_runtime_marker` until the live tray restarts
+   and writes its installed-script hash marker.
+8. **Hermetic mutation tests** — Tests that invoke restore/apply/launch paths
+   must redirect `STATE_FILE`, `_state_file_targets`, or `LOCALAPPDATA` to
+   `tmp_path`; never let tests mutate this PC's real LocalAppData state.
 
 ## Technical Notes
 
@@ -166,7 +199,10 @@ pipelines pick it up automatically.
 ### Windows Settings
 - HAGS (`HwSchMode` registry key): Game-dependent, make per-profile
 - VBS/Memory Integrity: Requires reboot after change
-- Fullscreen optimizations: Disable per-executable via AppCompatFlags
+- Fullscreen optimizations: Tune per-executable via AppCompatFlags
+- MPO changes are registry-target writes that only become live after reboot;
+  verification can prove the target is written, not that DWM has committed the
+  compositor path before reboot.
 
 ### Registry Paths
 - Game priority: `HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Multimedia\SystemProfile\Tasks\Games`

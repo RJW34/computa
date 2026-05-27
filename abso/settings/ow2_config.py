@@ -57,6 +57,7 @@ class OW2ConfigHandler(SettingsHandler):
     """
 
     is_critical_verify = True
+    AUTO_VRR_FPS_CAP_KEY = "auto_vrr_fps_cap"
 
     # Matches versioned render section headers like [Render.13]
     RENDER_SECTION_RE = re.compile(r"^\[Render\.\d+\]$")
@@ -67,6 +68,9 @@ class OW2ConfigHandler(SettingsHandler):
     # Profile snake_case key -> INI key inside [Render.X]
     MUTABLE_SETTINGS: dict[str, str] = {
         "window_mode": "WindowMode",
+        "fullscreen_window": "FullscreenWindow",
+        "fullscreen_window_enabled": "FullscreenWindowEnabled",
+        "windowed_fullscreen": "WindowedFullscreen",
         "vsync": "LimitToRefresh",
         "reduce_buffering": "CpuForceSyncEnabled",
         "dynamic_render_scale": "UseGPUScale",
@@ -91,6 +95,7 @@ class OW2ConfigHandler(SettingsHandler):
     BOOL_SETTINGS: frozenset[str] = frozenset({
         "vsync", "reduce_buffering", "dynamic_render_scale", "dynamic_render_scale_v2",
         "use_custom_frame_rates",
+        "fullscreen_window", "fullscreen_window_enabled", "windowed_fullscreen",
         "upscaling", "triple_buffering", "show_fps", "show_latency",
         "hdr",
     })
@@ -188,26 +193,7 @@ class OW2ConfigHandler(SettingsHandler):
         """Apply OW2 render settings to Settings_v0.ini."""
         settings = dict(settings)  # Don't mutate caller's dict
 
-        # Auto VRR FPS cap: detect refresh rate and set in-game cap to refresh - 3
-        if settings.pop("auto_vrr_fps_cap", False):
-            try:
-                from abso.core.vrr import get_vrr_fps_cap
-                from abso.settings.nvidia import NvidiaSettingsHandler
-
-                refresh_hz = NvidiaSettingsHandler()._detect_primary_refresh_rate()
-                if refresh_hz and refresh_hz > 0:
-                    settings["frame_rate_cap"] = get_vrr_fps_cap(refresh_hz)
-                    logger.info(
-                        "OW2 auto VRR FPS cap: %d (from %d Hz)",
-                        settings["frame_rate_cap"], refresh_hz,
-                    )
-            except Exception as e:
-                logger.warning("OW2 auto VRR FPS cap detection failed: %s", e)
-
-        # OW2 ignores FrameRateCap unless UseCustomFrameRates is "1".
-        # Automatically enable it whenever we set a custom cap.
-        if "frame_rate_cap" in settings and "use_custom_frame_rates" not in settings:
-            settings["use_custom_frame_rates"] = True
+        settings = self._resolve_auto_vrr_fps_cap(settings)
 
         invalid = validate_allowed_keys(
             set(settings.keys()),
@@ -299,6 +285,7 @@ class OW2ConfigHandler(SettingsHandler):
         if not current.get("config_found"):
             return results
 
+        settings = self._resolve_auto_vrr_fps_cap(settings)
         replacements = self._build_replacements(settings)
         ini_to_profile = {v: k for k, v in self.MUTABLE_SETTINGS.items()}
 
@@ -581,6 +568,36 @@ class OW2ConfigHandler(SettingsHandler):
             replacements[ini_key] = self._to_ini_value(profile_key, value)
 
         return replacements
+
+    def _resolve_auto_vrr_fps_cap(self, settings: dict[str, Any]) -> dict[str, Any]:
+        """Expand ``auto_vrr_fps_cap`` into concrete OW2 INI settings.
+
+        Apply and verify must share this path. Otherwise health/state checks can
+        report the profile active while OW2's actual FrameRateCap has drifted.
+        """
+        resolved = dict(settings)
+
+        if resolved.pop(self.AUTO_VRR_FPS_CAP_KEY, False):
+            try:
+                from abso.core.vrr import get_vrr_fps_cap
+                from abso.settings.nvidia import NvidiaSettingsHandler
+
+                refresh_hz = NvidiaSettingsHandler()._detect_primary_refresh_rate()
+                if refresh_hz and refresh_hz > 0:
+                    resolved["frame_rate_cap"] = get_vrr_fps_cap(refresh_hz)
+                    logger.info(
+                        "OW2 auto VRR FPS cap: %d (from %d Hz)",
+                        resolved["frame_rate_cap"], refresh_hz,
+                    )
+            except Exception as e:
+                logger.warning("OW2 auto VRR FPS cap detection failed: %s", e)
+
+        # OW2 ignores FrameRateCap unless UseCustomFrameRates is "1".
+        # Automatically enable it whenever we set a custom cap.
+        if "frame_rate_cap" in resolved and "use_custom_frame_rates" not in resolved:
+            resolved["use_custom_frame_rates"] = True
+
+        return resolved
 
     def _to_ini_value(self, profile_key: str, value: Any) -> str:
         """Convert a single profile value to its INI string representation."""

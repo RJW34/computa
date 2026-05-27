@@ -810,6 +810,90 @@ class TestNvidiaApply:
         assert verify["all_active"] is False
         assert any("Executable binding mismatch" in item for item in verify["setting_failures"])
 
+    @patch("abso.settings.nvidia.nvapi_drs.DRSProfileManager")
+    def test_verify_active_uses_safe_binding_probe_when_exact_owner_is_unresolved(self, mock_manager_cls):
+        """require_exact_binding must not be ignored by live profile verification."""
+        mock_manager = MagicMock()
+        fake_drs = MagicMock()
+        fake_drs.find_profile_by_name.return_value = object()
+
+        class _Ctx:
+            def __enter__(self_inner):
+                return fake_drs
+
+            def __exit__(self_inner, exc_type, exc, tb):
+                return False
+
+        mock_manager._drs = _Ctx()
+        mock_manager._get_application_owner_profile_name.return_value = None
+        mock_manager._profile_contains_application.return_value = False
+        mock_manager.probe_profile_binding.return_value = {
+            "app_binding_safe": True,
+            "app_binding_state": "predefined_profile_safe",
+            "app_binding_note": (
+                "NVIDIA predefined profile 'Overwatch 2' already exists and has bound applications."
+            ),
+        }
+        mock_manager.get_app_settings.return_value = {
+            "_profile": "Overwatch 2",
+            "vrr_app_override": 0x00000000,
+        }
+        mock_manager._resolve_setting.return_value = (0x10A879CF, 0x00000000)
+        mock_manager_cls.return_value = mock_manager
+
+        verify = NvidiaSettingsHandler().verify_active({
+            "vrr_app_override": "allow",
+            "executables": ["Overwatch.exe"],
+            "game_name": "Overwatch 2",
+            "profile_name": "Overwatch 2",
+            "require_exact_binding": True,
+        })
+
+        assert verify["all_active"] is True
+        assert verify["scope"] == "profile_and_safe_binding_probe"
+        assert verify["binding_owner_profiles"] == {"Overwatch.exe": "Overwatch 2"}
+        assert verify["binding_probe_state"] == "predefined_profile_safe"
+
+    @patch("abso.settings.nvidia.nvapi_drs.DRSProfileManager")
+    def test_verify_active_fails_required_binding_when_probe_is_not_safe(self, mock_manager_cls):
+        """A required binding should fail live verification if no safe owner exists."""
+        mock_manager = MagicMock()
+        fake_drs = MagicMock()
+        fake_drs.find_profile_by_name.return_value = object()
+
+        class _Ctx:
+            def __enter__(self_inner):
+                return fake_drs
+
+            def __exit__(self_inner, exc_type, exc, tb):
+                return False
+
+        mock_manager._drs = _Ctx()
+        mock_manager._get_application_owner_profile_name.return_value = None
+        mock_manager._profile_contains_application.return_value = False
+        mock_manager.probe_profile_binding.return_value = {
+            "app_binding_safe": False,
+            "app_binding_state": "missing",
+            "app_binding_note": "Exact NVIDIA executable binding could not be confirmed.",
+        }
+        mock_manager.get_app_settings.return_value = {
+            "_profile": "Overwatch 2",
+            "vrr_app_override": 0x00000000,
+        }
+        mock_manager._resolve_setting.return_value = (0x10A879CF, 0x00000000)
+        mock_manager_cls.return_value = mock_manager
+
+        verify = NvidiaSettingsHandler().verify_active({
+            "vrr_app_override": "allow",
+            "executables": ["Overwatch.exe"],
+            "game_name": "Overwatch 2",
+            "profile_name": "Overwatch 2",
+            "require_exact_binding": True,
+        })
+
+        assert verify["all_active"] is False
+        assert "Exact NVIDIA executable binding could not be confirmed." in verify["setting_failures"]
+
     @patch("abso.settings.windows.WindowsSettingsHandler._get_refresh_rate_info")
     @patch("abso.core.detector.HardwareDetector.detect_monitors")
     def test_detect_primary_refresh_rate_falls_back_to_windows_handler(

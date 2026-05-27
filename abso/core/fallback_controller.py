@@ -116,7 +116,7 @@ class FallbackController:
             return False
 
         try:
-            with open(self.state_file, "r", encoding="utf-8") as f:
+            with open(self.state_file, encoding="utf-8") as f:
                 data = json.load(f)
             self.state = FallbackState.from_dict(data)
             logger.info(f"Loaded fallback state: {len(self.state.failures)} executables tracked")

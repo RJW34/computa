@@ -2,11 +2,13 @@
 
 > **DEPRECATED**: This document is an auto-generated snapshot from an earlier session and
 > contains inaccurate claims. The "~1.0ms display latency" figure is **physically
-> implausible** (scanout alone at 300Hz is 3.33ms). Several settings here (LLM Ultra,
-> VSync Fast + G-Sync) conflict with the canonical spec in `rollback.md`.
+> implausible** (scanout alone at 300Hz is 3.33ms). Several settings here
+> (LLM Ultra, VSync Fast + G-Sync) conflict with the current shipped profile
+> policy.
 >
-> **Do not use this document as a reference.** See `rollback.md` for the authoritative
-> Rivals 2 configuration spec.
+> **Do not use this document as a reference.** Use
+> `rivals2-300hz-lowest-latency-guide.md`, `python -m abso profiles --json`,
+> and the live profile modules instead.
 
 ## ~~Achieved: ~1.0ms display latency at stable 297fps~~ (INACCURATE — see note above)
 

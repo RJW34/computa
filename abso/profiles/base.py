@@ -4,11 +4,22 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Literal
+from typing import TYPE_CHECKING, Any, Literal, get_args
 
 if TYPE_CHECKING:
     from abso.core.process_janitor import LaunchKillset
     from abso.settings.base import SettingsHandler
+
+
+NetworkScope = Literal["full", "limited", "none"]
+GraphicsApi = Literal["dx11", "dx12", "vulkan", "opengl", "unknown"]
+CpuAffinityStrategy = Literal["p_cores_only", "all_cores", "custom"]
+
+VALID_NETWORK_SCOPES: frozenset[str] = frozenset(get_args(NetworkScope))
+VALID_GRAPHICS_APIS: frozenset[str] = frozenset(get_args(GraphicsApi))
+VALID_CPU_AFFINITY_STRATEGIES: frozenset[str] = frozenset(
+    get_args(CpuAffinityStrategy)
+)
 
 
 @dataclass(frozen=True)
@@ -156,7 +167,7 @@ class BaseProfile(ABC):
         return any(ind in name_lower for ind in sdr_indicators)
 
     @property
-    def network_scope(self) -> Literal["full", "limited", "none"]:
+    def network_scope(self) -> NetworkScope:
         """What network optimizations are allowed.
 
         - "full": Allow all network optimizations (Nagle disable, TCP tuning)
@@ -170,7 +181,7 @@ class BaseProfile(ABC):
         return "none"
 
     @property
-    def graphics_api(self) -> Literal["dx11", "dx12", "vulkan", "opengl", "unknown"]:
+    def graphics_api(self) -> GraphicsApi:
         """Primary graphics API used by the game/emulator.
 
         Used to determine HAGS compatibility and LLM effectiveness.
@@ -191,7 +202,7 @@ class BaseProfile(ABC):
         }
 
     @property
-    def cpu_affinity_strategy(self) -> str | None:
+    def cpu_affinity_strategy(self) -> CpuAffinityStrategy | None:
         """CPU affinity strategy for this profile.
 
         Returns None to skip affinity management, or one of:
@@ -364,6 +375,17 @@ class BaseProfile(ABC):
         return None
 
     @property
+    def mixed_refresh_safe_fallback_profile_id(self) -> str | None:
+        """Optional fallback when strict fullscreen VRR is unsafe on mixed-refresh displays.
+
+        Profile families that already expose an overlay/capture-safe borderless
+        sibling can usually reuse it here. Families without a VRR-safe
+        borderless sibling should override this with a no-sync sibling, or
+        leave it unset so ABSO fails closed instead of inventing a profile.
+        """
+        return self.overlay_compatible_fallback_profile_id
+
+    @property
     def auto_disable_blocking_overlays(self) -> bool:
         """Whether ABSO should try to shut down blocking overlays automatically."""
         return bool(self.display_path_requirements.require_overlay_free_path)
@@ -384,7 +406,7 @@ class BaseProfile(ABC):
         """
         return False
 
-    def launch_process_killset(self) -> "LaunchKillset":
+    def launch_process_killset(self) -> LaunchKillset:
         """Processes the launch-time janitor may stop while this profile's game is alive.
 
         Data-driven from existing profile traits; built-in lanes do not need

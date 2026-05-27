@@ -82,6 +82,57 @@ function Format-StartupProfileRecord {
     return "$srcPart [$status] $idPart @ $tsPart$timeSrcPart$pathPart"
 }
 
+function Get-CanonicalStartupSource {
+    param(
+        [object]$Source,
+        [string]$Default = "unknown"
+    )
+
+    if ($null -eq $Source) {
+        return $Default
+    }
+
+    $text = "$Source".Trim()
+    if ([string]::IsNullOrWhiteSpace($text)) {
+        return $Default
+    }
+
+    # Startup restore used to persist sources such as
+    # startup_restore:last_profile_state:startup_restore:state_file on every
+    # tray launch. Strip wrapper prefixes so logs and tray config stay bounded.
+    $wrapperPattern = '^(startup_restore|last_profile_state):(.+)$'
+    while ($text -match $wrapperPattern) {
+        $text = "$($Matches[2])".Trim()
+        if ([string]::IsNullOrWhiteSpace($text)) {
+            return $Default
+        }
+    }
+
+    return $text
+}
+
+function Get-LastProfileStateCandidateSource {
+    param([object]$Source)
+
+    $baseSource = Get-CanonicalStartupSource -Source $Source -Default "unknown"
+    if ($baseSource -eq "unknown") {
+        return "last_profile_state"
+    }
+
+    return "last_profile_state:$baseSource"
+}
+
+function Get-StartupRestoreStateSource {
+    param([object]$Source)
+
+    $baseSource = Get-CanonicalStartupSource -Source $Source -Default "startup_restore"
+    if ($baseSource -eq "startup_restore") {
+        return "startup_restore"
+    }
+
+    return "startup_restore:$baseSource"
+}
+
 function Get-StartupProfileMeaning {
     param([object]$Record)
 
@@ -127,6 +178,52 @@ function Select-CorroboratedTrayCandidate {
     return $lastProfileState
 }
 
+function Select-CorroboratedStateFileCandidate {
+    param([object[]]$Candidates)
+
+    if (-not $Candidates -or $Candidates.Count -eq 0) {
+        return $null
+    }
+
+    $stateFiles = @(
+        $Candidates | Where-Object { "$($_.source)" -eq "state_file" }
+    )
+    if ($stateFiles.Count -lt 2) {
+        return $null
+    }
+
+    $groups = @{}
+    foreach ($record in $stateFiles) {
+        $meaning = Get-StartupProfileMeaning -Record $record
+        if (-not $groups.ContainsKey($meaning)) {
+            $groups[$meaning] = @()
+        }
+        $groups[$meaning] += $record
+    }
+
+    $corroborated = @()
+    foreach ($meaning in $groups.Keys) {
+        $records = @($groups[$meaning])
+        if ($records.Count -lt 2) { continue }
+        $corroborated += @(
+            $records | Sort-Object `
+                @{ Expression = { if ($_.has_timestamp) { 1 } else { 0 } }; Descending = $true }, `
+                @{ Expression = { if ($_.parsed_at) { $_.parsed_at.Ticks } else { 0 } }; Descending = $true } |
+                Select-Object -First 1
+        )
+    }
+
+    if ($corroborated.Count -eq 0) {
+        return $null
+    }
+
+    return @(
+        $corroborated | Sort-Object `
+            @{ Expression = { if ($_.has_timestamp) { 1 } else { 0 } }; Descending = $true }, `
+            @{ Expression = { if ($_.parsed_at) { $_.parsed_at.Ticks } else { 0 } }; Descending = $true }
+    ) | Select-Object -First 1
+}
+
 function Repair-StartupActiveProfileState {
     param([object]$Record)
 
@@ -153,7 +250,8 @@ function Repair-StartupActiveProfileState {
         }
 
         $tmpPath = "$statePath.tmp"
-        $state | ConvertTo-Json -Depth 6 | Set-Content -Path $tmpPath -Encoding UTF8 -Force -ErrorAction Stop
+        $jsonText = ($state | ConvertTo-Json -Depth 6) + [Environment]::NewLine
+        [System.IO.File]::WriteAllText($tmpPath, $jsonText, [System.Text.UTF8Encoding]::new($false))
         Move-Item -LiteralPath $tmpPath -Destination $statePath -Force -ErrorAction Stop
         Write-StartupStateLog "Reconciled active profile state file '$statePath' to '$($Record.id)' using corroborated tray state"
         return $true
@@ -240,7 +338,7 @@ function Resolve-StartupActiveProfile {
     $candidates = @()
 
     $resolvedStateCandidates = @()
-    if ($StateCandidates -and $StateCandidates.Count -gt 0) {
+    if ($PSBoundParameters.ContainsKey("StateCandidates")) {
         $resolvedStateCandidates = @($StateCandidates)
     }
     else {
@@ -305,7 +403,7 @@ function Resolve-StartupActiveProfile {
                 $null
             }
             $timestamp = if ($state.timestamp) { "$($state.timestamp)" } else { $null }
-            $source = if ($state.source) { "last_profile_state:$($state.source)" } else { "last_profile_state" }
+            $source = Get-LastProfileStateCandidateSource -Source $state.source
             $candidates += New-StartupProfileRecord `
                 -Status $status `
                 -Id $candidateId `
@@ -350,6 +448,50 @@ function Resolve-StartupActiveProfile {
     $corroboratedTrayCandidate = Select-CorroboratedTrayCandidate -Candidates $candidates
     if ($corroboratedTrayCandidate) {
         $corroboratedMeaning = Get-StartupProfileMeaning -Record $corroboratedTrayCandidate
+        $corroboratedStateFileCandidate = Select-CorroboratedStateFileCandidate -Candidates $candidates
+        if ($corroboratedStateFileCandidate) {
+            $stateFileMeaning = Get-StartupProfileMeaning -Record $corroboratedStateFileCandidate
+            if ($stateFileMeaning -ne $corroboratedMeaning) {
+                $stateTicks = if ($corroboratedStateFileCandidate.parsed_at) {
+                    $corroboratedStateFileCandidate.parsed_at.Ticks
+                }
+                else {
+                    0
+                }
+                $trayTicks = if ($corroboratedTrayCandidate.parsed_at) {
+                    $corroboratedTrayCandidate.parsed_at.Ticks
+                }
+                else {
+                    0
+                }
+
+                if ($stateTicks -gt $trayTicks) {
+                    Write-StartupStateLog (
+                        "Using corroborated newer state-file candidate '" +
+                        (Format-StartupProfileRecord -Record $corroboratedStateFileCandidate) +
+                        "' over older tray state '" +
+                        (Format-StartupProfileRecord -Record $corroboratedTrayCandidate) +
+                        "'"
+                    ) "WARN"
+
+                    $corroboratedStateFileCandidate.decision = "corroborated_state_files_newer"
+                    $corroboratedStateFileCandidate.candidate_count = $candidates.Count
+
+                    return [ordered]@{
+                        status          = $corroboratedStateFileCandidate.status
+                        id              = $corroboratedStateFileCandidate.id
+                        name            = $corroboratedStateFileCandidate.name
+                        timestamp       = $corroboratedStateFileCandidate.timestamp
+                        source          = $corroboratedStateFileCandidate.source
+                        path            = $corroboratedStateFileCandidate.path
+                        sync_state_path = $null
+                        decision        = $corroboratedStateFileCandidate.decision
+                        candidate_count = $corroboratedStateFileCandidate.candidate_count
+                    }
+                }
+            }
+        }
+
         $conflictingStateFile = @(
             $candidates |
                 Where-Object {
@@ -362,6 +504,44 @@ function Resolve-StartupActiveProfile {
             Select-Object -First 1
 
         if ($conflictingStateFile) {
+            $stateTicks = if ($conflictingStateFile.parsed_at) {
+                $conflictingStateFile.parsed_at.Ticks
+            }
+            else {
+                0
+            }
+            $trayTicks = if ($corroboratedTrayCandidate.parsed_at) {
+                $corroboratedTrayCandidate.parsed_at.Ticks
+            }
+            else {
+                0
+            }
+
+            if ($stateTicks -gt $trayTicks) {
+                Write-StartupStateLog (
+                    "Using newer state-file candidate '" +
+                    (Format-StartupProfileRecord -Record $conflictingStateFile) +
+                    "' over older corroborated tray state '" +
+                    (Format-StartupProfileRecord -Record $corroboratedTrayCandidate) +
+                    "'"
+                ) "WARN"
+
+                $conflictingStateFile.decision = "newer_state_file"
+                $conflictingStateFile.candidate_count = $candidates.Count
+
+                return [ordered]@{
+                    status          = $conflictingStateFile.status
+                    id              = $conflictingStateFile.id
+                    name            = $conflictingStateFile.name
+                    timestamp       = $conflictingStateFile.timestamp
+                    source          = $conflictingStateFile.source
+                    path            = $conflictingStateFile.path
+                    sync_state_path = $null
+                    decision        = $conflictingStateFile.decision
+                    candidate_count = $conflictingStateFile.candidate_count
+                }
+            }
+
             Write-StartupStateLog (
                 "Ignoring uncorroborated state-file candidate '" +
                 (Format-StartupProfileRecord -Record $conflictingStateFile) +

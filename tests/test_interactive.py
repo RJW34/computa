@@ -330,6 +330,75 @@ class TestRunApplyProfile:
         mock_handler.apply.assert_not_called()
         mock_set_current_profile.assert_called_once()
 
+    @patch("abso.interactive.Prompt.ask", return_value="")
+    @patch("abso.interactive.Confirm.ask", return_value=True)
+    @patch("abso.interactive.is_admin", return_value=True)
+    @patch("abso.interactive.ProfileTransactionManager")
+    @patch("abso.interactive.ProfileApplier")
+    def test_apply_profile_persists_transaction_fallback_profile(
+        self,
+        mock_applier_class,
+        mock_tx_manager_class,
+        mock_is_admin,
+        mock_confirm,
+        mock_prompt,
+    ):
+        """Interactive apply should save/report the profile that actually committed."""
+        mock_profile = MagicMock()
+        mock_profile.display_name = "Strict"
+        mock_profile.description = "Strict desc"
+        mock_profile.optimization_target = "latency"
+        mock_profile.get_handlers.return_value = []
+        mock_profile.has_in_game_settings.return_value = False
+
+        mock_applier = MagicMock()
+        mock_applier._get_profile.return_value = mock_profile
+        mock_applier_class.return_value = mock_applier
+
+        mock_result = MagicMock()
+        mock_result.success = True
+        mock_result.requires_reboot = False
+        mock_result.reboot_reasons = []
+        mock_result.warnings = []
+        mock_result.notices = []
+
+        mock_tx = MagicMock()
+        mock_tx.success = True
+        mock_tx.profile_id = "safe-profile"
+        mock_tx.fallback_chain = [
+            {
+                "from": "strict-profile",
+                "to": "safe-profile",
+                "reason": "strict display path blocked",
+            }
+        ]
+        mock_tx.apply_result = mock_result
+        mock_tx.backup_id = "backup-test"
+        mock_tx.checkpoints = []
+
+        mock_tx_manager = MagicMock()
+        mock_tx_manager.execute.return_value = mock_tx
+        mock_tx_manager_class.return_value = mock_tx_manager
+
+        with (
+            patch.object(interactive.console, "print") as mock_print,
+            patch("abso.main.set_current_profile") as mock_set_current_profile,
+        ):
+            interactive.run_apply_profile("strict-profile")
+
+        mock_set_current_profile.assert_called_once_with(
+            "safe-profile",
+            requires_reboot=False,
+            reboot_reasons=[],
+        )
+        panel_text = "\n".join(
+            str(call.args[0].renderable)
+            for call in mock_print.call_args_list
+            if call.args and hasattr(call.args[0], "renderable")
+        )
+        assert "safe-profile" in panel_text
+        assert "strict-profile" in panel_text
+
 
 class TestRunInteractive:
     """Tests for run_interactive main loop."""

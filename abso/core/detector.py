@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import ctypes
 import logging
 import subprocess
@@ -667,12 +668,10 @@ class HardwareDetector:
     def cleanup(self) -> None:
         """Explicitly release WMI connection resources."""
         if self._wmi is not None:
-            try:
+            with contextlib.suppress(Exception):
                 # WMI connections don't have explicit close, but setting to None
                 # allows garbage collection of COM objects
                 self._wmi = None
-            except Exception:
-                pass
 
     def _get_wmi(self):
         """Lazy-load WMI connection."""
@@ -745,14 +744,10 @@ class HardwareDetector:
                 result["model"] = (system.Model or "").strip()
 
                 # SystemFamily and SystemSKUNumber may not exist on all systems
-                try:
+                with contextlib.suppress(AttributeError):
                     result["system_family"] = (system.SystemFamily or "").strip() or None
-                except AttributeError:
-                    pass
-                try:
+                with contextlib.suppress(AttributeError):
                     result["system_sku"] = (system.SystemSKUNumber or "").strip() or None
-                except AttributeError:
-                    pass
                 break
 
         except AttributeError as e:

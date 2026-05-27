@@ -8,6 +8,7 @@ settings, and audits for common streaming issues.
 from __future__ import annotations
 
 import configparser
+import contextlib
 import json
 import logging
 from pathlib import Path
@@ -495,18 +496,14 @@ class OBSSettingsHandler(SettingsHandler):
             for encoder_type in ["stream", "record"]:
                 encoder_file = profile_path / f"{encoder_type}Encoder.json"
                 if encoder_file.exists():
-                    try:
+                    with contextlib.suppress(OSError):
                         profile_backup[f"{encoder_type}_encoder"] = encoder_file.read_text(encoding="utf-8")
-                    except OSError:
-                        pass
 
             # Backup basic.ini
             basic_ini = profile_path / "basic.ini"
             if basic_ini.exists():
-                try:
+                with contextlib.suppress(OSError):
                     profile_backup["basic_ini"] = basic_ini.read_text(encoding="utf-8-sig")
-                except OSError:
-                    pass
 
             backup_data["profiles"][profile_name] = profile_backup
 

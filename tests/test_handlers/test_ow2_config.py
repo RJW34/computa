@@ -11,6 +11,9 @@ from abso.settings.ow2_config import OW2ConfigHandler
 SAMPLE_INI = """\
 [Render.13]
 WindowMode = "1"
+FullscreenWindow = "0"
+FullscreenWindowEnabled = "0"
+WindowedFullscreen = "1"
 LimitToRefresh = "1"
 CpuForceSyncEnabled = "0"
 UseGPUScale = "1"
@@ -51,6 +54,9 @@ def test_apply_updates_allowed_keys(tmp_path: Path) -> None:
         handler = OW2ConfigHandler()
         result = handler.apply({
             "window_mode": 0,
+            "fullscreen_window": False,
+            "fullscreen_window_enabled": True,
+            "windowed_fullscreen": False,
             "vsync": False,
             "reduce_buffering": True,
             "dynamic_render_scale": False,
@@ -71,6 +77,9 @@ def test_apply_updates_allowed_keys(tmp_path: Path) -> None:
 
     # Verify key=value pairs use OW2's quoted format
     assert 'WindowMode = "0"' in content
+    assert 'FullscreenWindow = "0"' in content
+    assert 'FullscreenWindowEnabled = "1"' in content
+    assert 'WindowedFullscreen = "0"' in content
     assert 'LimitToRefresh = "0"' in content
     assert 'CpuForceSyncEnabled = "1"' in content
     assert 'UseGPUScale = "0"' in content
@@ -163,6 +172,9 @@ def test_detect_parses_quoted_values(tmp_path: Path) -> None:
 
     assert detected["config_found"] is True
     assert detected["window_mode"] == 1
+    assert detected["fullscreen_window"] == 0
+    assert detected["fullscreen_window_enabled"] == 0
+    assert detected["windowed_fullscreen"] == 1
     assert detected["vsync"] == 1
     assert detected["reduce_buffering"] == 0
     assert detected["dynamic_render_scale"] == 1
@@ -206,6 +218,52 @@ def test_verify_active_all_match(tmp_path: Path) -> None:
 
     # window_mode=1 matches, vsync True -> "1" matches "1"
     assert verify["all_active"] is True
+
+
+def test_verify_active_expands_auto_vrr_fps_cap(tmp_path: Path) -> None:
+    """auto_vrr_fps_cap must verify the concrete FrameRateCap OW2 sees."""
+    ini = SAMPLE_INI.replace('FrameRateCap = "60"', 'FrameRateCap = "285"')
+    ini = ini.replace('UseCustomFrameRates = "0"\n', "")
+    ini = ini.replace('ShowFPSCounter = "0"', 'UseCustomFrameRates = "1"\nShowFPSCounter = "0"')
+    ini_path = tmp_path / "Settings_v0.ini"
+    _write_settings_ini(ini_path, ini)
+
+    with (
+        patch("abso.settings.ow2_config._get_ow2_settings_path", return_value=ini_path),
+        patch(
+            "abso.settings.nvidia.NvidiaSettingsHandler._detect_primary_refresh_rate",
+            return_value=300,
+        ),
+    ):
+        verify = OW2ConfigHandler().verify_active({"auto_vrr_fps_cap": True})
+
+    assert verify["all_active"] is True
+    assert verify["settings"]["frame_rate_cap"] == {
+        "target": 285,
+        "current": 285,
+        "active": True,
+    }
+    assert verify["settings"]["use_custom_frame_rates"]["active"] is True
+
+
+def test_verify_active_reports_auto_vrr_fps_cap_drift(tmp_path: Path) -> None:
+    """A drifted OW2 cap should make state/health verification fail."""
+    ini_path = tmp_path / "Settings_v0.ini"
+    _write_settings_ini(ini_path, SAMPLE_INI)
+
+    with (
+        patch("abso.settings.ow2_config._get_ow2_settings_path", return_value=ini_path),
+        patch(
+            "abso.settings.nvidia.NvidiaSettingsHandler._detect_primary_refresh_rate",
+            return_value=300,
+        ),
+    ):
+        verify = OW2ConfigHandler().verify_active({"auto_vrr_fps_cap": True})
+
+    assert verify["all_active"] is False
+    assert verify["settings"]["frame_rate_cap"]["target"] == 285
+    assert verify["settings"]["frame_rate_cap"]["current"] == 60
+    assert verify["settings"]["frame_rate_cap"]["active"] is False
 
 
 def test_backup_restore_round_trip(tmp_path: Path) -> None:

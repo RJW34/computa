@@ -12,11 +12,12 @@ and other monitors) using VCP 0xE6 + 0xF8 combo.
 
 from __future__ import annotations
 
+import contextlib
 import ctypes
 import logging
 import threading
 import time
-from ctypes import Structure, wintypes, byref
+from ctypes import Structure, byref, wintypes
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -142,10 +143,8 @@ def _destroy_physical_monitors(
     count: int, monitors: ctypes.Array[PHYSICAL_MONITOR],
 ) -> None:
     """Clean up physical monitor handles."""
-    try:
+    with contextlib.suppress(Exception):
         ctypes.windll.dxva2.DestroyPhysicalMonitors(count, monitors)
-    except Exception:
-        pass
 
 
 def _try_adaptive_sync_toggle(

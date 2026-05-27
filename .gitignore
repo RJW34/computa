@@ -36,6 +36,8 @@ env/
 
 # Testing
 .pytest_cache/
+.pytest-runtime/
+.pytest-tmp/
 .mypy_cache/
 .ruff_cache/
 .coverage

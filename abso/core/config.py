@@ -8,12 +8,16 @@ from __future__ import annotations
 
 import dataclasses
 import logging
+import os
+from collections.abc import Mapping
+from copy import deepcopy
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
 
 import yaml
 
+from abso.core.app_paths import app_data_dir
 from abso.core.exceptions import (
     ConfigLoadError,
     ConfigSaveError,
@@ -24,6 +28,25 @@ logger = logging.getLogger(__name__)
 
 # Default configuration file name
 DEFAULT_CONFIG_NAME = "abso.yaml"
+CONFIG_ENV_VAR = "ABSO_CONFIG"
+
+
+def resolve_default_config_path(cwd: Path | None = None) -> Path:
+    """Return the default config path for source and installed runtimes."""
+    configured = os.environ.get(CONFIG_ENV_VAR)
+    if configured:
+        return Path(configured).expanduser()
+
+    current_dir = cwd or Path.cwd()
+    cwd_config = current_dir / DEFAULT_CONFIG_NAME
+    if cwd_config.exists():
+        return cwd_config
+
+    installed_config = app_data_dir() / DEFAULT_CONFIG_NAME
+    if installed_config.exists():
+        return installed_config
+
+    return cwd_config
 
 
 @dataclass
@@ -46,11 +69,20 @@ class CpuBalancerConfig:
     trigger_delay_ms: int = 2800
     restraint_duration_ms: int = 6000
     poll_interval_ms: int = 1000
-    excluded_processes: list[str] = field(default_factory=lambda: [
-        "csrss.exe", "dwm.exe", "audiodg.exe", "System",
-        "svchost.exe", "wininit.exe", "services.exe",
-        "smss.exe", "lsass.exe", "winlogon.exe",
-    ])
+    excluded_processes: list[str] = field(
+        default_factory=lambda: [
+            "csrss.exe",
+            "dwm.exe",
+            "audiodg.exe",
+            "System",
+            "svchost.exe",
+            "wininit.exe",
+            "services.exe",
+            "smss.exe",
+            "lsass.exe",
+            "winlogon.exe",
+        ]
+    )
 
 
 @dataclass
@@ -89,12 +121,129 @@ class ProfileOverrides:
 
     nvidia: dict[str, Any] = field(default_factory=dict)
     windows: dict[str, Any] = field(default_factory=dict)
+    registry: dict[str, Any] = field(default_factory=dict)
+    graphics: dict[str, Any] = field(default_factory=dict)
     network: dict[str, Any] = field(default_factory=dict)
     power: dict[str, Any] = field(default_factory=dict)
     timer: dict[str, Any] = field(default_factory=dict)
     mouse: dict[str, Any] = field(default_factory=dict)
     color: dict[str, Any] = field(default_factory=dict)
     display_color_range: dict[str, Any] = field(default_factory=dict)
+
+
+_PROFILE_OVERRIDE_SECTION_NAMES: frozenset[str] = frozenset(
+    f.name for f in dataclasses.fields(ProfileOverrides)
+)
+
+
+PROFILE_OVERRIDE_HANDLER_ATTRS: dict[str, str] = {
+    "NvidiaSettingsHandler": "nvidia",
+    "WindowsSettingsHandler": "windows",
+    "RegistrySettingsHandler": "registry",
+    "GraphicsSettingsHandler": "graphics",
+    "NetworkSettingsHandler": "network",
+    "PowerSettingsHandler": "power",
+    "TimerSettingsHandler": "timer",
+    "MouseSettingsHandler": "mouse",
+    "ColorProfileSettingsHandler": "color",
+    "DisplayColorRangeHandler": "display_color_range",
+}
+
+
+def _format_known_profile_override_sections() -> str:
+    return ", ".join(sorted(_PROFILE_OVERRIDE_SECTION_NAMES))
+
+
+def _coerce_profile_overrides(
+    profile_overrides: Mapping[str, Any] | dict[str, ProfileOverrides],
+) -> dict[str, ProfileOverrides]:
+    """Validate and convert raw profile override config."""
+    if not profile_overrides:
+        return {}
+
+    if not isinstance(profile_overrides, Mapping):
+        raise ConfigValidationError(
+            "Invalid type for profile_overrides",
+            details="Must be a mapping of profile IDs to override sections",
+        )
+
+    converted: dict[str, ProfileOverrides] = {}
+    for profile_id, overrides in profile_overrides.items():
+        if not isinstance(profile_id, str):
+            raise ConfigValidationError(
+                "Invalid profile_overrides key",
+                details=f"Profile override keys must be strings, got {profile_id!r}",
+            )
+
+        if isinstance(overrides, ProfileOverrides):
+            converted[profile_id] = overrides
+            continue
+
+        if not isinstance(overrides, Mapping):
+            raise ConfigValidationError(
+                f"Invalid profile_overrides.{profile_id}",
+                details="Must be a mapping of override sections",
+            )
+
+        unknown_sections = set(overrides) - _PROFILE_OVERRIDE_SECTION_NAMES
+        if unknown_sections:
+            unknown = ", ".join(str(section) for section in sorted(unknown_sections, key=str))
+            raise ConfigValidationError(
+                f"Unknown profile override section for {profile_id}: {unknown}",
+                details=f"Known sections: {_format_known_profile_override_sections()}",
+            )
+
+        for section, values in overrides.items():
+            if not isinstance(values, Mapping):
+                raise ConfigValidationError(
+                    f"Invalid profile_overrides.{profile_id}.{section}",
+                    details="Must be a mapping of setting names to values",
+                )
+
+        converted[profile_id] = ProfileOverrides(**dict(overrides))
+
+    return converted
+
+
+def get_handler_profile_overrides(
+    overrides: ProfileOverrides,
+    handler_name: str,
+) -> Mapping[str, Any]:
+    """Return the override map that targets a handler."""
+    attr_name = PROFILE_OVERRIDE_HANDLER_ATTRS.get(handler_name)
+    if not attr_name:
+        return {}
+    handler_overrides = getattr(overrides, attr_name, {})
+    if not isinstance(handler_overrides, Mapping):
+        return {}
+    return handler_overrides
+
+
+def _merge_override_values(
+    settings: Mapping[str, Any],
+    overrides: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Recursively merge profile overrides without sharing nested state."""
+    merged: dict[str, Any] = deepcopy(dict(settings))
+    for key, value in overrides.items():
+        current = merged.get(key)
+        if isinstance(current, Mapping) and isinstance(value, Mapping):
+            merged[key] = _merge_override_values(current, value)
+        else:
+            merged[key] = deepcopy(value)
+    return merged
+
+
+def merge_profile_override_settings(
+    settings: dict[str, Any],
+    handler_name: str,
+    overrides: ProfileOverrides,
+) -> dict[str, Any]:
+    """Merge one handler's profile settings with configured overrides."""
+    handler_overrides = get_handler_profile_overrides(overrides, handler_name)
+    if not handler_overrides:
+        return settings
+    return _merge_override_values(settings, handler_overrides)
 
 
 @dataclass
@@ -151,14 +300,7 @@ class ABSOConfig:
 
     def __post_init__(self) -> None:
         """Convert nested dicts to typed config objects."""
-        if self.profile_overrides:
-            converted = {}
-            for profile_id, overrides in self.profile_overrides.items():
-                if isinstance(overrides, dict):
-                    converted[profile_id] = ProfileOverrides(**overrides)
-                else:
-                    converted[profile_id] = overrides
-            self.profile_overrides = converted
+        self.profile_overrides = _coerce_profile_overrides(self.profile_overrides)
         if isinstance(self.ddci, dict):
             self.ddci = DDCIConfig(**self.ddci)
         if isinstance(self.color, dict):
@@ -173,9 +315,7 @@ class ABSOConfig:
 
 # Derived from ABSOConfig dataclass fields — never manually maintained.
 # Adding a new field to ABSOConfig automatically makes it a known config key.
-_ABSO_CONFIG_KNOWN_KEYS: frozenset[str] = frozenset(
-    f.name for f in dataclasses.fields(ABSOConfig)
-)
+_ABSO_CONFIG_KNOWN_KEYS: frozenset[str] = frozenset(f.name for f in dataclasses.fields(ABSOConfig))
 
 
 class ConfigManager:
@@ -226,7 +366,7 @@ class ConfigManager:
             config_path: Path to configuration file. If None, uses default location.
         """
         if config_path is None:
-            config_path = Path.cwd() / DEFAULT_CONFIG_NAME
+            config_path = resolve_default_config_path()
         self.config_path = config_path
         self._config: ABSOConfig | None = None
 
@@ -259,8 +399,7 @@ class ConfigManager:
 
             if not isinstance(data, dict):
                 raise ConfigValidationError(
-                    "Invalid configuration format",
-                    details="Configuration must be a YAML mapping"
+                    "Invalid configuration format", details="Configuration must be a YAML mapping"
                 )
 
             # Validate before creating config
@@ -273,20 +412,11 @@ class ConfigManager:
             return ABSOConfig(**filtered_data)
 
         except yaml.YAMLError as e:
-            raise ConfigLoadError(
-                "Failed to parse configuration file",
-                details=str(e)
-            ) from e
+            raise ConfigLoadError("Failed to parse configuration file", details=str(e)) from e
         except TypeError as e:
-            raise ConfigValidationError(
-                "Invalid configuration structure",
-                details=str(e)
-            ) from e
+            raise ConfigValidationError("Invalid configuration structure", details=str(e)) from e
         except OSError as e:
-            raise ConfigLoadError(
-                "Failed to read configuration file",
-                details=str(e)
-            ) from e
+            raise ConfigLoadError("Failed to read configuration file", details=str(e)) from e
 
     def save(self, config: ABSOConfig | None = None) -> None:
         """Save configuration to file.
@@ -324,10 +454,7 @@ class ConfigManager:
             self._config = config
 
         except OSError as e:
-            raise ConfigSaveError(
-                "Failed to write configuration file",
-                details=str(e)
-            ) from e
+            raise ConfigSaveError("Failed to write configuration file", details=str(e)) from e
 
     def create_default(self) -> None:
         """Create a default configuration file with comments."""
@@ -360,6 +487,11 @@ confirm_destructive: true
 #   slippi-melee:
 #     nvidia:
 #       preset: minimum_latency
+#     registry:
+#       game_priority:
+#         priority: 6
+#     graphics:
+#       disable_mpo: true
 #     timer:
 #       resolution_ms: 0.5
 
@@ -410,10 +542,7 @@ confirm_destructive: true
             self.config_path.write_text(default_yaml, encoding="utf-8")
             logger.info(f"Created default configuration at {self.config_path}")
         except OSError as e:
-            raise ConfigSaveError(
-                "Failed to create default configuration",
-                details=str(e)
-            ) from e
+            raise ConfigSaveError("Failed to create default configuration", details=str(e)) from e
 
     def validate(self, config: ABSOConfig | None = None) -> list[str]:
         """Validate configuration and return list of warnings.
@@ -436,7 +565,7 @@ confirm_destructive: true
         if config.log_level.upper() not in self.VALID_LOG_LEVELS:
             raise ConfigValidationError(
                 f"Invalid log_level: {config.log_level}",
-                details=f"Must be one of: {', '.join(self.VALID_LOG_LEVELS)}"
+                details=f"Must be one of: {', '.join(self.VALID_LOG_LEVELS)}",
             )
 
         # Validate backup directory
@@ -454,14 +583,20 @@ confirm_destructive: true
         # Validate default profile
         if config.default_profile:
             from abso.core.applier import ProfileApplier
-            if config.default_profile not in ProfileApplier.PROFILES:
+            from abso.profiles.catalog import resolve_profile_id
+
+            canonical_default_profile = resolve_profile_id(config.default_profile)
+            if canonical_default_profile not in ProfileApplier.PROFILES:
                 warnings.append(f"Unknown default_profile: {config.default_profile}")
 
         # Validate profile overrides reference existing profiles
         if config.profile_overrides:
             from abso.core.applier import ProfileApplier
+            from abso.profiles.catalog import resolve_profile_id
+
             for profile_id in config.profile_overrides:
-                if profile_id not in ProfileApplier.PROFILES:
+                canonical_profile_id = resolve_profile_id(profile_id) or profile_id
+                if canonical_profile_id not in ProfileApplier.PROFILES:
                     warnings.append(f"Profile override for unknown profile: {profile_id}")
 
         return warnings
@@ -475,7 +610,24 @@ confirm_destructive: true
         Returns:
             ProfileOverrides if configured, None otherwise.
         """
-        return self.config.profile_overrides.get(profile_id)
+        exact = self.config.profile_overrides.get(profile_id)
+        if exact is not None:
+            return exact
+
+        from abso.profiles.catalog import resolve_profile_id
+
+        canonical_profile_id = resolve_profile_id(profile_id)
+        if not canonical_profile_id:
+            return None
+
+        canonical_match = self.config.profile_overrides.get(canonical_profile_id)
+        if canonical_match is not None:
+            return canonical_match
+
+        for configured_profile_id, overrides in self.config.profile_overrides.items():
+            if resolve_profile_id(configured_profile_id) == canonical_profile_id:
+                return overrides
+        return None
 
     def is_handler_disabled(self, handler_name: str) -> bool:
         """Check if a handler is disabled in configuration.
@@ -497,39 +649,22 @@ confirm_destructive: true
         Raises:
             ConfigValidationError: If data is invalid.
         """
-        # Check for unknown keys
-        known_keys = {
-            "backup_dir",
-            "auto_backup",
-            "max_backups",
-            "log_level",
-            "default_profile",
-            "profile_overrides",
-            "custom_profiles",
-            "disabled_handlers",
-            "confirm_destructive",
-            "ddci",
-            "color",
-            "standby_list",
-            "cpu_balancer",
-            "process_overrides",
-        }
-
-        unknown_keys = set(data.keys()) - known_keys
+        # Check for unknown keys. The known-key set is derived from ABSOConfig
+        # fields so config validation cannot drift when new top-level options
+        # are added.
+        unknown_keys = set(data.keys()) - _ABSO_CONFIG_KNOWN_KEYS
         if unknown_keys:
             logger.warning(f"Unknown configuration keys: {unknown_keys}")
 
         # Validate types
         if "auto_backup" in data and not isinstance(data["auto_backup"], bool):
             raise ConfigValidationError(
-                "Invalid type for auto_backup",
-                details="Must be a boolean (true/false)"
+                "Invalid type for auto_backup", details="Must be a boolean (true/false)"
             )
 
         if "disabled_handlers" in data and not isinstance(data["disabled_handlers"], list):
             raise ConfigValidationError(
-                "Invalid type for disabled_handlers",
-                details="Must be a list of handler names"
+                "Invalid type for disabled_handlers", details="Must be a list of handler names"
             )
 
     def _config_to_dict(self, config: ABSOConfig) -> dict[str, Any]:

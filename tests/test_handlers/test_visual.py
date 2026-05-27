@@ -239,7 +239,7 @@ class TestVisualPrivateMethods:
         handler = VisualSettingsHandler()
         result = handler._get_animations_enabled()
 
-        assert isinstance(result, (bool, type(None)))
+        assert isinstance(result, bool | None)
 
     @patch("abso.settings.visual.winreg.OpenKey", side_effect=FileNotFoundError)
     def test_get_animations_handles_missing_key(self, mock_open):

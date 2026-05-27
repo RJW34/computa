@@ -29,7 +29,7 @@ class TestPowerDetect:
         """Test _get_active_plan parses powercfg output correctly."""
         mock_run.return_value = MagicMock(
             returncode=0,
-            stdout="Power Scheme GUID: 381b4222-f694-41f0-9685-ff5bb260df2e  (Balanced)"
+            stdout="Power Scheme GUID: 381b4222-f694-41f0-9685-ff5bb260df2e  (Balanced)",
         )
 
         handler = PowerSettingsHandler()
@@ -47,7 +47,7 @@ class TestPowerDetect:
 -----------------------------------
 Power Scheme GUID: 381b4222-f694-41f0-9685-ff5bb260df2e  (Balanced) *
 Power Scheme GUID: 8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c  (High performance)
-"""
+""",
         )
 
         handler = PowerSettingsHandler()
@@ -150,16 +150,34 @@ class TestPowerApply:
     """Tests for PowerSettingsHandler.apply()."""
 
     @patch.object(PowerSettingsHandler, "_set_active_plan")
+    @patch.object(PowerSettingsHandler, "_get_active_plan")
     @patch.object(PowerSettingsHandler, "_has_ultimate_performance")
-    def test_apply_sets_active_plan(self, mock_has_up, mock_set_active):
+    def test_apply_sets_active_plan(self, mock_has_up, mock_get_active, mock_set_active):
         """Test apply sets the active power plan."""
         mock_has_up.return_value = True
+        mock_get_active.return_value = {"guid": "guid-bal", "name": "Balanced"}
 
         handler = PowerSettingsHandler()
         result = handler.apply({"active_plan": "high_performance"})
 
         assert result["success"] is True
         mock_set_active.assert_called_once_with(handler.HIGH_PERFORMANCE_GUID)
+
+    @patch.object(PowerSettingsHandler, "_set_active_plan")
+    @patch.object(PowerSettingsHandler, "_get_active_plan")
+    def test_apply_skips_already_active_plan(self, mock_get_active, mock_set_active):
+        """Already-active plans should not churn powercfg /setactive."""
+        mock_get_active.return_value = {
+            "guid": PowerSettingsHandler.HIGH_PERFORMANCE_GUID,
+            "name": "High performance",
+        }
+
+        handler = PowerSettingsHandler()
+        result = handler.apply({"active_plan": "high_performance"})
+
+        assert result["success"] is True
+        mock_set_active.assert_not_called()
+        assert "Power plan already active: high_performance" in result["skipped"]
 
     @patch.object(PowerSettingsHandler, "_set_active_plan")
     @patch.object(PowerSettingsHandler, "_has_ultimate_performance")
@@ -174,25 +192,57 @@ class TestPowerApply:
         assert result["success"] is True
         mock_create.assert_called_once()
 
+    @patch.object(PowerSettingsHandler, "_apply_current_scheme")
+    @patch.object(PowerSettingsHandler, "_get_power_setting")
     @patch.object(PowerSettingsHandler, "_set_power_setting")
     @patch.object(PowerSettingsHandler, "_has_ultimate_performance")
-    def test_apply_disables_usb_suspend(self, mock_has_up, mock_set_power):
+    def test_apply_disables_usb_suspend(
+        self, mock_has_up, mock_set_power, mock_get_power, mock_apply_scheme
+    ):
         """Test apply disables USB selective suspend."""
         mock_has_up.return_value = True
+        mock_get_power.return_value = 1
 
         handler = PowerSettingsHandler()
         result = handler.apply({"disable_usb_suspend": True})
 
         assert result["success"] is True
-        mock_set_power.assert_called_with(
+        mock_set_power.assert_called_once_with(
             handler.USB_SUBGROUP,
             handler.USB_SELECTIVE_SUSPEND,
-            0
+            0,
+            apply_changes=False,
+        )
+        mock_apply_scheme.assert_called_once()
+
+    @patch.object(PowerSettingsHandler, "_apply_current_scheme")
+    @patch.object(PowerSettingsHandler, "_get_power_setting")
+    @patch.object(PowerSettingsHandler, "_set_power_setting")
+    def test_apply_skips_matching_power_subsettings(
+        self, mock_set_power, mock_get_power, mock_apply_scheme
+    ):
+        """Matching sub-settings should not rewrite or re-apply the scheme."""
+        mock_get_power.return_value = 0
+
+        handler = PowerSettingsHandler()
+        result = handler.apply(
+            {
+                "disable_usb_suspend": True,
+                "disable_pcie_power_saving": True,
+            }
         )
 
+        assert result["success"] is True
+        mock_set_power.assert_not_called()
+        mock_apply_scheme.assert_not_called()
+        assert "USB selective suspend: already 0" in result["skipped"]
+        assert "PCIe link state power management: already 0" in result["skipped"]
+
     @patch.object(PowerSettingsHandler, "_set_active_plan")
-    def test_apply_handles_error(self, mock_set_active):
+    @patch.object(PowerSettingsHandler, "_get_active_plan")
+    def test_apply_handles_error(self, mock_get_active, mock_set_active):
         """Test apply handles errors gracefully."""
+        mock_get_active.return_value = {"guid": "guid-bal", "name": "Balanced"}
         mock_set_active.side_effect = RuntimeError("Failed to set plan")
 
         handler = PowerSettingsHandler()

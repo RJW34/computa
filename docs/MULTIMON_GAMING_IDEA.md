@@ -1,5 +1,12 @@
 # Multi-Monitor Gaming Mode
 
+> **Status:** design note only. This is not current monitor-flicker guidance and
+> is not a prescription for the active `overwatch2-gsync-hdr-capture` profile on
+> this PC. For the live mixed-refresh HDR/VRR flicker issue, read
+> `CURRENT_AGENT_BRIEFING.md` first. Most current ABSO profiles leave MPO alone;
+> this PC has one local Overwatch 2 override that writes an MPO-disable registry
+> target and requires a normal reboot before the compositor path can be judged.
+
 ## Concept
 
 Allow gaming on primary monitor while using secondary monitors freely, without breaking out of the game or losing profile-managed settings.
@@ -28,7 +35,7 @@ slippi-melee             -> slippi-melee-multimon
 | Display Mode | Exclusive Fullscreen | Borderless Windowed |
 | FSO (Fullscreen Optimizations) | OFF | ON (let Windows optimize) |
 | VRR in Windowed | N/A | ON |
-| MPO (Multi-Plane Overlay) | OFF | ON |
+| MPO (Multi-Plane Overlay) | Profile-specific; usually unchanged | Profile-specific; usually unchanged |
 | Windows VRR Optimize | OFF | ON |
 
 ### Latency Impact Assessment
@@ -57,7 +64,7 @@ slippi-melee             -> slippi-melee-multimon
 
 3. **NvidiaSettingsHandler changes**:
    - When `multi_monitor_mode=True`:
-     - Keep MPO enabled
+     - Do not toggle MPO by default
      - Consider VRR/G-SYNC enabled for borderless
 
 4. **Game config handlers** (Rivals2ConfigHandler, DolphinConfigHandler):

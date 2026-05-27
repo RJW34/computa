@@ -65,6 +65,7 @@ python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
 addopts = "-v --tb=short"
+asyncio_default_fixture_loop_scope = "function"
 markers = [
     "integration: marks tests that exercise real or simulated end-to-end system flows",
 ]
@@ -80,6 +81,8 @@ exclude = '''
     | venv
     | __pycache__
     | \.pytest_cache
+    | \.pytest-runtime
+    | \.pytest-tmp
 )/
 '''
 

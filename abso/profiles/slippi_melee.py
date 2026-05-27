@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Any, Literal
 
 from abso.profiles.profile_bases import (
     EmulatorLatencyBaseProfile,
+    fso_overrides,
     merge_settings_map,
 )
 
@@ -38,9 +39,20 @@ _HDR_OVERRIDES: dict[str, dict[str, Any]] = {
         "disable_auto_color_management": True,
     },
     "ColorProfileSettingsHandler": {
-        # On the HDR path the OS owns gamut, so steer ABSO's color handler
-        # to native instead of the sRGB clamp the SDR variants use.
+        # Match the OW2-HDR convention: native (no explicit sRGB
+        # association). On this hardware (LG OLED primary + Alienware
+        # QD-OLED secondary + Windows HDR on) the sRGB ICC clamp was
+        # empirically verified to LOOK MORE washed-out than native, not
+        # less — the LG's internal color processing reacts to the sRGB
+        # ICC metadata by switching to an sRGB-simulation picture mode
+        # that reads as muted. The COLOR_HDR_SRGB_CLAMP lint rule has
+        # the right default for this hardware class.
         "icc_profile": "native",
+        # Restore neutral vibrance on the HDR path — the SDR base
+        # applies a -5 compensation for wide-gamut SDR-on-OLED, but
+        # Windows HDR composition owns gamut mapping and an extra
+        # NVCP pull-down would fight it.
+        "digital_vibrance": 50,
     },
 }
 
@@ -130,7 +142,7 @@ class SlippiMeleeProfile(EmulatorLatencyBaseProfile):
         # Slippi runs exclusive fullscreen for lowest scanout latency. Disable
         # FSO per-exe so Dolphin is not silently bumped into the composited
         # borderless path for the strict no-sync profile.
-        return {exe: True for exe in self.executable_hints}
+        return fso_overrides(self.executable_hints)
 
     @property
     def allow_unverified_nvidia_profile_reuse(self) -> bool:

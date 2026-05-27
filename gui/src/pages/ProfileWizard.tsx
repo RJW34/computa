@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 import { useAppStore } from '@/stores/appStore';
 import { cn } from '@/lib/utils';
-import type { ApplyResult } from '@/lib/types';
+import type { ApplyResult, Profile } from '@/lib/types';
 import * as api from '@/lib/api';
 
 const STEPS = ['Select Profile', 'Review Scope', 'Backup Options', 'Apply'];
@@ -35,6 +35,22 @@ const HANDLER_LABEL_OVERRIDES: Record<string, string> = {
   Rivals2ConfigHandler: 'Rivals 2 config',
   OW2ConfigHandler: 'Overwatch 2 config',
 };
+
+const PROFILE_CATEGORY_ORDER: Record<string, number> = {
+  Desktop: 0,
+  Fighting: 1,
+  Shooters: 2,
+  RPGs: 3,
+  Other: 4,
+};
+
+interface ProfileGroup {
+  id: string;
+  name: string;
+  category: string;
+  rank: number;
+  profiles: Profile[];
+}
 
 function formatOptimizationTarget(target: string): string {
   return target
@@ -168,6 +184,43 @@ export function ProfileWizard() {
   }, [loadProfiles, profiles.length]);
 
   const selectedProfile = profiles.find((profile) => profile.id === wizardProfile);
+  const profileGroups = React.useMemo<ProfileGroup[]>(() => {
+    const groups = new Map<string, ProfileGroup>();
+
+    profiles
+      .filter((profile) => profile.tray_visible !== false)
+      .forEach((profile) => {
+        const groupId = profile.tray_group || profile.id;
+        const group = groups.get(groupId) ?? {
+          id: groupId,
+          name: profile.tray_group_name || profile.display_name,
+          category: profile.tray_category || 'Other',
+          rank: profile.tray_rank ?? 100,
+          profiles: [],
+        };
+
+        group.rank = Math.min(group.rank, profile.tray_rank ?? 100);
+        group.profiles.push(profile);
+        groups.set(groupId, group);
+      });
+
+    return Array.from(groups.values())
+      .map((group) => ({
+        ...group,
+        profiles: group.profiles.sort(
+          (a, b) =>
+            (a.tray_rank ?? 100) - (b.tray_rank ?? 100) ||
+            (a.tray_variant || a.display_name).localeCompare(b.tray_variant || b.display_name)
+        ),
+      }))
+      .sort(
+        (a, b) =>
+          (PROFILE_CATEGORY_ORDER[a.category] ?? 99) -
+            (PROFILE_CATEGORY_ORDER[b.category] ?? 99) ||
+          a.rank - b.rank ||
+          a.name.localeCompare(b.name)
+      );
+  }, [profiles]);
   const applyWarnings = React.useMemo(() => collectApplyWarnings(applyResult), [applyResult]);
   const applyNotices = React.useMemo(() => collectApplyNotices(applyResult), [applyResult]);
   const applySummaryLevel =
@@ -213,7 +266,13 @@ export function ProfileWizard() {
 
         try {
           const state = await api.getCurrentState();
-          setActiveProfile(state.current_profile, state.applied_at ?? undefined);
+          setActiveProfile(
+            state.current_profile,
+            state.applied_at ?? undefined,
+            state.verification ?? null,
+            state.reboot_pending,
+            state.reboot_reasons
+          );
         } catch (error) {
           console.warn('Failed to read backend active-profile state after apply:', error);
           setActiveProfile(wizardProfile);
@@ -326,30 +385,42 @@ export function ProfileWizard() {
             {profilesLoading && (
               <p className="text-sm text-muted-foreground">Loading profiles...</p>
             )}
-            {profiles.map((profile) => (
-              <Card
-                key={profile.id}
-                className={cn(
-                  'cursor-pointer transition-all',
-                  wizardProfile === profile.id
-                    ? 'border-primary ring-2 ring-primary'
-                    : 'hover:border-primary/50'
-                )}
-                onClick={() => setWizardProfile(profile.id)}
-              >
-                <CardContent className="flex items-center justify-between p-4">
-                  <div className="flex items-center gap-4">
-                    <Gamepad2 className="h-8 w-8 text-muted-foreground" />
-                    <div>
-                      <h3 className="font-semibold">{profile.display_name}</h3>
-                      <p className="text-sm text-muted-foreground">{profile.description}</p>
-                    </div>
-                  </div>
-                  {wizardProfile === profile.id && (
-                    <Check className="h-5 w-5 text-primary" />
-                  )}
-                </CardContent>
-              </Card>
+            {profileGroups.map((group) => (
+              <section key={group.id} className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-semibold">{group.name}</h3>
+                  <span className="text-xs text-muted-foreground">{group.category}</span>
+                </div>
+                {group.profiles.map((profile) => (
+                  <Card
+                    key={profile.id}
+                    className={cn(
+                      'cursor-pointer transition-all',
+                      wizardProfile === profile.id
+                        ? 'border-primary ring-2 ring-primary'
+                        : 'hover:border-primary/50'
+                    )}
+                    onClick={() => setWizardProfile(profile.id)}
+                  >
+                    <CardContent className="flex items-center justify-between p-4">
+                      <div className="flex items-center gap-4">
+                        <Gamepad2 className="h-8 w-8 text-muted-foreground" />
+                        <div>
+                          <h4 className="font-semibold">
+                            {profile.tray_variant || profile.display_name}
+                          </h4>
+                          <p className="text-sm text-muted-foreground">
+                            {profile.tray_subtitle || profile.description}
+                          </p>
+                        </div>
+                      </div>
+                      {wizardProfile === profile.id && (
+                        <Check className="h-5 w-5 text-primary" />
+                      )}
+                    </CardContent>
+                  </Card>
+                ))}
+              </section>
             ))}
           </div>
         )}

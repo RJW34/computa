@@ -62,9 +62,9 @@ def _make_serializable(obj: Any) -> Any:
     """Convert non-JSON-serializable values for snapshot comparison."""
     if isinstance(obj, dict):
         return {k: _make_serializable(v) for k, v in obj.items()}
-    if isinstance(obj, (list, tuple)):
+    if isinstance(obj, list | tuple):
         return [_make_serializable(v) for v in obj]
-    if isinstance(obj, (str, int, float, bool)) or obj is None:
+    if isinstance(obj, str | int | float | bool) or obj is None:
         return obj
     return str(obj)
 

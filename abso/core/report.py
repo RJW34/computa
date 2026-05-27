@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import logging
 import math
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from abso.core.benchmark import ComparisonResult, FrameTimeAnalysis
@@ -134,7 +134,7 @@ class BenchmarkReportGenerator:
         lines.append(separator)
         lines.append("  A.B.S.O. Benchmark Report")
         lines.append(separator)
-        lines.append(f"  Timestamp : {datetime.now(tz=timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}")
+        lines.append(f"  Timestamp : {datetime.now(tz=UTC).strftime('%Y-%m-%d %H:%M:%S UTC')}")
         if profile_id:
             lines.append(f"  Profile   : {profile_id}")
         if hardware_info:
@@ -224,7 +224,7 @@ class BenchmarkReportGenerator:
         lines.append(separator)
         lines.append("  A.B.S.O. Benchmark Comparison Report")
         lines.append(separator)
-        lines.append(f"  Timestamp : {datetime.now(tz=timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}")
+        lines.append(f"  Timestamp : {datetime.now(tz=UTC).strftime('%Y-%m-%d %H:%M:%S UTC')}")
         if profile_id:
             lines.append(f"  Profile   : {profile_id}")
         lines.append(separator)

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
+from copy import deepcopy
 from typing import TYPE_CHECKING, Any, Literal
 
 from abso.profiles.base import BaseProfile
@@ -14,15 +16,36 @@ if TYPE_CHECKING:
     from abso.settings.base import SettingsHandler
 
 
+# SDR-on-wide-gamut compensation. Modern OLED / QD-OLED / mini-LED panels
+# render wider than sRGB natively; without compensation, sRGB content gets
+# stretched into the panel's wider primaries and reads as oversaturated /
+# "off-color." A small DVC pull-down (-5 from neutral 50) restores the
+# author-intended sRGB perception across the SDR profile lineup.
+#
+# HDR profiles override this back to NEUTRAL_VIBRANCE because Windows HDR
+# composition owns the gamut mapping and DVC compensation would fight it.
+SDR_WIDE_GAMUT_VIBRANCE = 45
+NEUTRAL_VIBRANCE = 50
+
+
+def fso_overrides(
+    executables: Iterable[str],
+    *,
+    disabled: bool = True,
+) -> dict[str, bool]:
+    """Build a per-executable Fullscreen Optimizations override map."""
+    return dict.fromkeys(executables, disabled)
+
+
 def merge_settings(
     base: dict[str, Any] | None,
     overrides: dict[str, Any] | None,
 ) -> dict[str, Any]:
     merged: dict[str, Any] = {}
     if base:
-        merged.update(base)
+        merged.update(deepcopy(base))
     if overrides:
-        merged.update(overrides)
+        merged.update(deepcopy(overrides))
     return merged
 
 
@@ -32,7 +55,7 @@ def merge_settings_map(
 ) -> dict[str, dict[str, Any]]:
     merged: dict[str, dict[str, Any]] = {}
     for key, value in base_map.items():
-        merged[key] = value.copy()
+        merged[key] = deepcopy(value)
     for handler, overrides in overrides_map.items():
         merged[handler] = merge_settings(merged.get(handler, {}), overrides)
     return merged
@@ -81,7 +104,7 @@ def inject_fullscreen_optimizations(
     if not overrides:
         return settings
 
-    merged = {k: v for k, v in settings.items()} if settings else {}
+    merged = dict(settings) if settings else {}
     raw_existing = merged.get("fullscreen_optimizations")
 
     if raw_existing is None:
@@ -113,8 +136,116 @@ def inject_fullscreen_optimizations(
     return merged
 
 
+def add_legacy_system_tweaks(settings: dict[str, dict[str, Any]]) -> None:
+    """Add opt-in legacy registry/memory targets to a profile settings map."""
+    settings["RegistrySettingsHandler"]["system_responsiveness"] = 10
+    settings["RegistrySettingsHandler"]["network_throttling"] = 0xFFFFFFFF
+    settings["MemorySettingsHandler"] = {
+        "large_system_cache": 0,
+        "disable_paging_executive": 1,
+    }
+
+
+def merged_handler_settings(profile: Any, handler_name: str) -> dict[str, Any]:
+    """Resolve one handler's settings through the shared base merge pipeline."""
+    settings_map = merge_settings_map(
+        profile._base_settings(),
+        profile._settings_overrides(),
+    )
+    settings = settings_map.get(handler_name, {})
+    settings = inject_nvidia_profile_identity(profile, handler_name, settings)
+    settings = inject_fullscreen_optimizations(profile, handler_name, settings)
+    return settings
+
+
+def build_standard_handlers(
+    profile: BaseProfile,
+    *,
+    include_mouse: bool,
+    include_cpu_affinity: bool,
+    include_nvidia_notifications: bool = False,
+    include_rivals2_config: bool = False,
+    additional_handlers: list[SettingsHandler] | None = None,
+) -> list[SettingsHandler]:
+    """Build the common gaming handler chain in one drift-resistant place."""
+    from abso.settings.color import ColorProfileSettingsHandler
+    from abso.settings.cpu_affinity import CpuAffinityHandler
+    from abso.settings.display_range import DisplayColorRangeHandler
+    from abso.settings.graphics import GraphicsSettingsHandler
+    from abso.settings.memory import MemorySettingsHandler
+    from abso.settings.mouse import MouseSettingsHandler
+    from abso.settings.network import NetworkSettingsHandler
+    from abso.settings.nvidia import NvidiaSettingsHandler
+    from abso.settings.power import PowerSettingsHandler
+    from abso.settings.process_priority import ProcessPriorityHandler
+    from abso.settings.registry import RegistrySettingsHandler
+    from abso.settings.windows import WindowsSettingsHandler
+
+    handlers: list[SettingsHandler] = [
+        WindowsSettingsHandler(),
+        PowerSettingsHandler(),
+        RegistrySettingsHandler(),
+        NvidiaSettingsHandler(),
+    ]
+
+    if include_nvidia_notifications:
+        from abso.settings.nvidia_notifications import NvidiaNotificationHandler
+
+        handlers.append(NvidiaNotificationHandler())
+
+    handlers.append(NetworkSettingsHandler())
+
+    if include_mouse:
+        handlers.append(MouseSettingsHandler())
+
+    handlers.append(GraphicsSettingsHandler())
+
+    if profile.include_legacy_tweaks:
+        handlers.append(MemorySettingsHandler())
+
+    handlers.append(ProcessPriorityHandler(profile.executable_hints))
+
+    if include_cpu_affinity:
+        handlers.append(CpuAffinityHandler(profile.executable_hints))
+
+    if include_rivals2_config:
+        from abso.settings.rivals2_config import Rivals2ConfigHandler
+
+        handlers.append(Rivals2ConfigHandler())
+
+    handlers.append(ColorProfileSettingsHandler())
+    handlers.append(DisplayColorRangeHandler())
+
+    if additional_handlers:
+        handlers.extend(additional_handlers)
+
+    return handlers
+
+
 class Rivals2BaseProfile(BaseProfile):
     """Shared base for Rivals 2 profiles."""
+
+    HDR_WINDOWS_COMPOSITION_OVERRIDES: dict[str, dict[str, Any]] = {
+        "WindowsSettingsHandler": {
+            "hdr": True,
+            "advanced_color": True,
+            "auto_hdr": False,
+            # Rivals 2 currently advertises no native HDR support in Steam's
+            # metadata, so HDR variants run the game as SDR composited into
+            # Windows HDR. 200 nits is the OLED / Mini-LED starting point for
+            # the SDR-in-HDR paper-white slider.
+            "sdr_white_level_nits": 200,
+        },
+        "GraphicsSettingsHandler": {
+            "disable_auto_color_management": True,
+        },
+        "ColorProfileSettingsHandler": {
+            "icc_profile": "native",
+            "digital_vibrance": NEUTRAL_VIBRANCE,
+            "show_osd_guidance": True,
+            "game_type": "competitive_fps",
+        },
+    }
 
     @property
     def executable_hints(self) -> list[str]:
@@ -145,12 +276,12 @@ class Rivals2BaseProfile(BaseProfile):
         # so the whole family wants Windows to keep the real shipping binary on
         # the true exclusive path. Disable FSO per-exe for the shipping binary
         # and the legacy detection aliases.
-        exe_names = {
+        exe_names = (
             "Rivals2-Win64-Shipping.exe",
             "RivalsofAether2.exe",
             "Rivals2.exe",
-        }
-        return {exe: True for exe in exe_names}
+        )
+        return fso_overrides(exe_names)
 
     @property
     def allow_unverified_nvidia_profile_reuse(self) -> bool:
@@ -198,9 +329,13 @@ class Rivals2BaseProfile(BaseProfile):
         if self.is_online_profile:
             candidates = [
                 "Rivals 2 - Online No Sync",
+                "Rivals 2 - Online No Sync HDR",
                 "Rivals 2 - Online GSYNC",
+                "Rivals 2 - Online GSYNC HDR",
                 "Rivals 2: Online / Matchmaking",
                 "Rivals 2: Online G-SYNC",
+                "Rivals 2: Online HDR",
+                "Rivals 2: Online G-SYNC HDR",
                 "Rivals 2 (Streaming)",
             ]
         else:
@@ -208,9 +343,13 @@ class Rivals2BaseProfile(BaseProfile):
                 "Rivals2-Win64-Shipping.exe",
                 "Rivals of Aether 2",
                 "Rivals 2 - Offline No Sync",
+                "Rivals 2 - Offline No Sync HDR",
                 "Rivals 2 - Offline GSYNC",
+                "Rivals 2 - Offline GSYNC HDR",
                 "Rivals 2: Offline / Training",
                 "Rivals 2: G-SYNC",
+                "Rivals 2: Offline HDR",
+                "Rivals 2: G-SYNC HDR",
                 "Rivals 2: 300Hz Maximum",
                 "Rivals 2: Tournament Sim (144Hz)",
             ]
@@ -222,51 +361,13 @@ class Rivals2BaseProfile(BaseProfile):
         return deduped
 
     def get_handlers(self) -> list[SettingsHandler]:
-        from abso.settings.color import ColorProfileSettingsHandler
-        from abso.settings.cpu_affinity import CpuAffinityHandler
-        from abso.settings.display_range import DisplayColorRangeHandler
-        from abso.settings.graphics import GraphicsSettingsHandler
-        from abso.settings.memory import MemorySettingsHandler
-        from abso.settings.mouse import MouseSettingsHandler
-        from abso.settings.network import NetworkSettingsHandler
-        from abso.settings.nvidia import NvidiaSettingsHandler
-        from abso.settings.power import PowerSettingsHandler
-        from abso.settings.process_priority import ProcessPriorityHandler
-        from abso.settings.registry import RegistrySettingsHandler
-        from abso.settings.windows import WindowsSettingsHandler
-
-        handlers: list[SettingsHandler] = [
-            WindowsSettingsHandler(),
-            PowerSettingsHandler(),
-            RegistrySettingsHandler(),
-            NvidiaSettingsHandler(),
-        ]
-
-        if self.include_nvidia_notifications:
-            from abso.settings.nvidia_notifications import NvidiaNotificationHandler
-
-            handlers.append(NvidiaNotificationHandler())
-
-        handlers += [
-            NetworkSettingsHandler(),
-            MouseSettingsHandler(),
-            GraphicsSettingsHandler(),
-        ]
-
-        if self.include_legacy_tweaks:
-            handlers.append(MemorySettingsHandler())
-
-        handlers.append(ProcessPriorityHandler(self.executable_hints))
-        handlers.append(CpuAffinityHandler(self.executable_hints))
-
-        if self.include_rivals2_config:
-            from abso.settings.rivals2_config import Rivals2ConfigHandler
-
-            handlers.append(Rivals2ConfigHandler())
-
-        handlers.append(ColorProfileSettingsHandler())
-        handlers.append(DisplayColorRangeHandler())
-        return handlers
+        return build_standard_handlers(
+            self,
+            include_mouse=True,
+            include_cpu_affinity=True,
+            include_nvidia_notifications=self.include_nvidia_notifications,
+            include_rivals2_config=self.include_rivals2_config,
+        )
 
     def _base_settings(self) -> dict[str, dict[str, Any]]:
         # Profile defaults. Evidence and tradeoffs vary by setting; legacy
@@ -324,7 +425,7 @@ class Rivals2BaseProfile(BaseProfile):
             },
             "ColorProfileSettingsHandler": {
                 "icc_profile": "srgb",
-                "digital_vibrance": 50,
+                "digital_vibrance": SDR_WIDE_GAMUT_VIBRANCE,
                 "show_osd_guidance": True,
                 "game_type": "competitive_fps",
             },
@@ -335,12 +436,7 @@ class Rivals2BaseProfile(BaseProfile):
 
         # Legacy/unverified settings — opt-in only
         if self.include_legacy_tweaks:
-            settings["RegistrySettingsHandler"]["system_responsiveness"] = 10
-            settings["RegistrySettingsHandler"]["network_throttling"] = 0xFFFFFFFF
-            settings["MemorySettingsHandler"] = {
-                "large_system_cache": 0,
-                "disable_paging_executive": 1,
-            }
+            add_legacy_system_tweaks(settings)
 
         return settings
 
@@ -348,11 +444,58 @@ class Rivals2BaseProfile(BaseProfile):
         return {}
 
     def get_settings(self, handler_name: str) -> dict[str, Any]:
-        settings_map = merge_settings_map(self._base_settings(), self._settings_overrides())
-        settings = settings_map.get(handler_name, {})
-        settings = inject_nvidia_profile_identity(self, handler_name, settings)
-        settings = inject_fullscreen_optimizations(self, handler_name, settings)
-        return settings
+        return merged_handler_settings(self, handler_name)
+
+    def _rivals2_hdr_guidance(self) -> list[dict[str, str]]:
+        return [
+            {
+                "category": "Windows HDR",
+                "setting": "Use HDR (Settings > System > Display)",
+                "value": "On",
+                "reason": (
+                    "This profile enables Windows HDR + WCG for OLED / Mini-LED "
+                    "comfort. Rivals 2 currently advertises no native HDR support, "
+                    "so the game remains SDR and Windows composites it into the HDR surface."
+                ),
+            },
+            {
+                "category": "Windows HDR",
+                "setting": "SDR content brightness",
+                "value": "200 nits starting point; tune to taste",
+                "reason": (
+                    "ABSO sets the Windows SDR-in-HDR paper-white slider to 200 nits. "
+                    "Move it up or down until Rivals 2 matches your preferred desktop brightness."
+                ),
+            },
+            {
+                "category": "Rivals 2 Video",
+                "setting": "HDR Output",
+                "value": "Off in GameUserSettings.ini",
+                "reason": (
+                    "Steam metadata reports hdr_support=0 for Rivals 2, so ABSO does not "
+                    "force Unreal's bUseHDRDisplayOutput flag. These HDR lanes are OS-level "
+                    "SDR-in-HDR composition variants, not native game HDR."
+                ),
+            },
+            {
+                "category": "Windows HDR",
+                "setting": "Auto HDR",
+                "value": "Off",
+                "reason": (
+                    "Auto HDR applies synthetic expansion to SDR games. Rivals 2's competitive "
+                    "color path is kept as SDR inside Windows HDR composition instead."
+                ),
+            },
+            {
+                "category": "Display",
+                "setting": "Exclusive Fullscreen vs SDR-in-HDR latency",
+                "value": "Accept a small HDR composition cost",
+                "reason": (
+                    "Windows HDR composition can add a small nonzero presentation cost. "
+                    "Use the SDR sibling when the leanest latency path matters more than HDR desktop comfort."
+                ),
+            },
+        ]
 
 
 class EmulatorLatencyBaseProfile(BaseProfile):
@@ -381,41 +524,12 @@ class EmulatorLatencyBaseProfile(BaseProfile):
         return "off"
 
     def get_handlers(self) -> list[SettingsHandler]:
-        from abso.settings.color import ColorProfileSettingsHandler
-        from abso.settings.cpu_affinity import CpuAffinityHandler
-        from abso.settings.display_range import DisplayColorRangeHandler
-        from abso.settings.graphics import GraphicsSettingsHandler
-        from abso.settings.memory import MemorySettingsHandler
-        from abso.settings.mouse import MouseSettingsHandler
-        from abso.settings.network import NetworkSettingsHandler
-        from abso.settings.nvidia import NvidiaSettingsHandler
-        from abso.settings.power import PowerSettingsHandler
-        from abso.settings.process_priority import ProcessPriorityHandler
-        from abso.settings.registry import RegistrySettingsHandler
-        from abso.settings.windows import WindowsSettingsHandler
-
-        handlers: list[SettingsHandler] = [
-            WindowsSettingsHandler(),
-            PowerSettingsHandler(),
-            RegistrySettingsHandler(),
-            NvidiaSettingsHandler(),
-            NetworkSettingsHandler(),
-            MouseSettingsHandler(),
-            GraphicsSettingsHandler(),
-        ]
-
-        if self.include_legacy_tweaks:
-            handlers.append(MemorySettingsHandler())
-
-        handlers += [
-            ProcessPriorityHandler(self.executable_hints),
-            CpuAffinityHandler(self.executable_hints),
-            ColorProfileSettingsHandler(),
-            DisplayColorRangeHandler(),
-        ]
-
-        handlers.extend(self._additional_handlers())
-        return handlers
+        return build_standard_handlers(
+            self,
+            include_mouse=True,
+            include_cpu_affinity=True,
+            additional_handlers=self._additional_handlers(),
+        )
 
     def _additional_handlers(self) -> list[SettingsHandler]:
         return []
@@ -479,7 +593,7 @@ class EmulatorLatencyBaseProfile(BaseProfile):
             },
             "ColorProfileSettingsHandler": {
                 "icc_profile": "srgb",
-                "digital_vibrance": 50,
+                "digital_vibrance": SDR_WIDE_GAMUT_VIBRANCE,
                 "show_osd_guidance": True,
                 "game_type": "emulator",
             },
@@ -490,12 +604,7 @@ class EmulatorLatencyBaseProfile(BaseProfile):
 
         # Legacy/unverified settings — opt-in only
         if self.include_legacy_tweaks:
-            settings["RegistrySettingsHandler"]["system_responsiveness"] = 10
-            settings["RegistrySettingsHandler"]["network_throttling"] = 0xFFFFFFFF
-            settings["MemorySettingsHandler"] = {
-                "large_system_cache": 0,
-                "disable_paging_executive": 1,
-            }
+            add_legacy_system_tweaks(settings)
 
         return settings
 
@@ -503,46 +612,18 @@ class EmulatorLatencyBaseProfile(BaseProfile):
         return {}
 
     def get_settings(self, handler_name: str) -> dict[str, Any]:
-        settings_map = merge_settings_map(self._base_settings(), self._settings_overrides())
-        settings = settings_map.get(handler_name, {})
-        settings = inject_nvidia_profile_identity(self, handler_name, settings)
-        settings = inject_fullscreen_optimizations(self, handler_name, settings)
-        return settings
+        return merged_handler_settings(self, handler_name)
 
 
 class WebGLBaseProfile(BaseProfile):
     """Shared base for WebGL/WebView2 performance profiles."""
 
     def get_handlers(self) -> list[SettingsHandler]:
-        from abso.settings.color import ColorProfileSettingsHandler
-        from abso.settings.display_range import DisplayColorRangeHandler
-        from abso.settings.graphics import GraphicsSettingsHandler
-        from abso.settings.memory import MemorySettingsHandler
-        from abso.settings.network import NetworkSettingsHandler
-        from abso.settings.nvidia import NvidiaSettingsHandler
-        from abso.settings.power import PowerSettingsHandler
-        from abso.settings.process_priority import ProcessPriorityHandler
-        from abso.settings.registry import RegistrySettingsHandler
-        from abso.settings.windows import WindowsSettingsHandler
-
-        handlers = [
-            WindowsSettingsHandler(),
-            PowerSettingsHandler(),
-            RegistrySettingsHandler(),
-            NvidiaSettingsHandler(),
-            NetworkSettingsHandler(),
-            GraphicsSettingsHandler(),
-        ]
-
-        if self.include_legacy_tweaks:
-            handlers.append(MemorySettingsHandler())
-
-        handlers += [
-            ProcessPriorityHandler(self.executable_hints),
-            ColorProfileSettingsHandler(),
-            DisplayColorRangeHandler(),
-        ]
-        return handlers
+        return build_standard_handlers(
+            self,
+            include_mouse=False,
+            include_cpu_affinity=False,
+        )
 
     def _base_settings(self) -> dict[str, dict[str, Any]]:
         # Profile defaults. Evidence and tradeoffs vary by setting; legacy
@@ -582,7 +663,7 @@ class WebGLBaseProfile(BaseProfile):
             },
             "ColorProfileSettingsHandler": {
                 "icc_profile": "srgb",
-                "digital_vibrance": 50,
+                "digital_vibrance": SDR_WIDE_GAMUT_VIBRANCE,
                 "show_osd_guidance": True,
                 "game_type": "casual",
             },
@@ -593,12 +674,7 @@ class WebGLBaseProfile(BaseProfile):
 
         # Legacy/unverified settings — opt-in only
         if self.include_legacy_tweaks:
-            settings["RegistrySettingsHandler"]["system_responsiveness"] = 10
-            settings["RegistrySettingsHandler"]["network_throttling"] = 0xFFFFFFFF
-            settings["MemorySettingsHandler"] = {
-                "large_system_cache": 0,
-                "disable_paging_executive": 1,
-            }
+            add_legacy_system_tweaks(settings)
 
         return settings
 
@@ -606,11 +682,7 @@ class WebGLBaseProfile(BaseProfile):
         return {}
 
     def get_settings(self, handler_name: str) -> dict[str, Any]:
-        settings_map = merge_settings_map(self._base_settings(), self._settings_overrides())
-        settings = settings_map.get(handler_name, {})
-        settings = inject_nvidia_profile_identity(self, handler_name, settings)
-        settings = inject_fullscreen_optimizations(self, handler_name, settings)
-        return settings
+        return merged_handler_settings(self, handler_name)
 
 
 class ReflexShooterBaseProfile(BaseProfile):
@@ -641,39 +713,11 @@ class ReflexShooterBaseProfile(BaseProfile):
         return "off"
 
     def get_handlers(self) -> list[SettingsHandler]:
-        from abso.settings.color import ColorProfileSettingsHandler
-        from abso.settings.cpu_affinity import CpuAffinityHandler
-        from abso.settings.display_range import DisplayColorRangeHandler
-        from abso.settings.graphics import GraphicsSettingsHandler
-        from abso.settings.memory import MemorySettingsHandler
-        from abso.settings.mouse import MouseSettingsHandler
-        from abso.settings.network import NetworkSettingsHandler
-        from abso.settings.nvidia import NvidiaSettingsHandler
-        from abso.settings.power import PowerSettingsHandler
-        from abso.settings.process_priority import ProcessPriorityHandler
-        from abso.settings.registry import RegistrySettingsHandler
-        from abso.settings.windows import WindowsSettingsHandler
-
-        handlers = [
-            WindowsSettingsHandler(),
-            PowerSettingsHandler(),
-            RegistrySettingsHandler(),
-            NvidiaSettingsHandler(),
-            NetworkSettingsHandler(),
-            MouseSettingsHandler(),
-            GraphicsSettingsHandler(),
-        ]
-
-        if self.include_legacy_tweaks:
-            handlers.append(MemorySettingsHandler())
-
-        handlers += [
-            ProcessPriorityHandler(self.executable_hints),
-            CpuAffinityHandler(self.executable_hints),
-            ColorProfileSettingsHandler(),
-            DisplayColorRangeHandler(),
-        ]
-        return handlers
+        return build_standard_handlers(
+            self,
+            include_mouse=True,
+            include_cpu_affinity=True,
+        )
 
     def _base_settings(self) -> dict[str, dict[str, Any]]:
         # Profile defaults. Evidence and tradeoffs vary by setting; legacy
@@ -734,7 +778,7 @@ class ReflexShooterBaseProfile(BaseProfile):
             },
             "ColorProfileSettingsHandler": {
                 "icc_profile": "srgb",
-                "digital_vibrance": 50,
+                "digital_vibrance": SDR_WIDE_GAMUT_VIBRANCE,
                 "show_osd_guidance": True,
                 "game_type": "competitive_fps",
             },
@@ -745,12 +789,7 @@ class ReflexShooterBaseProfile(BaseProfile):
 
         # Legacy/unverified settings — opt-in only
         if self.include_legacy_tweaks:
-            settings["RegistrySettingsHandler"]["system_responsiveness"] = 10
-            settings["RegistrySettingsHandler"]["network_throttling"] = 0xFFFFFFFF
-            settings["MemorySettingsHandler"] = {
-                "large_system_cache": 0,
-                "disable_paging_executive": 1,
-            }
+            add_legacy_system_tweaks(settings)
 
         return settings
 
@@ -758,8 +797,4 @@ class ReflexShooterBaseProfile(BaseProfile):
         return {}
 
     def get_settings(self, handler_name: str) -> dict[str, Any]:
-        settings_map = merge_settings_map(self._base_settings(), self._settings_overrides())
-        settings = settings_map.get(handler_name, {})
-        settings = inject_nvidia_profile_identity(self, handler_name, settings)
-        settings = inject_fullscreen_optimizations(self, handler_name, settings)
-        return settings
+        return merged_handler_settings(self, handler_name)

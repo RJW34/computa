@@ -24,10 +24,7 @@ def _summarize_restore_issues(
     blocking_only: bool = False,
 ) -> str:
     """Build a concise summary for restore issues."""
-    relevant = [
-        item for item in items
-        if not blocking_only or bool(item.get("blocking", True))
-    ]
+    relevant = [item for item in items if not blocking_only or bool(item.get("blocking", True))]
     if not relevant:
         return ""
 
@@ -56,6 +53,8 @@ class TransactionResult:
     success: bool
     profile_id: str
     state: str
+    requested_profile_id: str | None = None
+    fallback_chain: list[dict[str, str]] = field(default_factory=list)
     backup_id: str | None = None
     rollback_backup_id: str | None = None
     error: str | None = None
@@ -67,15 +66,15 @@ class TransactionResult:
     checkpoints: list[TransactionCheckpoint] = field(default_factory=list)
 
     def add_checkpoint(self, phase: str, status: str, message: str) -> None:
-        self.checkpoints.append(
-            TransactionCheckpoint(phase=phase, status=status, message=message)
-        )
+        self.checkpoints.append(TransactionCheckpoint(phase=phase, status=status, message=message))
 
     def to_dict(self) -> dict[str, Any]:
         """Serialize to JSON-safe dictionary."""
         return {
             "success": self.success,
             "profile_id": self.profile_id,
+            "requested_profile_id": self.requested_profile_id,
+            "fallback_chain": self.fallback_chain,
             "state": self.state,
             "backup_id": self.backup_id,
             "rollback_backup_id": self.rollback_backup_id,
@@ -115,7 +114,7 @@ class ProfileTransactionManager:
             auto_rollback_on_critical: Roll back when compliance detects a
                 critical issue after apply.
             auto_rollback_on_partial_apply: Roll back when the apply loop
-                actually mutated state (``applied_settings`` is non-empty)
+                actually mutated state (``changed_settings`` is non-empty)
                 but returned ``success=False``. This prevents leaving the
                 system in a half-applied profile state — the class of bug
                 that used to force users to run ``abso restore latest`` by
@@ -127,20 +126,42 @@ class ProfileTransactionManager:
         self.auto_rollback_on_critical = auto_rollback_on_critical
         self.auto_rollback_on_partial_apply = auto_rollback_on_partial_apply
 
-    def execute(self, profile_id: str, create_backup: bool = True) -> TransactionResult:
+    def execute(
+        self,
+        profile_id: str,
+        create_backup: bool = True,
+        *,
+        requested_profile_id: str | None = None,
+        fallback_chain: list[dict[str, str]] | None = None,
+        allow_capability_fallback: bool = True,
+    ) -> TransactionResult:
         """Run full transactional apply flow."""
         canonical_profile_id = resolve_profile_id(profile_id) or profile_id
+        requested = requested_profile_id or canonical_profile_id
+        chain = list(fallback_chain or [])
         tx = TransactionResult(
             success=False,
             profile_id=canonical_profile_id,
             state="planned",
+            requested_profile_id=requested,
+            fallback_chain=chain,
         )
         tx.add_checkpoint("plan", "ok", "Transaction planned")
+        if chain:
+            tx.add_checkpoint(
+                "fallback",
+                "ok",
+                (
+                    f"Using fallback profile '{canonical_profile_id}' "
+                    f"for requested profile '{requested}'"
+                ),
+            )
 
         if canonical_profile_id not in self.applier.PROFILES:
             tx.state = "failed"
             tx.error = f"Unknown profile: {profile_id}"
             tx.add_checkpoint("validate", "failed", tx.error)
+            tx.apply_result = ApplyResult(success=False, error=tx.error)
             return tx
 
         try:
@@ -148,12 +169,60 @@ class ProfileTransactionManager:
         except Exception as e:
             tx.state = "failed"
             tx.error = f"Prerequisite validation failed: {e}"
+            tx.apply_result = ApplyResult(success=False, error=tx.error)
             tx.add_checkpoint("validate", "failed", tx.error)
             return tx
 
         if prerequisite_error:
+            fallback_profile_id: str | None = None
+            get_fallback = getattr(self.applier, "get_prepared_transition_fallback", None)
+            if callable(get_fallback):
+                candidate = get_fallback(canonical_profile_id)
+                if isinstance(candidate, str) and candidate.strip():
+                    fallback_profile_id = resolve_profile_id(candidate.strip()) or candidate.strip()
+
+            visited = {canonical_profile_id}
+            for item in chain:
+                for key in ("from", "to"):
+                    value = item.get(key)
+                    if isinstance(value, str) and value:
+                        visited.add(resolve_profile_id(value) or value)
+
+            if (
+                allow_capability_fallback
+                and fallback_profile_id
+                and fallback_profile_id not in visited
+            ):
+                next_chain = chain + [
+                    {
+                        "from": canonical_profile_id,
+                        "to": fallback_profile_id,
+                        "reason": prerequisite_error,
+                    }
+                ]
+                logger.info(
+                    "Profile '%s' blocked during preflight; falling back to '%s': %s",
+                    canonical_profile_id,
+                    fallback_profile_id,
+                    prerequisite_error,
+                )
+                return self.execute(
+                    fallback_profile_id,
+                    create_backup=create_backup,
+                    requested_profile_id=requested,
+                    fallback_chain=next_chain,
+                    allow_capability_fallback=allow_capability_fallback,
+                )
+
             tx.state = "failed"
             tx.error = prerequisite_error
+            get_failure_result = getattr(self.applier, "get_prepared_failure_result", None)
+            if callable(get_failure_result):
+                failure_result = get_failure_result(canonical_profile_id, prerequisite_error)
+                if isinstance(failure_result, ApplyResult):
+                    tx.apply_result = failure_result
+            if tx.apply_result is None:
+                tx.apply_result = ApplyResult(success=False, error=prerequisite_error)
             tx.add_checkpoint("validate", "failed", prerequisite_error)
             return tx
 
@@ -194,13 +263,16 @@ class ProfileTransactionManager:
                 if baseline_path and baseline_path.exists():
                     restore_summary = restore_manager.restore_backup(baseline_path.name)
                     if restore_summary.complete:
-                        tx.add_checkpoint("baseline_restore", "ok", f"Restored baseline: {baseline_path.name}")
+                        tx.add_checkpoint(
+                            "baseline_restore", "ok", f"Restored baseline: {baseline_path.name}"
+                        )
                     elif restore_summary.has_blocking_issues:
                         tx.state = "failed"
                         tx.error = (
                             "Baseline restore incomplete for restorable handlers: "
                             + _summarize_restore_issues(
-                                restore_summary.skipped_components + restore_summary.failed_components,
+                                restore_summary.skipped_components
+                                + restore_summary.failed_components,
                                 blocking_only=True,
                             )
                         )
@@ -217,9 +289,13 @@ class ProfileTransactionManager:
                             ),
                         )
                 else:
-                    tx.add_checkpoint("baseline_restore", "skipped", "No previous backup - first application")
+                    tx.add_checkpoint(
+                        "baseline_restore", "skipped", "No previous backup - first application"
+                    )
             except BackupNotFoundError:
-                tx.add_checkpoint("baseline_restore", "skipped", "No baseline backup found - first application")
+                tx.add_checkpoint(
+                    "baseline_restore", "skipped", "No baseline backup found - first application"
+                )
             except BackupCorruptedError as e:
                 tx.state = "failed"
                 tx.error = f"Baseline backup corrupted: {e}"
@@ -325,7 +401,7 @@ class ProfileTransactionManager:
         partial_apply_failure = (
             tx.apply_result is not None
             and not tx.apply_result.success
-            and bool(tx.apply_result.applied_settings)
+            and bool(tx.apply_result.changed_settings)
         )
 
         should_rollback = bool(
@@ -346,7 +422,7 @@ class ProfileTransactionManager:
             rollback_reason = (
                 "Critical compliance failure"
                 if has_critical
-                else f"Partial apply failure ({len(tx.apply_result.applied_settings)} handler(s) mutated state before failure)"
+                else f"Partial apply failure ({len(tx.apply_result.changed_settings)} setting(s) mutated state before failure)"
             )
             tx.state = "rolling_back"
             try:
@@ -361,24 +437,19 @@ class ProfileTransactionManager:
                     tx.rollback_error = (
                         "Rollback incomplete for handlers: "
                         + _summarize_restore_issues(
-                            restore_summary.skipped_components
-                            + restore_summary.failed_components,
+                            restore_summary.skipped_components + restore_summary.failed_components,
                             blocking_only=True,
                         )
                     )
                     tx.state = "failed"
                     tx.error = (
-                        f"{rollback_reason} and rollback was incomplete: "
-                        f"{tx.rollback_error}"
+                        f"{rollback_reason} and rollback was incomplete: " f"{tx.rollback_error}"
                     )
                     tx.add_checkpoint("rollback", "failed", tx.error)
             except Exception as e:
                 tx.rollback_error = str(e)
                 tx.state = "failed"
-                tx.error = (
-                    f"{rollback_reason} and rollback failed: "
-                    f"{tx.rollback_error}"
-                )
+                tx.error = f"{rollback_reason} and rollback failed: " f"{tx.rollback_error}"
                 tx.add_checkpoint("rollback", "failed", tx.error)
             tx.success = False
             return tx

@@ -53,8 +53,7 @@ class DisplayColorRangeHandler(SettingsHandler):
         displays = self._collect_display_state()
         any_limited = any(d.get("dynamic_range_label") == "limited" for d in displays)
         any_non_user_policy = any(
-            d.get("color_selection_policy") != int(NvColorSelectionPolicy.USER)
-            for d in displays
+            d.get("color_selection_policy") != int(NvColorSelectionPolicy.USER) for d in displays
         )
         return {
             "displays": displays,
@@ -74,42 +73,47 @@ class DisplayColorRangeHandler(SettingsHandler):
         limited = [d for d in state["displays"] if d.get("dynamic_range_label") == "limited"]
         if limited:
             ids = ", ".join(str(d["display_id"]) for d in limited)
-            issues.append(Issue(
-                title="NVIDIA Output Dynamic Range set to Limited (TV range)",
-                severity="warning",
-                current_value=f"Limited on {len(limited)} display(s) [IDs: {ids}]",
-                optimal_value="Full (VESA / PC range)",
-                explanation=(
-                    "PC monitors should output Full RGB (0-255) for correct black "
-                    "level and contrast. Limited range (16-235) is for TVs and will "
-                    "make the desktop look washed out with elevated blacks. NVIDIA "
-                    "driver installs commonly reset this back to Limited when the "
-                    "display's EDID advertises TV-style signalling."
-                ),
-                category="color",
-                evidence_tier=EvidenceTier.VERIFIED,
-            ))
+            issues.append(
+                Issue(
+                    title="NVIDIA Output Dynamic Range set to Limited (TV range)",
+                    severity="warning",
+                    current_value=f"Limited on {len(limited)} display(s) [IDs: {ids}]",
+                    optimal_value="Full (VESA / PC range)",
+                    explanation=(
+                        "PC monitors should output Full RGB (0-255) for correct black "
+                        "level and contrast. Limited range (16-235) is for TVs and will "
+                        "make the desktop look washed out with elevated blacks. NVIDIA "
+                        "driver installs commonly reset this back to Limited when the "
+                        "display's EDID advertises TV-style signalling."
+                    ),
+                    category="color",
+                    evidence_tier=EvidenceTier.VERIFIED,
+                )
+            )
 
         auto_policy = [
-            d for d in state["displays"]
+            d
+            for d in state["displays"]
             if d.get("color_selection_policy") != int(NvColorSelectionPolicy.USER)
         ]
         if auto_policy and not limited:
             # Only surface this if we didn't already flag a harder problem.
             ids = ", ".join(str(d["display_id"]) for d in auto_policy)
-            issues.append(Issue(
-                title="NVIDIA color selection policy is non-USER",
-                severity="info",
-                current_value=f"Driver-managed on {len(auto_policy)} display(s) [IDs: {ids}]",
-                optimal_value="User (explicit) so the choice survives driver restarts",
-                explanation=(
-                    "Driver-managed color policy lets NVIDIA reselect format and "
-                    "range on each display attach, which is why these settings "
-                    "flap across driver updates. A USER policy persists."
-                ),
-                category="color",
-                evidence_tier=EvidenceTier.EMPIRICAL,
-            ))
+            issues.append(
+                Issue(
+                    title="NVIDIA color selection policy is non-USER",
+                    severity="info",
+                    current_value=f"Driver-managed on {len(auto_policy)} display(s) [IDs: {ids}]",
+                    optimal_value="User (explicit) so the choice survives driver restarts",
+                    explanation=(
+                        "Driver-managed color policy lets NVIDIA reselect format and "
+                        "range on each display attach, which is why these settings "
+                        "flap across driver updates. A USER policy persists."
+                    ),
+                    category="color",
+                    evidence_tier=EvidenceTier.EMPIRICAL,
+                )
+            )
 
         return issues
 
@@ -132,7 +136,7 @@ class DisplayColorRangeHandler(SettingsHandler):
                 "error": None,
                 "requires_reboot": False,
                 "applied": [],
-                "skipped": [f"NVAPI not available (non-NVIDIA system or driver missing)"],
+                "skipped": ["NVAPI not available (non-NVIDIA system or driver missing)"],
             }
 
         display_ids = nvdisp.enumerate_display_ids(require_active=True)
@@ -148,6 +152,7 @@ class DisplayColorRangeHandler(SettingsHandler):
         applied: list[str] = []
         skipped: list[str] = []
         errors: list[str] = []
+        changed = False
 
         for display_id in display_ids:
             try:
@@ -155,19 +160,19 @@ class DisplayColorRangeHandler(SettingsHandler):
             except Exception as exc:
                 logger.info(
                     "DisplayColorRangeHandler: NVAPI raised for display %s: %s",
-                    display_id, exc,
+                    display_id,
+                    exc,
                 )
                 skipped.append(f"Display {display_id}: NVAPI raised ({exc})")
                 continue
 
             if not outcome["success"]:
-                errors.append(
-                    f"Display {display_id}: {outcome.get('error') or 'unknown error'}"
-                )
+                errors.append(f"Display {display_id}: {outcome.get('error') or 'unknown error'}")
                 continue
 
             label = _range_value_label(target)
             if outcome["changed"]:
+                changed = True
                 applied.append(f"Display {display_id}: Output Dynamic Range → {label}")
             else:
                 applied.append(f"Display {display_id}: already {label} (no change)")
@@ -178,6 +183,8 @@ class DisplayColorRangeHandler(SettingsHandler):
             "requires_reboot": False,
             "applied": applied,
             "skipped": skipped,
+            "changed": changed,
+            "changed_keys": ["dynamic_range"] if changed else [],
         }
 
     def backup(self) -> dict[str, Any]:
@@ -217,21 +224,30 @@ class DisplayColorRangeHandler(SettingsHandler):
                 )
                 continue
             try:
-                target = NvDynamicRange(range_value) if range_value in (
-                    NvDynamicRange.VESA, NvDynamicRange.CEA, NvDynamicRange.AUTO,
-                ) else NvDynamicRange.AUTO
+                target = (
+                    NvDynamicRange(range_value)
+                    if range_value
+                    in (
+                        NvDynamicRange.VESA,
+                        NvDynamicRange.CEA,
+                        NvDynamicRange.AUTO,
+                    )
+                    else NvDynamicRange.AUTO
+                )
                 outcome = nvdisp.set_dynamic_range(display_id, target)
                 if not outcome["success"]:
                     any_failure = True
                     logger.error(
                         "DisplayColorRangeHandler.restore failed for display %s: %s",
-                        display_id, outcome.get("error"),
+                        display_id,
+                        outcome.get("error"),
                     )
             except Exception as exc:
                 any_failure = True
                 logger.error(
                     "DisplayColorRangeHandler.restore raised for display %s: %s",
-                    display_id, exc,
+                    display_id,
+                    exc,
                 )
 
         return not any_failure

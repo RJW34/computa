@@ -13,6 +13,7 @@ from abso.core.config_safety import (
 )
 from abso.core.models import Issue
 from abso.settings.base import SettingsHandler
+from abso.settings.value_parsing import parse_bool_like
 
 logger = logging.getLogger(__name__)
 
@@ -305,7 +306,7 @@ class UEGameUserSettingsHandler(SettingsHandler):
 
     def _convert_value(self, profile_key: str, value: Any) -> str | None:
         if profile_key in self.BOOL_SETTINGS:
-            parsed = self._parse_bool(value)
+            parsed = parse_bool_like(value)
             return None if parsed is None else ("True" if parsed else "False")
 
         try:
@@ -322,23 +323,10 @@ class UEGameUserSettingsHandler(SettingsHandler):
 
     def _coerce_detected(self, profile_key: str, raw_value: str) -> Any:
         if profile_key in self.BOOL_SETTINGS:
-            return raw_value.strip().lower() == "true"
+            parsed = parse_bool_like(raw_value)
+            return bool(parsed) if parsed is not None else raw_value
 
         try:
             return int(float(raw_value))
         except (TypeError, ValueError):
             return raw_value
-
-    @staticmethod
-    def _parse_bool(value: Any) -> bool | None:
-        if isinstance(value, bool):
-            return value
-        if isinstance(value, (int, float)):
-            return bool(value)
-        if isinstance(value, str):
-            lowered = value.strip().lower()
-            if lowered in {"1", "true", "yes", "on"}:
-                return True
-            if lowered in {"0", "false", "no", "off"}:
-                return False
-        return None

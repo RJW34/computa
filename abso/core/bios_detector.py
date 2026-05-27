@@ -13,6 +13,7 @@ Detects:
 
 from __future__ import annotations
 
+import contextlib
 import logging
 import winreg
 from dataclasses import dataclass, field
@@ -324,17 +325,13 @@ class BiosDetector:
 
         raw_speed = getattr(stick, "Speed", None)
         if raw_speed is not None:
-            try:
+            with contextlib.suppress(ValueError, TypeError):
                 rated_speed = int(raw_speed)
-            except (ValueError, TypeError):
-                pass
 
         raw_configured = getattr(stick, "ConfiguredClockSpeed", None)
         if raw_configured is not None:
-            try:
+            with contextlib.suppress(ValueError, TypeError):
                 current_speed = int(raw_configured)
-            except (ValueError, TypeError):
-                pass
 
         if rated_speed is None or current_speed is None:
             return ("unknown", rated_speed, current_speed)
@@ -595,11 +592,11 @@ class BiosDetector:
                 title="Enable XMP/EXPO memory profile in BIOS",
                 explanation=(
                     "Your memory appears to be running at JEDEC base speed "
-                    "instead of its rated XMP/EXPO speed.{detail} Enabling "
+                    f"instead of its rated XMP/EXPO speed.{speed_detail} Enabling "
                     "XMP (Intel) or EXPO (AMD) in BIOS is free performance "
                     "-- typically 5-15% improvement in CPU-bound scenarios "
                     "and minimum frame times."
-                ).format(detail=speed_detail),
+                ),
                 impact="high",
                 evidence_tier=EvidenceTier.VERIFIED,
                 current_value=f"{info.current_speed_mhz} MHz (JEDEC base)",

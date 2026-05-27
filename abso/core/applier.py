@@ -18,7 +18,7 @@ from pathlib import Path
 from typing import Any
 
 from abso.core.capabilities import CapabilityEngine, CapabilityReport
-from abso.core.config import ConfigManager
+from abso.core.config import ConfigManager, merge_profile_override_settings
 from abso.core.exceptions import (
     ProfileNotFoundError,
 )
@@ -27,10 +27,12 @@ from abso.core.linter import LintResult, ProfileLinter
 from abso.core.multimon_detector import MultiMonitorDetector, MultiMonitorResult
 from abso.core.network_scope import NetworkScopeManager, NetworkScopeResult
 from abso.core.overlay_manager import OverlayManager
+from abso.core.process_list import parse_tasklist_csv_images
 from abso.core.rollback_guard import RollbackGuard, RollbackGuardResult
 from abso.core.stability_gate import StabilityGate, StabilityGateResult
 from abso.profiles.base import BaseProfile
 from abso.profiles.catalog import get_profile_classes, resolve_profile_id
+from abso.profiles.profile_bases import inject_nvidia_profile_identity
 
 logger = logging.getLogger(__name__)
 
@@ -45,6 +47,7 @@ class ApplyResult:
     reboot_reasons: list[str] = field(default_factory=list)
     in_game_settings: bool = False
     applied_settings: list[str] = field(default_factory=list)
+    changed_settings: list[str] = field(default_factory=list)
     failed_settings: list[str] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
     notices: list[str] = field(default_factory=list)
@@ -71,6 +74,8 @@ class ProfilePreparationResult:
 
     success: bool
     error: str | None = None
+    fallback_profile_id: str | None = None
+    fallback_reason: str | None = None
     multimon_result: MultiMonitorResult | None = None
     capability_report: CapabilityReport | None = None
     warnings: list[str] = field(default_factory=list)
@@ -135,13 +140,15 @@ class ProfileApplier:
         self._capability_engine = CapabilityEngine()
         self._linter = ProfileLinter()
         self._rollback_guard = RollbackGuard(mode=rollback_guard_mode)
-        self._stability_gate = StabilityGate(
-            fallback_controller=self._fallback_controller
-        )
+        self._stability_gate = StabilityGate(fallback_controller=self._fallback_controller)
         self._network_scope = NetworkScopeManager()
         self._multimon_detector = MultiMonitorDetector()
         self._overlay_manager = OverlayManager()
         self._prepared_profiles: dict[str, ProfilePreparationResult] = {}
+
+    @staticmethod
+    def _canonical_profile_name(profile_name: str) -> str:
+        return resolve_profile_id(profile_name) or profile_name
 
     def _get_profile(self, profile_name: str) -> BaseProfile:
         """Get or create a profile instance.
@@ -155,15 +162,14 @@ class ProfileApplier:
         Raises:
             ValueError: If profile not found.
         """
-        canonical_profile_name = resolve_profile_id(profile_name) or profile_name
+        canonical_profile_name = self._canonical_profile_name(profile_name)
 
         if canonical_profile_name not in self._profiles:
             profile_class = self.PROFILES.get(canonical_profile_name)
             if not profile_class:
                 available = ", ".join(self.PROFILES.keys())
                 raise ProfileNotFoundError(
-                    f"Unknown profile: {profile_name}",
-                    details=f"Available profiles: {available}"
+                    f"Unknown profile: {profile_name}", details=f"Available profiles: {available}"
                 )
             self._profiles[canonical_profile_name] = profile_class()
 
@@ -187,6 +193,7 @@ class ProfileApplier:
         Returns:
             ApplyResult with status and validation details.
         """
+        profile_name = self._canonical_profile_name(profile_name)
         try:
             profile = self._get_profile(profile_name)
         except ProfileNotFoundError as e:
@@ -230,9 +237,7 @@ class ProfileApplier:
 
             if lint_result.has_errors and not self.force_aggressive:
                 error_codes = [e.code for e in lint_result.errors]
-                logger.error(
-                    f"Profile '{profile_name}' failed linting: {error_codes}"
-                )
+                logger.error(f"Profile '{profile_name}' failed linting: {error_codes}")
                 result.success = False
                 result.error = f"Lint failed: {', '.join(error_codes)}"
                 return result
@@ -245,9 +250,7 @@ class ProfileApplier:
             if rollback_result.violations:
                 if self._rollback_guard.mode == "block" and not self.force_aggressive:
                     violation_codes = [v.code for v in rollback_result.violations]
-                    logger.error(
-                        f"RollbackGuard blocked profile: {violation_codes}"
-                    )
+                    logger.error(f"RollbackGuard blocked profile: {violation_codes}")
                     result.success = False
                     result.error = f"Rollback violations: {', '.join(violation_codes)}"
                     return result
@@ -256,9 +259,7 @@ class ProfileApplier:
                     settings_map = self._rollback_guard.apply_overrides(
                         settings_map, rollback_result
                     )
-                    result.rollback_overrides_applied = len(
-                        rollback_result.enforced_overrides
-                    )
+                    result.rollback_overrides_applied = len(rollback_result.enforced_overrides)
 
         # === PHASE 4: StabilityGate ===
         if not self.skip_stability_gate and not self.force_aggressive:
@@ -272,9 +273,7 @@ class ProfileApplier:
         if not self.skip_network_scope:
             network_result = self._network_scope.apply_scope(profile, settings_map)
             result.network_scope_result = network_result
-            settings_map = self._network_scope.get_scoped_settings(
-                settings_map, network_result
-            )
+            settings_map = self._network_scope.get_scoped_settings(settings_map, network_result)
 
         # === PHASE 6: Build final settings / preflight ===
         config_manager = ConfigManager()
@@ -310,6 +309,7 @@ class ProfileApplier:
 
         # === PHASE 7: Apply Handlers ===
         applied: list[str] = []
+        changed: list[str] = []
         failed: list[str] = []
         skipped: list[str] = []
         requires_reboot = False
@@ -331,13 +331,14 @@ class ProfileApplier:
 
                 if handler_result.get("success", False):
                     applied.append(handler_name)
-                    if handler_result.get("requires_reboot", False) or handler_result.get("requires_restart", False):
+                    changed.extend(self._handler_changed_settings(handler_name, handler_result))
+                    if handler_result.get("requires_reboot", False) or handler_result.get(
+                        "requires_restart", False
+                    ):
                         requires_reboot = True
                         reboot_reasons.append(handler_name)
                 else:
-                    failed.append(
-                        f"{handler_name}: {handler_result.get('error', 'Unknown error')}"
-                    )
+                    failed.append(f"{handler_name}: {handler_result.get('error', 'Unknown error')}")
 
                 for warning in handler_result.get("warnings", []) or []:
                     self._append_unique(result.warnings, str(warning))
@@ -358,6 +359,7 @@ class ProfileApplier:
                 failed.append(f"{handler_name}: Unexpected error - {e}")
 
         result.applied_settings = applied
+        result.changed_settings = changed
         result.failed_settings = failed
         result.requires_reboot = requires_reboot
         result.reboot_reasons = reboot_reasons
@@ -422,9 +424,15 @@ class ProfileApplier:
                 multimon_result=multimon_result,
             )
             if capability_report.has_blockers:
+                fallback_profile_id = self._select_capability_fallback(
+                    profile_name,
+                    capability_report,
+                )
                 return ProfilePreparationResult(
                     success=False,
                     error=capability_report.blockers[0].message,
+                    fallback_profile_id=fallback_profile_id,
+                    fallback_reason=capability_report.blockers[0].message,
                     multimon_result=multimon_result,
                     capability_report=capability_report,
                     warnings=warnings,
@@ -438,6 +446,64 @@ class ProfileApplier:
             warnings=warnings,
             notices=notices,
         )
+
+    def _select_capability_fallback(
+        self,
+        profile_name: str,
+        capability_report: CapabilityReport,
+    ) -> str | None:
+        """Return a canonical fallback profile when every blocker agrees.
+
+        Falling back is only safe when the capability engine emits structured
+        profile metadata. ABSO never guesses a fallback from names here.
+        """
+        canonical_profile_name = resolve_profile_id(profile_name) or profile_name
+        candidates: list[str] = []
+        for finding in capability_report.blockers:
+            raw = getattr(finding, "fallback_profile_id", None)
+            if not isinstance(raw, str) or not raw.strip():
+                return None
+            canonical = resolve_profile_id(raw.strip()) or raw.strip()
+            if canonical == canonical_profile_name or canonical not in self.PROFILES:
+                return None
+            candidates.append(canonical)
+
+        if not candidates:
+            return None
+
+        first = candidates[0]
+        if any(candidate != first for candidate in candidates):
+            return None
+        return first
+
+    def get_prepared_transition_fallback(self, profile_name: str) -> str | None:
+        """Return a safe fallback discovered during prerequisite validation."""
+        canonical_profile_name = resolve_profile_id(profile_name) or profile_name
+        preparation = self._prepared_profiles.get(canonical_profile_name)
+        if preparation is None:
+            return None
+        return preparation.fallback_profile_id
+
+    def get_prepared_failure_result(
+        self,
+        profile_name: str,
+        error: str,
+    ) -> ApplyResult:
+        """Build an ApplyResult for failures that happen before apply begins."""
+        canonical_profile_name = resolve_profile_id(profile_name) or profile_name
+        preparation = self._prepared_profiles.get(canonical_profile_name)
+        result = ApplyResult(success=False, error=error)
+        if preparation is None:
+            return result
+
+        result.multimon_result = preparation.multimon_result
+        result.capability_report = preparation.capability_report
+        result.warnings = list(preparation.warnings)
+        result.notices = list(preparation.notices)
+        if preparation.capability_report:
+            result.capability_blockers = len(preparation.capability_report.blockers)
+            result.capability_warnings = len(preparation.capability_report.warnings)
+        return result
 
     def _remediate_blocking_overlays(
         self,
@@ -473,6 +539,7 @@ class ProfileApplier:
 
     def validate_profile_prerequisites(self, profile_name: str) -> str | None:
         """Validate a named profile before any transactional side effects begin."""
+        profile_name = self._canonical_profile_name(profile_name)
         profile = self._get_profile(profile_name)
         preparation = self._prepare_profile_environment(profile_name, profile)
         self._prepared_profiles[profile_name] = preparation
@@ -539,10 +606,7 @@ class ProfileApplier:
             if handler_name == "NvidiaSettingsHandler":
                 settings["executables"] = list(profile.nvidia_binding_executables)
                 settings["game_name"] = profile.display_name
-                if profile.nvidia_profile_name:
-                    settings.setdefault("profile_name", profile.nvidia_profile_name)
-                if profile.nvidia_profile_aliases:
-                    settings.setdefault("profile_aliases", list(profile.nvidia_profile_aliases))
+                settings = inject_nvidia_profile_identity(profile, handler_name, settings)
                 if profile.requires_exact_nvidia_binding:
                     settings.setdefault("require_exact_binding", True)
                 if profile.allow_unverified_nvidia_profile_reuse:
@@ -560,7 +624,12 @@ class ProfileApplier:
         profile_name: str,
         profile: BaseProfile,
         profile_overrides: Any | None,
-    ) -> tuple[dict[str, dict[str, Any]], LintResult | None, StabilityGateResult | None, NetworkScopeResult | None]:
+    ) -> tuple[
+        dict[str, dict[str, Any]],
+        LintResult | None,
+        StabilityGateResult | None,
+        NetworkScopeResult | None,
+    ]:
         """Build the effective handler settings after the same transforms apply() uses.
 
         This keeps verification aligned with the real applied path so compliance
@@ -627,7 +696,9 @@ class ProfileApplier:
             try:
                 preflight_result = handler.preflight(settings.copy())
             except Exception as e:
-                logger.error("Handler preflight crashed for %s/%s: %s", profile_name, handler_name, e)
+                logger.error(
+                    "Handler preflight crashed for %s/%s: %s", profile_name, handler_name, e
+                )
                 failures.append(f"{handler_name}: preflight crashed: {e}")
                 continue
 
@@ -648,6 +719,51 @@ class ProfileApplier:
             return
 
         messages.append(normalized)
+
+    @staticmethod
+    def _handler_changed_settings(
+        handler_name: str,
+        handler_result: dict[str, Any],
+    ) -> list[str]:
+        """Return settings that actually changed, if the handler reported them.
+
+        ``applied_settings`` is an API compatibility field meaning "handler
+        succeeded." Rollback decisions need a stricter signal: did the handler
+        mutate state? Newer handlers can report ``changed_settings`` or
+        ``changed_keys``. Older handlers are interpreted conservatively so
+        failures still roll back if we cannot prove a no-op.
+        """
+        explicit_settings = handler_result.get("changed_settings")
+        if isinstance(explicit_settings, list):
+            out: list[str] = []
+            for item in explicit_settings:
+                text = str(item).strip()
+                if not text:
+                    continue
+                out.append(text if "." in text else f"{handler_name}.{text}")
+            return out
+
+        explicit_keys = handler_result.get("changed_keys")
+        if isinstance(explicit_keys, list):
+            return [
+                f"{handler_name}.{str(item).strip()}" for item in explicit_keys if str(item).strip()
+            ]
+
+        if "changed" in handler_result:
+            return [handler_name] if bool(handler_result.get("changed")) else []
+
+        applied = handler_result.get("applied")
+        if isinstance(applied, list):
+            if not applied:
+                return []
+            no_op_markers = ("already", "no change", "skipped")
+            for item in applied:
+                text = str(item).lower()
+                if not any(marker in text for marker in no_op_markers):
+                    return [handler_name]
+            return []
+
+        return [handler_name]
 
     def _check_game_running(self, executable_hints: list[str]) -> list[str]:
         """Check if any of the profile's game executables are currently running.
@@ -670,7 +786,7 @@ class ProfileApplier:
                 timeout=30,
             )
             if result.returncode == 0:
-                running_procs = result.stdout.lower()
+                running_procs = parse_tasklist_csv_images(result.stdout or "")
                 for exe in executable_hints:
                     if exe.lower() in running_procs:
                         warnings.append(
@@ -702,32 +818,10 @@ class ProfileApplier:
         Returns:
             Merged settings dictionary.
         """
-        # Map handler names to override attribute names
-        handler_to_attr = {
-            "NvidiaSettingsHandler": "nvidia",
-            "WindowsSettingsHandler": "windows",
-            "NetworkSettingsHandler": "network",
-            "PowerSettingsHandler": "power",
-            "TimerSettingsHandler": "timer",
-            "MouseSettingsHandler": "mouse",
-            "ColorProfileSettingsHandler": "color",
-            "DisplayColorRangeHandler": "display_color_range",
-        }
-
-        attr_name = handler_to_attr.get(handler_name)
-        if not attr_name:
+        merged = merge_profile_override_settings(settings, handler_name, overrides)
+        if merged is settings:
             return settings
-
-        # Get handler-specific overrides
-        handler_overrides = getattr(overrides, attr_name, {})
-        if not handler_overrides:
-            return settings
-
-        # Deep merge: overrides take precedence
-        merged = settings.copy()
-        merged.update(handler_overrides)
-        logger.debug(f"Applied overrides for {handler_name}: {handler_overrides}")
-
+        logger.debug("Applied overrides for %s", handler_name)
         return merged
 
     def generate_report(self, profile_name: str, output_dir: Path) -> Path:
@@ -743,6 +837,7 @@ class ProfileApplier:
         Raises:
             ValueError: If profile not found.
         """
+        profile_name = self._canonical_profile_name(profile_name)
         profile = self._get_profile(profile_name)
 
         report_path = output_dir / f"{profile_name}_settings.md"
@@ -764,19 +859,24 @@ class ProfileApplier:
         Returns:
             Dict with 'all_active' bool and per-handler verification results.
         """
+        profile_name = self._canonical_profile_name(profile_name)
         profile = self._get_profile(profile_name)
         config_manager = ConfigManager()
         profile_overrides = config_manager.get_profile_overrides(profile_name)
-        final_settings_map, lint_result, stability_gate_result, network_scope_result = self._build_effective_settings_map(
-            profile_name,
-            profile,
-            profile_overrides,
+        final_settings_map, lint_result, stability_gate_result, network_scope_result = (
+            self._build_effective_settings_map(
+                profile_name,
+                profile,
+                profile_overrides,
+            )
         )
 
         results: dict[str, Any] = {
             "profile": profile_name,
             "all_active": True,
             "handlers": {},
+            "pending_apply_settings": [],
+            "pending_reboot_gated_settings": [],
         }
         if lint_result is not None:
             results["lint_warnings"] = len(lint_result.warnings)
@@ -803,6 +903,12 @@ class ProfileApplier:
 
                 if not handler_result.get("all_active", True):
                     results["all_active"] = False
+                    for setting_name in handler_result.get("pending_apply_settings", []):
+                        results["pending_apply_settings"].append(f"{handler_name}.{setting_name}")
+                    for setting_name in handler_result.get("pending_reboot_gated_settings", []):
+                        results["pending_reboot_gated_settings"].append(
+                            f"{handler_name}.{setting_name}"
+                        )
 
             except Exception as e:
                 logger.error(f"Error verifying {handler_name}: {e}")
@@ -811,6 +917,11 @@ class ProfileApplier:
                     "all_active": False,
                 }
                 results["all_active"] = False
+
+        if not results["pending_apply_settings"]:
+            results.pop("pending_apply_settings", None)
+        if not results["pending_reboot_gated_settings"]:
+            results.pop("pending_reboot_gated_settings", None)
 
         return results
 
@@ -824,11 +935,13 @@ class ProfileApplier:
 
         for name, profile_class in self.PROFILES.items():
             profile = profile_class()
-            profiles.append({
-                "id": name,
-                "display_name": profile.display_name,
-                "description": profile.description,
-                "optimization_target": profile.optimization_target,
-            })
+            profiles.append(
+                {
+                    "id": name,
+                    "display_name": profile.display_name,
+                    "description": profile.description,
+                    "optimization_target": profile.optimization_target,
+                }
+            )
 
         return profiles

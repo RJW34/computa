@@ -23,7 +23,7 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-from abso.profiles.profile_bases import Rivals2BaseProfile
+from abso.profiles.profile_bases import Rivals2BaseProfile, merge_settings_map
 
 
 class Rivals2OfflineProfile(Rivals2BaseProfile):
@@ -64,6 +64,10 @@ class Rivals2OfflineProfile(Rivals2BaseProfile):
     def is_online_profile(self) -> bool:
         """This is explicitly an OFFLINE profile - no rollback protection needed."""
         return False
+
+    @property
+    def is_sdr_only(self) -> bool:
+        return True
 
     @property
     def graphics_api(self) -> Literal["dx11", "dx12", "vulkan", "opengl", "unknown"]:
@@ -170,5 +174,37 @@ class Rivals2OfflineProfile(Rivals2BaseProfile):
                 "reason": "FPS should run uncapped without hitching. Tearing is expected.",
             },
         ]
+
+
+class Rivals2OfflineHDRProfile(Rivals2OfflineProfile):
+    """Offline no-sync Rivals 2 profile with Windows HDR composition enabled."""
+
+    @property
+    def profile_id(self) -> str:
+        return "rivals2-offline-hdr"
+
+    @property
+    def display_name(self) -> str:
+        return "Rivals 2 - Offline No Sync HDR"
+
+    @property
+    def description(self) -> str:
+        return (
+            "Offline no-sync Rivals 2 profile with Windows HDR composition. "
+            "Keeps the same latency knobs as the SDR lane; Rivals 2 native HDR output stays off."
+        )
+
+    @property
+    def is_sdr_only(self) -> bool:
+        return False
+
+    def _settings_overrides(self) -> dict[str, dict[str, Any]]:
+        return merge_settings_map(
+            super()._settings_overrides(),
+            self.HDR_WINDOWS_COMPOSITION_OVERRIDES,
+        )
+
+    def get_in_game_settings(self) -> list[dict[str, str]]:
+        return [*self._rivals2_hdr_guidance(), *super().get_in_game_settings()]
 
 

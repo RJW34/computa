@@ -7,7 +7,6 @@ from unittest.mock import patch
 
 import pytest
 
-from abso.core import bios_detector as bd
 from abso.core.bios_detector import (
     SECURE_BOOT_CERT_EXPIRY_DATE,
     BiosDetector,

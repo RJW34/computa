@@ -18,10 +18,11 @@ import os
 import re
 import subprocess
 import winreg
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from abso.core.models import EvidenceTier, Issue
+from abso.core.process_list import parse_tasklist_csv_images
 from abso.settings.base import SettingsHandler
 
 logger = logging.getLogger(__name__)
@@ -181,16 +182,12 @@ class DiagnosticsSettingsHandler(SettingsHandler):
             )
         except (OSError, subprocess.SubprocessError):
             return []
-        running: set[str] = set()
-        for line in proc.stdout.splitlines():
-            if not line:
-                continue
-            # CSV first column is quoted image name.
-            first = line.split('","')[0].strip('"').strip()
-            lowered = first.lower()
-            for hint in _OVERLAY_PROCESS_HINTS:
-                if lowered == hint.lower():
-                    running.add(hint)
+        running_images = parse_tasklist_csv_images(proc.stdout or "")
+        running = {
+            hint
+            for hint in _OVERLAY_PROCESS_HINTS
+            if hint.lower() in running_images
+        }
         return sorted(running)
 
     def _read_nvidia_driver_info(self) -> dict[str, Any] | None:
@@ -290,7 +287,7 @@ class DiagnosticsSettingsHandler(SettingsHandler):
         }
 
     def _directstorage_runtime_present(self) -> bool | None:
-        system32 = os.environ.get("SystemRoot")
+        system32 = os.environ.get("SYSTEMROOT")
         if not system32:
             return None
         candidate = os.path.join(system32, "System32", "dstorage.dll")
@@ -330,7 +327,7 @@ class DiagnosticsSettingsHandler(SettingsHandler):
             hz = getattr(disp, "refresh_rate_hz", None) or getattr(
                 disp, "refresh_hz", None
             )
-            if isinstance(hz, (int, float)) and hz > 0:
+            if isinstance(hz, int | float) and hz > 0:
                 refresh_rates.append(float(hz))
         return {
             "count": len(displays) if displays else 0,
@@ -614,14 +611,14 @@ def estimate_driver_age_days(version: str, reference: datetime | None = None) ->
     match = re.match(r"(\d+)\.(\d+)", version)
     if not match:
         return None
-    ref = reference or datetime.now(timezone.utc)
+    ref = reference or datetime.now(UTC)
     branch = int(match.group(1))
     # Base: branch 550 ~ early 2024. This is deliberately imprecise; the
     # audit check above only fires when branch < 520, so this helper is a
     # placeholder for future refinement.
     base_branch = 550
-    base_date = datetime(2024, 1, 15, tzinfo=timezone.utc)
+    base_date = datetime(2024, 1, 15, tzinfo=UTC)
     delta_branches = base_branch - branch
     approx = base_date.timestamp() - delta_branches * 90 * 24 * 3600
-    approx_dt = datetime.fromtimestamp(approx, tz=timezone.utc)
+    approx_dt = datetime.fromtimestamp(approx, tz=UTC)
     return max((ref - approx_dt).days, 0)

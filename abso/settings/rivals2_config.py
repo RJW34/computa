@@ -17,6 +17,7 @@ from abso.core.config_safety import (
 )
 from abso.core.models import Issue
 from abso.settings.base import SettingsHandler
+from abso.settings.value_parsing import parse_bool_like
 
 logger = logging.getLogger(__name__)
 
@@ -105,16 +106,16 @@ class Rivals2ConfigHandler(SettingsHandler):
             if "FullscreenMode" in assignments:
                 result["fullscreen_mode"] = int(float(assignments["FullscreenMode"]))
             if "bUseVSync" in assignments:
-                result["vsync"] = assignments["bUseVSync"].lower() == "true"
+                result["vsync"] = parse_bool_like(assignments["bUseVSync"])
             if "bUseRawInput" in assignments:
-                result["raw_input"] = assignments["bUseRawInput"].lower() == "true"
+                result["raw_input"] = parse_bool_like(assignments["bUseRawInput"])
             if "FrameRateLimit" in assignments:
                 try:
                     result["frame_rate_limit"] = int(float(assignments["FrameRateLimit"]))
                 except ValueError:
                     logger.debug("Rivals 2 frame rate limit value was non-numeric")
             if "bUseHDRDisplayOutput" in assignments:
-                result["hdr_output"] = assignments["bUseHDRDisplayOutput"].lower() == "true"
+                result["hdr_output"] = parse_bool_like(assignments["bUseHDRDisplayOutput"])
             if "HDRDisplayOutputNits" in assignments:
                 try:
                     result["hdr_nits"] = int(float(assignments["HDRDisplayOutputNits"]))
@@ -390,14 +391,14 @@ class Rivals2ConfigHandler(SettingsHandler):
                 errors.append("fullscreen_mode must be an integer")
 
         if "vsync" in settings:
-            parsed = self._parse_bool(settings["vsync"])
+            parsed = parse_bool_like(settings["vsync"])
             if parsed is None:
                 errors.append("vsync must be a boolean")
             else:
                 replacements["bUseVSync"] = "True" if parsed else "False"
 
         if "raw_input" in settings:
-            parsed = self._parse_bool(settings["raw_input"])
+            parsed = parse_bool_like(settings["raw_input"])
             if parsed is None:
                 errors.append("raw_input must be a boolean")
             else:
@@ -413,7 +414,7 @@ class Rivals2ConfigHandler(SettingsHandler):
                 errors.append("frame_rate_limit must be a non-negative number")
 
         if "hdr_output" in settings:
-            parsed = self._parse_bool(settings["hdr_output"])
+            parsed = parse_bool_like(settings["hdr_output"])
             if parsed is None:
                 errors.append("hdr_output must be a boolean")
             else:
@@ -429,17 +430,3 @@ class Rivals2ConfigHandler(SettingsHandler):
                 errors.append("hdr_nits must be a positive number")
 
         return replacements, errors
-
-    def _parse_bool(self, value: Any) -> bool | None:
-        """Convert bool-like values into a bool or None when unsupported."""
-        if isinstance(value, bool):
-            return value
-        if isinstance(value, (int, float)):
-            return bool(value)
-        if isinstance(value, str):
-            lowered = value.strip().lower()
-            if lowered in {"1", "true", "yes", "on"}:
-                return True
-            if lowered in {"0", "false", "no", "off"}:
-                return False
-        return None

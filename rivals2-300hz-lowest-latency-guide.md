@@ -4,6 +4,14 @@
 ## Purpose
 This document provides the **lowest possible latency** configuration for Rivals of Aether 2 on Windows with NVIDIA GPUs and a **300Hz monitor**. Two configurations are provided: absolute minimum latency (accepting tearing) and minimum latency while tear-free.
 
+## Current ABSO Profile Alignment (2026-05)
+
+The shipped profiles are the source of truth:
+
+- `rivals2-offline` / `rivals2-online`: no-sync, VRR off, NVCP Max Frame Rate off, Rivals 2 `FrameRateLimit=999`.
+- `rivals2-gsync` / `rivals2-online-gsync`: strict fullscreen-only G-SYNC, NVCP VSync safety net, and matching in-game + driver refresh-scaled caps (`285 @ 300Hz`, `233 @ 240Hz`, `141 @ 144Hz`).
+- HDR siblings use Windows HDR composition only. Steam currently advertises `hdr_support=0` for Rivals 2, so ABSO keeps Rivals 2 `bUseHDRDisplayOutput=False`.
+
 ---
 
 ## TL;DR: Lowest Latency Configurations
@@ -24,7 +32,7 @@ WINDOWS:
 
 RIVALS 2 IN-GAME:
   V-SYNC ...................... OFF
-  Frame Rate Cap .............. UNCAPPED or 240 (highest preset)
+  Frame Rate Cap .............. UNCAPPED / Engine Max (ABSO writes 999)
   Display Mode ................ EXCLUSIVE FULLSCREEN
 ```
 **Result:** Absolute minimum input lag. Tearing occurs but is barely visible at 300Hz (~3.33ms tear lines).
@@ -38,7 +46,7 @@ NVIDIA CONTROL PANEL:
   G-SYNC ...................... ON
   Vertical Sync ............... ON (safety net only)
   Low Latency Mode ............ On (NOT Ultra)
-  Max Frame Rate .............. OFF
+  Max Frame Rate .............. Auto refresh-scaled cap (285 @ 300Hz)
   Power Management ............ Prefer maximum performance
 
 WINDOWS:
@@ -47,7 +55,7 @@ WINDOWS:
 
 RIVALS 2 IN-GAME:
   V-SYNC ...................... OFF (critical)
-  Frame Rate Cap .............. 240 (must cap for G-SYNC)
+  Frame Rate Cap .............. Auto refresh-scaled cap (285 @ 300Hz)
   Display Mode ................ EXCLUSIVE FULLSCREEN
 ```
 **Result:** Near-minimum latency with zero tearing. Adds ~2-5ms vs no-sync.
@@ -55,34 +63,18 @@ RIVALS 2 IN-GAME:
 
 ---
 
-## The 300Hz Problem with Rivals 2
+## The 300Hz Cap Detail
 
-### FPS Cap Limitation
-Rivals 2 only offers preset FPS caps: **60, 120, 144, 165, 240**
+### UI Presets vs Config Values
+Rivals 2's UI may expose preset FPS caps such as **60, 120, 144, 165, 240**. ABSO writes `FrameRateLimit` in `GameUserSettings.ini` directly, so the G-SYNC profiles use the same custom refresh-scaled cap as the NVIDIA driver safety cap.
 
-For optimal VRR on a 300Hz monitor, you'd want **300 FPS** (refresh). But 240 is the highest available preset.
+For a 300Hz monitor, the current ABSO VRR cap is **285 FPS**. This replaces the older `refresh - 3` / `297 FPS` guidance, which was too tight for high-refresh frame-time variance.
 
-### What You Lose with 240 FPS Cap on 300Hz
-| Metric | 300 FPS (optimal) | 240 FPS (available) | Difference |
-|--------|-------------------|---------------------|------------|
-| Scanout time | 3.33ms | 4.17ms | +0.84ms |
-| Refresh utilization | 99% | 80% | -19% |
-| VRR headroom wasted | 3 FPS | 60 FPS | 57 FPS |
+### Why ABSO Uses Matching Game + Driver Caps
 
-### Why 240 FPS In-Game is Still Recommended (Tear-Free Option)
-Despite losing 60Hz of headroom, the **in-game limiter has ~0.5-1 frame lower latency** than external limiters (RTSS/NVCP). For a 60Hz-logic fighting game:
+The in-game limiter is the preferred limiter when the config value sticks. Rivals 2 can rewrite `GameUserSettings.ini` on exit, so ABSO also keeps the NVIDIA driver cap as a safety net. Both caps resolve to the same value, preventing dueling limiter targets.
 
-- You receive new game state only **60 times per second** regardless of render FPS
-- The limiter latency savings (~3-4ms) outweighs the scanout difference (~0.84ms)
--- Net result: In-game 240 cap beats RTSS 300 cap for total input lag
-
-### When to Use RTSS 300 Instead
-If you're playing other games on the same system that:
-- Have uncapped or custom FPS options
-- Are not 60Hz-logic locked
-- Benefit from the full 300 FPS
-
-Then configure RTSS at 300 globally and disable it per-profile for Rivals 2.
+Do not add RTSS on top of these profiles. Online no-sync also forbids external frame caps because rollback timing is more important than frametime smoothing.
 
 ---
 
@@ -139,7 +131,7 @@ Display Mode: Exclusive Fullscreen
 ### Why This Works
 - **G-SYNC matches refresh to framerate** — No traditional V-SYNC buffer delay
 - **NVCP V-SYNC as safety net** — Only engages if FPS exceeds refresh (which the cap prevents)
-- **In-game cap at 240** — Stays within VRR range; lower limiter latency than RTSS
+- **Matching game + driver caps** — Stays within VRR range with one refresh-scaled target
 
 ### NVIDIA Control Panel
 ```
@@ -151,7 +143,7 @@ Manage 3D Settings → Program Settings → Rivals2.exe:
   Monitor Technology: G-SYNC Compatible
   Vertical sync: On
   Low Latency Mode: On (NOT Ultra — Ultra overrides FPS caps)
-  Max Frame Rate: Off
+  Max Frame Rate: Auto refresh-scaled cap (285 @ 300Hz)
   Power management mode: Prefer maximum performance
   Triple buffering: Off
   Preferred refresh rate: Highest available
@@ -169,14 +161,14 @@ Settings → System → Display → Graphics → Change default graphics setting
 ### Rivals 2 In-Game
 ```
 V-SYNC: Off (critical — in-game V-SYNC adds latency)
-Frame Rate Cap: 240 (highest available)
-Display Mode: Exclusive Fullscreen (or Borderless if G-SYNC windowed enabled)
+Frame Rate Cap: Auto refresh-scaled cap (285 @ 300Hz)
+Display Mode: Exclusive Fullscreen
 ```
 
 ### Expected Behavior
-- Steady 240 FPS (capped by in-game limiter)
+- Steady 285 FPS on 300Hz (capped by matching in-game and driver caps)
 - Zero screen tearing
-- G-SYNC active (monitor refreshes at 240Hz dynamically)
+- G-SYNC active (monitor refreshes at the capped framerate dynamically)
 - NVCP V-SYNC never engages (FPS always below 300Hz ceiling)
 - Near-minimum latency with perfect visual consistency
 
@@ -186,7 +178,7 @@ Display Mode: Exclusive Fullscreen (or Borderless if G-SYNC windowed enabled)
 
 ### Does 300Hz vs 240Hz Matter for 60fps Logic?
 
-**Quick Answer:** Both are fine for cadence. For VRR with 240 FPS cap, scanout is identical.
+**Quick Answer:** Both divide evenly into 60Hz game logic, but keep the monitor at 300Hz for no-sync scanout and VRR headroom.
 
 **Explanation:**
 | Refresh | ÷ 60fps | Result |
@@ -202,11 +194,11 @@ Both divide evenly into 60, so no frame cadence judder occurs with either.
 
 | Scenario | Actual Scanout |
 |----------|---------------|
-| 240 FPS cap on 300Hz monitor (G-SYNC) | **4.17ms** |
-| 240 FPS cap on 240Hz monitor (G-SYNC) | **4.17ms** |
+| 285 FPS cap on 300Hz monitor (G-SYNC) | **~3.51ms** |
+| 233 FPS cap on 240Hz monitor (G-SYNC) | **~4.29ms** |
 | Uncapped 300+ FPS on 300Hz (no sync) | **~3.33ms** |
 
-**For VRR setup (recommended):** Monitor at 240Hz vs 300Hz makes no latency difference when capped at 240 FPS. Keep at 300Hz for VRR headroom (prevents hitting ceiling on FPS spikes).
+**For VRR setup:** Keep the monitor at its maximum refresh. ABSO scales the cap with refresh so the VRR path gets headroom without leaving the display at a lower scanout ceiling.
 
 **For no-sync setup:** Monitor at 300Hz DOES matter — you get 3.33ms scanout vs 4.17ms at 240Hz.
 
@@ -224,7 +216,8 @@ Each FPS cap preset in Rivals 2 has different latency characteristics:
 | 120 | 8.33ms | ~4-8ms | 2x faster frame delivery |
 | 144 | 6.94ms | ~3.5-7ms | Common VRR target |
 | 165 | 6.06ms | ~3-6ms | Mid-tier option |
-| 240 | 4.17ms | ~2-4ms | **Lowest - always use this** |
+| 240 | 4.17ms | ~2-4ms | Best manual UI preset if custom INI writes are unavailable |
+| 285 | 3.51ms | ~1.8-3.5ms | ABSO 300Hz G-SYNC profile target |
 
 *Limiter overhead is ~0.5-1 frame. At higher FPS, a "frame" is shorter in absolute time.
 
@@ -237,11 +230,11 @@ Each FPS cap preset in Rivals 2 has different latency characteristics:
 | Configuration | Sync Latency | Limiter Latency | Scanout | Tearing | Total Relative |
 |---------------|--------------|-----------------|---------|---------|----------------|
 | No sync, uncapped | 0 | 0 | ~3.3ms | Yes | **Lowest** |
-| G-SYNC+VSYNC, 240 in-game | ~0 | ~2-4ms | ~4.2ms | No | **Very Low** |
+| G-SYNC+VSYNC, 285 game+driver cap | ~0 | ~1.8-3.5ms | ~3.5ms | No | **Very Low** |
 | G-SYNC+VSYNC, 300 RTSS | ~0 | ~4-6ms | ~3.4ms | No | Very Low (but higher limiter overhead) |
 | V-SYNC only, 300 cap | High (~16ms) | Low | ~3.3ms | No | High |
 
-**Note:** G-SYNC at 240 FPS has 4.2ms scanout regardless of monitor's max refresh (240Hz or 300Hz).
+**Note:** ABSO no longer uses the older 240-only guidance for the profile path; 240 remains the manual fallback when the game UI is the only thing being changed.
 
 ---
 
@@ -278,7 +271,7 @@ You receive **new gameplay information 60 times per second** regardless of rende
 ### Confirm FPS Cap is Working
 1. Enable Steam FPS counter (Steam → Settings → In-Game → FPS Counter)
 2. Or use RTSS overlay (shows frametime graph too)
-3. FPS should stay at 240 (tear-free) or 300+ (no sync)
+3. FPS should stay near the ABSO VRR cap, such as 285 at 300Hz (tear-free), or 300+ (no sync)
 
 ### Confirm No Tearing (Tear-Free Option)
 1. Move camera rapidly left/right in training mode
@@ -296,7 +289,7 @@ You receive **new gameplay information 60 times per second** regardless of rende
 
 ### Issue: FPS stuck at 60
 - Check in-game FPS cap setting
-- Check NVCP Max Frame Rate (should be Off)
+- Check NVCP Max Frame Rate (off for no-sync, ABSO auto cap for G-SYNC)
 - Check for V-SYNC forcing 60Hz lock
 - Verify monitor is set to 300Hz in Windows
 
@@ -321,7 +314,7 @@ You receive **new gameplay information 60 times per second** regardless of rende
 ### Issue: Higher latency feel than expected
 - Ensure in-game V-SYNC is OFF (most common mistake)
 - Check Low Latency Mode is "On" not "Ultra" or "Off"
-- Verify no frame rate limiting in NVCP
+- Verify no extra RTSS/global limiter is layered over the profile's intended cap
 - Check GPU isn't thermal throttling (monitor temps)
 
 ---
@@ -346,12 +339,12 @@ At 300Hz with a 60Hz-logic game, the difference between these configurations is 
 │            300Hz LOWEST LATENCY - RIVALS OF AETHER 2            │
 ├─────────────────────────────────────────────────────────────────┤
 │ DEFAULT: NO-SYNC (Minimum Latency)                              │
-│   G-SYNC: OFF | V-SYNC: OFF | LLM: On | Cap: UNCAPPED/240       │
+│   G-SYNC: OFF | V-SYNC: OFF | LLM: On | Cap: Engine max / 999   │
 │   Monitor: 300Hz (CRITICAL) | Scanout: 3.33ms                   │
 ├─────────────────────────────────────────────────────────────────┤
 │ ALTERNATIVE: VRR (Tear-Free, +2-5ms)                            │
-│   G-SYNC: ON | V-SYNC: ON (NVCP) | LLM: On | Cap: 240 in-game   │
-│   Monitor: 300Hz (for headroom) | Scanout: 4.17ms               │
+│   G-SYNC: ON | V-SYNC: ON (NVCP) | LLM: On | Cap: 285 @ 300Hz   │
+│   Monitor: 300Hz (for headroom) | Scanout: ~3.51ms              │
 ├─────────────────────────────────────────────────────────────────┤
 │ BOTH SETUPS:                                                    │
 │   In-game V-SYNC: OFF | Power: Prefer maximum performance       │
@@ -363,32 +356,29 @@ At 300Hz with a 60Hz-logic game, the difference between these configurations is 
 
 ## FAQ: Common Questions
 
-### Should I set my monitor to 240Hz to "match" my 240 FPS cap?
+### Should I set my monitor to 240Hz to "match" a 240 FPS cap?
 
 **No.** There is no benefit to matching monitor refresh to FPS cap because:
 
-1. **G-SYNC determines scanout by actual FPS** — At 240fps, scanout is 4.17ms regardless of whether monitor is set to 240Hz or 300Hz
+1. **ABSO's G-SYNC profiles scale the cap to the monitor** — 300Hz gets a 285 cap, not 240
 2. **No "sync harmony" benefit** — G-SYNC dynamically matches refresh to frame rate
-3. **300Hz gives VRR headroom** — If FPS spikes to 245, you stay in VRR range instead of triggering V-SYNC
+3. **300Hz gives VRR headroom** — If FPS spikes above a lower manual cap, you stay in VRR range instead of triggering V-SYNC
 4. **Power difference is negligible** — The only theoretical benefit of 240Hz
 
 **Always keep monitor at 300Hz.**
 
 ### Why not use RTSS at 300 FPS for better scanout?
 
-The math doesn't favor it for 60Hz-logic fighting games:
-- RTSS 300 FPS: 3.33ms scanout + ~4-6ms limiter overhead = ~7-9ms
-- In-game 240 FPS: 4.17ms scanout + ~2-4ms limiter overhead = ~6-8ms
+ABSO already uses a 285 FPS cap at 300Hz for the G-SYNC profile. RTSS adds another limiter layer and breaks the profile's single-target cap contract. Use RTSS only for manual experiments outside the shipped profiles.
 
-In-game limiter's lower overhead outweighs the scanout benefit.
-
-### Does the specific FPS cap value (60/120/144/165/240) affect limiter latency?
+### Does the specific FPS cap value affect limiter latency?
 
 Yes, but it's frame time, not limiter mechanism. The limiter adds ~0.5-1 frame overhead:
 - At 60fps: 0.5 frame = ~8ms
 - At 240fps: 0.5 frame = ~2ms
+- At 285fps: 0.5 frame = ~1.75ms
 
-**Always use 240** — highest available = lowest absolute latency.
+Use the highest stable cap that still leaves VRR headroom. In ABSO's 300Hz G-SYNC profile that is 285 FPS.
 
 ---
 

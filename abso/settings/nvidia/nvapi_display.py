@@ -259,7 +259,7 @@ class NVAPIDisplay:
 
     def _find_nvapi_dll(self) -> Path | None:
         """Locate nvapi64.dll in System32 (or the driver store fallback)."""
-        system32 = Path(os.environ.get("SystemRoot", r"C:\Windows")) / "System32"
+        system32 = Path(os.environ.get("SYSTEMROOT", r"C:\Windows")) / "System32"
         candidate = system32 / "nvapi64.dll"
         if candidate.exists():
             return candidate

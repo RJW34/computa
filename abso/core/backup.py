@@ -6,6 +6,7 @@ import json
 import logging
 import os
 import shutil
+import time
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -28,6 +29,18 @@ DEFAULT_MAX_BACKUPS = 20
 # (e.g. timer resolution reverts on process exit, so there is nothing to
 # restore). Their skip/fail in a restore summary is not a blocking issue.
 _NON_BLOCKING_GUARANTEES = frozenset({"none", "ephemeral"})
+
+
+def _commit_staged_backup(staging_path: Path, final_path: Path) -> None:
+    """Rename a staged backup directory, retrying transient Windows denials."""
+    for attempt in range(5):
+        try:
+            os.replace(staging_path, final_path)
+            return
+        except PermissionError:
+            if attempt == 4 or final_path.exists():
+                raise
+            time.sleep(0.05 * (attempt + 1))
 
 
 @dataclass
@@ -84,7 +97,14 @@ class BackupManager:
             backup_dir: Directory to store backups.
         """
         self.backup_dir = backup_dir
-        self._handlers = _get_backup_handlers()
+        self._handlers: list[SettingsHandler] | None = None
+
+    @property
+    def handlers(self) -> list[SettingsHandler]:
+        """Lazily load backup handlers only for backup/restore operations."""
+        if self._handlers is None:
+            self._handlers = _get_backup_handlers()
+        return self._handlers
 
     @staticmethod
     def _resolve_restore_guarantee(
@@ -151,7 +171,7 @@ class BackupManager:
         }
 
         try:
-            for handler in self._handlers:
+            for handler in self.handlers:
                 handler_name = handler.__class__.__name__
                 restore_guarantee = str(getattr(handler, "restore_guarantee", "full"))
 
@@ -219,8 +239,10 @@ class BackupManager:
             raise
 
         # Commit: rename the staging dir to its final name.  os.replace
-        # requires the target not to exist, which is guaranteed above.
-        os.replace(staging_path, final_path)
+        # requires the target not to exist, which is guaranteed above. Windows
+        # can briefly deny directory renames right after nested file writes, so
+        # tolerate that transient without leaving a valid backup as .partial.
+        _commit_staged_backup(staging_path, final_path)
 
         logger.info(f"Backup created: {final_path.name}")
         return final_path.name
@@ -242,29 +264,25 @@ class BackupManager:
         if not backup_path or not backup_path.exists():
             raise BackupNotFoundError(
                 f"Backup not found: {backup_id}",
-                details=f"Expected path: {self.backup_dir / backup_id}"
+                details=f"Expected path: {self.backup_dir / backup_id}",
             )
 
         manifest_path = backup_path / "manifest.json"
         if not manifest_path.exists():
             raise BackupCorruptedError(
                 f"Backup manifest not found: {backup_id}",
-                details="The backup directory exists but manifest.json is missing"
+                details="The backup directory exists but manifest.json is missing",
             )
 
         try:
             manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
         except json.JSONDecodeError as e:
             raise BackupCorruptedError(
-                f"Backup manifest is corrupted: {backup_id}",
-                details=str(e)
+                f"Backup manifest is corrupted: {backup_id}", details=str(e)
             ) from e
 
         # Create handler lookup
-        handler_map = {
-            handler.__class__.__name__: handler
-            for handler in self._handlers
-        }
+        handler_map = {handler.__class__.__name__: handler for handler in self.handlers}
         restore_summary = BackupRestoreSummary(backup_id=backup_path.name)
 
         # Restore each component
@@ -279,34 +297,40 @@ class BackupManager:
                     or "Component was not backed up with a safe restore path"
                 )
                 logger.warning(f"Skipping {handler_name}: {detail}")
-                restore_summary.skipped_components.append({
-                    "handler": handler_name,
-                    "reason": "backup_unavailable",
-                    "detail": detail,
-                    "blocking": is_blocking,
-                })
+                restore_summary.skipped_components.append(
+                    {
+                        "handler": handler_name,
+                        "reason": "backup_unavailable",
+                        "detail": detail,
+                        "blocking": is_blocking,
+                    }
+                )
                 continue
 
             if not handler:
                 logger.warning(f"No handler for {handler_name}")
-                restore_summary.skipped_components.append({
-                    "handler": handler_name,
-                    "reason": "handler_missing",
-                    "detail": "No restore handler is registered for this component",
-                    "blocking": is_blocking,
-                })
+                restore_summary.skipped_components.append(
+                    {
+                        "handler": handler_name,
+                        "reason": "handler_missing",
+                        "detail": "No restore handler is registered for this component",
+                        "blocking": is_blocking,
+                    }
+                )
                 continue
 
             try:
                 component_path = backup_path / component_info["file"]
                 if not component_path.exists():
                     logger.error(f"Backup file missing for {handler_name}: {component_path}")
-                    restore_summary.failed_components.append({
-                        "handler": handler_name,
-                        "reason": "backup_file_missing",
-                        "detail": str(component_path),
-                        "blocking": is_blocking,
-                    })
+                    restore_summary.failed_components.append(
+                        {
+                            "handler": handler_name,
+                            "reason": "backup_file_missing",
+                            "detail": str(component_path),
+                            "blocking": is_blocking,
+                        }
+                    )
                     continue
                 data = json.loads(component_path.read_text(encoding="utf-8"))
 
@@ -316,45 +340,55 @@ class BackupManager:
                     logger.info(f"Restored {handler_name}")
                 else:
                     logger.error(f"Restore handler reported failure for {handler_name}")
-                    restore_summary.failed_components.append({
-                        "handler": handler_name,
-                        "reason": "restore_failed",
-                        "detail": "Handler returned False",
-                        "blocking": is_blocking,
-                    })
+                    restore_summary.failed_components.append(
+                        {
+                            "handler": handler_name,
+                            "reason": "restore_failed",
+                            "detail": "Handler returned False",
+                            "blocking": is_blocking,
+                        }
+                    )
 
             except json.JSONDecodeError as e:
                 logger.error(f"Corrupted backup data for {handler_name}: {e}")
-                restore_summary.failed_components.append({
-                    "handler": handler_name,
-                    "reason": "backup_data_corrupted",
-                    "detail": str(e),
-                    "blocking": is_blocking,
-                })
+                restore_summary.failed_components.append(
+                    {
+                        "handler": handler_name,
+                        "reason": "backup_data_corrupted",
+                        "detail": str(e),
+                        "blocking": is_blocking,
+                    }
+                )
             except PermissionError as e:
                 logger.error(f"Permission denied restoring {handler_name}: {e}")
-                restore_summary.failed_components.append({
-                    "handler": handler_name,
-                    "reason": "permission_denied",
-                    "detail": str(e),
-                    "blocking": is_blocking,
-                })
+                restore_summary.failed_components.append(
+                    {
+                        "handler": handler_name,
+                        "reason": "permission_denied",
+                        "detail": str(e),
+                        "blocking": is_blocking,
+                    }
+                )
             except OSError as e:
                 logger.error(f"OS error restoring {handler_name}: {e}")
-                restore_summary.failed_components.append({
-                    "handler": handler_name,
-                    "reason": "os_error",
-                    "detail": str(e),
-                    "blocking": is_blocking,
-                })
+                restore_summary.failed_components.append(
+                    {
+                        "handler": handler_name,
+                        "reason": "os_error",
+                        "detail": str(e),
+                        "blocking": is_blocking,
+                    }
+                )
             except (ValueError, TypeError, KeyError) as e:
                 logger.error(f"Data error restoring {handler_name}: {e}")
-                restore_summary.failed_components.append({
-                    "handler": handler_name,
-                    "reason": "data_error",
-                    "detail": str(e),
-                    "blocking": is_blocking,
-                })
+                restore_summary.failed_components.append(
+                    {
+                        "handler": handler_name,
+                        "reason": "data_error",
+                        "detail": str(e),
+                        "blocking": is_blocking,
+                    }
+                )
 
         logger.info(f"Backup restored: {backup_id}")
         return restore_summary
@@ -380,13 +414,15 @@ class BackupManager:
 
             try:
                 manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-                backups.append({
-                    "id": backup_path.name,
-                    "created_at": manifest.get("created_at", "Unknown"),
-                    "components": list(manifest.get("components", {}).keys()),
-                    "profile_id": manifest.get("profile_id"),
-                    "backup_type": manifest.get("backup_type"),
-                })
+                backups.append(
+                    {
+                        "id": backup_path.name,
+                        "created_at": manifest.get("created_at", "Unknown"),
+                        "components": list(manifest.get("components", {}).keys()),
+                        "profile_id": manifest.get("profile_id"),
+                        "backup_type": manifest.get("backup_type"),
+                    }
+                )
             except json.JSONDecodeError as e:
                 logger.warning(f"Corrupted manifest in backup {backup_path.name}: {e}")
             except OSError as e:
@@ -475,8 +511,7 @@ class BackupManager:
 
         if not backup_path.exists():
             raise BackupNotFoundError(
-                f"Backup not found: {backup_id}",
-                details=f"Expected path: {backup_path}"
+                f"Backup not found: {backup_id}", details=f"Expected path: {backup_path}"
             )
 
         shutil.rmtree(backup_path)

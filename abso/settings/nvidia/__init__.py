@@ -24,7 +24,7 @@ from typing import Any
 from abso.core.models import Issue
 from abso.settings.base import SettingsHandler
 
-from .npi import NPIManager, NPI_IMPORTS_DISABLED
+from .npi import NPI_IMPORTS_DISABLED, NPIManager
 from .presets import NVIDIA_PRESETS, NvidiaSettingIDs, NvidiaSettingValues
 from .profiles import generate_custom_profile, generate_game_profile, generate_preset_profile
 
@@ -718,6 +718,10 @@ class NvidiaSettingsHandler(SettingsHandler):
             str(alias) for alias in raw_profile_aliases
             if isinstance(alias, str) and alias.strip()
         ]
+        require_exact_binding = bool(settings.pop("require_exact_binding", False))
+        allow_unverified_existing_profile_reuse = bool(
+            settings.pop("allow_unverified_existing_profile_reuse", False)
+        )
 
         global_settings: dict[str, Any] = {}
         raw_global_settings = settings.pop("global_settings", None)
@@ -868,15 +872,74 @@ class NvidiaSettingsHandler(SettingsHandler):
                             if exe not in binding_owner_profiles
                         ]
 
+                        if require_exact_binding and (mismatched_bindings or unresolved_bindings):
+                            try:
+                                probe = manager.probe_profile_binding(
+                                    executables,
+                                    profile_name=effective_profile_name,
+                                    profile_aliases=driver_profile_aliases,
+                                )
+                                result["binding_probe_state"] = probe.get("app_binding_state")
+                                probe_safe = bool(
+                                    probe.get(
+                                        "app_binding_safe",
+                                        probe.get("app_binding_exact", False),
+                                    )
+                                )
+                                if (
+                                    not probe_safe
+                                    and allow_unverified_existing_profile_reuse
+                                    and str(probe.get("app_binding_state") or "")
+                                    .strip()
+                                    .lower()
+                                    in {
+                                        "reused_family_profile",
+                                        "existing_profile_unverified",
+                                    }
+                                ):
+                                    probe_safe = True
+
+                                probe_note = probe.get("app_binding_note")
+                                if probe_note:
+                                    result["notes"].append(str(probe_note))
+
+                                if probe_safe:
+                                    mismatched_bindings = []
+                                    unresolved_bindings = []
+                                    binding_owner_profiles = dict.fromkeys(
+                                        executables,
+                                        effective_profile_name,
+                                    )
+                                    result["binding_owner_profiles"] = binding_owner_profiles
+                                    result["scope"] = "profile_and_safe_binding_probe"
+                                else:
+                                    result["setting_failures"].append(
+                                        str(
+                                            probe_note
+                                            or "Exact NVIDIA executable binding could not be confirmed."
+                                        )
+                                    )
+                            except Exception as binding_probe_error:
+                                result["setting_failures"].append(
+                                    "Executable binding ownership could not be proven: "
+                                    + str(binding_probe_error)
+                                )
+
                         if mismatched_bindings:
                             result["setting_failures"].append(
                                 "Executable binding mismatch: "
                                 + ", ".join(sorted(mismatched_bindings))
                             )
                         elif len(binding_owner_profiles) == len(executables):
-                            result["scope"] = "profile_and_binding_readback"
-                            result["notes"].append(
-                                "Executable membership was confirmed on the effective NVIDIA profile."
+                            if result["scope"] != "profile_and_safe_binding_probe":
+                                result["scope"] = "profile_and_binding_readback"
+                                result["notes"].append(
+                                    "Executable membership was confirmed on the effective NVIDIA profile."
+                                )
+                        elif require_exact_binding:
+                            result["setting_failures"].append(
+                                "Executable binding could not be proven for: "
+                                + ", ".join(sorted(unresolved_bindings))
                             )
                         else:
                             result["notes"].append(

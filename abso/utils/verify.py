@@ -4,9 +4,9 @@ Outputs clean JSON that can be parsed by external tools.
 """
 
 import json
+import subprocess
 import sys
 import winreg
-import subprocess
 from typing import Any
 
 
@@ -190,11 +190,16 @@ def verify_profile(profile_name: str = None) -> dict:
     # Compute summary
     issues = []
 
-    for key, check in results["windows"].items():
-        if isinstance(check, dict) and "expected" in check:
-            if check["expected"] != "profile_dependent":
-                if check["value"] != check["expected"]:
-                    issues.append(f"{check['description']}: got {check['value']}, expected {check['expected']}")
+    for check in results["windows"].values():
+        if (
+            isinstance(check, dict)
+            and "expected" in check
+            and check["expected"] != "profile_dependent"
+            and check["value"] != check["expected"]
+        ):
+            issues.append(
+                f"{check['description']}: got {check['value']}, expected {check['expected']}"
+            )
 
     if not results["power_plan"].get("ok"):
         issues.append("Power plan is not Ultimate Performance (current standard)")
@@ -204,7 +209,7 @@ def verify_profile(profile_name: str = None) -> dict:
         if "error" in np:
             issues.append(f"NVIDIA: {np['error']}")
         elif not np.get("apps_bound"):
-            issues.append(f"NVIDIA profile has no apps bound")
+            issues.append("NVIDIA profile has no apps bound")
         elif "settings" in np:
             for name, data in np["settings"].items():
                 if "ok" in data and not data["ok"]:

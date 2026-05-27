@@ -266,7 +266,7 @@ class ProcessPriorityHandler(SettingsHandler):
         if "processes" in settings:
             targets = settings["processes"]
         else:
-            targets = {exe: settings for exe in self.executables}
+            targets = dict.fromkeys(self.executables, settings)
 
         for exe, exe_settings in targets.items():
             current = self._get_process_settings(exe)

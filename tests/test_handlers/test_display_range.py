@@ -17,7 +17,6 @@ from abso.settings.nvidia.nvapi_display import (
     parse_dynamic_range,
 )
 
-
 # ---------------------------------------------------------------------------
 # parse_dynamic_range
 # ---------------------------------------------------------------------------
@@ -195,6 +194,8 @@ def test_apply_full_range_on_two_displays():
 
         assert result["success"] is True
         assert len(result["applied"]) == 2
+        assert result["changed"] is True
+        assert result["changed_keys"] == ["dynamic_range"]
         assert any("101" in entry and "Full" in entry for entry in result["applied"])
         assert any("202" in entry and "already" in entry for entry in result["applied"])
         # Must call with VESA for "full"
@@ -220,7 +221,9 @@ def test_apply_is_idempotent_second_call():
         second = handler.apply({"dynamic_range": "full"})
 
         assert first["success"] is True
+        assert first["changed"] is True
         assert second["success"] is True
+        assert second["changed"] is False
     finally:
         patcher.stop()
 
@@ -230,8 +233,14 @@ def test_apply_collects_errors_from_per_display_failures():
     try:
         mock_nvapi.enumerate_display_ids.return_value = [1, 2]
         mock_nvapi.set_dynamic_range.side_effect = [
-            {"display_id": 1, "success": False, "before": 1, "after": None, "changed": False,
-             "error": "SET failed: NVAPI status -9 (struct v5)"},
+            {
+                "display_id": 1,
+                "success": False,
+                "before": 1,
+                "after": None,
+                "changed": False,
+                "error": "SET failed: NVAPI status -9 (struct v5)",
+            },
             {"display_id": 2, "success": True, "before": 0, "after": 0, "changed": False},
         ]
 
@@ -277,12 +286,14 @@ def test_restore_round_trips_per_display_state():
             {"display_id": 8, "success": True, "before": 1, "after": 0, "changed": True},
         ]
 
-        ok = handler.restore({
-            "displays": [
-                {"display_id": 7, "dynamic_range": NvDynamicRange.CEA},
-                {"display_id": 8, "dynamic_range": NvDynamicRange.VESA},
-            ]
-        })
+        ok = handler.restore(
+            {
+                "displays": [
+                    {"display_id": 7, "dynamic_range": NvDynamicRange.CEA},
+                    {"display_id": 8, "dynamic_range": NvDynamicRange.VESA},
+                ]
+            }
+        )
 
         assert ok is True
         calls = mock_nvapi.set_dynamic_range.call_args_list
@@ -297,15 +308,21 @@ def test_restore_skips_disconnected_displays():
     try:
         mock_nvapi.enumerate_display_ids.return_value = [5]  # backed-up 9 is gone
         mock_nvapi.set_dynamic_range.return_value = {
-            "display_id": 5, "success": True, "before": 0, "after": 0, "changed": False,
+            "display_id": 5,
+            "success": True,
+            "before": 0,
+            "after": 0,
+            "changed": False,
         }
 
-        ok = handler.restore({
-            "displays": [
-                {"display_id": 5, "dynamic_range": NvDynamicRange.VESA},
-                {"display_id": 9, "dynamic_range": NvDynamicRange.CEA},
-            ]
-        })
+        ok = handler.restore(
+            {
+                "displays": [
+                    {"display_id": 5, "dynamic_range": NvDynamicRange.VESA},
+                    {"display_id": 9, "dynamic_range": NvDynamicRange.CEA},
+                ]
+            }
+        )
 
         assert ok is True
         # 9 is disconnected — must not call set_dynamic_range for it.
@@ -321,15 +338,19 @@ def test_restore_skips_disconnected_displays():
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("profile_import_path,profile_cls_name", [
-    ("abso.profiles.overwatch2", "Overwatch2GSyncHDRProfile"),
-    ("abso.profiles.overwatch2", "Overwatch2NoSyncHDRProfile"),
-    ("abso.profiles.marvel_rivals", "MarvelRivalsHDRProfile"),
-    ("abso.profiles.fortnite", "FortniteHDRProfile"),
-    ("abso.profiles.diablo4", "Diablo4Profile"),
-])
+@pytest.mark.parametrize(
+    "profile_import_path,profile_cls_name",
+    [
+        ("abso.profiles.overwatch2", "Overwatch2GSyncHDRProfile"),
+        ("abso.profiles.overwatch2", "Overwatch2NoSyncHDRProfile"),
+        ("abso.profiles.marvel_rivals", "MarvelRivalsHDRProfile"),
+        ("abso.profiles.fortnite", "FortniteHDRProfile"),
+        ("abso.profiles.diablo4", "Diablo4Profile"),
+    ],
+)
 def test_profile_includes_display_color_range_handler(profile_import_path, profile_cls_name):
     import importlib
+
     module = importlib.import_module(profile_import_path)
     profile_cls = getattr(module, profile_cls_name)
     profile = profile_cls()
@@ -337,13 +358,17 @@ def test_profile_includes_display_color_range_handler(profile_import_path, profi
     assert "DisplayColorRangeHandler" in handler_names
 
 
-@pytest.mark.parametrize("profile_import_path,profile_cls_name", [
-    ("abso.profiles.overwatch2", "Overwatch2GSyncHDRProfile"),
-    ("abso.profiles.marvel_rivals", "MarvelRivalsHDRProfile"),
-    ("abso.profiles.diablo4", "Diablo4Profile"),
-])
+@pytest.mark.parametrize(
+    "profile_import_path,profile_cls_name",
+    [
+        ("abso.profiles.overwatch2", "Overwatch2GSyncHDRProfile"),
+        ("abso.profiles.marvel_rivals", "MarvelRivalsHDRProfile"),
+        ("abso.profiles.diablo4", "Diablo4Profile"),
+    ],
+)
 def test_hdr_profiles_default_to_full_dynamic_range(profile_import_path, profile_cls_name):
     import importlib
+
     module = importlib.import_module(profile_import_path)
     profile = getattr(module, profile_cls_name)()
     assert profile.get_settings("DisplayColorRangeHandler").get("dynamic_range") == "full"

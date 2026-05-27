@@ -22,18 +22,44 @@ Usage:
     powershell -File "abso/tray/Install-Startup.ps1" -Install
 """
 
+import json
 import subprocess
 import sys
-import json
 import time
 from pathlib import Path
+
+from abso.core.app_paths import app_data_dir
 
 TRAY_MUTEX_NAME = "Global\\ABSO_Tray_SingleInstance_v2"
 
 
 def get_tray_dir() -> Path:
     """Get the tray scripts directory."""
-    return Path(__file__).parent
+    module_dir = Path(__file__).resolve().parent
+    candidates: list[Path] = []
+
+    if getattr(sys, "frozen", False):
+        exe_dir = Path(sys.executable).resolve().parent
+        # One-file PyInstaller extracts this module to a temporary _MEI*
+        # directory. Prefer a durable source/install tree beside the exe so
+        # startup registration never points at a transient extraction path.
+        candidates.extend([
+            exe_dir / "abso" / "tray",
+            exe_dir.parent / "abso" / "tray",
+            Path.cwd() / "abso" / "tray",
+        ])
+
+    candidates.append(module_dir)
+
+    for candidate in candidates:
+        if (
+            (candidate / "ABSO-Tray.ps1").exists()
+            and (candidate / "ABSO-Tray.vbs").exists()
+            and (candidate / "Install-Startup.ps1").exists()
+        ):
+            return candidate
+
+    return module_dir
 
 
 def start_tray() -> None:
@@ -74,6 +100,36 @@ def install_startup(uninstall: bool = False) -> None:
     )
 
 
+def _contains_literal(text: str, needle: Path) -> bool:
+    """Return True when text contains a path literal, case-insensitively."""
+    if not text:
+        return False
+    return str(needle).lower() in text.lower()
+
+
+def _annotate_installed_startup_status(status: dict[str, object]) -> dict[str, object]:
+    """Mark startup status healthy when it points at installed tray assets."""
+    installed_tray_dir = app_data_dir() / "abso" / "tray"
+    installed_launcher = installed_tray_dir / "ABSO-StartupLaunch.ps1"
+    installed_vbs = installed_tray_dir / "ABSO-Tray.vbs"
+    action_arguments = str(status.get("task_action_arguments") or "")
+    uses_installed_launcher = (
+        installed_launcher.exists() and _contains_literal(action_arguments, installed_launcher)
+    )
+    uses_installed_vbs = installed_vbs.exists() and _contains_literal(
+        action_arguments,
+        installed_vbs,
+    )
+
+    enriched = dict(status)
+    enriched["task_action_installed_launcher_path"] = str(installed_launcher)
+    enriched["task_action_installed_vbs_path"] = str(installed_vbs)
+    enriched["task_action_uses_installed_launcher"] = uses_installed_launcher
+    enriched["task_action_uses_installed_vbs"] = uses_installed_vbs
+    enriched["task_action_path_installed"] = bool(uses_installed_launcher or uses_installed_vbs)
+    return enriched
+
+
 def get_startup_status() -> dict[str, object]:
     """Get startup registration status from the installer script."""
     tray_dir = get_tray_dir()
@@ -95,7 +151,10 @@ def get_startup_status() -> dict[str, object]:
         check=True,
     )
 
-    return json.loads(result.stdout.strip() or "{}")
+    status = json.loads(result.stdout.strip() or "{}")
+    if not isinstance(status, dict):
+        return {}
+    return _annotate_installed_startup_status(status)
 
 
 def _tray_mutex_exists() -> bool:

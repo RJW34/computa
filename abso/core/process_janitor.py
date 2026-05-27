@@ -23,6 +23,9 @@ import logging
 import subprocess
 from dataclasses import dataclass, field
 
+from abso.core.overlay_policy import OVERLAY_PROCESS_IMAGES
+from abso.core.process_list import parse_tasklist_csv_images
+
 logger = logging.getLogger(__name__)
 
 
@@ -61,30 +64,39 @@ class ProcessSweepResult:
 # next launch, and LLM/peripheral daemons can be re-launched by the user
 # after the session.
 ALWAYS_SAFE_LAUNCH_KILLSET: tuple[str, ...] = (
-    # --- NVIDIA capture + overlay ---
-    "NVIDIA Share.exe",
+    # --- Canonical overlay/capture surfaces shared with apply-time detection ---
+    *OVERLAY_PROCESS_IMAGES,
+    # --- NVIDIA overlay sidecar not always surfaced by overlay detection ---
     "NVIDIA Overlay.exe",
-    "nvcontainer.exe",  # User-session container only; the service runs separately.
-    # --- Steam overlay (not Steam itself, which is protected) ---
-    "GameOverlayUI.exe",
-    # --- Xbox Game Bar ---
-    "GameBar.exe",
-    "GameBarFTServer.exe",
+    # nvcontainer.exe deliberately NOT in this list. Empirically (verified on
+    # 2026-05-22 with NVIDIA 5xx-series drivers on a QD-OLED + WOLED multi-
+    # monitor setup) killing nvcontainer.exe causes two compounding
+    # display-pipeline problems:
+    #
+    #   1. Immediate (~5s after kill): per-display Digital Vibrance is reset
+    #      to the hardware minimum — desktop renders desaturated/grayscale.
+    #   2. Cumulative across multiple kill cycles: NVIDIA driver state
+    #      corrupts in ways that aren't visible in any single setting (per-
+    #      monitor ICC, ACM, WCG, sdr_white_nits and Output Dynamic Range all
+    #      look correct, yet desktop colors still read as muted). Re-applying
+    #      a "known-good" profile does NOT recover. On the affected machine
+    #      a SINGLE Ctrl+Win+Shift+B DWM restart was not enough — the user
+    #      had to fire the shortcut TWICE before the LG OLED's color pipeline
+    #      came back to normal. Plan recovery flows accordingly.
+    #
+    # The earlier assumption that the user-session container was safe to stop
+    # because "the service runs separately" turned out to be wrong on modern
+    # driver branches: the user-session container is what holds DRS context,
+    # color pipeline state, and the per-display USER-policy values.
+    # --- Xbox Game Bar sidecar ---
     "gamebarpresencewriter.exe",
-    # --- Discord in-game overlay (Discord itself is protected for teammate comms) ---
-    "DiscordHookHelper.exe",
-    "DiscordHookHelper64.exe",
-    # --- RTSS / Afterburner OSD ---
-    "RTSS.exe",
+    # --- RTSS / Afterburner OSD sidecars ---
     "RTSSHooksLoader.exe",
     "RTSSHooksLoader64.exe",
     "MSIAfterburner.exe",
     "EVGAPrecision_X1.exe",
-    # --- Capture clients (use capture-safe profile variants if you need OBS/Medal alive) ---
-    "obs64.exe",
+    # --- 32-bit capture sidecar ---
     "obs32.exe",
-    "Medal.exe",
-    "MedalEncoder.exe",
     # --- Audio enhancement DPC offenders ---
     "NahimicService.exe",
     "NahimicSvc64.exe",
@@ -231,7 +243,9 @@ CAPTURE_ALLOWED_IMAGES: frozenset[str] = frozenset(
         # NVIDIA capture / overlay (ShadowPlay)
         "NVIDIA Share.exe",
         "NVIDIA Overlay.exe",
-        "nvcontainer.exe",
+        # nvcontainer.exe removed from the always-safe killset entirely
+        # (see comment in ALWAYS_SAFE_LAUNCH_KILLSET above) — no need to
+        # whitelist it here because it is never enqueued for killing.
         # Peripheral RGB / macro daemons (user may want LIGHTSYNC etc.
         # alive during a recorded session)
         "lghub.exe",
@@ -475,8 +489,7 @@ class ProcessJanitor:
 
         if completed.returncode != 0:
             return False
-        output = (completed.stdout or "").strip().lower()
-        return image_name.lower() in output
+        return image_name.lower() in parse_tasklist_csv_images(completed.stdout or "")
 
     def _stop_process_image(self, image_name: str) -> bool:
         try:

@@ -621,9 +621,11 @@ class DebloatHandler(SettingsHandler):
                 # Value didn't exist before — attempt to delete it
                 hive_int = HIVE_MAP.get(info.get("hive", ""), 0)
                 if hive_int:
-                    with contextlib.suppress(OSError):
-                        with winreg.OpenKey(hive_int, info["key"], 0, winreg.KEY_SET_VALUE) as key:
-                            winreg.DeleteValue(key, info["value_name"])
+                    with (
+                        contextlib.suppress(OSError),
+                        winreg.OpenKey(hive_int, info["key"], 0, winreg.KEY_SET_VALUE) as key,
+                    ):
+                        winreg.DeleteValue(key, info["value_name"])
                 continue
 
             # Reconstruct a lightweight tweak for _write_registry_value
@@ -646,7 +648,7 @@ class DebloatHandler(SettingsHandler):
                 success = False
 
         # Restore service start types
-        for tweak_name, info in data.get("services", {}).items():
+        for _tweak_name, info in data.get("services", {}).items():
             cur_start = info.get("current_start")
             if cur_start is not None:
                 ok = self._set_service_start_type(info["service"], cur_start)

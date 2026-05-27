@@ -195,11 +195,7 @@ class RollbackGuard:
         # Check for explicit "online" or "ranked" in profile name only (not description)
         # This avoids false positives from descriptions like "NOT for online"
         online_keywords_strict = {"online", "ranked", "matchmaking"}
-        for keyword in online_keywords_strict:
-            if keyword in name_lower:
-                return True
-
-        return False
+        return any(keyword in name_lower for keyword in online_keywords_strict)
 
     def _check_nvidia_settings(
         self,

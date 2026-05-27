@@ -165,7 +165,7 @@ export async function getReport(
  * Get persisted backend active-profile state.
  */
 export async function getCurrentState(): Promise<BackendState> {
-  return runAbsoJson<BackendState>('state');
+  return runAbsoJson<BackendState>('state', ['--verify']);
 }
 
 /**

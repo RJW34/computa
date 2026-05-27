@@ -8,19 +8,36 @@ with the profile catalog.
 from __future__ import annotations
 
 import logging
+from copy import deepcopy
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 import yaml
 
-from abso.profiles.base import BaseProfile
-from abso.profiles.catalog import ProfileCatalogEntry, SyncMode, TrayCategory
+from abso.profiles.base import (
+    VALID_CPU_AFFINITY_STRATEGIES,
+    VALID_GRAPHICS_APIS,
+    VALID_NETWORK_SCOPES,
+    BaseProfile,
+)
+from abso.profiles.catalog import (
+    ProfileCatalogEntry,
+    SyncMode,
+    is_valid_profile_id,
+    is_valid_sync_mode,
+    is_valid_tray_category,
+    normalize_tray_category,
+    sync_mode_choices,
+    tray_category_choices,
+)
 from abso.profiles.profile_bases import (
     EmulatorLatencyBaseProfile,
     ReflexShooterBaseProfile,
     Rivals2BaseProfile,
     WebGLBaseProfile,
-    merge_settings_map,
+    add_legacy_system_tweaks,
+    build_standard_handlers,
+    merged_handler_settings,
 )
 from abso.settings.registry import WIN32_PRIORITY_GAMING_ONLINE
 
@@ -36,17 +53,22 @@ _REQUIRED_FIELDS = frozenset({
     "optimization_target",
     "executable_hints",
 })
-
-_VALID_TRAY_CATEGORIES: set[TrayCategory] = {
-    "Productivity",
-    "Fighting",
-    "ARPG",
-    "Shooter",
-    "Streaming",
-    "Other",
-}
-
-_VALID_SYNC_MODES: set[SyncMode] = {"on", "off", "agnostic"}
+_OPTIONAL_FIELDS = frozenset({
+    "base",
+    "settings",
+    "metadata",
+    "in_game_settings",
+    "tray_category",
+    "tray_subtitle",
+    "tray_description",
+    "sync_mode",
+    "tray_group",
+    "tray_group_name",
+    "tray_variant",
+    "tray_rank",
+    "tray_visible",
+})
+_ALLOWED_FIELDS = _REQUIRED_FIELDS | _OPTIONAL_FIELDS
 
 # YAML profile loading uses yaml.safe_load (no arbitrary code execution), but
 # the metadata fields below feed online-safety checks (e.g. is_online_profile
@@ -63,6 +85,80 @@ _METADATA_PROPERTIES: set[str] = {
     "include_legacy_tweaks",
     "cpu_affinity_strategy",
 }
+_BOOLEAN_METADATA_PROPERTIES: set[str] = {
+    "is_online_profile",
+    "is_emulator_profile",
+    "requires_reflex",
+    "is_sdr_only",
+    "allows_aggressive_settings",
+    "include_legacy_tweaks",
+}
+
+
+def _field_type_error(path: Path, field: str, expected: str) -> ValueError:
+    return ValueError(f"Expected '{field}' to be {expected} in {path}")
+
+
+def _one_of(values: tuple[str, ...]) -> str:
+    return "one of " + ", ".join(values)
+
+
+def _guidance_scalar_to_string(value: Any) -> str:
+    if isinstance(value, bool):
+        return "On" if value else "Off"
+    return str(value)
+
+
+def _normalize_in_game_settings(
+    settings: list[dict[str, Any]],
+) -> list[dict[str, str]]:
+    return [
+        {
+            key: _guidance_scalar_to_string(value)
+            for key, value in item.items()
+        }
+        for item in settings
+    ]
+
+
+def _normalize_sync_mode(value: Any, path: Path) -> SyncMode:
+    if value is None:
+        return "agnostic"
+    if isinstance(value, bool):
+        return "on" if value else "off"
+    if isinstance(value, str):
+        sync_mode = value.strip().lower()
+        if is_valid_sync_mode(sync_mode):
+            return sync_mode
+        raise _field_type_error(path, "sync_mode", _one_of(sync_mode_choices()))
+    raise _field_type_error(path, "sync_mode", "a string or boolean")
+
+
+def _normalize_literal_metadata(
+    path: Path,
+    metadata: dict[str, Any],
+    key: str,
+    allowed_values: frozenset[str],
+    *,
+    allow_none: bool = False,
+) -> None:
+    if key not in metadata:
+        return
+    value = metadata[key]
+    if value is None and allow_none:
+        return
+    if not isinstance(value, str):
+        expected = "one of " + ", ".join(sorted(allowed_values))
+        if allow_none:
+            expected += ", or null"
+        raise _field_type_error(path, f"metadata.{key}", expected)
+    normalized = value.strip().lower()
+    if normalized not in allowed_values:
+        expected = "one of " + ", ".join(sorted(allowed_values))
+        if allow_none:
+            expected += ", or null"
+        raise _field_type_error(path, f"metadata.{key}", expected)
+    metadata[key] = normalized
 
 
 class BalancedBaseProfile(BaseProfile):
@@ -73,37 +169,11 @@ class BalancedBaseProfile(BaseProfile):
     """
 
     def get_handlers(self) -> list[SettingsHandler]:
-        from abso.settings.color import ColorProfileSettingsHandler
-        from abso.settings.display_range import DisplayColorRangeHandler
-        from abso.settings.graphics import GraphicsSettingsHandler
-        from abso.settings.memory import MemorySettingsHandler
-        from abso.settings.mouse import MouseSettingsHandler
-        from abso.settings.network import NetworkSettingsHandler
-        from abso.settings.nvidia import NvidiaSettingsHandler
-        from abso.settings.power import PowerSettingsHandler
-        from abso.settings.process_priority import ProcessPriorityHandler
-        from abso.settings.registry import RegistrySettingsHandler
-        from abso.settings.windows import WindowsSettingsHandler
-
-        handlers: list[SettingsHandler] = [
-            WindowsSettingsHandler(),
-            PowerSettingsHandler(),
-            RegistrySettingsHandler(),
-            NvidiaSettingsHandler(),
-            NetworkSettingsHandler(),
-            MouseSettingsHandler(),
-            GraphicsSettingsHandler(),
-        ]
-
-        if self.include_legacy_tweaks:
-            handlers.append(MemorySettingsHandler())
-
-        handlers += [
-            ProcessPriorityHandler(self.executable_hints),
-            ColorProfileSettingsHandler(),
-            DisplayColorRangeHandler(),
-        ]
-        return handlers
+        return build_standard_handlers(
+            self,
+            include_mouse=True,
+            include_cpu_affinity=False,
+        )
 
     def _base_settings(self) -> dict[str, dict[str, Any]]:
         settings: dict[str, dict[str, Any]] = {
@@ -155,12 +225,7 @@ class BalancedBaseProfile(BaseProfile):
         }
 
         if self.include_legacy_tweaks:
-            settings["RegistrySettingsHandler"]["system_responsiveness"] = 10
-            settings["RegistrySettingsHandler"]["network_throttling"] = 0xFFFFFFFF
-            settings["MemorySettingsHandler"] = {
-                "large_system_cache": 0,
-                "disable_paging_executive": 1,
-            }
+            add_legacy_system_tweaks(settings)
 
         return settings
 
@@ -168,10 +233,7 @@ class BalancedBaseProfile(BaseProfile):
         return {}
 
     def get_settings(self, handler_name: str) -> dict[str, Any]:
-        settings_map = merge_settings_map(
-            self._base_settings(), self._settings_overrides()
-        )
-        return settings_map.get(handler_name, {})
+        return merged_handler_settings(self, handler_name)
 
     def get_in_game_settings(self) -> list[dict[str, str]]:
         return []
@@ -252,7 +314,7 @@ class YAMLProfileLoader:
             yaml.YAMLError: If the file contains invalid YAML.
             OSError: If the file cannot be read.
         """
-        with open(path, "r", encoding="utf-8") as fh:
+        with open(path, encoding="utf-8") as fh:
             data = yaml.safe_load(fh)
 
         if not isinstance(data, dict):
@@ -262,23 +324,9 @@ class YAMLProfileLoader:
 
         profile_class = self._create_profile_class(data)
 
-        tray_category: TrayCategory = data.get("tray_category", "Other")
-        if tray_category not in _VALID_TRAY_CATEGORIES:
-            logger.warning(
-                "Unknown tray_category '%s' in %s — defaulting to 'Other'",
-                tray_category,
-                path,
-            )
-            tray_category = "Other"
+        tray_category = normalize_tray_category(data.get("tray_category", "Other"))
 
-        sync_mode: SyncMode = data.get("sync_mode", "agnostic")
-        if sync_mode not in _VALID_SYNC_MODES:
-            logger.warning(
-                "Unknown sync_mode '%s' in %s — defaulting to 'agnostic'",
-                sync_mode,
-                path,
-            )
-            sync_mode = "agnostic"
+        sync_mode = _normalize_sync_mode(data.get("sync_mode"), path)
 
         entry = ProfileCatalogEntry(
             profile_class=profile_class,
@@ -286,6 +334,11 @@ class YAMLProfileLoader:
             tray_subtitle=data.get("tray_subtitle", data["display_name"]),
             tray_description=data.get("tray_description"),
             sync_mode=sync_mode,
+            tray_group=data.get("tray_group"),
+            tray_group_name=data.get("tray_group_name"),
+            tray_variant=data.get("tray_variant"),
+            tray_rank=int(data.get("tray_rank", 100)),
+            tray_visible=bool(data.get("tray_visible", True)),
         )
 
         return data["profile_id"], entry
@@ -305,13 +358,167 @@ class YAMLProfileLoader:
             raise ValueError(
                 f"Missing required fields {sorted(missing)} in {path}"
             )
+        unknown_fields = sorted(set(data) - _ALLOWED_FIELDS)
+        if unknown_fields:
+            field = unknown_fields[0]
+            raise _field_type_error(
+                path,
+                field,
+                _one_of(tuple(sorted(_ALLOWED_FIELDS))),
+            )
+
+        for field in (
+            "profile_id",
+            "display_name",
+            "description",
+            "optimization_target",
+        ):
+            if not isinstance(data[field], str) or not data[field].strip():
+                raise _field_type_error(path, field, "a non-empty string")
+        if not is_valid_profile_id(data["profile_id"]):
+            raise _field_type_error(
+                path,
+                "profile_id",
+                "a lowercase slug using letters, numbers, and single hyphens",
+            )
+
+        executable_hints = data["executable_hints"]
+        if (
+            not isinstance(executable_hints, list)
+            or not executable_hints
+            or not all(isinstance(item, str) and item.strip() for item in executable_hints)
+        ):
+            raise _field_type_error(
+                path,
+                "executable_hints",
+                "a non-empty list of non-empty strings",
+            )
 
         base_name = data.get("base", "balanced")
+        if not isinstance(base_name, str):
+            raise _field_type_error(path, "base", "a string")
         if base_name not in self.BASE_TEMPLATES:
             raise ValueError(
                 f"Unknown base template '{base_name}' in {path}. "
                 f"Valid options: {sorted(self.BASE_TEMPLATES)}"
             )
+
+        for field in ("settings", "metadata"):
+            value = data.get(field, {})
+            if not isinstance(value, dict):
+                raise _field_type_error(path, field, "a mapping")
+
+        settings = data.get("settings", {})
+        for handler_name, handler_settings in settings.items():
+            if not isinstance(handler_name, str) or not handler_name.strip():
+                raise _field_type_error(
+                    path,
+                    "settings",
+                    "a mapping of non-empty handler names to settings mappings",
+                )
+            if not isinstance(handler_settings, dict):
+                raise _field_type_error(
+                    path,
+                    f"settings.{handler_name}",
+                    "a mapping",
+                )
+
+        metadata = data.get("metadata", {})
+        if not all(isinstance(key, str) and key.strip() for key in metadata):
+            raise _field_type_error(
+                path,
+                "metadata",
+                "a mapping with non-empty string keys",
+            )
+        unknown_metadata = sorted(set(metadata) - _METADATA_PROPERTIES)
+        if unknown_metadata:
+            key = unknown_metadata[0]
+            raise _field_type_error(
+                path,
+                f"metadata.{key}",
+                _one_of(tuple(sorted(_METADATA_PROPERTIES))),
+            )
+        for key in _BOOLEAN_METADATA_PROPERTIES:
+            if key not in metadata:
+                continue
+            value = metadata[key]
+            if not isinstance(value, bool):
+                raise _field_type_error(path, f"metadata.{key}", "a boolean")
+        _normalize_literal_metadata(
+            path,
+            metadata,
+            "network_scope",
+            VALID_NETWORK_SCOPES,
+        )
+        _normalize_literal_metadata(
+            path,
+            metadata,
+            "graphics_api",
+            VALID_GRAPHICS_APIS,
+        )
+        _normalize_literal_metadata(
+            path,
+            metadata,
+            "cpu_affinity_strategy",
+            VALID_CPU_AFFINITY_STRATEGIES,
+            allow_none=True,
+        )
+
+        in_game_settings = data.get("in_game_settings", [])
+        if not isinstance(in_game_settings, list):
+            raise _field_type_error(path, "in_game_settings", "a list")
+        if not all(isinstance(item, dict) for item in in_game_settings):
+            raise _field_type_error(path, "in_game_settings", "a list of mappings")
+        for item in in_game_settings:
+            if not all(isinstance(key, str) for key in item):
+                raise _field_type_error(
+                    path,
+                    "in_game_settings",
+                    "a list of string-keyed mappings",
+                )
+            if any(isinstance(value, dict | list) or value is None for value in item.values()):
+                raise _field_type_error(
+                    path,
+                    "in_game_settings",
+                    "a list of mappings with scalar values",
+                )
+
+        for field in (
+            "tray_category",
+            "tray_subtitle",
+            "tray_description",
+            "tray_group",
+            "tray_group_name",
+            "tray_variant",
+        ):
+            value = data.get(field)
+            if value is not None and not isinstance(value, str):
+                raise _field_type_error(path, field, "a string")
+
+        tray_category = data.get("tray_category")
+        if tray_category is not None and not is_valid_tray_category(tray_category):
+            raise _field_type_error(
+                path,
+                "tray_category",
+                _one_of(tray_category_choices()),
+            )
+
+        sync_mode = data.get("sync_mode")
+        if sync_mode is not None and not isinstance(sync_mode, str | bool):
+            raise _field_type_error(path, "sync_mode", "a string or boolean")
+        if isinstance(sync_mode, str) and not is_valid_sync_mode(
+            sync_mode.strip().lower()
+        ):
+            raise _field_type_error(path, "sync_mode", _one_of(sync_mode_choices()))
+
+        if "tray_visible" in data and not isinstance(data["tray_visible"], bool):
+            raise _field_type_error(path, "tray_visible", "a boolean")
+
+        if "tray_rank" in data:
+            try:
+                int(data["tray_rank"])
+            except (TypeError, ValueError) as exc:
+                raise _field_type_error(path, "tray_rank", "an integer") from exc
 
     def _create_profile_class(self, data: dict[str, Any]) -> type[BaseProfile]:
         """Create a dynamic BaseProfile subclass from parsed YAML data.
@@ -325,7 +532,7 @@ class YAMLProfileLoader:
 
         yaml_settings: dict[str, dict[str, Any]] = data.get("settings", {})
         yaml_metadata: dict[str, Any] = data.get("metadata", {})
-        yaml_in_game: list[dict[str, str]] = data.get("in_game_settings", [])
+        yaml_in_game: list[dict[str, Any]] = data.get("in_game_settings", [])
         yaml_executables: list[str] = data["executable_hints"]
 
         # --- Build the class namespace ---
@@ -348,23 +555,16 @@ class YAMLProfileLoader:
         namespace["executable_hints"] = property(lambda self, _v=exes: list(_v))
 
         # Settings overrides — feeds into the base class merge pipeline
-        frozen_settings = dict(yaml_settings)
-        namespace["_settings_overrides"] = lambda self, _v=frozen_settings: _v
+        frozen_settings = deepcopy(yaml_settings)
+        namespace["_settings_overrides"] = lambda self, _v=frozen_settings: deepcopy(_v)
 
         # In-game settings
-        frozen_in_game = list(yaml_in_game)
-        namespace["get_in_game_settings"] = lambda self, _v=frozen_in_game: list(_v)
+        frozen_in_game = _normalize_in_game_settings(yaml_in_game)
+        namespace["get_in_game_settings"] = lambda self, _v=frozen_in_game: deepcopy(_v)
 
         # Optional metadata property overrides
         for key, value in yaml_metadata.items():
-            if key not in _METADATA_PROPERTIES:
-                logger.warning(
-                    "Ignoring unknown metadata key '%s' in profile '%s'",
-                    key,
-                    data["profile_id"],
-                )
-                continue
-            namespace[key] = property(lambda self, v=value: v)
+            namespace[key] = property(lambda self, v=value: deepcopy(v))
 
         # Derive a valid Python class name from the profile ID
         class_name = "YAMLProfile_" + data["profile_id"].replace("-", "_")

@@ -42,6 +42,7 @@ class CapabilityFinding:
     severity: str  # blocker, warning, info
     message: str
     details: str | None = None
+    fallback_profile_id: str | None = None
 
 
 @dataclass
@@ -85,6 +86,7 @@ class CapabilityReport:
                     "severity": finding.severity,
                     "message": finding.message,
                     "details": finding.details,
+                    "fallback_profile_id": finding.fallback_profile_id,
                 }
                 for finding in self.findings
             ],
@@ -509,6 +511,36 @@ class CapabilityEngine:
                     details=(
                         "Overlays can force borderless/composited presentation or destabilize "
                         "VRR on the target display."
+                    ),
+                    fallback_profile_id=(
+                        fallback_profile_id
+                        if isinstance(fallback_profile_id, str) and fallback_profile_id.strip()
+                        else None
+                    ),
+                )
+            )
+
+        environment = multimon_result.environment
+        if (
+            getattr(profile, "uses_fullscreen_only_vrr_path", False)
+            and environment.is_multi_monitor
+            and environment.has_mixed_refresh
+        ):
+            report.findings.append(
+                CapabilityFinding(
+                    code="DISPLAY_PATH_MIXED_REFRESH_BLOCKS_STRICT_VRR",
+                    severity="warning",
+                    message=(
+                        "This fullscreen-only VRR profile is risky because the active "
+                        f"display path has {environment.monitor_count} monitors with mixed "
+                        f"refresh rates ({environment.min_refresh:g}Hz - "
+                        f"{environment.max_refresh:g}Hz)."
+                    ),
+                    details=(
+                        "Mixed-refresh multi-monitor paths with fullscreen-only G-SYNC/VRR "
+                        "can trigger MPO/display pipeline black flashes during focus or "
+                        "present-mode transitions. The profile is still allowed so a user "
+                        "can deliberately choose the lean strict fullscreen path."
                     ),
                 )
             )

@@ -5,6 +5,7 @@ import type {
   Issue,
   Profile,
   Backup,
+  BackendStateVerification,
   Page,
   Theme,
 } from '@/lib/types';
@@ -47,7 +48,16 @@ interface AppState {
   // Active profile tracking
   activeProfile: string | null;  // Profile ID of currently applied profile
   activeProfileAppliedAt: string | null;  // ISO timestamp when profile was applied
-  setActiveProfile: (profileId: string | null, appliedAt?: string) => void;
+  activeProfileVerification: BackendStateVerification | null;
+  activeProfileRebootPending: boolean;
+  activeProfileRebootReasons: string[];
+  setActiveProfile: (
+    profileId: string | null,
+    appliedAt?: string,
+    verification?: BackendStateVerification | null,
+    rebootPending?: boolean,
+    rebootReasons?: string[]
+  ) => void;
 
   // Backups
   backups: Backup[];
@@ -149,9 +159,21 @@ export const useAppStore = create<AppState>()(
       // Active profile tracking
       activeProfile: null,
       activeProfileAppliedAt: null,
-      setActiveProfile: (profileId, appliedAt) => set({
+      activeProfileVerification: null,
+      activeProfileRebootPending: false,
+      activeProfileRebootReasons: [],
+      setActiveProfile: (
+        profileId,
+        appliedAt,
+        verification,
+        rebootPending = false,
+        rebootReasons = []
+      ) => set({
         activeProfile: profileId,
         activeProfileAppliedAt: profileId ? (appliedAt || new Date().toISOString()) : null,
+        activeProfileVerification: profileId ? (verification ?? null) : null,
+        activeProfileRebootPending: profileId ? rebootPending : false,
+        activeProfileRebootReasons: profileId ? rebootReasons : [],
       }),
 
       // Backups

@@ -244,24 +244,60 @@ class TestColorHandlerApply:
         result = handler.apply({})
         assert result["success"] is True
 
+    @patch.object(ColorProfileSettingsHandler, "_get_current_icc_profile", return_value=None)
     @patch.object(ColorProfileSettingsHandler, "_apply_icc_profile")
-    def test_apply_icc_srgb(self, mock_apply_icc: MagicMock):
+    def test_apply_icc_srgb(self, mock_apply_icc: MagicMock, mock_current_icc: MagicMock):
         """Applying sRGB should call _apply_icc_profile."""
         handler = ColorProfileSettingsHandler()
         result = handler.apply({"icc_profile": "srgb"})
         assert result["success"] is True
+        assert result["changed_keys"] == ["icc_profile"]
         mock_apply_icc.assert_called_once_with("srgb")
 
+    @patch.object(
+        ColorProfileSettingsHandler,
+        "_get_current_icc_profile",
+        return_value="sRGB Color Space Profile.icm",
+    )
     @patch.object(ColorProfileSettingsHandler, "_apply_icc_profile")
-    def test_apply_icc_native(self, mock_apply_icc: MagicMock):
+    def test_apply_icc_native(self, mock_apply_icc: MagicMock, mock_current_icc: MagicMock):
         """Applying native should call _apply_icc_profile('native')."""
         handler = ColorProfileSettingsHandler()
         result = handler.apply({"icc_profile": "native"})
         assert result["success"] is True
         mock_apply_icc.assert_called_once_with("native")
 
-    @patch.object(ColorProfileSettingsHandler, "_apply_icc_profile", side_effect=FileNotFoundError("not found"))
-    def test_apply_icc_failure_graceful(self, mock_apply_icc: MagicMock):
+    @patch.object(
+        ColorProfileSettingsHandler,
+        "_get_current_icc_profile",
+        return_value="sRGB Color Space Profile.icm",
+    )
+    @patch.object(ColorProfileSettingsHandler, "_apply_icc_profile")
+    def test_apply_icc_skips_when_already_active(
+        self,
+        mock_apply_icc: MagicMock,
+        mock_current_icc: MagicMock,
+    ):
+        """Already-active ICC profiles should not be re-written."""
+        handler = ColorProfileSettingsHandler()
+        result = handler.apply({"icc_profile": "srgb"})
+        assert result["success"] is True
+        mock_apply_icc.assert_not_called()
+        assert result["changed"] is False
+        assert result["changed_keys"] == []
+        assert any("already active" in item for item in result["skipped"])
+
+    @patch.object(
+        ColorProfileSettingsHandler,
+        "_apply_icc_profile",
+        side_effect=FileNotFoundError("not found"),
+    )
+    @patch.object(ColorProfileSettingsHandler, "_get_current_icc_profile", return_value=None)
+    def test_apply_icc_failure_graceful(
+        self,
+        mock_current_icc: MagicMock,
+        mock_apply_icc: MagicMock,
+    ):
         """ICC failure should not crash — reports error but continues."""
         handler = ColorProfileSettingsHandler()
         result = handler.apply({"icc_profile": "nonexistent.icm"})
@@ -274,9 +310,12 @@ class TestColorHandlerApply:
         handler = ColorProfileSettingsHandler()
         result = handler.apply({"digital_vibrance": 60})
         assert result["success"] is True
+        assert result["changed_keys"] == ["digital_vibrance"]
         mock_set_dv.assert_called_once_with(60)
 
-    @patch.object(ColorProfileSettingsHandler, "_set_digital_vibrance", side_effect=RuntimeError("no NVAPI"))
+    @patch.object(
+        ColorProfileSettingsHandler, "_set_digital_vibrance", side_effect=RuntimeError("no NVAPI")
+    )
     def test_apply_vibrance_unavailable_is_graceful_skip(self, mock_set_dv: MagicMock):
         """Unavailable NVAPI should gracefully skip, not fail the handler."""
         handler = ColorProfileSettingsHandler()
@@ -298,18 +337,27 @@ class TestColorHandlerApply:
         assert result["success"] is True
         mock_set_dv.assert_called_once_with(50)
 
+    @patch.object(ColorProfileSettingsHandler, "_get_current_icc_profile", return_value=None)
     @patch.object(ColorProfileSettingsHandler, "_apply_icc_profile")
     @patch.object(ColorProfileSettingsHandler, "_set_digital_vibrance")
-    def test_apply_multiple_settings(self, mock_dv: MagicMock, mock_icc: MagicMock):
+    def test_apply_multiple_settings(
+        self,
+        mock_dv: MagicMock,
+        mock_icc: MagicMock,
+        mock_current_icc: MagicMock,
+    ):
         """Both ICC and vibrance applied together."""
         handler = ColorProfileSettingsHandler()
-        result = handler.apply({
-            "icc_profile": "srgb",
-            "digital_vibrance": 55,
-            "show_osd_guidance": False,
-            "game_type": "competitive_fps",
-        })
+        result = handler.apply(
+            {
+                "icc_profile": "srgb",
+                "digital_vibrance": 55,
+                "show_osd_guidance": False,
+                "game_type": "competitive_fps",
+            }
+        )
         assert result["success"] is True
+        assert result["changed_keys"] == ["icc_profile", "digital_vibrance"]
         mock_icc.assert_called_once_with("srgb")
         mock_dv.assert_called_once_with(55)
 
@@ -324,7 +372,11 @@ class TestColorHandlerBackupRestore:
 
     @patch.object(ColorProfileSettingsHandler, "_get_primary_monitor_info", return_value=None)
     @patch.object(ColorProfileSettingsHandler, "_get_digital_vibrance", return_value=50)
-    @patch.object(ColorProfileSettingsHandler, "_get_current_icc_profile", return_value="sRGB Color Space Profile.icm")
+    @patch.object(
+        ColorProfileSettingsHandler,
+        "_get_current_icc_profile",
+        return_value="sRGB Color Space Profile.icm",
+    )
     def test_backup_returns_current_state(self, mock_icc, mock_dv, mock_mon):
         handler = ColorProfileSettingsHandler()
         data = handler.backup()
@@ -335,10 +387,12 @@ class TestColorHandlerBackupRestore:
     @patch.object(ColorProfileSettingsHandler, "_set_digital_vibrance")
     def test_restore_calls_apply(self, mock_dv, mock_icc):
         handler = ColorProfileSettingsHandler()
-        success = handler.restore({
-            "icc_profile": "sRGB Color Space Profile.icm",
-            "digital_vibrance": 75,  # Non-default to exercise restore path
-        })
+        success = handler.restore(
+            {
+                "icc_profile": "sRGB Color Space Profile.icm",
+                "digital_vibrance": 75,  # Non-default to exercise restore path
+            }
+        )
         assert success is True
         mock_icc.assert_called_once_with("sRGB Color Space Profile.icm")
         mock_dv.assert_called_once_with(75)
@@ -348,10 +402,12 @@ class TestColorHandlerBackupRestore:
     def test_restore_sets_default_vibrance(self, mock_dv, mock_icc):
         """Restoring vibrance=50 must still set hardware to default."""
         handler = ColorProfileSettingsHandler()
-        success = handler.restore({
-            "icc_profile": "sRGB Color Space Profile.icm",
-            "digital_vibrance": 50,
-        })
+        success = handler.restore(
+            {
+                "icc_profile": "sRGB Color Space Profile.icm",
+                "digital_vibrance": 50,
+            }
+        )
         assert success is True
         mock_icc.assert_called_once()
         mock_dv.assert_called_once_with(50)
@@ -364,15 +420,27 @@ class TestColorHandlerBackupRestore:
 
 class TestColorHandlerDetect:
 
-    @patch.object(ColorProfileSettingsHandler, "_get_display_color_info", return_value={"bits_per_channel": 10, "encoding": "RGB"})
+    @patch.object(
+        ColorProfileSettingsHandler,
+        "_get_display_color_info",
+        return_value={"bits_per_channel": 10, "encoding": "RGB"},
+    )
     @patch.object(ColorProfileSettingsHandler, "_get_digital_vibrance", return_value=50)
-    @patch.object(ColorProfileSettingsHandler, "_get_current_icc_profile", return_value="sRGB Color Space Profile.icm")
-    @patch.object(ColorProfileSettingsHandler, "_get_primary_monitor_info", return_value={
-        "device_name": r"\\.\DISPLAY1",
-        "class_index": "0001",
-        "monitor_id": r"MONITOR\GSM7847\{guid}",
-        "monitor_string": "LG OLED",
-    })
+    @patch.object(
+        ColorProfileSettingsHandler,
+        "_get_current_icc_profile",
+        return_value="sRGB Color Space Profile.icm",
+    )
+    @patch.object(
+        ColorProfileSettingsHandler,
+        "_get_primary_monitor_info",
+        return_value={
+            "device_name": r"\\.\DISPLAY1",
+            "class_index": "0001",
+            "monitor_id": r"MONITOR\GSM7847\{guid}",
+            "monitor_string": "LG OLED",
+        },
+    )
     def test_detect_full(self, mock_mon, mock_icc, mock_dv, mock_color):
         handler = ColorProfileSettingsHandler()
         result = handler.detect()
@@ -482,10 +550,14 @@ class TestColorHandlerDetect:
 
 class TestColorHandlerAudit:
 
-    @patch.object(ColorProfileSettingsHandler, "detect", return_value={
-        "icc_profile": None,
-        "digital_vibrance": 75,
-    })
+    @patch.object(
+        ColorProfileSettingsHandler,
+        "detect",
+        return_value={
+            "icc_profile": None,
+            "digital_vibrance": 75,
+        },
+    )
     def test_audit_finds_issues(self, mock_detect):
         handler = ColorProfileSettingsHandler()
         issues = handler.audit()
@@ -493,10 +565,14 @@ class TestColorHandlerAudit:
         categories = [i.category for i in issues]
         assert all(c == "color" for c in categories)
 
-    @patch.object(ColorProfileSettingsHandler, "detect", return_value={
-        "icc_profile": "sRGB Color Space Profile.icm",
-        "digital_vibrance": 50,
-    })
+    @patch.object(
+        ColorProfileSettingsHandler,
+        "detect",
+        return_value={
+            "icc_profile": "sRGB Color Space Profile.icm",
+            "digital_vibrance": 50,
+        },
+    )
     def test_audit_no_issues_when_default(self, mock_detect):
         handler = ColorProfileSettingsHandler()
         issues = handler.audit()
@@ -513,19 +589,25 @@ class TestOSDAcknowledgment:
     def test_is_osd_acknowledged_no_file(self, tmp_path: Path):
         """No ack file → not acknowledged."""
         with patch("abso.settings.color.OSD_ACK_FILE", tmp_path / "nonexistent.json"):
-            assert ColorProfileSettingsHandler._is_osd_acknowledged(r"MONITOR\GSM7847\{guid}") is False
+            assert (
+                ColorProfileSettingsHandler._is_osd_acknowledged(r"MONITOR\GSM7847\{guid}") is False
+            )
 
     def test_acknowledge_and_check(self, tmp_path: Path):
         """Acknowledge then verify it's marked."""
         ack_file = tmp_path / "osd_acknowledged.json"
-        with patch("abso.settings.color.OSD_ACK_FILE", ack_file), \
-             patch("abso.settings.color.OSD_ACK_DIR", tmp_path):
+        with (
+            patch("abso.settings.color.OSD_ACK_FILE", ack_file),
+            patch("abso.settings.color.OSD_ACK_DIR", tmp_path),
+        ):
             ColorProfileSettingsHandler._acknowledge_osd(r"MONITOR\GSM7847\{guid}")
             assert ack_file.exists()
             data = json.loads(ack_file.read_text())
             assert data.get("GSM7847") is True
 
-            assert ColorProfileSettingsHandler._is_osd_acknowledged(r"MONITOR\GSM7847\{guid}") is True
+            assert (
+                ColorProfileSettingsHandler._is_osd_acknowledged(r"MONITOR\GSM7847\{guid}") is True
+            )
 
 
 # =============================================================================
@@ -538,26 +620,32 @@ class TestProfileIntegration:
 
     def test_rivals2_has_color_handler(self):
         from abso.profiles.rivals2 import Rivals2Profile
+
         profile = Rivals2Profile()
         handler_names = [h.__class__.__name__ for h in profile.get_handlers()]
         assert "ColorProfileSettingsHandler" in handler_names
 
     def test_rivals2_color_settings(self):
         from abso.profiles.rivals2 import Rivals2Profile
+
         profile = Rivals2Profile()
         settings = profile.get_settings("ColorProfileSettingsHandler")
         assert settings["icc_profile"] == "srgb"
-        assert settings["digital_vibrance"] == 50
+        # SDR profiles use the wide-gamut compensation (-5) per the
+        # documented policy in profile_bases.SDR_WIDE_GAMUT_VIBRANCE.
+        assert settings["digital_vibrance"] == 45
         assert settings["game_type"] == "competitive_fps"
 
     def test_diablo4_has_color_handler(self):
         from abso.profiles.diablo4 import Diablo4Profile
+
         profile = Diablo4Profile()
         handler_names = [h.__class__.__name__ for h in profile.get_handlers()]
         assert "ColorProfileSettingsHandler" in handler_names
 
     def test_diablo4_color_settings(self):
         from abso.profiles.diablo4 import Diablo4Profile
+
         profile = Diablo4Profile()
         settings = profile.get_settings("ColorProfileSettingsHandler")
         assert settings["icc_profile"] == "native"
@@ -565,12 +653,14 @@ class TestProfileIntegration:
 
     def test_productivity_has_color_handler(self):
         from abso.profiles.productivity_oled import ProductivityOLEDProfile
+
         profile = ProductivityOLEDProfile()
         handler_names = [h.__class__.__name__ for h in profile.get_handlers()]
         assert "ColorProfileSettingsHandler" in handler_names
 
     def test_productivity_color_settings(self):
         from abso.profiles.productivity_oled import ProductivityOLEDProfile
+
         profile = ProductivityOLEDProfile()
         settings = profile.get_settings("ColorProfileSettingsHandler")
         assert settings["icc_profile"] == "native"
@@ -578,18 +668,21 @@ class TestProfileIntegration:
 
     def test_slippi_has_color_handler(self):
         from abso.profiles.slippi_melee import SlippiMeleeProfile
+
         profile = SlippiMeleeProfile()
         handler_names = [h.__class__.__name__ for h in profile.get_handlers()]
         assert "ColorProfileSettingsHandler" in handler_names
 
     def test_overwatch2_gsync_hdr_has_color_handler(self):
         from abso.profiles.overwatch2 import Overwatch2GSyncHDRProfile
+
         profile = Overwatch2GSyncHDRProfile()
         handler_names = [h.__class__.__name__ for h in profile.get_handlers()]
         assert "ColorProfileSettingsHandler" in handler_names
 
     def test_overwatch2_gsync_hdr_color_settings(self):
         from abso.profiles.overwatch2 import Overwatch2GSyncHDRProfile
+
         profile = Overwatch2GSyncHDRProfile()
         settings = profile.get_settings("ColorProfileSettingsHandler")
         assert settings["icc_profile"] == "native"

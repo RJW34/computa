@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
-from abso.settings.timer import TimerSettingsHandler
+from abso.settings.timer import TimerResolutionGuard, TimerSettingsHandler
 
 
 class TestTimerConversions:
@@ -249,3 +249,13 @@ class TestTimerConvenienceMethods:
 
         assert result is True
         mock_restore.assert_called_once_with({})
+
+
+@patch("abso.settings.timer.subprocess.run")
+def test_timer_process_check_uses_exact_tasklist_image_name(mock_subprocess_run):
+    """Timer hold should not keep running because of substring tasklist matches."""
+    mock_subprocess_run.return_value = MagicMock(
+        stdout='"notgame.exe","1111","Console","1","10000 K"\n',
+    )
+
+    assert TimerResolutionGuard._is_process_running("game.exe") is False

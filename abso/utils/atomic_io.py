@@ -10,6 +10,7 @@ with os.replace, which is the documented atomic move on Windows and POSIX.
 
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 import secrets
@@ -44,16 +45,12 @@ def atomic_write_text(
         with open(staging, "w", encoding=encoding, newline=newline) as fh:
             fh.write(text)
             fh.flush()
-            try:
+            with contextlib.suppress(OSError, AttributeError):
                 os.fsync(fh.fileno())
-            except (OSError, AttributeError):
-                pass
         os.replace(staging, target)
     except Exception:
-        try:
+        with contextlib.suppress(OSError):
             staging.unlink(missing_ok=True)
-        except OSError:
-            pass
         raise
 
 

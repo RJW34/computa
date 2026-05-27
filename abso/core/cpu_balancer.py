@@ -345,9 +345,7 @@ class CpuBalancer:
             return True
         if pid == self._get_foreground_pid():
             return True
-        if pid <= 4:  # System / Idle
-            return True
-        return False
+        return pid <= 4  # System / Idle
 
     # ------------------------------------------------------------------
     # Restrain / release
@@ -374,26 +372,29 @@ class CpuBalancer:
             return
         try:
             original = self._kernel32.GetPriorityClass(handle)
-            if original and original > BELOW_NORMAL_PRIORITY_CLASS:
-                if self._kernel32.SetPriorityClass(handle, BELOW_NORMAL_PRIORITY_CLASS):
-                    self._restrained[pid] = RestrainedProcess(
-                        pid=pid,
-                        name=name,
-                        original_priority=original,
-                        restrained_at=time.monotonic(),
-                        cpu_percent=cpu,
-                    )
-                    self._events.append(BalancerEvent(
-                        timestamp=time.time(),
-                        action="restrain",
-                        pid=pid,
-                        process_name=name,
-                        cpu_percent=cpu,
-                    ))
-                    logger.info(
-                        "Restrained %s (PID %d) from %d to BelowNormal (%.1f%% CPU)",
-                        name, pid, original, cpu,
-                    )
+            if (
+                original
+                and original > BELOW_NORMAL_PRIORITY_CLASS
+                and self._kernel32.SetPriorityClass(handle, BELOW_NORMAL_PRIORITY_CLASS)
+            ):
+                self._restrained[pid] = RestrainedProcess(
+                    pid=pid,
+                    name=name,
+                    original_priority=original,
+                    restrained_at=time.monotonic(),
+                    cpu_percent=cpu,
+                )
+                self._events.append(BalancerEvent(
+                    timestamp=time.time(),
+                    action="restrain",
+                    pid=pid,
+                    process_name=name,
+                    cpu_percent=cpu,
+                ))
+                logger.info(
+                    "Restrained %s (PID %d) from %d to BelowNormal (%.1f%% CPU)",
+                    name, pid, original, cpu,
+                )
         finally:
             self._kernel32.CloseHandle(handle)
 

@@ -6,12 +6,16 @@ that may affect profile behavior.
 
 from __future__ import annotations
 
+import ctypes
 import logging
 import subprocess
+from ctypes import wintypes
 from dataclasses import dataclass, field
 from typing import Any
 
 from abso.core.detector import HardwareDetector
+from abso.core.overlay_policy import OVERLAY_PROCESS_LABELS
+from abso.core.process_list import parse_tasklist_csv_images
 
 logger = logging.getLogger(__name__)
 
@@ -27,6 +31,9 @@ class MonitorInfo:
     is_primary: bool
     is_hdr_capable: bool = False
     is_vrr_capable: bool = False
+    max_refresh_rate: float | None = None
+    vrr_type: str | None = None
+    vrr_range: str | None = None
 
 
 @dataclass
@@ -82,19 +89,8 @@ class MultiMonitorDetector:
     - Compositor latency estimates
     """
 
-    # Known overlay processes
-    OVERLAY_PROCESSES = {
-        "nvidia share.exe": "NVIDIA Share Overlay",
-        "gameoverlayui.exe": "Steam Overlay",
-        "gamebar.exe": "Xbox Game Bar",
-        "gamebarftserver.exe": "Xbox Game Bar Server",
-        "discordhookhelper.exe": "Discord Overlay",
-        "discordhookhelper64.exe": "Discord Overlay",
-        "rtss.exe": "RivaTuner Statistics Server",
-        "obs64.exe": "OBS Studio",
-        "medal.exe": "Medal Overlay",
-        "medalencoder.exe": "Medal Overlay",
-    }
+    # Backward-compatible alias for older callers/tests.
+    OVERLAY_PROCESSES = OVERLAY_PROCESS_LABELS
 
     def detect(self) -> MultiMonitorResult:
         """Detect display environment and edge cases.
@@ -137,7 +133,9 @@ class MultiMonitorDetector:
 
                 env.max_refresh = max(refresh_rates)
                 env.min_refresh = min(refresh_rates)
-                env.has_mixed_refresh = len(set(refresh_rates)) > 1
+                env.has_mixed_refresh = (
+                    len({self._refresh_bucket(rate) for rate in refresh_rates}) > 1
+                )
                 env.has_mixed_resolution = len(set(resolutions)) > 1
 
                 primary = next((m for m in monitors if m.is_primary), monitors[0])
@@ -168,11 +166,19 @@ class MultiMonitorDetector:
                     is_primary=bool(entry.get("is_primary", False)),
                     is_hdr_capable=False,
                     is_vrr_capable=entry.get("vrr_supported") in {True, "hardware", "likely", "possible"},
+                    max_refresh_rate=self._pick_max_refresh_rate(entry),
+                    vrr_type=self._optional_string(entry.get("vrr_type")),
+                    vrr_range=self._optional_string(entry.get("vrr_range")),
                 ))
             if monitors:
-                return monitors
+                desktop_monitors = self._enum_desktop_screens()
+                return self._merge_monitor_sources(monitors, desktop_monitors)
         except Exception as e:
             logger.debug(f"HardwareDetector monitor enumeration failed: {e}")
+
+        desktop_monitors = self._enum_desktop_screens()
+        if desktop_monitors:
+            return desktop_monitors
 
         try:
             # Use Windows CCD API or fallback to basic WMI
@@ -221,6 +227,101 @@ class MultiMonitorDetector:
 
         return monitors
 
+    def _enum_desktop_screens(self) -> list[MonitorInfo]:
+        """Enumerate active desktop monitor rectangles via Win32 user32."""
+        monitors: list[MonitorInfo] = []
+
+        try:
+            user32 = ctypes.windll.user32
+
+            class RECT(ctypes.Structure):
+                _fields_ = [
+                    ("left", ctypes.c_long),
+                    ("top", ctypes.c_long),
+                    ("right", ctypes.c_long),
+                    ("bottom", ctypes.c_long),
+                ]
+
+            class MONITORINFOEXW(ctypes.Structure):
+                _fields_ = [
+                    ("cbSize", ctypes.c_ulong),
+                    ("rcMonitor", RECT),
+                    ("rcWork", RECT),
+                    ("dwFlags", ctypes.c_ulong),
+                    ("szDevice", ctypes.c_wchar * 32),
+                ]
+
+            MONITORINFOF_PRIMARY = 0x00000001
+            MONITORENUMPROC = ctypes.WINFUNCTYPE(
+                wintypes.BOOL,
+                wintypes.HMONITOR,
+                wintypes.HDC,
+                ctypes.POINTER(RECT),
+                wintypes.LPARAM,
+            )
+
+            def callback(
+                monitor_handle: wintypes.HMONITOR,
+                _hdc: wintypes.HDC,
+                rect: ctypes.POINTER(RECT),
+                _lparam: wintypes.LPARAM,
+            ) -> bool:
+                info = MONITORINFOEXW()
+                info.cbSize = ctypes.sizeof(MONITORINFOEXW)
+                device_name = ""
+                is_primary = False
+                if user32.GetMonitorInfoW(monitor_handle, ctypes.byref(info)):
+                    device_name = str(info.szDevice or "")
+                    is_primary = bool(info.dwFlags & MONITORINFOF_PRIMARY)
+                bounds = rect.contents
+                width = max(0, int(bounds.right - bounds.left))
+                height = max(0, int(bounds.bottom - bounds.top))
+                monitors.append(MonitorInfo(
+                    name=device_name or f"Display {len(monitors) + 1}",
+                    width=width or 1920,
+                    height=height or 1080,
+                    refresh_rate=60.0,
+                    is_primary=is_primary,
+                ))
+                return True
+
+            user32.EnumDisplayMonitors(None, None, MONITORENUMPROC(callback), 0)
+        except Exception as e:
+            logger.debug(f"Desktop monitor enumeration fallback failed: {e}")
+
+        return monitors
+
+    @staticmethod
+    def _merge_monitor_sources(
+        hardware_monitors: list[MonitorInfo],
+        desktop_monitors: list[MonitorInfo],
+    ) -> list[MonitorInfo]:
+        """Preserve rich hardware data while filling partial topology gaps."""
+        if len(desktop_monitors) <= len(hardware_monitors):
+            return hardware_monitors
+
+        merged = list(hardware_monitors)
+        matched_desktop_indexes: set[int] = set()
+        for hardware in hardware_monitors:
+            for index, desktop in enumerate(desktop_monitors):
+                if index in matched_desktop_indexes:
+                    continue
+                if (
+                    hardware.width == desktop.width
+                    and hardware.height == desktop.height
+                    and hardware.is_primary == desktop.is_primary
+                ):
+                    matched_desktop_indexes.add(index)
+                    break
+
+        for index, desktop in enumerate(desktop_monitors):
+            if index not in matched_desktop_indexes:
+                merged.append(desktop)
+                if len(merged) >= len(desktop_monitors):
+                    break
+
+        return merged
+
     @staticmethod
     def _parse_resolution(value: Any) -> tuple[int, int]:
         """Parse resolution formatted like '2560x1440'."""
@@ -250,6 +351,32 @@ class MultiMonitorDetector:
                 continue
         return 60.0
 
+    @staticmethod
+    def _pick_max_refresh_rate(entry: dict[str, Any]) -> float | None:
+        """Pick the best detected maximum refresh capability, if available."""
+        for key in ("max_refresh_rate", "max_refresh_capability"):
+            try:
+                value = entry.get(key)
+                if value is None:
+                    continue
+                rate = float(value)
+                if rate > 0:
+                    return rate
+            except (TypeError, ValueError):
+                continue
+        return None
+
+    @staticmethod
+    def _optional_string(value: Any) -> str | None:
+        """Return a non-empty string value, or None."""
+        text = str(value or "").strip()
+        return text or None
+
+    @staticmethod
+    def _refresh_bucket(refresh_rate: float) -> int:
+        """Bucket refresh rates so 59.94/59.95/60.0 do not look mixed."""
+        return int(round(refresh_rate))
+
     def _detect_overlays(self, env: DisplayEnvironment) -> None:
         """Detect running overlay processes."""
         try:
@@ -261,10 +388,10 @@ class MultiMonitorDetector:
             )
 
             if result.returncode == 0:
-                running_procs = result.stdout.lower()
+                running_images = parse_tasklist_csv_images(result.stdout)
 
                 for proc, name in self.OVERLAY_PROCESSES.items():
-                    if proc.lower() in running_procs:
+                    if proc.lower() in running_images and name not in env.detected_overlays:
                         env.detected_overlays.append(name)
                         logger.debug(f"Detected overlay: {name}")
 
@@ -284,6 +411,30 @@ class MultiMonitorDetector:
                     "Mixed refresh can cause compositor overhead. Consider disabling "
                     "secondary monitors during competitive gaming, or ensure HAGS is ON "
                     "to mitigate compositor latency."
+                ),
+            ))
+
+        underclocked = [
+            monitor
+            for monitor in env.monitors
+            if monitor.max_refresh_rate is not None
+            and monitor.max_refresh_rate - monitor.refresh_rate >= 5.0
+        ]
+        if underclocked:
+            monitor = max(
+                underclocked,
+                key=lambda item: (item.max_refresh_rate or 0.0) - item.refresh_rate,
+            )
+            result.warnings.append(MultiMonitorWarning(
+                code="MULTIMON_REFRESH_BELOW_CAPABILITY",
+                message=(
+                    f"{monitor.name} is running at {monitor.refresh_rate:g}Hz "
+                    f"below detected capability {monitor.max_refresh_rate:g}Hz"
+                ),
+                recommendation=(
+                    "After the pending reboot, consider setting each active display to its "
+                    "highest stable refresh rate in Windows/NVIDIA Control Panel. ABSO "
+                    "does not change live display modes automatically."
                 ),
             ))
 

@@ -1,15 +1,13 @@
 """Tests for KB checker module."""
 
-from datetime import datetime, timedelta, timezone
+from datetime import timedelta
 from unittest.mock import MagicMock, patch
 
 from abso.core.kb_checker import (
     KNOWN_BAD_KBS,
     LAST_REVIEWED_UTC,
     STALENESS_DAYS,
-    ProblematicKB,
     check_problematic_kbs,
-    get_installed_kbs,
     is_review_stale,
     list_review_staleness,
     uninstall_kb,
@@ -56,7 +54,6 @@ class TestGetInstalledKBs:
         """get_installed_kbs returns empty list when wmi is unavailable."""
         with patch.dict("sys.modules", {"wmi": None}):
             # Force reimport to trigger ImportError
-            import importlib
             from abso.core import kb_checker
             # The function handles ImportError gracefully
             # Just verify the function exists and is callable

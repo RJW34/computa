@@ -6,6 +6,7 @@ TimerResolutionGuard for holding a resolution while a game process runs.
 
 from __future__ import annotations
 
+import contextlib
 import ctypes
 import json
 import logging
@@ -16,6 +17,7 @@ from pathlib import Path
 from typing import Any
 
 from abso.core.models import Issue
+from abso.core.process_list import parse_tasklist_csv_images
 from abso.settings.base import SettingsHandler
 
 logger = logging.getLogger(__name__)
@@ -536,10 +538,8 @@ class TimerResolutionGuard:
 
     def _remove_status(self) -> None:
         """Clean up the status file."""
-        try:
+        with contextlib.suppress(Exception):
             _STATUS_FILE.unlink(missing_ok=True)
-        except Exception:
-            pass
 
     # -- context manager ----------------------------------------------------
 
@@ -595,13 +595,12 @@ class TimerResolutionGuard:
         """
         try:
             result = subprocess.run(
-                ["tasklist", "/FI", f"IMAGENAME eq {process_name}", "/NH"],
+                ["tasklist", "/FI", f"IMAGENAME eq {process_name}", "/FO", "CSV", "/NH"],
                 capture_output=True,
                 text=True,
                 timeout=10,
             )
-            # tasklist prints "INFO: No tasks are running..." when nothing matches
-            return process_name.lower() in result.stdout.lower()
+            return process_name.lower() in parse_tasklist_csv_images(result.stdout or "")
         except Exception as e:
             logger.warning("tasklist check failed: %s", e)
             return False

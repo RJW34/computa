@@ -177,7 +177,9 @@ fn relaunch_self_elevated() -> Result<(), String> {
             std::ptr::null_mut(),
             operation.as_ptr(),
             file.as_ptr(),
-            parameters.as_ref().map_or(std::ptr::null(), |value| value.as_ptr()),
+            parameters
+                .as_ref()
+                .map_or(std::ptr::null(), |value| value.as_ptr()),
             directory.as_ptr(),
             1,
         )
@@ -224,6 +226,14 @@ fn ensure_gui_admin() {
 #[cfg(not(windows))]
 fn ensure_gui_admin() {}
 
+/// Resolve an installed sidecar located beside the GUI executable.
+fn current_exe_sidecar_path() -> Option<PathBuf> {
+    let exe = std::env::current_exe().ok()?;
+    let exe_dir = exe.parent()?;
+    let sidecar = exe_dir.join("abso.exe");
+    sidecar.exists().then_some(sidecar)
+}
+
 /// Get the path to the bundled abso.exe sidecar
 fn get_sidecar_path(app_handle: Option<&tauri::AppHandle>) -> PathBuf {
     // In production: use the bundled sidecar
@@ -234,6 +244,10 @@ fn get_sidecar_path(app_handle: Option<&tauri::AppHandle>) -> PathBuf {
                 return sidecar;
             }
         }
+    }
+
+    if let Some(sidecar) = current_exe_sidecar_path() {
+        return sidecar;
     }
 
     // Fallback for development: look for dist/abso.exe in project root
@@ -264,6 +278,10 @@ fn should_use_python() -> bool {
     // In release builds, check for bundled sidecar
     #[cfg(not(debug_assertions))]
     {
+        if current_exe_sidecar_path().is_some() {
+            return false;
+        }
+
         let dev_paths = [
             PathBuf::from("../../dist/abso.exe"),
             PathBuf::from("../dist/abso.exe"),
@@ -471,7 +489,9 @@ fn load_backend_active_profile(app_handle: &tauri::AppHandle) -> Option<String> 
             .output()
     } else {
         let sidecar_path = get_sidecar_path(Some(app_handle));
-        Command::new(&sidecar_path).args(["state", "--json"]).output()
+        Command::new(&sidecar_path)
+            .args(["state", "--json"])
+            .output()
     };
 
     let output = match output {
@@ -700,8 +720,11 @@ fn main() {
             }
 
             // Create initial tray menu
-            let menu =
-                create_tray_menu(app.handle(), &tray_profiles, initial_active_profile.as_deref())?;
+            let menu = create_tray_menu(
+                app.handle(),
+                &tray_profiles,
+                initial_active_profile.as_deref(),
+            )?;
 
             // Build tray icon
             let _tray = TrayIconBuilder::with_id("main-tray")

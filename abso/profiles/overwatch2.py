@@ -8,7 +8,11 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
 
 from abso.profiles.base import DisplayPathRequirements
-from abso.profiles.profile_bases import ReflexShooterBaseProfile
+from abso.profiles.profile_bases import (
+    ReflexShooterBaseProfile,
+    fso_overrides,
+    merge_settings_map,
+)
 
 if TYPE_CHECKING:
     from abso.settings.base import SettingsHandler
@@ -159,7 +163,7 @@ class _Overwatch2BaseProfile(ReflexShooterBaseProfile):
 
     def _fso_dict(self, *, disabled: bool) -> dict[str, bool]:
         """Build the deterministic profile FSO declaration."""
-        return {"Overwatch.exe": disabled}
+        return fso_overrides(self.executable_hints, disabled=disabled)
 
     def resolve_runtime_settings(
         self,
@@ -214,6 +218,9 @@ class _Overwatch2BaseProfile(ReflexShooterBaseProfile):
             },
             "OW2ConfigHandler": {
                 "window_mode": 0,  # Fullscreen (Exclusive)
+                "fullscreen_window": False,
+                "fullscreen_window_enabled": True,
+                "windowed_fullscreen": False,
                 "vsync": False,  # Off
                 "reduce_buffering": True,  # On
                 "dynamic_render_scale": False,  # Off (UseGPUScale)
@@ -236,12 +243,7 @@ class _Overwatch2BaseProfile(ReflexShooterBaseProfile):
         return {}
 
     def _settings_overrides(self) -> dict[str, dict[str, Any]]:
-        merged = self._base_overrides()
-        for handler, values in self._variant_overrides().items():
-            if handler not in merged:
-                merged[handler] = {}
-            merged[handler].update(values)
-        return merged
+        return merge_settings_map(self._base_overrides(), self._variant_overrides())
 
 
 class Overwatch2Profile(_Overwatch2BaseProfile):
@@ -767,6 +769,10 @@ class Overwatch2GSyncCaptureProfile(_Overwatch2BaseProfile):
         return True
 
     @property
+    def requires_exact_nvidia_binding(self) -> bool:
+        return True
+
+    @property
     def fullscreen_optimizations_per_exe(self) -> dict[str, bool]:
         # Capture lane intentionally runs the borderless FSO path. Clear any
         # per-exe FSO-disable flag a previous exclusive profile may have left
@@ -798,6 +804,9 @@ class Overwatch2GSyncCaptureProfile(_Overwatch2BaseProfile):
             },
             "OW2ConfigHandler": {
                 "window_mode": 1,
+                "fullscreen_window": False,
+                "fullscreen_window_enabled": False,
+                "windowed_fullscreen": True,
                 "auto_vrr_fps_cap": True,
             },
         }
@@ -878,6 +887,10 @@ class Overwatch2GSyncHDRCaptureProfile(_Overwatch2BaseProfile):
         return True
 
     @property
+    def requires_exact_nvidia_binding(self) -> bool:
+        return True
+
+    @property
     def fullscreen_optimizations_per_exe(self) -> dict[str, bool]:
         # HDR capture lane: intentionally borderless FSO. Clear any stale FSO
         # disable left by a prior exclusive-HDR apply so the composited HDR
@@ -929,6 +942,9 @@ class Overwatch2GSyncHDRCaptureProfile(_Overwatch2BaseProfile):
             },
             "OW2ConfigHandler": {
                 "window_mode": 1,
+                "fullscreen_window": False,
+                "fullscreen_window_enabled": False,
+                "windowed_fullscreen": True,
                 "auto_vrr_fps_cap": True,
             },
         }

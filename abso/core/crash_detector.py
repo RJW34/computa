@@ -263,9 +263,7 @@ class CrashDetector:
         """
         if exit_code is not None and exit_code != 0:
             return True
-        if runtime_seconds < _MIN_RUNTIME_SECONDS:
-            return True
-        return False
+        return runtime_seconds < _MIN_RUNTIME_SECONDS
 
     def _resolve_profile_id(self, process_info: ProcessInfo) -> str | None:
         """Determine which profile was active when the process ran."""

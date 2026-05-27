@@ -96,12 +96,40 @@
       }
     },
     {
+      "id": "apply-rivals2-offline-hdr",
+      "profile_id": "rivals2-offline-hdr",
+      "kind": "apply_profile",
+      "assumptions": [
+        "administrator",
+        "nvidia_gpu",
+        "hdr_capable"
+      ],
+      "expected": {
+        "transaction_state": "committed",
+        "apply_success": true
+      }
+    },
+    {
       "id": "apply-rivals2-online",
       "profile_id": "rivals2-online",
       "kind": "apply_profile",
       "assumptions": [
         "administrator",
         "nvidia_gpu"
+      ],
+      "expected": {
+        "transaction_state": "committed",
+        "apply_success": true
+      }
+    },
+    {
+      "id": "apply-rivals2-online-hdr",
+      "profile_id": "rivals2-online-hdr",
+      "kind": "apply_profile",
+      "assumptions": [
+        "administrator",
+        "nvidia_gpu",
+        "hdr_capable"
       ],
       "expected": {
         "transaction_state": "committed",
@@ -123,6 +151,21 @@
       }
     },
     {
+      "id": "apply-rivals2-gsync-hdr",
+      "profile_id": "rivals2-gsync-hdr",
+      "kind": "apply_profile",
+      "assumptions": [
+        "administrator",
+        "nvidia_gpu",
+        "vrr_confirmed",
+        "hdr_capable"
+      ],
+      "expected": {
+        "transaction_state": "committed",
+        "apply_success": true
+      }
+    },
+    {
       "id": "apply-rivals2-online-gsync",
       "profile_id": "rivals2-online-gsync",
       "kind": "apply_profile",
@@ -130,6 +173,21 @@
         "administrator",
         "nvidia_gpu",
         "vrr_confirmed"
+      ],
+      "expected": {
+        "transaction_state": "committed",
+        "apply_success": true
+      }
+    },
+    {
+      "id": "apply-rivals2-online-gsync-hdr",
+      "profile_id": "rivals2-online-gsync-hdr",
+      "kind": "apply_profile",
+      "assumptions": [
+        "administrator",
+        "nvidia_gpu",
+        "vrr_confirmed",
+        "hdr_capable"
       ],
       "expected": {
         "transaction_state": "committed",
@@ -364,6 +422,19 @@
       "kind": "apply_profile",
       "assumptions": [
         "administrator"
+      ],
+      "expected": {
+        "transaction_state": "committed",
+        "apply_success": true
+      }
+    },
+    {
+      "id": "apply-productivity-hdr",
+      "profile_id": "productivity-hdr",
+      "kind": "apply_profile",
+      "assumptions": [
+        "administrator",
+        "hdr_display"
       ],
       "expected": {
         "transaction_state": "committed",

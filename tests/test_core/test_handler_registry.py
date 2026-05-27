@@ -15,7 +15,6 @@ from __future__ import annotations
 
 from abso.core.compliance import ComplianceEngine
 from abso.core.handler_registry import (
-    HandlerEntry,
     _all_entries,
     get_audit_handlers,
     get_backup_handlers,

@@ -37,7 +37,9 @@ ICC_PROFILE_ALIASES: dict[str, str] = {
 }
 
 # Windows color directory
-COLOR_DIR = Path(os.environ.get("SYSTEMROOT", r"C:\Windows")) / "System32" / "spool" / "drivers" / "color"
+COLOR_DIR = (
+    Path(os.environ.get("SYSTEMROOT", r"C:\Windows")) / "System32" / "spool" / "drivers" / "color"
+)
 
 # Registry paths for ICC profile associations
 # Per-monitor: HKCU\SOFTWARE\Microsoft\Windows NT\CurrentVersion\ICM\ProfileAssociations\Display\{class_guid}\{index}
@@ -82,6 +84,7 @@ COLOR_ENCODING_NAMES = {
 # =============================================================================
 # CCD Structures (reuse pattern from windows.py)
 # =============================================================================
+
 
 class _LUID(ctypes.Structure):
     _fields_ = [("LowPart", wintypes.DWORD), ("HighPart", wintypes.LONG)]
@@ -152,6 +155,7 @@ class _DISPLAYCONFIG_PATH_INFO(ctypes.Structure):
 # DISPLAY_DEVICE structure for EnumDisplayDevices
 # =============================================================================
 
+
 class _DISPLAY_DEVICE(ctypes.Structure):
     _fields_ = [
         ("cb", wintypes.DWORD),
@@ -167,8 +171,10 @@ class _DISPLAY_DEVICE(ctypes.Structure):
 # NV_DISPLAY_DVC_INFO_EX structure for NVAPI digital vibrance
 # =============================================================================
 
+
 class _NV_DISPLAY_DVC_INFO(ctypes.Structure):
     """Legacy NvAPI_GetDVCInfo / NvAPI_SetDVCLevel struct (4 fields)."""
+
     _fields_ = [
         ("version", c_uint),
         ("currentLevel", c_int),
@@ -179,6 +185,7 @@ class _NV_DISPLAY_DVC_INFO(ctypes.Structure):
 
 class _NV_DISPLAY_DVC_INFO_EX(ctypes.Structure):
     """Extended NvAPI_GetDVCInfoEx / NvAPI_SetDVCLevelEx struct (5 fields)."""
+
     _fields_ = [
         ("version", c_uint),
         ("currentLevel", c_int),
@@ -192,9 +199,11 @@ class _NV_DISPLAY_DVC_INFO_EX(ctypes.Structure):
 # Helper functions
 # =============================================================================
 
+
 @dataclass
 class DVCRange:
     """Hardware-reported digital vibrance range from NvAPI_GetDVCInfoEx."""
+
     min_level: int
     max_level: int
     default_level: int
@@ -247,6 +256,7 @@ def _internal_to_user(internal_level: int, hw: DVCRange) -> int:
 # Handler
 # =============================================================================
 
+
 class ColorProfileSettingsHandler(SettingsHandler):
     """Handles display color profile settings.
 
@@ -291,33 +301,37 @@ class ColorProfileSettingsHandler(SettingsHandler):
 
         vibrance = current.get("digital_vibrance")
         if vibrance is not None and vibrance != DVC_USER_DEFAULT:
-            issues.append(Issue(
-                title="NVIDIA digital vibrance is non-default",
-                severity="info",
-                current_value=f"{vibrance}%",
-                optimal_value=f"{DVC_USER_DEFAULT}% (default)",
-                explanation=(
-                    "Digital vibrance is set to a non-default level. This may be intentional "
-                    "for competitive games (boosted colors improve visibility) but should be "
-                    "reset for color-accurate work."
-                ),
-                category="color",
-            ))
+            issues.append(
+                Issue(
+                    title="NVIDIA digital vibrance is non-default",
+                    severity="info",
+                    current_value=f"{vibrance}%",
+                    optimal_value=f"{DVC_USER_DEFAULT}% (default)",
+                    explanation=(
+                        "Digital vibrance is set to a non-default level. This may be intentional "
+                        "for competitive games (boosted colors improve visibility) but should be "
+                        "reset for color-accurate work."
+                    ),
+                    category="color",
+                )
+            )
 
         icc = current.get("icc_profile")
         if icc is None:
-            issues.append(Issue(
-                title="No ICC color profile detected",
-                severity="info",
-                current_value="None / default",
-                optimal_value="sRGB Color Space Profile.icm (for gaming)",
-                explanation=(
-                    "No explicit ICC profile is set. For competitive gaming, sRGB ensures "
-                    "consistent, standardized colors. For HDR/cinematic games, the monitor's "
-                    "native profile is preferred."
-                ),
-                category="color",
-            ))
+            issues.append(
+                Issue(
+                    title="No ICC color profile detected",
+                    severity="info",
+                    current_value="None / default",
+                    optimal_value="sRGB Color Space Profile.icm (for gaming)",
+                    explanation=(
+                        "No explicit ICC profile is set. For competitive gaming, sRGB ensures "
+                        "consistent, standardized colors. For HDR/cinematic games, the monitor's "
+                        "native profile is preferred."
+                    ),
+                    category="color",
+                )
+            )
 
         return issues
 
@@ -355,13 +369,18 @@ class ColorProfileSettingsHandler(SettingsHandler):
         errors: list[str] = []
         applied: list[str] = []
         skipped: list[str] = []
+        changed_keys: list[str] = []
 
         # --- ICC Profile ---
         if "icc_profile" in settings:
             try:
                 profile_alias = settings["icc_profile"]
-                self._apply_icc_profile(profile_alias)
-                applied.append(f"ICC profile: {profile_alias}")
+                if self._icc_profile_already_active(profile_alias):
+                    skipped.append(f"ICC profile: {profile_alias} already active")
+                else:
+                    self._apply_icc_profile(profile_alias)
+                    changed_keys.append("icc_profile")
+                    applied.append(f"ICC profile: {profile_alias}")
             except FileNotFoundError as e:
                 # Missing profile is a real error (user asked for something specific)
                 logger.warning(f"Failed to set ICC profile: {e}")
@@ -377,6 +396,7 @@ class ColorProfileSettingsHandler(SettingsHandler):
             level = settings["digital_vibrance"]
             try:
                 self._set_digital_vibrance(level)
+                changed_keys.append("digital_vibrance")
                 applied.append(f"Digital vibrance: {level}%")
             except Exception as e:
                 # NVAPI not available, no display handle, etc. → graceful skip
@@ -400,6 +420,8 @@ class ColorProfileSettingsHandler(SettingsHandler):
             "requires_reboot": False,
             "applied": applied,
             "skipped": skipped,
+            "changed": bool(changed_keys),
+            "changed_keys": changed_keys,
         }
 
     def backup(self) -> dict[str, Any]:
@@ -480,7 +502,9 @@ class ColorProfileSettingsHandler(SettingsHandler):
                         # Extract class index from DeviceKey
                         # DeviceKey looks like: \Registry\Machine\System\...\{guid}\XXXX
                         device_key = monitor.DeviceKey
-                        class_index = device_key.rsplit("\\", 1)[-1] if "\\" in device_key else "0000"
+                        class_index = (
+                            device_key.rsplit("\\", 1)[-1] if "\\" in device_key else "0000"
+                        )
 
                         return {
                             "device_name": adapter.DeviceName,
@@ -552,14 +576,23 @@ class ColorProfileSettingsHandler(SettingsHandler):
         # Treat as literal filename
         return alias
 
+    def _icc_profile_already_active(self, alias: str) -> bool:
+        """Return True when the requested ICC/default profile is already active."""
+        filename = self._resolve_profile_name(str(alias))
+        current = self._get_current_icc_profile()
+
+        if filename is None:
+            return current in (None, "")
+        if not current:
+            return False
+
+        return Path(str(current)).name.lower() == filename.lower()
+
     def _list_installed_profiles(self) -> list[str]:
         """List ICC profiles installed in the Windows color directory."""
         try:
             if COLOR_DIR.exists():
-                return [
-                    f.name for f in COLOR_DIR.iterdir()
-                    if f.suffix.lower() in (".icm", ".icc")
-                ]
+                return [f.name for f in COLOR_DIR.iterdir() if f.suffix.lower() in (".icm", ".icc")]
         except Exception as e:
             logger.debug(f"Failed to list color profiles: {e}")
         return []
@@ -604,21 +637,21 @@ class ColorProfileSettingsHandler(SettingsHandler):
             # cpstColorProfileSubType: CPST_RGB_WORKING_SPACE = 4 or CPST_NONE = 1
             func = self._mscms.WcsSetDefaultColorProfile
             func.argtypes = [
-                wintypes.DWORD,    # scope
+                wintypes.DWORD,  # scope
                 ctypes.c_wchar_p,  # pDeviceName (None = default device)
-                wintypes.DWORD,    # cptColorProfileType
-                wintypes.DWORD,    # cpstColorProfileSubType
-                wintypes.DWORD,    # dwProfileID
+                wintypes.DWORD,  # cptColorProfileType
+                wintypes.DWORD,  # cpstColorProfileSubType
+                wintypes.DWORD,  # dwProfileID
                 ctypes.c_wchar_p,  # pProfileName
             ]
             func.restype = wintypes.BOOL
 
             result = func(
-                1,         # WCS_PROFILE_MANAGEMENT_SCOPE_CURRENT_USER
-                None,      # default display device
-                1,         # CPT_ICC
-                1,         # CPST_NONE (default)
-                0,         # dwProfileID
+                1,  # WCS_PROFILE_MANAGEMENT_SCOPE_CURRENT_USER
+                None,  # default display device
+                1,  # CPT_ICC
+                1,  # CPST_NONE (default)
+                0,  # dwProfileID
                 filename,  # profile filename
             )
 
@@ -739,7 +772,9 @@ class ColorProfileSettingsHandler(SettingsHandler):
             logger.debug(f"NVAPI init failed: {e}")
             return False
 
-    def _nvapi_get_function(self, name: str, interface_id: int, restype: Any, argtypes: list[Any]) -> Any:
+    def _nvapi_get_function(
+        self, name: str, interface_id: int, restype: Any, argtypes: list[Any]
+    ) -> Any:
         """Get and cache an NVAPI function pointer."""
         if name in self._interface_table:
             return self._interface_table[name]
@@ -1117,15 +1152,17 @@ class ColorProfileSettingsHandler(SettingsHandler):
             path = paths[i]
             source = path.sourceInfo
             target = path.targetInfo
-            targets.append({
-                "adapter_id": target.adapterId,
-                "target_id": target.id,
-                "source_id": source.id,
-                "source_device_name": ColorProfileSettingsHandler._get_source_device_name(
-                    source.adapterId,
-                    source.id,
-                ),
-            })
+            targets.append(
+                {
+                    "adapter_id": target.adapterId,
+                    "target_id": target.id,
+                    "source_id": source.id,
+                    "source_device_name": ColorProfileSettingsHandler._get_source_device_name(
+                        source.adapterId,
+                        source.id,
+                    ),
+                }
+            )
         return targets
 
     # =========================================================================

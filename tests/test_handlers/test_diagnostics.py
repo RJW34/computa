@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from abso.settings.diagnostics import DiagnosticsSettingsHandler
 
@@ -107,3 +107,16 @@ def test_apply_is_noop() -> None:
     assert result["success"] is True
     assert result["requires_reboot"] is False
     assert result["applied"] == []
+
+
+@patch("abso.settings.diagnostics.subprocess.run")
+def test_detect_running_overlays_uses_exact_tasklist_image_names(mock_run) -> None:
+    mock_run.return_value = MagicMock(
+        stdout=(
+            '"notgamebar.exe","1111","Console","1","10000 K"\n'
+            '"GameBar.exe","2222","Console","1","10000 K"\n'
+        )
+    )
+    handler = DiagnosticsSettingsHandler()
+
+    assert handler._detect_running_overlays() == ["GameBar.exe"]

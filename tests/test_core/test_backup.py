@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -21,13 +22,33 @@ class TestBackupManagerInit:
             assert manager is not None
             assert manager.backup_dir == tmp_path
 
-    def test_init_loads_handlers(self, tmp_path):
-        """Test BackupManager loads handlers on init."""
+    def test_init_defers_handler_loading(self, tmp_path):
+        """Listing backups should not instantiate every settings handler."""
         mock_handler = MagicMock()
 
-        with patch("abso.core.backup._get_backup_handlers", return_value=[mock_handler]):
+        with patch(
+            "abso.core.backup._get_backup_handlers", return_value=[mock_handler]
+        ) as get_handlers:
             manager = BackupManager(tmp_path)
-            assert len(manager._handlers) == 1
+            assert manager._handlers is None
+            assert manager.handlers == [mock_handler]
+            get_handlers.assert_called_once()
+
+    def test_list_backups_does_not_load_handlers(self, tmp_path):
+        """Manifest-only backup listing should stay cheap for health checks."""
+        backup_path = tmp_path / "2026-05-26_010101"
+        backup_path.mkdir()
+        (backup_path / "manifest.json").write_text(
+            json.dumps({"created_at": "now", "components": {}}),
+            encoding="utf-8",
+        )
+
+        with patch("abso.core.backup._get_backup_handlers") as get_handlers:
+            manager = BackupManager(tmp_path)
+            backups = manager.list_backups()
+
+        assert backups[0]["id"] == "2026-05-26_010101"
+        get_handlers.assert_not_called()
 
     def test_default_backup_handlers_include_native_game_config_handlers(self):
         """Native game config handlers must be backed up before profile swaps."""
@@ -145,6 +166,30 @@ class TestCreateBackup:
         assert backup_id[7] == "-"
         assert backup_id[10] == "_"
 
+    def test_create_backup_retries_transient_directory_commit_denial(self, tmp_path):
+        """Windows can briefly deny staged-directory renames after file writes."""
+        real_replace = os.replace
+        attempts = 0
+
+        def flaky_replace(src, dst):
+            nonlocal attempts
+            if str(src).endswith(".partial"):
+                attempts += 1
+            if str(src).endswith(".partial") and attempts == 1:
+                raise PermissionError("transient rename denial")
+            real_replace(src, dst)
+
+        with (
+            patch("abso.core.backup._get_backup_handlers", return_value=[]),
+            patch("abso.core.backup.os.replace", side_effect=flaky_replace),
+        ):
+            manager = BackupManager(tmp_path)
+            backup_id = manager.create_backup()
+
+        assert attempts == 2
+        assert (tmp_path / backup_id / "manifest.json").exists()
+        assert not list(tmp_path.glob("*.partial"))
+
 
 class TestRestoreBackup:
     """Tests for restore_backup method."""
@@ -220,6 +265,7 @@ class TestRestoreBackup:
             # Create two backups
             manager.create_backup()
             import time
+
             time.sleep(0.1)  # Ensure different timestamp
             manager.create_backup()  # Second backup
 
@@ -338,6 +384,7 @@ class TestListBackups:
     def test_list_backups_returns_all(self, tmp_path):
         """Test list_backups returns all backups."""
         import time
+
         with patch("abso.core.backup._get_backup_handlers", return_value=[]):
             manager = BackupManager(tmp_path)
 
@@ -352,6 +399,7 @@ class TestListBackups:
     def test_list_backups_sorted_newest_first(self, tmp_path):
         """Test list_backups returns newest first."""
         import time
+
         with patch("abso.core.backup._get_backup_handlers", return_value=[]):
             manager = BackupManager(tmp_path)
 
@@ -457,6 +505,7 @@ class TestGetLatestBackup:
 
             manager.create_backup()
             import time
+
             time.sleep(0.1)
             id2 = manager.create_backup()
 

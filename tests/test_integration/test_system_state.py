@@ -21,7 +21,7 @@ import winreg
 
 import pytest
 
-from tests.test_integration.conftest import _is_admin, requires_admin
+from tests.test_integration.conftest import requires_admin
 
 pytestmark = [
     pytest.mark.integration,

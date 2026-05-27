@@ -1,10 +1,21 @@
-# Competitive Latency Canonical Profiles
+# Competitive Latency Legacy Note
 ## Rivals of Aether 2 (ONLINE) & Slippi / SSBM (Slippi Dolphin)
 
-**Status:** FINAL – Deterministic  
-**Purpose:** Enforce lowest-latency configurations that do NOT introduce hitches, rollback instability, or frame pacing variance  
-**Audience:** Windows optimizer / per-game profile system  
-**Scope:** Profile refactor + enforcement logic
+> **Status 2026-05-26:** legacy design note. This file preserves useful
+> rollback-coupling rationale, but it is no longer the repo-wide authoritative
+> source of truth for shipped profile behavior.
+>
+> Current agents should read `AGENTS.md`, `docs/CURRENT_AGENT_BRIEFING.md`, and
+> `docs/AGENT_PROTOCOL.md` first. For live profile behavior, inspect the
+> shipped catalog with `python -m abso profiles --json`, the profile modules
+> under `abso/profiles/`, and the snapshot tests. For the current Rivals 2
+> 300 Hz user-facing guide, use
+> `rivals2-300hz-lowest-latency-guide.md`.
+
+**Purpose:** Preserve latency/rollback design rationale that should be checked
+against the live catalog before implementation work.
+**Audience:** Windows optimizer / per-game profile system
+**Scope:** historical profile refactor + enforcement logic
 
 ---
 
@@ -50,11 +61,12 @@ High-refresh tearing is visually negligible and latency-optimal.
 
 | Setting | Value |
 |----|----|
-| In-Game FPS Cap | Unlimited / Engine Max |
-| NVCP Frame Rate Limit | 240 FPS |
+| In-Game FPS Cap | Unlimited / Engine Max (ABSO writes 999) |
+| NVCP Frame Rate Limit | OFF |
 | External Limiters (RTSS) | DISABLED |
 
-**Note:** 240 FPS cap via NVCP provides stable frame pacing for online play.  
+**Note:** Online no-sync uses one authoritative uncapped engine path and no
+external limiter. Do not add RTSS/NVCP caps to this profile.
 
 ---
 
@@ -141,7 +153,7 @@ The optimizer MUST block these when `rivals2-online` is active:
 
 ### Canonical One-Line Definition (Rivals 2 Online)
 
-> **Exclusive fullscreen + no sync + 240 FPS cap + NV LLM ON (not Ultra - can cause frame pacing issues) + HAGS ON + Ultimate Performance plan + no overlays**
+> **Exclusive fullscreen + no sync + uncapped engine FPS + NV LLM ON (not Ultra - can cause frame pacing issues) + HAGS ON + Ultimate Performance plan + no overlays**
 
 ---
 
@@ -255,7 +267,7 @@ If SK / RTSS / overlays are detected:
 | VRR | OFF | OFF |
 | LLM | ON | ULTRA |
 | HAGS | ON | ON |
-| FPS Cap | 240 | NONE |
+| FPS Cap | Engine max / uncapped | NONE |
 | Priority Aggression | LOW | HIGH |
 | Frame Pacing Priority | HIGH | LOW |
 | Raw Latency Priority | MEDIUM | MAX |
@@ -273,5 +285,6 @@ If SK / RTSS / overlays are detected:
 
 ## End of Document
 
-This file is the **authoritative reference** for competitive latency behavior.
-Any optimizer behavior that contradicts this is a bug.
+This file is historical guidance. If it contradicts the live profile catalog,
+tests, or current docs, update or archive this note rather than assuming the
+optimizer behavior is wrong.

@@ -105,6 +105,19 @@ function Test-StartupTaskInstalled {
     }
 }
 
+function Test-StringContainsLiteral {
+    param(
+        [string]$Text,
+        [string]$Needle
+    )
+
+    if ([string]::IsNullOrWhiteSpace($Text) -or [string]::IsNullOrWhiteSpace($Needle)) {
+        return $false
+    }
+
+    return ($Text.IndexOf($Needle, [System.StringComparison]::OrdinalIgnoreCase) -ge 0)
+}
+
 function Get-StartupTaskInfoSafe {
     try {
         $task = Get-ScheduledTask -TaskName $TaskName -ErrorAction Stop
@@ -118,6 +131,11 @@ function Get-StartupTaskInfoSafe {
         elseif ($runLevelValue) {
             $taskHighest = ($runLevelValue -match "Highest" -or $runLevelValue -eq "1")
         }
+        $action = @($task.Actions) | Select-Object -First 1
+        $actionExecute = if ($action) { "$($action.Execute)" } else { "" }
+        $actionArguments = if ($action) { "$($action.Arguments)" } else { "" }
+        $usesExpectedLauncher = Test-StringContainsLiteral -Text $actionArguments -Needle $StartupLauncherPath
+        $usesExpectedVbs = Test-StringContainsLiteral -Text $actionArguments -Needle $VBSPath
         return [ordered]@{
             exists = $true
             enabled = [bool]$task.Settings.Enabled
@@ -126,6 +144,13 @@ function Get-StartupTaskInfoSafe {
             run_level = $runLevelValue
             highest = $taskHighest
             user_id = "$($task.Principal.UserId)"
+            action_execute = $actionExecute
+            action_arguments = $actionArguments
+            action_expected_launcher_path = $StartupLauncherPath
+            action_expected_vbs_path = $VBSPath
+            action_uses_expected_launcher = [bool]$usesExpectedLauncher
+            action_uses_expected_vbs = [bool]$usesExpectedVbs
+            action_path_current = [bool]($usesExpectedLauncher -or $usesExpectedVbs)
         }
     }
     catch {
@@ -137,6 +162,13 @@ function Get-StartupTaskInfoSafe {
             run_level = $null
             highest = $false
             user_id = $null
+            action_execute = $null
+            action_arguments = $null
+            action_expected_launcher_path = $StartupLauncherPath
+            action_expected_vbs_path = $VBSPath
+            action_uses_expected_launcher = $false
+            action_uses_expected_vbs = $false
+            action_path_current = $false
         }
     }
 }
@@ -170,6 +202,13 @@ function Get-InstallStatus {
         task_run_level     = $taskInfo.run_level
         task_highest       = [bool]$taskInfo.highest
         task_user_id       = $taskInfo.user_id
+        task_action_execute = $taskInfo.action_execute
+        task_action_arguments = $taskInfo.action_arguments
+        task_action_path_current = [bool]$taskInfo.action_path_current
+        task_action_uses_expected_launcher = [bool]$taskInfo.action_uses_expected_launcher
+        task_action_uses_expected_vbs = [bool]$taskInfo.action_uses_expected_vbs
+        task_action_expected_launcher_path = $taskInfo.action_expected_launcher_path
+        task_action_expected_vbs_path = $taskInfo.action_expected_vbs_path
         shortcut_installed = $shortcutInstalled
         task_name          = $TaskName
         shortcut_path      = $ShortcutPath
@@ -267,6 +306,10 @@ if ($Status) {
         Write-Host "Mode: $modeLabel"
         if ($statusObj.task_installed) {
             Write-Host "Task: $($statusObj.task_name)"
+            if (-not $statusObj.task_action_path_current) {
+                Write-Host "Warning: startup task action points at a different tray path" -ForegroundColor Yellow
+                Write-Host "Action: $($statusObj.task_action_execute) $($statusObj.task_action_arguments)"
+            }
         }
         if ($statusObj.shortcut_installed) {
             Write-Host "Shortcut: $($statusObj.shortcut_path)"

@@ -27,7 +27,7 @@ from __future__ import annotations
 import logging
 import subprocess
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +36,7 @@ logger = logging.getLogger(__name__)
 # Canary 29xxx) release notes. No gaming-impacting regressions called out;
 # the branch is pre-27H2 (Strontium) and not yet a GA candidate. No new
 # KNOWN_BAD_KBS entries added.
-LAST_REVIEWED_UTC = datetime(2026, 5, 21, tzinfo=timezone.utc)
+LAST_REVIEWED_UTC = datetime(2026, 5, 21, tzinfo=UTC)
 
 # Audit flags the list as stale beyond this window since LAST_REVIEWED_UTC.
 STALENESS_DAYS = 60
@@ -117,10 +117,11 @@ def _is_superseded(
     """Return True if the regression is patched on this machine."""
     if kb.superseded_by and kb.superseded_by.upper() in installed_set:
         return True
-    if kb.fixed_in_build and build_revision is not None:
-        if build_revision >= kb.fixed_in_build:
-            return True
-    return False
+    return (
+        kb.fixed_in_build
+        and build_revision is not None
+        and build_revision >= kb.fixed_in_build
+    )
 
 
 def check_problematic_kbs(
@@ -169,9 +170,9 @@ def list_review_staleness(now: datetime | None = None) -> int:
     Returns:
         Days elapsed since the list was last reviewed.
     """
-    current = now or datetime.now(timezone.utc)
+    current = now or datetime.now(UTC)
     if current.tzinfo is None:
-        current = current.replace(tzinfo=timezone.utc)
+        current = current.replace(tzinfo=UTC)
     delta = current - LAST_REVIEWED_UTC
     return max(delta.days, 0)
 

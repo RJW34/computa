@@ -273,6 +273,58 @@ def test_capability_blocks_overlay_sensitive_profile_when_overlays_are_detected(
     assert report.has_blockers is True
     finding = next(f for f in report.findings if f.code == "DISPLAY_OVERLAYS_BLOCK_EXCLUSIVE_PROFILE")
     assert "overwatch2-gsync-capture" in finding.message
+    assert finding.fallback_profile_id == "overwatch2-gsync-capture"
+    assert (
+        next(
+            item for item in report.to_dict()["findings"]
+            if item["code"] == "DISPLAY_OVERLAYS_BLOCK_EXCLUSIVE_PROFILE"
+        )["fallback_profile_id"]
+        == "overwatch2-gsync-capture"
+    )
+
+
+def test_capability_warns_strict_vrr_on_mixed_refresh_multimon_path() -> None:
+    detector = MagicMock()
+    detector.detect_monitors.return_value = [
+        {
+            "name": "LG UltraGear",
+            "vrr_supported": True,
+            "is_primary": True,
+            "refresh_rate": 300,
+        }
+    ]
+    detector.detect_gpu.return_value = {"name": "NVIDIA GeForce RTX 4090"}
+    profile = _make_profile("deadlock-gsync-hdr", requires_confirmed_vrr_support=True)
+    profile.display_path_requirements = DisplayPathRequirements(require_overlay_free_path=True)
+    profile.uses_fullscreen_only_vrr_path = True
+    profile.mixed_refresh_safe_fallback_profile_id = "deadlock-hdr"
+    multimon_result = MultiMonitorResult(
+        environment=DisplayEnvironment(
+            monitors=[],
+            monitor_count=2,
+            has_mixed_refresh=True,
+            min_refresh=59.95,
+            max_refresh=300.0,
+        )
+    )
+
+    report = CapabilityEngine(detector).evaluate(profile, multimon_result=multimon_result)
+
+    assert report.has_blockers is False
+    finding = next(
+        f for f in report.findings
+        if f.code == "DISPLAY_PATH_MIXED_REFRESH_BLOCKS_STRICT_VRR"
+    )
+    assert finding.severity == "warning"
+    assert "deadlock-hdr" not in finding.message
+    assert finding.fallback_profile_id is None
+    assert (
+        next(
+            item for item in report.to_dict()["findings"]
+            if item["code"] == "DISPLAY_PATH_MIXED_REFRESH_BLOCKS_STRICT_VRR"
+        )["fallback_profile_id"]
+        is None
+    )
 
 
 def test_capability_blocks_fixed_refresh_when_monitor_cannot_support_it() -> None:

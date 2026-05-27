@@ -4,7 +4,11 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-from abso.profiles.profile_bases import ReflexShooterBaseProfile, merge_settings_map
+from abso.profiles.profile_bases import (
+    ReflexShooterBaseProfile,
+    fso_overrides,
+    merge_settings_map,
+)
 
 
 class _FortniteBaseProfile(ReflexShooterBaseProfile):
@@ -25,7 +29,7 @@ class _FortniteBaseProfile(ReflexShooterBaseProfile):
         # GameUserSettings.ini). Disable FSO per-exe so Windows doesn't shunt
         # the shipping binary into the composited borderless path and steal
         # FPS from the Reflex/DX12 presentation path.
-        return {exe: True for exe in self.executable_hints}
+        return fso_overrides(self.executable_hints)
 
     @property
     def nvidia_profile_name(self) -> str | None:
@@ -158,7 +162,7 @@ class FortniteProfile(_FortniteBaseProfile):
             },
             "ColorProfileSettingsHandler": {
                 "icc_profile": "srgb",
-                "digital_vibrance": 50,
+                "digital_vibrance": 45,
                 "show_osd_guidance": True,
                 "game_type": "competitive_fps",
             },

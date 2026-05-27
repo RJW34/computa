@@ -5,9 +5,9 @@ from __future__ import annotations
 import pytest
 
 from abso.core.vrr import (
+    VRR_FPS_CAPS,
     FrameLimiterType,
     GraphicsAPI,
-    VRR_FPS_CAPS,
     get_best_ingame_preset,
     get_fighting_game_config,
     get_high_refresh_benefit,

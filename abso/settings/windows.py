@@ -33,10 +33,7 @@ _SDC_TOPOLOGY_CLONE = 0x00000002
 _SDC_TOPOLOGY_EXTEND = 0x00000004
 _SDC_TOPOLOGY_EXTERNAL = 0x00000008
 _SDC_USE_DATABASE_CURRENT = (
-    _SDC_TOPOLOGY_INTERNAL
-    | _SDC_TOPOLOGY_CLONE
-    | _SDC_TOPOLOGY_EXTEND
-    | _SDC_TOPOLOGY_EXTERNAL
+    _SDC_TOPOLOGY_INTERNAL | _SDC_TOPOLOGY_CLONE | _SDC_TOPOLOGY_EXTEND | _SDC_TOPOLOGY_EXTERNAL
 )
 _SDC_APPLY = 0x00000080
 
@@ -87,6 +84,7 @@ class DISPLAYCONFIG_GET_ADVANCED_COLOR_INFO(ctypes.Structure):
       bit 2: wideColorEnforced
       bit 3: advancedColorForceDisabled
     """
+
     _fields_ = [
         ("header", DISPLAYCONFIG_DEVICE_INFO_HEADER),
         ("value", wintypes.UINT),
@@ -103,6 +101,7 @@ class DISPLAYCONFIG_GET_ADVANCED_COLOR_INFO_2(ctypes.Structure):
     compositor mode, which avoids reporting WCG as HDR or missing a user-enabled
     HDR toggle that is not currently active on the wire.
     """
+
     _fields_ = [
         ("header", DISPLAYCONFIG_DEVICE_INFO_HEADER),
         ("value", wintypes.UINT),
@@ -118,6 +117,7 @@ class DISPLAYCONFIG_SET_ADVANCED_COLOR_STATE(ctypes.Structure):
     The 'value' field is a bitfield:
       bit 0: enableAdvancedColor (1=on, 0=off)
     """
+
     _fields_ = [
         ("header", DISPLAYCONFIG_DEVICE_INFO_HEADER),
         ("value", wintypes.UINT),
@@ -131,6 +131,7 @@ class DISPLAYCONFIG_SDR_WHITE_LEVEL_V1(ctypes.Structure):
     SDRWhiteLevel. Most Win11 builds accept this shape for both GET (type
     11) and SET (type 18).
     """
+
     _fields_ = [
         ("header", DISPLAYCONFIG_DEVICE_INFO_HEADER),
         ("SDRWhiteLevel", wintypes.ULONG),
@@ -145,6 +146,7 @@ class DISPLAYCONFIG_SDR_WHITE_LEVEL_V2(ctypes.Structure):
     community tools like HDRTray/SpecialK's HDR switcher. We try V1 first
     and fall back to V2 on struct-size errors.
     """
+
     _fields_ = [
         ("header", DISPLAYCONFIG_DEVICE_INFO_HEADER),
         ("SDRWhiteLevel", wintypes.ULONG),
@@ -194,6 +196,7 @@ class DISPLAYCONFIG_PATH_INFO(ctypes.Structure):
 
 class DEVMODE(ctypes.Structure):
     """Windows DEVMODE structure for display settings."""
+
     _fields_ = [
         ("dmDeviceName", ctypes.c_wchar * 32),
         ("dmSpecVersion", ctypes.c_ushort),
@@ -246,14 +249,57 @@ class WindowsSettingsHandler(SettingsHandler):
     GAME_BAR_KEY = r"Software\Microsoft\GameBar"
     GAME_DVR_KEY = r"Software\Microsoft\Windows\CurrentVersion\GameDVR"
     GRAPHICS_DRIVERS_KEY = r"SYSTEM\CurrentControlSet\Control\GraphicsDrivers"
-    VBS_KEY = r"SYSTEM\CurrentControlSet\Control\DeviceGuard\Scenarios\HypervisorEnforcedCodeIntegrity"
+    VBS_KEY = (
+        r"SYSTEM\CurrentControlSet\Control\DeviceGuard\Scenarios\HypervisorEnforcedCodeIntegrity"
+    )
     # HDR registry path (per-monitor, but this is the global toggle)
     DISPLAY_KEY = r"SOFTWARE\Microsoft\Windows\CurrentVersion\VideoSettings"
     # Per-monitor color state (ACM, HDR, WCG, SDR white level) lives here.
     MONITOR_DATA_STORE_KEY = _MONITOR_DATA_STORE_KEY
+    DIRECTX_USER_GLOBAL_SETTINGS_KEY = r"Software\Microsoft\DirectX\UserGpuPreferences"
+    DIRECTX_FLAG_NAMES = {
+        "auto_hdr": "AutoHDREnable",
+        "windowed_optimizations": "SwapEffectUpgradeEnable",
+        "vrr_optimize": "VRROptimizeEnable",
+    }
 
     # DWM refresh propagation; tunable for slow systems.
     _DWM_REFRESH_WAIT_SECONDS: float = 0.5
+
+    @staticmethod
+    def _bool_matches(value: Any, target: bool) -> bool:
+        """Return True only when a detected boolean value is known and matches."""
+        return value is not None and bool(value) == bool(target)
+
+    @staticmethod
+    def _nits_matches(value: Any, target: float, *, tolerance: float = 1.0) -> bool:
+        """Return True when a detected SDR paper-white value already matches."""
+        try:
+            return abs(float(value) - float(target)) <= tolerance
+        except (TypeError, ValueError):
+            return False
+
+    @classmethod
+    def _advanced_color_matches(
+        cls,
+        current: dict[str, Any],
+        target_advanced_color: bool,
+        target_hdr: bool,
+        *,
+        manage_hdr_intent: bool = True,
+    ) -> bool:
+        """Check whether live/readback state already matches the WCG+HDR target."""
+        if not cls._bool_matches(current.get("advanced_color"), target_advanced_color):
+            return False
+        if not manage_hdr_intent:
+            return True
+
+        hdr_values = [
+            value for value in (current.get("hdr"), current.get("hdr_active")) if value is not None
+        ]
+        if not hdr_values:
+            return not bool(target_hdr)
+        return all(bool(value) == bool(target_hdr) for value in hdr_values)
 
     def detect(self) -> dict[str, Any]:
         """Detect current Windows gaming settings."""
@@ -261,6 +307,7 @@ class WindowsSettingsHandler(SettingsHandler):
         hdr_state = self._get_hdr_state_summary()
         sdr_white = self._get_sdr_white_level()
         advanced_color = self._get_advanced_color()
+        directx_flags = self._get_directx_flags()
         return {
             "game_mode": self._get_game_mode(),
             "game_bar": self._get_game_bar(),
@@ -271,19 +318,99 @@ class WindowsSettingsHandler(SettingsHandler):
             "hdr_active": hdr_state.get("any_active") if hdr_state["available"] else None,
             "hdr_capable_count": hdr_state["hdr_capable_count"] if hdr_state["available"] else None,
             "hdr_enabled_count": hdr_state["hdr_enabled_count"] if hdr_state["available"] else None,
-            "hdr_active_count": hdr_state.get("hdr_active_count") if hdr_state["available"] else None,
+            "hdr_active_count": (
+                hdr_state.get("hdr_active_count") if hdr_state["available"] else None
+            ),
             "hdr_per_target": hdr_state.get("per_target") if hdr_state["available"] else None,
-            "auto_hdr": self._get_auto_hdr(),
+            "auto_hdr": directx_flags.get("auto_hdr"),
             "advanced_color": advanced_color.get("any_enabled"),
             "advanced_color_per_monitor": advanced_color.get("per_monitor"),
-            "windowed_optimizations": self._get_windowed_optimizations(),
-            "vrr_optimize": self._get_vrr_optimize(),
+            "windowed_optimizations": directx_flags.get("windowed_optimizations"),
+            "vrr_optimize": directx_flags.get("vrr_optimize"),
             "refresh_rate": refresh_info.get("current"),
             "max_refresh_rate": refresh_info.get("max"),
             "available_refresh_rates": refresh_info.get("available"),
             "sdr_white_level_nits": sdr_white.get("min_nits"),
             "sdr_white_level_per_target": sdr_white.get("per_target"),
         }
+
+    @staticmethod
+    def _add_hdr_summary(current: dict[str, Any], hdr_state: dict[str, Any]) -> None:
+        """Add HDR summary keys in the same shape returned by detect()."""
+        if hdr_state.get("available"):
+            current.update(
+                {
+                    "hdr": hdr_state.get("any_enabled"),
+                    "hdr_active": hdr_state.get("any_active"),
+                    "hdr_capable_count": hdr_state.get("hdr_capable_count"),
+                    "hdr_enabled_count": hdr_state.get("hdr_enabled_count"),
+                    "hdr_active_count": hdr_state.get("hdr_active_count"),
+                    "hdr_per_target": hdr_state.get("per_target"),
+                }
+            )
+        else:
+            current.update(
+                {
+                    "hdr": None,
+                    "hdr_active": None,
+                    "hdr_capable_count": None,
+                    "hdr_enabled_count": None,
+                    "hdr_active_count": None,
+                    "hdr_per_target": None,
+                }
+            )
+
+    def _detect_for_apply(self, settings: dict[str, Any]) -> dict[str, Any]:
+        """Detect only the current values needed to apply the requested keys.
+
+        Full ``detect()`` enumerates DisplayConfig, HDR, WCG, SDR white level,
+        refresh rate, and several registry-backed flags. Applying one already
+        active registry flag should not query every display subsystem first.
+        """
+        current: dict[str, Any] = {}
+
+        if "game_mode" in settings:
+            current["game_mode"] = self._get_game_mode()
+        if "game_bar" in settings:
+            current["game_bar"] = self._get_game_bar()
+        if "game_dvr" in settings:
+            current["game_dvr"] = self._get_game_dvr()
+        if "hags" in settings:
+            current["hags"] = self._get_hags()
+        if "vbs" in settings:
+            current["vbs"] = self._get_vbs()
+
+        directx_keys = set(self.DIRECTX_FLAG_NAMES).intersection(settings)
+        if directx_keys:
+            directx_flags = self._get_directx_flags()
+            for key in directx_keys:
+                current[key] = directx_flags.get(key)
+
+        if "advanced_color" in settings:
+            advanced_color = self._get_advanced_color()
+            current["advanced_color"] = advanced_color.get("any_enabled")
+            current["advanced_color_per_monitor"] = advanced_color.get("per_monitor")
+            self._add_hdr_summary(current, self._get_hdr_state_summary())
+
+        if settings.get("sdr_white_level_nits") is not None:
+            sdr_white = self._get_sdr_white_level()
+            current["sdr_white_level_nits"] = sdr_white.get("min_nits")
+            current["sdr_white_level_per_target"] = sdr_white.get("per_target")
+
+        if "refresh_rate" in settings or settings.get("max_refresh_rate") is True:
+            refresh_info = self._get_refresh_rate_info()
+            current["refresh_rate"] = refresh_info.get("current")
+            current["max_refresh_rate"] = refresh_info.get("max")
+            current["available_refresh_rates"] = refresh_info.get("available")
+
+        return current
+
+    def _detect_for_verify(self, settings: dict[str, Any]) -> dict[str, Any]:
+        """Detect only the current values needed to verify requested keys."""
+        current = self._detect_for_apply(settings)
+        if "hdr" in settings and "hdr" not in current:
+            self._add_hdr_summary(current, self._get_hdr_state_summary())
+        return current
 
     def audit(self) -> list[Issue]:
         """Audit Windows settings for gaming optimization issues."""
@@ -292,35 +419,41 @@ class WindowsSettingsHandler(SettingsHandler):
 
         # Check Game Mode
         if not current.get("game_mode"):
-            issues.append(Issue(
-                title="Game Mode is disabled",
-                severity="warning",
-                current_value="Disabled",
-                optimal_value="Enabled",
-                explanation="Game Mode prioritizes gaming processes and reduces background activity.",
-                category="windows",
-            ))
+            issues.append(
+                Issue(
+                    title="Game Mode is disabled",
+                    severity="warning",
+                    current_value="Disabled",
+                    optimal_value="Enabled",
+                    explanation="Game Mode prioritizes gaming processes and reduces background activity.",
+                    category="windows",
+                )
+            )
 
         # Check Game Bar/DVR (should be disabled for performance)
         if current.get("game_bar"):
-            issues.append(Issue(
-                title="Game Bar is enabled",
-                severity="info",
-                current_value="Enabled",
-                optimal_value="Disabled",
-                explanation="Game Bar can add slight overhead. Disable unless you use its features.",
-                category="windows",
-            ))
+            issues.append(
+                Issue(
+                    title="Game Bar is enabled",
+                    severity="info",
+                    current_value="Enabled",
+                    optimal_value="Disabled",
+                    explanation="Game Bar can add slight overhead. Disable unless you use its features.",
+                    category="windows",
+                )
+            )
 
         if current.get("game_dvr"):
-            issues.append(Issue(
-                title="Background recording is enabled",
-                severity="warning",
-                current_value="Enabled",
-                optimal_value="Disabled",
-                explanation="Background recording impacts performance even when not actively recording.",
-                category="windows",
-            ))
+            issues.append(
+                Issue(
+                    title="Background recording is enabled",
+                    severity="warning",
+                    current_value="Enabled",
+                    optimal_value="Disabled",
+                    explanation="Background recording impacts performance even when not actively recording.",
+                    category="windows",
+                )
+            )
 
         # VBS surfacing. ABSO does NOT advertise a universal "disable for
         # FPS" recommendation: independent testing shows VBS/HVCI can cost
@@ -331,40 +464,44 @@ class WindowsSettingsHandler(SettingsHandler):
         # (see ``abso.settings.vbs_optin``) is the only path that disables
         # VBS; the audit output just reports current state.
         if current.get("vbs"):
-            issues.append(Issue(
-                title="VBS / Memory Integrity is enabled",
-                severity="info",
-                current_value="Enabled",
-                optimal_value="Enabled (security tradeoff; opt-in disable available)",
-                explanation=(
-                    "VBS/Memory Integrity adds a virtualization layer that can cost "
-                    "gaming performance. Current 2025-2026 testing on Ada/Blackwell "
-                    "and Zen 4/5 hardware shows roughly 1-7% in typical workloads, "
-                    "with higher impact in heavy DX12 ray tracing. Disabling it is "
-                    "a security tradeoff: VBS protects credentials, kernel memory "
-                    "integrity, and hypervisor-protected code integrity. ABSO does "
-                    "not silently disable VBS. If you want to trade security for "
-                    "performance, use the explicit opt-in max-performance flow; it "
-                    "requires a reboot and provides a reversible restore path."
-                ),
-                category="windows",
-            ))
+            issues.append(
+                Issue(
+                    title="VBS / Memory Integrity is enabled",
+                    severity="info",
+                    current_value="Enabled",
+                    optimal_value="Enabled (security tradeoff; opt-in disable available)",
+                    explanation=(
+                        "VBS/Memory Integrity adds a virtualization layer that can cost "
+                        "gaming performance. Current 2025-2026 testing on Ada/Blackwell "
+                        "and Zen 4/5 hardware shows roughly 1-7% in typical workloads, "
+                        "with higher impact in heavy DX12 ray tracing. Disabling it is "
+                        "a security tradeoff: VBS protects credentials, kernel memory "
+                        "integrity, and hypervisor-protected code integrity. ABSO does "
+                        "not silently disable VBS. If you want to trade security for "
+                        "performance, use the explicit opt-in max-performance flow; it "
+                        "requires a reboot and provides a reversible restore path."
+                    ),
+                    category="windows",
+                )
+            )
 
         # Refresh rate check
         current_hz = current.get("refresh_rate")
         max_hz = current.get("max_refresh_rate")
         if current_hz and max_hz and current_hz < max_hz:
-            issues.append(Issue(
-                title="Display not running at maximum refresh rate",
-                severity="warning",
-                current_value=f"{current_hz} Hz",
-                optimal_value=f"{max_hz} Hz",
-                explanation=(
-                    f"Your monitor supports up to {max_hz} Hz but is currently set to {current_hz} Hz. "
-                    "Higher refresh rates provide smoother gameplay and lower input latency."
-                ),
-                category="windows",
-            ))
+            issues.append(
+                Issue(
+                    title="Display not running at maximum refresh rate",
+                    severity="warning",
+                    current_value=f"{current_hz} Hz",
+                    optimal_value=f"{max_hz} Hz",
+                    explanation=(
+                        f"Your monitor supports up to {max_hz} Hz but is currently set to {current_hz} Hz. "
+                        "Higher refresh rates provide smoother gameplay and lower input latency."
+                    ),
+                    category="windows",
+                )
+            )
 
         return issues
 
@@ -379,29 +516,45 @@ class WindowsSettingsHandler(SettingsHandler):
         requires_reboot = False
         errors: list[str] = []
         applied: list[str] = []
+        changed_keys: list[str] = []
 
-        # Get current values to check if we're actually changing anything
-        current = self.detect()
+        # Get only the current values needed to check if we're changing anything.
+        current = self._detect_for_apply(settings)
 
         # Apply each setting individually with error tracking
         if "game_mode" in settings:
             try:
-                self._set_game_mode(settings["game_mode"])
-                applied.append(f"Game Mode: {'enabled' if settings['game_mode'] else 'disabled'}")
+                target = bool(settings["game_mode"])
+                if self._bool_matches(current.get("game_mode"), target):
+                    applied.append(f"Game Mode: already {'enabled' if target else 'disabled'}")
+                else:
+                    self._set_game_mode(target)
+                    changed_keys.append("game_mode")
+                    applied.append(f"Game Mode: {'enabled' if target else 'disabled'}")
             except Exception as e:
                 errors.append(f"Game Mode: {e}")
 
         if "game_bar" in settings:
             try:
-                self._set_game_bar(settings["game_bar"])
-                applied.append(f"Game Bar: {'enabled' if settings['game_bar'] else 'disabled'}")
+                target = bool(settings["game_bar"])
+                if self._bool_matches(current.get("game_bar"), target):
+                    applied.append(f"Game Bar: already {'enabled' if target else 'disabled'}")
+                else:
+                    self._set_game_bar(target)
+                    changed_keys.append("game_bar")
+                    applied.append(f"Game Bar: {'enabled' if target else 'disabled'}")
             except Exception as e:
                 errors.append(f"Game Bar: {e}")
 
         if "game_dvr" in settings:
             try:
-                self._set_game_dvr(settings["game_dvr"])
-                applied.append(f"Game DVR: {'enabled' if settings['game_dvr'] else 'disabled'}")
+                target = bool(settings["game_dvr"])
+                if self._bool_matches(current.get("game_dvr"), target):
+                    applied.append(f"Game DVR: already {'enabled' if target else 'disabled'}")
+                else:
+                    self._set_game_dvr(target)
+                    changed_keys.append("game_dvr")
+                    applied.append(f"Game DVR: {'enabled' if target else 'disabled'}")
             except Exception as e:
                 errors.append(f"Game DVR: {e}")
 
@@ -410,10 +563,14 @@ class WindowsSettingsHandler(SettingsHandler):
                 target = settings["hags"]
                 current_hags = current.get("hags")
                 # Only set requires_reboot if we can detect current value AND it differs
-                if current_hags is not None and current_hags != target:
-                    requires_reboot = True
-                self._set_hags(target)
-                applied.append(f"HAGS: {'enabled' if target else 'disabled'}")
+                if self._bool_matches(current_hags, target):
+                    applied.append(f"HAGS: already {'enabled' if target else 'disabled'}")
+                else:
+                    if current_hags is not None and current_hags != target:
+                        requires_reboot = True
+                    self._set_hags(target)
+                    changed_keys.append("hags")
+                    applied.append(f"HAGS: {'enabled' if target else 'disabled'}")
             except Exception as e:
                 errors.append(f"HAGS: {e}")
 
@@ -421,13 +578,17 @@ class WindowsSettingsHandler(SettingsHandler):
             try:
                 target = settings["vbs"]
                 current_vbs = current.get("vbs")
-                if current_vbs is None:
-                    # Detection failed — conservatively assume reboot needed
-                    requires_reboot = True
-                elif current_vbs != target:
-                    requires_reboot = True
-                self._set_vbs(target)
-                applied.append(f"VBS: {'enabled' if target else 'disabled'}")
+                if self._bool_matches(current_vbs, target):
+                    applied.append(f"VBS: already {'enabled' if target else 'disabled'}")
+                else:
+                    if current_vbs is None:
+                        # Detection failed — conservatively assume reboot needed
+                        requires_reboot = True
+                    elif current_vbs != target:
+                        requires_reboot = True
+                    self._set_vbs(target)
+                    changed_keys.append("vbs")
+                    applied.append(f"VBS: {'enabled' if target else 'disabled'}")
             except Exception as e:
                 errors.append(f"VBS: {e}")
 
@@ -439,46 +600,83 @@ class WindowsSettingsHandler(SettingsHandler):
         # final state instead of flickering twice.
         hdr_handled_by_refresh = False
         if "advanced_color" in settings:
+            manage_hdr_intent = "hdr" in settings
             target_advanced_color = bool(settings["advanced_color"])
-            if "hdr" in settings:
+            live_hdr_summary_for_refresh: dict[str, Any] | None = None
+            if manage_hdr_intent:
                 target_hdr = bool(settings["hdr"])
                 hdr_handled_by_refresh = True
             else:
                 # Preserve current live HDR state; we only flip WCG.
-                current_hdr_state = self._get_hdr_state_summary()
-                target_hdr = bool(
-                    current_hdr_state.get("any_enabled")
-                    if current_hdr_state.get("available") else False
-                )
-
-            try:
-                refresh_result = self._set_advanced_color_with_refresh(
-                    target_advanced_color, target_hdr
-                )
-            except Exception as e:
-                errors.append(f"Advanced color refresh crashed: {e}")
-            else:
-                state_note = (
-                    f"Wide Color Gamut: {'on' if target_advanced_color else 'off'}"
-                    f" + HDR: {'on' if target_hdr else 'off'}"
-                )
-                if refresh_result.get("applied_count", 0) > 0:
-                    applied.append(
-                        f"{state_note} (written to "
-                        f"{refresh_result['applied_count']} monitor(s))"
+                current_hdr_active = current.get("hdr_active")
+                if current_hdr_active is None:
+                    live_hdr_summary_for_refresh = self._get_hdr_state_summary()
+                    target_hdr = bool(
+                        live_hdr_summary_for_refresh.get("any_active")
+                        if live_hdr_summary_for_refresh.get("available")
+                        else False
                     )
-                elif refresh_result.get("skipped_count", 0) > 0:
-                    applied.append(f"{state_note} (already correct)")
-                # WCG errors are surfaced as notes, never as handler errors:
-                # cosmetic setting must never roll a profile back.
-                for err in refresh_result.get("errors", []):
-                    applied.append(f"Advanced color: warning ({err})")
-                for err in refresh_result.get("critical_errors", []):
-                    errors.append(str(err))
+                else:
+                    target_hdr = bool(current_hdr_active)
+                    current_hdr_enabled = current.get("hdr")
+                    live_hdr_summary_for_refresh = {
+                        "available": True,
+                        "any_active": target_hdr,
+                        "any_enabled": (
+                            bool(current_hdr_enabled)
+                            if current_hdr_enabled is not None
+                            else target_hdr
+                        ),
+                    }
+
+            state_note = (
+                f"Wide Color Gamut: {'on' if target_advanced_color else 'off'}"
+                f" + HDR: {'on' if target_hdr else 'off'}"
+            )
+            if self._advanced_color_matches(
+                current,
+                target_advanced_color,
+                target_hdr,
+                manage_hdr_intent=manage_hdr_intent,
+            ):
+                applied.append(f"{state_note} (already correct)")
+            else:
+                try:
+                    refresh_kwargs: dict[str, Any] = {
+                        "manage_hdr_intent": manage_hdr_intent,
+                    }
+                    if live_hdr_summary_for_refresh is not None:
+                        refresh_kwargs["live_hdr_summary"] = live_hdr_summary_for_refresh
+                    refresh_result = self._set_advanced_color_with_refresh(
+                        target_advanced_color,
+                        target_hdr,
+                        **refresh_kwargs,
+                    )
+                except Exception as e:
+                    errors.append(f"Advanced color refresh crashed: {e}")
+                else:
+                    if refresh_result.get("applied_count", 0) > 0:
+                        changed_keys.append("advanced_color")
+                        if "hdr" in settings:
+                            changed_keys.append("hdr")
+                        applied.append(
+                            f"{state_note} (written to "
+                            f"{refresh_result['applied_count']} monitor(s))"
+                        )
+                    elif refresh_result.get("skipped_count", 0) > 0:
+                        applied.append(f"{state_note} (already correct)")
+                    # WCG errors are surfaced as notes, never as handler errors:
+                    # cosmetic setting must never roll a profile back.
+                    for err in refresh_result.get("errors", []):
+                        applied.append(f"Advanced color: warning ({err})")
+                    for err in refresh_result.get("critical_errors", []):
+                        errors.append(str(err))
 
         if "hdr" in settings and not hdr_handled_by_refresh:
             hdr_result = self._set_hdr(settings["hdr"])
             if hdr_result["success"]:
+                if hdr_result.get("changed"):
+                    changed_keys.append("hdr")
                 if settings["hdr"]:
                     hdr_capable_count = int(hdr_result.get("hdr_capable_count", 0) or 0)
                     hdr_enabled_count = int(hdr_result.get("hdr_enabled_count", 0) or 0)
@@ -504,11 +702,16 @@ class WindowsSettingsHandler(SettingsHandler):
                     errors.append(f"HDR: {err}")
 
         if "auto_hdr" in settings:
-            auto_hdr_result = self._set_auto_hdr(settings["auto_hdr"])
-            if auto_hdr_result["success"]:
-                applied.append(f"Auto HDR: {'enabled' if settings['auto_hdr'] else 'disabled'}")
+            target_auto_hdr = bool(settings["auto_hdr"])
+            if self._bool_matches(current.get("auto_hdr"), target_auto_hdr):
+                applied.append(f"Auto HDR: already {'enabled' if target_auto_hdr else 'disabled'}")
             else:
-                errors.append(f"Auto HDR: {auto_hdr_result.get('error', 'Unknown error')}")
+                auto_hdr_result = self._set_auto_hdr(target_auto_hdr)
+                if auto_hdr_result["success"]:
+                    changed_keys.append("auto_hdr")
+                    applied.append(f"Auto HDR: {'enabled' if target_auto_hdr else 'disabled'}")
+                else:
+                    errors.append(f"Auto HDR: {auto_hdr_result.get('error', 'Unknown error')}")
 
         if "sdr_white_level_nits" in settings:
             requested_nits = settings["sdr_white_level_nits"]
@@ -525,53 +728,87 @@ class WindowsSettingsHandler(SettingsHandler):
                         f"{requested_nits!r}: {e})"
                     )
                 else:
-                    sdr_result = self._set_sdr_white_level(nits_value)
-                    if sdr_result["applied_count"] > 0:
+                    if self._nits_matches(
+                        current.get("sdr_white_level_nits"),
+                        nits_value,
+                    ):
                         applied.append(
-                            f"SDR content brightness: {sdr_result['requested_nits']} nits "
-                            f"on {sdr_result['applied_count']} HDR monitor(s)"
+                            f"SDR content brightness: already {round(nits_value, 1)} nits"
                         )
-                    if sdr_result["skipped_count"] > 0 and sdr_result["applied_count"] == 0:
-                        # All targets either SDR or declined the op — not an
-                        # error, just a notice. SDR white level is cosmetic
-                        # and never fails the handler.
-                        applied.append(
-                            f"SDR content brightness: skipped "
-                            f"({sdr_result['skipped_count']} target(s) not HDR "
-                            "or not SDR-white-level-settable)"
-                        )
-                    for warn in sdr_result.get("warnings", []):
-                        # Surface unusual statuses as applied-notes so the
-                        # tray UI sees them, but do NOT append to errors[] —
-                        # a cosmetic slider must not roll back a profile.
-                        applied.append(f"SDR content brightness: warning ({warn})")
+                    else:
+                        sdr_result = self._set_sdr_white_level(nits_value)
+                        if sdr_result["applied_count"] > 0:
+                            changed_keys.append("sdr_white_level_nits")
+                            applied.append(
+                                f"SDR content brightness: {sdr_result['requested_nits']} nits "
+                                f"on {sdr_result['applied_count']} HDR monitor(s)"
+                            )
+                        if sdr_result["skipped_count"] > 0 and sdr_result["applied_count"] == 0:
+                            # All targets either SDR or declined the op — not an
+                            # error, just a notice. SDR white level is cosmetic
+                            # and never fails the handler.
+                            applied.append(
+                                f"SDR content brightness: skipped "
+                                f"({sdr_result['skipped_count']} target(s) not HDR "
+                                "or not SDR-white-level-settable)"
+                            )
+                        for warn in sdr_result.get("warnings", []):
+                            # Surface unusual statuses as applied-notes so the
+                            # tray UI sees them, but do NOT append to errors[] —
+                            # a cosmetic slider must not roll back a profile.
+                            applied.append(f"SDR content brightness: warning ({warn})")
 
         if "windowed_optimizations" in settings:
-            wo_result = self._set_windowed_optimizations(settings["windowed_optimizations"])
-            if wo_result["success"]:
-                state = "enabled" if settings["windowed_optimizations"] else "disabled"
-                applied.append(f"Windowed Optimizations: {state}")
+            target = bool(settings["windowed_optimizations"])
+            if self._bool_matches(current.get("windowed_optimizations"), target):
+                state = "enabled" if target else "disabled"
+                applied.append(f"Windowed Optimizations: already {state}")
             else:
-                errors.append(f"Windowed Optimizations: {wo_result.get('error', 'Unknown error')}")
+                wo_result = self._set_windowed_optimizations(target)
+                if wo_result["success"]:
+                    changed_keys.append("windowed_optimizations")
+                    state = "enabled" if target else "disabled"
+                    applied.append(f"Windowed Optimizations: {state}")
+                else:
+                    errors.append(
+                        f"Windowed Optimizations: {wo_result.get('error', 'Unknown error')}"
+                    )
 
         if "vrr_optimize" in settings:
-            vrr_result = self._set_vrr_optimize(settings["vrr_optimize"])
-            if vrr_result["success"]:
-                applied.append(f"VRR Optimize: {'enabled' if settings['vrr_optimize'] else 'disabled'}")
+            target = bool(settings["vrr_optimize"])
+            if self._bool_matches(current.get("vrr_optimize"), target):
+                applied.append(f"VRR Optimize: already {'enabled' if target else 'disabled'}")
             else:
-                errors.append(f"VRR Optimize: {vrr_result.get('error', 'Unknown error')}")
+                vrr_result = self._set_vrr_optimize(target)
+                if vrr_result["success"]:
+                    changed_keys.append("vrr_optimize")
+                    applied.append(f"VRR Optimize: {'enabled' if target else 'disabled'}")
+                else:
+                    errors.append(f"VRR Optimize: {vrr_result.get('error', 'Unknown error')}")
 
         if "refresh_rate" in settings:
             try:
-                self._set_refresh_rate(settings["refresh_rate"])
-                applied.append(f"Refresh Rate: {settings['refresh_rate']} Hz")
+                target_hz = int(settings["refresh_rate"])
+                current_hz = current.get("refresh_rate")
+                if current_hz is not None and int(current_hz) == target_hz:
+                    applied.append(f"Refresh Rate: already {target_hz} Hz")
+                else:
+                    self._set_refresh_rate(target_hz)
+                    changed_keys.append("refresh_rate")
+                    applied.append(f"Refresh Rate: {target_hz} Hz")
             except Exception as e:
                 errors.append(f"Refresh Rate: {e}")
 
         if settings.get("max_refresh_rate") is True:
             try:
-                self._set_max_refresh_rate()
-                applied.append("Refresh Rate: set to maximum")
+                current_hz = current.get("refresh_rate")
+                max_hz = current.get("max_refresh_rate")
+                if current_hz is not None and max_hz is not None and int(current_hz) >= int(max_hz):
+                    applied.append(f"Refresh Rate: already at maximum ({current_hz} Hz)")
+                else:
+                    self._set_max_refresh_rate()
+                    changed_keys.append("refresh_rate")
+                    applied.append("Refresh Rate: set to maximum")
             except Exception as e:
                 errors.append(f"Max Refresh Rate: {e}")
 
@@ -586,6 +823,8 @@ class WindowsSettingsHandler(SettingsHandler):
             "error": "; ".join(errors) if errors else None,
             "requires_reboot": requires_reboot,
             "applied": applied,
+            "changed": bool(changed_keys),
+            "changed_keys": changed_keys,
             "failed": errors,
         }
 
@@ -596,8 +835,44 @@ class WindowsSettingsHandler(SettingsHandler):
         state, so HDR profile swaps cannot silently pass verification when the
         live display path remains SDR.
         """
-        current = self.detect()
+        current = self._detect_for_verify(settings)
         results = {"all_active": True, "settings": {}}
+
+        if "game_mode" in settings:
+            target = bool(settings["game_mode"])
+            current_val = current.get("game_mode")
+            is_active = current_val is None or bool(current_val) == target
+            results["settings"]["game_mode"] = {
+                "target": target,
+                "current": current_val if current_val is not None else "undetectable",
+                "active": is_active,
+            }
+            if not is_active:
+                results["all_active"] = False
+
+        if "game_bar" in settings:
+            target = bool(settings["game_bar"])
+            current_val = current.get("game_bar")
+            is_active = current_val is None or bool(current_val) == target
+            results["settings"]["game_bar"] = {
+                "target": target,
+                "current": current_val if current_val is not None else "undetectable",
+                "active": is_active,
+            }
+            if not is_active:
+                results["all_active"] = False
+
+        if "game_dvr" in settings:
+            target = bool(settings["game_dvr"])
+            current_val = current.get("game_dvr")
+            is_active = current_val is None or bool(current_val) == target
+            results["settings"]["game_dvr"] = {
+                "target": target,
+                "current": current_val if current_val is not None else "undetectable",
+                "active": is_active,
+            }
+            if not is_active:
+                results["all_active"] = False
 
         if "hags" in settings:
             target = settings["hags"]
@@ -641,7 +916,11 @@ class WindowsSettingsHandler(SettingsHandler):
             else:
                 is_active = not target
             current_report: Any
-            if active_val is not None and current_val is not None and bool(active_val) != bool(current_val):
+            if (
+                active_val is not None
+                and current_val is not None
+                and bool(active_val) != bool(current_val)
+            ):
                 current_report = {
                     "user_enabled": bool(current_val),
                     "active": bool(active_val),
@@ -705,8 +984,89 @@ class WindowsSettingsHandler(SettingsHandler):
                 and abs(float(current_nits) - target_nits) <= 1.0
             )
             results["settings"]["sdr_white_level_nits"] = {
-                "target": target_nits if target_nits is not None else settings["sdr_white_level_nits"],
+                "target": (
+                    target_nits if target_nits is not None else settings["sdr_white_level_nits"]
+                ),
                 "current": current_nits if current_nits is not None else "undetectable",
+                "active": is_active,
+            }
+            if not is_active:
+                results["all_active"] = False
+
+        if "windowed_optimizations" in settings:
+            target = bool(settings["windowed_optimizations"])
+            current_val = current.get("windowed_optimizations")
+            is_active = current_val is None or bool(current_val) == target
+            results["settings"]["windowed_optimizations"] = {
+                "target": target,
+                "current": current_val if current_val is not None else "undetectable",
+                "active": is_active,
+            }
+            if not is_active:
+                results["all_active"] = False
+
+        if "vrr_optimize" in settings:
+            target = bool(settings["vrr_optimize"])
+            current_val = current.get("vrr_optimize")
+            is_active = current_val is None or bool(current_val) == target
+            results["settings"]["vrr_optimize"] = {
+                "target": target,
+                "current": current_val if current_val is not None else "undetectable",
+                "active": is_active,
+            }
+            if not is_active:
+                results["all_active"] = False
+
+        if "refresh_rate" in settings:
+            target_hz: int | None
+            try:
+                target_hz = int(settings["refresh_rate"])
+            except (TypeError, ValueError):
+                target_hz = None
+            current_hz = current.get("refresh_rate")
+            try:
+                current_hz_int = int(current_hz) if current_hz is not None else None
+            except (TypeError, ValueError):
+                current_hz_int = None
+            is_active = (
+                target_hz is not None
+                and current_hz_int is not None
+                and current_hz_int == target_hz
+            )
+            if current_hz_int is None:
+                is_active = True
+            results["settings"]["refresh_rate"] = {
+                "target": target_hz if target_hz is not None else settings["refresh_rate"],
+                "current": current_hz_int if current_hz_int is not None else "undetectable",
+                "active": is_active,
+            }
+            if not is_active:
+                results["all_active"] = False
+
+        if settings.get("max_refresh_rate") is True:
+            current_hz = current.get("refresh_rate")
+            max_hz = current.get("max_refresh_rate")
+            try:
+                current_hz_int = int(current_hz) if current_hz is not None else None
+                max_hz_int = int(max_hz) if max_hz is not None else None
+            except (TypeError, ValueError):
+                current_hz_int = None
+                max_hz_int = None
+            is_active = (
+                current_hz_int is None
+                or max_hz_int is None
+                or current_hz_int >= max_hz_int
+            )
+            results["settings"]["max_refresh_rate"] = {
+                "target": "maximum",
+                "current": (
+                    {
+                        "refresh_rate": current_hz_int,
+                        "max_refresh_rate": max_hz_int,
+                    }
+                    if current_hz_int is not None and max_hz_int is not None
+                    else "undetectable"
+                ),
                 "active": is_active,
             }
             if not is_active:
@@ -728,12 +1088,7 @@ class WindowsSettingsHandler(SettingsHandler):
     def _get_game_mode(self) -> bool | None:
         """Get Game Mode status."""
         try:
-            key = winreg.OpenKey(
-                winreg.HKEY_CURRENT_USER,
-                self.GAME_BAR_KEY,
-                0,
-                winreg.KEY_READ
-            )
+            key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, self.GAME_BAR_KEY, 0, winreg.KEY_READ)
             try:
                 value = winreg.QueryValueEx(key, "AutoGameModeEnabled")[0]
                 return bool(value)
@@ -748,14 +1103,13 @@ class WindowsSettingsHandler(SettingsHandler):
     def _set_game_mode(self, enabled: bool) -> None:
         """Set Game Mode status."""
         if not isinstance(enabled, int):
-            logger.warning(f"Skipping registry write for Game Mode: expected int, got {type(enabled).__name__}")
+            logger.warning(
+                f"Skipping registry write for Game Mode: expected int, got {type(enabled).__name__}"
+            )
             return
         value = 1 if enabled else 0
         with winreg.OpenKey(
-            winreg.HKEY_CURRENT_USER,
-            self.GAME_BAR_KEY,
-            0,
-            winreg.KEY_ALL_ACCESS
+            winreg.HKEY_CURRENT_USER, self.GAME_BAR_KEY, 0, winreg.KEY_ALL_ACCESS
         ) as key:
             winreg.SetValueEx(key, "AllowAutoGameMode", 0, winreg.REG_DWORD, value)
             winreg.SetValueEx(key, "AutoGameModeEnabled", 0, winreg.REG_DWORD, value)
@@ -763,12 +1117,7 @@ class WindowsSettingsHandler(SettingsHandler):
     def _get_game_bar(self) -> bool | None:
         """Get Game Bar status."""
         try:
-            key = winreg.OpenKey(
-                winreg.HKEY_CURRENT_USER,
-                self.GAME_BAR_KEY,
-                0,
-                winreg.KEY_READ
-            )
+            key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, self.GAME_BAR_KEY, 0, winreg.KEY_READ)
             try:
                 value = winreg.QueryValueEx(key, "UseNexusForGameBarEnabled")[0]
                 return bool(value)
@@ -783,25 +1132,21 @@ class WindowsSettingsHandler(SettingsHandler):
     def _set_game_bar(self, enabled: bool) -> None:
         """Set Game Bar status."""
         if not isinstance(enabled, int):
-            logger.warning(f"Skipping registry write for Game Bar: expected int, got {type(enabled).__name__}")
+            logger.warning(
+                f"Skipping registry write for Game Bar: expected int, got {type(enabled).__name__}"
+            )
             return
         with winreg.OpenKey(
-            winreg.HKEY_CURRENT_USER,
-            self.GAME_BAR_KEY,
-            0,
-            winreg.KEY_ALL_ACCESS
+            winreg.HKEY_CURRENT_USER, self.GAME_BAR_KEY, 0, winreg.KEY_ALL_ACCESS
         ) as key:
-            winreg.SetValueEx(key, "UseNexusForGameBarEnabled", 0, winreg.REG_DWORD, 1 if enabled else 0)
+            winreg.SetValueEx(
+                key, "UseNexusForGameBarEnabled", 0, winreg.REG_DWORD, 1 if enabled else 0
+            )
 
     def _get_game_dvr(self) -> bool | None:
         """Get Game DVR (background recording) status."""
         try:
-            key = winreg.OpenKey(
-                winreg.HKEY_CURRENT_USER,
-                self.GAME_DVR_KEY,
-                0,
-                winreg.KEY_READ
-            )
+            key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, self.GAME_DVR_KEY, 0, winreg.KEY_READ)
             try:
                 value = winreg.QueryValueEx(key, "AppCaptureEnabled")[0]
                 return bool(value)
@@ -816,13 +1161,12 @@ class WindowsSettingsHandler(SettingsHandler):
     def _set_game_dvr(self, enabled: bool) -> None:
         """Set Game DVR status."""
         if not isinstance(enabled, int):
-            logger.warning(f"Skipping registry write for Game DVR: expected int, got {type(enabled).__name__}")
+            logger.warning(
+                f"Skipping registry write for Game DVR: expected int, got {type(enabled).__name__}"
+            )
             return
         with winreg.OpenKey(
-            winreg.HKEY_CURRENT_USER,
-            self.GAME_DVR_KEY,
-            0,
-            winreg.KEY_ALL_ACCESS
+            winreg.HKEY_CURRENT_USER, self.GAME_DVR_KEY, 0, winreg.KEY_ALL_ACCESS
         ) as key:
             winreg.SetValueEx(key, "AppCaptureEnabled", 0, winreg.REG_DWORD, 1 if enabled else 0)
 
@@ -830,10 +1174,7 @@ class WindowsSettingsHandler(SettingsHandler):
         """Get Hardware-Accelerated GPU Scheduling status."""
         try:
             key = winreg.OpenKey(
-                winreg.HKEY_LOCAL_MACHINE,
-                self.GRAPHICS_DRIVERS_KEY,
-                0,
-                winreg.KEY_READ
+                winreg.HKEY_LOCAL_MACHINE, self.GRAPHICS_DRIVERS_KEY, 0, winreg.KEY_READ
             )
             try:
                 value = winreg.QueryValueEx(key, "HwSchMode")[0]
@@ -849,25 +1190,19 @@ class WindowsSettingsHandler(SettingsHandler):
     def _set_hags(self, enabled: bool) -> None:
         """Set Hardware-Accelerated GPU Scheduling status."""
         if not isinstance(enabled, int):
-            logger.warning(f"Skipping registry write for HAGS: expected int, got {type(enabled).__name__}")
+            logger.warning(
+                f"Skipping registry write for HAGS: expected int, got {type(enabled).__name__}"
+            )
             return
         with winreg.OpenKey(
-            winreg.HKEY_LOCAL_MACHINE,
-            self.GRAPHICS_DRIVERS_KEY,
-            0,
-            winreg.KEY_ALL_ACCESS
+            winreg.HKEY_LOCAL_MACHINE, self.GRAPHICS_DRIVERS_KEY, 0, winreg.KEY_ALL_ACCESS
         ) as key:
             winreg.SetValueEx(key, "HwSchMode", 0, winreg.REG_DWORD, 2 if enabled else 1)
 
     def _get_vbs(self) -> bool | None:
         """Get VBS / Memory Integrity status."""
         try:
-            key = winreg.OpenKey(
-                winreg.HKEY_LOCAL_MACHINE,
-                self.VBS_KEY,
-                0,
-                winreg.KEY_READ
-            )
+            key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, self.VBS_KEY, 0, winreg.KEY_READ)
             try:
                 value = winreg.QueryValueEx(key, "Enabled")[0]
                 return bool(value)
@@ -882,13 +1217,12 @@ class WindowsSettingsHandler(SettingsHandler):
     def _set_vbs(self, enabled: bool) -> None:
         """Set VBS / Memory Integrity status."""
         if not isinstance(enabled, int):
-            logger.warning(f"Skipping registry write for VBS: expected int, got {type(enabled).__name__}")
+            logger.warning(
+                f"Skipping registry write for VBS: expected int, got {type(enabled).__name__}"
+            )
             return
         with winreg.OpenKey(
-            winreg.HKEY_LOCAL_MACHINE,
-            self.VBS_KEY,
-            0,
-            winreg.KEY_ALL_ACCESS
+            winreg.HKEY_LOCAL_MACHINE, self.VBS_KEY, 0, winreg.KEY_ALL_ACCESS
         ) as key:
             winreg.SetValueEx(key, "Enabled", 0, winreg.REG_DWORD, 1 if enabled else 0)
 
@@ -977,6 +1311,8 @@ class WindowsSettingsHandler(SettingsHandler):
             active_mode = int(info2.activeColorMode)
             return {
                 "api": "advanced_color_info_2",
+                "adapter_low_part": int(adapter_id.LowPart),
+                "adapter_high_part": int(adapter_id.HighPart),
                 "target_id": int(target_id),
                 "raw_value": value,
                 "advanced_color_supported": bool(value & 0x01),
@@ -1006,6 +1342,8 @@ class WindowsSettingsHandler(SettingsHandler):
         enabled = bool(value & 0x02)
         return {
             "api": "advanced_color_info_legacy",
+            "adapter_low_part": int(adapter_id.LowPart),
+            "adapter_high_part": int(adapter_id.HighPart),
             "target_id": int(target_id),
             "raw_value": value,
             "advanced_color_supported": bool(value & 0x01),
@@ -1056,6 +1394,53 @@ class WindowsSettingsHandler(SettingsHandler):
         except Exception as e:
             logger.debug(f"HDR state summary failed: {e}")
             return summary
+
+    @staticmethod
+    def _display_target_key(adapter_id: Any, target_id: int) -> tuple[int, int, int]:
+        """Return a stable key for matching active display targets to CCD info."""
+        return (int(adapter_id.LowPart), int(adapter_id.HighPart), int(target_id))
+
+    @staticmethod
+    def _hdr_info_key(info: dict[str, Any]) -> tuple[int, int, int] | None:
+        """Return the target key from a `_get_target_hdr_info` row when present."""
+        try:
+            return (
+                int(info["adapter_low_part"]),
+                int(info["adapter_high_part"]),
+                int(info["target_id"]),
+            )
+        except (KeyError, TypeError, ValueError):
+            return None
+
+    @classmethod
+    def _hdr_info_by_target(
+        cls,
+        summary: dict[str, Any],
+    ) -> dict[tuple[int, int, int], dict[str, Any]]:
+        """Index active-target HDR info rows when the summary carries identities."""
+        indexed: dict[tuple[int, int, int], dict[str, Any]] = {}
+        for info in summary.get("per_target") or []:
+            if not isinstance(info, dict):
+                continue
+            key = cls._hdr_info_key(info)
+            if key is not None:
+                indexed[key] = info
+        return indexed
+
+    @staticmethod
+    def _should_send_hdr_set_to_target(
+        *,
+        enabled: bool,
+        info: dict[str, Any] | None,
+    ) -> bool:
+        """Skip known SDR-only targets while preserving unknown-target fallback."""
+        if info is None:
+            return True
+        if bool(info.get("hdr_supported")):
+            return True
+        return not enabled and (
+            bool(info.get("hdr_active")) or bool(info.get("hdr_user_enabled"))
+        )
 
     def _get_hdr(self) -> bool | None:
         """Get Windows HDR status using the CCD DisplayConfig API.
@@ -1132,6 +1517,7 @@ class WindowsSettingsHandler(SettingsHandler):
             "hdr_capable_count": 0,
             "hdr_enabled_count": 0,
             "errors": [],
+            "changed": False,
         }
 
         live_before = self._get_hdr_state_summary()
@@ -1155,6 +1541,7 @@ class WindowsSettingsHandler(SettingsHandler):
         # Step 2: SET_HDR_STATE per active target. We don't short-circuit on
         # registry state here — MonitorDataStore contains inactive historical
         # displays and can disagree with the target that is actually connected.
+        result["changed"] = True
         try:
             targets = self._get_active_display_targets()
             if not targets:
@@ -1163,8 +1550,32 @@ class WindowsSettingsHandler(SettingsHandler):
                 return result
 
             user32 = ctypes.windll.user32
+            hdr_info_by_target = self._hdr_info_by_target(live_before)
+            selected_targets: list[tuple[Any, int]] = []
+            skipped_targets: list[dict[str, Any]] = []
 
             for adapter_id, target_id in targets:
+                info = hdr_info_by_target.get(self._display_target_key(adapter_id, target_id))
+                if self._should_send_hdr_set_to_target(enabled=enabled, info=info):
+                    selected_targets.append((adapter_id, target_id))
+                    continue
+
+                skipped_targets.append(
+                    {
+                        "target_id": int(target_id),
+                        "reason": "hdr_not_supported",
+                    }
+                )
+
+            if skipped_targets:
+                result["skipped_targets"] = skipped_targets
+
+            if not selected_targets:
+                result["errors"].append("No HDR-capable active display targets found")
+                result["success"] = False
+                return result
+
+            for adapter_id, target_id in selected_targets:
                 try:
                     set_success = False
                     state = DISPLAYCONFIG_SET_ADVANCED_COLOR_STATE()
@@ -1195,7 +1606,8 @@ class WindowsSettingsHandler(SettingsHandler):
                     else:
                         logger.info(
                             "HDR %s for display target %s",
-                            "enabled" if enabled else "disabled", target_id,
+                            "enabled" if enabled else "disabled",
+                            target_id,
                         )
                 except Exception as exc:
                     msg = f"Failed to set HDR for target {target_id}: {exc}"
@@ -1240,7 +1652,9 @@ class WindowsSettingsHandler(SettingsHandler):
                 "HDR active mode did not match target after SET_HDR_STATE "
                 "(target=%s, user_enabled_count=%s, active_count=%s). "
                 "Writing registry intent and kicking SetDisplayConfig.",
-                enabled, live_enabled_count, live_active_count,
+                enabled,
+                live_enabled_count,
+                live_active_count,
             )
             self._write_hdr_enabled_registry(enabled)
             if self._kick_display_config_database_reapply():
@@ -1256,8 +1670,7 @@ class WindowsSettingsHandler(SettingsHandler):
                 live_user_enabled_matches_target = bool(live_summary.get("any_enabled")) == enabled
                 if live_active_matches_target:
                     result.setdefault("notices", []).append(
-                        "HDR live state recovered after SetDisplayConfig "
-                        "database re-apply"
+                        "HDR live state recovered after SetDisplayConfig " "database re-apply"
                     )
 
         if enabled and live_capable_count > 0 and live_active_count == 0:
@@ -1366,35 +1779,39 @@ class WindowsSettingsHandler(SettingsHandler):
                 hdr_enabled = bool(target_hdr and target_hdr.get("hdr_active"))
 
                 if not hdr_enabled:
-                    out["per_target"].append({
-                        "target_id": target_id,
-                        "nits": None,
-                        "hdr_enabled": False,
-                        "struct_variant": None,
-                    })
+                    out["per_target"].append(
+                        {
+                            "target_id": target_id,
+                            "nits": None,
+                            "hdr_enabled": False,
+                            "struct_variant": None,
+                        }
+                    )
                     continue
 
                 nits_val, variant = self._read_sdr_white_level_raw(adapter_id, target_id)
                 if nits_val is None:
-                    out["per_target"].append({
-                        "target_id": target_id,
-                        "nits": None,
-                        "hdr_enabled": True,
-                        "struct_variant": None,
-                    })
+                    out["per_target"].append(
+                        {
+                            "target_id": target_id,
+                            "nits": None,
+                            "hdr_enabled": True,
+                            "struct_variant": None,
+                        }
+                    )
                     continue
 
                 values.append(nits_val)
-                out["per_target"].append({
-                    "target_id": target_id,
-                    "nits": round(nits_val, 1),
-                    "hdr_enabled": True,
-                    "struct_variant": variant,
-                })
+                out["per_target"].append(
+                    {
+                        "target_id": target_id,
+                        "nits": round(nits_val, 1),
+                        "hdr_enabled": True,
+                        "struct_variant": variant,
+                    }
+                )
 
-            out["any_hdr_enabled"] = any(
-                t["hdr_enabled"] for t in out["per_target"]
-            )
+            out["any_hdr_enabled"] = any(t["hdr_enabled"] for t in out["per_target"])
             if values:
                 out["min_nits"] = round(min(values), 1)
                 out["max_nits"] = round(max(values), 1)
@@ -1429,7 +1846,9 @@ class WindowsSettingsHandler(SettingsHandler):
                 return nits, variant_label
             logger.debug(
                 "GET_SDR_WHITE_LEVEL %s for target %s: status=%s",
-                variant_label, target_id, status,
+                variant_label,
+                target_id,
+                status,
             )
         return None, None
 
@@ -1438,12 +1857,14 @@ class WindowsSettingsHandler(SettingsHandler):
     # Windows does not always accept SDR_WHITE_LEVEL writes on every
     # target even when the advanced-color GET reports HDR on, e.g. on
     # Win11 24H2+ where WCG/HDR were split, or on secondary/clone paths.
-    _SDR_WHITE_LEVEL_SKIP_ERRORS = frozenset({
-        31,   # ERROR_GEN_FAILURE
-        50,   # ERROR_NOT_SUPPORTED
-        87,   # ERROR_INVALID_PARAMETER — driver declined this target
-        1168, # ERROR_NOT_FOUND
-    })
+    _SDR_WHITE_LEVEL_SKIP_ERRORS = frozenset(
+        {
+            31,  # ERROR_GEN_FAILURE
+            50,  # ERROR_NOT_SUPPORTED
+            87,  # ERROR_INVALID_PARAMETER — driver declined this target
+            1168,  # ERROR_NOT_FOUND
+        }
+    )
 
     def _set_sdr_white_level(self, nits: float) -> dict[str, Any]:
         """Set the Windows "SDR content brightness" slider to ``nits``.
@@ -1499,9 +1920,7 @@ class WindowsSettingsHandler(SettingsHandler):
                 # require V2 (28 bytes, with finalValue). The cached probe
                 # from the GET path would be faster but less reliable across
                 # reboots, so we re-probe per SET for correctness.
-                set_status = self._write_sdr_white_level(
-                    adapter_id, target_id, encoded
-                )
+                set_status = self._write_sdr_white_level(adapter_id, target_id, encoded)
 
                 if set_status == 0:
                     result["applied_count"] += 1
@@ -1513,7 +1932,8 @@ class WindowsSettingsHandler(SettingsHandler):
                     result["skipped_count"] += 1
                     logger.debug(
                         "SDR_WHITE_LEVEL declined for target %s (Win32 error %s) — skipped",
-                        target_id, set_status,
+                        target_id,
+                        set_status,
                     )
                     continue
 
@@ -1565,7 +1985,7 @@ class WindowsSettingsHandler(SettingsHandler):
         last_status = 0
 
         attempts = (
-            ("v2", DISPLAYCONFIG_SDR_WHITE_LEVEL_V2, True),   # commit-shape
+            ("v2", DISPLAYCONFIG_SDR_WHITE_LEVEL_V2, True),  # commit-shape
             ("v1", DISPLAYCONFIG_SDR_WHITE_LEVEL_V1, False),  # docs-shape fallback
         )
 
@@ -1583,15 +2003,15 @@ class WindowsSettingsHandler(SettingsHandler):
             last_status = status
             logger.debug(
                 "SET_SDR_WHITE_LEVEL %s for target %s: status=%s",
-                label, target_id, status,
+                label,
+                target_id,
+                status,
             )
             if status != 0:
                 continue
 
             # Win11 quirk: some builds accept both struct shapes but persist neither.
-            readback_nits, _variant = self._read_sdr_white_level_raw(
-                adapter_id, target_id
-            )
+            readback_nits, _variant = self._read_sdr_white_level_raw(adapter_id, target_id)
             if readback_nits is None:
                 # Can't verify — trust the status and move on.
                 return 0
@@ -1605,7 +2025,9 @@ class WindowsSettingsHandler(SettingsHandler):
                 "SDR_WHITE_LEVEL %s SET returned 0 but readback=%.1f nits "
                 "differs from requested %.1f nits — silent commit failure, "
                 "trying next variant",
-                label, readback_nits, requested_nits,
+                label,
+                readback_nits,
+                requested_nits,
             )
             # Pretend this was a struct-size-ish failure so the caller's
             # SKIP_ERRORS set doesn't prematurely short-circuit.
@@ -1714,9 +2136,7 @@ class WindowsSettingsHandler(SettingsHandler):
                     if current == value:
                         result["skipped_count"] += 1
                         continue
-                    winreg.SetValueEx(
-                        sub, "AdvancedColorEnabled", 0, winreg.REG_DWORD, value
-                    )
+                    winreg.SetValueEx(sub, "AdvancedColorEnabled", 0, winreg.REG_DWORD, value)
                     result["applied_count"] += 1
             except PermissionError as exc:
                 result["errors"].append(f"{mid}: permission denied ({exc})")
@@ -1726,7 +2146,7 @@ class WindowsSettingsHandler(SettingsHandler):
                 result["errors"].append(f"{mid}: {exc}")
         return result
 
-    def _write_hdr_enabled_registry(self, enabled: bool) -> None:
+    def _write_hdr_enabled_registry(self, enabled: bool) -> dict[str, Any]:
         """Persist HDREnabled per-monitor so a DWM re-init reads our intent.
 
         SET_HDR_STATE writes this too on success, but on Win11 builds where
@@ -1734,6 +2154,7 @@ class WindowsSettingsHandler(SettingsHandler):
         upcoming HDR-cycle re-init picks up the intended state.
         """
         value = 1 if enabled else 0
+        result: dict[str, Any] = {"applied_count": 0, "skipped_count": 0}
         try:
             with winreg.OpenKey(
                 winreg.HKEY_LOCAL_MACHINE,
@@ -1750,7 +2171,7 @@ class WindowsSettingsHandler(SettingsHandler):
                     except OSError:
                         break
         except Exception:
-            return
+            return result
 
         for mid in monitor_ids:
             sub_path = f"{self.MONITOR_DATA_STORE_KEY}\\{mid}"
@@ -1768,16 +2189,21 @@ class WindowsSettingsHandler(SettingsHandler):
                     # Only rewrite when target differs so we don't bump modify
                     # time on monitors that aren't HDR-capable.
                     if current_hdr != value:
-                        winreg.SetValueEx(
-                            sub, "HDREnabled", 0, winreg.REG_DWORD, value
-                        )
+                        winreg.SetValueEx(sub, "HDREnabled", 0, winreg.REG_DWORD, value)
+                        result["applied_count"] += 1
+                    else:
+                        result["skipped_count"] += 1
             except Exception:
                 continue
+        return result
 
     def _set_advanced_color_with_refresh(
         self,
         target_advanced_color: bool,
         target_hdr: bool,
+        *,
+        manage_hdr_intent: bool = True,
+        live_hdr_summary: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """Write WCG/HDR registry intent + cycle HDR to force DWM re-read.
 
@@ -1811,9 +2237,19 @@ class WindowsSettingsHandler(SettingsHandler):
         # subsequent ON silently no-ops, which would leave the user with HDR
         # actively turned OFF as a side effect of an apply that was supposed
         # to be a no-op. Only cycle when we genuinely need to flip HDR.
-        live_pre = self._get_hdr_state_summary()
+        live_pre = (
+            live_hdr_summary
+            if live_hdr_summary is not None
+            else self._get_hdr_state_summary()
+        )
         live_hdr_on = bool(live_pre.get("any_active"))
-        skip_hdr_cycle = live_hdr_on == bool(target_hdr)
+        skip_hdr_cycle = (not manage_hdr_intent) or live_hdr_on == bool(target_hdr)
+        if not manage_hdr_intent:
+            logger.info(
+                "WCG-only refresh will not write HDR intent or cycle HDR; "
+                "preserving live HDR active state (%s).",
+                "on" if live_hdr_on else "off",
+            )
         if skip_hdr_cycle:
             logger.info(
                 "HDR live state already matches target (%s); WCG refresh "
@@ -1860,7 +2296,31 @@ class WindowsSettingsHandler(SettingsHandler):
         if not adv_result["success"]:
             result["success"] = False
 
-        self._write_hdr_enabled_registry(target_hdr)
+        hdr_registry_result = (
+            self._write_hdr_enabled_registry(target_hdr) if manage_hdr_intent else None
+        )
+
+        if not manage_hdr_intent:
+            result["cycle_ran"] = False
+            result["final_state"] = {
+                "advanced_color_registry_any_enabled": target_advanced_color,
+                "hdr_any_enabled": live_pre.get("any_enabled"),
+                "hdr_any_active": live_pre.get("any_active"),
+            }
+            return result
+
+        hdr_registry_changed = (
+            isinstance(hdr_registry_result, dict)
+            and int(hdr_registry_result.get("applied_count", 0) or 0) > 0
+        )
+        if skip_hdr_cycle and adv_result.get("applied_count", 0) == 0 and not hdr_registry_changed:
+            result["cycle_ran"] = False
+            result["final_state"] = {
+                "advanced_color_registry_any_enabled": target_advanced_color,
+                "hdr_any_enabled": live_pre.get("any_enabled"),
+                "hdr_any_active": live_pre.get("any_active"),
+            }
+            return result
 
         # Step 3: give DWM a moment to finish its OFF path. 0.5s was
         # measured sufficient on Win11 25H2 — 2s was overcautious.
@@ -1905,7 +2365,7 @@ class WindowsSettingsHandler(SettingsHandler):
         Auto HDR is controlled by AutoHDREnable in DirectXUserGlobalSettings.
         NOTE: SwapEffectUpgradeEnable is a DIFFERENT setting (windowed optimizations).
         """
-        return self._get_directx_flag("AutoHDREnable")
+        return self._get_directx_flag(self.DIRECTX_FLAG_NAMES["auto_hdr"])
 
     def _set_auto_hdr(self, enabled: bool) -> dict[str, Any]:
         """Set Windows Auto HDR status (Windows 11 only).
@@ -1914,7 +2374,11 @@ class WindowsSettingsHandler(SettingsHandler):
         For competitive gaming, this should typically be disabled.
         Uses AutoHDREnable flag (not SwapEffectUpgradeEnable which is windowed optimizations).
         """
-        return self._set_directx_flag("AutoHDREnable", enabled, "Auto HDR")
+        return self._set_directx_flag(
+            self.DIRECTX_FLAG_NAMES["auto_hdr"],
+            enabled,
+            "Auto HDR",
+        )
 
     def _get_windowed_optimizations(self) -> bool | None:
         """Get 'Optimizations for windowed games' status (Windows 11).
@@ -1923,7 +2387,7 @@ class WindowsSettingsHandler(SettingsHandler):
         When enabled, Windows upgrades DX10/DX11 swap chains to flip model
         in windowed/borderless mode. Can cause stutter on 24H2.
         """
-        return self._get_directx_flag("SwapEffectUpgradeEnable")
+        return self._get_directx_flag(self.DIRECTX_FLAG_NAMES["windowed_optimizations"])
 
     def _set_windowed_optimizations(self, enabled: bool) -> dict[str, Any]:
         """Set 'Optimizations for windowed games' (Windows 11).
@@ -1934,7 +2398,11 @@ class WindowsSettingsHandler(SettingsHandler):
 
         Also sets SwapEffectUpgradeCache DWORD for full effect.
         """
-        result = self._set_directx_flag("SwapEffectUpgradeEnable", enabled, "Windowed Optimizations")
+        result = self._set_directx_flag(
+            self.DIRECTX_FLAG_NAMES["windowed_optimizations"],
+            enabled,
+            "Windowed Optimizations",
+        )
 
         # Also set the cache DWORD that Windows checks
         try:
@@ -1945,7 +2413,9 @@ class WindowsSettingsHandler(SettingsHandler):
                 winreg.KEY_ALL_ACCESS,
             )
             try:
-                winreg.SetValueEx(key, "SwapEffectUpgradeCache", 0, winreg.REG_DWORD, 1 if enabled else 0)
+                winreg.SetValueEx(
+                    key, "SwapEffectUpgradeCache", 0, winreg.REG_DWORD, 1 if enabled else 0
+                )
             finally:
                 winreg.CloseKey(key)
         except FileNotFoundError:
@@ -1955,7 +2425,9 @@ class WindowsSettingsHandler(SettingsHandler):
                     r"Software\Microsoft\DirectX\GraphicsSettings",
                 )
                 try:
-                    winreg.SetValueEx(key, "SwapEffectUpgradeCache", 0, winreg.REG_DWORD, 1 if enabled else 0)
+                    winreg.SetValueEx(
+                        key, "SwapEffectUpgradeCache", 0, winreg.REG_DWORD, 1 if enabled else 0
+                    )
                 finally:
                     winreg.CloseKey(key)
             except Exception as e:
@@ -1967,18 +2439,66 @@ class WindowsSettingsHandler(SettingsHandler):
 
     # --- Shared DirectX flag helpers ---
 
-    def _get_directx_flag(self, flag_name: str) -> bool | None:
-        """Read a flag from DirectXUserGlobalSettings semicolon-delimited string."""
+    @classmethod
+    def _parse_directx_flags(cls, value: Any) -> dict[str, bool]:
+        """Parse DirectXUserGlobalSettings into ABSO setting names."""
+        by_flag = dict.fromkeys(cls.DIRECTX_FLAG_NAMES.values(), False)
+        for token in (part.strip() for part in str(value).split(";")):
+            name, sep, flag_value = token.partition("=")
+            if sep != "=" or name not in by_flag:
+                continue
+            cleaned = flag_value.strip()
+            if cleaned in {"0", "1"}:
+                by_flag[name] = cleaned == "1"
+
+        return {
+            setting_name: bool(by_flag[flag_name])
+            for setting_name, flag_name in cls.DIRECTX_FLAG_NAMES.items()
+        }
+
+    def _get_directx_flags(self) -> dict[str, bool | None]:
+        """Read all DirectXUserGlobalSettings flags with one registry query."""
         try:
             key = winreg.OpenKey(
                 winreg.HKEY_CURRENT_USER,
-                r"Software\Microsoft\DirectX\UserGpuPreferences",
+                self.DIRECTX_USER_GLOBAL_SETTINGS_KEY,
                 0,
                 winreg.KEY_READ,
             )
             try:
                 value = winreg.QueryValueEx(key, "DirectXUserGlobalSettings")[0]
-                return f"{flag_name}=1" in str(value)
+                return self._parse_directx_flags(value)
+            except FileNotFoundError:
+                return dict.fromkeys(self.DIRECTX_FLAG_NAMES, None)
+            finally:
+                winreg.CloseKey(key)
+        except Exception as e:
+            logger.debug(f"Failed to get DirectXUserGlobalSettings: {e}")
+            return dict.fromkeys(self.DIRECTX_FLAG_NAMES, None)
+
+    def _get_directx_flag(self, flag_name: str) -> bool | None:
+        """Read a flag from DirectXUserGlobalSettings semicolon-delimited string."""
+        try:
+            key = winreg.OpenKey(
+                winreg.HKEY_CURRENT_USER,
+                self.DIRECTX_USER_GLOBAL_SETTINGS_KEY,
+                0,
+                winreg.KEY_READ,
+            )
+            try:
+                value = winreg.QueryValueEx(key, "DirectXUserGlobalSettings")[0]
+                parsed = self._parse_directx_flags(value)
+                setting_name = next(
+                    (
+                        candidate
+                        for candidate, candidate_flag in self.DIRECTX_FLAG_NAMES.items()
+                        if candidate_flag == flag_name
+                    ),
+                    None,
+                )
+                if setting_name is None:
+                    return None
+                return parsed[setting_name]
             except FileNotFoundError:
                 return None
             finally:
@@ -1987,46 +2507,77 @@ class WindowsSettingsHandler(SettingsHandler):
             logger.debug(f"Failed to get {flag_name}: {e}")
             return None
 
+    @classmethod
+    def _directx_settings_with_flag(
+        cls,
+        current: Any | None,
+        flag_name: str,
+        enabled: bool,
+    ) -> str:
+        """Return DirectXUserGlobalSettings with normalized ABSO-owned flags."""
+        val = "1" if enabled else "0"
+        tracked_names = set(cls.DIRECTX_FLAG_NAMES.values())
+        tracked_values = dict.fromkeys(cls.DIRECTX_FLAG_NAMES.values(), "0")
+        unknown_tokens: list[str] = []
+
+        if current is not None:
+            for token in (part.strip() for part in str(current).split(";")):
+                if not token:
+                    continue
+                name, sep, token_value = token.partition("=")
+                if sep == "=" and name in tracked_names:
+                    cleaned = token_value.strip()
+                    if cleaned in {"0", "1"}:
+                        tracked_values[name] = cleaned
+                    continue
+                unknown_tokens.append(token)
+
+        tracked_values[flag_name] = val
+        tracked_tokens = [f"{name}={tracked_values[name]}" for name in cls.DIRECTX_FLAG_NAMES.values()]
+        return ";".join([*unknown_tokens, *tracked_tokens])
+
     def _set_directx_flag(self, flag_name: str, enabled: bool, display_name: str) -> dict[str, Any]:
         """Set a flag in DirectXUserGlobalSettings semicolon-delimited string."""
         result: dict[str, Any] = {"success": True, "error": None}
-        val = "1" if enabled else "0"
 
         try:
             key = winreg.OpenKey(
                 winreg.HKEY_CURRENT_USER,
-                r"Software\Microsoft\DirectX\UserGpuPreferences",
+                self.DIRECTX_USER_GLOBAL_SETTINGS_KEY,
                 0,
                 winreg.KEY_ALL_ACCESS,
             )
             try:
                 current = winreg.QueryValueEx(key, "DirectXUserGlobalSettings")[0]
-                if f"{flag_name}=" in current:
-                    # Replace existing value
-                    import re
-                    new_value = re.sub(rf"{flag_name}=\d", f"{flag_name}={val}", current)
-                else:
-                    new_value = current.rstrip(";") + f";{flag_name}={val}"
+                new_value = self._directx_settings_with_flag(current, flag_name, enabled)
                 winreg.SetValueEx(key, "DirectXUserGlobalSettings", 0, winreg.REG_SZ, new_value)
                 logger.info(f"{display_name} set to {'enabled' if enabled else 'disabled'}")
             except FileNotFoundError:
                 winreg.SetValueEx(
-                    key, "DirectXUserGlobalSettings", 0, winreg.REG_SZ,
-                    f"SwapEffectUpgradeEnable=0;AutoHDREnable=0;VRROptimizeEnable=0;{flag_name}={val}",
+                    key,
+                    "DirectXUserGlobalSettings",
+                    0,
+                    winreg.REG_SZ,
+                    self._directx_settings_with_flag(None, flag_name, enabled),
                 )
-                logger.info(f"{display_name} set to {'enabled' if enabled else 'disabled'} (created)")
+                logger.info(
+                    f"{display_name} set to {'enabled' if enabled else 'disabled'} (created)"
+                )
             finally:
                 winreg.CloseKey(key)
         except FileNotFoundError:
             try:
                 key = winreg.CreateKey(
                     winreg.HKEY_CURRENT_USER,
-                    r"Software\Microsoft\DirectX\UserGpuPreferences",
+                    self.DIRECTX_USER_GLOBAL_SETTINGS_KEY,
                 )
                 try:
                     winreg.SetValueEx(
-                        key, "DirectXUserGlobalSettings", 0, winreg.REG_SZ,
-                        f"SwapEffectUpgradeEnable=0;AutoHDREnable=0;VRROptimizeEnable=0;{flag_name}={val}",
+                        key,
+                        "DirectXUserGlobalSettings",
+                        0,
+                        winreg.REG_SZ,
+                        self._directx_settings_with_flag(None, flag_name, enabled),
                     )
                 finally:
                     winreg.CloseKey(key)
@@ -2044,23 +2595,7 @@ class WindowsSettingsHandler(SettingsHandler):
         optimizations. Counterintuitively, this can ADD latency even in
         exclusive fullscreen by keeping compositor logic in the path.
         """
-        try:
-            key = winreg.OpenKey(
-                winreg.HKEY_CURRENT_USER,
-                r"Software\Microsoft\DirectX\UserGpuPreferences",
-                0,
-                winreg.KEY_READ
-            )
-            try:
-                value = winreg.QueryValueEx(key, "DirectXUserGlobalSettings")[0]
-                return "VRROptimizeEnable=1" in str(value)
-            except FileNotFoundError:
-                return None
-            finally:
-                winreg.CloseKey(key)
-        except Exception as e:
-            logger.debug(f"Failed to get VRR Optimize status: {e}")
-            return None
+        return self._get_directx_flag(self.DIRECTX_FLAG_NAMES["vrr_optimize"])
 
     def _set_vrr_optimize(self, enabled: bool) -> dict[str, Any]:
         """Set VRR Optimize for windowed games (Windows 11).
@@ -2072,75 +2607,11 @@ class WindowsSettingsHandler(SettingsHandler):
         Returns:
             Dict with 'success' and optional 'error'.
         """
-        result: dict[str, Any] = {"success": True, "error": None}
-
-        try:
-            key = winreg.OpenKey(
-                winreg.HKEY_CURRENT_USER,
-                r"Software\Microsoft\DirectX\UserGpuPreferences",
-                0,
-                winreg.KEY_ALL_ACCESS
-            )
-            try:
-                current = winreg.QueryValueEx(key, "DirectXUserGlobalSettings")[0]
-                # Parse and update the VRROptimizeEnable setting
-                if "VRROptimizeEnable=" in current:
-                    new_value = current.replace(
-                        "VRROptimizeEnable=1" if not enabled else "VRROptimizeEnable=0",
-                        "VRROptimizeEnable=1" if enabled else "VRROptimizeEnable=0"
-                    )
-                else:
-                    # Add the setting
-                    new_value = current.rstrip(";") + f";VRROptimizeEnable={'1' if enabled else '0'};"
-                winreg.SetValueEx(key, "DirectXUserGlobalSettings", 0, winreg.REG_SZ, new_value)
-                logger.info(f"VRR Optimize set to {'enabled' if enabled else 'disabled'}")
-            except FileNotFoundError:
-                # Create default value with all relevant settings disabled for latency
-                winreg.SetValueEx(
-                    key,
-                    "DirectXUserGlobalSettings",
-                    0,
-                    winreg.REG_SZ,
-                    f"SwapEffectUpgradeEnable=0;AutoHDREnable=0;VRROptimizeEnable={'1' if enabled else '0'};"
-                )
-                logger.info(f"VRR Optimize set to {'enabled' if enabled else 'disabled'} (created new key)")
-            finally:
-                winreg.CloseKey(key)
-        except FileNotFoundError:
-            # Key doesn't exist, create it
-            try:
-                key = winreg.CreateKey(
-                    winreg.HKEY_CURRENT_USER,
-                    r"Software\Microsoft\DirectX\UserGpuPreferences"
-                )
-                try:
-                    winreg.SetValueEx(
-                        key,
-                        "DirectXUserGlobalSettings",
-                        0,
-                        winreg.REG_SZ,
-                        f"SwapEffectUpgradeEnable=0;AutoHDREnable=0;VRROptimizeEnable={'1' if enabled else '0'};"
-                    )
-                    logger.info(f"VRR Optimize set to {'enabled' if enabled else 'disabled'} (created registry path)")
-                finally:
-                    winreg.CloseKey(key)
-            except Exception as e:
-                error_msg = f"Failed to create VRR Optimize registry key: {e}"
-                logger.error(error_msg)
-                result["success"] = False
-                result["error"] = error_msg
-        except PermissionError as e:
-            error_msg = f"Permission denied setting VRR Optimize: {e}"
-            logger.error(error_msg)
-            result["success"] = False
-            result["error"] = error_msg
-        except Exception as e:
-            error_msg = f"Failed to set VRR Optimize: {e}"
-            logger.error(error_msg)
-            result["success"] = False
-            result["error"] = error_msg
-
-        return result
+        return self._set_directx_flag(
+            self.DIRECTX_FLAG_NAMES["vrr_optimize"],
+            enabled,
+            "VRR Optimize",
+        )
 
     def _get_refresh_rate_info(self) -> dict[str, Any]:
         """Get current and available refresh rates for the primary display.
@@ -2172,11 +2643,15 @@ class WindowsSettingsHandler(SettingsHandler):
                 enum_devmode = DEVMODE()
                 enum_devmode.dmSize = ctypes.sizeof(DEVMODE)
 
-                while mode_num < 500 and user32.EnumDisplaySettingsW(None, mode_num, ctypes.byref(enum_devmode)):
+                while mode_num < 500 and user32.EnumDisplaySettingsW(
+                    None, mode_num, ctypes.byref(enum_devmode)
+                ):
                     # Only consider modes at current resolution
-                    if (enum_devmode.dmPelsWidth == current_width and
-                        enum_devmode.dmPelsHeight == current_height and
-                        enum_devmode.dmDisplayFrequency > 0):
+                    if (
+                        enum_devmode.dmPelsWidth == current_width
+                        and enum_devmode.dmPelsHeight == current_height
+                        and enum_devmode.dmDisplayFrequency > 0
+                    ):
                         available_rates.add(enum_devmode.dmDisplayFrequency)
                     mode_num += 1
 
@@ -2217,7 +2692,9 @@ class WindowsSettingsHandler(SettingsHandler):
             # Test if the mode is valid
             result = user32.ChangeDisplaySettingsW(ctypes.byref(devmode), CDS_TEST)
             if result != DISP_CHANGE_SUCCESSFUL:
-                raise RuntimeError(f"Display mode {target_hz} Hz is not supported (error: {result})")
+                raise RuntimeError(
+                    f"Display mode {target_hz} Hz is not supported (error: {result})"
+                )
 
             # Apply the change
             result = user32.ChangeDisplaySettingsW(ctypes.byref(devmode), CDS_UPDATEREGISTRY)
@@ -2241,13 +2718,17 @@ class WindowsSettingsHandler(SettingsHandler):
             return
 
         if current_hz and current_hz >= max_hz:
-            logger.info(f"Display already at or above maximum enumerated rate ({current_hz} Hz >= {max_hz} Hz)")
+            logger.info(
+                f"Display already at or above maximum enumerated rate ({current_hz} Hz >= {max_hz} Hz)"
+            )
             return
 
         logger.info(f"Setting display to maximum refresh rate: {max_hz} Hz (was {current_hz} Hz)")
         self._set_refresh_rate(max_hz)
 
-    def optimize_for_gaming(self, primary_max: bool = True, secondary_low: bool = True) -> dict[str, Any]:
+    def optimize_for_gaming(
+        self, primary_max: bool = True, secondary_low: bool = True
+    ) -> dict[str, Any]:
         """Optimize multi-monitor setup for gaming.
 
         Strategy:
@@ -2302,7 +2783,9 @@ class WindowsSettingsHandler(SettingsHandler):
                         devmode = DEVMODE()
                         devmode.dmSize = ctypes.sizeof(DEVMODE)
 
-                        if user32.EnumDisplaySettingsW(device_name, ENUM_CURRENT_SETTINGS, ctypes.byref(devmode)):
+                        if user32.EnumDisplaySettingsW(
+                            device_name, ENUM_CURRENT_SETTINGS, ctypes.byref(devmode)
+                        ):
                             current_hz = devmode.dmDisplayFrequency
                             current_width = devmode.dmPelsWidth
                             current_height = devmode.dmPelsHeight
@@ -2313,10 +2796,14 @@ class WindowsSettingsHandler(SettingsHandler):
                             enum_devmode = DEVMODE()
                             enum_devmode.dmSize = ctypes.sizeof(DEVMODE)
 
-                            while mode_num < 500 and user32.EnumDisplaySettingsW(device_name, mode_num, ctypes.byref(enum_devmode)):
-                                if (enum_devmode.dmPelsWidth == current_width and
-                                    enum_devmode.dmPelsHeight == current_height and
-                                    enum_devmode.dmDisplayFrequency > 0):
+                            while mode_num < 500 and user32.EnumDisplaySettingsW(
+                                device_name, mode_num, ctypes.byref(enum_devmode)
+                            ):
+                                if (
+                                    enum_devmode.dmPelsWidth == current_width
+                                    and enum_devmode.dmPelsHeight == current_height
+                                    and enum_devmode.dmDisplayFrequency > 0
+                                ):
                                     available_rates.add(enum_devmode.dmDisplayFrequency)
                                 mode_num += 1
 
@@ -2385,7 +2872,9 @@ class WindowsSettingsHandler(SettingsHandler):
             devmode = DEVMODE()
             devmode.dmSize = ctypes.sizeof(DEVMODE)
 
-            if not user32.EnumDisplaySettingsW(device_name, ENUM_CURRENT_SETTINGS, ctypes.byref(devmode)):
+            if not user32.EnumDisplaySettingsW(
+                device_name, ENUM_CURRENT_SETTINGS, ctypes.byref(devmode)
+            ):
                 raise RuntimeError(f"Failed to get settings for {device_name}")
 
             devmode.dmDisplayFrequency = target_hz
