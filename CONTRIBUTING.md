@@ -4,12 +4,15 @@ ABSO is primarily a personal-use tool. External contributions are welcome but sm
 
 ## Setup
 
-```bash
-python -m venv venv
-venv\Scripts\activate
+```powershell
+python -m venv .venv
+.\.venv\Scripts\activate
 pip install -r requirements.txt
 pre-commit install
 ```
+
+Use the `.venv` name — the build/deploy tooling (`build.py`, `CLAUDE.md`) refers
+to `.\.venv\Scripts\python.exe`.
 
 ## Conventions
 

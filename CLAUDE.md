@@ -43,9 +43,9 @@ capture-safe variants where supported.
 ## Build & Run Commands
 
 ```bash
-# Environment setup
-python -m venv venv
-venv\Scripts\activate
+# Environment setup (use the .venv name — build/deploy commands assume it)
+python -m venv .venv
+.\.venv\Scripts\activate
 pip install -r requirements.txt
 
 # CLI commands (requires admin elevation)

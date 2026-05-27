@@ -91,10 +91,15 @@ A.B.S.O. will automatically detect NPI and use it for advanced NVIDIA settings. 
 3. Create a virtual environment and install dependencies:
 
 ```powershell
-python -m venv venv
-venv\Scripts\activate
+python -m venv .venv
+.\.venv\Scripts\activate
 pip install -r requirements.txt
 ```
+
+> The project's build/deploy tooling (`build.py`, and the examples in
+> `CLAUDE.md`) assumes the virtual environment lives at `.\.venv\`. Use that
+> name so documented commands like `.\.venv\Scripts\python.exe build.py deploy`
+> work without modification.
 
 ## Quick Start
 

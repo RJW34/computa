@@ -195,9 +195,15 @@ Rules:
 
 Recommended default split for this project:
 
-- `MAGNETON`: implementation host
-- Primary gaming/dev machine: validation host
-- Release signoff should happen on the validation host unless a broader hardware matrix is in place
+- The concrete host(s) filling these roles are defined in
+  `docs/AGENT_PROTOCOL.md` §2, not hardcoded here. (Historical drafts named
+  `MAGNETON`/`MIRAIDON`; those are machine-specific and must be re-confirmed on
+  whatever PC the repo is currently checked out on — see
+  `docs/NEW_MACHINE_SETUP.md`.)
+- When one machine wears all three hats, discipline replaces geography: do not
+  upgrade evidence to `measured` or claim `optimal` without validation-host
+  artifacts on hardware that actually exposes the relevant path.
+- Release signoff should happen on the validation host unless a broader hardware matrix is in place.
 
 ## Forbidden Claims
 
