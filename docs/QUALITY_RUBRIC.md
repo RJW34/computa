@@ -176,34 +176,20 @@ Rules:
 - `restore_guarantee=partial` forces degraded transaction semantics unless explicitly excluded.
 - High-impact handlers must expose `supports_verify=True` before their profile path can be graded `A`.
 
-## Machine Roles
+## Evidence & Validation Discipline
 
-This project is allowed to use different machines for implementation and validation, but the roles must be explicit.
+A.B.S.O. is developed and validated on a single machine — whatever PC the repo
+is checked out on (see `docs/AGENT_PROTOCOL.md` §2). There is no multi-host role
+split; the same box does coding, validation, and signoff. What matters is the
+evidence standard, not which machine produced it:
 
-| Role | Purpose |
-| --- | --- |
-| `Implementation Host` | day-to-day coding, tests, refactors, UI/tray work, CI work |
-| `Validation Host` | hardware/display-path verification for VRR, HDR, NVIDIA, refresh, and game behavior |
-| `Release Signoff Host` | final benchmark and truth-claim signoff before shipping touched profiles |
-
-Rules:
-
-- The implementation host does not automatically qualify as a validation host.
-- A profile cannot be upgraded to `measured` evidence based only on implementation-host results unless that machine is an approved validation host for the relevant path.
-- VRR, HDR, refresh-rate, and NVIDIA claims must be validated on a machine that actually exposes those capabilities.
-- "Optimal" claims require validation-host evidence, not just passing tests on the implementation host.
-
-Recommended default split for this project:
-
-- The concrete host(s) filling these roles are defined in
-  `docs/AGENT_PROTOCOL.md` §2, not hardcoded here. (Historical drafts named
-  `MAGNETON`/`MIRAIDON`; those are machine-specific and must be re-confirmed on
-  whatever PC the repo is currently checked out on — see
-  `docs/NEW_MACHINE_SETUP.md`.)
-- When one machine wears all three hats, discipline replaces geography: do not
-  upgrade evidence to `measured` or claim `optimal` without validation-host
-  artifacts on hardware that actually exposes the relevant path.
-- Release signoff should happen on the validation host unless a broader hardware matrix is in place.
+- A profile cannot be upgraded to `measured` evidence without an actual
+  benchmark artifact in `reports/benchmarks/`, captured on hardware that
+  actually exposes the relevant path.
+- VRR, HDR, refresh-rate, and NVIDIA claims are only valid on a machine that
+  actually exposes those capabilities — confirm with `python -m abso detect`.
+- "Optimal" claims require recorded before/after frame data, not just passing
+  tests.
 
 ## Forbidden Claims
 

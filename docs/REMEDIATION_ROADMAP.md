@@ -3,10 +3,9 @@
 > **Status update 2026-05-13.** Phase 4 (Deep Verification Coverage) is
 > partially complete — see PR-09 below. The forward-looking backlog
 > (open vs. closed PRs) is consolidated in
-> **[`docs/AGENT_PROTOCOL.md`](./AGENT_PROTOCOL.md) §6**. The historical
-> machine-role split mentioning `MAGNETON` is superseded by Agent
-> Protocol §2 — the implementation+validation+signoff host is
-> `MIRAIDON`.
+> **[`docs/AGENT_PROTOCOL.md`](./AGENT_PROTOCOL.md) §6**. This is a
+> single-developer, single-machine project — ignore the historical multi-host
+> "machine role" framing below; see Agent Protocol §2 for the current model.
 
 This roadmap is the execution plan for raising A.B.S.O. from its March 26, 2026 baseline (`C+` overall) to `A` grades across the board.
 
@@ -49,26 +48,13 @@ That document exists because the project has now cleared most of the highest-ris
 - Ryujinx enforcement or explicit contract limits
 - deeper post-apply verification for the handlers those families still depend on
 
-## Machine Role Policy
+## Evidence Policy
 
-The remediation program assumes different machines may be used for implementation and validation.
+This is a single-developer, single-machine project (see
+`docs/AGENT_PROTOCOL.md` §2). Code, tests, refactors, tray/GUI work, and
+CI/release-gate work all happen on the same box the repo is checked out on.
 
-Current expected split:
-
-- `MAGNETON`: implementation host
-- primary gaming/dev machine: validation host
-- release signoff: validation host unless a broader matrix is approved
-
-What may be done on the implementation host:
-
-- code changes
-- tests
-- refactors
-- tray/GUI work
-- handler contract work
-- CI/release gate work
-
-What may not be signed off from the implementation host alone:
+What may **not** be signed off without real artifacts on capable hardware:
 
 - VRR / G-SYNC behavior claims
 - HDR correctness claims
@@ -78,7 +64,9 @@ What may not be signed off from the implementation host alone:
 
 Rule:
 
-- HERMES may improve structure and truthfulness on `MAGNETON`, but it must not upgrade profile evidence to `measured` or claim a path is `optimal` without validation-host artifacts.
+- An agent may improve structure and truthfulness anywhere, but must not upgrade
+  profile evidence to `measured` or claim a path is `optimal` without a
+  benchmark artifact captured on hardware that actually exposes that path.
 
 ## Phase 1: Truth Freeze
 
@@ -411,7 +399,7 @@ Acceptance:
 
 - Benchmarks have a standard format.
 - Touched optimal profiles must attach benchmark artifacts.
-- Benchmark artifacts record which machine acted as implementation host, validation host, and signoff host.
+- Benchmark artifacts record the machine and hardware they were captured on.
 
 ### PR-13: Benchmark top-tier shipping profiles
 

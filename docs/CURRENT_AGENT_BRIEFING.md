@@ -4,13 +4,13 @@ Last updated: 2026-05-26 23:20 America/New_York
 
 > **MACHINE-SPECIFIC — read `docs/NEW_MACHINE_SETUP.md` first if this repo was
 > just cloned onto a different PC.** Everything below describes the live state of
-> one specific box (RTX 4070 Windows 11, hostname `MIRAIDON`): active profile,
-> running PIDs, installed build hashes, deploy timestamps, and an in-progress
-> Overwatch 2 monitor-flicker investigation. On a freshly cloned machine none of
-> that is true yet — no build is deployed, no profile is applied, nothing is
-> reboot-pending. Treat this file as a **record of the previous session's work**,
-> not as this machine's truth, until you have re-verified with read-only commands
-> (`detect` / `audit` / `health --json` / `state --json --verify`).
+> one specific Windows 11 gaming PC: active profile, running PIDs, installed
+> build hashes, deploy timestamps, and an in-progress Overwatch 2 monitor-flicker
+> investigation. On a freshly cloned machine none of that is true yet — no build
+> is deployed, no profile is applied, nothing is reboot-pending. Treat this file
+> as a **record of the previous session's work**, not as this machine's truth,
+> until you have re-verified with read-only commands (`detect` / `audit` /
+> `health --json` / `state --json --verify`).
 
 This is the first live-state file for agents arriving with no prior session
 context. Historical handoffs and old plans belong in `docs/archive/`; this file

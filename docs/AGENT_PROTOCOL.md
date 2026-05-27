@@ -1,8 +1,9 @@
 # A.B.S.O. Agent Protocol
 
-**Freshly cloned onto a new PC? Read `docs/NEW_MACHINE_SETUP.md` first.** §2
-(machine roles) and §3 (live-PC mutation exception) below describe one specific
-box and do **not** automatically apply to a new machine.
+**Freshly cloned onto a new PC? Read `docs/NEW_MACHINE_SETUP.md` first** to set
+up the dev environment and establish this machine's real state. This is a
+single-developer, single-machine project: there is no multi-machine role split
+(see §2), and live-PC mutation always needs the user's go-ahead (see §3).
 
 **On an already-configured machine, read `docs/CURRENT_AGENT_BRIEFING.md`
 first.** That file is the current live-machine handoff, including the active
@@ -44,44 +45,38 @@ and PR slices that have since changed.
 
 ---
 
-## 2. Machine roles (current)
+## 2. Development & test machine
 
-The roadmap historically described an "implementation host = MAGNETON,
-validation host = primary gaming PC" split. **That naming is stale.**
-The current host this project lives on is `MIRAIDON` (Windows Insider
-Dev/future-platforms build 29595.1000; Windows reports
-`ProductName="Windows 10 Home"` and `DisplayVersion="Dev"` on this branch;
-RTX 4070; MSI Aegis R2 14th).
+A.B.S.O. is a single-developer project. Whatever PC the repo is checked out on
+is the one machine that does everything — coding, tests, live validation, and
+release signoff. There is no multi-machine role split and no cross-machine
+coordination; treat the machine you're operating on as a standalone testing
+ground. Do not assume any particular GPU, monitor, or OS build — detect the
+actual hardware with `python -m abso detect` first.
 
-For practical purposes:
-
-| Role | Machine | Allowed |
-|---|---|---|
-| Implementation | `MIRAIDON` | structural code changes, refactors, tests, tray/GUI work, CI work |
-| Validation | `MIRAIDON` (same box) | live registry/WMI probes, CLI smoke runs, apply/verify/restore round trips against a real profile |
-| Release signoff | `MIRAIDON` | benchmark artifacts, "optimal" claim support |
-
-Because the same machine wears all three hats, **discipline replaces
-geography**:
+Because one machine wears every hat, **discipline replaces geography**:
 
 - Do not upgrade a setting's evidence to `measured` without an actual
   benchmark artifact in `reports/benchmarks/`.
-- Do not call a profile `optimal` without recorded before/after frame
-  data on this hardware.
-- Treat "no validation host" as the constraint, not the excuse.
+- Do not call a profile `optimal` without recorded before/after frame data on
+  the hardware you actually ran it on.
+- VRR, HDR, refresh-rate, and NVIDIA claims are only valid on a machine that
+  actually exposes those capabilities — confirm with `detect` before claiming.
 
 ---
 
 ## 3. Live-PC test policy
 
-The current live-machine exception is always subordinate to the user's latest
-instruction and to `docs/CURRENT_AGENT_BRIEFING.md`. If the briefing says a
-change is reboot-gated, do not keep re-applying profiles to force it.
+Live-PC actions are always subordinate to the user's latest instruction and to
+`docs/CURRENT_AGENT_BRIEFING.md`. If the briefing says a change is reboot-gated,
+do not keep re-applying profiles to force it.
 
-The user has explicitly granted **read-only and state-mutating** access
-to this machine for ABSO work specifically. This is an exception to the
-broader "never run system commands on live PC without permission" rule
-that lives in the user's auto-memory.
+The user treats the machine they are actively developing ABSO on as a testing
+ground, so the read-only and apply/restore ABSO operations below are in scope on
+that machine. This is narrower than blanket access: run read-only commands
+first, confirm before anything disruptive, and always pair `apply` with a
+`restore`. When unsure, fall back to the standing rule — read-only by default,
+ask before mutating.
 
 What's pre-authorized:
 
@@ -117,8 +112,8 @@ What still needs explicit approval:
 5. Restore via `abso restore latest`.
 6. Confirm `abso state` shows no active profile (or the prior state).
 
-This sequence has been validated end-to-end on `MIRAIDON` — it does not
-leave the machine in a broken state.
+This sequence has been validated end-to-end and does not leave the machine in a
+broken state.
 
 **Required protocol for automated tests that invoke CLI mutations:**
 
@@ -439,7 +434,7 @@ bundle.
 Standing audit against `overwatch2-gsync-hdr` after the launch-time
 process janitor landed. These are the knobs ABSO still does not tune
 that would measurably move click-to-photon latency on a competitive
-RTX 4070 / 14th-gen / 300 Hz VRR primary plus mixed-refresh secondary setup.
+300 Hz VRR primary plus mixed-refresh secondary setup.
 Ordered by impact. Most of these benefit every Reflex shooter profile (Marvel
 Rivals, Deadlock, Fortnite, Rivals 2 G-SYNC), not just OW2 — wire them through
 `BaseProfile` traits, not into OW2 specifically.
@@ -541,7 +536,7 @@ Rivals, Deadlock, Fortnite, Rivals 2 G-SYNC), not just OW2 — wire them through
 
 ### 6.2 Experimental (Future Platforms) / Canary 29xxx live status
 
-Updated 2026-05-26 after live smoke on MIRAIDON. The machine is now on
+Updated 2026-05-26 after a live smoke run. The dev machine at that time was on
 Windows Insider build 29595.1000 with
 `release_branch="experimental_future_platforms"` and
 `OsRelease.is_experimental_future_platform == True`. Windows still
@@ -651,9 +646,8 @@ The 2026-05-24 HDR recovery pass adds:
    then update the candidate list (or wire the apply path).
 3. **NPU detection** — build 29591+ added NPU columns to Task
    Manager. `HardwareDetector` does not currently surface NPU
-   presence. Out of scope for the current rig (RTX 4070 / 14th-gen
-   with no NPU), but record as a future detection extension if the
-   user moves to a Copilot+ machine.
+   presence. Out of scope on non-NPU hardware, but record as a future
+   detection extension for Copilot+ machines.
 4. **Xbox Mode / AI Agents revalidation** — these handlers fire on
    any build >= 26100.8457, which 29595 satisfies. Their candidate
    registry paths were chosen on the 25H2 branch and may need

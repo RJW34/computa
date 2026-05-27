@@ -9,10 +9,9 @@ have established this machine's state and read the project docs, hand off to
 
 ## Why this file exists
 
-The other agent docs were written against **one specific live machine**: an
-RTX 4070 Windows 11 box (hostname `MIRAIDON`) that was mid-way through debugging
-Overwatch 2 secondary-monitor black flashes. On a freshly cloned machine, those
-"live state" claims are **history, not truth**:
+The live-state docs were written against **one specific Windows 11 box** that
+was mid-way through debugging Overwatch 2 secondary-monitor black flashes. On a
+freshly cloned machine, those "live state" claims are **history, not truth**:
 
 - No ABSO build is deployed to `%LOCALAPPDATA%\AdaptiveBattleStationOptimizer\`
   yet — the installed `abso.exe`, tray runtime, and state file do not exist here.
@@ -74,17 +73,17 @@ python -m abso state --json --verify
 On a fresh clone, expect **no active profile**, **no installed runtime**, and
 the audit to report a stock, unoptimized system. That is the correct baseline.
 
-## 3. Safety: the live-PC mutation exception does NOT transfer
+## 3. Safety: read-only by default, authorize before mutating
 
-`docs/AGENT_PROTOCOL.md` §3 says the user granted **read-only _and_
-state-mutating** access "to this machine" — but that was the old box
-(`MIRAIDON`). The user's standing global rule is **never run tests or
-system-mutating commands on the live PC without permission.**
+`docs/AGENT_PROTOCOL.md` §3 treats the machine you are actively developing ABSO
+on as a testing ground, so this PC is a valid place to run live ABSO operations.
+But the user's standing rule still holds: **never run system-mutating commands
+on the live PC without permission.**
 
-On this new machine, **default to read-only.** Do not run `apply`, `restore`,
-`apply-pending`, `launch`, `build.py deploy`, registry writes, display resets,
-or the tray installer until the user **explicitly authorizes mutating _this_
-machine.** Re-confirm scope here; the old machine's grant does not carry over.
+Default to read-only. Do not run `apply`, `restore`, `apply-pending`, `launch`,
+`build.py deploy`, registry writes, display resets, or the tray installer until
+the user gives the go-ahead on this machine. After any `apply`, pair it with a
+`restore`.
 
 ## 4. Reading order to understand the project
 
@@ -93,9 +92,8 @@ machine.** Re-confirm scope here; the old machine's grant does not carry over.
    the most accurate single source for "what does it actually do."
 2. **`docs/AGENT_PROTOCOL.md`** — durable workflow, architecture patterns,
    handler/profile conventions, validation pipeline, evidence/claim rules, and
-   the open backlog. **Treat §2 (machine roles, `MIRAIDON`) and §3 (live-PC
-   mutation exception) as machine-specific history — they do not describe this
-   PC.**
+   the open backlog. §2 describes the single-machine dev/test model and §3 the
+   live-PC test policy — both apply directly to whatever PC you're on.
 3. **`CLAUDE.md`** — repo-rooted conventions and critical constraints
    (always-backup, admin elevation, idempotency, online-safety, hermetic tests).
 4. **`docs/INDEX.md`** — full map of current vs. archived docs.
