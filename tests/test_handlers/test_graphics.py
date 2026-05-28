@@ -269,18 +269,39 @@ class TestGraphicsApply:
         assert "elevated apply" in setting["note"]
 
     @patch.object(GraphicsSettingsHandler, "detect")
-    def test_verify_mpo_written_reports_reboot_commit_action(self, mock_detect):
-        """A matching MPO registry target is written, but live DWM commit is boot-gated."""
+    def test_verify_mpo_written_after_reboot_reports_no_action(self, mock_detect):
+        """A matching MPO registry target with no pending reboot is fully active."""
         mock_detect.return_value = {"mpo_disabled": True}
 
         handler = GraphicsSettingsHandler()
-        result = handler.verify_active({"disable_mpo": True})
+        # _reboot_pending=False simulates the post-reboot state where the live
+        # DWM compositor has already committed the MPO target.
+        result = handler.verify_active({"disable_mpo": True, "_reboot_pending": False})
 
         setting = result["settings"]["mpo_disabled"]
         assert result["all_active"] is True
         assert "pending_apply_settings" not in result
+        assert "pending_reboot_gated_settings" not in result
         assert setting["registry_target_written"] is True
         assert setting["live_activation_verifiable"] is False
+        assert setting["live_commit_pending"] is False
+        assert setting["next_action"] == "no_action_required"
+        assert "compositor path" in setting["note"]
+
+    @patch.object(GraphicsSettingsHandler, "detect")
+    def test_verify_mpo_written_with_pending_reboot_caveats_state(self, mock_detect):
+        """A matching MPO registry target with reboot still pending is reboot-gated."""
+        mock_detect.return_value = {"mpo_disabled": True}
+
+        handler = GraphicsSettingsHandler()
+        result = handler.verify_active({"disable_mpo": True, "_reboot_pending": True})
+
+        setting = result["settings"]["mpo_disabled"]
+        assert result["all_active"] is False
+        assert "pending_apply_settings" not in result
+        assert result["pending_reboot_gated_settings"] == ["mpo_disabled"]
+        assert setting["registry_target_written"] is True
+        assert setting["live_commit_pending"] is True
         assert setting["next_action"] == "reboot_to_commit_live_compositor"
         assert "compositor path" in setting["note"]
 

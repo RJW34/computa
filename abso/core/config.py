@@ -117,7 +117,16 @@ class ColorConfig:
 
 @dataclass
 class ProfileOverrides:
-    """Custom overrides for a game profile."""
+    """Custom overrides for a game profile.
+
+    Each field maps to one settings handler. The override dict is shallow-
+    merged into the profile's declared settings for that handler at apply /
+    verify time (see ``merge_profile_override_settings``). Adding a new
+    handler-specific override surface requires (1) a new field here,
+    (2) a row in ``PROFILE_OVERRIDE_HANDLER_ATTRS``, and (3) the handler
+    has to be on the ``_coerce_profile_overrides`` allowlist via being a
+    field of this dataclass — that is automatic.
+    """
 
     nvidia: dict[str, Any] = field(default_factory=dict)
     windows: dict[str, Any] = field(default_factory=dict)
@@ -129,6 +138,14 @@ class ProfileOverrides:
     mouse: dict[str, Any] = field(default_factory=dict)
     color: dict[str, Any] = field(default_factory=dict)
     display_color_range: dict[str, Any] = field(default_factory=dict)
+    # Per-game config-file handlers — exposed individually so users can
+    # disable a profile's auto_vrr_fps_cap, pin a specific frame_rate_cap,
+    # or otherwise tune the in-game settings file without modifying source.
+    ow2_config: dict[str, Any] = field(default_factory=dict)
+    diablo4_config: dict[str, Any] = field(default_factory=dict)
+    rivals2_config: dict[str, Any] = field(default_factory=dict)
+    marvel_rivals_config: dict[str, Any] = field(default_factory=dict)
+    fortnite_config: dict[str, Any] = field(default_factory=dict)
 
 
 _PROFILE_OVERRIDE_SECTION_NAMES: frozenset[str] = frozenset(
@@ -147,6 +164,11 @@ PROFILE_OVERRIDE_HANDLER_ATTRS: dict[str, str] = {
     "MouseSettingsHandler": "mouse",
     "ColorProfileSettingsHandler": "color",
     "DisplayColorRangeHandler": "display_color_range",
+    "OW2ConfigHandler": "ow2_config",
+    "Diablo4ConfigHandler": "diablo4_config",
+    "Rivals2ConfigHandler": "rivals2_config",
+    "MarvelRivalsConfigHandler": "marvel_rivals_config",
+    "FortniteConfigHandler": "fortnite_config",
 }
 
 

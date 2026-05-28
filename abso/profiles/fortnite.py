@@ -84,8 +84,8 @@ class _FortniteBaseProfile(ReflexShooterBaseProfile):
             {
                 "category": "Display",
                 "setting": "NVIDIA Reflex Low Latency",
-                "value": "On + Boost (must be enabled manually in-game)",
-                "reason": "Fortnite's Reflex toggle lives in Fortnite's settings, not in a stable config key ABSO can write. ABSO keeps driver LLM off so Reflex owns render-queue control.",
+                "value": "On + Boost — ABSO already set driver LLM off; flip the in-game toggle to finish",
+                "reason": "ABSO has already configured the driver side: NVIDIA LLM is OFF so the engine owns the render queue (Reflex's correct path). Fortnite's Reflex toggle lives in Fortnite's settings and there is no stable config key to write it from outside; flip 'NVIDIA Reflex Low Latency' to 'On + Boost' in the game once.",
             },
             {
                 "category": "Display",

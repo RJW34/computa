@@ -51,6 +51,14 @@ class ApplyResult:
     failed_settings: list[str] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
     notices: list[str] = field(default_factory=list)
+    # Per-handler granular detail lines (handler class name -> list of "<setting>: <value>" strings).
+    # This is what surfaces strings like "Monitor Adaptive Sync: disabled" so the tray can suppress
+    # OSD reminders that ABSO has already handled. The top-level applied_settings list only carries
+    # handler class names for API compatibility.
+    handler_applied_details: dict[str, list[str]] = field(default_factory=dict)
+    # Structured signal for monitor firmware Adaptive Sync state after apply.
+    # None = not toggled / DDC/CI disabled in config / no NVIDIA path. "enabled"/"disabled" when toggled.
+    monitor_adaptive_sync_state: str | None = None
 
     # Validation subsystem results
     lint_result: LintResult | None = None
@@ -314,6 +322,14 @@ class ProfileApplier:
         skipped: list[str] = []
         requires_reboot = False
         reboot_reasons: list[str] = []
+        handler_applied_details: dict[str, list[str]] = {}
+        monitor_adaptive_sync_state: str | None = None
+
+        # Resolve once: does the active profile expect NVIDIA Reflex to be in the
+        # render loop? Handlers that auto-compute a VRR FPS cap consult this to
+        # pick the Reflex-aware (looser) cap formula instead of the conservative
+        # non-Reflex one. See abso/core/vrr.py:get_vrr_fps_cap for the policy.
+        reflex_active = bool(getattr(profile, "requires_reflex", False))
 
         for handler in profile.get_handlers():
             handler_name = handler.__class__.__name__
@@ -327,6 +343,26 @@ class ProfileApplier:
             try:
                 settings = final_settings_map.get(handler_name, {}).copy()
 
+                # Inject profile sync mode into the color handler so it can filter
+                # OSD recommendations that contradict the active profile (e.g. don't
+                # show "Adaptive-Sync: On" when applying a no-sync profile). The
+                # profile id has already been resolved to its canonical form upstream.
+                if handler_name == "ColorProfileSettingsHandler" and "sync_mode" not in settings:
+                    try:
+                        from abso.profiles.catalog import get_profile_sync_mode
+
+                        injected_sync = get_profile_sync_mode(profile_name)
+                        if injected_sync:
+                            settings["sync_mode"] = injected_sync
+                    except Exception:  # noqa: BLE001 — never block apply on metadata lookup
+                        pass
+
+                # Propagate the Reflex-active flag so handlers that resolve
+                # `auto_vrr_fps_cap` pick the right cap policy. Underscore prefix
+                # marks it as applier-injected metadata that handlers are free to
+                # ignore — only the auto-cap call sites read it.
+                settings.setdefault("_reflex_active", reflex_active)
+
                 handler_result = handler.apply(settings)
 
                 if handler_result.get("success", False):
@@ -339,6 +375,22 @@ class ProfileApplier:
                         reboot_reasons.append(handler_name)
                 else:
                     failed.append(f"{handler_name}: {handler_result.get('error', 'Unknown error')}")
+
+                # Carry forward the handler's local "applied" list so downstream consumers
+                # (tray suppression, GUI surfacing) can see granular setting lines, not just
+                # the handler class name.
+                handler_applied = handler_result.get("applied")
+                if isinstance(handler_applied, list) and handler_applied:
+                    handler_applied_details[handler_name] = [
+                        str(line) for line in handler_applied
+                    ]
+
+                # NVIDIA handler returns a structured monitor_adaptive_sync_state when DDC/CI
+                # ran during apply. Pull it up to the top-level result so the tray can drop
+                # the "go disable Adaptive Sync in your OSD" reminder without scraping strings.
+                nvidia_sync_state = handler_result.get("monitor_adaptive_sync_state")
+                if isinstance(nvidia_sync_state, str) and nvidia_sync_state:
+                    monitor_adaptive_sync_state = nvidia_sync_state
 
                 for warning in handler_result.get("warnings", []) or []:
                     self._append_unique(result.warnings, str(warning))
@@ -363,6 +415,8 @@ class ProfileApplier:
         result.failed_settings = failed
         result.requires_reboot = requires_reboot
         result.reboot_reasons = reboot_reasons
+        result.handler_applied_details = handler_applied_details
+        result.monitor_adaptive_sync_state = monitor_adaptive_sync_state
 
         if failed:
             result.success = False
@@ -885,6 +939,27 @@ class ProfileApplier:
         if network_scope_result is not None and network_scope_result.changes_made:
             results["network_scope_changes"] = list(network_scope_result.changes_made)
 
+        # Thread the system-wide reboot_pending bit into per-handler verify so
+        # reboot-gated settings (e.g. MPO via DisableOverlays) can distinguish
+        # "registry target written and live" from "registry written but waiting
+        # on a reboot for DWM to commit it". Without this, the verify call
+        # would report MPO active even when the user has not rebooted yet.
+        reboot_pending = False
+        try:
+            from abso.core.app_paths import app_state_file
+            from abso.core.state_store import read_state_snapshot
+
+            reboot_pending = bool(
+                read_state_snapshot([app_state_file()]).get("reboot_pending", False)
+            )
+        except Exception:  # noqa: BLE001 — verify must never fail because of state IO
+            reboot_pending = False
+
+        # Resolve the Reflex flag once so the verify path computes the same
+        # auto_vrr_fps_cap that apply just wrote (otherwise verify would call
+        # get_vrr_fps_cap with the wrong policy and falsely report drift).
+        reflex_active = bool(getattr(profile, "requires_reflex", False))
+
         # Check handlers that have reboot-requiring settings
         for handler in profile.get_handlers():
             handler_name = handler.__class__.__name__
@@ -898,7 +973,15 @@ class ProfileApplier:
                 continue
 
             try:
-                handler_result = handler.verify_active(settings)
+                # Inject the system reboot_pending flag for handlers that need
+                # to caveat reboot-gated settings (currently: GraphicsSettingsHandler
+                # for MPO), plus the Reflex flag so auto_vrr_fps_cap verifies
+                # against the same policy apply used. Handlers that don't read
+                # these keys are unaffected.
+                verify_settings = dict(settings)
+                verify_settings["_reboot_pending"] = reboot_pending
+                verify_settings.setdefault("_reflex_active", reflex_active)
+                handler_result = handler.verify_active(verify_settings)
                 results["handlers"][handler_name] = handler_result
 
                 if not handler_result.get("all_active", True):

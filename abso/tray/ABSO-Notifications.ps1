@@ -272,8 +272,10 @@ function _Derive-ToastTitle {
     }
     # Strip a parenthesized mode list ("(Strict HDR | Reflex | G-SYNC ON)") - too long for a headline.
     $title = ($title -replace '\s*\([^()]*\)\s*$', '').Trim()
-    # If the headline still has " | " separators, keep only the first segment.
-    if ($title -match '\s\|\s') {
+    # If the headline still has " | " separators AND would overflow the 62-char headline
+    # budget, keep only the first segment. We do NOT pre-chop short pipe-separated names
+    # (e.g. "Game | Variant") because that throws away legitimate name parts.
+    if ($title.Length -gt 62 -and $title -match '\s\|\s') {
         $title = ($title -split '\s\|\s', 2)[0].Trim()
     }
     return (_Smart-Truncate -Text $title -MaxLen 62)
@@ -630,7 +632,13 @@ function Show-ThemedToast {
         [ValidateSet("Info","Warning","Error","Success")]
         [string]$Type = "Info",
         [int]$Duration = 4500,
-        [string]$MetaText = ""
+        [string]$MetaText = "",
+        # When the toast is fired in response to an explicit user action (clicking
+        # "Apply" in the tray menu, hitting "Restore", etc.) the dedup window
+        # silently swallowing the popup makes the UI feel dead — the user clicked,
+        # nothing happened. Callers can pass -BypassDedup to acknowledge that the
+        # action is intentional and should always surface a toast.
+        [switch]$BypassDedup
     )
 
     try {
@@ -641,7 +649,7 @@ function Show-ThemedToast {
         $key       = "$Type|$realTitle|$realBody"
 
         $nowMs = [DateTimeOffset]::Now.ToUnixTimeMilliseconds()
-        if ($script:ToastDedupMap.ContainsKey($key)) {
+        if (-not $BypassDedup -and $script:ToastDedupMap.ContainsKey($key)) {
             $last = $script:ToastDedupMap[$key]
             if (($nowMs - $last) -lt $script:ToastDedupWindowMs) {
                 if (Get-Command Write-TrayLog -ErrorAction SilentlyContinue) {

@@ -135,6 +135,10 @@ class Diablo4ConfigHandler(SettingsHandler):
 
         auto_refresh = requested.pop(self.AUTO_REFRESH_RATE_KEY, False)
         auto_vrr_cap = requested.pop(self.AUTO_VRR_FPS_CAP_KEY, False)
+        # Diablo IV supports NVIDIA Reflex (in-game video setting). The applier
+        # threads `requires_reflex` here so the static foreground cap matches
+        # what Reflex would otherwise undershoot — refresh - 3 instead of 5%.
+        reflex_active = bool(requested.pop("_reflex_active", False))
 
         refresh_hz: float | None = None
         if auto_refresh or auto_vrr_cap:
@@ -154,23 +158,26 @@ class Diablo4ConfigHandler(SettingsHandler):
 
         if auto_vrr_cap:
             # Prefer in-game limiter per Blur Busters G-SYNC 101: in-game caps have
-            # lower latency than driver/NVCP caps. If we can't compute refresh - 3,
+            # lower latency than driver/NVCP caps. If we can't compute the cap,
             # surface a notice so the caller can fall back to the NVIDIA driver cap.
             if refresh_hz and refresh_hz > 0:
                 from abso.core.vrr import get_vrr_fps_cap
 
-                cap = get_vrr_fps_cap(refresh_hz)
+                cap = get_vrr_fps_cap(refresh_hz, reflex_active=reflex_active)
                 requested["limit_foreground_fps"] = True
                 requested["foreground_fps_limit"] = cap
                 logger.info(
-                    "Diablo IV auto VRR FPS cap: %d (from %.2f Hz)", cap, refresh_hz,
+                    "Diablo IV auto VRR FPS cap: %d (from %.2f Hz, reflex_active=%s)",
+                    cap, refresh_hz, reflex_active,
                 )
             else:
                 notices.append(
                     "Diablo IV auto_vrr_fps_cap skipped: refresh rate detection "
-                    "failed. In-game foreground cap was NOT set; fall back to the "
-                    "NVIDIA driver cap (NvidiaSettingsHandler.auto_vrr_fps_cap) "
-                    "or set refresh_rate + foreground_fps_limit manually."
+                    "failed. In-game foreground cap was NOT set. To recover, "
+                    "either enable nvidia.auto_vrr_fps_cap in this profile so "
+                    "the driver imposes the cap, or set "
+                    "diablo4.refresh_rate + diablo4.foreground_fps_limit "
+                    "explicitly in your profile overrides."
                 )
 
         invalid_keys = sorted(set(requested.keys()) - set(self.MUTABLE_SETTINGS_TO_PREFS))
@@ -190,10 +197,15 @@ class Diablo4ConfigHandler(SettingsHandler):
                 "skipped": "Diablo IV LocalPrefs.txt not found",
             }
             if auto_vrr_cap:
+                # Do NOT claim the driver cap "remains the limiter" — we have not
+                # actually read the driver state here, and a no-sync profile may
+                # have intentionally cleared all driver caps. Be explicit that the
+                # in-game cap was not applied and direct the user to verify.
                 notices.append(
                     "Diablo IV LocalPrefs.txt not found; auto_vrr_fps_cap could "
-                    "not be enforced in-game. The NVIDIA driver cap (if enabled) "
-                    "will remain the limiter."
+                    "not be enforced in-game. If your profile also enables "
+                    "nvidia.auto_vrr_fps_cap, the driver cap will limit frames; "
+                    "otherwise frames are uncapped. Verify NVCP/NPI before play."
                 )
             if notices:
                 result["notices"] = notices
@@ -259,6 +271,7 @@ class Diablo4ConfigHandler(SettingsHandler):
         requested = dict(settings)
         auto_refresh = requested.pop(self.AUTO_REFRESH_RATE_KEY, False)
         auto_vrr_cap = requested.pop(self.AUTO_VRR_FPS_CAP_KEY, False)
+        reflex_active = bool(requested.pop("_reflex_active", False))
 
         refresh_hz: float | None = None
         if auto_refresh or auto_vrr_cap:
@@ -276,7 +289,9 @@ class Diablo4ConfigHandler(SettingsHandler):
             from abso.core.vrr import get_vrr_fps_cap
 
             requested["limit_foreground_fps"] = True
-            requested["foreground_fps_limit"] = get_vrr_fps_cap(refresh_hz)
+            requested["foreground_fps_limit"] = get_vrr_fps_cap(
+                refresh_hz, reflex_active=reflex_active,
+            )
 
         for key, target in requested.items():
             current_value = current.get(key)

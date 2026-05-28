@@ -515,32 +515,36 @@ function Get-ApplyFailureMessage {
     return "Backend reported failure without a detailed error message (exit code: $(Get-ExitCodeDescriptor -ExitCode $ExitCode))"
 }
 
-function Test-NeedsNoSyncOsdReminder {
+function Get-SyncTransitionDirection {
+    # Returns one of: "to_no_sync", "to_sync", "" — describing how the user is moving
+    # between profile sync modes. Used to decide whether to nudge the user about
+    # firmware Adaptive Sync state, and which direction.
     param(
         [string]$FromProfileId,
         [string]$ToProfileId
     )
 
     if ([string]::IsNullOrWhiteSpace($FromProfileId) -or [string]::IsNullOrWhiteSpace($ToProfileId)) {
-        return $false
+        return ""
     }
 
     $fromProfile = $script:Profiles[$FromProfileId]
     $toProfile = $script:Profiles[$ToProfileId]
-    if (-not $fromProfile -or -not $toProfile) { return $false }
+    if (-not $fromProfile -or -not $toProfile) { return "" }
 
     $fromSyncMode = if ($fromProfile.SyncMode) { "$($fromProfile.SyncMode)".ToLowerInvariant() } else { "" }
     $toSyncMode = if ($toProfile.SyncMode) { "$($toProfile.SyncMode)".ToLowerInvariant() } else { "" }
     if (($fromSyncMode -eq "on") -and ($toSyncMode -eq "off")) {
-        return $true
+        return "to_no_sync"
+    }
+    if (($fromSyncMode -eq "off") -and ($toSyncMode -eq "on")) {
+        return "to_sync"
     }
 
     $fromText = (($fromProfile.Name, $fromProfile.Sub, $fromProfile.Desc) -join " ").ToLowerInvariant()
     $toText = (($toProfile.Name, $toProfile.Sub, $toProfile.Desc) -join " ").ToLowerInvariant()
 
-    # Treat profile metadata as source of truth:
-    # - sync-on intents should contain explicit ON markers
-    # - no-sync intents should contain explicit OFF/no-sync markers
+    # Fall back to profile metadata text when SyncMode is unset/agnostic.
     $fromSyncOn = (
         $fromText -match "\bg-?sync\s*on\b" -or
         $fromText -match "\bvrr\s*on\b"
@@ -551,8 +555,30 @@ function Test-NeedsNoSyncOsdReminder {
         $toText -match "\bno[-\s]?sync\b" -or
         $toText -match "\bno\s+vrr\b"
     )
+    if ($fromSyncOn -and $toSyncOff) { return "to_no_sync" }
 
-    return ($fromSyncOn -and $toSyncOff)
+    $fromSyncOff = (
+        $fromText -match "\bg-?sync\s*off\b" -or
+        $fromText -match "\bvrr\s*off\b" -or
+        $fromText -match "\bno[-\s]?sync\b" -or
+        $fromText -match "\bno\s+vrr\b"
+    )
+    $toSyncOn = (
+        $toText -match "\bg-?sync\s*on\b" -or
+        $toText -match "\bvrr\s*on\b"
+    )
+    if ($fromSyncOff -and $toSyncOn) { return "to_sync" }
+
+    return ""
+}
+
+function Test-NeedsNoSyncOsdReminder {
+    # Backwards-compatible wrapper — kept so any external/tray callers still resolve.
+    param(
+        [string]$FromProfileId,
+        [string]$ToProfileId
+    )
+    return ((Get-SyncTransitionDirection -FromProfileId $FromProfileId -ToProfileId $ToProfileId) -eq "to_no_sync")
 }
 
 $script:SoundFilesChecked = $false
@@ -2930,34 +2956,54 @@ function Apply-Profile {
                 $toastMetaText = "$requestedProfileId -> $appliedProfileId"
                 Write-TrayLog "Profile fallback applied: requested=$requestedProfileId actual=$appliedProfileId"
             }
-            $needsNoSyncOsdReminder = Test-NeedsNoSyncOsdReminder -FromProfileId $previousProfileId -ToProfileId $appliedProfileId
+            $syncTransition = Get-SyncTransitionDirection -FromProfileId $previousProfileId -ToProfileId $appliedProfileId
+            $needsNoSyncOsdReminder = ($syncTransition -eq "to_no_sync")
 
             $applyWarnings = Get-ApplyWarningMessages -Json $json
             $applyNotices = Get-ApplyNoticeMessages -Json $json
             $applySummaryLevel = Get-ApplySummaryLevel -Json $json
-            # Build the toast body separately from the title. The TITLE is now
-            # the bare profile display name (clean, no parens, no pipes); the
-            # BODY is one human sentence. Warnings/notices append AT MOST one
-            # caveat sentence - the full list goes to the tray log, not the toast.
+            # Build the toast body separately from the title. The TITLE is the bare
+            # profile display name (clean, no parens, no pipes); the BODY is the
+            # applied-profile Sub plus a short caveat list. Caveats are now joined
+            # into a single grammatical sentence with a clear separator so the
+            # downstream sentence-trimmer in _Derive-ToastBody can't accidentally
+            # truncate a multi-caveat message at the first period.
             $toastTitle = $appliedProfile.Name
             $msg = "Applied. $($appliedProfile.Sub)."
             $extras = @()
             if ($json.data.requires_reboot) { $extras += "Restart required to take full effect" }
             if ($fallbackApplied -and $requestedProfileId -ne $appliedProfileId) {
-                $extras += "Used a safe fallback for this display path"
+                $requestedDisplayName = $requestedProfileId
+                if ($script:Profiles.Contains($requestedProfileId)) {
+                    $requestedDisplayName = $script:Profiles[$requestedProfileId].Name
+                }
+                $extras += "Requested '$requestedDisplayName' was unsafe for this display; used safe fallback '$($appliedProfile.Name)'"
             }
             if ($applyWarnings.Count -gt 0) {
                 $label = if ($applySummaryLevel -eq "caution") { "Caution" } else { "Warning" }
                 $extras += ("${label}: " + $applyWarnings[0])
+                if ($applyWarnings.Count -gt 1) {
+                    $extras += ("(+$($applyWarnings.Count - 1) more - see tray log)")
+                }
             }
             if ($applyNotices.Count -gt 0 -and $applyWarnings.Count -eq 0) {
                 $extras += ("Note: " + $applyNotices[0])
+                if ($applyNotices.Count -gt 1) {
+                    $extras += ("(+$($applyNotices.Count - 1) more - see tray log)")
+                }
             }
+            # Compose caveats into a sentence rather than just appending the first.
+            # Each caveat reads as its own clause and ends with a period so any
+            # later concatenation (e.g. DDC/CI confirmation) starts cleanly.
             if ($extras.Count -gt 0) {
-                $msg += " " + ($extras[0])
+                $caveatSentence = ""
+                foreach ($extra in $extras) {
+                    $clean = "$extra".Trim().TrimEnd('.')
+                    if ($caveatSentence) { $caveatSentence += " " }
+                    $caveatSentence += ($clean + ".")
+                }
+                $msg += " " + $caveatSentence
             }
-            $extraCount = ($applyWarnings.Count + $applyNotices.Count) - 1
-            if ($extraCount -gt 0 -and $json.data.requires_reboot) { $extraCount += 0 }
             # Trim trailing whitespace/punctuation drift
             $msg = $msg.Trim()
 
@@ -2990,43 +3036,97 @@ function Apply-Profile {
             Start-Sleep -Milliseconds 500
             Close-ProgressOverlay
 
-            # Suppress OSD reminder if DDC/CI already toggled monitor Adaptive Sync
-            $ddciHandled = $false
-            if ($json.data.applied_settings) {
-                foreach ($line in $json.data.applied_settings) {
-                    if ($line -match "Monitor Adaptive Sync:\s*disabled") {
-                        $ddciHandled = $true
-                        break
+            # Decide whether ABSO already handled monitor firmware Adaptive Sync via DDC/CI.
+            # Preferred signal: the structured `monitor_adaptive_sync_state` field surfaced
+            # by ApplyResult.  Fallback (for older backends or non-apply paths): scan the
+            # NVIDIA handler's granular `handler_applied_details` list for the marker line.
+            # The legacy fallback of scanning top-level `applied_settings` is intentionally
+            # dropped — that list only contains handler class names, not setting lines, so
+            # the suppression never fired and users got stale "go to your OSD" popups even
+            # when ABSO had already disabled Adaptive Sync.
+            $ddciDisabled = $false
+            $ddciEnabled = $false
+            $structuredSyncState = $null
+            if ($json.data -and $null -ne $json.data.monitor_adaptive_sync_state) {
+                $structuredSyncState = "$($json.data.monitor_adaptive_sync_state)".ToLowerInvariant()
+            }
+            if ($structuredSyncState -eq "disabled") { $ddciDisabled = $true }
+            elseif ($structuredSyncState -eq "enabled") { $ddciEnabled = $true }
+            else {
+                # Fallback: scan the NVIDIA handler's granular applied lines if the
+                # structured field is missing (e.g., reapply path, older backend build).
+                $nvidiaApplied = $null
+                if ($json.data -and $json.data.handler_applied_details) {
+                    $nvidiaApplied = $json.data.handler_applied_details.NvidiaSettingsHandler
+                }
+                if ($nvidiaApplied) {
+                    foreach ($line in $nvidiaApplied) {
+                        if ($line -match "Monitor Adaptive Sync:\s*disabled") { $ddciDisabled = $true; break }
+                        if ($line -match "Monitor Adaptive Sync:\s*enabled")  { $ddciEnabled  = $true; break }
                     }
                 }
             }
 
-            if ($needsNoSyncOsdReminder -and -not $ddciHandled) {
-                $msg = "Applied. Turn OFF Adaptive Sync/FreeSync in monitor OSD for strict No-Sync mode."
+            # All branches keep the carefully composed $msg (profile Sub + caveat sentences)
+            # so reboot warnings, fallback notes, and apply warnings never get dropped just
+            # because a sync-mode transition or DDC/CI signal also triggered a popup.  We
+            # APPEND a Sync-Mode clause to $msg rather than overwriting it, and we ensure
+            # the append always starts after a clean sentence boundary.
+            $msg = $msg.TrimEnd()
+            if ($msg -and $msg[-1] -notin @('.', '!', '?')) { $msg += "." }
+
+            if ($needsNoSyncOsdReminder -and -not $ddciDisabled) {
+                # DDC/CI did not (or could not) disable the monitor's firmware Adaptive Sync,
+                # so the user still has to touch the OSD. Keep the rest of the context but
+                # prepend the OSD action so it leads visually.
+                $msg = "Turn OFF Adaptive Sync/FreeSync in your monitor OSD for strict No-Sync mode. " + $msg
                 Play-VrrWarningSound
                 Write-TrayLog "No-Sync OSD reminder shown for transition: $previousProfileId -> $appliedProfileId"
                 Play-ApplySuccessIconAnimation
-                Show-ThemedToast -Title $toastTitle -Message $msg -Type "Warning" -Duration 6000 -MetaText $toastMetaText
+                Show-ThemedToast -Title $toastTitle -Message $msg -Type "Warning" -Duration 6000 -MetaText $toastMetaText -BypassDedup
+            }
+            elseif ($needsNoSyncOsdReminder -and $ddciDisabled) {
+                # ABSO already disabled monitor Adaptive Sync via DDC/CI — give the user
+                # a low-key confirmation instead of the stale "go into your OSD" warning.
+                $msg += " ABSO turned OFF monitor Adaptive Sync via DDC/CI."
+                Write-TrayLog "Monitor Adaptive Sync auto-disabled via DDC/CI for: $previousProfileId -> $appliedProfileId"
+                Play-SuccessSound
+                Play-ApplySuccessIconAnimation
+                Show-ThemedToast -Title $toastTitle -Message $msg -Type "Success" -Duration 5000 -MetaText $toastMetaText -BypassDedup
+            }
+            elseif ($syncTransition -eq "to_sync" -and $ddciEnabled) {
+                # Symmetric feedback: tell the user ABSO re-enabled their firmware Adaptive
+                # Sync so they aren't left wondering whether they need to touch the OSD.
+                $msg += " ABSO turned ON monitor Adaptive Sync via DDC/CI."
+                Write-TrayLog "Monitor Adaptive Sync auto-enabled via DDC/CI for: $previousProfileId -> $appliedProfileId"
+                Play-SuccessSound
+                Play-ApplySuccessIconAnimation
+                Show-ThemedToast -Title $toastTitle -Message $msg -Type "Success" -Duration 5000 -MetaText $toastMetaText -BypassDedup
             }
             elseif ($applySummaryLevel -eq "warning") {
-                Play-SuccessSound
+                # Apply succeeded but a real (non-soft) warning was raised. Use the warning
+                # sound + amber toast so the user actually realizes something needs attention.
+                Play-VrrWarningSound
                 Play-ApplySuccessIconAnimation
-                Show-ThemedToast -Title $toastTitle -Message $msg -Type "Warning" -Duration 6000 -MetaText $toastMetaText
+                Show-ThemedToast -Title $toastTitle -Message $msg -Type "Warning" -Duration 6000 -MetaText $toastMetaText -BypassDedup
             }
             elseif ($applySummaryLevel -eq "caution") {
+                # Soft environmental warnings (mixed refresh, MPO glitch risk, etc.).
+                # Render as a Warning-toned toast (amber), not green Success — the user
+                # should still notice the caveat without it shouting "error".
                 Play-SuccessSound
                 Play-ApplySuccessIconAnimation
-                Show-ThemedToast -Title $toastTitle -Message $msg -Type "Success" -Duration 6000 -MetaText $toastMetaText
+                Show-ThemedToast -Title $toastTitle -Message $msg -Type "Warning" -Duration 6000 -MetaText $toastMetaText -BypassDedup
             }
             elseif ($applyNotices.Count -gt 0) {
                 Play-SuccessSound
                 Play-ApplySuccessIconAnimation
-                Show-ThemedToast -Title $toastTitle -Message $msg -Type "Success" -Duration 6000 -MetaText $toastMetaText
+                Show-ThemedToast -Title $toastTitle -Message $msg -Type "Success" -Duration 6000 -MetaText $toastMetaText -BypassDedup
             }
             else {
                 Play-SuccessSound
                 Play-ApplySuccessIconAnimation
-                Show-ThemedToast -Title $toastTitle -Message $msg -Type "Success" -MetaText $toastMetaText
+                Show-ThemedToast -Title $toastTitle -Message $msg -Type "Success" -MetaText $toastMetaText -BypassDedup
             }
 
             $script:activeProfile = $appliedProfileId
@@ -3064,7 +3164,12 @@ function Apply-Profile {
             }
             Set-IconState -State "Error"
             $notifyType = if ($isVrrPrereqError) { "Warning" } else { "Error" }
-            Show-Notification -Title "A.B.S.O." -Message "Failed: $err" -Type $notifyType
+            # Use the profile name as the toast title so the popup carries enough
+            # context for the user (otherwise _Derive-ToastTitle reduces the generic
+            # "A.B.S.O." prefix down to the first message segment, leaving titles
+            # like "Failed" with no clue which profile failed to apply).
+            $failureTitle = if ($profile -and $profile.Name) { $profile.Name } else { "A.B.S.O." }
+            Show-Notification -Title $failureTitle -Message "Failed: $err" -Type $notifyType
             $script:LastAction = "Failed: $err"
             $script:LastActionTime = Get-Date -Format "HH:mm"
             Update-MenuState
@@ -3075,7 +3180,8 @@ function Apply-Profile {
         Close-ProgressOverlay
         Play-FailSound
         Set-IconState -State "Error"
-        Show-Notification -Title "A.B.S.O." -Message "Error: $($_.Exception.Message)" -Type "Error"
+        $exceptionTitle = if ($profile -and $profile.Name) { $profile.Name } else { "A.B.S.O." }
+        Show-Notification -Title $exceptionTitle -Message "Error: $($_.Exception.Message)" -Type "Error"
         $script:LastAction = "Error: $($_.Exception.Message)"
         $script:LastActionTime = Get-Date -Format "HH:mm"
         Update-MenuState
@@ -3278,7 +3384,7 @@ function Restore-Settings {
 
         if ($exitCodeOk -and $json.success -and $json.data -and $json.data.success) {
             Close-ProgressOverlay
-            Show-Notification -Title "A.B.S.O." -Message "Settings restored" -Type "Info"
+            Show-Notification -Title "A.B.S.O." -Message "Settings restored" -Type "Success"
             $script:activeProfile = $null
             Reset-ActiveProfileVerificationState
             $script:LastAction = "Restored settings"
@@ -3518,7 +3624,7 @@ function Run-Audit {
                 $script:AuditIssueCount = $issueCount
 
                 if ($issueCount -eq 0) {
-                    Show-Notification -Title "A.B.S.O. Audit" -Message "No issues detected by the current audit scope." -Type "Info"
+                    Show-Notification -Title "A.B.S.O. Audit" -Message "No issues detected by the current audit scope." -Type "Success"
                     Set-IconState -State $(if ($script:activeProfile) { "Active" } else { "Idle" })
                 }
                 else {
@@ -5025,7 +5131,7 @@ public class HotkeyMessageWindow : NativeWindow {
                     $count = $result.sent_count
                     if (-not $count) { $count = 0 }
                     Show-Notification -Title "A.B.S.O." `
-                        -Message "Display pipeline reset ($count combo(s) sent)" -Type "Info"
+                        -Message "Display pipeline reset ($count combo(s) sent)" -Type "Success"
                 }
                 elseif ($null -eq $j) {
                     Write-TrayLog "Reset Display: CLI produced unparseable JSON" -Level "ERROR"
@@ -5160,7 +5266,7 @@ public class HotkeyMessageWindow : NativeWindow {
     $refreshProfilesItem.Add_Click({
         try {
             Initialize-ProfilesFromCliCatalog
-            Show-Notification -Title "A.B.S.O." -Message "Profiles refreshed ($($script:Profiles.Count) profiles loaded)" -Type "Info"
+            Show-Notification -Title "A.B.S.O." -Message "Profiles refreshed ($($script:Profiles.Count) profiles loaded)" -Type "Success"
             Write-TrayLog "Profiles refreshed via menu ($($script:Profiles.Count) profiles)"
         }
         catch {

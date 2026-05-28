@@ -111,8 +111,8 @@ class _DeadlockBaseProfile(ReflexShooterBaseProfile):
             {
                 "category": "Display",
                 "setting": "NVIDIA Reflex Low Latency",
-                "value": "On + Boost (must be enabled manually in-game)",
-                "reason": "Deadlock supports Reflex in its video settings. ABSO does not write the Source 2 video config; the in-game toggle has to be flipped manually. ABSO keeps driver LLM off so Reflex owns render-queue control.",
+                "value": "On + Boost — ABSO already set driver LLM off; flip the in-game toggle to finish",
+                "reason": "ABSO has already configured the driver side: NVIDIA LLM is OFF so the engine owns the render queue (Reflex's correct path). The Source 2 video config is owned by the game and cannot be written from outside; toggle 'NVIDIA Reflex Low Latency' to 'On + Boost' in Deadlock's Video settings once to finish setup.",
             },
             {
                 "category": "Display",
@@ -160,8 +160,8 @@ class _DeadlockBaseProfile(ReflexShooterBaseProfile):
             {
                 "category": "Display",
                 "setting": "NVIDIA Reflex Low Latency",
-                "value": "On + Boost (must be enabled manually in-game)",
-                "reason": "Deadlock supports Reflex in its video settings. ABSO does not write the Source 2 video config; the in-game toggle has to be flipped manually. ABSO keeps driver LLM off so Reflex owns render-queue control.",
+                "value": "On + Boost — ABSO already set driver LLM off; flip the in-game toggle to finish",
+                "reason": "ABSO has already configured the driver side: NVIDIA LLM is OFF so the engine owns the render queue (Reflex's correct path). The Source 2 video config is owned by the game and cannot be written from outside; toggle 'NVIDIA Reflex Low Latency' to 'On + Boost' in Deadlock's Video settings once to finish setup.",
             },
             {
                 "category": "Display",

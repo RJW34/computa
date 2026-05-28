@@ -284,6 +284,39 @@ class CapabilityEngine:
             )
             return None
 
+    def _ddci_enabled(self) -> bool:
+        """Return True when DDC/CI Adaptive Sync control is opted-in in abso.yaml.
+
+        Capability messages use this to avoid telling the user to "go into your
+        monitor OSD and enable Adaptive Sync" when ABSO will toggle it via
+        DDC/CI during apply.
+        """
+        try:
+            from abso.core.config import get_config
+            return bool(get_config().ddci.enabled)
+        except Exception:  # noqa: BLE001 — config errors must not break capability eval
+            return False
+
+    def _osd_step_text(self, action: str) -> str:
+        """Phrase the OSD step so it acknowledges DDC/CI when enabled.
+
+        ``action`` is "enable" or "verify". DDC/CI-enabled boxes get a softer
+        "if needed" phrasing because ABSO will run the firmware toggle itself.
+        """
+        if self._ddci_enabled():
+            if action == "enable":
+                return (
+                    "ABSO will toggle monitor Adaptive Sync via DDC/CI on apply; "
+                    "only touch the OSD if that fails"
+                )
+            return (
+                "ABSO manages monitor Adaptive Sync via DDC/CI; "
+                "only check the OSD if you still see tearing"
+            )
+        if action == "enable":
+            return "Enable monitor Adaptive Sync/FreeSync in OSD"
+        return "Verify Adaptive Sync/FreeSync is enabled in your monitor OSD"
+
     def _check_vrr_requirements(
         self,
         profile: BaseProfile,
@@ -300,7 +333,7 @@ class CapabilityEngine:
                     severity="blocker",
                     message=(
                         "Cannot confirm VRR/G-SYNC support because no monitors were detected. "
-                        "Enable monitor Adaptive Sync/FreeSync in OSD, enable G-SYNC in NVIDIA Control Panel, then retry."
+                        f"{self._osd_step_text('enable')}, enable G-SYNC in NVIDIA Control Panel, then retry."
                     ),
                 )
             )
@@ -314,7 +347,7 @@ class CapabilityEngine:
                     severity="blocker",
                     message=(
                         "Cannot confirm VRR/G-SYNC support because no monitors were detected. "
-                        "Enable monitor Adaptive Sync/FreeSync in OSD, enable G-SYNC in NVIDIA Control Panel, then retry."
+                        f"{self._osd_step_text('enable')}, enable G-SYNC in NVIDIA Control Panel, then retry."
                     ),
                 )
             )
@@ -336,8 +369,7 @@ class CapabilityEngine:
                     severity="info",
                     message=(
                         f"VRR support detected as likely on target gaming display '{target_name}'. "
-                        "Profile will enable G-SYNC. If you experience issues, "
-                        "verify Adaptive Sync/FreeSync is enabled in your monitor OSD."
+                        f"Profile will enable G-SYNC. If you experience issues, {self._osd_step_text('verify').lower()}."
                     ),
                 )
             )
@@ -360,7 +392,7 @@ class CapabilityEngine:
                 severity="blocker",
                 message=(
                     f"Target gaming display '{target_name}' does not report confirmed VRR/G-SYNC support. "
-                    "Turn on Adaptive Sync/FreeSync in that monitor's OSD, make sure it is the gaming display, "
+                    f"{self._osd_step_text('enable')} on that display, make sure it is the gaming display, "
                     "enable G-SYNC in NVIDIA Control Panel, then retry."
                 ),
                 details=details,

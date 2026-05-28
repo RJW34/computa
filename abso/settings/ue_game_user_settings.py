@@ -267,18 +267,24 @@ class UEGameUserSettingsHandler(SettingsHandler):
             return False
 
     def _apply_auto_vrr_cap(self, settings: dict[str, Any]) -> None:
+        # Pop the applier-injected Reflex flag so it routes the cap policy but
+        # never reaches the UE INI writer as a phantom setting key.
+        reflex_active = bool(settings.pop("_reflex_active", False))
         try:
             from abso.core.vrr import get_vrr_fps_cap
             from abso.settings.nvidia import NvidiaSettingsHandler
 
             refresh_hz = NvidiaSettingsHandler()._detect_primary_refresh_rate()
             if refresh_hz and refresh_hz > 0:
-                settings["frame_rate_limit"] = get_vrr_fps_cap(refresh_hz)
+                settings["frame_rate_limit"] = get_vrr_fps_cap(
+                    refresh_hz, reflex_active=reflex_active,
+                )
                 logger.info(
-                    "%s auto VRR FPS cap: %d (from %d Hz)",
+                    "%s auto VRR FPS cap: %d (from %d Hz, reflex_active=%s)",
                     self.__class__.__name__,
                     settings["frame_rate_limit"],
                     refresh_hz,
+                    reflex_active,
                 )
         except Exception as e:
             logger.warning("%s auto VRR FPS cap detection failed: %s", self.__class__.__name__, e)

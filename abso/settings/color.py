@@ -406,8 +406,12 @@ class ColorProfileSettingsHandler(SettingsHandler):
         # --- OSD Guidance ---
         if settings.get("show_osd_guidance", False):
             game_type = settings.get("game_type", "competitive_fps")
+            # The active profile's sync mode lets us filter contradicting recs (e.g. don't
+            # show "Adaptive-Sync: On" on no-sync profiles).  Caller threads it through
+            # the settings dict; missing/agnostic values mean "show all sync-tagged recs".
+            sync_mode = settings.get("sync_mode")
             try:
-                self._show_osd_guidance(game_type)
+                self._show_osd_guidance(game_type, sync_mode=sync_mode)
             except Exception as e:
                 logger.debug(f"OSD guidance display failed: {e}")
 
@@ -1169,8 +1173,16 @@ class ColorProfileSettingsHandler(SettingsHandler):
     # Monitor OSD Guidance
     # =========================================================================
 
-    def _show_osd_guidance(self, game_type: str) -> None:
-        """Show monitor OSD recommendations if not previously acknowledged."""
+    def _show_osd_guidance(self, game_type: str, sync_mode: str | None = None) -> None:
+        """Show monitor OSD recommendations if not previously acknowledged.
+
+        ``sync_mode`` ("on" / "off" / "agnostic" / None) is forwarded to the OSD
+        lookup so sync-tagged recs (e.g. "Adaptive-Sync: On") are dropped when
+        the active profile disagrees.  We also derive ``suppressed_kinds`` from
+        the user's ``color.manage_vibrance`` / ``color.manage_icc`` preferences
+        so that opt-out users don't see OSD hints about knobs ABSO would never
+        touch on their behalf.
+        """
         monitor_info = self._get_primary_monitor_info()
         if not monitor_info:
             return
@@ -1184,7 +1196,24 @@ class ColorProfileSettingsHandler(SettingsHandler):
             logger.debug("Monitor OSD data module not available")
             return
 
-        result = get_osd_recommendations(monitor_id, game_type)
+        suppressed: list[str] = []
+        try:
+            from abso.core.config import get_config
+
+            color_cfg = get_config().color
+            if not color_cfg.manage_vibrance:
+                suppressed.append("vibrance")
+            if not color_cfg.manage_icc:
+                suppressed.append("icc")
+        except Exception:  # noqa: BLE001 — config errors must not block guidance
+            pass
+
+        result = get_osd_recommendations(
+            monitor_id,
+            game_type,
+            sync_mode=sync_mode,
+            suppressed_kinds=tuple(suppressed),
+        )
         if result is None:
             return
 

@@ -325,6 +325,9 @@ class NvidiaSettingsHandler(SettingsHandler):
         errors: list[str] = []
         warnings: list[str] = []
         notices: list[str] = []
+        # Structured signal so callers (applier / tray) don't have to grep the `applied` lines
+        # for the "Monitor Adaptive Sync: ..." string. None means we never touched it.
+        monitor_adaptive_sync_state: str | None = None
 
         executables = list(requested["executables"] or [])
         game_name = str(requested["game_name"] or "Game")
@@ -336,9 +339,13 @@ class NvidiaSettingsHandler(SettingsHandler):
             requested["allow_unverified_existing_profile_reuse"]
         )
 
-        # Optional auto-cap for VRR profiles (refresh - 3)
+        # Optional auto-cap for VRR profiles. Policy is Reflex-aware: the applier
+        # injects `_reflex_active` based on the active profile's `requires_reflex`
+        # property so Reflex-enabled paths get a looser static cap (refresh - 3)
+        # and non-Reflex paths get the conservative scaled margin.
         auto_vrr_fps_cap = bool(requested["auto_vrr_fps_cap"])
         forced_refresh_hz = requested["forced_refresh_hz"]
+        reflex_active = bool(settings.get("_reflex_active", False))
         if auto_vrr_fps_cap:
             refresh_hz: int | None = None
             if forced_refresh_hz is not None:
@@ -350,11 +357,13 @@ class NvidiaSettingsHandler(SettingsHandler):
             if refresh_hz and refresh_hz > 0:
                 from abso.core.vrr import get_vrr_fps_cap
 
-                auto_cap = get_vrr_fps_cap(refresh_hz)
+                auto_cap = get_vrr_fps_cap(refresh_hz, reflex_active=reflex_active)
                 settings["max_frame_rate"] = auto_cap
-                applied.append(f"Auto VRR FPS cap: {auto_cap} (from {refresh_hz} Hz)")
+                policy_note = " [Reflex-aware]" if reflex_active else ""
+                applied.append(f"Auto VRR FPS cap: {auto_cap} (from {refresh_hz} Hz){policy_note}")
                 logger.info(
-                    f"Auto VRR FPS cap enabled for {game_name}: refresh={refresh_hz}Hz cap={auto_cap}"
+                    f"Auto VRR FPS cap enabled for {game_name}: "
+                    f"refresh={refresh_hz}Hz cap={auto_cap} reflex_active={reflex_active}"
                 )
             else:
                 applied.append(
@@ -486,6 +495,7 @@ class NvidiaSettingsHandler(SettingsHandler):
                             if sync_result["success"]:
                                 state = "enabled" if enable_adaptive else "disabled"
                                 applied.append(f"Monitor Adaptive Sync: {state}")
+                                monitor_adaptive_sync_state = state
                                 logger.info(f"Monitor Adaptive Sync {state}")
                             elif sync_result.get("error"):
                                 logger.warning(
@@ -564,10 +574,18 @@ class NvidiaSettingsHandler(SettingsHandler):
                     elif note:
                         warnings.append(f"NVIDIA app binding requires manual action: {note}")
 
-                    # If NPI was launched, add a clear message
+                    # If NPI was launched, surface a message that does NOT overstate
+                    # the work remaining. The profile settings ARE written to the
+                    # target driver profile; only the per-EXE association is missing.
+                    # Saying "ACTION REQUIRED" with no qualifier read as "your apply
+                    # failed", which is wrong.
                     if result.get("npi_launched"):
                         npi_launched = True
-                        applied.append("ACTION REQUIRED: NPI opened - add the app(s) to the profile and click Apply")
+                        applied.append(
+                            "NVIDIA settings applied. Final step: NPI opened — "
+                            "add the executable(s) to this profile and click "
+                            "Apply to finish the per-EXE binding."
+                        )
                 else:
                     app_bound = True
                     npi_launched = bool(result.get("npi_launched", False))
@@ -612,6 +630,7 @@ class NvidiaSettingsHandler(SettingsHandler):
                 "notices": notices,
                 "app_bound": app_bound,
                 "npi_launched": npi_launched,
+                "monitor_adaptive_sync_state": monitor_adaptive_sync_state,
                 "global_verification_failures": global_verification_failures if global_verification_failures else None,
                 "verification_failures": verification_failures if verification_failures else None,
             }
@@ -742,6 +761,9 @@ class NvidiaSettingsHandler(SettingsHandler):
 
         auto_vrr_fps_cap = bool(settings.pop("auto_vrr_fps_cap", False))
         forced_refresh_hz = settings.pop("vrr_refresh_rate_hz", None)
+        # Read the Reflex flag injected by the applier so verify computes
+        # the same cap apply did. Pop so it doesn't leak into DRS readback keys.
+        reflex_active = bool(settings.pop("_reflex_active", False))
         if auto_vrr_fps_cap:
             refresh_hz: int | None = None
             if forced_refresh_hz is not None:
@@ -753,7 +775,9 @@ class NvidiaSettingsHandler(SettingsHandler):
             if refresh_hz and refresh_hz > 0:
                 from abso.core.vrr import get_vrr_fps_cap
 
-                settings["max_frame_rate"] = get_vrr_fps_cap(refresh_hz)
+                settings["max_frame_rate"] = get_vrr_fps_cap(
+                    refresh_hz, reflex_active=reflex_active,
+                )
 
         preset_name = settings.get("preset")
         allowed_keys = (

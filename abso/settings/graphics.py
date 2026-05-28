@@ -228,6 +228,24 @@ class GraphicsSettingsHandler(SettingsHandler):
         if "disable_mpo" in settings:
             target = settings["disable_mpo"]
             is_active = current.get("mpo_disabled") == target
+            # Determine whether a reboot is still pending so we can caveat the
+            # "registry written" state with "but compositor commit not yet live".
+            # The reboot_pending bit in settings (threaded from the caller, e.g.
+            # the applier) is the authoritative signal. Fall back to reading the
+            # LocalAppData state file directly when nothing was threaded in.
+            reboot_pending: bool
+            if "_reboot_pending" in settings:
+                reboot_pending = bool(settings.get("_reboot_pending"))
+            else:
+                try:
+                    from abso.core.app_paths import app_state_file
+                    from abso.core.state_store import read_state_snapshot
+
+                    state_snapshot = read_state_snapshot([app_state_file()])
+                    reboot_pending = bool(state_snapshot.get("reboot_pending", False))
+                except Exception:  # noqa: BLE001 — state read must never break verify
+                    reboot_pending = False
+
             results["settings"]["mpo_disabled"] = {
                 "target": target,
                 "current": current.get("mpo_disabled"),
@@ -236,10 +254,15 @@ class GraphicsSettingsHandler(SettingsHandler):
                 "activation": "after_reboot",
                 "registry_target_written": is_active,
                 "live_activation_verifiable": False,
+                "live_commit_pending": bool(is_active and reboot_pending),
                 "next_action": (
                     "reboot_to_commit_live_compositor"
-                    if is_active
-                    else "run_elevated_apply_to_write_registry"
+                    if is_active and reboot_pending
+                    else (
+                        "no_action_required"
+                        if is_active
+                        else "run_elevated_apply_to_write_registry"
+                    )
                 ),
                 "note": (
                     "This verifies the MPO registry target only. If current does "
@@ -251,6 +274,13 @@ class GraphicsSettingsHandler(SettingsHandler):
             }
             if not is_active:
                 results.setdefault("pending_apply_settings", []).append("mpo_disabled")
+                results["all_active"] = False
+            elif reboot_pending:
+                # Registry target is written but live compositor commit is reboot-gated
+                # and the system state still says a reboot is pending. Surface this so
+                # the CLI/tray/state command renders the pending-reboot caveat instead
+                # of falsely reporting the setting as fully active.
+                results.setdefault("pending_reboot_gated_settings", []).append("mpo_disabled")
                 results["all_active"] = False
 
         return results

@@ -6,6 +6,7 @@ import pytest
 
 from abso.core.vrr import (
     VRR_FPS_CAPS,
+    VRR_FPS_CAPS_REFLEX,
     FrameLimiterType,
     GraphicsAPI,
     get_best_ingame_preset,
@@ -28,11 +29,11 @@ class TestVRRFPSCap:
         assert get_vrr_fps_cap(165) == 162
 
     def test_get_vrr_fps_cap_high_refresh_uses_scaled_margin(self):
-        """For 200Hz+, margin scales (Blur Busters 2026 guidance).
+        """For 200Hz+ non-Reflex paths, margin scales (Blur Busters 2026).
 
-        At high refresh the legacy -3 rule is too tight; frame-time variance
-        can briefly hit the ceiling. Modern guidance uses 3-5% margin so
-        VRR stays engaged.
+        At high refresh the legacy -3 rule is too tight for non-Reflex games;
+        frame-time variance can briefly hit the ceiling. Modern guidance uses
+        3-5% margin so VRR stays engaged.
         """
         assert get_vrr_fps_cap(240) == 233  # was 237, now refresh * 0.97
         assert get_vrr_fps_cap(280) == 272  # was 277, now refresh * 0.97
@@ -40,8 +41,28 @@ class TestVRRFPSCap:
         assert get_vrr_fps_cap(360) == 342  # was 357, now refresh * 0.95
         assert get_vrr_fps_cap(480) == 456  # was 477, now refresh * 0.95
 
+    def test_get_vrr_fps_cap_reflex_active_uses_minus_three_across_range(self):
+        """Reflex-active paths use refresh - 3 even at high refresh.
+
+        With NVIDIA Reflex in the render loop, the engine's dynamic cap is the
+        latency control. The static cap is only the V-SYNC safety boundary, so
+        the 3-fps headroom is sufficient.
+        """
+        assert get_vrr_fps_cap(60, reflex_active=True) == 57
+        assert get_vrr_fps_cap(144, reflex_active=True) == 141
+        assert get_vrr_fps_cap(240, reflex_active=True) == 237
+        assert get_vrr_fps_cap(300, reflex_active=True) == 297
+        assert get_vrr_fps_cap(360, reflex_active=True) == 357
+        assert get_vrr_fps_cap(480, reflex_active=True) == 477
+
+    def test_get_vrr_fps_cap_reflex_fallback_for_unlisted_rates(self):
+        """Non-preset refresh rates fall through to refresh - 3 on Reflex paths."""
+        assert get_vrr_fps_cap(220, reflex_active=True) == 217
+        assert get_vrr_fps_cap(330, reflex_active=True) == 327
+        assert get_vrr_fps_cap(540, reflex_active=True) == 537
+
     def test_get_vrr_fps_cap_fallback_calculation(self):
-        """Non-preset values fall through to the scaled formula."""
+        """Non-preset values fall through to the scaled formula (non-Reflex)."""
         # Below 200Hz still uses refresh - 3
         assert get_vrr_fps_cap(85) == 82
         assert get_vrr_fps_cap(155) == 152
@@ -52,12 +73,25 @@ class TestVRRFPSCap:
         assert get_vrr_fps_cap(320) == round(320 * 0.95)  # 304
         assert get_vrr_fps_cap(540) == round(540 * 0.95)  # 513
 
+    def test_get_vrr_fps_cap_reflex_default_is_off(self):
+        """Default behavior (no reflex_active arg) is the conservative cap."""
+        # Identical results without the kwarg confirms backwards compat.
+        assert get_vrr_fps_cap(300) == 285
+        assert get_vrr_fps_cap(300, reflex_active=False) == 285
+
     def test_vrr_fps_caps_dict_has_common_values(self):
         """Test that VRR_FPS_CAPS contains expected presets."""
         assert 60 in VRR_FPS_CAPS
         assert 144 in VRR_FPS_CAPS
         assert 240 in VRR_FPS_CAPS
         assert 360 in VRR_FPS_CAPS
+
+    def test_vrr_fps_caps_reflex_dict_has_common_values(self):
+        """VRR_FPS_CAPS_REFLEX mirrors the conservative table at same refresh rates."""
+        assert VRR_FPS_CAPS_REFLEX[300] == 297
+        assert VRR_FPS_CAPS_REFLEX[240] == 237
+        # Sub-200 values match the conservative table (refresh - 3 in both).
+        assert VRR_FPS_CAPS_REFLEX[144] == VRR_FPS_CAPS[144] == 141
 
 
 class TestBestInGamePreset:

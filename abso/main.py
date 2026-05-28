@@ -324,6 +324,8 @@ def _build_same_profile_apply_noop_payload(
         "in_game_settings": False,
         "error": None,
         "applied_settings": [],
+        "handler_applied_details": {},
+        "monitor_adaptive_sync_state": None,
         "failed_settings": [],
         "warnings": [],
         "notices": [notice],
@@ -379,6 +381,8 @@ def _build_pending_apply_as_apply_payload(
         "in_game_settings": False,
         "error": pending_result.get("error"),
         "applied_settings": [],
+        "handler_applied_details": {},
+        "monitor_adaptive_sync_state": None,
         "failed_settings": [],
         "warnings": warnings,
         "notices": notices,
@@ -1122,6 +1126,12 @@ def apply(
                     "in_game_settings": result.in_game_settings if result else False,
                     "error": tx.error if not tx.success else None,
                     "applied_settings": applied_settings,
+                    "handler_applied_details": (
+                        result.handler_applied_details if result else {}
+                    ),
+                    "monitor_adaptive_sync_state": (
+                        result.monitor_adaptive_sync_state if result else None
+                    ),
                     "failed_settings": failed_settings,
                     "warnings": apply_warnings,
                     "notices": apply_notices,

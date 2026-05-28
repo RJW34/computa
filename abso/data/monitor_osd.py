@@ -21,11 +21,24 @@ logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class OSDRecommendation:
-    """A single monitor OSD setting recommendation."""
+    """A single monitor OSD setting recommendation.
+
+    Optional metadata lets the lookup filter out recommendations that the
+    user's active context contradicts:
+
+    * ``applies_to_sync_modes`` — restrict to {"on", "off"}; when empty/None
+      the recommendation is shown regardless of the profile's sync mode.
+    * ``setting_kind`` — coarse tag for the kind of OSD knob this is
+      (``"vibrance"``, ``"icc"``, ``"sync"``, ``"other"``). Lets the color
+      handler suppress vibrance/ICC hints when the user has opted out of
+      ABSO managing those.
+    """
 
     setting: str   # OSD menu item name
     value: str     # Recommended value
     reason: str    # Why this matters
+    applies_to_sync_modes: tuple[str, ...] = ()
+    setting_kind: str = "other"
 
 
 @dataclass(frozen=True)
@@ -59,6 +72,7 @@ _BUILTIN_MONITOR_DB: list[MonitorOSDProfile] = [
                     setting="Color Gamut (SDR only)",
                     value="Use 'sRGB' picture mode, or stay on 'Game Optimizer' and lower digital vibrance",
                     reason="OLED native gamut is DCI-P3. SDR games output sRGB; the wider gamut causes oversaturation. Switch to 'sRGB' mode for accurate colors (some settings restricted), or compensate via digital vibrance if you need Game Optimizer's lowest input lag.",
+                    setting_kind="vibrance",
                 ),
                 OSDRecommendation(
                     setting="Black Stabilizer",
@@ -74,6 +88,15 @@ _BUILTIN_MONITOR_DB: list[MonitorOSDProfile] = [
                     setting="Adaptive-Sync",
                     value="On",
                     reason="Enable G-Sync Compatible for tear-free gaming.",
+                    applies_to_sync_modes=("on",),
+                    setting_kind="sync",
+                ),
+                OSDRecommendation(
+                    setting="Adaptive-Sync",
+                    value="Off",
+                    reason="No-sync competitive profiles want strict OFF to avoid VRR scan-out adding input lag.",
+                    applies_to_sync_modes=("off",),
+                    setting_kind="sync",
                 ),
                 OSDRecommendation(
                     setting="OLED Pixel Care → Screen Move",
@@ -167,6 +190,15 @@ _BUILTIN_MONITOR_DB: list[MonitorOSDProfile] = [
                     setting="FreeSync",
                     value="On",
                     reason="Enable G-Sync Compatible mode for tear-free gaming.",
+                    applies_to_sync_modes=("on",),
+                    setting_kind="sync",
+                ),
+                OSDRecommendation(
+                    setting="FreeSync",
+                    value="Off",
+                    reason="No-sync competitive profiles want strict OFF to avoid VRR scan-out adding input lag.",
+                    applies_to_sync_modes=("off",),
+                    setting_kind="sync",
                 ),
             ],
         },
@@ -185,14 +217,25 @@ def _parse_monitor_entry(data: dict) -> MonitorOSDProfile:
     """Convert a YAML monitor dict into a MonitorOSDProfile."""
     recommendations: dict[str, list[OSDRecommendation]] = {}
     for game_type, recs in data.get("recommendations", {}).items():
-        recommendations[game_type] = [
-            OSDRecommendation(
-                setting=r["setting"],
-                value=r["value"],
-                reason=r["reason"],
+        parsed: list[OSDRecommendation] = []
+        for r in recs:
+            raw_sync = r.get("applies_to_sync_modes") or ()
+            if isinstance(raw_sync, str):
+                raw_sync = (raw_sync,)
+            sync_modes = tuple(
+                str(s).lower() for s in raw_sync
+                if str(s).lower() in {"on", "off"}
             )
-            for r in recs
-        ]
+            parsed.append(
+                OSDRecommendation(
+                    setting=r["setting"],
+                    value=r["value"],
+                    reason=r["reason"],
+                    applies_to_sync_modes=sync_modes,
+                    setting_kind=str(r.get("setting_kind", "other")).lower(),
+                )
+            )
+        recommendations[game_type] = parsed
     return MonitorOSDProfile(
         model_pattern=data["model_pattern"],
         display_name=data["display_name"],
@@ -250,18 +293,33 @@ def _get_monitor_db() -> list[MonitorOSDProfile]:
 def get_osd_recommendations(
     monitor_id: str,
     game_type: str,
+    sync_mode: str | None = None,
+    suppressed_kinds: tuple[str, ...] = (),
 ) -> tuple[str, list[OSDRecommendation]] | None:
     """Look up OSD recommendations for a monitor + game type.
 
     Args:
         monitor_id: Monitor device ID string from Windows (e.g. "MONITOR\\GSM7847\\...")
         game_type: One of "competitive_fps", "cinematic", "emulator", "productivity"
+        sync_mode: Active profile sync mode — "on" / "off" / "agnostic" / None.
+            Recommendations tagged with ``applies_to_sync_modes`` are filtered
+            to entries that match this value. Untagged entries pass through.
+        suppressed_kinds: Iterable of ``setting_kind`` values to drop entirely.
+            Used by the color handler to hide "lower digital vibrance" OSD
+            hints when the user has set ``color.manage_vibrance: false`` in
+            their config (because ABSO will never touch DV in that case, and
+            telling them to does not match what ABSO actually does).
 
     Returns:
         Tuple of (display_name, recommendations) or None if no match found.
+        Returns None if filtering removed every recommendation for this
+        combination (since showing an empty list to the user is noise).
     """
     if not monitor_id:
         return None
+
+    normalized_sync = (sync_mode or "").lower()
+    suppressed = {str(k).lower() for k in suppressed_kinds}
 
     # Normalize for matching
     normalized = monitor_id.upper().replace("/", "\\")
@@ -269,8 +327,22 @@ def get_osd_recommendations(
     for profile in _get_monitor_db():
         if profile.model_pattern.upper() in normalized:
             recs = profile.recommendations.get(game_type, [])
-            if recs:
-                return (profile.display_name, recs)
+            if not recs:
+                return None
+            filtered: list[OSDRecommendation] = []
+            for rec in recs:
+                if rec.setting_kind in suppressed:
+                    continue
+                # Sync-mode filtering applies only when the caller actually told
+                # us the active sync mode. With an empty/None sync_mode, we keep
+                # tagged entries (caller may want to display every variant; e.g.
+                # docs UIs, legacy callers).
+                if rec.applies_to_sync_modes and normalized_sync in ("on", "off"):
+                    if normalized_sync not in rec.applies_to_sync_modes:
+                        continue
+                filtered.append(rec)
+            if filtered:
+                return (profile.display_name, filtered)
             return None
 
     return None

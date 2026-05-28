@@ -439,8 +439,13 @@ class DiagnosticsSettingsHandler(SettingsHandler):
                 explanation=(
                     "Overlay apps (Game Bar, Discord overlay, Overwolf, Nahimic, "
                     "etc.) hook the game's present path and can cost frametime "
-                    "stability or compatibility. ABSO does not kill user apps; "
-                    "this is informational so you can disable their overlays."
+                    "stability or compatibility. ABSO does not kill the host apps "
+                    "themselves; it does kill known overlay helpers (Discord "
+                    "overlay hook, RTSS, MSI Afterburner, OBS, Medal, NVIDIA "
+                    "ShadowPlay overlay) during strict fullscreen apply via the "
+                    "launch-time process janitor. The audit lists the host apps "
+                    "so you can decide whether to keep them running for non-"
+                    "strict profiles."
                 ),
                 category="diagnostics",
                 evidence_tier=EvidenceTier.EMPIRICAL,

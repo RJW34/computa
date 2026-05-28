@@ -23,6 +23,7 @@ monitors:
             causes oversaturation. Switch to 'sRGB' mode for accurate colors
             (some settings restricted), or compensate via digital vibrance if you
             need Game Optimizer's lowest input lag.
+          setting_kind: vibrance
         - setting: "Black Stabilizer"
           value: "60-70"
           reason: "Improves shadow visibility without washing out colors."
@@ -32,6 +33,13 @@ monitors:
         - setting: "Adaptive-Sync"
           value: "On"
           reason: "Enable G-Sync Compatible for tear-free gaming."
+          applies_to_sync_modes: ["on"]
+          setting_kind: sync
+        - setting: "Adaptive-Sync"
+          value: "Off"
+          reason: "No-sync competitive profiles want strict OFF to avoid VRR scan-out adding input lag."
+          applies_to_sync_modes: ["off"]
+          setting_kind: sync
         - setting: "OLED Pixel Care → Screen Move"
           value: "Off (during sessions)"
           reason: "Pixel shift can cause micro-stutters. Re-enable after sessions."
@@ -88,3 +96,10 @@ monitors:
         - setting: "FreeSync"
           value: "On"
           reason: "Enable G-Sync Compatible mode for tear-free gaming."
+          applies_to_sync_modes: ["on"]
+          setting_kind: sync
+        - setting: "FreeSync"
+          value: "Off"
+          reason: "No-sync competitive profiles want strict OFF to avoid VRR scan-out adding input lag."
+          applies_to_sync_modes: ["off"]
+          setting_kind: sync

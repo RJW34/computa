@@ -44,9 +44,9 @@
       },
       {
         "category": "Display",
-        "reason": "Deadlock supports Reflex in its video settings. ABSO does not write the Source 2 video config; the in-game toggle has to be flipped manually. ABSO keeps driver LLM off so Reflex owns render-queue control.",
+        "reason": "ABSO has already configured the driver side: NVIDIA LLM is OFF so the engine owns the render queue (Reflex's correct path). The Source 2 video config is owned by the game and cannot be written from outside; toggle 'NVIDIA Reflex Low Latency' to 'On + Boost' in Deadlock's Video settings once to finish setup.",
         "setting": "NVIDIA Reflex Low Latency",
-        "value": "On + Boost (must be enabled manually in-game)"
+        "value": "On + Boost — ABSO already set driver LLM off; flip the in-game toggle to finish"
       },
       {
         "category": "Display",
@@ -195,9 +195,9 @@
       },
       {
         "category": "Display",
-        "reason": "Deadlock supports Reflex in its video settings. ABSO does not write the Source 2 video config; the in-game toggle has to be flipped manually. ABSO keeps driver LLM off so Reflex owns render-queue control.",
+        "reason": "ABSO has already configured the driver side: NVIDIA LLM is OFF so the engine owns the render queue (Reflex's correct path). The Source 2 video config is owned by the game and cannot be written from outside; toggle 'NVIDIA Reflex Low Latency' to 'On + Boost' in Deadlock's Video settings once to finish setup.",
         "setting": "NVIDIA Reflex Low Latency",
-        "value": "On + Boost (must be enabled manually in-game)"
+        "value": "On + Boost — ABSO already set driver LLM off; flip the in-game toggle to finish"
       },
       {
         "category": "Display",
@@ -347,9 +347,9 @@
       },
       {
         "category": "Display",
-        "reason": "Deadlock supports Reflex in its video settings. ABSO does not write the Source 2 video config; the in-game toggle has to be flipped manually. ABSO keeps driver LLM off so Reflex owns render-queue control.",
+        "reason": "ABSO has already configured the driver side: NVIDIA LLM is OFF so the engine owns the render queue (Reflex's correct path). The Source 2 video config is owned by the game and cannot be written from outside; toggle 'NVIDIA Reflex Low Latency' to 'On + Boost' in Deadlock's Video settings once to finish setup.",
         "setting": "NVIDIA Reflex Low Latency",
-        "value": "On + Boost (must be enabled manually in-game)"
+        "value": "On + Boost — ABSO already set driver LLM off; flip the in-game toggle to finish"
       },
       {
         "category": "Display",
@@ -502,9 +502,9 @@
       },
       {
         "category": "Display",
-        "reason": "Deadlock supports Reflex in its video settings. ABSO does not write the Source 2 video config; the in-game toggle has to be flipped manually. ABSO keeps driver LLM off so Reflex owns render-queue control.",
+        "reason": "ABSO has already configured the driver side: NVIDIA LLM is OFF so the engine owns the render queue (Reflex's correct path). The Source 2 video config is owned by the game and cannot be written from outside; toggle 'NVIDIA Reflex Low Latency' to 'On + Boost' in Deadlock's Video settings once to finish setup.",
         "setting": "NVIDIA Reflex Low Latency",
-        "value": "On + Boost (must be enabled manually in-game)"
+        "value": "On + Boost — ABSO already set driver LLM off; flip the in-game toggle to finish"
       },
       {
         "category": "Display",
@@ -955,9 +955,9 @@
       },
       {
         "category": "Display",
-        "reason": "Fortnite's Reflex toggle lives in Fortnite's settings, not in a stable config key ABSO can write. ABSO keeps driver LLM off so Reflex owns render-queue control.",
+        "reason": "ABSO has already configured the driver side: NVIDIA LLM is OFF so the engine owns the render queue (Reflex's correct path). Fortnite's Reflex toggle lives in Fortnite's settings and there is no stable config key to write it from outside; flip 'NVIDIA Reflex Low Latency' to 'On + Boost' in the game once.",
         "setting": "NVIDIA Reflex Low Latency",
-        "value": "On + Boost (must be enabled manually in-game)"
+        "value": "On + Boost — ABSO already set driver LLM off; flip the in-game toggle to finish"
       },
       {
         "category": "Display",
@@ -1133,9 +1133,9 @@
       },
       {
         "category": "Display",
-        "reason": "Fortnite's Reflex toggle lives in Fortnite's settings, not in a stable config key ABSO can write. ABSO keeps driver LLM off so Reflex owns render-queue control.",
+        "reason": "ABSO has already configured the driver side: NVIDIA LLM is OFF so the engine owns the render queue (Reflex's correct path). Fortnite's Reflex toggle lives in Fortnite's settings and there is no stable config key to write it from outside; flip 'NVIDIA Reflex Low Latency' to 'On + Boost' in the game once.",
         "setting": "NVIDIA Reflex Low Latency",
-        "value": "On + Boost (must be enabled manually in-game)"
+        "value": "On + Boost — ABSO already set driver LLM off; flip the in-game toggle to finish"
       },
       {
         "category": "Display",
@@ -1817,9 +1817,9 @@
       },
       {
         "category": "Display",
-        "reason": "OW2's Reflex toggle is not written by ABSO (Settings_v0.ini's Reflex key is not stable across patches). ABSO keeps driver LLM off so Reflex owns render-queue control once you enable it in-game.",
+        "reason": "ABSO has already configured the driver side: NVIDIA LLM is OFF so the engine owns the render queue (Reflex's correct path). OW2's Reflex toggle lives in Settings_v0.ini behind a key that is not stable across patches and is not safely writable from outside; flip 'NVIDIA Reflex Low Latency' to 'Enabled + Boost' in Overwatch 2's Video settings once.",
         "setting": "NVIDIA Reflex Low Latency",
-        "value": "Enabled + Boost (must be enabled manually in-game)"
+        "value": "Enabled + Boost — ABSO already set driver LLM off; flip the in-game toggle to finish"
       },
       {
         "category": "Display",
@@ -1975,9 +1975,9 @@
       },
       {
         "category": "Display",
-        "reason": "OW2's Reflex toggle is not written by ABSO (Settings_v0.ini's Reflex key is not stable across patches). ABSO keeps driver LLM off so Reflex owns render-queue control once you enable it in-game.",
+        "reason": "ABSO has already configured the driver side: NVIDIA LLM is OFF so the engine owns the render queue (Reflex's correct path). OW2's Reflex toggle lives in Settings_v0.ini behind a key that is not stable across patches and is not safely writable from outside; flip 'NVIDIA Reflex Low Latency' to 'Enabled + Boost' in Overwatch 2's Video settings once.",
         "setting": "NVIDIA Reflex Low Latency",
-        "value": "Enabled + Boost (must be enabled manually in-game)"
+        "value": "Enabled + Boost — ABSO already set driver LLM off; flip the in-game toggle to finish"
       },
       {
         "category": "Display",
@@ -2134,9 +2134,9 @@
       },
       {
         "category": "Display",
-        "reason": "OW2's Reflex toggle is not written by ABSO (Settings_v0.ini's Reflex key is not stable across patches). ABSO keeps driver LLM off so Reflex owns render-queue control once you enable it in-game.",
+        "reason": "ABSO has already configured the driver side: NVIDIA LLM is OFF so the engine owns the render queue (Reflex's correct path). OW2's Reflex toggle lives in Settings_v0.ini behind a key that is not stable across patches and is not safely writable from outside; flip 'NVIDIA Reflex Low Latency' to 'Enabled + Boost' in Overwatch 2's Video settings once.",
         "setting": "NVIDIA Reflex Low Latency",
-        "value": "Enabled + Boost (must be enabled manually in-game)"
+        "value": "Enabled + Boost — ABSO already set driver LLM off; flip the in-game toggle to finish"
       },
       {
         "category": "Display",
@@ -2319,9 +2319,9 @@
       },
       {
         "category": "Display",
-        "reason": "OW2's Reflex toggle is not written by ABSO (Settings_v0.ini's Reflex key is not stable across patches). ABSO keeps driver LLM off so Reflex owns render-queue control once you enable it in-game.",
+        "reason": "ABSO has already configured the driver side: NVIDIA LLM is OFF so the engine owns the render queue (Reflex's correct path). OW2's Reflex toggle lives in Settings_v0.ini behind a key that is not stable across patches and is not safely writable from outside; flip 'NVIDIA Reflex Low Latency' to 'Enabled + Boost' in Overwatch 2's Video settings once.",
         "setting": "NVIDIA Reflex Low Latency",
-        "value": "Enabled + Boost (must be enabled manually in-game)"
+        "value": "Enabled + Boost — ABSO already set driver LLM off; flip the in-game toggle to finish"
       },
       {
         "category": "Display",

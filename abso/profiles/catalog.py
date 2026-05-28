@@ -618,6 +618,22 @@ def resolve_profile_id(profile_id: str | None) -> str | None:
     return PROFILE_ALIASES.get(profile_id, profile_id)
 
 
+def get_profile_sync_mode(profile_id: str | None) -> str | None:
+    """Return the catalog-declared sync mode for a profile, or None.
+
+    Used by the apply path to thread profile sync intent through to handlers
+    that need it (e.g. ColorProfileSettingsHandler filtering monitor OSD
+    recommendations that contradict the active profile's sync mode).
+    """
+    canonical = resolve_profile_id(profile_id)
+    if not canonical:
+        return None
+    entry = _get_full_catalog().get(canonical)
+    if entry is None:
+        return None
+    return entry.sync_mode
+
+
 def get_profile_instances() -> dict[str, BaseProfile]:
     """Get all profile instances keyed by profile ID."""
     return {pid: entry.profile_class() for pid, entry in _get_full_catalog().items()}

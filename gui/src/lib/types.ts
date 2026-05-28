@@ -194,6 +194,18 @@ export interface ApplyResult {
   in_game_settings: boolean;
   error?: string | null;
   applied_settings: string[];
+  /**
+   * Per-handler granular applied lines, keyed by handler class name. Surfaces
+   * messages like "Monitor Adaptive Sync: disabled" so UIs can suppress stale
+   * follow-up prompts (e.g. "go to your monitor OSD and turn it off") when
+   * ABSO already handled the action via DDC/CI or similar.
+   */
+  handler_applied_details?: Record<string, string[]>;
+  /**
+   * Structured signal for monitor firmware Adaptive Sync state after apply.
+   * "enabled" / "disabled" when ABSO toggled it via DDC/CI, null otherwise.
+   */
+  monitor_adaptive_sync_state?: 'enabled' | 'disabled' | null;
   failed_settings: string[];
   warnings: string[];
   notices: string[];
