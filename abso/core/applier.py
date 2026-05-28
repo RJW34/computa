@@ -325,12 +325,6 @@ class ProfileApplier:
         handler_applied_details: dict[str, list[str]] = {}
         monitor_adaptive_sync_state: str | None = None
 
-        # Resolve once: does the active profile expect NVIDIA Reflex to be in the
-        # render loop? Handlers that auto-compute a VRR FPS cap consult this to
-        # pick the Reflex-aware (looser) cap formula instead of the conservative
-        # non-Reflex one. See abso/core/vrr.py:get_vrr_fps_cap for the policy.
-        reflex_active = bool(getattr(profile, "requires_reflex", False))
-
         for handler in profile.get_handlers():
             handler_name = handler.__class__.__name__
 
@@ -356,12 +350,6 @@ class ProfileApplier:
                             settings["sync_mode"] = injected_sync
                     except Exception:  # noqa: BLE001 — never block apply on metadata lookup
                         pass
-
-                # Propagate the Reflex-active flag so handlers that resolve
-                # `auto_vrr_fps_cap` pick the right cap policy. Underscore prefix
-                # marks it as applier-injected metadata that handlers are free to
-                # ignore — only the auto-cap call sites read it.
-                settings.setdefault("_reflex_active", reflex_active)
 
                 handler_result = handler.apply(settings)
 
@@ -955,11 +943,6 @@ class ProfileApplier:
         except Exception:  # noqa: BLE001 — verify must never fail because of state IO
             reboot_pending = False
 
-        # Resolve the Reflex flag once so the verify path computes the same
-        # auto_vrr_fps_cap that apply just wrote (otherwise verify would call
-        # get_vrr_fps_cap with the wrong policy and falsely report drift).
-        reflex_active = bool(getattr(profile, "requires_reflex", False))
-
         # Check handlers that have reboot-requiring settings
         for handler in profile.get_handlers():
             handler_name = handler.__class__.__name__
@@ -975,12 +958,9 @@ class ProfileApplier:
             try:
                 # Inject the system reboot_pending flag for handlers that need
                 # to caveat reboot-gated settings (currently: GraphicsSettingsHandler
-                # for MPO), plus the Reflex flag so auto_vrr_fps_cap verifies
-                # against the same policy apply used. Handlers that don't read
-                # these keys are unaffected.
+                # for MPO). Handlers that don't read this key are unaffected.
                 verify_settings = dict(settings)
                 verify_settings["_reboot_pending"] = reboot_pending
-                verify_settings.setdefault("_reflex_active", reflex_active)
                 handler_result = handler.verify_active(verify_settings)
                 results["handlers"][handler_name] = handler_result
 

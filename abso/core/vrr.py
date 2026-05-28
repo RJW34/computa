@@ -65,56 +65,30 @@ class VRRConfig:
 # FPS cap presets for VRR
 # =============================================================================
 #
-# Two cap tables, both targeting "stay inside the VRR window so NVCP V-SYNC
-# never has to engage". They differ in how much headroom they leave below
-# refresh:
+# ABSO's static FPS cap exists to be the V-SYNC safety boundary: when G-SYNC
+# is engaged and NVCP V-SYNC is on as a tear-prevention safety net, an
+# uncapped frame rate that briefly exceeds the refresh interval will trigger
+# V-SYNC and add scanout latency for those frames. The cap prevents that.
 #
-#   * VRR_FPS_CAPS_REFLEX (Reflex-active path) uses `refresh - 3`.
-#     When NVIDIA Reflex is in the render loop, the engine's own dynamic
-#     cap is the real latency control — it pins frame rate to whatever
-#     keeps the render queue at the configured depth (empirically ~276 fps
-#     on a 300 Hz panel). The static cap below is a *safety boundary*
-#     only — its job is to be the absolute ceiling that prevents frame
-#     time from crossing the refresh interval and triggering V-SYNC. A
-#     3 fps headroom is sufficient because Reflex constrains frame-time
-#     variance from inside the engine; widening it just throws away
-#     fps the user could otherwise see in Reflex's loose moments.
+# The default formula is `refresh - 3`, the long-standing Blur Busters
+# G-SYNC 101 convention. ABSO previously experimented with a wider
+# refresh-scaled margin (3% under 300 Hz, 5% at 300 Hz+, plus a separate
+# Reflex-aware table) but that policy was synthesized from secondhand
+# references rather than a fetched primary source. Adversarial deep
+# research in 2026-05 could not confirm any specific scaling formula
+# from a primary Blur Busters or NVIDIA citation, so ABSO reverts to the
+# historical refresh - 3 convention as the single source of truth.
 #
-#   * VRR_FPS_CAPS (non-Reflex path) uses a refresh-scaled margin matching
-#     Blur Busters' 2026 G-SYNC 101 update — 3% under 300 Hz, 5% at 300 Hz+.
-#     For games without Reflex (Rivals 2, emulators, older titles), nothing
-#     constrains frame-time variance internally, so a wider headroom is
-#     needed to keep VRR engaged through micro-bursts at high refresh.
+# Practical implication: the cap is *not* the latency control. NVIDIA
+# Reflex (when engaged in-game) provides dynamic pacing that may bind
+# below this static ceiling; that's expected and desirable. The cap just
+# guarantees the V-SYNC safety net never trips during normal play.
 #
-# Formula (non-Reflex):
-#   refresh < 200        -> refresh - 3              (~1.5–5% margin)
-#   200 <= refresh < 300 -> round(refresh * 0.97)    (~3% margin)
-#   refresh >= 300       -> round(refresh * 0.95)    (~5% margin)
-#
-# Formula (Reflex-active): refresh - 3 across the board.
-#
-# Routing: the `reflex_active` parameter on get_vrr_fps_cap controls which
-# table/formula is used. The applier propagates this from the active
-# profile's `requires_reflex` property (see abso/profiles/base.py).
+# Users observing FPS far below the cap should run the empirical isolation
+# test (each Reflex mode in turn, see docs/AGENT_PROTOCOL.md) to identify
+# what is actually binding — Reflex, CPU, GPU, or an in-game limit. The
+# cap value itself is rarely the answer.
 VRR_FPS_CAPS: dict[int, int] = {
-    60: 57,
-    75: 72,
-    100: 97,
-    120: 117,
-    144: 141,
-    165: 162,
-    180: 177,
-    200: 194,    # 0.97 scaling, near refresh - 3
-    240: 233,    # 0.97 scaling — conservative buffer for non-Reflex high-refresh
-    280: 272,
-    300: 285,    # 0.95 scaling — non-Reflex needs the headroom
-    360: 342,
-    390: 371,
-    480: 456,
-    500: 475,
-}
-
-VRR_FPS_CAPS_REFLEX: dict[int, int] = {
     60: 57,
     75: 72,
     100: 97,
@@ -125,7 +99,7 @@ VRR_FPS_CAPS_REFLEX: dict[int, int] = {
     200: 197,
     240: 237,
     280: 277,
-    300: 297,    # refresh - 3 — Reflex's dynamic cap is the real latency control
+    300: 297,
     360: 357,
     390: 387,
     480: 477,
@@ -138,62 +112,35 @@ COMMON_FPS_PRESETS = [30, 60, 120, 144, 165, 240, 300, 360]
 
 def get_vrr_fps_cap(
     refresh_rate: int | float,
-    reflex_active: bool = False,
+    reflex_active: bool | None = None,  # noqa: ARG001 — kept for callsite stability
 ) -> int:
-    """Calculate ABSO's recommended FPS cap for VRR displays.
+    """Calculate ABSO's static V-SYNC-safety-boundary FPS cap for VRR.
 
-    Picks one of two policies depending on whether NVIDIA Reflex is in the
-    render loop for the active profile.
+    Returns ``refresh - 3`` (the historical Blur Busters G-SYNC 101
+    convention), looked up from the ``VRR_FPS_CAPS`` preset table for
+    common rates or computed inline otherwise. Float inputs (e.g. 299.99
+    from CCD / pixel-clock detection) are rounded before lookup.
 
-    **Reflex-active (refresh - 3):**
-        When Reflex is engaged (typically via in-game "NVIDIA Reflex Low
-        Latency: On + Boost"), the engine's dynamic cap is the real latency
-        control. The static cap below is only the V-SYNC safety boundary,
-        and a 3 fps headroom is enough because Reflex constrains frame-time
-        variance from inside the pipeline. Widening the static cap further
-        just leaves fps on the table — Reflex's dynamic cap is the lower
-        bound that actually runs in practice.
-
-    **Non-Reflex (scaled margin):**
-        Without Reflex, frame-time variance can briefly poke above a tight
-        headroom and engage V-SYNC, defeating the VRR-only path. A
-        refresh-scaled margin (3% under 300 Hz, 5% at 300 Hz+) holds VRR
-        through those micro-bursts.
-
-    Accepts float inputs (e.g. 299.99) and rounds to the nearest integer
-    before lookup so fractional Hz values from CCD / pixel-clock detection
-    hit the correct preset.
+    The cap is intentionally the same regardless of whether NVIDIA Reflex
+    is in the render loop. Reflex is a latency control (dynamic CPU
+    pacing); the static cap is a V-SYNC safety boundary. They operate on
+    different mechanisms — there is no documented primary-source basis
+    for ABSO to apply a different static cap based on Reflex presence.
 
     Args:
         refresh_rate: Monitor's maximum refresh rate in Hz.
-        reflex_active: True when the active profile expects NVIDIA Reflex
-            to be engaged (game supports it and the profile keeps driver
-            LLM off so the engine owns the queue). The applier sources
-            this from ``profile.requires_reflex`` so callers usually do
-            not pass it directly — it is threaded through the apply /
-            verify path via a private settings key.
+        reflex_active: Accepted for callsite stability; currently ignored.
+            Previously used to select between two cap tables under an
+            unverified scaling rationale. Now both Reflex and non-Reflex
+            profiles use the same ``refresh - 3`` cap.
 
     Returns:
         Recommended FPS cap value.
     """
     refresh_rate = round(float(refresh_rate))
-
-    if reflex_active:
-        # Reflex-active table prioritizes headroom over conservatism.
-        if refresh_rate in VRR_FPS_CAPS_REFLEX:
-            return VRR_FPS_CAPS_REFLEX[refresh_rate]
-        # Refresh - 3 is the canonical Blur Busters rule and works across
-        # the whole range when Reflex provides the dynamic ceiling.
-        return max(1, refresh_rate - 3)
-
-    # Non-Reflex path: hand-reviewed preset table first, scaled formula otherwise.
     if refresh_rate in VRR_FPS_CAPS:
         return VRR_FPS_CAPS[refresh_rate]
-    if refresh_rate < 200:
-        return refresh_rate - 3
-    if refresh_rate < 300:
-        return round(refresh_rate * 0.97)
-    return round(refresh_rate * 0.95)
+    return max(1, refresh_rate - 3)
 
 
 def get_best_ingame_preset(

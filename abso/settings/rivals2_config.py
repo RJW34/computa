@@ -163,10 +163,6 @@ class Rivals2ConfigHandler(SettingsHandler):
     def apply(self, settings: dict[str, Any]) -> dict[str, Any]:
         """Apply Rivals 2 game config settings."""
         settings = dict(settings)
-        # Rivals 2 (UE5) does not integrate NVIDIA Reflex, so this typically
-        # resolves to False. We still consume the applier-injected flag so the
-        # call site stays uniform with the rest of the auto-cap consumers.
-        reflex_active = bool(settings.pop("_reflex_active", False))
 
         if settings.pop("auto_vrr_fps_cap", False):
             try:
@@ -175,14 +171,11 @@ class Rivals2ConfigHandler(SettingsHandler):
 
                 refresh_hz = NvidiaSettingsHandler()._detect_primary_refresh_rate()
                 if refresh_hz and refresh_hz > 0:
-                    settings["frame_rate_limit"] = get_vrr_fps_cap(
-                        refresh_hz, reflex_active=reflex_active,
-                    )
+                    settings["frame_rate_limit"] = get_vrr_fps_cap(refresh_hz)
                     logger.info(
-                        "Rivals 2 auto VRR FPS cap: %d (from %d Hz, reflex_active=%s)",
+                        "Rivals 2 auto VRR FPS cap: %d (from %d Hz)",
                         settings["frame_rate_limit"],
                         refresh_hz,
-                        reflex_active,
                     )
             except Exception as e:
                 logger.warning("Rivals 2 auto VRR FPS cap detection failed: %s", e)
@@ -286,7 +279,6 @@ class Rivals2ConfigHandler(SettingsHandler):
     def verify_active(self, settings: dict[str, Any]) -> dict[str, Any]:
         """Verify requested Rivals 2 config values are active."""
         settings = dict(settings)
-        reflex_active = bool(settings.pop("_reflex_active", False))
         if settings.pop("auto_vrr_fps_cap", False):
             try:
                 from abso.core.vrr import get_vrr_fps_cap
@@ -294,9 +286,7 @@ class Rivals2ConfigHandler(SettingsHandler):
 
                 refresh_hz = NvidiaSettingsHandler()._detect_primary_refresh_rate()
                 if refresh_hz and refresh_hz > 0:
-                    settings["frame_rate_limit"] = get_vrr_fps_cap(
-                        refresh_hz, reflex_active=reflex_active,
-                    )
+                    settings["frame_rate_limit"] = get_vrr_fps_cap(refresh_hz)
             except Exception as e:
                 logger.warning("Rivals 2 auto VRR FPS cap verification failed: %s", e)
 

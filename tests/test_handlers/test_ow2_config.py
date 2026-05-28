@@ -221,8 +221,11 @@ def test_verify_active_all_match(tmp_path: Path) -> None:
 
 
 def test_verify_active_expands_auto_vrr_fps_cap(tmp_path: Path) -> None:
-    """auto_vrr_fps_cap must verify the concrete FrameRateCap OW2 sees."""
-    ini = SAMPLE_INI.replace('FrameRateCap = "60"', 'FrameRateCap = "285"')
+    """auto_vrr_fps_cap must verify the concrete FrameRateCap OW2 sees.
+
+    At 300 Hz the cap is refresh - 3 = 297 (Blur Busters G-SYNC 101).
+    """
+    ini = SAMPLE_INI.replace('FrameRateCap = "60"', 'FrameRateCap = "297"')
     ini = ini.replace('UseCustomFrameRates = "0"\n', "")
     ini = ini.replace('ShowFPSCounter = "0"', 'UseCustomFrameRates = "1"\nShowFPSCounter = "0"')
     ini_path = tmp_path / "Settings_v0.ini"
@@ -239,8 +242,8 @@ def test_verify_active_expands_auto_vrr_fps_cap(tmp_path: Path) -> None:
 
     assert verify["all_active"] is True
     assert verify["settings"]["frame_rate_cap"] == {
-        "target": 285,
-        "current": 285,
+        "target": 297,
+        "current": 297,
         "active": True,
     }
     assert verify["settings"]["use_custom_frame_rates"]["active"] is True
@@ -261,7 +264,7 @@ def test_verify_active_reports_auto_vrr_fps_cap_drift(tmp_path: Path) -> None:
         verify = OW2ConfigHandler().verify_active({"auto_vrr_fps_cap": True})
 
     assert verify["all_active"] is False
-    assert verify["settings"]["frame_rate_cap"]["target"] == 285
+    assert verify["settings"]["frame_rate_cap"]["target"] == 297
     assert verify["settings"]["frame_rate_cap"]["current"] == 60
     assert verify["settings"]["frame_rate_cap"]["active"] is False
 

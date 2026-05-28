@@ -143,8 +143,8 @@ def test_apply_auto_vrr_fps_cap_uses_detected_refresh(tmp_path: Path) -> None:
 
     assert result["success"] is True
     content = ini_path.read_text(encoding="utf-8")
-    # 300Hz cap is 285 under the 2026-05 Blur Busters formula (0.95x), was 297.
-    assert "FrameRateLimit=285" in content
+    # 300Hz cap = refresh - 3 = 297 (Blur Busters G-SYNC 101 convention).
+    assert "FrameRateLimit=297" in content
     assert "bNvidiaReflex=True" in content
 
 

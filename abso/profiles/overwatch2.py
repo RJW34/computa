@@ -545,8 +545,8 @@ class Overwatch2GSyncProfile(_Overwatch2BaseProfile):
             {
                 "category": "Display",
                 "setting": "Frame Rate Cap",
-                "value": "Auto (refresh-scaled: e.g. 285 @ 300Hz, 233 @ 240Hz, 141 @ 144Hz)",
-                "reason": "Set by ABSO using Blur Busters' 2026 scaled-margin formula (-3 below 200Hz, *0.97 at 200-299Hz, *0.95 at 300Hz+). Keeps NVCP VSync from engaging while preserving VRR.",
+                "value": "Auto (refresh - 3: e.g. 297 @ 300Hz, 237 @ 240Hz, 141 @ 144Hz)",
+                "reason": "Set by ABSO to refresh - 3 (Blur Busters G-SYNC 101 convention) as the V-SYNC safety boundary. NVIDIA Reflex (the engine's dynamic CPU pacer) may bind below this; that's expected — the static cap just keeps NVCP V-SYNC from ever engaging.",
             },
             {
                 "category": "Display",
@@ -652,20 +652,19 @@ class Overwatch2GSyncHDRProfile(_Overwatch2BaseProfile):
             "NvidiaSettingsHandler": {
                 "preset": "reflex_gsync",
                 "profile_name": "Overwatch 2",
-                # auto_vrr_fps_cap routes through get_vrr_fps_cap with the
-                # Reflex-aware policy (refresh - 3) because this profile
-                # inherits requires_reflex=True from ReflexShooterBaseProfile.
-                # Reflex's dynamic cap is the latency control; the static cap
-                # below is the V-SYNC safety boundary.
+                # auto_vrr_fps_cap routes through get_vrr_fps_cap which uses
+                # the Blur Busters G-SYNC 101 ``refresh - 3`` convention as
+                # the V-SYNC safety boundary. NVIDIA Reflex (the engine's
+                # dynamic CPU pacer) operates separately and may bind below
+                # this static ceiling — that's expected.
                 "auto_vrr_fps_cap": True,
                 "global_vrr_mode": "fullscreen_only",
             },
             "OW2ConfigHandler": {
-                # In-game cap matches the driver-side cap (refresh - 3 on a
-                # Reflex-enabled profile) so OW2 and NVCP agree on the VRR
-                # target. To override (e.g. pin a different value), set
-                # ``profile_overrides.overwatch2-gsync-hdr.ow2_config`` in
-                # abso.yaml: ``auto_vrr_fps_cap: false`` plus an explicit
+                # In-game cap matches the driver-side cap so OW2 and NVCP
+                # agree on the target. To override (e.g. pin a different
+                # value), set ``profile_overrides.overwatch2-gsync-hdr.ow2_config``
+                # in abso.yaml: ``auto_vrr_fps_cap: false`` plus an explicit
                 # ``frame_rate_cap: <int>``.
                 "auto_vrr_fps_cap": True,
             },
@@ -697,8 +696,8 @@ class Overwatch2GSyncHDRProfile(_Overwatch2BaseProfile):
             {
                 "category": "Display",
                 "setting": "Frame Rate Cap",
-                "value": "Auto (refresh-scaled: e.g. 285 @ 300Hz, 233 @ 240Hz, 141 @ 144Hz)",
-                "reason": "Set by ABSO using Blur Busters' 2026 scaled-margin formula (-3 below 200Hz, *0.97 at 200-299Hz, *0.95 at 300Hz+). Keeps NVCP VSync from engaging while preserving VRR.",
+                "value": "Auto (refresh - 3: e.g. 297 @ 300Hz, 237 @ 240Hz, 141 @ 144Hz)",
+                "reason": "Set by ABSO to refresh - 3 (Blur Busters G-SYNC 101 convention) as the V-SYNC safety boundary. NVIDIA Reflex (the engine's dynamic CPU pacer) may bind below this; that's expected — the static cap just keeps NVCP V-SYNC from ever engaging.",
             },
             {
                 "category": "Display",
@@ -848,8 +847,8 @@ class Overwatch2GSyncCaptureProfile(_Overwatch2BaseProfile):
             {
                 "category": "Display",
                 "setting": "Frame Rate Cap",
-                "value": "Auto (refresh-scaled: e.g. 285 @ 300Hz, 233 @ 240Hz, 141 @ 144Hz)",
-                "reason": "Set by ABSO using Blur Busters' 2026 scaled-margin formula for stable windowed G-SYNC behavior below refresh.",
+                "value": "Auto (refresh - 3: e.g. 297 @ 300Hz, 237 @ 240Hz, 141 @ 144Hz)",
+                "reason": "Set by ABSO to refresh - 3 (Blur Busters G-SYNC 101 convention) so windowed G-SYNC stays within the VRR window and NVCP V-SYNC never engages.",
             },
             {
                 "category": "Display",
@@ -985,8 +984,8 @@ class Overwatch2GSyncHDRCaptureProfile(_Overwatch2BaseProfile):
             {
                 "category": "Display",
                 "setting": "Frame Rate Cap",
-                "value": "Auto (refresh-scaled: e.g. 285 @ 300Hz, 233 @ 240Hz, 141 @ 144Hz)",
-                "reason": "Set by ABSO using Blur Busters' 2026 scaled-margin formula for stable windowed G-SYNC behavior below refresh.",
+                "value": "Auto (refresh - 3: e.g. 297 @ 300Hz, 237 @ 240Hz, 141 @ 144Hz)",
+                "reason": "Set by ABSO to refresh - 3 (Blur Busters G-SYNC 101 convention) so windowed G-SYNC stays within the VRR window and NVCP V-SYNC never engages.",
             },
             {
                 "category": "Display",

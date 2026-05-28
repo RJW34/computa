@@ -97,10 +97,17 @@ class _Diablo4BaseProfile(BaseProfile):
                 "disable_pcie_power_saving": True,
             },
             "RegistrySettingsHandler": {
+                # Diablo IV is a cinematic ARPG, not a twitch shooter. Use the
+                # Medium MMCSS scheduling category (same as productivity / emulator
+                # profiles) instead of the High setting inherited by ReflexShooter
+                # profiles — High can starve OBS / Discord encoder threads during
+                # streamed sessions without delivering measurable latency benefit
+                # on a non-twitch game. ``gpu_priority: 8`` is preserved because
+                # GPU work for D4 still benefits from the elevated bucket.
                 "game_priority": {
                     "gpu_priority": 8,
                     "priority": 6,
-                    "scheduling_category": "High",
+                    "scheduling_category": "Medium",
                 },
             },
             "NvidiaSettingsHandler": {
@@ -174,8 +181,8 @@ class _Diablo4BaseProfile(BaseProfile):
             {
                 "category": "Display",
                 "setting": "Foreground FPS Limit",
-                "value": "Refresh-scaled (e.g., 141 @ 144Hz, 233 @ 240Hz, 285 @ 300Hz)",
-                "reason": "ABSO writes LimitForegroundFPS=1 and MaxForegroundFPS=<scaled> into LocalPrefs.txt using Blur Busters' 2026 scaled-margin formula (-3 below 200Hz, *0.97 at 200-299Hz, *0.95 at 300Hz+). In-game limiter owns the VRR cap per Blur Busters G-SYNC 101; the NVIDIA driver cap is off.",
+                "value": "refresh - 3 (e.g., 141 @ 144Hz, 237 @ 240Hz, 297 @ 300Hz)",
+                "reason": "ABSO writes LimitForegroundFPS=1 and MaxForegroundFPS=<refresh-3> into LocalPrefs.txt (Blur Busters G-SYNC 101 convention). In-game limiter owns the VRR safety boundary; the NVIDIA driver cap is off.",
             },
             {
                 "category": "Graphics",

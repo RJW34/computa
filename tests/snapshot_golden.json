@@ -201,9 +201,9 @@
       },
       {
         "category": "Display",
-        "reason": "Set by ABSO via NVCP using Blur Busters' 2026 scaled-margin formula. Keeps VSync from engaging while preserving VRR.",
+        "reason": "Set by ABSO via NVCP to refresh - 3 (Blur Busters G-SYNC 101 convention). Keeps NVCP V-SYNC from engaging while preserving VRR.",
         "setting": "Frame Rate Cap",
-        "value": "Auto (refresh-scaled: e.g. 285 @ 300Hz, 233 @ 240Hz, 141 @ 144Hz)"
+        "value": "Auto (refresh - 3: e.g. 297 @ 300Hz, 237 @ 240Hz, 141 @ 144Hz)"
       },
       {
         "category": "Graphics",
@@ -353,9 +353,9 @@
       },
       {
         "category": "Display",
-        "reason": "Set by ABSO via NVCP using Blur Busters' 2026 scaled-margin formula. Keeps VSync from engaging while preserving VRR.",
+        "reason": "Set by ABSO via NVCP to refresh - 3 (Blur Busters G-SYNC 101 convention). Keeps NVCP V-SYNC from engaging while preserving VRR.",
         "setting": "Frame Rate Cap",
-        "value": "Auto (refresh-scaled: e.g. 285 @ 300Hz, 233 @ 240Hz, 141 @ 144Hz)"
+        "value": "Auto (refresh - 3: e.g. 297 @ 300Hz, 237 @ 240Hz, 141 @ 144Hz)"
       },
       {
         "category": "Graphics",
@@ -662,9 +662,9 @@
       },
       {
         "category": "Display",
-        "reason": "ABSO writes LimitForegroundFPS=1 and MaxForegroundFPS=<scaled> into LocalPrefs.txt using Blur Busters' 2026 scaled-margin formula (-3 below 200Hz, *0.97 at 200-299Hz, *0.95 at 300Hz+). In-game limiter owns the VRR cap per Blur Busters G-SYNC 101; the NVIDIA driver cap is off.",
+        "reason": "ABSO writes LimitForegroundFPS=1 and MaxForegroundFPS=<refresh-3> into LocalPrefs.txt (Blur Busters G-SYNC 101 convention). In-game limiter owns the VRR safety boundary; the NVIDIA driver cap is off.",
         "setting": "Foreground FPS Limit",
-        "value": "Refresh-scaled (e.g., 141 @ 144Hz, 233 @ 240Hz, 285 @ 300Hz)"
+        "value": "refresh - 3 (e.g., 141 @ 144Hz, 237 @ 240Hz, 297 @ 300Hz)"
       },
       {
         "category": "Graphics",
@@ -814,9 +814,9 @@
       },
       {
         "category": "Display",
-        "reason": "ABSO writes LimitForegroundFPS=1 and MaxForegroundFPS=<scaled> into LocalPrefs.txt using Blur Busters' 2026 scaled-margin formula (-3 below 200Hz, *0.97 at 200-299Hz, *0.95 at 300Hz+). In-game limiter owns the VRR cap per Blur Busters G-SYNC 101; the NVIDIA driver cap is off.",
+        "reason": "ABSO writes LimitForegroundFPS=1 and MaxForegroundFPS=<refresh-3> into LocalPrefs.txt (Blur Busters G-SYNC 101 convention). In-game limiter owns the VRR safety boundary; the NVIDIA driver cap is off.",
         "setting": "Foreground FPS Limit",
-        "value": "Refresh-scaled (e.g., 141 @ 144Hz, 233 @ 240Hz, 285 @ 300Hz)"
+        "value": "refresh - 3 (e.g., 141 @ 144Hz, 237 @ 240Hz, 297 @ 300Hz)"
       },
       {
         "category": "Graphics",
@@ -1320,9 +1320,9 @@
       },
       {
         "category": "Display",
-        "reason": "Set by ABSO using Blur Busters' 2026 scaled-margin formula. Keeps G-SYNC active and prevents NVCP VSync from engaging while preserving tear-free latency.",
+        "reason": "Set by ABSO to refresh - 3 (Blur Busters G-SYNC 101 convention). Keeps G-SYNC active and prevents NVCP V-SYNC from engaging while preserving tear-free latency.",
         "setting": "Frame Rate Limit",
-        "value": "Auto (refresh-scaled: e.g. 285 @ 300Hz, 233 @ 240Hz, 141 @ 144Hz)"
+        "value": "Auto (refresh - 3: e.g. 297 @ 300Hz, 237 @ 240Hz, 141 @ 144Hz)"
       },
       {
         "category": "Display",
@@ -1501,9 +1501,9 @@
       },
       {
         "category": "Display",
-        "reason": "Set by ABSO using Blur Busters' 2026 scaled-margin formula. Keeps G-SYNC active and prevents NVCP VSync from engaging while preserving tear-free latency.",
+        "reason": "Set by ABSO to refresh - 3 (Blur Busters G-SYNC 101 convention). Keeps G-SYNC active and prevents NVCP V-SYNC from engaging while preserving tear-free latency.",
         "setting": "Frame Rate Limit",
-        "value": "Auto (refresh-scaled: e.g. 285 @ 300Hz, 233 @ 240Hz, 141 @ 144Hz)"
+        "value": "Auto (refresh - 3: e.g. 297 @ 300Hz, 237 @ 240Hz, 141 @ 144Hz)"
       },
       {
         "category": "Display",
@@ -1823,9 +1823,9 @@
       },
       {
         "category": "Display",
-        "reason": "Set by ABSO using Blur Busters' 2026 scaled-margin formula (-3 below 200Hz, *0.97 at 200-299Hz, *0.95 at 300Hz+). Keeps NVCP VSync from engaging while preserving VRR.",
+        "reason": "Set by ABSO to refresh - 3 (Blur Busters G-SYNC 101 convention) as the V-SYNC safety boundary. NVIDIA Reflex (the engine's dynamic CPU pacer) may bind below this; that's expected — the static cap just keeps NVCP V-SYNC from ever engaging.",
         "setting": "Frame Rate Cap",
-        "value": "Auto (refresh-scaled: e.g. 285 @ 300Hz, 233 @ 240Hz, 141 @ 144Hz)"
+        "value": "Auto (refresh - 3: e.g. 297 @ 300Hz, 237 @ 240Hz, 141 @ 144Hz)"
       },
       {
         "category": "Display",
@@ -1981,9 +1981,9 @@
       },
       {
         "category": "Display",
-        "reason": "Set by ABSO using Blur Busters' 2026 scaled-margin formula for stable windowed G-SYNC behavior below refresh.",
+        "reason": "Set by ABSO to refresh - 3 (Blur Busters G-SYNC 101 convention) so windowed G-SYNC stays within the VRR window and NVCP V-SYNC never engages.",
         "setting": "Frame Rate Cap",
-        "value": "Auto (refresh-scaled: e.g. 285 @ 300Hz, 233 @ 240Hz, 141 @ 144Hz)"
+        "value": "Auto (refresh - 3: e.g. 297 @ 300Hz, 237 @ 240Hz, 141 @ 144Hz)"
       },
       {
         "category": "Display",
@@ -2140,9 +2140,9 @@
       },
       {
         "category": "Display",
-        "reason": "Set by ABSO using Blur Busters' 2026 scaled-margin formula (-3 below 200Hz, *0.97 at 200-299Hz, *0.95 at 300Hz+). Keeps NVCP VSync from engaging while preserving VRR.",
+        "reason": "Set by ABSO to refresh - 3 (Blur Busters G-SYNC 101 convention) as the V-SYNC safety boundary. NVIDIA Reflex (the engine's dynamic CPU pacer) may bind below this; that's expected — the static cap just keeps NVCP V-SYNC from ever engaging.",
         "setting": "Frame Rate Cap",
-        "value": "Auto (refresh-scaled: e.g. 285 @ 300Hz, 233 @ 240Hz, 141 @ 144Hz)"
+        "value": "Auto (refresh - 3: e.g. 297 @ 300Hz, 237 @ 240Hz, 141 @ 144Hz)"
       },
       {
         "category": "Display",
@@ -2325,9 +2325,9 @@
       },
       {
         "category": "Display",
-        "reason": "Set by ABSO using Blur Busters' 2026 scaled-margin formula for stable windowed G-SYNC behavior below refresh.",
+        "reason": "Set by ABSO to refresh - 3 (Blur Busters G-SYNC 101 convention) so windowed G-SYNC stays within the VRR window and NVCP V-SYNC never engages.",
         "setting": "Frame Rate Cap",
-        "value": "Auto (refresh-scaled: e.g. 285 @ 300Hz, 233 @ 240Hz, 141 @ 144Hz)"
+        "value": "Auto (refresh - 3: e.g. 297 @ 300Hz, 237 @ 240Hz, 141 @ 144Hz)"
       },
       {
         "category": "Display",
@@ -3196,9 +3196,9 @@
     "in_game_settings": [
       {
         "category": "=== G-SYNC PROFILE ===",
-        "reason": "Tear-free low-latency VRR profile. VSync acts as safety net only - never activates with FPS capped below refresh rate. For 300Hz: cap at 285. For 240Hz: cap at 233. For 144Hz: cap at 141. (Cap scales with refresh per Blur Busters' 2026 guidance: -3 below 200Hz, 0.97x at 200-300Hz, 0.95x at 300Hz+.)",
+        "reason": "Tear-free low-latency VRR profile. VSync acts as safety net only - never activates with FPS capped below refresh rate. For 300Hz: cap at 297. For 240Hz: cap at 237. For 144Hz: cap at 141. (Blur Busters G-SYNC 101 convention.)",
         "setting": "Overview",
-        "value": "G-SYNC ON, VSync ON (NVCP), refresh-scaled FPS cap"
+        "value": "G-SYNC ON, VSync ON (NVCP), refresh - 3 FPS cap"
       },
       {
         "category": "NVIDIA Control Panel",
@@ -3220,9 +3220,9 @@
       },
       {
         "category": "NVIDIA Control Panel",
-        "reason": "ABSO auto-detects your refresh rate and applies the Blur Busters 2026 scaled-margin cap (e.g. 285 @ 300Hz, 233 @ 240Hz, 141 @ 144Hz). Keeps G-SYNC active and VSync from engaging.",
+        "reason": "ABSO auto-detects your refresh rate and applies the Blur Busters G-SYNC 101 convention (refresh - 3: e.g. 297 @ 300Hz, 237 @ 240Hz, 141 @ 144Hz). Keeps G-SYNC active and V-SYNC from engaging.",
         "setting": "Max Frame Rate",
-        "value": "Refresh-scaled VRR cap (auto-set by ABSO)"
+        "value": "refresh - 3 cap (auto-set by ABSO)"
       },
       {
         "category": "In-Game Video",
@@ -3240,7 +3240,7 @@
         "category": "In-Game Video",
         "reason": "Must cap below refresh for G-SYNC to work properly. In-game limiter has lower latency than NVCP/RTSS limiters.",
         "setting": "Frame Rate Cap",
-        "value": "Refresh-scaled VRR cap (e.g., 285 for 300Hz)"
+        "value": "refresh - 3 cap (e.g., 297 for 300Hz)"
       },
       {
         "category": "In-Game Video",
@@ -3401,9 +3401,9 @@
       },
       {
         "category": "=== G-SYNC PROFILE ===",
-        "reason": "Tear-free low-latency VRR profile. VSync acts as safety net only - never activates with FPS capped below refresh rate. For 300Hz: cap at 285. For 240Hz: cap at 233. For 144Hz: cap at 141. (Cap scales with refresh per Blur Busters' 2026 guidance: -3 below 200Hz, 0.97x at 200-300Hz, 0.95x at 300Hz+.)",
+        "reason": "Tear-free low-latency VRR profile. VSync acts as safety net only - never activates with FPS capped below refresh rate. For 300Hz: cap at 297. For 240Hz: cap at 237. For 144Hz: cap at 141. (Blur Busters G-SYNC 101 convention.)",
         "setting": "Overview",
-        "value": "G-SYNC ON, VSync ON (NVCP), refresh-scaled FPS cap"
+        "value": "G-SYNC ON, VSync ON (NVCP), refresh - 3 FPS cap"
       },
       {
         "category": "NVIDIA Control Panel",
@@ -3425,9 +3425,9 @@
       },
       {
         "category": "NVIDIA Control Panel",
-        "reason": "ABSO auto-detects your refresh rate and applies the Blur Busters 2026 scaled-margin cap (e.g. 285 @ 300Hz, 233 @ 240Hz, 141 @ 144Hz). Keeps G-SYNC active and VSync from engaging.",
+        "reason": "ABSO auto-detects your refresh rate and applies the Blur Busters G-SYNC 101 convention (refresh - 3: e.g. 297 @ 300Hz, 237 @ 240Hz, 141 @ 144Hz). Keeps G-SYNC active and V-SYNC from engaging.",
         "setting": "Max Frame Rate",
-        "value": "Refresh-scaled VRR cap (auto-set by ABSO)"
+        "value": "refresh - 3 cap (auto-set by ABSO)"
       },
       {
         "category": "In-Game Video",
@@ -3445,7 +3445,7 @@
         "category": "In-Game Video",
         "reason": "Must cap below refresh for G-SYNC to work properly. In-game limiter has lower latency than NVCP/RTSS limiters.",
         "setting": "Frame Rate Cap",
-        "value": "Refresh-scaled VRR cap (e.g., 285 for 300Hz)"
+        "value": "refresh - 3 cap (e.g., 297 for 300Hz)"
       },
       {
         "category": "In-Game Video",

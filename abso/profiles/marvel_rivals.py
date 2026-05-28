@@ -110,8 +110,8 @@ class _MarvelRivalsBaseProfile(ReflexShooterBaseProfile):
             {
                 "category": "Display",
                 "setting": "Frame Rate Limit",
-                "value": "Auto (refresh-scaled: e.g. 285 @ 300Hz, 233 @ 240Hz, 141 @ 144Hz)",
-                "reason": "Set by ABSO using Blur Busters' 2026 scaled-margin formula. Keeps G-SYNC active and prevents NVCP VSync from engaging while preserving tear-free latency.",
+                "value": "Auto (refresh - 3: e.g. 297 @ 300Hz, 237 @ 240Hz, 141 @ 144Hz)",
+                "reason": "Set by ABSO to refresh - 3 (Blur Busters G-SYNC 101 convention). Keeps G-SYNC active and prevents NVCP V-SYNC from engaging while preserving tear-free latency.",
             },
             {
                 "category": "Display",
@@ -178,6 +178,12 @@ class MarvelRivalsSDRProfile(_MarvelRivalsBaseProfile):
                 "auto_hdr": False,
             },
             "ColorProfileSettingsHandler": {
+                # SDR path on a wide-gamut OLED: clamp to sRGB ICC and apply
+                # a -5 vibrance compensation (50 - 5 = 45) so saturation lands
+                # at perceptually neutral. Without this, sRGB content on a
+                # DCI-P3 panel reads as oversaturated. The HDR sibling below
+                # uses 50 (neutral) because Windows HDR composition owns gamut
+                # mapping and a vibrance pull-down would fight it.
                 "icc_profile": "srgb",
                 "digital_vibrance": 45,
                 "show_osd_guidance": True,
@@ -243,6 +249,11 @@ class MarvelRivalsHDRProfile(_MarvelRivalsBaseProfile):
                 "disable_auto_color_management": True,
             },
             "ColorProfileSettingsHandler": {
+                # HDR path: native ICC (no clamp) and neutral vibrance (50).
+                # Windows HDR composition owns gamut mapping; an extra NVCP
+                # vibrance pull-down would fight it. The SDR sibling uses 45
+                # because the wide-gamut OLED needs a -5 compensation for sRGB
+                # content; HDR doesn't.
                 "icc_profile": "native",
                 "digital_vibrance": 50,
                 "show_osd_guidance": True,

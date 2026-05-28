@@ -136,11 +136,10 @@ def test_verify_active_reports_mismatch(tmp_path: Path) -> None:
     assert verify["settings"]["reflex"]["active"] is False
 
 
-def test_apply_auto_vrr_fps_cap_writes_scaled_margin(tmp_path: Path) -> None:
-    """auto_vrr_fps_cap writes the in-game cap using the refresh-scaled formula.
+def test_apply_auto_vrr_fps_cap_writes_refresh_minus_three(tmp_path: Path) -> None:
+    """auto_vrr_fps_cap writes the in-game cap using refresh - 3.
 
-    240Hz now resolves to 233 (0.97x) per Blur Busters' 2026 guidance,
-    replacing the legacy refresh - 3 = 237 value. See abso/core/vrr.py.
+    240 Hz -> 237 (Blur Busters G-SYNC 101 convention). See abso/core/vrr.py.
     """
     prefs_path = tmp_path / "Documents" / "Diablo IV" / "LocalPrefs.txt"
     _write_local_prefs(
@@ -167,7 +166,7 @@ def test_apply_auto_vrr_fps_cap_writes_scaled_margin(tmp_path: Path) -> None:
     assert result["success"] is True
     content = prefs_path.read_text(encoding="utf-8")
     assert 'LimitForegroundFPS "1"' in content
-    assert 'MaxForegroundFPS "233"' in content
+    assert 'MaxForegroundFPS "237"' in content
 
 
 def test_apply_auto_vrr_fps_cap_without_refresh_emits_notice(tmp_path: Path) -> None:

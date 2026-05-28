@@ -166,8 +166,8 @@ class _DeadlockBaseProfile(ReflexShooterBaseProfile):
             {
                 "category": "Display",
                 "setting": "Frame Rate Cap",
-                "value": "Auto (refresh-scaled: e.g. 285 @ 300Hz, 233 @ 240Hz, 141 @ 144Hz)",
-                "reason": "Set by ABSO via NVCP using Blur Busters' 2026 scaled-margin formula. Keeps VSync from engaging while preserving VRR.",
+                "value": "Auto (refresh - 3: e.g. 297 @ 300Hz, 237 @ 240Hz, 141 @ 144Hz)",
+                "reason": "Set by ABSO via NVCP to refresh - 3 (Blur Busters G-SYNC 101 convention). Keeps NVCP V-SYNC from engaging while preserving VRR.",
             },
             {
                 "category": "Graphics",

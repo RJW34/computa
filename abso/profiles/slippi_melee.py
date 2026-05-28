@@ -39,14 +39,16 @@ _HDR_OVERRIDES: dict[str, dict[str, Any]] = {
         "disable_auto_color_management": True,
     },
     "ColorProfileSettingsHandler": {
-        # Match the OW2-HDR convention: native (no explicit sRGB
-        # association). On this hardware (LG OLED primary + Alienware
-        # QD-OLED secondary + Windows HDR on) the sRGB ICC clamp was
-        # empirically verified to LOOK MORE washed-out than native, not
-        # less — the LG's internal color processing reacts to the sRGB
-        # ICC metadata by switching to an sRGB-simulation picture mode
-        # that reads as muted. The COLOR_HDR_SRGB_CLAMP lint rule has
-        # the right default for this hardware class.
+        # Match the OW2-HDR convention: native (no explicit sRGB association).
+        # Why native and not srgb? On the OLED panel class this profile was
+        # tuned against, applying the sRGB ICC clamp triggered the panel's
+        # internal sRGB-simulation picture mode and read as muted. Native
+        # passes color through Windows HDR's gamut mapper instead. On a
+        # different panel the right choice may be "srgb" — override via
+        # ``profile_overrides.<profile-id>.color.icc_profile: srgb`` in
+        # abso.yaml if your OLED renders native as oversaturated rather than
+        # neutral. Also: the abso.yaml ``color.manage_icc: false`` knob
+        # disables ICC management entirely for users who calibrate manually.
         "icc_profile": "native",
         # Restore neutral vibrance on the HDR path — the SDR base
         # applies a -5 compensation for wide-gamut SDR-on-OLED, but
@@ -97,10 +99,11 @@ def _hdr_in_game_guidance() -> list[dict[str, str]]:
             "value": "Accept a small HDR composition cost",
             "reason": (
                 "When Windows is in HDR mode, even 'exclusive fullscreen' SDR apps go through "
-                "the HDR composition path. The added latency is small (sub-frame on a high-refresh "
-                "display) but it's not zero. The HDR variant is for sessions where eye-strain relief "
-                "matters more than the leanest no-sync path; switch back to the SDR sibling "
-                "for tournament/practice where latency is the priority."
+                "the HDR composition path. The added latency is real but not measured by ABSO — "
+                "Windows HDR composition cost varies by OS build, driver, and panel. The HDR "
+                "variant is for sessions where eye-strain relief matters more than the leanest "
+                "no-sync path; switch back to the SDR sibling for tournament/practice where "
+                "latency is the priority."
             ),
         },
     ]
@@ -618,7 +621,16 @@ class SlippiMeleeUniversalProfile(SlippiMeleeProfile):
 
 
 class SlippiMeleeConsoleParityProfile(SlippiMeleeProfile):
-    """Console-parity style profile for offline Melee practice on modern displays."""
+    """Console-parity style profile for offline Melee practice on modern displays.
+
+    SYSTEM-WIDE BEHAVIOR WARNING: This profile drops the active display to
+    60 Hz via Windows ChangeDisplaySettingsEx. Windows has no per-application
+    refresh-rate scoping, so every other app on that display also runs at
+    60 Hz until you switch back to a max-refresh profile (every other ABSO
+    profile sets ``max_refresh_rate: True``, so switching automatically
+    restores your panel's native rate). Do not stay on Console Parity while
+    actively using high-refresh apps in parallel.
+    """
 
     @property
     def profile_id(self) -> str:
@@ -630,7 +642,10 @@ class SlippiMeleeConsoleParityProfile(SlippiMeleeProfile):
 
     @property
     def description(self) -> str:
-        return "Console-like frame pacing and presentation for offline practice"
+        return (
+            "Console-like 60 Hz frame pacing for offline Melee practice. "
+            "Drops display to 60 Hz system-wide until you switch profiles."
+        )
 
     @property
     def optimization_target(self) -> str:
@@ -640,6 +655,9 @@ class SlippiMeleeConsoleParityProfile(SlippiMeleeProfile):
         return {
             "WindowsSettingsHandler": {
                 # Strict console-style pacing is 60 Hz output cadence.
+                # NOTE: this is SYSTEM-WIDE — Windows has no per-app refresh
+                # scoping. Every other ABSO profile sets max_refresh_rate=True,
+                # so switching profiles restores the panel's native rate.
                 "refresh_rate": 60,
             },
             "NvidiaSettingsHandler": {

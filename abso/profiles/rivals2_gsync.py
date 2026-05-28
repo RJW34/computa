@@ -101,13 +101,12 @@ class Rivals2GSyncProfile(Rivals2BaseProfile):
             {
                 "category": "=== G-SYNC PROFILE ===",
                 "setting": "Overview",
-                "value": "G-SYNC ON, VSync ON (NVCP), refresh-scaled FPS cap",
+                "value": "G-SYNC ON, VSync ON (NVCP), refresh - 3 FPS cap",
                 "reason": (
                     "Tear-free low-latency VRR profile. VSync acts as safety net only - "
                     "never activates with FPS capped below refresh rate. "
-                    "For 300Hz: cap at 285. For 240Hz: cap at 233. For 144Hz: cap at 141. "
-                    "(Cap scales with refresh per Blur Busters' 2026 guidance: -3 below 200Hz, "
-                    "0.97x at 200-300Hz, 0.95x at 300Hz+.)"
+                    "For 300Hz: cap at 297. For 240Hz: cap at 237. For 144Hz: cap at 141. "
+                    "(Blur Busters G-SYNC 101 convention.)"
                 ),
             },
             {
@@ -138,12 +137,12 @@ class Rivals2GSyncProfile(Rivals2BaseProfile):
             {
                 "category": "NVIDIA Control Panel",
                 "setting": "Max Frame Rate",
-                "value": "Refresh-scaled VRR cap (auto-set by ABSO)",
+                "value": "refresh - 3 cap (auto-set by ABSO)",
                 "reason": (
                     "ABSO auto-detects your refresh rate and applies the Blur "
-                    "Busters 2026 scaled-margin cap (e.g. 285 @ 300Hz, 233 @ "
-                    "240Hz, 141 @ 144Hz). Keeps G-SYNC active and VSync from "
-                    "engaging."
+                    "Busters G-SYNC 101 convention (refresh - 3: e.g. 297 @ "
+                    "300Hz, 237 @ 240Hz, 141 @ 144Hz). Keeps G-SYNC active "
+                    "and V-SYNC from engaging."
                 ),
             },
             {
@@ -161,7 +160,7 @@ class Rivals2GSyncProfile(Rivals2BaseProfile):
             {
                 "category": "In-Game Video",
                 "setting": "Frame Rate Cap",
-                "value": "Refresh-scaled VRR cap (e.g., 285 for 300Hz)",
+                "value": "refresh - 3 cap (e.g., 297 for 300Hz)",
                 "reason": (
                     "Must cap below refresh for G-SYNC to work properly. "
                     "In-game limiter has lower latency than NVCP/RTSS limiters."

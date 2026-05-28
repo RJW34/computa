@@ -575,15 +575,10 @@ class OW2ConfigHandler(SettingsHandler):
         Apply and verify must share this path. Otherwise health/state checks can
         report the profile active while OW2's actual FrameRateCap has drifted.
 
-        The cap policy is Reflex-aware: when the applier marks the active profile
-        as Reflex-enabled (`_reflex_active`), the engine's dynamic cap is the real
-        latency control and the static INI cap becomes a looser V-SYNC safety
-        boundary (refresh - 3). For non-Reflex paths the conservative scaled
-        margin is used instead.
+        Uses the Blur Busters G-SYNC 101 ``refresh - 3`` convention as the
+        V-SYNC safety boundary. See ``abso/core/vrr.py:get_vrr_fps_cap``.
         """
         resolved = dict(settings)
-        # Pop so the flag never reaches OW2's INI writer as a phantom setting.
-        reflex_active = bool(resolved.pop("_reflex_active", False))
 
         if resolved.pop(self.AUTO_VRR_FPS_CAP_KEY, False):
             try:
@@ -592,12 +587,10 @@ class OW2ConfigHandler(SettingsHandler):
 
                 refresh_hz = NvidiaSettingsHandler()._detect_primary_refresh_rate()
                 if refresh_hz and refresh_hz > 0:
-                    resolved["frame_rate_cap"] = get_vrr_fps_cap(
-                        refresh_hz, reflex_active=reflex_active,
-                    )
+                    resolved["frame_rate_cap"] = get_vrr_fps_cap(refresh_hz)
                     logger.info(
-                        "OW2 auto VRR FPS cap: %d (from %d Hz, reflex_active=%s)",
-                        resolved["frame_rate_cap"], refresh_hz, reflex_active,
+                        "OW2 auto VRR FPS cap: %d (from %d Hz)",
+                        resolved["frame_rate_cap"], refresh_hz,
                     )
             except Exception as e:
                 logger.warning("OW2 auto VRR FPS cap detection failed: %s", e)

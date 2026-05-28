@@ -135,10 +135,6 @@ class Diablo4ConfigHandler(SettingsHandler):
 
         auto_refresh = requested.pop(self.AUTO_REFRESH_RATE_KEY, False)
         auto_vrr_cap = requested.pop(self.AUTO_VRR_FPS_CAP_KEY, False)
-        # Diablo IV supports NVIDIA Reflex (in-game video setting). The applier
-        # threads `requires_reflex` here so the static foreground cap matches
-        # what Reflex would otherwise undershoot — refresh - 3 instead of 5%.
-        reflex_active = bool(requested.pop("_reflex_active", False))
 
         refresh_hz: float | None = None
         if auto_refresh or auto_vrr_cap:
@@ -163,12 +159,12 @@ class Diablo4ConfigHandler(SettingsHandler):
             if refresh_hz and refresh_hz > 0:
                 from abso.core.vrr import get_vrr_fps_cap
 
-                cap = get_vrr_fps_cap(refresh_hz, reflex_active=reflex_active)
+                cap = get_vrr_fps_cap(refresh_hz)
                 requested["limit_foreground_fps"] = True
                 requested["foreground_fps_limit"] = cap
                 logger.info(
-                    "Diablo IV auto VRR FPS cap: %d (from %.2f Hz, reflex_active=%s)",
-                    cap, refresh_hz, reflex_active,
+                    "Diablo IV auto VRR FPS cap: %d (from %.2f Hz)",
+                    cap, refresh_hz,
                 )
             else:
                 notices.append(
@@ -271,7 +267,6 @@ class Diablo4ConfigHandler(SettingsHandler):
         requested = dict(settings)
         auto_refresh = requested.pop(self.AUTO_REFRESH_RATE_KEY, False)
         auto_vrr_cap = requested.pop(self.AUTO_VRR_FPS_CAP_KEY, False)
-        reflex_active = bool(requested.pop("_reflex_active", False))
 
         refresh_hz: float | None = None
         if auto_refresh or auto_vrr_cap:
@@ -289,9 +284,7 @@ class Diablo4ConfigHandler(SettingsHandler):
             from abso.core.vrr import get_vrr_fps_cap
 
             requested["limit_foreground_fps"] = True
-            requested["foreground_fps_limit"] = get_vrr_fps_cap(
-                refresh_hz, reflex_active=reflex_active,
-            )
+            requested["foreground_fps_limit"] = get_vrr_fps_cap(refresh_hz)
 
         for key, target in requested.items():
             current_value = current.get(key)
