@@ -157,7 +157,7 @@ def get_best_ingame_preset(
         refresh_rate: Monitor's refresh rate.
         available_presets: Game's available FPS presets. Uses common presets if None.
         reflex_active: Forwarded to ``get_vrr_fps_cap`` so the chosen preset
-            tracks the Reflex-aware ceiling.
+            stays callsite-compatible with older profile logic.
 
     Returns:
         Best preset value, or None if no suitable preset exists.
@@ -191,8 +191,9 @@ def get_limiter_recommendation(
     Returns:
         Dictionary with limiter type and recommended cap value.
     """
-    # When the game supports Reflex, use the Reflex-aware (looser) static
-    # cap as the safety boundary — Reflex's dynamic cap handles latency.
+    # Reflex is a dynamic latency control, not a separate static cap policy.
+    # The argument is still threaded for compatibility, but get_vrr_fps_cap
+    # intentionally uses the same V-SYNC safety boundary either way.
     recommended_cap = get_vrr_fps_cap(refresh_rate, reflex_active=has_reflex)
 
     if has_ingame_limiter:

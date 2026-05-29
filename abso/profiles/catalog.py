@@ -324,7 +324,7 @@ PROFILE_CATALOG: OrderedDict[str, ProfileCatalogEntry] = OrderedDict(
             tray_subtitle="Strict SDR G-SYNC | LLM ON | VSync Safety Net | Offline Only",
             tray_description=(
                 "Offline/training Rivals 2 strict fullscreen-only G-SYNC SDR profile. "
-                "Uses refresh-scaled FPS caps and disables UE5 driver threaded optimization."
+                "Uses refresh - 3 FPS caps and disables UE5 driver threaded optimization."
             ),
             sync_mode="on",
         ),

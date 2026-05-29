@@ -28,7 +28,7 @@ class Rivals2GSyncProfile(Rivals2BaseProfile):
         # Rivals 2 GameUserSettings.ini is known to be rewritten by the game
         # on exit, so ABSO keeps the NVIDIA driver cap as a safety net in
         # addition to the in-game cap. Both resolve to the same
-        # refresh-scaled VRR cap.
+        # refresh - 3 VRR cap.
         return True
 
     @property
@@ -227,7 +227,7 @@ class Rivals2OnlineGSyncProfile(Rivals2BaseProfile):
         # Same rationale as Rivals2GSyncProfile: UE5 rewrites
         # GameUserSettings.ini on exit, so ABSO keeps the driver cap as a
         # safety net alongside the in-game cap. Both resolve to the same
-        # refresh-scaled VRR cap.
+        # refresh - 3 VRR cap.
         return True
 
     @property
