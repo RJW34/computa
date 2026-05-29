@@ -1,6 +1,6 @@
 # Current Agent Briefing
 
-Last updated: 2026-05-29 16:05 America/New_York
+Last updated: 2026-05-29 17:02 America/New_York
 
 > **MACHINE-SPECIFIC — read `docs/NEW_MACHINE_SETUP.md` first if this repo was
 > just cloned onto a different PC.** Everything below describes the live state of
@@ -29,25 +29,61 @@ is the current operational truth for this PC.
 
 ## Live Machine State
 
-- Active profile: `overwatch2-gsync-hdr-capture`.
+- Active profile: `overwatch2-gsync-hdr`.
+- Active display topology from installed `display-diagnostics --json`:
+  one monitor, `Dell S2719DGF(Displayport)`, 2560x1440 at 300 Hz,
+  VRR-capable (`gsync_compatible`), no mixed-refresh secondary currently
+  detected.
 - Installed backend:
   `%LOCALAPPDATA%\AdaptiveBattleStationOptimizer\abso.exe`
-  length `17893575`, last write `2026-05-29 16:02:49`.
+  length `17892269`, last write `2026-05-29 16:52:04`, SHA256
+  `B2D481C5F875010AB215E27127E45370ECB75FF09BAC055835F03C0F398D2026`.
 - Tray runtime: scheduled-task startup is installed and enabled. Live tray PID
-  `23744` is running installed script
+  `21832` is running installed script
   `%LOCALAPPDATA%\AdaptiveBattleStationOptimizer\abso\tray\ABSO-Tray.ps1`.
   `health --json` reports `tray_runtime_marker: ok`.
-- Local config includes:
-  `profile_overrides.overwatch2-gsync-hdr-capture.graphics.disable_mpo: true`.
-- Current installed verification reports
-  `current_profile: overwatch2-gsync-hdr-capture`, `reboot_pending: true`,
-  `reboot_reasons: ["GraphicsSettingsHandler"]`, verification
-  `status: pending_reboot`, and pending reboot-gated setting
-  `GraphicsSettingsHandler.mpo_disabled`.
+- Installed tray cache matches source:
+  `abso\tray\profile-catalog-cache.json` SHA256
+  `4EC4C8816CD40E4AB318E63C0FAB5F13F00D3A0AF19D628D6FC7DCE84F1258FB`.
+- Current installed state reports `current_profile: overwatch2-gsync-hdr`,
+  `reboot_pending: false`, `reboot_reasons: []`.
+- Current installed verification reports `all_active: false` only because
+  `OW2ConfigHandler` sees display-mode drift:
+  `window_mode` target `0` current `1`,
+  `fullscreen_window_enabled` target `1` current `0`, and
+  `windowed_fullscreen` target `0` current `1`.
+  The FPS cap is already correct for the active 300 Hz path:
+  `frame_rate_cap` target `297`, current `297`, active `true`.
 - Installed health reports `7 ok`, `3 warning`, `0 error`. The warnings are
-  active profile reboot-pending, recent display/power events from the user's
-  apply attempts, and display compositor risk with Medal Overlay currently
-  detected.
+  active profile verification mismatch in `OW2ConfigHandler`, recent
+  power/display events from profile work, and compositor risk due to the
+  current VRR-capable display path.
+
+## 2026-05-29 VRR Cap / Reflex Clarification
+
+The Overwatch 2 cap policy is now documented in source, README,
+troubleshooting docs, and this briefing:
+
+- ABSO's persisted static VRR safety cap is `refresh - 3`.
+- On this PC's 300 Hz Overwatch path, ABSO should write `297`, not `276`,
+  `277`, or any 280 Hz-derived value.
+- NVIDIA Reflex may dynamically pace the effective runtime FPS below that
+  static ceiling, often around the mid/high 270s on a 300 Hz path. That is
+  Reflex queue control, not the value ABSO should persist to NVCP or OW2 config.
+- Current installed verification proves the active OW2 config cap is already
+  `297` target/current. The remaining strict-profile mismatch is display mode
+  drift into borderless/windowed, not cap policy.
+
+Validation and deployment for the cleanup:
+
+- Commit `87b4393 Align VRR cap validation with 300Hz profile path` is pushed
+  to `origin/master`.
+- `pytest tests\ -q`: `1843 passed, 3 skipped`.
+- `ruff check .`: passed.
+- `git diff --check`: passed.
+- `build.py deploy` completed at `2026-05-29 16:52`, updating the backend and
+  one tray asset.
+- Tray was restarted after deploy and is running as PID `21832`.
 
 ## 2026-05-29 Tray Switch Failure Fix
 
@@ -173,10 +209,10 @@ Additional FPS audit evidence:
 - A large NVIDIA DX shader cache file was written at OW2 launch time
   (`DXCache\ecc4a93befac14d8.nvph`, 512 MB, 22:36), so the first session after
   driver/cache churn may run below normal while shaders warm.
-- Current OW2 config is fullscreen (`WindowMode=0`) while the active profile is
-  still the capture-safe profile whose FSO policy has cleared the strict
-  AppCompat FSO-disable flag. This is not the same as the strict profile's true
-  exclusive lane.
+- At that point, OW2 config was fullscreen (`WindowMode=0`) while the active
+  profile was still the capture-safe profile whose FSO policy had cleared the
+  strict AppCompat FSO-disable flag. That was not the same as the strict
+  profile's true exclusive lane.
 - OW2 display mode is now written and verified as a key tuple:
   `WindowMode`, `FullscreenWindow`, `FullscreenWindowEnabled`, and
   `WindowedFullscreen`. Observed local fullscreen is `0/0/1/0`; observed
@@ -231,26 +267,27 @@ profile/display-path change to address the FPS-vs-flicker tradeoff.
 
 ## Current Bookmark
 
-Work can stop here without leaving the program mid-transition. The strict
-competitive Overwatch profile is applied, verified active, and the tray is
-operational with the startup-state fix deployed.
+Work can stop here without leaving the program mid-transition. The runtime is
+deployed, the tray is restarted, and the branch is clean after commit
+`87b4393`.
 
-- Installed backend was rebuilt and deployed at `2026-05-26 22:57:30`:
-  length `17887429`; previous backend backup:
-  `deploy-backups\abso.exe.bak-20260526-225730`.
-- Tray is operational and running the installed tray script:
-  PID `25080`, script hash
-  `af5d8eeb7cb63ea02f844478b7ad55becc977693a15c3253169059da9f9e8c0a`.
-- Installed `ABSO-StartupState.ps1` byte-matches source and has hash
-  `c5fd4ff078f2601a479f901bcc00a86aa79334107bebdb274b7088f4dfb4ec27`.
+- Installed backend was rebuilt and deployed at `2026-05-29 16:52:04`:
+  length `17892269`, SHA256
+  `B2D481C5F875010AB215E27127E45370ECB75FF09BAC055835F03C0F398D2026`.
+- Tray is operational and running the installed tray script at PID `21832`;
+  `health --json` reports `tray_runtime_marker: ok`.
+- Installed tray profile cache byte-content matches source by SHA256:
+  `4EC4C8816CD40E4AB318E63C0FAB5F13F00D3A0AF19D628D6FC7DCE84F1258FB`.
 - Active profile state:
   `overwatch2-gsync-hdr`, `reboot_pending: false`.
-- Current verification is clean: `state --json --verify` reports
-  verification `active`, `all_active: true`, and no mismatched handlers.
+- Current verification is not clean, but the remaining mismatch is specific:
+  `OW2ConfigHandler` reports OW2 display mode as windowed/borderless while the
+  strict profile expects exclusive fullscreen. The FPS cap is correct:
+  `frame_rate_cap` target/current `297`.
 - `display-diagnostics --json` reports current profile
   `overwatch2-gsync-hdr`, `is_capture_safe: false`,
-  `nvidia_global_vrr_mode: fullscreen_only`, `ow2_window_mode: 0`, and only
-  the remaining mixed-refresh display-topology recommendation.
+  `nvidia_global_vrr_mode: fullscreen_only`, one 300 Hz VRR-capable monitor,
+  and no reboot-pending graphics action.
 
 ## Latest Verified Slice
 
@@ -301,8 +338,8 @@ completed and deployed:
   source and installed cache compare equal.
 - Tray was restarted after deploy and is operational at PID `24484`, script
   hash `af5d8eeb7cb63ea02f844478b7ad55becc977693a15c3253169059da9f9e8c0a`.
-- Installed health reports `7 ok`, `3 warning`, `0 error`. The warnings are
-  expected for current state: active profile reboot pending, profile verify
+- Installed health reports `7 ok`, `3 warning`, `0 error`. The warnings were
+  expected for that captured state: active profile reboot pending, profile verify
   mismatch in `OW2ConfigHandler`, and display topology risk.
 - Installed `state --json --verify` reports active profile
   `overwatch2-gsync-hdr-capture`, `reboot_pending: true`, and verification
@@ -334,8 +371,8 @@ At `2026-05-26 22:40`, manual tray fallback behavior was fixed and deployed:
 - Tray was restarted after deploy and is operational at PID `23568`, script
   hash `af5d8eeb7cb63ea02f844478b7ad55becc977693a15c3253169059da9f9e8c0a`.
 - Installed `abso.exe apply --help` includes `--no-fallback`.
-- Installed health reports `7 ok`, `3 warning`, `0 error`. The warnings are
-  expected for current state: active profile reboot pending, profile verify
+- Installed health reports `7 ok`, `3 warning`, `0 error`. The warnings were
+  expected for that captured state: active profile reboot pending, profile verify
   mismatch in `OW2ConfigHandler`, and display topology risk.
 - Installed `state --json --verify` reports active profile
   `overwatch2-gsync-hdr-capture`, `reboot_pending: true`, and verification
@@ -353,8 +390,8 @@ Validation evidence:
 At `2026-05-26 22:06`, a one-time Overwatch FPS regression audit was completed
 and the installed runtime/tray were redeployed:
 
-- Root cause: after the reboot, the MPO-disable override is now committed while
-  the active profile remains `overwatch2-gsync-hdr-capture`, which is
+- Root cause at that time: after the reboot, the MPO-disable override was
+  committed while the active profile remained `overwatch2-gsync-hdr-capture`, which is
   capture-safe, borderless (`ow2_window_mode: 1`), HDR, and
   `fullscreen_and_windowed` VRR. This is the likely reason flicker improved but
   FPS dropped.
@@ -514,9 +551,10 @@ Continue with small, verifiable slices:
   and custom-profile validation.
 - Prefer shared helpers over repeating policy in `main.py`, tray scripts, and
   profile loaders.
-- After reboot, verify whether `reboot_pending` clears and whether flicker
-  stops before changing display policy again.
-- If post-reboot flicker continues, collect fresh
+- If the user wants the strict Overwatch profile completely active, resolve the
+  `OW2ConfigHandler` display-mode drift by putting OW2 back in exclusive
+  fullscreen or by running an approved elevated profile apply, then verify.
+- If flicker continues, collect fresh
   `display-diagnostics --json` and event evidence before applying another
   mitigation.
 

@@ -28,26 +28,32 @@ snapshots as current state unless the active briefing explicitly tells you to.
 
 ## Current Live-PC Constraint
 
-As of 2026-05-26, this PC is debugging secondary-monitor black flashes on the
-active `overwatch2-gsync-hdr-capture` profile. The local profile override has
-already written the MPO-disable registry target, and verification reports the
-profile active with `GraphicsSettingsHandler` reboot-pending.
+As of 2026-05-29, this PC is on the strict Overwatch 2 profile
+`overwatch2-gsync-hdr` with no reboot pending. The active display path is a
+single 2560x1440 300 Hz VRR-capable display, so ABSO's expected static VRR cap
+for Overwatch is `297` (`refresh - 3`). NVIDIA Reflex may dynamically pace the
+runtime FPS lower; do not replace the persisted cap with a Reflex-observed
+value such as `276`.
 
-The remaining commit step is a normal Windows reboot. Do not run full profile
-apply, live display reset, HDR off/on cycling, DWM restart, or the graphics
-driver hotkey just because the monitor flickers unless the user explicitly asks.
+Current verification is not fully clean only because `OW2ConfigHandler` sees
+display-mode drift: OW2 is currently windowed/borderless while the strict
+profile expects exclusive fullscreen. The FPS cap verifies as `297`
+target/current. Do not run full profile apply, live display reset, HDR off/on
+cycling, DWM restart, or the graphics driver hotkey just because the monitor
+flickers unless the user explicitly asks.
 
 Safe evidence commands:
 
 ```powershell
-%LOCALAPPDATA%\AdaptiveBattleStationOptimizer\abso.exe display-diagnostics --json
-%LOCALAPPDATA%\AdaptiveBattleStationOptimizer\abso.exe state --json --verify
-%LOCALAPPDATA%\AdaptiveBattleStationOptimizer\abso.exe health --json
-%LOCALAPPDATA%\AdaptiveBattleStationOptimizer\abso.exe reapply --json
+& "$env:LOCALAPPDATA\AdaptiveBattleStationOptimizer\abso.exe" display-diagnostics --json
+& "$env:LOCALAPPDATA\AdaptiveBattleStationOptimizer\abso.exe" state --json --verify
+& "$env:LOCALAPPDATA\AdaptiveBattleStationOptimizer\abso.exe" health --json
+& "$env:LOCALAPPDATA\AdaptiveBattleStationOptimizer\abso.exe" verify overwatch2-gsync-hdr --json
 ```
 
-Expected current `reapply --json` behavior for the active profile is a no-op:
-`changed: false`, `changed_settings: []`, and `transaction: null`.
+Expected current `verify overwatch2-gsync-hdr --json` behavior: all handlers
+active except `OW2ConfigHandler` display-mode keys; `frame_rate_cap` should be
+`297` target/current.
 
 ## Deploy And Verify
 
@@ -60,8 +66,8 @@ Use the deploy helper instead of hand-copying installed runtime files:
 
 After code changes, run focused tests for the touched area, then `ruff check .`.
 Run the full pytest suite before a deploy when behavior changed. Avoid live
-display/profile transaction tests while the current flicker investigation is
-reboot-gated unless the user explicitly authorizes them.
+display/profile transaction tests for the flicker/FPS investigation unless the
+user explicitly authorizes them; prefer read-only verify/health diagnostics.
 
 ## Worktree Rule
 

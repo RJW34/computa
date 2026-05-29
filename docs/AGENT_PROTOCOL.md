@@ -129,18 +129,26 @@ broken state.
 
 ### 3.1 Current monitor-flicker safety rule
 
-As of 2026-05-26, the active repair path for the secondary-monitor black-flash
-issue is:
+As of 2026-05-29, the live PC is no longer in the reboot-gated capture-safe
+MPO state. The active profile is `overwatch2-gsync-hdr`, the installed state
+reports `reboot_pending: false`, and display diagnostics show a single
+2560x1440 300 Hz VRR-capable monitor. The remaining live verification mismatch
+is `OW2ConfigHandler` display-mode drift: OW2 is windowed/borderless while the
+strict profile expects exclusive fullscreen. The FPS cap itself verifies as
+`297` target/current.
 
-1. Keep `overwatch2-gsync-hdr-capture` active.
-2. Keep the local override
-   `profile_overrides.overwatch2-gsync-hdr-capture.graphics.disable_mpo: true`.
-3. Use `display-diagnostics --json`, `state --json --verify`, `health --json`,
-   or `apply-pending --json` for verification/remediation.
-4. Do not run full profile apply, live display reset, HDR cycle, DWM restart,
+Current safe handling:
+
+1. Use `display-diagnostics --json`, `state --json --verify`,
+   `verify overwatch2-gsync-hdr --json`, or `health --json` for evidence.
+2. Treat `297` as the expected persisted static cap on the 300 Hz Overwatch
+   path. Reflex may dynamically pace below it at runtime, but ABSO should not
+   persist Reflex-observed values such as `276`.
+3. Do not run full profile apply, live display reset, HDR cycle, DWM restart,
    or driver hotkey unless the user explicitly asks.
-5. Reboot normally to let the written MPO registry target become live, then
-   verify.
+4. If the user wants the strict profile fully verified, the narrow user-facing
+   fix is to put Overwatch 2 back into exclusive fullscreen or run an approved
+   profile apply from an elevated context, then re-run verify.
 
 The tray must keep already-active profile selection verify-gated. Pending
 apply state should route to the narrow `apply-pending` action, active or
@@ -379,24 +387,48 @@ Old shape (do not reintroduce): duplicate LocalAppData path construction,
 duplicate `.abso_state.json` reads/writes in `main.py` and health, or broad
 profile apply logic for a single pending reboot-gated graphics setting.
 
+### 5.9 VRR static cap versus Reflex dynamic cap
+
+ABSO's manual VRR cap policy is `refresh - 3` for both Reflex and non-Reflex
+profiles. The value is a static V-SYNC safety boundary, not the latency
+controller. For a 300 Hz Overwatch 2 profile, ABSO should write `297` to the
+NVIDIA profile and to any owned game config cap.
+
+Do not replace that static cap with a Reflex-observed effective value such as
+`276` on a 300 Hz path. Reflex is an engine/runtime pacing mechanism. With
+G-SYNC and the V-SYNC safety net enabled, Reflex may choose an effective cap
+well below the static ceiling to keep the render queue shallow. That runtime
+behavior is expected, but it is not the value ABSO should persist.
+
+When auditing Overwatch 2 on this PC:
+
+- Verify the active monitor path first. The current reference setup is
+  2560x1440 at 300 Hz, so the expected ABSO static cap is `297`.
+- If verification reports `frame_rate_cap` target/current `297`, the cap is
+  not the active mismatch.
+- Strict OW2 G-SYNC profiles expect exclusive fullscreen. If verification
+  reports `OW2ConfigHandler` mismatches for `window_mode`,
+  `fullscreen_window_enabled`, or `windowed_fullscreen`, the issue is display
+  mode drift, not the FPS cap.
+
 ---
 
 ## 6. Backlog: what's actually open right now
 
-Updated 2026-05-26 after the monitor-flicker repair, targeted
-`apply-pending` path, state-store/path extraction, deployed tray/GUI rebuild,
-startup-action self-repair, and installed config-path fallback. For live
-machine status, installed build timestamps, scheduled-task action state,
-installed config/backup state, local deploy command status, and the current
-reboot-gated MPO state, read `docs/CURRENT_AGENT_BRIEFING.md` first.
+Updated 2026-05-29 after the tray switch rollback fix, VRR cap policy cleanup,
+deployed tray/backend rebuild, and live briefing refresh. For live machine
+status, installed build timestamps, scheduled-task action state, installed
+config/backup state, local deploy command status, and the current Overwatch
+verification state, read `docs/CURRENT_AGENT_BRIEFING.md` first.
 
 ### Real open work
 
-- **Monitor-flicker final validation** — the MPO registry target is written for
-  `overwatch2-gsync-hdr-capture`, but Windows has not rebooted since that
-  write. The next step is a normal reboot, followed by installed
-  `state --json --verify` and `health --json`. Do not re-run full profile apply
-  to solve this state.
+- **OW2 strict-profile display-mode drift** — current installed verification
+  reports the `overwatch2-gsync-hdr` cap correctly as `297` target/current, but
+  `OW2ConfigHandler` sees OW2 in windowed/borderless mode while the strict
+  profile expects exclusive fullscreen. Do not confuse this with a VRR cap
+  problem. Use read-only verify first; only apply or edit game config if the
+  user explicitly wants the strict profile fully reasserted.
 - **Tray runtime-marker warning after deploys** — if installed health warns
   `tray_runtime_marker` after a future tray script deploy, restart the tray
   into the deployed LocalAppData `ABSO-Tray.ps1`. This does not require profile

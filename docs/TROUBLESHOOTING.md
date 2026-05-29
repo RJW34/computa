@@ -11,6 +11,7 @@ This guide helps diagnose and resolve common issues with A.B.S.O.
 - [Detection Problems](#detection-problems)
 - [Reboot Requirements When Switching Profiles](#reboot-requirements-when-switching-profiles)
 - [Secondary Monitor Black Flashes](#secondary-monitor-black-flashes)
+- [Overwatch Reflex and VRR FPS Caps](#overwatch-reflex-and-vrr-fps-caps)
 - [Profile Application Failures](#profile-application-failures)
 - [Backup and Restore Issues](#backup-and-restore-issues)
 - [Performance Issues](#performance-issues)
@@ -361,6 +362,39 @@ DxgKrnl Admin/Operational events. If
 `checks.display_events.data.channel_error_count` is nonzero, record the
 `channel_errors` entries before treating a zero-event result as clean. Also
 inspect `%TEMP%\abso_tray.log`.
+
+---
+
+## Overwatch Reflex and VRR FPS Caps
+
+### Why ABSO writes 297 on a 300 Hz Overwatch profile
+
+**Symptom:** A guide or latency tool suggests a Reflex cap around `276`, while
+ABSO writes `297` for a 300 Hz G-SYNC Overwatch profile.
+
+These are different mechanisms:
+
+- `297` is ABSO's manual VRR safety ceiling: `refresh - 3`. It keeps the
+  driver-side V-SYNC safety net from engaging above the VRR window.
+- `~276` is a possible NVIDIA Reflex effective runtime cap on a 300 Hz path.
+  Reflex paces the render queue dynamically when the in-game Reflex toggle is
+  enabled; ABSO does not hard-code that value into NVIDIA Control Panel or the
+  Overwatch config.
+
+For `overwatch2-gsync` and `overwatch2-gsync-hdr` on a 300 Hz monitor, the
+expected setup is:
+
+1. Display refresh: `300 Hz`
+2. NVIDIA Control Panel G-SYNC: enabled for the profile path
+3. NVIDIA Control Panel V-SYNC: on as safety net
+4. Overwatch VSync: off
+5. Overwatch NVIDIA Reflex: `Enabled + Boost`
+6. ABSO static cap: `297`
+
+If profile verification fails while the cap is already `297`, check the
+reported handler detail. On the current strict Overwatch path, a common
+mismatch is display mode drift: strict profiles expect exclusive fullscreen,
+while capture-safe profiles expect borderless/windowed fullscreen.
 
 ---
 
