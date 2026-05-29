@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "saved_at": "2026-05-26T22:59:46.0477067-04:00",
+  "saved_at": "2026-05-29T16:19:25.190091-04:00",
   "profiles": [
     {
       "id": "slippi-melee",
@@ -273,7 +273,7 @@
     {
       "id": "slippi-melee-console-parity",
       "display_name": "Super Smash Bros. Melee (Slippi Console-Parity)",
-      "description": "Console-like frame pacing and presentation for offline practice",
+      "description": "Console-like 60 Hz frame pacing for offline Melee practice. Drops display to 60 Hz system-wide until you switch profiles.",
       "optimization_target": "balanced",
       "application_scope": "system_plus_native_config",
       "executables": [
@@ -297,7 +297,7 @@
       "has_in_game_settings": true,
       "tray_category": "Fighting",
       "tray_subtitle": "Console-Parity | 60Hz + VSync | LLM OFF",
-      "tray_description": "Console-like frame pacing and presentation for offline practice",
+      "tray_description": "Console-like 60 Hz frame pacing for offline Melee practice. Drops display to 60 Hz system-wide until you switch profiles.",
       "tray_group": "slippi-melee",
       "tray_group_name": "Super Smash Bros. Melee (Slippi)",
       "tray_variant": "Console-Parity 60 Hz (SDR)",

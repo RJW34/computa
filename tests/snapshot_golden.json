@@ -46,7 +46,7 @@
         "category": "Display",
         "reason": "ABSO has already configured the driver side: NVIDIA LLM is OFF so the engine owns the render queue (Reflex's correct path). The Source 2 video config is owned by the game and cannot be written from outside; toggle 'NVIDIA Reflex Low Latency' to 'On + Boost' in Deadlock's Video settings once to finish setup.",
         "setting": "NVIDIA Reflex Low Latency",
-        "value": "On + Boost — ABSO already set driver LLM off; flip the in-game toggle to finish"
+        "value": "On + Boost \u2014 ABSO already set driver LLM off; flip the in-game toggle to finish"
       },
       {
         "category": "Display",
@@ -197,7 +197,7 @@
         "category": "Display",
         "reason": "ABSO has already configured the driver side: NVIDIA LLM is OFF so the engine owns the render queue (Reflex's correct path). The Source 2 video config is owned by the game and cannot be written from outside; toggle 'NVIDIA Reflex Low Latency' to 'On + Boost' in Deadlock's Video settings once to finish setup.",
         "setting": "NVIDIA Reflex Low Latency",
-        "value": "On + Boost — ABSO already set driver LLM off; flip the in-game toggle to finish"
+        "value": "On + Boost \u2014 ABSO already set driver LLM off; flip the in-game toggle to finish"
       },
       {
         "category": "Display",
@@ -349,7 +349,7 @@
         "category": "Display",
         "reason": "ABSO has already configured the driver side: NVIDIA LLM is OFF so the engine owns the render queue (Reflex's correct path). The Source 2 video config is owned by the game and cannot be written from outside; toggle 'NVIDIA Reflex Low Latency' to 'On + Boost' in Deadlock's Video settings once to finish setup.",
         "setting": "NVIDIA Reflex Low Latency",
-        "value": "On + Boost — ABSO already set driver LLM off; flip the in-game toggle to finish"
+        "value": "On + Boost \u2014 ABSO already set driver LLM off; flip the in-game toggle to finish"
       },
       {
         "category": "Display",
@@ -504,7 +504,7 @@
         "category": "Display",
         "reason": "ABSO has already configured the driver side: NVIDIA LLM is OFF so the engine owns the render queue (Reflex's correct path). The Source 2 video config is owned by the game and cannot be written from outside; toggle 'NVIDIA Reflex Low Latency' to 'On + Boost' in Deadlock's Video settings once to finish setup.",
         "setting": "NVIDIA Reflex Low Latency",
-        "value": "On + Boost — ABSO already set driver LLM off; flip the in-game toggle to finish"
+        "value": "On + Boost \u2014 ABSO already set driver LLM off; flip the in-game toggle to finish"
       },
       {
         "category": "Display",
@@ -751,7 +751,7 @@
         "game_priority": {
           "gpu_priority": 8,
           "priority": 6,
-          "scheduling_category": "High"
+          "scheduling_category": "Medium"
         }
       },
       "WindowsSettingsHandler": {
@@ -899,7 +899,7 @@
         "game_priority": {
           "gpu_priority": 8,
           "priority": 6,
-          "scheduling_category": "High"
+          "scheduling_category": "Medium"
         }
       },
       "WindowsSettingsHandler": {
@@ -957,7 +957,7 @@
         "category": "Display",
         "reason": "ABSO has already configured the driver side: NVIDIA LLM is OFF so the engine owns the render queue (Reflex's correct path). Fortnite's Reflex toggle lives in Fortnite's settings and there is no stable config key to write it from outside; flip 'NVIDIA Reflex Low Latency' to 'On + Boost' in the game once.",
         "setting": "NVIDIA Reflex Low Latency",
-        "value": "On + Boost — ABSO already set driver LLM off; flip the in-game toggle to finish"
+        "value": "On + Boost \u2014 ABSO already set driver LLM off; flip the in-game toggle to finish"
       },
       {
         "category": "Display",
@@ -1135,7 +1135,7 @@
         "category": "Display",
         "reason": "ABSO has already configured the driver side: NVIDIA LLM is OFF so the engine owns the render queue (Reflex's correct path). Fortnite's Reflex toggle lives in Fortnite's settings and there is no stable config key to write it from outside; flip 'NVIDIA Reflex Low Latency' to 'On + Boost' in the game once.",
         "setting": "NVIDIA Reflex Low Latency",
-        "value": "On + Boost — ABSO already set driver LLM off; flip the in-game toggle to finish"
+        "value": "On + Boost \u2014 ABSO already set driver LLM off; flip the in-game toggle to finish"
       },
       {
         "category": "Display",
@@ -1819,11 +1819,11 @@
         "category": "Display",
         "reason": "ABSO has already configured the driver side: NVIDIA LLM is OFF so the engine owns the render queue (Reflex's correct path). OW2's Reflex toggle lives in Settings_v0.ini behind a key that is not stable across patches and is not safely writable from outside; flip 'NVIDIA Reflex Low Latency' to 'Enabled + Boost' in Overwatch 2's Video settings once.",
         "setting": "NVIDIA Reflex Low Latency",
-        "value": "Enabled + Boost — ABSO already set driver LLM off; flip the in-game toggle to finish"
+        "value": "Enabled + Boost \u2014 ABSO already set driver LLM off; flip the in-game toggle to finish"
       },
       {
         "category": "Display",
-        "reason": "Set by ABSO to refresh - 3 (Blur Busters G-SYNC 101 convention) as the V-SYNC safety boundary. NVIDIA Reflex (the engine's dynamic CPU pacer) may bind below this; that's expected — the static cap just keeps NVCP V-SYNC from ever engaging.",
+        "reason": "Set by ABSO to refresh - 3 (Blur Busters G-SYNC 101 convention) as the V-SYNC safety boundary. NVIDIA Reflex (the engine's dynamic CPU pacer) may bind below this; that's expected \u2014 the static cap just keeps NVCP V-SYNC from ever engaging.",
         "setting": "Frame Rate Cap",
         "value": "Auto (refresh - 3: e.g. 297 @ 300Hz, 237 @ 240Hz, 141 @ 144Hz)"
       },
@@ -1977,7 +1977,7 @@
         "category": "Display",
         "reason": "ABSO has already configured the driver side: NVIDIA LLM is OFF so the engine owns the render queue (Reflex's correct path). OW2's Reflex toggle lives in Settings_v0.ini behind a key that is not stable across patches and is not safely writable from outside; flip 'NVIDIA Reflex Low Latency' to 'Enabled + Boost' in Overwatch 2's Video settings once.",
         "setting": "NVIDIA Reflex Low Latency",
-        "value": "Enabled + Boost — ABSO already set driver LLM off; flip the in-game toggle to finish"
+        "value": "Enabled + Boost \u2014 ABSO already set driver LLM off; flip the in-game toggle to finish"
       },
       {
         "category": "Display",
@@ -2136,11 +2136,11 @@
         "category": "Display",
         "reason": "ABSO has already configured the driver side: NVIDIA LLM is OFF so the engine owns the render queue (Reflex's correct path). OW2's Reflex toggle lives in Settings_v0.ini behind a key that is not stable across patches and is not safely writable from outside; flip 'NVIDIA Reflex Low Latency' to 'Enabled + Boost' in Overwatch 2's Video settings once.",
         "setting": "NVIDIA Reflex Low Latency",
-        "value": "Enabled + Boost — ABSO already set driver LLM off; flip the in-game toggle to finish"
+        "value": "Enabled + Boost \u2014 ABSO already set driver LLM off; flip the in-game toggle to finish"
       },
       {
         "category": "Display",
-        "reason": "Set by ABSO to refresh - 3 (Blur Busters G-SYNC 101 convention) as the V-SYNC safety boundary. NVIDIA Reflex (the engine's dynamic CPU pacer) may bind below this; that's expected — the static cap just keeps NVCP V-SYNC from ever engaging.",
+        "reason": "Set by ABSO to refresh - 3 (Blur Busters G-SYNC 101 convention) as the V-SYNC safety boundary. NVIDIA Reflex (the engine's dynamic CPU pacer) may bind below this; that's expected \u2014 the static cap just keeps NVCP V-SYNC from ever engaging.",
         "setting": "Frame Rate Cap",
         "value": "Auto (refresh - 3: e.g. 297 @ 300Hz, 237 @ 240Hz, 141 @ 144Hz)"
       },
@@ -2321,7 +2321,7 @@
         "category": "Display",
         "reason": "ABSO has already configured the driver side: NVIDIA LLM is OFF so the engine owns the render queue (Reflex's correct path). OW2's Reflex toggle lives in Settings_v0.ini behind a key that is not stable across patches and is not safely writable from outside; flip 'NVIDIA Reflex Low Latency' to 'Enabled + Boost' in Overwatch 2's Video settings once.",
         "setting": "NVIDIA Reflex Low Latency",
-        "value": "Enabled + Boost — ABSO already set driver LLM off; flip the in-game toggle to finish"
+        "value": "Enabled + Boost \u2014 ABSO already set driver LLM off; flip the in-game toggle to finish"
       },
       {
         "category": "Display",
@@ -5550,7 +5550,7 @@
       },
       {
         "category": "Display",
-        "reason": "When Windows is in HDR mode, even 'exclusive fullscreen' SDR apps go through the HDR composition path. The added latency is small (sub-frame on a high-refresh display) but it's not zero. The HDR variant is for sessions where eye-strain relief matters more than the leanest no-sync path; switch back to the SDR sibling for tournament/practice where latency is the priority.",
+        "reason": "When Windows is in HDR mode, even 'exclusive fullscreen' SDR apps go through the HDR composition path. The added latency is real but not measured by ABSO \u2014 Windows HDR composition cost varies by OS build, driver, and panel. The HDR variant is for sessions where eye-strain relief matters more than the leanest no-sync path; switch back to the SDR sibling for tournament/practice where latency is the priority.",
         "setting": "Exclusive Fullscreen vs SDR-in-HDR latency",
         "value": "Accept a small HDR composition cost"
       },
@@ -5744,7 +5744,7 @@
       },
       {
         "category": "Display",
-        "reason": "When Windows is in HDR mode, even 'exclusive fullscreen' SDR apps go through the HDR composition path. The added latency is small (sub-frame on a high-refresh display) but it's not zero. The HDR variant is for sessions where eye-strain relief matters more than the leanest no-sync path; switch back to the SDR sibling for tournament/practice where latency is the priority.",
+        "reason": "When Windows is in HDR mode, even 'exclusive fullscreen' SDR apps go through the HDR composition path. The added latency is real but not measured by ABSO \u2014 Windows HDR composition cost varies by OS build, driver, and panel. The HDR variant is for sessions where eye-strain relief matters more than the leanest no-sync path; switch back to the SDR sibling for tournament/practice where latency is the priority.",
         "setting": "Exclusive Fullscreen vs SDR-in-HDR latency",
         "value": "Accept a small HDR composition cost"
       },
@@ -6429,7 +6429,7 @@
       },
       {
         "category": "Display",
-        "reason": "When Windows is in HDR mode, even 'exclusive fullscreen' SDR apps go through the HDR composition path. The added latency is small (sub-frame on a high-refresh display) but it's not zero. The HDR variant is for sessions where eye-strain relief matters more than the leanest no-sync path; switch back to the SDR sibling for tournament/practice where latency is the priority.",
+        "reason": "When Windows is in HDR mode, even 'exclusive fullscreen' SDR apps go through the HDR composition path. The added latency is real but not measured by ABSO \u2014 Windows HDR composition cost varies by OS build, driver, and panel. The HDR variant is for sessions where eye-strain relief matters more than the leanest no-sync path; switch back to the SDR sibling for tournament/practice where latency is the priority.",
         "setting": "Exclusive Fullscreen vs SDR-in-HDR latency",
         "value": "Accept a small HDR composition cost"
       },

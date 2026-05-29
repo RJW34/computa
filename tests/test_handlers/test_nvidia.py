@@ -395,15 +395,15 @@ class TestNvidiaApply:
 
     @patch("abso.settings.nvidia.nvapi_drs.DRSProfileManager")
     def test_apply_auto_vrr_fps_cap_overrides_preset(self, mock_manager_cls):
-        """auto_vrr_fps_cap sets max_frame_rate using the refresh-scaled formula.
+        """auto_vrr_fps_cap sets max_frame_rate using ABSO's static VRR cap.
 
-        At 280Hz the new (2026-05) value is 0.97 * 280 = 272 (was refresh - 3 = 277).
+        At 280Hz the value is refresh - 3 = 277.
         See abso/core/vrr.py.
         """
         mock_manager = MagicMock()
         mock_manager.apply_settings_to_app.return_value = {
             "settings_applied": {
-                "max_frame_rate": 272,
+                "max_frame_rate": 277,
                 "vsync": "on",
                 "vrr_app_override": "allow",
             },
@@ -412,7 +412,7 @@ class TestNvidiaApply:
             "npi_launched": False,
         }
         mock_manager.get_app_settings.return_value = {}
-        mock_manager._resolve_setting.return_value = (0x10835002, 272)
+        mock_manager._resolve_setting.return_value = (0x10835002, 277)
         mock_manager_cls.return_value = mock_manager
 
         handler = NvidiaSettingsHandler()
@@ -427,9 +427,9 @@ class TestNvidiaApply:
 
         args, kwargs = mock_manager.apply_settings_to_app.call_args
         sent_settings = args[1]
-        assert sent_settings["max_frame_rate"] == 272
+        assert sent_settings["max_frame_rate"] == 277
         assert result["success"] is True
-        assert any("Auto VRR FPS cap: 272 (from 280 Hz)" in line for line in result["applied"])
+        assert any("Auto VRR FPS cap: 277 (from 280 Hz)" in line for line in result["applied"])
 
     @patch("abso.settings.nvidia.nvapi_drs.DRSProfileManager")
     def test_apply_verification_uses_explicit_profile_name(self, mock_manager_cls):

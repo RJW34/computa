@@ -337,9 +337,12 @@ def get_osd_recommendations(
                 # us the active sync mode. With an empty/None sync_mode, we keep
                 # tagged entries (caller may want to display every variant; e.g.
                 # docs UIs, legacy callers).
-                if rec.applies_to_sync_modes and normalized_sync in ("on", "off"):
-                    if normalized_sync not in rec.applies_to_sync_modes:
-                        continue
+                if (
+                    rec.applies_to_sync_modes
+                    and normalized_sync in ("on", "off")
+                    and normalized_sync not in rec.applies_to_sync_modes
+                ):
+                    continue
                 filtered.append(rec)
             if filtered:
                 return (profile.display_name, filtered)
