@@ -1,6 +1,6 @@
 # Current Agent Briefing
 
-Last updated: 2026-05-26 23:20 America/New_York
+Last updated: 2026-05-29 16:05 America/New_York
 
 > **MACHINE-SPECIFIC — read `docs/NEW_MACHINE_SETUP.md` first if this repo was
 > just cloned onto a different PC.** Everything below describes the live state of
@@ -19,32 +19,77 @@ is the current operational truth for this PC.
 ## Current User Objective
 
 - Stop occasional secondary-monitor black flashes while keeping Overwatch 2
-  usable. The user has now explicitly chosen the strict competitive
-  `overwatch2-gsync-hdr` lane over the capture-safe lane.
+  usable. The user tried switching from the strict competitive
+  `overwatch2-gsync-hdr` lane to the recording-friendly
+  `overwatch2-gsync-hdr-capture` lane, then back to strict. Capture-safe applied
+  with a warning; the return to strict failed before this session's fix.
 - Continue end-to-end repo cleanup: remove bloat, centralize duplicated policy,
   harden profile/apply behavior, keep docs accurate, and deploy verified builds
   to this local machine.
 
 ## Live Machine State
 
-- Active profile: `overwatch2-gsync-hdr`.
+- Active profile: `overwatch2-gsync-hdr-capture`.
 - Installed backend:
   `%LOCALAPPDATA%\AdaptiveBattleStationOptimizer\abso.exe`
-  length `17887429`, last write `2026-05-26 22:57:30`.
+  length `17893575`, last write `2026-05-29 16:02:49`.
 - Tray runtime: scheduled-task startup is installed and enabled. Live tray PID
-  `25080` is running installed script
+  `23744` is running installed script
   `%LOCALAPPDATA%\AdaptiveBattleStationOptimizer\abso\tray\ABSO-Tray.ps1`.
-  The installed `ABSO-StartupState.ps1` hash is
-  `c5fd4ff078f2601a479f901bcc00a86aa79334107bebdb274b7088f4dfb4ec27` and
-  byte-matches source.
+  `health --json` reports `tray_runtime_marker: ok`.
 - Local config includes:
   `profile_overrides.overwatch2-gsync-hdr-capture.graphics.disable_mpo: true`.
-- Current installed verification after the user's strict-profile request reports
-  `current_profile: overwatch2-gsync-hdr`, `reboot_pending: false`,
-  verification `status: active`, `all_active: true`, and no mismatched
-  handlers.
-- Installed health reports `8 ok`, `2 warning`, `0 error`. The warnings are
-  display-event/topology warnings, not profile-apply failures.
+- Current installed verification reports
+  `current_profile: overwatch2-gsync-hdr-capture`, `reboot_pending: true`,
+  `reboot_reasons: ["GraphicsSettingsHandler"]`, verification
+  `status: pending_reboot`, and pending reboot-gated setting
+  `GraphicsSettingsHandler.mpo_disabled`.
+- Installed health reports `7 ok`, `3 warning`, `0 error`. The warnings are
+  active profile reboot-pending, recent display/power events from the user's
+  apply attempts, and display compositor risk with Medal Overlay currently
+  detected.
+
+## 2026-05-29 Tray Switch Failure Fix
+
+Root cause of the user's "back to competitive" failure:
+
+- The tray correctly sent
+  `apply overwatch2-gsync-hdr --json --no-fallback`.
+- The backend captured `pre_switch` and `pre_apply` backups and completed the
+  strict profile apply.
+- Post-apply transaction verification read the old active profile's
+  reboot-pending state from `.abso_state.json`.
+- `GraphicsSettingsHandler` then reported a reboot-gated
+  `mpo_disabled` verification gap even though the strict profile's registry
+  target was already written.
+- `ComplianceEngine` treated that reboot-only gap as critical, so
+  `ProfileTransactionManager` auto-rolled back to the capture-safe state and
+  the tray surfaced a failure.
+
+Fix deployed in source and installed backend:
+
+- `ProfileApplier.verify_profile()` accepts an explicit `reboot_pending`
+  override.
+- `ProfileTransactionManager` verifies a just-applied profile with
+  `apply_result.requires_reboot` instead of stale previous-profile state.
+- `ComplianceEngine` classifies a written reboot-gated-only verification gap as
+  `VERIFY_PENDING_REBOOT` warning, not rollback-critical. Missing registry
+  targets and unrelated handler mismatches remain critical.
+
+Validation:
+
+- Focused regression tests:
+  `71 passed` for compliance, transaction, and applier tests.
+- `ruff check` on touched files passed.
+- `git diff --check` on touched files passed, with only existing CRLF warnings.
+- Full `pytest tests/ -q` was run and found unrelated baseline failures already
+  present on current `master`: NVIDIA auto VRR cap expectation drift, profile
+  snapshot drift, and tray profile catalog cache drift.
+- Full `ruff check .` was run and found one unrelated existing
+  `SIM102` in `abso/data/monitor_osd.py`.
+- Local deploy completed with `.\.venv\Scripts\python.exe build.py deploy`.
+- Safe installed checks after deploy: `state --json --verify` and
+  `health --json` both succeeded.
 
 ## Flicker Root Cause
 

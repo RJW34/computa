@@ -889,7 +889,12 @@ class ProfileApplier:
 
         return report_path
 
-    def verify_profile(self, profile_name: str) -> dict[str, Any]:
+    def verify_profile(
+        self,
+        profile_name: str,
+        *,
+        reboot_pending: bool | None = None,
+    ) -> dict[str, Any]:
         """Verify that a profile's verifiable settings are active.
 
         This checks every handler that implements ``verify_active`` and lets
@@ -897,6 +902,10 @@ class ProfileApplier:
 
         Args:
             profile_name: Name of the profile to verify.
+            reboot_pending: Optional reboot-pending override for the profile
+                being verified. Transactions pass the just-finished apply
+                result here so stale state from the previous active profile
+                cannot poison verification of a profile switch.
 
         Returns:
             Dict with 'all_active' bool and per-handler verification results.
@@ -932,16 +941,18 @@ class ProfileApplier:
         # "registry target written and live" from "registry written but waiting
         # on a reboot for DWM to commit it". Without this, the verify call
         # would report MPO active even when the user has not rebooted yet.
-        reboot_pending = False
-        try:
-            from abso.core.app_paths import app_state_file
-            from abso.core.state_store import read_state_snapshot
+        if reboot_pending is None:
+            try:
+                from abso.core.app_paths import app_state_file
+                from abso.core.state_store import read_state_snapshot
 
-            reboot_pending = bool(
-                read_state_snapshot([app_state_file()]).get("reboot_pending", False)
-            )
-        except Exception:  # noqa: BLE001 — verify must never fail because of state IO
-            reboot_pending = False
+                reboot_pending = bool(
+                    read_state_snapshot([app_state_file()]).get("reboot_pending", False)
+                )
+            except Exception:  # noqa: BLE001 — verify must never fail because of state IO
+                reboot_pending = False
+        else:
+            reboot_pending = bool(reboot_pending)
 
         # Check handlers that have reboot-requiring settings
         for handler in profile.get_handlers():

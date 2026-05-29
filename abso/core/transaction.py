@@ -360,7 +360,10 @@ class ProfileTransactionManager:
 
         tx.state = "verifying"
         try:
-            tx.verify_result = self.applier.verify_profile(canonical_profile_id)
+            tx.verify_result = self.applier.verify_profile(
+                canonical_profile_id,
+                reboot_pending=bool(tx.apply_result.requires_reboot),
+            )
             if tx.verify_result.get("all_active", True):
                 tx.add_checkpoint("verify", "ok", "Verification completed")
             else:

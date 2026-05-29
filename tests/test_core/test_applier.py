@@ -344,6 +344,62 @@ class TestApplyProfile:
         assert result["pending_apply_settings"] == ["PendingApplyHandler.mpo_disabled"]
         assert "pending_reboot_gated_settings" not in result
 
+    def test_verify_profile_uses_reboot_pending_override(self):
+        """Profile-switch verification should not read stale active-profile reboot state."""
+
+        class RebootAwareHandler:
+            def verify_active(self, settings):
+                if settings.get("_reboot_pending"):
+                    return {
+                        "all_active": False,
+                        "pending_reboot_gated_settings": ["mpo_disabled"],
+                        "settings": {
+                            "mpo_disabled": {
+                                "active": True,
+                                "reboot_gated": True,
+                                "registry_target_written": True,
+                            }
+                        },
+                    }
+                return {
+                    "all_active": True,
+                    "settings": {
+                        "mpo_disabled": {
+                            "active": True,
+                            "reboot_gated": True,
+                            "registry_target_written": True,
+                        }
+                    },
+                }
+
+        class VerifyProfile:
+            def get_handlers(self):
+                return [RebootAwareHandler()]
+
+        applier = ProfileApplier()
+        applier._profiles["verify-profile"] = VerifyProfile()
+
+        with (
+            patch("abso.core.applier.ConfigManager") as mock_config_cls,
+            patch("abso.core.state_store.read_state_snapshot") as mock_read_state,
+            patch.object(
+                applier,
+                "_build_effective_settings_map",
+                return_value=(
+                    {"RebootAwareHandler": {"disable_mpo": False}},
+                    None,
+                    None,
+                    None,
+                ),
+            ),
+        ):
+            mock_config_cls.return_value.get_profile_overrides.return_value = {}
+            result = applier.verify_profile("verify-profile", reboot_pending=False)
+
+        mock_read_state.assert_not_called()
+        assert result["all_active"] is True
+        assert "pending_reboot_gated_settings" not in result
+
     def test_apply_profile_collects_handler_notices(self):
         """Handler notices should be propagated to the apply result."""
         handler = MagicMock()

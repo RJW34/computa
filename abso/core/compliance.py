@@ -123,6 +123,45 @@ class ComplianceEngine:
         """Drop the cached set so the next call re-derives it (tests only)."""
         cls._critical_handler_names = None
 
+    @staticmethod
+    def _is_reboot_gated_only_mismatch(handler_data: dict[str, Any]) -> bool:
+        """Return True when the only verify gap is a written reboot-gated target."""
+        pending_apply = handler_data.get("pending_apply_settings") or []
+        if pending_apply:
+            return False
+
+        pending_reboot = handler_data.get("pending_reboot_gated_settings") or []
+        pending_reboot_names = {
+            str(setting).strip() for setting in pending_reboot if str(setting).strip()
+        }
+        if not pending_reboot_names:
+            return False
+
+        settings = handler_data.get("settings")
+        if not isinstance(settings, dict):
+            return True
+
+        for setting_name, setting_data in settings.items():
+            if not isinstance(setting_data, dict):
+                continue
+
+            if str(setting_name) in pending_reboot_names:
+                if not bool(setting_data.get("reboot_gated", False)):
+                    return False
+                if setting_data.get("registry_target_written") is False:
+                    return False
+                continue
+
+            # Any unrelated explicit inactive setting means this is not a pure
+            # reboot wait. Missing "active" stays non-blocking for older
+            # verifier payloads.
+            if setting_data.get("active") is False:
+                return False
+            if setting_data.get("registry_target_written") is False:
+                return False
+
+        return True
+
     def evaluate(
         self,
         profile_id: str,
@@ -164,6 +203,18 @@ class ComplianceEngine:
 
                 all_active = handler_data.get("all_active", True)
                 if all_active:
+                    continue
+
+                if self._is_reboot_gated_only_mismatch(handler_data):
+                    report.issues.append(
+                        ComplianceIssue(
+                            code="VERIFY_PENDING_REBOOT",
+                            severity=ComplianceSeverity.WARNING,
+                            message=f"Verification pending reboot in {handler_name}",
+                            details=str(handler_data),
+                            source=handler_name,
+                        )
+                    )
                     continue
 
                 severity = ComplianceSeverity.WARNING

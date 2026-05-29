@@ -173,6 +173,64 @@ def test_transaction_rolls_back_on_critical_when_backup_available(tmp_path: Path
         assert tx.rollback_backup_id == "rollback-123"
 
 
+def test_transaction_commits_reboot_gated_written_verify_gap(tmp_path: Path) -> None:
+    """A written reboot-gated setting should commit and ask for reboot, not roll back."""
+    applier = _make_applier()
+    applier.apply_profile.return_value = ApplyResult(
+        success=True,
+        applied_settings=["GraphicsSettingsHandler"],
+        changed_settings=["GraphicsSettingsHandler.disable_mpo"],
+        requires_reboot=True,
+        reboot_reasons=["GraphicsSettingsHandler"],
+    )
+    applier.verify_profile.return_value = {
+        "all_active": False,
+        "pending_reboot_gated_settings": ["GraphicsSettingsHandler.mpo_disabled"],
+        "handlers": {
+            "GraphicsSettingsHandler": {
+                "all_active": False,
+                "pending_reboot_gated_settings": ["mpo_disabled"],
+                "settings": {
+                    "mpo_disabled": {
+                        "target": False,
+                        "current": False,
+                        "active": True,
+                        "reboot_gated": True,
+                        "registry_target_written": True,
+                        "live_commit_pending": True,
+                    }
+                },
+            }
+        },
+    }
+
+    with patch("abso.core.transaction.BackupManager") as mock_backup_cls:
+        rollback_manager = MagicMock()
+        rollback_manager.create_backup.return_value = "rollback-live-state"
+        rollback_manager.restore_backup.return_value = _complete_restore_summary()
+        restore_manager = MagicMock()
+        restore_manager.get_baseline_backup.return_value = None
+        backup_manager = MagicMock()
+        backup_manager.create_backup.return_value = "baseline-for-next-switch"
+        mock_backup_cls.side_effect = [rollback_manager, restore_manager, backup_manager]
+
+        manager = ProfileTransactionManager(tmp_path, applier=applier)
+        tx = manager.execute("test-profile", create_backup=True)
+
+    rollback_manager.restore_backup.assert_not_called()
+    applier.verify_profile.assert_called_once_with("test-profile", reboot_pending=True)
+    assert tx.success is True
+    assert tx.state == "committed"
+    assert tx.error is None
+    assert tx.compliance_report is not None
+    assert tx.compliance_report.has_critical is False
+    assert [issue.code for issue in tx.compliance_report.warnings] == [
+        "VERIFY_PENDING_REBOOT"
+    ]
+    assert any(cp.phase == "compliance" and cp.status == "warn" for cp in tx.checkpoints)
+    assert any(cp.phase == "commit" and cp.status == "ok" for cp in tx.checkpoints)
+
+
 def test_transaction_restores_baseline_before_apply(tmp_path: Path) -> None:
     """When a previous backup exists, restore it before applying new profile."""
     applier = _make_applier()
