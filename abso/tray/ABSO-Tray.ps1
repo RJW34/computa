@@ -1368,17 +1368,17 @@ $script:FallbackProfiles = [ordered]@{
     }
     "overwatch2-gsync"  = @{
         Name     = "Overwatch 2 - GSYNC SDR"
-        Sub      = "Strict SDR Exclusive | Reflex (set in-game) | G-SYNC ON"
+        Sub      = "Overlay-Free SDR Borderless | Reflex (set in-game) | G-SYNC ON"
         Cat      = "Shooters"
-        Desc     = "Low latency VRR profile (Reflex, VSync safety net, G-SYNC ON)"
+        Desc     = "Low-latency Overwatch 2 G-SYNC on the optimized borderless VRR path, while stopping capture and overlay processes."
         Exes     = @("Overwatch.exe")
         SyncMode = "on"
     }
     "overwatch2-gsync-hdr" = @{
         Name     = "Overwatch 2 - GSYNC HDR"
-        Sub      = "HDR ON | Reflex ON+Boost | G-SYNC ON"
+        Sub      = "Overlay-Free HDR Borderless | Reflex (set in-game) | G-SYNC ON"
         Cat      = "Shooters"
-        Desc     = "Tear-free low latency VRR with native HDR (OLED/Mini-LED)"
+        Desc     = "Low-latency native-HDR Overwatch 2 G-SYNC on the optimized borderless VRR path, while stopping capture and overlay processes."
         Exes     = @("Overwatch.exe")
         SyncMode = "on"
     }

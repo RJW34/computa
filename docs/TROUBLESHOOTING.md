@@ -279,8 +279,8 @@ For the current mixed-refresh flicker path, expect these codes:
 - `review_secondary_refresh_rate` - after reboot, check Windows/NVIDIA display
   settings if a display is running below detected capability.
 - `review_capture_mpo_performance` - capture-safe borderless VRR with MPO
-  disabled can reduce FPS; use the strict fullscreen profile when overlays are
-  not needed, or fix the display path before re-enabling MPO.
+  disabled can reduce FPS; compare the overlay-free G-SYNC profile when
+  overlays are not needed, or fix the display path before re-enabling MPO.
 - `avoid_redundant_profile_apply` - do not repeatedly reapply an already-active
   profile to chase black flashes.
 
@@ -306,7 +306,7 @@ Selecting a different tray profile should not silently apply a fallback profile.
 Manual tray applies use backend `apply --no-fallback`; if strict G-SYNC cannot
 apply because of a real blocker, the tray should surface the failure rather than
 committing the capture-safe profile. Mixed-refresh multi-monitor topology is a
-warning for strict fullscreen VRR, not a fallback trigger by itself.
+warning for fullscreen-only VRR profiles, not a fallback trigger by itself.
 If a profile is applied outside the tray, tray startup must not let stale
 `lastProfileState` / `recentProfiles` cache overwrite a newer backend
 `.abso_state.json`. A newer state file is the active-profile source of truth;
@@ -392,9 +392,10 @@ expected setup is:
 6. ABSO static cap: `297`
 
 If profile verification fails while the cap is already `297`, check the
-reported handler detail. On the current strict Overwatch path, a common
-mismatch is display mode drift: strict profiles expect exclusive fullscreen,
-while capture-safe profiles expect borderless/windowed fullscreen.
+reported handler detail. On the current Overwatch G-SYNC HDR path, both the
+overlay-free and capture-safe profiles intentionally expect
+borderless/windowed fullscreen. Do not "fix" those profiles by forcing
+exclusive fullscreen.
 
 ---
 

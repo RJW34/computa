@@ -12,10 +12,14 @@ ddci:
   controller_override: CVTE
 
 # Local stability override for this mixed-refresh HDR/G-SYNC desktop.
-# The active Overwatch capture-safe profile intentionally uses the windowed
-# VRR path, but this PC has shown secondary-monitor black flashes with MPO
-# left enabled. Disabling MPO is reboot-gated and should be applied once.
+# Both Overwatch HDR G-SYNC lanes intentionally use the windowed VRR path on
+# this PC; keep the same MPO mitigation on the overlay-free and capture-safe
+# variants so switching profiles does not try to undo the compositor fix.
+# Disabling MPO is reboot-gated and should be applied once.
 profile_overrides:
+  overwatch2-gsync-hdr:
+    graphics:
+      disable_mpo: true
   overwatch2-gsync-hdr-capture:
     graphics:
       disable_mpo: true

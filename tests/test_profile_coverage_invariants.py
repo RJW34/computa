@@ -332,11 +332,11 @@ def test_handler_class_names_match_imported_classes(profiles_by_id) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Profile-pair consistency: strict variants must honor their "leaner" promise
+# Profile-pair consistency: compositor flags must match the declared profile path
 # ---------------------------------------------------------------------------
 
 def test_strict_gaming_profiles_do_not_force_windowed_compositor_flags(profiles_by_id) -> None:
-    """Strict/no-sync gaming profiles must not silently opt into borderless flags."""
+    """Non-borderless gaming profiles must not silently opt into compositor flags."""
     keys = ("windowed_optimizations", "vrr_optimize")
     failures: list[str] = []
     for profile_id, profile in profiles_by_id.items():
@@ -348,18 +348,27 @@ def test_strict_gaming_profiles_do_not_force_windowed_compositor_flags(profiles_
             continue
 
         windows_settings = profile.get_settings("WindowsSettingsHandler") or {}
+        nvidia_settings = profile.get_settings("NvidiaSettingsHandler") or {}
+        requirements = getattr(profile, "display_path_requirements", None)
+        explicit_overlay_free_windowed_vrr = (
+            getattr(requirements, "require_overlay_free_path", False) is True
+            and str(nvidia_settings.get("global_vrr_mode") or "").strip().lower()
+            == "fullscreen_and_windowed"
+        )
         for key in keys:
             if key not in windows_settings:
+                continue
+            if explicit_overlay_free_windowed_vrr:
                 continue
             if windows_settings.get(key) is not False:
                 failures.append(
                     f"{profile_id}: WindowsSettingsHandler.{key} is "
                     f"{windows_settings.get(key)!r} (strict profiles should "
-                    f"leave the windowed compositor path off unless a "
-                    f"borderless/capture variant opts in)"
+                    f"leave the windowed compositor path off unless an "
+                    f"explicit borderless/capture variant opts in)"
                 )
     assert not failures, (
-        "Strict gaming profiles forcing Win11 windowed compositor flags:\n  "
+        "Profiles forcing Win11 windowed compositor flags without a matching path:\n  "
         + "\n  ".join(failures)
     )
 

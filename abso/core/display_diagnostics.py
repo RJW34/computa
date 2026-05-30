@@ -244,7 +244,7 @@ def build_recommended_actions(
             "code": ACTION_REVIEW_CAPTURE_MPO_PERFORMANCE,
             "label": (
                 "MPO is disabled on a capture-safe borderless VRR profile; "
-                "if FPS dropped after reboot, use the strict fullscreen profile "
+                "if FPS dropped after reboot, compare the overlay-free G-SYNC profile "
                 "or re-enable MPO after fixing the mixed-refresh display path."
             ),
             "source": "active_profile_settings",
@@ -253,8 +253,9 @@ def build_recommended_actions(
             "detail": (
                 "This combination can trade the one-second black flash for extra "
                 "DWM/compositor cost in Overwatch's borderless HDR path. The "
-                "strict Overwatch G-SYNC HDR profile avoids that borderless "
-                "capture path, while re-enabling MPO requires another reboot."
+                "overlay-free Overwatch G-SYNC HDR profile keeps the same fast "
+                "borderless VRR path while removing capture/overlay hooks. "
+                "Re-enabling MPO requires another reboot."
             ),
         })
 

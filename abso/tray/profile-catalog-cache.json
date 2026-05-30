@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "saved_at": "2026-05-29T16:48:12.031189-04:00",
+  "saved_at": "2026-05-30T00:44:07.674633-04:00",
   "profiles": [
     {
       "id": "slippi-melee",
@@ -3521,8 +3521,8 @@
       ],
       "has_in_game_settings": true,
       "tray_category": "Shooters",
-      "tray_subtitle": "Strict SDR Exclusive | Reflex (set in-game) | G-SYNC ON",
-      "tray_description": "Low latency VRR profile (VSync safety net, G-SYNC ON). Keeps driver LLM off for Reflex; enable Reflex On + Boost in-game.",
+      "tray_subtitle": "Overlay-Free SDR Borderless | Reflex (set in-game) | G-SYNC ON",
+      "tray_description": "Low-latency Overwatch 2 G-SYNC on the same optimized borderless VRR path as capture-safe, while stopping capture and overlay processes.",
       "tray_group": "overwatch2",
       "tray_group_name": "Overwatch 2",
       "tray_variant": "G-SYNC (SDR)",
@@ -3654,8 +3654,8 @@
       ],
       "has_in_game_settings": true,
       "tray_category": "Shooters",
-      "tray_subtitle": "Strict HDR Exclusive | Reflex (set in-game) | G-SYNC ON",
-      "tray_description": "Tear-free low latency VRR with native HDR (OLED/Mini-LED)",
+      "tray_subtitle": "Overlay-Free HDR Borderless | Reflex (set in-game) | G-SYNC ON",
+      "tray_description": "Low-latency native-HDR Overwatch 2 G-SYNC on the optimized borderless VRR path, while stopping capture and overlay processes.",
       "tray_group": "overwatch2",
       "tray_group_name": "Overwatch 2",
       "tray_variant": "G-SYNC (HDR)",

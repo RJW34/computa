@@ -670,8 +670,8 @@ class ProfileLinter:
 
         Xbox Mode (Win11 25H2 26200.8457+) is a streamlined fullscreen shell
         that swaps the compositor topology. It is incompatible with the
-        strict fullscreen-only VRR path ABSO uses for OW2 G-SYNC and
-        Diablo 4 HDR — those profiles disable per-exe Fullscreen
+        strict fullscreen-only VRR path used by some G-SYNC/HDR profiles.
+        Those profiles disable per-exe Fullscreen
         Optimizations to keep the GPU on the true exclusive path.
 
         Hard error:

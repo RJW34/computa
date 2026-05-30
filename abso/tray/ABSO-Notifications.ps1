@@ -245,7 +245,7 @@ function _Smart-Truncate {
 
 function _Derive-ToastTitle {
     param([string]$RawTitle, [string]$Message, [string]$Type)
-    # Production titles look like "Overwatch 2 - GSYNC HDR (Strict HDR Exclusive | Reflex | G-SYNC ON)".
+    # Production titles look like "Overwatch 2 - GSYNC HDR (Overlay-Free HDR Borderless | Reflex | G-SYNC ON)".
     # Cutting at 56 chars leaves unclosed parens. Cut at the first " (" or " |"
     # boundary so we keep the profile name intact and drop the mode list.
     $trim = "$RawTitle".Trim()

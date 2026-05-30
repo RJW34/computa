@@ -1805,9 +1805,9 @@
     "in_game_settings": [
       {
         "category": "Display",
-        "reason": "This profile is tuned for fullscreen-only G-SYNC. Do not switch to borderless/windowed mode after launch.",
+        "reason": "This profile uses the same fast Win11 borderless G-SYNC path as capture-safe, but keeps capture and overlay processes out for lower frame-time noise.",
         "setting": "Display Mode",
-        "value": "Fullscreen (Exclusive)"
+        "value": "Borderless / Windowed Fullscreen"
       },
       {
         "category": "Display",
@@ -1867,7 +1867,7 @@
         "dynamic_range": "full"
       },
       "GraphicsSettingsHandler": {
-        "disable_global_fso": true,
+        "disable_global_fso": false,
         "disable_mpo": false
       },
       "MouseSettingsHandler": {
@@ -1880,7 +1880,7 @@
       },
       "NvidiaSettingsHandler": {
         "auto_vrr_fps_cap": true,
-        "global_vrr_mode": "fullscreen_only",
+        "global_vrr_mode": "fullscreen_and_windowed",
         "preset": "reflex_gsync",
         "profile_name": "Overwatch 2"
       },
@@ -1891,7 +1891,7 @@
         "dynamic_render_scale_v2": false,
         "effects_quality": 1,
         "fullscreen_window": false,
-        "fullscreen_window_enabled": true,
+        "fullscreen_window_enabled": false,
         "gfx_preset": 1,
         "hdr": false,
         "model_quality": 1,
@@ -1903,8 +1903,8 @@
         "triple_buffering": false,
         "upscaling": false,
         "vsync": false,
-        "window_mode": 0,
-        "windowed_fullscreen": false
+        "window_mode": 1,
+        "windowed_fullscreen": true
       },
       "PowerSettingsHandler": {
         "active_plan": "ultimate_performance",
@@ -1919,7 +1919,7 @@
       },
       "RegistrySettingsHandler": {
         "fullscreen_optimizations": {
-          "Overwatch.exe": true
+          "Overwatch.exe": false
         },
         "game_priority": {
           "gpu_priority": 8,
@@ -1936,8 +1936,8 @@
         "hags": true,
         "hdr": false,
         "max_refresh_rate": true,
-        "vrr_optimize": false,
-        "windowed_optimizations": false
+        "vrr_optimize": true,
+        "windowed_optimizations": true
       }
     }
   },
@@ -1963,7 +1963,7 @@
     "in_game_settings": [
       {
         "category": "Display",
-        "reason": "Capture-safe path: keeps Medal/Discord/OBS overlays compatible while using the windowed G-SYNC path. Use the strict fullscreen profile for the leaner no-overlay path.",
+        "reason": "Capture-safe path: uses the same fast Win11 borderless G-SYNC path as the overlay-free profile, while keeping Medal/Discord/OBS overlays compatible.",
         "setting": "Display Mode",
         "value": "Borderless / Windowed Fullscreen"
       },
@@ -2122,9 +2122,9 @@
     "in_game_settings": [
       {
         "category": "Display",
-        "reason": "This profile is tuned for fullscreen-only G-SYNC. Do not switch to borderless/windowed mode after launch.",
+        "reason": "This profile uses the same fast Win11 borderless HDR G-SYNC path as capture-safe, but keeps capture and overlay processes out for lower frame-time noise.",
         "setting": "Display Mode",
-        "value": "Fullscreen (Exclusive)"
+        "value": "Borderless / Windowed Fullscreen"
       },
       {
         "category": "Display",
@@ -2209,7 +2209,7 @@
       },
       "GraphicsSettingsHandler": {
         "disable_auto_color_management": true,
-        "disable_global_fso": true,
+        "disable_global_fso": false,
         "disable_mpo": false
       },
       "MouseSettingsHandler": {
@@ -2222,7 +2222,7 @@
       },
       "NvidiaSettingsHandler": {
         "auto_vrr_fps_cap": true,
-        "global_vrr_mode": "fullscreen_only",
+        "global_vrr_mode": "fullscreen_and_windowed",
         "preset": "reflex_gsync",
         "profile_name": "Overwatch 2"
       },
@@ -2233,7 +2233,7 @@
         "dynamic_render_scale_v2": false,
         "effects_quality": 1,
         "fullscreen_window": false,
-        "fullscreen_window_enabled": true,
+        "fullscreen_window_enabled": false,
         "gfx_preset": 1,
         "hdr": true,
         "model_quality": 1,
@@ -2245,8 +2245,8 @@
         "triple_buffering": false,
         "upscaling": false,
         "vsync": false,
-        "window_mode": 0,
-        "windowed_fullscreen": false
+        "window_mode": 1,
+        "windowed_fullscreen": true
       },
       "PowerSettingsHandler": {
         "active_plan": "ultimate_performance",
@@ -2261,7 +2261,7 @@
       },
       "RegistrySettingsHandler": {
         "fullscreen_optimizations": {
-          "Overwatch.exe": true
+          "Overwatch.exe": false
         },
         "game_priority": {
           "gpu_priority": 8,
@@ -2280,8 +2280,8 @@
         "hdr": true,
         "max_refresh_rate": true,
         "sdr_white_level_nits": 200,
-        "vrr_optimize": false,
-        "windowed_optimizations": false
+        "vrr_optimize": true,
+        "windowed_optimizations": true
       }
     }
   },
@@ -2307,7 +2307,7 @@
     "in_game_settings": [
       {
         "category": "Display",
-        "reason": "Capture-safe HDR path: keeps Medal/Discord/OBS overlays compatible while using windowed G-SYNC. Use the strict HDR profile only when overlays are off.",
+        "reason": "Capture-safe HDR path: uses the same fast Win11 borderless HDR G-SYNC path as the overlay-free profile, while keeping Medal/Discord/OBS overlays compatible.",
         "setting": "Display Mode",
         "value": "Borderless / Windowed Fullscreen"
       },

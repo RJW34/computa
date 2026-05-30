@@ -28,19 +28,22 @@ snapshots as current state unless the active briefing explicitly tells you to.
 
 ## Current Live-PC Constraint
 
-As of 2026-05-29, this PC is on the strict Overwatch 2 profile
-`overwatch2-gsync-hdr` with no reboot pending. The active display path is a
-single 2560x1440 300 Hz VRR-capable display, so ABSO's expected static VRR cap
-for Overwatch is `297` (`refresh - 3`). NVIDIA Reflex may dynamically pace the
-runtime FPS lower; do not replace the persisted cap with a Reflex-observed
-value such as `276`.
+As of 2026-05-30, this PC is on `overwatch2-gsync-hdr-capture` with
+`GraphicsSettingsHandler.mpo_disabled` reboot-gated by a local mixed-refresh
+stability override. The active topology currently detects a 2560x1440 300 Hz
+VRR-capable primary plus a 2560x1440 59.95 Hz secondary, so ABSO's expected
+static VRR cap for Overwatch is still `297` (`primary refresh - 3`). NVIDIA
+Reflex may dynamically pace the runtime FPS lower; do not replace the
+persisted cap with a Reflex-observed value such as `276`.
 
-Current verification is not fully clean only because `OW2ConfigHandler` sees
-display-mode drift: OW2 is currently windowed/borderless while the strict
-profile expects exclusive fullscreen. The FPS cap verifies as `297`
-target/current. Do not run full profile apply, live display reset, HDR off/on
-cycling, DWM restart, or the graphics driver hotkey just because the monitor
-flickers unless the user explicitly asks.
+The Overwatch 2 G-SYNC HDR profiles now intentionally share the same optimized
+borderless/windowed VRR display path. `overwatch2-gsync-hdr` is the
+overlay-free lane and should still stop capture/overlay processes;
+`overwatch2-gsync-hdr-capture` keeps those processes alive. Do not treat
+windowed/borderless OW2 mode as drift for these G-SYNC HDR profiles. Do not run
+full profile apply, live display reset, HDR off/on cycling, DWM restart, or the
+graphics driver hotkey just because the monitor flickers unless the user
+explicitly asks.
 
 Safe evidence commands:
 
@@ -51,9 +54,10 @@ Safe evidence commands:
 & "$env:LOCALAPPDATA\AdaptiveBattleStationOptimizer\abso.exe" verify overwatch2-gsync-hdr --json
 ```
 
-Expected current `verify overwatch2-gsync-hdr --json` behavior: all handlers
-active except `OW2ConfigHandler` display-mode keys; `frame_rate_cap` should be
-`297` target/current.
+Expected current `verify overwatch2-gsync-hdr --json` behavior after deploy:
+the OW2 display-mode keys should target borderless/windowed fullscreen and
+`frame_rate_cap` should be `297` target/current. Any remaining MPO warning is
+the PC-local reboot-gated mitigation, not an OW2 FPS-cap problem.
 
 ## Deploy And Verify
 

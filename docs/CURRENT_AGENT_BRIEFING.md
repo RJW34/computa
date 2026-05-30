@@ -1,6 +1,6 @@
 # Current Agent Briefing
 
-Last updated: 2026-05-29 17:02 America/New_York
+Last updated: 2026-05-30 00:52 America/New_York
 
 > **MACHINE-SPECIFIC — read `docs/NEW_MACHINE_SETUP.md` first if this repo was
 > just cloned onto a different PC.** Everything below describes the live state of
@@ -19,45 +19,43 @@ is the current operational truth for this PC.
 ## Current User Objective
 
 - Stop occasional secondary-monitor black flashes while keeping Overwatch 2
-  usable. The user tried switching from the strict competitive
-  `overwatch2-gsync-hdr` lane to the recording-friendly
-  `overwatch2-gsync-hdr-capture` lane, then back to strict. Capture-safe applied
-  with a warning; the return to strict failed before this session's fix.
+  usable. The user found that `overwatch2-gsync-hdr-capture` performed better
+  than the overlay-free `overwatch2-gsync-hdr` lane; root cause was the
+  profiles using different display paths, not overlays improving performance.
 - Continue end-to-end repo cleanup: remove bloat, centralize duplicated policy,
   harden profile/apply behavior, keep docs accurate, and deploy verified builds
   to this local machine.
 
 ## Live Machine State
 
-- Active profile: `overwatch2-gsync-hdr`.
+- Active profile: `overwatch2-gsync-hdr-capture`.
 - Active display topology from installed `display-diagnostics --json`:
-  one monitor, `Dell S2719DGF(Displayport)`, 2560x1440 at 300 Hz,
-  VRR-capable (`gsync_compatible`), no mixed-refresh secondary currently
-  detected.
+  two monitors: a 2560x1440 300 Hz VRR-capable primary plus
+  `Dell S2719DGF(Displayport)` at 2560x1440 59.95 Hz. The secondary is below
+  its detected 144 Hz capability, and the topology remains mixed-refresh.
 - Installed backend:
   `%LOCALAPPDATA%\AdaptiveBattleStationOptimizer\abso.exe`
-  length `17892269`, last write `2026-05-29 16:52:04`, SHA256
-  `B2D481C5F875010AB215E27127E45370ECB75FF09BAC055835F03C0F398D2026`.
+  length `17894806`, last write `2026-05-30 00:50:00`, SHA256
+  `FDFB1D0237B6AC4E858F50DA8018272A209F60703E9F10EE6C1AEBA63693EEC0`.
 - Tray runtime: scheduled-task startup is installed and enabled. Live tray PID
-  `21832` is running installed script
+  `17172` is running installed script
   `%LOCALAPPDATA%\AdaptiveBattleStationOptimizer\abso\tray\ABSO-Tray.ps1`.
   `health --json` reports `tray_runtime_marker: ok`.
 - Installed tray cache matches source:
   `abso\tray\profile-catalog-cache.json` SHA256
-  `4EC4C8816CD40E4AB318E63C0FAB5F13F00D3A0AF19D628D6FC7DCE84F1258FB`.
-- Current installed state reports `current_profile: overwatch2-gsync-hdr`,
-  `reboot_pending: false`, `reboot_reasons: []`.
-- Current installed verification reports `all_active: false` only because
-  `OW2ConfigHandler` sees display-mode drift:
-  `window_mode` target `0` current `1`,
-  `fullscreen_window_enabled` target `1` current `0`, and
-  `windowed_fullscreen` target `0` current `1`.
-  The FPS cap is already correct for the active 300 Hz path:
+  `0B5EF40DC2412869855085E0A45CB020D227DA0BF17A59DAE74B26ED07F9D304`.
+- Current installed state reports `current_profile:
+  overwatch2-gsync-hdr-capture` with `reboot_pending: true` for
+  `GraphicsSettingsHandler.mpo_disabled`.
+- Current source fixes the OW2 strict/capture inversion: both Overwatch 2
+  G-SYNC HDR profiles intentionally target the optimized borderless/windowed
+  VRR path. `overwatch2-gsync-hdr` is still overlay-free by process policy;
+  `overwatch2-gsync-hdr-capture` keeps capture/overlay processes alive.
+- The FPS cap is already correct for the active 300 Hz path:
   `frame_rate_cap` target `297`, current `297`, active `true`.
-- Installed health reports `7 ok`, `3 warning`, `0 error`. The warnings are
-  active profile verification mismatch in `OW2ConfigHandler`, recent
-  power/display events from profile work, and compositor risk due to the
-  current VRR-capable display path.
+- Any remaining MPO warning is the PC-local mixed-refresh compositor
+  mitigation waiting for a normal reboot, not an OW2 display-mode or cap
+  problem.
 
 ## 2026-05-29 VRR Cap / Reflex Clarification
 
@@ -70,9 +68,9 @@ troubleshooting docs, and this briefing:
 - NVIDIA Reflex may dynamically pace the effective runtime FPS below that
   static ceiling, often around the mid/high 270s on a 300 Hz path. That is
   Reflex queue control, not the value ABSO should persist to NVCP or OW2 config.
-- Current installed verification proves the active OW2 config cap is already
-  `297` target/current. The remaining strict-profile mismatch is display mode
-  drift into borderless/windowed, not cap policy.
+- Current installed/source policy keeps the OW2 config cap at `297`
+  target/current. Borderless/windowed mode is now intentional for OW2 G-SYNC
+  HDR; do not treat it as display-mode drift for that profile family.
 
 Validation and deployment for the cleanup:
 
@@ -84,6 +82,26 @@ Validation and deployment for the cleanup:
 - `build.py deploy` completed at `2026-05-29 16:52`, updating the backend and
   one tray asset.
 - Tray was restarted after deploy and is running as PID `21832`.
+
+## 2026-05-30 OW2 G-SYNC Display-Path Correction
+
+The previous OW2 strict G-SYNC profiles targeted the legacy exclusive /
+fullscreen-only lane, while the capture-safe profiles targeted the modern
+borderless/windowed VRR lane. On this PC that made capture-safe benchmark
+better even though it keeps overlays and capture hooks alive.
+
+Root-cause fix:
+
+- `overwatch2-gsync` and `overwatch2-gsync-hdr` now use the same optimized
+  borderless/windowed VRR path as their capture-safe siblings:
+  `global_vrr_mode=fullscreen_and_windowed`, Windows windowed optimizations
+  on, per-exe FSO-disable cleared, and OW2 `window_mode=1`.
+- The strict/capture distinction is now process policy, not display path:
+  overlay-free profiles still stop Medal/Discord/OBS/RTSS-style hooks;
+  capture-safe profiles keep them alive.
+- On this PC, the local `abso.yaml` MPO mitigation should cover both HDR
+  G-SYNC variants if the overlay-free HDR profile is applied. The remaining
+  MPO state is reboot-gated and should not be confused with an FPS-cap issue.
 
 ## 2026-05-29 Tray Switch Failure Fix
 
@@ -279,15 +297,14 @@ deployed, the tray is restarted, and the branch is clean after commit
 - Installed tray profile cache byte-content matches source by SHA256:
   `4EC4C8816CD40E4AB318E63C0FAB5F13F00D3A0AF19D628D6FC7DCE84F1258FB`.
 - Active profile state:
-  `overwatch2-gsync-hdr`, `reboot_pending: false`.
-- Current verification is not clean, but the remaining mismatch is specific:
-  `OW2ConfigHandler` reports OW2 display mode as windowed/borderless while the
-  strict profile expects exclusive fullscreen. The FPS cap is correct:
-  `frame_rate_cap` target/current `297`.
-- `display-diagnostics --json` reports current profile
-  `overwatch2-gsync-hdr`, `is_capture_safe: false`,
-  `nvidia_global_vrr_mode: fullscreen_only`, one 300 Hz VRR-capable monitor,
-  and no reboot-pending graphics action.
+  `overwatch2-gsync-hdr-capture`, `reboot_pending: true` for the local MPO
+  mitigation.
+- Current source makes the overlay-free and capture-safe OW2 G-SYNC HDR
+  profiles share the same borderless/windowed VRR display path. The FPS cap is
+  correct: `frame_rate_cap` target/current `297`.
+- `display-diagnostics --json` should report one 300 Hz VRR-capable monitor.
+  If it reports an MPO/compositor next action, treat that as the local
+  reboot-gated mitigation, not as a reason to force exclusive fullscreen.
 
 ## Latest Verified Slice
 
@@ -324,8 +341,9 @@ completed and deployed:
 - `abso/settings/ow2_config.py` now exposes and verifies the full OW2 display
   mode tuple: `WindowMode`, `FullscreenWindow`,
   `FullscreenWindowEnabled`, and `WindowedFullscreen`.
-- `abso/profiles/overwatch2.py` now declares strict fullscreen as
-  `0/0/1/0` and capture-safe/windowed fullscreen as `1/0/0/1`.
+- `abso/profiles/overwatch2.py` at that point declared strict fullscreen as
+  `0/0/1/0` and capture-safe/windowed fullscreen as `1/0/0/1`; this has since
+  been superseded for OW2 G-SYNC HDR by the 2026-05-30 borderless-path fix.
 - `abso/tray/profile-catalog-cache.json` and the golden profile snapshot were
   regenerated so the installed tray starts with the updated profile manifest.
 - `abso/tray/ABSO-StartupState.ps1` now treats an explicitly empty
@@ -551,9 +569,9 @@ Continue with small, verifiable slices:
   and custom-profile validation.
 - Prefer shared helpers over repeating policy in `main.py`, tray scripts, and
   profile loaders.
-- If the user wants the strict Overwatch profile completely active, resolve the
-  `OW2ConfigHandler` display-mode drift by putting OW2 back in exclusive
-  fullscreen or by running an approved elevated profile apply, then verify.
+- If the user wants the overlay-free Overwatch G-SYNC HDR profile active, apply
+  `overwatch2-gsync-hdr` and verify that OW2 remains borderless/windowed
+  fullscreen with cap `297`. Do not force exclusive fullscreen for this path.
 - If flicker continues, collect fresh
   `display-diagnostics --json` and event evidence before applying another
   mitigation.

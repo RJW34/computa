@@ -165,6 +165,24 @@ class _Overwatch2BaseProfile(ReflexShooterBaseProfile):
         """Build the deterministic profile FSO declaration."""
         return fso_overrides(self.executable_hints, disabled=disabled)
 
+    @staticmethod
+    def _windowed_vrr_windows_settings() -> dict[str, Any]:
+        """Windows flags required for OW2's modern borderless G-SYNC path."""
+        return {
+            "windowed_optimizations": True,
+            "vrr_optimize": True,
+        }
+
+    @staticmethod
+    def _borderless_ow2_settings() -> dict[str, Any]:
+        """OW2 Settings_v0.ini keys for borderless/windowed fullscreen."""
+        return {
+            "window_mode": 1,
+            "fullscreen_window": False,
+            "fullscreen_window_enabled": False,
+            "windowed_fullscreen": True,
+        }
+
     def resolve_runtime_settings(
         self,
         handler_name: str,
@@ -476,11 +494,11 @@ class Overwatch2GSyncProfile(_Overwatch2BaseProfile):
 
     @property
     def fullscreen_optimizations_per_exe(self) -> dict[str, bool]:
-        # Strict fullscreen VRR lane: disable FSO per-exe so Windows holds the
-        # true exclusive path and the refresh-3 cap stays cap-bound at ~297
-        # instead of relying on the borderless fallback if OW2 drifts.
+        # Overlay-free G-SYNC uses OW2's faster modern borderless flip path on
+        # this Win11/Reflex setup. Clear any stale FSO-disable entry left by
+        # the former exclusive profile so Windows can use the optimized path.
         # Full launcher paths are expanded only at apply/verify time.
-        return self._fso_dict(disabled=True)
+        return self._fso_dict(disabled=False)
 
     @property
     def display_path_requirements(self) -> DisplayPathRequirements:
@@ -496,7 +514,9 @@ class Overwatch2GSyncProfile(_Overwatch2BaseProfile):
 
     def _variant_overrides(self) -> dict[str, dict[str, Any]]:
         return {
+            "WindowsSettingsHandler": self._windowed_vrr_windows_settings(),
             "GraphicsSettingsHandler": {
+                "disable_global_fso": False,
                 "disable_mpo": False,
             },
             "NvidiaSettingsHandler": {
@@ -505,15 +525,14 @@ class Overwatch2GSyncProfile(_Overwatch2BaseProfile):
                 "profile_name": "Overwatch 2",
                 # Enforce VRR-safe cap automatically (refresh-3) to keep VSync as safety net.
                 "auto_vrr_fps_cap": True,
-                # This profile is intentionally fullscreen-only. If we ever add a
-                # borderless OW2 VRR profile, it needs a different VRR path.
-                "global_vrr_mode": "fullscreen_only",
+                "global_vrr_mode": "fullscreen_and_windowed",
             },
             "ColorProfileSettingsHandler": {
                 # Slightly below neutral (50) to compensate for DCI-P3 oversaturation in SDR.
                 "digital_vibrance": 45,
             },
             "OW2ConfigHandler": {
+                **self._borderless_ow2_settings(),
                 # Set in-game cap to refresh - 3 so OW2 and NVCP agree on the VRR target.
                 "auto_vrr_fps_cap": True,
             },
@@ -524,10 +543,11 @@ class Overwatch2GSyncProfile(_Overwatch2BaseProfile):
             {
                 "category": "Display",
                 "setting": "Display Mode",
-                "value": "Fullscreen (Exclusive)",
+                "value": "Borderless / Windowed Fullscreen",
                 "reason": (
-                    "This profile is tuned for fullscreen-only G-SYNC. "
-                    "Do not switch to borderless/windowed mode after launch."
+                    "This profile uses the same fast Win11 borderless G-SYNC path as "
+                    "capture-safe, but keeps capture and overlay processes out for lower "
+                    "frame-time noise."
                 ),
             },
             {
@@ -599,11 +619,12 @@ class Overwatch2GSyncHDRProfile(_Overwatch2BaseProfile):
 
     @property
     def fullscreen_optimizations_per_exe(self) -> dict[str, bool]:
-        # Native HDR strict lane: FSO must stay disabled per-exe. Otherwise
-        # Windows composites OW2's HDR tone map through DWM (borderless FSO)
-        # and the GPU pays compositor overhead on top of the HDR pipeline.
+        # Native HDR on this Win11/Reflex setup is faster on OW2's modern
+        # borderless flip path than on the former exclusive/fullscreen-only
+        # lane. Clear stale FSO-disable entries so the optimized path can
+        # engage after switching away from old strict builds.
         # Full launcher paths are expanded only at apply/verify time.
-        return self._fso_dict(disabled=True)
+        return self._fso_dict(disabled=False)
 
     @property
     def display_path_requirements(self) -> DisplayPathRequirements:
@@ -644,7 +665,9 @@ class Overwatch2GSyncHDRProfile(_Overwatch2BaseProfile):
 
     def _variant_overrides(self) -> dict[str, dict[str, Any]]:
         return {
+            "WindowsSettingsHandler": self._windowed_vrr_windows_settings(),
             "GraphicsSettingsHandler": {
+                "disable_global_fso": False,
                 "disable_mpo": False,
                 # Assert ACM off — see _base_overrides comment.
                 "disable_auto_color_management": True,
@@ -658,9 +681,10 @@ class Overwatch2GSyncHDRProfile(_Overwatch2BaseProfile):
                 # dynamic CPU pacer) operates separately and may bind below
                 # this static ceiling — that's expected.
                 "auto_vrr_fps_cap": True,
-                "global_vrr_mode": "fullscreen_only",
+                "global_vrr_mode": "fullscreen_and_windowed",
             },
             "OW2ConfigHandler": {
+                **self._borderless_ow2_settings(),
                 # In-game cap matches the driver-side cap so OW2 and NVCP
                 # agree on the target. To override (e.g. pin a different
                 # value), set ``profile_overrides.overwatch2-gsync-hdr.ow2_config``
@@ -675,10 +699,11 @@ class Overwatch2GSyncHDRProfile(_Overwatch2BaseProfile):
             {
                 "category": "Display",
                 "setting": "Display Mode",
-                "value": "Fullscreen (Exclusive)",
+                "value": "Borderless / Windowed Fullscreen",
                 "reason": (
-                    "This profile is tuned for fullscreen-only G-SYNC. "
-                    "Do not switch to borderless/windowed mode after launch."
+                    "This profile uses the same fast Win11 borderless HDR G-SYNC path as "
+                    "capture-safe, but keeps capture and overlay processes out for lower "
+                    "frame-time noise."
                 ),
             },
             {
@@ -791,10 +816,7 @@ class Overwatch2GSyncCaptureProfile(_Overwatch2BaseProfile):
 
     def _variant_overrides(self) -> dict[str, dict[str, Any]]:
         return {
-            "WindowsSettingsHandler": {
-                "windowed_optimizations": True,
-                "vrr_optimize": True,
-            },
+            "WindowsSettingsHandler": self._windowed_vrr_windows_settings(),
             "GraphicsSettingsHandler": {
                 "disable_global_fso": False,
                 "disable_mpo": False,
@@ -812,10 +834,7 @@ class Overwatch2GSyncCaptureProfile(_Overwatch2BaseProfile):
                 "digital_vibrance": 45,
             },
             "OW2ConfigHandler": {
-                "window_mode": 1,
-                "fullscreen_window": False,
-                "fullscreen_window_enabled": False,
-                "windowed_fullscreen": True,
+                **self._borderless_ow2_settings(),
                 "auto_vrr_fps_cap": True,
             },
         }
@@ -827,9 +846,9 @@ class Overwatch2GSyncCaptureProfile(_Overwatch2BaseProfile):
                 "setting": "Display Mode",
                 "value": "Borderless / Windowed Fullscreen",
                 "reason": (
-                    "Capture-safe path: keeps Medal/Discord/OBS overlays compatible while "
-                    "using the windowed G-SYNC path. Use the strict fullscreen profile for "
-                    "the leaner no-overlay path."
+                    "Capture-safe path: uses the same fast Win11 borderless G-SYNC path "
+                    "as the overlay-free profile, while keeping Medal/Discord/OBS "
+                    "overlays compatible."
                 ),
             },
             {
@@ -932,10 +951,7 @@ class Overwatch2GSyncHDRCaptureProfile(_Overwatch2BaseProfile):
 
     def _variant_overrides(self) -> dict[str, dict[str, Any]]:
         return {
-            "WindowsSettingsHandler": {
-                "windowed_optimizations": True,
-                "vrr_optimize": True,
-            },
+            "WindowsSettingsHandler": self._windowed_vrr_windows_settings(),
             "GraphicsSettingsHandler": {
                 "disable_global_fso": False,
                 "disable_mpo": False,
@@ -950,10 +966,7 @@ class Overwatch2GSyncHDRCaptureProfile(_Overwatch2BaseProfile):
                 "global_vrr_mode": "fullscreen_and_windowed",
             },
             "OW2ConfigHandler": {
-                "window_mode": 1,
-                "fullscreen_window": False,
-                "fullscreen_window_enabled": False,
-                "windowed_fullscreen": True,
+                **self._borderless_ow2_settings(),
                 "auto_vrr_fps_cap": True,
             },
         }
@@ -965,8 +978,9 @@ class Overwatch2GSyncHDRCaptureProfile(_Overwatch2BaseProfile):
                 "setting": "Display Mode",
                 "value": "Borderless / Windowed Fullscreen",
                 "reason": (
-                    "Capture-safe HDR path: keeps Medal/Discord/OBS overlays compatible while "
-                    "using windowed G-SYNC. Use the strict HDR profile only when overlays are off."
+                    "Capture-safe HDR path: uses the same fast Win11 borderless HDR "
+                    "G-SYNC path as the overlay-free profile, while keeping "
+                    "Medal/Discord/OBS overlays compatible."
                 ),
             },
             {

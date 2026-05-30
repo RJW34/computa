@@ -82,11 +82,10 @@ def test_productivity_profile_has_empty_killset(profiles_by_id) -> None:
     ],
 )
 def test_strict_overlay_free_profiles_get_full_killset(profile_id, profiles_by_id) -> None:
-    """Strict fullscreen-only VRR profiles get always-safe + opt-in tiers.
+    """Strict overlay-free gaming profiles get always-safe + opt-in tiers.
 
-    This is auto-derived from ``uses_fullscreen_only_vrr_path``, so adding a
-    new strict fullscreen G-SYNC profile to the catalog will pick this
-    contract up automatically.
+    Fullscreen-only VRR profiles get this from their display path; the OW2
+    overlay-free borderless lanes opt in with an explicit profile contract.
     """
     profile = profiles_by_id[profile_id]
     killset = profile.launch_process_killset()

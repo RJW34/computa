@@ -463,13 +463,21 @@ PROFILE_CATALOG: OrderedDict[str, ProfileCatalogEntry] = OrderedDict(
         "overwatch2-gsync": ProfileCatalogEntry(
             profile_class=Overwatch2GSyncProfile,
             tray_category="Shooters",
-            tray_subtitle="Strict SDR Exclusive | Reflex (set in-game) | G-SYNC ON",
+            tray_subtitle="Overlay-Free SDR Borderless | Reflex (set in-game) | G-SYNC ON",
+            tray_description=(
+                "Low-latency Overwatch 2 G-SYNC on the same optimized borderless VRR "
+                "path as capture-safe, while stopping capture and overlay processes."
+            ),
             sync_mode="on",
         ),
         "overwatch2-gsync-hdr": ProfileCatalogEntry(
             profile_class=Overwatch2GSyncHDRProfile,
             tray_category="Shooters",
-            tray_subtitle="Strict HDR Exclusive | Reflex (set in-game) | G-SYNC ON",
+            tray_subtitle="Overlay-Free HDR Borderless | Reflex (set in-game) | G-SYNC ON",
+            tray_description=(
+                "Low-latency native-HDR Overwatch 2 G-SYNC on the optimized borderless "
+                "VRR path, while stopping capture and overlay processes."
+            ),
             sync_mode="on",
         ),
         "overwatch2-gsync-capture": ProfileCatalogEntry(

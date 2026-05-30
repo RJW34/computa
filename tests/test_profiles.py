@@ -263,7 +263,7 @@ class TestProfileLoading:
             assert registry_settings["fullscreen_optimizations"]["deadlock.exe"] is True
 
     def test_deadlock_gsync_variants_inherit_strict_display_path_contract(self):
-        """G-SYNC Deadlock variants should match OW2/Marvel Rivals strict fullscreen contract."""
+        """G-SYNC Deadlock variants should match strict fullscreen VRR contract."""
         for profile_cls in (DeadlockGSyncProfile, DeadlockGSyncHDRProfile):
             profile = profile_cls()
             assert profile.uses_fullscreen_only_vrr_path is True, profile_cls.__name__
@@ -610,24 +610,24 @@ class TestProfileSettings:
         assert settings["global_vrr_mode"] == "off"
 
     def test_overwatch2_gsync_nvidia_settings(self):
-        """G-SYNC Overwatch profile should use reflex VRR preset."""
+        """G-SYNC Overwatch profile should use the optimized borderless VRR path."""
         profile = Overwatch2GSyncProfile()
         settings = profile.get_settings("NvidiaSettingsHandler")
         assert settings["preset"] == "reflex_gsync"
         assert settings["profile_name"] == "Overwatch 2"
         assert settings["auto_vrr_fps_cap"] is True
-        assert settings["global_vrr_mode"] == "fullscreen_only"
+        assert settings["global_vrr_mode"] == "fullscreen_and_windowed"
 
-    def test_overwatch2_gsync_in_game_display_mode_matches_fullscreen_vrr_path(self):
-        """G-SYNC Overwatch guidance should match the fullscreen-only driver path."""
+    def test_overwatch2_gsync_in_game_display_mode_matches_windowed_vrr_path(self):
+        """G-SYNC Overwatch guidance should match the borderless driver path."""
         profile = Overwatch2GSyncProfile()
         display_mode = next(
             item for item in profile.get_in_game_settings()
             if item["setting"] == "Display Mode"
         )
-        assert display_mode["value"] == "Fullscreen (Exclusive)"
-        assert "fullscreen-only g-sync" in display_mode["reason"].lower()
-        assert "do not switch to borderless/windowed" in display_mode["reason"].lower()
+        assert display_mode["value"] == "Borderless / Windowed Fullscreen"
+        assert "borderless g-sync path" in display_mode["reason"].lower()
+        assert "capture and overlay processes out" in display_mode["reason"].lower()
 
     def test_overwatch2_gsync_hdr_settings(self):
         """G-SYNC HDR Overwatch profile should enable HDR, disable auto-HDR, use native ICC."""
@@ -640,22 +640,44 @@ class TestProfileSettings:
         assert nvidia["preset"] == "reflex_gsync"
         assert nvidia["profile_name"] == "Overwatch 2"
         assert nvidia["auto_vrr_fps_cap"] is True
-        assert nvidia["global_vrr_mode"] == "fullscreen_only"
+        assert nvidia["global_vrr_mode"] == "fullscreen_and_windowed"
 
         color = profile.get_settings("ColorProfileSettingsHandler")
         assert color["icc_profile"] == "native"
         assert color["game_type"] == "competitive_fps"
 
-    def test_overwatch2_gsync_hdr_in_game_display_mode_matches_fullscreen_vrr_path(self):
-        """G-SYNC HDR guidance should stay aligned with fullscreen-only VRR settings."""
+    def test_overwatch2_gsync_hdr_in_game_display_mode_matches_windowed_vrr_path(self):
+        """G-SYNC HDR guidance should stay aligned with borderless VRR settings."""
         profile = Overwatch2GSyncHDRProfile()
         display_mode = next(
             item for item in profile.get_in_game_settings()
             if item["setting"] == "Display Mode"
         )
-        assert display_mode["value"] == "Fullscreen (Exclusive)"
-        assert "fullscreen-only g-sync" in display_mode["reason"].lower()
-        assert "do not switch to borderless/windowed" in display_mode["reason"].lower()
+        assert display_mode["value"] == "Borderless / Windowed Fullscreen"
+        assert "borderless hdr g-sync path" in display_mode["reason"].lower()
+        assert "capture and overlay processes out" in display_mode["reason"].lower()
+
+    def test_overwatch2_strict_gsync_profiles_use_overlay_free_windowed_vrr_path(self):
+        """Overlay-free OW2 G-SYNC should share capture-safe's fast display path."""
+        for profile_cls in (Overwatch2GSyncProfile, Overwatch2GSyncHDRProfile):
+            profile = profile_cls()
+            windows = profile.get_settings("WindowsSettingsHandler")
+            graphics = profile.get_settings("GraphicsSettingsHandler")
+            nvidia = profile.get_settings("NvidiaSettingsHandler")
+            ow2 = profile.get_settings("OW2ConfigHandler")
+
+            assert profile.is_capture_safe is False
+            assert profile.display_path_requirements.require_overlay_free_path is True
+            assert profile.requires_exact_nvidia_binding is True
+            assert windows["windowed_optimizations"] is True
+            assert windows["vrr_optimize"] is True
+            assert graphics["disable_global_fso"] is False
+            assert graphics["disable_mpo"] is False
+            assert nvidia["global_vrr_mode"] == "fullscreen_and_windowed"
+            assert ow2["window_mode"] == 1
+            assert ow2["fullscreen_window"] is False
+            assert ow2["fullscreen_window_enabled"] is False
+            assert ow2["windowed_fullscreen"] is True
 
     def test_overwatch2_capture_profile_uses_windowed_vrr_path(self):
         """Capture-safe OW2 should explicitly use the borderless/windowed VRR path."""
@@ -710,7 +732,7 @@ class TestProfileSettings:
         assert hdr_capture.requires_exact_nvidia_binding is True
 
     def test_overwatch2_strict_profiles_auto_disable_blocking_overlays(self):
-        """Strict exclusive OW2 profiles should auto-shut overlay blockers before failing."""
+        """Overlay-free OW2 profiles should auto-shut overlay blockers before failing."""
         strict = Overwatch2GSyncProfile()
         strict_hdr = Overwatch2GSyncHDRProfile()
         capture = Overwatch2GSyncCaptureProfile()
@@ -722,8 +744,6 @@ class TestProfileSettings:
     def test_all_fullscreen_only_vrr_profiles_inherit_strict_display_path_contract(self):
         """Fullscreen-only VRR profiles should share the hardened Overwatch strict path behavior."""
         strict_profiles = [
-            Overwatch2GSyncProfile(),
-            Overwatch2GSyncHDRProfile(),
             MarvelRivalsSDRProfile(),
             MarvelRivalsHDRProfile(),
             Rivals2GSyncProfile(),
@@ -1170,21 +1190,19 @@ class TestFullscreenOptimizationsPerExe:
         registry_settings = profile.get_settings("RegistrySettingsHandler") or {}
         assert "fullscreen_optimizations" not in registry_settings
 
-    def test_overwatch2_exclusive_variants_disable_fso(self):
-        """All exclusive-fullscreen OW2 variants must disable FSO for Overwatch.exe."""
-        for profile_cls in (
-            Overwatch2Profile,
-            Overwatch2GSyncProfile,
-            Overwatch2GSyncHDRProfile,
-        ):
+    def test_overwatch2_no_sync_variants_disable_fso(self):
+        """Exclusive-fullscreen no-sync OW2 variants must disable FSO for Overwatch.exe."""
+        for profile_cls in (Overwatch2Profile, Overwatch2NoSyncHDRProfile):
             profile = profile_cls()
             assert profile.fullscreen_optimizations_per_exe == {"Overwatch.exe": True}
             registry_settings = profile.get_settings("RegistrySettingsHandler")
             assert registry_settings["fullscreen_optimizations"] == {"Overwatch.exe": True}
 
-    def test_overwatch2_capture_variants_clear_fso(self):
-        """Capture/borderless OW2 variants must clear any prior FSO disable."""
+    def test_overwatch2_borderless_gsync_variants_clear_fso(self):
+        """Borderless OW2 G-SYNC variants must clear any prior FSO disable."""
         for profile_cls in (
+            Overwatch2GSyncProfile,
+            Overwatch2GSyncHDRProfile,
             Overwatch2GSyncCaptureProfile,
             Overwatch2GSyncHDRCaptureProfile,
         ):
