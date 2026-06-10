@@ -171,6 +171,37 @@ def test_tray_surfaces_pending_apply_state() -> None:
     assert "Pending profile fix: $pendingApplyText" in script
 
 
+def test_tray_surfaces_verification_mismatch_state() -> None:
+    """Generic verifier mismatches should be visible after silent startup checks."""
+    script = TRAY_SCRIPT.read_text(encoding="utf-8")
+    pending_section = script.split("function Get-ActiveProfilePendingApplyText", 1)[1].split(
+        "function Get-ActiveProfileRebootPendingText",
+        1,
+    )[0]
+    verify_section = script.split("function Apply-ActiveProfileVerificationJson", 1)[1].split(
+        "function Start-ActiveProfileVerificationProcess",
+        1,
+    )[0]
+    same_active_section = script.split("function Complete-SameActiveProfileSelectionIfHandled", 1)[1].split(
+        "function Refresh-ActiveProfileVerificationState",
+        1,
+    )[0]
+    menu_state_section = script.split("if ($script:applyPendingItem) {", 1)[1].split(
+        "Restore-TrayTooltipFromState",
+        1,
+    )[0]
+
+    assert '"pending_apply", "mismatch"' in pending_section
+    assert '$script:ActiveProfileVerificationStatus -eq "mismatch"' in pending_section
+    assert "Active profile verification mismatch: $pendingText" in verify_section
+    assert 'Profile mismatch: $pendingText' in verify_section
+    assert '$script:ActiveProfileVerificationStatus -ne "mismatch"' in same_active_section
+    assert "Apply-PendingProfileFixes routing mismatch" in script
+    assert "Reapply Active Profile: $pendingApplyTextForAction" in menu_state_section
+    assert "Verifier mismatch: $pendingApplyTextForAction" in menu_state_section
+    assert '"PROFILE MISMATCH"' in menu_state_section
+
+
 def test_tray_exposes_targeted_apply_pending_action() -> None:
     """Elevated tray should expose the narrow pending-fix CLI path."""
     script = TRAY_SCRIPT.read_text(encoding="utf-8")
@@ -204,6 +235,7 @@ def test_apply_pending_menu_tooltip_reports_current_fix_scope() -> None:
         in update_section
     )
     assert '$script:applyPendingItem.AccessibleDescription = "PENDING FIXES"' in update_section
+    assert '$script:applyPendingItem.AccessibleDescription = "PROFILE MISMATCH"' in update_section
     assert '$script:applyPendingItem.AccessibleDescription = "CHECKING PENDING FIXES"' in update_section
     assert '$script:applyPendingItem.AccessibleDescription = "NO PENDING FIXES"' in update_section
     assert 'Set-MenuItemImageSafe -Item $script:applyPendingItem -NewImage (New-ActionBitmap -Action "PendingFix" -Color $script:Colors.AccentAmber)' in update_section

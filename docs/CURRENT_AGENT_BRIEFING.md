@@ -265,8 +265,12 @@ Recommended next pickup:
   G-SYNC HDR profiles intentionally target the optimized borderless/windowed
   VRR path. `overwatch2-gsync-hdr` is still overlay-free by process policy;
   `overwatch2-gsync-hdr-capture` keeps capture/overlay processes alive.
-- The FPS cap is already correct for the active 300 Hz path:
-  `frame_rate_cap` target `297`, current `297`, active `true`.
+- The deployed FPS cap target for the active 300 Hz OW2 G-SYNC path is now the
+  OW2 Reflex/G-SYNC policy value: target `276`. Read-only verification after
+  deploy still reports the pre-change live values (`NvidiaSettingsHandler`
+  `max_frame_rate` current `297`, `OW2ConfigHandler.frame_rate_cap` current
+  `297`) because no profile apply was run while Overwatch/live display state
+  may be active.
 - Current health has two warnings: the expected reboot-gated
   `GraphicsSettingsHandler.mpo_disabled` profile state and the live
   mixed-refresh multi-monitor display topology. Neither is an OW2 FPS-cap
@@ -1455,15 +1459,15 @@ Deployment:
 The Overwatch 2 cap policy is now documented in source, README,
 troubleshooting docs, and this briefing:
 
-- ABSO's persisted static VRR safety cap is `refresh - 3`.
-- On this PC's 300 Hz Overwatch path, ABSO should write `297`, not `276`,
-  `277`, or any 280 Hz-derived value.
-- NVIDIA Reflex may dynamically pace the effective runtime FPS below that
-  static ceiling, often around the mid/high 270s on a 300 Hz path. That is
-  Reflex queue control, not the value ABSO should persist to NVCP or OW2 config.
-- Current installed/source policy keeps the OW2 config cap at `297`
-  target/current. Borderless/windowed mode is now intentional for OW2 G-SYNC
-  HDR; do not treat it as display-mode drift for that profile family.
+- ABSO's default VRR safety cap remains `refresh - 3` for generic VRR
+  profiles.
+- Overwatch 2 G-SYNC profiles are an explicit exception. They persist the OW2
+  Reflex/G-SYNC policy value to both the NVIDIA profile and OW2 config; on this
+  PC's 300 Hz path that target is `276`.
+- No-sync Overwatch 2 profiles remain at the game's `600` FPS ceiling with
+  VRR/G-SYNC off.
+- Borderless/windowed mode is intentional for OW2 G-SYNC HDR; do not treat it
+  as display-mode drift for that profile family.
 
 Validation and deployment for the cleanup:
 
@@ -1708,7 +1712,10 @@ was run.
   mitigation.
 - Current source makes the overlay-free and capture-safe OW2 G-SYNC HDR
   profiles share the same borderless/windowed VRR display path. The FPS cap is
-  correct: `frame_rate_cap` target/current `297`.
+  correct when `frame_rate_cap` target/current is `276` on the 300 Hz path.
+  Immediately after the 2026-06-10 deploy, read-only verification showed the
+  new target `276` and old current `297`; apply the active OW2 profile when
+  live mutation is appropriate to write the new cap.
 - Installed `health --json` reports `8 ok`, `2 warning`, `0 error`. The
   warnings are the accurate reboot-gated
   `GraphicsSettingsHandler.mpo_disabled` state and the current high-risk
@@ -1983,7 +1990,8 @@ Continue with small, verifiable slices:
   profile loaders.
 - If the user wants the overlay-free Overwatch G-SYNC HDR profile active, apply
   `overwatch2-gsync-hdr` and verify that OW2 remains borderless/windowed
-  fullscreen with cap `297`. Do not force exclusive fullscreen for this path.
+  fullscreen with cap `276` on the 300 Hz path. Do not force exclusive
+  fullscreen for this path.
 - If flicker continues, collect fresh
   `display-diagnostics --json` and event evidence before applying another
   mitigation.

@@ -5,6 +5,8 @@ from __future__ import annotations
 import pytest
 
 from abso.core.vrr import (
+    OW2_REFLEX_GSYNC_CAP_POLICY,
+    REFLEX_GSYNC_FPS_CAPS,
     VRR_FPS_CAPS,
     FrameLimiterType,
     GraphicsAPI,
@@ -13,7 +15,9 @@ from abso.core.vrr import (
     get_high_refresh_benefit,
     get_limiter_recommendation,
     get_llm_recommendation,
+    get_reflex_gsync_fps_cap,
     get_vrr_fps_cap,
+    get_vrr_fps_cap_for_policy,
 )
 
 
@@ -71,6 +75,24 @@ class TestVRRFPSCap:
         for hz in (60, 144, 165, 240, 280, 300, 360, 480, 500):
             assert hz in VRR_FPS_CAPS, f"missing preset {hz}"
             assert VRR_FPS_CAPS[hz] == hz - 3, f"{hz} preset is not refresh - 3"
+
+    def test_get_reflex_gsync_fps_cap_known_rates(self):
+        """OW2 Reflex/G-SYNC policy uses the wider current Reflex margin."""
+        assert get_reflex_gsync_fps_cap(165) == 157
+        assert get_reflex_gsync_fps_cap(240) == 224
+        assert get_reflex_gsync_fps_cap(300) == 276
+        assert REFLEX_GSYNC_FPS_CAPS[300] == 276
+
+    def test_get_reflex_gsync_fps_cap_fallback_calculation(self):
+        """Less-common refresh rates use the same frame-time margin."""
+        assert get_reflex_gsync_fps_cap(280) == 259
+        assert get_reflex_gsync_fps_cap(299.99) == 276
+
+    def test_get_vrr_fps_cap_for_policy(self):
+        """Policy selection is explicit so non-OW games keep refresh - 3."""
+        assert get_vrr_fps_cap_for_policy(300) == 297
+        assert get_vrr_fps_cap_for_policy(300, "refresh_minus_3") == 297
+        assert get_vrr_fps_cap_for_policy(300, OW2_REFLEX_GSYNC_CAP_POLICY) == 276
 
 
 class TestBestInGamePreset:

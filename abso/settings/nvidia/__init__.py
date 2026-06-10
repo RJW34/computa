@@ -200,6 +200,7 @@ class NvidiaSettingsHandler(SettingsHandler):
 
         auto_vrr_fps_cap = bool(settings.pop("auto_vrr_fps_cap", False))
         forced_refresh_hz = settings.pop("vrr_refresh_rate_hz", None)
+        vrr_cap_policy = settings.pop("vrr_cap_policy", None)
 
         return {
             "settings": settings,
@@ -210,6 +211,7 @@ class NvidiaSettingsHandler(SettingsHandler):
             "global_settings": global_settings,
             "auto_vrr_fps_cap": auto_vrr_fps_cap,
             "forced_refresh_hz": forced_refresh_hz,
+            "vrr_cap_policy": vrr_cap_policy,
             "require_exact_binding": require_exact_binding,
             "allow_unverified_existing_profile_reuse": allow_unverified_existing_profile_reuse,
         }
@@ -339,12 +341,12 @@ class NvidiaSettingsHandler(SettingsHandler):
             requested["allow_unverified_existing_profile_reuse"]
         )
 
-        # Optional auto-cap for VRR profiles. Uses the Blur Busters G-SYNC 101
-        # ``refresh - 3`` convention as the V-SYNC safety boundary.  Reflex
-        # presence does not change the static cap (separate mechanism, separate
-        # purpose — see abso/core/vrr.py for the rationale).
+        # Optional auto-cap for VRR profiles. Defaults to the Blur Busters
+        # G-SYNC 101 ``refresh - 3`` convention, but profile data can request
+        # a narrower policy such as OW2 Reflex/G-SYNC.
         auto_vrr_fps_cap = bool(requested["auto_vrr_fps_cap"])
         forced_refresh_hz = requested["forced_refresh_hz"]
+        vrr_cap_policy = requested["vrr_cap_policy"]
         if auto_vrr_fps_cap:
             refresh_hz: int | None = None
             if forced_refresh_hz is not None:
@@ -354,14 +356,17 @@ class NvidiaSettingsHandler(SettingsHandler):
                 refresh_hz = self._detect_primary_refresh_rate()
 
             if refresh_hz and refresh_hz > 0:
-                from abso.core.vrr import get_vrr_fps_cap
+                from abso.core.vrr import get_vrr_fps_cap_for_policy
 
-                auto_cap = get_vrr_fps_cap(refresh_hz)
+                auto_cap = get_vrr_fps_cap_for_policy(refresh_hz, vrr_cap_policy)
                 settings["max_frame_rate"] = auto_cap
-                applied.append(f"Auto VRR FPS cap: {auto_cap} (from {refresh_hz} Hz)")
+                policy_suffix = f", {vrr_cap_policy}" if vrr_cap_policy else ""
+                applied.append(
+                    f"Auto VRR FPS cap: {auto_cap} (from {refresh_hz} Hz{policy_suffix})"
+                )
                 logger.info(
                     f"Auto VRR FPS cap enabled for {game_name}: "
-                    f"refresh={refresh_hz}Hz cap={auto_cap}"
+                    f"refresh={refresh_hz}Hz cap={auto_cap} policy={vrr_cap_policy or 'static'}"
                 )
             else:
                 applied.append(
@@ -759,6 +764,7 @@ class NvidiaSettingsHandler(SettingsHandler):
 
         auto_vrr_fps_cap = bool(settings.pop("auto_vrr_fps_cap", False))
         forced_refresh_hz = settings.pop("vrr_refresh_rate_hz", None)
+        vrr_cap_policy = settings.pop("vrr_cap_policy", None)
         if auto_vrr_fps_cap:
             refresh_hz: int | None = None
             if forced_refresh_hz is not None:
@@ -768,9 +774,12 @@ class NvidiaSettingsHandler(SettingsHandler):
                 refresh_hz = self._detect_primary_refresh_rate()
 
             if refresh_hz and refresh_hz > 0:
-                from abso.core.vrr import get_vrr_fps_cap
+                from abso.core.vrr import get_vrr_fps_cap_for_policy
 
-                settings["max_frame_rate"] = get_vrr_fps_cap(refresh_hz)
+                settings["max_frame_rate"] = get_vrr_fps_cap_for_policy(
+                    refresh_hz,
+                    vrr_cap_policy,
+                )
 
         preset_name = settings.get("preset")
         allowed_keys = (

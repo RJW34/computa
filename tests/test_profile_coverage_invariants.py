@@ -64,6 +64,7 @@ _NVIDIA_KNOWN_KEYS: frozenset[str] = frozenset({
     "vrr_mode",
     "vrr_request_state",
     "auto_vrr_fps_cap",
+    "vrr_cap_policy",
     "vrr_refresh_rate_hz",
     "profile_name",
     "profile_aliases",

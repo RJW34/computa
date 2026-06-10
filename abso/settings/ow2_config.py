@@ -58,6 +58,7 @@ class OW2ConfigHandler(SettingsHandler):
 
     is_critical_verify = True
     AUTO_VRR_FPS_CAP_KEY = "auto_vrr_fps_cap"
+    VRR_CAP_POLICY_KEY = "vrr_cap_policy"
 
     # Matches versioned render section headers like [Render.13]
     RENDER_SECTION_RE = re.compile(r"^\[Render\.\d+\]$")
@@ -575,22 +576,27 @@ class OW2ConfigHandler(SettingsHandler):
         Apply and verify must share this path. Otherwise health/state checks can
         report the profile active while OW2's actual FrameRateCap has drifted.
 
-        Uses the Blur Busters G-SYNC 101 ``refresh - 3`` convention as the
-        V-SYNC safety boundary. See ``abso/core/vrr.py:get_vrr_fps_cap``.
+        Uses the default Blur Busters G-SYNC 101 ``refresh - 3`` convention
+        unless the profile declares a narrower policy such as OW2's
+        Reflex/G-SYNC cap.
         """
         resolved = dict(settings)
+        cap_policy = resolved.pop(self.VRR_CAP_POLICY_KEY, None)
 
         if resolved.pop(self.AUTO_VRR_FPS_CAP_KEY, False):
             try:
-                from abso.core.vrr import get_vrr_fps_cap
+                from abso.core.vrr import get_vrr_fps_cap_for_policy
                 from abso.settings.nvidia import NvidiaSettingsHandler
 
                 refresh_hz = NvidiaSettingsHandler()._detect_primary_refresh_rate()
                 if refresh_hz and refresh_hz > 0:
-                    resolved["frame_rate_cap"] = get_vrr_fps_cap(refresh_hz)
+                    resolved["frame_rate_cap"] = get_vrr_fps_cap_for_policy(
+                        refresh_hz,
+                        cap_policy,
+                    )
                     logger.info(
-                        "OW2 auto VRR FPS cap: %d (from %d Hz)",
-                        resolved["frame_rate_cap"], refresh_hz,
+                        "OW2 auto VRR FPS cap: %d (from %d Hz, policy=%s)",
+                        resolved["frame_rate_cap"], refresh_hz, cap_policy or "static",
                     )
             except Exception as e:
                 logger.warning("OW2 auto VRR FPS cap detection failed: %s", e)

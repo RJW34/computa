@@ -249,6 +249,35 @@ def test_verify_active_expands_auto_vrr_fps_cap(tmp_path: Path) -> None:
     assert verify["settings"]["use_custom_frame_rates"]["active"] is True
 
 
+def test_verify_active_expands_ow2_reflex_gsync_cap_policy(tmp_path: Path) -> None:
+    """OW2 Reflex/G-SYNC profiles verify the concrete 276 FPS 300 Hz target."""
+    ini = SAMPLE_INI.replace('FrameRateCap = "60"', 'FrameRateCap = "276"')
+    ini = ini.replace('UseCustomFrameRates = "0"\n', "")
+    ini = ini.replace('ShowFPSCounter = "0"', 'UseCustomFrameRates = "1"\nShowFPSCounter = "0"')
+    ini_path = tmp_path / "Settings_v0.ini"
+    _write_settings_ini(ini_path, ini)
+
+    with (
+        patch("abso.settings.ow2_config._get_ow2_settings_path", return_value=ini_path),
+        patch(
+            "abso.settings.nvidia.NvidiaSettingsHandler._detect_primary_refresh_rate",
+            return_value=300,
+        ),
+    ):
+        verify = OW2ConfigHandler().verify_active({
+            "auto_vrr_fps_cap": True,
+            "vrr_cap_policy": "ow2_reflex_gsync",
+        })
+
+    assert verify["all_active"] is True
+    assert verify["settings"]["frame_rate_cap"] == {
+        "target": 276,
+        "current": 276,
+        "active": True,
+    }
+    assert verify["settings"]["use_custom_frame_rates"]["active"] is True
+
+
 def test_verify_active_reports_auto_vrr_fps_cap_drift(tmp_path: Path) -> None:
     """A drifted OW2 cap should make state/health verification fail."""
     ini_path = tmp_path / "Settings_v0.ini"

@@ -367,31 +367,32 @@ inspect `%TEMP%\abso_tray.log`.
 
 ## Overwatch Reflex and VRR FPS Caps
 
-### Why ABSO writes 297 on a 300 Hz Overwatch profile
+### Why ABSO writes 276 on a 300 Hz Overwatch G-SYNC profile
 
-**Symptom:** A guide or latency tool suggests a Reflex cap around `276`, while
-ABSO writes `297` for a 300 Hz G-SYNC Overwatch profile.
+**Symptom:** Older ABSO notes or a generic VRR guide mention `refresh - 3`
+(`297` at 300 Hz), while the current Overwatch G-SYNC profile verifies `276`.
 
-These are different mechanisms:
+ABSO now treats Overwatch 2 G-SYNC as an explicit Reflex/G-SYNC exception:
 
-- `297` is ABSO's manual VRR safety ceiling: `refresh - 3`. It keeps the
-  driver-side V-SYNC safety net from engaging above the VRR window.
-- `~276` is a possible NVIDIA Reflex effective runtime cap on a 300 Hz path.
-  Reflex paces the render queue dynamically when the in-game Reflex toggle is
-  enabled; ABSO does not hard-code that value into NVIDIA Control Panel or the
-  Overwatch config.
+- The default VRR cap policy is still `refresh - 3` for games that use the
+  generic G-SYNC safety boundary.
+- The Overwatch 2 G-SYNC profiles use the OW2 Reflex/G-SYNC cap policy. On a
+  300 Hz primary display that policy resolves to `276`.
+- The no-sync Overwatch profiles are separate and remain at the game's `600`
+  FPS ceiling with VRR/G-SYNC off.
 
-For `overwatch2-gsync` and `overwatch2-gsync-hdr` on a 300 Hz monitor, the
-expected setup is:
+For `overwatch2-gsync`, `overwatch2-gsync-hdr`,
+`overwatch2-gsync-capture`, and `overwatch2-gsync-hdr-capture` on a 300 Hz
+monitor, the expected setup is:
 
 1. Display refresh: `300 Hz`
 2. NVIDIA Control Panel G-SYNC: enabled for the profile path
 3. NVIDIA Control Panel V-SYNC: on as safety net
 4. Overwatch VSync: off
 5. Overwatch NVIDIA Reflex: `Enabled + Boost`
-6. ABSO static cap: `297`
+6. ABSO OW2 Reflex/G-SYNC cap: `276`
 
-If profile verification fails while the cap is already `297`, check the
+If profile verification fails while the cap is already `276`, check the
 reported handler detail. On the current Overwatch G-SYNC HDR path, both the
 overlay-free and capture-safe profiles intentionally expect
 borderless/windowed fullscreen. Do not "fix" those profiles by forcing

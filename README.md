@@ -220,7 +220,7 @@ A.B.S.O. applies optimizations across multiple system areas. Exact settings vary
 ### NVIDIA / VRR
 - Per-application NVIDIA driver profile (via NPI / NVAPI DRS) with Low Latency Mode, VSync, Power Management, Max Frame Rate, and VRR App Override tuned per profile
 - Native Reflex is preferred over driver Low Latency Mode whenever the game supports Reflex (CoD, Apex, Valorant, Fortnite, Overwatch 2, Diablo 4, Marvel Rivals). ABSO keeps driver LLM off for those games; the Reflex toggle itself must still be enabled in-game
-- ABSO's manual VRR safety cap is `refresh - 3` for every profile. On a 300 Hz Overwatch 2 path that means ABSO writes `297`. NVIDIA Reflex may then pace the game lower at runtime, sometimes around the mid/high 270s on 300 Hz systems, but that is Reflex's dynamic effective cap, not the static value ABSO should write
+- ABSO's default manual VRR safety cap is `refresh - 3`. Overwatch 2 G-SYNC profiles are an explicit exception: they use the OW2 Reflex/G-SYNC policy, which resolves to `276` on the 300 Hz reference path. No-sync Overwatch 2 profiles remain uncapped at the game's `600` FPS ceiling
 
 ### VBS / HVCI / Virtualization-Based Security
 - ABSO does **not** silently disable Memory Integrity (HVCI), Virtual Machine Platform, or hypervisor launch state. Disabling VBS is a security tradeoff and is only available through an explicit opt-in flow with warnings and a restore path

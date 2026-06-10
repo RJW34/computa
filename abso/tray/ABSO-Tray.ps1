@@ -990,10 +990,19 @@ function Test-ActiveProfileVerificationInFlight {
 }
 
 function Get-ActiveProfilePendingApplyText {
-    if ($script:ActiveProfileVerificationStatus -ne "pending_apply") { return $null }
+    if ($script:ActiveProfileVerificationStatus -notin @("pending_apply", "mismatch")) { return $null }
     $pending = @($script:ActiveProfilePendingApplySettings)
     if ($pending.Count -gt 0 -and -not [string]::IsNullOrWhiteSpace("$($pending[0])")) {
         return (Format-TrayUserFacingText -Text "$($pending[0])")
+    }
+    if ($script:ActiveProfileVerificationStatus -eq "mismatch") {
+        $mismatches = @($script:ActiveProfileMismatchedHandlers) |
+            Where-Object { -not [string]::IsNullOrWhiteSpace("$($_)") } |
+            Select-Object -First 2
+        if ($mismatches.Count -gt 0) {
+            return (Format-TrayUserFacingText -Text ($mismatches -join ", "))
+        }
+        return "profile mismatch"
     }
     return "profile verification"
 }
@@ -1050,7 +1059,10 @@ function Complete-SameActiveProfileSelectionIfHandled {
     )
 
     $pendingApplyText = Get-ActiveProfilePendingApplyText
-    if (-not [string]::IsNullOrWhiteSpace($pendingApplyText)) {
+    if (
+        -not [string]::IsNullOrWhiteSpace($pendingApplyText) -and
+        $script:ActiveProfileVerificationStatus -ne "mismatch"
+    ) {
         Write-TrayLog "Profile '$ProfileId' is already active but needs pending fixes; using apply-pending instead of full apply"
         Apply-PendingProfileFixes
         return $true
@@ -1227,6 +1239,12 @@ function Apply-ActiveProfileVerificationJson {
         $pendingText = Get-ActiveProfilePendingApplyText
         Write-TrayLog "Active profile has pending profile fixes: $pendingText" -Level "WARN"
         $script:LastAction = "Pending profile fix: $pendingText"
+        $script:LastActionTime = Get-Date
+    }
+    elseif ($script:ActiveProfileVerificationStatus -eq "mismatch") {
+        $pendingText = Get-ActiveProfilePendingApplyText
+        Write-TrayLog "Active profile verification mismatch: $pendingText" -Level "WARN"
+        $script:LastAction = "Profile mismatch: $pendingText"
         $script:LastActionTime = Get-Date
     }
     elseif ($script:ActiveProfileStateRebootPending) {
@@ -4523,6 +4541,14 @@ function Apply-PendingProfileFixes {
 
     $activeRecord = Get-ActiveTrayProfileRecord
     $pendingText = Get-ActiveProfilePendingApplyText
+    if ($script:ActiveProfileVerificationStatus -eq "mismatch") {
+        if ([string]::IsNullOrWhiteSpace($pendingText)) {
+            $pendingText = "profile mismatch"
+        }
+        Write-TrayLog "Apply-PendingProfileFixes routing mismatch for '$script:activeProfile' through reapply ($pendingText)"
+        Apply-Profile -ProfileId $script:activeProfile
+        return
+    }
     if ([string]::IsNullOrWhiteSpace($pendingText) -and -not $Force) {
         $pendingNoopVisual = Get-TrayProfileToastVisualArgs `
             -ProfileId $script:activeProfile `
@@ -4855,9 +4881,16 @@ function Update-MenuState {
         )
         $script:applyPendingItem.Visible = ($script:applyPendingItem.Enabled -or $pendingFixChecking)
         if ($script:applyPendingItem.Enabled) {
-            $script:applyPendingItem.Text = "Apply Pending Fixes: $pendingApplyTextForAction"
-            $script:applyPendingItem.ToolTipText = "Targeted verifier fix: $pendingApplyTextForAction. No backup, baseline restore, or display reset."
-            $script:applyPendingItem.AccessibleDescription = "PENDING FIXES"
+            if ($script:ActiveProfileVerificationStatus -eq "mismatch") {
+                $script:applyPendingItem.Text = "Reapply Active Profile: $pendingApplyTextForAction"
+                $script:applyPendingItem.ToolTipText = "Verifier mismatch: $pendingApplyTextForAction. Reapply the active profile to write the current target settings."
+                $script:applyPendingItem.AccessibleDescription = "PROFILE MISMATCH"
+            }
+            else {
+                $script:applyPendingItem.Text = "Apply Pending Fixes: $pendingApplyTextForAction"
+                $script:applyPendingItem.ToolTipText = "Targeted verifier fix: $pendingApplyTextForAction. No backup, baseline restore, or display reset."
+                $script:applyPendingItem.AccessibleDescription = "PENDING FIXES"
+            }
             Set-MenuItemImageSafe -Item $script:applyPendingItem -NewImage (New-ActionBitmap -Action "PendingFix" -Color $script:Colors.AccentAmber)
         }
         elseif ($pendingFixChecking) {
@@ -5398,7 +5431,7 @@ function New-TrayLastActionStatusBitmap {
     $color = $dimColor
 
     switch -Regex ($text) {
-        '^(Pending profile fix|No active profile to repair|No pending profile fixes|No pending profile fix|Pending profile fixes|Fixed:)' {
+        '^(Pending profile fix|Profile mismatch|No active profile to repair|No pending profile fixes|No pending profile fix|Pending profile fixes|Fixed:)' {
             $action = "PendingFix"; $color = $script:Colors.AccentAmber; break
         }
         '^(Windows restart required)' {

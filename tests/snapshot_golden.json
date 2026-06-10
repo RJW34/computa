@@ -1841,9 +1841,9 @@
       },
       {
         "category": "Display",
-        "reason": "Set by ABSO to refresh - 3 (Blur Busters G-SYNC 101 convention) as the V-SYNC safety boundary. NVIDIA Reflex (the engine's dynamic CPU pacer) may bind below this; that's expected \u2014 the static cap just keeps NVCP V-SYNC from ever engaging.",
+        "reason": "Set by ABSO through the OW2 Reflex/G-SYNC policy so the in-game cap and NVIDIA driver cap agree. On the 300 Hz reference path this is 276 FPS; no-sync OW2 profiles remain uncapped at 600.",
         "setting": "Frame Rate Cap",
-        "value": "Auto (refresh - 3: e.g. 297 @ 300Hz, 237 @ 240Hz, 141 @ 144Hz)"
+        "value": "Auto OW2 Reflex/G-SYNC cap (276 @ 300Hz; scales by refresh)"
       },
       {
         "category": "Display",
@@ -1900,7 +1900,8 @@
         "auto_vrr_fps_cap": true,
         "global_vrr_mode": "fullscreen_and_windowed",
         "preset": "reflex_gsync",
-        "profile_name": "Overwatch 2"
+        "profile_name": "Overwatch 2",
+        "vrr_cap_policy": "ow2_reflex_gsync"
       },
       "OW2ConfigHandler": {
         "aa_detail": 0,
@@ -1920,6 +1921,7 @@
         "texture_detail": 1,
         "triple_buffering": false,
         "upscaling": false,
+        "vrr_cap_policy": "ow2_reflex_gsync",
         "vsync": false,
         "window_mode": 1,
         "windowed_fullscreen": true
@@ -2001,9 +2003,9 @@
       },
       {
         "category": "Display",
-        "reason": "Set by ABSO to refresh - 3 (Blur Busters G-SYNC 101 convention) so windowed G-SYNC stays within the VRR window and NVCP V-SYNC never engages.",
+        "reason": "Set by ABSO through the OW2 Reflex/G-SYNC policy so the in-game cap and NVIDIA driver cap agree. On the 300 Hz reference path this is 276 FPS; no-sync OW2 profiles remain uncapped at 600.",
         "setting": "Frame Rate Cap",
-        "value": "Auto (refresh - 3: e.g. 297 @ 300Hz, 237 @ 240Hz, 141 @ 144Hz)"
+        "value": "Auto OW2 Reflex/G-SYNC cap (276 @ 300Hz; scales by refresh)"
       },
       {
         "category": "Display",
@@ -2061,7 +2063,8 @@
         "auto_vrr_fps_cap": true,
         "global_vrr_mode": "fullscreen_and_windowed",
         "preset": "reflex_gsync",
-        "profile_name": "Overwatch 2"
+        "profile_name": "Overwatch 2",
+        "vrr_cap_policy": "ow2_reflex_gsync"
       },
       "OW2ConfigHandler": {
         "aa_detail": 0,
@@ -2081,6 +2084,7 @@
         "texture_detail": 1,
         "triple_buffering": false,
         "upscaling": false,
+        "vrr_cap_policy": "ow2_reflex_gsync",
         "vsync": false,
         "window_mode": 1,
         "windowed_fullscreen": true
@@ -2162,9 +2166,9 @@
       },
       {
         "category": "Display",
-        "reason": "Set by ABSO to refresh - 3 (Blur Busters G-SYNC 101 convention) as the V-SYNC safety boundary. NVIDIA Reflex (the engine's dynamic CPU pacer) may bind below this; that's expected \u2014 the static cap just keeps NVCP V-SYNC from ever engaging.",
+        "reason": "Set by ABSO through the OW2 Reflex/G-SYNC policy so the in-game cap and NVIDIA driver cap agree. On the 300 Hz reference path this is 276 FPS; no-sync OW2 profiles remain uncapped at 600.",
         "setting": "Frame Rate Cap",
-        "value": "Auto (refresh - 3: e.g. 297 @ 300Hz, 237 @ 240Hz, 141 @ 144Hz)"
+        "value": "Auto OW2 Reflex/G-SYNC cap (276 @ 300Hz; scales by refresh)"
       },
       {
         "category": "Display",
@@ -2246,7 +2250,8 @@
         "auto_vrr_fps_cap": true,
         "global_vrr_mode": "fullscreen_and_windowed",
         "preset": "reflex_gsync",
-        "profile_name": "Overwatch 2"
+        "profile_name": "Overwatch 2",
+        "vrr_cap_policy": "ow2_reflex_gsync"
       },
       "OW2ConfigHandler": {
         "aa_detail": 0,
@@ -2266,6 +2271,7 @@
         "texture_detail": 1,
         "triple_buffering": false,
         "upscaling": false,
+        "vrr_cap_policy": "ow2_reflex_gsync",
         "vsync": false,
         "window_mode": 1,
         "windowed_fullscreen": true
@@ -2349,9 +2355,9 @@
       },
       {
         "category": "Display",
-        "reason": "Set by ABSO to refresh - 3 (Blur Busters G-SYNC 101 convention) so windowed G-SYNC stays within the VRR window and NVCP V-SYNC never engages.",
+        "reason": "Set by ABSO through the OW2 Reflex/G-SYNC policy so the in-game cap and NVIDIA driver cap agree. On the 300 Hz reference path this is 276 FPS; no-sync OW2 profiles remain uncapped at 600.",
         "setting": "Frame Rate Cap",
-        "value": "Auto (refresh - 3: e.g. 297 @ 300Hz, 237 @ 240Hz, 141 @ 144Hz)"
+        "value": "Auto OW2 Reflex/G-SYNC cap (276 @ 300Hz; scales by refresh)"
       },
       {
         "category": "Display",
@@ -2427,7 +2433,8 @@
         "auto_vrr_fps_cap": true,
         "global_vrr_mode": "fullscreen_and_windowed",
         "preset": "reflex_gsync",
-        "profile_name": "Overwatch 2"
+        "profile_name": "Overwatch 2",
+        "vrr_cap_policy": "ow2_reflex_gsync"
       },
       "OW2ConfigHandler": {
         "aa_detail": 0,
@@ -2447,6 +2454,7 @@
         "texture_detail": 1,
         "triple_buffering": false,
         "upscaling": false,
+        "vrr_cap_policy": "ow2_reflex_gsync",
         "vsync": false,
         "window_mode": 1,
         "windowed_fullscreen": true

@@ -433,6 +433,44 @@ class TestNvidiaApply:
         assert any("Auto VRR FPS cap: 297 (from 300 Hz)" in line for line in result["applied"])
 
     @patch("abso.settings.nvidia.nvapi_drs.DRSProfileManager")
+    def test_apply_auto_vrr_fps_cap_uses_ow2_reflex_policy(self, mock_manager_cls):
+        """OW2 G-SYNC profiles can opt into the current Reflex 276 FPS cap."""
+        mock_manager = MagicMock()
+        mock_manager.apply_settings_to_app.return_value = {
+            "settings_applied": {
+                "max_frame_rate": 276,
+                "vsync": "on",
+                "vrr_app_override": "allow",
+            },
+            "errors": [],
+            "app_bound": True,
+            "npi_launched": False,
+        }
+        mock_manager.get_app_settings.return_value = {}
+        mock_manager._resolve_setting.return_value = (0x10835002, 276)
+        mock_manager_cls.return_value = mock_manager
+
+        handler = NvidiaSettingsHandler()
+        with patch.object(handler, "_detect_primary_refresh_rate", return_value=300):
+            result = handler.apply({
+                "preset": "reflex_gsync",
+                "auto_vrr_fps_cap": True,
+                "vrr_cap_policy": "ow2_reflex_gsync",
+                "executables": ["Overwatch.exe"],
+                "game_name": "Overwatch 2 - GSYNC",
+                "profile_name": "Overwatch 2",
+            })
+
+        args, kwargs = mock_manager.apply_settings_to_app.call_args
+        sent_settings = args[1]
+        assert sent_settings["max_frame_rate"] == 276
+        assert result["success"] is True
+        assert any(
+            "Auto VRR FPS cap: 276 (from 300 Hz, ow2_reflex_gsync)" in line
+            for line in result["applied"]
+        )
+
+    @patch("abso.settings.nvidia.nvapi_drs.DRSProfileManager")
     def test_apply_verification_uses_explicit_profile_name(self, mock_manager_cls):
         """Verification should read back from explicit profile name when provided."""
         mock_manager = MagicMock()

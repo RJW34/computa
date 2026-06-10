@@ -106,6 +106,19 @@ VRR_FPS_CAPS: dict[int, int] = {
     500: 497,
 }
 
+OW2_REFLEX_GSYNC_CAP_POLICY = "ow2_reflex_gsync"
+
+REFLEX_GSYNC_FRAME_TIME_MARGIN_MS = 0.29
+
+REFLEX_GSYNC_FPS_CAPS: dict[int, int] = {
+    144: 138,
+    165: 157,
+    240: 224,
+    300: 276,
+    360: 326,
+    480: 421,
+}
+
 # Common in-game FPS cap presets (for games without custom values)
 COMMON_FPS_PRESETS = [30, 60, 120, 144, 165, 240, 300, 360]
 
@@ -141,6 +154,36 @@ def get_vrr_fps_cap(
     if refresh_rate in VRR_FPS_CAPS:
         return VRR_FPS_CAPS[refresh_rate]
     return max(1, refresh_rate - 3)
+
+
+def get_reflex_gsync_fps_cap(refresh_rate: int | float) -> int:
+    """Calculate the OW2/NVIDIA Reflex G-SYNC effective cap.
+
+    NVIDIA's Reflex/ULLM G-SYNC path uses a wider frame-time margin than the
+    static ``refresh - 3`` safety cap. Known public examples include roughly
+    157 FPS at 165 Hz and 224 FPS at 240 Hz; the current OW2 300 Hz target is
+    276 FPS. The fallback keeps the same ~0.29 ms frame-time margin for less
+    common refresh rates.
+    """
+    rounded_refresh = round(float(refresh_rate))
+    if rounded_refresh in REFLEX_GSYNC_FPS_CAPS:
+        return REFLEX_GSYNC_FPS_CAPS[rounded_refresh]
+
+    frame_time_ms = (1000.0 / rounded_refresh) + REFLEX_GSYNC_FRAME_TIME_MARGIN_MS
+    return max(1, min(rounded_refresh - 1, round(1000.0 / frame_time_ms)))
+
+
+def get_vrr_fps_cap_for_policy(
+    refresh_rate: int | float,
+    policy: str | None = None,
+) -> int:
+    """Resolve a profile-requested VRR cap policy to a concrete FPS cap."""
+    normalized = str(policy or "").strip().lower().replace("-", "_")
+    if not normalized or normalized in {"static", "refresh_minus_3", "vrr"}:
+        return get_vrr_fps_cap(refresh_rate)
+    if normalized in {OW2_REFLEX_GSYNC_CAP_POLICY, "reflex_gsync"}:
+        return get_reflex_gsync_fps_cap(refresh_rate)
+    raise ValueError(f"Unknown VRR FPS cap policy: {policy!r}")
 
 
 def get_best_ingame_preset(

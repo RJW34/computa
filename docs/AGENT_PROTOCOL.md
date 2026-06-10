@@ -132,8 +132,8 @@ broken state.
 As of 2026-05-30, the live PC is on `overwatch2-gsync-hdr-capture` with the
 local mixed-refresh MPO mitigation still reboot-gated. Display diagnostics
 currently show a 2560x1440 300 Hz VRR-capable primary plus a 2560x1440
-59.95 Hz secondary. The expected Overwatch static cap remains `297`
-target/current.
+59.95 Hz secondary. The expected Overwatch G-SYNC cap now resolves through the
+OW2 Reflex/G-SYNC policy to `276` target/current on this 300 Hz path.
 
 The Overwatch 2 G-SYNC HDR profile pair now shares the optimized
 borderless/windowed VRR display path because that path outperformed the former
@@ -146,9 +146,8 @@ Current safe handling:
 
 1. Use `display-diagnostics --json`, `state --json --verify`,
    `verify overwatch2-gsync-hdr --json`, or `health --json` for evidence.
-2. Treat `297` as the expected persisted static cap on the 300 Hz Overwatch
-   path. Reflex may dynamically pace below it at runtime, but ABSO should not
-   persist Reflex-observed values such as `276`.
+2. Treat `276` as the expected persisted cap for the 300 Hz Overwatch G-SYNC
+   path. The no-sync OW2 profiles remain separate at the game's `600` FPS cap.
 3. Do not run full profile apply, live display reset, HDR cycle, DWM restart,
    or driver hotkey unless the user explicitly asks.
 4. If verification is not clean, inspect the handler detail first. A remaining
@@ -392,27 +391,24 @@ Old shape (do not reintroduce): duplicate LocalAppData path construction,
 duplicate `.abso_state.json` reads/writes in `main.py` and health, or broad
 profile apply logic for a single pending reboot-gated graphics setting.
 
-### 5.9 VRR static cap versus Reflex dynamic cap
+### 5.9 Generic VRR cap versus Overwatch Reflex/G-SYNC cap
 
-ABSO's manual VRR cap policy is `refresh - 3` for both Reflex and non-Reflex
-profiles. The value is a static V-SYNC safety boundary, not the latency
-controller. For a 300 Hz Overwatch 2 profile, ABSO should write `297` to the
-NVIDIA profile and to any owned game config cap.
+ABSO's default manual VRR cap policy is `refresh - 3`. The value is a static
+V-SYNC safety boundary for generic VRR profiles.
 
-Do not replace that static cap with a Reflex-observed effective value such as
-`276` on a 300 Hz path. Reflex is an engine/runtime pacing mechanism. With
-G-SYNC and the V-SYNC safety net enabled, Reflex may choose an effective cap
-well below the static ceiling to keep the render queue shallow. That runtime
-behavior is expected, but it is not the value ABSO should persist.
+Overwatch 2 G-SYNC profiles are an explicit exception. They declare the OW2
+Reflex/G-SYNC cap policy for both the NVIDIA profile and OW2 Settings_v0.ini;
+on the 300 Hz reference path that policy resolves to `276`. The no-sync OW2
+profiles keep VRR/G-SYNC off and use the game's `600` FPS ceiling.
 
 When auditing Overwatch 2 on this PC:
 
 - Verify the active monitor path first. The current reference setup is
-  2560x1440 at 300 Hz, so the expected ABSO static cap is `297`.
-- If verification reports `frame_rate_cap` target/current `297`, the cap is
+  2560x1440 at 300 Hz, so the expected OW2 G-SYNC cap is `276`.
+- If verification reports `frame_rate_cap` target/current `276`, the cap is
   not the active mismatch.
 - OW2 G-SYNC profiles intentionally expect borderless/windowed fullscreen on
-  this PC. If verification reports `frame_rate_cap` target/current `297`, the
+  this PC. If verification reports `frame_rate_cap` target/current `276`, the
   cap is not the active mismatch; inspect handler detail for compositor/MPO,
   NVIDIA binding, or process-policy issues instead.
 
