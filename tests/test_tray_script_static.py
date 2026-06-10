@@ -168,7 +168,8 @@ def test_tray_surfaces_pending_apply_state() -> None:
     script = TRAY_SCRIPT.read_text(encoding="utf-8")
     assert "ActiveProfilePendingApplySettings" in script
     assert "Get-ActiveProfilePendingApplyText" in script
-    assert "Pending profile fix: $pendingApplyText" in script
+    assert '$pendingStatusLabel = if ($statusIsVerificationMismatch) { "Profile mismatch" } else { "Pending profile fix" }' in script
+    assert 'Add-UniqueTrayMessage -Target $statusParts -Message "${pendingStatusLabel}: $pendingApplyText"' in script
 
 
 def test_tray_surfaces_verification_mismatch_state() -> None:
@@ -196,6 +197,9 @@ def test_tray_surfaces_verification_mismatch_state() -> None:
     assert "Active profile verification mismatch: $pendingText" in verify_section
     assert 'Profile mismatch: $pendingText' in verify_section
     assert '$script:ActiveProfileVerificationStatus -ne "mismatch"' in same_active_section
+    assert '$lastActionText.StartsWith("Profile mismatch:")' in script
+    assert 'return "A.B.S.O. - Profile mismatch: $profileName"' in script
+    assert 'return "Active state: profile mismatch for $pendingText"' in script
     assert "Apply-PendingProfileFixes routing mismatch" in script
     assert "Reapply Active Profile: $pendingApplyTextForAction" in menu_state_section
     assert "Verifier mismatch: $pendingApplyTextForAction" in menu_state_section
@@ -868,7 +872,8 @@ def test_tray_status_bar_deduplicates_repeated_status_fragments() -> None:
     )
     assert 'Add-UniqueTrayMessage -Target $statusParts -Message "Restart required: $rebootPendingText"' not in script
     assert "$lastActionText = Normalize-TrayLastActionMessage -Message $script:LastAction" in script
-    assert "Add-UniqueTrayMessage -Target $statusParts -Message $lastActionText" in script
+    assert "$statusBarLastActionText = $lastActionText" in script
+    assert "Add-UniqueTrayMessage -Target $statusParts -Message $statusBarLastActionText" in script
     assert "Add-UniqueTrayMessage -Target $statusParts -Message $script:LastAction" not in script
 
 
@@ -898,15 +903,19 @@ def test_tray_status_bar_renders_state_chips_from_existing_status_truth() -> Non
     assert '[void]$chips.Add("BACKUP")' in chip_section
     assert '[void]$chips.Add("READY")' in chip_section
     assert "$statusHasBackup = ($backupTime -ne \"Never\")" in script
-    assert '$statusBarText = if ($statusParts.Count -gt 0) { @($statusParts) -join \'  |  \' } else { "Ready" }' in (
-        script
-    )
+    assert '$statusIsVerificationMismatch = ($script:ActiveProfileVerificationStatus -eq "mismatch")' in script
+    assert '$pendingStatusLabel = if ($statusIsVerificationMismatch) { "Profile mismatch" } else { "Pending profile fix" }' in script
+    assert 'Add-UniqueTrayMessage -Target $statusParts -Message "${pendingStatusLabel}: $pendingApplyText"' in script
+    assert '$statusBarLastActionText = $lastActionText' in script
+    assert '$statusBarLastActionText.StartsWith("Profile mismatch:")' in script
+    assert '$statusBarLastActionText = $null' in script
+    assert '$statusBarText = if ($statusParts.Count -gt 0) { @($statusParts) -join \'  |  \' } else { "Ready" }' in script
     assert '$script:statusBarItem.Text = "  $statusBarText"' in script
     assert "$script:statusBarItem.AccessibleDescription = Get-TrayStatusBarChipText `" in script
     assert "-PendingApplyText $pendingApplyText `" in script
     assert "-RebootPendingText $rebootPendingText `" in script
     assert "-VerificationProgressText $verificationProgressText `" in script
-    assert "-LastActionText $lastActionText `" in script
+    assert "-LastActionText $statusBarLastActionText `" in script
     assert "-HasBackup $statusHasBackup" in script
     assert "$script:statusBarItem.AccessibleDescription = Get-TrayStatusBarChipText -Preview $true" in script
     assert 'chipRaw.Contains("FIX") || chipRaw.Contains("RESTART")' in renderer_background
@@ -928,6 +937,35 @@ def test_tray_status_bar_renders_state_chips_from_existing_status_truth() -> Non
         1,
     )[0]
     assert "if (-not $script:activeProfile) { return }" not in pulse_section
+
+
+def test_tray_menu_renderer_uses_bounded_chip_layout() -> None:
+    """Right-edge chips should not chase an over-wide or clipped popup width."""
+    script = TRAY_SCRIPT.read_text(encoding="utf-8")
+    renderer_section = script.split("public class DarkThemeRenderer", 1)[1].split(
+        '"@ -ReferencedAssemblies System.Windows.Forms,System.Drawing',
+        1,
+    )[0]
+    menu_width_section = script.split("function Get-TrayMenuWidthBudget", 1)[1].split(
+        "function Invoke-TrayMenuPulseInvalidation",
+        1,
+    )[0]
+    menu_creation_section = script.split("$menu = New-Object System.Windows.Forms.ContextMenuStrip", 1)[1].split(
+        "# ─── HEADER ───",
+        1,
+    )[0]
+
+    assert "private const int SafeMenuMaxWidth = 760;" in renderer_section
+    assert "private static int GetSafeItemWidth(ToolStripItem item)" in renderer_section
+    assert "private static int GetSafeChipRight(ToolStripItem item)" in renderer_section
+    assert "int chipRight = GetSafeChipRight(e.Item);" in renderer_section
+    assert "e.Item.Width - 24" not in renderer_section
+    assert "$script:TrayMenuPreferredWidth = 760" in script
+    assert "$script:TrayMenuScreenMargin = 48" in script
+    assert "$DropDown.MinimumSize = New-Object System.Drawing.Size($widthBudget, 0)" in menu_width_section
+    assert "$DropDown.MaximumSize = New-Object System.Drawing.Size($widthBudget, 0)" in menu_width_section
+    assert "Set-TrayDropDownWidthBudget -DropDown $menu" in menu_creation_section
+    assert "Set-TrayDropDownWidthBudget -DropDown $item.DropDown" in menu_creation_section
 
 
 def test_tray_surfaces_verification_in_progress_truthfully() -> None:
@@ -993,7 +1031,8 @@ def test_active_profile_status_handles_catalog_mismatch_truthfully() -> None:
     assert '$script:statusItem.Text = "$($activeRecord.DisplayName)|Active profile not in current profile list"' in script
     assert '$profileDisplayName = if (' in script
     assert '-not [string]::IsNullOrWhiteSpace("$($activeRecord.Profile.Name)")' in script
-    assert '$script:statusItem.Text = "$profileDisplayName|Pending profile fix: $pendingApplyText"' in script
+    assert '$pendingStatusLabel = if ($script:ActiveProfileVerificationStatus -eq "mismatch") { "Profile mismatch" } else { "Pending profile fix" }' in script
+    assert '$script:statusItem.Text = "$profileDisplayName|${pendingStatusLabel}: $pendingApplyText"' in script
     assert '$script:statusItem.Text = "$profileDisplayName|Windows restart required: $rebootPendingText"' in script
     assert 'Set-TrayStatusHeroImage -ProfileId $activeRecord.Id -Profile $activeRecord.Profile -ActiveBadge -PendingApplyBadge' in script
     assert 'Set-TrayStatusHeroImage -ProfileId $activeRecord.Id -Profile $activeRecord.Profile -ActiveBadge -WindowsRestartBadge' in script
@@ -2130,6 +2169,7 @@ def test_profile_menu_rows_render_compact_status_chips() -> None:
     assert 'if (Get-ActiveProfileVerificationInProgressText) { return "CHECK" }' in script
     assert "function Get-ProfileMenuActiveStateTooltipText" in script
     assert 'return "Active state: pending profile fix for $pendingText"' in script
+    assert 'return "Active state: profile mismatch for $pendingText"' in script
     assert 'return "Active state: Windows restart required for $rebootText"' in script
     assert 'return "Active state: checking profile state"' in script
     assert "function Set-TrayProfileMenuItemTooltipState" in script
@@ -3334,7 +3374,7 @@ def test_tray_last_action_status_uses_timestamped_failure_state() -> None:
     )
     assert "if ($lastActionImage) { return $lastActionImage }" in status_image_section
     assert "-VerificationProgressText $verificationProgressText `" in script
-    assert "-LastActionText $lastActionText `" in script
+    assert "-LastActionText $statusBarLastActionText `" in script
 
 
 def test_tray_status_bar_maps_last_action_to_specific_glyphs() -> None:
@@ -3447,7 +3487,9 @@ def test_tray_has_dedicated_windows_restart_status_glyph() -> None:
     assert 'throw "No output"' not in restore_settings_section
     assert '$script:notifyIcon.Text = "A.B.S.O."' not in restore_settings_section
     assert "$lastActionTimeMessage = Get-TrayLastActionTimeMessage -Value $script:LastActionTime" in script
-    assert "Add-UniqueTrayMessage -Target $statusParts -Message $lastActionTimeMessage" in script
+    assert "$statusShouldShowActionTime = (" in script
+    assert "[string]::IsNullOrWhiteSpace($pendingApplyText)" in script
+    assert "if ($statusShouldShowActionTime) { Add-UniqueTrayMessage -Target $statusParts -Message $lastActionTimeMessage }" in script
     assert 'LastActionTime = Get-Date -Format "HH:mm"' not in script
     assert "Add-UniqueTrayMessage -Target $statusParts -Message $script:LastActionTime" not in script
 

@@ -1149,6 +1149,7 @@ function Set-ActiveProfileVerificationUnavailableAction {
         -not [string]::IsNullOrWhiteSpace($lastActionText) -and (
         $lastActionText.StartsWith("Verifying:") -or
         $lastActionText.StartsWith("Pending profile fix:") -or
+        $lastActionText.StartsWith("Profile mismatch:") -or
         $lastActionText.StartsWith("Windows restart required:")
         )
     )
@@ -1258,6 +1259,7 @@ function Apply-ActiveProfileVerificationJson {
         $lastActionWasVerifierPending = (
             -not [string]::IsNullOrWhiteSpace($lastActionText) -and (
             $lastActionText.StartsWith("Pending profile fix:") -or
+            $lastActionText.StartsWith("Profile mismatch:") -or
             $lastActionText.StartsWith("Windows restart required:")
             )
         )
@@ -1448,6 +1450,9 @@ function Get-TrayStateTooltipText {
         $pendingApplyText = Get-ActiveProfilePendingApplyText
         $rebootPendingText = Get-ActiveProfileRebootPendingText
         if ($pendingApplyText) {
+            if ($script:ActiveProfileVerificationStatus -eq "mismatch") {
+                return "A.B.S.O. - Profile mismatch: $profileName"
+            }
             return "A.B.S.O. - Pending profile fix: $profileName"
         }
         if ($rebootPendingText) {
@@ -2775,8 +2780,38 @@ public class DarkThemeRenderer : ToolStripProfessionalRenderer
     private static readonly Color AccentGold = Color.FromArgb(255, 0, 245, 212);  // phosphor cyan (key name kept for diff hygiene)
     private static readonly Color AccentGoldDim = Color.FromArgb(60, 0, 245, 212);
     public static int PulseFrame = 0;
+    private const int SafeMenuMaxWidth = 760;
 
     public DarkThemeRenderer() : base(new DarkColorTable()) { }
+
+    private static int GetSafeItemWidth(ToolStripItem item)
+    {
+        int width = 0;
+        if (item != null)
+        {
+            width = item.Width;
+            if (item.Owner != null)
+            {
+                int ownerWidth = item.Owner.ClientSize.Width;
+                if (ownerWidth <= 0) ownerWidth = item.Owner.Width;
+                if (ownerWidth > 0) width = width > 0 ? Math.Min(width, ownerWidth) : ownerWidth;
+            }
+        }
+        if (width <= 0) width = SafeMenuMaxWidth;
+        return Math.Max(1, Math.Min(SafeMenuMaxWidth, width));
+    }
+
+    private static Rectangle GetSafeItemRect(ToolStripItem item, int insetX, int insetY)
+    {
+        int width = GetSafeItemWidth(item);
+        int height = item != null ? item.Height : 0;
+        return new Rectangle(insetX, insetY, Math.Max(1, width - (insetX * 2)), Math.Max(1, height - (insetY * 2)));
+    }
+
+    private static int GetSafeChipRight(ToolStripItem item)
+    {
+        return Math.Max(48, GetSafeItemWidth(item) - 24);
+    }
 
     // Paint the entire menu background with a subtle vertical gradient
     protected override void OnRenderToolStripBackground(ToolStripRenderEventArgs e)
@@ -2851,10 +2886,10 @@ public class DarkThemeRenderer : ToolStripProfessionalRenderer
     {
         var g = e.Graphics;
         g.SmoothingMode = SmoothingMode.AntiAlias;
-        int w = e.Item.Width;
+        int w = GetSafeItemWidth(e.Item);
         int h = e.Item.Height;
         if (w < 2 || h < 2) return; // guard against zero-size layout passes
-        var rect = new Rectangle(3, 1, w - 6, h - 2);
+        var rect = GetSafeItemRect(e.Item, 3, 1);
 
         try
         {
@@ -3288,7 +3323,7 @@ public class DarkThemeRenderer : ToolStripProfessionalRenderer
         {
             int y = e.Item.Height / 2;
             var g = e.Graphics;
-            int w = e.Item.Width;
+            int w = GetSafeItemWidth(e.Item);
             if (w <= 42) { base.OnRenderSeparator(e); return; }
 
             using (var brush = new LinearGradientBrush(
@@ -3364,7 +3399,7 @@ public class DarkThemeRenderer : ToolStripProfessionalRenderer
                 string label = (e.Item.Text ?? "").Trim();
                 string chipRaw = e.Item.AccessibleDescription ?? "";
                 string[] chips = chipRaw.Split(new char[] { '|' }, StringSplitOptions.RemoveEmptyEntries);
-                int chipRight = e.Item.Width - 24;
+                int chipRight = GetSafeChipRight(e.Item);
 
                 using (var chipFont = ResolveEyebrowFont(6.6f))
                 using (var chipTextBrush = new SolidBrush(Color.FromArgb(226, 232, 234, 240)))
@@ -3452,7 +3487,7 @@ public class DarkThemeRenderer : ToolStripProfessionalRenderer
             try
             {
                 Rectangle textRect = e.TextRectangle;
-                int chipRight = e.Item.Width - 24;
+                int chipRight = GetSafeChipRight(e.Item);
                 string chip = (e.Item.AccessibleDescription ?? "").Trim();
                 bool hasChip = !string.IsNullOrWhiteSpace(chip);
                 Rectangle chipRect = Rectangle.Empty;
@@ -3521,7 +3556,7 @@ public class DarkThemeRenderer : ToolStripProfessionalRenderer
             try
             {
                 Rectangle textRect = e.TextRectangle;
-                int chipRight = e.Item.Width - 24;
+                int chipRight = GetSafeChipRight(e.Item);
                 string chipRaw = e.Item.AccessibleDescription ?? "";
                 string[] chips = chipRaw.Split(new char[] { '|' }, StringSplitOptions.RemoveEmptyEntries);
 
@@ -3595,7 +3630,7 @@ public class DarkThemeRenderer : ToolStripProfessionalRenderer
                 }
 
                 Rectangle textRect = e.TextRectangle;
-                int chipRight = e.Item.Width - 24;
+                int chipRight = GetSafeChipRight(e.Item);
                 string chipRaw = e.Item.AccessibleDescription ?? "";
                 string[] chips = chipRaw.Split(new char[] { '|' }, StringSplitOptions.RemoveEmptyEntries);
 
@@ -3664,7 +3699,7 @@ public class DarkThemeRenderer : ToolStripProfessionalRenderer
                 string[] chips = chipRaw.Split(new char[] { '|' }, StringSplitOptions.RemoveEmptyEntries);
                 bool hasChip = chips.Length > 0;
                 Rectangle textRect = e.TextRectangle;
-                int chipRight = e.Item.Width - 24;
+                int chipRight = GetSafeChipRight(e.Item);
                 if (hasChip)
                 {
                     using (var chipMeasureFont = ResolveEyebrowFont(7.0f))
@@ -3714,7 +3749,7 @@ public class DarkThemeRenderer : ToolStripProfessionalRenderer
                         chipFormat.LineAlignment = StringAlignment.Center;
                         chipFormat.Trimming = StringTrimming.EllipsisCharacter;
                         chipFormat.FormatFlags = StringFormatFlags.NoWrap;
-                        chipRight = e.Item.Width - 24;
+                        chipRight = GetSafeChipRight(e.Item);
                         for (int i = chips.Length - 1; i >= 0; i--)
                         {
                             string chip = chips[i].Trim();
@@ -3885,6 +3920,9 @@ foreach ($mono in @("Cascadia Mono", "Cascadia Code", "Consolas")) {
 }
 if (-not $script:FontMono) { $script:FontMono = New-Object System.Drawing.Font("Consolas", 7.75) }
 
+$script:TrayMenuPreferredWidth = 760
+$script:TrayMenuMinimumWidth = 360
+$script:TrayMenuScreenMargin = 48
 $script:IconState = "Idle"
 $script:ApplyAnimTimer = $null
 $script:TrayMenuPulseTimer = $null
@@ -3949,6 +3987,31 @@ function Set-TrayCommandItemVisualState {
     $Item.AccessibleName = "__flyout_command__"
     $Item.AccessibleDescription = if ([string]::IsNullOrWhiteSpace($ChipText)) { "" } else { $ChipText.Trim().ToUpperInvariant() }
     $Item.Padding = New-Object System.Windows.Forms.Padding(0, 0, $PaddingRight, 0)
+}
+
+function Get-TrayMenuWidthBudget {
+    $widthBudget = [int]$script:TrayMenuPreferredWidth
+    try {
+        $screen = [System.Windows.Forms.Screen]::FromPoint([System.Windows.Forms.Cursor]::Position)
+        if (-not $screen) { $screen = [System.Windows.Forms.Screen]::PrimaryScreen }
+        if ($screen -and $screen.WorkingArea.Width -gt 0) {
+            $screenBudget = [Math]::Max([int]$script:TrayMenuMinimumWidth, $screen.WorkingArea.Width - [int]$script:TrayMenuScreenMargin)
+            $widthBudget = [Math]::Min($widthBudget, $screenBudget)
+        }
+    }
+    catch {}
+    return [Math]::Max([int]$script:TrayMenuMinimumWidth, $widthBudget)
+}
+
+function Set-TrayDropDownWidthBudget {
+    param([System.Windows.Forms.ToolStripDropDown]$DropDown)
+
+    if (-not $DropDown) { return }
+
+    $widthBudget = Get-TrayMenuWidthBudget
+    $DropDown.MinimumSize = New-Object System.Drawing.Size($widthBudget, 0)
+    $DropDown.MaximumSize = New-Object System.Drawing.Size($widthBudget, 0)
+    $DropDown.AutoSize = $true
 }
 
 function Invoke-TrayMenuPulseInvalidation {
@@ -4916,16 +4979,35 @@ function Update-MenuState {
         $pendingApplyText = Get-ActiveProfilePendingApplyText
         $rebootPendingText = Get-ActiveProfileRebootPendingText
         $verificationProgressText = Get-ActiveProfileVerificationInProgressText
-        if ($pendingApplyText) { Add-UniqueTrayMessage -Target $statusParts -Message "Pending profile fix: $pendingApplyText" }
+        $statusIsVerificationMismatch = ($script:ActiveProfileVerificationStatus -eq "mismatch")
+        if ($pendingApplyText) {
+            $pendingStatusLabel = if ($statusIsVerificationMismatch) { "Profile mismatch" } else { "Pending profile fix" }
+            Add-UniqueTrayMessage -Target $statusParts -Message "${pendingStatusLabel}: $pendingApplyText"
+        }
         if ($rebootPendingText) { Add-UniqueTrayMessage -Target $statusParts -Message "Windows restart required: $rebootPendingText" }
         if ($verificationProgressText) { Add-UniqueTrayMessage -Target $statusParts -Message "Checking profile state" }
         $lastActionText = Normalize-TrayLastActionMessage -Message $script:LastAction
-        if ($lastActionText) { Add-UniqueTrayMessage -Target $statusParts -Message $lastActionText }
+        $statusBarLastActionText = $lastActionText
+        if (
+            $statusIsVerificationMismatch -and
+            -not [string]::IsNullOrWhiteSpace($statusBarLastActionText) -and
+            $statusBarLastActionText.StartsWith("Profile mismatch:")
+        ) {
+            $statusBarLastActionText = $null
+        }
+        if ($statusBarLastActionText) { Add-UniqueTrayMessage -Target $statusParts -Message $statusBarLastActionText }
         $lastActionTimeMessage = Get-TrayLastActionTimeMessage -Value $script:LastActionTime
-        if ($lastActionTimeMessage) { Add-UniqueTrayMessage -Target $statusParts -Message $lastActionTimeMessage }
+        $statusShouldShowActionTime = (
+            $lastActionTimeMessage -and
+            [string]::IsNullOrWhiteSpace($pendingApplyText) -and
+            [string]::IsNullOrWhiteSpace($rebootPendingText) -and
+            [string]::IsNullOrWhiteSpace($verificationProgressText) -and
+            $statusParts.Count -lt 2
+        )
+        if ($statusShouldShowActionTime) { Add-UniqueTrayMessage -Target $statusParts -Message $lastActionTimeMessage }
         $backupTime = Get-LastBackupTime
         $statusHasBackup = ($backupTime -ne "Never")
-        if ($statusHasBackup) { Add-UniqueTrayMessage -Target $statusParts -Message "Backup: $backupTime" }
+        if ($statusHasBackup -and $statusParts.Count -lt 2) { Add-UniqueTrayMessage -Target $statusParts -Message "Backup: $backupTime" }
         $statusBarText = if ($statusParts.Count -gt 0) { @($statusParts) -join '  |  ' } else { "Ready" }
         $script:statusBarItem.Text = "  $statusBarText"
         $script:statusBarItem.ForeColor = [System.Drawing.Color]::FromArgb(255, 100, 100, 110)
@@ -4933,14 +5015,14 @@ function Update-MenuState {
             -PendingApplyText $pendingApplyText `
             -RebootPendingText $rebootPendingText `
             -VerificationProgressText $verificationProgressText `
-            -LastActionText $lastActionText `
+            -LastActionText $statusBarLastActionText `
             -HasBackup $statusHasBackup
         $statusImage = New-TrayStatusBarImage `
             -PendingApplyText $pendingApplyText `
             -RebootPendingText $rebootPendingText `
             -VerificationProgressText $verificationProgressText `
             -ProfileId $script:activeProfile `
-            -LastActionText $lastActionText `
+            -LastActionText $statusBarLastActionText `
             -FallbackColor $script:statusBarItem.ForeColor
         Set-MenuItemImageSafe -Item $script:statusBarItem -NewImage $statusImage
     }
@@ -5765,7 +5847,8 @@ function Set-TrayActiveStatusItemFromState {
     $rebootPendingText = Get-ActiveProfileRebootPendingText
     $verificationProgressText = Get-ActiveProfileVerificationInProgressText
     if ($pendingApplyText) {
-        $script:statusItem.Text = "$profileDisplayName|Pending profile fix: $pendingApplyText"
+        $pendingStatusLabel = if ($script:ActiveProfileVerificationStatus -eq "mismatch") { "Profile mismatch" } else { "Pending profile fix" }
+        $script:statusItem.Text = "$profileDisplayName|${pendingStatusLabel}: $pendingApplyText"
         $script:statusItem.ForeColor = $script:Colors.AccentAmber
         Set-TrayStatusHeroImage -ProfileId $activeRecord.Id -Profile $activeRecord.Profile -ActiveBadge -PendingApplyBadge
         return
@@ -8210,6 +8293,7 @@ public class HotkeyMessageWindow : NativeWindow {
     $menu.ForeColor = $script:Colors.Text
     $menu.ShowImageMargin = $true
     $menu.ShowCheckMargin = $false
+    Set-TrayDropDownWidthBudget -DropDown $menu
     try {
         $menu.Renderer = New-Object DarkThemeRenderer
     }
@@ -8222,6 +8306,7 @@ public class HotkeyMessageWindow : NativeWindow {
     # Apply DWM rounded corners and dark mode to the context menu popup
     $menu.Add_Opened({
         try {
+            Set-TrayDropDownWidthBudget -DropDown $menu
             if ("DwmHelper" -as [type]) {
                 [DwmHelper]::SetRoundedCorners($menu.Handle, 3)
                 [DwmHelper]::SetDarkMode($menu.Handle)
@@ -8234,9 +8319,11 @@ public class HotkeyMessageWindow : NativeWindow {
         param($s, $e)
         $item = $e.Item
         if ($item -is [System.Windows.Forms.ToolStripMenuItem]) {
+            Set-TrayDropDownWidthBudget -DropDown $item.DropDown
             $item.DropDown.Add_Opened({
                 param($ds, $de)
                 try {
+                    Set-TrayDropDownWidthBudget -DropDown $ds
                     if ("DwmHelper" -as [type]) {
                         [DwmHelper]::SetRoundedCorners($ds.Handle, 3)
                         [DwmHelper]::SetDarkMode($ds.Handle)
@@ -8626,6 +8713,9 @@ public class HotkeyMessageWindow : NativeWindow {
 
         $pendingText = Get-ActiveProfilePendingApplyText
         if (-not [string]::IsNullOrWhiteSpace($pendingText)) {
+            if ($script:ActiveProfileVerificationStatus -eq "mismatch") {
+                return "Active state: profile mismatch for $pendingText"
+            }
             return "Active state: pending profile fix for $pendingText"
         }
 
