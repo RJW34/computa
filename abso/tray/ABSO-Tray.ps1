@@ -5432,7 +5432,7 @@ function New-TrayLastActionStatusBitmap {
             $color = if ($text -match '(?i)failed|warning') { $script:Colors.AccentAmber } else { $script:Colors.AccentBlue }
             break
         }
-        '^(Opened backups|Open backups|No backups)' {
+        '^(Opened backups|Open backups|No backups|Current backups)' {
             $action = "Backups"; $color = $script:Colors.AccentPurple; break
         }
         '^(Opened tray log|Open tray log)' {

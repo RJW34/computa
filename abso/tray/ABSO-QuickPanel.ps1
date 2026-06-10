@@ -183,15 +183,45 @@ function Get-QuickPanelCardChipText {
         return "EMPTY"
     }
     if ($Profile -and -not [string]::IsNullOrWhiteSpace("$($Profile.Variant)")) {
-        return (Format-QuickPanelDisplayCopy -Text "$($Profile.Variant)")
+        return (Get-QuickPanelCompactChipText -Text "$($Profile.Variant)")
     }
     if ($Profile -and -not [string]::IsNullOrWhiteSpace("$($Profile.SyncMode)")) {
-        return (Format-QuickPanelDisplayCopy -Text "$($Profile.SyncMode)")
+        return (Get-QuickPanelCompactChipText -Text "$($Profile.SyncMode)")
     }
     if ("$Kind" -eq "favorite") {
         return "FAV"
     }
     return ""
+}
+
+function Get-QuickPanelCompactChipText {
+    param([AllowNull()][string]$Text)
+
+    if ([string]::IsNullOrWhiteSpace($Text)) { return "" }
+
+    $value = (Format-QuickPanelDisplayCopy -Text $Text).Trim()
+    if ([string]::IsNullOrWhiteSpace($value)) { return "" }
+
+    switch -Regex ($value) {
+        '(?i)capture' { return "CAPTURE" }
+        '(?i)console[-\s]?parity' { return "CONSOLE" }
+        '(?i)tournament|144\s*hz' { return "144HZ" }
+        '(?i)g[-\s]?sync' { return "G-SYNC" }
+        '(?i)no\s*sync' { return "NO SYNC" }
+        '(?i)low[-\s]?latency' { return "LOW LAT" }
+        '(?i)webgl' { return "WEBGL" }
+        '(?i)tauri|webview|native' { return "NATIVE" }
+        '(?i)universal' { return "UNIV" }
+        '(?i)offline' { return "OFFLINE" }
+        '(?i)online' { return "ONLINE" }
+        '(?i)\bHDR\b' { return "HDR" }
+        '(?i)\bSDR\b' { return "SDR" }
+        '(?i)agnostic' { return "ANY" }
+    }
+
+    $upper = $value.ToUpperInvariant()
+    if ($upper.Length -gt 8) { return $upper.Substring(0, 8) }
+    return $upper
 }
 
 function Get-QuickPanelCardTooltipText {
@@ -561,7 +591,7 @@ function Show-QuickPanel {
     }
 
     # Phosphor HUD card dimensions
-    $panelWidth   = 280
+    $panelWidth   = 380
     $cardHeight   = if ($emptyPanel) { 70 } else { 56 }
     $cardGap      = 6
     $padX         = 18
@@ -733,6 +763,7 @@ function Show-QuickPanel {
     $headerChip.Size      = New-Object System.Drawing.Size(84, 17)
     $headerChip.BackColor = $script:QPPalette.Ink100
     $capHeaderChipText = $headerChipText
+    $capHeaderChipFont = $script:QPFont_Eyebrow
     $headerChip.Add_Paint({
         param($s, $e)
         $g = $e.Graphics
@@ -768,7 +799,7 @@ function Show-QuickPanel {
         $chipFormat.LineAlignment = [System.Drawing.StringAlignment]::Center
         $chipFormat.Trimming = [System.Drawing.StringTrimming]::EllipsisCharacter
         $chipFormat.FormatFlags = [System.Drawing.StringFormatFlags]::NoWrap
-        $g.DrawString($capHeaderChipText, $script:QPFont_Eyebrow, $chipBrush, (New-Object System.Drawing.RectangleF(2, 1, ($s.Width - 4), ($s.Height - 2))), $chipFormat)
+        $g.DrawString($capHeaderChipText, $capHeaderChipFont, $chipBrush, (New-Object System.Drawing.RectangleF(2, 1, ($s.Width - 4), ($s.Height - 2))), $chipFormat)
         $chipFormat.Dispose()
         $chipBrush.Dispose()
     }.GetNewClosure())
@@ -987,7 +1018,7 @@ function Show-QuickPanel {
 
             # Compact chip: active status, variant, sync mode, or favorite marker.
             if (-not [string]::IsNullOrWhiteSpace($capCardChip)) {
-                $chipRect = New-Object System.Drawing.Rectangle(($s.Width - 82), 8, 58, 15)
+                $chipRect = New-Object System.Drawing.Rectangle(($s.Width - 96), 8, 72, 15)
                 $chipAlpha = if ($capCardActive) {
                     [int](75 + (25 * ([Math]::Sin($script:QuickPanelPulseFrame / 4.0) + 1.0)))
                 }
@@ -1011,7 +1042,13 @@ function Show-QuickPanel {
                 $chipFormat.LineAlignment = [System.Drawing.StringAlignment]::Center
                 $chipFormat.Trimming = [System.Drawing.StringTrimming]::EllipsisCharacter
                 $chipFormat.FormatFlags = [System.Drawing.StringFormatFlags]::NoWrap
-                $g.DrawString($capCardChip, $capChipFont, $chipBrush, $chipRect, $chipFormat)
+                $chipTextRect = New-Object System.Drawing.RectangleF(
+                    [float]$chipRect.X,
+                    [float]$chipRect.Y,
+                    [float]$chipRect.Width,
+                    [float]$chipRect.Height
+                )
+                $g.DrawString($capCardChip, $capChipFont, $chipBrush, $chipTextRect, $chipFormat)
                 $chipFormat.Dispose()
                 $chipBrush.Dispose()
             }
@@ -1052,7 +1089,7 @@ function Show-QuickPanel {
             "Quick profile"
         }
         $nameLabel.Location  = New-Object System.Drawing.Point(48, 8)
-        $nameLabel.Size      = New-Object System.Drawing.Size(($panelWidth - $padX * 2 - 134), 20)
+        $nameLabel.Size      = New-Object System.Drawing.Size(($panelWidth - $padX * 2 - 152), 20)
         $nameLabel.ForeColor = $script:QPPalette.Paper
         $nameLabel.Font      = $script:QPFont_Title
         $nameLabel.BackColor = $cardBg
@@ -1077,7 +1114,7 @@ function Show-QuickPanel {
             New-Object System.Drawing.Size(($panelWidth - $padX * 2 - 76), 32)
         }
         else {
-            New-Object System.Drawing.Size(($panelWidth - $padX * 2 - 134), 16)
+            New-Object System.Drawing.Size(($panelWidth - $padX * 2 - 152), 16)
         }
         $subLabel.ForeColor = $script:QPPalette.Mist
         $subLabel.Font      = $script:QPFont_Sub

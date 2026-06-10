@@ -894,7 +894,8 @@ function Show-SettingsPanel {
 
     $form = New-Object System.Windows.Forms.Form
     $form.Text = "A.B.S.O. Settings"
-    $form.Size = New-Object System.Drawing.Size(420, 725)
+    $form.ClientSize = New-Object System.Drawing.Size(404, 760)
+    $form.MinimumSize = New-Object System.Drawing.Size(420, 780)
     $form.FormBorderStyle = [System.Windows.Forms.FormBorderStyle]::FixedDialog
     $form.MaximizeBox = $false
     $form.StartPosition = [System.Windows.Forms.FormStartPosition]::CenterScreen
@@ -1441,6 +1442,14 @@ function Show-SettingsPanel {
     }
     $closeBtn.Add_Click({ $form.Close() })
     $form.Controls.Add($closeBtn)
+
+    $requiredClientHeight = [Math]::Max(
+        $profilesFolderBtn.Bottom,
+        [Math]::Max($saveBtn.Bottom, $closeBtn.Bottom)
+    ) + 16
+    if ($form.ClientSize.Height -lt $requiredClientHeight) {
+        $form.ClientSize = New-Object System.Drawing.Size($form.ClientSize.Width, $requiredClientHeight)
+    }
 
     $script:SettingsForm = $form
     $form.Add_FormClosed({

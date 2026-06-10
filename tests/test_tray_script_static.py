@@ -695,7 +695,14 @@ def test_settings_panel_has_branded_animated_header() -> None:
     assert "function Clear-SettingsGeneratedImages" in script
     assert "$Root -is [System.Windows.Forms.PictureBox]" in script
     assert "$Root -is [System.Windows.Forms.Button]" in script
-    assert "$form.Size = New-Object System.Drawing.Size(420, 725)" in settings_panel_section
+    assert "$form.ClientSize = New-Object System.Drawing.Size(404, 760)" in settings_panel_section
+    assert "$form.MinimumSize = New-Object System.Drawing.Size(420, 780)" in settings_panel_section
+    assert "$requiredClientHeight = [Math]::Max(" in settings_panel_section
+    assert "[Math]::Max($saveBtn.Bottom, $closeBtn.Bottom)" in settings_panel_section
+    assert "$form.ClientSize = New-Object System.Drawing.Size($form.ClientSize.Width, $requiredClientHeight)" in (
+        settings_panel_section
+    )
+    assert "$form.Size = New-Object System.Drawing.Size(420, 725)" not in settings_panel_section
     assert "$settingsHeader = New-SettingsBrandHeaderPanel `" in settings_panel_section
     assert "-ChipText (Get-SettingsHeaderChipText -Config $Config)" in settings_panel_section
     assert "$settingsHeaderPulseTimer = New-Object System.Windows.Forms.Timer" in settings_panel_section
@@ -2595,8 +2602,16 @@ def test_quick_panel_cards_show_text_status_chips_without_overlap() -> None:
     assert 'return "EMPTY"' in script
     assert '$chipText = "MISSING"' in script
     assert 'return "INFO"' not in script
-    assert 'return (Format-QuickPanelDisplayCopy -Text "$($Profile.Variant)")' in script
-    assert 'return (Format-QuickPanelDisplayCopy -Text "$($Profile.SyncMode)")' in script
+    assert "function Get-QuickPanelCompactChipText" in script
+    assert 'return (Get-QuickPanelCompactChipText -Text "$($Profile.Variant)")' in script
+    assert 'return (Get-QuickPanelCompactChipText -Text "$($Profile.SyncMode)")' in script
+    assert 'return (Format-QuickPanelDisplayCopy -Text "$($Profile.Variant)")' not in script
+    assert 'return (Format-QuickPanelDisplayCopy -Text "$($Profile.SyncMode)")' not in script
+    assert "'(?i)capture' { return \"CAPTURE\" }" in script
+    assert "'(?i)console[-\\s]?parity' { return \"CONSOLE\" }" in script
+    assert "'(?i)g[-\\s]?sync' { return \"G-SYNC\" }" in script
+    assert "'(?i)no\\s*sync' { return \"NO SYNC\" }" in script
+    assert "if ($upper.Length -gt 8) { return $upper.Substring(0, 8) }" in script
     assert 'function Format-QuickPanelDisplayCopy' in script
     assert 'function Format-QuickPanelUserFacingText' in script
     assert 'return "FAV"' in script
@@ -2632,6 +2647,9 @@ def test_quick_panel_cards_show_text_status_chips_without_overlap() -> None:
     assert "Click to verify or repair this active profile." not in script
     assert '$script:QuickPanelToolTip = $toolTip' in script
     assert "$form.Add_Disposed({ Clear-QuickPanelToolTip })" in script
+    assert "$capHeaderChipFont = $script:QPFont_Eyebrow" in script
+    assert "$g.DrawString($capHeaderChipText, $capHeaderChipFont" in script
+    assert "$g.DrawString($capHeaderChipText, $script:QPFont_Eyebrow" not in script
     assert "$chipText = Get-QuickPanelCardChipText `" in script
     assert "-PendingApply $pendingApplyBadge `" in script
     assert "-WindowsRestart $windowsRestartBadge `" in script
@@ -2663,23 +2681,27 @@ def test_quick_panel_cards_show_text_status_chips_without_overlap() -> None:
     assert '$capStateRailKind -in @("fix", "restart", "check")' in script
     assert '$scanY = $railTop + (($script:QuickPanelPulseFrame * 3) % [Math]::Max(1, $railHeight))' in script
     assert '$g.DrawLine($scanPen, ($railX - 4), $scanY, ($railX + 6), $scanY)' in script
-    assert "$chipRect = New-Object System.Drawing.Rectangle(($s.Width - 82), 8, 58, 15)" in script
+    assert "$panelWidth   = 380" in script
+    assert "$chipRect = New-Object System.Drawing.Rectangle(($s.Width - 96), 8, 72, 15)" in script
+    assert "$chipRect = New-Object System.Drawing.Rectangle(($s.Width - 82), 8, 58, 15)" not in script
     assert "$chipFormat.Trimming = [System.Drawing.StringTrimming]::EllipsisCharacter" in script
     assert "$chipFormat.FormatFlags = [System.Drawing.StringFormatFlags]::NoWrap" in script
-    assert "$g.DrawString($capCardChip, $capChipFont, $chipBrush, $chipRect, $chipFormat)" in script
+    assert "$chipTextRect = New-Object System.Drawing.RectangleF(" in script
+    assert "$g.DrawString($capCardChip, $capChipFont, $chipBrush, $chipTextRect, $chipFormat)" in script
+    assert "$g.DrawString($capCardChip, $capChipFont, $chipBrush, $chipRect, $chipFormat)" not in script
     assert "$sweepAlpha = [int](55 + (30 * ([Math]::Sin($script:QuickPanelPulseFrame / 4.0) + 1.0)))" in script
     assert "$g.DrawLine($sweepPen, 6, 1, ($s.Width - 10), 1)" in script
     assert '$nameLabel.Text      = if ($entry.Profile -and -not [string]::IsNullOrWhiteSpace("$($entry.Profile.Name)")) {' in script
     assert 'Format-QuickPanelDisplayCopy -Text "$($entry.Profile.Name)"' in script
     assert 'Format-QuickPanelUserFacingText -Text "$($entry.Id)"' in script
     assert '$nameLabel.Text      = $entry.Profile.Name' not in script
-    assert "$nameLabel.Size      = New-Object System.Drawing.Size(($panelWidth - $padX * 2 - 134), 20)" in script
+    assert "$nameLabel.Size      = New-Object System.Drawing.Size(($panelWidth - $padX * 2 - 152), 20)" in script
     assert 'Format-QuickPanelDisplayCopy -Text "$($entry.Profile.Sub)"' in script
     assert 'Format-QuickPanelDisplayCopy -Text "$($entry.Profile.Cat)"' in script
     assert '$subText = if ($entry.Profile.Sub) { $entry.Profile.Sub } else { $entry.Profile.Cat }' not in script
     assert "$subLabel.Size      = if ($isDisabled)" in script
     assert "New-Object System.Drawing.Size(($panelWidth - $padX * 2 - 76), 32)" in script
-    assert "New-Object System.Drawing.Size(($panelWidth - $padX * 2 - 134), 16)" in script
+    assert "New-Object System.Drawing.Size(($panelWidth - $padX * 2 - 152), 16)" in script
 
 
 def test_quick_panel_pins_active_profile_before_favorites() -> None:
@@ -2721,7 +2743,9 @@ def test_quick_panel_header_chip_summarizes_visible_state() -> None:
     assert '$toolTip.SetToolTip($headerChip, "Quick Panel summary: $headerChipText")' in script
     assert '[void]$script:QuickPanelPulseTargets.Add($headerChip)' in script
     assert '$sweepX = 4 + (($script:QuickPanelPulseFrame * 3) % [Math]::Max(1, ($s.Width - 26)))' in script
-    assert "$g.DrawString($capHeaderChipText, $script:QPFont_Eyebrow" in script
+    assert "$capHeaderChipFont = $script:QPFont_Eyebrow" in script
+    assert "$g.DrawString($capHeaderChipText, $capHeaderChipFont" in script
+    assert "$g.DrawString($capHeaderChipText, $script:QPFont_Eyebrow" not in script
 
 
 def test_quick_panel_paint_uses_valid_drawing_constructors() -> None:
@@ -3314,6 +3338,7 @@ def test_tray_status_bar_maps_last_action_to_specific_glyphs() -> None:
     assert "'^(Display reset)'" in action_section
     assert "'^(Profiles refreshed|Profiles fallback|Profile refresh)'" in action_section
     assert "'^(Tray restart)'" in action_section
+    assert "'^(Opened backups|Open backups|No backups|Current backups)'" in action_section
     assert "$color = if ($text -match '(?i)failed|warning') { $script:Colors.AccentAmber } else { $script:Colors.AccentBlue }" in (
         action_section
     )
