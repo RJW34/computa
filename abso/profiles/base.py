@@ -532,6 +532,21 @@ class BaseProfile(ABC):
         return "leave"
 
     @property
+    def keep_awake_while_gaming(self) -> bool:
+        """Whether the tray should inhibit system + display sleep during play.
+
+        Gamepad-driven titles (emulators especially) often do not reset the OS
+        idle timer, so Windows can blank or sleep mid-session during long
+        matchmaking / lobby / spectate / shader-compile / download waits. When
+        True the tray asserts ``SetThreadExecutionState`` for the watched
+        process lifetime and clears it on game exit (ephemeral, self-reverting
+        — no backup/restore). Modern exclusive-fullscreen shooters mostly
+        self-assert ``ES_DISPLAY_REQUIRED`` already, so this defaults False and
+        is overridden True only where it is the non-redundant win (emulators).
+        """
+        return False
+
+    @property
     def application_scope(self) -> Literal["system_only", "system_plus_native_config"]:
         """Describe how much of the profile ABSO can enforce directly.
 

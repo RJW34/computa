@@ -18,7 +18,9 @@ import os
 import signal
 import threading
 import time
+from collections.abc import Iterable
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -104,11 +106,23 @@ class BalancerEvent:
 class CpuBalancerConfig:
     """Tunable thresholds for the CPU balancer."""
 
-    system_cpu_threshold: int = 85
-    """System-wide CPU % that triggers background scanning."""
+    system_cpu_threshold: int = 55
+    """System-wide CPU % that triggers background scanning.
 
-    process_cpu_threshold: int = 20
-    """Per-process CPU % above which a background process is restrained."""
+    Tuned for a high-core-count desktop (e.g. 24C/32T): the system metric is
+    the aggregate across *all* logical processors, so a capped game leaves it
+    low and only a genuine background spike crosses this floor. Keep in sync
+    with :class:`abso.core.config.CpuBalancerConfig`.
+    """
+
+    process_cpu_threshold: int = 8
+    """Per-process CPU % above which a background process is restrained.
+
+    Normalized to *total* system capacity, so on a 32-thread box one fully
+    saturated core is ~3%. 8% (~2.5 cores) catches multi-core offenders
+    (shader compiles, AV scans, encoders) without demoting light single-
+    threaded background apps. Tune against live measurement on the rig.
+    """
 
     trigger_delay_ms: int = 2800
     """How long system CPU must stay above threshold before we act."""
@@ -154,13 +168,57 @@ class CpuBalancer:
         config: Optional tuning parameters.
     """
 
-    def __init__(self, game_pid: int, config: CpuBalancerConfig | None = None) -> None:
+    def __init__(
+        self,
+        game_pid: int,
+        config: CpuBalancerConfig | None = None,
+        *,
+        extra_excluded: Iterable[str] | None = None,
+        stop_file: str | os.PathLike[str] | None = None,
+        enable_cpu_sets: bool = False,
+        enable_eco: bool = False,
+        eco_images: Iterable[str] | None = None,
+        enable_watchdog: bool = False,
+        watchdog_rules: Any = None,
+        is_online: bool = False,
+        watchdog_keep_cores: int = 4,
+    ) -> None:
         self._game_pid = game_pid
         self._config = config or CpuBalancerConfig()
+
+        # Optional Tier B session behaviors (default OFF -> keystone unchanged).
+        self._enable_cpu_sets = bool(enable_cpu_sets)
+        self._enable_eco = bool(enable_eco)
+        self._eco_images = list(eco_images or [])
+        self._eco_herder: Any = None
+        self._enable_watchdog = bool(enable_watchdog)
+        self._watchdog_rules = list(watchdog_rules or [])
+        self._is_online = bool(is_online)
+        self._watchdog_keep_cores = int(watchdog_keep_cores)
+        self._watchdog_engine: Any = None
+        # Separate CPU-time store so the watchdog's cpu metric never double-
+        # samples (and corrupts) the restraint loop's per-process deltas.
+        self._watchdog_cpu_times: dict[int, tuple[int, int]] = {}
         self._restrained: dict[int, RestrainedProcess] = {}
         self._events: list[BalancerEvent] = []
         self._stop_event = threading.Event()
         self._high_cpu_since: float | None = None
+
+        # Pre-compute the lowercased exclusion set once. ``extra_excluded``
+        # carries the anti-cheat / launcher / protect-list images sourced from
+        # ProcessJanitor.NEVER_KILL_IMAGES + abso.yaml process_overrides.protect
+        # so the balancer never even *demotes* a protected or game-critical
+        # process -- the online-safety guarantee for running during ranked play.
+        excluded = {p.lower() for p in self._config.excluded_processes}
+        if extra_excluded:
+            excluded |= {str(p).lower() for p in extra_excluded}
+        self._excluded_lower: frozenset[str] = frozenset(excluded)
+
+        # When set, the presence of this file signals a graceful stop so the
+        # ``run()`` finally-block restores every demoted process. The tray uses
+        # this instead of TerminateProcess (.Kill), which would skip the
+        # restore and strand background apps at BelowNormal.
+        self._stop_file: Path | None = Path(stop_file) if stop_file else None
 
         # CPU time tracking
         self._last_system_times: tuple[int, int, int] | None = None  # idle, kernel, user
@@ -176,8 +234,9 @@ class CpuBalancer:
     def run(self) -> None:
         """Run the balancer loop (blocking). Call from main thread or a thread."""
         logger.info("CPU Balancer started for game PID %d", self._game_pid)
+        self._start_session_extras()
         try:
-            while not self._stop_event.is_set():
+            while not self._stop_requested():
                 if not self._is_game_running():
                     logger.info("Game PID %d exited, stopping balancer", self._game_pid)
                     break
@@ -185,11 +244,27 @@ class CpuBalancer:
                 self._stop_event.wait(self._config.poll_interval_ms / 1000.0)
         finally:
             self._release_all()
+            self._stop_session_extras()
             logger.info("CPU Balancer stopped. %d events logged.", len(self._events))
 
     def stop(self) -> None:
         """Signal the balancer loop to exit."""
         self._stop_event.set()
+
+    def _stop_requested(self) -> bool:
+        """Return ``True`` when the loop should exit.
+
+        Either an in-process :meth:`stop` call or the appearance of the
+        configured stop-sentinel file ends the loop. The sentinel path lets a
+        separate process (the tray) request a *graceful* shutdown so the
+        ``finally`` block in :meth:`run` restores demoted priorities.
+        """
+        if self._stop_event.is_set():
+            return True
+        if self._stop_file is not None and self._stop_file.exists():
+            logger.info("Stop sentinel %s present; stopping balancer", self._stop_file)
+            return True
+        return False
 
     def get_events(self) -> list[BalancerEvent]:
         """Return a copy of all restrain/release events."""
@@ -219,6 +294,21 @@ class CpuBalancer:
 
         # Check if restrained processes can be released
         self._check_releases(now)
+
+        # Tier B: herd busy background images onto E-cores (idempotent; skips
+        # already-throttled, the game, foreground, and never-eco images).
+        if self._eco_herder is not None:
+            try:
+                self._eco_herder.herd()
+            except Exception as exc:
+                logger.debug("EcoQoS herd failed: %s", exc)
+
+        # Tier B: evaluate declarative watchdog rules against live processes.
+        if self._watchdog_engine is not None:
+            try:
+                self._watchdog_engine.tick(self._enumerate_processes())
+            except Exception as exc:
+                logger.debug("Watchdog tick failed: %s", exc)
 
     # ------------------------------------------------------------------
     # System-wide CPU measurement
@@ -259,12 +349,17 @@ class CpuBalancer:
     # Per-process CPU measurement
     # ------------------------------------------------------------------
 
-    def _get_process_cpu(self, pid: int) -> float | None:
+    def _get_process_cpu(
+        self, pid: int, *, times_store: dict[int, tuple[int, int]] | None = None
+    ) -> float | None:
         """Get per-process CPU usage percentage via ``GetProcessTimes``.
 
         Returns an approximate CPU % relative to total system capacity
-        (number of logical CPUs x elapsed wall time).
+        (number of logical CPUs x elapsed wall time). ``times_store`` selects
+        which delta-tracking dict to use; the watchdog passes its own so it
+        never corrupts the restraint loop's per-process deltas.
         """
+        store = times_store if times_store is not None else self._last_process_times
         handle = self._kernel32.OpenProcess(PROCESS_QUERY_INFORMATION, False, pid)
         if not handle:
             return None
@@ -284,8 +379,8 @@ class CpuBalancer:
 
             kern_val = kernel.to_int()
             user_val = user.to_int()
-            prev = self._last_process_times.get(pid)
-            self._last_process_times[pid] = (kern_val, user_val)
+            prev = store.get(pid)
+            store[pid] = (kern_val, user_val)
 
             if prev is None:
                 return None
@@ -338,8 +433,7 @@ class CpuBalancer:
 
     def _is_excluded(self, name: str, pid: int) -> bool:
         """Return ``True`` if the process must not be restrained."""
-        name_lower = name.lower()
-        if name_lower in {p.lower() for p in self._config.excluded_processes}:
+        if name.lower() in self._excluded_lower:
             return True
         if pid == self._game_pid:
             return True
@@ -444,6 +538,88 @@ class CpuBalancer:
             self._release(pid)
 
     # ------------------------------------------------------------------
+    # Tier B session extras (opt-in, additive, exception-isolated)
+    # ------------------------------------------------------------------
+
+    def _start_session_extras(self) -> None:
+        """Apply optional Tier B session behaviors at daemon start.
+
+        A failure here must never break the core restraint loop, so every step
+        is exception-isolated. No-ops entirely when the flags are off.
+        """
+        if self._enable_cpu_sets:
+            try:
+                from abso.core import cpu_sets
+
+                ids = cpu_sets.get_pcore_cpu_set_ids()
+                if ids and cpu_sets.steer_process_to_pcores(self._game_pid, ids):
+                    logger.info(
+                        "CPU Sets: steered game PID %d toward %d P-core set(s)",
+                        self._game_pid, len(ids),
+                    )
+            except Exception as exc:
+                logger.debug("CPU Sets steer failed: %s", exc)
+
+        if self._enable_eco:
+            try:
+                from abso.core.efficiency_mode import EcoQosHerder
+
+                self._eco_herder = EcoQosHerder(self._game_pid, self._eco_images)
+                logger.info(
+                    "EcoQoS herding enabled for %d background image(s)",
+                    len(self._eco_images),
+                )
+            except Exception as exc:
+                logger.debug("EcoQoS herder init failed: %s", exc)
+
+        if self._enable_watchdog and self._watchdog_rules:
+            try:
+                from abso.core import proc_actions
+                from abso.core.watchdog_engine import WatchdogEngine
+
+                self._watchdog_engine = WatchdogEngine(
+                    self._watchdog_rules,
+                    is_online=self._is_online,
+                    keep_cores=self._watchdog_keep_cores,
+                    cpu_sampler=lambda pid: self._get_process_cpu(
+                        pid, times_store=self._watchdog_cpu_times
+                    ),
+                    ram_sampler=proc_actions.get_working_set_mb,
+                    priority_sampler=proc_actions.get_priority_class,
+                )
+                logger.info(
+                    "Watchdog engine active with %d rule(s)%s",
+                    self._watchdog_engine.active_rule_count,
+                    " (online: demote-only)" if self._is_online else "",
+                )
+            except Exception as exc:
+                logger.debug("Watchdog engine init failed: %s", exc)
+
+    def _stop_session_extras(self) -> None:
+        """Revert Tier B session behaviors at daemon stop."""
+        if self._enable_cpu_sets:
+            try:
+                from abso.core import cpu_sets
+
+                cpu_sets.clear_process_cpu_sets(self._game_pid)
+            except Exception as exc:
+                logger.debug("CPU Sets clear failed: %s", exc)
+
+        if self._eco_herder is not None:
+            try:
+                self._eco_herder.release_all()
+            except Exception as exc:
+                logger.debug("EcoQoS release failed: %s", exc)
+            self._eco_herder = None
+
+        if self._watchdog_engine is not None:
+            try:
+                self._watchdog_engine.restore_all()
+            except Exception as exc:
+                logger.debug("Watchdog restore failed: %s", exc)
+            self._watchdog_engine = None
+
+    # ------------------------------------------------------------------
     # Game liveness check
     # ------------------------------------------------------------------
 
@@ -462,6 +638,106 @@ class CpuBalancer:
 # CLI entry point
 # ---------------------------------------------------------------------------
 
+def _build_runtime_config_from_user(
+    user_cfg: Any,
+    *,
+    system_threshold: int | None = None,
+    process_threshold: int | None = None,
+    poll_interval: int | None = None,
+    trigger_delay: int | None = None,
+    restraint_duration: int | None = None,
+) -> CpuBalancerConfig:
+    """Translate the YAML-facing config into a runtime config.
+
+    ``user_cfg`` is an :class:`abso.core.config.CpuBalancerConfig` -- a distinct
+    dataclass that also carries the ``enabled`` flag. Explicit CLI arguments
+    win over the configured values; anything left ``None`` falls back to the
+    user config.
+    """
+
+    def pick(override: int | None, configured: int) -> int:
+        return override if override is not None else configured
+
+    return CpuBalancerConfig(
+        system_cpu_threshold=pick(system_threshold, user_cfg.system_cpu_threshold),
+        process_cpu_threshold=pick(process_threshold, user_cfg.process_cpu_threshold),
+        trigger_delay_ms=pick(trigger_delay, user_cfg.trigger_delay_ms),
+        restraint_duration_ms=pick(restraint_duration, user_cfg.restraint_duration_ms),
+        poll_interval_ms=pick(poll_interval, user_cfg.poll_interval_ms),
+        excluded_processes=list(user_cfg.excluded_processes),
+    )
+
+
+def _gather_extra_excluded() -> frozenset[str]:
+    """Union the never-kill safety net + user protect list for exclusions.
+
+    The balancer must never demote anti-cheat, game launchers, audio, the
+    user's interactive/agentic tooling, or anything marked protected in
+    ``abso.yaml``. :data:`~abso.core.process_janitor.NEVER_KILL_IMAGES` already
+    encodes the curated safety net (pre-lowercased); we add the per-machine
+    protect list on top. Failures are swallowed so config issues never break
+    the balancer.
+    """
+    from abso.core.process_janitor import NEVER_KILL_IMAGES
+
+    excluded: set[str] = set(NEVER_KILL_IMAGES)
+    try:
+        from abso.core.config import get_config
+
+        overrides = getattr(get_config(), "process_overrides", None)
+        for name in getattr(overrides, "protect", []) or []:
+            cleaned = str(name).strip().lower()
+            if cleaned:
+                excluded.add(cleaned)
+    except Exception as exc:
+        logger.debug("Could not load process_overrides.protect: %s", exc)
+    return frozenset(excluded)
+
+
+def _resolve_session_extras(
+    *, cpu_sets_flag: bool, eco_flag: bool
+) -> tuple[bool, bool, list[str]]:
+    """Resolve Tier B enablement: a behavior runs if its CLI flag is set OR its
+    ``abso.yaml`` config flag is enabled. Returns
+    ``(enable_cpu_sets, enable_eco, eco_images)``.
+    """
+    enable_cpu_sets = bool(cpu_sets_flag)
+    enable_eco = bool(eco_flag)
+    eco_images: list[str] = []
+    try:
+        from abso.core.config import get_config
+
+        cfg = get_config()
+        enable_cpu_sets = enable_cpu_sets or bool(cfg.cpu_sets.enabled)
+        enable_eco = enable_eco or bool(cfg.efficiency_mode.enabled)
+        eco_images = list(cfg.efficiency_mode.background_images)
+    except Exception as exc:
+        logger.debug("Could not load Tier B config: %s", exc)
+    return enable_cpu_sets, enable_eco, eco_images
+
+
+def _resolve_watchdog(*, watchdog_flag: bool) -> tuple[bool, list, int]:
+    """Resolve the watchdog: enabled if ``--watchdog`` OR ``watchdog.enabled``.
+
+    Returns ``(enable, rules, keep_cores)`` where ``rules`` come from
+    ``watchdog.rules`` and ``keep_cores`` (the throttle-action shrink size) from
+    ``cpu_limiter.keep_cores``.
+    """
+    enable = bool(watchdog_flag)
+    rules: list = []
+    keep_cores = 4
+    try:
+        from abso.core.config import get_config
+
+        cfg = get_config()
+        enable = enable or bool(cfg.watchdog.enabled)
+        rules = list(cfg.watchdog.rules)
+        keep_cores = int(cfg.cpu_limiter.keep_cores)
+    except Exception as exc:
+        logger.debug("Could not load watchdog config: %s", exc)
+    return enable, rules, keep_cores
+
+
 def main() -> None:
     """Launch the CPU balancer from the command line."""
     import argparse
@@ -473,17 +749,75 @@ def main() -> None:
 
     parser = argparse.ArgumentParser(description="CPU Priority Balancer")
     parser.add_argument("--pid", type=int, required=True, help="Game process ID")
-    parser.add_argument("--system-threshold", type=int, default=85)
-    parser.add_argument("--process-threshold", type=int, default=20)
-    parser.add_argument("--poll-interval", type=int, default=1000)
+    parser.add_argument("--system-threshold", type=int, default=None)
+    parser.add_argument("--process-threshold", type=int, default=None)
+    parser.add_argument("--poll-interval", type=int, default=None)
+    parser.add_argument("--trigger-delay", type=int, default=None)
+    parser.add_argument("--restraint-duration", type=int, default=None)
+    parser.add_argument(
+        "--stop-file",
+        type=str,
+        default=None,
+        help="Graceful-stop sentinel: when this file appears the balancer "
+        "exits and restores all demoted priorities.",
+    )
+    parser.add_argument(
+        "--cpu-sets",
+        action="store_true",
+        help="Tier B: soft-steer the game toward P-cores (CPU Sets).",
+    )
+    parser.add_argument(
+        "--eco",
+        action="store_true",
+        help="Tier B: herd busy background images onto E-cores (EcoQoS).",
+    )
+    parser.add_argument(
+        "--watchdog",
+        action="store_true",
+        help="Tier B: evaluate declarative watchdog.rules (demote/throttle/trim).",
+    )
+    parser.add_argument(
+        "--online",
+        action="store_true",
+        help="Restrict the watchdog to the demote-only tier for online play.",
+    )
     args = parser.parse_args()
 
-    config = CpuBalancerConfig(
-        system_cpu_threshold=args.system_threshold,
-        process_cpu_threshold=args.process_threshold,
-        poll_interval_ms=args.poll_interval,
+    try:
+        from abso.core.config import get_config
+
+        user_cfg: Any = get_config().cpu_balancer
+    except Exception as exc:
+        logger.warning("Falling back to default balancer config: %s", exc)
+        user_cfg = CpuBalancerConfig()
+
+    config = _build_runtime_config_from_user(
+        user_cfg,
+        system_threshold=args.system_threshold,
+        process_threshold=args.process_threshold,
+        poll_interval=args.poll_interval,
+        trigger_delay=args.trigger_delay,
+        restraint_duration=args.restraint_duration,
     )
-    balancer = CpuBalancer(args.pid, config)
+    enable_cpu_sets, enable_eco, eco_images = _resolve_session_extras(
+        cpu_sets_flag=args.cpu_sets, eco_flag=args.eco
+    )
+    enable_watchdog, watchdog_rules, watchdog_keep_cores = _resolve_watchdog(
+        watchdog_flag=args.watchdog
+    )
+    balancer = CpuBalancer(
+        args.pid,
+        config,
+        extra_excluded=_gather_extra_excluded(),
+        stop_file=args.stop_file,
+        enable_cpu_sets=enable_cpu_sets,
+        enable_eco=enable_eco,
+        eco_images=eco_images,
+        enable_watchdog=enable_watchdog,
+        watchdog_rules=watchdog_rules,
+        is_online=args.online,
+        watchdog_keep_cores=watchdog_keep_cores,
+    )
 
     def _shutdown(signum: int, frame: Any) -> None:
         balancer.stop()

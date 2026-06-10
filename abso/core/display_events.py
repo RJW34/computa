@@ -22,6 +22,7 @@ DISPLAY_EVENT_CHANNELS = (
 )
 MAX_MESSAGE_CHARS = 700
 DEFAULT_QUERY_TIMEOUT_SECONDS = 5
+BENIGN_POWER_POLICY_RESET_CLASS = "benign_power_policy_reset"
 
 
 Runner = Callable[..., subprocess.CompletedProcess[str]]
@@ -96,7 +97,7 @@ def _trim_message(value: Any, *, max_chars: int = MAX_MESSAGE_CHARS) -> str:
 
 
 def _normalize_event(item: dict[str, Any]) -> dict[str, Any]:
-    return {
+    event = {
         "time_created": item.get("time_created"),
         "log_name": item.get("log_name"),
         "provider": item.get("provider"),
@@ -104,6 +105,29 @@ def _normalize_event(item: dict[str, Any]) -> dict[str, Any]:
         "level": item.get("level"),
         "message": _trim_message(item.get("message")),
     }
+    event["classification"] = classify_display_event(event)
+    event["actionable"] = is_actionable_display_event(event)
+    return event
+
+
+def classify_display_event(event: dict[str, Any]) -> str:
+    """Return a compact user-facing event class for display diagnostics."""
+    provider = str(event.get("provider") or "").strip()
+    event_id = str(event.get("id") or "").strip()
+    message = str(event.get("message") or "")
+    if (
+        provider == "Microsoft-Windows-UserModePowerService"
+        and event_id == "12"
+        and "powercfg.exe" in message
+        and " reset policy scheme " in message
+    ):
+        return BENIGN_POWER_POLICY_RESET_CLASS
+    return "actionable"
+
+
+def is_actionable_display_event(event: dict[str, Any]) -> bool:
+    """Return whether an event should make health/display diagnostics warn."""
+    return classify_display_event(event) == "actionable"
 
 
 def _normalize_channel_error(item: dict[str, Any]) -> dict[str, str]:
@@ -180,6 +204,9 @@ def collect_recent_display_events(
         "channels": list(DISPLAY_EVENT_CHANNELS),
         "events": [],
         "count": 0,
+        "actionable_count": 0,
+        "benign_count": 0,
+        "benign_classifications": {},
         "channel_errors": [],
         "channel_error_count": 0,
     }
@@ -230,9 +257,19 @@ def collect_recent_display_events(
         return payload
 
     events = parsed_payload["events"]
+    actionable_count = sum(1 for event in events if event.get("actionable") is not False)
+    benign_counts: dict[str, int] = {}
+    for event in events:
+        if event.get("actionable") is not False:
+            continue
+        classification = str(event.get("classification") or "benign")
+        benign_counts[classification] = benign_counts.get(classification, 0) + 1
     channel_errors = parsed_payload["channel_errors"]
     payload["events"] = events
     payload["count"] = len(events)
+    payload["actionable_count"] = actionable_count
+    payload["benign_count"] = len(events) - actionable_count
+    payload["benign_classifications"] = benign_counts
     payload["channel_errors"] = channel_errors
     payload["channel_error_count"] = len(channel_errors)
     return payload

@@ -63,7 +63,25 @@ a = Analysis(
         ('abso\\core\\manifests\\integration_test_matrix.json', 'abso\\core\\manifests'),
         ('abso\\core\\manifests\\linter_rules.json', 'abso\\core\\manifests'),
     ] + TRAY_DATA_FILES,
-    hiddenimports=['win32gui', 'win32process', 'win32security', 'pynvml', 'abso.core.vrr'],
+    hiddenimports=[
+        'win32gui', 'win32process', 'win32security', 'pynvml', 'abso.core.vrr',
+        # Process Lasso-class session-runtime modules. These are imported
+        # lazily inside cpu_balancer (so the daemon can host them), which
+        # PyInstaller's static analysis may not follow; list them explicitly so
+        # the frozen exe actually contains them (otherwise the daemon's
+        # exception-isolated imports would silently no-op the features).
+        'abso.core.cpu_sets',
+        'abso.core.efficiency_mode',
+        'abso.core.cpu_limiter',
+        'abso.core.watchdog',
+        'abso.core.watchdog_engine',
+        'abso.core.proc_actions',
+        # Post-apply borderless-VRR enabler reconciliation. Imported lazily
+        # inside applier.apply() (PHASE 7.5); list it so the frozen exe contains
+        # it -- otherwise the exception-isolated import would silently no-op the
+        # fix that keeps borderless G-SYNC from regressing to half refresh.
+        'abso.core.vrr_reconcile',
+    ],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],

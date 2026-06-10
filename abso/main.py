@@ -2974,28 +2974,115 @@ def debloat(tier: int, dry_run: bool, json_output: bool) -> None:
 @cli.command("cpu-balance")
 @click.option("--pid", type=int, required=True, help="Game process ID to protect")
 @click.option(
-    "--system-threshold", type=int, default=85, help="System CPU % to trigger intervention"
+    "--system-threshold",
+    type=int,
+    default=None,
+    help="System CPU % to trigger intervention (default: cpu_balancer config)",
 )
-@click.option("--process-threshold", type=int, default=20, help="Per-process CPU % threshold")
-@click.option("--poll-interval", type=int, default=1000, help="Poll interval in ms")
+@click.option(
+    "--process-threshold",
+    type=int,
+    default=None,
+    help="Per-process CPU % threshold (default: cpu_balancer config)",
+)
+@click.option("--poll-interval", type=int, default=None, help="Poll interval in ms")
+@click.option(
+    "--stop-file",
+    type=str,
+    default=None,
+    help="Graceful-stop sentinel path: when this file appears the balancer "
+    "exits and restores every demoted priority. The tray uses this instead "
+    "of killing the process (which would strand background apps at BelowNormal).",
+)
+@click.option(
+    "--cpu-sets",
+    is_flag=True,
+    default=False,
+    help="Tier B: soft-steer the game toward P-cores (CPU Sets). Also enabled "
+    "by cpu_sets.enabled in abso.yaml.",
+)
+@click.option(
+    "--eco",
+    is_flag=True,
+    default=False,
+    help="Tier B: herd busy background images (efficiency_mode.background_images) "
+    "onto E-cores via EcoQoS. Also enabled by efficiency_mode.enabled in abso.yaml.",
+)
+@click.option(
+    "--watchdog",
+    is_flag=True,
+    default=False,
+    help="Tier B: evaluate declarative watchdog.rules (demote/throttle/trim). "
+    "Also enabled by watchdog.enabled in abso.yaml.",
+)
+@click.option(
+    "--online",
+    is_flag=True,
+    default=False,
+    help="Restrict the watchdog to demote-only (online/ranked safety).",
+)
 def cpu_balance(
-    pid: int, system_threshold: int, process_threshold: int, poll_interval: int
+    pid: int,
+    system_threshold: int | None,
+    process_threshold: int | None,
+    poll_interval: int | None,
+    stop_file: str | None,
+    cpu_sets: bool,
+    eco: bool,
+    watchdog: bool,
+    online: bool,
 ) -> None:
     """Run real-time CPU priority balancer for a game session.
 
-    Monitors CPU usage and temporarily lowers background process priority
-    when the game is being starved. Exits when the game process exits.
+    Monitors CPU usage and temporarily lowers background process priority when
+    the game is being starved. Exits when the game process exits or the
+    stop-file sentinel appears. Thresholds default to the ``cpu_balancer``
+    section of ``abso.yaml``; anti-cheat, launchers, audio, and any
+    ``process_overrides.protect`` images are never demoted (online-safe).
 
     Typically launched by the tray app, not run manually.
     """
-    from abso.core.cpu_balancer import CpuBalancer, CpuBalancerConfig
-
-    config = CpuBalancerConfig(
-        system_cpu_threshold=system_threshold,
-        process_cpu_threshold=process_threshold,
-        poll_interval_ms=poll_interval,
+    from abso.core.cpu_balancer import (
+        CpuBalancer,
+        CpuBalancerConfig,
+        _build_runtime_config_from_user,
+        _gather_extra_excluded,
+        _resolve_session_extras,
+        _resolve_watchdog,
     )
-    balancer = CpuBalancer(pid, config)
+
+    try:
+        from abso.core.config import get_config
+
+        user_cfg = get_config().cpu_balancer
+    except Exception:
+        user_cfg = CpuBalancerConfig()
+
+    config = _build_runtime_config_from_user(
+        user_cfg,
+        system_threshold=system_threshold,
+        process_threshold=process_threshold,
+        poll_interval=poll_interval,
+    )
+    enable_cpu_sets, enable_eco, eco_images = _resolve_session_extras(
+        cpu_sets_flag=cpu_sets, eco_flag=eco
+    )
+    enable_watchdog, watchdog_rules, watchdog_keep_cores = _resolve_watchdog(
+        watchdog_flag=watchdog
+    )
+    balancer = CpuBalancer(
+        pid,
+        config,
+        extra_excluded=_gather_extra_excluded(),
+        stop_file=stop_file,
+        enable_cpu_sets=enable_cpu_sets,
+        enable_eco=enable_eco,
+        eco_images=eco_images,
+        enable_watchdog=enable_watchdog,
+        watchdog_rules=watchdog_rules,
+        is_online=online,
+        watchdog_keep_cores=watchdog_keep_cores,
+    )
 
     import signal
 

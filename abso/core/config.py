@@ -64,8 +64,15 @@ class CpuBalancerConfig:
     """ProBalance-style CPU priority intervention configuration."""
 
     enabled: bool = False
-    system_cpu_threshold: int = 85
-    process_cpu_threshold: int = 20
+    # Defaults tuned for a high-core-count desktop (24C/32T): the system metric
+    # aggregates across all logical processors, so a capped game keeps it low
+    # and only a genuine background spike crosses 55%. The per-process metric is
+    # normalized to total capacity (~3% per saturated core on a 32-thread box),
+    # so 8% catches multi-core offenders without demoting light background apps.
+    # Tune against live measurement. Keep in sync with
+    # abso.core.cpu_balancer.CpuBalancerConfig.
+    system_cpu_threshold: int = 55
+    process_cpu_threshold: int = 8
     trigger_delay_ms: int = 2800
     restraint_duration_ms: int = 6000
     poll_interval_ms: int = 1000
@@ -83,6 +90,80 @@ class CpuBalancerConfig:
             "winlogon.exe",
         ]
     )
+
+
+@dataclass
+class EfficiencyModeConfig:
+    """EcoQoS background-herding configuration (Tier B scaffold, default OFF).
+
+    When ``enabled`` the tray may, during a game session, throttle the
+    ``background_images`` onto E-cores via EcoQoS and reset them on game exit.
+    The herder never throttles the game, anti-cheat, capture tools, or Discord.
+    """
+
+    enabled: bool = False
+    background_images: list[str] = field(default_factory=list)
+
+
+@dataclass
+class CpuSetsConfig:
+    """CPU Sets soft P-core steering configuration (Tier B scaffold, default OFF).
+
+    When ``enabled`` the tray may apply ``SetProcessDefaultCpuSets`` to bias the
+    game's threads toward P-cores while leaving the hard affinity mask intact
+    (threads still spill to E-cores under load). Anti-cheat-safe and
+    hybrid-correct, unlike hard affinity.
+    """
+
+    enabled: bool = False
+
+
+@dataclass
+class CpuLimiterConfig:
+    """Reversible CPU limiter (affinity-shrink throttle) — Tier B scaffold, OFF.
+
+    When ``enabled`` the governor may shrink a runaway background process's HARD
+    affinity to ``keep_cores`` cores while it exceeds threshold, restoring the
+    original mask on release/exit. MUST stay disabled for online profiles:
+    mid-match affinity mutation injects the timing nondeterminism RollbackGuard
+    exists to prevent.
+    """
+
+    enabled: bool = False
+    keep_cores: int = 4
+
+
+@dataclass
+class WatchdogRule:
+    """One declarative, reversible process-watchdog rule.
+
+    ``action`` is restricted to reversible verbs; terminate is intentionally not
+    expressible here (it would route through ProcessJanitor's NEVER_KILL net,
+    never as a free-form rule).
+    """
+
+    match: str
+    metric: str = "cpu"  # cpu | ram | priority
+    threshold: float = 90.0
+    sustain_s: float = 5.0
+    action: str = "demote"  # demote | throttle | trim
+
+
+@dataclass
+class WatchdogConfig:
+    """Declarative watchdog rule list (Tier B scaffold, default: no rules)."""
+
+    enabled: bool = False
+    rules: list[WatchdogRule] = field(default_factory=list)
+
+    def __post_init__(self) -> None:
+        coerced: list[WatchdogRule] = []
+        for rule in self.rules:
+            if isinstance(rule, WatchdogRule):
+                coerced.append(rule)
+            elif isinstance(rule, dict):
+                coerced.append(WatchdogRule(**rule))
+        self.rules = coerced
 
 
 @dataclass
@@ -318,6 +399,10 @@ class ABSOConfig:
     color: ColorConfig = field(default_factory=ColorConfig)
     standby_list: StandbyListConfig = field(default_factory=StandbyListConfig)
     cpu_balancer: CpuBalancerConfig = field(default_factory=CpuBalancerConfig)
+    efficiency_mode: EfficiencyModeConfig = field(default_factory=EfficiencyModeConfig)
+    cpu_sets: CpuSetsConfig = field(default_factory=CpuSetsConfig)
+    cpu_limiter: CpuLimiterConfig = field(default_factory=CpuLimiterConfig)
+    watchdog: WatchdogConfig = field(default_factory=WatchdogConfig)
     process_overrides: ProcessOverridesConfig = field(default_factory=ProcessOverridesConfig)
 
     def __post_init__(self) -> None:
@@ -331,6 +416,14 @@ class ABSOConfig:
             self.standby_list = StandbyListConfig(**self.standby_list)
         if isinstance(self.cpu_balancer, dict):
             self.cpu_balancer = CpuBalancerConfig(**self.cpu_balancer)
+        if isinstance(self.efficiency_mode, dict):
+            self.efficiency_mode = EfficiencyModeConfig(**self.efficiency_mode)
+        if isinstance(self.cpu_sets, dict):
+            self.cpu_sets = CpuSetsConfig(**self.cpu_sets)
+        if isinstance(self.cpu_limiter, dict):
+            self.cpu_limiter = CpuLimiterConfig(**self.cpu_limiter)
+        if isinstance(self.watchdog, dict):
+            self.watchdog = WatchdogConfig(**self.watchdog)
         if isinstance(self.process_overrides, dict):
             self.process_overrides = ProcessOverridesConfig(**self.process_overrides)
 

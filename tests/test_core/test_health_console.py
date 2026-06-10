@@ -28,7 +28,7 @@ def test_build_health_check_lines_lists_known_and_extra_checks_with_details() ->
         {
             "display_stability": {
                 "status": "warning",
-                "warnings": ["display topology has compositor black-flash risk factors"],
+                "warnings": ["display topology has high compositor black-flash risk"],
             },
             "custom_probe": {"status": "error", "error": "custom probe failed"},
             "tray_runtime": {"status": "ok"},
@@ -38,7 +38,7 @@ def test_build_health_check_lines_lists_known_and_extra_checks_with_details() ->
     assert lines == [
         "  [green]tray_runtime: ok[/green]",
         "  [yellow]display_stability: warning[/yellow]",
-        "    [yellow]- display topology has compositor black-flash risk factors[/yellow]",
+        "    [yellow]- display topology has high compositor black-flash risk[/yellow]",
         "  [red]custom_probe: error[/red]",
         "    [red]- custom probe failed[/red]",
     ]
@@ -110,11 +110,33 @@ def test_build_display_diagnostic_report_lines_builds_complete_sample_body() -> 
         "  Likely black-flash path: windows_compositor_mpo_vrr_mixed_refresh",
         "  Next action: Normal reboot required.",
         (
-            "[yellow]Interpretation: clean event logs plus this topology point "
-            "at the Windows compositor/MPO/VRR path.[/yellow]"
+            "[yellow]Interpretation: clean actionable event logs plus the "
+            "display/profile evidence point at the Windows compositor/MPO/VRR "
+            "path.[/yellow]"
         ),
         "[bold]Recommended actions:[/bold]",
         "  - Do not repeatedly reapply the active profile.",
+    ]
+
+
+def test_build_display_context_lines_splits_actionable_and_benign_events() -> None:
+    lines = build_display_context_lines_from_payload(
+        {
+            "count": 5,
+            "actionable_count": 0,
+            "benign_count": 5,
+            "channel_error_count": 0,
+        },
+        {},
+    )
+
+    assert lines == [
+        "",
+        "[bold]Display diagnostics:[/bold]",
+        (
+            "  Event log: 0 actionable display/driver/power event(s), "
+            "5 benign event(s), 0 channel error(s)"
+        ),
     ]
 
 

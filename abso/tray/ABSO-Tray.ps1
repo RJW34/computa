@@ -3,7 +3,10 @@
 # Left-click shows profile menu, applies via CLI, monitors game lifecycle
 # Features: Dynamic icons, favorites, search, progress overlay, hotkeys, settings
 
-param([switch]$Hidden)
+param(
+    [switch]$Hidden,
+    [string]$RestartToken = ""
+)
 
 # Cold-start wall clock: started at script entry, stopped right before
 # Application.Run so we can log total time-to-ready and catch regressions.
@@ -18,7 +21,16 @@ $isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIden
 if (-not $isAdmin) {
     $scriptPath = $PSCommandPath
     try {
-        Start-Process powershell.exe -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File `"$scriptPath`" -Hidden" -Verb RunAs -WindowStyle Hidden
+        $elevationArgs = @(
+            "-NoProfile",
+            "-ExecutionPolicy", "Bypass",
+            "-File", "`"$scriptPath`"",
+            "-Hidden"
+        )
+        if (-not [string]::IsNullOrWhiteSpace($RestartToken)) {
+            $elevationArgs += @("-RestartToken", "`"$RestartToken`"")
+        }
+        Start-Process powershell.exe -ArgumentList ($elevationArgs -join " ") -Verb RunAs -WindowStyle Hidden
     }
     catch {
         Add-Type -AssemblyName System.Windows.Forms
@@ -172,6 +184,7 @@ catch {
     $restartMarkerRoot = $env:TEMP
 }
 $script:RestartSoundMarkerFile = Join-Path $restartMarkerRoot "tray-restart-pending.json"
+$script:RestartToken = if ([string]::IsNullOrWhiteSpace($RestartToken)) { "" } else { $RestartToken.Trim() }
 
 function Get-MediaPlayer {
     if ($null -eq $script:MediaPlayer) {
@@ -248,7 +261,7 @@ function Play-VrrWarningSound {
 function Play-RestartSound {
     try {
         if (-not $script:TrayConfig.soundEnabled) {
-            Write-TrayLog "Restart sound skipped (sound effects disabled)"
+            Write-TrayLog "Restart sound skipped (tray audio cues disabled)"
             return
         }
 
@@ -304,8 +317,14 @@ public static class AbsoMci {
 }
 
 function Set-RestartSuccessSoundMarker {
+    param([string]$RestartToken)
+
     try {
         if (-not $script:RestartSoundMarkerFile) { return }
+        if ([string]::IsNullOrWhiteSpace($RestartToken)) {
+            Write-TrayLog "Restart success-sound marker skipped: missing restart token" -Level "WARN"
+            return
+        }
 
         $dir = Split-Path -Parent $script:RestartSoundMarkerFile
         if ($dir -and -not (Test-Path $dir)) {
@@ -316,12 +335,24 @@ function Set-RestartSuccessSoundMarker {
             requested_at = (Get-Date).ToString("o")
             requested_pid = $PID
             source = "restart_menu"
+            restart_token = $RestartToken.Trim()
         }
         $payload | ConvertTo-Json -Depth 3 | Set-Content -Path $script:RestartSoundMarkerFile -Encoding UTF8
         Write-TrayLog "Restart success-sound marker written"
     }
     catch {
         Write-TrayLog "Failed to write restart success-sound marker: $($_.Exception.Message)" -Level "WARN"
+    }
+}
+
+function Clear-RestartSuccessSoundMarker {
+    try {
+        if ($script:RestartSoundMarkerFile -and (Test-Path $script:RestartSoundMarkerFile)) {
+            Remove-Item -Path $script:RestartSoundMarkerFile -Force -ErrorAction SilentlyContinue
+        }
+    }
+    catch {
+        Write-TrayLog "Failed to clear restart success-sound marker: $($_.Exception.Message)" -Level "WARN"
     }
 }
 
@@ -353,9 +384,21 @@ function Invoke-RestartSuccessSoundIfPending {
             }
         }
 
+        $markerToken = if ($marker -and $marker.restart_token) { "$($marker.restart_token)".Trim() } else { "" }
+        if (
+            [string]::IsNullOrWhiteSpace($markerToken) -or
+            [string]::IsNullOrWhiteSpace($script:RestartToken) -or
+            $markerToken -ne $script:RestartToken
+        ) {
+            Write-TrayLog "Restart success-sound marker ignored: token mismatch or missing"
+            Remove-Item -Path $script:RestartSoundMarkerFile -Force -ErrorAction SilentlyContinue
+            return
+        }
+
         # Consume marker first to avoid replay if audio fails.
         Remove-Item -Path $script:RestartSoundMarkerFile -Force -ErrorAction SilentlyContinue
         Write-TrayLog "Restart marker consumed; playing restart success sound"
+        $script:RestartToken = ""
         Play-RestartSound
     }
     catch {
@@ -386,7 +429,8 @@ function Add-UniqueTrayMessage {
 
     if ([string]::IsNullOrWhiteSpace($Message)) { return }
 
-    $normalized = $Message.Trim()
+    $normalized = Format-TrayUserFacingText -Text $Message
+    if ([string]::IsNullOrWhiteSpace($normalized)) { return }
     if (-not $Target.Contains($normalized)) {
         [void]$Target.Add($normalized)
     }
@@ -396,10 +440,74 @@ function Get-ExitCodeDescriptor {
     param([AllowNull()][object]$ExitCode)
 
     if ($null -eq $ExitCode) {
-        return "unavailable"
+        return "not reported"
     }
 
     return "$ExitCode"
+}
+
+function Format-TrayUserFacingText {
+    <#
+    .SYNOPSIS
+    Converts backend handler/setting identifiers into short tray-safe labels.
+
+    .DESCRIPTION
+    CLI JSON intentionally carries stable internal identifiers such as
+    GraphicsSettingsHandler.mpo_disabled. The tray is the user's frequent
+    status surface, so it should present those as concise setting names instead
+    of raw class paths.
+    #>
+    param([AllowNull()][string]$Text)
+
+    if ([string]::IsNullOrWhiteSpace($Text)) { return $null }
+
+    $friendly = $Text.Trim()
+    $replacements = [ordered]@{
+        "GraphicsSettingsHandler.mpo_disabled" = "Graphics settings (MPO)"
+        "GraphicsSettingsHandler.disable_mpo" = "Graphics settings (MPO)"
+        "WindowsSettingsHandler.windowed_optimizations" = "Windows windowed optimizations"
+        "WindowsSettingsHandler.vrr_optimize" = "Windows VRR optimization"
+        "WindowsSettingsHandler.hdr" = "Windows HDR"
+        "WindowsSettingsHandler.refresh_rate" = "Windows refresh rate"
+        "WindowsSettingsHandler.max_refresh_rate" = "Windows refresh rate"
+        "NvidiaSettingsHandler.monitor_adaptive_sync" = "Monitor Adaptive Sync"
+        "NvidiaSettingsHandler.app_binding" = "NVIDIA app binding"
+        "NvidiaSettingsHandler.frame_rate_cap" = "NVIDIA frame-rate cap"
+        "OW2ConfigHandler.frame_rate_cap" = "Overwatch 2 frame-rate cap"
+        "OW2ConfigHandler.window_mode" = "Overwatch 2 display mode"
+        "GraphicsSettingsHandler" = "Graphics settings"
+        "WindowsSettingsHandler" = "Windows display settings"
+        "NvidiaSettingsHandler" = "NVIDIA settings"
+        "OW2ConfigHandler" = "Overwatch 2 config"
+        "ColorProfileSettingsHandler" = "Color profile"
+        "DisplayColorRangeHandler" = "Display color range"
+        "RegistrySettingsHandler" = "Windows registry settings"
+        "PowerSettingsHandler" = "Power plan"
+        "NetworkSettingsHandler" = "Network settings"
+        "MouseSettingsHandler" = "Mouse settings"
+        "MemorySettingsHandler" = "Memory settings"
+        "ProcessPriorityHandler" = "Process priority"
+    }
+
+    foreach ($key in $replacements.Keys) {
+        $friendly = $friendly -replace [regex]::Escape($key), $replacements[$key]
+    }
+
+    return (Format-TrayDisplayCopy -Text $friendly)
+}
+
+function Format-TrayDisplayCopy {
+    param([AllowNull()][string]$Text)
+
+    if ([string]::IsNullOrWhiteSpace($Text)) { return $null }
+
+    $display = "$Text".Trim()
+    $display = [regex]::Replace(
+        $display,
+        '(?i)\bG[\s_-]?SYNC\b',
+        'G-SYNC'
+    )
+    return $display
 }
 
 function Get-ApplyWarningMessages {
@@ -500,19 +608,91 @@ function Get-ApplyFailureMessage {
     )
 
     if ($FailedHandlers.Count -gt 0) {
-        return "Handler failures: $($FailedHandlers -join ', ')"
+        $friendlyHandlers = @($FailedHandlers | ForEach-Object { Format-TrayUserFacingText -Text "$_" })
+        return "Failed settings: $($friendlyHandlers -join ', ')"
     }
     elseif ($Json.error) {
-        return "$($Json.error)"
+        return (Format-TrayUserFacingText -Text "$($Json.error)")
     }
     elseif ($Json.data -and $Json.data.error) {
-        return "$($Json.data.error)"
+        return (Format-TrayUserFacingText -Text "$($Json.data.error)")
     }
     elseif ($Json.data -and $Json.data.failed_settings -and $Json.data.failed_settings.Count -gt 0) {
-        return ($Json.data.failed_settings -join "; ")
+        return (Format-TrayUserFacingText -Text ($Json.data.failed_settings -join "; "))
     }
 
     return "Backend reported failure without a detailed error message (exit code: $(Get-ExitCodeDescriptor -ExitCode $ExitCode))"
+}
+
+function Get-TrayProfileGameGroup {
+    param(
+        [string]$ProfileId,
+        [object]$Profile
+    )
+
+    if ($Profile -and -not [string]::IsNullOrWhiteSpace("$($Profile.GameGroup)")) {
+        return "$($Profile.GameGroup)"
+    }
+
+    $variantSuffixes = @(
+        "-online-gsync-hdr", "-gsync-hdr-capture", "-gsync-capture",
+        "-online-gsync", "-offline-gsync-hdr",
+        "-offline-hdr", "-online-hdr", "-console-parity-hdr",
+        "-universal-hdr", "-gsync-hdr", "-tournament-sim-144hz",
+        "-console-parity", "-300hz-max", "-streaming-hdr", "-streaming",
+        "-offline", "-online", "-vrr-lab", "-gsync", "-hdr", "-sdr",
+        "-universal", "-capture"
+    )
+    foreach ($suffix in $variantSuffixes) {
+        if ($ProfileId.EndsWith($suffix)) {
+            return $ProfileId.Substring(0, $ProfileId.Length - $suffix.Length)
+        }
+    }
+    return $ProfileId
+}
+
+function Get-TrayProfileToastVisualArgs {
+    param(
+        [string]$ProfileId,
+        [object]$Profile,
+        [switch]$ActiveBadge
+    )
+
+    if ([string]::IsNullOrWhiteSpace($ProfileId)) { return @{} }
+    if (-not $Profile -and $script:Profiles -and $script:Profiles.Contains($ProfileId)) {
+        $Profile = $script:Profiles[$ProfileId]
+    }
+
+    # Catalog-drift or user-profile misses still get deterministic stylized
+    # profile-id art instead of collapsing to a generic brand-only toast.
+    $category = if ($Profile -and $Profile.Cat) { "$($Profile.Cat)" } else { "Other" }
+    $gameGroup = Get-TrayProfileGameGroup -ProfileId $ProfileId -Profile $Profile
+    $color = Get-TrayProfileAccentColor -ProfileId $ProfileId -Profile $Profile -Fallback $script:Colors.Text
+    $variant = if ($Profile -and $Profile.Variant) { "$($Profile.Variant)" } else { "" }
+    $modeBadge = if ("$ProfileId" -match '(?i)capture' -or $variant -match '(?i)capture') {
+        "capture"
+    }
+    elseif ($variant -match '(?i)\bHDR\b' -or "$ProfileId" -match '(?i)-hdr($|-)' ) {
+        "hdr"
+    }
+    else {
+        ""
+    }
+    $favoriteBadge = if (Get-Command Test-Favorite -ErrorAction SilentlyContinue) {
+        Test-Favorite -ProfileId $ProfileId -Config $script:TrayConfig
+    }
+    else {
+        $false
+    }
+
+    return @{
+        ProfileGameGroup = $gameGroup
+        ProfileCategory = $category
+        ProfileColor = $color
+        ProfileActiveBadge = [bool]$ActiveBadge
+        ProfileModeBadge = $modeBadge
+        ProfileFavoriteBadge = [bool]$favoriteBadge
+    }
 }
 
 function Get-SyncTransitionDirection {
@@ -734,31 +914,122 @@ function Reset-ActiveProfileVerificationState {
     $script:ActiveProfileStateRebootReasons = @()
 }
 
+function Set-ActiveProfileVerificationSeedFromApplyData {
+    <#
+    .SYNOPSIS
+    Seeds tray status from the apply/apply-pending result before the slower
+    verifier refresh completes.
+    #>
+    param([AllowNull()][object]$Data)
+
+    Reset-ActiveProfileVerificationState
+    if ($null -eq $Data) { return }
+
+    $pendingApplyAfter = @()
+    if ($Data.PSObject.Properties["pending_apply_settings_after"]) {
+        $pendingApplyAfter = @($Data.pending_apply_settings_after)
+    }
+    $pendingApplyAfter = @($pendingApplyAfter | Where-Object { -not [string]::IsNullOrWhiteSpace("$($_)") })
+
+    $pendingRebootAfter = @()
+    if ($Data.PSObject.Properties["pending_reboot_gated_settings_after"]) {
+        $pendingRebootAfter = @($Data.pending_reboot_gated_settings_after)
+    }
+    $pendingRebootAfter = @($pendingRebootAfter | Where-Object { -not [string]::IsNullOrWhiteSpace("$($_)") })
+
+    $requiresReboot = $false
+    if ($Data.PSObject.Properties["requires_reboot"]) {
+        $requiresReboot = [bool]$Data.requires_reboot
+    }
+    elseif ($Data.PSObject.Properties["reboot_pending"]) {
+        $requiresReboot = [bool]$Data.reboot_pending
+    }
+
+    $rebootReasons = @()
+    if ($Data.PSObject.Properties["reboot_reasons"]) {
+        $rebootReasons = @($Data.reboot_reasons)
+    }
+    $rebootReasons = @($rebootReasons | Where-Object { -not [string]::IsNullOrWhiteSpace("$($_)") })
+
+    if ($pendingApplyAfter.Count -gt 0) {
+        $script:ActiveProfileVerificationStatus = "pending_apply"
+        $script:ActiveProfilePendingApplySettings = $pendingApplyAfter
+        $script:ActiveProfilePendingRebootSettings = $pendingRebootAfter
+        $script:ActiveProfileStateRebootPending = $requiresReboot
+        $script:ActiveProfileStateRebootReasons = $rebootReasons
+    }
+    elseif ($requiresReboot -or $pendingRebootAfter.Count -gt 0) {
+        $script:ActiveProfileVerificationStatus = "pending_reboot"
+        $script:ActiveProfilePendingRebootSettings = $pendingRebootAfter
+        $script:ActiveProfileStateRebootPending = $true
+        if ($rebootReasons.Count -gt 0) {
+            $script:ActiveProfileStateRebootReasons = $rebootReasons
+        }
+        elseif ($pendingRebootAfter.Count -gt 0) {
+            $script:ActiveProfileStateRebootReasons = $pendingRebootAfter
+        }
+        else {
+            $script:ActiveProfileStateRebootReasons = @("profile changes")
+        }
+    }
+    else {
+        $script:ActiveProfileVerificationStatus = "active"
+    }
+
+    $script:ActiveProfileVerificationCheckedAt = (Get-Date).ToString("o")
+}
+
+function Test-ActiveProfileVerificationInFlight {
+    if (-not $script:ActiveProfileVerifyProc) { return $false }
+    try {
+        return (-not $script:ActiveProfileVerifyProc.HasExited)
+    }
+    catch {
+        return $false
+    }
+}
+
 function Get-ActiveProfilePendingApplyText {
     if ($script:ActiveProfileVerificationStatus -ne "pending_apply") { return $null }
     $pending = @($script:ActiveProfilePendingApplySettings)
     if ($pending.Count -gt 0 -and -not [string]::IsNullOrWhiteSpace("$($pending[0])")) {
-        return "$($pending[0])"
+        return (Format-TrayUserFacingText -Text "$($pending[0])")
     }
     return "profile verification"
 }
 
 function Get-ActiveProfileRebootPendingText {
+    $pending = @($script:ActiveProfilePendingRebootSettings)
+    if (
+        $script:ActiveProfileVerificationStatus -eq "active" -and
+        $pending.Count -eq 0
+    ) {
+        return $null
+    }
+
     if (
         -not $script:ActiveProfileStateRebootPending -and
-        $script:ActiveProfileVerificationStatus -ne "pending_reboot"
+        $script:ActiveProfileVerificationStatus -ne "pending_reboot" -and
+        $pending.Count -eq 0
     ) {
         return $null
     }
     $reasons = @($script:ActiveProfileStateRebootReasons)
     if ($reasons.Count -gt 0 -and -not [string]::IsNullOrWhiteSpace("$($reasons[0])")) {
-        return "$($reasons[0])"
+        return (Format-TrayUserFacingText -Text "$($reasons[0])")
     }
-    $pending = @($script:ActiveProfilePendingRebootSettings)
     if ($pending.Count -gt 0 -and -not [string]::IsNullOrWhiteSpace("$($pending[0])")) {
-        return "$($pending[0])"
+        return (Format-TrayUserFacingText -Text "$($pending[0])")
     }
     return "profile changes"
+}
+
+function Get-ActiveProfileVerificationInProgressText {
+    if ([string]::IsNullOrWhiteSpace([string]$script:activeProfile)) { return $null }
+    if (-not (Test-ActiveProfileVerificationInFlight)) { return $null }
+    if (Get-ActiveProfilePendingApplyText) { return $null }
+    if (Get-ActiveProfileRebootPendingText) { return $null }
+    return "checking profile state"
 }
 
 function Complete-SameActiveProfileSelectionIfHandled {
@@ -788,20 +1059,22 @@ function Complete-SameActiveProfileSelectionIfHandled {
     $status = if ($script:ActiveProfileVerificationStatus) { "$($script:ActiveProfileVerificationStatus)" } else { "" }
     $rebootText = Get-ActiveProfileRebootPendingText
     $alreadyVerified = $status -in @("active", "pending_reboot")
+    $sameActiveNoticeVisual = Get-TrayProfileToastVisualArgs -ProfileId $ProfileId -Profile $Profile
+    $profileTitle = Get-TrayProfileObjectDisplayName -Profile $Profile -Fallback $ProfileId
 
     if ($alreadyVerified -or -not [string]::IsNullOrWhiteSpace($rebootText)) {
         Set-IconState -State "Active"
         if (-not [string]::IsNullOrWhiteSpace($rebootText)) {
-            Write-TrayLog "Profile '$ProfileId' already verifies active; skipping apply. Restart required: $rebootText"
-            Show-Notification -Title $Profile.Name -Message "Already active. Restart required: $rebootText" -Type "Warning"
-            $script:LastAction = "Restart required: $rebootText"
+            Write-TrayLog "Profile '$ProfileId' already verifies active; skipping apply. Windows restart required: $rebootText"
+            Show-Notification @sameActiveNoticeVisual -Title $profileTitle -Message "Already active. Windows restart required: $rebootText" -Type "Warning" -MetaText $ProfileId
+            $script:LastAction = "Windows restart required: $rebootText"
         }
         else {
             Write-TrayLog "Profile '$ProfileId' already verifies active; skipping redundant apply"
-            Show-Notification -Title $Profile.Name -Message "Already active." -Type "Info"
-            $script:LastAction = "Already active: $($Profile.Name)"
+            Show-Notification @sameActiveNoticeVisual -Title $profileTitle -Message "Already active." -Type "Info" -MetaText $ProfileId
+            $script:LastAction = "Already active: $profileTitle"
         }
-        $script:LastActionTime = Get-Date -Format "HH:mm"
+        $script:LastActionTime = Get-Date
         Update-MenuState
         Start-ActiveProfileVerificationTimer -DelayMilliseconds 500
         return $true
@@ -809,9 +1082,9 @@ function Complete-SameActiveProfileSelectionIfHandled {
 
     if ([string]::IsNullOrWhiteSpace($status)) {
         Write-TrayLog "Profile '$ProfileId' is already active but verification has not completed; refreshing before any apply"
-        Show-Notification -Title $Profile.Name -Message "Verifying current profile before reapply." -Type "Info"
-        $script:LastAction = "Verifying: $($Profile.Name)"
-        $script:LastActionTime = Get-Date -Format "HH:mm"
+        Show-Notification @sameActiveNoticeVisual -Title $profileTitle -Message "Verifying current profile before reapply." -Type "Info" -MetaText $ProfileId
+        $script:LastAction = "Verifying: $profileTitle"
+        $script:LastActionTime = Get-Date
         Refresh-ActiveProfileVerificationState -Silent
         return $true
     }
@@ -830,14 +1103,53 @@ function Refresh-ActiveProfileVerificationState {
     #>
     param([switch]$Silent)
 
-    Reset-ActiveProfileVerificationState
-
     if ([string]::IsNullOrWhiteSpace([string]$script:activeProfile)) {
+        Reset-ActiveProfileVerificationState
         Update-MenuState
         return
     }
 
+    if (Test-ActiveProfileVerificationInFlight) {
+        if (-not $Silent) { $script:ActiveProfileVerifySilent = $false }
+        Write-TrayLog "State verification already running; coalescing refresh request"
+        return
+    }
+
+    Reset-ActiveProfileVerificationState
     Start-ActiveProfileVerificationProcess -Silent:$Silent
+}
+
+function Set-ActiveProfileVerificationFailureAction {
+    param([string]$Reason)
+
+    $lastActionText = Normalize-TrayLastActionMessage -Message $script:LastAction
+    if ([string]::IsNullOrWhiteSpace($lastActionText) -or -not $lastActionText.StartsWith("Verifying:")) { return }
+
+    $failureReason = if ([string]::IsNullOrWhiteSpace($Reason)) { "reason not reported" } else { $Reason.Trim() }
+    Set-TrayLastAction -Message "Verify failed: $failureReason"
+}
+
+function Set-ActiveProfileVerificationUnavailableAction {
+    param([string]$Reason)
+
+    $lastActionText = Normalize-TrayLastActionMessage -Message $script:LastAction
+    $lastActionWasVerifierDerived = (
+        -not [string]::IsNullOrWhiteSpace($lastActionText) -and (
+        $lastActionText.StartsWith("Verifying:") -or
+        $lastActionText.StartsWith("Pending profile fix:") -or
+        $lastActionText.StartsWith("Windows restart required:")
+        )
+    )
+    if (-not $lastActionWasVerifierDerived) { return }
+
+    $cleanReason = if ([string]::IsNullOrWhiteSpace($Reason)) { "not current" } else { $Reason.Trim() }
+    $statusPrefix = if ($cleanReason -in @("profile changed", "not current")) {
+        "Verification not current"
+    }
+    else {
+        "Verification status not reported"
+    }
+    Set-TrayLastAction -Message "${statusPrefix}: $cleanReason"
 }
 
 function Stop-ActiveProfileVerificationRuntime {
@@ -882,16 +1194,28 @@ function Apply-ActiveProfileVerificationJson {
     $verification = $Json.data.verification
     if (-not $verification) {
         Write-TrayLog "State verification returned no verification block" -Level "WARN"
+        Reset-ActiveProfileVerificationState
+        Set-ActiveProfileVerificationUnavailableAction -Reason "missing verifier data"
         return
     }
 
     $verifiedProfile = if ($verification.profile) { "$($verification.profile)" } else { "" }
     if ($verifiedProfile -and $verifiedProfile -ne "$script:activeProfile") {
         Write-TrayLog "State verification profile '$verifiedProfile' does not match tray active profile '$script:activeProfile'" -Level "WARN"
+        Reset-ActiveProfileVerificationState
+        Set-ActiveProfileVerificationUnavailableAction -Reason "profile changed"
         return
     }
 
-    $script:ActiveProfileVerificationStatus = if ($verification.status) { "$($verification.status)" } else { "unknown" }
+    $reportedStatus = if ($verification.status) { "$($verification.status)" } else { "" }
+    if ([string]::IsNullOrWhiteSpace($reportedStatus)) {
+        Write-TrayLog "State verification returned no verification status" -Level "WARN"
+        Reset-ActiveProfileVerificationState
+        Set-ActiveProfileVerificationUnavailableAction -Reason "missing verifier status"
+        return
+    }
+
+    $script:ActiveProfileVerificationStatus = $reportedStatus
     $script:ActiveProfilePendingApplySettings = @($verification.pending_apply_settings)
     $script:ActiveProfilePendingRebootSettings = @($verification.pending_reboot_gated_settings)
     $script:ActiveProfileMismatchedHandlers = @($verification.mismatched_handlers)
@@ -901,15 +1225,44 @@ function Apply-ActiveProfileVerificationJson {
 
     if ($script:ActiveProfileVerificationStatus -eq "pending_apply") {
         $pendingText = Get-ActiveProfilePendingApplyText
-        Write-TrayLog "Active profile needs apply before it is fully active: $pendingText" -Level "WARN"
-        $script:LastAction = "Needs apply: $pendingText"
-        $script:LastActionTime = Get-Date -Format "HH:mm"
+        Write-TrayLog "Active profile has pending profile fixes: $pendingText" -Level "WARN"
+        $script:LastAction = "Pending profile fix: $pendingText"
+        $script:LastActionTime = Get-Date
     }
     elseif ($script:ActiveProfileStateRebootPending) {
         $rebootText = Get-ActiveProfileRebootPendingText
-        Write-TrayLog "Active profile has pending reboot-gated changes: $rebootText" -Level "WARN"
-        $script:LastAction = "Restart required: $rebootText"
-        $script:LastActionTime = Get-Date -Format "HH:mm"
+        Write-TrayLog "Active profile has Windows restart-gated changes: $rebootText" -Level "WARN"
+        $script:LastAction = "Windows restart required: $rebootText"
+        $script:LastActionTime = Get-Date
+    }
+    elseif ($script:ActiveProfileVerificationStatus -eq "active") {
+        $lastActionText = Normalize-TrayLastActionMessage -Message $script:LastAction
+        $lastActionWasVerifierPending = (
+            -not [string]::IsNullOrWhiteSpace($lastActionText) -and (
+            $lastActionText.StartsWith("Pending profile fix:") -or
+            $lastActionText.StartsWith("Windows restart required:")
+            )
+        )
+        if ($lastActionWasVerifierPending) {
+            $activeName = Get-TrayProfileDisplayName -ProfileId "$script:activeProfile"
+            Write-TrayLog "Active profile now verifies clean; replacing stale verifier action '$lastActionText'"
+            $script:LastAction = "Verified active: $activeName"
+            $script:LastActionTime = Get-Date
+        }
+        elseif ([string]::IsNullOrWhiteSpace($lastActionText)) {
+            # Fresh session with no action yet (e.g. the first verification
+            # after an OS reboot): show a positive confirmation instead of an
+            # empty status, so a user who just restarted Windows sees that the
+            # restart-gated change committed instead of wondering whether the
+            # pre-reboot "Windows restart required" notice still applies.
+            $activeName = Get-TrayProfileDisplayName -ProfileId "$script:activeProfile"
+            Write-TrayLog "Active profile verifies clean on fresh session; surfacing verified status"
+            $script:LastAction = "Verified active: $activeName"
+            $script:LastActionTime = Get-Date
+        }
+        elseif (-not $Silent) {
+            Write-TrayLog "Active profile verification status: $script:ActiveProfileVerificationStatus"
+        }
     }
     elseif (-not $Silent) {
         Write-TrayLog "Active profile verification status: $script:ActiveProfileVerificationStatus"
@@ -923,7 +1276,17 @@ function Start-ActiveProfileVerificationProcess {
     #>
     param([switch]$Silent)
 
-    Stop-ActiveProfileVerificationRuntime -KillProcess
+    if (Test-ActiveProfileVerificationInFlight) {
+        if (-not $Silent) { $script:ActiveProfileVerifySilent = $false }
+        Write-TrayLog "State verification already running; skipping duplicate process start"
+        return
+    }
+
+    if ($script:ActiveProfileVerifyProc) {
+        Complete-ActiveProfileVerificationIfReady
+        if (Test-ActiveProfileVerificationInFlight) { return }
+        Stop-ActiveProfileVerificationRuntime
+    }
 
     if ([string]::IsNullOrWhiteSpace([string]$script:activeProfile)) {
         Update-MenuState
@@ -942,6 +1305,8 @@ function Start-ActiveProfileVerificationProcess {
             -NoNewWindow -PassThru -WorkingDirectory $script:ProjectRoot `
             -RedirectStandardOutput $script:ActiveProfileVerifyOutputFile `
             -RedirectStandardError $script:ActiveProfileVerifyErrorFile
+        # PS 5.1: cache the handle now or .ExitCode reads $null after exit.
+        if ($script:ActiveProfileVerifyProc) { $null = $script:ActiveProfileVerifyProc.Handle }
 
         $pollTimer = New-Object System.Windows.Forms.Timer
         $pollTimer.Interval = 250
@@ -951,6 +1316,7 @@ function Start-ActiveProfileVerificationProcess {
     }
     catch {
         Write-TrayLog "State verification start failed: $($_.Exception.Message)" -Level "WARN"
+        Set-ActiveProfileVerificationFailureAction -Reason "$($_.Exception.Message)"
         Stop-ActiveProfileVerificationRuntime -KillProcess
         Update-MenuState
     }
@@ -997,6 +1363,7 @@ function Complete-ActiveProfileVerificationIfReady {
     }
     catch {
         Write-TrayLog "State verification refresh failed: $($_.Exception.Message)" -Level "WARN"
+        Set-ActiveProfileVerificationFailureAction -Reason "$($_.Exception.Message)"
     }
     finally {
         Stop-ActiveProfileVerificationRuntime
@@ -1032,26 +1399,175 @@ function Start-ActiveProfileVerificationTimer {
 # ============================================================================
 
 $script:EnableBalloonNotifications = $true
+$script:NotificationTooltipRestoreTimer = $null
+$script:NotificationTooltipRestoreDelayMs = 4500
+
+function Set-NotifyIconTooltipText {
+    param([AllowNull()][string]$Text)
+
+    if (-not $script:notifyIcon) { return }
+
+    $tooltipText = if ([string]::IsNullOrWhiteSpace($Text)) { "A.B.S.O." } else { $Text.Trim() }
+    if ($tooltipText.Length -gt 63) {
+        $tooltipText = $tooltipText.Substring(0, 60) + "..."
+    }
+    $script:notifyIcon.Text = $tooltipText
+}
+
+function Get-TrayStateTooltipText {
+    $activeRecord = Get-ActiveTrayProfileRecord
+    if ($activeRecord.Id) {
+        $profileName = if (
+            $activeRecord.InCatalog -and
+            $activeRecord.Profile -and
+            -not [string]::IsNullOrWhiteSpace("$($activeRecord.Profile.Name)")
+        ) {
+            Format-TrayDisplayCopy -Text "$($activeRecord.Profile.Name)"
+        }
+        else {
+            "$($activeRecord.DisplayName)"
+        }
+        $pendingApplyText = Get-ActiveProfilePendingApplyText
+        $rebootPendingText = Get-ActiveProfileRebootPendingText
+        if ($pendingApplyText) {
+            return "A.B.S.O. - Pending profile fix: $profileName"
+        }
+        if ($rebootPendingText) {
+            return "A.B.S.O. - Windows restart required: $profileName"
+        }
+        if (Get-ActiveProfileVerificationInProgressText) {
+            return "A.B.S.O. - Checking profile state: $profileName"
+        }
+    }
+    if ($activeRecord.Id -and $activeRecord.InCatalog) {
+        $p = $activeRecord.Profile
+        return "A.B.S.O. - $(Get-TrayProfileObjectDisplayName -Profile $p -Fallback $activeRecord.Id)"
+    }
+    if ($activeRecord.Id) {
+        return "A.B.S.O. - Profile missing from current list: $($activeRecord.DisplayName)"
+    }
+    return "A.B.S.O. - Ready"
+}
+
+function Restore-TrayTooltipFromState {
+    param([switch]$Force)
+
+    if ($script:NotificationTooltipRestoreTimer -and -not $Force) { return }
+    Set-NotifyIconTooltipText -Text (Get-TrayStateTooltipText)
+}
+
+function Stop-NotificationTooltipRestoreTimer {
+    if ($script:NotificationTooltipRestoreTimer) {
+        try { $script:NotificationTooltipRestoreTimer.Stop() } catch {}
+        try { $script:NotificationTooltipRestoreTimer.Dispose() } catch {}
+        $script:NotificationTooltipRestoreTimer = $null
+    }
+}
+
+function Start-NotificationTooltipRestoreTimer {
+    if (-not $script:notifyIcon) { return }
+    Stop-NotificationTooltipRestoreTimer
+    $timer = New-Object System.Windows.Forms.Timer
+    $timer.Interval = $script:NotificationTooltipRestoreDelayMs
+    $timer.Add_Tick({
+        Stop-NotificationTooltipRestoreTimer
+        Restore-TrayTooltipFromState -Force
+    })
+    $script:NotificationTooltipRestoreTimer = $timer
+    $timer.Start()
+}
+
+function Set-TrayOperationTooltipText {
+    param([AllowNull()][string]$Text)
+
+    Stop-NotificationTooltipRestoreTimer
+    Set-NotifyIconTooltipText -Text $Text
+}
+
+function Set-TransientNotificationTooltip {
+    param(
+        [string]$Title,
+        [string]$Message
+    )
+
+    Set-NotifyIconTooltipText -Text "$Title - $Message"
+    Start-NotificationTooltipRestoreTimer
+}
+
+function Show-TrayToast {
+    param(
+        [string]$Title = "A.B.S.O.",
+        [string]$Message = "",
+        [ValidateSet("Info","Warning","Error","Success")]
+        [string]$Type = "Info",
+        [int]$Duration = 4500,
+        [string]$MetaText = "",
+        [switch]$BypassDedup,
+        [string]$ProfileGameGroup = "",
+        [string]$ProfileCategory = "Other",
+        [System.Drawing.Color]$ProfileColor = [System.Drawing.Color]::Empty,
+        [switch]$ProfileActiveBadge,
+        [string]$ProfileModeBadge = "",
+        [switch]$ProfileFavoriteBadge,
+        [string]$ActionName = "",
+        [System.Drawing.Color]$ActionColor = [System.Drawing.Color]::Empty
+    )
+
+    Set-TransientNotificationTooltip -Title $Title -Message $Message
+
+    if ($script:EnableBalloonNotifications) {
+        Show-ThemedToast `
+            -Title $Title `
+            -Message $Message `
+            -Type $Type `
+            -Duration $Duration `
+            -MetaText $MetaText `
+            -BypassDedup:$BypassDedup `
+            -ProfileGameGroup $ProfileGameGroup `
+            -ProfileCategory $ProfileCategory `
+            -ProfileColor $ProfileColor `
+            -ProfileActiveBadge:$ProfileActiveBadge `
+            -ProfileModeBadge $ProfileModeBadge `
+            -ProfileFavoriteBadge:$ProfileFavoriteBadge `
+            -ActionName $ActionName `
+            -ActionColor $ActionColor
+    }
+}
 
 function Show-Notification {
     param(
         [string]$Title,
         [string]$Message,
         [ValidateSet("Info", "Warning", "Error", "Success")]
-        [string]$Type = "Info"
+        [string]$Type = "Info",
+        [string]$MetaText = "",
+        [string]$ProfileGameGroup = "",
+        [string]$ProfileCategory = "Other",
+        [System.Drawing.Color]$ProfileColor = [System.Drawing.Color]::Empty,
+        [switch]$ProfileActiveBadge,
+        [string]$ProfileModeBadge = "",
+        [switch]$ProfileFavoriteBadge,
+        [string]$ActionName = "",
+        [System.Drawing.Color]$ActionColor = [System.Drawing.Color]::Empty
     )
 
-    # Update tray tooltip
-    $maxLen = [Math]::Min(63, "$Title - $Message".Length)
-    $script:notifyIcon.Text = "$Title - $Message".Substring(0, $maxLen)
-
-    if ($script:EnableBalloonNotifications) {
-        # Pass Type through verbatim. Prior versions mapped Success -> Info,
-        # which meant every "successful apply" toast was rendering as the
-        # blue Info variant instead of the green phosphor Success accent.
-        $toastType = if ($Type -in @("Info","Warning","Error","Success")) { $Type } else { "Info" }
-        Show-ThemedToast -Title $Title -Message $Message -Type $toastType
-    }
+    # Pass Type through verbatim. Prior versions mapped Success -> Info,
+    # which meant every "successful apply" toast was rendering as the
+    # blue Info variant instead of the green phosphor Success accent.
+    $toastType = if ($Type -in @("Info","Warning","Error","Success")) { $Type } else { "Info" }
+    Show-TrayToast `
+        -Title $Title `
+        -Message $Message `
+        -Type $toastType `
+        -MetaText $MetaText `
+        -ProfileGameGroup $ProfileGameGroup `
+        -ProfileCategory $ProfileCategory `
+        -ProfileColor $ProfileColor `
+        -ProfileActiveBadge:$ProfileActiveBadge `
+        -ProfileModeBadge $ProfileModeBadge `
+        -ProfileFavoriteBadge:$ProfileFavoriteBadge `
+        -ActionName $ActionName `
+        -ActionColor $ActionColor
 }
 
 # ============================================================================
@@ -1180,6 +1696,25 @@ function Write-TrayRuntimeMarker {
             $scriptLastWrite = (Get-Item -LiteralPath $scriptPath -ErrorAction Stop).LastWriteTimeUtc.ToString("o")
         } catch {}
 
+        $moduleHashes = [ordered]@{}
+        foreach ($moduleName in @(
+            "ABSO-Icons.ps1",
+            "ABSO-Notifications.ps1",
+            "ABSO-Settings.ps1",
+            "ABSO-StartupState.ps1",
+            "ABSO-QuickPanel.ps1"
+        )) {
+            $modulePath = Join-Path $script:ScriptDir $moduleName
+            if (-not (Test-Path -LiteralPath $modulePath)) { continue }
+            try {
+                $moduleHashes[$moduleName] = [ordered]@{
+                    path = $modulePath
+                    hash_sha256 = (Get-FileHash -Algorithm SHA256 -LiteralPath $modulePath -ErrorAction Stop).Hash.ToLowerInvariant()
+                    last_write_utc = (Get-Item -LiteralPath $modulePath -ErrorAction Stop).LastWriteTimeUtc.ToString("o")
+                }
+            } catch {}
+        }
+
         $payload = [ordered]@{
             version = $script:AppVersion
             pid = $PID
@@ -1187,9 +1722,10 @@ function Write-TrayRuntimeMarker {
             script_path = $scriptPath
             script_hash_sha256 = $scriptHash
             script_last_write_utc = $scriptLastWrite
+            module_hashes = $moduleHashes
             backend_command = Get-AbsoBackendCommandLine -CommandArgs @("--version")
         }
-        $jsonText = $payload | ConvertTo-Json -Depth 4
+        $jsonText = $payload | ConvertTo-Json -Depth 6
         [System.IO.File]::WriteAllText($markerPath, $jsonText, $script:LogUtf8NoBom)
         Write-TrayLog "Tray runtime marker written: $markerPath"
     }
@@ -1402,11 +1938,23 @@ $script:FallbackProfiles = [ordered]@{
     }
 }
 
+foreach ($fallbackProfile in @($script:FallbackProfiles.Values)) {
+    if (-not $fallbackProfile) { continue }
+    foreach ($copyField in @("Name", "Sub", "Desc", "GroupName", "Variant")) {
+        if ($fallbackProfile.ContainsKey($copyField)) {
+            $fallbackProfile[$copyField] = Format-TrayDisplayCopy -Text "$($fallbackProfile[$copyField])"
+        }
+    }
+}
+
 $script:Profiles = [ordered]@{}
 foreach ($id in $script:FallbackProfiles.Keys) {
     $script:Profiles[$id] = $script:FallbackProfiles[$id]
 }
 $script:ProfileCatalogCacheFile = Join-Path $script:ScriptDir "profile-catalog-cache.json"
+$script:ProfileCatalogLastSource = $null
+$script:ProfileCatalogLastCount = 0
+$script:ProfileCatalogUsedFallback = $false
 
 function Get-CategoryFromOptimizationTarget {
     param([string]$OptimizationTarget)
@@ -1472,8 +2020,10 @@ function Convert-CatalogEntriesToProfileMap {
             $null
         }
 
-        $name = if ($entry.display_name) { "$($entry.display_name)" } elseif ($fallback) { "$($fallback.Name)" } else { $id }
-        $sub = if ($entry.tray_subtitle) { "$($entry.tray_subtitle)" } elseif ($fallback) { "$($fallback.Sub)" } else { "Profile" }
+        $rawName = if ($entry.display_name) { "$($entry.display_name)" } elseif ($fallback) { "$($fallback.Name)" } else { $id }
+        $rawSub = if ($entry.tray_subtitle) { "$($entry.tray_subtitle)" } elseif ($fallback) { "$($fallback.Sub)" } else { "Profile" }
+        $name = Format-TrayDisplayCopy -Text $rawName
+        $sub = Format-TrayDisplayCopy -Text $rawSub
         $cat = if ($entry.tray_category) {
             "$($entry.tray_category)"
         }
@@ -1484,7 +2034,7 @@ function Convert-CatalogEntriesToProfileMap {
             Get-CategoryFromOptimizationTarget -OptimizationTarget "$($entry.optimization_target)"
         }
         $cat = Normalize-TrayCategory -Category $cat
-        $desc = if ($entry.tray_description) {
+        $rawDesc = if ($entry.tray_description) {
             "$($entry.tray_description)"
         }
         elseif ($entry.description) {
@@ -1532,20 +2082,22 @@ function Convert-CatalogEntriesToProfileMap {
         } else {
             $id
         }
-        $groupName = if ($entry.tray_group_name) {
+        $rawGroupName = if ($entry.tray_group_name) {
             "$($entry.tray_group_name)"
         } elseif ($fallback -and $fallback.GroupName) {
             "$($fallback.GroupName)"
         } else {
             $name
         }
-        $variant = if ($entry.tray_variant) {
+        $groupName = Format-TrayDisplayCopy -Text $rawGroupName
+        $rawVariant = if ($entry.tray_variant) {
             "$($entry.tray_variant)"
         } elseif ($fallback -and $fallback.Variant) {
             "$($fallback.Variant)"
         } else {
             $name
         }
+        $variant = Format-TrayDisplayCopy -Text $rawVariant
         $rank = if ($null -ne $entry.tray_rank) {
             try { [int]$entry.tray_rank } catch { 100 }
         } elseif ($fallback -and $fallback.Rank) {
@@ -1588,6 +2140,16 @@ function Convert-CatalogEntriesToProfileMap {
             try { $requiresOverlayFree = [bool]$entry.requires_overlay_free_path } catch {}
         }
 
+        $keepAwakeWhileGaming = $false
+        if ($null -ne $entry.keep_awake_while_gaming) {
+            try { $keepAwakeWhileGaming = [bool]$entry.keep_awake_while_gaming } catch {}
+        }
+
+        $isOnlineProfile = $false
+        if ($null -ne $entry.is_online_profile) {
+            try { $isOnlineProfile = [bool]$entry.is_online_profile } catch {}
+        }
+
         $profiles[$id] = @{
             Name                  = $name
             Sub                   = $sub
@@ -1604,6 +2166,8 @@ function Convert-CatalogEntriesToProfileMap {
             KillsetAlwaysSafe     = $alwaysSafe
             KillsetOptIn          = $optIn
             RequiresOverlayFree   = $requiresOverlayFree
+            KeepAwakeWhileGaming  = $keepAwakeWhileGaming
+            IsOnline              = $isOnlineProfile
         }
     }
 
@@ -1660,7 +2224,7 @@ function Write-ProfileCatalogCache {
     )
 
     if (-not $script:ProfileCatalogCacheFile -or -not $Entries -or $Entries.Count -eq 0) {
-        return
+        return $false
     }
 
     # Preserve existing aliases when caller didn't supply a fresh map.
@@ -1693,7 +2257,7 @@ function Write-ProfileCatalogCache {
 
             if ($existingProfilesJson -eq $newProfilesJson -and $existingAliasesJson -eq $newAliasesJson) {
                 Write-TrayLog "Profile catalog cache unchanged; skipping write"
-                return
+                return $false
             }
         }
 
@@ -1710,10 +2274,12 @@ function Write-ProfileCatalogCache {
         # Use .NET WriteAllText to avoid UTF-8 BOM (PowerShell 5.1 Set-Content adds BOM)
         $jsonText = $payload | ConvertTo-Json -Depth 8
         [System.IO.File]::WriteAllText($script:ProfileCatalogCacheFile, $jsonText, [System.Text.UTF8Encoding]::new($false))
+        return $true
     }
     catch {
         Write-TrayLog "Profile catalog cache write failed: $($_.Exception.Message)" -Level "WARN"
     }
+    return $false
 }
 
 function Resolve-ProfileAlias {
@@ -1845,6 +2411,8 @@ function Fetch-ProfileAliasMapFromCli {
         $proc = Start-Process -FilePath $script:PythonExe -ArgumentList (Get-AbsoBackendArgs -CommandArgs @("profile-aliases", "--json")) `
             -NoNewWindow -PassThru -WorkingDirectory $script:ProjectRoot `
             -RedirectStandardOutput $tempFile -RedirectStandardError $errFile
+        # PS 5.1: cache the handle now or .ExitCode reads $null after exit.
+        if ($proc) { $null = $proc.Handle }
         # WaitForExit(timeout) returns Boolean; [void] prevents it from polluting
         # the function's output stream (which would turn the returned hashtable
         # into a 2-element Object[] array).
@@ -1904,6 +2472,8 @@ function Invoke-CliCatalogRefresh {
         $proc = Start-Process -FilePath $script:PythonExe -ArgumentList (Get-AbsoBackendArgs -CommandArgs @("profiles", "--json")) `
             -NoNewWindow -PassThru -WorkingDirectory $script:ProjectRoot `
             -RedirectStandardOutput $tempFile -RedirectStandardError $errFile
+        # PS 5.1: cache the handle now or .ExitCode reads $null after exit.
+        if ($proc) { $null = $proc.Handle }
 
         $proc.WaitForExit(15000)
         if (-not $proc.HasExited) {
@@ -1989,9 +2559,14 @@ function Start-BackgroundCatalogRefresh {
                 $entries = $result.Entries
                 $aliasMap = $result.AliasMap
                 if ($entries -and $entries.Count -gt 0) {
-                    Write-ProfileCatalogCache -Entries $entries -Aliases $aliasMap
+                    $wroteCache = [bool](Write-ProfileCatalogCache -Entries $entries -Aliases $aliasMap)
                     $sw.Stop()
-                    Write-TrayLog "Background catalog refresh wrote cache ($($entries.Count) profiles) in $($sw.ElapsedMilliseconds)ms" -Level "INFO"
+                    if ($wroteCache) {
+                        Write-TrayLog "Background catalog refresh wrote cache ($($entries.Count) profiles) in $($sw.ElapsedMilliseconds)ms" -Level "INFO"
+                    }
+                    else {
+                        Write-TrayLog "Background catalog refresh verified cache current ($($entries.Count) profiles) in $($sw.ElapsedMilliseconds)ms" -Level "INFO"
+                    }
                 } else {
                     Write-TrayLog "Background catalog refresh returned empty - cache unchanged" -Level "WARN"
                 }
@@ -2041,6 +2616,9 @@ function Initialize-ProfilesFromCliCatalog {
     $entries = @()
     $source = "fallback"
     $aliasMap = $null
+    $script:ProfileCatalogLastSource = $null
+    $script:ProfileCatalogLastCount = 0
+    $script:ProfileCatalogUsedFallback = $false
 
     # Primary source: on-disk cache (snappy).
     $cachedEntries = Read-ProfileCatalogCacheEntries
@@ -2062,7 +2640,7 @@ function Initialize-ProfilesFromCliCatalog {
         $aliasMap = $result.AliasMap
         if ($entries.Count -gt 0) {
             $source = "cli (cold)"
-            Write-ProfileCatalogCache -Entries $entries -Aliases $aliasMap
+            $null = Write-ProfileCatalogCache -Entries $entries -Aliases $aliasMap
         }
     }
 
@@ -2077,6 +2655,9 @@ function Initialize-ProfilesFromCliCatalog {
         $resolved = Convert-CatalogEntriesToProfileMap -Entries $entries -FallbackProfiles $fallbackProfiles
         if ($resolved.Count -gt 0) {
             $script:Profiles = $resolved
+            $script:ProfileCatalogLastSource = $source
+            $script:ProfileCatalogLastCount = $resolved.Count
+            $script:ProfileCatalogUsedFallback = $false
             $sw.Stop()
             Write-TrayLog "Profile catalog loaded from $source ($($resolved.Count) profiles, $($script:ProfileAliases.Count) aliases) in $($sw.ElapsedMilliseconds)ms"
             return
@@ -2087,6 +2668,9 @@ function Initialize-ProfilesFromCliCatalog {
 
     # Final source: built-in emergency fallback map in this script
     $script:Profiles = Copy-ProfileMap -Source $fallbackProfiles
+    $script:ProfileCatalogLastSource = "built-in fallback"
+    $script:ProfileCatalogLastCount = $script:Profiles.Count
+    $script:ProfileCatalogUsedFallback = $true
     $sw.Stop()
     Write-TrayLog "Profile catalog using built-in fallback definitions ($($script:Profiles.Count) profiles, $($script:ProfileAliases.Count) aliases) in $($sw.ElapsedMilliseconds)ms" -Level "WARN"
 }
@@ -2172,6 +2756,7 @@ public class DarkThemeRenderer : ToolStripProfessionalRenderer
     private static readonly Color BorderColor = Color.FromArgb(255, 31, 40, 57); // rule-strong
     private static readonly Color AccentGold = Color.FromArgb(255, 0, 245, 212);  // phosphor cyan (key name kept for diff hygiene)
     private static readonly Color AccentGoldDim = Color.FromArgb(60, 0, 245, 212);
+    public static int PulseFrame = 0;
 
     public DarkThemeRenderer() : base(new DarkColorTable()) { }
 
@@ -2260,6 +2845,9 @@ public class DarkThemeRenderer : ToolStripProfessionalRenderer
             if (tag == "__hero_banner__")
             {
                 Color tint = e.Item.ForeColor;
+                double heroWave = (Math.Sin(PulseFrame / 6.0) + 1.0) / 2.0;
+                int heroGlowAlpha = 36 + (int)(heroWave * 28);
+                int heroRingAlpha = 120 + (int)(heroWave * 70);
                 // Full-width gradient background in category color (alpha 20 -> 8)
                 var fullRect = new Rectangle(0, 0, w, h);
                 using (var brush = new LinearGradientBrush(
@@ -2281,20 +2869,68 @@ public class DarkThemeRenderer : ToolStripProfessionalRenderer
                     }
                 }
 
-                // Glowing dot (10px circle with outer glow ring)
-                int dotX = 12;
-                int dotY = (h / 2) - 5;
-                using (var glowBrush = new SolidBrush(Color.FromArgb(35, tint.R, tint.G, tint.B)))
+                Image heroImage = e.Item.Image;
+                bool hasHeroImage = heroImage != null;
+                if (hasHeroImage)
                 {
-                    g.FillEllipse(glowBrush, dotX - 3, dotY - 3, 16, 16);
+                    int medallionSize = Math.Min(32, Math.Max(24, h - 14));
+                    int medallionX = 12;
+                    int medallionY = Math.Max(4, (h - medallionSize) / 2);
+                    using (var glowBrush = new SolidBrush(Color.FromArgb(heroGlowAlpha, tint.R, tint.G, tint.B)))
+                    {
+                        g.FillEllipse(glowBrush, medallionX - 4, medallionY - 4, medallionSize + 8, medallionSize + 8);
+                    }
+                    using (var backingBrush = new LinearGradientBrush(
+                        new Rectangle(medallionX, medallionY, medallionSize, medallionSize),
+                        Color.FromArgb(215, 19, 24, 36),
+                        Color.FromArgb(230, 10, 14, 21),
+                        LinearGradientMode.ForwardDiagonal))
+                    {
+                        g.FillEllipse(backingBrush, medallionX, medallionY, medallionSize, medallionSize);
+                    }
+                    using (var ringPen = new Pen(Color.FromArgb(160, tint.R, tint.G, tint.B), 1.2f))
+                    {
+                        g.DrawEllipse(ringPen, medallionX, medallionY, medallionSize - 1, medallionSize - 1);
+                    }
+                    int orbitStart = (PulseFrame * 9) % 360;
+                    using (var orbitPen = new Pen(Color.FromArgb(heroRingAlpha, tint.R, tint.G, tint.B), 1.45f))
+                    {
+                        orbitPen.StartCap = LineCap.Round;
+                        orbitPen.EndCap = LineCap.Round;
+                        g.DrawArc(orbitPen, medallionX - 2, medallionY - 2, medallionSize + 3, medallionSize + 3, orbitStart, 82);
+                    }
+                    int imageSize = Math.Max(16, medallionSize - 10);
+                    var imageRect = new Rectangle(
+                        medallionX + ((medallionSize - imageSize) / 2),
+                        medallionY + ((medallionSize - imageSize) / 2),
+                        imageSize,
+                        imageSize);
+                    g.DrawImage(heroImage, imageRect);
+                    int sweepX = medallionX + medallionSize + 8 + ((PulseFrame * 6) % Math.Max(1, w - medallionX - medallionSize - 88));
+                    using (var sweepPen = new Pen(Color.FromArgb(32 + (int)(heroWave * 42), tint.R, tint.G, tint.B), 1.1f))
+                    {
+                        sweepPen.StartCap = LineCap.Round;
+                        sweepPen.EndCap = LineCap.Round;
+                        g.DrawLine(sweepPen, sweepX, 6, Math.Min(w - 18, sweepX + 48), 6);
+                    }
                 }
-                using (var dotBrush = new SolidBrush(Color.FromArgb(200, tint.R, tint.G, tint.B)))
+                else
                 {
-                    g.FillEllipse(dotBrush, dotX, dotY, 10, 10);
-                }
-                using (var specBrush = new SolidBrush(Color.FromArgb(80, 255, 255, 255)))
-                {
-                    g.FillEllipse(specBrush, dotX + 2, dotY + 1, 4, 3);
+                    // Fallback glowing dot (10px circle with outer glow ring)
+                    int dotX = 12;
+                    int dotY = (h / 2) - 5;
+                    using (var glowBrush = new SolidBrush(Color.FromArgb(heroGlowAlpha, tint.R, tint.G, tint.B)))
+                    {
+                        g.FillEllipse(glowBrush, dotX - 3, dotY - 3, 16, 16);
+                    }
+                    using (var dotBrush = new SolidBrush(Color.FromArgb(200, tint.R, tint.G, tint.B)))
+                    {
+                        g.FillEllipse(dotBrush, dotX, dotY, 10, 10);
+                    }
+                    using (var specBrush = new SolidBrush(Color.FromArgb(80, 255, 255, 255)))
+                    {
+                        g.FillEllipse(specBrush, dotX + 2, dotY + 1, 4, 3);
+                    }
                 }
 
                 // Render text manually (profile name + subtitle)
@@ -2305,7 +2941,7 @@ public class DarkThemeRenderer : ToolStripProfessionalRenderer
 
                 g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
 
-                int textX = 28;
+                int textX = hasHeroImage ? 54 : 28;
                 // Profile name: editorial serif (Sitka Banner -> Cambria -> Constantia -> Georgia)
                 Color brightTint = Color.FromArgb(255,
                     Math.Min(255, tint.R + 40),
@@ -2332,10 +2968,133 @@ public class DarkThemeRenderer : ToolStripProfessionalRenderer
                 return;
             }
 
-            // --- Section headers: disabled + bold items (category headers) ---
+            // --- Status lane: compact truth chips for the durable tray footer ---
+            if (e.Item.AccessibleName == "__status_bar__")
+            {
+                string chipRaw = e.Item.AccessibleDescription ?? "";
+                Color tint = e.Item.ForeColor;
+                if (chipRaw.Contains("FIX") || chipRaw.Contains("RESTART"))
+                {
+                    tint = Color.FromArgb(255, 255, 187, 80);
+                }
+                else if (chipRaw.Contains("CHECK") || chipRaw.Contains("PREVIEW"))
+                {
+                    tint = Color.FromArgb(255, 89, 218, 255);
+                }
+                else if (chipRaw.Contains("BACKUP"))
+                {
+                    tint = Color.FromArgb(255, 196, 137, 255);
+                }
+                else if (chipRaw.Contains("MIXED"))
+                {
+                    tint = Color.FromArgb(255, 255, 187, 80);
+                }
+                else if (chipRaw.Contains("DISPLAY") || chipRaw.Contains("GPU") || chipRaw.Contains("HZ"))
+                {
+                    tint = Color.FromArgb(255, 89, 218, 255);
+                }
+                else if (chipRaw.Contains("NO-DATA"))
+                {
+                    tint = Color.FromArgb(255, 100, 100, 110);
+                }
+
+                double statusWave = (Math.Sin(PulseFrame / 5.5) + 1.0) / 2.0;
+                int fillAlpha = 14 + (int)(statusWave * 10);
+                int edgeAlpha = 28 + (int)(statusWave * 28);
+                if (rect.Width > 0 && rect.Height > 0)
+                {
+                    using (var brush = new LinearGradientBrush(
+                        rect,
+                        Color.FromArgb(fillAlpha, tint.R, tint.G, tint.B),
+                        Color.FromArgb(5, tint.R, tint.G, tint.B),
+                        LinearGradientMode.Horizontal))
+                    {
+                        FillRoundRect(g, brush, rect, 4);
+                    }
+                    using (var pen = new Pen(Color.FromArgb(edgeAlpha, tint.R, tint.G, tint.B), 1f))
+                    {
+                        DrawRoundRect(g, pen, rect, 4);
+                    }
+
+                    int railX = rect.X + 5;
+                    int railH = Math.Max(4, rect.Height - 9);
+                    using (var railBrush = new LinearGradientBrush(
+                        new Rectangle(railX, rect.Y + 4, 3, railH),
+                        Color.FromArgb(45, tint.R, tint.G, tint.B),
+                        Color.FromArgb(170, tint.R, tint.G, tint.B),
+                        LinearGradientMode.Vertical))
+                    {
+                        FillRoundRect(g, railBrush, new Rectangle(railX, rect.Y + 4, 3, railH), 1);
+                    }
+
+                    int sweepWidth = Math.Max(34, Math.Min(76, rect.Width / 3));
+                    int sweepTravel = Math.Max(1, rect.Width - sweepWidth - 20);
+                    int sweepX = rect.X + 12 + ((PulseFrame * 5) % sweepTravel);
+                    using (var sweepPen = new Pen(Color.FromArgb(32 + (int)(statusWave * 36), tint.R, tint.G, tint.B), 1.0f))
+                    {
+                        sweepPen.StartCap = LineCap.Round;
+                        sweepPen.EndCap = LineCap.Round;
+                        g.DrawLine(sweepPen, sweepX, rect.Y + 2, Math.Min(rect.Right - 9, sweepX + sweepWidth), rect.Y + 2);
+                    }
+                }
+                return;
+            }
+
+            // --- Top-level flyout commands: compact animated launcher pills ---
+            if (e.Item.AccessibleName == "__flyout_command__")
+            {
+                Color tint = e.Item.ForeColor;
+                double wave = (Math.Sin(PulseFrame / 5.0) + 1.0) / 2.0;
+                int fillAlpha = 22 + (int)(wave * 12);
+                int edgeAlpha = 42 + (int)(wave * 38);
+
+                if (rect.Width > 0 && rect.Height > 0)
+                {
+                    using (var brush = new LinearGradientBrush(
+                        rect,
+                        Color.FromArgb(fillAlpha, tint.R, tint.G, tint.B),
+                        Color.FromArgb(8, tint.R, tint.G, tint.B),
+                        LinearGradientMode.Horizontal))
+                    {
+                        FillRoundRect(g, brush, rect, 5);
+                    }
+                    using (var pen = new Pen(Color.FromArgb(edgeAlpha, tint.R, tint.G, tint.B), 1f))
+                    {
+                        DrawRoundRect(g, pen, rect, 5);
+                    }
+
+                    int railX = rect.X + 5;
+                    int railY = rect.Y + 5;
+                    int railH = Math.Max(4, rect.Height - 10);
+                    using (var railBrush = new LinearGradientBrush(
+                        new Rectangle(railX, railY, 3, railH),
+                        Color.FromArgb(60, tint.R, tint.G, tint.B),
+                        Color.FromArgb(210, tint.R, tint.G, tint.B),
+                        LinearGradientMode.Vertical))
+                    {
+                        FillRoundRect(g, railBrush, new Rectangle(railX, railY, 3, railH), 1);
+                    }
+
+                    int sweepWidth = Math.Max(34, Math.Min(70, rect.Width / 3));
+                    int sweepTravel = Math.Max(1, rect.Width - sweepWidth - 24);
+                    int sweepX = rect.X + 14 + ((PulseFrame * 5) % sweepTravel);
+                    using (var sweepPen = new Pen(Color.FromArgb(44 + (int)(wave * 44), tint.R, tint.G, tint.B), 1.0f))
+                    {
+                        g.DrawLine(sweepPen, sweepX, rect.Y + 2, Math.Min(rect.Right - 10, sweepX + sweepWidth), rect.Y + 2);
+                    }
+                }
+
+                using (var brush = new SolidBrush(Color.FromArgb(18 + (int)(wave * 14), tint.R, tint.G, tint.B)))
+                {
+                    g.FillEllipse(brush, 2, rect.Y - 2, 28, rect.Height + 4);
+                }
+            }
+
+            // --- Section headers: disabled + bold items (section/category bands) ---
             if (!e.Item.Enabled && e.Item.Font != null && e.Item.Font.Bold)
             {
                 Color tint = e.Item.ForeColor;
+                bool isSectionHeader = e.Item.AccessibleName == "__section_header__";
 
                 // Gradient background: category color alpha 18 -> 0
                 using (var brush = new LinearGradientBrush(
@@ -2353,7 +3112,67 @@ public class DarkThemeRenderer : ToolStripProfessionalRenderer
                     int lineY = h - 1;
                     g.DrawLine(pen, 28, lineY, w - 8, lineY);
                 }
+
+                if (isSectionHeader && w > 80)
+                {
+                    double wave = (Math.Sin(PulseFrame / 7.0) + 1.0) / 2.0;
+                    int railAlpha = 46 + (int)(wave * 48);
+                    using (var railPen = new Pen(Color.FromArgb(railAlpha, tint.R, tint.G, tint.B), 1.2f))
+                    {
+                        railPen.StartCap = LineCap.Round;
+                        railPen.EndCap = LineCap.Round;
+                        g.DrawLine(railPen, 34, 3, Math.Min(w - 16, 78), 3);
+                    }
+
+                    int sweepWidth = Math.Max(28, Math.Min(72, w / 4));
+                    int sweepTravel = Math.Max(1, w - sweepWidth - 58);
+                    int sweepX = 34 + ((PulseFrame * 3) % sweepTravel);
+                    using (var sweepPen = new Pen(Color.FromArgb(36 + (int)(wave * 34), tint.R, tint.G, tint.B), 1f))
+                    {
+                        g.DrawLine(sweepPen, sweepX, h - 3, Math.Min(w - 12, sweepX + sweepWidth), h - 3);
+                    }
+                }
                 return;
+            }
+
+            var profileMenuItem = e.Item as ToolStripMenuItem;
+            bool isActiveProfileRow = e.Item.AccessibleName == "__profile_menu_item__" &&
+                profileMenuItem != null && profileMenuItem.Checked;
+            if (isActiveProfileRow)
+            {
+                Color tint = e.Item.ForeColor;
+                double wave = (Math.Sin(PulseFrame / 4.0) + 1.0) / 2.0;
+                int fillAlpha = 24 + (int)(wave * 18);
+                int ringAlpha = 52 + (int)(wave * 58);
+
+                if (rect.Width > 0 && rect.Height > 0)
+                {
+                    using (var brush = new LinearGradientBrush(
+                        rect,
+                        Color.FromArgb(fillAlpha, tint.R, tint.G, tint.B),
+                        Color.FromArgb(10, tint.R, tint.G, tint.B),
+                        LinearGradientMode.Horizontal))
+                    {
+                        FillRoundRect(g, brush, rect, 5);
+                    }
+                    using (var pen = new Pen(Color.FromArgb(ringAlpha, tint.R, tint.G, tint.B), 1f))
+                    {
+                        DrawRoundRect(g, pen, rect, 5);
+                    }
+
+                    int sweepWidth = Math.Max(36, Math.Min(84, rect.Width / 3));
+                    int sweepTravel = Math.Max(1, rect.Width - sweepWidth - 18);
+                    int sweepX = rect.X + 9 + ((PulseFrame * 7) % sweepTravel);
+                    using (var sweepPen = new Pen(Color.FromArgb(80 + (int)(wave * 85), tint.R, tint.G, tint.B), 1.25f))
+                    {
+                        g.DrawLine(sweepPen, sweepX, rect.Y + 2, Math.Min(rect.Right - 9, sweepX + sweepWidth), rect.Y + 2);
+                    }
+                }
+
+                using (var brush = new SolidBrush(Color.FromArgb(30 + (int)(wave * 25), tint.R, tint.G, tint.B)))
+                {
+                    g.FillEllipse(brush, 2, rect.Y - 2, 28, rect.Height + 4);
+                }
             }
 
             if (e.Item.Selected && e.Item.Enabled)
@@ -2519,6 +3338,413 @@ public class DarkThemeRenderer : ToolStripProfessionalRenderer
         var tag = e.Item.Tag as string;
         if (tag == "__hero_banner__") return;
 
+        if (e.Item.AccessibleName == "__status_bar__")
+        {
+            try
+            {
+                Rectangle textRect = e.TextRectangle;
+                string label = (e.Item.Text ?? "").Trim();
+                string chipRaw = e.Item.AccessibleDescription ?? "";
+                string[] chips = chipRaw.Split(new char[] { '|' }, StringSplitOptions.RemoveEmptyEntries);
+                int chipRight = e.Item.Width - 24;
+
+                using (var chipFont = ResolveEyebrowFont(6.6f))
+                using (var chipTextBrush = new SolidBrush(Color.FromArgb(226, 232, 234, 240)))
+                using (var chipFormat = new StringFormat())
+                {
+                    chipFormat.Alignment = StringAlignment.Center;
+                    chipFormat.LineAlignment = StringAlignment.Center;
+                    chipFormat.Trimming = StringTrimming.EllipsisCharacter;
+                    chipFormat.FormatFlags = StringFormatFlags.NoWrap;
+
+                    for (int i = chips.Length - 1; i >= 0; i--)
+                    {
+                        string chip = chips[i].Trim();
+                        if (string.IsNullOrWhiteSpace(chip)) continue;
+                        SizeF chipSize = e.Graphics.MeasureString(chip, chipFont);
+                        int chipWidth = Math.Max(34, Math.Min(66, (int)Math.Ceiling(chipSize.Width) + 12));
+                        int chipX = chipRight - chipWidth;
+                        if (chipX <= textRect.X + 82) continue;
+
+                        Rectangle chipRect = new Rectangle(chipX, Math.Max(3, (e.Item.Height - 15) / 2), chipWidth, 15);
+                        Color tint = e.Item.ForeColor;
+                        if (chip == "FIX" || chip == "RESTART")
+                        {
+                            tint = Color.FromArgb(255, 255, 187, 80);
+                        }
+                        else if (chip == "CHECK" || chip == "PREVIEW")
+                        {
+                            tint = Color.FromArgb(255, 89, 218, 255);
+                        }
+                        else if (chip == "BACKUP")
+                        {
+                            tint = Color.FromArgb(255, 196, 137, 255);
+                        }
+                        else if (chip == "MIXED")
+                        {
+                            tint = Color.FromArgb(255, 255, 187, 80);
+                        }
+                        else if (chip == "DISPLAY" || chip == "GPU" || chip == "HZ")
+                        {
+                            tint = Color.FromArgb(255, 89, 218, 255);
+                        }
+                        else if (chip == "NO-DATA")
+                        {
+                            tint = Color.FromArgb(255, 100, 100, 110);
+                        }
+
+                        using (var chipBrush = new LinearGradientBrush(
+                            chipRect,
+                            Color.FromArgb(50, tint.R, tint.G, tint.B),
+                            Color.FromArgb(15, tint.R, tint.G, tint.B),
+                            LinearGradientMode.Horizontal))
+                        {
+                            FillRoundRect(e.Graphics, chipBrush, chipRect, 4);
+                        }
+                        using (var chipPen = new Pen(Color.FromArgb(82, tint.R, tint.G, tint.B), 1f))
+                        {
+                            DrawRoundRect(e.Graphics, chipPen, chipRect, 4);
+                        }
+                        e.Graphics.DrawString(chip, chipFont, chipTextBrush, chipRect, chipFormat);
+                        chipRight = chipX - 4;
+                    }
+                }
+
+                Rectangle labelRect = new Rectangle(
+                    textRect.X,
+                    textRect.Y,
+                    Math.Max(24, chipRight - textRect.X - 8),
+                    textRect.Height);
+                using (var format = new StringFormat())
+                using (var brush = new SolidBrush(Color.FromArgb(206, e.Item.ForeColor.R, e.Item.ForeColor.G, e.Item.ForeColor.B)))
+                {
+                    format.Trimming = StringTrimming.EllipsisCharacter;
+                    format.FormatFlags = StringFormatFlags.NoWrap;
+                    format.LineAlignment = StringAlignment.Center;
+                    e.Graphics.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
+                    e.Graphics.DrawString(label, e.TextFont, brush, labelRect, format);
+                }
+                return;
+            }
+            catch {}
+        }
+
+        if (e.Item.AccessibleName == "__flyout_command__")
+        {
+            try
+            {
+                Rectangle textRect = e.TextRectangle;
+                int chipRight = e.Item.Width - 24;
+                string chip = (e.Item.AccessibleDescription ?? "").Trim();
+                bool hasChip = !string.IsNullOrWhiteSpace(chip);
+                Rectangle chipRect = Rectangle.Empty;
+
+                if (hasChip)
+                {
+                    using (var chipMeasureFont = ResolveEyebrowFont(6.7f))
+                    {
+                        SizeF chipSize = e.Graphics.MeasureString(chip, chipMeasureFont);
+                        int chipWidth = Math.Max(36, Math.Min(64, (int)Math.Ceiling(chipSize.Width) + 12));
+                        int chipX = chipRight - chipWidth;
+                        if (chipX > textRect.X + 68)
+                        {
+                            chipRect = new Rectangle(chipX, Math.Max(3, (e.Item.Height - 15) / 2), chipWidth, 15);
+                        }
+                    }
+                }
+
+                Rectangle labelRect = chipRect.IsEmpty
+                    ? textRect
+                    : new Rectangle(textRect.X, textRect.Y, Math.Max(18, chipRect.X - textRect.X - 8), textRect.Height);
+                using (var labelFormat = new StringFormat())
+                using (var labelBrush = new SolidBrush(e.Item.ForeColor))
+                using (var labelFont = ResolveEyebrowFont(7.6f))
+                {
+                    labelFormat.Trimming = StringTrimming.EllipsisCharacter;
+                    labelFormat.FormatFlags = StringFormatFlags.NoWrap;
+                    labelFormat.LineAlignment = StringAlignment.Center;
+                    e.Graphics.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
+                    e.Graphics.DrawString((e.Text ?? "").Trim().ToUpperInvariant(), labelFont, labelBrush, labelRect, labelFormat);
+                }
+
+                if (!chipRect.IsEmpty)
+                {
+                    Color tint = e.Item.ForeColor;
+                    using (var chipBrush = new LinearGradientBrush(
+                        chipRect,
+                        Color.FromArgb(58, tint.R, tint.G, tint.B),
+                        Color.FromArgb(18, tint.R, tint.G, tint.B),
+                        LinearGradientMode.Horizontal))
+                    {
+                        FillRoundRect(e.Graphics, chipBrush, chipRect, 4);
+                    }
+                    using (var chipPen = new Pen(Color.FromArgb(84, tint.R, tint.G, tint.B), 1f))
+                    {
+                        DrawRoundRect(e.Graphics, chipPen, chipRect, 4);
+                    }
+                    using (var chipFont = ResolveEyebrowFont(6.7f))
+                    using (var chipTextBrush = new SolidBrush(Color.FromArgb(228, 232, 234, 240)))
+                    using (var chipFormat = new StringFormat())
+                    {
+                        chipFormat.Alignment = StringAlignment.Center;
+                        chipFormat.LineAlignment = StringAlignment.Center;
+                        chipFormat.Trimming = StringTrimming.EllipsisCharacter;
+                        chipFormat.FormatFlags = StringFormatFlags.NoWrap;
+                        e.Graphics.DrawString(chip.ToUpperInvariant(), chipFont, chipTextBrush, chipRect, chipFormat);
+                    }
+                }
+                return;
+            }
+            catch {}
+        }
+
+        if (e.Item.AccessibleName == "__category_header__" || e.Item.AccessibleName == "__section_header__")
+        {
+            try
+            {
+                Rectangle textRect = e.TextRectangle;
+                int chipRight = e.Item.Width - 24;
+                string chipRaw = e.Item.AccessibleDescription ?? "";
+                string[] chips = chipRaw.Split(new char[] { '|' }, StringSplitOptions.RemoveEmptyEntries);
+
+                using (var chipFont = ResolveEyebrowFont(6.8f))
+                using (var chipTextBrush = new SolidBrush(Color.FromArgb(225, 232, 234, 240)))
+                using (var chipFormat = new StringFormat())
+                {
+                    chipFormat.Alignment = StringAlignment.Center;
+                    chipFormat.LineAlignment = StringAlignment.Center;
+                    chipFormat.Trimming = StringTrimming.EllipsisCharacter;
+                    chipFormat.FormatFlags = StringFormatFlags.NoWrap;
+
+                    for (int i = chips.Length - 1; i >= 0; i--)
+                    {
+                        string chip = chips[i].Trim();
+                        if (string.IsNullOrWhiteSpace(chip)) continue;
+                        SizeF chipSize = e.Graphics.MeasureString(chip, chipFont);
+                        int chipWidth = Math.Max(38, Math.Min(76, (int)Math.Ceiling(chipSize.Width) + 12));
+                        int chipX = chipRight - chipWidth;
+                        if (chipX <= textRect.X + 68) continue;
+
+                        Rectangle chipRect = new Rectangle(chipX, Math.Max(3, (e.Item.Height - 15) / 2), chipWidth, 15);
+                        Color tint = e.Item.ForeColor;
+                        using (var chipBrush = new LinearGradientBrush(
+                            chipRect,
+                            Color.FromArgb(46, tint.R, tint.G, tint.B),
+                            Color.FromArgb(14, tint.R, tint.G, tint.B),
+                            LinearGradientMode.Horizontal))
+                        {
+                            FillRoundRect(e.Graphics, chipBrush, chipRect, 4);
+                        }
+                        using (var chipPen = new Pen(Color.FromArgb(72, tint.R, tint.G, tint.B), 1f))
+                        {
+                            DrawRoundRect(e.Graphics, chipPen, chipRect, 4);
+                        }
+                        e.Graphics.DrawString(chip, chipFont, chipTextBrush, chipRect, chipFormat);
+                        chipRight = chipX - 4;
+                    }
+                }
+
+                Rectangle labelRect = new Rectangle(
+                    textRect.X,
+                    textRect.Y,
+                    Math.Max(22, chipRight - textRect.X - 8),
+                    textRect.Height);
+                using (var labelFormat = new StringFormat())
+                using (var labelFont = ResolveEyebrowFont(8.0f))
+                using (var labelBrush = new SolidBrush(e.Item.ForeColor))
+                {
+                    labelFormat.Trimming = StringTrimming.EllipsisCharacter;
+                    labelFormat.FormatFlags = StringFormatFlags.NoWrap;
+                    labelFormat.LineAlignment = StringAlignment.Center;
+                    e.Graphics.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
+                    e.Graphics.DrawString((e.Item.Text ?? "").Trim().ToUpperInvariant(), labelFont, labelBrush, labelRect, labelFormat);
+                }
+                return;
+            }
+            catch {}
+        }
+
+        if (e.Item.AccessibleName == "__game_flyout_header__")
+        {
+            try
+            {
+                string rawText = e.Item.Text ?? "";
+                string[] parts = rawText.Split('|');
+                string labelText = parts.Length > 0 ? parts[0].Trim() : rawText.Trim();
+                if (parts.Length > 1 && !string.IsNullOrWhiteSpace(parts[1]))
+                {
+                    labelText = labelText + "  |  " + parts[1].Trim();
+                }
+
+                Rectangle textRect = e.TextRectangle;
+                int chipRight = e.Item.Width - 24;
+                string chipRaw = e.Item.AccessibleDescription ?? "";
+                string[] chips = chipRaw.Split(new char[] { '|' }, StringSplitOptions.RemoveEmptyEntries);
+
+                using (var chipFont = ResolveEyebrowFont(6.8f))
+                using (var chipTextBrush = new SolidBrush(Color.FromArgb(230, 232, 234, 240)))
+                using (var chipFormat = new StringFormat())
+                {
+                    chipFormat.Alignment = StringAlignment.Center;
+                    chipFormat.LineAlignment = StringAlignment.Center;
+                    chipFormat.Trimming = StringTrimming.EllipsisCharacter;
+                    chipFormat.FormatFlags = StringFormatFlags.NoWrap;
+
+                    for (int i = chips.Length - 1; i >= 0; i--)
+                    {
+                        string chip = chips[i].Trim();
+                        if (string.IsNullOrWhiteSpace(chip)) continue;
+                        SizeF chipSize = e.Graphics.MeasureString(chip, chipFont);
+                        int chipWidth = Math.Max(32, Math.Min(68, (int)Math.Ceiling(chipSize.Width) + 12));
+                        int chipX = chipRight - chipWidth;
+                        if (chipX <= textRect.X + 86) continue;
+
+                        Rectangle chipRect = new Rectangle(chipX, Math.Max(3, (e.Item.Height - 15) / 2), chipWidth, 15);
+                        Color tint = e.Item.ForeColor;
+                        using (var chipBrush = new LinearGradientBrush(
+                            chipRect,
+                            Color.FromArgb(50, tint.R, tint.G, tint.B),
+                            Color.FromArgb(16, tint.R, tint.G, tint.B),
+                            LinearGradientMode.Horizontal))
+                        {
+                            FillRoundRect(e.Graphics, chipBrush, chipRect, 4);
+                        }
+                        using (var chipPen = new Pen(Color.FromArgb(80, tint.R, tint.G, tint.B), 1f))
+                        {
+                            DrawRoundRect(e.Graphics, chipPen, chipRect, 4);
+                        }
+                        e.Graphics.DrawString(chip, chipFont, chipTextBrush, chipRect, chipFormat);
+                        chipRight = chipX - 4;
+                    }
+                }
+
+                Rectangle labelRect = new Rectangle(
+                    textRect.X,
+                    textRect.Y,
+                    Math.Max(22, chipRight - textRect.X - 8),
+                    textRect.Height);
+                using (var labelFormat = new StringFormat())
+                using (var labelFont = ResolveEyebrowFont(7.0f))
+                using (var labelBrush = new SolidBrush(e.Item.ForeColor))
+                {
+                    labelFormat.Trimming = StringTrimming.EllipsisCharacter;
+                    labelFormat.FormatFlags = StringFormatFlags.NoWrap;
+                    labelFormat.LineAlignment = StringAlignment.Center;
+                    e.Graphics.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
+                    e.Graphics.DrawString(labelText.ToUpperInvariant(), labelFont, labelBrush, labelRect, labelFormat);
+                }
+                return;
+            }
+            catch {}
+        }
+
+        if (e.Item.AccessibleName == "__profile_menu_item__" || e.Item.AccessibleName == "__backup_menu_item__")
+        {
+            try
+            {
+                string chipRaw = e.Item.AccessibleDescription ?? "";
+                string[] chips = chipRaw.Split(new char[] { '|' }, StringSplitOptions.RemoveEmptyEntries);
+                bool hasChip = chips.Length > 0;
+                Rectangle textRect = e.TextRectangle;
+                int chipRight = e.Item.Width - 24;
+                if (hasChip)
+                {
+                    using (var chipMeasureFont = ResolveEyebrowFont(7.0f))
+                    {
+                        for (int i = chips.Length - 1; i >= 0; i--)
+                        {
+                            string chip = chips[i].Trim();
+                            if (string.IsNullOrWhiteSpace(chip)) continue;
+                            SizeF chipSize = e.Graphics.MeasureString(chip, chipMeasureFont);
+                            int chipWidth = Math.Max(38, Math.Min(66, (int)Math.Ceiling(chipSize.Width) + 14));
+                            int chipX = chipRight - chipWidth;
+                            if (chipX <= textRect.X + 18) continue;
+                            chipRight = chipX - 4;
+                        }
+                    }
+                }
+
+                Rectangle labelRect = hasChip
+                    ? new Rectangle(textRect.X, textRect.Y, Math.Max(18, chipRight - textRect.X - 8), textRect.Height)
+                    : textRect;
+                using (var format = new StringFormat())
+                {
+                    format.Trimming = StringTrimming.EllipsisCharacter;
+                    format.FormatFlags = StringFormatFlags.NoWrap;
+                    format.LineAlignment = StringAlignment.Center;
+                    using (var brush = new SolidBrush(e.TextColor))
+                    {
+                        e.Graphics.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
+                        e.Graphics.DrawString(e.Text, e.TextFont, brush, labelRect, format);
+                    }
+                }
+
+                if (hasChip)
+                {
+                    Color tint = e.Item.ForeColor;
+                    var profileMenuItem = e.Item as ToolStripMenuItem;
+                    bool isActiveProfileChip = profileMenuItem != null && profileMenuItem.Checked;
+                    double chipWave = (Math.Sin(PulseFrame / 4.5) + 1.0) / 2.0;
+                    int chipFillAlpha = isActiveProfileChip ? 72 + (int)(chipWave * 24) : 62;
+                    int chipFadeAlpha = isActiveProfileChip ? 26 + (int)(chipWave * 16) : 22;
+                    int chipEdgeAlpha = isActiveProfileChip ? 105 + (int)(chipWave * 70) : 90;
+                    using (var chipFont = ResolveEyebrowFont(7.0f))
+                    using (var chipTextBrush = new SolidBrush(Color.FromArgb(230, 232, 234, 240)))
+                    using (var chipFormat = new StringFormat())
+                    {
+                        chipFormat.Alignment = StringAlignment.Center;
+                        chipFormat.LineAlignment = StringAlignment.Center;
+                        chipFormat.Trimming = StringTrimming.EllipsisCharacter;
+                        chipFormat.FormatFlags = StringFormatFlags.NoWrap;
+                        chipRight = e.Item.Width - 24;
+                        for (int i = chips.Length - 1; i >= 0; i--)
+                        {
+                            string chip = chips[i].Trim();
+                            if (string.IsNullOrWhiteSpace(chip)) continue;
+                            SizeF chipSize = e.Graphics.MeasureString(chip, chipFont);
+                            int chipWidth = Math.Max(38, Math.Min(66, (int)Math.Ceiling(chipSize.Width) + 14));
+                            int chipX = chipRight - chipWidth;
+                            if (chipX <= textRect.X + 18) continue;
+                            Rectangle chipRect = new Rectangle(
+                                chipX,
+                                Math.Max(3, (e.Item.Height - 15) / 2),
+                                chipWidth,
+                                15);
+
+                            using (var chipBrush = new LinearGradientBrush(
+                                chipRect,
+                                Color.FromArgb(chipFillAlpha, tint.R, tint.G, tint.B),
+                                Color.FromArgb(chipFadeAlpha, tint.R, tint.G, tint.B),
+                                LinearGradientMode.Horizontal))
+                            {
+                                FillRoundRect(e.Graphics, chipBrush, chipRect, 4);
+                            }
+                            using (var chipPen = new Pen(Color.FromArgb(chipEdgeAlpha, tint.R, tint.G, tint.B), 1f))
+                            {
+                                DrawRoundRect(e.Graphics, chipPen, chipRect, 4);
+                            }
+                            if (isActiveProfileChip && chipRect.Width > 26)
+                            {
+                                int sweepWidth = Math.Max(10, Math.Min(22, chipRect.Width / 2));
+                                int sweepTravel = Math.Max(1, chipRect.Width - sweepWidth - 8);
+                                int chipSweepX = chipRect.X + 4 + ((PulseFrame * 4) % sweepTravel);
+                                using (var chipSweepPen = new Pen(Color.FromArgb(68 + (int)(chipWave * 54), 232, 234, 240), 1.0f))
+                                {
+                                    chipSweepPen.StartCap = LineCap.Round;
+                                    chipSweepPen.EndCap = LineCap.Round;
+                                    e.Graphics.DrawLine(chipSweepPen, chipSweepX, chipRect.Y + 2, Math.Min(chipRect.Right - 4, chipSweepX + sweepWidth), chipRect.Y + 2);
+                                }
+                            }
+                            e.Graphics.DrawString(chip, chipFont, chipTextBrush, chipRect, chipFormat);
+                            chipRight = chipX - 4;
+                        }
+                    }
+                }
+                return;
+            }
+            catch {}
+        }
+
         e.Graphics.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
         base.OnRenderItemText(e);
     }
@@ -2643,11 +3869,14 @@ if (-not $script:FontMono) { $script:FontMono = New-Object System.Drawing.Font("
 
 $script:IconState = "Idle"
 $script:ApplyAnimTimer = $null
+$script:TrayMenuPulseTimer = $null
+$script:TrayMenuPulseFrame = 0
 $script:StartupIconHealTimer = $null
 $script:StartupIconHealAttempts = 0
 $script:ProcessGuardTimer = $null
 $script:MenuStateInitialized = $false
 $script:LastRenderedActiveProfile = $null
+$script:AboutForm = $null
 
 function Set-IconSafe {
     <#
@@ -2688,6 +3917,67 @@ function Set-MenuItemImageSafe {
     if ($oldImage -and -not [object]::ReferenceEquals($oldImage, $NewImage)) {
         try { $oldImage.Dispose() } catch {}
     }
+}
+
+function Set-TrayCommandItemVisualState {
+    param(
+        [System.Windows.Forms.ToolStripMenuItem]$Item,
+        [AllowNull()][string]$ChipText,
+        [int]$PaddingRight = 64
+    )
+
+    if (-not $Item) { return }
+
+    $Item.AccessibleName = "__flyout_command__"
+    $Item.AccessibleDescription = if ([string]::IsNullOrWhiteSpace($ChipText)) { "" } else { $ChipText.Trim().ToUpperInvariant() }
+    $Item.Padding = New-Object System.Windows.Forms.Padding(0, 0, $PaddingRight, 0)
+}
+
+function Invoke-TrayMenuPulseInvalidation {
+    try {
+        if ($script:notifyIcon -and $script:notifyIcon.ContextMenuStrip) {
+            $menu = $script:notifyIcon.ContextMenuStrip
+            if (-not $menu.IsDisposed -and $menu.Visible) {
+                $menu.Invalidate()
+            }
+        }
+        foreach ($item in @($script:profileMenuItems)) {
+            if (-not $item -or -not $item.Owner) { continue }
+            if (-not $item.Owner.IsDisposed -and $item.Owner.Visible) {
+                $item.Owner.Invalidate()
+            }
+        }
+    } catch {}
+}
+
+function Stop-TrayMenuPulseTimer {
+    if ($script:TrayMenuPulseTimer) {
+        try { $script:TrayMenuPulseTimer.Stop() } catch {}
+        try { $script:TrayMenuPulseTimer.Dispose() } catch {}
+        $script:TrayMenuPulseTimer = $null
+    }
+    $script:TrayMenuPulseFrame = 0
+    if ("DarkThemeRenderer" -as [type]) {
+        try { [DarkThemeRenderer]::PulseFrame = 0 } catch {}
+    }
+}
+
+function Start-TrayMenuPulseTimer {
+    Stop-TrayMenuPulseTimer
+    $script:TrayMenuPulseTimer = New-Object System.Windows.Forms.Timer
+    $script:TrayMenuPulseTimer.Interval = 90
+    $script:TrayMenuPulseTimer.Add_Tick({
+        try {
+            $script:TrayMenuPulseFrame = ($script:TrayMenuPulseFrame + 1) % 120
+            if ("DarkThemeRenderer" -as [type]) {
+                [DarkThemeRenderer]::PulseFrame = $script:TrayMenuPulseFrame
+            }
+            Invoke-TrayMenuPulseInvalidation
+        } catch {
+            Stop-TrayMenuPulseTimer
+        }
+    })
+    $script:TrayMenuPulseTimer.Start()
 }
 
 function Set-IconState {
@@ -2841,23 +4131,29 @@ function Apply-Profile {
     $needsNoSyncOsdReminder = Test-NeedsNoSyncOsdReminder -FromProfileId $previousProfileId -ToProfileId $ProfileId
 
     if (-not $profile) {
-        Write-TrayLog "Profile not found: $ProfileId" -Level "ERROR"
+        Write-TrayLog "Profile missing from current profile list: $ProfileId" -Level "WARN"
         Play-FailSound
-        Set-IconState -State "Error"
-        Show-Notification -Title "A.B.S.O." -Message "Profile not found: $ProfileId" -Type "Error"
+        Set-IconState -State "Warning"
+        $missingProfileVisual = Get-TrayProfileToastVisualArgs -ProfileId $ProfileId -Profile $null
+        $missingProfileTitle = Get-TrayProfileDisplayName -ProfileId $ProfileId
+        Show-Notification @missingProfileVisual -Title $missingProfileTitle -Message "Profile missing from current list." -Type "Warning" -MetaText $ProfileId
+        Set-TrayLastAction -Message "Profile missing from current list: $missingProfileTitle"
+        Update-MenuState
         return
     }
 
     if ($sameActiveProfile -and (Complete-SameActiveProfileSelectionIfHandled -ProfileId $ProfileId -Profile $profile)) {
         return
     }
+    $profileTitle = Get-TrayProfileObjectDisplayName -Profile $profile -Fallback $ProfileId
 
     # Show applying state
     Set-IconState -State "Applying"
-    $script:notifyIcon.Text = "A.B.S.O. - Applying..."
+    Set-TrayOperationTooltipText -Text "A.B.S.O. - Applying..."
 
     # Show progress overlay
-    Show-ProgressOverlay -Title "Applying $($profile.Name)" -StepText "Initializing..."
+    $progressVisual = Get-TrayProfileToastVisualArgs -ProfileId $ProfileId -Profile $profile
+    Show-ProgressOverlay @progressVisual -Title "Applying $profileTitle" -StepText "Initializing..."
 
     try {
         $tempFile = [System.IO.Path]::GetTempFileName()
@@ -2877,6 +4173,8 @@ function Apply-Profile {
         $proc = Start-Process -FilePath $script:PythonExe -ArgumentList $applyArgs `
             -NoNewWindow -PassThru -WorkingDirectory $script:ProjectRoot `
             -RedirectStandardOutput $tempFile -RedirectStandardError $errFile
+        # PS 5.1: cache the handle now or .ExitCode reads $null after exit.
+        if ($proc) { $null = $proc.Handle }
 
         # Poll instead of -Wait so the UI thread message pump stays alive
         $timeout = (Get-Date).AddSeconds(120)
@@ -2891,7 +4189,11 @@ function Apply-Profile {
             Close-ProgressOverlay
             Play-FailSound
             Set-IconState -State "Error"
-            Show-Notification -Title "A.B.S.O." -Message "Apply timed out after 120s" -Type "Error"
+            $timeoutVisual = Get-TrayProfileToastVisualArgs -ProfileId $ProfileId -Profile $profile
+            $timeoutTitle = $profileTitle
+            Show-Notification @timeoutVisual -Title $timeoutTitle -Message "Apply timed out after 120s" -Type "Error" -MetaText $ProfileId
+            Set-TrayLastAction -Message "Apply timed out after 120s"
+            Update-MenuState
             Remove-Item $tempFile -Force -ErrorAction SilentlyContinue
             Remove-Item $errFile -Force -ErrorAction SilentlyContinue
             return
@@ -2947,9 +4249,24 @@ function Apply-Profile {
             if ($json.data -and $null -ne $json.data.fallback_applied) {
                 $fallbackApplied = [bool]$json.data.fallback_applied
             }
-            $appliedProfile = $profile
+            $appliedProfile = $null
             if ($script:Profiles.Contains($appliedProfileId)) {
                 $appliedProfile = $script:Profiles[$appliedProfileId]
+            }
+            elseif ($appliedProfileId -eq $ProfileId -and $profile) {
+                $appliedProfile = $profile
+            }
+            $appliedDisplayName = if ($appliedProfile -and -not [string]::IsNullOrWhiteSpace("$($appliedProfile.Name)")) {
+                Format-TrayDisplayCopy -Text "$($appliedProfile.Name)"
+            }
+            else {
+                Get-TrayProfileDisplayName -ProfileId $appliedProfileId
+            }
+            $appliedSub = if ($appliedProfile -and -not [string]::IsNullOrWhiteSpace("$($appliedProfile.Sub)")) {
+                Format-TrayDisplayCopy -Text "$($appliedProfile.Sub)"
+            }
+            else {
+                ""
             }
             $toastMetaText = $appliedProfileId
             if ($fallbackApplied -and $requestedProfileId -ne $appliedProfileId) {
@@ -2968,16 +4285,13 @@ function Apply-Profile {
             # into a single grammatical sentence with a clear separator so the
             # downstream sentence-trimmer in _Derive-ToastBody can't accidentally
             # truncate a multi-caveat message at the first period.
-            $toastTitle = $appliedProfile.Name
-            $msg = "Applied. $($appliedProfile.Sub)."
+            $toastTitle = $appliedDisplayName
+            $msg = if ([string]::IsNullOrWhiteSpace($appliedSub)) { "Applied." } else { "Applied. $appliedSub." }
             $extras = @()
-            if ($json.data.requires_reboot) { $extras += "Restart required to take full effect" }
+            if ($json.data.requires_reboot) { $extras += "Windows restart required to take full effect" }
             if ($fallbackApplied -and $requestedProfileId -ne $appliedProfileId) {
-                $requestedDisplayName = $requestedProfileId
-                if ($script:Profiles.Contains($requestedProfileId)) {
-                    $requestedDisplayName = $script:Profiles[$requestedProfileId].Name
-                }
-                $extras += "Requested '$requestedDisplayName' was unsafe for this display; used safe fallback '$($appliedProfile.Name)'"
+                $requestedDisplayName = Get-TrayProfileDisplayName -ProfileId $requestedProfileId
+                $extras += "Requested '$requestedDisplayName' was unsafe for this display; used safe fallback '$appliedDisplayName'"
             }
             if ($applyWarnings.Count -gt 0) {
                 $label = if ($applySummaryLevel -eq "caution") { "Caution" } else { "Warning" }
@@ -3006,6 +4320,10 @@ function Apply-Profile {
             }
             # Trim trailing whitespace/punctuation drift
             $msg = $msg.Trim()
+            $toastProfileVisual = Get-TrayProfileToastVisualArgs `
+                -ProfileId $appliedProfileId `
+                -Profile $appliedProfile `
+                -ActiveBadge
 
             if ($applySummaryLevel -eq "warning") {
                 Write-TrayLog "Profile committed with warnings: $appliedProfileId" -Level "WARN"
@@ -3083,7 +4401,7 @@ function Apply-Profile {
                 Play-VrrWarningSound
                 Write-TrayLog "No-Sync OSD reminder shown for transition: $previousProfileId -> $appliedProfileId"
                 Play-ApplySuccessIconAnimation
-                Show-ThemedToast -Title $toastTitle -Message $msg -Type "Warning" -Duration 6000 -MetaText $toastMetaText -BypassDedup
+                Show-TrayToast @toastProfileVisual -Title $toastTitle -Message $msg -Type "Warning" -Duration 6000 -MetaText $toastMetaText -BypassDedup
             }
             elseif ($needsNoSyncOsdReminder -and $ddciDisabled) {
                 # ABSO already disabled monitor Adaptive Sync via DDC/CI — give the user
@@ -3092,7 +4410,7 @@ function Apply-Profile {
                 Write-TrayLog "Monitor Adaptive Sync auto-disabled via DDC/CI for: $previousProfileId -> $appliedProfileId"
                 Play-SuccessSound
                 Play-ApplySuccessIconAnimation
-                Show-ThemedToast -Title $toastTitle -Message $msg -Type "Success" -Duration 5000 -MetaText $toastMetaText -BypassDedup
+                Show-TrayToast @toastProfileVisual -Title $toastTitle -Message $msg -Type "Success" -Duration 5000 -MetaText $toastMetaText -BypassDedup
             }
             elseif ($syncTransition -eq "to_sync" -and $ddciEnabled) {
                 # Symmetric feedback: tell the user ABSO re-enabled their firmware Adaptive
@@ -3101,14 +4419,14 @@ function Apply-Profile {
                 Write-TrayLog "Monitor Adaptive Sync auto-enabled via DDC/CI for: $previousProfileId -> $appliedProfileId"
                 Play-SuccessSound
                 Play-ApplySuccessIconAnimation
-                Show-ThemedToast -Title $toastTitle -Message $msg -Type "Success" -Duration 5000 -MetaText $toastMetaText -BypassDedup
+                Show-TrayToast @toastProfileVisual -Title $toastTitle -Message $msg -Type "Success" -Duration 5000 -MetaText $toastMetaText -BypassDedup
             }
             elseif ($applySummaryLevel -eq "warning") {
                 # Apply succeeded but a real (non-soft) warning was raised. Use the warning
                 # sound + amber toast so the user actually realizes something needs attention.
                 Play-VrrWarningSound
                 Play-ApplySuccessIconAnimation
-                Show-ThemedToast -Title $toastTitle -Message $msg -Type "Warning" -Duration 6000 -MetaText $toastMetaText -BypassDedup
+                Show-TrayToast @toastProfileVisual -Title $toastTitle -Message $msg -Type "Warning" -Duration 6000 -MetaText $toastMetaText -BypassDedup
             }
             elseif ($applySummaryLevel -eq "caution") {
                 # Soft environmental warnings (mixed refresh, MPO glitch risk, etc.).
@@ -3116,39 +4434,44 @@ function Apply-Profile {
                 # should still notice the caveat without it shouting "error".
                 Play-SuccessSound
                 Play-ApplySuccessIconAnimation
-                Show-ThemedToast -Title $toastTitle -Message $msg -Type "Warning" -Duration 6000 -MetaText $toastMetaText -BypassDedup
+                Show-TrayToast @toastProfileVisual -Title $toastTitle -Message $msg -Type "Warning" -Duration 6000 -MetaText $toastMetaText -BypassDedup
             }
             elseif ($applyNotices.Count -gt 0) {
                 Play-SuccessSound
                 Play-ApplySuccessIconAnimation
-                Show-ThemedToast -Title $toastTitle -Message $msg -Type "Success" -Duration 6000 -MetaText $toastMetaText -BypassDedup
+                Show-TrayToast @toastProfileVisual -Title $toastTitle -Message $msg -Type "Success" -Duration 6000 -MetaText $toastMetaText -BypassDedup
             }
             else {
                 Play-SuccessSound
                 Play-ApplySuccessIconAnimation
-                Show-ThemedToast -Title $toastTitle -Message $msg -Type "Success" -MetaText $toastMetaText -BypassDedup
+                Show-TrayToast @toastProfileVisual -Title $toastTitle -Message $msg -Type "Success" -MetaText $toastMetaText -BypassDedup
             }
 
             $script:activeProfile = $appliedProfileId
+            Set-ActiveProfileVerificationSeedFromApplyData -Data $json.data
             $script:LastAction = if ($applySummaryLevel -eq "warning") {
-                "Applied w/ warnings: $($appliedProfile.Name)"
+                "Applied w/ warnings: $appliedDisplayName"
             }
             elseif ($applySummaryLevel -eq "caution") {
-                "Applied w/ cautions: $($appliedProfile.Name)"
+                "Applied w/ cautions: $appliedDisplayName"
             }
             elseif ($applyNotices.Count -gt 0) {
-                "Applied w/ notes: $($appliedProfile.Name)"
+                "Applied w/ notes: $appliedDisplayName"
             }
             else {
-                "Applied: $($appliedProfile.Name)"
+                "Applied: $appliedDisplayName"
             }
-            $script:LastActionTime = Get-Date -Format "HH:mm"
+            $script:LastActionTime = Get-Date
 
             # Record in history and persist the last known active state for startup arbitration.
-            $script:TrayConfig = Add-ProfileHistory -ProfileId $appliedProfileId -ProfileName $appliedProfile.Name -Config $script:TrayConfig
+            $script:TrayConfig = Add-ProfileHistory -ProfileId $appliedProfileId -ProfileName $appliedDisplayName -Config $script:TrayConfig
 
             Update-MenuState
-            Update-QuickPanel -Favorites $script:TrayConfig.favorites -Profiles $script:Profiles -ActiveProfile $script:activeProfile -OnApply { param($id) Apply-Profile $id }
+            $quickPanelEmpty = Get-QuickPanelEmptyStatus
+            $quickPanelPendingApplyText = Get-ActiveProfilePendingApplyText
+            $quickPanelWindowsRestartText = Get-ActiveProfileRebootPendingText
+            $quickPanelVerificationText = Get-ActiveProfileVerificationInProgressText
+            Update-QuickPanel -Favorites $script:TrayConfig.favorites -Profiles $script:Profiles -ActiveProfile $script:activeProfile -ActivePendingApplyText $quickPanelPendingApplyText -ActiveWindowsRestartText $quickPanelWindowsRestartText -ActiveVerificationText $quickPanelVerificationText -EmptyMessage $quickPanelEmpty.Message -EmptyProfileId $quickPanelEmpty.ProfileId -OnApply { param($id) Apply-Profile $id }
             Start-ActiveProfileVerificationTimer -DelayMilliseconds 500
         }
         else {
@@ -3164,14 +4487,13 @@ function Apply-Profile {
             }
             Set-IconState -State "Error"
             $notifyType = if ($isVrrPrereqError) { "Warning" } else { "Error" }
-            # Use the profile name as the toast title so the popup carries enough
-            # context for the user (otherwise _Derive-ToastTitle reduces the generic
-            # "A.B.S.O." prefix down to the first message segment, leaving titles
-            # like "Failed" with no clue which profile failed to apply).
-            $failureTitle = if ($profile -and $profile.Name) { $profile.Name } else { "A.B.S.O." }
-            Show-Notification -Title $failureTitle -Message "Failed: $err" -Type $notifyType
-            $script:LastAction = "Failed: $err"
-            $script:LastActionTime = Get-Date -Format "HH:mm"
+            # Use the profile name as the toast title and name the failed action in
+            # the body so the popup is clear even when multiple tray actions run.
+            $failureTitle = $profileTitle
+            $failureVisual = Get-TrayProfileToastVisualArgs -ProfileId $ProfileId -Profile $profile
+            Show-Notification @failureVisual -Title $failureTitle -Message "Apply failed: $err" -Type $notifyType -MetaText $ProfileId
+            $script:LastAction = "Apply failed: $err"
+            $script:LastActionTime = Get-Date
             Update-MenuState
         }
     }
@@ -3180,10 +4502,11 @@ function Apply-Profile {
         Close-ProgressOverlay
         Play-FailSound
         Set-IconState -State "Error"
-        $exceptionTitle = if ($profile -and $profile.Name) { $profile.Name } else { "A.B.S.O." }
-        Show-Notification -Title $exceptionTitle -Message "Error: $($_.Exception.Message)" -Type "Error"
+        $exceptionTitle = $profileTitle
+        $exceptionVisual = Get-TrayProfileToastVisualArgs -ProfileId $ProfileId -Profile $profile
+        Show-Notification @exceptionVisual -Title $exceptionTitle -Message "Error: $($_.Exception.Message)" -Type "Error" -MetaText $ProfileId
         $script:LastAction = "Error: $($_.Exception.Message)"
-        $script:LastActionTime = Get-Date -Format "HH:mm"
+        $script:LastActionTime = Get-Date
         Update-MenuState
     }
 }
@@ -3192,13 +4515,23 @@ function Apply-PendingProfileFixes {
     param([switch]$Force)
 
     if ([string]::IsNullOrWhiteSpace([string]$script:activeProfile)) {
-        Show-Notification -Title "A.B.S.O." -Message "No active profile to repair" -Type "Warning"
+        Show-Notification -Title "A.B.S.O." -Message "No active profile to repair" -Type "Info" -ActionName "Apply" -ActionColor $script:Colors.AccentAmber
+        Set-TrayLastAction -Message "No active profile to repair"
+        Update-MenuState
         return
     }
 
+    $activeRecord = Get-ActiveTrayProfileRecord
     $pendingText = Get-ActiveProfilePendingApplyText
     if ([string]::IsNullOrWhiteSpace($pendingText) -and -not $Force) {
-        Show-Notification -Title "A.B.S.O." -Message "No pending profile fixes found" -Type "Info"
+        $pendingNoopVisual = Get-TrayProfileToastVisualArgs `
+            -ProfileId $script:activeProfile `
+            -Profile $activeRecord.Profile `
+            -ActiveBadge
+        $pendingNoopTitle = if ($activeRecord.Id) { $activeRecord.DisplayName } else { "A.B.S.O." }
+        Show-Notification @pendingNoopVisual -Title $pendingNoopTitle -Message "No pending profile fixes found" -Type "Info" -MetaText $script:activeProfile
+        Set-TrayLastAction -Message "No pending profile fixes found"
+        Update-MenuState
         return
     }
     if ([string]::IsNullOrWhiteSpace($pendingText)) {
@@ -3207,8 +4540,12 @@ function Apply-PendingProfileFixes {
 
     Write-TrayLog "Apply-PendingProfileFixes called for '$script:activeProfile' ($pendingText)"
     Set-IconState -State "Applying"
-    $script:notifyIcon.Text = "A.B.S.O. - Applying pending fix..."
-    Show-ProgressOverlay -Title "Applying pending fix" -StepText $pendingText
+    Set-TrayOperationTooltipText -Text "A.B.S.O. - Applying pending profile fixes..."
+    $pendingProgressVisual = Get-TrayProfileToastVisualArgs `
+        -ProfileId $script:activeProfile `
+        -Profile $activeRecord.Profile `
+        -ActiveBadge
+    Show-ProgressOverlay @pendingProgressVisual -Title "Applying pending profile fixes" -StepText $pendingText
 
     $tempFile = [System.IO.Path]::GetTempFileName()
     $errFile = "$tempFile.err"
@@ -3218,6 +4555,8 @@ function Apply-PendingProfileFixes {
         $proc = Start-Process -FilePath $script:PythonExe -ArgumentList $args `
             -NoNewWindow -PassThru -WorkingDirectory $script:ProjectRoot `
             -RedirectStandardOutput $tempFile -RedirectStandardError $errFile
+        # PS 5.1: cache the handle now or .ExitCode reads $null after exit.
+        if ($proc) { $null = $proc.Handle }
 
         $timeout = (Get-Date).AddSeconds(45)
         while (-not $proc.HasExited -and (Get-Date) -lt $timeout) {
@@ -3243,32 +4582,38 @@ function Apply-PendingProfileFixes {
             Write-TrayLog "apply-pending exit code was unavailable; falling back to JSON payload validation" -Level "WARN"
         }
         if (-not $exitCodeOk -or -not $json.success -or -not $json.data -or -not $json.data.success) {
-            $err = if ($json.data -and $json.data.error) { $json.data.error } elseif ($json.error) { $json.error } else { "unknown error" }
+            $err = if ($json.data -and $json.data.error) { $json.data.error } elseif ($json.error) { $json.error } else { "reason not reported" }
             throw $err
         }
 
         Close-ProgressOverlay
         $changedSettings = @($json.data.changed_settings)
         $requiresReboot = if ($json.data.PSObject.Properties["requires_reboot"]) { [bool]$json.data.requires_reboot } else { $false }
+        Set-ActiveProfileVerificationSeedFromApplyData -Data $json.data
+        $pendingToastVisual = Get-TrayProfileToastVisualArgs `
+            -ProfileId $script:activeProfile `
+            -Profile $activeRecord.Profile `
+            -ActiveBadge
+        $pendingTitle = if ($activeRecord.Id) { $activeRecord.DisplayName } else { "A.B.S.O." }
         if ($changedSettings.Count -gt 0) {
-            Write-TrayLog "Pending profile fix applied: $($changedSettings -join ', ')"
+            Write-TrayLog "Pending profile fixes applied: $($changedSettings -join ', ')"
             Play-SuccessSound
             Play-ApplySuccessIconAnimation
             $message = if ($requiresReboot) {
-                "Pending fix applied. Restart required."
+                "Pending profile fixes applied: $pendingText. Windows restart required."
             }
             else {
-                "Pending fix applied."
+                "Pending profile fixes applied: $pendingText."
             }
-            Show-ThemedToast -Title "A.B.S.O." -Message $message -Type "Success" -MetaText $script:activeProfile
-            $script:LastAction = if ($requiresReboot) { "Restart required: $pendingText" } else { "Fixed: $pendingText" }
+            Show-TrayToast @pendingToastVisual -Title $pendingTitle -Message $message -Type "Success" -MetaText $script:activeProfile
+            $script:LastAction = if ($requiresReboot) { "Windows restart required: $pendingText" } else { "Fixed: $pendingText" }
         }
         else {
             Write-TrayLog "apply-pending succeeded with no write needed"
-            Show-Notification -Title "A.B.S.O." -Message "No pending write was needed" -Type "Info"
-            $script:LastAction = "No pending fix needed"
+            Show-Notification @pendingToastVisual -Title $pendingTitle -Message "No pending profile fix was needed" -Type "Info" -MetaText $script:activeProfile
+            $script:LastAction = "No pending profile fix needed"
         }
-        $script:LastActionTime = Get-Date -Format "HH:mm"
+        $script:LastActionTime = Get-Date
         Start-ActiveProfileVerificationTimer -DelayMilliseconds 500
         Update-MenuState
     }
@@ -3277,9 +4622,15 @@ function Apply-PendingProfileFixes {
         Write-TrayLog "Apply-PendingProfileFixes failed: $($_.Exception.Message)" -Level "ERROR"
         Play-FailSound
         Set-IconState -State "Error"
-        Show-Notification -Title "A.B.S.O." -Message "Pending fix failed: $($_.Exception.Message)" -Type "Error"
-        $script:LastAction = "Pending fix failed: $($_.Exception.Message)"
-        $script:LastActionTime = Get-Date -Format "HH:mm"
+        $activeRecord = Get-ActiveTrayProfileRecord
+        $pendingFailureVisual = Get-TrayProfileToastVisualArgs `
+            -ProfileId $script:activeProfile `
+            -Profile $activeRecord.Profile `
+            -ActiveBadge
+        $pendingFailureTitle = if ($activeRecord.Id) { $activeRecord.DisplayName } else { "A.B.S.O." }
+        Show-Notification @pendingFailureVisual -Title $pendingFailureTitle -Message "Pending profile fixes failed: $($_.Exception.Message)" -Type "Error" -MetaText $script:activeProfile
+        $script:LastAction = "Pending profile fixes failed: $($_.Exception.Message)"
+        $script:LastActionTime = Get-Date
         Update-MenuState
     }
     finally {
@@ -3337,8 +4688,12 @@ function Invoke-TrayCommandFile {
 
 function Restore-Settings {
     Set-IconState -State "Applying"
-    $script:notifyIcon.Text = "A.B.S.O. - Restoring..."
-    Show-ProgressOverlay -Title "Restoring Settings" -StepText "Restoring previous configuration..."
+    Set-TrayOperationTooltipText -Text "A.B.S.O. - Restoring..."
+    Show-ProgressOverlay `
+        -Title "Restoring Settings" `
+        -StepText "Restoring previous configuration..." `
+        -ActionName "Restore" `
+        -ActionColor $script:Colors.AccentPurple
 
     try {
         $tempFile = [System.IO.Path]::GetTempFileName()
@@ -3347,6 +4702,8 @@ function Restore-Settings {
         $proc = Start-Process -FilePath $script:PythonExe -ArgumentList (Get-AbsoBackendArgs -CommandArgs @("restore", "latest", "--json")) `
             -NoNewWindow -PassThru -WorkingDirectory $script:ProjectRoot `
             -RedirectStandardOutput $tempFile -RedirectStandardError $errFile
+        # PS 5.1: cache the handle now or .ExitCode reads $null after exit.
+        if ($proc) { $null = $proc.Handle }
 
         $timeout = (Get-Date).AddSeconds(120)
         while (-not $proc.HasExited -and (Get-Date) -lt $timeout) {
@@ -3358,8 +4715,10 @@ function Restore-Settings {
             $proc.Kill()
             $proc.Dispose()
             Close-ProgressOverlay
-            Show-Notification -Title "A.B.S.O." -Message "Restore timed out after 120s" -Type "Error"
+            Show-Notification -Title "A.B.S.O." -Message "Restore timed out after 120s" -Type "Error" -ActionName "Restore" -ActionColor $script:Colors.AccentAmber
             Set-IconState -State "Error"
+            Set-TrayLastAction -Message "Restore timed out after 120s"
+            Update-MenuState
             Remove-Item $tempFile -Force -ErrorAction SilentlyContinue
             Remove-Item $errFile -Force -ErrorAction SilentlyContinue
             return
@@ -3372,7 +4731,7 @@ function Restore-Settings {
         Remove-Item $errFile -Force -ErrorAction SilentlyContinue
         if ($errOutput) { Write-TrayLog "Restore CLI stderr: $errOutput" -Level "WARN" }
 
-        if (-not $rawOutput) { throw "No output" }
+        if (-not $rawOutput) { throw "runtime returned no restore status" }
 
         $json = Invoke-JsonSafe -Text $rawOutput -Source 'Restore'
         if ($null -eq $json) { throw "Restore CLI returned malformed JSON (see tray log for payload preview)" }
@@ -3384,11 +4743,10 @@ function Restore-Settings {
 
         if ($exitCodeOk -and $json.success -and $json.data -and $json.data.success) {
             Close-ProgressOverlay
-            Show-Notification -Title "A.B.S.O." -Message "Settings restored" -Type "Success"
+            Show-Notification -Title "A.B.S.O." -Message "Settings restored" -Type "Success" -ActionName "Restore" -ActionColor $script:Colors.AccentGreen
             $script:activeProfile = $null
             Reset-ActiveProfileVerificationState
-            $script:LastAction = "Restored settings"
-            $script:LastActionTime = Get-Date -Format "HH:mm"
+            Set-TrayLastAction -Message "Restored settings"
             $script:TrayConfig = Set-LastProfileState -Config $script:TrayConfig -Status "restored" -Source "tray_restore"
             Set-IconState -State "Idle"
             Update-MenuState
@@ -3404,16 +4762,20 @@ function Restore-Settings {
                 "Backend reported restore failure without a detailed error message (exit code: $(Get-ExitCodeDescriptor -ExitCode $exitCode))"
             }
             Close-ProgressOverlay
-            Show-Notification -Title "A.B.S.O." -Message "Failed: $restoreError" -Type "Warning"
-            Set-IconState -State "Warning"
+            Show-Notification -Title "A.B.S.O." -Message "Restore failed: $restoreError" -Type "Error" -ActionName "Restore" -ActionColor $script:Colors.AccentAmber
+            Set-IconState -State "Error"
+            Set-TrayLastAction -Message "Restore failed: $restoreError"
+            Update-MenuState
         }
     }
     catch {
         Close-ProgressOverlay
-        Show-Notification -Title "A.B.S.O." -Message "Error: $($_.Exception.Message)" -Type "Warning"
+        Show-Notification -Title "A.B.S.O." -Message "Restore failed: $($_.Exception.Message)" -Type "Error" -ActionName "Restore" -ActionColor $script:Colors.AccentAmber
         Set-IconState -State "Error"
+        Set-TrayLastAction -Message "Restore failed: $($_.Exception.Message)"
+        Update-MenuState
     }
-    $script:notifyIcon.Text = "A.B.S.O."
+    Restore-TrayTooltipFromState
 }
 
 # ============================================================================
@@ -3433,6 +4795,7 @@ function Update-MenuState {
         $p = $script:Profiles[$item.Tag]
         if (-not $p) { continue }
         $catColor = Get-CategoryColor -Category $p.Cat -Fallback $script:Colors.Text
+        $gameColor = Get-TrayProfileAccentColor -ProfileId $item.Tag -Profile $p -Fallback $catColor
 
         # Items inside submenus (OwnerItem is a ToolStripMenuItem) vs top-level items
         $inSubmenu = ($null -ne $item.OwnerItem -and $item.OwnerItem -is [System.Windows.Forms.ToolStripMenuItem])
@@ -3440,25 +4803,36 @@ function Update-MenuState {
         if (-not $needsVisualRefresh) { continue }
 
         try {
+            $item.Text = Get-ProfileMenuDisplayText -ProfileId $item.Tag -InSubmenu $inSubmenu
+            Set-TrayProfileMenuItemMetadata -Item $item -ProfileId $item.Tag -Profile $p
+            $showSyncBadge = ($item.AccessibleName -eq "__profile_menu_item__")
+            $favoriteBadge = (Test-Favorite -ProfileId $item.Tag -Config $script:TrayConfig)
             if ($isActive) {
-                $item.Text = $p.Name
-                $newImage = New-ActiveCheckBitmap -Color $catColor
+                $newImage = New-TrayProfileMenuImage `
+                    -ProfileId $item.Tag `
+                    -IsActive $true `
+                    -InSubmenu $inSubmenu `
+                    -ShowSyncBadge $showSyncBadge `
+                    -FavoriteBadge $favoriteBadge
                 Set-MenuItemImageSafe -Item $item -NewImage $newImage
                 $item.ForeColor = [System.Drawing.Color]::FromArgb(
                     255,
-                    [Math]::Min(255, $catColor.R + 30),
-                    [Math]::Min(255, $catColor.G + 30),
-                    [Math]::Min(255, $catColor.B + 30)
+                    [Math]::Min(255, $gameColor.R + 30),
+                    [Math]::Min(255, $gameColor.G + 30),
+                    [Math]::Min(255, $gameColor.B + 30)
                 )
                 $item.Font = $script:FontBold
-                $item.BackColor = Blend-Color -Base $script:Colors.Background -Overlay $catColor -Ratio 0.15
+                $item.BackColor = Blend-Color -Base $script:Colors.Background -Overlay $gameColor -Ratio 0.15
             }
             else {
-                $item.Text = $p.Name
-                $gg = Get-GameGroup -ProfileId $item.Tag
-                $newImage = New-GameBitmap -GameGroup $gg -Color $catColor -Category $p.Cat
+                $newImage = New-TrayProfileMenuImage `
+                    -ProfileId $item.Tag `
+                    -IsActive $false `
+                    -InSubmenu $inSubmenu `
+                    -ShowSyncBadge $showSyncBadge `
+                    -FavoriteBadge $favoriteBadge
                 Set-MenuItemImageSafe -Item $item -NewImage $newImage
-                $item.ForeColor = $catColor
+                $item.ForeColor = $gameColor
                 $item.Font = $script:FontNormal
                 $item.BackColor = $script:Colors.Background
             }
@@ -3470,73 +4844,72 @@ function Update-MenuState {
     if ($script:restoreItem) { $script:restoreItem.Enabled = ($null -ne $script:activeProfile) }
     if ($script:applyPendingItem) {
         $pendingApplyTextForAction = Get-ActiveProfilePendingApplyText
+        $pendingFixCheckingText = Get-ActiveProfileVerificationInProgressText
+        $pendingFixChecking = (
+            $null -ne $script:activeProfile -and
+            -not [string]::IsNullOrWhiteSpace($pendingFixCheckingText)
+        )
         $script:applyPendingItem.Enabled = (
             $null -ne $script:activeProfile -and
             -not [string]::IsNullOrWhiteSpace($pendingApplyTextForAction)
         )
-        $script:applyPendingItem.Visible = $script:applyPendingItem.Enabled
+        $script:applyPendingItem.Visible = ($script:applyPendingItem.Enabled -or $pendingFixChecking)
         if ($script:applyPendingItem.Enabled) {
-            $script:applyPendingItem.Text = "Apply Pending Fix: $pendingApplyTextForAction"
+            $script:applyPendingItem.Text = "Apply Pending Fixes: $pendingApplyTextForAction"
+            $script:applyPendingItem.ToolTipText = "Targeted verifier fix: $pendingApplyTextForAction. No backup, baseline restore, or display reset."
+            $script:applyPendingItem.AccessibleDescription = "PENDING FIXES"
+            Set-MenuItemImageSafe -Item $script:applyPendingItem -NewImage (New-ActionBitmap -Action "PendingFix" -Color $script:Colors.AccentAmber)
+        }
+        elseif ($pendingFixChecking) {
+            $script:applyPendingItem.Text = "Checking Pending Fixes"
+            $script:applyPendingItem.ToolTipText = "Verifier is reading current settings; pending fixes will appear here if found."
+            $script:applyPendingItem.AccessibleDescription = "CHECKING PENDING FIXES"
+            Set-MenuItemImageSafe -Item $script:applyPendingItem -NewImage (New-ActionBitmap -Action "PendingFix" -Color $script:Colors.AccentBlue)
         }
         else {
-            $script:applyPendingItem.Text = "Apply Pending Fix"
+            $script:applyPendingItem.Text = "Apply Pending Fixes"
+            $script:applyPendingItem.ToolTipText = "No verifier-reported pending fixes for the active profile"
+            $script:applyPendingItem.AccessibleDescription = "NO PENDING FIXES"
+            Set-MenuItemImageSafe -Item $script:applyPendingItem -NewImage (New-ActionBitmap -Action "PendingFix" -Color $script:Colors.TextDisabled)
         }
     }
 
-    if ($script:activeProfile) {
-        $p = $script:Profiles[$script:activeProfile]
-        $pendingApplyText = Get-ActiveProfilePendingApplyText
-        $rebootPendingText = Get-ActiveProfileRebootPendingText
-        $tooltipText = if ($pendingApplyText) {
-            "A.B.S.O. - Needs apply: $($p.Name)"
-        }
-        elseif ($rebootPendingText) {
-            "A.B.S.O. - Restart required: $($p.Name)"
-        }
-        else {
-            "A.B.S.O. - $($p.Name)"
-        }
-        if ($tooltipText.Length -gt 63) {
-            $tooltipText = $tooltipText.Substring(0, 60) + "..."
-        }
-        $script:notifyIcon.Text = $tooltipText
-
-        if ($script:statusItem) {
-            if ($pendingApplyText) {
-                $script:statusItem.Text = "$($p.Name)|Needs apply: $pendingApplyText"
-                $script:statusItem.ForeColor = $script:Colors.AccentAmber
-            }
-            elseif ($rebootPendingText) {
-                $script:statusItem.Text = "$($p.Name)|Restart required: $rebootPendingText"
-                $script:statusItem.ForeColor = $script:Colors.AccentAmber
-            }
-            else {
-                $script:statusItem.Text = "$($p.Name)|$($p.Sub)"
-                $script:statusItem.ForeColor = Get-CategoryColor -Category $p.Cat -Fallback $script:Colors.AccentGreen
-            }
-        }
-    }
-    else {
-        $script:notifyIcon.Text = "A.B.S.O. - Ready"
-
-        if ($script:statusItem) {
-            $script:statusItem.Text = "Ready|No profile active"
-            $script:statusItem.ForeColor = $script:Colors.AccentGreen
-        }
-    }
+    Restore-TrayTooltipFromState
+    Set-TrayActiveStatusItemFromState
 
     # Update status bar
     if ($script:statusBarItem) {
-        $parts = @()
+        $statusParts = [System.Collections.Generic.List[string]]::new()
         $pendingApplyText = Get-ActiveProfilePendingApplyText
         $rebootPendingText = Get-ActiveProfileRebootPendingText
-        if ($pendingApplyText) { $parts += "Needs apply: $pendingApplyText" }
-        if ($rebootPendingText) { $parts += "Restart required: $rebootPendingText" }
-        if ($script:LastAction) { $parts += $script:LastAction }
-        if ($script:LastActionTime) { $parts += $script:LastActionTime }
+        $verificationProgressText = Get-ActiveProfileVerificationInProgressText
+        if ($pendingApplyText) { Add-UniqueTrayMessage -Target $statusParts -Message "Pending profile fix: $pendingApplyText" }
+        if ($rebootPendingText) { Add-UniqueTrayMessage -Target $statusParts -Message "Windows restart required: $rebootPendingText" }
+        if ($verificationProgressText) { Add-UniqueTrayMessage -Target $statusParts -Message "Checking profile state" }
+        $lastActionText = Normalize-TrayLastActionMessage -Message $script:LastAction
+        if ($lastActionText) { Add-UniqueTrayMessage -Target $statusParts -Message $lastActionText }
+        $lastActionTimeMessage = Get-TrayLastActionTimeMessage -Value $script:LastActionTime
+        if ($lastActionTimeMessage) { Add-UniqueTrayMessage -Target $statusParts -Message $lastActionTimeMessage }
         $backupTime = Get-LastBackupTime
-        if ($backupTime -ne "Never") { $parts += "Backup: $backupTime" }
-        $script:statusBarItem.Text = "  $($parts -join '  |  ')"
+        $statusHasBackup = ($backupTime -ne "Never")
+        if ($statusHasBackup) { Add-UniqueTrayMessage -Target $statusParts -Message "Backup: $backupTime" }
+        $statusBarText = if ($statusParts.Count -gt 0) { @($statusParts) -join '  |  ' } else { "Ready" }
+        $script:statusBarItem.Text = "  $statusBarText"
+        $script:statusBarItem.ForeColor = [System.Drawing.Color]::FromArgb(255, 100, 100, 110)
+        $script:statusBarItem.AccessibleDescription = Get-TrayStatusBarChipText `
+            -PendingApplyText $pendingApplyText `
+            -RebootPendingText $rebootPendingText `
+            -VerificationProgressText $verificationProgressText `
+            -LastActionText $lastActionText `
+            -HasBackup $statusHasBackup
+        $statusImage = New-TrayStatusBarImage `
+            -PendingApplyText $pendingApplyText `
+            -RebootPendingText $rebootPendingText `
+            -VerificationProgressText $verificationProgressText `
+            -ProfileId $script:activeProfile `
+            -LastActionText $lastActionText `
+            -FallbackColor $script:statusBarItem.ForeColor
+        Set-MenuItemImageSafe -Item $script:statusBarItem -NewImage $statusImage
     }
 
     $script:LastRenderedActiveProfile = $script:activeProfile
@@ -3547,11 +4920,304 @@ function Update-MenuState {
 # SYSTEM INFO
 # ============================================================================
 
+function Ensure-TrayDisplaySettingsReader {
+    if ("Abso.Tray.DisplaySettingsReader" -as [type]) { return $true }
+    if ($script:TrayDisplaySettingsReaderUnavailable) { return $false }
+
+    try {
+        Add-Type -TypeDefinition @"
+using System;
+using System.Runtime.InteropServices;
+
+namespace Abso.Tray {
+    public static class DisplaySettingsReader {
+        private const int ENUM_CURRENT_SETTINGS = -1;
+
+        [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Ansi)]
+        public struct DEVMODE {
+            [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 32)] public string dmDeviceName;
+            public short dmSpecVersion;
+            public short dmDriverVersion;
+            public short dmSize;
+            public short dmDriverExtra;
+            public int dmFields;
+            public int dmPositionX;
+            public int dmPositionY;
+            public int dmDisplayOrientation;
+            public int dmDisplayFixedOutput;
+            public short dmColor;
+            public short dmDuplex;
+            public short dmYResolution;
+            public short dmTTOption;
+            public short dmCollate;
+            [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 32)] public string dmFormName;
+            public short dmLogPixels;
+            public int dmBitsPerPel;
+            public int dmPelsWidth;
+            public int dmPelsHeight;
+            public int dmDisplayFlags;
+            public int dmDisplayFrequency;
+            public int dmICMMethod;
+            public int dmICMIntent;
+            public int dmMediaType;
+            public int dmDitherType;
+            public int dmReserved1;
+            public int dmReserved2;
+            public int dmPanningWidth;
+            public int dmPanningHeight;
+        }
+
+        [DllImport("user32.dll", CharSet = CharSet.Ansi)]
+        private static extern bool EnumDisplaySettings(string deviceName, int modeNum, ref DEVMODE devMode);
+
+        public static int GetCurrentRefreshRate(string deviceName) {
+            DEVMODE mode = new DEVMODE();
+            mode.dmSize = (short)Marshal.SizeOf(typeof(DEVMODE));
+            return EnumDisplaySettings(deviceName, ENUM_CURRENT_SETTINGS, ref mode) ? mode.dmDisplayFrequency : 0;
+        }
+    }
+}
+"@ -ErrorAction Stop
+        return $true
+    }
+    catch {
+        $script:TrayDisplaySettingsReaderUnavailable = $true
+        if (-not $script:TrayDisplaySettingsReaderWarned) {
+            Write-TrayLog "Failed to load display settings reader: $($_.Exception.Message)" -Level "WARN"
+            $script:TrayDisplaySettingsReaderWarned = $true
+        }
+        return $false
+    }
+}
+
+function ConvertTo-TrayRefreshRate {
+    param([AllowNull()][object]$Rate)
+
+    if ($null -eq $Rate -or [string]::IsNullOrWhiteSpace("$Rate")) { return $null }
+
+    try {
+        $numeric = [double]::Parse("$Rate", [System.Globalization.CultureInfo]::InvariantCulture)
+    }
+    catch {
+        return $null
+    }
+
+    if ($numeric -le 1) { return $null }
+
+    $commonRates = @(24, 30, 48, 50, 60, 72, 75, 90, 100, 120, 144, 165, 170, 175, 180, 200, 240, 280, 300, 360, 480)
+    foreach ($commonRate in $commonRates) {
+        if ([Math]::Abs($numeric - $commonRate) -le 1.0) { return [int]$commonRate }
+    }
+
+    return [int][Math]::Round($numeric, 0)
+}
+
+function Format-TrayRefreshRate {
+    param([AllowNull()][object]$Rate)
+
+    $normalized = ConvertTo-TrayRefreshRate -Rate $Rate
+    if ($null -eq $normalized) { return $null }
+    return "{0}Hz" -f $normalized
+}
+
+function Get-TrayScreenRefreshSnapshot {
+    param([AllowNull()][object[]]$Screens)
+
+    if (-not $Screens) {
+        try {
+            $Screens = @([System.Windows.Forms.Screen]::AllScreens)
+        }
+        catch {
+            Write-TrayLog "Failed to enumerate screens: $($_.Exception.Message)" -Level "WARN"
+            return @()
+        }
+    }
+
+    $apiReady = Ensure-TrayDisplaySettingsReader
+    $snapshot = @()
+    foreach ($screen in @($Screens)) {
+        $rate = $null
+        if ($apiReady -and $screen -and -not [string]::IsNullOrWhiteSpace("$($screen.DeviceName)")) {
+            try {
+                $rate = [Abso.Tray.DisplaySettingsReader]::GetCurrentRefreshRate("$($screen.DeviceName)")
+            }
+            catch {
+                if (-not $script:TrayDisplaySettingsReaderWarned) {
+                    Write-TrayLog "Failed to read display refresh for $($screen.DeviceName): $($_.Exception.Message)" -Level "WARN"
+                    $script:TrayDisplaySettingsReaderWarned = $true
+                }
+            }
+        }
+
+        $normalizedRate = ConvertTo-TrayRefreshRate -Rate $rate
+        $snapshot += [pscustomobject]@{
+            DeviceName = if ($screen) { "$($screen.DeviceName)" } else { "" }
+            Primary = if ($screen) { [bool]$screen.Primary } else { $false }
+            RefreshRate = $normalizedRate
+            RefreshText = if ($null -ne $normalizedRate) { "{0}Hz" -f $normalizedRate } else { $null }
+        }
+    }
+
+    return @($snapshot)
+}
+
+function Get-TrayDisplaySummary {
+    param([AllowNull()][object]$FallbackRefreshRate)
+
+    $fallbackText = Format-TrayRefreshRate -Rate $FallbackRefreshRate
+    try {
+        $screens = @([System.Windows.Forms.Screen]::AllScreens)
+    }
+    catch {
+        if ($fallbackText) { return $fallbackText }
+        return "Display status not reported"
+    }
+
+    $screenCount = @($screens).Count
+    if ($screenCount -le 0) {
+        if ($fallbackText) { return $fallbackText }
+        return "Display status not reported"
+    }
+
+    $refreshRecords = Get-TrayScreenRefreshSnapshot -Screens $screens
+    $rateLabels = @(
+        $refreshRecords |
+            Where-Object { $null -ne $_.RefreshRate -and -not [string]::IsNullOrWhiteSpace("$($_.RefreshText)") } |
+            Sort-Object RefreshRate -Descending |
+            Select-Object -ExpandProperty RefreshText -Unique
+    )
+
+    if ($screenCount -gt 1) {
+        if ($rateLabels.Count -gt 1) {
+            return "$screenCount displays - $($rateLabels -join '/') mixed"
+        }
+        if ($rateLabels.Count -eq 1) {
+            return "$screenCount displays - $($rateLabels[0])"
+        }
+        if ($fallbackText) {
+            return "$screenCount displays - adapter $fallbackText"
+        }
+        return "$screenCount displays"
+    }
+
+    if ($rateLabels.Count -ge 1) { return "$($rateLabels[0])" }
+    if ($fallbackText) { return $fallbackText }
+    return "Display status not reported"
+}
+
+function New-TrayDisplayTopologyBitmap {
+    <#
+    .SYNOPSIS
+    Builds a compact system-info icon from the already computed display summary.
+    It does not probe display state; it only visualizes text like
+    "2 displays - 300Hz/60Hz mixed" or "300Hz".
+    #>
+    param(
+        [AllowNull()][string]$DisplaySummary,
+        [System.Drawing.Color]$Color = [System.Drawing.Color]::White
+    )
+
+    $summary = if ([string]::IsNullOrWhiteSpace($DisplaySummary)) { "Display status not reported" } else { "$DisplaySummary" }
+    $displayCount = 0
+    if ($summary -match '^\s*(\d+)\s+displays\b') {
+        try { $displayCount = [Math]::Max(0, [int]$matches[1]) } catch { $displayCount = 0 }
+    }
+    elseif ($summary -match '\d+\s*Hz' -or $summary -notmatch '(?i)unknown|not reported') {
+        $displayCount = 1
+    }
+    $isMixed = ($summary -match '(?i)\bmixed\b' -or $summary -match '\d+\s*Hz\s*/\s*\d+\s*Hz')
+    $hasRate = ($summary -match '\d+\s*Hz')
+
+    $bmp = New-Object System.Drawing.Bitmap(16, 16)
+    $g = [System.Drawing.Graphics]::FromImage($bmp)
+    $g.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
+    $g.Clear([System.Drawing.Color]::Transparent)
+
+    $glowBrush = New-Object System.Drawing.SolidBrush(
+        [System.Drawing.Color]::FromArgb(34, $Color.R, $Color.G, $Color.B)
+    )
+    $screenBrush = New-Object System.Drawing.SolidBrush(
+        [System.Drawing.Color]::FromArgb(230, $Color.R, $Color.G, $Color.B)
+    )
+    $dimBrush = New-Object System.Drawing.SolidBrush(
+        [System.Drawing.Color]::FromArgb(120, $Color.R, $Color.G, $Color.B)
+    )
+    $innerBrush = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::FromArgb(190, 10, 16, 24))
+    $accent = if ($isMixed) { $script:Colors.AccentAmber } elseif ($hasRate) { $script:Colors.AccentCyan } else { $Color }
+    $accentBrush = New-Object System.Drawing.SolidBrush($accent)
+    $accentPen = New-Object System.Drawing.Pen($accent, 1.05)
+    $accentPen.StartCap = [System.Drawing.Drawing2D.LineCap]::Round
+    $accentPen.EndCap = [System.Drawing.Drawing2D.LineCap]::Round
+    $standBrush = New-Object System.Drawing.SolidBrush($Color)
+    $textBrush = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::White)
+    $font = New-Object System.Drawing.Font("Segoe UI", 5.5, [System.Drawing.FontStyle]::Bold)
+    $format = New-Object System.Drawing.StringFormat
+    $format.Alignment = [System.Drawing.StringAlignment]::Center
+    $format.LineAlignment = [System.Drawing.StringAlignment]::Center
+
+    try {
+        $g.FillEllipse($glowBrush, 1, 1, 14, 14)
+
+        if ($displayCount -le 0) {
+            $g.FillRectangle($dimBrush, 3, 4, 10, 7)
+            $g.FillRectangle($innerBrush, 4, 5, 8, 4)
+            $g.DrawString("?", $font, $textBrush, (New-Object System.Drawing.RectangleF(3, 3, 10, 9)), $format)
+        }
+        elseif ($displayCount -gt 1) {
+            $g.FillRectangle($dimBrush, 2, 4, 8, 6)
+            $g.FillRectangle($innerBrush, 3, 5, 6, 3)
+            $g.FillRectangle($screenBrush, 6, 2, 9, 8)
+            $g.FillRectangle($innerBrush, 7, 3, 7, 5)
+            $g.FillRectangle($standBrush, 5, 11, 2, 2)
+            $g.FillRectangle($standBrush, 11, 10, 2, 3)
+            $g.FillRectangle($standBrush, 3, 13, 6, 1)
+            $g.FillRectangle($standBrush, 9, 13, 6, 1)
+        }
+        else {
+            $g.FillRectangle($screenBrush, 2, 3, 12, 8)
+            $g.FillRectangle($innerBrush, 3, 4, 10, 5)
+            $g.FillRectangle($standBrush, 7, 11, 2, 2)
+            $g.FillRectangle($standBrush, 5, 13, 6, 1)
+        }
+
+        if ($hasRate) {
+            $g.DrawLine($accentPen, 4, 7, 6, 5.5)
+            $g.DrawLine($accentPen, 6, 5.5, 8, 8.2)
+            $g.DrawLine($accentPen, 8, 8.2, 11, 5.6)
+        }
+
+        if ($isMixed) {
+            $g.FillEllipse($accentBrush, 10, 0, 5, 5)
+            $g.DrawLine($accentPen, 12.5, 1.2, 12.5, 3.0)
+            $g.DrawLine($accentPen, 12.5, 3.8, 12.5, 3.9)
+        }
+        elseif ($displayCount -gt 1) {
+            $g.FillEllipse($accentBrush, 11, 1, 4, 4)
+        }
+    }
+    finally {
+        $format.Dispose()
+        $font.Dispose()
+        $textBrush.Dispose()
+        $standBrush.Dispose()
+        $accentPen.Dispose()
+        $accentBrush.Dispose()
+        $innerBrush.Dispose()
+        $dimBrush.Dispose()
+        $screenBrush.Dispose()
+        $glowBrush.Dispose()
+        $g.Dispose()
+    }
+
+    return $bmp
+}
+
 function Get-SystemInfo {
     $info = @{
-        GPU = "Unknown GPU"
-        Monitor = "Unknown"
-        RefreshRate = "?"
+        GPU = "GPU not reported"
+        Monitor = "Display not reported"
+        RefreshRate = "Refresh rate not reported"
+        DisplaySummary = "Display status not reported"
     }
 
     try {
@@ -3583,9 +5249,13 @@ function Get-SystemInfo {
             $info.Monitor = $name
         }
 
+        $fallbackRefreshRate = $null
         if ($realGpu -and $realGpu.CurrentRefreshRate) {
-            $info.RefreshRate = "$($realGpu.CurrentRefreshRate)Hz"
+            $fallbackRefreshRate = $realGpu.CurrentRefreshRate
+            $info.RefreshRate = Format-TrayRefreshRate -Rate $fallbackRefreshRate
         }
+
+        $info.DisplaySummary = Get-TrayDisplaySummary -FallbackRefreshRate $fallbackRefreshRate
     }
     catch {
         Write-TrayLog "Failed to get system info: $($_.Exception.Message)" -Level "WARN"
@@ -3594,107 +5264,992 @@ function Get-SystemInfo {
     return $info
 }
 
+function Get-TraySystemInfoChipText {
+    param(
+        [AllowNull()][string]$GpuName,
+        [AllowNull()][string]$DisplaySummary
+    )
+
+    $chips = [System.Collections.Generic.List[string]]::new()
+    $gpuText = if ([string]::IsNullOrWhiteSpace($GpuName)) { "" } else { "$GpuName" }
+    $displayText = if ([string]::IsNullOrWhiteSpace($DisplaySummary)) { "" } else { "$DisplaySummary" }
+    $gpuReported = (-not [string]::IsNullOrWhiteSpace($gpuText) -and $gpuText -notmatch '(?i)unknown|not reported')
+    $displayReported = (-not [string]::IsNullOrWhiteSpace($displayText) -and $displayText -notmatch '(?i)unknown|not reported')
+
+    if ($gpuReported) { [void]$chips.Add("GPU") }
+    if ($displayReported) {
+        [void]$chips.Add("DISPLAY")
+        if ($displayText -match '(?i)\bmixed\b' -or $displayText -match '\d+\s*Hz\s*/\s*\d+\s*Hz') {
+            [void]$chips.Add("MIXED")
+        }
+        elseif ($displayText -match '\d+\s*Hz') {
+            [void]$chips.Add("HZ")
+        }
+    }
+    if ($chips.Count -eq 0) { [void]$chips.Add("NO-DATA") }
+    return (@($chips) -join "|")
+}
+
+function ConvertTo-TrayDateTime {
+    param([AllowNull()][object]$Value)
+
+    if ($null -eq $Value -or [string]::IsNullOrWhiteSpace("$Value")) {
+        return $null
+    }
+
+    if ($Value -is [DateTime]) {
+        return [DateTime]$Value
+    }
+
+    try {
+        return [DateTime]::Parse("$Value", [System.Globalization.CultureInfo]::InvariantCulture)
+    }
+    catch {
+        return $null
+    }
+}
+
+function Format-TrayTimestamp {
+    param([AllowNull()][object]$Value)
+
+    $dt = ConvertTo-TrayDateTime -Value $Value
+    if (-not $dt) { return "time unknown" }
+
+    if ($dt.Year -eq (Get-Date).Year) {
+        return $dt.ToString("MMM d HH:mm", [System.Globalization.CultureInfo]::InvariantCulture)
+    }
+    return $dt.ToString("yyyy MMM d HH:mm", [System.Globalization.CultureInfo]::InvariantCulture)
+}
+
+function Set-TrayLastAction {
+    param([AllowNull()][string]$Message)
+
+    if ([string]::IsNullOrWhiteSpace($Message)) {
+        $script:LastAction = $null
+        $script:LastActionTime = $null
+        return
+    }
+
+    $script:LastAction = Normalize-TrayLastActionMessage -Message $Message
+    $script:LastActionTime = Get-Date
+}
+
+function Normalize-TrayLastActionMessage {
+    param([AllowNull()][string]$Message)
+
+    if ([string]::IsNullOrWhiteSpace($Message)) { return $null }
+
+    $text = "$Message".Trim()
+    if ($text -match '(?i)^Restart required:\s*(.+)$') {
+        return "Windows restart required: $($Matches[1].Trim())"
+    }
+    if ($text -match '(?i)^Restart required$') {
+        return "Windows restart required"
+    }
+    if ($text -match '(?i)^Needs apply:\s*(.+)$') {
+        return "Pending profile fix: $($Matches[1].Trim())"
+    }
+    if ($text -match '(?i)^Needs apply$') {
+        return "Pending profile fix"
+    }
+    return $text
+}
+
+function Get-TrayLastActionTimeMessage {
+    param([AllowNull()][object]$Value)
+
+    $displayTime = Format-TrayTimestamp -Value $Value
+    if ($displayTime -eq "time unknown") { return $null }
+    return "Action: $displayTime"
+}
+
+function Get-TrayStatusBarChipText {
+    param(
+        [AllowNull()][string]$PendingApplyText,
+        [AllowNull()][string]$RebootPendingText,
+        [AllowNull()][string]$VerificationProgressText,
+        [AllowNull()][string]$LastActionText,
+        [bool]$HasBackup = $false,
+        [bool]$Preview = $false
+    )
+
+    $chips = [System.Collections.Generic.List[string]]::new()
+    if ($Preview) { [void]$chips.Add("PREVIEW") }
+    if (-not [string]::IsNullOrWhiteSpace($PendingApplyText)) { [void]$chips.Add("FIX") }
+    if (-not [string]::IsNullOrWhiteSpace($RebootPendingText)) { [void]$chips.Add("RESTART") }
+    if (-not [string]::IsNullOrWhiteSpace($VerificationProgressText)) { [void]$chips.Add("CHECK") }
+    if (-not [string]::IsNullOrWhiteSpace($LastActionText)) { [void]$chips.Add("ACTION") }
+    if ($HasBackup) { [void]$chips.Add("BACKUP") }
+    if ($chips.Count -eq 0) { [void]$chips.Add("READY") }
+    return (@($chips) -join "|")
+}
+
+function New-TrayLastActionStatusBitmap {
+    param(
+        [AllowNull()][string]$LastActionText,
+        [AllowNull()][System.Drawing.Color]$FallbackColor
+    )
+
+    if ([string]::IsNullOrWhiteSpace($LastActionText)) { return $null }
+
+    $text = Normalize-TrayLastActionMessage -Message $LastActionText
+    $dimColor = if ($FallbackColor) { $FallbackColor } else { $script:Colors.TextDim }
+    $action = $null
+    $color = $dimColor
+
+    switch -Regex ($text) {
+        '^(Pending profile fix|No active profile to repair|No pending profile fixes|No pending profile fix|Pending profile fixes|Fixed:)' {
+            $action = "PendingFix"; $color = $script:Colors.AccentAmber; break
+        }
+        '^(Windows restart required)' {
+            $action = "WindowsRestart"; $color = $script:Colors.AccentAmber; break
+        }
+        '^(Restored|Restore|Restore hotkey)' {
+            $action = "Restore"; $color = $script:Colors.AccentPurple; break
+        }
+        '^(Audit|Verify|Verification)' {
+            $action = "Audit"; $color = $script:Colors.AccentBlue; break
+        }
+        '^(Startup)' {
+            $action = "Startup"
+            $color = if ($text -match '(?i)failed|warning') { $script:Colors.AccentAmber } else { $script:Colors.AccentBlue }
+            break
+        }
+        '^(Display reset)' {
+            $action = "Reset"; $color = $script:Colors.AccentAmber; break
+        }
+        '^(Standby|Clearing standby)' {
+            $action = "Memory"; $color = $script:Colors.AccentBlue; break
+        }
+        '^(Quick Panel)' {
+            $action = "QuickPanel"; $color = $script:Colors.AccentGreen; break
+        }
+        '^(Profiles refreshed|Profiles fallback|Profile refresh)' {
+            $action = "Refresh"; $color = $script:Colors.AccentBlue; break
+        }
+        '^(Tray restart)' {
+            $action = "Refresh"
+            $color = if ($text -match '(?i)failed|warning') { $script:Colors.AccentAmber } else { $script:Colors.AccentBlue }
+            break
+        }
+        '^(Opened backups|Open backups|No backups)' {
+            $action = "Backups"; $color = $script:Colors.AccentPurple; break
+        }
+        '^(Opened tray log|Open tray log)' {
+            $action = "Log"; $color = $dimColor; break
+        }
+        '^(Opened tray settings|Open tray settings|Tray settings)' {
+            $action = "Settings"; $color = $script:Colors.Text; break
+        }
+        '^(Opened installed runtime folder|Open runtime folder|Opened user profiles folder|Open profiles folder)' {
+            $action = "Folder"; $color = $dimColor; break
+        }
+        '^(Toast popups)' {
+            $action = "Toast"; $color = $script:Colors.AccentBlue; break
+        }
+        '^(Tray audio cues)' {
+            $action = "Sound"; $color = $script:Colors.AccentBlue; break
+        }
+        '^(Profile missing|Profile not found|Apply timed out|Apply failed:|Applied|Failed:|Error:)' {
+            $action = "Apply"; $color = $script:Colors.AccentAmber; break
+        }
+        default {
+            $action = $null
+        }
+    }
+
+    if ([string]::IsNullOrWhiteSpace($action)) { return $null }
+    return New-ActionBitmap -Action $action -Color $color
+}
+
+function New-TrayStatusBarImage {
+    param(
+        [AllowNull()][string]$PendingApplyText,
+        [AllowNull()][string]$RebootPendingText,
+        [AllowNull()][string]$VerificationProgressText,
+        [AllowNull()][string]$ProfileId,
+        [AllowNull()][string]$LastActionText,
+        [AllowNull()][System.Drawing.Color]$FallbackColor
+    )
+
+    $dimColor = if ($FallbackColor) { $FallbackColor } else { $script:Colors.TextDim }
+    if (-not [string]::IsNullOrWhiteSpace($PendingApplyText)) {
+        return New-ActionBitmap -Action "PendingFix" -Color $script:Colors.AccentAmber
+    }
+    if (-not [string]::IsNullOrWhiteSpace($RebootPendingText)) {
+        return New-ActionBitmap -Action "WindowsRestart" -Color $script:Colors.AccentAmber
+    }
+    $verificationBadge = -not [string]::IsNullOrWhiteSpace($VerificationProgressText)
+    if (
+        -not [string]::IsNullOrWhiteSpace($ProfileId) -and
+        $script:Profiles -and
+        $script:Profiles.Contains($ProfileId)
+    ) {
+        $favoriteBadge = (Test-Favorite -ProfileId $ProfileId -Config $script:TrayConfig)
+        return New-TrayProfileMenuImage `
+            -ProfileId $ProfileId `
+            -IsActive ($ProfileId -eq $script:activeProfile) `
+            -ShowSyncBadge $true `
+            -FavoriteBadge $favoriteBadge
+    }
+    if (-not [string]::IsNullOrWhiteSpace($ProfileId)) {
+        $profile = $null
+        $category = "Other"
+        $accent = Get-TrayProfileAccentColor -ProfileId $ProfileId -Profile $profile -Fallback $dimColor
+        $gameGroup = Get-TrayProfileGameGroup -ProfileId $ProfileId -Profile $profile
+        $modeBadge = if ("$ProfileId" -match '(?i)capture') {
+            "capture"
+        }
+        elseif ("$ProfileId" -match '(?i)-hdr($|-)') {
+            "hdr"
+        }
+        else {
+            ""
+        }
+        $desc = Format-TrayDisplayCopy -Text $rawDesc
+        $favoriteBadge = if (Get-Command Test-Favorite -ErrorAction SilentlyContinue) {
+            Test-Favorite -ProfileId $ProfileId -Config $script:TrayConfig
+        }
+        else {
+            $false
+        }
+        if ($ProfileId -eq $script:activeProfile -and (Get-Command New-ActiveGameBitmap -ErrorAction SilentlyContinue)) {
+            return New-ActiveGameBitmap `
+                -GameGroup $gameGroup `
+                -Color $accent `
+                -Category $category `
+                -ModeBadge $modeBadge `
+                -FavoriteBadge $favoriteBadge `
+                -VerificationBadge $verificationBadge
+        }
+        if ($favoriteBadge -and (Get-Command New-FavoriteGameBitmap -ErrorAction SilentlyContinue)) {
+            return New-FavoriteGameBitmap `
+                -GameGroup $gameGroup `
+                -Color $accent `
+                -Category $category `
+                -ModeBadge $modeBadge
+        }
+        if (Get-Command New-GameSyncBadgeBitmap -ErrorAction SilentlyContinue) {
+            return New-GameSyncBadgeBitmap `
+                -GameGroup $gameGroup `
+                -Color $accent `
+                -Category $category `
+                -SyncMode "agnostic" `
+                -ModeBadge $modeBadge
+        }
+    }
+    if ($verificationBadge) {
+        return New-ActionBitmap -Action "Search" -Color $script:Colors.AccentBlue
+    }
+    $lastActionImage = New-TrayLastActionStatusBitmap -LastActionText $LastActionText -FallbackColor $dimColor
+    if ($lastActionImage) { return $lastActionImage }
+    return New-ActionBitmap -Action "Info" -Color $dimColor
+}
+
+function Get-TrayProfileDisplayName {
+    param([AllowNull()][string]$ProfileId)
+
+    if ([string]::IsNullOrWhiteSpace($ProfileId)) { return "Profile not reported" }
+    if ($script:Profiles -and $script:Profiles.Contains($ProfileId)) {
+        $profile = $script:Profiles[$ProfileId]
+        if ($profile -and -not [string]::IsNullOrWhiteSpace("$($profile.Name)")) {
+            return (Format-TrayDisplayCopy -Text "$($profile.Name)")
+        }
+    }
+    return (Format-TrayUserFacingText -Text $ProfileId)
+}
+
+function Get-TrayProfileObjectDisplayName {
+    param(
+        [AllowNull()][object]$Profile,
+        [AllowNull()][string]$Fallback = ""
+    )
+
+    if ($Profile -and -not [string]::IsNullOrWhiteSpace("$($Profile.Name)")) {
+        return (Format-TrayDisplayCopy -Text "$($Profile.Name)")
+    }
+    if (-not [string]::IsNullOrWhiteSpace($Fallback)) {
+        return (Format-TrayUserFacingText -Text $Fallback)
+    }
+    return "A.B.S.O."
+}
+
+function Get-ActiveTrayProfileRecord {
+    $profileId = if ([string]::IsNullOrWhiteSpace([string]$script:activeProfile)) {
+        $null
+    }
+    else {
+        "$($script:activeProfile)"
+    }
+
+    $profile = $null
+    $inCatalog = $false
+    if ($profileId -and $script:Profiles -and $script:Profiles.Contains($profileId)) {
+        $profile = $script:Profiles[$profileId]
+        $inCatalog = ($null -ne $profile)
+    }
+
+    $displayName = if ($inCatalog -and $profile -and -not [string]::IsNullOrWhiteSpace("$($profile.Name)")) {
+        Format-TrayDisplayCopy -Text "$($profile.Name)"
+    }
+    elseif ($profileId) {
+        Format-TrayUserFacingText -Text $profileId
+    }
+    else {
+        "No profile active"
+    }
+
+    return [pscustomobject]@{
+        Id = $profileId
+        Profile = $profile
+        DisplayName = $displayName
+        InCatalog = $inCatalog
+    }
+}
+
+function Get-TrayProfileAccentColor {
+    param(
+        [AllowNull()][string]$ProfileId,
+        [AllowNull()][object]$Profile,
+        [System.Drawing.Color]$Fallback = [System.Drawing.Color]::White
+    )
+
+    if (-not $Profile -and -not [string]::IsNullOrWhiteSpace($ProfileId) -and $script:Profiles -and $script:Profiles.Contains($ProfileId)) {
+        $Profile = $script:Profiles[$ProfileId]
+    }
+
+    $category = if ($Profile -and $Profile.Cat) { "$($Profile.Cat)" } else { "Other" }
+    $baseColor = if (Get-Command Get-CategoryColor -ErrorAction SilentlyContinue) {
+        Get-CategoryColor -Category $category -Fallback $Fallback
+    }
+    else {
+        $Fallback
+    }
+
+    if (Get-Command Get-GameAccentColor -ErrorAction SilentlyContinue) {
+        $gameGroup = Get-TrayProfileGameGroup -ProfileId $ProfileId -Profile $Profile
+        return Get-GameAccentColor -GameGroup $gameGroup -FallbackColor $baseColor
+    }
+
+    return $baseColor
+}
+
+function Set-TrayStatusHeroImage {
+    param(
+        [AllowNull()][string]$ProfileId,
+        [AllowNull()][object]$Profile,
+        [switch]$ActiveBadge,
+        [switch]$PendingApplyBadge,
+        [switch]$WindowsRestartBadge,
+        [switch]$VerificationBadge
+    )
+
+    if (-not $script:statusItem) { return }
+    if ([string]::IsNullOrWhiteSpace($ProfileId)) {
+        Set-MenuItemImageSafe -Item $script:statusItem -NewImage $null
+        return
+    }
+
+    if (-not $Profile -and $script:Profiles -and $script:Profiles.Contains($ProfileId)) {
+        $Profile = $script:Profiles[$ProfileId]
+    }
+
+    # If catalog metadata is stale, keep the status hero identifiable with the
+    # same deterministic profile-id art used by toasts.
+    $category = if ($Profile -and $Profile.Cat) { "$($Profile.Cat)" } else { "Other" }
+    $accent = Get-TrayProfileAccentColor -ProfileId $ProfileId -Profile $Profile -Fallback $script:Colors.AccentGreen
+    $gameGroup = Get-TrayProfileGameGroup -ProfileId $ProfileId -Profile $Profile
+    $variant = if ($Profile -and $Profile.Variant) { "$($Profile.Variant)" } else { "" }
+    $modeBadge = if ("$ProfileId" -match '(?i)capture' -or $variant -match '(?i)capture') {
+        "capture"
+    }
+    elseif ($variant -match '(?i)\bHDR\b' -or "$ProfileId" -match '(?i)-hdr($|-)' ) {
+        "hdr"
+    }
+    else {
+        ""
+    }
+    $favoriteBadge = (Test-Favorite -ProfileId $ProfileId -Config $script:TrayConfig)
+    $heroImage = if ($ActiveBadge -and (Get-Command New-ActiveGameBitmap -ErrorAction SilentlyContinue)) {
+        New-ActiveGameBitmap `
+            -GameGroup $gameGroup `
+            -Color $accent `
+            -Category $category `
+            -ModeBadge $modeBadge `
+            -FavoriteBadge $favoriteBadge `
+            -PendingApplyBadge ([bool]$PendingApplyBadge) `
+            -WindowsRestartBadge ([bool]$WindowsRestartBadge) `
+            -VerificationBadge ([bool]$VerificationBadge)
+    }
+    elseif ($favoriteBadge -and (Get-Command New-FavoriteGameBitmap -ErrorAction SilentlyContinue)) {
+        New-FavoriteGameBitmap `
+            -GameGroup $gameGroup `
+            -Color $accent `
+            -Category $category `
+            -SyncMode "agnostic" `
+            -ModeBadge $modeBadge
+    }
+    elseif (-not [string]::IsNullOrWhiteSpace($modeBadge) -and (Get-Command New-GameSyncBadgeBitmap -ErrorAction SilentlyContinue)) {
+        New-GameSyncBadgeBitmap `
+            -GameGroup $gameGroup `
+            -Color $accent `
+            -Category $category `
+            -SyncMode "agnostic" `
+            -ModeBadge $modeBadge
+    }
+    elseif (Get-Command New-GameBitmap -ErrorAction SilentlyContinue) {
+        New-GameBitmap -GameGroup $gameGroup -Color $accent -Category $category
+    }
+    else {
+        $null
+    }
+
+    Set-MenuItemImageSafe -Item $script:statusItem -NewImage $heroImage
+}
+
+function Set-TrayActiveStatusItemFromState {
+    if (-not $script:statusItem) { return }
+
+    $activeRecord = Get-ActiveTrayProfileRecord
+    if (-not $activeRecord.Id) {
+        $script:statusItem.Text = "Ready|No profile active"
+        $script:statusItem.ForeColor = $script:Colors.AccentGreen
+        Set-TrayStatusHeroImage -ProfileId $null -Profile $null
+        return
+    }
+
+    $profileDisplayName = if (
+        $activeRecord.InCatalog -and
+        $activeRecord.Profile -and
+        -not [string]::IsNullOrWhiteSpace("$($activeRecord.Profile.Name)")
+    ) {
+        Format-TrayDisplayCopy -Text "$($activeRecord.Profile.Name)"
+    }
+    else {
+        "$($activeRecord.DisplayName)"
+    }
+    $pendingApplyText = Get-ActiveProfilePendingApplyText
+    $rebootPendingText = Get-ActiveProfileRebootPendingText
+    $verificationProgressText = Get-ActiveProfileVerificationInProgressText
+    if ($pendingApplyText) {
+        $script:statusItem.Text = "$profileDisplayName|Pending profile fix: $pendingApplyText"
+        $script:statusItem.ForeColor = $script:Colors.AccentAmber
+        Set-TrayStatusHeroImage -ProfileId $activeRecord.Id -Profile $activeRecord.Profile -ActiveBadge -PendingApplyBadge
+        return
+    }
+    if ($rebootPendingText) {
+        $script:statusItem.Text = "$profileDisplayName|Windows restart required: $rebootPendingText"
+        $script:statusItem.ForeColor = $script:Colors.AccentAmber
+        Set-TrayStatusHeroImage -ProfileId $activeRecord.Id -Profile $activeRecord.Profile -ActiveBadge -WindowsRestartBadge
+        return
+    }
+    if ($verificationProgressText) {
+        $script:statusItem.Text = "$profileDisplayName|Checking profile state..."
+        $script:statusItem.ForeColor = $script:Colors.AccentBlue
+        Set-TrayStatusHeroImage -ProfileId $activeRecord.Id -Profile $activeRecord.Profile -ActiveBadge -VerificationBadge
+        return
+    }
+
+    if (-not $activeRecord.InCatalog) {
+        $script:statusItem.Text = "$($activeRecord.DisplayName)|Active profile not in current profile list"
+        $script:statusItem.ForeColor = $script:Colors.AccentAmber
+        Set-TrayStatusHeroImage -ProfileId $activeRecord.Id -Profile $null -ActiveBadge
+        return
+    }
+
+    $p = $activeRecord.Profile
+    $statusName = Get-TrayProfileObjectDisplayName -Profile $p -Fallback $activeRecord.Id
+    $statusSub = Format-TrayDisplayCopy -Text "$($p.Sub)"
+    $script:statusItem.Text = "$statusName|$statusSub"
+    $script:statusItem.ForeColor = Get-TrayProfileAccentColor -ProfileId $activeRecord.Id -Profile $p -Fallback $script:Colors.AccentGreen
+    Set-TrayStatusHeroImage -ProfileId $activeRecord.Id -Profile $p -ActiveBadge
+}
+
+function Get-QuickPanelEmptyStatus {
+    $activeRecord = Get-ActiveTrayProfileRecord
+    $favoriteIds = @(
+        @($script:TrayConfig.favorites) |
+            Where-Object { -not [string]::IsNullOrWhiteSpace("$_") } |
+            ForEach-Object { "$_" }
+    )
+
+    $loadedFavoriteCount = 0
+    foreach ($favId in $favoriteIds) {
+        if ($script:Profiles -and $script:Profiles.Contains($favId)) {
+            $loadedFavoriteCount++
+        }
+    }
+
+    $activeMissing = ($activeRecord.Id -and -not $activeRecord.InCatalog)
+    $favoritesMissing = ($favoriteIds.Count -gt 0 -and $loadedFavoriteCount -eq 0)
+
+    if ($activeMissing -and $favoritesMissing) {
+        return [pscustomobject]@{
+            Message = "Active profile and favorites are not in the current profile list."
+            LastAction = "Quick Panel empty: profile list mismatch"
+            ProfileId = "$($activeRecord.Id)"
+        }
+    }
+    if ($activeMissing) {
+        return [pscustomobject]@{
+            Message = "Active profile is not in the current profile list: $($activeRecord.DisplayName)."
+            LastAction = "Quick Panel empty: active profile missing"
+            ProfileId = "$($activeRecord.Id)"
+        }
+    }
+    if ($favoritesMissing) {
+        return [pscustomobject]@{
+            Message = "Favorite profiles are not in the current profile list."
+            LastAction = "Quick Panel empty: favorites missing"
+            ProfileId = "$($favoriteIds[0])"
+        }
+    }
+
+    return [pscustomobject]@{
+        Message = "No active profile or favorites to show."
+        LastAction = "Quick Panel empty"
+        ProfileId = $null
+    }
+}
+
+function Get-TrayProfilePreviewText {
+    param(
+        [string]$ProfileId,
+        [object]$Profile
+    )
+
+    if (-not $Profile -and $script:Profiles -and $script:Profiles.Contains($ProfileId)) {
+        $Profile = $script:Profiles[$ProfileId]
+    }
+    if (-not $Profile) { return "Preview: $(Format-TrayUserFacingText -Text $ProfileId)" }
+
+    $parts = [System.Collections.Generic.List[string]]::new()
+    $groupName = if (-not [string]::IsNullOrWhiteSpace("$($Profile.GroupName)")) {
+        Format-TrayDisplayCopy -Text "$($Profile.GroupName)"
+    }
+    elseif (-not [string]::IsNullOrWhiteSpace("$($Profile.Name)")) {
+        Format-TrayDisplayCopy -Text "$($Profile.Name)"
+    }
+    else {
+        Format-TrayUserFacingText -Text $ProfileId
+    }
+    [void]$parts.Add("Preview: $groupName")
+
+    if (-not [string]::IsNullOrWhiteSpace("$($Profile.Variant)")) {
+        Add-UniqueTrayMessage -Target $parts -Message (Format-TrayDisplayCopy -Text "$($Profile.Variant)")
+    }
+    elseif (-not [string]::IsNullOrWhiteSpace("$($Profile.Cat)")) {
+        Add-UniqueTrayMessage -Target $parts -Message (Format-TrayDisplayCopy -Text "$($Profile.Cat)")
+    }
+
+    if (-not [string]::IsNullOrWhiteSpace("$($Profile.SyncMode)")) {
+        Add-UniqueTrayMessage -Target $parts -Message (Format-TrayDisplayCopy -Text "$($Profile.SyncMode)")
+    }
+
+    return (@($parts) -join "  |  ")
+}
+
+function Set-TrayProfileHoverPreview {
+    param([string]$ProfileId)
+
+    if ([string]::IsNullOrWhiteSpace($ProfileId) -or -not $script:Profiles -or -not $script:Profiles.Contains($ProfileId)) {
+        return
+    }
+
+    $profile = $script:Profiles[$ProfileId]
+    $accent = Get-TrayProfileAccentColor -ProfileId $ProfileId -Profile $profile -Fallback $script:Colors.Text
+    $favoriteBadge = (Test-Favorite -ProfileId $ProfileId -Config $script:TrayConfig)
+    if ($script:statusItem) {
+        $previewName = Get-TrayProfileObjectDisplayName -Profile $profile -Fallback $ProfileId
+        $subtitle = if ($profile.Sub) { Format-TrayDisplayCopy -Text "$($profile.Sub)" } elseif ($profile.Cat) { Format-TrayDisplayCopy -Text "$($profile.Cat)" } else { "Profile preview" }
+        $script:statusItem.Text = "$previewName|$subtitle"
+        $script:statusItem.ForeColor = $accent
+        Set-TrayStatusHeroImage -ProfileId $ProfileId -Profile $profile -ActiveBadge:($ProfileId -eq $script:activeProfile)
+    }
+    if ($script:statusBarItem) {
+        $script:statusBarItem.Text = "  $(Get-TrayProfilePreviewText -ProfileId $ProfileId -Profile $profile)"
+        $script:statusBarItem.ForeColor = $accent
+        $script:statusBarItem.AccessibleDescription = Get-TrayStatusBarChipText -Preview $true
+        $previewImage = New-TrayProfileMenuImage `
+            -ProfileId $ProfileId `
+            -IsActive ($ProfileId -eq $script:activeProfile) `
+            -ShowSyncBadge $true `
+            -FavoriteBadge $favoriteBadge
+        Set-MenuItemImageSafe -Item $script:statusBarItem -NewImage $previewImage
+    }
+}
+
+function Clear-TrayProfileHoverPreview {
+    Update-MenuState
+}
+
+function Register-TrayProfileHoverPreview {
+    param(
+        [System.Windows.Forms.ToolStripMenuItem]$Item,
+        [string]$ProfileId
+    )
+
+    if (-not $Item -or [string]::IsNullOrWhiteSpace($ProfileId)) { return }
+    $capturedProfileId = $ProfileId
+    $Item.Add_MouseEnter({
+        Set-TrayProfileHoverPreview -ProfileId $capturedProfileId
+    }.GetNewClosure())
+    $Item.Add_MouseLeave({
+        Clear-TrayProfileHoverPreview
+    }.GetNewClosure())
+}
+
+function Get-RecentProfileTooltipText {
+    param(
+        [object]$Profile,
+        [object]$Entry
+    )
+
+    $parts = [System.Collections.Generic.List[string]]::new()
+    if ($Profile -and -not [string]::IsNullOrWhiteSpace("$($Profile.Sub)")) {
+        [void]$parts.Add((Format-TrayDisplayCopy -Text "$($Profile.Sub)"))
+    }
+    if ($Entry) {
+        $recordedAt = if ($Entry.PSObject.Properties["recorded_at"]) { $Entry.recorded_at } else { $null }
+        $timestamp = if ($recordedAt) { $recordedAt } elseif ($Entry.PSObject.Properties["timestamp"]) { $Entry.timestamp } else { $null }
+        $displayTime = Format-TrayTimestamp -Value $timestamp
+        if ($displayTime -ne "time unknown") {
+            [void]$parts.Add("Last applied: $displayTime")
+        }
+    }
+    return (($parts | Where-Object { -not [string]::IsNullOrWhiteSpace("$_") }) -join "`n")
+}
+
 # ============================================================================
 # ACTIONS
 # ============================================================================
 
-function Run-Audit {
-    Write-TrayLog "Running audit..."
-    Set-IconState -State "Applying"
-    $script:notifyIcon.Text = "A.B.S.O. - Running Audit..."
+$script:AuditProc = $null
+$script:AuditPollTimer = $null
+$script:AuditOutputFile = $null
+$script:AuditErrorFile = $null
+$script:AuditStartedAt = $null
+
+function Set-TrayAuditStatusItem {
+    param(
+        [string]$Text,
+        [System.Drawing.Color]$Color,
+        [string]$ChipText = "AUDIT",
+        [switch]$IssueBadge
+    )
+
+    if (-not $script:auditStatusItem) { return }
+
+    $script:auditStatusItem.Text = $Text
+    $script:auditStatusItem.ForeColor = $Color
+    $script:auditStatusItem.AccessibleName = "__status_bar__"
+    $script:auditStatusItem.AccessibleDescription = if ([string]::IsNullOrWhiteSpace($ChipText)) { "AUDIT" } else { $ChipText }
+    Set-MenuItemImageSafe -Item $script:auditStatusItem -NewImage (
+        New-AuditStatusBitmap -Color $script:auditStatusItem.ForeColor -IssueBadge:$IssueBadge
+    )
+    $script:auditStatusItem.Visible = $true
+}
+
+function Test-AuditInFlight {
+    if (-not $script:AuditProc) { return $false }
+    try {
+        return (-not $script:AuditProc.HasExited)
+    }
+    catch {
+        return $false
+    }
+}
+
+function Stop-AuditRuntime {
+    param([switch]$KillProcess)
+
+    if ($script:AuditPollTimer) {
+        try { $script:AuditPollTimer.Stop() } catch {}
+        try { $script:AuditPollTimer.Dispose() } catch {}
+        $script:AuditPollTimer = $null
+    }
+    if ($script:AuditProc) {
+        try {
+            if ($KillProcess -and -not $script:AuditProc.HasExited) {
+                $script:AuditProc.Kill()
+            }
+        } catch {}
+        try { $script:AuditProc.Dispose() } catch {}
+        $script:AuditProc = $null
+    }
+    foreach ($path in @($script:AuditOutputFile, $script:AuditErrorFile)) {
+        if ($path) { Remove-Item $path -Force -ErrorAction SilentlyContinue }
+    }
+    $script:AuditOutputFile = $null
+    $script:AuditErrorFile = $null
+    $script:AuditStartedAt = $null
+}
+
+function Complete-AuditIfReady {
+    $proc = $script:AuditProc
+    if (-not $proc) {
+        Stop-AuditRuntime
+        return
+    }
+
+    $elapsedSeconds = if ($script:AuditStartedAt) {
+        ([DateTime]::UtcNow - $script:AuditStartedAt).TotalSeconds
+    }
+    else {
+        0
+    }
+    if (-not $proc.HasExited -and $elapsedSeconds -lt 60) {
+        return
+    }
 
     try {
-        $tempFile = [System.IO.Path]::GetTempFileName()
-        $errFile = "$tempFile.err"
-        Start-Process -FilePath $script:PythonExe -ArgumentList (Get-AbsoBackendArgs -CommandArgs @("audit", "--json")) `
-            -NoNewWindow -Wait -WorkingDirectory $script:ProjectRoot `
-            -RedirectStandardOutput $tempFile -RedirectStandardError $errFile
+        if ($script:AuditPollTimer) {
+            $script:AuditPollTimer.Stop()
+        }
 
-        $rawOutput = Get-Content $tempFile -Raw -ErrorAction SilentlyContinue
-        $errOutput = Get-Content $errFile -Raw -ErrorAction SilentlyContinue
-        Remove-Item $tempFile -Force -ErrorAction SilentlyContinue
-        Remove-Item $errFile -Force -ErrorAction SilentlyContinue
+        if (-not $proc.HasExited) {
+            try { $proc.Kill() } catch {}
+            throw "audit timed out after 60s"
+        }
+
+        $exitCode = $proc.ExitCode
+        $rawOutput = Get-Content $script:AuditOutputFile -Raw -ErrorAction SilentlyContinue
+        $errOutput = Get-Content $script:AuditErrorFile -Raw -ErrorAction SilentlyContinue
         if ($errOutput) { Write-TrayLog "Audit CLI stderr: $errOutput" -Level "WARN" }
+        if ($null -ne $exitCode -and $exitCode -ne 0) {
+            throw "audit exited $exitCode"
+        }
 
-        if ($rawOutput) {
-            $json = Invoke-JsonSafe -Text $rawOutput -Source 'Audit'
-            if ($null -ne $json -and $json.success -and $json.data) {
-                $issues = if ($json.data -is [System.Array]) { @($json.data) } else { @($json.data.issues) }
-                $issueCount = if ($issues) { $issues.Count } else { 0 }
-                $script:AuditIssueCount = $issueCount
+        if (-not $rawOutput) {
+            Show-Notification -Title "A.B.S.O. Audit" -Message "Audit failed: runtime returned no status" -Type "Error" -ActionName "Audit" -ActionColor $script:Colors.AccentBlue
+            Set-IconState -State "Error"
+            Set-TrayAuditStatusItem -Text "Audit Failed" -Color $script:Colors.AccentAmber -ChipText "AUDIT|FAIL" -IssueBadge
+            $script:LastAction = "Audit failed: runtime returned no status"
+            return
+        }
 
-                if ($issueCount -eq 0) {
-                    Show-Notification -Title "A.B.S.O. Audit" -Message "No issues detected by the current audit scope." -Type "Success"
-                    Set-IconState -State $(if ($script:activeProfile) { "Active" } else { "Idle" })
+        $json = Invoke-JsonSafe -Text $rawOutput -Source 'Audit'
+        if ($null -eq $json) {
+            Show-Notification -Title "A.B.S.O. Audit" -Message "Audit failed: runtime status unreadable" -Type "Error" -ActionName "Audit" -ActionColor $script:Colors.AccentBlue
+            Set-IconState -State "Error"
+            Set-TrayAuditStatusItem -Text "Audit Failed" -Color $script:Colors.AccentAmber -ChipText "AUDIT|FAIL" -IssueBadge
+            $script:LastAction = "Audit failed: runtime status unreadable"
+            return
+        }
+        if (-not $json.success -or -not $json.data) {
+            $auditError = if ($json.error) { "$($json.error)" } else { "runtime status unreadable" }
+            Show-Notification -Title "A.B.S.O. Audit" -Message "Audit failed: $auditError" -Type "Error" -ActionName "Audit" -ActionColor $script:Colors.AccentBlue
+            Set-IconState -State "Error"
+            Set-TrayAuditStatusItem -Text "Audit Failed" -Color $script:Colors.AccentAmber -ChipText "AUDIT|FAIL" -IssueBadge
+            $script:LastAction = "Audit failed: $auditError"
+            return
+        }
+
+        $issues = if ($json.data -is [System.Array]) { @($json.data) } else { @($json.data.issues) }
+        $issueCount = if ($issues) { $issues.Count } else { 0 }
+        $script:AuditIssueCount = $issueCount
+
+        if ($issueCount -eq 0) {
+            Show-Notification -Title "A.B.S.O. Audit" -Message "No issues detected by the current audit scope." -Type "Success" -ActionName "Audit" -ActionColor $script:Colors.AccentBlue
+            $auditActionMessage = "Audit clean: no issues in scope"
+            Set-IconState -State $(if ($script:activeProfile) { "Active" } else { "Idle" })
+        }
+        else {
+            $auditIssueLabel = if ($issueCount -eq 1) { "issue" } else { "issues" }
+            $auditStatusLabel = if ($issueCount -eq 1) { "Issue Found" } else { "Issues Found" }
+            $issueIndex = 0
+            foreach ($issue in @($issues)) {
+                $issueIndex += 1
+                $issueText = if ($issue -is [string]) {
+                    "$issue"
+                }
+                elseif ($issue.message) {
+                    if ($issue.details) { "$($issue.message): $($issue.details)" } else { "$($issue.message)" }
                 }
                 else {
-                    Show-Notification -Title "A.B.S.O. Audit" -Message "$issueCount issue(s) found. Run 'abso audit' for details." -Type "Warning"
-                    Set-IconState -State "Warning"
+                    try { $issue | ConvertTo-Json -Depth 5 -Compress } catch { "$issue" }
                 }
+                Write-TrayLog "Audit issue ${issueIndex}/${issueCount}: $(Format-TrayUserFacingText -Text $issueText)" -Level "WARN"
+            }
+            Show-Notification -Title "A.B.S.O. Audit" -Message "$issueCount $auditIssueLabel found. See tray log for details." -Type "Warning" -ActionName "Audit" -ActionColor $script:Colors.AccentBlue
+            $auditActionMessage = "Audit ${auditIssueLabel} found: $issueCount"
+            Set-IconState -State "Warning"
+        }
 
-                # Update audit menu item
-                if ($script:auditStatusItem) {
-                    if ($issueCount -gt 0) {
-                        $script:auditStatusItem.Text = "      Issues Found: $issueCount"
-                        $script:auditStatusItem.ForeColor = [System.Drawing.Color]::FromArgb(255, 240, 180, 60)
-                        $script:auditStatusItem.Visible = $true
-                    }
-                    else {
-                        $script:auditStatusItem.Text = "      No Issues In Scope"
-                        $script:auditStatusItem.ForeColor = $script:Colors.AccentGreen
-                        $script:auditStatusItem.Visible = $true
-                    }
-                }
+        if ($script:auditStatusItem) {
+            if ($issueCount -gt 0) {
+                Set-TrayAuditStatusItem `
+                    -Text "${auditStatusLabel}: $issueCount" `
+                    -Color ([System.Drawing.Color]::FromArgb(255, 240, 180, 60)) `
+                    -ChipText "AUDIT|ISSUES" `
+                    -IssueBadge
+            }
+            else {
+                Set-TrayAuditStatusItem -Text "No Issues In Scope" -Color $script:Colors.AccentGreen -ChipText "AUDIT|CLEAN"
             }
         }
+
+        $script:LastAction = $auditActionMessage
     }
     catch {
         Write-TrayLog "Audit failed: $($_.Exception.Message)" -Level "ERROR"
-        Show-Notification -Title "A.B.S.O." -Message "Audit failed: $($_.Exception.Message)" -Type "Error"
+        Show-Notification -Title "A.B.S.O." -Message "Audit failed: $($_.Exception.Message)" -Type "Error" -ActionName "Audit" -ActionColor $script:Colors.AccentBlue
         Set-IconState -State "Error"
+        Set-TrayAuditStatusItem -Text "Audit Failed" -Color $script:Colors.AccentAmber -ChipText "AUDIT|FAIL" -IssueBadge
+        $script:LastAction = "Audit failed: $($_.Exception.Message)"
+    }
+    finally {
+        $script:LastActionTime = Get-Date
+        Stop-AuditRuntime
+        Update-MenuState
+    }
+}
+
+function Run-Audit {
+    if (Test-AuditInFlight) {
+        Show-Notification -Title "A.B.S.O. Audit" -Message "Audit is already running." -Type "Info" -ActionName "Audit" -ActionColor $script:Colors.AccentBlue
+        Set-TrayLastAction -Message "Audit already running"
+        Update-MenuState
+        return
     }
 
-    $script:LastAction = "Audit completed"
-    $script:LastActionTime = Get-Date -Format "HH:mm"
+    Write-TrayLog "Running audit..."
+    Set-IconState -State "Applying"
+    Set-TrayOperationTooltipText -Text "A.B.S.O. - Running Audit..."
+    $script:LastAction = "Audit running"
+    $script:LastActionTime = Get-Date
+    Set-TrayAuditStatusItem -Text "Audit Running" -Color $script:Colors.AccentBlue -ChipText "AUDIT|RUN"
     Update-MenuState
+
+    try {
+        $script:AuditOutputFile = [System.IO.Path]::GetTempFileName()
+        $script:AuditErrorFile = "$($script:AuditOutputFile).err"
+        $script:AuditStartedAt = [DateTime]::UtcNow
+        $script:AuditProc = Start-Process -FilePath $script:PythonExe -ArgumentList (Get-AbsoBackendArgs -CommandArgs @("audit", "--json")) `
+            -NoNewWindow -PassThru -WorkingDirectory $script:ProjectRoot `
+            -RedirectStandardOutput $script:AuditOutputFile -RedirectStandardError $script:AuditErrorFile
+        # PS 5.1: cache the handle now or .ExitCode reads $null after exit.
+        if ($script:AuditProc) { $null = $script:AuditProc.Handle }
+
+        $pollTimer = New-Object System.Windows.Forms.Timer
+        $pollTimer.Interval = 400
+        $pollTimer.Add_Tick({ Complete-AuditIfReady })
+        $script:AuditPollTimer = $pollTimer
+        $pollTimer.Start()
+    }
+    catch {
+        Write-TrayLog "Audit failed: $($_.Exception.Message)" -Level "ERROR"
+        Show-Notification -Title "A.B.S.O." -Message "Audit failed: $($_.Exception.Message)" -Type "Error" -ActionName "Audit" -ActionColor $script:Colors.AccentBlue
+        Set-IconState -State "Error"
+        Set-TrayAuditStatusItem -Text "Audit Failed" -Color $script:Colors.AccentAmber -ChipText "AUDIT|FAIL" -IssueBadge
+        $script:LastAction = "Audit failed: $($_.Exception.Message)"
+        $script:LastActionTime = Get-Date
+        Stop-AuditRuntime -KillProcess
+        Update-MenuState
+    }
 }
 
 function Open-BackupsFolder {
-    $backupsPath = Join-Path $script:ProjectRoot "backups"
+    $backupsPath = Get-BackupPath
     if (Test-Path $backupsPath) {
         try {
             Start-Process "explorer.exe" -ArgumentList $backupsPath -ErrorAction Stop
+            Set-TrayLastAction -Message "Opened backups folder"
+            Update-MenuState
         }
         catch {
             Write-TrayLog "Failed to open backups folder: $($_.Exception.Message)" -Level "ERROR"
-            Show-Notification -Title "A.B.S.O." -Message "Failed to open folder: $($_.Exception.Message)" -Type "Error"
+            Show-Notification -Title "A.B.S.O." -Message "Failed to open backups folder: $($_.Exception.Message)" -Type "Error" -ActionName "Folder" -ActionColor $script:Colors.AccentPurple
+            Set-TrayLastAction -Message "Open backups failed: $($_.Exception.Message)"
+            Update-MenuState
         }
     }
     else {
-        Show-Notification -Title "A.B.S.O." -Message "No backups folder found" -Type "Warning"
+        Show-Notification -Title "A.B.S.O." -Message "Current backups folder not found. Applying a profile creates it." -Type "Info" -ActionName "Backups" -ActionColor $script:Colors.AccentPurple
+        Set-TrayLastAction -Message "Current backups folder not found"
+        Update-MenuState
     }
 }
 
 function Open-LogFile {
-    if (Test-Path $script:LogFile) {
-        Start-Process "notepad.exe" -ArgumentList $script:LogFile
+    try {
+        if (-not (Test-Path $script:LogFile)) {
+            Write-TrayLog "Tray log file created for manual view request"
+        }
+        Start-Process "notepad.exe" -ArgumentList $script:LogFile -ErrorAction Stop
+        Set-TrayLastAction -Message "Opened tray log file"
+        Update-MenuState
     }
+    catch {
+        Write-TrayLog "Failed to open tray log file: $($_.Exception.Message)" -Level "ERROR"
+        Show-Notification -Title "A.B.S.O." -Message "Failed to open tray log: $($_.Exception.Message)" -Type "Error" -ActionName "Log" -ActionColor $script:Colors.TextDim
+        Set-TrayLastAction -Message "Open tray log failed: $($_.Exception.Message)"
+        Update-MenuState
+    }
+}
+
+function Get-TrayConfigDir {
+    $appDataRoot = if ($env:APPDATA) {
+        $env:APPDATA
+    }
+    else {
+        [Environment]::GetFolderPath("ApplicationData")
+    }
+    return (Join-Path $appDataRoot "ABSO")
 }
 
 function Open-ConfigFolder {
-    $configDir = Join-Path $env:APPDATA "ABSO"
-    if (-not (Test-Path $configDir)) {
-        New-Item -Path $configDir -ItemType Directory -Force | Out-Null
+    try {
+        $configDir = Get-TrayConfigDir
+        if (-not (Test-Path $configDir)) {
+            New-Item -Path $configDir -ItemType Directory -Force | Out-Null
+        }
+        Start-Process "explorer.exe" -ArgumentList $configDir -ErrorAction Stop
+        Set-TrayLastAction -Message "Opened tray settings folder"
+        Update-MenuState
     }
-    Start-Process "explorer.exe" -ArgumentList $configDir
+    catch {
+        Write-TrayLog "Failed to open tray settings folder: $($_.Exception.Message)" -Level "ERROR"
+        Show-Notification -Title "A.B.S.O." -Message "Failed to open tray settings folder: $($_.Exception.Message)" -Type "Error" -ActionName "Folder" -ActionColor $script:Colors.TextDim
+        Set-TrayLastAction -Message "Open tray settings failed: $($_.Exception.Message)"
+        Update-MenuState
+    }
+}
+
+function Open-RuntimeFolder {
+    try {
+        $runtimeDir = Get-InstalledAppRoot
+        if (-not (Test-Path $runtimeDir)) {
+            New-Item -Path $runtimeDir -ItemType Directory -Force | Out-Null
+        }
+        Start-Process "explorer.exe" -ArgumentList $runtimeDir -ErrorAction Stop
+        Set-TrayLastAction -Message "Opened installed runtime folder"
+        Update-MenuState
+    }
+    catch {
+        Write-TrayLog "Failed to open installed runtime folder: $($_.Exception.Message)" -Level "ERROR"
+        Show-Notification -Title "A.B.S.O." -Message "Failed to open runtime folder: $($_.Exception.Message)" -Type "Error" -ActionName "Folder" -ActionColor $script:Colors.TextDim
+        Set-TrayLastAction -Message "Open runtime folder failed: $($_.Exception.Message)"
+        Update-MenuState
+    }
 }
 
 function Open-ProfilesFolder {
-    $profilesDir = Join-Path $env:USERPROFILE ".abso\profiles"
-    if (-not (Test-Path $profilesDir)) {
-        New-Item -ItemType Directory -Path $profilesDir -Force | Out-Null
+    try {
+        $profilesDir = Join-Path $env:USERPROFILE ".abso\profiles"
+        if (-not (Test-Path $profilesDir)) {
+            New-Item -ItemType Directory -Path $profilesDir -Force | Out-Null
+        }
+        Start-Process "explorer.exe" -ArgumentList $profilesDir -ErrorAction Stop
+        Set-TrayLastAction -Message "Opened user profiles folder"
+        Update-MenuState
     }
-    Start-Process "explorer.exe" -ArgumentList $profilesDir
+    catch {
+        Write-TrayLog "Failed to open user profiles folder: $($_.Exception.Message)" -Level "ERROR"
+        Show-Notification -Title "A.B.S.O." -Message "Failed to open profiles folder: $($_.Exception.Message)" -Type "Error" -ActionName "Folder" -ActionColor $script:Colors.TextDim
+        Set-TrayLastAction -Message "Open profiles folder failed: $($_.Exception.Message)"
+        Update-MenuState
+    }
 }
 
 function Get-InstalledAppRoot {
@@ -3711,50 +6266,170 @@ function Get-InstalledTrayDir {
     return (Join-Path (Get-InstalledAppRoot) "abso\tray")
 }
 
-function Get-StartupStatus {
+function Test-StartupStringContainsLiteral {
+    param(
+        [string]$Text,
+        [string]$Needle
+    )
+
+    if ([string]::IsNullOrWhiteSpace($Text) -or [string]::IsNullOrWhiteSpace($Needle)) {
+        return $false
+    }
+
+    return ($Text.IndexOf($Needle, [System.StringComparison]::OrdinalIgnoreCase) -ge 0)
+}
+
+function Get-StartupStatusFallback {
+    param([string]$InstallScript)
+
     $legacyShortcutPath = [System.IO.Path]::Combine(
         [Environment]::GetFolderPath("Startup"),
         "ABSO-Tray.lnk"
     )
+    $trayDir = if (-not [string]::IsNullOrWhiteSpace($InstallScript)) {
+        try { Split-Path -Parent $InstallScript } catch { $script:ScriptDir }
+    }
+    else {
+        $script:ScriptDir
+    }
+    $expectedLauncherPath = Join-Path $trayDir "ABSO-StartupLaunch.ps1"
+    $expectedVbsPath = Join-Path $trayDir "ABSO-Tray.vbs"
+    $shortcutInstalled = Test-Path $legacyShortcutPath
+    $taskName = "ABSO-Tray-Startup"
+    $taskInstalled = $false
+    $taskEnabled = $false
+    $actionExecute = $null
+    $actionArguments = $null
+    $actionPathCurrent = $false
+
+    $task = $null
+    try {
+        $task = Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
+    }
+    catch {
+        Write-TrayLog "Startup fallback scheduled-task probe failed: $($_.Exception.Message)" -Level "WARN"
+    }
+
+    if ($task) {
+        $taskInstalled = $true
+        $taskEnabled = [bool]$task.Settings.Enabled
+        $action = @($task.Actions) | Select-Object -First 1
+        $actionExecute = if ($action) { "$($action.Execute)" } else { $null }
+        $actionArguments = if ($action) { "$($action.Arguments)" } else { $null }
+        $actionUsesLauncher = Test-StartupStringContainsLiteral -Text $actionArguments -Needle $expectedLauncherPath
+        $actionUsesVbs = Test-StartupStringContainsLiteral -Text $actionArguments -Needle $expectedVbsPath
+        $actionPathCurrent = [bool]($actionUsesLauncher -or $actionUsesVbs)
+    }
+
+    $taskUsable = ($taskInstalled -and $taskEnabled)
+    $mode = if ($taskUsable) {
+        "scheduled_task"
+    }
+    elseif ($shortcutInstalled) {
+        "startup_shortcut"
+    }
+    else {
+        "none"
+    }
+
+    return [PSCustomObject]@{
+        installed                = ($taskUsable -or $shortcutInstalled)
+        mode                     = $mode
+        task_installed           = $taskInstalled
+        task_enabled             = $taskEnabled
+        task_action_execute      = $actionExecute
+        task_action_arguments    = $actionArguments
+        task_action_path_current = $actionPathCurrent
+        shortcut_installed       = $shortcutInstalled
+        task_name                = $taskName
+        shortcut_path            = $legacyShortcutPath
+        vbs_path                 = $expectedVbsPath
+        launcher_path            = $expectedLauncherPath
+    }
+}
+
+function Invoke-StartupInstallerJson {
+    param(
+        [string]$ScriptPath,
+        [string[]]$CommandArgs,
+        [int]$TimeoutSeconds = 30,
+        [string]$Source = "StartupInstaller"
+    )
+
+    if ([string]::IsNullOrWhiteSpace($ScriptPath) -or -not (Test-Path $ScriptPath)) {
+        throw "startup installer script not found"
+    }
+
+    $stdoutPath = [System.IO.Path]::GetTempFileName()
+    $stderrPath = "$stdoutPath.err"
+    $proc = $null
+    try {
+        $psArgs = @(
+            "-NoProfile",
+            "-ExecutionPolicy", "Bypass",
+            "-File", "`"$ScriptPath`""
+        ) + @($CommandArgs)
+
+        $proc = Start-Process -FilePath "powershell.exe" -ArgumentList $psArgs `
+            -NoNewWindow -PassThru `
+            -RedirectStandardOutput $stdoutPath -RedirectStandardError $stderrPath
+        # PS 5.1: cache the handle now or .ExitCode reads $null after the child
+        # exits. This made every startup-status call fall back with
+        # "empty/bad JSON or exit code " even though the installer succeeded.
+        if ($proc) { $null = $proc.Handle }
+
+        $timeoutMs = [Math]::Max(1, $TimeoutSeconds) * 1000
+        $completed = $proc.WaitForExit($timeoutMs)
+        if (-not $completed -or -not $proc.HasExited) {
+            try { $proc.Kill() } catch {}
+            throw "$Source timed out after ${TimeoutSeconds}s"
+        }
+        # Parameterless WaitForExit finalizes redirected output after the
+        # timed wait so short reads cannot hand back a truncated payload.
+        $proc.WaitForExit()
+
+        $exitCode = $proc.ExitCode
+        $raw = Get-Content $stdoutPath -Raw -ErrorAction SilentlyContinue
+        $stderr = Get-Content $stderrPath -Raw -ErrorAction SilentlyContinue
+        if ($stderr) { Write-TrayLog "$Source stderr: $stderr" -Level "WARN" }
+        $payload = if ($raw) { Invoke-JsonSafe -Text $raw -Source $Source } else { $null }
+
+        return [PSCustomObject]@{
+            ExitCode = $exitCode
+            Raw = $raw
+            Payload = $payload
+        }
+    }
+    finally {
+        if ($proc) {
+            try { if (-not $proc.HasExited) { $proc.Kill() } } catch {}
+            try { $proc.Dispose() } catch {}
+        }
+        Remove-Item $stdoutPath -Force -ErrorAction SilentlyContinue
+        Remove-Item $stderrPath -Force -ErrorAction SilentlyContinue
+    }
+}
+
+function Get-StartupStatus {
     $installScript = Join-Path $script:ScriptDir "Install-Startup.ps1"
 
-    # Fallback for missing installer script
     if (-not (Test-Path $installScript)) {
-        $legacyInstalled = Test-Path $legacyShortcutPath
-        return [PSCustomObject]@{
-            installed          = $legacyInstalled
-            mode               = if ($legacyInstalled) { "startup_shortcut" } else { "none" }
-            task_installed     = $false
-            shortcut_installed = $legacyInstalled
-        }
+        return (Get-StartupStatusFallback -InstallScript $installScript)
     }
 
     try {
-        $args = @(
-            "-NoProfile",
-            "-ExecutionPolicy", "Bypass",
-            "-File", $installScript,
-            "-Status",
-            "-Json"
-        )
-        $raw = & powershell.exe @args
-        if ($LASTEXITCODE -eq 0 -and $raw) {
-            return ($raw | ConvertFrom-Json)
+        $result = Invoke-StartupInstallerJson -ScriptPath $installScript -CommandArgs @("-Status", "-Json") -TimeoutSeconds 15 -Source "StartupStatus"
+        if (($result.ExitCode -eq 0 -or $null -eq $result.ExitCode) -and $result.Payload) {
+            return $result.Payload
         }
 
-        Write-TrayLog "Get-StartupStatus fallback: installer returned empty or exit code $LASTEXITCODE" -Level "WARN"
+        Write-TrayLog "Get-StartupStatus fallback: installer returned empty/bad JSON or exit code $($result.ExitCode)" -Level "WARN"
     }
     catch {
         Write-TrayLog "Get-StartupStatus failed: $($_.Exception.Message)" -Level "WARN"
     }
 
-    $legacyInstalled = Test-Path $legacyShortcutPath
-    return [PSCustomObject]@{
-        installed          = $legacyInstalled
-        mode               = if ($legacyInstalled) { "startup_shortcut" } else { "none" }
-        task_installed     = $false
-        shortcut_installed = $legacyInstalled
-    }
+    return (Get-StartupStatusFallback -InstallScript $installScript)
 }
 
 function Get-InstalledStartupStatus {
@@ -3764,24 +6439,17 @@ function Get-InstalledStartupStatus {
     }
 
     try {
-        $args = @(
-            "-NoProfile",
-            "-ExecutionPolicy", "Bypass",
-            "-File", $installedScript,
-            "-Status",
-            "-Json"
-        )
-        $raw = & powershell.exe @args
-        if ($LASTEXITCODE -eq 0 -and $raw) {
-            return ($raw | ConvertFrom-Json)
+        $result = Invoke-StartupInstallerJson -ScriptPath $installedScript -CommandArgs @("-Status", "-Json") -TimeoutSeconds 15 -Source "InstalledStartupStatus"
+        if (($result.ExitCode -eq 0 -or $null -eq $result.ExitCode) -and $result.Payload) {
+            return $result.Payload
         }
-        Write-TrayLog "Installed startup status check returned empty or exit code $LASTEXITCODE" -Level "WARN"
+        Write-TrayLog "Installed startup status check returned empty/bad JSON or exit code $($result.ExitCode)" -Level "WARN"
     }
     catch {
         Write-TrayLog "Installed startup status check failed: $($_.Exception.Message)" -Level "WARN"
     }
 
-    return $null
+    return (Get-StartupStatusFallback -InstallScript $installedScript)
 }
 
 function Repair-StartupRegistration {
@@ -3800,16 +6468,9 @@ function Repair-StartupRegistration {
     }
 
     try {
-        $args = @(
-            "-NoProfile",
-            "-ExecutionPolicy", "Bypass",
-            "-File", $installedScript,
-            "-Install",
-            "-Json"
-        )
-        $raw = & powershell.exe @args
-        if ($LASTEXITCODE -ne 0) {
-            throw "Installer exit code $LASTEXITCODE. Output: $raw"
+        $result = Invoke-StartupInstallerJson -ScriptPath $installedScript -CommandArgs @("-Install", "-Json") -TimeoutSeconds 120 -Source "StartupRepair"
+        if ($null -ne $result.ExitCode -and $result.ExitCode -ne 0) {
+            throw "Installer exit code $($result.ExitCode). Output: $($result.Raw)"
         }
 
         $after = Get-InstalledStartupStatus
@@ -3838,11 +6499,19 @@ function Set-StartupMenuState {
 
     $isInstalled = $false
     $mode = "none"
+    $taskActionCurrent = $true
 
     if ($StartupStatus) {
         $isInstalled = [bool]$StartupStatus.installed
         if ($StartupStatus.mode) {
             $mode = "$($StartupStatus.mode)"
+        }
+        if (
+            $StartupStatus.PSObject.Properties["task_action_path_current"] -and
+            $StartupStatus.PSObject.Properties["task_installed"] -and
+            [bool]$StartupStatus.task_installed
+        ) {
+            $taskActionCurrent = [bool]$StartupStatus.task_action_path_current
         }
     }
 
@@ -3852,43 +6521,65 @@ function Set-StartupMenuState {
         default { "not configured" }
     }
 
-    $script:startupItem.Text = if ($isInstalled) { "      Disable Auto-Start" } else { "      Enable Auto-Start" }
+    $startupActionIsStale = ($isInstalled -and $mode -eq "scheduled_task" -and -not $taskActionCurrent)
+    $startupIconAction = if ($startupActionIsStale) { "Warning" } else { "Startup" }
+    $startupIconColor = if ($startupActionIsStale) { $script:Colors.AccentAmber } else { $script:Colors.Text }
+    $startupChipText = if ($startupActionIsStale) { "STALE" } else { "STARTUP" }
+
+    $script:startupItem.Text = if ($isInstalled) { "Disable Auto-Start" } else { "Enable Auto-Start" }
+    $script:startupItem.ForeColor = if ($startupActionIsStale) { $script:Colors.AccentAmber } else { $script:Colors.Text }
+    Set-MenuItemImageSafe -Item $script:startupItem -NewImage (New-ActionBitmap -Action $startupIconAction -Color $startupIconColor)
     $script:startupItem.Checked = $isInstalled
     $script:startupItem.ToolTipText = if ($isInstalled) {
-        "Start A.B.S.O. Tray when Windows starts (configured via $modeLabel)"
+        if ($mode -eq "scheduled_task" -and -not $taskActionCurrent) {
+            "Auto-start task points at different tray files; toggle auto-start to rewrite it"
+        }
+        else {
+            "Start A.B.S.O. Tray when Windows starts (configured via $modeLabel)"
+        }
     }
     else {
         "Start A.B.S.O. Tray when Windows starts"
     }
+    Set-TrayCommandItemVisualState -Item $script:startupItem -ChipText $startupChipText
 }
 
 function Toggle-Startup {
     $installScript = Join-Path $script:ScriptDir "Install-Startup.ps1"
     if (-not (Test-Path $installScript)) {
-        Show-Notification -Title "A.B.S.O." -Message "Startup installer not found" -Type "Error"
+        Show-Notification -Title "A.B.S.O." -Message "Startup installer not found" -Type "Error" -ActionName "Startup" -ActionColor $script:Colors.AccentAmber
         Write-TrayLog "Toggle-Startup failed: missing installer script at $installScript" -Level "ERROR"
+        Set-TrayLastAction -Message "Startup update failed: installer not found"
+        Update-MenuState
         return
     }
 
     $before = Get-StartupStatus
     $operation = if ($before.installed) { "-Uninstall" } else { "-Install" }
 
+    Set-TrayOperationTooltipText -Text "A.B.S.O. - Updating startup..."
+    Set-TrayLastAction -Message "Startup update running"
+    Update-MenuState
+
+    $installerWarning = ""
     try {
-        $args = @(
-            "-NoProfile",
-            "-ExecutionPolicy", "Bypass",
-            "-File", $installScript,
-            $operation,
-            "-Json"
-        )
-        $raw = & powershell.exe @args
-        if ($LASTEXITCODE -ne 0) {
-            throw "Installer exit code $LASTEXITCODE. Output: $raw"
+        $result = Invoke-StartupInstallerJson -ScriptPath $installScript -CommandArgs @($operation, "-Json") -TimeoutSeconds 120 -Source "Startup update"
+        if ($null -ne $result.ExitCode -and $result.ExitCode -ne 0) {
+            throw "Installer exit code $($result.ExitCode). Output: $($result.Raw)"
+        }
+        if ($result.Payload -and $result.Payload.PSObject.Properties["success"] -and -not [bool]$result.Payload.success) {
+            $payloadError = if ($result.Payload.error) { "$($result.Payload.error)" } else { "installer reported failure" }
+            throw $payloadError
+        }
+        if ($result.Payload -and $result.Payload.warning) {
+            $installerWarning = "$($result.Payload.warning)"
         }
     }
     catch {
-        Show-Notification -Title "A.B.S.O." -Message "Failed to update startup registration" -Type "Error"
+        Show-Notification -Title "A.B.S.O." -Message "Startup update failed: $($_.Exception.Message)" -Type "Error" -ActionName "Startup" -ActionColor $script:Colors.AccentAmber
         Write-TrayLog "Toggle-Startup failed: $($_.Exception.Message)" -Level "ERROR"
+        Set-TrayLastAction -Message "Startup update failed: $($_.Exception.Message)"
+        Update-MenuState
         return
     }
 
@@ -3897,18 +6588,52 @@ function Toggle-Startup {
 
     if ((-not $before.installed) -and $after.installed) {
         $modeLabel = if ("$($after.mode)" -eq "scheduled_task") { "Task Scheduler" } else { "Startup Folder shortcut" }
-        Show-Notification -Title "A.B.S.O." -Message "Added to Windows startup ($modeLabel)" -Type "Info"
+        $startupMessage = if ([string]::IsNullOrWhiteSpace($installerWarning)) {
+            "Added to Windows startup ($modeLabel)"
+        }
+        else {
+            "Added to Windows startup ($modeLabel): $installerWarning"
+        }
+        $startupType = if ([string]::IsNullOrWhiteSpace($installerWarning)) { "Info" } else { "Warning" }
+        Show-Notification -Title "A.B.S.O." -Message $startupMessage -Type $startupType -ActionName "Startup" -ActionColor $script:Colors.AccentBlue
         Write-TrayLog "Startup enabled via mode: $($after.mode)"
+        if ([string]::IsNullOrWhiteSpace($installerWarning)) {
+            Set-TrayLastAction -Message "Startup enabled: $modeLabel"
+        }
+        else {
+            Set-TrayLastAction -Message "Startup enabled with warning: $modeLabel"
+        }
     }
     elseif ($before.installed -and (-not $after.installed)) {
-        Show-Notification -Title "A.B.S.O." -Message "Removed from Windows startup" -Type "Info"
+        $startupMessage = if ([string]::IsNullOrWhiteSpace($installerWarning)) {
+            "Removed from Windows startup"
+        }
+        else {
+            "Removed from Windows startup: $installerWarning"
+        }
+        $startupType = if ([string]::IsNullOrWhiteSpace($installerWarning)) { "Info" } else { "Warning" }
+        Show-Notification -Title "A.B.S.O." -Message $startupMessage -Type $startupType -ActionName "Startup" -ActionColor $script:Colors.AccentBlue
         Write-TrayLog "Startup disabled"
+        if ([string]::IsNullOrWhiteSpace($installerWarning)) {
+            Set-TrayLastAction -Message "Startup disabled"
+        }
+        else {
+            Set-TrayLastAction -Message "Startup disabled with warning"
+        }
     }
     else {
         $state = if ($after.installed) { "enabled" } else { "disabled" }
-        Show-Notification -Title "A.B.S.O." -Message "Startup is $state" -Type "Warning"
+        $unchangedMessage = if ([string]::IsNullOrWhiteSpace($installerWarning)) {
+            "Startup unchanged; still $state"
+        }
+        else {
+            "Startup unchanged; still ${state}: $installerWarning"
+        }
+        Show-Notification -Title "A.B.S.O." -Message $unchangedMessage -Type "Warning" -ActionName "Startup" -ActionColor $script:Colors.AccentBlue
         Write-TrayLog "Toggle-Startup no state change detected (before=$($before.installed), after=$($after.installed))" -Level "WARN"
+        Set-TrayLastAction -Message "Startup unchanged: $state"
     }
+    Update-MenuState
 }
 
 function Get-BackupTimestamp {
@@ -3948,21 +6673,90 @@ function Get-BackupTimestamp {
 }
 
 function Get-BackupPath {
-    return (Join-Path $script:ProjectRoot "backups")
+    $roots = @(Get-BackupRoots)
+    if ($roots.Count -gt 0) {
+        return $roots[0].Path
+    }
+    return (Join-Path (Get-InstalledAppRoot) "backups")
+}
+
+function Get-BackupRoots {
+    $roots = [System.Collections.Generic.List[object]]::new()
+    $candidates = @(
+        [PSCustomObject]@{ Role = "installed"; Path = (Join-Path (Get-InstalledAppRoot) "backups") },
+        [PSCustomObject]@{ Role = "workspace"; Path = (Join-Path $script:ProjectRoot "backups") }
+    )
+
+    foreach ($candidate in $candidates) {
+        if (
+            $candidate.Path -and
+            -not [string]::IsNullOrWhiteSpace("$($candidate.Path)") -and
+            (Test-Path $candidate.Path)
+        ) {
+            [void]$roots.Add($candidate)
+        }
+    }
+
+    return @($roots)
+}
+
+function Get-BackupDirectoryEntries {
+    $entriesById = @{}
+    foreach ($root in @(Get-BackupRoots)) {
+        $dirs = Get-ChildItem $root.Path -Directory -ErrorAction SilentlyContinue
+        foreach ($dir in @($dirs)) {
+            if ($entriesById.ContainsKey($dir.Name)) { continue }
+            $entriesById[$dir.Name] = [PSCustomObject]@{
+                Directory = $dir
+                Time = Get-BackupTimestamp -Directory $dir
+                RootRole = $root.Role
+                RootPath = $root.Path
+            }
+        }
+    }
+
+    return @($entriesById.Values)
+}
+
+function Get-BackupSourceLabel {
+    param([AllowNull()][string]$Source)
+
+    switch ("$Source") {
+        "installed" { return "installed backup folder" }
+        "workspace" { return "workspace backup folder" }
+        default { return "backup location" }
+    }
+}
+
+function Get-BackupSourceChipText {
+    param([AllowNull()][string]$Source)
+
+    switch ("$Source") {
+        "installed" { return "INSTALLED" }
+        "workspace" { return "WORKSPACE" }
+        default { return "BACKUP" }
+    }
+}
+
+function Get-BackupMenuChipText {
+    param([int]$VisibleBackupCount)
+
+    $count = [Math]::Max(0, $VisibleBackupCount)
+    if ($count -le 0) { return "NO BACKUPS" }
+    if ($count -eq 1) { return "1 BACKUP" }
+    return "$count BACKUPS"
 }
 
 function Get-LastBackupTime {
-    $backupsPath = Get-BackupPath
-    if (Test-Path $backupsPath) {
-        $latest = Get-ChildItem $backupsPath -Directory -ErrorAction SilentlyContinue |
-            ForEach-Object { [PSCustomObject]@{ Directory = $_; Time = Get-BackupTimestamp -Directory $_ } } |
-            Sort-Object Time -Descending | Select-Object -First 1
-        if ($latest) {
-            $age = (Get-Date) - $latest.Time
-            if ($age.TotalMinutes -lt 60) { return "$([int]$age.TotalMinutes)m ago" }
-            elseif ($age.TotalHours -lt 24) { return "$([int]$age.TotalHours)h ago" }
-            else { return "$([int]$age.TotalDays)d ago" }
-        }
+    $latest = Get-BackupDirectoryEntries |
+        Sort-Object Time -Descending |
+        Select-Object -First 1
+    if ($latest) {
+        $age = (Get-Date) - $latest.Time
+        if ($age.TotalSeconds -lt 0) { return "just now" }
+        if ($age.TotalMinutes -lt 60) { return "$([int]$age.TotalMinutes)m ago" }
+        elseif ($age.TotalHours -lt 24) { return "$([int]$age.TotalHours)h ago" }
+        else { return "$([int]$age.TotalDays)d ago" }
     }
     return "Never"
 }
@@ -3974,27 +6768,39 @@ function Get-RecentBackups {
     #>
     param([int]$Count = 5)
 
-    $backupsPath = Get-BackupPath
     $result = @()
-    if (Test-Path $backupsPath) {
-        $dirs = Get-ChildItem $backupsPath -Directory -ErrorAction SilentlyContinue |
-            ForEach-Object { [PSCustomObject]@{ Directory = $_; Time = Get-BackupTimestamp -Directory $_ } } |
-            Sort-Object Time -Descending | Select-Object -First $Count
-        foreach ($entry in $dirs) {
-            $dir = $entry.Directory
-            $timestamp = $entry.Time
-            $manifest = Join-Path $dir.FullName "manifest.json"
-            $label = $dir.Name
-            if (Test-Path $manifest) {
-                try {
-                    $mj = Get-Content $manifest -Raw | ConvertFrom-Json
-                    if ($mj.profile_id) { $label = "$($mj.profile_id) - $($timestamp.ToString('MMM dd HH:mm'))" }
-                    else { $label = $timestamp.ToString("MMM dd HH:mm") }
-                } catch {
-                    $label = $timestamp.ToString("MMM dd HH:mm")
+    $dirs = Get-BackupDirectoryEntries |
+        Sort-Object Time -Descending |
+        Select-Object -First $Count
+    foreach ($entry in $dirs) {
+        $dir = $entry.Directory
+        $timestamp = $entry.Time
+        $manifest = Join-Path $dir.FullName "manifest.json"
+        $label = $dir.Name
+        $profileId = $null
+        if (Test-Path $manifest) {
+            try {
+                $mj = Get-Content $manifest -Raw | ConvertFrom-Json
+                $displayTime = Format-TrayTimestamp -Value $timestamp
+                if ($mj.profile_id) {
+                    $profileId = "$($mj.profile_id)"
+                    $profileName = Get-TrayProfileDisplayName -ProfileId $profileId
+                    $label = "$profileName - $displayTime"
                 }
+                else { $label = $displayTime }
+            } catch {
+                $label = Format-TrayTimestamp -Value $timestamp
             }
-            $result += @{ Path = $dir.FullName; Name = $dir.Name; Label = $label; Time = $timestamp }
+        }
+        $result += @{
+            Path = $dir.FullName
+            Name = $dir.Name
+            Label = $label
+            ProfileId = $profileId
+            Time = $timestamp
+            Source = $entry.RootRole
+            SourceLabel = Get-BackupSourceLabel -Source $entry.RootRole
+            RootPath = $entry.RootPath
         }
     }
     return $result
@@ -4040,6 +6846,76 @@ function Find-Profiles {
     }
 
     return $matches
+}
+
+function Get-TraySearchResultGameGroups {
+    param(
+        [object[]]$MatchedIds,
+        [int]$Count = 3
+    )
+
+    $groups = [System.Collections.Generic.List[string]]::new()
+    $seen = @{}
+    foreach ($id in @($MatchedIds)) {
+        if ([string]::IsNullOrWhiteSpace("$id")) { continue }
+        if (-not $script:Profiles -or -not $script:Profiles.Contains($id)) { continue }
+        $profile = $script:Profiles[$id]
+        $gameGroup = Get-TrayProfileGameGroup -ProfileId "$id" -Profile $profile
+        if ([string]::IsNullOrWhiteSpace($gameGroup)) { continue }
+        $key = "$gameGroup".Trim().ToLowerInvariant()
+        if ($seen.ContainsKey($key)) { continue }
+        $seen[$key] = $true
+        [void]$groups.Add("$gameGroup")
+        if ($groups.Count -ge $Count) { break }
+    }
+    return @($groups)
+}
+
+function Set-TraySearchStatus {
+    param(
+        [string]$Query,
+        [object[]]$MatchedIds
+    )
+
+    if (-not $script:searchStatusItem) { return }
+
+    $fullQuery = "$Query".Trim()
+    if ([string]::IsNullOrWhiteSpace($fullQuery)) {
+        $script:searchStatusItem.Visible = $false
+        $script:searchStatusItem.AccessibleDescription = ""
+        return
+    }
+    $cleanQuery = $fullQuery
+    if ($cleanQuery.Length -gt 28) {
+        $cleanQuery = $cleanQuery.Substring(0, 28) + "..."
+    }
+
+    $matchCount = @($MatchedIds).Count
+    $plural = if ($matchCount -eq 1) { "match" } else { "matches" }
+    if ($matchCount -eq 0) {
+        $script:searchStatusItem.Text = "SEARCH: no matches | $cleanQuery"
+        $script:searchStatusItem.ForeColor = $script:Colors.AccentAmber
+        $script:searchStatusItem.ToolTipText = "No profile matches: $fullQuery"
+        $script:searchStatusItem.AccessibleDescription = "SEARCH|NONE"
+        Set-MenuItemImageSafe -Item $script:searchStatusItem -NewImage (New-ActionBitmap -Action "Search" -Color $script:Colors.AccentAmber)
+    }
+    else {
+        $script:searchStatusItem.Text = "SEARCH: $matchCount $plural | $cleanQuery"
+        $script:searchStatusItem.ForeColor = $script:Colors.AccentGold
+        $tooltipCount = if ($matchCount -eq 1) { "1 profile match" } else { "$matchCount profile matches" }
+        $script:searchStatusItem.ToolTipText = "${tooltipCount}: $fullQuery"
+        $script:searchStatusItem.AccessibleDescription = if ($matchCount -eq 1) { "SEARCH|MATCH" } else { "SEARCH|MATCHES" }
+        $matchedGameGroups = Get-TraySearchResultGameGroups -MatchedIds $MatchedIds -Count 3
+        if ($matchedGameGroups.Count -gt 0 -and (Get-Command New-GameMosaicBitmap -ErrorAction SilentlyContinue)) {
+            Set-MenuItemImageSafe -Item $script:searchStatusItem -NewImage (
+                New-GameMosaicBitmap -GameGroups $matchedGameGroups -Color $script:Colors.AccentGold -Category "Other"
+            )
+        }
+        else {
+            Set-MenuItemImageSafe -Item $script:searchStatusItem -NewImage (New-ActionBitmap -Action "Search" -Color $script:Colors.AccentGold)
+        }
+    }
+    $script:searchStatusItem.Visible = $true
 }
 
 # ============================================================================
@@ -4165,6 +7041,182 @@ $script:LaunchSanitizerTimer = $null
 $script:LaunchSanitizerActiveProfileId = $null
 $script:LaunchSanitizerLastSweepStopped = @{}
 $script:LaunchSanitizerGameWasAlive = $false
+$script:LaunchSanitizerSweepProc = $null
+$script:LaunchSanitizerSweepPollTimer = $null
+$script:LaunchSanitizerSweepOutputFile = $null
+$script:LaunchSanitizerSweepErrorFile = $null
+$script:LaunchSanitizerSweepProfileId = $null
+$script:LaunchSanitizerSweepFirstDetection = $false
+$script:LaunchSanitizerSweepStartedAt = $null
+
+# --- Keep-Awake (anti-sleep) for gamepad-driven sessions --------------------
+# SetThreadExecutionState inhibits system + display idle sleep for the lifetime
+# of the asserting thread. The WinForms timer tick runs on the tray UI thread,
+# which lives the whole session, so an ES_CONTINUOUS assertion holds until we
+# clear it. Ephemeral and self-reverting: no powercfg edits, no backup/restore,
+# and zero interaction with the display/GPU pipeline. Asserted only for profiles
+# whose catalog flag KeepAwakeWhileGaming is true (emulators) while their game
+# is alive; cleared on game exit, profile change, and tray shutdown.
+if (-not ('ABSO.PowerState' -as [type])) {
+    Add-Type -Namespace 'ABSO' -Name 'PowerState' -MemberDefinition @'
+[System.Runtime.InteropServices.DllImport("kernel32.dll", SetLastError = true)]
+public static extern uint SetThreadExecutionState(uint esFlags);
+'@
+}
+$script:KeepAwakeAsserted   = $false
+$script:ES_CONTINUOUS       = [uint32]0x80000000
+$script:ES_SYSTEM_REQUIRED  = [uint32]0x00000001
+$script:ES_DISPLAY_REQUIRED = [uint32]0x00000002
+
+function Set-AbsoKeepAwake {
+    try {
+        $flags = [uint32]($script:ES_CONTINUOUS -bor $script:ES_SYSTEM_REQUIRED -bor $script:ES_DISPLAY_REQUIRED)
+        [ABSO.PowerState]::SetThreadExecutionState($flags) | Out-Null
+        if (-not $script:KeepAwakeAsserted) {
+            Write-TrayLog "KeepAwake: inhibiting system/display sleep for active game session"
+        }
+        $script:KeepAwakeAsserted = $true
+    }
+    catch {
+        Write-TrayLog "KeepAwake: assert failed: $($_.Exception.Message)" -Level "WARN"
+    }
+}
+
+function Clear-AbsoKeepAwake {
+    if (-not $script:KeepAwakeAsserted) { return }
+    try {
+        [ABSO.PowerState]::SetThreadExecutionState($script:ES_CONTINUOUS) | Out-Null
+        Write-TrayLog "KeepAwake: released sleep inhibitor"
+    }
+    catch {}
+    $script:KeepAwakeAsserted = $false
+}
+
+# --- ProBalance governor (background CPU-contention restraint) --------------
+# Runs the backend `cpu-balance --pid <game> --stop-file <f>` daemon for the
+# session. It demotes only background CPU spikers (never the game, foreground,
+# anti-cheat, launchers, audio, or process_overrides.protect images) and
+# auto-restores them. Gated on the tray-config `cpuBalancer` flag (default OFF;
+# opt in per machine). Stopped via the stop-file sentinel so the daemon's
+# cleanup restores every demoted priority — never a hard kill except as a last
+# resort.
+$script:CpuBalancerProc      = $null
+$script:CpuBalancerStopFile  = $null
+$script:CpuBalancerProfileId = $null
+$script:CpuBalancerGamePid   = $null
+
+function Test-CpuBalancerRunning {
+    if (-not $script:CpuBalancerProc) { return $false }
+    try { return (-not $script:CpuBalancerProc.HasExited) } catch { return $false }
+}
+
+function Get-ActiveProfileGamePid {
+    <#
+    .SYNOPSIS
+    Returns the PID of the first running game executable for the active profile,
+    or $null. Used to scope the ProBalance governor to the live game.
+    #>
+    $summary = Get-ActiveProfileKillsetSummary
+    if (-not $summary -or -not $summary.Exes -or $summary.Exes.Count -eq 0) { return $null }
+    $baseNames = @()
+    foreach ($exe in $summary.Exes) {
+        if ([string]::IsNullOrWhiteSpace("$exe")) { continue }
+        $name = "$exe"
+        if ($name.ToLowerInvariant().EndsWith(".exe")) {
+            $name = $name.Substring(0, $name.Length - 4)
+        }
+        $baseNames += $name
+    }
+    if ($baseNames.Count -eq 0) { return $null }
+
+    $procs = Get-Process -Name $baseNames -ErrorAction SilentlyContinue
+    if (-not $procs) { return $null }
+    $gamePid = $null
+    foreach ($p in @($procs)) {
+        if ($null -eq $gamePid) { $gamePid = $p.Id }
+        try { $p.Dispose() } catch {}
+    }
+    return $gamePid
+}
+
+function Start-CpuBalancerForGame {
+    param(
+        [Parameter(Mandatory = $true)][string]$ProfileId,
+        [Parameter(Mandatory = $true)][int]$GamePid
+    )
+
+    if (Test-CpuBalancerRunning) { return $false }
+    if (-not $script:PythonExe) {
+        Write-TrayLog "CpuBalancer: PythonExe unresolved; skipping" -Level "WARN"
+        return $false
+    }
+
+    try {
+        # GetTempFileName creates the file; the balancer treats EXISTENCE as the
+        # stop signal, so delete it now and only re-create it to request stop.
+        $script:CpuBalancerStopFile = [System.IO.Path]::GetTempFileName()
+        Remove-Item $script:CpuBalancerStopFile -Force -ErrorAction SilentlyContinue
+
+        $cmdArgs = @("cpu-balance", "--pid", "$GamePid", "--stop-file", $script:CpuBalancerStopFile)
+        # Tier B opt-ins (default OFF), passed through as CLI flags so the daemon
+        # also performs P-core steering / EcoQoS herding / watchdog rules.
+        if ($script:TrayConfig -and [bool]$script:TrayConfig.cpuSets) { $cmdArgs += "--cpu-sets" }
+        if ($script:TrayConfig -and [bool]$script:TrayConfig.ecoMode) { $cmdArgs += "--eco" }
+        if ($script:TrayConfig -and [bool]$script:TrayConfig.watchdog) {
+            $cmdArgs += "--watchdog"
+            # Restrict the watchdog to demote-only for online/ranked profiles.
+            $wdProfile = $script:Profiles[$ProfileId]
+            if ($wdProfile -and [bool]$wdProfile.IsOnline) { $cmdArgs += "--online" }
+        }
+        $arguments = Get-AbsoBackendArgs -CommandArgs $cmdArgs
+        $script:CpuBalancerProc = Start-Process -FilePath $script:PythonExe `
+            -ArgumentList $arguments `
+            -NoNewWindow -PassThru -WorkingDirectory $script:ProjectRoot
+        $script:CpuBalancerProfileId = $ProfileId
+        $script:CpuBalancerGamePid = $GamePid
+        Write-TrayLog "CpuBalancer: started for '$ProfileId' (game pid $GamePid)"
+        return $true
+    }
+    catch {
+        Write-TrayLog "CpuBalancer: failed to start: $($_.Exception.Message)" -Level "WARN"
+        Stop-CpuBalancerForGame
+        return $false
+    }
+}
+
+function Stop-CpuBalancerForGame {
+    <#
+    .SYNOPSIS
+    Graceful stop: drop the stop-file sentinel so the daemon's finally-block
+    restores every demoted priority, wait briefly, then reap. Hard-kill only as
+    a last resort. Idempotent / safe when nothing is running.
+    #>
+    if ($script:CpuBalancerStopFile) {
+        try { New-Item -ItemType File -Path $script:CpuBalancerStopFile -Force | Out-Null } catch {}
+    }
+    if ($script:CpuBalancerProc) {
+        try {
+            if (-not $script:CpuBalancerProc.HasExited) {
+                # Balancer polls the sentinel ~1/s; this brief wait happens only
+                # on game-exit / profile-change / shutdown (rare events).
+                $null = $script:CpuBalancerProc.WaitForExit(3000)
+                if (-not $script:CpuBalancerProc.HasExited) {
+                    Write-TrayLog "CpuBalancer: graceful stop timed out; killing" -Level "WARN"
+                    try { $script:CpuBalancerProc.Kill() } catch {}
+                }
+            }
+        }
+        catch {}
+        try { $script:CpuBalancerProc.Dispose() } catch {}
+        $script:CpuBalancerProc = $null
+    }
+    if ($script:CpuBalancerStopFile) {
+        Remove-Item $script:CpuBalancerStopFile -Force -ErrorAction SilentlyContinue
+        $script:CpuBalancerStopFile = $null
+    }
+    $script:CpuBalancerProfileId = $null
+    $script:CpuBalancerGamePid = $null
+}
 
 function Get-ActiveProfileKillsetSummary {
     <#
@@ -4219,21 +7271,171 @@ function Test-IsActiveProfileGameRunning {
     return $false
 }
 
-function Invoke-LaunchSweepCli {
+function Test-LaunchSweepInFlight {
+    if (-not $script:LaunchSanitizerSweepProc) { return $false }
+    try {
+        return (-not $script:LaunchSanitizerSweepProc.HasExited)
+    }
+    catch {
+        return $false
+    }
+}
+
+function Stop-LaunchSweepRuntime {
+    param([switch]$KillProcess)
+
+    if ($script:LaunchSanitizerSweepPollTimer) {
+        try { $script:LaunchSanitizerSweepPollTimer.Stop() } catch {}
+        try { $script:LaunchSanitizerSweepPollTimer.Dispose() } catch {}
+        $script:LaunchSanitizerSweepPollTimer = $null
+    }
+
+    if ($script:LaunchSanitizerSweepProc) {
+        try {
+            if ($KillProcess -and -not $script:LaunchSanitizerSweepProc.HasExited) {
+                $script:LaunchSanitizerSweepProc.Kill()
+            }
+        } catch {}
+        try { $script:LaunchSanitizerSweepProc.Dispose() } catch {}
+        $script:LaunchSanitizerSweepProc = $null
+    }
+
+    foreach ($path in @($script:LaunchSanitizerSweepOutputFile, $script:LaunchSanitizerSweepErrorFile)) {
+        if ($path) { Remove-Item $path -Force -ErrorAction SilentlyContinue }
+    }
+    $script:LaunchSanitizerSweepOutputFile = $null
+    $script:LaunchSanitizerSweepErrorFile = $null
+    $script:LaunchSanitizerSweepProfileId = $null
+    $script:LaunchSanitizerSweepFirstDetection = $false
+    $script:LaunchSanitizerSweepStartedAt = $null
+}
+
+function Apply-LaunchSweepPayload {
+    param(
+        [AllowNull()][object]$Payload,
+        [string]$ProfileId,
+        [bool]$IsFirstDetection
+    )
+
+    if (-not $Payload -or -not $Payload.result) { return }
+
+    $stopped = @()
+    if ($Payload.result.stopped) { $stopped = @($Payload.result.stopped) }
+
+    foreach ($img in $stopped) {
+        if (-not $script:LaunchSanitizerLastSweepStopped.ContainsKey("$img")) {
+            $script:LaunchSanitizerLastSweepStopped["$img"] = $true
+            Write-TrayLog "LaunchSanitizer: stopped $img during '$ProfileId' session"
+        }
+    }
+
+    if ($Payload.result.warnings) {
+        foreach ($warning in @($Payload.result.warnings)) {
+            Write-TrayLog "LaunchSanitizer warning: $warning" -Level "WARN"
+        }
+    }
+
+    # Surface a single toast on the FIRST sweep that actually stops
+    # something, so the user knows the launch sanitizer did its job.
+    # Subsequent ticks (e.g. Medal respawn) stay quiet in the log.
+    if ($IsFirstDetection -and $stopped.Count -gt 0) {
+        $summary = $stopped -join ", "
+        if ($summary.Length -gt 80) {
+            $summary = $summary.Substring(0, 80) + "..."
+        }
+        try {
+            $sanitizerProfile = $null
+            if (-not [string]::IsNullOrWhiteSpace($ProfileId) -and $script:Profiles -and $script:Profiles.Contains($ProfileId)) {
+                $sanitizerProfile = $script:Profiles[$ProfileId]
+            }
+            $sanitizerVisual = Get-TrayProfileToastVisualArgs -ProfileId $ProfileId -Profile $sanitizerProfile -ActiveBadge
+            $sanitizerTitle = if ($sanitizerProfile) {
+                Get-TrayProfileDisplayName -ProfileId $ProfileId
+            }
+            else {
+                "A.B.S.O. Launch Sanitizer"
+            }
+            Show-Notification @sanitizerVisual -Title $sanitizerTitle `
+                -Message "Launch sanitizer stopped: $summary" `
+                -Type "Success" `
+                -MetaText $ProfileId
+        } catch {
+            Write-TrayLog "LaunchSanitizer: notification failed: $($_.Exception.Message)" -Level "WARN"
+        }
+    }
+}
+
+function Complete-LaunchSweepIfReady {
+    $proc = $script:LaunchSanitizerSweepProc
+    if (-not $proc) {
+        Stop-LaunchSweepRuntime
+        return
+    }
+
+    $elapsedSeconds = if ($script:LaunchSanitizerSweepStartedAt) {
+        ([DateTime]::UtcNow - $script:LaunchSanitizerSweepStartedAt).TotalSeconds
+    }
+    else {
+        0
+    }
+    if (-not $proc.HasExited -and $elapsedSeconds -lt 30) {
+        return
+    }
+
+    try {
+        if ($script:LaunchSanitizerSweepPollTimer) {
+            $script:LaunchSanitizerSweepPollTimer.Stop()
+        }
+
+        if (-not $proc.HasExited) {
+            try { $proc.Kill() } catch {}
+            throw "launch-sweep timed out after 30s"
+        }
+
+        $exitCode = $proc.ExitCode
+        $stdout = Get-Content $script:LaunchSanitizerSweepOutputFile -Raw -ErrorAction SilentlyContinue
+        $stderr = Get-Content $script:LaunchSanitizerSweepErrorFile -Raw -ErrorAction SilentlyContinue
+        if ($stderr) {
+            Write-TrayLog "LaunchSanitizer stderr: $stderr" -Level "WARN"
+        }
+        if ($null -ne $exitCode -and $exitCode -ne 0) {
+            Write-TrayLog "LaunchSanitizer: launch-sweep exited $exitCode" -Level "WARN"
+        }
+
+        $payload = Invoke-JsonSafe -Text $stdout -Source "LaunchSweep"
+        Apply-LaunchSweepPayload `
+            -Payload $payload `
+            -ProfileId $script:LaunchSanitizerSweepProfileId `
+            -IsFirstDetection ([bool]$script:LaunchSanitizerSweepFirstDetection)
+    }
+    catch {
+        Write-TrayLog "LaunchSanitizer: launch-sweep completion failed: $($_.Exception.Message)" -Level "WARN"
+    }
+    finally {
+        Stop-LaunchSweepRuntime
+    }
+}
+
+function Start-LaunchSweepCliProcess {
     <#
     .SYNOPSIS
-    Calls the ABSO backend `launch-sweep <profile> --json` and returns the parsed
-    JSON payload (or $null on failure). Honors the IncludeOptIn flag derived
-    from TrayConfig.aggressiveProcessJanitor.
+    Starts the ABSO backend `launch-sweep <profile> --json` without blocking
+    the WinForms UI thread. Completion is handled by Complete-LaunchSweepIfReady.
     #>
     param(
         [Parameter(Mandatory = $true)][string]$ProfileId,
-        [bool]$IncludeOptIn = $false
+        [bool]$IncludeOptIn = $false,
+        [bool]$IsFirstDetection = $false
     )
+
+    if (Test-LaunchSweepInFlight) {
+        Write-TrayLog "LaunchSanitizer: sweep already running; skipping duplicate tick"
+        return $false
+    }
 
     if (-not $script:PythonExe) {
         Write-TrayLog "LaunchSanitizer: PythonExe unresolved; skipping sweep" -Level "WARN"
-        return $null
+        return $false
     }
 
     $arguments = Get-AbsoBackendArgs -CommandArgs @("launch-sweep", $ProfileId, "--json")
@@ -4242,34 +7444,31 @@ function Invoke-LaunchSweepCli {
     }
 
     try {
-        $proc = Start-Process -FilePath $script:PythonExe `
+        $script:LaunchSanitizerSweepOutputFile = [System.IO.Path]::GetTempFileName()
+        $script:LaunchSanitizerSweepErrorFile = "$($script:LaunchSanitizerSweepOutputFile).err"
+        $script:LaunchSanitizerSweepProfileId = $ProfileId
+        $script:LaunchSanitizerSweepFirstDetection = $IsFirstDetection
+        $script:LaunchSanitizerSweepStartedAt = [DateTime]::UtcNow
+
+        $script:LaunchSanitizerSweepProc = Start-Process -FilePath $script:PythonExe `
             -ArgumentList $arguments `
-            -NoNewWindow -Wait -PassThru `
-            -RedirectStandardOutput "$env:TEMP\abso_launch_sweep.stdout" `
-            -RedirectStandardError "$env:TEMP\abso_launch_sweep.stderr"
+            -NoNewWindow -PassThru -WorkingDirectory $script:ProjectRoot `
+            -RedirectStandardOutput $script:LaunchSanitizerSweepOutputFile `
+            -RedirectStandardError $script:LaunchSanitizerSweepErrorFile
+        # PS 5.1: cache the handle now or .ExitCode reads $null after exit.
+        if ($script:LaunchSanitizerSweepProc) { $null = $script:LaunchSanitizerSweepProc.Handle }
 
-        $stdout = ""
-        if (Test-Path "$env:TEMP\abso_launch_sweep.stdout") {
-            $stdout = Get-Content "$env:TEMP\abso_launch_sweep.stdout" -Raw -ErrorAction SilentlyContinue
-            Remove-Item "$env:TEMP\abso_launch_sweep.stdout" -Force -ErrorAction SilentlyContinue
-        }
-        if (Test-Path "$env:TEMP\abso_launch_sweep.stderr") {
-            $stderr = Get-Content "$env:TEMP\abso_launch_sweep.stderr" -Raw -ErrorAction SilentlyContinue
-            Remove-Item "$env:TEMP\abso_launch_sweep.stderr" -Force -ErrorAction SilentlyContinue
-            if ($stderr) {
-                Write-TrayLog "LaunchSanitizer stderr: $stderr" -Level "WARN"
-            }
-        }
-
-        if ($proc.ExitCode -ne 0) {
-            Write-TrayLog "LaunchSanitizer: launch-sweep exited $($proc.ExitCode)" -Level "WARN"
-        }
-
-        return Invoke-JsonSafe -Text $stdout -Source "LaunchSweep"
+        $pollTimer = New-Object System.Windows.Forms.Timer
+        $pollTimer.Interval = 400
+        $pollTimer.Add_Tick({ Complete-LaunchSweepIfReady })
+        $script:LaunchSanitizerSweepPollTimer = $pollTimer
+        $pollTimer.Start()
+        return $true
     }
     catch {
-        Write-TrayLog "LaunchSanitizer: failed to invoke launch-sweep: $($_.Exception.Message)" -Level "WARN"
-        return $null
+        Write-TrayLog "LaunchSanitizer: failed to start launch-sweep: $($_.Exception.Message)" -Level "WARN"
+        Stop-LaunchSweepRuntime -KillProcess
+        return $false
     }
 }
 
@@ -4282,19 +7481,39 @@ function Invoke-LaunchSanitizerTick {
     try {
         $profileId = $script:activeProfile
         if ([string]::IsNullOrWhiteSpace($profileId)) {
+            if (Test-LaunchSweepInFlight) {
+                Stop-LaunchSweepRuntime -KillProcess
+            }
             $script:LaunchSanitizerActiveProfileId = $null
             $script:LaunchSanitizerGameWasAlive = $false
+            Clear-AbsoKeepAwake
+            Stop-CpuBalancerForGame
             if ($script:LaunchSanitizerTimer -and $script:LaunchSanitizerTimer.Interval -ne $script:LaunchSanitizerIdleIntervalMs) {
                 $script:LaunchSanitizerTimer.Interval = $script:LaunchSanitizerIdleIntervalMs
             }
             return
         }
 
+        if (
+            (Test-LaunchSweepInFlight) -and
+            $script:LaunchSanitizerSweepProfileId -and
+            $script:LaunchSanitizerSweepProfileId -ne $profileId
+        ) {
+            Write-TrayLog "LaunchSanitizer: active profile changed; canceling in-flight sweep for '$script:LaunchSanitizerSweepProfileId'"
+            Stop-LaunchSweepRuntime -KillProcess
+            Stop-CpuBalancerForGame
+        }
+
         $profile = $script:Profiles[$profileId]
         if (-not $profile -or -not $profile.KillsetAlwaysSafe -or $profile.KillsetAlwaysSafe.Count -eq 0) {
             # Profile defines no killset (productivity etc.) - nothing to do.
+            if (Test-LaunchSweepInFlight) {
+                Stop-LaunchSweepRuntime -KillProcess
+            }
             $script:LaunchSanitizerActiveProfileId = $profileId
             $script:LaunchSanitizerGameWasAlive = $false
+            Clear-AbsoKeepAwake
+            Stop-CpuBalancerForGame
             if ($script:LaunchSanitizerTimer -and $script:LaunchSanitizerTimer.Interval -ne $script:LaunchSanitizerIdleIntervalMs) {
                 $script:LaunchSanitizerTimer.Interval = $script:LaunchSanitizerIdleIntervalMs
             }
@@ -4310,10 +7529,47 @@ function Invoke-LaunchSanitizerTick {
             }
             $script:LaunchSanitizerGameWasAlive = $false
             $script:LaunchSanitizerActiveProfileId = $profileId
+            Clear-AbsoKeepAwake
+            Stop-CpuBalancerForGame
             if ($script:LaunchSanitizerTimer -and $script:LaunchSanitizerTimer.Interval -ne $script:LaunchSanitizerIdleIntervalMs) {
                 $script:LaunchSanitizerTimer.Interval = $script:LaunchSanitizerIdleIntervalMs
             }
             return
+        }
+
+        # Keep-Awake: emulator-style profiles inhibit system/display sleep while
+        # the game is alive (gamepad input does not reset the OS idle timer).
+        # Idempotent: re-asserting identical flags each tick is a no-op, and an
+        # alive-but-not-eligible profile (e.g. a shooter) clears any stale state.
+        # The tray-config flag defaults to allowed when absent.
+        $keepAwakeAllowed = $true
+        if ($script:TrayConfig -and $null -ne $script:TrayConfig.keepAwakeWhileGaming) {
+            $keepAwakeAllowed = [bool]$script:TrayConfig.keepAwakeWhileGaming
+        }
+        if ([bool]$profile.KeepAwakeWhileGaming -and $keepAwakeAllowed) {
+            Set-AbsoKeepAwake
+        }
+        else {
+            Clear-AbsoKeepAwake
+        }
+
+        # ProBalance governor: spawn the background-restraint daemon for the
+        # session. Gated on the tray-config flag (default OFF — opt in per
+        # machine). Self-exits when the game dies; also stopped on exit below.
+        $cpuBalancerAllowed = $false
+        if ($script:TrayConfig -and $null -ne $script:TrayConfig.cpuBalancer) {
+            $cpuBalancerAllowed = [bool]$script:TrayConfig.cpuBalancer
+        }
+        if ($cpuBalancerAllowed) {
+            if (-not (Test-CpuBalancerRunning)) {
+                $gameProcId = Get-ActiveProfileGamePid
+                if ($gameProcId) {
+                    Start-CpuBalancerForGame -ProfileId $profileId -GamePid $gameProcId | Out-Null
+                }
+            }
+        }
+        elseif (Test-CpuBalancerRunning) {
+            Stop-CpuBalancerForGame
         }
 
         $includeOptIn = $false
@@ -4330,45 +7586,21 @@ function Invoke-LaunchSanitizerTick {
             Write-TrayLog "LaunchSanitizer: game detected for '$profileId' ($exeList) - sweeping $tier killset"
         }
 
-        $payload = Invoke-LaunchSweepCli -ProfileId $profileId -IncludeOptIn $includeOptIn
-
-        if ($payload -and $payload.result) {
-            $stopped = @()
-            if ($payload.result.stopped) { $stopped = @($payload.result.stopped) }
-
-            foreach ($img in $stopped) {
-                if (-not $script:LaunchSanitizerLastSweepStopped.ContainsKey("$img")) {
-                    $script:LaunchSanitizerLastSweepStopped["$img"] = $true
-                    Write-TrayLog "LaunchSanitizer: stopped $img during '$profileId' session"
-                }
+        if (Test-LaunchSweepInFlight) {
+            if ($script:LaunchSanitizerTimer -and $script:LaunchSanitizerTimer.Interval -ne $script:LaunchSanitizerActiveIntervalMs) {
+                $script:LaunchSanitizerTimer.Interval = $script:LaunchSanitizerActiveIntervalMs
             }
-
-            if ($payload.result.warnings) {
-                foreach ($warning in @($payload.result.warnings)) {
-                    Write-TrayLog "LaunchSanitizer warning: $warning" -Level "WARN"
-                }
-            }
-
-            # Surface a single toast on the FIRST sweep that actually stops
-            # something, so the user knows the launch sanitizer did its job.
-            # Subsequent ticks (e.g. Medal respawn) stay quiet in the log.
-            if ($isFirstDetection -and $stopped.Count -gt 0) {
-                $summary = $stopped -join ", "
-                if ($summary.Length -gt 80) {
-                    $summary = $summary.Substring(0, 80) + "..."
-                }
-                try {
-                    Show-Notification -Title "A.B.S.O. Launch Sanitizer" `
-                        -Message "Stopped: $summary" `
-                        -Type "Success"
-                } catch {
-                    Write-TrayLog "LaunchSanitizer: notification failed: $($_.Exception.Message)" -Level "WARN"
-                }
-            }
+            return
         }
 
-        $script:LaunchSanitizerActiveProfileId = $profileId
-        $script:LaunchSanitizerGameWasAlive = $true
+        $started = Start-LaunchSweepCliProcess `
+            -ProfileId $profileId `
+            -IncludeOptIn $includeOptIn `
+            -IsFirstDetection $isFirstDetection
+        if ($started) {
+            $script:LaunchSanitizerActiveProfileId = $profileId
+            $script:LaunchSanitizerGameWasAlive = $true
+        }
         if ($script:LaunchSanitizerTimer -and $script:LaunchSanitizerTimer.Interval -ne $script:LaunchSanitizerActiveIntervalMs) {
             $script:LaunchSanitizerTimer.Interval = $script:LaunchSanitizerActiveIntervalMs
         }
@@ -4405,6 +7637,353 @@ function Stop-LaunchSanitizerTimer {
         try { $script:LaunchSanitizerTimer.Dispose() } catch {}
         $script:LaunchSanitizerTimer = $null
     }
+    Stop-LaunchSweepRuntime -KillProcess
+    Clear-AbsoKeepAwake
+    Stop-CpuBalancerForGame
+}
+
+function Show-AboutPanel {
+    <#
+    .SYNOPSIS
+    Shows the branded tray About surface.
+
+    .DESCRIPTION
+    The tray's most common UI surfaces use the Penumbra visual system. The
+    About action should match that system and preserve accurate status copy
+    instead of falling back to a generic MessageBox.
+    #>
+
+    if ($script:AboutForm -and -not $script:AboutForm.IsDisposed) {
+        try { $script:AboutForm.BringToFront() } catch {}
+        try { $script:AboutForm.Activate() } catch {}
+        return
+    }
+
+    $hotkeyText = Get-HotkeyRegistrationSummaryText -Config $script:TrayConfig
+    $form = New-Object System.Windows.Forms.Form
+    $form.Text = "About A.B.S.O."
+    $form.Size = New-Object System.Drawing.Size(430, 398)
+    $form.FormBorderStyle = [System.Windows.Forms.FormBorderStyle]::FixedDialog
+    $form.MaximizeBox = $false
+    $form.MinimizeBox = $false
+    $form.StartPosition = [System.Windows.Forms.FormStartPosition]::CenterScreen
+    $form.BackColor = $script:Colors.Background
+    $form.ForeColor = $script:Colors.Text
+    $form.Font = $script:FontNormal
+    $form.TopMost = $true
+    $form.ShowInTaskbar = $false
+
+    $aboutPulseTimer = $null
+    $aboutTruthPulseTimer = $null
+
+    $header = New-Object System.Windows.Forms.Panel
+    $header.Location = New-Object System.Drawing.Point(10, 10)
+    $header.Size = New-Object System.Drawing.Size(394, 74)
+    $header.BackColor = $script:Colors.BackgroundDark
+    $header.Tag = @{
+        Frame = 0
+        Accent = $script:Colors.AccentGold
+        Blue = $script:Colors.AccentBlue
+    }
+    $header.Add_Paint({
+        param($s, $e)
+        $g = $e.Graphics
+        $g.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
+        $accent = $s.Tag["Accent"]
+        $blue = $s.Tag["Blue"]
+        $frame = [int]$s.Tag["Frame"]
+
+        $bgBrush = New-Object System.Drawing.SolidBrush -ArgumentList $script:Colors.BackgroundDark
+        $g.FillRectangle($bgBrush, 0, 0, $s.Width, $s.Height)
+        $bgBrush.Dispose()
+
+        $haloBrush = New-Object System.Drawing.SolidBrush -ArgumentList (
+            [System.Drawing.Color]::FromArgb(42, $accent.R, $accent.G, $accent.B)
+        )
+        $g.FillEllipse($haloBrush, 13, 10, 46, 46)
+        $haloBrush.Dispose()
+
+        $orbitStart = ($frame * 8) % 360
+        $orbitPen = New-Object System.Drawing.Pen -ArgumentList (
+            [System.Drawing.Color]::FromArgb(160, $accent.R, $accent.G, $accent.B), 1.6
+        )
+        $orbitPen.StartCap = [System.Drawing.Drawing2D.LineCap]::Round
+        $orbitPen.EndCap = [System.Drawing.Drawing2D.LineCap]::Round
+        $g.DrawArc($orbitPen, 12, 9, 48, 48, $orbitStart, 88)
+        $orbitPen.Dispose()
+
+        $railPen = New-Object System.Drawing.Pen -ArgumentList (
+            [System.Drawing.Color]::FromArgb(70, $blue.R, $blue.G, $blue.B), 1
+        )
+        $g.DrawLine($railPen, 72, 58, ($s.Width - 18), 58)
+        $railPen.Dispose()
+
+        $sweepX = 72 + (($frame * 7) % [Math]::Max(1, $s.Width - 150))
+        $sweepPen = New-Object System.Drawing.Pen -ArgumentList (
+            [System.Drawing.Color]::FromArgb(180, $accent.R, $accent.G, $accent.B), 1.2
+        )
+        $sweepPen.StartCap = [System.Drawing.Drawing2D.LineCap]::Round
+        $sweepPen.EndCap = [System.Drawing.Drawing2D.LineCap]::Round
+        $g.DrawLine($sweepPen, $sweepX, 58, [Math]::Min($s.Width - 18, $sweepX + 56), 58)
+        $sweepPen.Dispose()
+
+        $borderPen = New-Object System.Drawing.Pen -ArgumentList $script:Colors.Border, 1
+        $g.DrawRectangle($borderPen, 0, 0, ($s.Width - 1), ($s.Height - 1))
+        $borderPen.Dispose()
+    })
+    $form.Controls.Add($header)
+
+    $brandBox = New-Object System.Windows.Forms.PictureBox
+    $brandBox.Location = New-Object System.Drawing.Point(25, 27)
+    $brandBox.Size = New-Object System.Drawing.Size(22, 22)
+    $brandBox.SizeMode = [System.Windows.Forms.PictureBoxSizeMode]::Zoom
+    $brandBox.BackColor = $script:Colors.BackgroundDark
+    $brandBox.Image = New-ActionBitmap -Action "Brand" -Color $script:Colors.AccentGold
+    $header.Controls.Add($brandBox)
+
+    $title = New-Object System.Windows.Forms.Label
+    $title.Text = "A.B.S.O. v$($script:AppVersion)"
+    $title.Location = New-Object System.Drawing.Point(72, 16)
+    $title.Size = New-Object System.Drawing.Size(210, 24)
+    $title.ForeColor = $script:Colors.Text
+    $title.BackColor = $script:Colors.BackgroundDark
+    $title.Font = $script:FontHero
+    $title.AutoEllipsis = $true
+    $header.Controls.Add($title)
+
+    $subtitle = New-Object System.Windows.Forms.Label
+    $subtitle.Text = "Adaptive Battle Station Optimizer"
+    $subtitle.Location = New-Object System.Drawing.Point(73, 39)
+    $subtitle.Size = New-Object System.Drawing.Size(242, 18)
+    $subtitle.ForeColor = $script:Colors.TextDim
+    $subtitle.BackColor = $script:Colors.BackgroundDark
+    $subtitle.Font = $script:FontMono
+    $subtitle.AutoEllipsis = $true
+    $header.Controls.Add($subtitle)
+
+    $chip = New-Object System.Windows.Forms.Label
+    $chip.Text = "TRAY"
+    $chip.Location = New-Object System.Drawing.Point(330, 18)
+    $chip.Size = New-Object System.Drawing.Size(44, 18)
+    $chip.TextAlign = [System.Drawing.ContentAlignment]::MiddleCenter
+    $chip.ForeColor = $script:Colors.AccentGold
+    $chip.BackColor = $script:Colors.BackgroundLight
+    $chip.Font = $script:FontEyebrow
+    $header.Controls.Add($chip)
+
+    $aboutPulseTimer = New-Object System.Windows.Forms.Timer
+    $aboutPulseTimer.Interval = 95
+    $aboutPulseTimer.Tag = $header
+    $aboutPulseTimer.Add_Tick({
+        try {
+            $target = $this.Tag
+            if (-not $target -or $target.IsDisposed) {
+                $this.Stop()
+                $this.Dispose()
+                return
+            }
+            if ($target.Tag -is [hashtable]) {
+                $target.Tag["Frame"] = ([int]$target.Tag["Frame"] + 1) % 120
+            }
+            $target.Invalidate()
+        } catch {
+            try { $this.Stop(); $this.Dispose() } catch {}
+        }
+    })
+    $aboutPulseTimer.Start()
+
+    $infoBox = New-Object System.Windows.Forms.PictureBox
+    $infoBox.Location = New-Object System.Drawing.Point(24, 104)
+    $infoBox.Size = New-Object System.Drawing.Size(24, 24)
+    $infoBox.SizeMode = [System.Windows.Forms.PictureBoxSizeMode]::Zoom
+    $infoBox.BackColor = $script:Colors.Background
+    $infoBox.Image = New-ActionBitmap -Action "Info" -Color $script:Colors.AccentBlue
+    $form.Controls.Add($infoBox)
+
+    $roleLabel = New-Object System.Windows.Forms.Label
+    $roleLabel.Text = "Tray control surface"
+    $roleLabel.Location = New-Object System.Drawing.Point(58, 101)
+    $roleLabel.Size = New-Object System.Drawing.Size(330, 22)
+    $roleLabel.ForeColor = $script:Colors.Text
+    $roleLabel.BackColor = $script:Colors.Background
+    $roleLabel.Font = $script:FontBold
+    $form.Controls.Add($roleLabel)
+
+    $truthLabel = New-Object System.Windows.Forms.Label
+    $truthLabel.Text = "Profiles apply only from explicit tray actions. Startup profile is a reminder, not an automatic apply."
+    $truthLabel.Location = New-Object System.Drawing.Point(58, 125)
+    $truthLabel.Size = New-Object System.Drawing.Size(330, 38)
+    $truthLabel.ForeColor = $script:Colors.TextDim
+    $truthLabel.BackColor = $script:Colors.Background
+    $truthLabel.Font = $script:FontNormal
+    $form.Controls.Add($truthLabel)
+
+    $truthStrip = New-Object System.Windows.Forms.Panel
+    $truthStrip.Location = New-Object System.Drawing.Point(24, 170)
+    $truthStrip.Size = New-Object System.Drawing.Size(364, 46)
+    $truthStrip.BackColor = $script:Colors.BackgroundLight
+    $truthStrip.Tag = @{
+        Accent = $script:Colors.AccentBlue
+        Gold = $script:Colors.AccentGold
+        Frame = 0
+    }
+    $truthStrip.Add_Paint({
+        param($s, $e)
+        $g = $e.Graphics
+        $g.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
+        $state = if ($s.Tag -is [hashtable]) { $s.Tag } else { @{} }
+        $accent = if ($state.ContainsKey("Accent") -and $state["Accent"] -is [System.Drawing.Color]) {
+            $state["Accent"]
+        } else {
+            $script:Colors.AccentBlue
+        }
+        $gold = if ($state.ContainsKey("Gold") -and $state["Gold"] -is [System.Drawing.Color]) {
+            $state["Gold"]
+        } else {
+            $script:Colors.AccentGold
+        }
+        $frame = if ($state.ContainsKey("Frame")) { [int]$state["Frame"] } else { 0 }
+        $borderPen = New-Object System.Drawing.Pen -ArgumentList (
+            [System.Drawing.Color]::FromArgb(70, $accent.R, $accent.G, $accent.B), 1
+        )
+        $g.DrawRectangle($borderPen, 0, 0, ($s.Width - 1), ($s.Height - 1))
+        $borderPen.Dispose()
+        $sweepX = 10 + (($frame * 5) % [Math]::Max(1, $s.Width - 42))
+        $sweepPen = New-Object System.Drawing.Pen -ArgumentList (
+            [System.Drawing.Color]::FromArgb(135, $gold.R, $gold.G, $gold.B), 1.1
+        )
+        $sweepPen.StartCap = [System.Drawing.Drawing2D.LineCap]::Round
+        $sweepPen.EndCap = [System.Drawing.Drawing2D.LineCap]::Round
+        $g.DrawLine($sweepPen, $sweepX, 4, [Math]::Min(($s.Width - 10), ($sweepX + 32)), 4)
+        $sweepPen.Dispose()
+    })
+    $form.Controls.Add($truthStrip)
+    $aboutTruthPulseTimer = New-Object System.Windows.Forms.Timer
+    $aboutTruthPulseTimer.Interval = 115
+    $aboutTruthPulseTimer.Tag = $truthStrip
+    $aboutTruthPulseTimer.Add_Tick({
+        try {
+            $target = $this.Tag
+            if (-not $target -or $target.IsDisposed) {
+                $this.Stop()
+                $this.Dispose()
+                return
+            }
+            if ($target.Tag -is [hashtable]) {
+                $target.Tag["Frame"] = ([int]$target.Tag["Frame"] + 1) % 120
+            }
+            $target.Invalidate()
+        } catch {
+            try { $this.Stop(); $this.Dispose() } catch {}
+        }
+    })
+    $aboutTruthPulseTimer.Start()
+
+    $applyTruthIcon = New-Object System.Windows.Forms.PictureBox
+    $applyTruthIcon.Location = New-Object System.Drawing.Point(10, 13)
+    $applyTruthIcon.Size = New-Object System.Drawing.Size(18, 18)
+    $applyTruthIcon.SizeMode = [System.Windows.Forms.PictureBoxSizeMode]::Zoom
+    $applyTruthIcon.BackColor = $truthStrip.BackColor
+    $applyTruthIcon.Image = New-ActionBitmap -Action "Apply" -Color $script:Colors.AccentGreen
+    $truthStrip.Controls.Add($applyTruthIcon)
+
+    $applyTruthLabel = New-Object System.Windows.Forms.Label
+    $applyTruthLabel.Text = "Explicit apply"
+    $applyTruthLabel.Location = New-Object System.Drawing.Point(32, 12)
+    $applyTruthLabel.Size = New-Object System.Drawing.Size(84, 20)
+    $applyTruthLabel.ForeColor = $script:Colors.Text
+    $applyTruthLabel.BackColor = $truthStrip.BackColor
+    $applyTruthLabel.Font = $script:FontEyebrow
+    $applyTruthLabel.AutoEllipsis = $true
+    $truthStrip.Controls.Add($applyTruthLabel)
+
+    $startupTruthIcon = New-Object System.Windows.Forms.PictureBox
+    $startupTruthIcon.Location = New-Object System.Drawing.Point(130, 13)
+    $startupTruthIcon.Size = New-Object System.Drawing.Size(18, 18)
+    $startupTruthIcon.SizeMode = [System.Windows.Forms.PictureBoxSizeMode]::Zoom
+    $startupTruthIcon.BackColor = $truthStrip.BackColor
+    $startupTruthIcon.Image = New-ActionBitmap -Action "Startup" -Color $script:Colors.AccentGold
+    $truthStrip.Controls.Add($startupTruthIcon)
+
+    $startupTruthLabel = New-Object System.Windows.Forms.Label
+    $startupTruthLabel.Text = "Reminder only"
+    $startupTruthLabel.Location = New-Object System.Drawing.Point(152, 12)
+    $startupTruthLabel.Size = New-Object System.Drawing.Size(88, 20)
+    $startupTruthLabel.ForeColor = $script:Colors.Text
+    $startupTruthLabel.BackColor = $truthStrip.BackColor
+    $startupTruthLabel.Font = $script:FontEyebrow
+    $startupTruthLabel.AutoEllipsis = $true
+    $truthStrip.Controls.Add($startupTruthLabel)
+
+    $hotkeyTruthIcon = New-Object System.Windows.Forms.PictureBox
+    $hotkeyTruthIcon.Location = New-Object System.Drawing.Point(254, 13)
+    $hotkeyTruthIcon.Size = New-Object System.Drawing.Size(18, 18)
+    $hotkeyTruthIcon.SizeMode = [System.Windows.Forms.PictureBoxSizeMode]::Zoom
+    $hotkeyTruthIcon.BackColor = $truthStrip.BackColor
+    $hotkeyTruthIcon.Image = New-ActionBitmap -Action "Hotkey" -Color $script:Colors.AccentBlue
+    $truthStrip.Controls.Add($hotkeyTruthIcon)
+
+    $hotkeyTruthLabel = New-Object System.Windows.Forms.Label
+    $hotkeyTruthLabel.Text = "Session state"
+    $hotkeyTruthLabel.Location = New-Object System.Drawing.Point(276, 12)
+    $hotkeyTruthLabel.Size = New-Object System.Drawing.Size(82, 20)
+    $hotkeyTruthLabel.ForeColor = $script:Colors.Text
+    $hotkeyTruthLabel.BackColor = $truthStrip.BackColor
+    $hotkeyTruthLabel.Font = $script:FontEyebrow
+    $hotkeyTruthLabel.AutoEllipsis = $true
+    $truthStrip.Controls.Add($hotkeyTruthLabel)
+
+    $hotkeyLabel = New-Object System.Windows.Forms.Label
+    $hotkeyLabel.Text = $hotkeyText
+    $hotkeyLabel.Location = New-Object System.Drawing.Point(24, 232)
+    $hotkeyLabel.Size = New-Object System.Drawing.Size(364, 76)
+    $hotkeyLabel.ForeColor = $script:Colors.TextDim
+    $hotkeyLabel.BackColor = $script:Colors.BackgroundLight
+    $hotkeyLabel.Font = $script:FontMono
+    $form.Controls.Add($hotkeyLabel)
+
+    $closeBtn = New-Object System.Windows.Forms.Button
+    $closeBtn.Text = "Close"
+    $closeBtn.Location = New-Object System.Drawing.Point(302, 312)
+    $closeBtn.Size = New-Object System.Drawing.Size(86, 32)
+    $closeBtn.BackColor = $script:Colors.BackgroundLight
+    $closeBtn.ForeColor = $script:Colors.Text
+    $closeBtn.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
+    $closeBtn.FlatAppearance.BorderSize = 0
+    $closeBtn.Font = $script:FontNormal
+    $closeBtn.Cursor = [System.Windows.Forms.Cursors]::Hand
+    $closeBtn.Image = New-ActionBitmap -Action "Close" -Color $script:Colors.TextDim
+    $closeBtn.ImageAlign = [System.Drawing.ContentAlignment]::MiddleLeft
+    $closeBtn.TextImageRelation = [System.Windows.Forms.TextImageRelation]::ImageBeforeText
+    $closeBtn.Padding = New-Object System.Windows.Forms.Padding(8, 0, 6, 0)
+    $closeBtn.Add_Click({ $form.Close() })
+    $form.Controls.Add($closeBtn)
+
+    $script:AboutForm = $form
+    $form.Add_FormClosed({
+        if ($aboutPulseTimer) {
+            try { $aboutPulseTimer.Stop() } catch {}
+            try { $aboutPulseTimer.Dispose() } catch {}
+        }
+        if ($aboutTruthPulseTimer) {
+            try { $aboutTruthPulseTimer.Stop() } catch {}
+            try { $aboutTruthPulseTimer.Dispose() } catch {}
+        }
+        foreach ($control in @($brandBox, $infoBox, $closeBtn, $applyTruthIcon, $startupTruthIcon, $hotkeyTruthIcon)) {
+            if ($control -and $control.Image) {
+                $image = $control.Image
+                $control.Image = $null
+                try { $image.Dispose() } catch {}
+            }
+        }
+        $form.Dispose()
+        $script:AboutForm = $null
+    }.GetNewClosure())
+
+    $form.Show()
+    try {
+        Apply-DwmWindowEffects -Form $form -CornerStyle 2 -BorderColorRGB @(0, 245, 212)
+    } catch {}
 }
 
 # ============================================================================
@@ -4439,6 +8018,7 @@ function Start-TrayApp {
 
     # Load config
     $script:TrayConfig = Read-TrayConfig
+    $script:EnableBalloonNotifications = [bool]$script:TrayConfig.notificationsEnabled
     $normalizeResult = Normalize-TrayConfigProfileIds -Config $script:TrayConfig
     $script:TrayConfig = $normalizeResult.Config
     if ($normalizeResult.Changed) {
@@ -4451,7 +8031,7 @@ function Start-TrayApp {
 
     $script:notifyIcon = New-Object System.Windows.Forms.NotifyIcon
     Set-IconState -State "Idle"
-    $script:notifyIcon.Text = "A.B.S.O. - Ready"
+    Set-TrayOperationTooltipText -Text "A.B.S.O. - Ready"
     $script:notifyIcon.Visible = $true
     Start-StartupIconSelfHeal
 
@@ -4465,13 +8045,10 @@ function Start-TrayApp {
     if ($startupProfile -and $startupProfile.status -eq "active" -and $startupProfile.id) {
         $script:activeProfile = "$($startupProfile.id)"
         $startupProfileName = if ($startupProfile.name) {
-            "$($startupProfile.name)"
-        }
-        elseif ($script:Profiles.Contains($script:activeProfile)) {
-            "$($script:Profiles[$script:activeProfile].Name)"
+            Format-TrayDisplayCopy -Text "$($startupProfile.name)"
         }
         else {
-            $script:activeProfile
+            Get-TrayProfileDisplayName -ProfileId $script:activeProfile
         }
         $stateSource = if ($startupProfile.source) { "$($startupProfile.source)" } else { "startup_restore" }
         $restoreSource = Get-StartupRestoreStateSource -Source $stateSource
@@ -4483,13 +8060,9 @@ function Start-TrayApp {
             -ProfileName $startupProfileName `
             -Source $restoreSource `
             -Timestamp $stateTimestamp
-        $script:LastAction = "Startup restore [$($startupProfile.source)]: $startupProfileName"
-        $script:LastActionTime = Get-Date -Format "HH:mm"
         Write-TrayLog "Startup restore selected active profile '$($startupProfile.id)' from '$($startupProfile.source)' (decision=$($startupProfile.decision), timestamp=$($startupProfile.timestamp))"
     }
     elseif ($startupProfile -and $startupProfile.status -eq "restored") {
-        $script:LastAction = "Startup restore [$($startupProfile.source)]: no active profile"
-        $script:LastActionTime = Get-Date -Format "HH:mm"
         Write-TrayLog "Startup restore selected no active profile from '$($startupProfile.source)' (decision=$($startupProfile.decision), timestamp=$($startupProfile.timestamp))"
     }
     else {
@@ -4552,7 +8125,7 @@ public class HotkeyMessageWindow : NativeWindow {
 
     # Register hotkeys using the NativeWindow handle
     try {
-        Register-GlobalHotkeys -WindowHandle $script:HotkeyWindow.Handle -Config $script:TrayConfig -Actions @{
+        $hotkeyRegistration = Register-GlobalHotkeys -WindowHandle $script:HotkeyWindow.Handle -Config $script:TrayConfig -Actions @{
             openMenu = {
                 $mi = $script:notifyIcon.GetType().GetMethod(
                     "ShowContextMenu",
@@ -4561,7 +8134,14 @@ public class HotkeyMessageWindow : NativeWindow {
                 $mi.Invoke($script:notifyIcon, $null)
             }
             restore = {
-                if ($script:activeProfile) { Restore-Settings }
+                if ($script:activeProfile) {
+                    Restore-Settings
+                }
+                else {
+                    Show-Notification -Title "A.B.S.O." -Message "No active profile to restore. Apply a profile first." -Type "Info" -ActionName "Restore" -ActionColor $script:Colors.AccentAmber
+                    Set-TrayLastAction -Message "Restore hotkey ignored: no active profile"
+                    Update-MenuState
+                }
             }
         }
 
@@ -4574,7 +8154,15 @@ public class HotkeyMessageWindow : NativeWindow {
             }
         }
 
-        Write-TrayLog "Global hotkeys registered"
+        if ($hotkeyRegistration.Active -gt 0 -and $hotkeyRegistration.Failed -le 0) {
+            Write-TrayLog "Global hotkeys active: $($hotkeyRegistration.Active)/$($hotkeyRegistration.Total)"
+        }
+        elseif ($hotkeyRegistration.Active -gt 0) {
+            Write-TrayLog "Global hotkeys partially active: $($hotkeyRegistration.Active)/$($hotkeyRegistration.Total)" -Level "WARN"
+        }
+        else {
+            Write-TrayLog "No global hotkeys active; configured keys may be unavailable" -Level "WARN"
+        }
     }
     catch {
         Write-TrayLog "Failed to register hotkeys: $($_.Exception.Message)" -Level "WARN"
@@ -4628,11 +8216,12 @@ public class HotkeyMessageWindow : NativeWindow {
     # ─── HEADER ───
 
     $header = New-Object System.Windows.Forms.ToolStripMenuItem
-    $header.Text = "  A.B.S.O.   v$($script:AppVersion)"
+    $header.Text = "A.B.S.O.   v$($script:AppVersion)"
     $header.Enabled = $false
     $header.BackColor = $script:Colors.BackgroundDark
     $header.ForeColor = $script:Colors.AccentGold
     $header.Font = [DarkThemeRenderer]::ResolveHeroFont(11.0, [System.Drawing.FontStyle]::Bold)
+    $header.Image = New-ActionBitmap -Action "Brand" -Color $script:Colors.AccentGold
     $menu.Items.Add($header) | Out-Null
 
     # ─── STATUS DASHBOARD ───
@@ -4645,49 +8234,35 @@ public class HotkeyMessageWindow : NativeWindow {
     $script:statusItem.Size = New-Object System.Drawing.Size(280, 48)
     $script:statusItem.Padding = New-Object System.Windows.Forms.Padding(0)
     $script:statusItem.Margin = New-Object System.Windows.Forms.Padding(0)
-    if ($script:activeProfile) {
-        $ap = $script:Profiles[$script:activeProfile]
-        $pendingApplyText = Get-ActiveProfilePendingApplyText
-        $rebootPendingText = Get-ActiveProfileRebootPendingText
-        if ($pendingApplyText) {
-            $script:statusItem.Text = "$($ap.Name)|Needs apply: $pendingApplyText"
-            $script:statusItem.ForeColor = $script:Colors.AccentAmber
-        }
-        elseif ($rebootPendingText) {
-            $script:statusItem.Text = "$($ap.Name)|Restart required: $rebootPendingText"
-            $script:statusItem.ForeColor = $script:Colors.AccentAmber
-        }
-        else {
-            $script:statusItem.Text = "$($ap.Name)|$($ap.Sub)"
-            $script:statusItem.ForeColor = Get-CategoryColor -Category $ap.Cat -Fallback $script:Colors.AccentGreen
-        }
-    }
-    else {
-        $script:statusItem.Text = "Ready|No profile active"
-        $script:statusItem.ForeColor = $script:Colors.AccentGreen
-    }
     $script:statusItem.Enabled = $false
     $script:statusItem.BackColor = $script:Colors.BackgroundDark
     $script:statusItem.Font = New-Object System.Drawing.Font("Segoe UI", 9, [System.Drawing.FontStyle]::Bold)
+    Set-TrayActiveStatusItemFromState
     $menu.Items.Add($script:statusItem) | Out-Null
 
-    # System info line (GPU + refresh rate)
-    $sysInfoText = "$($sysInfo.GPU)  |  $($sysInfo.RefreshRate)"
+    # System info line (GPU + display topology summary)
+    $sysInfoText = "$($sysInfo.GPU)  |  $($sysInfo.DisplaySummary)"
     $sysInfoItem = New-Object System.Windows.Forms.ToolStripMenuItem
     $sysInfoItem.Text = $sysInfoText
+    $sysInfoItem.AccessibleName = "__status_bar__"
+    $sysInfoItem.AccessibleDescription = Get-TraySystemInfoChipText -GpuName $sysInfo.GPU -DisplaySummary $sysInfo.DisplaySummary
     $sysInfoItem.Enabled = $false
     $sysInfoItem.BackColor = $script:Colors.BackgroundDark
     $sysInfoItem.ForeColor = $script:Colors.TextDisabled
     $sysInfoItem.Font = $script:FontMono
+    $sysInfoItem.Image = New-TrayDisplayTopologyBitmap -DisplaySummary $sysInfo.DisplaySummary -Color $script:Colors.TextDisabled
     $menu.Items.Add($sysInfoItem) | Out-Null
 
     # Audit status item (hidden until audit is run)
     $script:auditStatusItem = New-Object System.Windows.Forms.ToolStripMenuItem
     $script:auditStatusItem.Text = ""
+    $script:auditStatusItem.AccessibleName = "__status_bar__"
+    $script:auditStatusItem.AccessibleDescription = "AUDIT"
     $script:auditStatusItem.Enabled = $false
     $script:auditStatusItem.BackColor = $script:Colors.BackgroundDark
     $script:auditStatusItem.ForeColor = $script:Colors.AccentGreen
     $script:auditStatusItem.Font = New-Object System.Drawing.Font("Segoe UI", 8)
+    $script:auditStatusItem.Image = New-AuditStatusBitmap -Color $script:Colors.AccentGreen
     $script:auditStatusItem.Visible = $false
     $menu.Items.Add($script:auditStatusItem) | Out-Null
 
@@ -4708,22 +8283,35 @@ public class HotkeyMessageWindow : NativeWindow {
 
     $searchBox.Add_GotFocus({
         if ($script:searchIsPlaceholder) {
+            $script:searchIsPlaceholder = $false
             $this.Text = ""
             $this.ForeColor = $script:Colors.Text
-            $script:searchIsPlaceholder = $false
         }
     })
     $searchBox.Add_LostFocus({
         if ($this.Text -eq "") {
+            $script:searchIsPlaceholder = $true
             $this.Text = "Search profiles..."
             $this.ForeColor = $script:Colors.TextDim
-            $script:searchIsPlaceholder = $true
         }
     })
+
+    $script:searchStatusItem = New-Object System.Windows.Forms.ToolStripMenuItem
+    $script:searchStatusItem.Text = ""
+    $script:searchStatusItem.AccessibleName = "__status_bar__"
+    $script:searchStatusItem.AccessibleDescription = "SEARCH"
+    $script:searchStatusItem.Enabled = $false
+    $script:searchStatusItem.Visible = $false
+    $script:searchStatusItem.BackColor = $script:Colors.BackgroundDark
+    $script:searchStatusItem.ForeColor = $script:Colors.TextDim
+    $script:searchStatusItem.Font = $script:FontEyebrow
+    $script:searchStatusItem.Image = New-ActionBitmap -Action "Search" -Color $script:Colors.TextDim
+
     $searchBox.Add_TextChanged({
         if (-not $script:searchIsPlaceholder) {
             $query = $this.Text
             $matchedIds = Find-Profiles -Query $query
+            Set-TraySearchStatus -Query $query -MatchedIds $matchedIds
             foreach ($item in $script:profileMenuItems) {
                 $item.Visible = ($matchedIds -contains $item.Tag)
             }
@@ -4731,7 +8319,11 @@ public class HotkeyMessageWindow : NativeWindow {
             foreach ($submenuItem in $script:gameGroupSubmenus) {
                 $hasVisible = $false
                 foreach ($child in $submenuItem.DropDownItems) {
-                    if ($child -is [System.Windows.Forms.ToolStripMenuItem] -and $child.Visible) {
+                    if (
+                        $child -is [System.Windows.Forms.ToolStripMenuItem] -and
+                        $child.Tag -ne "__game_flyout_header__" -and
+                        $child.Visible
+                    ) {
                         $hasVisible = $true
                         break
                     }
@@ -4760,6 +8352,7 @@ public class HotkeyMessageWindow : NativeWindow {
         }
     })
     $menu.Items.Add($searchBox) | Out-Null
+    $menu.Items.Add($script:searchStatusItem) | Out-Null
 
     # --- Derive game groups from catalog metadata ---
     # The Python manifest now carries explicit group/variant labels so games
@@ -4777,7 +8370,10 @@ public class HotkeyMessageWindow : NativeWindow {
 
     function Get-GameGroup {
         param([string]$ProfileId)
-        $profile = $script:Profiles[$ProfileId]
+        $profile = $null
+        if ($script:Profiles -and $script:Profiles.Contains($ProfileId)) {
+            $profile = $script:Profiles[$ProfileId]
+        }
         if ($profile -and -not [string]::IsNullOrWhiteSpace("$($profile.GameGroup)")) {
             return "$($profile.GameGroup)"
         }
@@ -4791,24 +8387,360 @@ public class HotkeyMessageWindow : NativeWindow {
 
     function Get-GameGroupName {
         param([string]$ProfileId)
-        $profile = $script:Profiles[$ProfileId]
+        $profile = $null
+        if ($script:Profiles -and $script:Profiles.Contains($ProfileId)) {
+            $profile = $script:Profiles[$ProfileId]
+        }
         if ($profile -and -not [string]::IsNullOrWhiteSpace("$($profile.GroupName)")) {
-            return "$($profile.GroupName)"
+            return (Format-TrayDisplayCopy -Text "$($profile.GroupName)")
         }
         if ($profile -and $profile.Name) {
-            return ("$($profile.Name)" -replace '(:|\s+-\s+).*$', '')
+            return ((Format-TrayDisplayCopy -Text "$($profile.Name)") -replace '(:|\s+-\s+).*$', '')
         }
         return $ProfileId
     }
 
     function Get-ProfileVariantLabel {
         param([string]$ProfileId)
-        $profile = $script:Profiles[$ProfileId]
-        if ($profile -and -not [string]::IsNullOrWhiteSpace("$($profile.Variant)")) {
-            return "$($profile.Variant)"
+        $profile = $null
+        if ($script:Profiles -and $script:Profiles.Contains($ProfileId)) {
+            $profile = $script:Profiles[$ProfileId]
         }
-        if ($profile -and $profile.Name) { return "$($profile.Name)" }
+        if ($profile -and -not [string]::IsNullOrWhiteSpace("$($profile.Variant)")) {
+            return (Format-TrayDisplayCopy -Text "$($profile.Variant)")
+        }
+        if ($profile -and $profile.Name) { return (Format-TrayDisplayCopy -Text "$($profile.Name)") }
         return $ProfileId
+    }
+
+    function Get-ProfileMenuDisplayText {
+        param([string]$ProfileId, [bool]$InSubmenu = $false)
+        $profile = $null
+        if ($script:Profiles -and $script:Profiles.Contains($ProfileId)) {
+            $profile = $script:Profiles[$ProfileId]
+        }
+        if ($InSubmenu) { return (Get-ProfileVariantLabel -ProfileId $ProfileId) }
+        if ($profile -and $profile.Name) { return (Format-TrayDisplayCopy -Text "$($profile.Name)") }
+        return $ProfileId
+    }
+
+    function New-TrayProfileMenuImage {
+        param(
+            [string]$ProfileId,
+            [bool]$IsActive = $false,
+            [bool]$InSubmenu = $false,
+            [bool]$ShowSyncBadge = $false,
+            [bool]$FavoriteBadge = $false
+        )
+
+        $profile = $null
+        if ($script:Profiles -and $script:Profiles.Contains($ProfileId)) {
+            $profile = $script:Profiles[$ProfileId]
+        }
+
+        $category = if ($profile -and -not [string]::IsNullOrWhiteSpace("$($profile.Cat)")) { "$($profile.Cat)" } else { "Other" }
+        $catColor = Get-TrayProfileAccentColor -ProfileId $ProfileId -Profile $profile -Fallback $script:Colors.Text
+        $gameGroup = Get-TrayProfileGameGroup -ProfileId $ProfileId -Profile $profile
+        $variant = if ($profile -and $profile.Variant) { "$($profile.Variant)" } else { "" }
+        $modeBadge = if ("$ProfileId" -match '(?i)capture' -or $variant -match '(?i)capture') {
+            "capture"
+        }
+        elseif ($variant -match '(?i)\bHDR\b' -or "$ProfileId" -match '(?i)-hdr($|-)' ) {
+            "hdr"
+        }
+        else {
+            ""
+        }
+
+        if ($IsActive) {
+            $pendingApplyBadge = -not [string]::IsNullOrWhiteSpace((Get-ActiveProfilePendingApplyText))
+            $windowsRestartBadge = (
+                -not $pendingApplyBadge -and
+                -not [string]::IsNullOrWhiteSpace((Get-ActiveProfileRebootPendingText))
+            )
+            $verificationBadge = (
+                -not $pendingApplyBadge -and
+                -not $windowsRestartBadge -and
+                -not [string]::IsNullOrWhiteSpace((Get-ActiveProfileVerificationInProgressText))
+            )
+            return New-ActiveGameBitmap `
+                -GameGroup $gameGroup `
+                -Color $catColor `
+                -Category $category `
+                -ModeBadge $modeBadge `
+                -FavoriteBadge $FavoriteBadge `
+                -PendingApplyBadge $pendingApplyBadge `
+                -WindowsRestartBadge $windowsRestartBadge `
+                -VerificationBadge $verificationBadge
+        }
+
+        if ($FavoriteBadge -and (Get-Command New-FavoriteGameBitmap -ErrorAction SilentlyContinue)) {
+            $syncMode = if ($profile -and $profile.SyncMode) { $profile.SyncMode } else { "agnostic" }
+            return New-FavoriteGameBitmap `
+                -GameGroup $gameGroup `
+                -Color $catColor `
+                -Category $category `
+                -SyncMode $syncMode `
+                -ModeBadge $modeBadge
+        }
+
+        if ($InSubmenu -or $ShowSyncBadge) {
+            $syncMode = if ($profile -and $profile.SyncMode) { $profile.SyncMode } else { "agnostic" }
+            return New-GameSyncBadgeBitmap `
+                -GameGroup $gameGroup `
+                -Color $catColor `
+                -Category $category `
+                -SyncMode $syncMode `
+                -ModeBadge $modeBadge
+        }
+
+        return New-GameBitmap -GameGroup $gameGroup -Color $catColor -Category $category
+    }
+
+    function New-TrayGameGroupMedallionBitmap {
+        param(
+            [string]$GameGroup,
+            [System.Drawing.Color]$Color,
+            [string]$Category = "Other"
+        )
+
+        $mark = New-GameBitmap -GameGroup $GameGroup -Color $Color -Category $Category
+        if (-not $mark) { return $null }
+
+        $bmp = New-Object System.Drawing.Bitmap(16, 16)
+        $g = [System.Drawing.Graphics]::FromImage($bmp)
+        $g.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
+        $g.Clear([System.Drawing.Color]::Transparent)
+
+        $glowBrush = New-Object System.Drawing.SolidBrush -ArgumentList (
+            [System.Drawing.Color]::FromArgb(42, $Color.R, $Color.G, $Color.B)
+        )
+        $backBrush = New-Object System.Drawing.SolidBrush -ArgumentList $script:Colors.BackgroundDark
+        $ringPen = New-Object System.Drawing.Pen -ArgumentList (
+            [System.Drawing.Color]::FromArgb(150, $Color.R, $Color.G, $Color.B), 1
+        )
+        $arcPen = New-Object System.Drawing.Pen -ArgumentList (
+            [System.Drawing.Color]::FromArgb(90, $Color.R, $Color.G, $Color.B), 1
+        )
+        $arcPen.StartCap = [System.Drawing.Drawing2D.LineCap]::Round
+        $arcPen.EndCap = [System.Drawing.Drawing2D.LineCap]::Round
+
+        try {
+            $g.FillEllipse($glowBrush, 0, 0, 16, 16)
+            $g.FillEllipse($backBrush, 2, 2, 12, 12)
+            $g.DrawEllipse($ringPen, 2, 2, 12, 12)
+            $g.DrawArc($arcPen, 1, 1, 14, 14, 215, 50)
+            $g.DrawImage($mark, (New-Object System.Drawing.Rectangle(3, 3, 10, 10)))
+        }
+        finally {
+            $arcPen.Dispose()
+            $ringPen.Dispose()
+            $backBrush.Dispose()
+            $glowBrush.Dispose()
+            $g.Dispose()
+            $mark.Dispose()
+        }
+
+        return $bmp
+    }
+
+    function Get-TrayProfileMenuAccent {
+        param([string]$ProfileId, [object]$Profile)
+
+        $baseColor = Get-CategoryColor -Category $Profile.Cat -Fallback $script:Colors.Text
+        $gameGroup = Get-GameGroup -ProfileId $ProfileId
+        if (Get-Command Get-GameAccentColor -ErrorAction SilentlyContinue) {
+            return Get-GameAccentColor -GameGroup $gameGroup -FallbackColor $baseColor
+        }
+        return $baseColor
+    }
+
+    function Get-ProfileMenuChipText {
+        param([string]$ProfileId, [object]$Profile)
+
+        if (-not $Profile) { return "" }
+
+        $variant = if ($Profile.Variant) { "$($Profile.Variant)" } else { "" }
+        $syncMode = if ($Profile.SyncMode) { "$($Profile.SyncMode)".ToLowerInvariant() } else { "" }
+        if ("$ProfileId" -match '(?i)capture' -or $variant -match '(?i)capture') { return "CAPTURE" }
+        if ($syncMode -eq "on") { return "G-SYNC" }
+        if ($syncMode -eq "off") { return "NO-SYNC" }
+        if ($variant -match '(?i)\bHDR\b' -or "$ProfileId" -match '(?i)-hdr($|-)' ) { return "HDR" }
+        if ($variant -match '(?i)\bSDR\b' -or "$ProfileId" -match '(?i)-sdr($|-)' ) { return "SDR" }
+        if ($variant -match '(?i)\bonline\b') { return "ONLINE" }
+        if ($variant -match '(?i)\boffline\b') { return "OFFLINE" }
+        return ""
+    }
+
+    function Get-ProfileMenuActiveStateChipText {
+        param([string]$ProfileId)
+
+        if ([string]::IsNullOrWhiteSpace($ProfileId)) { return "" }
+        if ([string]::IsNullOrWhiteSpace([string]$script:activeProfile)) { return "" }
+        if ("$ProfileId" -ne "$script:activeProfile") { return "" }
+        if (Get-ActiveProfilePendingApplyText) { return "FIX" }
+        if (Get-ActiveProfileRebootPendingText) { return "RESTART" }
+        if (Get-ActiveProfileVerificationInProgressText) { return "CHECK" }
+        return ""
+    }
+
+    function Get-ProfileMenuActiveStateTooltipText {
+        param([string]$ProfileId)
+
+        if ([string]::IsNullOrWhiteSpace($ProfileId)) { return "" }
+        if ([string]::IsNullOrWhiteSpace([string]$script:activeProfile)) { return "" }
+        if ("$ProfileId" -ne "$script:activeProfile") { return "" }
+
+        $pendingText = Get-ActiveProfilePendingApplyText
+        if (-not [string]::IsNullOrWhiteSpace($pendingText)) {
+            return "Active state: pending profile fix for $pendingText"
+        }
+
+        $rebootText = Get-ActiveProfileRebootPendingText
+        if (-not [string]::IsNullOrWhiteSpace($rebootText)) {
+            return "Active state: Windows restart required for $rebootText"
+        }
+
+        if (Get-ActiveProfileVerificationInProgressText) {
+            return "Active state: checking profile state"
+        }
+
+        return ""
+    }
+
+    function Set-TrayProfileMenuItemTooltipState {
+        param(
+            [System.Windows.Forms.ToolStripMenuItem]$Item,
+            [string]$StateText = ""
+        )
+
+        if (-not $Item) { return }
+
+        $baseLines = New-Object System.Collections.Generic.List[string]
+        $rawTooltip = if ($Item.ToolTipText) { "$($Item.ToolTipText)" } else { "" }
+        foreach ($line in ($rawTooltip -split "`r?`n")) {
+            if ("$line" -match '^Active state: ') { continue }
+            [void]$baseLines.Add("$line")
+        }
+        while ($baseLines.Count -gt 0 -and [string]::IsNullOrWhiteSpace($baseLines[$baseLines.Count - 1])) {
+            $baseLines.RemoveAt($baseLines.Count - 1)
+        }
+
+        $newTooltip = ($baseLines -join "`n").TrimEnd()
+        if (-not [string]::IsNullOrWhiteSpace($StateText)) {
+            if (-not [string]::IsNullOrWhiteSpace($newTooltip)) {
+                $newTooltip += "`n`n"
+            }
+            $newTooltip += $StateText.Trim()
+        }
+
+        $Item.ToolTipText = $newTooltip
+    }
+
+    function Set-TrayProfileMenuItemMetadata {
+        param(
+            [System.Windows.Forms.ToolStripMenuItem]$Item,
+            [string]$ProfileId,
+            [object]$Profile,
+            [string]$ExtraChipText = ""
+        )
+
+        if (-not $Item) { return }
+        $chipText = Get-ProfileMenuChipText -ProfileId $ProfileId -Profile $Profile
+        $stateChipText = Get-ProfileMenuActiveStateChipText -ProfileId $ProfileId
+        $stateTooltipText = Get-ProfileMenuActiveStateTooltipText -ProfileId $ProfileId
+        if (
+            [string]::IsNullOrWhiteSpace($ExtraChipText) -and
+            $Item.AccessibleDescription -and
+            "$($Item.AccessibleDescription)" -match '(^|\|)RECENT(\||$)'
+        ) {
+            $ExtraChipText = "RECENT"
+        }
+        $chips = @()
+        if (-not [string]::IsNullOrWhiteSpace($chipText)) { $chips += $chipText }
+        if (-not [string]::IsNullOrWhiteSpace($ExtraChipText)) { $chips += $ExtraChipText.Trim().ToUpperInvariant() }
+        if (-not [string]::IsNullOrWhiteSpace($stateChipText)) { $chips += $stateChipText }
+        if ($chips.Count -le 0) {
+            $Item.AccessibleName = ""
+            $Item.AccessibleDescription = ""
+            $Item.Padding = New-Object System.Windows.Forms.Padding(0)
+            Set-TrayProfileMenuItemTooltipState -Item $Item -StateText $stateTooltipText
+            return
+        }
+
+        $Item.AccessibleName = "__profile_menu_item__"
+        $Item.AccessibleDescription = ($chips -join "|")
+        $paddingRight = [Math]::Min(160, 62 + (($chips.Count - 1) * 58))
+        $Item.Padding = New-Object System.Windows.Forms.Padding(0, 0, $paddingRight, 0)
+        Set-TrayProfileMenuItemTooltipState -Item $Item -StateText $stateTooltipText
+    }
+
+    function Get-GameFlyoutHeaderSummaryChips {
+        param([string[]]$ProfileIds)
+
+        $syncOn = 0
+        $syncOff = 0
+        $hdr = 0
+        $capture = 0
+        foreach ($profileId in @($ProfileIds)) {
+            if (-not $profileId -or -not $script:Profiles.Contains($profileId)) { continue }
+            $profile = $script:Profiles[$profileId]
+            $variant = if ($profile.Variant) { "$($profile.Variant)" } else { "" }
+            $syncMode = if ($profile.SyncMode) { "$($profile.SyncMode)".ToLowerInvariant() } else { "" }
+            if ($syncMode -eq "on") { $syncOn += 1 }
+            elseif ($syncMode -eq "off") { $syncOff += 1 }
+            if ("$profileId" -match '(?i)-hdr($|-)' -or $variant -match '(?i)\bHDR\b') { $hdr += 1 }
+            if ("$profileId" -match '(?i)capture' -or $variant -match '(?i)capture') { $capture += 1 }
+        }
+
+        $chips = @()
+        if ($syncOn -gt 0) { $chips += "${syncOn} G-SYNC" }
+        if ($syncOff -gt 0) { $chips += "${syncOff} NO-SYNC" }
+        if ($hdr -gt 0) { $chips += "${hdr} HDR" }
+        if ($capture -gt 0) { $chips += "${capture} CAP" }
+        return ($chips -join "|")
+    }
+
+    function Get-CategoryHeaderSummaryChips {
+        param(
+            [int]$GameCount,
+            [int]$ProfileCount
+        )
+
+        $gameLabel = if ($GameCount -eq 1) { "game" } else { "games" }
+        $profileLabel = if ($ProfileCount -eq 1) { "profile" } else { "profiles" }
+        return "$GameCount $gameLabel|$ProfileCount $profileLabel"
+    }
+
+    function Get-TraySectionHeaderSummaryChips {
+        param(
+            [int]$ItemCount,
+            [string]$ItemSingular,
+            [string]$ItemPlural,
+            [int]$GameCount = 0
+        )
+
+        $safeItemCount = [Math]::Max(0, $ItemCount)
+        $itemLabel = if ($safeItemCount -eq 1) { $ItemSingular } else { $ItemPlural }
+        $chips = @("$safeItemCount $itemLabel")
+        if ($GameCount -gt 0) {
+            $safeGameCount = [Math]::Max(0, $GameCount)
+            $gameLabel = if ($safeGameCount -eq 1) { "game" } else { "games" }
+            $chips += "$safeGameCount $gameLabel"
+        }
+        return ($chips -join "|")
+    }
+
+    function Set-TraySectionHeaderVisualState {
+        param(
+            [System.Windows.Forms.ToolStripMenuItem]$Item,
+            [string]$ChipText
+        )
+
+        if (-not $Item) { return }
+        $Item.AccessibleName = "__section_header__"
+        $Item.AccessibleDescription = if ([string]::IsNullOrWhiteSpace($ChipText)) { "" } else { $ChipText.Trim() }
+        $Item.Padding = New-Object System.Windows.Forms.Padding(0, 0, 94, 0)
     }
 
     # ─── FAVORITES ───
@@ -4821,31 +8753,66 @@ public class HotkeyMessageWindow : NativeWindow {
     }
 
     if ($favProfiles.Count -gt 0) {
+        $favoriteHeaderGameGroups = [System.Collections.Generic.List[string]]::new()
+        $favoriteHeaderGroupKeys = @{}
+        foreach ($favId in $favProfiles) {
+            if (-not $script:Profiles.Contains($favId)) { continue }
+            $favoriteGroup = Get-GameGroup -ProfileId $favId
+            if ([string]::IsNullOrWhiteSpace($favoriteGroup)) { continue }
+            $favoriteGroupKey = "$favoriteGroup".Trim().ToLowerInvariant()
+            if ($favoriteHeaderGroupKeys.ContainsKey($favoriteGroupKey)) { continue }
+            $favoriteHeaderGroupKeys[$favoriteGroupKey] = $true
+            if ($favoriteHeaderGameGroups.Count -lt 3) {
+                [void]$favoriteHeaderGameGroups.Add($favoriteGroup)
+            }
+        }
+
         $favLabel = New-Object System.Windows.Forms.ToolStripMenuItem
         $favLabel.Text = "FAVORITES"
         $favLabel.Enabled = $false
         $favLabel.BackColor = $script:Colors.Background
         $favLabel.ForeColor = $script:Colors.FavoriteStar
         $favLabel.Font = $script:FontEyebrow
+        Set-TraySectionHeaderVisualState `
+            -Item $favLabel `
+            -ChipText (Get-TraySectionHeaderSummaryChips `
+                -ItemCount $favProfiles.Count `
+                -ItemSingular "favorite" `
+                -ItemPlural "favorites" `
+                -GameCount $favoriteHeaderGroupKeys.Count)
+        if ($favoriteHeaderGameGroups.Count -gt 0 -and (Get-Command New-FavoriteGameMosaicBitmap -ErrorAction SilentlyContinue)) {
+            $favLabel.Image = New-FavoriteGameMosaicBitmap -GameGroups @($favoriteHeaderGameGroups) -Color $script:Colors.FavoriteStar -Category "Other"
+        }
+        else {
+            $favLabel.Image = New-ActionBitmap -Action "Favorite" -Color $script:Colors.FavoriteStar
+        }
         $menu.Items.Add($favLabel) | Out-Null
         $script:favSectionLabel = $favLabel
 
         foreach ($favId in $favProfiles) {
             $p = $script:Profiles[$favId]
             $catColor = Get-CategoryColor -Category $p.Cat -Fallback $script:Colors.Text
+            $gameColor = Get-TrayProfileMenuAccent -ProfileId $favId -Profile $p
             $item = New-Object System.Windows.Forms.ToolStripMenuItem
-            $item.Text = $p.Name
+            $item.Text = Get-TrayProfileObjectDisplayName -Profile $p -Fallback $favId
             $item.Tag = $favId
-            $gg = Get-GameGroup -ProfileId $favId
-            $item.Image = New-GameBitmap -GameGroup $gg -Color $catColor -Category $p.Cat
+            $item.Image = New-TrayProfileMenuImage `
+                -ProfileId $favId `
+                -IsActive ($favId -eq $script:activeProfile) `
+                -ShowSyncBadge $true `
+                -FavoriteBadge $true
             $item.BackColor = $script:Colors.Background
-            $item.ForeColor = $catColor
+            $item.ForeColor = $gameColor
             $item.Font = New-Object System.Drawing.Font("Segoe UI", 9)
-            $item.ToolTipText = "$($p.Sub)`n$($p.Desc)"
+            $favoriteSub = if ($p.Sub) { Format-TrayDisplayCopy -Text "$($p.Sub)" } else { "" }
+            $favoriteDesc = if ($p.Desc) { Format-TrayDisplayCopy -Text "$($p.Desc)" } else { "" }
+            $item.ToolTipText = "$favoriteSub`n$favoriteDesc".Trim()
+            Set-TrayProfileMenuItemMetadata -Item $item -ProfileId $favId -Profile $p
             $item.Add_Click({
                 param($s, $ev)
                 Apply-Profile $s.Tag
             }.GetNewClosure())
+            Register-TrayProfileHoverPreview -Item $item -ProfileId $favId
             $menu.Items.Add($item) | Out-Null
             $script:profileMenuItems += $item
         }
@@ -4855,12 +8822,44 @@ public class HotkeyMessageWindow : NativeWindow {
 
     $recentProfiles = @($script:TrayConfig.recentProfiles)
     if ($recentProfiles.Count -gt 0) {
+        $recentHeaderGameGroups = [System.Collections.Generic.List[string]]::new()
+        $recentHeaderGroupKeys = @{}
+        $recentDisplayCount = 0
+        foreach ($entry in $recentProfiles) {
+            $rId = $entry.id
+            if (-not $rId) { continue }
+            if ($favProfiles -contains $rId) { continue }
+            if (-not $script:Profiles.Contains($rId)) { continue }
+            if ($recentDisplayCount -ge 3) { break }
+            $recentDisplayCount += 1
+            $recentGroup = Get-GameGroup -ProfileId $rId
+            if ([string]::IsNullOrWhiteSpace($recentGroup)) { continue }
+            $recentGroupKey = "$recentGroup".Trim().ToLowerInvariant()
+            if ($recentHeaderGroupKeys.ContainsKey($recentGroupKey)) { continue }
+            $recentHeaderGroupKeys[$recentGroupKey] = $true
+            [void]$recentHeaderGameGroups.Add($recentGroup)
+            if ($recentHeaderGameGroups.Count -ge 3) { break }
+        }
+
         $recentLabel = New-Object System.Windows.Forms.ToolStripMenuItem
         $recentLabel.Text = "RECENT"
         $recentLabel.Enabled = $false
         $recentLabel.BackColor = $script:Colors.Background
         $recentLabel.ForeColor = $script:Colors.TextDim
         $recentLabel.Font = $script:FontEyebrow
+        Set-TraySectionHeaderVisualState `
+            -Item $recentLabel `
+            -ChipText (Get-TraySectionHeaderSummaryChips `
+                -ItemCount $recentDisplayCount `
+                -ItemSingular "recent" `
+                -ItemPlural "recent" `
+                -GameCount $recentHeaderGameGroups.Count)
+        if ($recentHeaderGameGroups.Count -gt 0 -and (Get-Command New-GameMosaicBitmap -ErrorAction SilentlyContinue)) {
+            $recentLabel.Image = New-GameMosaicBitmap -GameGroups @($recentHeaderGameGroups) -Color $script:Colors.TextDim -Category "Other"
+        }
+        else {
+            $recentLabel.Image = New-ActionBitmap -Action "Recent" -Color $script:Colors.TextDim
+        }
         $menu.Items.Add($recentLabel) | Out-Null
 
         $shownRecent = 0
@@ -4874,19 +8873,24 @@ public class HotkeyMessageWindow : NativeWindow {
 
             $p = $script:Profiles[$rId]
             $catColor = Dim-Color -Color (Get-CategoryColor -Category $p.Cat -Fallback $script:Colors.TextDim) -Alpha 200
+            $gameColor = Dim-Color -Color (Get-TrayProfileMenuAccent -ProfileId $rId -Profile $p) -Alpha 210
             $item = New-Object System.Windows.Forms.ToolStripMenuItem
-            $item.Text = $p.Name
+            $item.Text = Get-TrayProfileObjectDisplayName -Profile $p -Fallback $rId
             $item.Tag = $rId
-            $gg = Get-GameGroup -ProfileId $rId
-            $item.Image = New-GameBitmap -GameGroup $gg -Color $catColor -Category $p.Cat
+            $item.Image = New-TrayProfileMenuImage `
+                -ProfileId $rId `
+                -IsActive ($rId -eq $script:activeProfile) `
+                -ShowSyncBadge $true
             $item.BackColor = $script:Colors.Background
-            $item.ForeColor = $catColor
+            $item.ForeColor = $gameColor
             $item.Font = New-Object System.Drawing.Font("Segoe UI", 9)
-            $item.ToolTipText = "$($p.Sub) - Last: $($entry.timestamp)"
+            $item.ToolTipText = Get-RecentProfileTooltipText -Profile $p -Entry $entry
+            Set-TrayProfileMenuItemMetadata -Item $item -ProfileId $rId -Profile $p -ExtraChipText "RECENT"
             $item.Add_Click({
                 param($s, $ev)
                 Apply-Profile $s.Tag
             }.GetNewClosure())
+            Register-TrayProfileHoverPreview -Item $item -ProfileId $rId
             $menu.Items.Add($item) | Out-Null
             $shownRecent++
         }
@@ -4896,12 +8900,42 @@ public class HotkeyMessageWindow : NativeWindow {
 
     $menu.Items.Add((New-Object System.Windows.Forms.ToolStripSeparator)) | Out-Null
 
+    $profilesHeaderGameGroups = [System.Collections.Generic.List[string]]::new()
+    $profilesHeaderGroupKeys = @{}
+    $profilesVisibleCount = 0
+    foreach ($id in $script:Profiles.Keys) {
+        $p = $script:Profiles[$id]
+        if ($null -ne $p.TrayVisible -and -not [bool]$p.TrayVisible) { continue }
+        $profilesVisibleCount += 1
+        $profileHeaderGroup = Get-GameGroup -ProfileId $id
+        if ([string]::IsNullOrWhiteSpace($profileHeaderGroup)) { continue }
+        $profileHeaderGroupKey = "$profileHeaderGroup".Trim().ToLowerInvariant()
+        if ($profilesHeaderGroupKeys.ContainsKey($profileHeaderGroupKey)) { continue }
+        $profilesHeaderGroupKeys[$profileHeaderGroupKey] = $true
+        if ($profilesHeaderGameGroups.Count -lt 3) {
+            [void]$profilesHeaderGameGroups.Add($profileHeaderGroup)
+        }
+    }
+
     $profilesLabel = New-Object System.Windows.Forms.ToolStripMenuItem
     $profilesLabel.Text = "PROFILES"
     $profilesLabel.Enabled = $false
     $profilesLabel.BackColor = $script:Colors.BackgroundDark
     $profilesLabel.ForeColor = [System.Drawing.Color]::FromArgb(255, 100, 110, 130)
     $profilesLabel.Font = $script:FontEyebrow
+    Set-TraySectionHeaderVisualState `
+        -Item $profilesLabel `
+        -ChipText (Get-TraySectionHeaderSummaryChips `
+            -ItemCount $profilesVisibleCount `
+            -ItemSingular "profile" `
+            -ItemPlural "profiles" `
+            -GameCount $profilesHeaderGroupKeys.Count)
+    if ($profilesHeaderGameGroups.Count -gt 0 -and (Get-Command New-GameMosaicBitmap -ErrorAction SilentlyContinue)) {
+        $profilesLabel.Image = New-GameMosaicBitmap -GameGroups @($profilesHeaderGameGroups) -Color $profilesLabel.ForeColor -Category "Other"
+    }
+    else {
+        $profilesLabel.Image = New-ActionBitmap -Action "Profiles" -Color $profilesLabel.ForeColor
+    }
     $menu.Items.Add($profilesLabel) | Out-Null
 
     # Helper to create a profile menu item (used in both direct items and submenus)
@@ -4910,41 +8944,69 @@ public class HotkeyMessageWindow : NativeWindow {
         $p = $script:Profiles[$ProfileId]
         $isFav = Test-Favorite -ProfileId $ProfileId -Config $script:TrayConfig
         $catColor = Get-CategoryColor -Category $p.Cat -Fallback $script:Colors.Text
+        $gameColor = Get-TrayProfileMenuAccent -ProfileId $ProfileId -Profile $p
 
         $item = New-Object System.Windows.Forms.ToolStripMenuItem
-        $item.Text = if ($InSubmenu) { Get-ProfileVariantLabel -ProfileId $ProfileId } else { $p.Name }
-
-        # Sync badge for variant items in submenus; game icon otherwise; category fallback
-        $badgeSet = $false
-        if ($ShowBadge -and $InSubmenu) {
-            $sm = if ($p.SyncMode) { $p.SyncMode } else { "agnostic" }
-            $badgeImg = New-SyncBadgeImage -SyncMode $sm
-            if ($badgeImg) {
-                $item.Image = $badgeImg
-                $badgeSet = $true
-            }
-        }
-        if (-not $badgeSet) {
-            $gg = Get-GameGroup -ProfileId $ProfileId
-            $item.Image = New-GameBitmap -GameGroup $gg -Color $catColor -Category $p.Cat
-        }
+        $item.Text = Get-ProfileMenuDisplayText -ProfileId $ProfileId -InSubmenu $InSubmenu
+        $item.Image = New-TrayProfileMenuImage `
+            -ProfileId $ProfileId `
+            -IsActive ($ProfileId -eq $script:activeProfile) `
+            -InSubmenu $InSubmenu `
+            -ShowSyncBadge $ShowBadge `
+            -FavoriteBadge $isFav
 
         $item.Tag = $ProfileId
         $item.BackColor = $script:Colors.Background
-        $item.ForeColor = $catColor
+        $item.ForeColor = $gameColor
         $item.Font = New-Object System.Drawing.Font("Segoe UI", 9)
 
-        $tooltipText = "$($p.Name)`n$($p.Sub)`n"
-        if ($p.Desc) { $tooltipText += "`n$($p.Desc)" }
+        $tooltipName = Get-TrayProfileObjectDisplayName -Profile $p -Fallback $ProfileId
+        $tooltipSub = if ($p.Sub) { Format-TrayDisplayCopy -Text "$($p.Sub)" } else { "" }
+        $tooltipText = "$tooltipName`n$tooltipSub`n"
+        if ($p.Desc) { $tooltipText += "`n$(Format-TrayDisplayCopy -Text "$($p.Desc)")" }
         if ($isFav) { $tooltipText += "`n`n[Favorited]" }
         $item.ToolTipText = $tooltipText.Trim()
+        Set-TrayProfileMenuItemMetadata -Item $item -ProfileId $ProfileId -Profile $p
 
         $item.Add_Click({
             param($s, $ev)
             Apply-Profile $s.Tag
         }.GetNewClosure())
+        Register-TrayProfileHoverPreview -Item $item -ProfileId $ProfileId
 
         return $item
+    }
+
+    function New-GameFlyoutHeaderItem {
+        param(
+            [object]$GroupInfo,
+            [string]$GameGroup,
+            [string]$Category,
+            [System.Drawing.Color]$CategoryColor,
+            [int]$VariantCount,
+            [string[]]$ProfileIds = @()
+        )
+
+        $gameColor = if (Get-Command Get-GameAccentColor -ErrorAction SilentlyContinue) {
+            Get-GameAccentColor -GameGroup $GameGroup -FallbackColor $CategoryColor
+        }
+        else {
+            $CategoryColor
+        }
+        $variantLabel = if ($VariantCount -eq 1) { "1 profile" } else { "$VariantCount variants" }
+        $headerItem = New-Object System.Windows.Forms.ToolStripMenuItem
+        $headerItem.Text = "$($GroupInfo.Name)  |  $variantLabel"
+        $headerItem.Tag = "__game_flyout_header__"
+        $headerItem.AccessibleName = "__game_flyout_header__"
+        $headerItem.AccessibleDescription = Get-GameFlyoutHeaderSummaryChips -ProfileIds $ProfileIds
+        $headerItem.Padding = New-Object System.Windows.Forms.Padding(0, 0, 72, 0)
+        $headerItem.Enabled = $false
+        $headerItem.BackColor = $script:Colors.BackgroundDark
+        $headerItem.ForeColor = $gameColor
+        $headerItem.Font = $script:FontEyebrow
+        $headerItem.Image = New-TrayGameGroupMedallionBitmap -GameGroup $GameGroup -Color $gameColor -Category $Category
+        $headerItem.ToolTipText = "Game group header for $($GroupInfo.Name): $variantLabel"
+        return $headerItem
     }
 
     # Group visible profiles by category, then by game. Each game appears once;
@@ -4983,10 +9045,24 @@ public class HotkeyMessageWindow : NativeWindow {
         if (-not $catGameGroups.Contains($cat)) { continue }
 
         $catColor = if ($script:CategoryColors.ContainsKey($cat)) { $script:CategoryColors[$cat] } else { $script:Colors.Text }
+        $catGameCount = @($catGameGroups[$cat].Keys).Count
+        $catProfileCount = 0
+        foreach ($gameGroupKey in $catGameGroups[$cat].Keys) {
+            $catProfileCount += @($catGameGroups[$cat][$gameGroupKey]).Count
+        }
         $catItem = New-Object System.Windows.Forms.ToolStripMenuItem
         $catItem.Text = $cat
         $catItem.Tag = $cat
-        $catItem.Image = New-CategoryBitmap -Category $cat -Color $catColor
+        $catItem.AccessibleName = "__category_header__"
+        $catItem.AccessibleDescription = Get-CategoryHeaderSummaryChips -GameCount $catGameCount -ProfileCount $catProfileCount
+        $catItem.Padding = New-Object System.Windows.Forms.Padding(0, 0, 92, 0)
+        $categorySampleGameGroups = @($catGameGroups[$cat].Keys | Sort-Object | Select-Object -First 3)
+        if (Get-Command New-GameMosaicBitmap -ErrorAction SilentlyContinue) {
+            $catItem.Image = New-GameMosaicBitmap -GameGroups $categorySampleGameGroups -Color $catColor -Category $cat
+        }
+        else {
+            $catItem.Image = New-CategoryBitmap -Category $cat -Color $catColor
+        }
         $catItem.Enabled = $false
         $catItem.BackColor = $script:Colors.Background
         $catItem.ForeColor = $catColor
@@ -5025,10 +9101,29 @@ public class HotkeyMessageWindow : NativeWindow {
                 $submenuItem = New-Object System.Windows.Forms.ToolStripMenuItem
                 $submenuItem.Text = $groupInfo.Name
                 $submenuItem.Tag = $cat
-                $submenuItem.Image = New-GameBitmap -GameGroup $gameGroup -Color $catColor -Category $cat
+                $submenuGameColor = if (Get-Command Get-GameAccentColor -ErrorAction SilentlyContinue) {
+                    Get-GameAccentColor -GameGroup $gameGroup -FallbackColor $catColor
+                }
+                else {
+                    $catColor
+                }
+                $submenuItem.Image = New-TrayGameGroupMedallionBitmap -GameGroup $gameGroup -Color $submenuGameColor -Category $cat
                 $submenuItem.BackColor = $script:Colors.Background
-                $submenuItem.ForeColor = $catColor
+                $submenuItem.ForeColor = $submenuGameColor
                 $submenuItem.Font = New-Object System.Drawing.Font("Segoe UI", 9)
+                $profileVariantChip = if ($profileIds.Count -eq 1) { "PROFILE" } else { "$($profileIds.Count) VAR" }
+                $submenuItem.ToolTipText = "Profile variants for $($groupInfo.Name): $($profileIds.Count)"
+                Set-TrayCommandItemVisualState -Item $submenuItem -ChipText $profileVariantChip -PaddingRight 72
+
+                $flyoutHeader = New-GameFlyoutHeaderItem `
+                    -GroupInfo $groupInfo `
+                    -GameGroup $gameGroup `
+                    -Category $cat `
+                    -CategoryColor $catColor `
+                    -VariantCount $profileIds.Count `
+                    -ProfileIds $profileIds
+                $submenuItem.DropDownItems.Add($flyoutHeader) | Out-Null
+                $submenuItem.DropDownItems.Add((New-Object System.Windows.Forms.ToolStripSeparator)) | Out-Null
 
                 foreach ($profId in $profileIds) {
                     $subItem = New-ProfileMenuItem -ProfileId $profId -InSubmenu $true -ShowBadge $true
@@ -5047,10 +9142,14 @@ public class HotkeyMessageWindow : NativeWindow {
     $menu.Items.Add((New-Object System.Windows.Forms.ToolStripSeparator)) | Out-Null
 
     $actionsMenu = New-Object System.Windows.Forms.ToolStripMenuItem
-    $actionsMenu.Text = "  Actions"
+    $actionsMenu.Text = "Actions"
     $actionsMenu.BackColor = $script:Colors.Background
     $actionsMenu.ForeColor = $script:Colors.AccentAmber
     $actionsMenu.Font = New-Object System.Drawing.Font("Segoe UI", 9)
+    $actionsMenu.Image = New-ActionBitmap -Action "Actions" -Color $script:Colors.AccentAmber
+    $actionsMenu.AccessibleName = "__flyout_command__"
+    $actionsMenu.AccessibleDescription = "TOOLS"
+    $actionsMenu.Padding = New-Object System.Windows.Forms.Padding(0, 0, 56, 0)
 
     # Restore Previous
     $script:restoreItem = New-Object System.Windows.Forms.ToolStripMenuItem
@@ -5061,6 +9160,7 @@ public class HotkeyMessageWindow : NativeWindow {
     $script:restoreItem.Font = New-Object System.Drawing.Font("Segoe UI", 9)
     $script:restoreItem.Image = New-ActionBitmap -Action "Restore" -Color $script:Colors.AccentAmber
     $script:restoreItem.ToolTipText = "Restore the last backup before profile was applied"
+    Set-TrayCommandItemVisualState -Item $script:restoreItem -ChipText "RESTORE"
     $script:restoreItem.Add_Click({ Restore-Settings })
     $actionsMenu.DropDownItems.Add($script:restoreItem) | Out-Null
 
@@ -5071,20 +9171,22 @@ public class HotkeyMessageWindow : NativeWindow {
     $auditItem.ForeColor = $script:Colors.AccentBlue
     $auditItem.Font = New-Object System.Drawing.Font("Segoe UI", 9)
     $auditItem.Image = New-ActionBitmap -Action "Audit" -Color $script:Colors.AccentBlue
-    $auditItem.ToolTipText = "Scan system for optimization issues"
+    $auditItem.ToolTipText = "Scan the current audit scope for optimization issues"
+    Set-TrayCommandItemVisualState -Item $auditItem -ChipText "AUDIT"
     $auditItem.Add_Click({ Run-Audit })
     $actionsMenu.DropDownItems.Add($auditItem) | Out-Null
 
-    # Apply Pending Fix - targeted verifier remediation, not a full profile apply.
+    # Apply Pending Fixes - targeted verifier remediation, not a full profile apply.
     $script:applyPendingItem = New-Object System.Windows.Forms.ToolStripMenuItem
-    $script:applyPendingItem.Text = "Apply Pending Fix"
+    $script:applyPendingItem.Text = "Apply Pending Fixes"
     $script:applyPendingItem.Enabled = $false
     $script:applyPendingItem.Visible = $false
     $script:applyPendingItem.BackColor = $script:Colors.Background
     $script:applyPendingItem.ForeColor = $script:Colors.AccentAmber
     $script:applyPendingItem.Font = New-Object System.Drawing.Font("Segoe UI", 9)
-    $script:applyPendingItem.Image = New-ActionBitmap -Action "Apply" -Color $script:Colors.AccentAmber
-    $script:applyPendingItem.ToolTipText = "Apply verifier-reported pending fixes without backup, baseline restore, or display reset"
+    $script:applyPendingItem.Image = New-ActionBitmap -Action "PendingFix" -Color $script:Colors.TextDisabled
+    $script:applyPendingItem.ToolTipText = "No verifier-reported pending fixes for the active profile"
+    Set-TrayCommandItemVisualState -Item $script:applyPendingItem -ChipText "FIX"
     $script:applyPendingItem.Add_Click({ Apply-PendingProfileFixes })
     $actionsMenu.DropDownItems.Add($script:applyPendingItem) | Out-Null
 
@@ -5096,7 +9198,9 @@ public class HotkeyMessageWindow : NativeWindow {
     $resetDisplayItem.BackColor = $script:Colors.Background
     $resetDisplayItem.ForeColor = $script:Colors.AccentAmber
     $resetDisplayItem.Font = New-Object System.Drawing.Font("Segoe UI", 9)
+    $resetDisplayItem.Image = New-ActionBitmap -Action "Reset" -Color $script:Colors.AccentAmber
     $resetDisplayItem.ToolTipText = "Advanced recovery: sends Ctrl+Win+Shift+B x2 and may blank monitors for a few seconds."
+    Set-TrayCommandItemVisualState -Item $resetDisplayItem -ChipText "RESET"
     $resetDisplayItem.Add_Click({
         Write-TrayLog "User invoked Reset Display Pipeline from tray menu"
         $confirm = [System.Windows.Forms.MessageBox]::Show(
@@ -5112,12 +9216,35 @@ public class HotkeyMessageWindow : NativeWindow {
         }
         try {
             $tf = [System.IO.Path]::GetTempFileName()
-            Start-Process -FilePath $script:PythonExe `
+            $errFile = "$tf.err"
+            $proc = $null
+            $proc = Start-Process -FilePath $script:PythonExe `
                 -ArgumentList (Get-AbsoBackendArgs -CommandArgs @("reset-display", "--method", "driver-hotkey", "--json")) `
-                -NoNewWindow -Wait -WorkingDirectory $script:ProjectRoot `
-                -RedirectStandardOutput $tf
+                -NoNewWindow -PassThru -WorkingDirectory $script:ProjectRoot `
+                -RedirectStandardOutput $tf -RedirectStandardError $errFile
+            # PS 5.1: cache the handle now or .ExitCode reads $null after exit.
+            if ($proc) { $null = $proc.Handle }
+
+            $completed = $proc.WaitForExit(30000)
+            if (-not $completed) {
+                try { $proc.Kill() } catch {}
+                try { $proc.Dispose() } catch {}
+                $proc = $null
+                Write-TrayLog "Reset Display timed out after 30s" -Level "ERROR"
+                Show-Notification -Title "A.B.S.O." `
+                    -Message "Display reset timed out after 30s" -Type "Error" `
+                    -ActionName "Reset" -ActionColor $script:Colors.AccentAmber
+                Set-TrayLastAction -Message "Display reset timed out after 30s"
+                Update-MenuState
+                return
+            }
+
+            $exitCode = $proc.ExitCode
+            try { $proc.Dispose() } catch {}
+            $proc = $null
             $out = Get-Content $tf -Raw -ErrorAction SilentlyContinue
-            Remove-Item $tf -Force -ErrorAction SilentlyContinue
+            $errOutput = Get-Content $errFile -Raw -ErrorAction SilentlyContinue
+            if ($errOutput) { Write-TrayLog "Reset Display CLI stderr: $errOutput" -Level "WARN" }
             if ($out) {
                 $j = Invoke-JsonSafe -Text $out -Source 'ResetDisplay'
                 $result = $null
@@ -5127,58 +9254,123 @@ public class HotkeyMessageWindow : NativeWindow {
                 elseif ($null -ne $j -and $j.result) {
                     $result = $j.result
                 }
-                if ($null -ne $j -and $j.success -and $j.data -and $j.data.success -and $null -ne $result) {
+                $exitCodeOk = ($null -eq $exitCode -or $exitCode -eq 0)
+                if ($exitCodeOk -and $null -ne $j -and $j.success -and $j.data -and $j.data.success -and $null -ne $result) {
                     $count = $result.sent_count
                     if (-not $count) { $count = 0 }
                     Show-Notification -Title "A.B.S.O." `
-                        -Message "Display pipeline reset ($count combo(s) sent)" -Type "Success"
+                        -Message "Display pipeline reset ($count combo(s) sent)" -Type "Success" `
+                        -ActionName "Reset" -ActionColor $script:Colors.AccentAmber
+                    Set-TrayLastAction -Message "Display reset: $count combo(s) sent"
+                    Update-MenuState
                 }
                 elseif ($null -eq $j) {
                     Write-TrayLog "Reset Display: CLI produced unparseable JSON" -Level "ERROR"
                     Show-Notification -Title "A.B.S.O." `
-                        -Message "Reset failed (bad CLI response - see tray log)" -Type "Error"
+                        -Message "Display reset failed: runtime status unreadable. See tray log." -Type "Error" `
+                        -ActionName "Reset" -ActionColor $script:Colors.AccentAmber
+                    Set-TrayLastAction -Message "Display reset failed: runtime status unreadable"
+                    Update-MenuState
                 }
                 else {
-                    $err = if ($j.error) { $j.error } elseif ($j.data -and $j.data.result -and $j.data.result.error) { $j.data.result.error } else { "unknown CLI error" }
+                    $err = if ($j.error) { $j.error } elseif ($j.data -and $j.data.result -and $j.data.result.error) { $j.data.result.error } elseif ($null -ne $exitCode -and $exitCode -ne 0) { "runtime exit code $exitCode" } else { "runtime error not reported" }
                     Write-TrayLog "Reset Display reported failure: $err" -Level "ERROR"
                     Show-Notification -Title "A.B.S.O." `
-                        -Message "Reset failed: $err" -Type "Error"
+                        -Message "Display reset failed: $err" -Type "Error" `
+                        -ActionName "Reset" -ActionColor $script:Colors.AccentAmber
+                    Set-TrayLastAction -Message "Display reset failed: $err"
+                    Update-MenuState
                 }
             }
             else {
                 Write-TrayLog "Reset Display: CLI produced no output" -Level "ERROR"
                 Show-Notification -Title "A.B.S.O." `
-                    -Message "Reset failed (no CLI output)" -Type "Error"
+                    -Message "Display reset failed: runtime returned no status" -Type "Error" `
+                    -ActionName "Reset" -ActionColor $script:Colors.AccentAmber
+                Set-TrayLastAction -Message "Display reset failed: runtime returned no status"
+                Update-MenuState
             }
         }
         catch {
             Write-TrayLog "Reset Display threw: $($_.Exception.Message)" -Level "ERROR"
             Show-Notification -Title "A.B.S.O." `
-                -Message "Reset failed: $($_.Exception.Message)" -Type "Error"
+                -Message "Display reset failed: $($_.Exception.Message)" -Type "Error" `
+                -ActionName "Reset" -ActionColor $script:Colors.AccentAmber
+            Set-TrayLastAction -Message "Display reset failed: $($_.Exception.Message)"
+            Update-MenuState
+        }
+        finally {
+            if ($proc) {
+                try { if (-not $proc.HasExited) { $proc.Kill() } } catch {}
+                try { $proc.Dispose() } catch {}
+            }
+            if ($tf) { Remove-Item $tf -Force -ErrorAction SilentlyContinue }
+            if ($errFile) { Remove-Item $errFile -Force -ErrorAction SilentlyContinue }
         }
     })
     $actionsMenu.DropDownItems.Add($resetDisplayItem) | Out-Null
 
     # Backups submenu (nested inside Actions)
     $backupTime = Get-LastBackupTime
+    $recentBackups = Get-RecentBackups -Count 5
+    $backupHeaderGameGroups = [System.Collections.Generic.List[string]]::new()
+    $backupHeaderGroupKeys = @{}
+    foreach ($backup in @($recentBackups)) {
+        $backupProfileId = if ($backup.ProfileId) { "$($backup.ProfileId)" } else { "" }
+        if ([string]::IsNullOrWhiteSpace($backupProfileId)) { continue }
+        # Manifest profile ids are still useful when the live catalog is stale.
+        $backupGroup = Get-GameGroup -ProfileId $backupProfileId
+        if ([string]::IsNullOrWhiteSpace($backupGroup)) { continue }
+        $backupGroupKey = "$backupGroup".Trim().ToLowerInvariant()
+        if ($backupHeaderGroupKeys.ContainsKey($backupGroupKey)) { continue }
+        $backupHeaderGroupKeys[$backupGroupKey] = $true
+        [void]$backupHeaderGameGroups.Add($backupGroup)
+        if ($backupHeaderGameGroups.Count -ge 3) { break }
+    }
+
     $backupsItem = New-Object System.Windows.Forms.ToolStripMenuItem
     $backupsItem.Text = "Backups ($backupTime)"
     $backupsItem.BackColor = $script:Colors.Background
     $backupsItem.ForeColor = $script:Colors.AccentPurple
     $backupsItem.Font = New-Object System.Drawing.Font("Segoe UI", 9)
-    $backupsItem.Image = New-ActionBitmap -Action "Backups" -Color $script:Colors.AccentPurple
+    if ($backupHeaderGameGroups.Count -gt 0 -and (Get-Command New-BackupGameMosaicBitmap -ErrorAction SilentlyContinue)) {
+        $backupsItem.Image = New-BackupGameMosaicBitmap -GameGroups @($backupHeaderGameGroups) -Color $script:Colors.AccentPurple -Category "Other"
+    }
+    else {
+        $backupsItem.Image = New-ActionBitmap -Action "Backups" -Color $script:Colors.AccentPurple
+    }
+    $backupsItem.ToolTipText = if ($backupTime -eq "Never") {
+        "No backups found. Applying a profile creates a restorable backup."
+    } else {
+        "Recent backups available. Open this submenu to restore one."
+    }
+    Set-TrayCommandItemVisualState -Item $backupsItem -ChipText (Get-BackupMenuChipText -VisibleBackupCount @($recentBackups).Count)
 
     $openBackupsItem = New-Object System.Windows.Forms.ToolStripMenuItem
     $openBackupsItem.Text = "Open Backups Folder"
     $openBackupsItem.BackColor = $script:Colors.Background
     $openBackupsItem.ForeColor = $script:Colors.Text
     $openBackupsItem.Font = New-Object System.Drawing.Font("Segoe UI", 9)
+    $openBackupsItem.Image = New-ActionBitmap -Action "Folder" -Color $script:Colors.AccentPurple
+    $openBackupsItem.ToolTipText = "Open the current backups folder"
+    Set-TrayCommandItemVisualState -Item $openBackupsItem -ChipText "FOLDER"
     $openBackupsItem.Add_Click({ Open-BackupsFolder })
     $backupsItem.DropDownItems.Add($openBackupsItem) | Out-Null
 
     $backupsItem.DropDownItems.Add((New-Object System.Windows.Forms.ToolStripSeparator)) | Out-Null
 
-    $recentBackups = Get-RecentBackups -Count 5
+    if (@($recentBackups).Count -le 0) {
+        $noBackupsItem = New-Object System.Windows.Forms.ToolStripMenuItem
+        $noBackupsItem.Text = "No backups found"
+        $noBackupsItem.Enabled = $false
+        $noBackupsItem.BackColor = $script:Colors.BackgroundDark
+        $noBackupsItem.ForeColor = $script:Colors.TextDisabled
+        $noBackupsItem.Font = New-Object System.Drawing.Font("Segoe UI", 9)
+        $noBackupsItem.Image = New-ActionBitmap -Action "Backups" -Color $script:Colors.TextDisabled
+        $noBackupsItem.ToolTipText = "No backup folders were found in installed or workspace backup locations."
+        $backupsItem.DropDownItems.Add($noBackupsItem) | Out-Null
+    }
+
     foreach ($backup in $recentBackups) {
         $bItem = New-Object System.Windows.Forms.ToolStripMenuItem
         $bItem.Text = $backup.Label
@@ -5186,41 +9378,114 @@ public class HotkeyMessageWindow : NativeWindow {
         $bItem.BackColor = $script:Colors.Background
         $bItem.ForeColor = $script:Colors.TextDim
         $bItem.Font = New-Object System.Drawing.Font("Consolas", 8)
-        $bItem.ToolTipText = "Click to restore this backup"
+        $bItem.AccessibleName = "__backup_menu_item__"
+        $bItem.AccessibleDescription = Get-BackupSourceChipText -Source $backup.Source
+        $bItem.Padding = New-Object System.Windows.Forms.Padding(0, 0, 70, 0)
+        $backupProfileId = if ($backup.ProfileId) { "$($backup.ProfileId)" } else { "" }
+        $backupProfile = $null
+        if (-not [string]::IsNullOrWhiteSpace($backupProfileId)) {
+            if ($script:Profiles -and $script:Profiles.Contains($backupProfileId)) {
+                $backupProfile = $script:Profiles[$backupProfileId]
+            }
+            $backupFavoriteBadge = if (Get-Command Test-Favorite -ErrorAction SilentlyContinue) {
+                Test-Favorite -ProfileId $backupProfileId -Config $script:TrayConfig
+            }
+            else {
+                $false
+            }
+            $bItem.Image = New-TrayProfileMenuImage `
+                -ProfileId $backupProfileId `
+                -ShowSyncBadge $true `
+                -FavoriteBadge $backupFavoriteBadge
+            $bItem.ForeColor = Get-TrayProfileAccentColor -ProfileId $backupProfileId -Profile $backupProfile -Fallback $script:Colors.TextDim
+        }
+        else {
+            $bItem.Image = New-ActionBitmap -Action "Restore" -Color $script:Colors.AccentPurple
+        }
+        $bItem.ToolTipText = "Restore backup: $($backup.Label)`nSource: $($backup.SourceLabel)"
         $capturedName = $backup.Name
+        $capturedLabel = $backup.Label
+        $capturedProfileId = $backupProfileId
         $bItem.Add_Click({
-            $script:notifyIcon.Text = "A.B.S.O. - Restoring..."
+            Set-TrayOperationTooltipText -Text "A.B.S.O. - Restoring..."
+            $restoreProfile = $null
+            if (
+                -not [string]::IsNullOrWhiteSpace($capturedProfileId) -and
+                $script:Profiles -and
+                $script:Profiles.Contains($capturedProfileId)
+            ) {
+                $restoreProfile = $script:Profiles[$capturedProfileId]
+            }
+            $restoreVisual = Get-TrayProfileToastVisualArgs -ProfileId $capturedProfileId -Profile $restoreProfile
+            $restoreTitle = if (-not [string]::IsNullOrWhiteSpace($capturedProfileId)) { Get-TrayProfileDisplayName -ProfileId $capturedProfileId } else { "A.B.S.O." }
+            $restoreMetaText = if (-not [string]::IsNullOrWhiteSpace($capturedProfileId)) { $capturedProfileId } else { $capturedName }
             try {
                 $tf = [System.IO.Path]::GetTempFileName()
-                Start-Process -FilePath $script:PythonExe -ArgumentList (Get-AbsoBackendArgs -CommandArgs @("restore", $capturedName, "--json")) `
-                    -NoNewWindow -Wait -WorkingDirectory $script:ProjectRoot `
-                    -RedirectStandardOutput $tf
+                $errFile = "$tf.err"
+                $proc = Start-Process -FilePath $script:PythonExe -ArgumentList (Get-AbsoBackendArgs -CommandArgs @("restore", $capturedName, "--json")) `
+                    -NoNewWindow -PassThru -WorkingDirectory $script:ProjectRoot `
+                    -RedirectStandardOutput $tf -RedirectStandardError $errFile
+                # PS 5.1: cache the handle now or .ExitCode reads $null after exit.
+                if ($proc) { $null = $proc.Handle }
+                $completed = $proc.WaitForExit(120000)
+                if (-not $completed -or -not $proc.HasExited) {
+                    try { $proc.Kill() } catch {}
+                    try { $proc.Dispose() } catch {}
+                    Remove-Item $tf -Force -ErrorAction SilentlyContinue
+                    Remove-Item $errFile -Force -ErrorAction SilentlyContinue
+                    Write-TrayLog "Restore '$capturedName' timed out after 120s" -Level "ERROR"
+                    Show-Notification @restoreVisual -Title $restoreTitle -Message "Restore timed out: $capturedLabel" -Type "Error" -MetaText $restoreMetaText
+                    Set-TrayLastAction -Message "Restore timed out: $capturedLabel"
+                    Update-MenuState
+                    return
+                }
+                $exitCode = $proc.ExitCode
+                $proc.Dispose()
                 $out = Get-Content $tf -Raw -ErrorAction SilentlyContinue
+                $errOutput = Get-Content $errFile -Raw -ErrorAction SilentlyContinue
+                if ($errOutput) { Write-TrayLog "Restore '$capturedName' stderr: $errOutput" -Level "WARN" }
                 Remove-Item $tf -Force -ErrorAction SilentlyContinue
+                Remove-Item $errFile -Force -ErrorAction SilentlyContinue
                 if ($out) {
                     $j = Invoke-JsonSafe -Text $out -Source 'RestoreBackup'
-                    if ($null -ne $j -and $j.success) {
-                        Show-Notification -Title "A.B.S.O." -Message "Restored from: $capturedName" -Type "Info"
+                    $exitCodeOk = ($null -eq $exitCode -or $exitCode -eq 0)
+                    if ($exitCodeOk -and $null -ne $j -and $j.success -and $j.data -and $j.data.success) {
+                        Show-Notification @restoreVisual -Title $restoreTitle -Message "Restored from: $capturedLabel" -Type "Success" -MetaText $restoreMetaText
                         $script:activeProfile = $null
+                        Reset-ActiveProfileVerificationState
+                        Set-TrayLastAction -Message "Restored backup: $capturedLabel"
+                        $script:TrayConfig = Set-LastProfileState -Config $script:TrayConfig -Status "restored" -Source "tray_restore_backup"
                         Set-IconState -State "Idle"
                         Update-MenuState
                     }
                     elseif ($null -eq $j) {
                         Write-TrayLog "Restore '$capturedName': CLI produced unparseable JSON" -Level "ERROR"
-                        Show-Notification -Title "A.B.S.O." -Message "Restore failed (bad CLI response - see tray log)" -Type "Error"
+                        Show-Notification @restoreVisual -Title $restoreTitle -Message "Restore failed: runtime status unreadable. See tray log." -Type "Error" -MetaText $restoreMetaText
+                        Set-TrayLastAction -Message "Restore failed: runtime status unreadable"
+                        Update-MenuState
                     }
                     else {
-                        $restoreErr = if ($j.error) { $j.error } else { "unknown CLI error" }
+                        $restoreErr = if ($j.error) { $j.error } elseif ($j.data -and $j.data.error) { $j.data.error } elseif ($j.data -and $j.data.message) { $j.data.message } elseif ($null -ne $exitCode -and $exitCode -ne 0) { "runtime exit code $exitCode" } else { "runtime error not reported" }
                         Write-TrayLog "Restore '$capturedName' reported failure: $restoreErr" -Level "ERROR"
-                        Show-Notification -Title "A.B.S.O." -Message "Restore failed: $restoreErr" -Type "Error"
+                        Show-Notification @restoreVisual -Title $restoreTitle -Message "Restore failed: $restoreErr" -Type "Error" -MetaText $restoreMetaText
+                        Set-TrayLastAction -Message "Restore failed: $restoreErr"
+                        Update-MenuState
                     }
                 } else {
                     Write-TrayLog "Restore '$capturedName': CLI produced no output" -Level "ERROR"
-                    Show-Notification -Title "A.B.S.O." -Message "Restore failed (no CLI output)" -Type "Error"
+                    Show-Notification @restoreVisual -Title $restoreTitle -Message "Restore failed: runtime returned no status" -Type "Error" -MetaText $restoreMetaText
+                    Set-TrayLastAction -Message "Restore failed: runtime returned no status"
+                    Update-MenuState
                 }
             } catch {
                 Write-TrayLog "Restore '$capturedName' threw: $($_.Exception.Message)" -Level "ERROR"
-                Show-Notification -Title "A.B.S.O." -Message "Restore failed: $($_.Exception.Message)" -Type "Error"
+                Show-Notification @restoreVisual -Title $restoreTitle -Message "Restore failed: $($_.Exception.Message)" -Type "Error" -MetaText $restoreMetaText
+                Set-TrayLastAction -Message "Restore failed: $($_.Exception.Message)"
+                Update-MenuState
+            } finally {
+                if ($tf) { Remove-Item $tf -Force -ErrorAction SilentlyContinue }
+                if ($errFile) { Remove-Item $errFile -Force -ErrorAction SilentlyContinue }
+                Restore-TrayTooltipFromState
             }
         }.GetNewClosure())
         $backupsItem.DropDownItems.Add($bItem) | Out-Null
@@ -5232,23 +9497,59 @@ public class HotkeyMessageWindow : NativeWindow {
 
     # Toggle Quick Panel
     $quickPanelItem = New-Object System.Windows.Forms.ToolStripMenuItem
-    $quickPanelItem.Text = "Quick Panel"
+    $quickPanelIsVisible = [bool](
+        $script:QuickPanelVisible -and
+        $script:QuickPanelForm -and
+        -not $script:QuickPanelForm.IsDisposed
+    )
+    $quickPanelItem.Text = if ($quickPanelIsVisible) { "Close Quick Panel" } else { "Open Quick Panel" }
     $quickPanelItem.BackColor = $script:Colors.Background
     $quickPanelItem.ForeColor = $script:Colors.AccentGreen
     $quickPanelItem.Font = New-Object System.Drawing.Font("Segoe UI", 9)
     $quickPanelItem.Image = New-ActionBitmap -Action "QuickPanel" -Color $script:Colors.AccentGreen
-    $quickPanelItem.ToolTipText = "Toggle floating quick-access panel"
-    $quickPanelItem.Checked = $script:TrayConfig.showQuickPanel
+    $quickPanelItem.ToolTipText = if ($quickPanelIsVisible) {
+        "Close the visible floating quick-access panel"
+    }
+    else {
+        "Open the floating quick-access panel; empty/profile-missing states are shown in the panel"
+    }
+    $quickPanelItem.Checked = $quickPanelIsVisible
+    Set-TrayCommandItemVisualState -Item $quickPanelItem -ChipText "PANEL"
     $quickPanelItem.Add_Click({
         if ($script:QuickPanelVisible) {
             Close-QuickPanel
             $script:TrayConfig.showQuickPanel = $false
+            Set-TrayLastAction -Message "Quick Panel closed"
+            Update-MenuState
         }
         else {
-            Show-QuickPanel -Favorites $script:TrayConfig.favorites -Profiles $script:Profiles -ActiveProfile $script:activeProfile -OnApply { param($id) Apply-Profile $id }
-            $script:TrayConfig.showQuickPanel = $true
+            $quickPanelEmpty = Get-QuickPanelEmptyStatus
+            $quickPanelPendingApplyText = Get-ActiveProfilePendingApplyText
+            $quickPanelWindowsRestartText = Get-ActiveProfileRebootPendingText
+            $quickPanelVerificationText = Get-ActiveProfileVerificationInProgressText
+            Show-QuickPanel -Favorites $script:TrayConfig.favorites -Profiles $script:Profiles -ActiveProfile $script:activeProfile -ActivePendingApplyText $quickPanelPendingApplyText -ActiveWindowsRestartText $quickPanelWindowsRestartText -ActiveVerificationText $quickPanelVerificationText -EmptyMessage $quickPanelEmpty.Message -EmptyProfileId $quickPanelEmpty.ProfileId -OnApply { param($id) Apply-Profile $id }
+            $script:TrayConfig.showQuickPanel = [bool]$script:QuickPanelVisible
+            if (-not $script:QuickPanelVisible) {
+                if (-not [string]::IsNullOrWhiteSpace($quickPanelEmpty.ProfileId)) {
+                    $quickPanelEmptyVisual = Get-TrayProfileToastVisualArgs -ProfileId $quickPanelEmpty.ProfileId -Profile $null
+                    $quickPanelEmptyTitle = Get-TrayProfileDisplayName -ProfileId $quickPanelEmpty.ProfileId
+                    Show-Notification @quickPanelEmptyVisual -Title $quickPanelEmptyTitle -Message $quickPanelEmpty.Message -Type "Info" -MetaText $quickPanelEmpty.ProfileId
+                }
+                else {
+                    Show-Notification -Title "A.B.S.O. Quick Panel" -Message $quickPanelEmpty.Message -Type "Info" -ActionName "QuickPanel" -ActionColor $script:Colors.AccentBlue
+                }
+                Set-TrayLastAction -Message $quickPanelEmpty.LastAction
+            }
+            elseif ($script:QuickPanelEmptyState) {
+                Set-TrayLastAction -Message $quickPanelEmpty.LastAction
+            }
+            else {
+                Set-TrayLastAction -Message "Quick Panel opened"
+            }
+            Update-MenuState
         }
-        $quickPanelItem.Checked = $script:TrayConfig.showQuickPanel
+        $quickPanelItem.Checked = [bool]$script:QuickPanelVisible
+        $quickPanelItem.Text = if ($script:QuickPanelVisible) { "Close Quick Panel" } else { "Open Quick Panel" }
         Save-TrayConfig $script:TrayConfig
     })
     $actionsMenu.DropDownItems.Add($quickPanelItem) | Out-Null
@@ -5261,17 +9562,36 @@ public class HotkeyMessageWindow : NativeWindow {
     $refreshProfilesItem.BackColor = $script:Colors.Background
     $refreshProfilesItem.ForeColor = $script:Colors.AccentBlue
     $refreshProfilesItem.Font = New-Object System.Drawing.Font("Segoe UI", 9)
-    $refreshProfilesItem.Image = New-ActionBitmap -Action "Audit" -Color $script:Colors.AccentBlue
-    $refreshProfilesItem.ToolTipText = "Reload profiles from CLI catalog and user profiles"
+    $refreshProfilesItem.Image = New-ActionBitmap -Action "Refresh" -Color $script:Colors.AccentBlue
+    $refreshProfilesItem.ToolTipText = "Reload the profile list and user profiles; no profile is applied."
+    Set-TrayCommandItemVisualState -Item $refreshProfilesItem -ChipText "REFRESH"
     $refreshProfilesItem.Add_Click({
         try {
             Initialize-ProfilesFromCliCatalog
-            Show-Notification -Title "A.B.S.O." -Message "Profiles refreshed ($($script:Profiles.Count) profiles loaded)" -Type "Success"
-            Write-TrayLog "Profiles refreshed via menu ($($script:Profiles.Count) profiles)"
+            $profileCount = if ($script:Profiles) { $script:Profiles.Count } else { 0 }
+            $catalogSource = if ($script:ProfileCatalogLastSource) { "$($script:ProfileCatalogLastSource)" } else { "source not reported" }
+            if ($profileCount -le 0) {
+                Show-Notification -Title "A.B.S.O." -Message "Profile refresh failed: no profiles loaded" -Type "Error" -ActionName "Refresh" -ActionColor $script:Colors.AccentBlue
+                Write-TrayLog "Profile refresh via menu loaded zero profiles" -Level "ERROR"
+                Set-TrayLastAction -Message "Profile refresh failed: no profiles loaded"
+            }
+            elseif ($script:ProfileCatalogUsedFallback) {
+                Show-Notification -Title "A.B.S.O." -Message "Profiles loaded from built-in fallback profile list ($profileCount profiles)" -Type "Warning" -ActionName "Refresh" -ActionColor $script:Colors.AccentBlue
+                Write-TrayLog "Profiles refreshed via menu from built-in fallback ($profileCount profiles)" -Level "WARN"
+                Set-TrayLastAction -Message "Profiles fallback list loaded: $profileCount"
+            }
+            else {
+                Show-Notification -Title "A.B.S.O." -Message "Profiles refreshed from $catalogSource ($profileCount profiles loaded)" -Type "Success" -ActionName "Refresh" -ActionColor $script:Colors.AccentBlue
+                Write-TrayLog "Profiles refreshed via menu from $catalogSource ($profileCount profiles)"
+                Set-TrayLastAction -Message "Profiles refreshed: $profileCount from $catalogSource"
+            }
+            Update-MenuState
         }
         catch {
             Write-TrayLog "Failed to refresh profiles: $($_.Exception.Message)" -Level "ERROR"
-            Show-Notification -Title "A.B.S.O." -Message "Failed to refresh profiles" -Type "Error"
+            Show-Notification -Title "A.B.S.O." -Message "Profile refresh failed: $($_.Exception.Message)" -Type "Error" -ActionName "Refresh" -ActionColor $script:Colors.AccentBlue
+            Set-TrayLastAction -Message "Profile refresh failed: $($_.Exception.Message)"
+            Update-MenuState
         }
     })
     $actionsMenu.DropDownItems.Add($refreshProfilesItem) | Out-Null
@@ -5282,45 +9602,72 @@ public class HotkeyMessageWindow : NativeWindow {
     $openProfilesItem.BackColor = $script:Colors.Background
     $openProfilesItem.ForeColor = $script:Colors.TextDim
     $openProfilesItem.Font = New-Object System.Drawing.Font("Segoe UI", 9)
+    $openProfilesItem.Image = New-ActionBitmap -Action "Folder" -Color $script:Colors.TextDim
     $openProfilesItem.ToolTipText = "Open user profiles folder in Explorer"
+    Set-TrayCommandItemVisualState -Item $openProfilesItem -ChipText "FOLDER"
     $openProfilesItem.Add_Click({ Open-ProfilesFolder })
     $actionsMenu.DropDownItems.Add($openProfilesItem) | Out-Null
 
     $actionsMenu.DropDownItems.Add((New-Object System.Windows.Forms.ToolStripSeparator)) | Out-Null
 
-    # Clear Standby List (ISLC equivalent)
+    # Clear Standby List - memory-cache cleanup without touching profiles.
     $clearMemoryItem = New-Object System.Windows.Forms.ToolStripMenuItem
     $clearMemoryItem.Text = "Clear Standby List"
     $clearMemoryItem.BackColor = $script:Colors.Background
     $clearMemoryItem.ForeColor = $script:Colors.AccentBlue
     $clearMemoryItem.Font = New-Object System.Drawing.Font("Segoe UI", 9)
-    $clearMemoryItem.ToolTipText = "Purge cached memory pages (ISLC equivalent)"
+    $clearMemoryItem.Image = New-ActionBitmap -Action "Memory" -Color $script:Colors.AccentBlue
+    $clearMemoryItem.ToolTipText = "Requests a standby-memory purge; does not close apps or change profiles"
+    Set-TrayCommandItemVisualState -Item $clearMemoryItem -ChipText "MEMORY"
     $clearMemoryItem.Add_Click({
         try {
             Write-TrayLog "Clearing standby list..."
+            Set-TrayLastAction -Message "Clearing standby list"
+            Update-MenuState
             $tempFile = [System.IO.Path]::GetTempFileName()
             $proc = Start-Process -FilePath $script:PythonExe `
                 -ArgumentList (Get-AbsoBackendArgs -CommandArgs @("memory-clear", "--json")) `
                 -NoNewWindow -PassThru -WorkingDirectory $script:ProjectRoot `
                 -RedirectStandardOutput $tempFile
-            $proc.WaitForExit(15000)
-            if (-not $proc.HasExited) { $proc.Kill() }
+            # PS 5.1: cache the handle now or .ExitCode reads $null after exit.
+            if ($proc) { $null = $proc.Handle }
+            $completed = $proc.WaitForExit(15000)
+            if (-not $completed -or -not $proc.HasExited) {
+                $proc.Kill()
+                $proc.Dispose()
+                Remove-Item $tempFile -Force -ErrorAction SilentlyContinue
+                Show-Notification -Title "A.B.S.O." -Message "Standby clear timed out after 15s" -Type "Error" -ActionName "Memory" -ActionColor $script:Colors.AccentBlue
+                Set-TrayLastAction -Message "Standby clear timed out after 15s"
+                Update-MenuState
+                return
+            }
             $proc.Dispose()
             $raw = Get-Content $tempFile -Raw -ErrorAction SilentlyContinue
             Remove-Item $tempFile -Force -ErrorAction SilentlyContinue
-            if ($raw) {
-                $json = $raw | ConvertFrom-Json
-                if ($json.success -and $json.data) {
-                    $freed = $json.data.freed_mb
-                    Show-Notification -Title "A.B.S.O." -Message "Standby list cleared. Freed ~${freed}MB" -Type "Success"
-                    Write-TrayLog "Standby list cleared: freed ${freed}MB"
-                } else {
-                    Show-Notification -Title "A.B.S.O." -Message "Standby clear failed" -Type "Error"
-                }
+            if (-not $raw) {
+                Show-Notification -Title "A.B.S.O." -Message "Standby clear failed: runtime returned no status" -Type "Error" -ActionName "Memory" -ActionColor $script:Colors.AccentBlue
+                Set-TrayLastAction -Message "Standby clear failed: runtime returned no status"
+                Update-MenuState
+                return
+            }
+            $json = $raw | ConvertFrom-Json
+            if ($json.success -and $json.data) {
+                $freed = $json.data.freed_mb
+                Show-Notification -Title "A.B.S.O." -Message "Standby list cleared. Freed ~${freed}MB" -Type "Success" -ActionName "Memory" -ActionColor $script:Colors.AccentBlue
+                Write-TrayLog "Standby list cleared: freed ${freed}MB"
+                Set-TrayLastAction -Message "Standby list cleared: ~${freed}MB"
+                Update-MenuState
+            } else {
+                $clearError = if ($json.error) { "$($json.error)" } elseif ($json.data -and $json.data.error) { "$($json.data.error)" } else { "runtime error not reported" }
+                Show-Notification -Title "A.B.S.O." -Message "Standby clear failed: $clearError" -Type "Error" -ActionName "Memory" -ActionColor $script:Colors.AccentBlue
+                Set-TrayLastAction -Message "Standby clear failed: $clearError"
+                Update-MenuState
             }
         } catch {
             Write-TrayLog "Clear standby failed: $($_.Exception.Message)" -Level "ERROR"
-            Show-Notification -Title "A.B.S.O." -Message "Standby clear failed: $($_.Exception.Message)" -Type "Error"
+            Show-Notification -Title "A.B.S.O." -Message "Standby clear failed: $($_.Exception.Message)" -Type "Error" -ActionName "Memory" -ActionColor $script:Colors.AccentBlue
+            Set-TrayLastAction -Message "Standby clear failed: $($_.Exception.Message)"
+            Update-MenuState
         }
     })
     $actionsMenu.DropDownItems.Add($clearMemoryItem) | Out-Null
@@ -5330,11 +9677,14 @@ public class HotkeyMessageWindow : NativeWindow {
     # ─── SETTINGS (flyout submenu) ───
 
     $settingsMenu = New-Object System.Windows.Forms.ToolStripMenuItem
-    $settingsMenu.Text = "  Settings"
+    $settingsMenu.Text = "Settings"
     $settingsMenu.BackColor = $script:Colors.Background
     $settingsMenu.ForeColor = $script:Colors.Text
     $settingsMenu.Font = New-Object System.Drawing.Font("Segoe UI", 9)
     $settingsMenu.Image = New-ActionBitmap -Action "Settings" -Color $script:Colors.Text
+    $settingsMenu.AccessibleName = "__flyout_command__"
+    $settingsMenu.AccessibleDescription = "PREFS"
+    $settingsMenu.Padding = New-Object System.Windows.Forms.Padding(0, 0, 56, 0)
 
     # Auto-Start toggle
     $startupStatus = Get-StartupStatus
@@ -5348,33 +9698,44 @@ public class HotkeyMessageWindow : NativeWindow {
 
     # Notifications toggle
     $script:notifyToggle = New-Object System.Windows.Forms.ToolStripMenuItem
-    $script:notifyToggle.Text = "Notifications"
+    $script:notifyToggle.Text = "Toast Popups"
     $script:notifyToggle.Checked = $script:EnableBalloonNotifications
     $script:notifyToggle.BackColor = $script:Colors.Background
     $script:notifyToggle.ForeColor = $script:Colors.Text
     $script:notifyToggle.Font = New-Object System.Drawing.Font("Segoe UI", 9)
-    $script:notifyToggle.ToolTipText = "Toggle balloon notifications"
+    $script:notifyToggle.Image = New-ActionBitmap -Action "Toast" -Color $script:Colors.Text
+    $script:notifyToggle.ToolTipText = "Toggle themed toast popups; tray hover/status text still updates"
+    Set-TrayCommandItemVisualState -Item $script:notifyToggle -ChipText "TOAST"
     $script:notifyToggle.Add_Click({
         $script:EnableBalloonNotifications = -not $script:EnableBalloonNotifications
+        $script:TrayConfig.notificationsEnabled = $script:EnableBalloonNotifications
         $script:notifyToggle.Checked = $script:EnableBalloonNotifications
         $state = if ($script:EnableBalloonNotifications) { "enabled" } else { "disabled" }
-        Write-TrayLog "Notifications $state"
+        Save-TrayConfig $script:TrayConfig
+        Write-TrayLog "Toast popups $state"
+        Set-TrayLastAction -Message "Toast popups $state"
+        Update-MenuState
     })
     $settingsMenu.DropDownItems.Add($script:notifyToggle) | Out-Null
 
     # Sound toggle
     $soundToggle = New-Object System.Windows.Forms.ToolStripMenuItem
-    $soundToggle.Text = "Sound Effects"
+    $soundToggle.Text = "Tray Audio Cues"
     $soundToggle.Checked = $script:TrayConfig.soundEnabled
     $soundToggle.BackColor = $script:Colors.Background
     $soundToggle.ForeColor = $script:Colors.Text
     $soundToggle.Font = New-Object System.Drawing.Font("Segoe UI", 9)
-    $soundToggle.ToolTipText = "Toggle sound effects"
+    $soundToggle.Image = New-ActionBitmap -Action "Sound" -Color $script:Colors.Text
+    $soundToggle.ToolTipText = "Toggle tray audio cues; toasts and status text still update"
+    Set-TrayCommandItemVisualState -Item $soundToggle -ChipText "AUDIO"
     $soundToggle.Add_Click({
         $script:TrayConfig.soundEnabled = -not $script:TrayConfig.soundEnabled
         $soundToggle.Checked = $script:TrayConfig.soundEnabled
         Save-TrayConfig $script:TrayConfig
-        Write-TrayLog "Sound effects: $($script:TrayConfig.soundEnabled)"
+        Write-TrayLog "Tray audio cues: $($script:TrayConfig.soundEnabled)"
+        $state = if ($script:TrayConfig.soundEnabled) { "enabled" } else { "disabled" }
+        Set-TrayLastAction -Message "Tray audio cues $state"
+        Update-MenuState
     })
     $settingsMenu.DropDownItems.Add($soundToggle) | Out-Null
 
@@ -5386,33 +9747,55 @@ public class HotkeyMessageWindow : NativeWindow {
     $settingsPanelItem.BackColor = $script:Colors.Background
     $settingsPanelItem.ForeColor = $script:Colors.Text
     $settingsPanelItem.Font = New-Object System.Drawing.Font("Segoe UI", 9)
+    $settingsPanelItem.Image = New-ActionBitmap -Action "Settings" -Color $script:Colors.Text
+    Set-TrayCommandItemVisualState -Item $settingsPanelItem -ChipText "CONFIG"
     $settingsPanelItem.Add_Click({
         Show-SettingsPanel -Config $script:TrayConfig -OnSave {
             param($cfg)
             $script:TrayConfig = $cfg
+            $script:EnableBalloonNotifications = [bool]$script:TrayConfig.notificationsEnabled
             Write-TrayLog "Settings saved"
+            Set-TrayLastAction -Message "Tray settings saved"
+            Update-MenuState
         }
     })
     $settingsMenu.DropDownItems.Add($settingsPanelItem) | Out-Null
 
     # View Log
     $logItem = New-Object System.Windows.Forms.ToolStripMenuItem
-    $logItem.Text = "View Log File"
+    $logItem.Text = "View Tray Log File"
     $logItem.BackColor = $script:Colors.Background
     $logItem.ForeColor = $script:Colors.TextDim
     $logItem.Font = New-Object System.Drawing.Font("Segoe UI", 9)
-    $logItem.ToolTipText = $script:LogFile
+    $logItem.Image = New-ActionBitmap -Action "Log" -Color $script:Colors.TextDim
+    $logItem.ToolTipText = "Opens current tray log: $script:LogFile"
+    Set-TrayCommandItemVisualState -Item $logItem -ChipText "LOG"
     $logItem.Add_Click({ Open-LogFile })
     $settingsMenu.DropDownItems.Add($logItem) | Out-Null
 
-    # Open Config Folder
+    # Open Tray Settings Folder
     $configFolderItem = New-Object System.Windows.Forms.ToolStripMenuItem
-    $configFolderItem.Text = "Open Config Folder"
+    $configFolderItem.Text = "Open Tray Settings Folder"
     $configFolderItem.BackColor = $script:Colors.Background
     $configFolderItem.ForeColor = $script:Colors.TextDim
     $configFolderItem.Font = New-Object System.Drawing.Font("Segoe UI", 9)
+    $configFolderItem.Image = New-ActionBitmap -Action "Folder" -Color $script:Colors.TextDim
+    $configFolderItem.ToolTipText = "Opens tray-config.json storage: $(Get-TrayConfigDir)"
+    Set-TrayCommandItemVisualState -Item $configFolderItem -ChipText "FOLDER"
     $configFolderItem.Add_Click({ Open-ConfigFolder })
     $settingsMenu.DropDownItems.Add($configFolderItem) | Out-Null
+
+    # Open Installed Runtime Folder
+    $runtimeFolderItem = New-Object System.Windows.Forms.ToolStripMenuItem
+    $runtimeFolderItem.Text = "Open Installed Runtime Folder"
+    $runtimeFolderItem.BackColor = $script:Colors.Background
+    $runtimeFolderItem.ForeColor = $script:Colors.TextDim
+    $runtimeFolderItem.Font = New-Object System.Drawing.Font("Segoe UI", 9)
+    $runtimeFolderItem.Image = New-ActionBitmap -Action "Folder" -Color $script:Colors.TextDim
+    $runtimeFolderItem.ToolTipText = "Opens abso.yaml, installed binaries, backups, and deployed tray assets"
+    Set-TrayCommandItemVisualState -Item $runtimeFolderItem -ChipText "RUNTIME"
+    $runtimeFolderItem.Add_Click({ Open-RuntimeFolder })
+    $settingsMenu.DropDownItems.Add($runtimeFolderItem) | Out-Null
 
     $menu.Items.Add($settingsMenu) | Out-Null
 
@@ -5422,10 +9805,13 @@ public class HotkeyMessageWindow : NativeWindow {
 
     $script:statusBarItem = New-Object System.Windows.Forms.ToolStripMenuItem
     $script:statusBarItem.Text = "  Ready"
+    $script:statusBarItem.AccessibleName = "__status_bar__"
+    $script:statusBarItem.AccessibleDescription = "READY"
     $script:statusBarItem.Enabled = $false
     $script:statusBarItem.BackColor = $script:Colors.BackgroundDark
     $script:statusBarItem.ForeColor = [System.Drawing.Color]::FromArgb(255, 100, 100, 110)
     $script:statusBarItem.Font = New-Object System.Drawing.Font("Consolas", 7.5)
+    $script:statusBarItem.Image = New-ActionBitmap -Action "Info" -Color $script:statusBarItem.ForeColor
     $menu.Items.Add($script:statusBarItem) | Out-Null
 
     # ─── EXIT SECTION ───
@@ -5434,53 +9820,61 @@ public class HotkeyMessageWindow : NativeWindow {
 
     # Restart
     $restartItem = New-Object System.Windows.Forms.ToolStripMenuItem
-    $restartItem.Text = "  Restart Tray"
+    $restartItem.Text = "Restart Tray"
     $restartItem.BackColor = $script:Colors.Background
     $restartItem.ForeColor = $script:Colors.TextDim
     $restartItem.Font = New-Object System.Drawing.Font("Segoe UI", 9)
+    $restartItem.Image = New-ActionBitmap -Action "Refresh" -Color $script:Colors.TextDim
     $restartItem.Add_Click({
-        Set-RestartSuccessSoundMarker
-        if ($script:HotkeyWindow) { Unregister-GlobalHotkeys -WindowHandle $script:HotkeyWindow.Handle }
-        Close-QuickPanel
-        Close-ProgressOverlay
-        $script:notifyIcon.Visible = $false
-        if ($script:mutex) {
-            try { $script:mutex.ReleaseMutex() } catch {}
-            $script:mutex.Close()
-            $script:mutex = $null
+        $restartToken = [guid]::NewGuid().ToString("N")
+        try {
+            Set-RestartSuccessSoundMarker -RestartToken $restartToken
+            if ($script:HotkeyWindow) { Unregister-GlobalHotkeys -WindowHandle $script:HotkeyWindow.Handle }
+            Close-QuickPanel
+            Close-ProgressOverlay
+            $script:notifyIcon.Visible = $false
+            if ($script:mutex) {
+                try { $script:mutex.ReleaseMutex() } catch {}
+                $script:mutex.Close()
+                $script:mutex = $null
+            }
+            # Brief delay to ensure mutex is fully released before new instance acquires it
+            Start-Sleep -Milliseconds 300
+            $restartArgs = @(
+                "-NoProfile",
+                "-ExecutionPolicy", "Bypass",
+                "-WindowStyle", "Hidden",
+                "-File", "`"$PSCommandPath`"",
+                "-Hidden",
+                "-RestartToken", "`"$restartToken`""
+            )
+            Start-Process powershell.exe -ArgumentList ($restartArgs -join " ") -WindowStyle Hidden -ErrorAction Stop | Out-Null
+            [System.Windows.Forms.Application]::Exit()
         }
-        # Brief delay to ensure mutex is fully released before new instance acquires it
-        Start-Sleep -Milliseconds 300
-        $vbsPath = Join-Path $script:ScriptDir "ABSO-Tray.vbs"
-        if (Test-Path $vbsPath) {
-            Start-Process "wscript.exe" -ArgumentList "`"$vbsPath`"" -WindowStyle Hidden
+        catch {
+            Clear-RestartSuccessSoundMarker
+            if ($script:notifyIcon) { $script:notifyIcon.Visible = $true }
+            Set-TrayLastAction -Message "Tray restart failed: $($_.Exception.Message)"
+            Restore-TrayTooltipFromState -Force
+            Update-MenuState
+            Show-Notification -Title "A.B.S.O." -Message "Tray restart failed: $($_.Exception.Message)" -Type "Error" -ActionName "Refresh" -ActionColor $script:Colors.AccentAmber
         }
-        else {
-            Start-Process powershell.exe -ArgumentList "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$PSCommandPath`"" -WindowStyle Hidden
-        }
-        [System.Windows.Forms.Application]::Exit()
     })
     $menu.Items.Add($restartItem) | Out-Null
 
     # About
     $aboutItem = New-Object System.Windows.Forms.ToolStripMenuItem
-    $aboutItem.Text = "  About A.B.S.O."
+    $aboutItem.Text = "About A.B.S.O."
     $aboutItem.BackColor = $script:Colors.Background
     $aboutItem.ForeColor = $script:Colors.TextDim
     $aboutItem.Font = New-Object System.Drawing.Font("Segoe UI", 9)
-    $aboutItem.Add_Click({
-        [System.Windows.Forms.MessageBox]::Show(
-            "A.B.S.O. v$($script:AppVersion)`n`nAdaptive Battle Station Optimizer`n`nWindows 11 Gaming Optimization Tool`nSingle-instance system tray application`n`nHotkeys:`n  $($script:TrayConfig.hotkeys.openMenu) - Open Menu`n  $($script:TrayConfig.hotkeys.restore) - Restore Settings",
-            "About A.B.S.O.",
-            [System.Windows.Forms.MessageBoxButtons]::OK,
-            [System.Windows.Forms.MessageBoxIcon]::Information
-        )
-    })
+    $aboutItem.Image = New-ActionBitmap -Action "Info" -Color $script:Colors.TextDim
+    $aboutItem.Add_Click({ Show-AboutPanel })
     $menu.Items.Add($aboutItem) | Out-Null
 
     # Exit
     $exitItem = New-Object System.Windows.Forms.ToolStripMenuItem
-    $exitItem.Text = "  Exit"
+    $exitItem.Text = "Exit"
     $exitItem.BackColor = $script:Colors.Background
     $exitItem.ForeColor = $script:Colors.TextDim
     $exitItem.Font = New-Object System.Drawing.Font("Segoe UI", 9)
@@ -5497,6 +9891,7 @@ public class HotkeyMessageWindow : NativeWindow {
     $script:notifyIcon.ContextMenuStrip = $menu
     Update-MenuState
     Set-IconState -State $(if ($script:activeProfile) { "Active" } else { "Idle" })
+    Start-TrayMenuPulseTimer
 
     # ─── LEFT-CLICK SHOWS MENU ───
 
@@ -5515,26 +9910,58 @@ public class HotkeyMessageWindow : NativeWindow {
 
     $script:notifyIcon.Add_DoubleClick({
         param($s, $ev)
-        if ($script:TrayConfig.favorites.Count -gt 0) {
-            $lastFav = $script:TrayConfig.favorites[0]
-            if ($script:Profiles.Contains($lastFav)) {
-                Apply-Profile $lastFav
-            }
+        if ($script:TrayConfig.favorites.Count -le 0) {
+            Show-Notification -Title "A.B.S.O." -Message "No favorite profile configured for double-click." -Type "Info" -ActionName "Favorite" -ActionColor $script:Colors.AccentAmber
+            Set-TrayLastAction -Message "Double-click ignored: no favorite"
+            Update-MenuState
+            return
+        }
+
+        $lastFav = "$($script:TrayConfig.favorites[0])"
+        if ($script:Profiles.Contains($lastFav)) {
+            Apply-Profile $lastFav
+        }
+        else {
+            $favName = Get-TrayProfileDisplayName -ProfileId $lastFav
+            $favMissingVisual = Get-TrayProfileToastVisualArgs -ProfileId $lastFav -Profile $null
+            Show-Notification @favMissingVisual -Title $favName -Message "Favorite profile is not in the current profile list." -Type "Warning" -MetaText $lastFav
+            Set-TrayLastAction -Message "Favorite missing: $favName"
+            Update-MenuState
         }
     })
 
     # ─── DEFAULT PROFILE (notify only, do not auto-apply) ───
 
-    if (-not $script:activeProfile -and $script:TrayConfig.defaultProfile -and $script:Profiles.Contains($script:TrayConfig.defaultProfile)) {
-        $defProfile = $script:Profiles[$script:TrayConfig.defaultProfile]
-        Write-TrayLog "Default profile available: $($script:TrayConfig.defaultProfile) (not auto-applying)"
-        Show-Notification -Title "A.B.S.O." -Message "Default profile ready: $($defProfile.Name). Right-click to apply." -Type "Info"
+    if (-not $script:activeProfile -and $script:TrayConfig.defaultProfile) {
+        $defaultProfileId = "$($script:TrayConfig.defaultProfile)"
+        if ($script:Profiles.Contains($defaultProfileId)) {
+            $defProfile = $script:Profiles[$defaultProfileId]
+            Write-TrayLog "Default profile available: $defaultProfileId (not auto-applying)"
+            $defaultReminderVisual = Get-TrayProfileToastVisualArgs -ProfileId $defaultProfileId -Profile $defProfile
+            $defaultReminderTitle = Get-TrayProfileObjectDisplayName -Profile $defProfile -Fallback $defaultProfileId
+            Show-Notification @defaultReminderVisual -Title $defaultReminderTitle -Message "Default profile ready. Open tray menu to apply." -Type "Info" -MetaText $defaultProfileId
+            Set-TrayLastAction -Message "Startup reminder: $defaultReminderTitle"
+            Update-MenuState
+        }
+        else {
+            $defaultProfileName = Get-TrayProfileDisplayName -ProfileId $defaultProfileId
+            Write-TrayLog "Default startup reminder profile '$defaultProfileId' is not in the current profile list" -Level "WARN"
+            $defaultMissingVisual = Get-TrayProfileToastVisualArgs -ProfileId $defaultProfileId -Profile $null
+            Show-Notification @defaultMissingVisual -Title $defaultProfileName -Message "Startup reminder profile is not in the current profile list." -Type "Warning" -MetaText $defaultProfileId
+            Set-TrayLastAction -Message "Startup reminder missing: $defaultProfileName"
+            Update-MenuState
+        }
     }
 
     # ─── SHOW QUICK PANEL IF ENABLED ───
 
-    if ($script:TrayConfig.showQuickPanel -and $script:TrayConfig.favorites.Count -gt 0) {
-        Show-QuickPanel -Favorites $script:TrayConfig.favorites -Profiles $script:Profiles -ActiveProfile $script:activeProfile -OnApply { param($id) Apply-Profile $id }
+    if ($script:TrayConfig.showQuickPanel) {
+        $startupQuickPanelEmpty = Get-QuickPanelEmptyStatus
+        $startupQuickPanelPendingApplyText = Get-ActiveProfilePendingApplyText
+        $startupQuickPanelWindowsRestartText = Get-ActiveProfileRebootPendingText
+        $startupQuickPanelVerificationText = Get-ActiveProfileVerificationInProgressText
+        Show-QuickPanel -Favorites $script:TrayConfig.favorites -Profiles $script:Profiles -ActiveProfile $script:activeProfile -ActivePendingApplyText $startupQuickPanelPendingApplyText -ActiveWindowsRestartText $startupQuickPanelWindowsRestartText -ActiveVerificationText $startupQuickPanelVerificationText -EmptyMessage $startupQuickPanelEmpty.Message -EmptyProfileId $startupQuickPanelEmpty.ProfileId -OnApply { param($id) Apply-Profile $id }
+        $script:TrayConfig.showQuickPanel = [bool]$script:QuickPanelVisible
     }
 
     # Only play restart sound once the new tray instance has fully initialized.
@@ -5598,6 +10025,9 @@ finally {
     }
     Stop-LaunchSanitizerTimer
     Stop-ProcessGuardTimer
+    Stop-AuditRuntime -KillProcess
+    Stop-NotificationTooltipRestoreTimer
+    Stop-TrayMenuPulseTimer
     if ($script:StartupIconHealTimer) {
         try { $script:StartupIconHealTimer.Stop() } catch {}
         try { $script:StartupIconHealTimer.Dispose() } catch {}

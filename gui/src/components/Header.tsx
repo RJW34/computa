@@ -1,7 +1,19 @@
-import { Moon, Sun, Settings, ArrowLeft } from 'lucide-react';
+import {
+  Archive,
+  ArrowLeft,
+  FileText,
+  Gamepad2,
+  Home,
+  Moon,
+  Search,
+  Settings,
+  Sun,
+  Timer,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAppStore } from '@/stores/appStore';
-import type { Theme } from '@/lib/types';
+import type { Page, Theme } from '@/lib/types';
+import { cn } from '@/lib/utils';
 
 interface HeaderProps {
   showBack?: boolean;
@@ -9,7 +21,7 @@ interface HeaderProps {
 }
 
 export function Header({ showBack, title }: HeaderProps) {
-  const { theme, setTheme, setPage } = useAppStore();
+  const { currentPage, theme, setTheme, setPage } = useAppStore();
 
   const cycleTheme = () => {
     const themes: Theme[] = ['light', 'dark', 'system'];
@@ -18,9 +30,18 @@ export function Header({ showBack, title }: HeaderProps) {
     setTheme(nextTheme);
   };
 
+  const navItems: Array<{ page: Page; label: string; icon: typeof Home }> = [
+    { page: 'home', label: 'Home', icon: Home },
+    { page: 'profile-wizard', label: 'Profiles', icon: Gamepad2 },
+    { page: 'audit', label: 'Audit', icon: Search },
+    { page: 'backups', label: 'Backups', icon: Archive },
+    { page: 'reports', label: 'Reports', icon: FileText },
+    { page: 'timer', label: 'Timer', icon: Timer },
+  ];
+
   return (
-    <header className="border-b">
-      <div className="container mx-auto px-6 py-4 flex items-center justify-between">
+    <header className="command-header">
+      <div className="container mx-auto px-6 py-3 flex items-center justify-between gap-4">
         <div className="flex items-center gap-4">
           {showBack && (
             <Button
@@ -30,20 +51,52 @@ export function Header({ showBack, title }: HeaderProps) {
               className="gap-2"
             >
               <ArrowLeft className="h-4 w-4" />
-              Back
+              <span className="hidden sm:inline">Back</span>
             </Button>
           )}
-          <h1 className="text-xl font-bold">
-            {title || 'A.B.S.O.'}
-          </h1>
+          <div className="brand-lockup">
+            <div className="brand-sigil">AB</div>
+            <div className="min-w-0">
+              <h1 className="truncate text-lg font-black leading-tight">
+                {title || 'A.B.S.O.'}
+              </h1>
+              <p className="truncate text-xs text-muted-foreground">
+                Adaptive Battle Station Optimizer
+              </p>
+            </div>
+          </div>
         </div>
+
+        <nav className="hidden xl:flex items-center gap-1 text-sm" aria-label="Primary">
+          {navItems.map(({ page, label, icon: Icon }) => (
+            <button
+              key={page}
+              type="button"
+              className={cn('nav-pill', currentPage === page && 'nav-pill--active')}
+              onClick={() => setPage(page)}
+            >
+              <Icon className="h-4 w-4" />
+              <span>{label}</span>
+            </button>
+          ))}
+        </nav>
 
         <div className="flex items-center gap-2">
           <Button
             variant="ghost"
             size="icon"
+            title="Settings"
+            onClick={() => setPage('settings')}
+            className={cn(currentPage === 'settings' && 'bg-primary/10 text-primary')}
+          >
+            <Settings className="h-5 w-5" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
             onClick={cycleTheme}
             title={`Theme: ${theme}`}
+            className="hidden sm:inline-flex"
           >
             {theme === 'dark' ? (
               <Moon className="h-5 w-5" />
@@ -55,14 +108,6 @@ export function Header({ showBack, title }: HeaderProps) {
                 <Moon className="h-3 w-3 absolute translate-x-1 translate-y-1" />
               </div>
             )}
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            title="Settings"
-            onClick={() => setPage('settings')}
-          >
-            <Settings className="h-5 w-5" />
           </Button>
         </div>
       </div>

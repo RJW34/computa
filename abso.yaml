@@ -11,15 +11,14 @@ ddci:
   enabled: true
   controller_override: CVTE
 
-# Local stability override for this mixed-refresh HDR/G-SYNC desktop.
-# Both Overwatch HDR G-SYNC lanes intentionally use the windowed VRR path on
-# this PC; keep the same MPO mitigation on the overlay-free and capture-safe
-# variants so switching profiles does not try to undo the compositor fix.
-# Disabling MPO is reboot-gated and should be applied once.
-profile_overrides:
-  overwatch2-gsync-hdr:
-    graphics:
-      disable_mpo: true
-  overwatch2-gsync-hdr-capture:
-    graphics:
-      disable_mpo: true
+# NOTE (2026-06-09): this file used to force `graphics.disable_mpo: true` on
+# both Overwatch 2 G-SYNC HDR lanes via profile_overrides. That override
+# predated the profiles' move to the optimized borderless/windowed VRR path
+# (which declares disable_mpo: false) and silently won over the profile on
+# every apply, re-writing the MPO-disable registry values each time. The
+# first reboot that committed them killed the borderless independent-flip
+# path, windowed G-SYNC could no longer engage, and the driver V-SYNC
+# backstop locked OW2 to exactly half refresh (150 fps on the 300 Hz panel).
+# Do not re-add an MPO override here without re-validating windowed VRR;
+# the applier now warns whenever a config override contradicts an explicit
+# profile declaration.

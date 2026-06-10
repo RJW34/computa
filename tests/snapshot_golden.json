@@ -116,10 +116,12 @@
       },
       "PowerSettingsHandler": {
         "active_plan": "ultimate_performance",
+        "disable_core_parking": true,
         "disable_pcie_power_saving": true,
         "disable_usb_suspend": true,
         "ensure_ultimate_performance": true,
-        "processor_max_performance": true
+        "processor_max_performance": true,
+        "processor_min_state": 100
       },
       "ProcessPriorityHandler": {
         "cpu_priority": 3,
@@ -268,10 +270,12 @@
       },
       "PowerSettingsHandler": {
         "active_plan": "ultimate_performance",
+        "disable_core_parking": true,
         "disable_pcie_power_saving": true,
         "disable_usb_suspend": true,
         "ensure_ultimate_performance": true,
-        "processor_max_performance": true
+        "processor_max_performance": true,
+        "processor_min_state": 100
       },
       "ProcessPriorityHandler": {
         "cpu_priority": 3,
@@ -421,10 +425,12 @@
       },
       "PowerSettingsHandler": {
         "active_plan": "ultimate_performance",
+        "disable_core_parking": true,
         "disable_pcie_power_saving": true,
         "disable_usb_suspend": true,
         "ensure_ultimate_performance": true,
-        "processor_max_performance": true
+        "processor_max_performance": true,
+        "processor_min_state": 100
       },
       "ProcessPriorityHandler": {
         "cpu_priority": 3,
@@ -575,10 +581,12 @@
       },
       "PowerSettingsHandler": {
         "active_plan": "ultimate_performance",
+        "disable_core_parking": true,
         "disable_pcie_power_saving": true,
         "disable_usb_suspend": true,
         "ensure_ultimate_performance": true,
-        "processor_max_performance": true
+        "processor_max_performance": true,
+        "processor_min_state": 100
       },
       "ProcessPriorityHandler": {
         "cpu_priority": 3,
@@ -1051,10 +1059,12 @@
       },
       "PowerSettingsHandler": {
         "active_plan": "ultimate_performance",
+        "disable_core_parking": true,
         "disable_pcie_power_saving": true,
         "disable_usb_suspend": true,
         "ensure_ultimate_performance": true,
-        "processor_max_performance": true
+        "processor_max_performance": true,
+        "processor_min_state": 100
       },
       "ProcessPriorityHandler": {
         "cpu_priority": 3,
@@ -1230,10 +1240,12 @@
       },
       "PowerSettingsHandler": {
         "active_plan": "ultimate_performance",
+        "disable_core_parking": true,
         "disable_pcie_power_saving": true,
         "disable_usb_suspend": true,
         "ensure_ultimate_performance": true,
-        "processor_max_performance": true
+        "processor_max_performance": true,
+        "processor_min_state": 100
       },
       "ProcessPriorityHandler": {
         "cpu_priority": 3,
@@ -1413,10 +1425,12 @@
       },
       "PowerSettingsHandler": {
         "active_plan": "ultimate_performance",
+        "disable_core_parking": true,
         "disable_pcie_power_saving": true,
         "disable_usb_suspend": true,
         "ensure_ultimate_performance": true,
-        "processor_max_performance": true
+        "processor_max_performance": true,
+        "processor_min_state": 100
       },
       "ProcessPriorityHandler": {
         "cpu_priority": 3,
@@ -1593,10 +1607,12 @@
       },
       "PowerSettingsHandler": {
         "active_plan": "ultimate_performance",
+        "disable_core_parking": true,
         "disable_pcie_power_saving": true,
         "disable_usb_suspend": true,
         "ensure_ultimate_performance": true,
-        "processor_max_performance": true
+        "processor_max_performance": true,
+        "processor_min_state": 100
       },
       "ProcessPriorityHandler": {
         "cpu_priority": 3,
@@ -1750,10 +1766,12 @@
       },
       "PowerSettingsHandler": {
         "active_plan": "ultimate_performance",
+        "disable_core_parking": true,
         "disable_pcie_power_saving": true,
         "disable_usb_suspend": true,
         "ensure_ultimate_performance": true,
-        "processor_max_performance": true
+        "processor_max_performance": true,
+        "processor_min_state": 100
       },
       "ProcessPriorityHandler": {
         "cpu_priority": 3,
@@ -1908,10 +1926,12 @@
       },
       "PowerSettingsHandler": {
         "active_plan": "ultimate_performance",
+        "disable_core_parking": true,
         "disable_pcie_power_saving": true,
         "disable_usb_suspend": true,
         "ensure_ultimate_performance": true,
-        "processor_max_performance": true
+        "processor_max_performance": true,
+        "processor_min_state": 100
       },
       "ProcessPriorityHandler": {
         "cpu_priority": 3,
@@ -2067,10 +2087,12 @@
       },
       "PowerSettingsHandler": {
         "active_plan": "ultimate_performance",
+        "disable_core_parking": true,
         "disable_pcie_power_saving": true,
         "disable_usb_suspend": true,
         "ensure_ultimate_performance": true,
-        "processor_max_performance": true
+        "processor_max_performance": true,
+        "processor_min_state": 100
       },
       "ProcessPriorityHandler": {
         "cpu_priority": 3,
@@ -2250,10 +2272,12 @@
       },
       "PowerSettingsHandler": {
         "active_plan": "ultimate_performance",
+        "disable_core_parking": true,
         "disable_pcie_power_saving": true,
         "disable_usb_suspend": true,
         "ensure_ultimate_performance": true,
-        "processor_max_performance": true
+        "processor_max_performance": true,
+        "processor_min_state": 100
       },
       "ProcessPriorityHandler": {
         "cpu_priority": 3,
@@ -2429,10 +2453,12 @@
       },
       "PowerSettingsHandler": {
         "active_plan": "ultimate_performance",
+        "disable_core_parking": true,
         "disable_pcie_power_saving": true,
         "disable_usb_suspend": true,
         "ensure_ultimate_performance": true,
-        "processor_max_performance": true
+        "processor_max_performance": true,
+        "processor_min_state": 100
       },
       "ProcessPriorityHandler": {
         "cpu_priority": 3,
@@ -2612,10 +2638,12 @@
       },
       "PowerSettingsHandler": {
         "active_plan": "ultimate_performance",
+        "disable_core_parking": true,
         "disable_pcie_power_saving": true,
         "disable_usb_suspend": true,
         "ensure_ultimate_performance": true,
-        "processor_max_performance": true
+        "processor_max_performance": true,
+        "processor_min_state": 100
       },
       "ProcessPriorityHandler": {
         "cpu_priority": 3,
@@ -2963,6 +2991,7 @@
     "graphics_api": "unknown",
     "handlers": [
       "WindowsSettingsHandler",
+      "PowerSettingsHandler",
       "RegistrySettingsHandler",
       "NvidiaSettingsHandler",
       "GraphicsSettingsHandler",
@@ -3031,6 +3060,10 @@
         "vrr_app_override": "allow",
         "vsync": "adaptive"
       },
+      "PowerSettingsHandler": {
+        "processor_max_performance": true,
+        "processor_min_state": 5
+      },
       "RegistrySettingsHandler": {
         "game_priority": {
           "gpu_priority": 8,
@@ -3058,6 +3091,7 @@
     "graphics_api": "unknown",
     "handlers": [
       "WindowsSettingsHandler",
+      "PowerSettingsHandler",
       "RegistrySettingsHandler",
       "NvidiaSettingsHandler",
       "GraphicsSettingsHandler",
@@ -3150,6 +3184,10 @@
         "threaded_optimization": "auto",
         "vrr_app_override": "allow",
         "vsync": "adaptive"
+      },
+      "PowerSettingsHandler": {
+        "processor_max_performance": true,
+        "processor_min_state": 5
       },
       "RegistrySettingsHandler": {
         "game_priority": {
@@ -3306,10 +3344,12 @@
       },
       "PowerSettingsHandler": {
         "active_plan": "ultimate_performance",
+        "disable_core_parking": true,
         "disable_pcie_power_saving": true,
         "disable_usb_suspend": true,
         "ensure_ultimate_performance": true,
-        "processor_max_performance": true
+        "processor_max_performance": true,
+        "processor_min_state": 100
       },
       "ProcessPriorityHandler": {
         "cpu_priority": 3,
@@ -3512,10 +3552,12 @@
       },
       "PowerSettingsHandler": {
         "active_plan": "ultimate_performance",
+        "disable_core_parking": true,
         "disable_pcie_power_saving": true,
         "disable_usb_suspend": true,
         "ensure_ultimate_performance": true,
-        "processor_max_performance": true
+        "processor_max_performance": true,
+        "processor_min_state": 100
       },
       "ProcessPriorityHandler": {
         "cpu_priority": 3,
@@ -3689,6 +3731,7 @@
       },
       "PowerSettingsHandler": {
         "active_plan": "ultimate_performance",
+        "disable_core_parking": true,
         "disable_pcie_power_saving": true,
         "disable_usb_suspend": true,
         "ensure_ultimate_performance": true,
@@ -3896,6 +3939,7 @@
       },
       "PowerSettingsHandler": {
         "active_plan": "ultimate_performance",
+        "disable_core_parking": true,
         "disable_pcie_power_saving": true,
         "disable_usb_suspend": true,
         "ensure_ultimate_performance": true,
@@ -4089,10 +4133,12 @@
       },
       "PowerSettingsHandler": {
         "active_plan": "ultimate_performance",
+        "disable_core_parking": true,
         "disable_pcie_power_saving": true,
         "disable_usb_suspend": true,
         "ensure_ultimate_performance": true,
-        "processor_max_performance": true
+        "processor_max_performance": true,
+        "processor_min_state": 100
       },
       "ProcessPriorityHandler": {
         "cpu_priority": 2,
@@ -4261,10 +4307,12 @@
       },
       "PowerSettingsHandler": {
         "active_plan": "ultimate_performance",
+        "disable_core_parking": true,
         "disable_pcie_power_saving": true,
         "disable_usb_suspend": true,
         "ensure_ultimate_performance": true,
-        "processor_max_performance": true
+        "processor_max_performance": true,
+        "processor_min_state": 100
       },
       "ProcessPriorityHandler": {
         "cpu_priority": 2,
@@ -4464,10 +4512,12 @@
       },
       "PowerSettingsHandler": {
         "active_plan": "ultimate_performance",
+        "disable_core_parking": true,
         "disable_pcie_power_saving": true,
         "disable_usb_suspend": true,
         "ensure_ultimate_performance": true,
-        "processor_max_performance": true
+        "processor_max_performance": true,
+        "processor_min_state": 100
       },
       "ProcessPriorityHandler": {
         "cpu_priority": 2,
@@ -4687,10 +4737,12 @@
       },
       "PowerSettingsHandler": {
         "active_plan": "ultimate_performance",
+        "disable_core_parking": true,
         "disable_pcie_power_saving": true,
         "disable_usb_suspend": true,
         "ensure_ultimate_performance": true,
-        "processor_max_performance": true
+        "processor_max_performance": true,
+        "processor_min_state": 100
       },
       "ProcessPriorityHandler": {
         "cpu_priority": 2,
@@ -4985,10 +5037,12 @@
       },
       "PowerSettingsHandler": {
         "active_plan": "ultimate_performance",
+        "disable_core_parking": true,
         "disable_pcie_power_saving": true,
         "disable_usb_suspend": true,
         "ensure_ultimate_performance": true,
-        "processor_max_performance": true
+        "processor_max_performance": true,
+        "processor_min_state": 100
       },
       "ProcessPriorityHandler": {
         "cpu_priority": 3,
@@ -5309,10 +5363,12 @@
       },
       "PowerSettingsHandler": {
         "active_plan": "ultimate_performance",
+        "disable_core_parking": true,
         "disable_pcie_power_saving": true,
         "disable_usb_suspend": true,
         "ensure_ultimate_performance": true,
-        "processor_max_performance": true
+        "processor_max_performance": true,
+        "processor_min_state": 100
       },
       "ProcessPriorityHandler": {
         "cpu_priority": 3,
@@ -5476,10 +5532,12 @@
       },
       "PowerSettingsHandler": {
         "active_plan": "ultimate_performance",
+        "disable_core_parking": true,
         "disable_pcie_power_saving": true,
         "disable_usb_suspend": true,
         "ensure_ultimate_performance": true,
-        "processor_max_performance": true
+        "processor_max_performance": true,
+        "processor_min_state": 100
       },
       "ProcessPriorityHandler": {
         "cpu_priority": 3,
@@ -5668,10 +5726,12 @@
       },
       "PowerSettingsHandler": {
         "active_plan": "ultimate_performance",
+        "disable_core_parking": true,
         "disable_pcie_power_saving": true,
         "disable_usb_suspend": true,
         "ensure_ultimate_performance": true,
-        "processor_max_performance": true
+        "processor_max_performance": true,
+        "processor_min_state": 100
       },
       "ProcessPriorityHandler": {
         "cpu_priority": 3,
@@ -6024,10 +6084,12 @@
       },
       "PowerSettingsHandler": {
         "active_plan": "ultimate_performance",
+        "disable_core_parking": true,
         "disable_pcie_power_saving": true,
         "disable_usb_suspend": true,
         "ensure_ultimate_performance": true,
-        "processor_max_performance": true
+        "processor_max_performance": true,
+        "processor_min_state": 100
       },
       "ProcessPriorityHandler": {
         "cpu_priority": 3,
@@ -6355,10 +6417,12 @@
       },
       "PowerSettingsHandler": {
         "active_plan": "ultimate_performance",
+        "disable_core_parking": true,
         "disable_pcie_power_saving": true,
         "disable_usb_suspend": true,
         "ensure_ultimate_performance": true,
-        "processor_max_performance": true
+        "processor_max_performance": true,
+        "processor_min_state": 100
       },
       "ProcessPriorityHandler": {
         "cpu_priority": 3,
@@ -6709,10 +6773,12 @@
       },
       "PowerSettingsHandler": {
         "active_plan": "ultimate_performance",
+        "disable_core_parking": true,
         "disable_pcie_power_saving": true,
         "disable_usb_suspend": true,
         "ensure_ultimate_performance": true,
-        "processor_max_performance": true
+        "processor_max_performance": true,
+        "processor_min_state": 100
       },
       "ProcessPriorityHandler": {
         "cpu_priority": 3,

@@ -12,6 +12,7 @@ from abso.core.display_diagnostics import (
     ACTION_REVIEW_CAPTURE_MPO_PERFORMANCE,
     ACTION_REVIEW_SECONDARY_REFRESH_RATE,
     GRAPHICS_REBOOT_NEXT_ACTION,
+    GRAPHICS_REBOOT_PENDING_PATH,
     build_active_state_context,
     build_recommended_actions,
     collect_active_state_context,
@@ -33,6 +34,8 @@ def test_summarize_display_diagnostics_marks_compositor_path_likely() -> None:
 
     assert summary == {
         "event_count": 0,
+        "actionable_event_count": 0,
+        "benign_event_count": 0,
         "channel_error_count": 0,
         "risk_level": "high",
         "likely_black_flash_path": "windows_compositor_mpo_vrr_mixed_refresh",
@@ -55,7 +58,7 @@ def test_summarize_display_diagnostics_marks_compositor_path_likely() -> None:
 
 def test_summarize_display_diagnostics_does_not_hide_driver_events() -> None:
     summary = summarize_display_diagnostics(
-        {"count": 1, "channel_error_count": 0},
+        {"count": 1, "actionable_count": 1, "benign_count": 0, "channel_error_count": 0},
         {
             "risk_level": "high",
             "likely_black_flash_path": "windows_compositor_mpo_vrr_mixed_refresh",
@@ -63,6 +66,43 @@ def test_summarize_display_diagnostics_does_not_hide_driver_events() -> None:
     )
 
     assert summary["clean_event_log"] is False
+    assert summary["compositor_black_flash_likely"] is False
+    assert summary["recommended_actions"] == []
+
+
+def test_summarize_display_diagnostics_ignores_benign_power_events_for_clean_log() -> None:
+    summary = summarize_display_diagnostics(
+        {
+            "count": 5,
+            "actionable_count": 0,
+            "benign_count": 5,
+            "channel_error_count": 0,
+        },
+        {
+            "risk_level": "high",
+            "likely_black_flash_path": "windows_compositor_mpo_vrr_mixed_refresh",
+        },
+    )
+
+    assert summary["event_count"] == 5
+    assert summary["actionable_event_count"] == 0
+    assert summary["benign_event_count"] == 5
+    assert summary["clean_event_log"] is True
+    assert summary["compositor_black_flash_likely"] is True
+
+
+def test_summarize_display_diagnostics_does_not_call_vrr_only_likely() -> None:
+    summary = summarize_display_diagnostics(
+        {"count": 0, "actionable_count": 0, "benign_count": 0, "channel_error_count": 0},
+        {
+            "risk_level": "low",
+            "risk_factors": ["vrr_capable_display"],
+            "likely_black_flash_path": None,
+            "warnings": [],
+        },
+    )
+
+    assert summary["clean_event_log"] is True
     assert summary["compositor_black_flash_likely"] is False
     assert summary["recommended_actions"] == []
 
@@ -159,6 +199,9 @@ def test_collect_display_diagnostics_includes_reboot_pending_state(tmp_path: Pat
     }
     assert payload["display_stability"]["graphics_reboot_pending"] is True
     assert payload["display_stability"]["next_action"] == GRAPHICS_REBOOT_NEXT_ACTION
+    assert payload["display_stability"]["likely_black_flash_path"] == (
+        "windows_compositor_mpo_vrr_mixed_refresh"
+    )
     assert payload["summary"]["reboot_pending"] is True
     assert payload["summary"]["next_action"] == GRAPHICS_REBOOT_NEXT_ACTION
     assert payload["summary"]["recommended_actions"][0]["code"] == (
@@ -263,6 +306,7 @@ def test_enrich_display_stability_with_active_state_does_not_clobber_next_action
 
     assert enriched == {
         "graphics_reboot_pending": True,
+        "likely_black_flash_path": GRAPHICS_REBOOT_PENDING_PATH,
         "next_action": "existing action",
     }
 

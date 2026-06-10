@@ -31,6 +31,14 @@ from abso.core.state_store import write_state_snapshot
 from abso.tray import ensure_tray_running, get_startup_status
 from abso.utils.atomic_io import atomic_write_json
 
+TRAY_RUNTIME_MODULES: tuple[str, ...] = (
+    "ABSO-Icons.ps1",
+    "ABSO-Notifications.ps1",
+    "ABSO-Settings.ps1",
+    "ABSO-StartupState.ps1",
+    "ABSO-QuickPanel.ps1",
+)
+
 
 def _candidate_backup_dirs(primary: Path) -> list[Path]:
     """Return backup roots worth reporting in diagnostics."""
@@ -277,9 +285,10 @@ def _build_tray_runtime_marker_check(
     root_dir: Path,
     tray_runtime: dict[str, Any],
 ) -> dict[str, Any]:
-    """Compare the running tray marker with the installed tray script."""
+    """Compare the running tray marker with installed tray scripts/modules."""
     marker_path = root_dir / "tray-runtime.json"
-    installed_script = root_dir / "abso" / "tray" / "ABSO-Tray.ps1"
+    installed_tray_dir = root_dir / "abso" / "tray"
+    installed_script = installed_tray_dir / "ABSO-Tray.ps1"
     running = bool(tray_runtime.get("running_after"))
     warnings: list[str] = []
     data: dict[str, Any] = {
@@ -296,6 +305,15 @@ def _build_tray_runtime_marker_check(
     data["installed_script_hash_sha256"] = installed_hash
     if installed_hash is None:
         warnings.append("installed tray script is missing or unreadable")
+
+    installed_modules: dict[str, dict[str, str | None]] = {}
+    for module_name in TRAY_RUNTIME_MODULES:
+        module_path = installed_tray_dir / module_name
+        installed_modules[module_name] = {
+            "path": str(module_path),
+            "hash_sha256": _hash_file_sha256(module_path),
+        }
+    data["installed_modules"] = installed_modules
 
     try:
         marker = json.loads(marker_path.read_text(encoding="utf-8"))
@@ -323,6 +341,36 @@ def _build_tray_runtime_marker_check(
             warnings.append("tray runtime marker has no script path")
         elif not _paths_match(marker_script_path, installed_script):
             warnings.append("running tray script path differs from installed tray script")
+
+        marker_modules = marker.get("module_hashes")
+        if not isinstance(marker_modules, dict):
+            marker_modules = {}
+            warnings.append("tray runtime marker has no module hashes")
+        data["marker_module_hashes"] = marker_modules
+        for module_name, installed_module in installed_modules.items():
+            installed_module_hash = installed_module.get("hash_sha256")
+            if not installed_module_hash:
+                warnings.append(f"installed tray module is missing or unreadable: {module_name}")
+                continue
+            marker_module = marker_modules.get(module_name)
+            if not isinstance(marker_module, dict):
+                warnings.append(f"tray runtime marker has no module hash for {module_name}")
+                continue
+            marker_module_hash = str(marker_module.get("hash_sha256") or "").lower() or None
+            marker_module_path = str(marker_module.get("path") or "") or None
+            if not marker_module_hash:
+                warnings.append(f"tray runtime marker has empty module hash for {module_name}")
+            elif marker_module_hash != installed_module_hash:
+                warnings.append(
+                    f"running tray module hash differs from installed tray module: {module_name}"
+                )
+            if marker_module_path and not _paths_match(
+                marker_module_path,
+                Path(str(installed_module["path"])),
+            ):
+                warnings.append(
+                    f"running tray module path differs from installed tray module: {module_name}"
+                )
         try:
             marker_pid_int = int(marker_pid)
         except (TypeError, ValueError):
@@ -351,8 +399,10 @@ def _build_display_events_check() -> dict[str, Any]:
 
     if events_payload.get("error"):
         warnings.append("display event log query failed")
-    elif events_payload.get("count", 0):
-        warnings.append("recent display/driver/power events found")
+    elif events_payload.get("channel_error_count", 0):
+        warnings.append("display event log channel query failed")
+    elif events_payload.get("actionable_count", events_payload.get("count", 0)):
+        warnings.append("recent actionable display/driver/power events found")
 
     check: dict[str, Any] = {
         "status": "warning" if warnings else "ok",
@@ -374,8 +424,10 @@ def _build_display_stability_check(
 
     if snapshot.get("error"):
         warnings.append("display topology stability probe failed")
-    elif snapshot.get("risk_level") in {"medium", "high"}:
-        warnings.append("display topology has compositor black-flash risk factors")
+    elif snapshot.get("risk_level") == "high":
+        warnings.append("display topology has high compositor black-flash risk")
+    elif snapshot.get("warnings"):
+        warnings.append("display topology has actionable display warnings")
 
     active_state = build_active_state_context(state_data) if state_data else None
     if active_state:

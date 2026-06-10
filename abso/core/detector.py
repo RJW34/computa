@@ -458,10 +458,20 @@ def _parse_edid_for_vrr(edid: bytes) -> dict[str, Any]:
                     if list(oui) == [0x00, 0x1A, 0x00] or list(oui) == [0x1A, 0x00, 0x00]:
                         result["vrr_supported"] = "hardware"
                         result["vrr_type"] = "freesync"
-                        # FreeSync range is typically in bytes 5-6 of the data block
-                        if length >= 6 and db_offset + 6 < len(edid):
-                            result["vrr_min_hz"] = edid[db_offset + 5]
-                            result["vrr_max_hz"] = edid[db_offset + 6]
+                        # FreeSync range position depends on the VSDB version
+                        # byte at +4: v1 keeps min/max at +5/+6, while v2+
+                        # insert a flags byte so min/max move to +6/+7.
+                        # Reading +5/+6 on a v2+ block returns (flags, min) —
+                        # e.g. a bogus "1-48Hz" from a real 48-240Hz LG
+                        # UltraGear block.
+                        version = edid[db_offset + 4] if db_offset + 4 < len(edid) else 0
+                        min_off, max_off = (6, 7) if version >= 2 else (5, 6)
+                        if length >= max_off and db_offset + max_off < len(edid):
+                            vrr_min = edid[db_offset + min_off]
+                            vrr_max = edid[db_offset + max_off]
+                            if 0 < vrr_min < vrr_max:
+                                result["vrr_min_hz"] = vrr_min
+                                result["vrr_max_hz"] = vrr_max
                         return result
 
                 # Extended tag block (tag 7)

@@ -82,7 +82,7 @@ export function BackupManager() {
     <div className="min-h-screen">
       <Header showBack title="Backups" />
 
-      <main className="container mx-auto px-6 py-6 max-w-3xl">
+      <main className="container mx-auto max-w-4xl px-6 py-6">
         {actionError && (
           <div className="mb-4 rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
             {actionError}
@@ -100,7 +100,7 @@ export function BackupManager() {
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
           </div>
         ) : backups.length === 0 ? (
-          <Card>
+          <Card className="wizard-panel shadow-none">
             <CardContent className="py-12 text-center">
               <Archive className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
               <h3 className="font-semibold mb-2">No Backups Yet</h3>
@@ -125,7 +125,7 @@ export function BackupManager() {
         ) : (
           <div className="space-y-4">
             {backups.map((backup) => (
-              <Card key={backup.id}>
+              <Card key={backup.id} className="wizard-panel shadow-none">
                 <CardContent className="p-4">
                   <div className="flex items-start justify-between">
                     <div>

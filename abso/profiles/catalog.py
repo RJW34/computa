@@ -693,6 +693,8 @@ def get_profile_manifest() -> list[dict[str, Any]]:
                 "requires_overlay_free_path": bool(
                     profile.display_path_requirements.require_overlay_free_path
                 ),
+                "keep_awake_while_gaming": bool(profile.keep_awake_while_gaming),
+                "is_online_profile": bool(profile.is_online_profile),
             }
         )
     return manifest

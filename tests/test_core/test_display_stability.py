@@ -117,3 +117,34 @@ def test_collect_display_stability_snapshot_marks_supported_payload() -> None:
     assert snapshot["query_scope"] == "multimon_detector_read_only"
     assert snapshot["risk_level"] == "low"
     assert snapshot["risk_factors"] == []
+
+
+def test_single_vrr_display_is_context_not_health_warning_risk() -> None:
+    result = MultiMonitorResult(
+        environment=DisplayEnvironment(
+            monitors=[
+                MonitorInfo(
+                    name="Primary VRR",
+                    width=2560,
+                    height=1440,
+                    refresh_rate=300.0,
+                    is_primary=True,
+                    is_vrr_capable=True,
+                    vrr_type="gsync_compatible",
+                )
+            ],
+            monitor_count=1,
+            primary_refresh=300.0,
+            min_refresh=300.0,
+            max_refresh=300.0,
+        ),
+        exclusive_fullscreen_safe=True,
+        warnings=[],
+    )
+
+    summary = summarize_display_stability(result)
+
+    assert summary["risk_factors"] == ["vrr_capable_display"]
+    assert summary["risk_level"] == "low"
+    assert summary["likely_black_flash_path"] is None
+    assert summary["warnings"] == []

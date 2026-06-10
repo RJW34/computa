@@ -3,10 +3,13 @@
 
 use serde::{Deserialize, Serialize};
 #[cfg(windows)]
-use std::ffi::{c_void, OsStr};
+use std::ffi::c_void;
+use std::ffi::OsStr;
 use std::fs;
 #[cfg(windows)]
 use std::os::windows::ffi::OsStrExt;
+#[cfg(windows)]
+use std::os::windows::process::CommandExt;
 use std::path::PathBuf;
 use std::process::Command;
 use std::sync::Mutex;
@@ -40,8 +43,9 @@ struct CliProfile {
 #[derive(Deserialize)]
 struct ApplyCliData {
     success: bool,
-    #[allow(dead_code)]
     profile: Option<String>,
+    #[allow(dead_code)]
+    requested_profile: Option<String>,
     #[allow(dead_code)]
     backup_id: Option<String>,
     #[serde(default)]
@@ -84,6 +88,18 @@ struct TrayProfileCache {
 struct AppState {
     active_profile: Mutex<Option<String>>,
     tray_profiles: Mutex<Vec<TrayProfile>>,
+}
+
+#[cfg(windows)]
+const CREATE_NO_WINDOW: u32 = 0x08000000;
+
+fn hidden_command(program: impl AsRef<OsStr>) -> Command {
+    let mut command = Command::new(program);
+    #[cfg(windows)]
+    {
+        command.creation_flags(CREATE_NO_WINDOW);
+    }
+    command
 }
 
 #[cfg(windows)]
@@ -321,7 +337,7 @@ async fn run_abso_command(
 ) -> Result<String, String> {
     let output = if should_use_python() {
         // Development mode: use Python
-        Command::new("python")
+        hidden_command("python")
             .args(["-m", "abso", &command])
             .args(&args)
             .current_dir(get_project_root())
@@ -330,7 +346,7 @@ async fn run_abso_command(
     } else {
         // Production mode: use bundled sidecar
         let sidecar_path = get_sidecar_path(Some(&app_handle));
-        Command::new(&sidecar_path)
+        hidden_command(&sidecar_path)
             .arg(&command)
             .args(&args)
             .output()
@@ -375,8 +391,7 @@ fn is_admin() -> bool {
     #[cfg(windows)]
     {
         // Simple check: try to read a protected registry key
-        use std::process::Command;
-        let output = Command::new("net").args(["session"]).output();
+        let output = hidden_command("net").args(["session"]).output();
 
         match output {
             Ok(o) => o.status.success(),
@@ -431,15 +446,15 @@ fn apply_profile_sync(
     profile_id: &str,
 ) -> Result<ApplyTrayEvent, String> {
     let output = if should_use_python() {
-        Command::new("python")
-            .args(["-m", "abso", "apply", profile_id, "--json"])
+        hidden_command("python")
+            .args(["-m", "abso", "apply", profile_id, "--json", "--no-fallback"])
             .current_dir(get_project_root())
             .output()
             .map_err(|e| format!("Failed to execute Python command: {}", e))?
     } else {
         let sidecar_path = get_sidecar_path(Some(app_handle));
-        Command::new(&sidecar_path)
-            .args(["apply", profile_id, "--json"])
+        hidden_command(&sidecar_path)
+            .args(["apply", profile_id, "--json", "--no-fallback"])
             .output()
             .map_err(|e| format!("Failed to execute sidecar: {}", e))?
     };
@@ -450,8 +465,13 @@ fn apply_profile_sync(
             .map_err(|e| format!("Failed to parse apply response: {}. stdout: {}", e, stdout))?;
 
         if parsed.success && parsed.data.success && parsed.data.failed_settings.is_empty() {
+            let applied_profile_id = parsed
+                .data
+                .profile
+                .clone()
+                .unwrap_or_else(|| profile_id.to_string());
             Ok(ApplyTrayEvent {
-                profile_id: profile_id.to_string(),
+                profile_id: applied_profile_id,
                 warnings: parsed.data.warnings,
                 notices: parsed.data.notices,
                 summary_level: parsed.data.summary_level,
@@ -483,13 +503,13 @@ fn apply_profile_sync(
 
 fn load_backend_active_profile(app_handle: &tauri::AppHandle) -> Option<String> {
     let output = if should_use_python() {
-        Command::new("python")
+        hidden_command("python")
             .args(["-m", "abso", "state", "--json"])
             .current_dir(get_project_root())
             .output()
     } else {
         let sidecar_path = get_sidecar_path(Some(app_handle));
-        Command::new(&sidecar_path)
+        hidden_command(&sidecar_path)
             .args(["state", "--json"])
             .output()
     };
@@ -563,16 +583,16 @@ fn fallback_tray_profiles(app_handle: &tauri::AppHandle) -> Vec<TrayProfile> {
     Vec::new()
 }
 
-/// Load tray profile menu entries from CLI metadata.
-fn load_tray_profiles(app_handle: &tauri::AppHandle) -> Vec<TrayProfile> {
+/// Load fresh tray profile menu entries from CLI metadata.
+fn load_tray_profiles_from_cli(app_handle: &tauri::AppHandle) -> Vec<TrayProfile> {
     let output = if should_use_python() {
-        Command::new("python")
+        hidden_command("python")
             .args(["-m", "abso", "profiles", "--json"])
             .current_dir(get_project_root())
             .output()
     } else {
         let sidecar_path = get_sidecar_path(Some(app_handle));
-        Command::new(&sidecar_path)
+        hidden_command(&sidecar_path)
             .args(["profiles", "--json"])
             .output()
     };
@@ -581,14 +601,14 @@ fn load_tray_profiles(app_handle: &tauri::AppHandle) -> Vec<TrayProfile> {
         Ok(o) => o,
         Err(e) => {
             eprintln!("Failed to load profiles for tray menu: {}", e);
-            return fallback_tray_profiles(app_handle);
+            return Vec::new();
         }
     };
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
         eprintln!("profiles --json failed for tray menu: {}", stderr);
-        return fallback_tray_profiles(app_handle);
+        return Vec::new();
     }
 
     let stdout = String::from_utf8_lossy(&output.stdout);
@@ -602,12 +622,51 @@ fn load_tray_profiles(app_handle: &tauri::AppHandle) -> Vec<TrayProfile> {
                 name: profile.display_name,
             })
             .collect(),
-        Ok(_) => fallback_tray_profiles(app_handle),
+        Ok(_) => Vec::new(),
         Err(e) => {
             eprintln!("Failed to parse profile metadata for tray menu: {}", e);
-            fallback_tray_profiles(app_handle)
+            Vec::new()
         }
     }
+}
+
+/// Load tray profile menu entries cache-first so the tray can appear promptly.
+fn load_tray_profiles(app_handle: &tauri::AppHandle) -> Vec<TrayProfile> {
+    let cached = fallback_tray_profiles(app_handle);
+    if !cached.is_empty() {
+        return cached;
+    }
+
+    load_tray_profiles_from_cli(app_handle)
+}
+
+fn refresh_tray_profiles_from_cli(app: tauri::AppHandle) {
+    tauri::async_runtime::spawn(async move {
+        let app_for_task = app.clone();
+        let result = tauri::async_runtime::spawn_blocking(move || {
+            load_tray_profiles_from_cli(&app_for_task)
+        })
+        .await;
+
+        let Ok(profiles) = result else {
+            return;
+        };
+        if profiles.is_empty() {
+            return;
+        }
+
+        if let Ok(mut guard) = app.state::<AppState>().tray_profiles.lock() {
+            *guard = profiles;
+        }
+
+        let active_profile = app
+            .state::<AppState>()
+            .active_profile
+            .lock()
+            .ok()
+            .and_then(|guard| guard.clone());
+        update_tray_menu(&app, active_profile.as_deref());
+    });
 }
 
 /// Create the tray menu
@@ -801,6 +860,8 @@ fn main() {
                     }
                 })
                 .build(app)?;
+
+            refresh_tray_profiles_from_cli(app.handle().clone());
 
             Ok(())
         })

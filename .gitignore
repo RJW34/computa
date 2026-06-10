@@ -73,3 +73,6 @@ IMPROVEMENT_PLAN.md
 .abso_state.json
 .power_switcher_state.json
 state/citadel_status.json
+
+# Local Codex CLI working state
+.codex/

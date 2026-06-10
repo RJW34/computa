@@ -15,7 +15,7 @@ from abso.core.display_diagnostics import (
     ACTION_REBOOT_TO_COMMIT_GRAPHICS_SETTINGS,
     ACTION_REVIEW_SECONDARY_REFRESH_RATE,
 )
-from abso.core.health import build_health_report, write_health_bundle
+from abso.core.health import TRAY_RUNTIME_MODULES, build_health_report, write_health_bundle
 from abso.utils.atomic_io import atomic_write_json as real_atomic_write_json
 
 
@@ -36,6 +36,7 @@ def _build_health_report_with_mocks(
     marker_pid_running: bool = True,
     include_verify_details: bool = False,
     include_backup_details: bool = False,
+    display_events_payload: dict[str, Any] | None = None,
     display_stability_snapshot: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Build a health report with stable, non-live dependencies."""
@@ -80,13 +81,16 @@ def _build_health_report_with_mocks(
         stack.enter_context(
             patch(
                 "abso.core.health.collect_recent_display_events",
-                return_value={
+                return_value=display_events_payload
+                or {
                     "supported": True,
                     "lookback_minutes": 360,
                     "max_events": 20,
                     "providers": [],
                     "events": [],
                     "count": 0,
+                    "actionable_count": 0,
+                    "benign_count": 0,
                 },
             )
         )
@@ -140,6 +144,7 @@ def _write_tray_runtime_marker(
     *,
     script_body: str = "# tray\n",
     marker_hash: str | None = None,
+    marker_module_hashes: dict[str, str] | None = None,
     marker_pid: int = 1234,
     marker_script_path: str | None = None,
 ) -> None:
@@ -147,11 +152,26 @@ def _write_tray_runtime_marker(
     script_path = root_dir / "abso" / "tray" / "ABSO-Tray.ps1"
     script_path.parent.mkdir(parents=True, exist_ok=True)
     script_path.write_text(script_body, encoding="utf-8")
+    marker_module_hashes = marker_module_hashes or {}
 
     if marker_hash is None:
         import hashlib
 
         marker_hash = hashlib.sha256(script_path.read_bytes()).hexdigest()
+
+    import hashlib
+
+    module_hashes: dict[str, dict[str, str]] = {}
+    for module_name in TRAY_RUNTIME_MODULES:
+        module_path = script_path.parent / module_name
+        module_path.write_text(f"# {module_name}\n", encoding="utf-8")
+        module_hashes[module_name] = {
+            "path": str(module_path),
+            "hash_sha256": marker_module_hashes.get(
+                module_name,
+                hashlib.sha256(module_path.read_bytes()).hexdigest(),
+            ),
+        }
 
     marker_path = root_dir / "tray-runtime.json"
     marker_path.write_text(
@@ -160,6 +180,7 @@ def _write_tray_runtime_marker(
             "pid": marker_pid,
             "script_path": marker_script_path or str(script_path),
             "script_hash_sha256": marker_hash,
+            "module_hashes": module_hashes,
         }),
         encoding="utf-8",
     )
@@ -185,6 +206,7 @@ def test_build_health_report_collects_checks(tmp_path: Path) -> None:
     assert "tray_startup" in report["checks"]
     assert report["checks"]["tray_runtime_marker"]["status"] == "ok"
     assert report["checks"]["tray_runtime_marker"]["data"]["marker_pid_running"] is True
+    assert "marker_module_hashes" in report["checks"]["tray_runtime_marker"]["data"]
     assert report["checks"]["display_events"]["status"] == "ok"
     assert report["checks"]["display_stability"]["status"] == "ok"
     assert report["checks"]["profile_verify"]["status"] == "ok"
@@ -281,6 +303,31 @@ def test_build_health_report_warns_when_tray_marker_path_is_stale(
     assert marker_check["status"] == "warning"
     assert marker_check["warnings"] == [
         "running tray script path differs from installed tray script"
+    ]
+
+
+def test_build_health_report_warns_when_running_tray_module_hash_is_stale(
+    tmp_path: Path,
+) -> None:
+    """A tray module deploy also requires a live tray restart."""
+    state_file = tmp_path / ".abso_state.json"
+    state_file.write_text(json.dumps({"current_profile": "overwatch2"}), encoding="utf-8")
+    _write_tray_runtime_marker(
+        tmp_path,
+        marker_module_hashes={"ABSO-QuickPanel.ps1": "0" * 64},
+    )
+
+    report = _build_health_report_with_mocks(
+        tmp_path,
+        state_file,
+        tray_runtime={"running_after": True},
+        verify_result={"profile": "overwatch2", "all_active": True},
+    )
+
+    marker_check = report["checks"]["tray_runtime_marker"]
+    assert marker_check["status"] == "warning"
+    assert marker_check["warnings"] == [
+        "running tray module hash differs from installed tray module: ABSO-QuickPanel.ps1"
     ]
 
 
@@ -438,7 +485,7 @@ def test_build_health_report_warns_on_display_stability_risk(tmp_path: Path) -> 
     stability_check = report["checks"]["display_stability"]
     assert stability_check["status"] == "warning"
     assert stability_check["warnings"] == [
-        "display topology has compositor black-flash risk factors"
+        "display topology has high compositor black-flash risk"
     ]
     assert stability_check["data"]["graphics_reboot_pending"] is True
     assert stability_check["data"]["next_action"] == (
@@ -456,6 +503,76 @@ def test_build_health_report_warns_on_display_stability_risk(tmp_path: Path) -> 
     assert profile_check["warnings"] == [
         "active profile is reboot pending: GraphicsSettingsHandler"
     ]
+
+
+def test_build_health_report_does_not_warn_on_vrr_only_display_context(
+    tmp_path: Path,
+) -> None:
+    state_file = tmp_path / ".abso_state.json"
+    state_file.write_text(
+        json.dumps({"current_profile": "overwatch2-gsync-hdr-capture"}),
+        encoding="utf-8",
+    )
+
+    report = _build_health_report_with_mocks(
+        tmp_path,
+        state_file,
+        verify_result={"profile": "overwatch2-gsync-hdr-capture", "all_active": True},
+        display_stability_snapshot={
+            "supported": True,
+            "query_scope": "multimon_detector_read_only",
+            "monitor_count": 1,
+            "risk_factors": ["vrr_capable_display"],
+            "risk_level": "low",
+            "likely_black_flash_path": None,
+            "warnings": [],
+        },
+    )
+
+    stability_check = report["checks"]["display_stability"]
+    assert stability_check["status"] == "ok"
+    assert "warnings" not in stability_check
+
+
+def test_build_health_report_does_not_warn_on_benign_power_policy_events(
+    tmp_path: Path,
+) -> None:
+    state_file = tmp_path / ".abso_state.json"
+    state_file.write_text(
+        json.dumps({"current_profile": "overwatch2-gsync-hdr-capture"}),
+        encoding="utf-8",
+    )
+
+    report = _build_health_report_with_mocks(
+        tmp_path,
+        state_file,
+        verify_result={"profile": "overwatch2-gsync-hdr-capture", "all_active": True},
+        display_events_payload={
+            "supported": True,
+            "lookback_minutes": 360,
+            "max_events": 20,
+            "events": [
+                {
+                    "provider": "Microsoft-Windows-UserModePowerService",
+                    "id": 12,
+                    "classification": "benign_power_policy_reset",
+                    "actionable": False,
+                }
+            ],
+            "count": 1,
+            "actionable_count": 0,
+            "benign_count": 1,
+            "benign_classifications": {"benign_power_policy_reset": 1},
+            "channel_errors": [],
+            "channel_error_count": 0,
+        },
+    )
+
+    events_check = report["checks"]["display_events"]
+    assert events_check["status"] == "ok"
+    assert "warnings" not in events_check
+    assert events_check["data"]["count"] == 1
+    assert events_check["data"]["actionable_count"] == 0
 
 
 def test_build_health_report_clears_stale_reboot_pending_after_later_clean_boot(

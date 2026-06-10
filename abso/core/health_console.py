@@ -101,8 +101,9 @@ def build_display_diagnostic_report_lines(payload: dict[str, Any]) -> list[str]:
     summary = payload.get("summary") or {}
     if summary.get("compositor_black_flash_likely"):
         lines.append(
-            "[yellow]Interpretation: clean event logs plus this topology point "
-            "at the Windows compositor/MPO/VRR path.[/yellow]"
+            "[yellow]Interpretation: clean actionable event logs plus the "
+            "display/profile evidence point at the Windows compositor/MPO/VRR "
+            "path.[/yellow]"
         )
     actions = summary.get("recommended_actions") or []
     if actions:
@@ -134,11 +135,25 @@ def build_display_context_lines_from_payload(
     lines = ["", "[bold]Display diagnostics:[/bold]"]
     if events:
         event_count = _int_or_zero(events.get("count"))
-        channel_error_count = _int_or_zero(events.get("channel_error_count"))
-        lines.append(
-            f"  Event log: {event_count} recent display/driver/power event(s), "
-            f"{channel_error_count} channel error(s)"
+        actionable_event_count = _int_or_zero(
+            events.get("actionable_count")
+            if "actionable_count" in events
+            else event_count
         )
+        benign_event_count = _int_or_zero(events.get("benign_count"))
+        channel_error_count = _int_or_zero(events.get("channel_error_count"))
+        if "actionable_count" in events or "benign_count" in events:
+            lines.append(
+                "  Event log: "
+                f"{actionable_event_count} actionable display/driver/power event(s), "
+                f"{benign_event_count} benign event(s), "
+                f"{channel_error_count} channel error(s)"
+            )
+        else:
+            lines.append(
+                f"  Event log: {event_count} recent display/driver/power event(s), "
+                f"{channel_error_count} channel error(s)"
+            )
 
     if stability:
         monitor_count = stability.get("monitor_count", "unknown")

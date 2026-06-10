@@ -347,3 +347,109 @@ class TestPowerVerify:
         assert result["settings"]["ensure_ultimate_performance"]["active"] is False
         assert result["settings"]["disable_usb_suspend"]["active"] is False
         assert result["settings"]["processor_max_state"]["active"] is False
+
+
+class TestPowerCoreParking:
+    """Tests for the disable_core_parking knob (Bitsum Highest Performance)."""
+
+    @patch.object(PowerSettingsHandler, "_apply_current_scheme")
+    @patch.object(PowerSettingsHandler, "_get_power_setting")
+    @patch.object(PowerSettingsHandler, "_set_power_setting")
+    def test_apply_disables_core_parking(self, mock_set, mock_get, mock_apply_scheme):
+        """A parked-cores plan (min < 100) is rewritten to 100 (fully unparked)."""
+        mock_get.return_value = 5
+
+        handler = PowerSettingsHandler()
+        result = handler.apply({"disable_core_parking": True})
+
+        assert result["success"] is True
+        mock_set.assert_called_once_with(
+            handler.PROCESSOR_SUBGROUP,
+            handler.PROCESSOR_CORE_PARKING_MIN,
+            100,
+            apply_changes=False,
+        )
+        mock_apply_scheme.assert_called_once()
+
+    @patch.object(PowerSettingsHandler, "_apply_current_scheme")
+    @patch.object(PowerSettingsHandler, "_get_power_setting")
+    @patch.object(PowerSettingsHandler, "_set_power_setting")
+    def test_apply_skips_core_parking_already_unparked(
+        self, mock_set, mock_get, mock_apply_scheme
+    ):
+        """Already-unparked (100) must not rewrite or re-apply the scheme."""
+        mock_get.return_value = 100
+
+        handler = PowerSettingsHandler()
+        result = handler.apply({"disable_core_parking": True})
+
+        assert result["success"] is True
+        mock_set.assert_not_called()
+        mock_apply_scheme.assert_not_called()
+        assert "CPU core parking (min cores unparked): already 100" in result["skipped"]
+
+    @patch.object(PowerSettingsHandler, "detect")
+    @patch.object(PowerSettingsHandler, "_get_power_setting")
+    def test_verify_core_parking_active(self, mock_get, mock_detect):
+        mock_detect.return_value = {
+            "active_plan": {"guid": "g", "name": "Ultimate Performance"},
+            "available_plans": [],
+            "has_ultimate_performance": True,
+        }
+        mock_get.return_value = 100
+
+        handler = PowerSettingsHandler()
+        result = handler.verify_active({"disable_core_parking": True})
+
+        assert result["settings"]["disable_core_parking"]["active"] is True
+        assert result["all_active"] is True
+
+    @patch.object(PowerSettingsHandler, "detect")
+    @patch.object(PowerSettingsHandler, "_get_power_setting")
+    def test_verify_core_parking_mismatch(self, mock_get, mock_detect):
+        mock_detect.return_value = {
+            "active_plan": {"guid": "g", "name": "Ultimate Performance"},
+            "available_plans": [],
+            "has_ultimate_performance": True,
+        }
+        mock_get.return_value = 5  # parking still enabled
+
+        handler = PowerSettingsHandler()
+        result = handler.verify_active({"disable_core_parking": True})
+
+        assert result["settings"]["disable_core_parking"]["active"] is False
+        assert result["all_active"] is False
+
+    @patch.object(PowerSettingsHandler, "detect")
+    @patch.object(PowerSettingsHandler, "_get_power_setting")
+    def test_backup_includes_core_parking(self, mock_get, mock_detect):
+        mock_get.return_value = 100
+        mock_detect.return_value = {"active_plan": {"guid": "g", "name": "n"}}
+
+        handler = PowerSettingsHandler()
+        backup = handler.backup()
+
+        assert backup["core_parking_min"] == 100
+
+    @patch.object(PowerSettingsHandler, "_set_power_setting")
+    def test_restore_core_parking(self, mock_set):
+        handler = PowerSettingsHandler()
+        result = handler.restore({"core_parking_min": 100})
+
+        assert result is True
+        mock_set.assert_called_once_with(
+            handler.PROCESSOR_SUBGROUP, handler.PROCESSOR_CORE_PARKING_MIN, 100
+        )
+
+    @patch.object(PowerSettingsHandler, "_run_powercfg")
+    def test_get_power_setting_includes_hidden(self, mock_run):
+        """Reads must use /qh — hidden settings (core parking) emit nothing under /query."""
+        mock_run.return_value = MagicMock(
+            returncode=0, stdout="Current AC Power Setting Index: 0x00000064"
+        )
+
+        handler = PowerSettingsHandler()
+        value = handler._get_power_setting("sub-guid", "setting-guid")
+
+        assert value == 100
+        assert mock_run.call_args[0][0] == "/qh"

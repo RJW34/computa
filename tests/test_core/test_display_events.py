@@ -6,6 +6,7 @@ import subprocess
 from typing import Any
 
 from abso.core.display_events import (
+    BENIGN_POWER_POLICY_RESET_CLASS,
     collect_recent_display_events,
     parse_display_event_payload,
     parse_display_events_json,
@@ -33,6 +34,8 @@ def test_parse_display_events_json_normalizes_single_event() -> None:
             "id": 4101,
             "level": "Warning",
             "message": "Display driver recovered.",
+            "classification": "actionable",
+            "actionable": True,
         }
     ]
 
@@ -61,6 +64,8 @@ def test_parse_display_event_payload_supports_legacy_event_list() -> None:
             "id": 4101,
             "level": "Warning",
             "message": "Display driver recovered.",
+            "classification": "actionable",
+            "actionable": True,
         }
     ]
     assert payload["channel_errors"] == []
@@ -95,6 +100,8 @@ def test_collect_recent_display_events_reports_unsupported_platform() -> None:
 
     assert payload["supported"] is False
     assert payload["count"] == 0
+    assert payload["actionable_count"] == 0
+    assert payload["benign_count"] == 0
     assert payload["events"] == []
     assert payload["channel_errors"] == []
     assert payload["channel_error_count"] == 0
@@ -148,6 +155,8 @@ def test_collect_recent_display_events_uses_read_only_powershell_runner() -> Non
         "Microsoft-Windows-DxgKrnl-Operational",
     ]
     assert payload["count"] == 0
+    assert payload["actionable_count"] == 0
+    assert payload["benign_count"] == 0
     assert payload["channel_errors"] == []
     assert payload["channel_error_count"] == 0
 
@@ -185,6 +194,8 @@ def test_collect_recent_display_events_surfaces_optional_channel_errors() -> Non
     payload = collect_recent_display_events(platform="win32", runner=runner)
 
     assert payload["count"] == 0
+    assert payload["actionable_count"] == 0
+    assert payload["benign_count"] == 0
     assert payload["events"] == []
     assert payload["channel_error_count"] == 1
     assert payload["channel_errors"] == [
@@ -208,6 +219,46 @@ def test_collect_recent_display_events_compacts_timeout_error() -> None:
     assert payload["error"] == "display event log query timed out after 2s"
     assert "Get-WinEvent" not in payload["error"]
     assert payload["events"] == []
+
+
+def test_collect_recent_display_events_classifies_powercfg_resets_as_benign() -> None:
+    def runner(*args: Any, **kwargs: Any) -> subprocess.CompletedProcess[str]:
+        return subprocess.CompletedProcess(
+            args=args[0],
+            returncode=0,
+            stdout=(
+                '{"events":['
+                '{"time_created":"2026-06-03T17:15:24.0302487-04:00",'
+                '"log_name":"System",'
+                '"provider":"Microsoft-Windows-UserModePowerService",'
+                '"id":12,'
+                '"level":"Information",'
+                '"message":"Process C:\\\\Windows\\\\System32\\\\powercfg.exe '
+                '(process ID:67240) reset policy scheme from '
+                '{abc} to {abc}"},'
+                '{"time_created":"2026-06-03T17:20:24.0302487-04:00",'
+                '"log_name":"System",'
+                '"provider":"Display",'
+                '"id":4101,'
+                '"level":"Warning",'
+                '"message":"Display driver recovered."}'
+                '],"channel_errors":[]}'
+            ),
+            stderr="",
+        )
+
+    payload = collect_recent_display_events(platform="win32", runner=runner)
+
+    assert payload["count"] == 2
+    assert payload["actionable_count"] == 1
+    assert payload["benign_count"] == 1
+    assert payload["benign_classifications"] == {
+        BENIGN_POWER_POLICY_RESET_CLASS: 1,
+    }
+    assert payload["events"][0]["classification"] == BENIGN_POWER_POLICY_RESET_CLASS
+    assert payload["events"][0]["actionable"] is False
+    assert payload["events"][1]["classification"] == "actionable"
+    assert payload["events"][1]["actionable"] is True
 
 
 def test_collect_recent_display_events_surfaces_query_error() -> None:

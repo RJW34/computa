@@ -13,7 +13,9 @@ Both profiles target multi-monitor coding and browsing work:
 - background services intentionally left running
 - VRR on for smooth scrolling
 - no aggressive latency tuning (no LLM, no Prefer Max Performance)
-- no power-plan switching (PowerSettingsHandler intentionally excluded)
+- power handler used only to RELAX the CPU floor (min-state back to 5) so a
+  prior latency profile's processor_min_state=100 hold does not keep the CPU
+  hot at idle; the active power plan is never switched here
 - no mouse-feel changes (MouseSettingsHandler intentionally excluded)
 """
 
@@ -70,14 +72,19 @@ class _ProductivityBaseProfile(BaseProfile):
         from abso.settings.display_range import DisplayColorRangeHandler
         from abso.settings.graphics import GraphicsSettingsHandler
         from abso.settings.nvidia import NvidiaSettingsHandler
+        from abso.settings.power import PowerSettingsHandler
         from abso.settings.registry import RegistrySettingsHandler
         from abso.settings.windows import WindowsSettingsHandler
 
-        # Minimal handlers — no power handler (would switch power plans) and
-        # no mouse handler (changing desktop mouse feel outside a game is out
-        # of scope for a productivity profile).
+        # No mouse handler (changing desktop mouse feel outside a game is out of
+        # scope for a productivity profile). The power handler is included only
+        # to RELAX the processor floor: a latency profile may have held
+        # processor_min_state at 100 + cores unparked, keeping the CPU hot at
+        # idle. Productivity does NOT switch the active power plan; it only
+        # restores the min-state floor to 5 so the desktop downclocks again.
         return [
             WindowsSettingsHandler(),
+            PowerSettingsHandler(),
             RegistrySettingsHandler(),
             NvidiaSettingsHandler(),
             GraphicsSettingsHandler(),
@@ -99,7 +106,16 @@ class _ProductivityBaseProfile(BaseProfile):
                 # VRR ON for smooth scrolling.
                 "vrr_optimize": True,
             },
-            # PowerSettingsHandler intentionally excluded — keep current power plan.
+            # Power: relax only, never switch the active plan. Latency profiles
+            # may hold processor_min_state at 100 (CPU floor pinned at base
+            # clock) which keeps a 14900F hot at idle; restoring the floor to 5
+            # lets the desktop downclock. max_state stays 100 (normal full
+            # turbo). Core parking is left as-is — an unparked core at min-state
+            # 5 still idles down, so no extra knob is needed here.
+            "PowerSettingsHandler": {
+                "processor_max_performance": True,
+                "processor_min_state": 5,
+            },
             "RegistrySettingsHandler": {
                 # Allow more background tasks — we want indexing, search, etc.
                 "system_responsiveness": 20,

@@ -73,19 +73,31 @@ def parse_state_timestamp(value: Any) -> float | None:
         return None
 
 
-def verification_proves_reboot_committed(verification: dict[str, Any]) -> bool:
-    """Return True when live verification no longer shows reboot/apply work."""
-    if not bool(verification.get("all_active")):
+def boot_commits_reboot_gated_writes(
+    snapshot: dict[str, Any],
+    verification: dict[str, Any],
+    *,
+    boot_time: datetime | None = None,
+) -> bool:
+    """Return True when a post-write boot has committed the reboot-gated writes.
+
+    A reboot is exactly what commits reboot-gated registry writes (MPO, HAGS,
+    VBS). Once the machine has booted *after* ``applied_at`` and the targets are
+    present -- i.e. nothing is still awaiting a live apply and there is no hard
+    error -- those settings are committed even though live verification cannot
+    directly observe DWM's MPO compositor state. Unrelated handler drift does
+    not gate this (that surfaces via its own mismatch indicator), so we do NOT
+    require a fully-clean verification here.
+    """
+    if verification.get("error"):
         return False
-    status = verification.get("status")
-    if status is not None and status != "active":
+    if verification.get("pending_apply_settings") or []:
         return False
-    return (
-        not (verification.get("pending_apply_settings") or [])
-        and not (verification.get("pending_reboot_gated_settings") or [])
-        and not (verification.get("mismatched_handlers") or [])
-        and not verification.get("error")
-    )
+    applied_at_ts = parse_state_timestamp(snapshot.get("applied_at"))
+    boot_time = boot_time or get_system_boot_time()
+    if applied_at_ts is None or boot_time is None:
+        return False
+    return boot_time.timestamp() > applied_at_ts
 
 
 def reconcile_reboot_pending_after_verified_boot(
@@ -94,23 +106,21 @@ def reconcile_reboot_pending_after_verified_boot(
     *,
     boot_time: datetime | None = None,
 ) -> tuple[dict[str, Any], bool]:
-    """Return state with stale reboot-pending cleared when a later boot is proven.
+    """Return state with stale reboot-pending cleared once a boot has committed it.
 
-    Some settings, notably MPO, can only be committed by the Windows compositor
-    at boot. Once the machine has booted after the write and live verification is
-    clean, keeping ``reboot_pending`` set only creates stale tray/GUI warnings.
+    Clears ``reboot_pending`` only when a boot has occurred after ``applied_at``
+    and the reboot-gated targets are present (see
+    :func:`boot_commits_reboot_gated_writes`). A reboot is what commits
+    reboot-gated writes (MPO/HAGS/VBS); a clean registry verify *before* a boot
+    does NOT clear it (the write is written but not yet effective). The old
+    behavior additionally demanded a fully-clean live verify, which left
+    ``reboot_pending`` stuck forever for MPO-using profiles since MPO's
+    committed compositor state is unobservable.
     """
     if not snapshot.get("reboot_pending"):
         return snapshot, False
-    if not verification_proves_reboot_committed(verification):
-        return snapshot, False
 
-    applied_at_ts = parse_state_timestamp(snapshot.get("applied_at"))
-    boot_time = boot_time or get_system_boot_time()
-    if applied_at_ts is None or boot_time is None:
-        return snapshot, False
-
-    if boot_time.timestamp() <= applied_at_ts:
+    if not boot_commits_reboot_gated_writes(snapshot, verification, boot_time=boot_time):
         return snapshot, False
 
     updated = dict(snapshot)

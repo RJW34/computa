@@ -60,7 +60,7 @@ export function AuditDetails() {
     <div className="min-h-screen">
       <Header showBack title="System Audit" />
 
-      <main className="container mx-auto px-6 py-6 max-w-4xl">
+      <main className="container mx-auto max-w-5xl px-6 py-6">
         {/* Severity filter chips */}
         <div className="flex flex-wrap gap-2 mb-4">
           {(['critical', 'warning', 'info'] as Severity[]).map((severity) => {
@@ -115,7 +115,7 @@ export function AuditDetails() {
         {/* Issues list */}
         <div className="space-y-3">
           {filteredIssues.length === 0 ? (
-            <Card>
+            <Card className="wizard-panel shadow-none">
               <CardContent className="py-8 text-center text-muted-foreground">
                 {auditLoading
                   ? 'Running audit...'
@@ -139,7 +139,7 @@ export function AuditDetails() {
                 <Card
                   key={issueKey}
                   className={cn(
-                    'border-l-4',
+                    'wizard-panel border-l-4 shadow-none',
                     issue.severity === 'critical' && 'border-l-critical',
                     issue.severity === 'warning' && 'border-l-warning',
                     issue.severity === 'info' && 'border-l-info'
@@ -201,7 +201,7 @@ export function AuditDetails() {
         </div>
 
         {filteredIssues.length > 0 && (
-          <div className="mt-6 rounded-lg border bg-muted/40 px-4 py-3 text-sm text-muted-foreground">
+          <div className="wizard-panel mt-6 px-4 py-3 text-sm text-muted-foreground">
             Per-issue fixing is not exposed here. Apply a profile to remediate, or review the profile-driven targets.
             <div className="mt-3 flex flex-wrap gap-2">
               <Button size="sm" onClick={() => setPage('profile-wizard')}>

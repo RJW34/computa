@@ -69,7 +69,8 @@ def _risk_level(env: DisplayEnvironment, factors: list[str]) -> str:
         env.has_mixed_refresh or any(monitor.is_vrr_capable for monitor in env.monitors)
     ):
         return "high"
-    if factors:
+    topology_factors = set(factors) - {"vrr_capable_display"}
+    if topology_factors:
         return "medium"
     return "low"
 
@@ -82,7 +83,7 @@ def summarize_display_stability(result: MultiMonitorResult) -> dict[str, Any]:
     likely_path = None
     if risk_level == "high":
         likely_path = "windows_compositor_mpo_vrr_mixed_refresh"
-    elif factors:
+    elif set(factors) - {"vrr_capable_display"}:
         likely_path = "windows_compositor"
 
     return {

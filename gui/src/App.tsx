@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { listen } from '@tauri-apps/api/event';
 import { useAppStore } from '@/stores/appStore';
 import { StatusBar } from '@/components/StatusBar';
@@ -20,16 +20,29 @@ interface ProfileAppliedEvent {
 }
 
 function App() {
-  const { currentPage, _hasHydrated, setActiveProfile } = useAppStore();
+  const {
+    currentPage,
+    _hasHydrated,
+    setActiveProfile,
+    setActiveProfileStateError,
+    setActiveProfileStateLoading,
+  } = useAppStore();
+  const stateSyncSeq = useRef(0);
 
   useEffect(() => {
     if (!_hasHydrated) {
       return;
     }
 
+    let disposed = false;
     const syncBackendState = async () => {
+      const seq = ++stateSyncSeq.current;
+      setActiveProfileStateLoading();
       try {
         const state = await api.getCurrentState();
+        if (disposed || seq !== stateSyncSeq.current) {
+          return;
+        }
         setActiveProfile(
           state.current_profile,
           state.applied_at ?? undefined,
@@ -38,20 +51,33 @@ function App() {
           state.reboot_reasons
         );
       } catch (error) {
+        if (disposed || seq !== stateSyncSeq.current) {
+          return;
+        }
         console.warn('Failed to sync backend active-profile state:', error);
+        setActiveProfileStateError(
+          error instanceof Error ? error.message : 'Failed to read backend state'
+        );
       }
     };
 
     void syncBackendState();
 
-    const unlisten = listen<ProfileAppliedEvent>('profile-applied', () => {
-      void syncBackendState();
-    });
+    let unlisten: Promise<() => void> | null = null;
+    if (typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window) {
+      unlisten = listen<ProfileAppliedEvent>('profile-applied', () => {
+        void syncBackendState();
+      });
+    }
 
     return () => {
-      unlisten.then((fn) => fn());
+      disposed = true;
+      stateSyncSeq.current += 1;
+      if (unlisten) {
+        unlisten.then((fn) => fn()).catch(() => undefined);
+      }
     };
-  }, [_hasHydrated, setActiveProfile]);
+  }, [_hasHydrated, setActiveProfile, setActiveProfileStateError, setActiveProfileStateLoading]);
 
   // Wait for hydration to prevent flash of default state
   if (!_hasHydrated) {
@@ -80,10 +106,10 @@ function App() {
   };
 
   return (
-    <>
+    <div className="app-shell">
       {renderPage()}
       <StatusBar />
-    </>
+    </div>
   );
 }
 

@@ -51,6 +51,10 @@ interface AppState {
   activeProfileVerification: BackendStateVerification | null;
   activeProfileRebootPending: boolean;
   activeProfileRebootReasons: string[];
+  activeProfileStateKnown: boolean;
+  activeProfileStateError: string | null;
+  setActiveProfileStateLoading: () => void;
+  setActiveProfileStateError: (error: string) => void;
   setActiveProfile: (
     profileId: string | null,
     appliedAt?: string,
@@ -162,6 +166,22 @@ export const useAppStore = create<AppState>()(
       activeProfileVerification: null,
       activeProfileRebootPending: false,
       activeProfileRebootReasons: [],
+      activeProfileStateKnown: false,
+      activeProfileStateError: null,
+      setActiveProfileStateLoading: () => set({
+        activeProfileVerification: null,
+        activeProfileRebootPending: false,
+        activeProfileRebootReasons: [],
+        activeProfileStateKnown: false,
+        activeProfileStateError: null,
+      }),
+      setActiveProfileStateError: (error) => set({
+        activeProfileVerification: null,
+        activeProfileRebootPending: false,
+        activeProfileRebootReasons: [],
+        activeProfileStateKnown: true,
+        activeProfileStateError: error,
+      }),
       setActiveProfile: (
         profileId,
         appliedAt,
@@ -174,6 +194,8 @@ export const useAppStore = create<AppState>()(
         activeProfileVerification: profileId ? (verification ?? null) : null,
         activeProfileRebootPending: profileId ? rebootPending : false,
         activeProfileRebootReasons: profileId ? rebootReasons : [],
+        activeProfileStateKnown: true,
+        activeProfileStateError: null,
       }),
 
       // Backups
@@ -210,9 +232,15 @@ export const useAppStore = create<AppState>()(
       partialize: (state) => ({
         theme: state.theme,
         settingsMode: state.settingsMode,
-        activeProfile: state.activeProfile,
-        activeProfileAppliedAt: state.activeProfileAppliedAt,
       }),
+      merge: (persistedState, currentState) => {
+        const persisted = persistedState as Partial<AppState> | undefined;
+        return {
+          ...currentState,
+          theme: persisted?.theme ?? currentState.theme,
+          settingsMode: persisted?.settingsMode ?? currentState.settingsMode,
+        };
+      },
       onRehydrateStorage: () => (state) => {
         state?.setHasHydrated(true);
       },

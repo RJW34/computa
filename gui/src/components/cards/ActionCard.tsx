@@ -1,7 +1,7 @@
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
-import type { LucideIcon } from 'lucide-react';
+import { ArrowUpRight, type LucideIcon } from 'lucide-react';
 
 interface ActionCardProps {
   icon: LucideIcon;
@@ -26,12 +26,12 @@ export function ActionCard({
   return (
     <Card
       className={cn(
-        'cursor-pointer transition-all hover:shadow-md hover:border-primary/50',
-        disabled && 'opacity-50 cursor-not-allowed hover:shadow-sm hover:border-border'
+        'control-tile cursor-pointer shadow-none',
+        disabled && 'opacity-50 cursor-not-allowed'
       )}
       onClick={disabled ? undefined : onClick}
     >
-      <CardContent className="flex flex-col items-center justify-center p-6 text-center min-h-[140px] relative">
+      <CardContent className="relative flex min-h-[140px] flex-col justify-between p-5">
         {badge && badge.count > 0 && (
           <Badge
             variant={badge.variant}
@@ -40,9 +40,16 @@ export function ActionCard({
             {badge.count}
           </Badge>
         )}
-        <Icon className="h-10 w-10 mb-3 text-muted-foreground" />
-        <h3 className="font-semibold text-lg">{title}</h3>
-        <p className="text-sm text-muted-foreground mt-1">{subtitle}</p>
+        <div className="control-tile__icon">
+          <Icon className="h-5 w-5" />
+        </div>
+        <div className="space-y-1">
+          <div className="flex items-center justify-between gap-3">
+            <h3 className="text-base font-bold">{title}</h3>
+            <ArrowUpRight className="h-4 w-4 text-muted-foreground" />
+          </div>
+          <p className="line-clamp-2 text-sm text-muted-foreground">{subtitle}</p>
+        </div>
       </CardContent>
     </Card>
   );

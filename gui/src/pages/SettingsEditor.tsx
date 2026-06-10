@@ -116,8 +116,8 @@ export function SettingsEditor() {
     <div className="min-h-screen">
       <Header showBack title="Settings" />
 
-      <main className="container mx-auto px-6 py-6 max-w-3xl">
-        <Card className="mb-6 border-warning/40 bg-warning/5">
+      <main className="container mx-auto max-w-4xl px-6 py-6">
+        <Card className="wizard-panel mb-6 border-warning/40 bg-warning/5 shadow-none">
           <CardContent className="pt-6">
             <div className="flex gap-3">
               <ShieldAlert className="h-5 w-5 text-warning flex-shrink-0 mt-0.5" />
@@ -157,7 +157,7 @@ export function SettingsEditor() {
 
         <div className="space-y-6">
           {allSettings.map((category) => (
-            <Card key={category.category}>
+            <Card key={category.category} className="wizard-panel shadow-none">
               <CardHeader className="pb-3">
                 <CardTitle className="text-lg">{category.category}</CardTitle>
               </CardHeader>

@@ -1,21 +1,27 @@
 import * as React from 'react';
 import { Header } from '@/components/Header';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
+import { GameMark, gameArtVars, getGameArt } from '@/components/GameMark';
 import {
   Check,
   Loader2,
-  Gamepad2,
   ChevronRight,
   ChevronLeft,
   Copy,
   Undo2,
   AlertCircle,
   FileText,
+  Layers,
 } from 'lucide-react';
 import { useAppStore } from '@/stores/appStore';
 import { cn } from '@/lib/utils';
-import type { ApplyResult, Profile } from '@/lib/types';
+import {
+  getRestartReasons,
+  verificationIsClean,
+} from '@/lib/profileState';
+import type { ApplyResult, BackendState, Profile } from '@/lib/types';
 import * as api from '@/lib/api';
 
 const STEPS = ['Select Profile', 'Review Scope', 'Backup Options', 'Apply'];
@@ -163,6 +169,7 @@ export function ProfileWizard() {
     profiles,
     profilesLoading,
     loadProfiles,
+    setActiveProfileStateError,
   } = useAppStore();
 
   const [createBackup, setCreateBackup] = React.useState(true);
@@ -173,9 +180,11 @@ export function ProfileWizard() {
   const [undoing, setUndoing] = React.useState(false);
   const [copyingReport, setCopyingReport] = React.useState(false);
   const [applyResult, setApplyResult] = React.useState<ApplyResult | null>(null);
+  const [postApplyState, setPostApplyState] = React.useState<BackendState | null>(null);
   const [reportContent, setReportContent] = React.useState('');
   const [reportPath, setReportPath] = React.useState<string | null>(null);
   const [reportError, setReportError] = React.useState<string | null>(null);
+  const [categoryFilter, setCategoryFilter] = React.useState('All');
 
   React.useEffect(() => {
     if (profiles.length === 0) {
@@ -221,6 +230,26 @@ export function ProfileWizard() {
           a.name.localeCompare(b.name)
       );
   }, [profiles]);
+  const visibleCategories = React.useMemo(
+    () => [
+      'All',
+      ...Array.from(new Set(profileGroups.map((group) => group.category))).sort(
+        (a, b) =>
+          (PROFILE_CATEGORY_ORDER[a] ?? 99) - (PROFILE_CATEGORY_ORDER[b] ?? 99) ||
+          a.localeCompare(b)
+      ),
+    ],
+    [profileGroups]
+  );
+  const filteredProfileGroups = React.useMemo(
+    () =>
+      categoryFilter === 'All'
+        ? profileGroups
+        : profileGroups.filter((group) => group.category === categoryFilter),
+    [categoryFilter, profileGroups]
+  );
+  const selectedArt = getGameArt(selectedProfile);
+  const selectedGroupId = selectedProfile?.tray_group || selectedProfile?.id || null;
   const applyWarnings = React.useMemo(() => collectApplyWarnings(applyResult), [applyResult]);
   const applyNotices = React.useMemo(() => collectApplyNotices(applyResult), [applyResult]);
   const applySummaryLevel =
@@ -229,6 +258,34 @@ export function ProfileWizard() {
   const committedWithWarnings = applySummaryLevel === 'warning';
   const appliedWithCautions = applySummaryLevel === 'caution';
   const appliedWithNotices = applySummaryLevel === 'notice';
+  const applyChanged = applyResult?.changed;
+  const completedProfileName = applyResult?.profile
+    ? profiles.find((profile) => profile.id === applyResult.profile)?.display_name ??
+      applyResult.profile
+    : selectedProfile?.display_name ?? 'Profile';
+  const postApplyRestartReasons = postApplyState
+    ? getRestartReasons(postApplyState.verification, postApplyState.reboot_reasons)
+    : getRestartReasons(null, applyResult?.reboot_reasons ?? []);
+  const postApplyVerificationClean = verificationIsClean(postApplyState?.verification);
+  const postApplyNeedsRestart = postApplyState
+    ? !postApplyVerificationClean &&
+      (postApplyState.reboot_pending || postApplyRestartReasons.length > 0)
+    : Boolean(applyResult?.requires_reboot);
+  const applyCompletionMessage = applyChanged === false
+    ? applyNotices[0] ?? `${completedProfileName} was already current.`
+    : committedWithWarnings
+      ? postApplyVerificationClean
+        ? `${completedProfileName} completed with warnings and verified active.`
+        : `${completedProfileName} completed with warnings worth reviewing.`
+      : appliedWithCautions
+        ? `${completedProfileName} completed with environmental cautions worth noting.`
+        : appliedWithNotices
+          ? `${completedProfileName} completed with notices below.`
+          : postApplyVerificationClean
+            ? `${completedProfileName} applied and verified active.`
+            : postApplyNeedsRestart
+              ? `${completedProfileName} applied; restart is required for the listed settings.`
+              : `${completedProfileName} applied; backend state was refreshed.`;
 
   const handleBack = () => {
     if (wizardStep === 0) {
@@ -253,6 +310,7 @@ export function ProfileWizard() {
     setApplyError(null);
     setAppliedBackupId(null);
     setApplyResult(null);
+    setPostApplyState(null);
     setReportContent('');
     setReportPath(null);
     setReportError(null);
@@ -263,9 +321,12 @@ export function ProfileWizard() {
 
       if (result.success) {
         setAppliedBackupId(result.backup_id ?? null);
+        let trayProfileId: string | null = result.profile ?? wizardProfile;
 
         try {
           const state = await api.getCurrentState();
+          setPostApplyState(state);
+          trayProfileId = state.current_profile ?? trayProfileId;
           setActiveProfile(
             state.current_profile,
             state.applied_at ?? undefined,
@@ -275,11 +336,13 @@ export function ProfileWizard() {
           );
         } catch (error) {
           console.warn('Failed to read backend active-profile state after apply:', error);
-          setActiveProfile(wizardProfile);
+          setActiveProfileStateError(
+            error instanceof Error ? error.message : 'Failed to read backend state after apply'
+          );
         }
 
         try {
-          await api.setActiveProfileBackend(wizardProfile);
+          await api.setActiveProfileBackend(trayProfileId);
         } catch (error) {
           console.warn('Failed to sync active profile with backend tray state:', error);
         }
@@ -360,81 +423,155 @@ export function ProfileWizard() {
     <div className="min-h-screen">
       <Header showBack title="Apply Profile" />
 
-      <main className="container mx-auto px-6 py-6 max-w-3xl">
-        <div className="mb-8">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-sm text-muted-foreground">
-              Step {wizardStep + 1} of {STEPS.length}: {STEPS[wizardStep]}
-            </span>
+      <main className="container mx-auto max-w-6xl space-y-6 px-6 py-6">
+        <section className="command-hero panel-enter p-5" style={gameArtVars(selectedArt)}>
+          <div className="grid gap-5 lg:grid-cols-[0.9fr_1.1fr] lg:items-center">
+            <div className="flex min-w-0 items-center gap-4">
+              <GameMark profile={selectedProfile} size="hero" active={Boolean(selectedProfile)} />
+              <div className="min-w-0">
+                <p className="section-kicker">Profile pipeline</p>
+                <h2 className="max-w-2xl text-3xl font-black leading-tight">
+                  {selectedProfile?.display_name || 'Choose a title'}
+                </h2>
+                <p className="mt-2 line-clamp-2 text-sm text-muted-foreground">
+                  {selectedProfile?.tray_description ||
+                    selectedProfile?.description ||
+                    'Select a game group, review the exact backend scope, and apply with a rollback point.'}
+                </p>
+              </div>
+            </div>
+
+            <div className="step-rail">
+              {STEPS.map((step, i) => (
+                <div
+                  key={step}
+                  className={cn('step-node', i <= wizardStep && 'step-node--active')}
+                >
+                  {i + 1}. {step}
+                </div>
+              ))}
+            </div>
           </div>
-          <div className="flex gap-1">
-            {STEPS.map((_, i) => (
-              <div
-                key={i}
-                className={cn(
-                  'h-1.5 flex-1 rounded-full transition-colors',
-                  i <= wizardStep ? 'bg-primary' : 'bg-muted'
-                )}
-              />
-            ))}
-          </div>
-        </div>
+        </section>
 
         {wizardStep === 0 && (
-          <div className="space-y-4">
+          <div className="space-y-4 panel-enter stagger-1">
             {profilesLoading && (
               <p className="text-sm text-muted-foreground">Loading profiles...</p>
             )}
-            {profileGroups.map((group) => (
-              <section key={group.id} className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <h3 className="font-semibold">{group.name}</h3>
-                  <span className="text-xs text-muted-foreground">{group.category}</span>
-                </div>
-                {group.profiles.map((profile) => (
-                  <Card
-                    key={profile.id}
+            <div className="flex flex-wrap gap-2">
+              {visibleCategories.map((category) => (
+                <Button
+                  key={category}
+                  type="button"
+                  variant={categoryFilter === category ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setCategoryFilter(category)}
+                >
+                  {category}
+                </Button>
+              ))}
+            </div>
+
+            <div className="grid gap-4 lg:grid-cols-2">
+              {filteredProfileGroups.map((group) => {
+                const art = getGameArt({ id: group.id });
+                const groupIsSelected = selectedGroupId === group.id;
+
+                return (
+                  <section
+                    key={group.id}
                     className={cn(
-                      'cursor-pointer transition-all',
-                      wizardProfile === profile.id
-                        ? 'border-primary ring-2 ring-primary'
-                        : 'hover:border-primary/50'
+                      'wizard-panel p-4 panel-enter',
+                      groupIsSelected && 'border-primary/50'
                     )}
-                    onClick={() => setWizardProfile(profile.id)}
+                    style={gameArtVars(art)}
                   >
-                    <CardContent className="flex items-center justify-between p-4">
-                      <div className="flex items-center gap-4">
-                        <Gamepad2 className="h-8 w-8 text-muted-foreground" />
-                        <div>
-                          <h4 className="font-semibold">
-                            {profile.tray_variant || profile.display_name}
-                          </h4>
-                          <p className="text-sm text-muted-foreground">
-                            {profile.tray_subtitle || profile.description}
-                          </p>
-                        </div>
+                    <div className="relative mb-4 flex items-center justify-between gap-4">
+                      <GameMark groupId={group.id} size="lg" showName active={groupIsSelected} />
+                      <div className="flex flex-col items-end gap-2">
+                        <Badge variant={groupIsSelected ? 'success' : 'outline'}>
+                          {group.category}
+                        </Badge>
+                        <span className="text-xs text-muted-foreground">
+                          {group.profiles.length} lane{group.profiles.length === 1 ? '' : 's'}
+                        </span>
                       </div>
-                      {wizardProfile === profile.id && (
-                        <Check className="h-5 w-5 text-primary" />
-                      )}
-                    </CardContent>
-                  </Card>
-                ))}
-              </section>
-            ))}
+                    </div>
+
+                    <div className="relative grid gap-2">
+                      {group.profiles.map((profile) => (
+                        <button
+                          key={profile.id}
+                          type="button"
+                          className={cn(
+                            'flex min-w-0 items-center justify-between gap-3 rounded-md border p-3 text-left transition-all',
+                            wizardProfile === profile.id
+                              ? 'border-primary bg-primary/10 text-foreground'
+                              : 'border-border/70 bg-background/40 hover:border-primary/40 hover:bg-primary/5'
+                          )}
+                          onClick={() => setWizardProfile(profile.id)}
+                        >
+                          <div className="min-w-0">
+                            <h4 className="truncate font-bold">
+                              {profile.tray_variant || profile.display_name}
+                            </h4>
+                            <p className="line-clamp-2 text-sm text-muted-foreground">
+                              {profile.tray_subtitle || profile.description}
+                            </p>
+                          </div>
+                          <div className="flex flex-none items-center gap-2">
+                            <Badge variant={profile.sync_mode === 'off' ? 'warning' : 'outline'}>
+                              {profile.sync_mode === 'off'
+                                ? 'No Sync'
+                                : profile.sync_mode === 'on'
+                                  ? 'Sync'
+                                  : 'Adaptive'}
+                            </Badge>
+                            {wizardProfile === profile.id && (
+                              <Check className="h-5 w-5 text-primary" />
+                            )}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </section>
+                );
+              })}
+            </div>
           </div>
         )}
 
         {wizardStep === 1 && selectedProfile && (
-          <div className="space-y-4">
-            <div className="mb-6">
-              <h2 className="text-xl font-semibold">{selectedProfile.display_name}</h2>
-              <p className="text-muted-foreground">
-                Target: {formatOptimizationTarget(selectedProfile.optimization_target)}
-              </p>
+          <div className="space-y-4 panel-enter stagger-1">
+            <div className="wizard-panel p-4" style={gameArtVars(selectedArt)}>
+              <div className="relative flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                <div className="flex min-w-0 items-center gap-4">
+                  <GameMark profile={selectedProfile} size="lg" showName active />
+                  <div className="min-w-0">
+                    <h2 className="truncate text-2xl font-black">{selectedProfile.display_name}</h2>
+                    <p className="text-sm text-muted-foreground">
+                      Target: {formatOptimizationTarget(selectedProfile.optimization_target)}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Badge variant="outline">{selectedProfile.tray_category || 'Other'}</Badge>
+                  <Badge variant={selectedProfile.sync_mode === 'off' ? 'warning' : 'outline'}>
+                    {selectedProfile.sync_mode === 'off'
+                      ? 'No Sync'
+                      : selectedProfile.sync_mode === 'on'
+                        ? 'Sync On'
+                        : 'Adaptive Sync'}
+                  </Badge>
+                  {selectedProfile.has_in_game_settings && (
+                    <Badge variant="success">Report</Badge>
+                  )}
+                </div>
+              </div>
             </div>
 
-            <Card>
+            <Card className="wizard-panel shadow-none">
               <CardContent className="p-4 space-y-2">
                 <h4 className="font-medium">Profile Intent</h4>
                 {selectedProfile.tray_subtitle && (
@@ -446,9 +583,12 @@ export function ProfileWizard() {
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className="wizard-panel shadow-none">
               <CardContent className="p-4 space-y-3">
-                <h4 className="font-medium">Backend Application Scope</h4>
+                <div className="flex items-center gap-2">
+                  <Layers className="h-4 w-4 text-primary" />
+                  <h4 className="font-medium">Backend Application Scope</h4>
+                </div>
                 <p className="text-sm text-muted-foreground">
                   {selectedProfile.application_scope === 'system_plus_native_config'
                     ? 'Applies machine-level settings and a title-specific config handler.'
@@ -462,7 +602,7 @@ export function ProfileWizard() {
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className="wizard-panel shadow-none">
               <CardContent className="p-4 space-y-3">
                 <h4 className="font-medium">Executable Matching</h4>
                 <p className="text-sm text-muted-foreground">
@@ -476,7 +616,7 @@ export function ProfileWizard() {
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className="wizard-panel shadow-none">
               <CardContent className="p-4 space-y-2">
                 <h4 className="font-medium">In-Game Guidance</h4>
                 <p className="text-sm text-muted-foreground">
@@ -490,16 +630,17 @@ export function ProfileWizard() {
         )}
 
         {wizardStep === 2 && (
-          <div className="space-y-4">
+          <div className="space-y-4 panel-enter stagger-1">
             <p className="text-muted-foreground mb-4">
               ABSO can create a backup first so you can roll back if needed.
             </p>
 
             <Card
               className={cn(
-                'cursor-pointer transition-all',
+                'wizard-panel cursor-pointer shadow-none transition-all',
                 createBackup ? 'border-primary ring-2 ring-primary' : 'hover:border-primary/50'
               )}
+              style={gameArtVars(selectedArt)}
               onClick={() => setCreateBackup(true)}
             >
               <CardContent className="p-4">
@@ -526,9 +667,10 @@ export function ProfileWizard() {
 
             <Card
               className={cn(
-                'cursor-pointer transition-all',
+                'wizard-panel cursor-pointer shadow-none transition-all',
                 !createBackup ? 'border-warning ring-2 ring-warning' : 'hover:border-muted-foreground'
               )}
+              style={gameArtVars(selectedArt)}
               onClick={() => setCreateBackup(false)}
             >
               <CardContent className="p-4">
@@ -556,7 +698,7 @@ export function ProfileWizard() {
         )}
 
         {wizardStep === 3 && !applyComplete && (
-          <div className="space-y-6 text-center py-12">
+          <div className="space-y-6 text-center py-12 panel-enter stagger-1">
             <h2 className="text-xl font-semibold">
               {applying
                 ? `Applying ${selectedProfile?.display_name}`
@@ -584,7 +726,7 @@ export function ProfileWizard() {
             )}
 
             {applying ? (
-              <Card className="max-w-xl mx-auto text-left">
+              <Card className="wizard-panel mx-auto max-w-xl text-left shadow-none" style={gameArtVars(selectedArt)}>
                 <CardContent className="p-6 space-y-4">
                   <div className="flex items-center gap-3">
                     <Loader2 className="h-5 w-5 animate-spin text-primary" />
@@ -608,7 +750,7 @@ export function ProfileWizard() {
         )}
 
         {wizardStep === 3 && applyComplete && (
-          <div className="space-y-6 text-center py-8">
+          <div className="space-y-6 text-center py-8 panel-enter stagger-1">
             <div className="flex justify-center">
               <div
                 className={cn(
@@ -624,7 +766,9 @@ export function ProfileWizard() {
               </div>
             </div>
             <h2 className="text-2xl font-semibold">
-              {committedWithWarnings
+              {applyChanged === false
+                ? 'No Profile Changes Needed'
+                : committedWithWarnings
                 ? 'Completed With Warnings'
                 : appliedWithCautions
                   ? 'Completed With Cautions'
@@ -633,16 +777,10 @@ export function ProfileWizard() {
                     : 'Apply Completed'}
             </h2>
             <p className="text-muted-foreground">
-              {committedWithWarnings
-                ? `${selectedProfile?.display_name} applied with warnings worth reviewing. Run 'abso verify' to confirm handler state.`
-                : appliedWithCautions
-                  ? `${selectedProfile?.display_name} applied with environmental cautions worth noting.`
-                  : appliedWithNotices
-                    ? `${selectedProfile?.display_name} applied with notices below.`
-                    : `${selectedProfile?.display_name} applied. Run 'abso verify' to confirm handler state.`}
+              {applyCompletionMessage}
             </p>
 
-            <Card className="text-left">
+            <Card className="wizard-panel text-left shadow-none" style={gameArtVars(selectedArt)}>
               <CardContent className="p-4 space-y-2">
                 <h4 className="font-medium">Backup Status</h4>
                 <p className="text-sm text-muted-foreground">
@@ -653,13 +791,13 @@ export function ProfileWizard() {
               </CardContent>
             </Card>
 
-            {applyResult?.requires_reboot && (
-              <Card className="text-left border-warning/40 bg-warning/5">
+            {postApplyNeedsRestart && (
+              <Card className="wizard-panel border-warning/40 bg-warning/5 text-left shadow-none" style={gameArtVars(selectedArt)}>
                 <CardContent className="p-4 space-y-2">
                   <h4 className="font-medium">Reboot Required</h4>
-                  {applyResult.reboot_reasons.length > 0 ? (
+                  {postApplyRestartReasons.length > 0 ? (
                     <ul className="text-sm text-muted-foreground space-y-1">
-                      {applyResult.reboot_reasons.map((reason) => (
+                      {postApplyRestartReasons.map((reason) => (
                         <li key={reason}>• {reason}</li>
                       ))}
                     </ul>
@@ -675,9 +813,10 @@ export function ProfileWizard() {
             {applyWarnings.length > 0 && (
               <Card
                 className={cn(
-                  'text-left',
+                  'wizard-panel text-left shadow-none',
                   committedWithWarnings ? 'border-warning/40 bg-warning/5' : 'border-success/20 bg-success/5'
                 )}
+                style={gameArtVars(selectedArt)}
               >
                 <CardContent className="p-4 space-y-3">
                   <h4 className="font-medium">
@@ -693,7 +832,7 @@ export function ProfileWizard() {
             )}
 
             {applyNotices.length > 0 && (
-              <Card className="text-left">
+              <Card className="wizard-panel text-left shadow-none" style={gameArtVars(selectedArt)}>
                 <CardContent className="p-4 space-y-3">
                   <h4 className="font-medium">Notices</h4>
                   <ul className="text-sm text-muted-foreground space-y-1">
@@ -705,7 +844,7 @@ export function ProfileWizard() {
               </Card>
             )}
 
-            <Card className="text-left">
+            <Card className="wizard-panel text-left shadow-none" style={gameArtVars(selectedArt)}>
               <CardContent className="p-4 space-y-4">
                 <div className="flex items-center gap-2">
                   <FileText className="h-4 w-4 text-muted-foreground" />

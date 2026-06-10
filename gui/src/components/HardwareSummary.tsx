@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { Card, CardContent } from '@/components/ui/card';
-import { Loader2, RefreshCw, AlertCircle } from 'lucide-react';
+import { Cpu, Loader2, Monitor, RefreshCw, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAppStore } from '@/stores/appStore';
 import { formatHardwareSummary } from '@/lib/utils';
@@ -23,7 +23,7 @@ export function HardwareSummary() {
 
   if (hardwareLoading) {
     return (
-      <Card className="mb-6">
+      <Card className="hardware-panel mb-6 shadow-none">
         <CardContent className="flex items-center justify-center py-4">
           <Loader2 className="h-5 w-5 animate-spin mr-2" />
           <span className="text-muted-foreground">Detecting hardware...</span>
@@ -34,7 +34,7 @@ export function HardwareSummary() {
 
   if (hardwareError) {
     return (
-      <Card className="mb-6 border-destructive">
+      <Card className="hardware-panel mb-6 border-destructive/40 bg-destructive/5 shadow-none">
         <CardContent className="flex items-center justify-between py-4">
           <div className="flex items-center">
             <AlertCircle className="h-5 w-5 text-destructive mr-2" />
@@ -54,11 +54,23 @@ export function HardwareSummary() {
   }
 
   return (
-    <Card className="mb-6">
-      <CardContent className="flex items-center justify-between py-4">
-        <span className="text-sm font-medium">
-          {formatHardwareSummary(hardware)}
-        </span>
+      <Card className="hardware-panel mb-6 shadow-none">
+      <CardContent className="flex items-center justify-between gap-4 py-4">
+        <div className="flex min-w-0 items-center gap-3">
+          <div className="control-tile__icon h-10 w-10">
+            <Cpu className="h-5 w-5" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-xs font-bold uppercase text-primary">Detected rig</p>
+            <span className="block truncate text-sm font-medium">
+              {formatHardwareSummary(hardware)}
+            </span>
+          </div>
+        </div>
+        <div className="hidden min-w-0 items-center gap-2 text-xs text-muted-foreground md:flex">
+          <Monitor className="h-4 w-4 text-primary" />
+          <span className="truncate">{hardware.monitors.length} display path(s)</span>
+        </div>
         <Button
           variant="ghost"
           size="sm"

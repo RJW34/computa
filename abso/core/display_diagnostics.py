@@ -18,6 +18,7 @@ SleepFunc = Callable[[float], None]
 GRAPHICS_REBOOT_NEXT_ACTION = (
     "Normal reboot required before judging MPO/compositor flicker fix."
 )
+GRAPHICS_REBOOT_PENDING_PATH = "windows_compositor_mpo_pending_reboot"
 ACTION_REBOOT_TO_COMMIT_GRAPHICS_SETTINGS = "reboot_to_commit_graphics_settings"
 ACTION_REVIEW_SECONDARY_REFRESH_RATE = "review_secondary_refresh_rate"
 ACTION_AVOID_REDUNDANT_PROFILE_APPLY = "avoid_redundant_profile_apply"
@@ -163,6 +164,8 @@ def enrich_display_stability_with_active_state(
     enriched = dict(stability)
     if active_state.get("graphics_reboot_pending"):
         enriched["graphics_reboot_pending"] = True
+        if not enriched.get("likely_black_flash_path"):
+            enriched["likely_black_flash_path"] = GRAPHICS_REBOOT_PENDING_PATH
     if active_state.get("next_action") and not enriched.get("next_action"):
         enriched["next_action"] = active_state["next_action"]
     return enriched
@@ -175,18 +178,33 @@ def summarize_display_diagnostics(
 ) -> dict[str, Any]:
     """Return compact interpretation fields for display diagnostics."""
     event_count = _safe_int(events.get("count"))
+    actionable_event_count = _safe_int(
+        events.get("actionable_count")
+        if "actionable_count" in events
+        else event_count
+    )
+    benign_event_count = _safe_int(events.get("benign_count"))
     channel_error_count = _safe_int(events.get("channel_error_count"))
     risk_level = str(stability.get("risk_level") or "unknown")
     likely_path = stability.get("likely_black_flash_path")
-    clean_event_log = event_count == 0 and channel_error_count == 0
+    clean_event_log = actionable_event_count == 0 and channel_error_count == 0
+    risk_factors = {str(item) for item in (stability.get("risk_factors") or [])}
+    concrete_compositor_evidence = bool(
+        risk_level == "high"
+        or active_state and active_state.get("graphics_reboot_pending")
+        or _has_display_warning(stability)
+        or (risk_factors - {"vrr_capable_display"})
+    )
     compositor_likely = bool(
         clean_event_log
-        and risk_level in {"medium", "high"}
+        and concrete_compositor_evidence
         and isinstance(likely_path, str)
         and likely_path.startswith("windows_compositor")
     )
     summary = {
         "event_count": event_count,
+        "actionable_event_count": actionable_event_count,
+        "benign_event_count": benign_event_count,
         "channel_error_count": channel_error_count,
         "risk_level": risk_level,
         "likely_black_flash_path": likely_path,
@@ -299,6 +317,11 @@ def _first_warning(stability: dict[str, Any], code: str) -> dict[str, Any] | Non
         if isinstance(warning, dict) and warning.get("code") == code:
             return warning
     return None
+
+
+def _has_display_warning(stability: dict[str, Any]) -> bool:
+    warnings = stability.get("warnings") or []
+    return isinstance(warnings, list) and any(isinstance(item, dict) for item in warnings)
 
 
 def _safe_int(value: object) -> int:

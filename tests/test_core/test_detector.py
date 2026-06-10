@@ -321,6 +321,33 @@ class TestParseEdidForVrr:
         assert result["vrr_min_hz"] == 48
         assert result["vrr_max_hz"] == 144
 
+    def test_parse_edid_freesync_v2plus_block_reads_range_at_offset_6_7(self):
+        """v2+ FreeSync VSDBs insert a flags byte; min/max live at +6/+7.
+
+        Real data block captured from an LG UltraGear 27GS95QE (FreeSync
+        range 48-240 Hz): version=3, flags=0x01, min=0x30, max=0xF0. The old
+        +5/+6 read returned (flags, min) and reported a bogus "1-48Hz".
+        """
+        edid = bytearray(256)
+        edid[126] = 1  # 1 extension block
+
+        # CTA-861 extension at offset 128
+        edid[128] = 0x02
+        edid[129] = 0x03
+        block = bytes.fromhex("1a0000030130f00000000000002c010000000000")
+        edid[130] = 4 + 1 + len(block)  # DTDs start after the data block
+
+        # Vendor-specific data block: tag=3, length=20
+        edid[132] = (3 << 5) | len(block)
+        edid[133 : 133 + len(block)] = block
+
+        result = _parse_edid_for_vrr(bytes(edid))
+
+        assert result["vrr_supported"] == "hardware"
+        assert result["vrr_type"] == "freesync"
+        assert result["vrr_min_hz"] == 48
+        assert result["vrr_max_hz"] == 240
+
 
 class TestExceptionHandling:
     """Tests for exception handling in detection methods."""

@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "saved_at": "2026-05-30T00:44:07.674633-04:00",
+  "saved_at": "2026-06-08T04:06:34.916137-04:00",
   "profiles": [
     {
       "id": "slippi-melee",
@@ -134,7 +134,9 @@
           "SearchFilterHost.exe"
         ]
       },
-      "requires_overlay_free_path": false
+      "requires_overlay_free_path": false,
+      "keep_awake_while_gaming": true,
+      "is_online_profile": false
     },
     {
       "id": "slippi-melee-hdr",
@@ -268,7 +270,9 @@
           "SearchFilterHost.exe"
         ]
       },
-      "requires_overlay_free_path": false
+      "requires_overlay_free_path": false,
+      "keep_awake_while_gaming": true,
+      "is_online_profile": false
     },
     {
       "id": "slippi-melee-console-parity",
@@ -402,7 +406,9 @@
           "SearchFilterHost.exe"
         ]
       },
-      "requires_overlay_free_path": false
+      "requires_overlay_free_path": false,
+      "keep_awake_while_gaming": true,
+      "is_online_profile": false
     },
     {
       "id": "slippi-melee-console-parity-hdr",
@@ -536,7 +542,9 @@
           "SearchFilterHost.exe"
         ]
       },
-      "requires_overlay_free_path": false
+      "requires_overlay_free_path": false,
+      "keep_awake_while_gaming": true,
+      "is_online_profile": false
     },
     {
       "id": "slippi-melee-universal",
@@ -670,7 +678,9 @@
           "SearchFilterHost.exe"
         ]
       },
-      "requires_overlay_free_path": false
+      "requires_overlay_free_path": false,
+      "keep_awake_while_gaming": true,
+      "is_online_profile": false
     },
     {
       "id": "slippi-melee-universal-hdr",
@@ -804,7 +814,9 @@
           "SearchFilterHost.exe"
         ]
       },
-      "requires_overlay_free_path": false
+      "requires_overlay_free_path": false,
+      "keep_awake_while_gaming": true,
+      "is_online_profile": false
     },
     {
       "id": "rivals2-offline",
@@ -940,7 +952,9 @@
           "SearchFilterHost.exe"
         ]
       },
-      "requires_overlay_free_path": false
+      "requires_overlay_free_path": false,
+      "keep_awake_while_gaming": false,
+      "is_online_profile": false
     },
     {
       "id": "rivals2-offline-hdr",
@@ -1076,7 +1090,9 @@
           "SearchFilterHost.exe"
         ]
       },
-      "requires_overlay_free_path": false
+      "requires_overlay_free_path": false,
+      "keep_awake_while_gaming": false,
+      "is_online_profile": false
     },
     {
       "id": "rivals2-online",
@@ -1212,7 +1228,9 @@
           "SearchFilterHost.exe"
         ]
       },
-      "requires_overlay_free_path": false
+      "requires_overlay_free_path": false,
+      "keep_awake_while_gaming": false,
+      "is_online_profile": true
     },
     {
       "id": "rivals2-online-hdr",
@@ -1348,7 +1366,9 @@
           "SearchFilterHost.exe"
         ]
       },
-      "requires_overlay_free_path": false
+      "requires_overlay_free_path": false,
+      "keep_awake_while_gaming": false,
+      "is_online_profile": true
     },
     {
       "id": "rivals2-gsync",
@@ -1484,7 +1504,9 @@
           "SearchFilterHost.exe"
         ]
       },
-      "requires_overlay_free_path": true
+      "requires_overlay_free_path": true,
+      "keep_awake_while_gaming": false,
+      "is_online_profile": false
     },
     {
       "id": "rivals2-gsync-hdr",
@@ -1620,7 +1642,9 @@
           "SearchFilterHost.exe"
         ]
       },
-      "requires_overlay_free_path": true
+      "requires_overlay_free_path": true,
+      "keep_awake_while_gaming": false,
+      "is_online_profile": false
     },
     {
       "id": "rivals2-online-gsync",
@@ -1756,7 +1780,9 @@
           "SearchFilterHost.exe"
         ]
       },
-      "requires_overlay_free_path": true
+      "requires_overlay_free_path": true,
+      "keep_awake_while_gaming": false,
+      "is_online_profile": true
     },
     {
       "id": "rivals2-online-gsync-hdr",
@@ -1892,7 +1918,9 @@
           "SearchFilterHost.exe"
         ]
       },
-      "requires_overlay_free_path": true
+      "requires_overlay_free_path": true,
+      "keep_awake_while_gaming": false,
+      "is_online_profile": true
     },
     {
       "id": "diablo4",
@@ -2024,7 +2052,9 @@
           "SearchFilterHost.exe"
         ]
       },
-      "requires_overlay_free_path": true
+      "requires_overlay_free_path": true,
+      "keep_awake_while_gaming": false,
+      "is_online_profile": false
     },
     {
       "id": "diablo4-sdr",
@@ -2156,7 +2186,9 @@
           "SearchFilterHost.exe"
         ]
       },
-      "requires_overlay_free_path": true
+      "requires_overlay_free_path": true,
+      "keep_awake_while_gaming": false,
+      "is_online_profile": false
     },
     {
       "id": "fortnite",
@@ -2292,7 +2324,9 @@
           "SearchFilterHost.exe"
         ]
       },
-      "requires_overlay_free_path": false
+      "requires_overlay_free_path": false,
+      "keep_awake_while_gaming": false,
+      "is_online_profile": false
     },
     {
       "id": "fortnite-hdr",
@@ -2428,7 +2462,9 @@
           "SearchFilterHost.exe"
         ]
       },
-      "requires_overlay_free_path": false
+      "requires_overlay_free_path": false,
+      "keep_awake_while_gaming": false,
+      "is_online_profile": false
     },
     {
       "id": "marvel-rivals-sdr",
@@ -2562,7 +2598,9 @@
           "SearchFilterHost.exe"
         ]
       },
-      "requires_overlay_free_path": true
+      "requires_overlay_free_path": true,
+      "keep_awake_while_gaming": false,
+      "is_online_profile": false
     },
     {
       "id": "marvel-rivals-hdr",
@@ -2696,7 +2734,9 @@
           "SearchFilterHost.exe"
         ]
       },
-      "requires_overlay_free_path": true
+      "requires_overlay_free_path": true,
+      "keep_awake_while_gaming": false,
+      "is_online_profile": false
     },
     {
       "id": "deadlock",
@@ -2829,7 +2869,9 @@
           "SearchFilterHost.exe"
         ]
       },
-      "requires_overlay_free_path": false
+      "requires_overlay_free_path": false,
+      "keep_awake_while_gaming": false,
+      "is_online_profile": false
     },
     {
       "id": "deadlock-hdr",
@@ -2962,7 +3004,9 @@
           "SearchFilterHost.exe"
         ]
       },
-      "requires_overlay_free_path": false
+      "requires_overlay_free_path": false,
+      "keep_awake_while_gaming": false,
+      "is_online_profile": false
     },
     {
       "id": "deadlock-gsync",
@@ -3095,7 +3139,9 @@
           "SearchFilterHost.exe"
         ]
       },
-      "requires_overlay_free_path": true
+      "requires_overlay_free_path": true,
+      "keep_awake_while_gaming": false,
+      "is_online_profile": false
     },
     {
       "id": "deadlock-gsync-hdr",
@@ -3228,7 +3274,9 @@
           "SearchFilterHost.exe"
         ]
       },
-      "requires_overlay_free_path": true
+      "requires_overlay_free_path": true,
+      "keep_awake_while_gaming": false,
+      "is_online_profile": false
     },
     {
       "id": "overwatch2",
@@ -3361,7 +3409,9 @@
           "SearchFilterHost.exe"
         ]
       },
-      "requires_overlay_free_path": false
+      "requires_overlay_free_path": false,
+      "keep_awake_while_gaming": false,
+      "is_online_profile": false
     },
     {
       "id": "overwatch2-hdr",
@@ -3494,7 +3544,9 @@
           "SearchFilterHost.exe"
         ]
       },
-      "requires_overlay_free_path": false
+      "requires_overlay_free_path": false,
+      "keep_awake_while_gaming": false,
+      "is_online_profile": false
     },
     {
       "id": "overwatch2-gsync",
@@ -3627,7 +3679,9 @@
           "SearchFilterHost.exe"
         ]
       },
-      "requires_overlay_free_path": true
+      "requires_overlay_free_path": true,
+      "keep_awake_while_gaming": false,
+      "is_online_profile": false
     },
     {
       "id": "overwatch2-gsync-hdr",
@@ -3760,7 +3814,9 @@
           "SearchFilterHost.exe"
         ]
       },
-      "requires_overlay_free_path": true
+      "requires_overlay_free_path": true,
+      "keep_awake_while_gaming": false,
+      "is_online_profile": false
     },
     {
       "id": "overwatch2-gsync-capture",
@@ -3872,7 +3928,9 @@
           "SearchFilterHost.exe"
         ]
       },
-      "requires_overlay_free_path": false
+      "requires_overlay_free_path": false,
+      "keep_awake_while_gaming": false,
+      "is_online_profile": false
     },
     {
       "id": "overwatch2-gsync-hdr-capture",
@@ -3984,7 +4042,9 @@
           "SearchFilterHost.exe"
         ]
       },
-      "requires_overlay_free_path": false
+      "requires_overlay_free_path": false,
+      "keep_awake_while_gaming": false,
+      "is_online_profile": false
     },
     {
       "id": "pokemon-auto-chess",
@@ -4117,7 +4177,9 @@
           "SearchFilterHost.exe"
         ]
       },
-      "requires_overlay_free_path": false
+      "requires_overlay_free_path": false,
+      "keep_awake_while_gaming": false,
+      "is_online_profile": false
     },
     {
       "id": "pacdeluxe",
@@ -4248,7 +4310,9 @@
           "SearchFilterHost.exe"
         ]
       },
-      "requires_overlay_free_path": false
+      "requires_overlay_free_path": false,
+      "keep_awake_while_gaming": false,
+      "is_online_profile": false
     },
     {
       "id": "productivity",
@@ -4267,6 +4331,7 @@
       ],
       "handlers": [
         "WindowsSettingsHandler",
+        "PowerSettingsHandler",
         "RegistrySettingsHandler",
         "NvidiaSettingsHandler",
         "GraphicsSettingsHandler",
@@ -4287,7 +4352,9 @@
         "always_safe": [],
         "opt_in": []
       },
-      "requires_overlay_free_path": false
+      "requires_overlay_free_path": false,
+      "keep_awake_while_gaming": false,
+      "is_online_profile": false
     },
     {
       "id": "productivity-hdr",
@@ -4306,6 +4373,7 @@
       ],
       "handlers": [
         "WindowsSettingsHandler",
+        "PowerSettingsHandler",
         "RegistrySettingsHandler",
         "NvidiaSettingsHandler",
         "GraphicsSettingsHandler",
@@ -4326,7 +4394,9 @@
         "always_safe": [],
         "opt_in": []
       },
-      "requires_overlay_free_path": false
+      "requires_overlay_free_path": false,
+      "keep_awake_while_gaming": false,
+      "is_online_profile": false
     },
     {
       "id": "ryujinx-ssbu",
@@ -4461,7 +4531,9 @@
           "SearchFilterHost.exe"
         ]
       },
-      "requires_overlay_free_path": false
+      "requires_overlay_free_path": false,
+      "keep_awake_while_gaming": true,
+      "is_online_profile": false
     }
   ],
   "aliases": {

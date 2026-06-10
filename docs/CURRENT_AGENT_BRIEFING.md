@@ -1,6 +1,6 @@
 # Current Agent Briefing
 
-Last updated: 2026-05-30 00:52 America/New_York
+Last updated: 2026-06-09 America/New_York
 
 > **MACHINE-SPECIFIC — read `docs/NEW_MACHINE_SETUP.md` first if this repo was
 > just cloned onto a different PC.** Everything below describes the live state of
@@ -18,6 +18,12 @@ is the current operational truth for this PC.
 
 ## Current User Objective
 
+- Optimize the current tray app for responsiveness and stale information
+  resistance. The user clarified on 2026-06-03 that the tray app is the
+  priority surface; do not continue desktop-GUI changes unless explicitly
+  requested. Prioritize false restart notices, repeated status fragments,
+  tray active-profile drift, blocking tray actions, and unnecessary shell-out
+  churn. Deploy verified tray fixes immediately to this local runtime.
 - Stop occasional secondary-monitor black flashes while keeping Overwatch 2
   usable. The user found that `overwatch2-gsync-hdr-capture` performed better
   than the overlay-free `overwatch2-gsync-hdr` lane; root cause was the
@@ -26,21 +32,229 @@ is the current operational truth for this PC.
   harden profile/apply behavior, keep docs accurate, and deploy verified builds
   to this local machine.
 
+## 2026-06-09 Tray Stale-Data Audit (PS 5.1 ExitCode defect + catalog log honesty)
+
+User-reported "discrepancies and stale data even after tray restart". Audited
+every tray data source against backend truth. Findings and fixes (deployed,
+tray restarted as PID 27916, `tests/test_tray_script_static.py` 137 passed):
+
+- FIXED — PS 5.1 `Start-Process -PassThru` reads `.ExitCode` as `$null` unless
+  the process handle is cached before the child exits. This made
+  `Get-StartupStatus` fall back with a WARN on every tray start (the installer
+  actually succeeded with valid JSON and exit 0) and would have made
+  `Toggle-Startup` throw on success (`$null -ne 0` is true). All 11 backend
+  shell-out sites that consume ExitCode now cache the handle immediately
+  (`$null = $proc.Handle`); `Invoke-StartupInstallerJson` also got a
+  finalizing parameterless `WaitForExit()`, `$args` → `$psArgs` (automatic-
+  variable shadowing), and null-exit-tolerant success checks. Static coverage:
+  `test_start_process_exitcode_consumers_cache_process_handle`.
+- FIXED — the background catalog refresh logged "wrote cache" even when
+  `Write-ProfileCatalogCache` skipped an identical write moments after the
+  "cache unchanged; skipping write" line. The function now returns
+  $true/$false and the refresh logs "verified cache current" vs "wrote cache".
+  Static coverage: `test_background_catalog_refresh_logs_honest_write_state`.
+- VERIFIED CORRECT (not stale): the installed profile-catalog-cache.json is
+  byte-identical to the repo copy and content-matches the live backend
+  catalog (35 profiles); tray profile names are internally consistent via the
+  `Format-TrayDisplayCopy` G-SYNC normalizer (existing static test); the
+  persistent "Windows restart required: Graphics settings (MPO)" banner is
+  TRUTHFUL until the pending Windows reboot commits the MPO-enable target —
+  it is not stale data and clears after reboot; lastProfileState/recents are
+  refreshed by the startup resolver (picked up the 23:29 CLI apply correctly).
+- Optional follow-up (not done): backend display names say "GSYNC" while the
+  tray normalizes to "G-SYNC" — renaming the backend (overwatch2/rivals2/
+  deadlock display_names + snapshot_golden.json + test assertions) would give
+  tray/GUI/CLI parity. Cosmetic only; the tray is already self-consistent.
+- 2026-06-10 post-reboot addendum: the user briefly saw the pre-reboot
+  "Windows restart required" notice right after logging in — `reboot_pending`
+  in the state file is only cleared when the first backend command after boot
+  runs the state reconcile (the tray's startup verification, ~15 s in). FIXED
+  surface: the first clean verification of a fresh session now writes
+  "Verified active: <profile>" to the durable status line instead of leaving
+  it empty (`test_clean_verification_surfaces_verified_status_on_fresh_session`,
+  138 tray static tests green; deployed, tray PID 13876).
+
+## 2026-06-10 OW2 fix outcome: USER-CONFIRMED — 276 fps restored
+
+After the Windows reboot committed the MPO-enable target, the user confirmed
+Overwatch 2 is back at 276 fps (the validated Reflex On+Boost ceiling).
+Post-reboot `state --json --verify`: `all_active: true`, zero pending and zero
+reboot-gated settings; both MPO-disable registry values remain absent. The
+2026-06-09 root-cause chain (stale abso.yaml override → boot-committed MPO
+disable → dead borderless windowed G-SYNC → forced V-SYNC half-refresh lock)
+is validated end-to-end.
+
+## 2026-06-09 OW2 150-fps Lock SOLVED (stale abso.yaml MPO override) — supersedes conflicting live-state claims below
+
+Full record: `docs/CODEX_HANDOFF_OW2_150FPS.md` §11 and memory
+`project_mpo_override_150fps`. Short version:
+
+- Root cause: `abso.yaml` `profile_overrides` (written 2026-05-30, minutes
+  before commit 51552de flipped the profiles to the borderless path) forced
+  `graphics.disable_mpo: true` on both OW2 G-SYNC HDR lanes, silently beating
+  the profiles' `disable_mpo: False` on every apply (PHASE 6 override merge).
+  Verify compared against the overridden target, so everything reported clean.
+  The first reboot that committed the boot-gated MPO disable killed the
+  borderless independent-flip path → windowed G-SYNC could not engage → the
+  forced driver V-SYNC backstop + 297 in-game cap produced an exact
+  half-refresh 150 fps lock on the 300 Hz panel. The Process Lasso runtime was
+  a timing coincidence and is exonerated.
+- Fixes shipped this session: overrides removed from `abso.yaml` (repo +
+  installed via deploy); applier now warns on any config-override-vs-profile
+  contradiction (`_collect_override_conflicts` + tests in
+  `tests/test_core/test_applier_override_conflicts.py`); EDID FreeSync range
+  parser fixed (the "1-48Hz" reading was a +5/+6 vs +6/+7 byte bug — the LG's
+  real range is 48-240 FreeSync / 48-300 panel); full suite 2117 passed;
+  deployed via `build.py deploy` (backend 17,997,481 bytes, 2026-06-09 ~23:28);
+  `overwatch2-gsync-hdr` reapplied (MPO-disable registry values deleted,
+  reboot pending to commit MPO-on).
+- Live state after this session: active profile `overwatch2-gsync-hdr`
+  (NOT the capture lane mentioned in older sections below), reboot pending to
+  commit the MPO-enable compositor path. After reboot + OW2 relaunch, expected
+  fps is ~276 (Reflex On+Boost ceiling), not 150.
+- Corrected false leads: "duplicate cpu-balance daemons" are PyInstaller
+  one-file bootloader parent + child pairs (identical command lines) — not a
+  bug; paired backups per apply are the designed `pre_switch`/`pre_apply`
+  stages. The repo `.venv` was missing and has been recreated (Python 3.12.10).
+
+## 2026-06-08 Process Lasso-Class Feature Port (CPU/process/power session tuning)
+
+A complete in-house equivalent of Process Lasso's useful features was built and
+**live-verified on this i9-14900F**. Full reference (features, every
+config/tray-config flag, online-safety, enablement):
+**[`PROCESS_LASSO_FEATURES.md`](./PROCESS_LASSO_FEATURES.md)**.
+
+State: **all code done + tested (hermetic + live); nothing is enabled.** Every
+runtime feature is gated OFF in tray-config (`cpuBalancer` / `cpuSets` /
+`ecoMode` / `watchdog` default false); Keep-Awake is allowed but only emulator
+profiles assert it. The user deferred the live flag-flip to themselves.
+
+- The ProBalance governor (`abso/core/cpu_balancer.py`) hosts the runtime
+  features (CPU Sets steer, EcoQoS herd, watchdog) and is spawned by the tray on
+  game launch, stopped via a stop-file sentinel so its cleanup restores
+  everything. Hardened exclusions (NEVER_KILL + `process_overrides.protect`):
+  never demotes anti-cheat / game / protected images.
+- "Highest Performance" power: `power.py` core-parking knob (CPMINCORES, read via
+  `/qh` — `/query` is blind to hidden settings) + min-state 100 on the
+  Reflex/Emulator/Rivals2 bases; the productivity profile relaxes the floor to 5.
+- New modules: `cpu_sets`, `efficiency_mode`, `cpu_limiter`, `watchdog`,
+  `watchdog_engine`, `proc_actions`. All Win32 calls are dependency-injected for
+  hermetic tests and prototype-hardened for Win64 (HANDLE truncation).
+- To enable for this PC: set `cpuBalancer: true` (+ optional `cpuSets` / `ecoMode`
+  / `watchdog`) in `%APPDATA%\ABSO\tray-config.json`, restart the tray, play, and
+  watch the 1%-low / frame-time graph.
+
+## 2026-06-05 Source-Only Tray UI/UX Handoff
+
+The user asked to bookmark progress and stop. Do not continue feature work from
+this session unless the user resumes it.
+
+Hard boundary for the next agent:
+
+- The user clarified the scope: change the tray app, not the main/desktop app.
+  Keep edits in `abso/tray/*.ps1`, tray assets/cache only when necessary, and
+  `tests/test_tray_script_static.py` unless the user explicitly expands scope.
+- The user objected after a previous live/runtime command. Do not deploy,
+  restart/launch the tray, run the installed ABSO binary, run live
+  `state`/`verify`/`health`/`display-diagnostics`, apply/reapply profiles,
+  reset displays, toggle HDR/G-SYNC, open runtime folders, or otherwise mutate
+  or inspect live PC state unless the user explicitly authorizes that exact
+  command.
+- Overwatch was reported running during this work. Do not treat profile drift
+  or live verification noise as apply failure while the game is live. Prefer
+  build/static validation.
+- Allowed verification for this paused work: PowerShell parser over
+  `abso/tray/*.ps1`, focused/static pytest, `ruff check .`, and
+  `git diff --check`.
+
+Current dirty tray-only work:
+
+- `abso/tray/ABSO-Notifications.ps1`: upgraded profile/action-themed toast and
+  progress visuals, action medallions, and popup-setting behavior.
+- `abso/tray/ABSO-Icons.ps1`: expanded stylized game identity marks and
+  fallback marks, including additional common game aliases.
+- `abso/tray/ABSO-QuickPanel.ps1`: richer active/fix/restart/check card states,
+  right-side state rails, restored Quick Panel visibility state, and a truthful
+  animated header chip.
+- `abso/tray/ABSO-Settings.ps1`: settings header and section visuals, tray
+  surface controls, startup-reminder preview, hotkey/status copy cleanup, and a
+  `N/3 ON` header chip for toast popups, Quick Panel restore, and audio cues.
+- `abso/tray/ABSO-Tray.ps1`: many stale-copy/status fixes, menu command pills,
+  section/header chips, backup count chips, profile/game/group visuals,
+  startup stale-action copy, restart-marker hardening, and folder/status action
+  cleanup.
+- `tests/test_tray_script_static.py`: static coverage for the tray-only UI and
+  stale-information fixes.
+
+Latest source-only validation before stopping:
+
+- PowerShell parser over `abso/tray/*.ps1`: passed.
+- Focused backup/folder/status static slice:
+  `30 passed, 103 deselected`.
+- Full tray static suite:
+  `.\.venv\Scripts\python.exe -m pytest tests\test_tray_script_static.py -q`
+  reported `133 passed`.
+- `.\.venv\Scripts\python.exe -m ruff check .`: passed.
+- `git diff --check` for the last touched tray/test files passed with only
+  LF-to-CRLF warnings.
+- No deploy, tray restart, installed runtime command, live diagnostics, profile
+  apply/verify, or display mutation was run after the user's correction.
+
+Recommended next pickup:
+
+- Start with the paused inspection around the Backups empty-state row in
+  `ABSO-Tray.ps1`. The parent Backups command now has a truthful dynamic chip,
+  and the empty toast now says only that the current backups folder is missing,
+  but the disabled submenu row is still a plain row. A good next tray-only
+  improvement is to give that row a dedicated visual state, e.g. an
+  `__empty_state_row__` or similar renderer path with an `EMPTY`/`NO BACKUPS`
+  chip, subtle animated accent, precise tooltip, and static coverage in
+  `test_tray_backups_submenu_has_empty_state_row`.
+- After that, run only source/static checks unless the user explicitly approves
+  live/deploy verification:
+  PowerShell parser over `abso/tray/*.ps1`, focused static tests for the touched
+  area, full `tests/test_tray_script_static.py`, `ruff check .`, and
+  `git diff --check`.
+- Do not mark the active goal complete until the original objective has been
+  deployed and visually/runtime verified with explicit user permission.
+
 ## Live Machine State
 
 - Active profile: `overwatch2-gsync-hdr-capture`.
-- Active display topology from installed `display-diagnostics --json`:
-  two monitors: a 2560x1440 300 Hz VRR-capable primary plus
-  `Dell S2719DGF(Displayport)` at 2560x1440 59.95 Hz. The secondary is below
-  its detected 144 Hz capability, and the topology remains mixed-refresh.
+- Latest active display topology from installed
+  `display-diagnostics --json` at
+  `2026-06-04 01:54 America/New_York`: two monitors, mixed refresh.
+  Primary is `Generic PnP Monitor`, 2560x1440 at 300 Hz, VRR-capable
+  (`gsync_compatible`). Secondary is `Dell S2719DGF(Displayport)`,
+  2560x1440 at 59.95 Hz with detected 144 Hz capability. No display events or
+  overlays were detected, but `risk_level: high` and
+  `likely_black_flash_path: windows_compositor_mpo_vrr_mixed_refresh`.
+  The earlier one-monitor 21:34 snapshot is no longer current.
 - Installed backend:
   `%LOCALAPPDATA%\AdaptiveBattleStationOptimizer\abso.exe`
-  length `17894806`, last write `2026-05-30 00:50:00`, SHA256
-  `FDFB1D0237B6AC4E858F50DA8018272A209F60703E9F10EE6C1AEBA63693EEC0`.
+  length `17899514`, last write `2026-06-03 23:15:11`, SHA256
+  `E457758A7739ADB6E2B8E0EB57C836076233BCE85136C787EA4A6AFB56A02294`.
+- Installed GUI:
+  `%LOCALAPPDATA%\AdaptiveBattleStationOptimizer\abso-gui.exe`
+  length `5062144`, last write `2026-06-03 22:46:50`, SHA256
+  `2EC9785600189812EB4F3B2C288C20F36191D3AF8579A3442FCC116D8791414F`.
 - Tray runtime: scheduled-task startup is installed and enabled. Live tray PID
-  `17172` is running installed script
-  `%LOCALAPPDATA%\AdaptiveBattleStationOptimizer\abso\tray\ABSO-Tray.ps1`.
-  `health --json` reports `tray_runtime_marker: ok`.
+  `57948` is running installed script
+  `%LOCALAPPDATA%\AdaptiveBattleStationOptimizer\abso\tray\ABSO-Tray.ps1`
+  with SHA256
+  `4798A3F2D0B7F1600B6DCF5637005099F90D71ADDEF4F03FDC9D940EC9494FBB`.
+  The live `tray-runtime.json` marker confirms that PID/hash and includes five
+  loaded tray module hashes.
+- Installed tray settings script
+  `%LOCALAPPDATA%\AdaptiveBattleStationOptimizer\abso\tray\ABSO-Settings.ps1`
+  matches source with SHA256
+  `E3FB034F09BEA77E9227413A69DF35353FFB7B213E5E5ABBFCEB4293E81DB9E0`.
+- Installed tray icon script SHA256:
+  `CCCBA47EB98096D07F2D446253065A4B86524967B147831EADAD931924443520`.
+- Installed tray notifications script SHA256:
+  `C310372DA9B1CAC71A087C0AA9E81CF6F386F560BEFFCA7074510B2D21843B1E`.
+- Installed tray quick panel script SHA256:
+  `9E1DBD4B38E80C5B7630F3E1EA7BD03D5AC2C1BD365581EEB90AE39A219BA024`.
 - Installed tray cache matches source:
   `abso\tray\profile-catalog-cache.json` SHA256
   `0B5EF40DC2412869855085E0A45CB020D227DA0BF17A59DAE74B26ED07F9D304`.
@@ -53,9 +267,1188 @@ is the current operational truth for this PC.
   `overwatch2-gsync-hdr-capture` keeps capture/overlay processes alive.
 - The FPS cap is already correct for the active 300 Hz path:
   `frame_rate_cap` target `297`, current `297`, active `true`.
-- Any remaining MPO warning is the PC-local mixed-refresh compositor
-  mitigation waiting for a normal reboot, not an OW2 display-mode or cap
+- Current health has two warnings: the expected reboot-gated
+  `GraphicsSettingsHandler.mpo_disabled` profile state and the live
+  mixed-refresh multi-monitor display topology. Neither is an OW2 FPS-cap
   problem.
+- As of 2026-06-04 02:00, the user stated Overwatch is currently running. Do
+  not interpret profile verification drift as an apply failure while the game
+  is live. Prefer build/static validation and tray runtime-marker verification;
+  keep live diagnostics minimal unless explicitly requested.
+
+## 2026-06-04 Tray Verifier Stale-Action Pass
+
+Continued the tray-only stale-information objective:
+
+- The tray verifier now replaces stale `Needs apply:` or `Restart required:`
+  last-action text when a later read-only verification says the active profile
+  is clean.
+- The replacement is narrow: it writes `Verified active: <profile>` only when
+  the previous durable action was verifier-generated pending/restart text. It
+  does not overwrite useful recent action text such as `Applied:`, `Fixed:`, or
+  settings/folder actions.
+
+Validation:
+
+- PowerShell parser check for `ABSO-Tray.ps1`: passed.
+- `.\.venv\Scripts\python.exe -m pytest tests\test_tray_script_static.py -q`:
+  `45 passed`.
+- `.\.venv\Scripts\python.exe -m pytest -q`:
+  `1880 passed`, `3 skipped`.
+- `.\.venv\Scripts\python.exe -m ruff check .`: passed.
+- `git diff --check` for `ABSO-Tray.ps1`,
+  `tests\test_tray_script_static.py`, and this briefing passed with only
+  expected CRLF normalization warnings before the briefing edit.
+
+Deployment:
+
+- `.\.venv\Scripts\python.exe build.py deploy-existing` reported backend and
+  desktop GUI already current and updated one tray asset.
+- Tray was restarted through scheduled task `ABSO-Tray-Startup`; live tray PID
+  changed from `9364` to `57948`.
+- Live `tray-runtime.json` reports root script SHA256
+  `4798A3F2D0B7F1600B6DCF5637005099F90D71ADDEF4F03FDC9D940EC9494FBB`.
+- `%LOCALAPPDATA%\AdaptiveBattleStationOptimizer\tray-restart-pending.json`
+  did not exist before the restart, and no manual restart token was involved.
+- Per the user's note that Overwatch is currently running, this pass did not
+  run the usual post-deploy `state --json --verify` or
+  `display-diagnostics --json` checks. Do not use live game-state drift from
+  this moment as failure evidence.
+
+## 2026-06-04 Tray No-Op Status Pass
+
+Continued the tray-only stale-information objective:
+
+- Profile-not-found and apply-timeout paths now update the durable tray status
+  before returning, so the status bar cannot continue showing an older profile
+  action after a visible failure toast.
+- `Apply Pending Fix` no-op paths now write durable status for `No active
+  profile to repair` and `No pending profile fixes found`.
+- `Run System Audit` now writes `Audit already running` when the user invokes
+  it while an audit is already in flight.
+- The default-profile startup reminder now writes `Startup reminder: <profile>`
+  to the tray status line after its reminder toast, while still not applying
+  anything automatically.
+
+Validation:
+
+- PowerShell parser check for `ABSO-Tray.ps1`: passed.
+- `.\.venv\Scripts\python.exe -m pytest tests\test_tray_script_static.py -q`:
+  `44 passed`.
+- `.\.venv\Scripts\python.exe -m pytest -q`:
+  `1879 passed`, `3 skipped`.
+- `.\.venv\Scripts\python.exe -m ruff check .`: passed.
+- `git diff --check` for `ABSO-Tray.ps1`,
+  `tests\test_tray_script_static.py`, and this briefing passed with only
+  expected CRLF normalization warnings.
+
+Deployment:
+
+- `.\.venv\Scripts\python.exe build.py deploy-existing` reported backend and
+  desktop GUI already current and updated one tray asset.
+- Tray was restarted through scheduled task `ABSO-Tray-Startup`; live tray PID
+  changed from `44668` to `9364`.
+- Live `tray-runtime.json` reports root script SHA256
+  `356BF633FF6877276F585B75C1B6F0FAAEDF85665ABB1289B1CDDFCC24AF15DF`.
+- `%LOCALAPPDATA%\AdaptiveBattleStationOptimizer\tray-restart-pending.json`
+  does not exist after restart.
+- Installed `health --json` reports `8 ok`, `2 warning`, `0 error`;
+  `tray_runtime_marker: ok`, with the new root script hash live. The warnings
+  are still the expected reboot-gated graphics setting and the current
+  mixed-refresh display topology.
+- Installed `state --json --verify` succeeds and reports active profile
+  `overwatch2-gsync-hdr-capture`, `status: pending_reboot`, with zero
+  pending-apply settings and reboot-gated
+  `GraphicsSettingsHandler.mpo_disabled`.
+- Installed `display-diagnostics --json` remains read-only and reports zero
+  display events, two monitors, `risk_level: high`, and
+  `likely_black_flash_path: windows_compositor_mpo_vrr_mixed_refresh`.
+
+## 2026-06-04 Tray Status Surface Pass
+
+Continued the tray-only stale-information objective:
+
+- Audit completion now writes a specific durable status:
+  `Audit clean: no issues in scope`, `Audit issues found: <count>`, or
+  `Audit completed: no details`, instead of the generic `Audit completed`.
+- Folder/log actions now update the status line on success and failure:
+  backups, tray log, tray settings folder, installed runtime folder, and user
+  profiles folder.
+- Settings toggles and saves now update durable status for notifications,
+  sound effects, and saved tray settings, so the status bar does not keep an
+  older profile/apply message after a visible settings change.
+
+Validation:
+
+- PowerShell parser check for `ABSO-Tray.ps1`: passed.
+- `.\.venv\Scripts\python.exe -m pytest tests\test_tray_script_static.py -q`:
+  `43 passed`.
+- `.\.venv\Scripts\python.exe -m pytest -q`:
+  `1878 passed`, `3 skipped`.
+- `.\.venv\Scripts\python.exe -m ruff check .`: passed.
+- `git diff --check` for `ABSO-Tray.ps1`,
+  `tests\test_tray_script_static.py`, and this briefing passed with only
+  expected CRLF normalization warnings.
+
+Deployment:
+
+- `.\.venv\Scripts\python.exe build.py deploy-existing` reported backend and
+  desktop GUI already current and updated one tray asset.
+- Tray was restarted through scheduled task `ABSO-Tray-Startup`; live tray PID
+  changed from `57616` to `44668`.
+- Live `tray-runtime.json` reports root script SHA256
+  `1786EBBDBCB57A4B696AA13A7E3E684E3ED952D76607A090868E26225079C934`.
+- `%LOCALAPPDATA%\AdaptiveBattleStationOptimizer\tray-restart-pending.json`
+  does not exist after restart.
+- Installed `health --json` reports `8 ok`, `2 warning`, `0 error`;
+  `tray_runtime_marker: ok`, with the new root script hash live. The warnings
+  are still the expected reboot-gated graphics setting and the current
+  mixed-refresh display topology.
+- Installed `state --json --verify` succeeds and reports active profile
+  `overwatch2-gsync-hdr-capture`, `status: pending_reboot`, with zero
+  pending-apply settings and reboot-gated
+  `GraphicsSettingsHandler.mpo_disabled`.
+- Installed `display-diagnostics --json` remains read-only and reports zero
+  display events, two monitors, `risk_level: high`, and
+  `likely_black_flash_path: windows_compositor_mpo_vrr_mixed_refresh`.
+
+## 2026-06-04 Tray Restart Marker Pass
+
+Continued the tray-only stale-information objective:
+
+- Manual `Restart Tray` now creates a one-time restart token and stores that
+  token in `tray-restart-pending.json`.
+- The restarted tray process must be launched with the matching token before it
+  consumes the marker and plays the restart success sound.
+- Unrelated tray starts, scheduled-task starts, abandoned restart attempts, and
+  stale pre-token markers now ignore/remove the marker instead of producing a
+  false restart-success cue.
+- The manual restart path now launches the replacement tray directly through
+  hidden PowerShell with `-RestartToken`; the scheduled startup task remains
+  unchanged.
+
+Validation:
+
+- PowerShell parser check for `ABSO-Tray.ps1`: passed.
+- `.\.venv\Scripts\python.exe -m pytest tests\test_tray_script_static.py -q`:
+  `42 passed`.
+- `.\.venv\Scripts\python.exe -m pytest -q`:
+  `1877 passed`, `3 skipped`.
+- `.\.venv\Scripts\python.exe -m ruff check .`: passed.
+- `git diff --check` for `ABSO-Tray.ps1`,
+  `tests\test_tray_script_static.py`, and this briefing passed with only
+  expected CRLF normalization warnings.
+
+Deployment:
+
+- `.\.venv\Scripts\python.exe build.py deploy-existing` reported backend and
+  desktop GUI already current and updated one tray asset.
+- Tray was restarted through scheduled task `ABSO-Tray-Startup`; live tray PID
+  changed from `5936` to `57616`.
+- Live `tray-runtime.json` reports root script SHA256
+  `0BB79FA56AB22342E57A2BE2EC893B22CE1D3BA182ACACBD83F9AF198F5CC6DE`.
+- `%LOCALAPPDATA%\AdaptiveBattleStationOptimizer\tray-restart-pending.json`
+  does not exist after the scheduled-task restart, proving no stale manual
+  restart marker was left pending.
+- Installed `health --json` reports `8 ok`, `2 warning`, `0 error`;
+  `tray_runtime_marker: ok`, with the new root script hash live. The warnings
+  are still the expected reboot-gated graphics setting and the current
+  mixed-refresh display topology.
+- Installed `state --json --verify` succeeds and reports active profile
+  `overwatch2-gsync-hdr-capture`, `status: pending_reboot`, with zero
+  pending-apply settings and reboot-gated
+  `GraphicsSettingsHandler.mpo_disabled`.
+- Installed `display-diagnostics --json` remains read-only and reports zero
+  display events, two monitors, `risk_level: high`, and
+  `likely_black_flash_path: windows_compositor_mpo_vrr_mixed_refresh`.
+
+## 2026-06-04 Tray Action Status Pass
+
+Continued the tray-only stale-information objective:
+
+- Tray menu actions that already showed notifications now also update durable
+  last-action status, so the tray status line does not keep showing stale
+  previous actions after user-visible work completes.
+- `Toggle-Startup` now records enabled, disabled, unchanged, missing-installer,
+  and failed-install outcomes before refreshing menu state.
+- `Reset Display Pipeline` now records success counts and CLI/JSON/exception
+  failures instead of leaving the old status line in place.
+- Quick panel open/close/empty outcomes, profile refresh success/failure, and
+  standby-list clear start/success/failure now write durable action status.
+
+Validation:
+
+- PowerShell parser check for `ABSO-Tray.ps1`: passed.
+- `.\.venv\Scripts\python.exe -m pytest tests\test_tray_script_static.py -q`:
+  `41 passed`.
+- `.\.venv\Scripts\python.exe -m pytest -q`:
+  `1876 passed`, `3 skipped`.
+- `.\.venv\Scripts\python.exe -m ruff check .`: passed.
+- `git diff --check` for `ABSO-Tray.ps1` and
+  `tests\test_tray_script_static.py` passed with only expected CRLF
+  normalization warnings.
+
+Deployment:
+
+- `.\.venv\Scripts\python.exe build.py deploy-existing` reported backend and
+  desktop GUI already current and updated one tray asset.
+- Tray was restarted through scheduled task `ABSO-Tray-Startup`; live tray PID
+  changed from `48272` to `5936`.
+- Live `tray-runtime.json` reports root script SHA256
+  `2397AD54BC9CD972653E725E7F5734E21C78624563DF46385FC1E1F9F5C149F8`.
+- Installed `health --json` reports `8 ok`, `2 warning`, `0 error`;
+  `tray_runtime_marker: ok`, with the new root script hash live. The warnings
+  are still the expected reboot-gated graphics setting and the current
+  mixed-refresh display topology.
+- Installed `state --json --verify` succeeds and reports active profile
+  `overwatch2-gsync-hdr-capture`, `status: pending_reboot`, with zero
+  pending-apply settings and reboot-gated
+  `GraphicsSettingsHandler.mpo_disabled`.
+- Installed `display-diagnostics --json` remains read-only and reports zero
+  display events, two monitors, `risk_level: high`, and
+  `likely_black_flash_path: windows_compositor_mpo_vrr_mixed_refresh`.
+
+## 2026-06-04 Tray Log Action Pass
+
+Continued the tray-only stale-information objective:
+
+- The Settings flyout now labels the log action as `View Tray Log File` instead
+  of the generic `View Log File`.
+- `Open-LogFile` now creates the tray log on demand through `Write-TrayLog`
+  before opening it, so the menu action cannot silently do nothing just because
+  the log file did not exist yet.
+- Notepad launch failure is now reported through the tray notification system
+  and logged as an error instead of failing silently.
+- Manual path check confirmed the current tray log exists at
+  `%TEMP%\abso_tray.log`.
+
+Validation:
+
+- PowerShell parser check for `ABSO-Tray.ps1`: passed.
+- `.\.venv\Scripts\python.exe -m pytest tests\test_tray_script_static.py -q`:
+  `40 passed`.
+- `.\.venv\Scripts\python.exe -m pytest -q`:
+  `1875 passed`, `3 skipped`.
+- `.\.venv\Scripts\python.exe -m ruff check .`: passed.
+- `git diff --check` for `ABSO-Tray.ps1` and
+  `tests\test_tray_script_static.py` passed with only expected CRLF
+  normalization warnings.
+
+Deployment:
+
+- `.\.venv\Scripts\python.exe build.py deploy-existing` reported backend and
+  desktop GUI already current and updated one tray asset.
+- Tray was restarted through scheduled task `ABSO-Tray-Startup`; live tray PID
+  changed from `6756` to `48272`.
+- Live `tray-runtime.json` reports root script SHA256
+  `1BD273E34CD3D0D42EA88AA1DB9B70A1B85834D71953FF59E9B71859D4B3A4E5`.
+- Installed `health --json` reports `8 ok`, `2 warning`, `0 error`;
+  `tray_runtime_marker: ok`, with the new root script hash live. The warnings
+  are still the expected reboot-gated graphics setting and the current
+  mixed-refresh display topology.
+- Installed `state --json --verify` succeeds and reports active profile
+  `overwatch2-gsync-hdr-capture`, `status: pending_reboot`, with zero
+  pending-apply settings.
+- Installed `display-diagnostics --json` remains read-only and reports zero
+  display events, two monitors, `risk_level: high`, and
+  `likely_black_flash_path: windows_compositor_mpo_vrr_mixed_refresh`.
+
+## 2026-06-04 Tray Settings Folder Label Pass
+
+Continued the tray-only stale-information objective:
+
+- The Settings flyout no longer exposes the vague `Open Config Folder` action.
+  That action opened `%APPDATA%\ABSO`, which is specifically the tray settings
+  storage for `tray-config.json`, not the installed runtime config folder.
+- The menu now labels that path as `Open Tray Settings Folder` and shows a
+  tooltip pointing at `tray-config.json` storage.
+- The Settings flyout now also includes `Open Installed Runtime Folder`, which
+  opens `%LOCALAPPDATA%\AdaptiveBattleStationOptimizer` where `abso.yaml`,
+  installed binaries, backups, and deployed tray assets live.
+- Manual path check on this PC confirmed `%APPDATA%\ABSO\tray-config.json` and
+  `%LOCALAPPDATA%\AdaptiveBattleStationOptimizer\abso.yaml` both exist.
+
+Validation:
+
+- PowerShell parser check for `ABSO-Tray.ps1`: passed.
+- `.\.venv\Scripts\python.exe -m pytest tests\test_tray_script_static.py -q`:
+  `39 passed`.
+- `.\.venv\Scripts\python.exe -m pytest -q`:
+  `1874 passed`, `3 skipped`.
+- `.\.venv\Scripts\python.exe -m ruff check .`: passed.
+- `git diff --check` for `ABSO-Tray.ps1` and
+  `tests\test_tray_script_static.py` passed with only expected CRLF
+  normalization warnings.
+
+Deployment:
+
+- `.\.venv\Scripts\python.exe build.py deploy-existing` reported backend and
+  desktop GUI already current and updated one tray asset.
+- Tray was restarted through scheduled task `ABSO-Tray-Startup`; live tray PID
+  changed from `64024` to `6756`.
+- Live `tray-runtime.json` reports root script SHA256
+  `629EA1D86A898DF8B67AB3F7ECD6EF323A7DB01CDDC1E7DDEFB3FBD9A1E4FDFB`.
+- Installed `health --json` reports `8 ok`, `2 warning`, `0 error`;
+  `tray_runtime_marker: ok`, with the new root script hash live. The warnings
+  are still the expected reboot-gated graphics setting and the current
+  mixed-refresh display topology.
+- Installed `state --json --verify` succeeds and reports active profile
+  `overwatch2-gsync-hdr-capture`, `status: pending_reboot`, with zero
+  pending-apply settings.
+- Installed `display-diagnostics --json` remains read-only and reports zero
+  display events, two monitors, `risk_level: high`, and
+  `likely_black_flash_path: windows_compositor_mpo_vrr_mixed_refresh`.
+
+## 2026-06-04 Tray Backup Root Pass
+
+Continued the tray-only stale-information objective:
+
+- The tray backup status/menu no longer reads the workspace `backups` mirror as
+  the primary source. On this PC the workspace mirror's newest visible entries
+  were from 2026-05-26, while installed runtime backups under
+  `%LOCALAPPDATA%\AdaptiveBattleStationOptimizer\backups` have 2026-06-03
+  entries.
+- `Open Backups Folder`, `Backups (<age>)`, and the recent-backup submenu now
+  use a shared root-aware resolver that prefers installed local backups, falls
+  back to the workspace mirror if needed, and dedupes matching backup ids across
+  roots.
+- Manual PowerShell harness confirmed the tray resolver orders roots as
+  `installed` then `workspace`, and its latest three backups are
+  `2026-06-03_171528`, `2026-06-03_171515`, and `2026-06-01_215136` from the
+  installed root.
+
+Validation:
+
+- PowerShell parser check for `ABSO-Tray.ps1`: passed.
+- `.\.venv\Scripts\python.exe -m pytest tests\test_tray_script_static.py -q`:
+  `38 passed`.
+- `.\.venv\Scripts\python.exe -m pytest -q`:
+  `1873 passed`, `3 skipped`.
+- `.\.venv\Scripts\python.exe -m ruff check .`: passed.
+- `git diff --check` for `ABSO-Tray.ps1` and
+  `tests\test_tray_script_static.py` passed with only expected CRLF
+  normalization warnings.
+
+Deployment:
+
+- `.\.venv\Scripts\python.exe build.py deploy-existing` reported backend and
+  desktop GUI already current and updated one tray asset.
+- Tray was restarted through scheduled task `ABSO-Tray-Startup`; live tray PID
+  changed from `27968` to `64024`.
+- Live `tray-runtime.json` reports root script SHA256
+  `A5E6CBE30BC5C77F289F71581FBD9F7FFAC350598CF3A1C3C3A5380FC3D77A94`.
+- Installed `health --json` reports `8 ok`, `2 warning`, `0 error`;
+  `tray_runtime_marker: ok`, with the new root script hash live. Health also
+  confirms the current backup primary root is
+  `%LOCALAPPDATA%\AdaptiveBattleStationOptimizer\backups` with latest backup
+  `2026-06-03_171528`.
+- Installed `state --json --verify` succeeds and reports active profile
+  `overwatch2-gsync-hdr-capture`, `status: pending_reboot`, with zero
+  pending-apply settings.
+- Installed `display-diagnostics --json` remains read-only and reports zero
+  display events, two monitors, `risk_level: high`, and
+  `likely_black_flash_path: windows_compositor_mpo_vrr_mixed_refresh`.
+
+## 2026-06-04 Tray Restore Status Pass
+
+Continued the tray-only stale-information objective:
+
+- The tray status bar no longer displays a bare `HH:mm` fragment for the last
+  action. It stores a real `DateTime` and renders a labeled compact timestamp
+  such as `Action: Jun 4 00:58`.
+- Main restore timeout, restore failure, and restore exception paths now update
+  durable tray last-action state, so a failed restore toast cannot leave the
+  status bar showing an older successful action.
+- Backup submenu restore success and failure paths now update durable
+  last-action state, clear active-profile verification state after a successful
+  backup restore, and restore the normal tray tooltip after the transient
+  `Restoring...` hover text.
+
+Validation:
+
+- PowerShell parser check for `ABSO-Tray.ps1`: passed.
+- `.\.venv\Scripts\python.exe -m pytest tests\test_tray_script_static.py -q`:
+  `37 passed`.
+- `.\.venv\Scripts\python.exe -m pytest -q`:
+  `1872 passed`, `3 skipped`.
+- `.\.venv\Scripts\python.exe -m ruff check .`: passed.
+- `git diff --check` for `ABSO-Tray.ps1` and
+  `tests\test_tray_script_static.py` passed with only expected CRLF
+  normalization warnings.
+
+Deployment:
+
+- `.\.venv\Scripts\python.exe build.py deploy-existing` reported backend and
+  desktop GUI already current and updated one tray asset.
+- Tray was restarted through scheduled task `ABSO-Tray-Startup`; live tray PID
+  changed from `49556` to `27968`.
+- Live `tray-runtime.json` reports root script SHA256
+  `765B12C781B599232B9DB8DBE1138984B57C811CE9C386D3F1C7A461CA4D2078`.
+- Installed `health --json` reports `8 ok`, `2 warning`, `0 error`;
+  `tray_runtime_marker: ok`, with the new root script hash live. The warnings
+  are still the expected reboot-gated graphics setting and the current
+  mixed-refresh display topology.
+- Installed `state --json --verify` succeeds and reports active profile
+  `overwatch2-gsync-hdr-capture`, `status: pending_reboot`, with zero
+  pending-apply settings.
+- Installed `display-diagnostics --json` remains read-only and reports zero
+  display events, two monitors, `risk_level: high`, and
+  `likely_black_flash_path: windows_compositor_mpo_vrr_mixed_refresh`.
+
+## 2026-06-04 Tray Multi-Display System Line Pass
+
+Continued the tray-only stale-information objective after the user clarified
+the tray app is the intended scope:
+
+- The tray menu's always-visible system line no longer presents a single
+  `Win32_VideoController.CurrentRefreshRate` value as if it describes the whole
+  desktop.
+- `ABSO-Tray.ps1` now reads current refresh per
+  `[System.Windows.Forms.Screen]::AllScreens` display through
+  `EnumDisplaySettings`, formats common Windows fractional/rounded reporting
+  noise (`59`/`60`, `299`/`300`), and summarizes multi-display mixed refresh as
+  a topology line such as `2 displays - 300Hz/60Hz mixed`.
+- The line still avoids backend shell-out during menu open; if the per-display
+  reader is unavailable it falls back to monitor count plus the adapter-reported
+  refresh, explicitly labeled as adapter data.
+- Manual API probe on this PC returned `\\.\DISPLAY1` primary at `300Hz` and
+  `\\.\DISPLAY2` at `59Hz`, matching the installed diagnostics' 300 Hz primary
+  plus 59.95 Hz secondary after tray formatting.
+
+Validation:
+
+- PowerShell parser check for `ABSO-Tray.ps1`: passed.
+- `.\.venv\Scripts\python.exe -m pytest tests\test_tray_script_static.py -q`:
+  `36 passed`.
+- `.\.venv\Scripts\python.exe -m pytest -q`:
+  `1871 passed`, `3 skipped`.
+- `.\.venv\Scripts\python.exe -m ruff check .`: passed.
+- `git diff --check` for `ABSO-Tray.ps1` and
+  `tests\test_tray_script_static.py` passed with only expected CRLF
+  normalization warnings.
+
+Deployment:
+
+- `.\.venv\Scripts\python.exe build.py deploy-existing` reported backend and
+  desktop GUI already current and updated one tray asset.
+- Tray was restarted through scheduled task `ABSO-Tray-Startup`; live tray PID
+  changed from `64560` to `49556`.
+- Live `tray-runtime.json` reports root script SHA256
+  `23C0BB3626B655754EE5EECDA86D4648432958AA6CB9D5E581DE33D0D7AF2986`.
+- Installed `health --json` reports `8 ok`, `2 warning`, `0 error`;
+  `tray_runtime_marker: ok`, with the new root script hash live. The warnings
+  are still the expected reboot-gated graphics setting and the current
+  mixed-refresh display topology.
+- Installed `state --json --verify` succeeds and reports active profile
+  `overwatch2-gsync-hdr-capture`, `status: pending_reboot`, with zero
+  pending-apply settings.
+- Installed `display-diagnostics --json` remains read-only and reports zero
+  display events, two monitors, `risk_level: high`, and
+  `likely_black_flash_path: windows_compositor_mpo_vrr_mixed_refresh`.
+
+## 2026-06-04 Tray Recent/Backup Label Pass
+
+Continued the tray-only stale-information objective:
+
+- Recent profile tooltips now use a shared tray timestamp formatter and show
+  `Last applied: <compact time>` instead of leaking the raw persisted
+  `timestamp` field.
+- Backup menu labels now use profile display names from the loaded profile
+  catalog instead of raw profile ids from `manifest.json`.
+- Backup menu timestamps now use the same compact formatter while continuing to
+  sort by manifest `created_at`, then timestamp-style directory name, then
+  filesystem time only as fallback.
+- Backup restore actions still pass the same backup id to the CLI; this pass
+  changes only the tray label and tooltip text.
+
+Validation:
+
+- PowerShell parser check for `ABSO-Tray.ps1`: passed.
+- `.\.venv\Scripts\python.exe -m pytest tests\test_tray_script_static.py -q`:
+  `35 passed`.
+- `.\.venv\Scripts\python.exe -m pytest -q`:
+  `1870 passed`, `3 skipped`.
+- `.\.venv\Scripts\python.exe -m ruff check .`: passed.
+- `git diff --check` for `ABSO-Tray.ps1` and
+  `tests\test_tray_script_static.py` passed with only expected CRLF
+  normalization warnings.
+
+Deployment:
+
+- `.\.venv\Scripts\python.exe build.py deploy-existing` reported backend and
+  desktop GUI already current and updated one tray asset.
+- Tray was restarted through scheduled task `ABSO-Tray-Startup`; live tray PID
+  changed from `32536` to `64560`.
+- Live `tray-runtime.json` reports root script SHA256
+  `9AA1A531A49C769E8EC1B698A2054C9F2715D52F08F9F8CDA5F687BCB4C4AB47`
+  and installed `ABSO-QuickPanel.ps1` SHA256
+  `9E1DBD4B38E80C5B7630F3E1EA7BD03D5AC2C1BD365581EEB90AE39A219BA024`.
+- Installed `health --json` reports `8 ok`, `2 warning`, `0 error`;
+  `tray_runtime_marker: ok`, with the new root script hash live. The warnings
+  are still the expected reboot-gated graphics setting and the current
+  mixed-refresh display topology.
+- Installed `state --json --verify` succeeds and reports active profile
+  `overwatch2-gsync-hdr-capture`, `status: pending_reboot`, with zero
+  pending-apply settings.
+- Installed `display-diagnostics --json` remains read-only and reports zero
+  display events, two monitors, `risk_level: high`, and
+  `likely_black_flash_path: windows_compositor_mpo_vrr_mixed_refresh`.
+
+## 2026-06-04 Tray Tooltip State Pass
+
+Continued the tray-only stale-information objective:
+
+- Tray notifications now write only a short transient hover tooltip.
+- A one-shot WinForms timer restores the persistent tray tooltip from current
+  active-profile state after the transient notification window.
+- Menu-state refresh now owns the durable tooltip text through
+  `Restore-TrayTooltipFromState`, so stale action strings like startup toggles,
+  audit results, profile-refresh results, or memory-clear notices do not remain
+  as the long-lived tray hover state.
+- Tooltip truncation now goes through one helper capped to the Windows
+  `NotifyIcon.Text` limit.
+
+Validation:
+
+- PowerShell parser check for `ABSO-Tray.ps1`: passed.
+- `.\.venv\Scripts\python.exe -m pytest tests\test_tray_script_static.py -q`:
+  `34 passed`.
+- `.\.venv\Scripts\python.exe -m pytest -q`:
+  `1869 passed`, `3 skipped`.
+- `.\.venv\Scripts\python.exe -m ruff check .`: passed.
+- `git diff --check` for `ABSO-Tray.ps1` and
+  `tests\test_tray_script_static.py` passed with only expected CRLF
+  normalization warnings.
+
+Deployment:
+
+- `.\.venv\Scripts\python.exe build.py deploy-existing` reported backend and
+  desktop GUI already current and updated one tray asset.
+- Tray was restarted through scheduled task `ABSO-Tray-Startup`; live tray PID
+  changed from `34516` to `32536`.
+- Live `tray-runtime.json` reports root script SHA256
+  `E0D8EF09D901DA30393F6A94A64B87F02D78D6B340C3EE77D100944D3B0C7869`
+  and installed `ABSO-QuickPanel.ps1` SHA256
+  `9E1DBD4B38E80C5B7630F3E1EA7BD03D5AC2C1BD365581EEB90AE39A219BA024`.
+- Installed `health --json` reports `8 ok`, `2 warning`, `0 error`;
+  `tray_runtime_marker: ok`, with the new root script hash live. The warnings
+  are still the expected reboot-gated graphics setting and the current
+  mixed-refresh display topology.
+- Installed `state --json --verify` succeeds and reports active profile
+  `overwatch2-gsync-hdr-capture`, `status: pending_reboot`, with zero
+  pending-apply settings.
+- Installed `display-diagnostics --json` remains read-only and reports zero
+  display events, two monitors, `risk_level: high`, and
+  `likely_black_flash_path: windows_compositor_mpo_vrr_mixed_refresh`.
+
+## 2026-06-04 Tray Quick Panel Visibility Pass
+
+Continued the tray-only stale-information objective:
+
+- Quick Panel rebuilds now clear `QuickPanelVisible` when the old form is
+  disposed and when there are no renderable cards, so the tray does not report
+  a panel as open after it returned without showing a form.
+- The tray Quick Panel toggle now saves `showQuickPanel` from actual runtime
+  visibility after `Show-QuickPanel`, not from the user's click intent.
+- If the toggle cannot show anything because there is no active profile and no
+  favorites, the tray leaves the setting unchecked and shows an accurate
+  one-line notice.
+- Startup auto-open now allows the active-only panel path introduced in the
+  prior pass; it no longer requires at least one favorite when an active
+  profile exists.
+
+Validation:
+
+- PowerShell parser check for `ABSO-QuickPanel.ps1` and `ABSO-Tray.ps1`:
+  passed.
+- `.\.venv\Scripts\python.exe -m pytest tests\test_tray_script_static.py -q`:
+  `33 passed`.
+- `.\.venv\Scripts\python.exe -m pytest -q`:
+  `1868 passed`, `3 skipped`.
+- `.\.venv\Scripts\python.exe -m ruff check .`: passed.
+- `git diff --check` for `ABSO-QuickPanel.ps1`, `ABSO-Tray.ps1`, and
+  `tests\test_tray_script_static.py` passed with only expected CRLF
+  normalization warnings.
+- Rendered `%TEMP%\abso-quickpanel-active-only-preview.png` from the WinForms
+  Quick Panel with active `overwatch2-gsync-hdr-capture` and no favorites. The
+  panel rendered one active Overwatch card. A second no-active/no-favorites
+  harness call returned `QuickPanelVisible: false` and no form.
+
+Deployment:
+
+- `.\.venv\Scripts\python.exe build.py deploy-existing` reported backend and
+  desktop GUI already current and updated two tray assets.
+- Tray was restarted through scheduled task `ABSO-Tray-Startup`; live tray PID
+  changed from `63348` to `34516`.
+- Live `tray-runtime.json` reports root script SHA256
+  `395CBE857BD9FD67FFBA484BAD9C0B78C8508D538A0B2F65CF6B98A76085B160`
+  and installed `ABSO-QuickPanel.ps1` SHA256
+  `9E1DBD4B38E80C5B7630F3E1EA7BD03D5AC2C1BD365581EEB90AE39A219BA024`.
+- Installed `health --json` reports `8 ok`, `2 warning`, `0 error`;
+  `tray_runtime_marker: ok`, with the new root and Quick Panel hashes live.
+  The warnings are still the expected reboot-gated graphics setting and the
+  current mixed-refresh display topology.
+- Installed `state --json --verify` succeeds and reports active profile
+  `overwatch2-gsync-hdr-capture`, `status: pending_reboot`, with zero
+  pending-apply settings.
+- Installed `display-diagnostics --json` remains read-only and reports zero
+  display events, two monitors, `risk_level: high`, and
+  `likely_black_flash_path: windows_compositor_mpo_vrr_mixed_refresh`.
+
+## 2026-06-04 Tray Quick Panel Active Pin Pass
+
+Continued the tray-only stale-information objective:
+
+- Quick Panel now pins the currently active profile as the first card when it
+  exists in the profile catalog, even if that profile is not favorited.
+- The favorite cards then fill the remaining slots without duplicating the
+  active profile, preserving the existing three-card panel size.
+- When an active card is pinned, the header changes to
+  `ACTIVE / QUICK LAUNCH` so the tray surface reflects current state instead
+  of implying it is only a favorites list.
+- Fixed Quick Panel paint handlers to capture palette colors before WinForms
+  repaint callbacks. The prior paint-time script-scope lookups could throw
+  during redraw and leave the panel partially painted.
+
+Validation:
+
+- PowerShell parser check for `ABSO-QuickPanel.ps1`: passed.
+- `.\.venv\Scripts\python.exe -m pytest tests\test_tray_script_static.py -q`:
+  `31 passed`.
+- `.\.venv\Scripts\python.exe -m pytest -q`:
+  `1866 passed`, `3 skipped`.
+- `.\.venv\Scripts\python.exe -m ruff check .`: passed.
+- `git diff --check` for `ABSO-QuickPanel.ps1` and
+  `tests\test_tray_script_static.py` passed with only expected CRLF
+  normalization warnings.
+- Rendered `%TEMP%\abso-quickpanel-active-preview.png` from the WinForms Quick
+  Panel with active `overwatch2-gsync-hdr-capture` not in favorites. The panel
+  rendered cleanly with card order
+  `overwatch2-gsync-hdr-capture,slippi-melee,rivals2`.
+
+Deployment:
+
+- `.\.venv\Scripts\python.exe build.py deploy-existing` reported backend and
+  desktop GUI already current and updated one tray asset.
+- Tray was restarted through scheduled task `ABSO-Tray-Startup`; live tray PID
+  changed from `24432` to `63348`.
+- Live `tray-runtime.json` reports root script SHA256
+  `95CF580735B57C7D6D42040E8603BE784F4B819CAA053714129148BF9D0F63ED`
+  and installed `ABSO-QuickPanel.ps1` SHA256
+  `13A2E646B1CC4DA0A734186325056E74CD2C97320F6F2CB73A89039C2029B6A0`.
+- Installed `health --json` reports `8 ok`, `2 warning`, `0 error`;
+  `tray_runtime_marker: ok`, with the new Quick Panel module hash live. The
+  warnings are still the expected reboot-gated graphics setting and the current
+  mixed-refresh display topology.
+- Installed `state --json --verify` succeeds and reports active profile
+  `overwatch2-gsync-hdr-capture`, `status: pending_reboot`, with zero
+  pending-apply settings.
+- Installed `display-diagnostics --json` remains read-only and reports zero
+  display events, two monitors, `risk_level: high`, and
+  `likely_black_flash_path: windows_compositor_mpo_vrr_mixed_refresh`.
+
+## 2026-06-03 Tray Profile Progress Overlay Pass
+
+Continued the tray-only UI/UX objective:
+
+- Profile apply progress overlays now accept optional profile visual metadata,
+  while generic progress overlays such as restore keep the old layout.
+- Profile apply and pending-fix overlays now show the selected profile's game
+  mark, category-colored rail/spinner/progress motion, and active badge where
+  appropriate.
+- The progress overlay disposes generated profile bitmaps on close so repeated
+  applies do not leak GDI images.
+
+Validation:
+
+- PowerShell parser check for `ABSO-Notifications.ps1` and `ABSO-Tray.ps1`:
+  passed.
+- `.\.venv\Scripts\python.exe -m pytest tests\test_tray_script_static.py -q`:
+  `29 passed`.
+- `.\.venv\Scripts\python.exe -m ruff check tests\test_tray_script_static.py`:
+  passed.
+- `git diff --check` for `ABSO-Notifications.ps1`, `ABSO-Tray.ps1`, and
+  `tests\test_tray_script_static.py` passed with only expected CRLF
+  normalization warnings.
+- Rendered `%TEMP%\abso-profile-progress-preview.png` from the WinForms
+  progress overlay and visually inspected it; the Overwatch mark, active badge,
+  headline, step text, and progress line fit cleanly.
+
+Deployment:
+
+- `.\.venv\Scripts\python.exe build.py deploy-existing` reported backend and
+  desktop GUI already current and updated two tray assets.
+- Tray was restarted through scheduled task `ABSO-Tray-Startup`.
+- Live tray PID `24432` wrote `tray-runtime.json` with root script SHA256
+  `95CF580735B57C7D6D42040E8603BE784F4B819CAA053714129148BF9D0F63ED`
+  and installed `ABSO-Notifications.ps1` SHA256
+  `C310372DA9B1CAC71A087C0AA9E81CF6F386F560BEFFCA7074510B2D21843B1E`.
+- Installed `health --json` reports `8 ok`, `2 warning`, `0 error`;
+  `tray_runtime_marker: ok`, `module_count: 5`. The warnings are still the
+  expected reboot-gated graphics setting and the current mixed-refresh display
+  topology.
+- Installed `state --json --verify` succeeds and reports active profile
+  `overwatch2-gsync-hdr-capture`, `status: pending_reboot`, with zero
+  pending-apply settings.
+
+## 2026-06-03 Tray Profile Toast Visual Pass
+
+Continued the tray-only UI/UX objective:
+
+- The themed toast engine now accepts optional profile visual metadata while
+  preserving the generic toast API for audit/startup/system notifications.
+- Profile apply, apply-warning/caution, failure, pending-fix success, and
+  pending-fix failure toasts now pass the selected profile's game group,
+  category color, footer metadata, and active badge state.
+- Profile-aware toasts render a 36 px game mark beside the headline and dispose
+  the generated bitmap on toast close, including queued-toast paths.
+
+Validation:
+
+- PowerShell parser check for `ABSO-Notifications.ps1` and `ABSO-Tray.ps1`:
+  passed.
+- `.\.venv\Scripts\python.exe -m pytest tests\test_tray_script_static.py -q`:
+  `28 passed`.
+- `.\.venv\Scripts\python.exe -m ruff check tests\test_tray_script_static.py`:
+  passed.
+- `git diff --check` for `ABSO-Notifications.ps1`, `ABSO-Tray.ps1`, and
+  `tests\test_tray_script_static.py` passed with only expected CRLF
+  normalization warnings.
+- Rendered `%TEMP%\abso-profile-toast-preview.png` from the WinForms toast
+  surface and visually inspected it; the Overwatch mark and active badge were
+  readable, and headline/body/footer text still fit.
+
+Deployment:
+
+- `.\.venv\Scripts\python.exe build.py deploy-existing` reported backend and
+  desktop GUI already current and updated two tray assets.
+- Tray was restarted through scheduled task `ABSO-Tray-Startup`.
+- Live tray PID `66420` wrote `tray-runtime.json` with root script SHA256
+  `C83ED08E3D8DFC91A7CBD5104473EE100E8489A27A9B743CAC439045B2B8345B`
+  and installed `ABSO-Notifications.ps1` SHA256
+  `1437BF05467A866F1BCC01592F05BB649FED4795F3BE0B97F2F79E99B1CBC71A`.
+- Installed `health --json` reports `8 ok`, `2 warning`, `0 error`;
+  `tray_runtime_marker: ok`, `module_count: 5`. The warnings are still the
+  expected reboot-gated graphics setting and the current mixed-refresh display
+  topology.
+- Installed `state --json --verify` succeeds and reports active profile
+  `overwatch2-gsync-hdr-capture`, `status: pending_reboot`, with zero
+  pending-apply settings.
+
+## 2026-06-03 Tray Settings Preview Pass
+
+Continued the tray-only UI/UX objective:
+
+- The Settings dialog now shows a selected default-profile preview card under
+  `Default Profile (startup reminder):`.
+- The preview uses the same game-mark pipeline as the tray menu, displays the
+  selected variant/category, and explicitly says
+  `Startup reminder only. Nothing is applied automatically.`
+- The `(None)` state also says `No profile is applied automatically.`
+- The preview updates immediately when the combo selection changes and disposes
+  its generated bitmap when the Settings form closes.
+
+Validation:
+
+- PowerShell parser check for `ABSO-Settings.ps1`: passed.
+- `.\.venv\Scripts\python.exe -m pytest tests\test_tray_script_static.py -q`:
+  `27 passed`.
+- `.\.venv\Scripts\python.exe -m ruff check tests\test_tray_script_static.py`:
+  passed.
+- `git diff --check` for `ABSO-Settings.ps1` and
+  `tests\test_tray_script_static.py` passed with only expected CRLF
+  normalization warnings.
+- Rendered `%TEMP%\abso-settings-preview.png` from the WinForms Settings panel
+  and visually inspected it; the preview row is readable and the bottom buttons
+  fit inside the dialog.
+
+Deployment:
+
+- `.\.venv\Scripts\python.exe build.py deploy-existing` reported backend and
+  desktop GUI already current and updated one tray asset.
+- Tray was restarted through scheduled task `ABSO-Tray-Startup`.
+- Live tray PID `36048` wrote `tray-runtime.json` with root script SHA256
+  `6387C85A1D9C51C768241BA4E74D28DFA3CE9141C67B5328210628E09E1CA6AF`
+  and installed `ABSO-Settings.ps1` SHA256
+  `E3FB034F09BEA77E9227413A69DF35353FFB7B213E5E5ABBFCEB4293E81DB9E0`.
+- Installed `health --json` reports `8 ok`, `2 warning`, `0 error`;
+  `tray_runtime_marker: ok`, `module_count: 5`. The warnings are the expected
+  reboot-gated graphics setting and the current mixed-refresh display topology.
+- Installed `state --json --verify` succeeds and reports active profile
+  `overwatch2-gsync-hdr-capture`, `status: pending_reboot`, with zero
+  pending-apply settings.
+
+## 2026-06-03 Tray Active-Badge / Refresh Pass
+
+Continued the tray-only UI/UX objective:
+
+- Active profile rows in the tray menu now keep their game-specific mark and
+  receive a compact active badge overlay instead of replacing the game mark
+  with a generic check icon.
+- Tray profile refresh now uses shared menu image/text helpers, so submenu
+  rows keep concise variant labels and inactive flyout rows keep sync badges
+  after active-state refreshes.
+
+Validation:
+
+- PowerShell parser check for `ABSO-Tray.ps1` and `ABSO-Icons.ps1`: passed.
+- `.\.venv\Scripts\python.exe -m pytest tests\test_tray_script_static.py -q`:
+  `26 passed`.
+- `.\.venv\Scripts\python.exe -m ruff check tests\test_tray_script_static.py`:
+  passed.
+- `git diff --check` for `ABSO-Tray.ps1`, `ABSO-Icons.ps1`, and
+  `tests\test_tray_script_static.py` passed with only expected CRLF
+  normalization warnings.
+- Generated `%TEMP%\abso-active-game-badges.png` and visually inspected the
+  normal/active tray marks; the active badge stayed readable without burying
+  game silhouettes.
+
+Deployment:
+
+- `.\.venv\Scripts\python.exe build.py deploy-existing` reported backend and
+  desktop GUI already current and updated two tray assets.
+- Tray was restarted through scheduled task `ABSO-Tray-Startup`.
+- Live tray PID `49676` wrote `tray-runtime.json` with root script SHA256
+  `6387C85A1D9C51C768241BA4E74D28DFA3CE9141C67B5328210628E09E1CA6AF`
+  and installed `ABSO-Icons.ps1` SHA256
+  `CCCBA47EB98096D07F2D446253065A4B86524967B147831EADAD931924443520`.
+- Installed `health --json` reports `9 ok`, `1 warning`, `0 error`;
+  `tray_runtime_marker: ok`, `module_count: 5`. The remaining warning is the
+  expected reboot-gated `GraphicsSettingsHandler.mpo_disabled` state.
+- Installed `state --json --verify` succeeds and reports active profile
+  `overwatch2-gsync-hdr-capture`, `status: pending_reboot`, with zero
+  pending-apply settings.
+
+## 2026-06-03 Tray Game-Mark / Runtime Marker Pass
+
+Continued the UI/UX objective on the tray app only:
+
+- Added a custom Deadlock tray game mark so the shipped Deadlock profiles no
+  longer fall back to generic shooter category art.
+- Quick Panel favorite cards now use the same game-specific tray marks as the
+  main tray menu instead of generic category icons.
+- Quick Panel active favorite cards now have a subtle pulsing active indicator
+  driven by a WinForms timer; the timer is cleaned up on panel close/rebuild.
+- Tray runtime marker now records hashes for loaded helper modules:
+  `ABSO-Icons.ps1`, `ABSO-Notifications.ps1`, `ABSO-Settings.ps1`,
+  `ABSO-StartupState.ps1`, and `ABSO-QuickPanel.ps1`.
+- Installed `health --json` now compares those helper module hashes against
+  disk, so a tray-asset-only deploy cannot be falsely reported current when the
+  live process still has old helper code loaded.
+
+Validation:
+
+- Generated a local sprite-sheet preview of all current tray game marks and
+  visually inspected it; the marks are legible at tray scale, including
+  Deadlock.
+- PowerShell parser check for `ABSO-Tray.ps1`, `ABSO-QuickPanel.ps1`, and
+  `ABSO-Icons.ps1`: passed.
+- `.\.venv\Scripts\python.exe -m pytest tests\test_tray_script_static.py
+  tests\test_core\test_health.py -q`: `46 passed`.
+- `.\.venv\Scripts\python.exe -m ruff check abso\core\health.py
+  tests\test_core\test_health.py tests\test_tray_script_static.py`: passed.
+- `git diff --check` for the touched tray/health/test files passed with only
+  expected CRLF normalization warnings.
+
+Deployment:
+
+- `.\.venv\Scripts\python.exe build.py deploy` rebuilt and deployed the
+  backend:
+  `%LOCALAPPDATA%\AdaptiveBattleStationOptimizer\abso.exe`, length
+  `17899514`, SHA256
+  `E457758A7739ADB6E2B8E0EB57C836076233BCE85136C787EA4A6AFB56A02294`,
+  previous backend backup
+  `deploy-backups\abso.exe.bak-20260603-231511`.
+- The same deploy copied current tray assets and left the desktop GUI already
+  current.
+- Tray was restarted via scheduled task `ABSO-Tray-Startup`.
+- Live tray PID `40796` wrote `tray-runtime.json` with root script SHA256
+  `CA2AF49C69DDAB220EDAD0CD18390E8A14C12E17D36077EBF9B223B83A8F72F7`
+  and five module hashes.
+- Installed `health --json` reports `9 ok`, `1 warning`, `0 error`;
+  `tray_runtime_marker: ok`, `module_count: 5`. The remaining warning is the
+  expected reboot-gated `GraphicsSettingsHandler.mpo_disabled` state.
+- Installed `state --json --verify` succeeds and reports active profile
+  `overwatch2-gsync-hdr-capture`, `status: pending_reboot`, with no
+  `pending_apply_settings`.
+
+## 2026-06-03 Tray Wording Accuracy Pass
+
+The user clarified that the tray app is the priority UI surface. Fixed and
+deployed a tray-only wording pass:
+
+- Tray status, bottom status bar, same-active-profile clicks, apply-warning
+  summaries, and apply-failure summaries now format backend handler identifiers
+  into user-facing labels. Example: `GraphicsSettingsHandler` displays as
+  `Graphics settings`; `GraphicsSettingsHandler.mpo_disabled` displays as
+  `Graphics settings (MPO)`.
+- The pending-fix toast now includes the friendly setting name, e.g.
+  `Pending fix applied: Graphics settings (MPO). Restart required.`
+- The Settings panel no longer claims the default profile will "apply on
+  startup". It now says `Default Profile (startup reminder)`, matching the
+  actual notify-only startup behavior.
+- The tray startup status no longer says `Startup restore [...]` for the normal
+  cached active-profile load. It now says `Startup state loaded: <profile>` so
+  the tray does not imply that settings were restored or reapplied.
+
+Validation:
+
+- PowerShell parser check for `abso\tray\ABSO-Tray.ps1` and
+  `abso\tray\ABSO-Settings.ps1`: passed.
+- `.\.venv\Scripts\python.exe -m pytest tests\test_tray_script_static.py -q`:
+  `22 passed`.
+- `git diff --check -- abso\tray\ABSO-Tray.ps1
+  abso\tray\ABSO-Settings.ps1 tests\test_tray_script_static.py`: passed with
+  only expected CRLF normalization warnings.
+
+Deployment:
+
+- `.\.venv\Scripts\python.exe build.py deploy-existing` updated two tray
+  assets and reported the backend and desktop GUI were already current.
+- Tray was restarted via scheduled task `ABSO-Tray-Startup`.
+- Live tray PID `62112` is running the installed tray script with SHA256
+  `2F3FA50E2B19197DBE1D7EF79B4E82B4250BCE312427EF7C8193096E992B83C4`.
+- Installed `ABSO-Settings.ps1` SHA256:
+  `5BFD20B406ED6ECF5B167ACC2175A41D1B779FCFAE6DBBF8A86FCE8FE1E0C7E5`.
+- Installed `health --json` reports `9 ok`, `1 warning`, `0 error`;
+  `tray_runtime_marker: ok`. The remaining warning is the expected
+  reboot-gated `GraphicsSettingsHandler.mpo_disabled` state.
+
+## 2026-06-03 GUI Visual System Upgrade
+
+Fixed and deployed a broad GUI/UX pass:
+
+- Added a shared title-art component with stylized game marks for the real
+  profile groups: Desktop, Slippi, Rivals 2, SSBU/Ryujinx, Diablo 4,
+  Fortnite, Marvel Rivals, Deadlock, Overwatch 2, Pokemon Auto Chess, and
+  PACDeluxe.
+- Reworked the global visual system into a darker command-console surface:
+  sticky header, animated grid/scan treatments, status dock, glass panels,
+  action tiles, game roster tiles, and reduced-motion support.
+- Home now starts with the live profile, accurate restart reason, hardware
+  state, audit/backups metrics, and a profile roster built from the backend
+  catalog. Native installed render shows `11 title groups / 35 variants`.
+- Profile Wizard now has a title-art hero, step rail, category filters,
+  game-group panels, variant chips, and selected-profile review panels.
+- Reports now uses title art and a compact profile selector instead of long
+  generic buttons.
+- Audit, Backups, Settings, and Timer pages were brought onto the same panel
+  system for visual consistency.
+- Plain-browser preview no longer calls the Tauri event listener when the
+  Tauri bridge is absent, avoiding the `transformCallback` crash during visual
+  QA outside the desktop shell.
+- Tauri backend/python/network helper command spawns now use a hidden
+  `CREATE_NO_WINDOW` helper so backend checks do not show a stray black
+  `abso.exe` console window over the GUI.
+
+Validation:
+
+- `npm run lint`: passed.
+- `npm run build`: passed.
+- `cargo check`: passed.
+- `.\.venv\Scripts\python.exe build.py gui`: passed after stopping the
+  temporary native QA process that held the release executable lock.
+- `git diff --check`: passed with only expected CRLF normalization warnings.
+- Browser preview via Playwright: desktop and 390px mobile screenshots captured
+  under `output/playwright/`; fixed wizard title-mark overlap and mobile header
+  crowding found during that pass.
+- Native Computer Use render check against the built release showed live
+  backend data. The installed GUI render after deploy shows
+  `Overwatch 2 - GSYNC HDR Capture-Safe`, accurate
+  `Restart required: Graphics settings`, detected `RTX 4070 @ 300Hz`,
+  `11 title groups / 35 variants`, and the new game mark roster.
+  Computer Use could capture the WebView but did not reliably deliver clicks
+  into it, so native interaction automation is limited to render verification
+  for this pass.
+
+Deployment:
+
+- `.\.venv\Scripts\python.exe build.py gui` rebuilt the Tauri GUI release.
+- `.\.venv\Scripts\python.exe build.py deploy-existing` copied the installed
+  GUI executable:
+  `%LOCALAPPDATA%\AdaptiveBattleStationOptimizer\abso-gui.exe`, length
+  `5062144`, SHA256
+  `2EC9785600189812EB4F3B2C288C20F36191D3AF8579A3442FCC116D8791414F`,
+  previous GUI backup
+  `deploy-backups\abso-gui.exe.bak-20260603-224708`.
+- Installed `health --json` still reports `9 ok`, `1 warning`, `0 error`.
+  The only warning is the accurate reboot-gated
+  `GraphicsSettingsHandler.mpo_disabled` state.
+
+## 2026-06-03 Soft Warning Accuracy Pass
+
+Fixed and deployed user-facing soft-warning accuracy issues found in installed
+health and display diagnostics:
+
+- `Microsoft-Windows-UserModePowerService` event ID `12` rows generated by
+  `powercfg.exe reset policy scheme` are now classified as benign power-policy
+  reset evidence instead of actionable display/driver events.
+- Health and plain console output now split display event counts into
+  actionable and benign counts. The current installed health report shows
+  `0 actionable display/driver/power event(s), 5 benign event(s), 0 channel
+  error(s)`.
+- A single VRR-capable monitor is now treated as display context, not a soft
+  topology warning by itself. The current installed topology is one 300 Hz
+  G-SYNC-compatible monitor, `risk_level: low`, with no detector warnings.
+- `display-diagnostics --json` now reports clean event logs from actionable
+  event count, not raw benign event count.
+- `compositor_black_flash_likely` now requires concrete compositor evidence.
+  On this PC the concrete evidence is the active graphics/MPO setting waiting
+  for normal reboot, so the likely path is
+  `windows_compositor_mpo_pending_reboot`.
+
+Validation:
+
+- Focused CLI/core regression slice: `138 passed`.
+- Full unit suite: `1854 passed, 3 skipped`.
+- Python lint: `ruff check .` passed.
+- Frontend: `npm run lint` passed; `npm run build` passed.
+- Tauri shell: `cargo check` passed.
+- `git diff --check` passed with only expected CRLF normalization warnings.
+
+Deployment:
+
+- `.\.venv\Scripts\python.exe build.py deploy` rebuilt and deployed the
+  backend:
+  `%LOCALAPPDATA%\AdaptiveBattleStationOptimizer\abso.exe`, length
+  `17895482`, previous backend backup
+  `deploy-backups\abso.exe.bak-20260603-213214`.
+- `.\.venv\Scripts\python.exe build.py gui` rebuilt the Tauri GUI release.
+- `.\.venv\Scripts\python.exe build.py deploy-existing` copied the installed
+  GUI executable:
+  `%LOCALAPPDATA%\AdaptiveBattleStationOptimizer\abso-gui.exe`, length
+  `5056512`, previous GUI backup
+  `deploy-backups\abso-gui.exe.bak-20260603-213357`.
+- Tray runtime marker is already current; live tray PID `49660` is running the
+  installed tray script with SHA256
+  `0C96D8146895A424C61BAC244A96216CFEBE4C8F25D24C89D86ABACA9995277E`.
+- Installed `health --json` succeeds with `9 ok`, `1 warning`, `0 error`.
+  The only remaining warning is the accurate reboot-gated
+  `GraphicsSettingsHandler.mpo_disabled` state.
+- Installed `state --json --verify` succeeds and reports active profile
+  `overwatch2-gsync-hdr-capture` with `reboot_pending: true` for
+  `GraphicsSettingsHandler.mpo_disabled`.
+- Installed `display-diagnostics --event-timeout 2 --json` reports
+  `event_count: 0`, `actionable_event_count: 0`, `benign_event_count: 0`,
+  `risk_level: low`, and
+  `likely_black_flash_path: windows_compositor_mpo_pending_reboot`.
+
+## 2026-06-03 UI/Tray Responsiveness Optimization
+
+Fixed and deployed responsiveness/staleness issues across the tray and GUI:
+
+- PowerShell tray active-profile verification is now single-flight. Duplicate
+  refresh requests coalesce into the running `state --json --verify` process
+  instead of killing it and starting over.
+- PowerShell tray launch sanitizer no longer blocks the WinForms UI thread
+  while `launch-sweep` runs. The tray still checks game-process liveness on a
+  cheap timer, but the backend sweep is now a unique-temp-file background
+  process with a poll timer and duplicate suppression.
+- PowerShell tray audit is now non-blocking and single-flight. The menu reports
+  `Audit running` while the read-only backend audit completes, then updates the
+  issue count/status without freezing tray interaction.
+- GUI backend-state refreshes preserve the last known active profile identity
+  while verification is loading or unavailable, so the UI does not briefly
+  claim "no active profile" during normal readback.
+- GUI backend-state sync is ordered by request sequence. Older overlapping
+  reads cannot overwrite newer active-profile state after tray/wizard apply
+  events.
+- GUI wizard syncs the Tauri tray active-profile cache from post-apply backend
+  state when available, not only the requested/apply-result id.
+- Tauri tray profile menu loading is cache-first, then refreshes CLI metadata
+  in the background so the tray menu appears promptly without giving up
+  freshness.
+
+Validation:
+
+- PowerShell parser check for `abso\tray\ABSO-Tray.ps1`: passed.
+- Focused regression tests:
+  `tests/test_tray_script_static.py tests/test_core/test_profile_status.py tests/test_cli.py`:
+  `105 passed`.
+- Full unit suite: `1847 passed, 3 skipped`.
+- Frontend: `npm run lint` passed; `npm run build` passed.
+- Tauri shell: `cargo check` passed.
+- Python lint: `ruff check .` passed.
+- `git diff --check` passed with only existing CRLF normalization warnings.
+
+Deployment:
+
+- `.\.venv\Scripts\python.exe build.py deploy` rebuilt and deployed the
+  backend:
+  `%LOCALAPPDATA%\AdaptiveBattleStationOptimizer\abso.exe`, length
+  `17896129`, previous backend backup
+  `deploy-backups\abso.exe.bak-20260603-195208`; one tray asset updated.
+- `.\.venv\Scripts\python.exe build.py gui` rebuilt the Tauri GUI release.
+- `.\.venv\Scripts\python.exe build.py deploy-existing` copied the installed
+  GUI executable:
+  `%LOCALAPPDATA%\AdaptiveBattleStationOptimizer\abso-gui.exe`, length
+  `5056512`, previous GUI backup
+  `deploy-backups\abso-gui.exe.bak-20260603-195344`.
+- Tray was restarted through the installed scheduled task and is running the
+  deployed script as PID `49660`; `health --json` reports
+  `tray_runtime_marker: ok`.
+- Installed `state --json --verify` succeeds and reports active profile
+  `overwatch2-gsync-hdr-capture` with `reboot_pending: true` for
+  `GraphicsSettingsHandler.mpo_disabled`.
+- Installed `health --json` succeeds with `7 ok`, `3 warning`, `0 error`.
+  Remaining warnings are the expected reboot-gated profile/display diagnostics
+  and recent display/power events; there is no stale tray runtime warning.
+
+## 2026-06-03 UI Truthfulness Cleanup
+
+Fixed and deployed stale user-facing status surfaces:
+
+- GUI active-profile state no longer hydrates from old browser storage. Theme
+  and settings mode still persist, but active profile status is read from
+  backend `state --json --verify` before the UI claims active/no-active state.
+- GUI status bar and home banner now derive active, pending apply, pending
+  restart, mismatch, error, loading, and unavailable states from a shared
+  backend-state helper instead of treating any profile id as green-active.
+- GUI apply wizard now uses post-apply backend state for restart cards, does
+  not call no-op applies fresh applies, and marks backend state unavailable if
+  post-apply state read fails instead of fabricating local active state.
+- GUI apply now sends `--no-fallback`, matching manual tray profile selection:
+  selected profiles either apply as requested or fail clearly.
+- Tauri tray quick-apply also sends `--no-fallback` and updates its active
+  profile cache from the backend-returned `profile` field, not the requested
+  menu id.
+- PowerShell tray restart text now suppresses stale persisted
+  `reboot_pending` when live verification is clean, and the bottom status bar
+  deduplicates repeated `Restart required` / `Needs apply` fragments.
+
+Validation:
+
+- Focused regression tests:
+  `tests/test_tray_script_static.py tests/test_core/test_profile_status.py`:
+  `21 passed`.
+- Full unit suite: `1845 passed, 3 skipped`.
+- Frontend: `npm run lint` passed; `npm run build` passed.
+- Tauri shell: `cargo check` passed.
+- Python lint: `ruff check .` passed.
+- `git diff --check` passed with only existing CRLF normalization warnings.
+
+Deployment:
+
+- `.\.venv\Scripts\python.exe build.py deploy` rebuilt and deployed the
+  backend:
+  `%LOCALAPPDATA%\AdaptiveBattleStationOptimizer\abso.exe`, length
+  `17895394`, previous backend backup
+  `deploy-backups\abso.exe.bak-20260603-173011`; one tray asset updated.
+- `.\.venv\Scripts\python.exe build.py gui` rebuilt the Tauri GUI release.
+- `.\.venv\Scripts\python.exe build.py deploy-existing` copied the installed
+  GUI executable:
+  `%LOCALAPPDATA%\AdaptiveBattleStationOptimizer\abso-gui.exe`, length
+  `5048320`, previous GUI backup
+  `deploy-backups\abso-gui.exe.bak-20260603-173219`.
+- Tray was restarted through the installed scheduled task and is running the
+  deployed script as PID `36604`; `health --json` reports
+  `tray_runtime_marker: ok`.
+- Installed `state --json --verify` succeeds and reports active profile
+  `overwatch2-gsync-hdr-capture` with `reboot_pending: true` for
+  `GraphicsSettingsHandler.mpo_disabled`.
+- Installed `health --json` succeeds with `7 ok`, `3 warning`, `0 error`.
+  Remaining warnings are the expected reboot-gated profile/display diagnostics
+  and recent display/power events; there is no stale tray runtime warning.
 
 ## 2026-05-29 VRR Cap / Reflex Clarification
 
@@ -246,9 +1639,8 @@ These commands are read-only or no-op guarded for the current state:
 & "$env:LOCALAPPDATA\AdaptiveBattleStationOptimizer\abso.exe" state --json --verify
 ```
 
-For the current strict profile, `reapply --json` should be a no-op if state
-verification remains active. Prefer `state --json --verify` or `health --json`
-first; do not run a full apply/reapply to chase black flashes.
+For the current active profile, prefer `state --json --verify` or
+`health --json` first; do not run a full apply/reapply to chase black flashes.
 
 ## Do Not Run Unless User Explicitly Asks
 
@@ -286,25 +1678,45 @@ profile/display-path change to address the FPS-vs-flicker tradeoff.
 ## Current Bookmark
 
 Work can stop here without leaving the program mid-transition. The runtime is
-deployed, the tray is restarted, and the branch is clean after commit
-`87b4393`.
+deployed, safe installed checks pass, and no disruptive display/profile action
+was run.
 
-- Installed backend was rebuilt and deployed at `2026-05-29 16:52:04`:
-  length `17892269`, SHA256
-  `B2D481C5F875010AB215E27127E45370ECB75FF09BAC055835F03C0F398D2026`.
-- Tray is operational and running the installed tray script at PID `21832`;
-  `health --json` reports `tray_runtime_marker: ok`.
+- Installed backend was rebuilt and deployed at `2026-06-03 23:15:11`:
+  length `17899514`, SHA256
+  `E457758A7739ADB6E2B8E0EB57C836076233BCE85136C787EA4A6AFB56A02294`.
+- Installed GUI was already current during the latest deploy. Current installed
+  GUI remains length `5062144`, last write `2026-06-03 22:46:50`, SHA256
+  `2EC9785600189812EB4F3B2C288C20F36191D3AF8579A3442FCC116D8791414F`.
+- Tray is operational and running the installed tray script at PID `64560`;
+  `health --json` reports `tray_runtime_marker: ok`. Installed tray root
+  script SHA256:
+  `9AA1A531A49C769E8EC1B698A2054C9F2715D52F08F9F8CDA5F687BCB4C4AB47`.
+  The runtime marker includes five loaded helper module hashes, so helper-only
+  tray asset changes are now covered by stale-runtime health checks.
+- Installed tray settings script SHA256:
+  `E3FB034F09BEA77E9227413A69DF35353FFB7B213E5E5ABBFCEB4293E81DB9E0`.
+- Installed tray icon script SHA256:
+  `CCCBA47EB98096D07F2D446253065A4B86524967B147831EADAD931924443520`.
+- Installed tray notifications script SHA256:
+  `C310372DA9B1CAC71A087C0AA9E81CF6F386F560BEFFCA7074510B2D21843B1E`.
+- Installed tray quick panel script SHA256:
+  `9E1DBD4B38E80C5B7630F3E1EA7BD03D5AC2C1BD365581EEB90AE39A219BA024`.
 - Installed tray profile cache byte-content matches source by SHA256:
-  `4EC4C8816CD40E4AB318E63C0FAB5F13F00D3A0AF19D628D6FC7DCE84F1258FB`.
+  `0B5EF40DC2412869855085E0A45CB020D227DA0BF17A59DAE74B26ED07F9D304`.
 - Active profile state:
   `overwatch2-gsync-hdr-capture`, `reboot_pending: true` for the local MPO
   mitigation.
 - Current source makes the overlay-free and capture-safe OW2 G-SYNC HDR
   profiles share the same borderless/windowed VRR display path. The FPS cap is
   correct: `frame_rate_cap` target/current `297`.
-- `display-diagnostics --json` should report one 300 Hz VRR-capable monitor.
-  If it reports an MPO/compositor next action, treat that as the local
-  reboot-gated mitigation, not as a reason to force exclusive fullscreen.
+- Installed `health --json` reports `8 ok`, `2 warning`, `0 error`. The
+  warnings are the accurate reboot-gated
+  `GraphicsSettingsHandler.mpo_disabled` state and the current high-risk
+  mixed-refresh multi-monitor topology.
+- Installed `display-diagnostics --json` reports a
+  300 Hz VRR-capable primary plus a 59.95 Hz secondary,
+  `risk_level: high`, and
+  `likely_black_flash_path: windows_compositor_mpo_vrr_mixed_refresh`.
 
 ## Latest Verified Slice
 

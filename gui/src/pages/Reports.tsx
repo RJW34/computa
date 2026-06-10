@@ -1,8 +1,10 @@
 import * as React from 'react';
 import { Header } from '@/components/Header';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
-import { Copy, Gamepad2 } from 'lucide-react';
+import { GameMark, gameArtVars, getGameArt } from '@/components/GameMark';
+import { Copy, FileText } from 'lucide-react';
 import { useAppStore } from '@/stores/appStore';
 import * as api from '@/lib/api';
 
@@ -56,40 +58,66 @@ export function Reports() {
     }
   };
 
-  const selectedProfileName = profiles.find((p) => p.id === selectedProfile)?.display_name;
+  const selectedProfileObject = profiles.find((p) => p.id === selectedProfile);
+  const selectedProfileName = selectedProfileObject?.display_name;
+  const selectedArt = getGameArt(selectedProfileObject);
 
   return (
     <div className="min-h-screen">
       <Header showBack title="Reports" />
 
-      <main className="container mx-auto px-6 py-6 max-w-3xl">
-        <p className="text-muted-foreground mb-4">
-          Select a profile to view recommended in-game settings:
-        </p>
+      <main className="container mx-auto max-w-5xl space-y-5 px-6 py-6">
+        <section className="command-hero panel-enter p-5" style={gameArtVars(selectedArt)}>
+          <div className="relative flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div className="flex min-w-0 items-center gap-4">
+              <GameMark profile={selectedProfileObject} size="lg" showName active />
+              <div className="min-w-0">
+                <p className="section-kicker">In-game report</p>
+                <h2 className="truncate text-2xl font-black">
+                  {selectedProfileName || 'Select a profile'}
+                </h2>
+                <p className="line-clamp-2 text-sm text-muted-foreground">
+                  {selectedProfileObject?.tray_description ||
+                    selectedProfileObject?.description ||
+                    'Profile-specific in-game setting notes load here.'}
+                </p>
+              </div>
+            </div>
+            {selectedProfileObject?.has_in_game_settings && (
+              <Badge variant="success">Report available</Badge>
+            )}
+          </div>
+        </section>
 
         {profilesLoading && (
           <p className="text-sm text-muted-foreground mb-4">Loading profiles...</p>
         )}
 
         {/* Profile selector */}
-        <div className="flex flex-wrap gap-2 mb-6">
+        <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
           {profiles.map((profile) => (
-            <Button
+            <button
               key={profile.id}
-              variant={selectedProfile === profile.id ? 'default' : 'outline'}
+              type="button"
+              className={`flex min-w-0 items-center gap-3 rounded-md border p-3 text-left transition-all ${
+                selectedProfile === profile.id
+                  ? 'border-primary bg-primary/10'
+                  : 'border-border/70 bg-card/70 hover:border-primary/40'
+              }`}
               onClick={() => setSelectedProfile(profile.id)}
             >
-              {profile.display_name}
-            </Button>
+              <GameMark profile={profile} size="sm" />
+              <span className="truncate text-sm font-semibold">{profile.display_name}</span>
+            </button>
           ))}
         </div>
 
         {/* Report content */}
-        <Card>
+        <Card className="wizard-panel shadow-none" style={gameArtVars(selectedArt)}>
           <CardContent className="pt-6">
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-semibold text-lg flex items-center gap-2">
-                <Gamepad2 className="h-5 w-5" />
+                <FileText className="h-5 w-5 text-primary" />
                 {selectedProfileName ? `${selectedProfileName} - In-Game Settings` : 'In-Game Settings'}
               </h3>
             </div>

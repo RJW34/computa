@@ -32,6 +32,10 @@ actively working on that area.
 ## Reference
 
 - [API Reference](./API.md)
+- [Process Lasso-Class Features](./PROCESS_LASSO_FEATURES.md) — ProBalance
+  governor, core-parking power plan, Keep-Awake, CPU Sets, EcoQoS, CPU Limiter,
+  and the declarative watchdog: feature catalog, every config/tray-config flag,
+  online-safety model, and the one-step enablement.
 - [Troubleshooting](./TROUBLESHOOTING.md)
 - [NVAPI Integration Plan](./NVAPI_INTEGRATION_PLAN.md)
 

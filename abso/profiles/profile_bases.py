@@ -392,6 +392,14 @@ class Rivals2BaseProfile(BaseProfile):
                 "disable_usb_suspend": True,
                 "disable_pcie_power_saving": True,
                 "processor_max_performance": True,
+                # Bitsum "Highest Performance" equivalent: hold the CPU floor at
+                # base clock and keep every core unparked during play, removing
+                # the DVFS ramp + core-unpark wake latency that degrades 1% lows
+                # under a frame cap. The desktop/productivity profile relaxes the
+                # floor back to 5 so the 14900F still idles cool. EXPERIMENTAL:
+                # a frame-time consistency win, not an average-FPS gain.
+                "processor_min_state": 100,
+                "disable_core_parking": True,
             },
             "RegistrySettingsHandler": {
                 "win32_priority_separation": WIN32_PRIORITY_GAMING_OFFLINE,
@@ -523,6 +531,15 @@ class EmulatorLatencyBaseProfile(BaseProfile):
     def ai_agents(self) -> Literal["off", "on", "leave"]:
         return "off"
 
+    @property
+    def keep_awake_while_gaming(self) -> bool:
+        # Slippi Melee / Ryujinx SSBU are gamepad-driven: controller input does
+        # not reset the OS idle timer, and netplay has long matchmaking / lobby
+        # / spectate / shader / download waits where Windows would blank or
+        # sleep mid-session. Emulator lane defaults this ON; other lanes leave
+        # it off (their fullscreen path self-asserts display-required).
+        return True
+
     def get_handlers(self) -> list[SettingsHandler]:
         return build_standard_handlers(
             self,
@@ -557,6 +574,14 @@ class EmulatorLatencyBaseProfile(BaseProfile):
                 "disable_usb_suspend": True,
                 "disable_pcie_power_saving": True,
                 "processor_max_performance": True,
+                # Bitsum "Highest Performance" equivalent: hold the CPU floor at
+                # base clock and keep every core unparked during play, removing
+                # the DVFS ramp + core-unpark wake latency that degrades 1% lows
+                # under a frame cap. The desktop/productivity profile relaxes the
+                # floor back to 5 so the 14900F still idles cool. EXPERIMENTAL:
+                # a frame-time consistency win, not an average-FPS gain.
+                "processor_min_state": 100,
+                "disable_core_parking": True,
             },
             "RegistrySettingsHandler": {
                 "win32_priority_separation": WIN32_PRIORITY_GAMING_OFFLINE,
@@ -742,6 +767,14 @@ class ReflexShooterBaseProfile(BaseProfile):
                 "disable_usb_suspend": True,
                 "disable_pcie_power_saving": True,
                 "processor_max_performance": True,
+                # Bitsum "Highest Performance" equivalent: hold the CPU floor at
+                # base clock and keep every core unparked during play, removing
+                # the DVFS ramp + core-unpark wake latency that degrades 1% lows
+                # under a frame cap. The desktop/productivity profile relaxes the
+                # floor back to 5 so the 14900F still idles cool. EXPERIMENTAL:
+                # a frame-time consistency win, not an average-FPS gain.
+                "processor_min_state": 100,
+                "disable_core_parking": True,
             },
             "RegistrySettingsHandler": {
                 "win32_priority_separation": WIN32_PRIORITY_GAMING_OFFLINE,

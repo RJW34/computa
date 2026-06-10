@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import logging
 import subprocess
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -35,6 +36,35 @@ from abso.profiles.catalog import get_profile_classes, resolve_profile_id
 from abso.profiles.profile_bases import inject_nvidia_profile_identity
 
 logger = logging.getLogger(__name__)
+
+
+def _collect_override_conflicts(
+    prefix: str,
+    profile_value: Any,
+    merged_value: Any,
+    conflicts: list[str],
+) -> None:
+    """Record config overrides that replace explicit profile declarations.
+
+    A stale ``profile_overrides`` entry in abso.yaml that inverts a value the
+    profile explicitly declares is invisible in source review: every code path
+    reads the profile and sees the right value while apply enforces the
+    override. A leftover ``graphics.disable_mpo: true`` shipped exactly that
+    way on 2026-06-09 — it kept re-disabling MPO after the OW2 G-SYNC lanes
+    moved to the borderless/MPO-on path, and the first reboot that committed
+    it broke windowed G-SYNC (half-refresh 150 fps lock on the 300 Hz panel).
+    """
+    if isinstance(profile_value, Mapping) and isinstance(merged_value, Mapping):
+        for key, merged_child in merged_value.items():
+            if key in profile_value:
+                _collect_override_conflicts(
+                    f"{prefix}.{key}", profile_value[key], merged_child, conflicts
+                )
+        return
+    if profile_value != merged_value:
+        conflicts.append(
+            f"{prefix}: config override {merged_value!r} replaces profile value {profile_value!r}"
+        )
 
 
 @dataclass
@@ -286,12 +316,22 @@ class ProfileApplier:
         # === PHASE 6: Build final settings / preflight ===
         config_manager = ConfigManager()
         profile_overrides = config_manager.get_profile_overrides(profile_name)
+        override_conflicts: list[str] = []
         final_settings_map = self._finalize_handler_settings(
             profile,
             profile_name,
             settings_map,
             profile_overrides,
+            override_conflicts=override_conflicts,
         )
+        for conflict in override_conflicts:
+            message = (
+                f"Config override conflict: {conflict} "
+                "(abso.yaml profile_overrides wins; remove the stale override "
+                "if this is not intentional)"
+            )
+            logger.warning(message)
+            self._append_unique(result.warnings, message)
 
         preflight_failures = self._run_handler_preflight(
             profile_name,
@@ -397,6 +437,29 @@ class ProfileApplier:
             except Exception as e:
                 logger.error(f"Unexpected error applying {handler_name}: {e}")
                 failed.append(f"{handler_name}: Unexpected error - {e}")
+
+        # === PHASE 7.5: Reconcile borderless/windowed VRR enablers ===
+        # A later handler's HDR/MPO display re-enumeration can silently reset the
+        # three enablers borderless G-SYNC needs -- NVIDIA global vrr_mode plus
+        # the two Windows windowed-VRR flags -- back to fullscreen-only/off,
+        # which locks the game to half refresh (e.g. 150 fps on a 300 Hz panel).
+        # Re-assert + verify them now that every handler has run, so the
+        # committed driver/OS state matches what the profile declared.
+        try:
+            from abso.core.vrr_reconcile import reconcile_vrr_enablers
+
+            vrr_recon = reconcile_vrr_enablers(final_settings_map)
+            if vrr_recon.get("ran"):
+                reasserted = vrr_recon.get("reasserted") or []
+                if reasserted:
+                    handler_applied_details["VrrReconcile"] = list(reasserted)
+                    for line in reasserted:
+                        self._append_unique(result.notices, f"VRR enabler re-asserted: {line}")
+                    logger.info("VRR enabler reconciliation re-asserted: %s", reasserted)
+                for warning in vrr_recon.get("warnings") or []:
+                    self._append_unique(result.warnings, f"VRR enabler reconcile: {warning}")
+        except Exception as e:  # noqa: BLE001 - reconciliation must never break apply
+            logger.warning(f"VRR enabler reconciliation skipped: {e}")
 
         result.applied_settings = applied
         result.changed_settings = changed
@@ -631,8 +694,15 @@ class ProfileApplier:
         profile_name: str,
         settings_map: dict[str, dict[str, Any]],
         profile_overrides: Any | None,
+        *,
+        override_conflicts: list[str] | None = None,
     ) -> dict[str, dict[str, Any]]:
-        """Build the final per-handler settings map before apply/verify."""
+        """Build the final per-handler settings map before apply/verify.
+
+        When ``override_conflicts`` is provided, every config override that
+        replaces an explicitly declared profile value is described into it so
+        apply can surface the contradiction as a warning.
+        """
         final_settings: dict[str, dict[str, Any]] = {}
 
         for handler in profile.get_handlers():
@@ -643,7 +713,12 @@ class ProfileApplier:
                 settings = (profile.get_settings(handler_name) or {}).copy()
 
             if profile_overrides:
+                pre_override_settings = settings
                 settings = self._merge_overrides(settings, handler_name, profile_overrides)
+                if override_conflicts is not None and settings is not pre_override_settings:
+                    _collect_override_conflicts(
+                        handler_name, pre_override_settings, settings, override_conflicts
+                    )
 
             if handler_name == "NvidiaSettingsHandler":
                 settings["executables"] = list(profile.nvidia_binding_executables)

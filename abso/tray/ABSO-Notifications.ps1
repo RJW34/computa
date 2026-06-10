@@ -262,10 +262,10 @@ function _Derive-ToastTitle {
         $msg = "$Message".Trim()
         if (-not $msg) {
             switch ($Type) {
-                "Success" { return "Done" }
-                "Warning" { return "Heads up" }
-                "Error"   { return "Something went wrong" }
-                default   { return "Status update" }
+                "Success" { return "Tray action complete" }
+                "Warning" { return "Tray warning" }
+                "Error"   { return "Tray error" }
+                default   { return "Tray status" }
             }
         }
         $title = ($msg -split '[.!?:|]', 2)[0].Trim()
@@ -457,6 +457,207 @@ function _Paint-ToastPanel {
     $hzBrush.Dispose()
 }
 
+function New-ProfileMarkMedallionBitmap {
+    <#
+    .SYNOPSIS
+    Wraps a game/profile mark in the same circular glow/ring treatment used by
+    the tray hero surfaces, sized for toast and progress panels.
+    #>
+    param(
+        [string]$ProfileGameGroup,
+        [string]$ProfileCategory = "Other",
+        [System.Drawing.Color]$Color = [System.Drawing.Color]::White,
+        [switch]$ActiveBadge,
+        [string]$ModeBadge = "",
+        [switch]$FavoriteBadge
+    )
+
+    if ([string]::IsNullOrWhiteSpace($ProfileGameGroup) -or -not (Get-Command New-GameBitmap -ErrorAction SilentlyContinue)) {
+        return $null
+    }
+
+    $mark = $null
+    $bmp = $null
+    $g = $null
+    $glowBrush = $null
+    $backBrush = $null
+    $ringPen = $null
+    $tickPen = $null
+    $shineBrush = $null
+    try {
+        if ($ActiveBadge -and (Get-Command New-ActiveGameBitmap -ErrorAction SilentlyContinue)) {
+            $mark = New-ActiveGameBitmap `
+                -GameGroup $ProfileGameGroup `
+                -Color $Color `
+                -Category $ProfileCategory `
+                -ModeBadge $ModeBadge `
+                -FavoriteBadge ([bool]$FavoriteBadge)
+        }
+        elseif ($FavoriteBadge -and (Get-Command New-FavoriteGameBitmap -ErrorAction SilentlyContinue)) {
+            $mark = New-FavoriteGameBitmap `
+                -GameGroup $ProfileGameGroup `
+                -Color $Color `
+                -Category $ProfileCategory `
+                -ModeBadge $ModeBadge
+        }
+        elseif (-not [string]::IsNullOrWhiteSpace($ModeBadge) -and (Get-Command New-GameSyncBadgeBitmap -ErrorAction SilentlyContinue)) {
+            $mark = New-GameSyncBadgeBitmap `
+                -GameGroup $ProfileGameGroup `
+                -Color $Color `
+                -Category $ProfileCategory `
+                -SyncMode "agnostic" `
+                -ModeBadge $ModeBadge
+        }
+        else {
+            $mark = New-GameBitmap -GameGroup $ProfileGameGroup -Color $Color -Category $ProfileCategory
+        }
+        if (-not $mark) { return $null }
+
+        $bmp = New-Object System.Drawing.Bitmap(36, 36)
+        $g = [System.Drawing.Graphics]::FromImage($bmp)
+        $g.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
+        $g.Clear([System.Drawing.Color]::Transparent)
+
+        $glowBrush = New-Object System.Drawing.SolidBrush -ArgumentList (
+            [System.Drawing.Color]::FromArgb(54, $Color.R, $Color.G, $Color.B)
+        )
+        $g.FillEllipse($glowBrush, 1, 1, 34, 34)
+
+        $backRect = New-Object System.Drawing.Rectangle(5, 5, 26, 26)
+        $backBrush = New-Object System.Drawing.Drawing2D.LinearGradientBrush(
+            $backRect,
+            [System.Drawing.Color]::FromArgb(235, 19, 24, 36),
+            [System.Drawing.Color]::FromArgb(245, 10, 14, 21),
+            [System.Drawing.Drawing2D.LinearGradientMode]::ForwardDiagonal
+        )
+        $g.FillEllipse($backBrush, $backRect)
+
+        $ringPen = New-Object System.Drawing.Pen -ArgumentList (
+            [System.Drawing.Color]::FromArgb(180, $Color.R, $Color.G, $Color.B), 1.4
+        )
+        $g.DrawEllipse($ringPen, 5, 5, 26, 26)
+
+        $tickPen = New-Object System.Drawing.Pen -ArgumentList (
+            [System.Drawing.Color]::FromArgb(110, $Color.R, $Color.G, $Color.B), 1.1
+        )
+        $tickPen.StartCap = [System.Drawing.Drawing2D.LineCap]::Round
+        $tickPen.EndCap = [System.Drawing.Drawing2D.LineCap]::Round
+        $g.DrawArc($tickPen, 3, 3, 30, 30, 212, 42)
+        $g.DrawArc($tickPen, 3, 3, 30, 30, 326, 34)
+
+        $g.DrawImage($mark, (New-Object System.Drawing.Rectangle(9, 9, 18, 18)))
+
+        $shineBrush = New-Object System.Drawing.SolidBrush -ArgumentList (
+            [System.Drawing.Color]::FromArgb(80, 255, 255, 255)
+        )
+        $g.FillEllipse($shineBrush, 10, 7, 8, 4)
+
+        return $bmp
+    }
+    catch {
+        if ($bmp) {
+            try { $bmp.Dispose() } catch {}
+            $bmp = $null
+        }
+        return $null
+    }
+    finally {
+        if ($shineBrush) { $shineBrush.Dispose() }
+        if ($tickPen) { $tickPen.Dispose() }
+        if ($ringPen) { $ringPen.Dispose() }
+        if ($backBrush) { $backBrush.Dispose() }
+        if ($glowBrush) { $glowBrush.Dispose() }
+        if ($g) { $g.Dispose() }
+        if ($mark) { $mark.Dispose() }
+    }
+}
+
+function New-ActionMarkMedallionBitmap {
+    <#
+    .SYNOPSIS
+    Wraps a tray action glyph in the same toast medallion treatment used by
+    profile toasts, so action-only notices are not visually generic.
+    #>
+    param(
+        [string]$ActionName,
+        [System.Drawing.Color]$Color = [System.Drawing.Color]::White
+    )
+
+    if ([string]::IsNullOrWhiteSpace($ActionName) -or -not (Get-Command New-ActionBitmap -ErrorAction SilentlyContinue)) {
+        return $null
+    }
+
+    $mark = $null
+    $bmp = $null
+    $g = $null
+    $glowBrush = $null
+    $backBrush = $null
+    $ringPen = $null
+    $tickPen = $null
+    $shineBrush = $null
+    try {
+        $mark = New-ActionBitmap -Action $ActionName -Color $Color
+        if (-not $mark) { return $null }
+
+        $bmp = New-Object System.Drawing.Bitmap(36, 36)
+        $g = [System.Drawing.Graphics]::FromImage($bmp)
+        $g.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
+        $g.Clear([System.Drawing.Color]::Transparent)
+
+        $glowBrush = New-Object System.Drawing.SolidBrush -ArgumentList (
+            [System.Drawing.Color]::FromArgb(48, $Color.R, $Color.G, $Color.B)
+        )
+        $g.FillEllipse($glowBrush, 1, 1, 34, 34)
+
+        $backRect = New-Object System.Drawing.Rectangle(5, 5, 26, 26)
+        $backBrush = New-Object System.Drawing.Drawing2D.LinearGradientBrush(
+            $backRect,
+            [System.Drawing.Color]::FromArgb(235, 19, 24, 36),
+            [System.Drawing.Color]::FromArgb(245, 10, 14, 21),
+            [System.Drawing.Drawing2D.LinearGradientMode]::ForwardDiagonal
+        )
+        $g.FillEllipse($backBrush, $backRect)
+
+        $ringPen = New-Object System.Drawing.Pen -ArgumentList (
+            [System.Drawing.Color]::FromArgb(170, $Color.R, $Color.G, $Color.B), 1.35
+        )
+        $g.DrawEllipse($ringPen, 5, 5, 26, 26)
+
+        $tickPen = New-Object System.Drawing.Pen -ArgumentList (
+            [System.Drawing.Color]::FromArgb(95, $Color.R, $Color.G, $Color.B), 1.05
+        )
+        $tickPen.StartCap = [System.Drawing.Drawing2D.LineCap]::Round
+        $tickPen.EndCap = [System.Drawing.Drawing2D.LineCap]::Round
+        $g.DrawArc($tickPen, 3, 3, 30, 30, 218, 38)
+        $g.DrawArc($tickPen, 3, 3, 30, 30, 324, 30)
+
+        $g.DrawImage($mark, (New-Object System.Drawing.Rectangle(10, 10, 16, 16)))
+
+        $shineBrush = New-Object System.Drawing.SolidBrush -ArgumentList (
+            [System.Drawing.Color]::FromArgb(72, 255, 255, 255)
+        )
+        $g.FillEllipse($shineBrush, 10, 7, 8, 4)
+
+        return $bmp
+    }
+    catch {
+        if ($bmp) {
+            try { $bmp.Dispose() } catch {}
+            $bmp = $null
+        }
+        return $null
+    }
+    finally {
+        if ($shineBrush) { $shineBrush.Dispose() }
+        if ($tickPen) { $tickPen.Dispose() }
+        if ($ringPen) { $ringPen.Dispose() }
+        if ($backBrush) { $backBrush.Dispose() }
+        if ($glowBrush) { $glowBrush.Dispose() }
+        if ($g) { $g.Dispose() }
+        if ($mark) { $mark.Dispose() }
+    }
+}
+
 # ============================================================================
 # FORM CONSTRUCTION
 # ============================================================================
@@ -467,13 +668,31 @@ function _Build-ToastForm {
         [string]$Message,
         [string]$FooterText,
         [hashtable]$TypeMeta,
-        [string]$ChapterText
+        [string]$ChapterText,
+        [string]$ProfileGameGroup = "",
+        [string]$ProfileCategory = "Other",
+        [System.Drawing.Color]$ProfileColor = [System.Drawing.Color]::Empty,
+        [switch]$ProfileActiveBadge,
+        [string]$ProfileModeBadge = "",
+        [switch]$ProfileFavoriteBadge,
+        [string]$ActionName = "",
+        [System.Drawing.Color]$ActionColor = [System.Drawing.Color]::Empty
     )
     _Ensure-Fonts
 
     # Layout constants (single source of truth so paint + control placement agree).
     # Tuned for Bahnschrift SemiBold Condensed 15.5pt headline + Cascadia Code 9pt body on Win11 DPI.
-    $gutterX   = 28
+    $hasProfileMark = (
+        -not [string]::IsNullOrWhiteSpace($ProfileGameGroup) -and
+        (Get-Command New-GameBitmap -ErrorAction SilentlyContinue)
+    )
+    $hasActionMark = (
+        -not $hasProfileMark -and
+        -not [string]::IsNullOrWhiteSpace($ActionName) -and
+        (Get-Command New-ActionBitmap -ErrorAction SilentlyContinue)
+    )
+    $hasSideMark = ($hasProfileMark -or $hasActionMark)
+    $gutterX   = if ($hasSideMark) { 76 } else { 28 }
     $eyebrowY  = 14
     $titleY    = 32
     $ruleY     = 68    # was 62; needs more clearance under the bolder Bahnschrift 15.5pt
@@ -524,6 +743,33 @@ function _Build-ToastForm {
         param($s, $e)
         & $capPaintFn -g $e.Graphics -Width $capW -Height $capH -Meta $capMeta -ChapterText $capChapter
     }.GetNewClosure())
+
+    $profileImageBox = $null
+    $profileImage = $null
+    if ($hasSideMark) {
+        $markColor = if ($ProfileColor.IsEmpty) { $TypeMeta.Accent } else { $ProfileColor }
+        if ($hasActionMark -and -not $ActionColor.IsEmpty) { $markColor = $ActionColor }
+        $profileImageBox = New-Object System.Windows.Forms.PictureBox
+        $profileImageBox.Location = New-Object System.Drawing.Point(24, 36)
+        $profileImageBox.Size = New-Object System.Drawing.Size(36, 36)
+        $profileImageBox.SizeMode = [System.Windows.Forms.PictureBoxSizeMode]::Zoom
+        $profileImageBox.BackColor = $script:Penumbra.Ink100
+        $profileImageBox.Cursor = [System.Windows.Forms.Cursors]::Hand
+        $profileImage = if ($hasProfileMark) {
+            New-ProfileMarkMedallionBitmap `
+                -ProfileGameGroup $ProfileGameGroup `
+                -ProfileCategory $ProfileCategory `
+                -Color $markColor `
+                -ActiveBadge:$ProfileActiveBadge `
+                -ModeBadge $ProfileModeBadge `
+                -FavoriteBadge:$ProfileFavoriteBadge
+        }
+        else {
+            New-ActionMarkMedallionBitmap -ActionName $ActionName -Color $markColor
+        }
+        $profileImageBox.Image = $profileImage
+        $form.Controls.Add($profileImageBox)
+    }
 
     # Eyebrow (tracked condensed caps in accent, signals the state at a glance).
     # All labels use solid Ink-100 BackColor (matches Form.BackColor) so they
@@ -596,6 +842,8 @@ function _Build-ToastForm {
         FooterLabel = $footerLabel
         EyebrowLabel= $eyebrow
         DismissHost = $dismissHost
+        ProfileImageBox = $profileImageBox
+        ProfileImage = $profileImage
         Height      = $height
     }
 }
@@ -638,7 +886,15 @@ function Show-ThemedToast {
         # silently swallowing the popup makes the UI feel dead — the user clicked,
         # nothing happened. Callers can pass -BypassDedup to acknowledge that the
         # action is intentional and should always surface a toast.
-        [switch]$BypassDedup
+        [switch]$BypassDedup,
+        [string]$ProfileGameGroup = "",
+        [string]$ProfileCategory = "Other",
+        [System.Drawing.Color]$ProfileColor = [System.Drawing.Color]::Empty,
+        [switch]$ProfileActiveBadge,
+        [string]$ProfileModeBadge = "",
+        [switch]$ProfileFavoriteBadge,
+        [string]$ActionName = "",
+        [System.Drawing.Color]$ActionColor = [System.Drawing.Color]::Empty
     )
 
     try {
@@ -669,6 +925,10 @@ function Show-ThemedToast {
             $queueItem = @{
                 Title = $realTitle; Message = $realBody; Type = $Type
                 Duration = $Duration; MetaText = $MetaText
+                ProfileGameGroup = $ProfileGameGroup; ProfileCategory = $ProfileCategory
+                ProfileColor = $ProfileColor; ProfileActiveBadge = [bool]$ProfileActiveBadge
+                ProfileModeBadge = $ProfileModeBadge; ProfileFavoriteBadge = [bool]$ProfileFavoriteBadge
+                ActionName = $ActionName; ActionColor = $ActionColor
             }
             # Error preempts the oldest Info/Success so critical signals always surface
             if ($typeMeta.Priority -ge 4) {
@@ -702,7 +962,11 @@ function Show-ThemedToast {
         }
 
         _Spawn-Toast -Title $realTitle -Message $realBody -Type $Type `
-            -TypeMeta $typeMeta -FooterText $footer -Duration $Duration -Key $key
+            -TypeMeta $typeMeta -FooterText $footer -Duration $Duration -Key $key `
+            -ProfileGameGroup $ProfileGameGroup -ProfileCategory $ProfileCategory `
+            -ProfileColor $ProfileColor -ProfileActiveBadge:$ProfileActiveBadge `
+            -ProfileModeBadge $ProfileModeBadge -ProfileFavoriteBadge:$ProfileFavoriteBadge `
+            -ActionName $ActionName -ActionColor $ActionColor
     } catch {
         if (Get-Command Write-TrayLog -ErrorAction SilentlyContinue) {
             Write-TrayLog "Show-ThemedToast failed: $($_.Exception.Message)" -Level "ERROR"
@@ -713,7 +977,15 @@ function Show-ThemedToast {
 function _Spawn-Toast {
     param(
         [string]$Title, [string]$Message, [string]$Type,
-        [hashtable]$TypeMeta, [string]$FooterText, [int]$Duration, [string]$Key
+        [hashtable]$TypeMeta, [string]$FooterText, [int]$Duration, [string]$Key,
+        [string]$ProfileGameGroup = "",
+        [string]$ProfileCategory = "Other",
+        [System.Drawing.Color]$ProfileColor = [System.Drawing.Color]::Empty,
+        [switch]$ProfileActiveBadge,
+        [string]$ProfileModeBadge = "",
+        [switch]$ProfileFavoriteBadge,
+        [string]$ActionName = "",
+        [System.Drawing.Color]$ActionColor = [System.Drawing.Color]::Empty
     )
 
     $script:ToastChapterSeq++
@@ -721,7 +993,11 @@ function _Spawn-Toast {
 
     $built = _Build-ToastForm `
         -Title $Title -Message $Message -FooterText $FooterText `
-        -TypeMeta $TypeMeta -ChapterText $chapterText
+        -TypeMeta $TypeMeta -ChapterText $chapterText `
+        -ProfileGameGroup $ProfileGameGroup -ProfileCategory $ProfileCategory `
+        -ProfileColor $ProfileColor -ProfileActiveBadge:$ProfileActiveBadge `
+        -ProfileModeBadge $ProfileModeBadge -ProfileFavoriteBadge:$ProfileFavoriteBadge `
+        -ActionName $ActionName -ActionColor $ActionColor
     $form = $built.Form
 
     $slotIndex = $script:ActiveToasts.Count
@@ -738,6 +1014,8 @@ function _Spawn-Toast {
         FooterLabel    = $built.FooterLabel
         EyebrowLabel   = $built.EyebrowLabel
         DismissHost    = $built.DismissHost
+        ProfileImageBox= $built.ProfileImageBox
+        ProfileImage   = $built.ProfileImage
         Height         = $built.Height
         CurrentY       = $targetY
         TargetY        = $targetY
@@ -761,6 +1039,7 @@ function _Spawn-Toast {
     $built.BodyLabel.Add_Click($closeHandler)
     $built.FooterLabel.Add_Click($closeHandler)
     $built.EyebrowLabel.Add_Click($closeHandler)
+    if ($built.ProfileImageBox) { $built.ProfileImageBox.Add_Click($closeHandler) }
 
     $form.Show()
 
@@ -913,6 +1192,13 @@ function _Dismiss-ActiveToast {
             if ($raw -ge 1) {
                 $this.Stop(); $this.Dispose()
                 try { $tt.Form.Hide() } catch {}
+                if ($tt.ProfileImageBox) {
+                    try { $tt.ProfileImageBox.Image = $null } catch {}
+                }
+                if ($tt.ProfileImage) {
+                    try { $tt.ProfileImage.Dispose() } catch {}
+                    $tt.ProfileImage = $null
+                }
                 try { $tt.Form.Close() } catch {}
                 try { $tt.Form.Dispose() } catch {}
                 if ($script:ActiveToasts.Contains($tt)) {
@@ -934,7 +1220,11 @@ function _Drain-ToastQueue {
         $footer = _Format-ToastFooter -Meta $q.MetaText
         $key = "$($q.Type)|$($q.Title)|$($q.Message)"
         _Spawn-Toast -Title $q.Title -Message $q.Message -Type $q.Type `
-            -TypeMeta $typeMeta -FooterText $footer -Duration $q.Duration -Key $key
+            -TypeMeta $typeMeta -FooterText $footer -Duration $q.Duration -Key $key `
+            -ProfileGameGroup $q.ProfileGameGroup -ProfileCategory $q.ProfileCategory `
+            -ProfileColor $q.ProfileColor -ProfileActiveBadge:([bool]$q.ProfileActiveBadge) `
+            -ProfileModeBadge $q.ProfileModeBadge -ProfileFavoriteBadge:([bool]$q.ProfileFavoriteBadge) `
+            -ActionName $q.ActionName -ActionColor $q.ActionColor
     }
 }
 
@@ -970,6 +1260,10 @@ $script:ProgressElapsedTimer   = $null
 $script:ProgressStartTime      = $null
 $script:ProgressAngle          = 0
 $script:ProgressShimmerOffset  = -60
+$script:ProgressProfileImageBox= $null
+$script:ProgressProfileImage   = $null
+$script:ProgressDismissButton  = $null
+$script:ProgressDismissImage   = $null
 
 function Show-ProgressOverlay {
     <#
@@ -981,15 +1275,41 @@ function Show-ProgressOverlay {
     #>
     param(
         [string]$Title = "Applying profile",
-        [string]$StepText = "Initializing..."
+        [string]$StepText = "Initializing...",
+        [string]$ProfileGameGroup = "",
+        [string]$ProfileCategory = "Other",
+        [System.Drawing.Color]$ProfileColor = [System.Drawing.Color]::Empty,
+        [switch]$ProfileActiveBadge,
+        [string]$ProfileModeBadge = "",
+        [switch]$ProfileFavoriteBadge,
+        [string]$ActionName = "",
+        [System.Drawing.Color]$ActionColor = [System.Drawing.Color]::Empty
     )
     Close-ProgressOverlay
     _Ensure-Fonts
 
-    $accent = $script:Penumbra.Lagoon
-    $width  = 460
+    $hasProfileMark = (
+        -not [string]::IsNullOrWhiteSpace($ProfileGameGroup) -and
+        (Get-Command New-GameBitmap -ErrorAction SilentlyContinue)
+    )
+    $hasActionMark = (
+        -not $hasProfileMark -and
+        -not [string]::IsNullOrWhiteSpace($ActionName) -and
+        (Get-Command New-ActionBitmap -ErrorAction SilentlyContinue)
+    )
+    $hasSideMark = ($hasProfileMark -or $hasActionMark)
+    $accent = if ($hasProfileMark -and -not $ProfileColor.IsEmpty) {
+        $ProfileColor
+    }
+    elseif ($hasActionMark -and -not $ActionColor.IsEmpty) {
+        $ActionColor
+    }
+    else {
+        $script:Penumbra.Lagoon
+    }
+    $width  = if ($hasSideMark) { 500 } else { 460 }
     $height = 156
-    $gutter = 26
+    $gutter = if ($hasSideMark) { 78 } else { 26 }
 
     $form = New-Object System.Windows.Forms.Form
     $form.Text             = ""
@@ -1023,6 +1343,7 @@ function Show-ProgressOverlay {
     $capFog     = $script:Penumbra.Fog
     $capHzText  = $script:HzBadgeText
     $capFontTag = $script:Font_Tag
+    $capHasSideMark = $hasSideMark
     $form.BackColor = $capInk100
     $form.Add_Paint({
         param($s, $e)
@@ -1064,6 +1385,36 @@ function Show-ProgressOverlay {
             }
             $tickBrush.Dispose()
 
+            # Profile/action overlays get a live beacon behind the medallion.
+            # It uses the existing ProgressAngle timer, so there is no extra
+            # animation loop.
+            if ($capHasSideMark) {
+                $markWave = ([Math]::Sin($script:ProgressAngle / 24.0) + 1.0) / 2.0
+                $markHaloAlpha = [int](28 + (24 * $markWave))
+                $markHaloBrush = New-Object System.Drawing.SolidBrush(
+                    [System.Drawing.Color]::FromArgb($markHaloAlpha, $capAccent.R, $capAccent.G, $capAccent.B)
+                )
+                $g.FillEllipse($markHaloBrush, 19, 37, 50, 50)
+                $markHaloBrush.Dispose()
+
+                $markOrbitPen = New-Object System.Drawing.Pen(
+                    [System.Drawing.Color]::FromArgb([int](118 + (70 * $markWave)), $capAccent.R, $capAccent.G, $capAccent.B), 1.35
+                )
+                $markOrbitPen.StartCap = [System.Drawing.Drawing2D.LineCap]::Round
+                $markOrbitPen.EndCap = [System.Drawing.Drawing2D.LineCap]::Round
+                $g.DrawArc($markOrbitPen, 20, 38, 48, 48, (($script:ProgressAngle + 205) % 360), 84)
+                $markOrbitPen.Dispose()
+
+                $markLinkPen = New-Object System.Drawing.Pen(
+                    [System.Drawing.Color]::FromArgb([int](58 + (40 * $markWave)), $capAccent.R, $capAccent.G, $capAccent.B), 1.0
+                )
+                $markLinkPen.StartCap = [System.Drawing.Drawing2D.LineCap]::Round
+                $markLinkPen.EndCap = [System.Drawing.Drawing2D.LineCap]::Round
+                $g.DrawLine($markLinkPen, 64, 62, 74, 62)
+                $g.DrawLine($markLinkPen, 64, 70, 70, 70)
+                $markLinkPen.Dispose()
+            }
+
             # 6) L-shaped corner brackets (TR + BL + BR)
             $bracketLen = 10
             $bracketPen = New-Object System.Drawing.Pen($capAccent, 1.6)
@@ -1103,6 +1454,30 @@ function Show-ProgressOverlay {
             } catch {}
         }
     }.GetNewClosure())
+
+    $profileImageBox = $null
+    $profileImage = $null
+    if ($hasSideMark) {
+        $profileImageBox = New-Object System.Windows.Forms.PictureBox
+        $profileImageBox.Location = New-Object System.Drawing.Point(26, 44)
+        $profileImageBox.Size = New-Object System.Drawing.Size(36, 36)
+        $profileImageBox.SizeMode = [System.Windows.Forms.PictureBoxSizeMode]::Zoom
+        $profileImageBox.BackColor = $script:Penumbra.Ink100
+        if ($hasProfileMark) {
+            $profileImage = New-ProfileMarkMedallionBitmap `
+                -ProfileGameGroup $ProfileGameGroup `
+                -ProfileCategory $ProfileCategory `
+                -Color $accent `
+                -ActiveBadge:$ProfileActiveBadge `
+                -ModeBadge $ProfileModeBadge `
+                -FavoriteBadge:$ProfileFavoriteBadge
+        }
+        else {
+            $profileImage = New-ActionMarkMedallionBitmap -ActionName $ActionName -Color $accent
+        }
+        $profileImageBox.Image = $profileImage
+        $form.Controls.Add($profileImageBox)
+    }
 
     # Eyebrow
     # Eyebrow (tracked condensed caps in phosphor)
@@ -1160,7 +1535,7 @@ function Show-ProgressOverlay {
     $progressFill.Size      = New-Object System.Drawing.Size(0, 2)
     $progressFill.BackColor = [System.Drawing.Color]::Transparent
     # Same null-safe capture pattern as the form Paint closure above.
-    $capLagoon = $script:Penumbra.Lagoon
+    $capProgressAccent = $accent
     $progressFill.Add_Paint({
         param($s, $e)
         if ($s.Width -le 1) { return }
@@ -1168,14 +1543,14 @@ function Show-ProgressOverlay {
         try {
             $fill = New-Object System.Drawing.Drawing2D.LinearGradientBrush(
                 (New-Object System.Drawing.Rectangle(0, 0, [Math]::Max(2, $s.Width), $s.Height)),
-                [System.Drawing.Color]::FromArgb(180, $capLagoon.R, $capLagoon.G, $capLagoon.B),
-                $capLagoon,
+                [System.Drawing.Color]::FromArgb(180, $capProgressAccent.R, $capProgressAccent.G, $capProgressAccent.B),
+                $capProgressAccent,
                 [System.Drawing.Drawing2D.LinearGradientMode]::Horizontal
             )
             $g.FillRectangle($fill, 0, 0, $s.Width, $s.Height)
             $fill.Dispose()
         } catch {
-            $solid = New-Object System.Drawing.SolidBrush($capLagoon)
+            $solid = New-Object System.Drawing.SolidBrush($capProgressAccent)
             $g.FillRectangle($solid, 0, 0, $s.Width, $s.Height)
             $solid.Dispose()
         }
@@ -1191,7 +1566,7 @@ function Show-ProgressOverlay {
     $progressTrack.Controls.Add($progressFill)
     $form.Controls.Add($progressTrack)
 
-    # Elapsed time (Cascadia Code mono, fog) + Dismiss eyebrow on the right
+    # Elapsed time (Cascadia Code mono, fog) + icon-backed dismiss action.
     $elapsedLabel = New-Object System.Windows.Forms.Label
     $elapsedLabel.Text      = "0.0s"
     $elapsedLabel.ForeColor = $script:Penumbra.Fog
@@ -1201,18 +1576,34 @@ function Show-ProgressOverlay {
     $elapsedLabel.BackColor = $script:Penumbra.Ink100
     $form.Controls.Add($elapsedLabel)
 
-    $cancelLabel = New-Object System.Windows.Forms.Label
-    $cancelLabel.Text      = "DISMISS"
-    $cancelLabel.ForeColor = $script:Penumbra.Fog
-    $cancelLabel.Font      = $script:Font_Eyebrow
-    $cancelLabel.Location  = New-Object System.Drawing.Point(($width - 100), 122)
-    $cancelLabel.Size      = New-Object System.Drawing.Size(70, 14)
-    $cancelLabel.BackColor = $script:Penumbra.Ink100
-    $cancelLabel.Cursor    = [System.Windows.Forms.Cursors]::Hand
-    $cancelLabel.TextAlign = [System.Drawing.ContentAlignment]::MiddleRight
-    $cancelLabel.Add_MouseEnter({ $this.ForeColor = $script:Penumbra.Coral })
-    $cancelLabel.Add_MouseLeave({ $this.ForeColor = $script:Penumbra.Fog })
-    $form.Controls.Add($cancelLabel)
+    $dismissImage = $null
+    if (Get-Command New-ActionBitmap -ErrorAction SilentlyContinue) {
+        $dismissImage = New-ActionBitmap -Action "Close" -Color $script:Penumbra.Fog
+    }
+    $cancelButton = New-Object System.Windows.Forms.Button
+    $cancelButton.Text      = "DISMISS"
+    $cancelButton.ForeColor = $script:Penumbra.Fog
+    $cancelButton.Font      = $script:Font_Eyebrow
+    $cancelButton.Location  = New-Object System.Drawing.Point(($width - 114), 116)
+    $cancelButton.Size      = New-Object System.Drawing.Size(92, 26)
+    $cancelButton.BackColor = $script:Penumbra.Ink100
+    $cancelButton.Cursor    = [System.Windows.Forms.Cursors]::Hand
+    $cancelButton.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
+    $cancelButton.FlatAppearance.BorderSize = 0
+    $cancelButton.FlatAppearance.MouseOverBackColor = [System.Drawing.Color]::FromArgb(22, $script:Penumbra.Coral.R, $script:Penumbra.Coral.G, $script:Penumbra.Coral.B)
+    $cancelButton.FlatAppearance.MouseDownBackColor = [System.Drawing.Color]::FromArgb(36, $script:Penumbra.Coral.R, $script:Penumbra.Coral.G, $script:Penumbra.Coral.B)
+    $cancelButton.Image = $dismissImage
+    $cancelButton.ImageAlign = [System.Drawing.ContentAlignment]::MiddleLeft
+    $cancelButton.TextAlign = [System.Drawing.ContentAlignment]::MiddleRight
+    $cancelButton.TextImageRelation = [System.Windows.Forms.TextImageRelation]::ImageBeforeText
+    $cancelButton.Padding = New-Object System.Windows.Forms.Padding(6, 0, 6, 0)
+    $cancelButton.UseVisualStyleBackColor = $false
+    $cancelButton.Add_Click({ Close-ProgressOverlay })
+    $cancelButton.Add_MouseEnter({ $this.ForeColor = $script:Penumbra.Coral })
+    $cancelButton.Add_MouseLeave({ $this.ForeColor = $script:Penumbra.Fog })
+    $form.Controls.Add($cancelButton)
+    $script:ProgressDismissButton = $cancelButton
+    $script:ProgressDismissImage = $dismissImage
 
     # Animation timer at monitor refresh rate (8ms floor for WinForms)
     $timer = New-Object System.Windows.Forms.Timer
@@ -1272,6 +1663,8 @@ function Show-ProgressOverlay {
     $script:ProgressTrack        = $progressTrack
     $script:ProgressFill         = $progressFill
     $script:ProgressElapsedLabel = $elapsedLabel
+    $script:ProgressProfileImageBox = $profileImageBox
+    $script:ProgressProfileImage = $profileImage
 
     $form.Show()
 
@@ -1337,6 +1730,22 @@ function Close-ProgressOverlay {
         try { $script:ProgressTopmostTimer.Stop(); $script:ProgressTopmostTimer.Dispose() } catch {}
         $script:ProgressTopmostTimer = $null
     }
+    if ($script:ProgressProfileImageBox) {
+        try { $script:ProgressProfileImageBox.Image = $null } catch {}
+        $script:ProgressProfileImageBox = $null
+    }
+    if ($script:ProgressProfileImage) {
+        try { $script:ProgressProfileImage.Dispose() } catch {}
+        $script:ProgressProfileImage = $null
+    }
+    if ($script:ProgressDismissButton) {
+        try { $script:ProgressDismissButton.Image = $null } catch {}
+        $script:ProgressDismissButton = $null
+    }
+    if ($script:ProgressDismissImage) {
+        try { $script:ProgressDismissImage.Dispose() } catch {}
+        $script:ProgressDismissImage = $null
+    }
     if ($script:ProgressForm) {
         try {
             $script:ProgressForm.Hide()
@@ -1355,6 +1764,10 @@ function Close-ProgressOverlay {
     $script:ProgressTrack        = $null
     $script:ProgressFill         = $null
     $script:ProgressElapsedLabel = $null
+    $script:ProgressProfileImageBox = $null
+    $script:ProgressProfileImage = $null
+    $script:ProgressDismissButton = $null
+    $script:ProgressDismissImage = $null
 }
 
 # ============================================================================
@@ -1369,13 +1782,31 @@ function Show-ABSONotification {
         [string]$Type = "Info",
         [System.Windows.Forms.NotifyIcon]$NotifyIcon,
         [int]$Duration = 4500,
-        [string]$MetaText = ""
+        [string]$MetaText = "",
+        [string]$ActionName = "",
+        [System.Drawing.Color]$ActionColor = [System.Drawing.Color]::Empty
     )
-    if ($NotifyIcon) {
-        $maxLen = [Math]::Min(63, "$Title - $Message".Length)
-        $NotifyIcon.Text = "$Title - $Message".Substring(0, $maxLen)
+    if (Get-Command Set-TransientNotificationTooltip -ErrorAction SilentlyContinue) {
+        Set-TransientNotificationTooltip -Title $Title -Message $Message
     }
-    Show-ThemedToast -Title $Title -Message $Message -Type $Type -Duration $Duration -MetaText $MetaText
+    elseif ($NotifyIcon) {
+        $tooltipText = "$Title - $Message"
+        if ($tooltipText.Length -gt 63) {
+            $tooltipText = $tooltipText.Substring(0, 60) + "..."
+        }
+        $NotifyIcon.Text = $tooltipText
+    }
+
+    $popupToggle = Get-Variable -Name EnableBalloonNotifications -Scope Script -ErrorAction SilentlyContinue
+    if ($popupToggle -and -not $script:EnableBalloonNotifications) { return }
+    Show-ThemedToast `
+        -Title $Title `
+        -Message $Message `
+        -Type $Type `
+        -Duration $Duration `
+        -MetaText $MetaText `
+        -ActionName $ActionName `
+        -ActionColor $ActionColor
 }
 
 # ============================================================================

@@ -38,6 +38,12 @@ class PowerSettingsHandler(SettingsHandler):
     PROCESSOR_SUBGROUP = "54533251-82be-4824-96c1-47b60b740d00"
     PROCESSOR_MIN_STATE = "893dee8e-2bef-41e0-89c6-b55d0929964c"
     PROCESSOR_MAX_STATE = "bc5038f7-23e0-4960-96da-33abaf5935ec"
+    # Core parking: CPMINCORES = minimum percent of cores kept unparked. 100 =
+    # parking fully disabled (every core always available), which removes the
+    # core-unpark wake latency that degrades frame-time consistency / 1% lows
+    # under a frame cap. Hidden in the powercfg UI but writable by GUID via
+    # /setacvalueindex, exactly like the min/max-state values above.
+    PROCESSOR_CORE_PARKING_MIN = "0cc5b647-c1df-4637-891a-dec35c318583"
 
     def detect(self) -> dict[str, Any]:
         """Detect current power settings."""
@@ -177,6 +183,14 @@ class PowerSettingsHandler(SettingsHandler):
                     100,
                 )
 
+            if settings.get("disable_core_parking"):
+                set_power_setting_if_needed(
+                    "CPU core parking (min cores unparked)",
+                    self.PROCESSOR_SUBGROUP,
+                    self.PROCESSOR_CORE_PARKING_MIN,
+                    100,
+                )
+
             if power_setting_changes:
                 self._apply_current_scheme()
 
@@ -214,6 +228,9 @@ class PowerSettingsHandler(SettingsHandler):
         backup_data["pcie_link_state"] = self._get_power_setting(
             self.PCIE_SUBGROUP, self.PCIE_LINK_STATE
         )
+        backup_data["core_parking_min"] = self._get_power_setting(
+            self.PROCESSOR_SUBGROUP, self.PROCESSOR_CORE_PARKING_MIN
+        )
 
         return backup_data
 
@@ -234,6 +251,7 @@ class PowerSettingsHandler(SettingsHandler):
             "processor_max_state": (self.PROCESSOR_SUBGROUP, self.PROCESSOR_MAX_STATE),
             "usb_selective_suspend": (self.USB_SUBGROUP, self.USB_SELECTIVE_SUSPEND),
             "pcie_link_state": (self.PCIE_SUBGROUP, self.PCIE_LINK_STATE),
+            "core_parking_min": (self.PROCESSOR_SUBGROUP, self.PROCESSOR_CORE_PARKING_MIN),
         }
 
         for key, (subgroup, setting) in setting_map.items():
@@ -315,6 +333,19 @@ class PowerSettingsHandler(SettingsHandler):
                 "active": max_active,
             }
             if not min_active or not max_active:
+                results["all_active"] = False
+
+        if settings.get("disable_core_parking"):
+            current_value = self._get_power_setting(
+                self.PROCESSOR_SUBGROUP, self.PROCESSOR_CORE_PARKING_MIN
+            )
+            is_active = current_value == 100
+            results["settings"]["disable_core_parking"] = {
+                "target": 100,
+                "current": current_value,
+                "active": is_active,
+            }
+            if not is_active:
                 results["all_active"] = False
 
         return results
@@ -455,9 +486,16 @@ class PowerSettingsHandler(SettingsHandler):
             logger.warning(f"Failed to apply power setting changes: {apply_result.stderr}")
 
     def _get_power_setting(self, subgroup: str, setting: str) -> int | None:
-        """Get a power setting value for the current scheme via powercfg /query."""
+        """Get a power setting value for the current scheme via powercfg /qh.
+
+        ``/qh`` (query including hidden) is required, not ``/query``: hidden
+        settings such as core parking (CPMINCORES) emit nothing under plain
+        ``/query`` — only the scheme header — so the index parse would return
+        ``None`` and break backup/verify for them. ``/qh`` is a safe superset
+        that also returns the non-hidden min/max-state values.
+        """
         try:
-            result = self._run_powercfg("/query", "SCHEME_CURRENT", subgroup, setting)
+            result = self._run_powercfg("/qh", "SCHEME_CURRENT", subgroup, setting)
             if result.returncode == 0:
                 # Parse "Current AC Power Setting Index: 0x000000nn"
                 match = re.search(

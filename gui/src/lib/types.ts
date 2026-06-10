@@ -188,8 +188,11 @@ export interface BackendState {
 export interface ApplyResult {
   success: boolean;
   profile: string;
+  requested_profile?: string;
+  fallback_applied?: boolean;
   backup_id?: string | null;
   requires_reboot: boolean;
+  reboot_pending?: boolean;
   reboot_reasons: string[];
   in_game_settings: boolean;
   error?: string | null;
@@ -210,6 +213,9 @@ export interface ApplyResult {
   warnings: string[];
   notices: string[];
   summary_level?: 'success' | 'notice' | 'caution' | 'warning';
+  changed?: boolean;
+  changed_settings?: string[];
+  verification?: BackendStateVerification;
   results: ApplyHandlerResult[];
   transaction?: TransactionSummary;
   compliance?: ComplianceSummary | null;

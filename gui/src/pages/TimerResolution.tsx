@@ -36,8 +36,8 @@ export function TimerResolution() {
     <div className="min-h-screen">
       <Header showBack title="Timer Resolution" />
 
-      <main className="container mx-auto px-6 py-6 max-w-2xl">
-        <Card className="mb-6">
+      <main className="container mx-auto max-w-3xl px-6 py-6">
+        <Card className="wizard-panel mb-6 shadow-none">
           <CardContent className="pt-6">
             {loading ? (
               <div className="flex items-center gap-2 text-muted-foreground">
@@ -69,7 +69,7 @@ export function TimerResolution() {
           </CardContent>
         </Card>
 
-        <Card className="mb-6 border-info/50 bg-info/5">
+        <Card className="wizard-panel mb-6 border-info/50 bg-info/5 shadow-none">
           <CardContent className="pt-6">
             <div className="flex gap-3">
               <Info className="h-5 w-5 text-info flex-shrink-0 mt-0.5" />

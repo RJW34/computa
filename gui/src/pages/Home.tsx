@@ -1,18 +1,81 @@
 import * as React from 'react';
 import {
+  Activity,
+  Archive,
+  CheckCircle2,
+  FileText,
   Gamepad2,
   Search,
   Settings,
-  Archive,
-  FileText,
+  Shield,
   Timer,
-  CheckCircle2,
+  Zap,
+  AlertTriangle,
 } from 'lucide-react';
 import { ActionCard } from '@/components/cards/ActionCard';
+import { GameMark, gameArtVars, getGameArt } from '@/components/GameMark';
 import { HardwareSummary } from '@/components/HardwareSummary';
 import { Header } from '@/components/Header';
-import { useAppStore } from '@/stores/appStore';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { useAppStore } from '@/stores/appStore';
+import { buildProfileUiState } from '@/lib/profileState';
+import { cn, formatRelativeTime } from '@/lib/utils';
+import type { Profile } from '@/lib/types';
+
+const PROFILE_CATEGORY_ORDER: Record<string, number> = {
+  Desktop: 0,
+  Fighting: 1,
+  Shooters: 2,
+  RPGs: 3,
+  Other: 4,
+};
+
+interface ProfileGroup {
+  id: string;
+  name: string;
+  category: string;
+  rank: number;
+  profiles: Profile[];
+}
+
+function buildProfileGroups(profiles: Profile[]): ProfileGroup[] {
+  const groups = new Map<string, ProfileGroup>();
+
+  profiles
+    .filter((profile) => profile.tray_visible !== false)
+    .forEach((profile) => {
+      const groupId = profile.tray_group || profile.id;
+      const group = groups.get(groupId) ?? {
+        id: groupId,
+        name: profile.tray_group_name || profile.display_name,
+        category: profile.tray_category || 'Other',
+        rank: profile.tray_rank ?? 100,
+        profiles: [],
+      };
+
+      group.rank = Math.min(group.rank, profile.tray_rank ?? 100);
+      group.profiles.push(profile);
+      groups.set(groupId, group);
+    });
+
+  return Array.from(groups.values())
+    .map((group) => ({
+      ...group,
+      profiles: group.profiles.sort(
+        (a, b) =>
+          (a.tray_rank ?? 100) - (b.tray_rank ?? 100) ||
+          (a.tray_variant || a.display_name).localeCompare(b.tray_variant || b.display_name)
+      ),
+    }))
+    .sort(
+      (a, b) =>
+        (PROFILE_CATEGORY_ORDER[a.category] ?? 99) -
+          (PROFILE_CATEGORY_ORDER[b.category] ?? 99) ||
+        a.rank - b.rank ||
+        a.name.localeCompare(b.name)
+    );
+}
 
 export function Home() {
   const {
@@ -23,15 +86,20 @@ export function Home() {
     backups,
     activeProfile,
     activeProfileAppliedAt,
+    activeProfileVerification,
+    activeProfileRebootPending,
+    activeProfileRebootReasons,
+    activeProfileStateKnown,
+    activeProfileStateError,
     profiles,
     loadProfiles,
+    setWizardProfile,
+    isAdmin,
   } = useAppStore();
 
-  // Track if initial load has been done to prevent duplicate calls
   const initialLoadDone = React.useRef(false);
 
   React.useEffect(() => {
-    // Only load data once on initial mount
     if (initialLoadDone.current) return;
     initialLoadDone.current = true;
 
@@ -40,114 +108,272 @@ export function Home() {
     void loadProfiles();
   }, [runAudit, loadBackups, loadProfiles]);
 
+  const profileGroups = React.useMemo(() => buildProfileGroups(profiles), [profiles]);
   const criticalCount = auditResults.filter((i) => i.severity === 'critical').length;
   const warningCount = auditResults.filter((i) => i.severity === 'warning').length;
   const totalIssues = criticalCount + warningCount;
+  const activeProfileObject = activeProfile
+    ? profiles.find((profile) => profile.id === activeProfile) ?? null
+    : null;
+  const activeProfileName = activeProfileObject?.display_name || activeProfile || null;
+  const profileUiState = buildProfileUiState({
+    activeProfileName,
+    stateKnown: activeProfileStateKnown,
+    stateError: activeProfileStateError,
+    verification: activeProfileVerification,
+    rebootPending: activeProfileRebootPending,
+    rebootReasons: activeProfileRebootReasons,
+  });
+  const activeGroupId = activeProfileObject?.tray_group || activeProfileObject?.id || null;
+  const heroArt = getGameArt(activeProfileObject);
+  const latestBackup = backups[0];
+  const activeCopy =
+    activeProfileName && profileUiState.kind === 'active'
+      ? `${activeProfileName} is verified active.`
+      : profileUiState.detail
+        ? `${profileUiState.label}: ${profileUiState.detail}`
+      : activeProfileName
+        ? `${profileUiState.label}: ${activeProfileName}`
+        : profileUiState.label;
 
-  // Format the active profile applied time
-  const getAppliedTimeAgo = () => {
-    if (!activeProfileAppliedAt) return '';
-    const appliedDate = new Date(activeProfileAppliedAt);
-    const now = new Date();
-    const diffMs = now.getTime() - appliedDate.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMins / 60);
-    const diffDays = Math.floor(diffHours / 24);
-
-    if (diffDays > 0) return `${diffDays}d ago`;
-    if (diffHours > 0) return `${diffHours}h ago`;
-    if (diffMins > 0) return `${diffMins}m ago`;
-    return 'just now';
+  const openProfileGroup = (group: ProfileGroup) => {
+    const preferredProfile =
+      group.profiles.find((profile) => profile.id === activeProfile) ?? group.profiles[0];
+    setWizardProfile(preferredProfile?.id ?? null);
+    setPage('profile-wizard');
   };
 
-  const activeProfileName = activeProfile
-    ? (profiles.find((p) => p.id === activeProfile)?.display_name || activeProfile)
-    : null;
-
   return (
-    <div className="min-h-screen pb-12">
+    <div className="min-h-screen">
       <Header />
 
-      <main className="container mx-auto px-6 py-6">
+      <main className="container mx-auto space-y-7 px-6 py-6">
+        <section className="command-hero panel-enter p-5 md:p-6" style={gameArtVars(heroArt)}>
+          <div className="grid gap-6 lg:grid-cols-[1.15fr_0.85fr] lg:items-end">
+            <div className="flex min-w-0 flex-col gap-5">
+              <div className="flex min-w-0 items-center gap-4">
+                <GameMark
+                  profile={activeProfileObject}
+                  size="hero"
+                  active={!profileUiState.needsAttention}
+                />
+                <div className="min-w-0">
+                  <p className="section-kicker">Live profile</p>
+                  <h2 className="max-w-2xl text-3xl font-black leading-tight md:text-4xl">
+                    {activeProfileName || 'No active profile'}
+                  </h2>
+                  <p
+                    className={cn(
+                      'mt-2 max-w-2xl text-sm',
+                      profileUiState.needsAttention
+                        ? 'text-warning'
+                        : 'text-muted-foreground'
+                    )}
+                  >
+                    {activeCopy}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                <Button onClick={() => setPage('profile-wizard')} className="gap-2">
+                  <Gamepad2 className="h-4 w-4" />
+                  Change profile
+                </Button>
+                <Button variant="outline" onClick={() => setPage('audit')} className="gap-2">
+                  <Search className="h-4 w-4" />
+                  Review audit
+                </Button>
+              </div>
+            </div>
+
+            <div className="metric-strip">
+              <div className="metric-chip">
+                <div className="metric-chip__label">State</div>
+                <div className="metric-chip__value">
+                  {profileUiState.needsAttention ? profileUiState.label : 'Ready'}
+                </div>
+              </div>
+              <div className="metric-chip">
+                <div className="metric-chip__label">Applied</div>
+                <div className="metric-chip__value">
+                  {activeProfileAppliedAt ? formatRelativeTime(activeProfileAppliedAt) : 'Unknown'}
+                </div>
+              </div>
+              <div className="metric-chip">
+                <div className="metric-chip__label">Audit</div>
+                <div className="metric-chip__value">
+                  {totalIssues > 0 ? `${totalIssues} issue${totalIssues === 1 ? '' : 's'}` : 'Clean'}
+                </div>
+              </div>
+              <div className="metric-chip">
+                <div className="metric-chip__label">Backups</div>
+                <div className="metric-chip__value">{backups.length || 'None'}</div>
+              </div>
+            </div>
+          </div>
+        </section>
+
         <HardwareSummary />
 
-        {/* Active Profile Banner */}
-        {activeProfile && (
-          <div className="mb-4 p-3 rounded-lg border border-success/30 bg-success/5 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <CheckCircle2 className="h-5 w-5 text-success" />
-              <span className="text-sm">
-                Active Profile: <strong>{activeProfileName}</strong>
-              </span>
-              <Badge variant="outline" className="text-xs">
-                {getAppliedTimeAgo()}
-              </Badge>
+        <section className="space-y-4 panel-enter stagger-1">
+          <div className="section-heading">
+            <div>
+              <p className="section-kicker">Game deck</p>
+              <h2 className="text-2xl font-black">Profile roster</h2>
             </div>
-            <button
-              onClick={() => setPage('profile-wizard')}
-              className="text-sm text-muted-foreground hover:text-foreground"
-            >
-              Change
-            </button>
+            <Badge variant="outline" className="hidden md:inline-flex">
+              {profileGroups.length} title groups / {profiles.length} variants
+            </Badge>
           </div>
-        )}
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          <ActionCard
-            icon={Gamepad2}
-            title="Apply Profile"
-            subtitle={activeProfile ? `Active: ${activeProfileName}` : 'Optimize for a specific profile'}
-            onClick={() => setPage('profile-wizard')}
-          />
+          <div className="profile-roster">
+            {profileGroups.map((group) => {
+              const art = getGameArt({ id: group.id });
+              const isActiveGroup = activeGroupId === group.id;
+              const variantPreview = group.profiles
+                .slice(0, 3)
+                .map((profile) => profile.tray_variant || profile.display_name)
+                .join(' / ');
 
-          <ActionCard
-            icon={Search}
-            title="Audit System"
-            subtitle="Check for optimization issues"
-            badge={
-              totalIssues > 0
-                ? {
-                    count: totalIssues,
-                    variant: criticalCount > 0 ? 'critical' : 'warning',
-                  }
-                : undefined
-            }
-            onClick={() => setPage('audit')}
-          />
+              return (
+                <button
+                  key={group.id}
+                  type="button"
+                  className={cn(
+                    'profile-group-tile text-left panel-enter',
+                    isActiveGroup && 'profile-group-tile--active'
+                  )}
+                  style={gameArtVars(art)}
+                  onClick={() => openProfileGroup(group)}
+                >
+                  <div className="relative flex items-start justify-between gap-4">
+                    <GameMark groupId={group.id} size="lg" showName active={isActiveGroup} />
+                    <div className="flex flex-col items-end gap-2">
+                      <Badge variant={isActiveGroup ? 'success' : 'outline'}>
+                        {isActiveGroup ? 'Live' : group.category}
+                      </Badge>
+                      <span className="text-xs text-muted-foreground">
+                        {group.profiles.length} variant{group.profiles.length === 1 ? '' : 's'}
+                      </span>
+                    </div>
+                  </div>
+                  <p className="relative mt-4 line-clamp-2 text-sm text-muted-foreground">
+                    {variantPreview}
+                  </p>
+                </button>
+              );
+            })}
+          </div>
+        </section>
 
-          <ActionCard
-            icon={Settings}
-            title="Settings"
-            subtitle="Review profile-driven setting targets"
-            onClick={() => setPage('settings')}
-          />
+        <section className="space-y-4 panel-enter stagger-2">
+          <div className="section-heading">
+            <div>
+              <p className="section-kicker">Operations</p>
+              <h2 className="text-2xl font-black">Control surface</h2>
+            </div>
+            <div className="hidden items-center gap-2 text-sm text-muted-foreground md:flex">
+              {isAdmin ? (
+                <>
+                  <Shield className="h-4 w-4 text-success" />
+                  Elevated runtime
+                </>
+              ) : (
+                <>
+                  <AlertTriangle className="h-4 w-4 text-warning" />
+                  Standard runtime
+                </>
+              )}
+            </div>
+          </div>
 
-          <ActionCard
-            icon={Archive}
-            title="Backups"
-            subtitle="Manage restore points"
-            badge={
-              backups.length > 0
-                ? { count: backups.length, variant: 'default' }
-                : undefined
-            }
-            onClick={() => setPage('backups')}
-          />
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+            <ActionCard
+              icon={Gamepad2}
+              title="Apply Profile"
+              subtitle={activeProfileName ? `Live: ${activeProfileName}` : 'Optimize for a title'}
+              onClick={() => setPage('profile-wizard')}
+            />
 
-          <ActionCard
-            icon={FileText}
-            title="Reports"
-            subtitle="View in-game setting guides"
-            onClick={() => setPage('reports')}
-          />
+            <ActionCard
+              icon={Activity}
+              title="System Audit"
+              subtitle="Check drift, warnings, and profile readiness"
+              badge={
+                totalIssues > 0
+                  ? {
+                      count: totalIssues,
+                      variant: criticalCount > 0 ? 'critical' : 'warning',
+                    }
+                  : undefined
+              }
+              onClick={() => setPage('audit')}
+            />
 
-          <ActionCard
-            icon={Timer}
-            title="Timer"
-            subtitle="Inspect current timer resolution"
-            onClick={() => setPage('timer')}
-          />
-        </div>
+            <ActionCard
+              icon={Settings}
+              title="Settings"
+              subtitle="Inspect profile-driven setting targets"
+              onClick={() => setPage('settings')}
+            />
+
+            <ActionCard
+              icon={Archive}
+              title="Backups"
+              subtitle={
+                latestBackup
+                  ? `Latest restore point: ${formatRelativeTime(latestBackup.created_at)}`
+                  : 'Create and restore rollback points'
+              }
+              badge={
+                backups.length > 0
+                  ? { count: backups.length, variant: 'default' }
+                  : undefined
+              }
+              onClick={() => setPage('backups')}
+            />
+
+            <ActionCard
+              icon={FileText}
+              title="Reports"
+              subtitle="Open title-specific in-game settings notes"
+              onClick={() => setPage('reports')}
+            />
+
+            <ActionCard
+              icon={Timer}
+              title="Timer"
+              subtitle="Inspect current timer resolution"
+              onClick={() => setPage('timer')}
+            />
+          </div>
+        </section>
+
+        <section className="wizard-panel panel-enter stagger-3 p-4" style={gameArtVars(heroArt)}>
+          <div className="relative flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div className="flex items-center gap-3">
+              {profileUiState.needsAttention ? (
+                <AlertTriangle className="h-5 w-5 text-warning" />
+              ) : (
+                <CheckCircle2 className="h-5 w-5 text-success" />
+              )}
+              <div>
+                <h3 className="font-bold">Profile state details</h3>
+                <p className="text-sm text-muted-foreground">
+                  {profileUiState.detail ||
+                    (activeProfileVerification?.checked_at
+                      ? `Verified ${formatRelativeTime(activeProfileVerification.checked_at)}`
+                      : 'Backend verification runs when the app opens.')}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Zap className="h-4 w-4 text-primary" />
+              {profiles.length} profile variants loaded
+            </div>
+          </div>
+        </section>
       </main>
     </div>
   );

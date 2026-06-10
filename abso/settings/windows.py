@@ -2476,6 +2476,20 @@ class WindowsSettingsHandler(SettingsHandler):
             logger.debug(f"Failed to get DirectXUserGlobalSettings: {e}")
             return dict.fromkeys(self.DIRECTX_FLAG_NAMES, None)
 
+    def get_windowed_vrr_flags(self) -> dict[str, bool | None]:
+        """Return just the borderless/windowed-VRR DirectX flags.
+
+        Light read (one registry query, no monitor/HDR probes), used by the
+        post-apply VRR-enabler reconciliation in :mod:`abso.core.vrr_reconcile`.
+        Keys: ``windowed_optimizations`` (SwapEffectUpgradeEnable) and
+        ``vrr_optimize`` (VRROptimizeEnable).
+        """
+        flags = self._get_directx_flags()
+        return {
+            "windowed_optimizations": flags.get("windowed_optimizations"),
+            "vrr_optimize": flags.get("vrr_optimize"),
+        }
+
     def _get_directx_flag(self, flag_name: str) -> bool | None:
         """Read a flag from DirectXUserGlobalSettings semicolon-delimited string."""
         try:

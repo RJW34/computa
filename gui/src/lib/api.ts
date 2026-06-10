@@ -100,7 +100,7 @@ export async function applyProfile(
   profileId: string,
   createBackup = true
 ): Promise<ApplyResult> {
-  const args = createBackup ? [] : ['--no-backup'];
+  const args = createBackup ? ['--no-fallback'] : ['--no-backup', '--no-fallback'];
   return runAbsoJson<ApplyResult>('apply', [profileId, ...args]);
 }
 
