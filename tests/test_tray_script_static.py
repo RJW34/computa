@@ -957,6 +957,8 @@ def test_tray_menu_renderer_uses_bounded_chip_layout() -> None:
 
     assert "private const int SafeMenuMaxWidth = 760;" in renderer_section
     assert "private static int GetSafeItemWidth(ToolStripItem item)" in renderer_section
+    assert "if (ownerWidth > 0) width = ownerWidth;" in renderer_section
+    assert "Math.Min(width, ownerWidth)" not in renderer_section
     assert "private static int GetSafeChipRight(ToolStripItem item)" in renderer_section
     assert "int chipRight = GetSafeChipRight(e.Item);" in renderer_section
     assert "e.Item.Width - 24" not in renderer_section

@@ -2794,7 +2794,7 @@ public class DarkThemeRenderer : ToolStripProfessionalRenderer
             {
                 int ownerWidth = item.Owner.ClientSize.Width;
                 if (ownerWidth <= 0) ownerWidth = item.Owner.Width;
-                if (ownerWidth > 0) width = width > 0 ? Math.Min(width, ownerWidth) : ownerWidth;
+                if (ownerWidth > 0) width = ownerWidth;
             }
         }
         if (width <= 0) width = SafeMenuMaxWidth;
