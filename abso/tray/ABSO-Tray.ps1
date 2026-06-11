@@ -2794,7 +2794,7 @@ public class DarkThemeRenderer : ToolStripProfessionalRenderer
             {
                 int ownerWidth = item.Owner.ClientSize.Width;
                 if (ownerWidth <= 0) ownerWidth = item.Owner.Width;
-                if (ownerWidth > 0) width = ownerWidth;
+                if (ownerWidth > 0) width = width > 0 ? Math.Min(width, ownerWidth) : ownerWidth;
             }
         }
         if (width <= 0) width = SafeMenuMaxWidth;
@@ -4009,7 +4009,8 @@ function Set-TrayDropDownWidthBudget {
     if (-not $DropDown) { return }
 
     $widthBudget = Get-TrayMenuWidthBudget
-    $DropDown.MinimumSize = New-Object System.Drawing.Size($widthBudget, 0)
+    $minimumWidth = [int]$script:TrayMenuMinimumWidth
+    $DropDown.MinimumSize = New-Object System.Drawing.Size($minimumWidth, 0)
     $DropDown.MaximumSize = New-Object System.Drawing.Size($widthBudget, 0)
     $DropDown.AutoSize = $true
 }
@@ -5968,35 +5969,13 @@ function Get-TrayProfilePreviewText {
 function Set-TrayProfileHoverPreview {
     param([string]$ProfileId)
 
-    if ([string]::IsNullOrWhiteSpace($ProfileId) -or -not $script:Profiles -or -not $script:Profiles.Contains($ProfileId)) {
-        return
-    }
-
-    $profile = $script:Profiles[$ProfileId]
-    $accent = Get-TrayProfileAccentColor -ProfileId $ProfileId -Profile $profile -Fallback $script:Colors.Text
-    $favoriteBadge = (Test-Favorite -ProfileId $ProfileId -Config $script:TrayConfig)
-    if ($script:statusItem) {
-        $previewName = Get-TrayProfileObjectDisplayName -Profile $profile -Fallback $ProfileId
-        $subtitle = if ($profile.Sub) { Format-TrayDisplayCopy -Text "$($profile.Sub)" } elseif ($profile.Cat) { Format-TrayDisplayCopy -Text "$($profile.Cat)" } else { "Profile preview" }
-        $script:statusItem.Text = "$previewName|$subtitle"
-        $script:statusItem.ForeColor = $accent
-        Set-TrayStatusHeroImage -ProfileId $ProfileId -Profile $profile -ActiveBadge:($ProfileId -eq $script:activeProfile)
-    }
-    if ($script:statusBarItem) {
-        $script:statusBarItem.Text = "  $(Get-TrayProfilePreviewText -ProfileId $ProfileId -Profile $profile)"
-        $script:statusBarItem.ForeColor = $accent
-        $script:statusBarItem.AccessibleDescription = Get-TrayStatusBarChipText -Preview $true
-        $previewImage = New-TrayProfileMenuImage `
-            -ProfileId $ProfileId `
-            -IsActive ($ProfileId -eq $script:activeProfile) `
-            -ShowSyncBadge $true `
-            -FavoriteBadge $favoriteBadge
-        Set-MenuItemImageSafe -Item $script:statusBarItem -NewImage $previewImage
-    }
+    # Keep row hover layout-neutral. Native selection is enough feedback, and
+    # rewriting hero/footer items makes WinForms recalculate the popup width.
+    return
 }
 
 function Clear-TrayProfileHoverPreview {
-    Update-MenuState
+    return
 }
 
 function Register-TrayProfileHoverPreview {
@@ -8739,25 +8718,16 @@ public class HotkeyMessageWindow : NativeWindow {
 
         if (-not $Item) { return }
 
-        $baseLines = New-Object System.Collections.Generic.List[string]
-        $rawTooltip = if ($Item.ToolTipText) { "$($Item.ToolTipText)" } else { "" }
-        foreach ($line in ($rawTooltip -split "`r?`n")) {
-            if ("$line" -match '^Active state: ') { continue }
-            [void]$baseLines.Add("$line")
-        }
-        while ($baseLines.Count -gt 0 -and [string]::IsNullOrWhiteSpace($baseLines[$baseLines.Count - 1])) {
-            $baseLines.RemoveAt($baseLines.Count - 1)
-        }
+        # Native ToolStrip tooltips float over the owner-drawn profile list.
+        # State is rendered by row chips and the active-profile status rows.
+        $Item.ToolTipText = ""
+    }
 
-        $newTooltip = ($baseLines -join "`n").TrimEnd()
-        if (-not [string]::IsNullOrWhiteSpace($StateText)) {
-            if (-not [string]::IsNullOrWhiteSpace($newTooltip)) {
-                $newTooltip += "`n`n"
-            }
-            $newTooltip += $StateText.Trim()
-        }
+    function Get-TrayProfileChipPaddingRight {
+        param([int]$ChipCount)
 
-        $Item.ToolTipText = $newTooltip
+        if ($ChipCount -le 0) { return 0 }
+        return [Math]::Min(260, 82 + (($ChipCount - 1) * 72))
     }
 
     function Set-TrayProfileMenuItemMetadata {
@@ -8793,7 +8763,7 @@ public class HotkeyMessageWindow : NativeWindow {
 
         $Item.AccessibleName = "__profile_menu_item__"
         $Item.AccessibleDescription = ($chips -join "|")
-        $paddingRight = [Math]::Min(160, 62 + (($chips.Count - 1) * 58))
+        $paddingRight = Get-TrayProfileChipPaddingRight -ChipCount $chips.Count
         $Item.Padding = New-Object System.Windows.Forms.Padding(0, 0, $paddingRight, 0)
         Set-TrayProfileMenuItemTooltipState -Item $Item -StateText $stateTooltipText
     }
@@ -8927,9 +8897,6 @@ public class HotkeyMessageWindow : NativeWindow {
             $item.BackColor = $script:Colors.Background
             $item.ForeColor = $gameColor
             $item.Font = New-Object System.Drawing.Font("Segoe UI", 9)
-            $favoriteSub = if ($p.Sub) { Format-TrayDisplayCopy -Text "$($p.Sub)" } else { "" }
-            $favoriteDesc = if ($p.Desc) { Format-TrayDisplayCopy -Text "$($p.Desc)" } else { "" }
-            $item.ToolTipText = "$favoriteSub`n$favoriteDesc".Trim()
             Set-TrayProfileMenuItemMetadata -Item $item -ProfileId $favId -Profile $p
             $item.Add_Click({
                 param($s, $ev)
@@ -9007,7 +8974,6 @@ public class HotkeyMessageWindow : NativeWindow {
             $item.BackColor = $script:Colors.Background
             $item.ForeColor = $gameColor
             $item.Font = New-Object System.Drawing.Font("Segoe UI", 9)
-            $item.ToolTipText = Get-RecentProfileTooltipText -Profile $p -Entry $entry
             Set-TrayProfileMenuItemMetadata -Item $item -ProfileId $rId -Profile $p -ExtraChipText "RECENT"
             $item.Add_Click({
                 param($s, $ev)
@@ -9083,12 +9049,6 @@ public class HotkeyMessageWindow : NativeWindow {
         $item.ForeColor = $gameColor
         $item.Font = New-Object System.Drawing.Font("Segoe UI", 9)
 
-        $tooltipName = Get-TrayProfileObjectDisplayName -Profile $p -Fallback $ProfileId
-        $tooltipSub = if ($p.Sub) { Format-TrayDisplayCopy -Text "$($p.Sub)" } else { "" }
-        $tooltipText = "$tooltipName`n$tooltipSub`n"
-        if ($p.Desc) { $tooltipText += "`n$(Format-TrayDisplayCopy -Text "$($p.Desc)")" }
-        if ($isFav) { $tooltipText += "`n`n[Favorited]" }
-        $item.ToolTipText = $tooltipText.Trim()
         Set-TrayProfileMenuItemMetadata -Item $item -ProfileId $ProfileId -Profile $p
 
         $item.Add_Click({

@@ -917,7 +917,7 @@ def test_tray_status_bar_renders_state_chips_from_existing_status_truth() -> Non
     assert "-VerificationProgressText $verificationProgressText `" in script
     assert "-LastActionText $statusBarLastActionText `" in script
     assert "-HasBackup $statusHasBackup" in script
-    assert "$script:statusBarItem.AccessibleDescription = Get-TrayStatusBarChipText -Preview $true" in script
+    assert "$script:statusBarItem.AccessibleDescription = Get-TrayStatusBarChipText -Preview $true" not in script
     assert 'chipRaw.Contains("FIX") || chipRaw.Contains("RESTART")' in renderer_background
     assert 'chipRaw.Contains("CHECK") || chipRaw.Contains("PREVIEW")' in renderer_background
     assert 'chipRaw.Contains("BACKUP")' in renderer_background
@@ -957,14 +957,13 @@ def test_tray_menu_renderer_uses_bounded_chip_layout() -> None:
 
     assert "private const int SafeMenuMaxWidth = 760;" in renderer_section
     assert "private static int GetSafeItemWidth(ToolStripItem item)" in renderer_section
-    assert "if (ownerWidth > 0) width = ownerWidth;" in renderer_section
-    assert "Math.Min(width, ownerWidth)" not in renderer_section
+    assert "if (ownerWidth > 0) width = width > 0 ? Math.Min(width, ownerWidth) : ownerWidth;" in renderer_section
     assert "private static int GetSafeChipRight(ToolStripItem item)" in renderer_section
     assert "int chipRight = GetSafeChipRight(e.Item);" in renderer_section
     assert "e.Item.Width - 24" not in renderer_section
     assert "$script:TrayMenuPreferredWidth = 760" in script
     assert "$script:TrayMenuScreenMargin = 48" in script
-    assert "$DropDown.MinimumSize = New-Object System.Drawing.Size($widthBudget, 0)" in menu_width_section
+    assert "$DropDown.MinimumSize = New-Object System.Drawing.Size($minimumWidth, 0)" in menu_width_section
     assert "$DropDown.MaximumSize = New-Object System.Drawing.Size($widthBudget, 0)" in menu_width_section
     assert "Set-TrayDropDownWidthBudget -DropDown $menu" in menu_creation_section
     assert "Set-TrayDropDownWidthBudget -DropDown $item.DropDown" in menu_creation_section
@@ -1789,8 +1788,8 @@ def test_profile_surfaces_use_game_identity_accent_colors() -> None:
     assert "-ActiveBadge:$isActive `" in quick_panel
 
 
-def test_profile_menu_hover_previews_are_transient() -> None:
-    """Hover previews should enrich the menu without overwriting durable LastAction."""
+def test_profile_menu_hover_handlers_are_layout_stable() -> None:
+    """Hovering profile rows should not rewrite menu content or force width recalculation."""
     script = TRAY_SCRIPT.read_text(encoding="utf-8")
     hover_section = script.split("function Set-TrayProfileHoverPreview", 1)[1].split(
         "function Get-RecentProfileTooltipText",
@@ -1802,19 +1801,11 @@ def test_profile_menu_hover_previews_are_transient() -> None:
     assert "$Item.Add_MouseEnter" in hover_section
     assert "$Item.Add_MouseLeave" in hover_section
     assert "Preview: $groupName" in script
-    assert 'Add-UniqueTrayMessage -Target $parts -Message (Format-TrayDisplayCopy -Text "$($Profile.Variant)")' in script
-    assert 'Add-UniqueTrayMessage -Target $parts -Message (Format-TrayDisplayCopy -Text "$($Profile.Cat)")' in script
-    assert 'Add-UniqueTrayMessage -Target $parts -Message (Format-TrayDisplayCopy -Text "$($Profile.SyncMode)")' in script
-    assert "$previewName = Get-TrayProfileObjectDisplayName -Profile $profile -Fallback $ProfileId" in hover_section
-    assert '$script:statusItem.Text = "$previewName|$subtitle"' in hover_section
-    assert "$script:statusBarItem.Text = \"  $(Get-TrayProfilePreviewText -ProfileId $ProfileId -Profile $profile)\"" in hover_section
-    assert "Set-MenuItemImageSafe -Item $script:statusBarItem -NewImage $previewImage" in hover_section
-    assert "$favoriteBadge = (Test-Favorite -ProfileId $ProfileId -Config $script:TrayConfig)" in hover_section
-    assert "New-TrayProfileMenuImage `" in hover_section
-    assert "-ProfileId $ProfileId `" in hover_section
-    assert "-IsActive ($ProfileId -eq $script:activeProfile) `" in hover_section
-    assert "-ShowSyncBadge $true `" in hover_section
-    assert "-FavoriteBadge $favoriteBadge" in hover_section
+    assert "Keep row hover layout-neutral." in hover_section
+    assert '$script:statusItem.Text = "$previewName|$subtitle"' not in hover_section
+    assert "$script:statusBarItem.Text = \"  $(Get-TrayProfilePreviewText -ProfileId $ProfileId -Profile $profile)\"" not in hover_section
+    assert "Set-MenuItemImageSafe -Item $script:statusBarItem -NewImage $previewImage" not in hover_section
+    assert "Update-MenuState" not in hover_section
     assert "Clear-TrayProfileHoverPreview" in hover_section
     assert "Set-TrayLastAction" not in hover_section
     assert "Register-TrayProfileHoverPreview -Item $item -ProfileId $favId" in script
@@ -1929,7 +1920,7 @@ def test_status_dashboard_uses_active_game_medallion() -> None:
     assert "Set-TrayStatusHeroImage -ProfileId $activeRecord.Id -Profile $activeRecord.Profile -ActiveBadge -VerificationBadge" in script
     assert "Set-TrayStatusHeroImage -ProfileId $null -Profile $null" in script
     assert "Set-TrayStatusHeroImage -ProfileId $activeRecord.Id -Profile $null -ActiveBadge" in script
-    assert "Set-TrayStatusHeroImage -ProfileId $ProfileId -Profile $profile -ActiveBadge:($ProfileId -eq $script:activeProfile)" in script
+    assert "Set-TrayStatusHeroImage -ProfileId $ProfileId -Profile $profile -ActiveBadge:($ProfileId -eq $script:activeProfile)" not in script
 
 
 def test_active_profile_menu_keeps_game_mark_with_status_badge() -> None:
@@ -2175,9 +2166,10 @@ def test_profile_menu_rows_render_compact_status_chips() -> None:
     assert 'return "Active state: Windows restart required for $rebootText"' in script
     assert 'return "Active state: checking profile state"' in script
     assert "function Set-TrayProfileMenuItemTooltipState" in script
-    assert '"$line" -match \'^Active state: \'' in script
-    assert "$newTooltip += \"`n`n\"" in script
-    assert "$Item.ToolTipText = $newTooltip" in script
+    assert "Native ToolStrip tooltips float over the owner-drawn profile list." in script
+    assert '$Item.ToolTipText = ""' in script
+    assert "function Get-TrayProfileChipPaddingRight" in script
+    assert "return [Math]::Min(260, 82 + (($ChipCount - 1) * 72))" in script
     assert "function Set-TrayProfileMenuItemMetadata" in script
     assert '$Item.AccessibleName = "__profile_menu_item__"' in script
     assert "[string]$ExtraChipText = \"\"" in script
@@ -2186,7 +2178,7 @@ def test_profile_menu_rows_render_compact_status_chips() -> None:
     assert "if (-not [string]::IsNullOrWhiteSpace($stateChipText)) { $chips += $stateChipText }" in script
     assert "Set-TrayProfileMenuItemTooltipState -Item $Item -StateText $stateTooltipText" in script
     assert "$Item.AccessibleDescription = ($chips -join \"|\")" in script
-    assert "$paddingRight = [Math]::Min(160, 62 + (($chips.Count - 1) * 58))" in script
+    assert "$paddingRight = Get-TrayProfileChipPaddingRight -ChipCount $chips.Count" in script
     assert "$Item.Padding = New-Object System.Windows.Forms.Padding(0, 0, $paddingRight, 0)" in script
     assert "Set-TrayProfileMenuItemMetadata -Item $item -ProfileId $favId -Profile $p" in script
     assert 'Set-TrayProfileMenuItemMetadata -Item $item -ProfileId $rId -Profile $p -ExtraChipText "RECENT"' in script
@@ -3083,7 +3075,7 @@ def test_tray_recent_and_backup_menus_use_friendly_time_and_profile_labels() -> 
     assert 'return "Unknown profile"' not in display_name_section
     assert "function Get-RecentProfileTooltipText" in script
     assert '[void]$parts.Add((Format-TrayDisplayCopy -Text "$($Profile.Sub)"))' in script
-    assert "$item.ToolTipText = Get-RecentProfileTooltipText -Profile $p -Entry $entry" in script
+    assert "$item.ToolTipText = Get-RecentProfileTooltipText -Profile $p -Entry $entry" not in script
     assert '$profileId = "$($mj.profile_id)"' in script
     assert "$profileName = Get-TrayProfileDisplayName -ProfileId $profileId" in script
     assert '$label = "$profileName - $displayTime"' in script
