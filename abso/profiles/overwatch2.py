@@ -479,6 +479,14 @@ class Overwatch2GSyncProfile(_Overwatch2BaseProfile):
 
     Tear-free low-latency VRR profile. Uses Reflex + NVCP VSync safety net and
     per-app VRR enabled.
+
+    Runs the same borderless windowed flip path as the capture-safe sibling;
+    the difference is overlay handling, not the display path. This lane kills
+    overlay/capture apps (OBS, Medal, RTSS, Steam/Discord overlays, NVIDIA
+    Share) at apply and game launch for frame-time headroom, and requires an
+    overlay-free display path at apply time. The Discord app itself is
+    never killed, so Discord screen sharing keeps working here — use the
+    capture-safe sibling only when you want overlay/capture *apps* kept alive.
     """
 
     @property
@@ -493,7 +501,8 @@ class Overwatch2GSyncProfile(_Overwatch2BaseProfile):
     def description(self) -> str:
         return (
             "Low latency VRR profile (VSync safety net, G-SYNC ON). "
-            "Keeps driver LLM off for Reflex; enable Reflex On + Boost in-game."
+            "Kills overlay/capture apps (OBS, Medal, RTSS, overlays) at launch "
+            "for frame-time headroom; Discord screen share still works."
         )
 
     @property
@@ -526,6 +535,11 @@ class Overwatch2GSyncProfile(_Overwatch2BaseProfile):
             "GraphicsSettingsHandler": {
                 "disable_global_fso": False,
                 "disable_mpo": False,
+                # Assert ACM off to match the SDR capture sibling — otherwise
+                # switching between the strict and capture SDR lanes flips ACM
+                # state. Win11 24H2+ can silently re-enable ACM after display
+                # re-enumeration, clamping wide-gamut SDR to sRGB.
+                "disable_auto_color_management": True,
             },
             "NvidiaSettingsHandler": {
                 "preset": "reflex_gsync",
@@ -609,6 +623,12 @@ class Overwatch2GSyncHDRProfile(_Overwatch2BaseProfile):
     OW2's HDR implementation works well on OLED with proper in-game
     calibration (Paper White Nits, Max Nits). Auto HDR is disabled
     since OW2 has native HDR support.
+
+    Same borderless windowed flip path as the HDR capture-safe sibling; the
+    difference is overlay handling only. This lane kills overlay/capture apps
+    at apply and game launch and requires an overlay-free display path. The
+    Discord app itself is never killed, so Discord screen sharing keeps
+    working here.
     """
 
     @property
@@ -621,7 +641,11 @@ class Overwatch2GSyncHDRProfile(_Overwatch2BaseProfile):
 
     @property
     def description(self) -> str:
-        return "Tear-free low latency VRR with native HDR (OLED/Mini-LED)"
+        return (
+            "Tear-free low latency VRR with native HDR (OLED/Mini-LED). "
+            "Kills overlay/capture apps at launch for frame-time headroom; "
+            "Discord screen share still works."
+        )
 
     @property
     def requires_confirmed_vrr_support(self) -> bool:
@@ -779,9 +803,14 @@ class Overwatch2GSyncHDRProfile(_Overwatch2BaseProfile):
 class Overwatch2GSyncCaptureProfile(_Overwatch2BaseProfile):
     """Capture-safe Overwatch 2 VRR profile.
 
-    Uses the borderless/windowed G-SYNC path so Medal/Discord/OBS-style
-    overlays can coexist with VRR more predictably than the strict
-    fullscreen-exclusive esports path.
+    Same borderless windowed G-SYNC flip path and settings payload as the
+    strict :class:`Overwatch2GSyncProfile`; the difference is overlay
+    handling. This lane keeps the capture / overlay / peripheral stack
+    (OBS, Medal, RTSS, Steam/Discord overlays, NVIDIA Share, G HUB, iCUE)
+    alive at apply and game launch, and skips the strict lane's
+    overlay-free display-path gate. Note: Discord screen sharing works on
+    BOTH lanes (the Discord app is never killed anywhere); pick this lane
+    when you want overlay/capture apps themselves left running.
     """
 
     @property
@@ -803,7 +832,10 @@ class Overwatch2GSyncCaptureProfile(_Overwatch2BaseProfile):
 
     @property
     def description(self) -> str:
-        return "Borderless/windowed VRR path for clipping, overlays, and capture apps"
+        return (
+            "Same VRR path as GSYNC SDR, but keeps OBS/Medal/RTSS and "
+            "overlays alive at launch instead of killing them"
+        )
 
     @property
     def requires_confirmed_vrr_support(self) -> bool:
@@ -898,7 +930,12 @@ class Overwatch2GSyncCaptureProfile(_Overwatch2BaseProfile):
 
 
 class Overwatch2GSyncHDRCaptureProfile(_Overwatch2BaseProfile):
-    """Capture-safe HDR Overwatch 2 VRR profile."""
+    """Capture-safe HDR Overwatch 2 VRR profile.
+
+    Same borderless windowed HDR G-SYNC path as the strict
+    :class:`Overwatch2GSyncHDRProfile`; the difference is overlay handling
+    only — see :class:`Overwatch2GSyncCaptureProfile` for the contract.
+    """
 
     @property
     def is_capture_safe(self) -> bool:
@@ -915,7 +952,10 @@ class Overwatch2GSyncHDRCaptureProfile(_Overwatch2BaseProfile):
 
     @property
     def description(self) -> str:
-        return "Borderless/windowed HDR VRR path for clipping, overlays, and capture apps"
+        return (
+            "Same HDR VRR path as GSYNC HDR, but keeps OBS/Medal/RTSS and "
+            "overlays alive at launch instead of killing them"
+        )
 
     @property
     def requires_confirmed_vrr_support(self) -> bool:

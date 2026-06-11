@@ -483,20 +483,22 @@ PROFILE_CATALOG: OrderedDict[str, ProfileCatalogEntry] = OrderedDict(
         "overwatch2-gsync-capture": ProfileCatalogEntry(
             profile_class=Overwatch2GSyncCaptureProfile,
             tray_category="Shooters",
-            tray_subtitle="SDR Capture-Safe | Borderless VRR | Medal/Discord Friendly",
+            tray_subtitle="SDR Capture-Safe | Borderless VRR | Keeps OBS/Medal/Overlays",
             tray_description=(
-                "Borderless/windowed G-SYNC profile for the active gaming display. "
-                "Keeps Medal, Discord, and similar capture overlays compatible."
+                "Same borderless G-SYNC path as the overlay-free lane, but keeps "
+                "OBS, Medal, RTSS, and overlay apps running at launch instead of "
+                "stopping them."
             ),
             sync_mode="on",
         ),
         "overwatch2-gsync-hdr-capture": ProfileCatalogEntry(
             profile_class=Overwatch2GSyncHDRCaptureProfile,
             tray_category="Shooters",
-            tray_subtitle="HDR Capture-Safe | Borderless VRR | Overlay Friendly",
+            tray_subtitle="HDR Capture-Safe | Borderless VRR | Keeps OBS/Medal/Overlays",
             tray_description=(
-                "HDR borderless/windowed G-SYNC profile for the active gaming display. "
-                "Best fit when you want HDR plus Medal/Discord-style capture workflows."
+                "Same borderless HDR G-SYNC path as the overlay-free lane, but keeps "
+                "OBS, Medal, RTSS, and overlay apps running at launch instead of "
+                "stopping them."
             ),
             sync_mode="on",
         ),

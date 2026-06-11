@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "saved_at": "2026-06-08T04:06:34.916137-04:00",
+  "saved_at": "2026-06-11T14:16:18.041842-04:00",
   "profiles": [
     {
       "id": "slippi-melee",
@@ -3551,7 +3551,7 @@
     {
       "id": "overwatch2-gsync",
       "display_name": "Overwatch 2 - GSYNC SDR",
-      "description": "Low latency VRR profile (VSync safety net, G-SYNC ON). Keeps driver LLM off for Reflex; enable Reflex On + Boost in-game.",
+      "description": "Low latency VRR profile (VSync safety net, G-SYNC ON). Kills overlay/capture apps (OBS, Medal, RTSS, overlays) at launch for frame-time headroom; Discord screen share still works.",
       "optimization_target": "low_latency_high_fps",
       "application_scope": "system_plus_native_config",
       "executables": [
@@ -3686,7 +3686,7 @@
     {
       "id": "overwatch2-gsync-hdr",
       "display_name": "Overwatch 2 - GSYNC HDR",
-      "description": "Tear-free low latency VRR with native HDR (OLED/Mini-LED)",
+      "description": "Tear-free low latency VRR with native HDR (OLED/Mini-LED). Kills overlay/capture apps at launch for frame-time headroom; Discord screen share still works.",
       "optimization_target": "low_latency_high_fps",
       "application_scope": "system_plus_native_config",
       "executables": [
@@ -3821,7 +3821,7 @@
     {
       "id": "overwatch2-gsync-capture",
       "display_name": "Overwatch 2 - GSYNC SDR Capture-Safe",
-      "description": "Borderless/windowed VRR path for clipping, overlays, and capture apps",
+      "description": "Same VRR path as GSYNC SDR, but keeps OBS/Medal/RTSS and overlays alive at launch instead of killing them",
       "optimization_target": "low_latency_high_fps",
       "application_scope": "system_plus_native_config",
       "executables": [
@@ -3843,8 +3843,8 @@
       ],
       "has_in_game_settings": true,
       "tray_category": "Shooters",
-      "tray_subtitle": "SDR Capture-Safe | Borderless VRR | Medal/Discord Friendly",
-      "tray_description": "Borderless/windowed G-SYNC profile for the active gaming display. Keeps Medal, Discord, and similar capture overlays compatible.",
+      "tray_subtitle": "SDR Capture-Safe | Borderless VRR | Keeps OBS/Medal/Overlays",
+      "tray_description": "Same borderless G-SYNC path as the overlay-free lane, but keeps OBS, Medal, RTSS, and overlay apps running at launch instead of stopping them.",
       "tray_group": "overwatch2",
       "tray_group_name": "Overwatch 2",
       "tray_variant": "Capture-Safe G-SYNC (SDR)",
@@ -3935,7 +3935,7 @@
     {
       "id": "overwatch2-gsync-hdr-capture",
       "display_name": "Overwatch 2 - GSYNC HDR Capture-Safe",
-      "description": "Borderless/windowed HDR VRR path for clipping, overlays, and capture apps",
+      "description": "Same HDR VRR path as GSYNC HDR, but keeps OBS/Medal/RTSS and overlays alive at launch instead of killing them",
       "optimization_target": "low_latency_high_fps",
       "application_scope": "system_plus_native_config",
       "executables": [
@@ -3957,8 +3957,8 @@
       ],
       "has_in_game_settings": true,
       "tray_category": "Shooters",
-      "tray_subtitle": "HDR Capture-Safe | Borderless VRR | Overlay Friendly",
-      "tray_description": "HDR borderless/windowed G-SYNC profile for the active gaming display. Best fit when you want HDR plus Medal/Discord-style capture workflows.",
+      "tray_subtitle": "HDR Capture-Safe | Borderless VRR | Keeps OBS/Medal/Overlays",
+      "tray_description": "Same borderless HDR G-SYNC path as the overlay-free lane, but keeps OBS, Medal, RTSS, and overlay apps running at launch instead of stopping them.",
       "tray_group": "overwatch2",
       "tray_group_name": "Overwatch 2",
       "tray_variant": "Capture-Safe G-SYNC (HDR)",

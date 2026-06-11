@@ -1885,6 +1885,7 @@
         "dynamic_range": "full"
       },
       "GraphicsSettingsHandler": {
+        "disable_auto_color_management": true,
         "disable_global_fso": false,
         "disable_mpo": false
       },
