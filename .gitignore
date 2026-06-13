@@ -76,3 +76,45 @@ state/citadel_status.json
 
 # Local Codex CLI working state
 .codex/
+
+# Local secrets and machine-specific config
+.env
+.env.*
+!.env.example
+!.env.sample
+!.env.template
+*.local
+*.secret
+*.secrets
+*.token
+*.tokens
+*.cookie
+*.cookies
+*.pem
+*.p12
+*.pfx
+*.key
+id_rsa
+id_dsa
+id_ecdsa
+id_ed25519
+.npmrc
+.pypirc
+
+# Runtime, generated, and agent scratch output
+artifacts/
+backups/
+captures/
+coverage/
+logs/
+runtime/
+session-data/
+tmp/
+temp/
+.cache/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+node_modules/
+dist/
+build/
