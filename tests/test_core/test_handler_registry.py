@@ -122,3 +122,23 @@ def test_handler_entry_dataclass_is_immutable():
     except Exception:
         return
     raise AssertionError("HandlerEntry should be frozen")
+
+
+def test_backup_handlers_declare_supported_restore_guarantees():
+    """Backup-capable handlers must make rollback confidence machine-checkable."""
+    allowed = {"full", "partial", "ephemeral", "none"}
+
+    for entry in _all_entries():
+        if not entry.backup:
+            continue
+        handler = entry.factory()
+        guarantee = handler.restore_guarantee
+        assert guarantee in allowed, (
+            f"{type(handler).__name__} declares unsupported restore_guarantee={guarantee!r}"
+        )
+        if guarantee != "full":
+            notes = entry.notes or ""
+            assert guarantee in notes, (
+                f"{type(handler).__name__} has restore_guarantee={guarantee!r} "
+                "but its HandlerEntry notes do not document that degraded rollback contract"
+            )

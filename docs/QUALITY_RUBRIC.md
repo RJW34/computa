@@ -167,13 +167,13 @@ Every settings handler must declare:
 - `supports_backup`
 - `supports_restore`
 - `supports_verify`
-- `restore_guarantee`: `full`, `partial`, `none`
+- `restore_guarantee`: `full`, `partial`, `ephemeral`, `none`
 - `verification_scope`: `full`, `reboot_only`, `none`
 
 Rules:
 
 - `supports_restore=False` means the handler cannot be counted in rollback promises.
-- `restore_guarantee=partial` forces degraded transaction semantics unless explicitly excluded.
+- `restore_guarantee=partial`, `ephemeral`, or `none` forces degraded transaction semantics unless explicitly excluded.
 - High-impact handlers must expose `supports_verify=True` before their profile path can be graded `A`.
 
 ## Evidence & Validation Discipline

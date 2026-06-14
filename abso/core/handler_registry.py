@@ -98,8 +98,18 @@ def _all_entries() -> list[HandlerEntry]:
         HandlerEntry(WindowsSettingsHandler, audit=True, backup=True),
         HandlerEntry(PowerSettingsHandler, audit=True, backup=True),
         HandlerEntry(RegistrySettingsHandler, audit=True, backup=True),
-        HandlerEntry(NvidiaSettingsHandler, audit=True, backup=True),
-        HandlerEntry(TimerSettingsHandler, audit=True, backup=True),
+        HandlerEntry(
+            NvidiaSettingsHandler,
+            audit=True,
+            backup=True,
+            notes="restore_guarantee='none': NVIDIA profile restore is intentionally not automatic.",
+        ),
+        HandlerEntry(
+            TimerSettingsHandler,
+            audit=True,
+            backup=True,
+            notes="restore_guarantee='ephemeral': NtSetTimerResolution state naturally reverts at process exit.",
+        ),
         HandlerEntry(MouseSettingsHandler, audit=True, backup=True),
         HandlerEntry(GraphicsSettingsHandler, audit=True, backup=True),
         HandlerEntry(ServicesSettingsHandler, audit=True, backup=True),
@@ -114,7 +124,7 @@ def _all_entries() -> list[HandlerEntry]:
             DisplayColorRangeHandler,
             audit=True,
             backup=True,
-            notes="Flags PC monitors stuck on Limited RGB / TV range after NVIDIA driver update.",
+            notes="restore_guarantee='partial': monitors can be unplugged/replaced between backup and restore.",
         ),
 
         # --- Audit-only surfaces ---
@@ -164,7 +174,7 @@ def _all_entries() -> list[HandlerEntry]:
             SharedAudioSettingsHandler,
             audit=True,
             backup=True,
-            notes="Detect-only Shared Audio (BT LE Audio broadcast); 29xxx-aware.",
+            notes="restore_guarantee='none': detect-only Shared Audio (BT LE Audio broadcast); 29xxx-aware.",
         ),
     ]
 
