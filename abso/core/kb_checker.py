@@ -32,11 +32,17 @@ from datetime import UTC, datetime
 logger = logging.getLogger(__name__)
 
 # Bump this whenever KNOWN_BAD_KBS or the surrounding audit logic is touched.
-# 2026-05-21: reviewed Insider build 29591.1000 (Experimental Future Platforms,
-# Canary 29xxx) release notes. No gaming-impacting regressions called out;
-# the branch is pre-27H2 (Strontium) and not yet a GA candidate. No new
-# KNOWN_BAD_KBS entries added.
-LAST_REVIEWED_UTC = datetime(2026, 5, 21, tzinfo=UTC)
+# 2026-06-17: reviewed the June 2026 Patch Tuesday GA cumulatives
+# (KB5094126 -> 24H2 26100.8655 / 25H2 26200.8655; KB5093998 -> 23H2
+# 22631.7219) and the Canary Experimental (Future Platforms) flight
+# 29610.1000 (June 12). Microsoft reports no known issues with the June
+# cumulatives (they expand Secure Boot cert eligibility and fix a
+# virtualization regression); the 29610 flight is a bug-fix flight
+# (kernel-crash green screens, storage perf, Defender false-positive,
+# duplicate Energy Saver). No gaming-impacting regressions were called out
+# on either track, so no new KNOWN_BAD_KBS entries were added. Prior review
+# 2026-05-21 covered Canary flight 29591.1000.
+LAST_REVIEWED_UTC = datetime(2026, 6, 17, tzinfo=UTC)
 
 # Audit flags the list as stale beyond this window since LAST_REVIEWED_UTC.
 STALENESS_DAYS = 60
