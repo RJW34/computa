@@ -41,6 +41,7 @@ import pytest
 # through main()).
 import abso.main  # noqa: F401
 from abso.profiles.catalog import get_profile_instances
+from abso.profiles.profile_bases import WebGLBaseProfile
 from abso.settings.nvidia.presets import NVIDIA_PRESETS
 
 # Keys consumed by the NVIDIA handler via preset expansion or the
@@ -344,6 +345,13 @@ def test_strict_gaming_profiles_do_not_force_windowed_compositor_flags(profiles_
         target = (profile.optimization_target or "").lower()
         # Skip non-strict profile families and explicit capture/borderless lanes.
         if target in {"productivity", "browser_game"}:
+            continue
+        # WebGL / WebView2 auto-battlers run windowed inside a browser shell, so
+        # the windowed compositor + VRR path is correct for them (same rationale
+        # as the productivity desktop lanes). Their optimization targets
+        # ("balanced" / "smooth_framerate") are shared with strict lanes, so key
+        # off the base class rather than the target string.
+        if isinstance(profile, WebGLBaseProfile):
             continue
         if getattr(profile, "is_capture_safe", False):
             continue

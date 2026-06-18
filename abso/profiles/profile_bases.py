@@ -659,6 +659,14 @@ class WebGLBaseProfile(BaseProfile):
                 "game_bar": False,
                 "game_dvr": False,
                 "hags": True,
+                # Casual WebGL lanes run windowed/borderless in a browser or
+                # WebView2 shell, not exclusive fullscreen. Enable the Win11
+                # windowed-games optimization + VRR-optimize path so VRR/G-SYNC
+                # can actually smooth variable WebGL frame delivery (the
+                # profiles' guidance promises this); without it VRR never
+                # engages for windowed content.
+                "windowed_optimizations": True,
+                "vrr_optimize": True,
             },
             "PowerSettingsHandler": {
                 "ensure_ultimate_performance": True,

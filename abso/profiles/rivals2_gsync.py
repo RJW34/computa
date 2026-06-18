@@ -14,6 +14,7 @@ from __future__ import annotations
 from typing import Any
 
 from abso.profiles.profile_bases import Rivals2BaseProfile, merge_settings_map
+from abso.settings.registry import WIN32_PRIORITY_GAMING_ONLINE
 
 
 class Rivals2GSyncProfile(Rivals2BaseProfile):
@@ -73,13 +74,18 @@ class Rivals2GSyncProfile(Rivals2BaseProfile):
                 "max_refresh_rate": True,
             },
             "NvidiaSettingsHandler": {
-                # vrr_fighting_game: LLM on, VSync on (safety net), VRR allow,
-                # threaded opt on, max perf power, shader cache unlimited
+                # vrr_fighting_game: LLM on, VSync on (safety net), threaded
+                # opt on, max perf power, shader cache unlimited. NOTE: this
+                # preset sets no vrr_app_override, so assert it explicitly below.
                 "preset": "vrr_fighting_game",
                 # Auto-detect refresh rate and cap below refresh for G-SYNC headroom
                 "auto_vrr_fps_cap": True,
-                # Ensure G-SYNC is enabled globally
+                # Enable G-SYNC: global fullscreen-only mode PLUS an explicit
+                # per-app allow so switching from a no-sync Rivals lane (which
+                # sets vrr_app_override=force_off) actually re-enables VRR for
+                # this profile instead of relying on the global flip alone.
                 "global_vrr_mode": "fullscreen_only",
+                "vrr_app_override": "allow",
                 # Keep UE5 driver threading consistent with the no-sync Rivals
                 # lanes; the generic fighting-game preset defaults this on.
                 "threaded_optimization": "off",
@@ -275,10 +281,22 @@ class Rivals2OnlineGSyncProfile(Rivals2BaseProfile):
             "WindowsSettingsHandler": {
                 "max_refresh_rate": True,
             },
+            "RegistrySettingsHandler": {
+                # Match the no-sync online lane (Rivals2OnlineProfile): rollback
+                # netcode wants deterministic scheduler timing over maximum
+                # foreground favoritism, so downgrade Win32PrioritySeparation to
+                # the ONLINE value. The base inherits the OFFLINE value, so the
+                # two online lanes would otherwise ship different scheduler
+                # tuning.
+                "win32_priority_separation": WIN32_PRIORITY_GAMING_ONLINE,
+            },
             "NvidiaSettingsHandler": {
                 "preset": "vrr_fighting_game",
                 "auto_vrr_fps_cap": True,
                 "global_vrr_mode": "fullscreen_only",
+                # Explicit per-app VRR allow, symmetric with the no-sync lanes'
+                # explicit force_off (vrr_fighting_game sets neither).
+                "vrr_app_override": "allow",
                 # Override preset default — UE5 driver contention risk with rollback
                 "threaded_optimization": "off",
             },

@@ -43,6 +43,10 @@ from abso.profiles.slippi_melee import (
     SlippiMeleeUniversalHDRProfile,
     SlippiMeleeUniversalProfile,
 )
+from abso.settings.registry import (
+    WIN32_PRIORITY_GAMING_OFFLINE,
+    WIN32_PRIORITY_GAMING_ONLINE,
+)
 
 
 class TestProfileLoading:
@@ -593,13 +597,15 @@ class TestProfileSettings:
         assert sdr_config["hdr_output"] is False
 
     def test_pokemon_auto_chess_nvidia_settings(self):
-        """Test PokemonAutoChessProfile returns explicit Nvidia settings."""
+        """PokemonAutoChess uses the balanced preset (adaptive VSync) like PACDeluxe."""
         profile = PokemonAutoChessProfile()
         settings = profile.get_settings("NvidiaSettingsHandler")
 
-        # WebGL benefits from low latency settings with VSync disabled
-        assert settings["low_latency_mode"] == "on"
-        assert settings["vsync"] == "off"
+        # Casual windowed WebGL auto-battler: the balanced preset gives adaptive
+        # VSync (not a competitive no-sync config that just tears in a browser),
+        # and an explicit VRR allow so windowed-VRR smoothness actually engages.
+        assert settings["preset"] == "balanced"
+        assert settings["vrr_app_override"] == "allow"
 
     def test_overwatch2_no_sync_nvidia_settings(self):
         """No-sync Overwatch profile should explicitly disable VRR/G-SYNC."""
@@ -1426,3 +1432,71 @@ class TestReflexContract:
         assert not violations, (
             "Reflex honesty violations:\n  " + "\n  ".join(violations)
         )
+
+
+class TestProfileOptimalityConsistency:
+    """Regression guards for the 2026-06 profile optimality/consistency audit.
+
+    Lock in the cross-profile consistency fixes so they cannot silently
+    regress: the "No Sync" Fortnite lanes must force VRR off at the driver, the
+    Rivals 2 G-SYNC lanes must explicitly allow per-app VRR, the two online
+    Rivals 2 lanes must share the same scheduler priority separation, Diablo 4
+    must manage Win32PrioritySeparation like every other gaming lane, and the
+    windowed WebGL lanes must wire the windowed VRR path they advertise.
+    """
+
+    def test_fortnite_no_sync_lanes_force_vrr_off_at_driver(self) -> None:
+        """Fortnite is a "No Sync" family; the driver preset must force VRR off."""
+        # reflex_no_sync carries vrr_app_override=force_off; the ReflexShooter
+        # base default (reflex_game) sets no vrr_app_override, which would leave
+        # G-SYNC to the user's global NVCP toggle on a "No Sync" profile.
+        for profile_cls in (FortniteProfile, FortniteHDRProfile):
+            nvidia = profile_cls().get_settings("NvidiaSettingsHandler")
+            assert nvidia["preset"] == "reflex_no_sync", profile_cls.__name__
+
+    def test_rivals2_gsync_lanes_explicitly_allow_per_app_vrr(self) -> None:
+        """All Rivals 2 G-SYNC lanes assert vrr_app_override=allow.
+
+        The vrr_fighting_game preset sets no vrr_app_override, while the no-sync
+        lanes set force_off; the G-SYNC lanes must explicitly re-allow VRR so a
+        no-sync -> G-SYNC switch is symmetric and deterministic.
+        """
+        for profile_cls in (
+            Rivals2GSyncProfile,
+            Rivals2GSyncHDRProfile,
+            Rivals2OnlineGSyncProfile,
+            Rivals2OnlineGSyncHDRProfile,
+        ):
+            nvidia = profile_cls().get_settings("NvidiaSettingsHandler")
+            assert nvidia.get("vrr_app_override") == "allow", profile_cls.__name__
+
+    def test_rivals2_online_lanes_share_priority_separation(self) -> None:
+        """Both online Rivals 2 lanes (no-sync + G-SYNC) use the ONLINE value."""
+        for profile_cls in (
+            Rivals2OnlineProfile,
+            Rivals2OnlineGSyncProfile,
+            Rivals2OnlineGSyncHDRProfile,
+        ):
+            reg = profile_cls().get_settings("RegistrySettingsHandler")
+            assert (
+                reg["win32_priority_separation"] == WIN32_PRIORITY_GAMING_ONLINE
+            ), profile_cls.__name__
+
+    def test_diablo4_manages_priority_separation(self) -> None:
+        """Diablo 4 must set Win32PrioritySeparation (not leave it unmanaged)."""
+        for profile_cls in (Diablo4Profile, Diablo4SDRProfile):
+            reg = profile_cls().get_settings("RegistrySettingsHandler")
+            assert (
+                reg["win32_priority_separation"] == WIN32_PRIORITY_GAMING_OFFLINE
+            ), profile_cls.__name__
+
+    def test_webgl_lanes_wire_the_windowed_vrr_path(self) -> None:
+        """Windowed WebGL/WebView2 lanes deliver the VRR smoothness they advertise."""
+        from abso.profiles.pacdeluxe import PACDeluxeProfile
+
+        for profile_cls in (PokemonAutoChessProfile, PACDeluxeProfile):
+            win = profile_cls().get_settings("WindowsSettingsHandler")
+            nvidia = profile_cls().get_settings("NvidiaSettingsHandler")
+            assert win.get("vrr_optimize") is True, profile_cls.__name__
+            assert win.get("windowed_optimizations") is True, profile_cls.__name__
+            assert nvidia.get("vrr_app_override") == "allow", profile_cls.__name__

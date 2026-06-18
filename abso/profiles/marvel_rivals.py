@@ -190,8 +190,10 @@ class MarvelRivalsSDRProfile(_MarvelRivalsBaseProfile):
                 "game_type": "competitive_fps",
             },
             "MarvelRivalsConfigHandler": {
+                # HDR off for the SDR lane. No hdr_nits: the config handler
+                # ignores the nits value when HDR output is disabled, so writing
+                # it here was an inert dead value.
                 "hdr_output": False,
-                "hdr_nits": 1000,
             },
         }
 

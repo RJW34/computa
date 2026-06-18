@@ -10,6 +10,7 @@ from abso.profiles.profile_bases import (
     fso_overrides,
     merged_handler_settings,
 )
+from abso.settings.registry import WIN32_PRIORITY_GAMING_OFFLINE
 
 if TYPE_CHECKING:
     from abso.settings.base import SettingsHandler
@@ -97,6 +98,11 @@ class _Diablo4BaseProfile(BaseProfile):
                 "disable_pcie_power_saving": True,
             },
             "RegistrySettingsHandler": {
+                # Apply the standard gaming foreground quantum so the profile
+                # manages Win32PrioritySeparation instead of leaving it at the
+                # live value (every other gaming profile sets this, and the
+                # auditor flags any non-gaming value as suboptimal).
+                "win32_priority_separation": WIN32_PRIORITY_GAMING_OFFLINE,
                 # Diablo IV is a cinematic ARPG, not a twitch shooter. Use the
                 # Medium MMCSS scheduling category (same as productivity / emulator
                 # profiles) instead of the High setting inherited by ReflexShooter

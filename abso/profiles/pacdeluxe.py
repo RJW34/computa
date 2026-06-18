@@ -69,6 +69,11 @@ class PACDeluxeProfile(WebGLBaseProfile):
                 # Smooth preset for consistent frame pacing
                 # WebGL benefits from shader caching and stable GPU clocks
                 "preset": "balanced",
+                # Explicitly allow VRR/G-SYNC so the variable-frame-delivery
+                # smoothness the guidance recommends is actually delivered
+                # (paired with vrr_optimize on the WebGL base), not left to the
+                # user's global NVCP toggle.
+                "vrr_app_override": "allow",
                 # Key settings applied:
                 # - Low Latency Mode: On (not Ultra - WebView handles timing)
                 # - VSync: Adaptive (prevents tearing without full VSync lag)

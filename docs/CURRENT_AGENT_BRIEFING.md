@@ -1,6 +1,6 @@
 # Current Agent Briefing
 
-Last updated: 2026-06-09 America/New_York
+Last updated: 2026-06-17 America/New_York
 
 > **MACHINE-SPECIFIC — read `docs/NEW_MACHINE_SETUP.md` first if this repo was
 > just cloned onto a different PC.** Everything below describes the live state of
@@ -15,6 +15,71 @@ Last updated: 2026-06-09 America/New_York
 This is the first live-state file for agents arriving with no prior session
 context. Historical handoffs and old plans belong in `docs/archive/`; this file
 is the current operational truth for this PC.
+
+## 2026-06-17 Win11 Insider 29610 upgrade — full re-verification (PASS) + MMCSS drift repaired
+
+The user updated this PC to **Windows Insider build 29610.1000** (Experimental
+Future Platforms / Canary, June 12 flight) and asked for full re-verification of
+every facet of ABSO against the new build. Result: **ABSO is healthy on 29610;
+no code break.** One OS-update-induced registry drift was found and repaired.
+
+- **No build-gate flips.** 29610 sits in the same band as the previously
+  validated 29595: `is_windows_11`, `is_25h2_or_newer`, and
+  `is_experimental_future_platform` are all True (unchanged); Xbox Mode / AI
+  Agents / Shared Audio min-build floors still pass; no profile declares
+  `min_os_build`/`validated_os_build`; there are no `at_most`/exact-build gates
+  anywhere. Logical branch behavior on 29610 is identical to 29595.
+- **Offline:** `ruff check .` clean; full suite **2128 passed / 0 failed**
+  (Python 3.12.10).
+- **Read-only live (all clean on 29610):** `detect` (full hardware map),
+  `os_release` (reads 29610.1000 despite the "Windows 10 Home / Dev" registry
+  quirk), `profiles`, `audit` (experimental banner fires; Xbox/AI/Shared-Audio
+  detect-only handlers correctly report "rollout not yet active"), `bios`
+  (ReBAR on, VBS on, Secure Boot on, TPM 2.0), `backup-create`.
+- **The one real change the update caused:** the 29610 feature update
+  re-provisioned the MMCSS `Games` task key
+  (`HKLM\...\Multimedia\SystemProfile\Tasks\Games`) back to Windows defaults:
+  `game_priority.priority` 6 -> 2 and `game_priority.scheduling_category`
+  High -> Medium (GPU Priority 8 and Win32PrioritySeparation 42 survived).
+  ABSO detected it correctly as a `RegistrySettingsHandler` mismatch with
+  **empty** `pending_apply_settings` (the narrow `apply-pending` path does not
+  cover MMCSS priority, so the repair requires a full apply).
+- **Repaired (user chose "fix and keep"):** baseline backup
+  `2026-06-17_200631`, then `apply overwatch2-gsync-hdr-capture` (the
+  already-current idempotent path wrote the registry fix and skipped the
+  redundant display/color reset, so no flicker risk was taken). Post-apply:
+  `state --json --verify` reports `status: active`, `all_active: True`,
+  `reboot_pending: False`, zero mismatched/pending/reboot-gated settings. All
+  21 OW2 INI keys incl. `frame_rate_cap=276` verify active.
+- **KB list reviewed for June (`abso/core/kb_checker.py`):** bumped
+  `LAST_REVIEWED_UTC` to 2026-06-17 covering the June 2026 Patch Tuesday GA
+  cumulatives (KB5094126 -> 26100.8655 / 26200.8655; KB5093998 -> 22631.7219;
+  MS reports no known issues) and the 29610 bug-fix flight. No gaming-impacting
+  regression on either track, so no new `KNOWN_BAD_KBS` entries.
+- **Open/minor:** `health` still reports the expected mixed-refresh
+  `display_stability` high-risk warning and `display_events` noise that is
+  actually the post-update **reboot** (Kernel-Power shutdown/boot + ACPI thermal
+  enum at 19:09-19:10, not flicker). `tray_runtime_marker` warns because the
+  post-reboot tray (PID 19252) has not written a runtime marker; restart the
+  tray into the installed `ABSO-Tray.ps1` to clear it (no apply/display action
+  needed). The active profile itself is fully clean.
+- Uncommitted working-tree changes from this session: `abso/core/kb_checker.py`
+  and this briefing (29610 verification), plus a follow-on profile
+  optimality/consistency audit (all 35 user-facing profiles) that fixed:
+  Fortnite no-sync lanes now use `reflex_no_sync` (force VRR off at the driver
+  instead of deferring to the global NVCP toggle); Rivals 2 G-SYNC lanes assert
+  `vrr_app_override: allow`; the two online Rivals 2 lanes share the ONLINE
+  `Win32PrioritySeparation`; Diablo 4 now manages `Win32PrioritySeparation`;
+  the WebGL lanes (pokemon/pacdeluxe) wire windowed VRR + use the `balanced`
+  preset; Reflex in-game guidance says "manually" (OW2/Deadlock/Fortnite);
+  stale preset notes + Marvel SDR inert `hdr_nits` cleaned up. Files touched:
+  `abso/profiles/{fortnite,pokemon_auto_chess,pacdeluxe,rivals2_gsync,diablo4,
+  marvel_rivals,overwatch2,deadlock,profile_bases}.py`,
+  `abso/settings/nvidia/presets.py`, `tests/test_profiles.py`,
+  `tests/test_profile_coverage_invariants.py`, regenerated
+  `tests/snapshot_golden.json`. Full suite 2133 passed, ruff clean. No
+  catastrophic bugs were found in the audit; these were consistency/correctness
+  gaps. Not committed (user did not request a commit).
 
 ## Current User Objective
 

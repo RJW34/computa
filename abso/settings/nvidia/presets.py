@@ -152,9 +152,9 @@ NVIDIA_PRESETS: dict[str, dict[str, Any]] = {
         },
         "notes": {
             "fps_cap": (
-                "Use in-game limiter at highest preset below refresh rate. "
-                "For 300Hz: use 240 in-game cap. In-game limiters have ~0.5-1 frame "
-                "lower latency than RTSS/NVCP, which outweighs scanout benefits."
+                "Use the in-game limiter at refresh_rate - 3 (Blur Busters "
+                "G-SYNC 101): e.g. 297 @ 300Hz, 237 @ 240Hz, 141 @ 144Hz. "
+                "In-game limiters have ~0.5-1 frame lower latency than RTSS/NVCP."
             ),
             "fighting_games": (
                 "60Hz-logic games still benefit from high refresh (reduced scanout latency). "
@@ -172,7 +172,10 @@ NVIDIA_PRESETS: dict[str, dict[str, Any]] = {
         "settings": {
             "low_latency_mode": "off",  # OFF - Diablo 4 has native Reflex, don't conflict
             "power_management": "prefer_max_performance",
-            "vsync": "off",  # OFF - G-Sync handles sync
+            # Preset default. The Diablo 4 profile overrides this to "on" so NVCP
+            # VSync acts as the G-SYNC backstop (never engages below the
+            # refresh-3 cap, per Blur Busters G-SYNC 101).
+            "vsync": "off",
             # Max Frame Rate is set by the Diablo 4 profile via auto_vrr_fps_cap.
             # That path calls NvidiaSettingsHandler to compute refresh - 3 at apply time.
             "max_frame_rate": "off",

@@ -42,14 +42,14 @@ class PokemonAutoChessProfile(WebGLBaseProfile):
     def _settings_overrides(self) -> dict[str, dict[str, Any]]:
         return {
             "NvidiaSettingsHandler": {
-                # Explicit low-latency WebGL settings (avoid preset overrides)
-                "low_latency_mode": "on",
-                "power_management": "prefer_max_performance",
-                "vsync": "off",
-                "max_frame_rate": "off",
-                "shader_cache": "unlimited",
-                "threaded_optimization": "on",
-                "triple_buffering": "off",
+                # Casual windowed WebGL auto-battler: use the balanced preset
+                # (adaptive VSync, not forced no-sync tearing) so this sibling
+                # matches PACDeluxe instead of running a competitive no-sync
+                # config that just tears in a windowed browser. Explicitly allow
+                # VRR/G-SYNC so the windowed-VRR smoothness the guidance
+                # promises is delivered rather than left to the global toggle.
+                "preset": "balanced",
+                "vrr_app_override": "allow",
             },
         }
 

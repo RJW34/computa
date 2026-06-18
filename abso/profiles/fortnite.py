@@ -54,6 +54,16 @@ class _FortniteBaseProfile(ReflexShooterBaseProfile):
 
     def _shared_overrides(self) -> dict[str, dict[str, Any]]:
         return {
+            "NvidiaSettingsHandler": {
+                # Honor the "No Sync" label at the driver level. The inherited
+                # ReflexShooter base preset is reflex_game, which sets no
+                # vrr_app_override and therefore leaves G-SYNC/VRR to the user's
+                # global NVCP toggle. reflex_no_sync explicitly forces VRR off
+                # (vrr_app_override=force_off + vsync_tear_control=disable) like
+                # the OW2/Deadlock no-sync siblings, while still keeping driver
+                # LLM off so in-game Reflex owns the render queue.
+                "preset": "reflex_no_sync",
+            },
             "FortniteConfigHandler": {
                 "fullscreen_mode": 0,
                 "vsync": False,
@@ -85,7 +95,7 @@ class _FortniteBaseProfile(ReflexShooterBaseProfile):
                 "category": "Display",
                 "setting": "NVIDIA Reflex Low Latency",
                 "value": "On + Boost — ABSO already set driver LLM off; flip the in-game toggle to finish",
-                "reason": "ABSO has already configured the driver side: NVIDIA LLM is OFF so the engine owns the render queue (Reflex's correct path). Fortnite's Reflex toggle lives in Fortnite's settings and there is no stable config key to write it from outside; flip 'NVIDIA Reflex Low Latency' to 'On + Boost' in the game once.",
+                "reason": "ABSO has already configured the driver side: NVIDIA LLM is OFF so the engine owns the render queue (Reflex's correct path). Fortnite's Reflex toggle lives in Fortnite's settings and there is no stable config key to write it from outside; manually flip 'NVIDIA Reflex Low Latency' to 'On + Boost' in the game once.",
             },
             {
                 "category": "Display",
