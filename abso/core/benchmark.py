@@ -197,6 +197,24 @@ def _safe_float(value: str, default: float = 0.0) -> float:
         return default
 
 
+def _row_get_ci(row: dict[str, str], *names: str) -> str:
+    """Return the first present column value, tolerant of header casing.
+
+    PresentMon 1.x emitted ``msBetweenPresents``; PresentMon 2.x emits
+    ``MsBetweenPresents``. Match case-insensitively so the analyzer works
+    across both CLI generations.
+    """
+    for name in names:
+        if name in row:
+            return row[name]
+    lowered = {k.lower(): v for k, v in row.items()}
+    for name in names:
+        value = lowered.get(name.lower())
+        if value is not None:
+            return value
+    return ""
+
+
 def _safe_int(value: str, default: int = 0) -> int:
     """Parse a string to int, returning *default* on failure."""
     try:
@@ -500,11 +518,12 @@ class FrameTimeBenchmark:
         dropped_count = 0
 
         for row in capture.raw_data:
-            ft = _safe_float(row.get("msBetweenPresents", ""))
+            # PresentMon 2.x: MsBetweenPresents; 1.x: msBetweenPresents.
+            ft = _safe_float(_row_get_ci(row, "MsBetweenPresents", "msBetweenPresents"))
             if ft > 0.0:
                 frame_times.append(ft)
 
-            if _safe_int(row.get("Dropped", "0")) == 1:
+            if _safe_int(_row_get_ci(row, "Dropped") or "0") == 1:
                 dropped_count += 1
 
         total_frames = len(frame_times)

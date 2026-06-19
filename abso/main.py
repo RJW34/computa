@@ -66,6 +66,7 @@ from abso.profiles.catalog import (
 )
 from abso.profiles.user_profile_template import build_user_profile_yaml_template
 from abso.utils.admin import is_admin
+from abso.utils.proc import no_window_creationflags
 
 console = Console()
 logger = logging.getLogger(__name__)
@@ -955,6 +956,11 @@ def apply(
             return
 
         if pending_apply_settings:
+            # Note: no up-front is_admin() gate here by design. The narrow
+            # pending-apply path (apply_pending_profile_settings) already fails
+            # closed on a non-admin caller BEFORE any registry write, returning
+            # a clear "admin required" error. Hoisting the gate here would only
+            # duplicate that and break the read-light fast-path contract.
             pending_result = _apply_pending_profile_settings(profile_name)
             pending_payload = _build_pending_apply_as_apply_payload(
                 profile_name,
@@ -1026,6 +1032,7 @@ def apply(
                         capture_output=True,
                         text=True,
                         timeout=5,
+                        creationflags=no_window_creationflags(),
                     )
                     if exe.lower() in parse_tasklist_csv_images(check.stdout or ""):
                         benchmark_exe = exe
@@ -1123,6 +1130,10 @@ def apply(
                     "fallback_chain": fallback_chain,
                     "backup_id": tx.backup_id,
                     "requires_reboot": result.requires_reboot if result else False,
+                    "reboot_pending": result.requires_reboot if result else False,
+                    "reboot_reasons": (
+                        list(result.reboot_reasons) if result and result.reboot_reasons else []
+                    ),
                     "in_game_settings": result.in_game_settings if result else False,
                     "error": tx.error if not tx.success else None,
                     "applied_settings": applied_settings,
@@ -1433,6 +1444,11 @@ def launch(
             sys.exit(1)
 
         if pending_apply_settings:
+            # Note: no up-front is_admin() gate here by design. The narrow
+            # pending-apply path (apply_pending_profile_settings) already fails
+            # closed on a non-admin caller BEFORE any registry write, returning
+            # a clear "admin required" error. Hoisting the gate here would only
+            # duplicate that and break the read-light fast-path contract.
             pending_result = _apply_pending_profile_settings(profile_name)
             pending_payload = _build_pending_apply_as_apply_payload(
                 profile_name,
@@ -2387,7 +2403,7 @@ def display_diagnostics(
 
     if json_output:
         data: dict[str, Any]
-        if samples == 1:
+        if samples == 1 and payloads:
             data = payloads[0]
         else:
             data = {"read_only": True, "samples": payloads}
@@ -2647,6 +2663,254 @@ def benchmark_compare(before_csv: str, after_csv: str, json_output: bool):
         sys.exit(1)
 
 
+def _benchmark_hardware_metadata() -> dict[str, Any]:
+    """Best-effort hardware/display metadata stamped into benchmark artifacts."""
+    meta: dict[str, Any] = {}
+    try:
+        from abso.core.detector import HardwareDetector
+
+        hw = HardwareDetector()
+        gpu = hw.detect_gpu()
+        if gpu and gpu.get("name"):
+            meta["gpu"] = gpu.get("name")
+    except Exception as exc:  # noqa: BLE001 - metadata is best-effort
+        logger.debug("Benchmark GPU metadata unavailable: %s", exc)
+    try:
+        from abso.settings.nvidia import NvidiaSettingsHandler
+
+        refresh = NvidiaSettingsHandler()._detect_primary_refresh_rate()
+        if refresh:
+            meta["primary_refresh_hz"] = refresh
+    except Exception as exc:  # noqa: BLE001 - metadata is best-effort
+        logger.debug("Benchmark refresh metadata unavailable: %s", exc)
+    return meta
+
+
+@cli.command("benchmark-capture")
+@click.argument("profile_name")
+@click.option(
+    "--label",
+    default=None,
+    help="Artifact label (auto: 'baseline' if none stored, else 'after')",
+)
+@click.option(
+    "--process",
+    "process_name",
+    default=None,
+    help="Target process exe (default: the profile's first executable hint)",
+)
+@click.option("--duration", default=30, type=int, help="Capture duration in seconds")
+@click.option(
+    "--compare/--no-compare",
+    "do_compare",
+    default=True,
+    help="Auto-compare an 'after' capture against the latest stored baseline",
+)
+@click.option(
+    "--list", "list_only", is_flag=True, help="List stored artifacts for the profile and exit"
+)
+@click.option("--json", "json_output", is_flag=True, help="Output as JSON")
+def benchmark_capture(
+    profile_name: str,
+    label: str | None,
+    process_name: str | None,
+    duration: int,
+    do_compare: bool,
+    list_only: bool,
+    json_output: bool,
+) -> None:
+    """Capture and STORE profile frame-time evidence under reports/benchmarks/.
+
+    Unlike the low-level ``benchmark`` command, this is profile-aware and
+    persists a durable JSON artifact so a profile accumulates the before/after
+    evidence the quality rubric requires for "measured"/"optimal" grading.
+    Run with the game already running:
+
+        abso benchmark-capture overwatch2-gsync-hdr --label baseline
+        # (apply the profile, then relaunch/observe)
+        abso benchmark-capture overwatch2-gsync-hdr --label after
+    """
+    from rich.table import Table
+
+    from abso.core.benchmark import (
+        CaptureError,
+        FrameTimeBenchmark,
+        PresentMonNotFoundError,
+    )
+    from abso.core.benchmark_store import (
+        BenchmarkArtifactStore,
+        analysis_from_dict,
+        analysis_to_dict,
+        summarize_comparison,
+    )
+
+    profile_name = resolve_profile_id(profile_name) or profile_name
+    store = BenchmarkArtifactStore(REPORTS_DIR)
+
+    if list_only:
+        artifacts = store.list_artifacts(profile_name)
+        if json_output:
+            output_json({"profile": profile_name, "artifacts": artifacts})
+            return
+        if not artifacts:
+            console.print(
+                f"[yellow]No benchmark artifacts stored for {profile_name} yet.[/yellow]"
+            )
+            console.print(
+                "[dim]Run 'abso benchmark-capture <profile> --label baseline' "
+                "with the game running.[/dim]"
+            )
+            return
+        table = Table(title=f"Stored benchmark artifacts: {profile_name}", border_style="cyan")
+        table.add_column("When")
+        table.add_column("Kind")
+        table.add_column("Label / Verdict")
+        table.add_column("Headline")
+        for artifact in artifacts:
+            kind = artifact.get("kind", "?")
+            if kind == "capture":
+                an = artifact.get("analysis", {})
+                table.add_row(
+                    str(artifact.get("captured_at", "")),
+                    kind,
+                    str(artifact.get("label", "")),
+                    f"avg {an.get('avg_fps', '?')} fps / 1% low {an.get('p1_low_fps', '?')}",
+                )
+            else:
+                summ = artifact.get("summary", {})
+                table.add_row(
+                    str(artifact.get("created_at", "")),
+                    kind,
+                    str(summ.get("verdict", "")),
+                    f"+{summ.get('improved_metrics', 0)} / -{summ.get('regressed_metrics', 0)} metrics",
+                )
+        console.print(table)
+        return
+
+    profile_class = ProfileApplier.PROFILES.get(profile_name)
+    if profile_class is None:
+        msg = f"Unknown profile: {profile_name}"
+        if json_output:
+            json_error(msg)
+        console.print(f"[red]Error: {msg}[/red]")
+        sys.exit(1)
+
+    if not process_name:
+        hints = list(getattr(profile_class(), "executable_hints", []) or [])
+        process_name = hints[0] if hints else None
+    if not process_name:
+        msg = f"No target process for {profile_name}; pass --process explicitly"
+        if json_output:
+            json_error(msg)
+        console.print(f"[red]Error: {msg}[/red]")
+        sys.exit(1)
+
+    if not label:
+        label = "after" if store.latest_capture(profile_name, label="baseline") else "baseline"
+
+    bench = FrameTimeBenchmark()
+    if not json_output:
+        console.print(Panel(f"Benchmark capture: {profile_name} ({label})", style="bold blue"))
+        console.print(f"[dim]Capturing {process_name} for {duration}s via PresentMon...[/dim]\n")
+
+    try:
+        capture = bench.capture(process_name, duration_seconds=duration)
+        analysis = bench.analyze(capture)
+    except PresentMonNotFoundError as exc:
+        detail = getattr(exc, "details", "") or str(exc)
+        if json_output:
+            json_error(f"PresentMon not installed: {detail}")
+        console.print("[red]Error: PresentMon is not installed.[/red]")
+        console.print(
+            "  Download: [cyan]https://github.com/GameTechDev/PresentMon/releases[/cyan]"
+        )
+        console.print(
+            "  Install to C:\\Program Files\\PresentMon\\ or add to PATH, "
+            "then retry with the game running."
+        )
+        sys.exit(1)
+    except CaptureError as exc:
+        detail = getattr(exc, "details", "") or str(exc)
+        if json_output:
+            json_error(f"Capture failed: {exc} | {detail}")
+        console.print(f"[red]Capture failed: {exc}[/red]")
+        if detail:
+            console.print(f"[dim]{detail}[/dim]")
+        sys.exit(1)
+
+    presentmon_path = None
+    try:
+        presentmon_path = str(bench._find_presentmon())
+    except Exception:  # noqa: BLE001 - path is informational metadata
+        presentmon_path = None
+
+    timestamp = datetime.now()
+    artifact_path = store.save_capture(
+        profile_id=profile_name,
+        label=label,
+        process_name=process_name,
+        duration_seconds=duration,
+        analysis=analysis,
+        timestamp=timestamp,
+        presentmon_path=presentmon_path,
+        hardware=_benchmark_hardware_metadata(),
+    )
+
+    comparison_summary = None
+    comparison_path = None
+    if label != "baseline" and do_compare:
+        baseline = store.latest_capture(profile_name, label="baseline")
+        if baseline and baseline.get("analysis"):
+            comparison = bench.compare(analysis_from_dict(baseline["analysis"]), analysis)
+            comparison_path = store.save_comparison(
+                profile_id=profile_name,
+                comparison=comparison,
+                baseline_ref=baseline.get("_filename"),
+                after_ref=artifact_path.name,
+                timestamp=timestamp,
+            )
+            comparison_summary = summarize_comparison(comparison)
+
+    if json_output:
+        output_json(
+            {
+                "profile": profile_name,
+                "label": label,
+                "process_name": process_name,
+                "duration_seconds": duration,
+                "artifact": str(artifact_path),
+                "analysis": analysis_to_dict(analysis),
+                "comparison": comparison_summary,
+                "comparison_artifact": str(comparison_path) if comparison_path else None,
+            }
+        )
+        return
+
+    table = Table(title=f"Frame Time Analysis ({label})", border_style="cyan")
+    table.add_column("Metric", style="bold")
+    table.add_column("Value", justify="right")
+    table.add_row("Avg FPS", f"{analysis.avg_fps:.2f}")
+    table.add_row("1% Low FPS", f"{analysis.p1_low_fps:.2f}")
+    table.add_row("0.1% Low FPS", f"{analysis.p01_low_fps:.2f}")
+    table.add_row("P99 Frame Time", f"{analysis.p99_frame_time_ms:.3f} ms")
+    table.add_row("Stdev", f"{analysis.frame_time_stdev:.3f} ms")
+    table.add_row("Total Frames", str(analysis.total_frames))
+    console.print(table)
+    console.print(f"\n[green]Stored artifact:[/green] {artifact_path}")
+    if comparison_summary:
+        console.print(
+            f"[bold]Comparison vs baseline:[/bold] {comparison_summary['verdict']} "
+            f"([green]+{comparison_summary['improved_metrics']}[/green] / "
+            f"[red]-{comparison_summary['regressed_metrics']}[/red] metrics)"
+        )
+        console.print(f"[dim]Comparison artifact: {comparison_path}[/dim]")
+    elif label != "baseline" and do_compare:
+        console.print(
+            "[yellow]No stored baseline to compare against; "
+            "capture one with --label baseline first.[/yellow]"
+        )
+
+
 @cli.command()
 @click.option("--json", "json_output", is_flag=True, help="Output as JSON")
 def bios(json_output: bool):
@@ -2663,8 +2927,9 @@ def bios(json_output: bool):
             gpu = hw_detector.detect_gpu()
             if gpu and "nvidia" in (gpu.get("name", "") or "").lower():
                 has_nvidia = True
-        except Exception:
-            pass  # GPU detection is best-effort for recommendation context
+        except Exception as exc:
+            # GPU detection is best-effort for recommendation context.
+            logger.debug("GPU detection for BIOS recommendations failed: %s", exc)
 
         recommendations = detector.get_recommendations(info, has_nvidia_gpu=has_nvidia)
 
