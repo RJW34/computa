@@ -16,6 +16,175 @@ This is the first live-state file for agents arriving with no prior session
 context. Historical handoffs and old plans belong in `docs/archive/`; this file
 is the current operational truth for this PC.
 
+## 2026-06-19 (session 2) Implemented all A/B/C/D improvements + live-verified (not committed/deployed)
+
+Follow-on to the audit below: the user asked to "act out every single improvement
+listed for A, B, C, D and use this PC to verify everything works." Done. Every
+handler was unit-tested AND live read-only `detect()`-verified on this PC.
+**No commit / no deploy; installed runtime unchanged.** Offline: full pytest suite
+**2290 passed / 0 failed**, `ruff check .` clean. Live verification was read-only
+`detect()` per handler (this shell is non-admin, so the elevated apply+restore of
+a wired ReflexShooter profile is the remaining user-run step).
+
+### A - Benchmark capture/store/compare flow (rubric "measured" path)
+- New `abso/core/benchmark_store.py` (artifact persistence + before/after compare +
+  verdict) and a profile-aware `abso benchmark-capture <profile>` CLI command that
+  stores durable JSON artifacts under `reports/benchmarks/<profile>/`. The existing
+  `benchmark`/`benchmark-compare` commands were ephemeral; this is the persisting,
+  profile-aware flow the rubric needs.
+- Hardened `benchmark.py` CSV parsing for PresentMon 2.x (`MsBetweenPresents`) vs
+  1.x (`msBetweenPresents`) casing.
+- Verified on this PC: store hermetic tests write real JSON; `--list` + graceful
+  "PresentMon not installed" path confirmed live (process resolved from the
+  profile's executable hints). The live game-capture step needs PresentMon
+  installed + a running game (inherently unverifiable now).
+
+### B - Profile fact fixes (verified against game facts, not assumed)
+- Deadlock `graphics_api`: KEPT `dx11` (web-confirmed Deadlock exposes both DX11 and
+  Vulkan; DX11 is the stability-preferred path) - the audit's "switch to vulkan" was
+  wrong; comment corrected.
+- Diablo 4: pinned `processor_max_performance`/`processor_min_state=100`/
+  `disable_core_parking` to match every other gaming base (fallback robustness).
+- Pokemon Auto Chess + PACDeluxe: replaced the contradictory adaptive-VSync+VRR with
+  the canonical G-SYNC + VSync-On pairing; aligned both catalog subtitles + sync_mode.
+- Fortnite `PreferredFullscreenMode`: VERIFIED correct (live config showed `1` /
+  Windowed-Fullscreen; a competitive community config uses `0` = Fullscreen, the stock
+  UE enum). ABSO writing `0` is right; documented the enum so it isn't re-flagged.
+- (Rivals 2 `frame_rate_limit` 999->0 was already done in session 1.)
+
+### C - Safety/behavior
+- ProcessJanitor + OverlayManager: dropped `taskkill /T` (tree-kill could reach a
+  NEVER_KILL child); `/IM` already stops the named image.
+- VPN route-holding daemons (`tailscaled`, `wireguard`, `openvpn`, `nordvpn-service`,
+  `ProtonVPNService`, `mullvad-daemon`, `ZeroTier One`) moved from always-safe to the
+  OPT_IN killset tier (kill-switch blackhole safety); VPN UIs/CLIs stay always-safe.
+- cpu_balancer: added game-process-subtree exclusion (parent-PID chain) so anti-cheat
+  child processes are never demoted; enumeration now captures parent PID.
+- C10 (admin-gate hoist): VERIFIED the pending fast path already fails closed before
+  any write (`apply_pending` admin-gates internally) and a test asserts the fast path
+  doesn't call `is_admin` - the audit's premise was wrong, so NO change (reverted).
+
+### D - Seven new latency-stack handlers (all registered audit+backup, unit-tested, live detect-verified)
+- `GameDvrHandler` - hard-off `GameDVR_Enabled` + `AllowGameDVR` policy (the master
+  keys the existing `AppCaptureEnabled` write missed). Live: already 0/0 here.
+- `InterruptModeHandler` - GPU MSI mode (`MSISupported=1`, reboot-gated), GPU PCI
+  instance resolved via WMI. Live: RTX 4070 already MSI=1.
+- `AudioEngineHandler` - disable the audio enhancement (APO) chain on the active
+  render device. Live: active device detected.
+- `NicDriverHandler` - InterruptModeration off / RSS on / FlowControl off / EEE off on
+  the active NIC. Live: read "Ethernet 2" (InterruptModeration currently 1).
+- `DefenderExclusionsHandler` - add game-folder exclusions, gated on Defender being
+  the active AV; restore reverts to the backed-up exclusion snapshot. Live: Defender
+  active, 2 existing exclusions.
+- `PagefileHandler` - fixed pagefile (1.5x/2x RAM, 32 GB cap), ACKNOWLEDGEMENT-GATED
+  (won't mutate without `acknowledge_pagefile_change=True`), `restore_guarantee=partial`.
+  Live: auto-managed, 32 GB. Correctly NOT auto-wired into any profile.
+- `HypervisorAuditHandler` - AUDIT-ONLY: flags an idle Hyper-V root partition only when
+  VBS is not running; ABSO never edits BCD. Live: hypervisor Auto + VBS running -> finding
+  correctly silent.
+- WIRING: the four apply-capable handlers (GameDvr/MSI/AudioEngine/NIC) are wired into
+  `ReflexShooterBaseProfile` -> they now apply on the flagship strict online lanes
+  (Overwatch 2, Marvel Rivals, Deadlock, Fortnite). Verified OW2 get_handlers/get_settings.
+  This closes most of the AGENT_PROTOCOL §6.1 latency-stack backlog (MSI mode, Game DVR
+  hard-off, audio APO, NIC tuning; pagefile + hypervisor delivered as opt-in/audit-only).
+- HARDENING (edge cases found pre-commit): the four wired handlers are best-effort on
+  apply AND on restore (a failed tweak/revert is a warning, never rolls back or blocks a
+  profile switch); `is_critical_verify=False` + `restore_guarantee='partial'` on them so a
+  verify miss is a WARNING not CRITICAL. Pagefile + Defender are `backup=False` (audit-only,
+  never auto-applied - matches `VBSOptInHandler`) so they add no per-switch backup/restore
+  overhead. NIC `Set` uses `-NoRestart` so the per-switch revert never bounces the link.
+
+## 2026-06-19 Recursive static audit + verified bug/accuracy fixes (offline only; not committed/deployed)
+
+User ran an overnight `/goal` to recursively audit and bug-fix ABSO, verify
+profile accuracy, and push toward "state of the art." Four parallel read-only
+auditors swept core/apply, settings handlers, profiles, and CLI/launch/display.
+Every finding was re-verified against the real code before acting (several
+agent findings were rejected — see below). Tests were explicitly authorized for
+this session because the user was away from the PC. **No commit and no deploy
+were performed; the installed runtime is unchanged.** All work is in the working
+tree, offline-validated: full pytest suite **2155 passed / 0 failed**
+(Python 3.12.10), `ruff check .` clean.
+
+### Fixes shipped (working tree, unit-tested)
+
+Restore-symmetry / correctness (settings handlers):
+- `audio.py` — `restore()` re-ran the high-priority apply path, rewriting four
+  MMCSS Audio values (`Priority`→2, `Background Only`→False, SFIO) on *every*
+  `restore`, even when no profile touched audio. Now captures a full Audio-task
+  snapshot and faithfully reverts only managed values (or deletes ones absent at
+  backup); apply's mislabeled `Priority` 2→8.
+- `color.py` — backup captured only the active ICC entry while a `"native"`
+  apply deletes the whole `ICMProfile` multi-string; multi-ICC users lost
+  secondary associations on restore. Now backs up/restores the full list, and
+  `restore_guarantee` is honestly `"partial"` (registry note added).
+- `storage.py` — `disablelastaccess` was collapsed to a bool, so restore
+  rewrote a default Win11 `2` (system-managed) to `0` on every rollback. Now
+  captures/restores the exact 0-3 value.
+- `tasks.py` — restore keyed off `Status: Ready` (runtime readiness) instead of
+  the authoritative `Scheduled Task State` (Enabled/Disabled), so a
+  disabled-but-ready task would be wrongly re-enabled. Verified the two fields
+  are distinct on this box (`ABSO-Tray-Startup`: Status Ready / State Enabled).
+- `power.py` — active-plan restore now falls back to matching a plan by name
+  when the backed-up GUID was deleted (custom plans get fresh GUIDs).
+- `monitor_adaptive_sync.py` — declared Win64-correct ctypes prototypes
+  (`MonitorFromPoint` HMONITOR restype + dxva2 argtypes) to stop HANDLE
+  truncation; `_get_primary_physical_monitor` documented as caller-owns-handle.
+- `amd.py` — `_write_reg_dword` uses `CreateKeyEx` (HKCU Radeon `CN`/`DVR`
+  often absent). Note: `AmdSettingsHandler` is unregistered/dormant (NVIDIA rig).
+
+Core / CLI / display / process:
+- `apply` success JSON now includes `reboot_pending`/`reboot_reasons` (matched
+  the no-op and pending payloads; GUI/tray schema consistency).
+- `state_store.read_state_file` reads `utf-8-sig` (BOM-tolerant).
+- New `abso/utils/proc.py::no_window_creationflags()` + wired into the apply-path
+  `tasklist`/`taskkill` calls (process_janitor, overlay_manager, multimon,
+  benchmark check) to stop console-window flashes when running windowless.
+- `process_janitor.sweep` no longer mislabels an unverifiable kill as "stopped"
+  (tri-state `_query_process_running`; unproven → failed, per the rubric).
+- `apply_hooks.live_monitor_count` fails closed when monitor detection used its
+  single-monitor fallback (`DisplayEnvironment.detection_confident=False`), so
+  opt-in auto display recovery can't fire on a real multi-monitor rig.
+- `crash_detector` records the concrete pre-apply backup id and rolls back to it
+  instead of `"latest"` (dormant feature; future-proofed).
+- `display-diagnostics --json` guards `payloads[0]`; `bios` GPU-probe bare-except
+  now logs.
+
+Profile accuracy:
+- Fortnite SDR: removed inert `hdr_nits: 1000` (HDR output off → value ignored;
+  matches the prior Marvel SDR cleanup).
+- Rivals 2 (all four no-sync lanes): `frame_rate_limit` 999 → 0 (UE true
+  uncapped; the comment/catalog already said "uncapped"). *Confirm if you want a
+  hard thermal cap instead.*
+- UE base (`ue_game_user_settings`): `auto_vrr_fps_cap` now surfaces a notice
+  when refresh detection fails (mirrors Diablo 4) so Marvel Rivals et al. no
+  longer silently skip the in-game cap.
+- Regenerated `tests/snapshot_golden.json` for the five intended profile diffs.
+
+### Findings re-verified as NOT bugs (do not re-flag)
+- `backup.py` `_NON_BLOCKING_GUARANTEES` excluding `"partial"`: correct.
+  `DisplayColorRangeHandler.restore` already skips offline monitors without
+  failing, and fail-closed-on-partial matches the QUALITY_RUBRIC.
+- `display_reset.py` missing ctypes argtypes: not a defect at those call sites
+  (only NULL pointers, a ctypes Array, and small int flags — no pointer-as-int
+  truncation, no handles).
+- Slippi console-parity `vsync_tear_control: "disable"` with `vsync: "on"`:
+  intentional (forces hard double-buffered VSync, no adaptive tear fallback).
+- `rollback_guard` `passed=True` in override mode: cosmetic and test-locked;
+  left as-is.
+
+### Open decisions for the user (require approval / a game fact)
+See the session's question list. Highest-value: **no profile has a benchmark
+artifact in `reports/benchmarks/`** despite the full PresentMon harness in
+`abso/core/benchmark.py` — capturing before/after frame-time + latency on this
+rig is the single biggest step toward rubric "measured"/"optimal" grading.
+Other open items: Fortnite `PreferredFullscreenMode` enum (confirm before
+changing), Deadlock `graphics_api` dx11-vs-vulkan, Diablo 4 CPU-floor omission,
+Pokemon/PACDeluxe windowed sync model, OW2 no-sync-HDR FSO posture, ProcessJanitor
+`/T` tree-kill + VPN-daemon killset tier, cpu_balancer anti-cheat child exclusion,
+and the §6.1 latency-stack handlers (MSI mode, Game DVR hard-off, Defender game
+exclusions, etc.).
+
 ## 2026-06-17 Win11 Insider 29610 upgrade — full re-verification (PASS) + MMCSS drift repaired
 
 The user updated this PC to **Windows Insider build 29610.1000** (Experimental
