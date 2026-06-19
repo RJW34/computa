@@ -64,9 +64,13 @@ def _write_reg_dword(
 
     Raises:
         PermissionError: If the caller lacks write access.
-        OSError: If the key cannot be opened or the write fails.
+        OSError: If the key cannot be opened/created or the write fails.
     """
-    key = winreg.OpenKey(hive, subkey, 0, winreg.KEY_ALL_ACCESS)
+    # CreateKeyEx opens the key or creates it when missing. Radeon Software
+    # keys (HKCU\Software\AMD\CN, DVR) frequently do not exist until Radeon
+    # Software writes them, so a plain OpenKey would raise FileNotFoundError
+    # and the tweak could never be applied on a fresh install.
+    key = winreg.CreateKeyEx(hive, subkey, 0, winreg.KEY_ALL_ACCESS)
     try:
         winreg.SetValueEx(key, value_name, 0, winreg.REG_DWORD, value)
     finally:

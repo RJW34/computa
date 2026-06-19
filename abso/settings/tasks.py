@@ -168,13 +168,28 @@ class TasksSettingsHandler(SettingsHandler):
             tasks = data.get("tasks", {})
             for task_path, task_info in tasks.items():
                 if task_info.get("exists"):
-                    # Re-enable tasks that were enabled before
-                    was_enabled = task_info.get("state") == "Ready"
+                    was_enabled = self._was_task_enabled(task_info)
                     self._set_task_enabled(task_path, was_enabled)
             return True
         except Exception as e:
             logger.error(f"Failed to restore scheduled task settings: {e}")
             return False
+
+    @staticmethod
+    def _was_task_enabled(task_info: dict[str, Any]) -> bool:
+        """Resolve the backed-up enable state of a task.
+
+        Prefers the authoritative ``Scheduled Task State`` (Enabled/Disabled)
+        field. ``Status`` (Ready/Running/Disabled) reflects runtime readiness,
+        not the enable flag — a disabled-but-ready task reports
+        ``Status: Ready``, so keying off it would wrongly re-enable a task the
+        user had disabled. Legacy backups that only captured ``state`` fall
+        back to the old Status-based heuristic.
+        """
+        scheduled_state = task_info.get("scheduled_task_state")
+        if scheduled_state is not None:
+            return str(scheduled_state).strip().lower() == "enabled"
+        return task_info.get("state") == "Ready"
 
     # Private helper methods
 
@@ -183,6 +198,7 @@ class TasksSettingsHandler(SettingsHandler):
         result: dict[str, Any] = {
             "exists": False,
             "state": None,
+            "scheduled_task_state": None,
             "last_run": None,
         }
 
@@ -197,10 +213,14 @@ class TasksSettingsHandler(SettingsHandler):
 
             if query_result.returncode == 0:
                 result["exists"] = True
-                # Parse output
+                # Parse output. "Status" is runtime readiness (Ready/Running);
+                # "Scheduled Task State" is the authoritative Enabled/Disabled
+                # flag used to decide whether restore re-enables the task.
                 for line in query_result.stdout.splitlines():
                     if line.startswith("Status:"):
                         result["state"] = line.split(":", 1)[1].strip()
+                    elif line.startswith("Scheduled Task State:"):
+                        result["scheduled_task_state"] = line.split(":", 1)[1].strip()
                     elif line.startswith("Last Run Time:"):
                         result["last_run"] = line.split(":", 1)[1].strip()
 

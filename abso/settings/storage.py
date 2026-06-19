@@ -35,6 +35,7 @@ class StorageSettingsHandler(SettingsHandler):
         """Detect current storage settings."""
         return {
             "last_access_disabled": self._get_last_access_disabled(),
+            "last_access_raw": self._get_last_access_raw(),
             "short_names_disabled": self._get_8dot3_disabled(),
             "trim_enabled": self._get_trim_enabled(),
         }
@@ -146,9 +147,18 @@ class StorageSettingsHandler(SettingsHandler):
         return self.detect()
 
     def restore(self, data: dict[str, Any]) -> bool:
-        """Restore storage settings from backup."""
+        """Restore storage settings from backup.
+
+        Prefers the exact ``last_access_raw`` value (0-3) so user-only (1) and
+        system-managed (2) states round-trip faithfully instead of being
+        rewritten to 0/3. Legacy backups without the raw value fall back to the
+        boolean behavior.
+        """
         try:
-            if "last_access_disabled" in data:
+            raw = data.get("last_access_raw")
+            if raw is not None:
+                self._set_last_access_value(str(raw))
+            elif "last_access_disabled" in data:
                 self._set_last_access_disabled(data["last_access_disabled"])
             if "short_names_disabled" in data:
                 self._set_8dot3_disabled(data["short_names_disabled"])
@@ -186,14 +196,45 @@ class StorageSettingsHandler(SettingsHandler):
 
         return None
 
-    def _set_last_access_disabled(self, disabled: bool) -> dict[str, Any]:
-        """Enable or disable Last Access Time updates."""
+    def _get_last_access_raw(self) -> int | None:
+        """Return the raw disablelastaccess value (0-3), or None if unknown.
+
+        Capturing the exact value lets restore round-trip user-only (1) and
+        system-managed (2) states instead of collapsing them to 0/3.
+        """
         try:
-            # Value 1 = disabled for user mode only
-            # Value 3 = disabled for both user and system
-            value = "3" if disabled else "0"
             result = subprocess.run(
-                ["fsutil", "behavior", "set", "disablelastaccess", value],
+                ["fsutil", "behavior", "query", "disablelastaccess"],
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
+            if result.returncode != 0:
+                return None
+            import re
+
+            match = re.search(r"(?:=|set to)\s*([0-3])", result.stdout.lower())
+            if match:
+                return int(match.group(1))
+        except subprocess.TimeoutExpired:
+            logger.warning("Timeout querying disablelastaccess")
+        except Exception as e:
+            logger.debug(f"Failed to get disablelastaccess raw value: {e}")
+        return None
+
+    def _set_last_access_disabled(self, disabled: bool) -> dict[str, Any]:
+        """Enable or disable Last Access Time updates.
+
+        Value 3 = disabled for both user and system; 0 = enabled for both.
+        Use :meth:`_set_last_access_value` to write a specific 0-3 state.
+        """
+        return self._set_last_access_value("3" if disabled else "0")
+
+    def _set_last_access_value(self, value: str) -> dict[str, Any]:
+        """Set disablelastaccess to an explicit fsutil value (0-3)."""
+        try:
+            result = subprocess.run(
+                ["fsutil", "behavior", "set", "disablelastaccess", str(value)],
                 capture_output=True,
                 text=True,
                 timeout=10,

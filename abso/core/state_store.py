@@ -37,7 +37,10 @@ def read_state_file(path: Path) -> dict[str, Any] | None:
     if not path.exists():
         return None
     try:
-        state = json.loads(path.read_text(encoding="utf-8"))
+        # utf-8-sig tolerates a stray BOM defensively. ABSO writers emit
+        # UTF-8 without a BOM, but a state file rewritten by some PowerShell
+        # paths can carry one, which plain utf-8 json.loads would reject.
+        state = json.loads(path.read_text(encoding="utf-8-sig"))
     except (json.JSONDecodeError, OSError):
         return None
     if not isinstance(state, dict):

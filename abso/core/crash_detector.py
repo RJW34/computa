@@ -82,7 +82,8 @@ class CrashDetector:
 
     1. Log the crash event.
     2. Persist a ``CrashRecord`` in crash history.
-    3. Trigger ``backup_manager.restore_backup("latest")``.
+    3. Restore the pre-apply backup recorded for this profile (falling back
+       to ``"latest"`` only when no concrete backup id was recorded).
     4. Flag the profile as unstable if 3+ crashes are recorded for the
        same game/profile combination.
     5. Invoke the optional notification callback.
@@ -106,6 +107,10 @@ class CrashDetector:
         # decision window.
         self._last_profile_id: str | None = None
         self._last_profile_applied_at: datetime | None = None
+        # Concrete backup taken before the last apply, so a crash rollback
+        # restores that exact pre-apply state rather than whatever happens to
+        # be "latest" (a manual backup created afterwards would mislead it).
+        self._last_backup_id: str | None = None
 
         # Optional notification callback (e.g. tray balloon notification).
         self._notify_callback: Callable[[str], Any] | None = None
@@ -121,20 +126,27 @@ class CrashDetector:
         """
         self._notify_callback = callback
 
-    def record_profile_apply(self, profile_id: str) -> None:
+    def record_profile_apply(
+        self, profile_id: str, backup_id: str | None = None
+    ) -> None:
         """Record that a profile was just applied.
 
         This starts the 5-minute rollback window.
 
         Args:
             profile_id: The profile that was applied.
+            backup_id: The concrete pre-apply backup id from the transaction.
+                When provided, a crash rollback restores exactly this backup
+                instead of ``"latest"``.
         """
         self._last_profile_id = profile_id
         self._last_profile_applied_at = datetime.now()
+        self._last_backup_id = backup_id
         logger.debug(
-            "CrashDetector: profile apply recorded — %s at %s",
+            "CrashDetector: profile apply recorded — %s at %s (backup=%s)",
             profile_id,
             self._last_profile_applied_at.isoformat(),
+            backup_id,
         )
 
     def on_game_exit(
@@ -291,7 +303,8 @@ class CrashDetector:
         )
 
         try:
-            restore_summary = self._backup_manager.restore_backup("latest")
+            target_backup = self._last_backup_id or "latest"
+            restore_summary = self._backup_manager.restore_backup(target_backup)
             if restore_summary.complete:
                 logger.info("Auto-rollback completed successfully")
                 return True

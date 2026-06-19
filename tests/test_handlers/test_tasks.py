@@ -171,3 +171,39 @@ class TestTasksBackupRestore:
 
         assert result is True
         mock_set_enabled.assert_called()
+
+    @patch.object(TasksSettingsHandler, "_set_task_enabled")
+    def test_restore_keeps_disabled_task_disabled(self, mock_set_enabled):
+        """A disabled-but-ready task must NOT be re-enabled on restore.
+
+        ``Status: Ready`` is runtime readiness; ``Scheduled Task State`` is the
+        authoritative Enabled/Disabled flag. Keying off Status would wrongly
+        re-enable a task the user had disabled.
+        """
+        mock_set_enabled.return_value = {"success": True}
+        handler = TasksSettingsHandler()
+        task = r"\Microsoft\Windows\Test\DisabledTask"
+        handler.restore({
+            "tasks": {
+                task: {
+                    "exists": True,
+                    "state": "Ready",
+                    "scheduled_task_state": "Disabled",
+                }
+            }
+        })
+
+        mock_set_enabled.assert_called_once_with(task, False)
+
+    def test_was_task_enabled_prefers_scheduled_task_state(self):
+        assert TasksSettingsHandler._was_task_enabled(
+            {"state": "Ready", "scheduled_task_state": "Enabled"}
+        ) is True
+        assert TasksSettingsHandler._was_task_enabled(
+            {"state": "Ready", "scheduled_task_state": "Disabled"}
+        ) is False
+
+    def test_was_task_enabled_legacy_fallback_uses_status(self):
+        # Legacy backup without the authoritative field falls back to Status.
+        assert TasksSettingsHandler._was_task_enabled({"state": "Ready"}) is True
+        assert TasksSettingsHandler._was_task_enabled({"state": "Disabled"}) is False

@@ -248,11 +248,10 @@ def test_strict_profiles_advertise_overlay_free_path_in_manifest() -> None:
         "lghub_agent.exe",
         "iCUE.exe",
         "LCore.exe",
-        # VPN clients (user explicitly called out Tailscale; same category for the rest)
+        # VPN UI/CLI/tray (user explicitly called out Tailscale). Route-holding
+        # daemons live in OPT_IN to avoid kill-switch traffic blackholes.
         "tailscale-ipn.exe",
         "tailscale.exe",
-        "tailscaled.exe",
-        "wireguard.exe",
         "openvpn-gui.exe",
         "NordVPN.exe",
         "ExpressVPN.exe",
@@ -314,6 +313,31 @@ def test_protected_processes_are_never_killable(image: str) -> None:
     assert image.lower() in NEVER_KILL_IMAGES, (
         f"{image} should be in NEVER_KILL_IMAGES to protect interactive work"
     )
+
+
+@pytest.mark.parametrize(
+    "image",
+    [
+        "tailscaled.exe",
+        "ZeroTier One.exe",
+        "wireguard.exe",
+        "openvpn.exe",
+        "nordvpn-service.exe",
+        "ProtonVPNService.exe",
+        "mullvad-daemon.exe",
+    ],
+)
+def test_vpn_daemons_are_opt_in_not_always_safe(image: str) -> None:
+    """Route-holding VPN daemons must not be killed by default.
+
+    Force-killing them on a kill-switch VPN can blackhole all traffic and take
+    an online game offline, so they belong in the opt-in tier (strict profiles
+    include them explicitly) rather than always-safe.
+    """
+    always = {name.lower() for name in ALWAYS_SAFE_LAUNCH_KILLSET}
+    opt_in = {name.lower() for name in OPT_IN_LAUNCH_KILLSET}
+    assert image.lower() in opt_in, f"{image} should be opt-in (kill-switch safety)"
+    assert image.lower() not in always, f"{image} must NOT be always-safe"
 
 
 def test_janitor_refuses_to_kill_vscode_even_when_listed() -> None:

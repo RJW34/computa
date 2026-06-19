@@ -104,14 +104,49 @@ class TestAudioBackupRestore:
 
         assert "audio_service_priority" in result
 
-    @patch.object(AudioSettingsHandler, "_set_audio_priority")
-    def test_restore_applies_backed_up_state(self, mock_set_priority):
-        """Test restore applies backed up settings."""
+    @patch.object(AudioSettingsHandler, "_write_scheduling_category_only")
+    def test_restore_legacy_writes_scheduling_category_only(self, mock_write):
+        """Legacy backups restore only the scheduling category.
+
+        Restore must NOT re-run the high-priority apply path, which would
+        re-inject Priority/SFIO/Background Only values the backup never
+        captured.
+        """
         handler = AudioSettingsHandler()
         result = handler.restore({"audio_service_priority": "High"})
 
         assert result is True
-        mock_set_priority.assert_called_with("High")
+        mock_write.assert_called_once_with("High")
+
+    @patch.object(AudioSettingsHandler, "_set_audio_priority")
+    def test_restore_does_not_reapply_optimization(self, mock_set_priority):
+        """Restore must never call the optimization apply helper."""
+        handler = AudioSettingsHandler()
+        with patch.object(AudioSettingsHandler, "_write_scheduling_category_only"):
+            handler.restore({"audio_service_priority": "High"})
+
+        mock_set_priority.assert_not_called()
+
+    @patch.object(AudioSettingsHandler, "_restore_audio_task_state", return_value=True)
+    def test_restore_full_state_reverts_managed_values(self, mock_restore_state):
+        """A full task-state backup routes to the faithful revert path."""
+        handler = AudioSettingsHandler()
+        state = {
+            "audio_task_state": {
+                "key_exists": True,
+                "values": {
+                    "Scheduling Category": "High",
+                    "SFIO Priority": "Normal",
+                    "Priority": 8,
+                    "Background Only": "True",
+                },
+            },
+            "audio_service_priority": "High",
+        }
+        result = handler.restore(state)
+
+        assert result is True
+        mock_restore_state.assert_called_once()
 
     def test_restore_handles_missing_data(self):
         """Test restore handles missing data gracefully."""
@@ -120,8 +155,12 @@ class TestAudioBackupRestore:
 
         assert result is True
 
-    @patch.object(AudioSettingsHandler, "_set_audio_priority", side_effect=Exception("Error"))
-    def test_restore_handles_exception(self, mock_set):
+    @patch.object(
+        AudioSettingsHandler,
+        "_write_scheduling_category_only",
+        side_effect=Exception("Error"),
+    )
+    def test_restore_handles_exception(self, mock_write):
         """Test restore handles exceptions gracefully."""
         handler = AudioSettingsHandler()
         result = handler.restore({"audio_service_priority": "High"})

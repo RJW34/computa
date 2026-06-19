@@ -11,6 +11,7 @@ from abso.core.overlay_policy import (
 )
 from abso.core.overlay_policy import unique_overlay_labels
 from abso.core.process_list import parse_tasklist_csv_images
+from abso.utils.proc import no_window_creationflags
 
 logger = logging.getLogger(__name__)
 
@@ -89,6 +90,7 @@ class OverlayManager:
                 capture_output=True,
                 text=True,
                 timeout=10,
+                creationflags=no_window_creationflags(),
             )
             if result.returncode != 0:
                 return False
@@ -100,11 +102,15 @@ class OverlayManager:
 
     def _stop_process_image(self, process_name: str) -> bool:
         try:
+            # No /T: /IM already stops every process with this image name;
+            # tree-killing could reach a protected child parented under an
+            # overlay process.
             result = subprocess.run(
-                ["taskkill", "/F", "/T", "/IM", process_name],
+                ["taskkill", "/F", "/IM", process_name],
                 capture_output=True,
                 text=True,
                 timeout=20,
+                creationflags=no_window_creationflags(),
             )
             if result.returncode == 0:
                 logger.info("Stopped overlay process image: %s", process_name)

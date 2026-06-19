@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import logging
 import winreg
 from typing import Any
@@ -33,11 +34,23 @@ class AudioSettingsHandler(SettingsHandler):
     AUDIO_KEY = r"SOFTWARE\Microsoft\Windows\CurrentVersion\Audio"
     MMCSS_KEY = r"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Multimedia\SystemProfile"
 
+    # MMCSS Audio-task values the high-priority apply path writes. Restore must
+    # put each one back exactly as captured (or delete it when it was absent at
+    # backup time) so a rollback never leaves ABSO-injected audio scheduling
+    # values behind on a system whose profile never even touched audio.
+    _MANAGED_AUDIO_VALUES: tuple[tuple[str, int], ...] = (
+        ("Scheduling Category", winreg.REG_SZ),
+        ("SFIO Priority", winreg.REG_SZ),
+        ("Priority", winreg.REG_DWORD),
+        ("Background Only", winreg.REG_SZ),
+    )
+
     def detect(self) -> dict[str, Any]:
         """Detect current audio settings."""
         return {
             "disable_audio_enhancements": self._get_audio_enhancements_disabled(),
             "audio_service_priority": self._get_audio_priority(),
+            "audio_task_state": self._get_audio_task_snapshot(),
         }
 
     def audit(self) -> list[Issue]:
@@ -92,10 +105,26 @@ class AudioSettingsHandler(SettingsHandler):
         return self.detect()
 
     def restore(self, data: dict[str, Any]) -> bool:
-        """Restore audio settings from backup."""
+        """Restore audio settings from backup.
+
+        Faithfully reverts only the MMCSS Audio-task values ABSO manages,
+        writing each captured value back (or deleting it when it was absent at
+        backup time). This must NOT re-run the high-priority apply path, which
+        would otherwise re-inject optimization values (``Priority``,
+        ``SFIO Priority``, ``Background Only``) that the backup never captured
+        and the active profile never changed.
+
+        Legacy backups that only captured the scheduling category restore just
+        that value and never create the Audio task key.
+        """
         try:
-            if "audio_service_priority" in data and data["audio_service_priority"]:
-                self._set_audio_priority(data["audio_service_priority"])
+            state = data.get("audio_task_state")
+            if isinstance(state, dict) and "values" in state:
+                return self._restore_audio_task_state(state)
+            # Legacy backup shape: only the Scheduling Category was captured.
+            legacy = data.get("audio_service_priority")
+            if legacy:
+                self._write_scheduling_category_only(str(legacy))
             return True
         except Exception as e:
             logger.error(f"Failed to restore audio settings: {e}")
@@ -237,10 +266,95 @@ class AudioSettingsHandler(SettingsHandler):
 
             if key is not None:
                 winreg.SetValueEx(key, "Scheduling Category", 0, winreg.REG_SZ, priority)
-                # Also set other audio optimization values
+                # Also set other audio optimization values. Within the MMCSS
+                # scheduling category, "Priority" runs 1-8 (8 highest); the
+                # Windows default for the Audio task is 8, so a "High" apply
+                # pins 8 rather than the previous (mislabeled) value of 2.
                 winreg.SetValueEx(key, "SFIO Priority", 0, winreg.REG_SZ, priority)
-                winreg.SetValueEx(key, "Priority", 0, winreg.REG_DWORD, 2)  # High priority
+                winreg.SetValueEx(key, "Priority", 0, winreg.REG_DWORD, 8)
                 winreg.SetValueEx(key, "Background Only", 0, winreg.REG_SZ, "False")
         finally:
             if key is not None:
                 winreg.CloseKey(key)
+
+    def _get_audio_task_snapshot(self) -> dict[str, Any]:
+        """Capture the MMCSS Audio-task values the apply path manages.
+
+        Returns a structure recording whether the Audio task key exists and the
+        current value (or ``None`` when absent) for every managed value, so
+        :meth:`restore` can put each one back exactly or remove it.
+        """
+        values: dict[str, Any] = {name: None for name, _ in self._MANAGED_AUDIO_VALUES}
+        try:
+            key = winreg.OpenKey(
+                winreg.HKEY_LOCAL_MACHINE,
+                f"{self.MMCSS_KEY}\\Tasks\\Audio",
+                0,
+                winreg.KEY_READ,
+            )
+        except FileNotFoundError:
+            return {"key_exists": False, "values": values}
+        except OSError as e:
+            logger.debug(f"Cannot read audio task key: {e}")
+            return {"key_exists": False, "values": values}
+
+        try:
+            for name, _ in self._MANAGED_AUDIO_VALUES:
+                try:
+                    values[name] = winreg.QueryValueEx(key, name)[0]
+                except FileNotFoundError:
+                    values[name] = None
+            return {"key_exists": True, "values": values}
+        finally:
+            winreg.CloseKey(key)
+
+    def _restore_audio_task_state(self, state: dict[str, Any]) -> bool:
+        """Revert managed Audio-task values to their captured originals.
+
+        Each managed value present at backup time is written back; any value
+        that was absent is deleted so ABSO-injected values do not survive a
+        rollback. If the Audio task key does not exist there is nothing ABSO
+        could have changed, so the restore is a no-op.
+        """
+        captured: dict[str, Any] = state.get("values") or {}
+        try:
+            key = winreg.OpenKey(
+                winreg.HKEY_LOCAL_MACHINE,
+                f"{self.MMCSS_KEY}\\Tasks\\Audio",
+                0,
+                winreg.KEY_SET_VALUE,
+            )
+        except FileNotFoundError:
+            return True
+
+        try:
+            for name, regtype in self._MANAGED_AUDIO_VALUES:
+                original = captured.get(name)
+                if original is None:
+                    with contextlib.suppress(FileNotFoundError):
+                        winreg.DeleteValue(key, name)
+                else:
+                    winreg.SetValueEx(key, name, 0, regtype, original)
+        finally:
+            winreg.CloseKey(key)
+        return True
+
+    def _write_scheduling_category_only(self, value: str) -> None:
+        """Write back only the Scheduling Category; never create the key.
+
+        Used for legacy backups that captured only the scheduling category.
+        """
+        try:
+            key = winreg.OpenKey(
+                winreg.HKEY_LOCAL_MACHINE,
+                f"{self.MMCSS_KEY}\\Tasks\\Audio",
+                0,
+                winreg.KEY_SET_VALUE,
+            )
+        except FileNotFoundError:
+            return
+
+        try:
+            winreg.SetValueEx(key, "Scheduling Category", 0, winreg.REG_SZ, value)
+        finally:
+            winreg.CloseKey(key)

@@ -286,6 +286,26 @@ class TestPowerBackupRestore:
 
         assert result is False
 
+    @patch.object(PowerSettingsHandler, "_list_plans")
+    @patch.object(PowerSettingsHandler, "_set_active_plan")
+    def test_restore_falls_back_to_plan_name_when_guid_gone(self, mock_set_active, mock_list):
+        """If the backed-up GUID was deleted, restore the same-named plan."""
+        # First call (stale GUID) fails; second call (resolved by name) succeeds.
+        mock_set_active.side_effect = [RuntimeError("invalid GUID"), None]
+        mock_list.return_value = [
+            {"guid": "fresh-guid-999", "name": "Ultimate Performance"},
+            {"guid": "balanced-guid", "name": "Balanced"},
+        ]
+
+        handler = PowerSettingsHandler()
+        result = handler.restore(
+            {"active_plan": "stale-guid-000", "active_plan_name": "Ultimate Performance"}
+        )
+
+        assert result is True
+        assert mock_set_active.call_args_list[0].args[0] == "stale-guid-000"
+        assert mock_set_active.call_args_list[1].args[0] == "fresh-guid-999"
+
     def test_restore_empty_data(self):
         """Test restore handles empty backup data."""
         handler = PowerSettingsHandler()

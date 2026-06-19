@@ -413,29 +413,59 @@ class CpuBalancer:
         self._user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
         return pid.value if pid.value else None
 
-    def _enumerate_processes(self) -> list[tuple[int, str]]:
-        """List all running processes via ``CreateToolhelp32Snapshot``."""
+    def _enumerate_processes(self) -> list[tuple[int, str, int]]:
+        """List running processes as ``(pid, image, parent_pid)`` tuples."""
         snapshot = self._kernel32.CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0)
         if snapshot == -1:
             return []
         try:
             entry = PROCESSENTRY32W()
             entry.dwSize = ctypes.sizeof(PROCESSENTRY32W)
-            processes: list[tuple[int, str]] = []
+            processes: list[tuple[int, str, int]] = []
             if self._kernel32.Process32FirstW(snapshot, ctypes.byref(entry)):
                 while True:
-                    processes.append((entry.th32ProcessID, entry.szExeFile))
+                    processes.append(
+                        (entry.th32ProcessID, entry.szExeFile, entry.th32ParentProcessID)
+                    )
                     if not self._kernel32.Process32NextW(snapshot, ctypes.byref(entry)):
                         break
             return processes
         finally:
             self._kernel32.CloseHandle(snapshot)
 
-    def _is_excluded(self, name: str, pid: int) -> bool:
+    def _compute_game_descendants(self, parent_map: dict[int, int]) -> frozenset[int]:
+        """Return every PID whose parent chain leads back to the game PID.
+
+        The game often spawns helper children (anti-cheat brokers, EAC/BE
+        children, shader-compile workers). Demoting those mid-match is exactly
+        the online-safety hazard the balancer must avoid, and they are not all
+        present in the static NEVER_KILL image set - so exclude the whole game
+        subtree. Over-inclusion (from a stale recycled parent PID) only means a
+        process is left alone, which is the safe direction.
+        """
+        children: dict[int, list[int]] = {}
+        for pid, ppid in parent_map.items():
+            children.setdefault(ppid, []).append(pid)
+
+        descendants: set[int] = set()
+        stack = list(children.get(self._game_pid, []))
+        while stack:
+            pid = stack.pop()
+            if pid in descendants or pid == self._game_pid:
+                continue
+            descendants.add(pid)
+            stack.extend(children.get(pid, []))
+        return frozenset(descendants)
+
+    def _is_excluded(
+        self, name: str, pid: int, game_descendants: frozenset[int] | None = None
+    ) -> bool:
         """Return ``True`` if the process must not be restrained."""
         if name.lower() in self._excluded_lower:
             return True
         if pid == self._game_pid:
+            return True
+        if game_descendants is not None and pid in game_descendants:
             return True
         if pid == self._get_foreground_pid():
             return True
@@ -447,8 +477,11 @@ class CpuBalancer:
 
     def _find_and_restrain_offenders(self) -> None:
         """Find background processes using too much CPU and lower their priority."""
-        for pid, name in self._enumerate_processes():
-            if self._is_excluded(name, pid):
+        processes = self._enumerate_processes()
+        parent_map = {pid: ppid for pid, _name, ppid in processes}
+        game_descendants = self._compute_game_descendants(parent_map)
+        for pid, name, _ppid in processes:
+            if self._is_excluded(name, pid, game_descendants):
                 continue
             if pid in self._restrained:
                 continue

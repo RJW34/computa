@@ -136,7 +136,13 @@ def live_monitor_count() -> tuple[int | None, str | None]:
         from abso.core.multimon_detector import MultiMonitorDetector
 
         detected = MultiMonitorDetector().detect()
-        monitor_count = getattr(getattr(detected, "environment", None), "monitor_count", None)
+        environment = getattr(detected, "environment", None)
+        monitor_count = getattr(environment, "monitor_count", None)
+        # A fallback monitor count (enumeration failed) must not be treated as a
+        # confident single-monitor reading, or auto display recovery could fire
+        # on a real multi-monitor rig and blank the secondary output.
+        if getattr(environment, "detection_confident", True) is False:
+            return None, "live monitor detection was not confident (enumeration fell back)"
         if isinstance(monitor_count, int) and monitor_count > 0:
             return monitor_count, None
         if isinstance(monitor_count, float) and monitor_count > 0:

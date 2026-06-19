@@ -25,6 +25,7 @@ from dataclasses import dataclass, field
 
 from abso.core.overlay_policy import OVERLAY_PROCESS_IMAGES
 from abso.core.process_list import parse_tasklist_csv_images
+from abso.utils.proc import no_window_creationflags
 
 logger = logging.getLogger(__name__)
 
@@ -120,26 +121,22 @@ ALWAYS_SAFE_LAUNCH_KILLSET: tuple[str, ...] = (
     "llamafile.exe",
     "AnythingLLM.exe",
     "Open WebUI.exe",
-    # --- VPN clients ---
+    # --- VPN clients (UI / CLI / tray only) ---
     # VPN clients add a virtual NIC + encryption pipeline that increases tail
-    # latency on competitive game traffic. User explicitly called out
-    # Tailscale; the rest follow the same category.
+    # latency on competitive game traffic. The user explicitly called out
+    # Tailscale. Only the UI/CLI/tray binaries are always-safe to stop; the
+    # route-holding *daemons/services* live in OPT_IN (see below) because
+    # force-killing them on a kill-switch VPN can blackhole ALL traffic and
+    # take an online game offline - the opposite of the intent.
     "tailscale-ipn.exe",
     "tailscale.exe",
-    "tailscaled.exe",
     "tailscale-tray.exe",
-    "ZeroTier One.exe",
     "zerotier_desktop_ui.exe",
-    "wireguard.exe",
     "openvpn-gui.exe",
-    "openvpn.exe",
     "NordVPN.exe",
-    "nordvpn-service.exe",
     "ExpressVPN.exe",
     "ProtonVPN.exe",
-    "ProtonVPNService.exe",
     "Mullvad VPN.exe",
-    "mullvad-daemon.exe",
     "Windscribe.exe",
     "AirVPN.exe",
     # --- Chat clients other than Discord (Discord stays protected for teammates) ---
@@ -207,6 +204,18 @@ OPT_IN_LAUNCH_KILLSET: tuple[str, ...] = (
     "SearchIndexer.exe",
     "SearchProtocolHost.exe",
     "SearchFilterHost.exe",
+    # VPN route-holding daemons/services. Force-killing these on a kill-switch
+    # VPN can blackhole ALL traffic, so they are opt-in: strict profiles
+    # include them automatically (the user's explicit aggressive choice), while
+    # productivity/casual profiles leave the tunnel - and any online game
+    # routed through it - intact.
+    "tailscaled.exe",
+    "ZeroTier One.exe",
+    "wireguard.exe",
+    "openvpn.exe",
+    "nordvpn-service.exe",
+    "ProtonVPNService.exe",
+    "mullvad-daemon.exe",
 )
 
 
@@ -453,15 +462,18 @@ class ProcessJanitor:
             if self._stop_process_image(normalized):
                 result.stopped.append(normalized)
                 result.notices.append(f"Stopped {normalized}")
-            elif self._is_process_running(normalized):
+            elif self._query_process_running(normalized) is False:
+                # taskkill returned non-zero but tasklist positively confirms
+                # the image is gone (race with natural exit). Treat as stopped.
+                result.stopped.append(normalized)
+                result.notices.append(f"Stopped {normalized}")
+            else:
+                # Still running, or could not verify the kill — surface as a
+                # failure rather than claim an unproven success.
                 result.failed.append(normalized)
                 result.warnings.append(
                     f"ProcessJanitor could not stop {normalized}; it is still running."
                 )
-            else:
-                # taskkill returned non-zero but the image is gone (race with
-                # natural exit). Treat as stopped.
-                result.stopped.append(normalized)
 
         return result
 
@@ -472,32 +484,48 @@ class ProcessJanitor:
         cleaned = str(name).strip().strip('"').strip("'")
         return cleaned
 
-    def _is_process_running(self, image_name: str) -> bool:
+    def _query_process_running(self, image_name: str) -> bool | None:
+        """Return True/False when tasklist can confirm, or None when it cannot.
+
+        A tasklist failure (unavailable / timeout / non-zero exit) returns None
+        so callers can distinguish "confirmed gone" from "could not verify" and
+        never report an unverifiable kill as a success.
+        """
         try:
             completed = subprocess.run(
                 ["tasklist", "/FI", f"IMAGENAME eq {image_name}", "/FO", "CSV", "/NH"],
                 capture_output=True,
                 text=True,
                 timeout=10,
+                creationflags=no_window_creationflags(),
             )
         except FileNotFoundError:
-            logger.debug("tasklist unavailable; assuming %s is not running", image_name)
-            return False
+            logger.debug("tasklist unavailable; cannot confirm %s", image_name)
+            return None
         except Exception as exc:
             logger.debug("Process existence check failed for %s: %s", image_name, exc)
-            return False
+            return None
 
         if completed.returncode != 0:
-            return False
+            return None
         return image_name.lower() in parse_tasklist_csv_images(completed.stdout or "")
+
+    def _is_process_running(self, image_name: str) -> bool:
+        # Unknown (tasklist failure) is treated as "not running" for the
+        # pre-kill gate: ABSO cannot stop an image it cannot observe.
+        return self._query_process_running(image_name) is True
 
     def _stop_process_image(self, image_name: str) -> bool:
         try:
+            # No /T: /IM already stops every process with this image name, and
+            # tree-killing (/T) could reach a NEVER_KILL child (anti-cheat, the
+            # game, a protected editor) parented under a swept image.
             completed = subprocess.run(
-                ["taskkill", "/F", "/T", "/IM", image_name],
+                ["taskkill", "/F", "/IM", image_name],
                 capture_output=True,
                 text=True,
                 timeout=20,
+                creationflags=no_window_creationflags(),
             )
         except FileNotFoundError:
             logger.warning("taskkill unavailable; cannot stop %s", image_name)

@@ -213,6 +213,9 @@ class PowerSettingsHandler(SettingsHandler):
 
         backup_data: dict[str, Any] = {
             "active_plan": current.get("active_plan", {}).get("guid"),
+            # Capture the name too so restore can recover when the backed-up
+            # GUID no longer exists (e.g. a custom plan deleted in between).
+            "active_plan_name": current.get("active_plan", {}).get("name"),
         }
 
         # Backup power sub-settings via powercfg /query
@@ -238,12 +241,14 @@ class PowerSettingsHandler(SettingsHandler):
         """Restore power settings from backup."""
         success = True
 
-        if "active_plan" in data and data["active_plan"]:
-            try:
-                self._set_active_plan(data["active_plan"])
-            except Exception as e:
-                logger.error(f"Failed to restore power plan: {e}")
-                success = False
+        if (
+            "active_plan" in data
+            and data["active_plan"]
+            and not self._restore_active_plan(
+                data["active_plan"], data.get("active_plan_name")
+            )
+        ):
+            success = False
 
         # Restore power sub-settings
         setting_map = {
@@ -400,6 +405,45 @@ class PowerSettingsHandler(SettingsHandler):
             logger.error(f"Failed to list plans: {e}")
 
         return plans
+
+    def _restore_active_plan(self, guid: str, name: str | None = None) -> bool:
+        """Restore the active power plan, tolerating a now-missing GUID.
+
+        Custom plans (e.g. a duplicated Ultimate Performance) get a fresh GUID
+        each time they are created and can be deleted between backup and
+        restore. When the backed-up GUID is gone, fall back to activating a
+        currently-present plan with the same name.
+        """
+        # Primary path: activate the backed-up GUID directly.
+        if guid:
+            try:
+                self._set_active_plan(guid)
+                return True
+            except Exception as e:
+                logger.error(f"Failed to restore power plan by GUID: {e}")
+
+        # Fallback: the GUID may have been deleted. Activate a currently-present
+        # plan with the same name instead.
+        if name:
+            target = str(name).strip().lower()
+            for plan in self._list_plans():
+                if plan["name"].strip().lower() == target:
+                    try:
+                        self._set_active_plan(plan["guid"])
+                        logger.info(
+                            "Restored power plan by name '%s' (GUID had changed)", name
+                        )
+                        return True
+                    except Exception as e:
+                        logger.error(f"Failed to restore power plan by name: {e}")
+                    break
+
+        logger.error(
+            "Could not restore power plan (guid=%s, name=%s): no matching plan present",
+            guid,
+            name,
+        )
+        return False
 
     def _has_ultimate_performance(self) -> bool:
         """Check if Ultimate Performance plan is available."""

@@ -173,6 +173,28 @@ class TestStorageBackupRestore:
 
         assert result is False
 
+    @patch.object(StorageSettingsHandler, "_set_last_access_value")
+    @patch.object(StorageSettingsHandler, "_set_last_access_disabled")
+    def test_restore_prefers_raw_value(self, mock_bool, mock_raw):
+        """A captured raw value (e.g. system-managed 2) must round-trip exactly."""
+        mock_raw.return_value = {"success": True}
+        handler = StorageSettingsHandler()
+        result = handler.restore({"last_access_disabled": False, "last_access_raw": 2})
+
+        assert result is True
+        mock_raw.assert_called_once_with("2")
+        mock_bool.assert_not_called()
+
+    @patch.object(StorageSettingsHandler, "_set_last_access_disabled")
+    def test_restore_legacy_uses_bool(self, mock_bool):
+        """Legacy backups without a raw value fall back to the boolean path."""
+        mock_bool.return_value = {"success": True}
+        handler = StorageSettingsHandler()
+        result = handler.restore({"last_access_disabled": True})
+
+        assert result is True
+        mock_bool.assert_called_once_with(True)
+
 
 class TestStoragePrivateMethods:
     """Tests for private helper methods."""
@@ -444,3 +466,27 @@ class TestStoragePrivateMethods:
         # Should use value "3" for disabled (both user and system)
         call_args = mock_run.call_args[0][0]
         assert "3" in call_args
+
+    @patch("subprocess.run")
+    def test_get_last_access_raw_parses_system_managed(self, mock_run):
+        """Raw value 2 (system managed) is read back exactly, not collapsed."""
+        from unittest.mock import MagicMock
+        mock_run.return_value = MagicMock(
+            returncode=0,
+            stdout="DisableLastAccess = 2  (System Managed, Disabled)",
+        )
+
+        handler = StorageSettingsHandler()
+        assert handler._get_last_access_raw() == 2
+
+    @patch("subprocess.run")
+    def test_set_last_access_value_writes_exact(self, mock_run):
+        """_set_last_access_value writes the exact 0-3 fsutil value."""
+        from unittest.mock import MagicMock
+        mock_run.return_value = MagicMock(returncode=0)
+
+        handler = StorageSettingsHandler()
+        handler._set_last_access_value("2")
+
+        call_args = mock_run.call_args[0][0]
+        assert "2" in call_args

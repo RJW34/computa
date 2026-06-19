@@ -69,9 +69,9 @@ def test_janitor_deduplicates_case_insensitive_input() -> None:
 
 
 @patch.object(ProcessJanitor, "_stop_process_image", return_value=False)
-@patch.object(ProcessJanitor, "_is_process_running", return_value=True)
+@patch.object(ProcessJanitor, "_query_process_running", return_value=True)
 def test_janitor_records_failures_when_taskkill_cannot_stop_image(
-    mock_is_running, mock_stop
+    mock_query, mock_stop
 ) -> None:
     janitor = ProcessJanitor()
 
@@ -79,6 +79,34 @@ def test_janitor_records_failures_when_taskkill_cannot_stop_image(
 
     assert result.failed == ["StubbornProcess.exe"]
     assert any("could not stop StubbornProcess.exe" in w for w in result.warnings)
+
+
+@patch.object(ProcessJanitor, "_stop_process_image", return_value=False)
+@patch.object(ProcessJanitor, "_query_process_running", side_effect=[True, None])
+def test_janitor_unverifiable_kill_is_failure_not_success(
+    mock_query, mock_stop
+) -> None:
+    """If tasklist cannot confirm the kill, do not claim a success."""
+    janitor = ProcessJanitor()
+
+    result = janitor.sweep(["StubbornProcess.exe"])
+
+    assert result.stopped == []
+    assert result.failed == ["StubbornProcess.exe"]
+
+
+@patch.object(ProcessJanitor, "_stop_process_image", return_value=False)
+@patch.object(ProcessJanitor, "_query_process_running", side_effect=[True, False])
+def test_janitor_confirmed_gone_after_failed_kill_is_stopped(
+    mock_query, mock_stop
+) -> None:
+    """A failed taskkill but a positively-confirmed absent image is a stop."""
+    janitor = ProcessJanitor()
+
+    result = janitor.sweep(["RacyProcess.exe"])
+
+    assert result.stopped == ["RacyProcess.exe"]
+    assert result.failed == []
 
 
 def test_launch_killset_resolve_default_excludes_opt_in() -> None:

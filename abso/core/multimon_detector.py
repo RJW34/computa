@@ -16,6 +16,7 @@ from typing import Any
 from abso.core.detector import HardwareDetector
 from abso.core.overlay_policy import OVERLAY_PROCESS_LABELS
 from abso.core.process_list import parse_tasklist_csv_images
+from abso.utils.proc import no_window_creationflags
 
 logger = logging.getLogger(__name__)
 
@@ -50,6 +51,10 @@ class DisplayEnvironment:
     can_guarantee_exclusive: bool = True
     detected_overlays: list[str] = field(default_factory=list)
     compositor_active: bool = True  # DWM is always active on Win11
+    # False when monitor enumeration failed and the count is a fallback
+    # assumption rather than a real reading. Display-recovery safety code must
+    # not treat a fallback "1 monitor" as a confident single-monitor rig.
+    detection_confident: bool = True
 
     @property
     def is_multi_monitor(self) -> bool:
@@ -143,9 +148,12 @@ class MultiMonitorDetector:
 
         except Exception as e:
             logger.error(f"Failed to detect monitors: {e}")
-            # Fallback to single monitor assumption
+            # Fallback to single monitor assumption. Mark detection as not
+            # confident so display-recovery safety code does not mistake this
+            # for a real single-monitor reading and auto-reset a multi-monitor rig.
             env.monitor_count = 1
             env.can_guarantee_exclusive = True
+            env.detection_confident = False
 
     def _enum_display_monitors(self) -> list[MonitorInfo]:
         """Enumerate display monitors using Win32 API."""
@@ -199,6 +207,7 @@ class MultiMonitorDetector:
                 capture_output=True,
                 text=True,
                 timeout=10,
+                creationflags=no_window_creationflags(),
             )
 
             if result.returncode == 0:
@@ -385,6 +394,7 @@ class MultiMonitorDetector:
                 capture_output=True,
                 text=True,
                 timeout=10,
+                creationflags=no_window_creationflags(),
             )
 
             if result.returncode == 0:

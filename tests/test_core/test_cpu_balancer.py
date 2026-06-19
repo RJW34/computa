@@ -43,6 +43,18 @@ class TestExclusions:
         # A random background app at a high PID is a valid restrain target.
         assert bal._is_excluded("randomupdater.exe", 31337) is False
 
+    def test_game_descendants_excluded(self) -> None:
+        """A child process of the game (e.g. anti-cheat broker) is never demoted."""
+        bal = _make_balancer()  # game_pid=4242
+        # 5000 is a direct child of the game; 5001 is a grandchild.
+        descendants = bal._compute_game_descendants({5000: 4242, 5001: 5000, 9999: 1})
+        assert 5000 in descendants
+        assert 5001 in descendants
+        assert 9999 not in descendants
+        assert bal._is_excluded("EAC-broker.exe", 5001, descendants) is True
+        # Without the descendant set, the same PID is a normal restrain target.
+        assert bal._is_excluded("EAC-broker.exe", 5001) is False
+
 
 class TestStopSentinel:
     def test_stop_requested_false_without_file(self) -> None:

@@ -52,8 +52,67 @@ class PHYSICAL_MONITOR(Structure):
     ]
 
 
+_prototypes_configured = False
+
+
+def _configure_prototypes(user32: Any, dxva2: Any) -> None:
+    """Declare Win64-correct argtypes/restypes for the DDC/CI calls.
+
+    Without these, ctypes defaults pointer-sized HMONITOR/HANDLE values to a
+    32-bit C int, which truncates handles on 64-bit Python and can break the
+    physical-monitor enumeration intermittently. ``windll`` caches the module
+    objects, so configuring once is sufficient and idempotent.
+    """
+    global _prototypes_configured
+    if _prototypes_configured:
+        return
+
+    user32.MonitorFromPoint.argtypes = [wintypes.POINT, wintypes.DWORD]
+    user32.MonitorFromPoint.restype = wintypes.HMONITOR
+
+    dxva2.GetNumberOfPhysicalMonitorsFromHMONITOR.argtypes = [
+        wintypes.HMONITOR,
+        ctypes.POINTER(wintypes.DWORD),
+    ]
+    dxva2.GetNumberOfPhysicalMonitorsFromHMONITOR.restype = wintypes.BOOL
+
+    dxva2.GetPhysicalMonitorsFromHMONITOR.argtypes = [
+        wintypes.HMONITOR,
+        wintypes.DWORD,
+        ctypes.POINTER(PHYSICAL_MONITOR),
+    ]
+    dxva2.GetPhysicalMonitorsFromHMONITOR.restype = wintypes.BOOL
+
+    dxva2.DestroyPhysicalMonitors.argtypes = [
+        wintypes.DWORD,
+        ctypes.POINTER(PHYSICAL_MONITOR),
+    ]
+    dxva2.DestroyPhysicalMonitors.restype = wintypes.BOOL
+
+    dxva2.SetVCPFeature.argtypes = [wintypes.HANDLE, ctypes.c_ubyte, wintypes.DWORD]
+    dxva2.SetVCPFeature.restype = wintypes.BOOL
+
+    dxva2.GetCapabilitiesStringLength.argtypes = [
+        wintypes.HANDLE,
+        ctypes.POINTER(wintypes.DWORD),
+    ]
+    dxva2.GetCapabilitiesStringLength.restype = wintypes.BOOL
+
+    dxva2.CapabilitiesRequestAndCapabilitiesReply.argtypes = [
+        wintypes.HANDLE,
+        ctypes.c_char_p,
+        wintypes.DWORD,
+    ]
+    dxva2.CapabilitiesRequestAndCapabilitiesReply.restype = wintypes.BOOL
+
+    _prototypes_configured = True
+
+
 def _get_primary_physical_monitor() -> tuple[wintypes.HANDLE, str] | None:
     """Get the primary monitor's physical monitor handle and description.
+
+    Note: the caller takes ownership of the returned handle and must release
+    the underlying array via ``DestroyPhysicalMonitors``.
 
     Returns:
         Tuple of (handle, description) or None if unavailable.
@@ -65,6 +124,7 @@ def _get_primary_physical_monitor() -> tuple[wintypes.HANDLE, str] | None:
         logger.debug("dxva2.dll not available")
         return None
 
+    _configure_prototypes(user32, dxva2)
     try:
         h_monitor = user32.MonitorFromPoint(wintypes.POINT(0, 0), 1)
         count = wintypes.DWORD()
@@ -160,6 +220,7 @@ def _try_adaptive_sync_toggle(
         result["error"] = "dxva2.dll not available"
         return result
 
+    _configure_prototypes(user32, dxva2)
     monitors = None
     count = wintypes.DWORD()
 
