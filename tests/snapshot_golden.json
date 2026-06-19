@@ -15,7 +15,11 @@
       "ProcessPriorityHandler",
       "CpuAffinityHandler",
       "ColorProfileSettingsHandler",
-      "DisplayColorRangeHandler"
+      "DisplayColorRangeHandler",
+      "GameDvrHandler",
+      "InterruptModeHandler",
+      "AudioEngineHandler",
+      "NicDriverHandler"
     ],
     "in_game_settings": [
       {
@@ -81,6 +85,9 @@
     "optimization_target": "low_latency_high_fps",
     "requires_reflex": true,
     "settings": {
+      "AudioEngineHandler": {
+        "disable_enhancements": true
+      },
       "ColorProfileSettingsHandler": {
         "digital_vibrance": 45,
         "game_type": "competitive_fps",
@@ -93,8 +100,14 @@
       "DisplayColorRangeHandler": {
         "dynamic_range": "full"
       },
+      "GameDvrHandler": {
+        "hard_disable": true
+      },
       "GraphicsSettingsHandler": {
         "disable_global_fso": true
+      },
+      "InterruptModeHandler": {
+        "enable_msi": true
       },
       "MouseSettingsHandler": {
         "disable_acceleration": true,
@@ -103,6 +116,9 @@
       "NetworkSettingsHandler": {
         "disable_nagle": false,
         "preset": "default"
+      },
+      "NicDriverHandler": {
+        "nic_tuning": true
       },
       "NvidiaSettingsHandler": {
         "global_vrr_mode": "off",
@@ -168,7 +184,11 @@
       "ProcessPriorityHandler",
       "CpuAffinityHandler",
       "ColorProfileSettingsHandler",
-      "DisplayColorRangeHandler"
+      "DisplayColorRangeHandler",
+      "GameDvrHandler",
+      "InterruptModeHandler",
+      "AudioEngineHandler",
+      "NicDriverHandler"
     ],
     "in_game_settings": [
       {
@@ -234,6 +254,9 @@
     "optimization_target": "low_latency_high_fps",
     "requires_reflex": true,
     "settings": {
+      "AudioEngineHandler": {
+        "disable_enhancements": true
+      },
       "ColorProfileSettingsHandler": {
         "digital_vibrance": 45,
         "game_type": "competitive_fps",
@@ -246,8 +269,14 @@
       "DisplayColorRangeHandler": {
         "dynamic_range": "full"
       },
+      "GameDvrHandler": {
+        "hard_disable": true
+      },
       "GraphicsSettingsHandler": {
         "disable_global_fso": true
+      },
+      "InterruptModeHandler": {
+        "enable_msi": true
       },
       "MouseSettingsHandler": {
         "disable_acceleration": true,
@@ -256,6 +285,9 @@
       "NetworkSettingsHandler": {
         "disable_nagle": false,
         "preset": "default"
+      },
+      "NicDriverHandler": {
+        "nic_tuning": true
       },
       "NvidiaSettingsHandler": {
         "auto_vrr_fps_cap": true,
@@ -322,7 +354,11 @@
       "ProcessPriorityHandler",
       "CpuAffinityHandler",
       "ColorProfileSettingsHandler",
-      "DisplayColorRangeHandler"
+      "DisplayColorRangeHandler",
+      "GameDvrHandler",
+      "InterruptModeHandler",
+      "AudioEngineHandler",
+      "NicDriverHandler"
     ],
     "in_game_settings": [
       {
@@ -388,6 +424,9 @@
     "optimization_target": "low_latency_high_fps",
     "requires_reflex": true,
     "settings": {
+      "AudioEngineHandler": {
+        "disable_enhancements": true
+      },
       "ColorProfileSettingsHandler": {
         "digital_vibrance": 50,
         "game_type": "competitive_fps",
@@ -400,9 +439,15 @@
       "DisplayColorRangeHandler": {
         "dynamic_range": "full"
       },
+      "GameDvrHandler": {
+        "hard_disable": true
+      },
       "GraphicsSettingsHandler": {
         "disable_auto_color_management": true,
         "disable_global_fso": true
+      },
+      "InterruptModeHandler": {
+        "enable_msi": true
       },
       "MouseSettingsHandler": {
         "disable_acceleration": true,
@@ -411,6 +456,9 @@
       "NetworkSettingsHandler": {
         "disable_nagle": false,
         "preset": "default"
+      },
+      "NicDriverHandler": {
+        "nic_tuning": true
       },
       "NvidiaSettingsHandler": {
         "auto_vrr_fps_cap": true,
@@ -479,7 +527,11 @@
       "ProcessPriorityHandler",
       "CpuAffinityHandler",
       "ColorProfileSettingsHandler",
-      "DisplayColorRangeHandler"
+      "DisplayColorRangeHandler",
+      "GameDvrHandler",
+      "InterruptModeHandler",
+      "AudioEngineHandler",
+      "NicDriverHandler"
     ],
     "in_game_settings": [
       {
@@ -545,6 +597,9 @@
     "optimization_target": "low_latency_high_fps",
     "requires_reflex": true,
     "settings": {
+      "AudioEngineHandler": {
+        "disable_enhancements": true
+      },
       "ColorProfileSettingsHandler": {
         "digital_vibrance": 50,
         "game_type": "competitive_fps",
@@ -557,9 +612,15 @@
       "DisplayColorRangeHandler": {
         "dynamic_range": "full"
       },
+      "GameDvrHandler": {
+        "hard_disable": true
+      },
       "GraphicsSettingsHandler": {
         "disable_auto_color_management": true,
         "disable_global_fso": true
+      },
+      "InterruptModeHandler": {
+        "enable_msi": true
       },
       "MouseSettingsHandler": {
         "disable_acceleration": true,
@@ -568,6 +629,9 @@
       "NetworkSettingsHandler": {
         "disable_nagle": false,
         "preset": "default"
+      },
+      "NicDriverHandler": {
+        "nic_tuning": true
       },
       "NvidiaSettingsHandler": {
         "global_vrr_mode": "off",
@@ -744,9 +808,12 @@
       },
       "PowerSettingsHandler": {
         "active_plan": "ultimate_performance",
+        "disable_core_parking": true,
         "disable_pcie_power_saving": true,
         "disable_usb_suspend": true,
-        "ensure_ultimate_performance": true
+        "ensure_ultimate_performance": true,
+        "processor_max_performance": true,
+        "processor_min_state": 100
       },
       "ProcessPriorityHandler": {
         "cpu_priority": 2,
@@ -893,9 +960,12 @@
       },
       "PowerSettingsHandler": {
         "active_plan": "ultimate_performance",
+        "disable_core_parking": true,
         "disable_pcie_power_saving": true,
         "disable_usb_suspend": true,
-        "ensure_ultimate_performance": true
+        "ensure_ultimate_performance": true,
+        "processor_max_performance": true,
+        "processor_min_state": 100
       },
       "ProcessPriorityHandler": {
         "cpu_priority": 2,
@@ -942,6 +1012,10 @@
       "CpuAffinityHandler",
       "ColorProfileSettingsHandler",
       "DisplayColorRangeHandler",
+      "GameDvrHandler",
+      "InterruptModeHandler",
+      "AudioEngineHandler",
+      "NicDriverHandler",
       "FortniteConfigHandler"
     ],
     "in_game_settings": [
@@ -1020,6 +1094,9 @@
     "optimization_target": "low_latency_high_fps",
     "requires_reflex": true,
     "settings": {
+      "AudioEngineHandler": {
+        "disable_enhancements": true
+      },
       "ColorProfileSettingsHandler": {
         "digital_vibrance": 45,
         "game_type": "competitive_fps",
@@ -1035,12 +1112,17 @@
       "FortniteConfigHandler": {
         "frame_rate_limit": 0,
         "fullscreen_mode": 0,
-        "hdr_nits": 1000,
         "hdr_output": false,
         "vsync": false
       },
+      "GameDvrHandler": {
+        "hard_disable": true
+      },
       "GraphicsSettingsHandler": {
         "disable_global_fso": true
+      },
+      "InterruptModeHandler": {
+        "enable_msi": true
       },
       "MouseSettingsHandler": {
         "disable_acceleration": true,
@@ -1049,6 +1131,9 @@
       "NetworkSettingsHandler": {
         "disable_nagle": false,
         "preset": "default"
+      },
+      "NicDriverHandler": {
+        "nic_tuning": true
       },
       "NvidiaSettingsHandler": {
         "preset": "reflex_no_sync",
@@ -1116,6 +1201,10 @@
       "CpuAffinityHandler",
       "ColorProfileSettingsHandler",
       "DisplayColorRangeHandler",
+      "GameDvrHandler",
+      "InterruptModeHandler",
+      "AudioEngineHandler",
+      "NicDriverHandler",
       "FortniteConfigHandler"
     ],
     "in_game_settings": [
@@ -1200,6 +1289,9 @@
     "optimization_target": "low_latency_high_fps",
     "requires_reflex": true,
     "settings": {
+      "AudioEngineHandler": {
+        "disable_enhancements": true
+      },
       "ColorProfileSettingsHandler": {
         "digital_vibrance": 50,
         "game_type": "competitive_fps",
@@ -1219,9 +1311,15 @@
         "hdr_output": true,
         "vsync": false
       },
+      "GameDvrHandler": {
+        "hard_disable": true
+      },
       "GraphicsSettingsHandler": {
         "disable_auto_color_management": true,
         "disable_global_fso": true
+      },
+      "InterruptModeHandler": {
+        "enable_msi": true
       },
       "MouseSettingsHandler": {
         "disable_acceleration": true,
@@ -1230,6 +1328,9 @@
       "NetworkSettingsHandler": {
         "disable_nagle": false,
         "preset": "default"
+      },
+      "NicDriverHandler": {
+        "nic_tuning": true
       },
       "NvidiaSettingsHandler": {
         "preset": "reflex_no_sync",
@@ -1299,6 +1400,10 @@
       "CpuAffinityHandler",
       "ColorProfileSettingsHandler",
       "DisplayColorRangeHandler",
+      "GameDvrHandler",
+      "InterruptModeHandler",
+      "AudioEngineHandler",
+      "NicDriverHandler",
       "MarvelRivalsConfigHandler"
     ],
     "in_game_settings": [
@@ -1383,6 +1488,9 @@
     "optimization_target": "low_latency_high_fps",
     "requires_reflex": true,
     "settings": {
+      "AudioEngineHandler": {
+        "disable_enhancements": true
+      },
       "ColorProfileSettingsHandler": {
         "digital_vibrance": 50,
         "game_type": "competitive_fps",
@@ -1395,9 +1503,15 @@
       "DisplayColorRangeHandler": {
         "dynamic_range": "full"
       },
+      "GameDvrHandler": {
+        "hard_disable": true
+      },
       "GraphicsSettingsHandler": {
         "disable_auto_color_management": true,
         "disable_global_fso": true
+      },
+      "InterruptModeHandler": {
+        "enable_msi": true
       },
       "MarvelRivalsConfigHandler": {
         "auto_vrr_fps_cap": true,
@@ -1418,6 +1532,9 @@
       "NetworkSettingsHandler": {
         "disable_nagle": false,
         "preset": "default"
+      },
+      "NicDriverHandler": {
+        "nic_tuning": true
       },
       "NvidiaSettingsHandler": {
         "auto_vrr_fps_cap": true,
@@ -1482,6 +1599,10 @@
       "CpuAffinityHandler",
       "ColorProfileSettingsHandler",
       "DisplayColorRangeHandler",
+      "GameDvrHandler",
+      "InterruptModeHandler",
+      "AudioEngineHandler",
+      "NicDriverHandler",
       "MarvelRivalsConfigHandler"
     ],
     "in_game_settings": [
@@ -1566,6 +1687,9 @@
     "optimization_target": "low_latency_high_fps",
     "requires_reflex": true,
     "settings": {
+      "AudioEngineHandler": {
+        "disable_enhancements": true
+      },
       "ColorProfileSettingsHandler": {
         "digital_vibrance": 45,
         "game_type": "competitive_fps",
@@ -1578,8 +1702,14 @@
       "DisplayColorRangeHandler": {
         "dynamic_range": "full"
       },
+      "GameDvrHandler": {
+        "hard_disable": true
+      },
       "GraphicsSettingsHandler": {
         "disable_global_fso": true
+      },
+      "InterruptModeHandler": {
+        "enable_msi": true
       },
       "MarvelRivalsConfigHandler": {
         "auto_vrr_fps_cap": true,
@@ -1599,6 +1729,9 @@
       "NetworkSettingsHandler": {
         "disable_nagle": false,
         "preset": "default"
+      },
+      "NicDriverHandler": {
+        "nic_tuning": true
       },
       "NvidiaSettingsHandler": {
         "auto_vrr_fps_cap": true,
@@ -1661,6 +1794,10 @@
       "CpuAffinityHandler",
       "ColorProfileSettingsHandler",
       "DisplayColorRangeHandler",
+      "GameDvrHandler",
+      "InterruptModeHandler",
+      "AudioEngineHandler",
+      "NicDriverHandler",
       "OW2ConfigHandler"
     ],
     "in_game_settings": [
@@ -1715,6 +1852,9 @@
     "optimization_target": "low_latency_high_fps",
     "requires_reflex": true,
     "settings": {
+      "AudioEngineHandler": {
+        "disable_enhancements": true
+      },
       "ColorProfileSettingsHandler": {
         "digital_vibrance": 45,
         "game_type": "competitive_fps",
@@ -1727,8 +1867,14 @@
       "DisplayColorRangeHandler": {
         "dynamic_range": "full"
       },
+      "GameDvrHandler": {
+        "hard_disable": true
+      },
       "GraphicsSettingsHandler": {
         "disable_global_fso": true
+      },
+      "InterruptModeHandler": {
+        "enable_msi": true
       },
       "MouseSettingsHandler": {
         "disable_acceleration": true,
@@ -1737,6 +1883,9 @@
       "NetworkSettingsHandler": {
         "disable_nagle": false,
         "preset": "default"
+      },
+      "NicDriverHandler": {
+        "nic_tuning": true
       },
       "NvidiaSettingsHandler": {
         "global_vrr_mode": "off",
@@ -1819,6 +1968,10 @@
       "CpuAffinityHandler",
       "ColorProfileSettingsHandler",
       "DisplayColorRangeHandler",
+      "GameDvrHandler",
+      "InterruptModeHandler",
+      "AudioEngineHandler",
+      "NicDriverHandler",
       "OW2ConfigHandler"
     ],
     "in_game_settings": [
@@ -1873,6 +2026,9 @@
     "optimization_target": "low_latency_high_fps",
     "requires_reflex": true,
     "settings": {
+      "AudioEngineHandler": {
+        "disable_enhancements": true
+      },
       "ColorProfileSettingsHandler": {
         "digital_vibrance": 45,
         "game_type": "competitive_fps",
@@ -1885,10 +2041,16 @@
       "DisplayColorRangeHandler": {
         "dynamic_range": "full"
       },
+      "GameDvrHandler": {
+        "hard_disable": true
+      },
       "GraphicsSettingsHandler": {
         "disable_auto_color_management": true,
         "disable_global_fso": false,
         "disable_mpo": false
+      },
+      "InterruptModeHandler": {
+        "enable_msi": true
       },
       "MouseSettingsHandler": {
         "disable_acceleration": true,
@@ -1897,6 +2059,9 @@
       "NetworkSettingsHandler": {
         "disable_nagle": false,
         "preset": "default"
+      },
+      "NicDriverHandler": {
+        "nic_tuning": true
       },
       "NvidiaSettingsHandler": {
         "auto_vrr_fps_cap": true,
@@ -1982,6 +2147,10 @@
       "CpuAffinityHandler",
       "ColorProfileSettingsHandler",
       "DisplayColorRangeHandler",
+      "GameDvrHandler",
+      "InterruptModeHandler",
+      "AudioEngineHandler",
+      "NicDriverHandler",
       "OW2ConfigHandler"
     ],
     "in_game_settings": [
@@ -2036,6 +2205,9 @@
     "optimization_target": "low_latency_high_fps",
     "requires_reflex": true,
     "settings": {
+      "AudioEngineHandler": {
+        "disable_enhancements": true
+      },
       "ColorProfileSettingsHandler": {
         "digital_vibrance": 45,
         "game_type": "competitive_fps",
@@ -2048,10 +2220,16 @@
       "DisplayColorRangeHandler": {
         "dynamic_range": "full"
       },
+      "GameDvrHandler": {
+        "hard_disable": true
+      },
       "GraphicsSettingsHandler": {
         "disable_auto_color_management": true,
         "disable_global_fso": false,
         "disable_mpo": false
+      },
+      "InterruptModeHandler": {
+        "enable_msi": true
       },
       "MouseSettingsHandler": {
         "disable_acceleration": true,
@@ -2060,6 +2238,9 @@
       "NetworkSettingsHandler": {
         "disable_nagle": false,
         "preset": "default"
+      },
+      "NicDriverHandler": {
+        "nic_tuning": true
       },
       "NvidiaSettingsHandler": {
         "auto_vrr_fps_cap": true,
@@ -2145,6 +2326,10 @@
       "CpuAffinityHandler",
       "ColorProfileSettingsHandler",
       "DisplayColorRangeHandler",
+      "GameDvrHandler",
+      "InterruptModeHandler",
+      "AudioEngineHandler",
+      "NicDriverHandler",
       "OW2ConfigHandler"
     ],
     "in_game_settings": [
@@ -2223,6 +2408,9 @@
     "optimization_target": "low_latency_high_fps",
     "requires_reflex": true,
     "settings": {
+      "AudioEngineHandler": {
+        "disable_enhancements": true
+      },
       "ColorProfileSettingsHandler": {
         "digital_vibrance": 50,
         "game_type": "competitive_fps",
@@ -2235,10 +2423,16 @@
       "DisplayColorRangeHandler": {
         "dynamic_range": "full"
       },
+      "GameDvrHandler": {
+        "hard_disable": true
+      },
       "GraphicsSettingsHandler": {
         "disable_auto_color_management": true,
         "disable_global_fso": false,
         "disable_mpo": false
+      },
+      "InterruptModeHandler": {
+        "enable_msi": true
       },
       "MouseSettingsHandler": {
         "disable_acceleration": true,
@@ -2247,6 +2441,9 @@
       "NetworkSettingsHandler": {
         "disable_nagle": false,
         "preset": "default"
+      },
+      "NicDriverHandler": {
+        "nic_tuning": true
       },
       "NvidiaSettingsHandler": {
         "auto_vrr_fps_cap": true,
@@ -2334,6 +2531,10 @@
       "CpuAffinityHandler",
       "ColorProfileSettingsHandler",
       "DisplayColorRangeHandler",
+      "GameDvrHandler",
+      "InterruptModeHandler",
+      "AudioEngineHandler",
+      "NicDriverHandler",
       "OW2ConfigHandler"
     ],
     "in_game_settings": [
@@ -2406,6 +2607,9 @@
     "optimization_target": "low_latency_high_fps",
     "requires_reflex": true,
     "settings": {
+      "AudioEngineHandler": {
+        "disable_enhancements": true
+      },
       "ColorProfileSettingsHandler": {
         "digital_vibrance": 50,
         "game_type": "competitive_fps",
@@ -2418,10 +2622,16 @@
       "DisplayColorRangeHandler": {
         "dynamic_range": "full"
       },
+      "GameDvrHandler": {
+        "hard_disable": true
+      },
       "GraphicsSettingsHandler": {
         "disable_auto_color_management": true,
         "disable_global_fso": false,
         "disable_mpo": false
+      },
+      "InterruptModeHandler": {
+        "enable_msi": true
       },
       "MouseSettingsHandler": {
         "disable_acceleration": true,
@@ -2430,6 +2640,9 @@
       "NetworkSettingsHandler": {
         "disable_nagle": false,
         "preset": "default"
+      },
+      "NicDriverHandler": {
+        "nic_tuning": true
       },
       "NvidiaSettingsHandler": {
         "auto_vrr_fps_cap": true,
@@ -2517,6 +2730,10 @@
       "CpuAffinityHandler",
       "ColorProfileSettingsHandler",
       "DisplayColorRangeHandler",
+      "GameDvrHandler",
+      "InterruptModeHandler",
+      "AudioEngineHandler",
+      "NicDriverHandler",
       "OW2ConfigHandler"
     ],
     "in_game_settings": [
@@ -2595,6 +2812,9 @@
     "optimization_target": "low_latency_high_fps",
     "requires_reflex": true,
     "settings": {
+      "AudioEngineHandler": {
+        "disable_enhancements": true
+      },
       "ColorProfileSettingsHandler": {
         "digital_vibrance": 50,
         "game_type": "competitive_fps",
@@ -2607,9 +2827,15 @@
       "DisplayColorRangeHandler": {
         "dynamic_range": "full"
       },
+      "GameDvrHandler": {
+        "hard_disable": true
+      },
       "GraphicsSettingsHandler": {
         "disable_auto_color_management": true,
         "disable_global_fso": true
+      },
+      "InterruptModeHandler": {
+        "enable_msi": true
       },
       "MouseSettingsHandler": {
         "disable_acceleration": true,
@@ -2618,6 +2844,9 @@
       "NetworkSettingsHandler": {
         "disable_nagle": false,
         "preset": "default"
+      },
+      "NicDriverHandler": {
+        "nic_tuning": true
       },
       "NvidiaSettingsHandler": {
         "global_vrr_mode": "off",
@@ -2746,9 +2975,9 @@
       },
       {
         "category": "Nvidia Control Panel",
-        "reason": "Adaptive VSync prevents tearing without constant latency penalty. Use 'Off' if you prefer the no-sync path and can tolerate minor tearing.",
+        "reason": "G-SYNC + VSync On is the canonical tear-free pairing. Latency is irrelevant for an auto-battler, so prefer guaranteed smoothness. Do not use Adaptive here - it is the alternative to G-SYNC, not a companion.",
         "setting": "Vertical Sync",
-        "value": "Adaptive (or Off for no-sync tearing)"
+        "value": "On (paired with windowed G-SYNC)"
       },
       {
         "category": "Nvidia Control Panel",
@@ -2829,7 +3058,8 @@
           "PACDeluxe (Streaming)"
         ],
         "profile_name": "PACDeluxe (Pokemon Auto Chess)",
-        "vrr_app_override": "allow"
+        "vrr_app_override": "allow",
+        "vsync": "on"
       },
       "PowerSettingsHandler": {
         "active_plan": "ultimate_performance",
@@ -2964,7 +3194,8 @@
       },
       "NvidiaSettingsHandler": {
         "preset": "balanced",
-        "vrr_app_override": "allow"
+        "vrr_app_override": "allow",
+        "vsync": "on"
       },
       "PowerSettingsHandler": {
         "active_plan": "ultimate_performance",
@@ -3768,7 +3999,7 @@
         "win32_priority_separation": 42
       },
       "Rivals2ConfigHandler": {
-        "frame_rate_limit": 999,
+        "frame_rate_limit": 0,
         "fullscreen_mode": 0,
         "hdr_output": false,
         "raw_input": true,
@@ -3976,7 +4207,7 @@
         "win32_priority_separation": 42
       },
       "Rivals2ConfigHandler": {
-        "frame_rate_limit": 999,
+        "frame_rate_limit": 0,
         "fullscreen_mode": 0,
         "hdr_output": false,
         "raw_input": true,
@@ -4170,7 +4401,7 @@
         "win32_priority_separation": 38
       },
       "Rivals2ConfigHandler": {
-        "frame_rate_limit": 999,
+        "frame_rate_limit": 0,
         "fullscreen_mode": 0,
         "hdr_output": false,
         "raw_input": true,
@@ -4776,7 +5007,7 @@
         "win32_priority_separation": 38
       },
       "Rivals2ConfigHandler": {
-        "frame_rate_limit": 999,
+        "frame_rate_limit": 0,
         "fullscreen_mode": 0,
         "hdr_output": false,
         "raw_input": true,

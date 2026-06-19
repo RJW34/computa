@@ -42,14 +42,18 @@ class PokemonAutoChessProfile(WebGLBaseProfile):
     def _settings_overrides(self) -> dict[str, dict[str, Any]]:
         return {
             "NvidiaSettingsHandler": {
-                # Casual windowed WebGL auto-battler: use the balanced preset
-                # (adaptive VSync, not forced no-sync tearing) so this sibling
-                # matches PACDeluxe instead of running a competitive no-sync
-                # config that just tears in a windowed browser. Explicitly allow
-                # VRR/G-SYNC so the windowed-VRR smoothness the guidance
-                # promises is delivered rather than left to the global toggle.
+                # Casual windowed WebGL auto-battler: smoothness over latency.
+                # Use the balanced preset for its LLM-on / max-perf / shader-cache
+                # baseline, but pair windowed G-SYNC (vrr_app_override allow +
+                # the WebGL base's windowed-VRR optimize) with VSync ON rather
+                # than the preset's "adaptive" default. Adaptive VSync is the
+                # *alternative* to G-SYNC (it disables VSync below refresh), so
+                # combining it with G-SYNC is contradictory; G-SYNC + VSync On is
+                # the canonical tear-free pairing. Kept identical to PACDeluxe so
+                # the two Pokemon Auto Chess siblings stay consistent.
                 "preset": "balanced",
                 "vrr_app_override": "allow",
+                "vsync": "on",
             },
         }
 

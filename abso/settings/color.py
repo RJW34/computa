@@ -428,11 +428,25 @@ class ColorProfileSettingsHandler(SettingsHandler):
             "changed_keys": changed_keys,
         }
 
+    @property
+    def restore_guarantee(self) -> str:
+        # The ICMProfile list round-trips faithfully via the registry, but
+        # digital vibrance depends on NVAPI being available and the same
+        # display being connected. The handler is therefore best-effort rather
+        # than a full guarantee, so backup summaries don't over-promise.
+        return "partial"
+
     def backup(self) -> dict[str, Any]:
-        """Backup current ICC profile and digital vibrance."""
+        """Backup current ICC profile and digital vibrance.
+
+        Captures the full ICMProfile multi-string list (not just the active
+        entry) so a later restore can put back secondary associations that an
+        ``icc_profile="native"`` apply removes by deleting the whole value.
+        """
         monitor_info = self._get_primary_monitor_info()
         return {
             "icc_profile": self._get_current_icc_profile(monitor_info),
+            "icc_profile_list": self._get_icc_profile_list(monitor_info),
             "digital_vibrance": self._get_digital_vibrance(),
             "monitor_class_index": monitor_info.get("class_index") if monitor_info else None,
         }
@@ -446,15 +460,24 @@ class ColorProfileSettingsHandler(SettingsHandler):
         try:
             errors = []
 
-            icc = data.get("icc_profile")
-            if icc is not None:
+            if "icc_profile_list" in data:
+                # New backup shape: rewrite the full ICMProfile list verbatim so
+                # every association (and ordering) the apply touched comes back.
                 try:
-                    self._apply_icc_profile(icc)
-                except FileNotFoundError as e:
-                    logger.error(f"Failed to restore ICC profile: {e}")
-                    errors.append(str(e))
+                    self._restore_icc_profile_list(data.get("icc_profile_list"))
                 except Exception as e:
-                    logger.info(f"ICC restore skipped (not available): {e}")
+                    logger.info(f"ICC list restore skipped (not available): {e}")
+            else:
+                # Legacy backup shape: only the active profile name was captured.
+                icc = data.get("icc_profile")
+                if icc is not None:
+                    try:
+                        self._apply_icc_profile(icc)
+                    except FileNotFoundError as e:
+                        logger.error(f"Failed to restore ICC profile: {e}")
+                        errors.append(str(e))
+                    except Exception as e:
+                        logger.info(f"ICC restore skipped (not available): {e}")
 
             vibrance = data.get("digital_vibrance")
             if vibrance is not None:
@@ -562,6 +585,70 @@ class ColorProfileSettingsHandler(SettingsHandler):
         except Exception as e:
             logger.debug(f"Failed to read ICC profile from registry: {e}")
             return None
+
+    def _get_icc_profile_list(self, monitor_info: dict[str, Any] | None = None) -> list[str] | None:
+        """Read the full ICMProfile multi-string list from the registry.
+
+        Returns the complete ordered list of associated ICC profiles (the first
+        entry is the active default), an empty list when the value exists but is
+        empty, or ``None`` when no ICMProfile value exists. Capturing the whole
+        list lets restore put back secondary associations that a "native" apply
+        (which deletes the entire value) would otherwise drop.
+        """
+        if monitor_info is None:
+            monitor_info = self._get_primary_monitor_info()
+        if not monitor_info:
+            return None
+
+        class_index = monitor_info.get("class_index", "0000")
+        reg_path = f"{ICM_ASSOC_BASE}\\{DISPLAY_CLASS_GUID}\\{class_index}"
+        try:
+            key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, reg_path, 0, winreg.KEY_READ)
+        except FileNotFoundError:
+            return None
+        except OSError as e:
+            logger.debug(f"Failed to read ICC profile list: {e}")
+            return None
+
+        try:
+            try:
+                value, _ = winreg.QueryValueEx(key, "ICMProfile")
+            except FileNotFoundError:
+                return None
+            if isinstance(value, list):
+                return [v for v in value if v]
+            if isinstance(value, str) and value:
+                return [value]
+            return []
+        finally:
+            winreg.CloseKey(key)
+
+    def _restore_icc_profile_list(self, profiles: list[str] | None) -> None:
+        """Restore the ICMProfile multi-string list captured at backup.
+
+        ``None`` (or an empty list) means the value was absent/empty and is
+        removed; a non-empty list is written back verbatim, preserving every
+        association and the original ordering.
+        """
+        cleaned = [str(p) for p in (profiles or []) if p]
+        if not cleaned:
+            self._remove_icc_profile()
+            return
+
+        monitor_info = self._get_primary_monitor_info()
+        if not monitor_info:
+            raise RuntimeError("Cannot identify primary monitor for ICC restore")
+
+        class_index = monitor_info.get("class_index", "0000")
+        reg_path = f"{ICM_ASSOC_BASE}\\{DISPLAY_CLASS_GUID}\\{class_index}"
+        try:
+            key = winreg.CreateKeyEx(winreg.HKEY_CURRENT_USER, reg_path, 0, winreg.KEY_ALL_ACCESS)
+            try:
+                winreg.SetValueEx(key, "ICMProfile", 0, winreg.REG_MULTI_SZ, cleaned)
+            finally:
+                winreg.CloseKey(key)
+        except Exception as e:
+            raise RuntimeError(f"Failed to restore ICC profile list: {e}") from e
 
     def _resolve_profile_name(self, alias: str) -> str | None:
         """Resolve a profile alias to an actual filename.

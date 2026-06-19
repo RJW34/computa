@@ -70,9 +70,12 @@ class _DeadlockBaseProfile(ReflexShooterBaseProfile):
 
     @property
     def graphics_api(self) -> Literal["dx11", "dx12", "vulkan", "opengl", "unknown"]:
-        # Source 2 ships DX11 as default. Vulkan is optional and not the
-        # path most playtesters land on; align HAGS / LLM expectations with
-        # the DX11 path the game uses out of the box.
+        # Deadlock (Source 2) exposes BOTH DX11 (-dx11) and Vulkan (-vulkan).
+        # ABSO targets the DX11 path: it delivers more consistent frame-time
+        # stability on most NVIDIA hardware (Vulkan can edge out peak FPS but is
+        # less stable), which matches this profile's latency-consistency goal.
+        # Players on AMD or chasing peak average FPS may prefer -vulkan; HAGS /
+        # LLM expectations here are aligned to DX11.
         return "dx11"
 
     def get_handlers(self) -> list[SettingsHandler]:

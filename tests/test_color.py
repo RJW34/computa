@@ -412,6 +412,52 @@ class TestColorHandlerBackupRestore:
         mock_icc.assert_called_once()
         mock_dv.assert_called_once_with(50)
 
+    def test_restore_guarantee_is_partial(self):
+        """ICC list round-trips, but vibrance is NVAPI/display dependent."""
+        assert ColorProfileSettingsHandler().restore_guarantee == "partial"
+
+    @patch.object(ColorProfileSettingsHandler, "_get_primary_monitor_info", return_value=None)
+    @patch.object(ColorProfileSettingsHandler, "_get_digital_vibrance", return_value=50)
+    @patch.object(
+        ColorProfileSettingsHandler,
+        "_get_icc_profile_list",
+        return_value=["sRGB Color Space Profile.icm", "CalibratedNative.icm"],
+    )
+    @patch.object(
+        ColorProfileSettingsHandler,
+        "_get_current_icc_profile",
+        return_value="sRGB Color Space Profile.icm",
+    )
+    def test_backup_captures_full_icc_list(self, mock_icc, mock_list, mock_dv, mock_mon):
+        """Backup must capture every ICC association, not just the active one."""
+        data = ColorProfileSettingsHandler().backup()
+        assert data["icc_profile_list"] == [
+            "sRGB Color Space Profile.icm",
+            "CalibratedNative.icm",
+        ]
+
+    @patch.object(ColorProfileSettingsHandler, "_apply_icc_profile")
+    @patch.object(ColorProfileSettingsHandler, "_restore_icc_profile_list")
+    @patch.object(ColorProfileSettingsHandler, "_set_digital_vibrance")
+    def test_restore_full_list_uses_list_path(self, mock_dv, mock_restore_list, mock_apply):
+        """New backups restore the whole list and never go through apply()."""
+        handler = ColorProfileSettingsHandler()
+        success = handler.restore(
+            {
+                "icc_profile": "sRGB Color Space Profile.icm",
+                "icc_profile_list": [
+                    "sRGB Color Space Profile.icm",
+                    "CalibratedNative.icm",
+                ],
+                "digital_vibrance": 50,
+            }
+        )
+        assert success is True
+        mock_restore_list.assert_called_once_with(
+            ["sRGB Color Space Profile.icm", "CalibratedNative.icm"]
+        )
+        mock_apply.assert_not_called()
+
 
 # =============================================================================
 # Handler Tests: detect (mocked)

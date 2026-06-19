@@ -105,9 +105,12 @@ class UEGameUserSettingsHandler(SettingsHandler):
     def apply(self, settings: dict[str, Any]) -> dict[str, Any]:
         """Apply validated config settings to GameUserSettings.ini."""
         settings = dict(settings)
+        notices: list[str] = []
 
         if settings.pop(self.AUTO_VRR_CAP_KEY, False):
-            self._apply_auto_vrr_cap(settings)
+            notice = self._apply_auto_vrr_cap(settings)
+            if notice:
+                notices.append(notice)
 
         invalid_requested_keys = validate_allowed_keys(
             set(settings.keys()),
@@ -125,12 +128,15 @@ class UEGameUserSettingsHandler(SettingsHandler):
 
         ini_path = self._get_config_path()
         if not ini_path:
-            return {
+            result_skipped: dict[str, Any] = {
                 "success": True,
                 "error": None,
                 "requires_reboot": False,
                 "skipped": f"{self.CONFIG_FILENAME} not found",
             }
+            if notices:
+                result_skipped["notices"] = notices
+            return result_skipped
 
         try:
             content = ini_path.read_text(encoding="utf-8", errors="replace")
@@ -144,12 +150,15 @@ class UEGameUserSettingsHandler(SettingsHandler):
                 }
 
             if not replacements:
-                return {
+                result_noop: dict[str, Any] = {
                     "success": True,
                     "error": None,
                     "requires_reboot": False,
                     "applied": [],
                 }
+                if notices:
+                    result_noop["notices"] = notices
+                return result_noop
 
             original_assignments = parse_ini_assignments(
                 lines,
@@ -193,12 +202,15 @@ class UEGameUserSettingsHandler(SettingsHandler):
                     len(patch_result.appended_keys),
                 )
 
-            return {
+            result_applied: dict[str, Any] = {
                 "success": True,
                 "error": None,
                 "requires_reboot": False,
                 "applied": sorted(patch_result.changed_keys | patch_result.appended_keys),
             }
+            if notices:
+                result_applied["notices"] = notices
+            return result_applied
         except Exception as e:
             return {
                 "success": False,
@@ -266,7 +278,13 @@ class UEGameUserSettingsHandler(SettingsHandler):
             logger.error("Failed to restore UE config %s: %s", config_path, e)
             return False
 
-    def _apply_auto_vrr_cap(self, settings: dict[str, Any]) -> None:
+    def _apply_auto_vrr_cap(self, settings: dict[str, Any]) -> str | None:
+        """Resolve the in-game VRR FPS cap from the primary refresh rate.
+
+        Returns a notice string when refresh detection fails and the in-game
+        ``frame_rate_limit`` was therefore NOT set, so the caller can surface it
+        (mirrors :class:`Diablo4ConfigHandler`). Returns ``None`` on success.
+        """
         try:
             from abso.core.vrr import get_vrr_fps_cap
             from abso.settings.nvidia import NvidiaSettingsHandler
@@ -280,8 +298,20 @@ class UEGameUserSettingsHandler(SettingsHandler):
                     settings["frame_rate_limit"],
                     refresh_hz,
                 )
+                return None
+            return (
+                f"{self.__class__.__name__} auto_vrr_fps_cap skipped: refresh rate "
+                "detection failed. The in-game FrameRateLimit was NOT set. To "
+                "recover, enable nvidia.auto_vrr_fps_cap so the driver imposes the "
+                "cap, or set frame_rate_limit explicitly in your profile overrides."
+            )
         except Exception as e:
             logger.warning("%s auto VRR FPS cap detection failed: %s", self.__class__.__name__, e)
+            return (
+                f"{self.__class__.__name__} auto_vrr_fps_cap failed: {e}. The in-game "
+                "FrameRateLimit was NOT set; verify your NVIDIA driver cap or set "
+                "frame_rate_limit explicitly in your profile overrides."
+            )
 
     def _build_replacements(self, settings: dict[str, Any]) -> tuple[dict[str, str], list[str]]:
         replacements: dict[str, str] = {}

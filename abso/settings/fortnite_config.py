@@ -14,6 +14,14 @@ class FortniteConfigHandler(UEGameUserSettingsHandler):
     is_critical_verify = True
 
     TARGET_SECTION_NAME = "/Script/FortniteGame.FortGameUserSettings"
+    # Fortnite uses the stock Unreal EWindowMode enum for its fullscreen mode:
+    #   0 = Fullscreen, 1 = Windowed Fullscreen (borderless), 2 = Windowed.
+    # Fortnite stores it ONLY as PreferredFullscreenMode (+ the mirrored
+    # LastConfirmedFullscreenMode) - there is no plain `FullscreenMode` key, so
+    # this handler must NOT inherit the generic key. Verified 2026-06-19 against
+    # a live install (was on 1 / Windowed Fullscreen) and a competitive
+    # community config (PreferredFullscreenMode=0). ABSO targets 0 (Fullscreen)
+    # for the lowest-latency presentation path, which is the competitive norm.
     MUTABLE_SETTINGS_TO_INI = {
         "fullscreen_mode": "PreferredFullscreenMode",
         "vsync": "bUseVSync",

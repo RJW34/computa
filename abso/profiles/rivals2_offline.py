@@ -110,7 +110,7 @@ class Rivals2OfflineProfile(Rivals2BaseProfile):
                 "fullscreen_mode": 0,  # Exclusive fullscreen no-sync path
                 "vsync": False,  # In-game VSync OFF
                 "raw_input": True,  # Best input latency
-                "frame_rate_limit": 999,  # Uncapped no-sync path
+                "frame_rate_limit": 0,  # 0 = truly uncapped (UE); driver cap is also off
                 "hdr_output": False,
             },
             "NvidiaNotificationHandler": {

@@ -66,22 +66,17 @@ class PACDeluxeProfile(WebGLBaseProfile):
                 "disable_pcie_power_saving": True,
             },
             "NvidiaSettingsHandler": {
-                # Smooth preset for consistent frame pacing
-                # WebGL benefits from shader caching and stable GPU clocks
+                # Smooth windowed WebGL frame pacing (Tauri/WebView2). Use the
+                # balanced preset's LLM-on / max-perf / unlimited-shader-cache
+                # baseline, but pair windowed G-SYNC (vrr_app_override allow +
+                # the WebGL base's windowed-VRR optimize) with VSync ON instead
+                # of the preset's "adaptive". Adaptive VSync is the alternative
+                # to G-SYNC, so pairing it with G-SYNC is contradictory; G-SYNC
+                # + VSync On is the canonical tear-free combo and is kept
+                # identical to the Pokemon Auto Chess (browser) sibling.
                 "preset": "balanced",
-                # Explicitly allow VRR/G-SYNC so the variable-frame-delivery
-                # smoothness the guidance recommends is actually delivered
-                # (paired with vrr_optimize on the WebGL base), not left to the
-                # user's global NVCP toggle.
                 "vrr_app_override": "allow",
-                # Key settings applied:
-                # - Low Latency Mode: On (not Ultra - WebView handles timing)
-                # - VSync: Adaptive (prevents tearing without full VSync lag)
-                # - Power Management: Prefer Maximum Performance
-                # - Shader Cache: Unlimited (WebGL generates many shaders)
-                # - Threaded Optimization: On
-                #
-                # G-Sync can help smooth variable frame delivery from WebGL
+                "vsync": "on",
             },
         }
 
@@ -143,10 +138,12 @@ class PACDeluxeProfile(WebGLBaseProfile):
             {
                 "category": "Nvidia Control Panel",
                 "setting": "Vertical Sync",
-                "value": "Adaptive (or Off for no-sync tearing)",
+                "value": "On (paired with windowed G-SYNC)",
                 "reason": (
-                    "Adaptive VSync prevents tearing without constant latency penalty. "
-                    "Use 'Off' if you prefer the no-sync path and can tolerate minor tearing."
+                    "G-SYNC + VSync On is the canonical tear-free pairing. Latency "
+                    "is irrelevant for an auto-battler, so prefer guaranteed smoothness. "
+                    "Do not use Adaptive here - it is the alternative to G-SYNC, not a "
+                    "companion."
                 ),
             },
             {

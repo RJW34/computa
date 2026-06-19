@@ -96,6 +96,15 @@ class _Diablo4BaseProfile(BaseProfile):
                 "active_plan": "ultimate_performance",
                 "disable_usb_suspend": True,
                 "disable_pcie_power_saving": True,
+                # Pin the CPU floor + unpark cores, matching every other gaming
+                # base. Ultimate Performance already implies this, but setting
+                # it explicitly keeps the 1%-low-friendly floor even if Ultimate
+                # Performance activation falls back to another plan on a
+                # restricted Windows edition. D4 is a demanding ARPG where DVFS
+                # ramp + core-unpark wake latency hurt frame-time consistency.
+                "processor_max_performance": True,
+                "processor_min_state": 100,
+                "disable_core_parking": True,
             },
             "RegistrySettingsHandler": {
                 # Apply the standard gaming foreground quantum so the profile

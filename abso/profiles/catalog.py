@@ -505,14 +505,14 @@ PROFILE_CATALOG: OrderedDict[str, ProfileCatalogEntry] = OrderedDict(
         "pokemon-auto-chess": ProfileCatalogEntry(
             profile_class=PokemonAutoChessProfile,
             tray_category="Other",
-            tray_subtitle="LLM ON | Browser WebGL",
-            sync_mode="agnostic",
+            tray_subtitle="LLM ON | Browser WebGL | G-SYNC + VSync On",
+            sync_mode="on",
         ),
         "pacdeluxe": ProfileCatalogEntry(
             profile_class=PACDeluxeProfile,
             tray_category="Other",
-            tray_subtitle="LLM ON | Tauri + WebView2 | Adaptive VSync",
-            sync_mode="agnostic",
+            tray_subtitle="LLM ON | Tauri + WebView2 | G-SYNC + VSync On",
+            sync_mode="on",
         ),
         "productivity": ProfileCatalogEntry(
             profile_class=ProductivityProfile,

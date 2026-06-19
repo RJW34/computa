@@ -148,6 +148,33 @@ def test_apply_auto_vrr_fps_cap_uses_detected_refresh(tmp_path: Path) -> None:
     assert "bNvidiaReflex=True" in content
 
 
+def test_apply_auto_vrr_fps_cap_surfaces_notice_when_refresh_unknown(tmp_path: Path) -> None:
+    """If refresh detection fails, the in-game cap is skipped WITH a notice.
+
+    The old behavior silently wrote no FrameRateLimit and surfaced nothing, so
+    a user could not tell their authoritative in-game cap never landed.
+    """
+    config_dir = tmp_path / "Marvel" / "Saved" / "Config" / "Windows"
+    ini_path = config_dir / "GameUserSettings.ini"
+    _write_game_user_settings(ini_path, "FullscreenMode=0\nFrameRateLimit=120\n")
+
+    with (
+        patch.object(MarvelRivalsConfigHandler, "_get_config_dir", return_value=config_dir),
+        patch(
+            "abso.settings.nvidia.NvidiaSettingsHandler._detect_primary_refresh_rate",
+            return_value=None,
+        ),
+    ):
+        handler = MarvelRivalsConfigHandler()
+        result = handler.apply({"auto_vrr_fps_cap": True})
+
+    assert result["success"] is True
+    notices = " ".join(result.get("notices", []))
+    assert "auto_vrr_fps_cap" in notices
+    # The in-game limiter must be left untouched (no silent 0/garbage cap).
+    assert "FrameRateLimit=120" in ini_path.read_text(encoding="utf-8")
+
+
 def test_detect_and_verify_active_read_current_values(tmp_path: Path) -> None:
     config_dir = tmp_path / "Marvel" / "Saved" / "Config" / "Windows"
     ini_path = config_dir / "GameUserSettings.ini"

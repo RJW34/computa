@@ -54,6 +54,7 @@ def _all_entries() -> list[HandlerEntry]:
     # backup-restore non-blocking even when the rollout is gated off.
     from abso.settings.ai_agents import AIAgentsSettingsHandler
     from abso.settings.audio import AudioSettingsHandler
+    from abso.settings.audio_engine import AudioEngineHandler
 
     # Profile-specific config handlers — backed up so settings from one
     # game don't leak into another's restore.
@@ -61,6 +62,7 @@ def _all_entries() -> list[HandlerEntry]:
     from abso.settings.color import ColorProfileSettingsHandler
     from abso.settings.cpu_affinity import CpuAffinityHandler
     from abso.settings.debloat import DebloatHandler
+    from abso.settings.defender_exclusions import DefenderExclusionsHandler
     from abso.settings.diablo4_config import Diablo4ConfigHandler
 
     # Audit-only diagnostics & opt-in surfaces.
@@ -68,15 +70,20 @@ def _all_entries() -> list[HandlerEntry]:
     from abso.settings.display_range import DisplayColorRangeHandler
     from abso.settings.dolphin import DolphinConfigHandler
     from abso.settings.fortnite_config import FortniteConfigHandler
+    from abso.settings.game_dvr import GameDvrHandler
     from abso.settings.graphics import GraphicsSettingsHandler
+    from abso.settings.hypervisor import HypervisorAuditHandler
+    from abso.settings.interrupt_mode import InterruptModeHandler
     from abso.settings.marvel_rivals_config import MarvelRivalsConfigHandler
     from abso.settings.memory import MemorySettingsHandler
     from abso.settings.mouse import MouseSettingsHandler
     from abso.settings.network import NetworkSettingsHandler
+    from abso.settings.nic_driver import NicDriverHandler
     from abso.settings.nvidia import NvidiaSettingsHandler
     from abso.settings.nvidia_notifications import NvidiaNotificationHandler
     from abso.settings.obs import OBSSettingsHandler
     from abso.settings.ow2_config import OW2ConfigHandler
+    from abso.settings.pagefile import PagefileHandler
     from abso.settings.power import PowerSettingsHandler
     from abso.settings.process_priority import ProcessPriorityHandler
     from abso.settings.registry import RegistrySettingsHandler
@@ -119,6 +126,49 @@ def _all_entries() -> list[HandlerEntry]:
         HandlerEntry(VisualSettingsHandler, audit=True, backup=True),
         HandlerEntry(StorageSettingsHandler, audit=True, backup=True),
         HandlerEntry(AudioSettingsHandler, audit=True, backup=True),
+        HandlerEntry(
+            GameDvrHandler,
+            audit=True,
+            backup=True,
+            notes="restore_guarantee='partial': opt-in best-effort latency add-on; a "
+            "failed revert never blocks a profile-switch baseline restore.",
+        ),
+        HandlerEntry(
+            InterruptModeHandler,
+            audit=True,
+            backup=True,
+            notes="restore_guarantee='partial': GPU MSI mode (reboot-gated); the "
+            "Enum\\PCI key can be ACL-restricted, so revert is best-effort/non-blocking.",
+        ),
+        HandlerEntry(
+            AudioEngineHandler,
+            audit=True,
+            backup=True,
+            notes="restore_guarantee='partial': opt-in best-effort audio-APO disable; a "
+            "failed revert never blocks a profile-switch baseline restore.",
+        ),
+        HandlerEntry(
+            NicDriverHandler,
+            audit=True,
+            backup=True,
+            notes="restore_guarantee='partial': opt-in per-NIC best-effort tuning; a "
+            "driver rejecting a keyword on revert never blocks a profile switch.",
+        ),
+        HandlerEntry(
+            DefenderExclusionsHandler,
+            audit=True,
+            backup=False,
+            notes="Opt-in Defender game-folder exclusions; audit-only until a launch "
+            "flow supplies game install paths. Not auto-applied by any profile.",
+        ),
+        HandlerEntry(
+            PagefileHandler,
+            audit=True,
+            backup=False,
+            notes="Acknowledgement-gated + reboot-committed (like VBSOptInHandler); "
+            "audit-only and never auto-applied, so it stays out of the backup/restore "
+            "cycle to avoid per-switch overhead.",
+        ),
         HandlerEntry(UpdatesSettingsHandler, audit=True, backup=True),
         HandlerEntry(
             DisplayColorRangeHandler,
@@ -140,6 +190,12 @@ def _all_entries() -> list[HandlerEntry]:
             backup=False,
             notes="Opt-in VBS/HVCI/VMP status surfacing. Never mutates unless explicitly acknowledged.",
         ),
+        HandlerEntry(
+            HypervisorAuditHandler,
+            audit=True,
+            backup=False,
+            notes="Audit-only: flags an idle Hyper-V root partition (no VBS). ABSO never edits BCD.",
+        ),
 
         # --- Profile-specific config handlers (backup-only) ---
         HandlerEntry(Diablo4ConfigHandler, audit=False, backup=True),
@@ -152,7 +208,13 @@ def _all_entries() -> list[HandlerEntry]:
         HandlerEntry(OBSSettingsHandler, audit=False, backup=True),
         HandlerEntry(ProcessPriorityHandler, audit=False, backup=True),
         HandlerEntry(CNMSettingsHandler, audit=False, backup=True),
-        HandlerEntry(ColorProfileSettingsHandler, audit=False, backup=True),
+        HandlerEntry(
+            ColorProfileSettingsHandler,
+            audit=False,
+            backup=True,
+            notes="restore_guarantee='partial': ICMProfile list round-trips, but "
+            "digital vibrance depends on NVAPI/display availability.",
+        ),
         HandlerEntry(CpuAffinityHandler, audit=False, backup=True),
         HandlerEntry(StandbyListHandler, audit=False, backup=True),
         HandlerEntry(DebloatHandler, audit=False, backup=True),

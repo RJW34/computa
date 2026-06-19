@@ -746,16 +746,40 @@ class ReflexShooterBaseProfile(BaseProfile):
         return "off"
 
     def get_handlers(self) -> list[SettingsHandler]:
+        from abso.settings.audio_engine import AudioEngineHandler
+        from abso.settings.game_dvr import GameDvrHandler
+        from abso.settings.interrupt_mode import InterruptModeHandler
+        from abso.settings.nic_driver import NicDriverHandler
+
+        # Strict online Reflex shooters opt into the latency-stack handlers:
+        # Game DVR hard-off, GPU MSI mode, audio-APO disable, and NIC driver
+        # tuning. Each is gated by its settings in _base_settings below.
         return build_standard_handlers(
             self,
             include_mouse=True,
             include_cpu_affinity=True,
+            additional_handlers=[
+                GameDvrHandler(),
+                InterruptModeHandler(),
+                AudioEngineHandler(),
+                NicDriverHandler(),
+            ],
         )
 
     def _base_settings(self) -> dict[str, dict[str, Any]]:
         # Profile defaults. Evidence and tradeoffs vary by setting; legacy
         # tweaks remain opt-in.
         settings: dict[str, dict[str, Any]] = {
+            # --- Latency-stack handlers (strict online Reflex shooters) ---
+            # Game DVR hard-off at the registry source (the janitor only stops
+            # the processes; this disarms the setting so they stay down).
+            "GameDvrHandler": {"hard_disable": True},
+            # GPU MSI interrupt mode (reboot-gated; one-time per machine).
+            "InterruptModeHandler": {"enable_msi": True},
+            # Disable the Windows audio enhancement (APO) DPC chain.
+            "AudioEngineHandler": {"disable_enhancements": True},
+            # NIC driver tuning for competitive online play (per-NIC; restorable).
+            "NicDriverHandler": {"nic_tuning": True},
             "WindowsSettingsHandler": {
                 "game_mode": True,
                 "game_bar": False,

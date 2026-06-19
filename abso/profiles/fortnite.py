@@ -177,8 +177,12 @@ class FortniteProfile(_FortniteBaseProfile):
                 "game_type": "competitive_fps",
             },
             "FortniteConfigHandler": {
+                # SDR lane: HDR output off. The config handler writes
+                # HDRDisplayOutputNits unconditionally, but Fortnite ignores the
+                # nits value when bUseHDRDisplayOutput is false, so setting it
+                # here would only write an inert INI line (matches the Marvel
+                # Rivals SDR cleanup).
                 "hdr_output": False,
-                "hdr_nits": 1000,
             },
         }
 
