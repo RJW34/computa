@@ -2747,7 +2747,7 @@ def test_quick_panel_cards_show_text_status_chips_without_overlap() -> None:
     assert '$capStateRailKind -in @("fix", "restart", "check")' in script
     assert '$scanY = $railTop + (($script:QuickPanelPulseFrame * 3) % [Math]::Max(1, $railHeight))' in script
     assert '$g.DrawLine($scanPen, ($railX - 4), $scanY, ($railX + 6), $scanY)' in script
-    assert "$panelWidth   = 380" in script
+    assert "$panelWidth   = 440" in script
     assert "$chipRect = New-Object System.Drawing.Rectangle(($s.Width - 96), 8, 72, 15)" in script
     assert "$chipRect = New-Object System.Drawing.Rectangle(($s.Width - 82), 8, 58, 15)" not in script
     assert "$chipFormat.Trimming = [System.Drawing.StringTrimming]::EllipsisCharacter" in script
@@ -2767,7 +2767,7 @@ def test_quick_panel_cards_show_text_status_chips_without_overlap() -> None:
     assert '$subText = if ($entry.Profile.Sub) { $entry.Profile.Sub } else { $entry.Profile.Cat }' not in script
     assert "$subLabel.Size      = if ($isDisabled)" in script
     assert "New-Object System.Drawing.Size(($panelWidth - $padX * 2 - 76), 32)" in script
-    assert "New-Object System.Drawing.Size(($panelWidth - $padX * 2 - 152), 16)" in script
+    assert "New-Object System.Drawing.Size(($panelWidth - $padX * 2 - 72), 16)" in script
 
 
 def test_quick_panel_pins_active_profile_before_favorites() -> None:

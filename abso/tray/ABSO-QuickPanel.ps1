@@ -591,7 +591,7 @@ function Show-QuickPanel {
     }
 
     # Phosphor HUD card dimensions
-    $panelWidth   = 380
+    $panelWidth   = 440
     $cardHeight   = if ($emptyPanel) { 70 } else { 56 }
     $cardGap      = 6
     $padX         = 18
@@ -1114,7 +1114,10 @@ function Show-QuickPanel {
             New-Object System.Drawing.Size(($panelWidth - $padX * 2 - 76), 32)
         }
         else {
-            New-Object System.Drawing.Size(($panelWidth - $padX * 2 - 152), 16)
+            # The subtitle sits on its own row below the chip (y=30), so it only
+            # needs to clear the ~11px right state rail - give it near-full card
+            # width instead of reserving the title-row chip's 152px gutter.
+            New-Object System.Drawing.Size(($panelWidth - $padX * 2 - 72), 16)
         }
         $subLabel.ForeColor = $script:QPPalette.Mist
         $subLabel.Font      = $script:QPFont_Sub
