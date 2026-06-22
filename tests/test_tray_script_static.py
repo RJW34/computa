@@ -26,6 +26,43 @@ def test_profiles_ordered_dictionary_uses_contains_not_contains_key() -> None:
     assert "$script:Profiles.ContainsKey(" not in script
 
 
+def test_tray_color_table_references_are_all_defined() -> None:
+    """Every ``$script:Colors.<Key>`` reference must exist in the Colors table.
+
+    Regression guard for the tray-startup crash where the display-topology
+    icon referenced ``$script:Colors.AccentCyan`` — a key that was never
+    defined. It resolved to ``$null``, and
+    ``New-Object System.Drawing.SolidBrush($null)`` throws "a constructor was
+    not found", which took down tray startup whenever a single-rate display
+    made that icon branch render.
+    """
+    tray = TRAY_SCRIPT.read_text(encoding="utf-8")
+    match = re.search(r"\$script:Colors\s*=\s*@\{(.*?)\n\}", tray, re.DOTALL)
+    assert match, "Could not locate the $script:Colors hashtable definition"
+    defined = set(re.findall(r"^\s*([A-Za-z][A-Za-z0-9]*)\s*=", match.group(1), re.MULTILINE))
+    # Sanity: the table actually parsed and carries known keys.
+    assert {"AccentAmber", "AccentTeal", "Text"} <= defined, sorted(defined)
+
+    # Hashtable members are not color keys (e.g. $script:Colors.Count).
+    hashtable_members = {
+        "Count", "Keys", "Values", "ContainsKey", "Contains", "Clone",
+        "GetEnumerator", "Item", "Remove", "Add", "GetType",
+    }
+    # $script:Colors is dot-sourced into the sibling tray scripts, so check
+    # references everywhere it is used, not just ABSO-Tray.ps1.
+    referenced: set[str] = set()
+    for path in (
+        TRAY_SCRIPT, ICONS_SCRIPT, NOTIFICATIONS_SCRIPT, SETTINGS_SCRIPT, QUICK_PANEL_SCRIPT,
+    ):
+        if path.exists():
+            referenced |= set(
+                re.findall(r"\$script:Colors\.([A-Za-z][A-Za-z0-9]*)", path.read_text(encoding="utf-8"))
+            )
+    missing = sorted(referenced - defined - hashtable_members)
+    assert not missing, f"$script:Colors references undefined keys: {missing}"
+    assert "AccentCyan" not in referenced  # the specific bug stays fixed
+
+
 def test_same_active_profile_selection_is_verify_gated() -> None:
     """Tray clicking the selected active profile must avoid redundant apply."""
     script = TRAY_SCRIPT.read_text(encoding="utf-8")
@@ -3303,7 +3340,7 @@ def test_tray_system_info_uses_multidisplay_refresh_summary() -> None:
     assert "$isMixed = ($summary -match '(?i)\\bmixed\\b' -or $summary -match '\\d+\\s*Hz\\s*/\\s*\\d+\\s*Hz')" in script
     assert "$hasRate = ($summary -match '\\d+\\s*Hz')" in script
     assert "$summary -notmatch '(?i)unknown|not reported'" in script
-    assert "$accent = if ($isMixed) { $script:Colors.AccentAmber } elseif ($hasRate) { $script:Colors.AccentCyan } else { $Color }" in script
+    assert "$accent = if ($isMixed) { $script:Colors.AccentAmber } elseif ($hasRate) { $script:Colors.AccentTeal } else { $Color }" in script
     assert "$g.FillEllipse($accentBrush, 10, 0, 5, 5)" in script
     assert "$sysInfoText = \"$($sysInfo.GPU)  |  $($sysInfo.DisplaySummary)\"" in script
     assert "$sysInfoItem.AccessibleName = \"__status_bar__\"" in script

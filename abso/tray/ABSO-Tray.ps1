@@ -5259,7 +5259,10 @@ function New-TrayDisplayTopologyBitmap {
         [System.Drawing.Color]::FromArgb(120, $Color.R, $Color.G, $Color.B)
     )
     $innerBrush = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::FromArgb(190, 10, 16, 24))
-    $accent = if ($isMixed) { $script:Colors.AccentAmber } elseif ($hasRate) { $script:Colors.AccentCyan } else { $Color }
+    $accent = if ($isMixed) { $script:Colors.AccentAmber } elseif ($hasRate) { $script:Colors.AccentTeal } else { $Color }
+    # Defensive: never let a missing/undefined theme color reach SolidBrush (a
+    # null color throws "constructor not found" and takes down tray startup).
+    if ($null -eq $accent) { $accent = $Color }
     $accentBrush = New-Object System.Drawing.SolidBrush($accent)
     $accentPen = New-Object System.Drawing.Pen($accent, 1.05)
     $accentPen.StartCap = [System.Drawing.Drawing2D.LineCap]::Round
@@ -10090,6 +10093,10 @@ try {
 catch {
     $fatal = $_.Exception.Message
     Write-TrayLog "ABSO Tray fatal startup/runtime error: $fatal" -Level "ERROR"
+    try {
+        Write-TrayLog "Fatal location: $(($_.InvocationInfo.PositionMessage -replace '\r?\n',' '))" -Level "ERROR"
+        Write-TrayLog "Fatal stack: $(($_.ScriptStackTrace -replace '\r?\n',' <- '))" -Level "ERROR"
+    } catch {}
     try {
         [System.Windows.Forms.MessageBox]::Show(
             "A.B.S.O. Tray encountered a fatal error and exited.`n`n$fatal`n`nSee log: $($script:LogFile)",
