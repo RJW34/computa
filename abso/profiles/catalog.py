@@ -19,7 +19,11 @@ from abso.profiles.deadlock import (
     DeadlockProfile,
 )
 from abso.profiles.diablo4 import Diablo4Profile, Diablo4SDRProfile
-from abso.profiles.fortnite import FortniteHDRProfile, FortniteProfile
+from abso.profiles.fortnite import (
+    FortniteGSyncHDRProfile,
+    FortniteHDRProfile,
+    FortniteProfile,
+)
 from abso.profiles.marvel_rivals import MarvelRivalsHDRProfile, MarvelRivalsSDRProfile
 from abso.profiles.overwatch2 import (
     Overwatch2GSyncCaptureProfile,
@@ -195,6 +199,7 @@ BUILTIN_TRAY_UI: dict[str, TrayProfileUi] = {
     "deadlock-gsync-hdr": TrayProfileUi("deadlock", "Deadlock", "G-SYNC (HDR)", 130),
     "fortnite": TrayProfileUi("fortnite", "Fortnite", "No Sync (SDR)", 200),
     "fortnite-hdr": TrayProfileUi("fortnite", "Fortnite", "No Sync (HDR)", 210),
+    "fortnite-gsync-hdr": TrayProfileUi("fortnite", "Fortnite", "G-SYNC (HDR)", 230),
     "marvel-rivals-sdr": TrayProfileUi(
         "marvel-rivals", "Marvel Rivals", "G-SYNC (SDR)", 300
     ),
@@ -383,6 +388,17 @@ PROFILE_CATALOG: OrderedDict[str, ProfileCatalogEntry] = OrderedDict(
             tray_category="Shooters",
             tray_subtitle="HDR ON | Reflex (set in-game) | No Sync",
             sync_mode="off",
+        ),
+        "fortnite-gsync-hdr": ProfileCatalogEntry(
+            profile_class=FortniteGSyncHDRProfile,
+            tray_category="Shooters",
+            tray_subtitle="HDR ON | Reflex (set in-game) | G-SYNC ON",
+            tray_description=(
+                "Tear-free low-latency VRR Fortnite with native HDR for "
+                "OLED / Mini-LED. G-SYNC ON + NVCP VSync safety net at a "
+                "refresh - 3 cap; enable Reflex On + Boost in-game."
+            ),
+            sync_mode="on",
         ),
         "marvel-rivals-sdr": ProfileCatalogEntry(
             profile_class=MarvelRivalsSDRProfile,

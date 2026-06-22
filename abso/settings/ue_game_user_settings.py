@@ -231,6 +231,14 @@ class UEGameUserSettingsHandler(SettingsHandler):
             self._apply_auto_vrr_cap(applied_settings)
 
         for key, target in applied_settings.items():
+            # Skip framework-injected synthetic keys. The applier threads a
+            # "_reboot_pending" flag into every handler's verify settings for
+            # reboot-gated handlers (e.g. GraphicsSettingsHandler/MPO). It is
+            # not a GameUserSettings.ini key, so verifying it against the INI
+            # would always mismatch — and on a handler with
+            # is_critical_verify=True that turns into a false critical rollback.
+            if key.startswith("_"):
+                continue
             current_value = current.get(key)
             is_active = current_value == target
             results["settings"][key] = {

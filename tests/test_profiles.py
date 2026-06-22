@@ -14,7 +14,11 @@ from abso.profiles.deadlock import (
     DeadlockProfile,
 )
 from abso.profiles.diablo4 import Diablo4Profile, Diablo4SDRProfile
-from abso.profiles.fortnite import FortniteHDRProfile, FortniteProfile
+from abso.profiles.fortnite import (
+    FortniteGSyncHDRProfile,
+    FortniteHDRProfile,
+    FortniteProfile,
+)
 from abso.profiles.marvel_rivals import MarvelRivalsHDRProfile, MarvelRivalsSDRProfile
 from abso.profiles.overwatch2 import (
     Overwatch2GSyncCaptureProfile,
@@ -111,13 +115,21 @@ class TestProfileLoading:
         )
 
     def test_fortnite_profiles_load(self):
-        """Fortnite should expose explicit SDR and HDR variants."""
+        """Fortnite should expose explicit SDR, HDR, and G-SYNC HDR variants."""
         sdr = FortniteProfile()
         hdr = FortniteHDRProfile()
+        gsync_hdr = FortniteGSyncHDRProfile()
         assert sdr.profile_id == "fortnite"
         assert sdr.display_name == "Fortnite - SDR"
         assert hdr.profile_id == "fortnite-hdr"
         assert hdr.display_name == "Fortnite - HDR"
+        assert gsync_hdr.profile_id == "fortnite-gsync-hdr"
+        assert gsync_hdr.display_name == "Fortnite - GSYNC HDR"
+        assert gsync_hdr.is_sdr_only is False
+        assert gsync_hdr.requires_confirmed_vrr_support is True
+        # On this mixed-refresh family there is no borderless/capture sibling,
+        # so the VRR-unsafe fallback is the no-sync HDR lane.
+        assert gsync_hdr.mixed_refresh_safe_fallback_profile_id == "fortnite-hdr"
 
     def test_pokemon_auto_chess_profile_loads(self):
         """Test PokemonAutoChessProfile can be instantiated."""
@@ -853,6 +865,42 @@ class TestProfileSettings:
         assert hdr_config["hdr_output"] is True
         assert hdr_config["fullscreen_mode"] == 0
         assert hdr_config["frame_rate_limit"] == 0
+
+    def test_fortnite_gsync_hdr_drives_vrr_and_native_hdr(self):
+        """Fortnite G-SYNC HDR should run reflex_gsync VRR with native HDR on."""
+        profile = FortniteGSyncHDRProfile()
+
+        nvidia = profile.get_settings("NvidiaSettingsHandler")
+        windows = profile.get_settings("WindowsSettingsHandler")
+        graphics = profile.get_settings("GraphicsSettingsHandler")
+        color = profile.get_settings("ColorProfileSettingsHandler")
+        config = profile.get_settings("FortniteConfigHandler")
+
+        # Driver: G-SYNC on (reflex_gsync), explicit per-app VRR allow, auto cap.
+        assert nvidia["preset"] == "reflex_gsync"
+        assert nvidia["vrr_app_override"] == "allow"
+        assert nvidia["global_vrr_mode"] == "fullscreen_only"
+        assert nvidia["auto_vrr_fps_cap"] is True
+        # The shared "Fortnite" NVIDIA identity is still injected.
+        assert nvidia["profile_name"] == "Fortnite"
+
+        # Native HDR enabled with all four canonical Windows HDR keys.
+        assert windows["hdr"] is True
+        assert windows["advanced_color"] is True
+        assert windows["auto_hdr"] is False
+        assert windows["sdr_white_level_nits"] == 200
+        assert graphics["disable_auto_color_management"] is True
+        assert color["icc_profile"] == "native"
+        assert color["digital_vibrance"] == 50
+
+        # In-game config: exclusive fullscreen, in-game VSync off, native HDR out,
+        # and the auto refresh - 3 cap (no leftover uncapped frame_rate_limit=0).
+        assert config["fullscreen_mode"] == 0
+        assert config["vsync"] is False
+        assert config["hdr_output"] is True
+        assert config["hdr_nits"] == 1000
+        assert config["auto_vrr_fps_cap"] is True
+        assert "frame_rate_limit" not in config
 
     def test_marvel_rivals_variants_drive_native_game_config(self):
         """Marvel Rivals variants should set native HDR and Reflex in GameUserSettings."""

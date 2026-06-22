@@ -1184,6 +1184,208 @@
       }
     }
   },
+  "fortnite-gsync-hdr": {
+    "allows_aggressive_settings": false,
+    "application_scope": "system_plus_native_config",
+    "display_name": "Fortnite - GSYNC HDR",
+    "graphics_api": "dx12",
+    "handlers": [
+      "WindowsSettingsHandler",
+      "PowerSettingsHandler",
+      "RegistrySettingsHandler",
+      "NvidiaSettingsHandler",
+      "NetworkSettingsHandler",
+      "MouseSettingsHandler",
+      "GraphicsSettingsHandler",
+      "ProcessPriorityHandler",
+      "CpuAffinityHandler",
+      "ColorProfileSettingsHandler",
+      "DisplayColorRangeHandler",
+      "GameDvrHandler",
+      "InterruptModeHandler",
+      "AudioEngineHandler",
+      "NicDriverHandler",
+      "FortniteConfigHandler"
+    ],
+    "in_game_settings": [
+      {
+        "category": "Display",
+        "reason": "Exclusive fullscreen is the lowest-latency presentation path and the right match for this profile's fullscreen-only G-SYNC mode.",
+        "setting": "Display Mode",
+        "value": "Fullscreen (Exclusive)"
+      },
+      {
+        "category": "Display",
+        "reason": "Leave VSync to NVIDIA Control Panel as the VRR safety net; keep the in-game toggle off so it never adds queueing latency.",
+        "setting": "VSync",
+        "value": "Off (in-game)"
+      },
+      {
+        "category": "Display",
+        "reason": "ABSO has already configured the driver side: NVIDIA LLM is OFF so the engine owns the render queue (Reflex's correct path). Fortnite's Reflex toggle lives in Fortnite's settings and there is no stable config key to write it from outside; manually flip 'NVIDIA Reflex Low Latency' to 'On + Boost' in the game once.",
+        "setting": "NVIDIA Reflex Low Latency",
+        "value": "On + Boost \u2014 ABSO already set driver LLM off; flip the in-game toggle to finish"
+      },
+      {
+        "category": "Display",
+        "reason": "Set by ABSO to refresh - 3 (Blur Busters G-SYNC 101). Keeps G-SYNC active and prevents NVCP V-SYNC from engaging while preserving tear-free output.",
+        "setting": "Frame Rate Limit",
+        "value": "Auto (refresh - 3: e.g. 297 @ 300Hz, 237 @ 240Hz, 141 @ 144Hz)"
+      },
+      {
+        "category": "Display",
+        "reason": "Use Fortnite's native HDR output path in GameUserSettings.ini when the installed build and display path support HDR.",
+        "setting": "HDR",
+        "value": "On"
+      },
+      {
+        "category": "Display",
+        "reason": "Keep Windows HDR and Fortnite's native HDR output aligned.",
+        "setting": "HDR Peak Brightness / Nits",
+        "value": "Start at 1000 nits or match your display peak"
+      },
+      {
+        "category": "Graphics",
+        "reason": "This profile is built around Fortnite's DX12 path for Reflex and modern presentation behavior.",
+        "setting": "Rendering Mode",
+        "value": "DirectX 12"
+      },
+      {
+        "category": "Graphics",
+        "reason": "Better CPU utilization and more stable frame delivery in stacked endgames.",
+        "setting": "Multithreaded Rendering",
+        "value": "On"
+      },
+      {
+        "category": "Graphics",
+        "reason": "Keep frame times stable first; use DLSS only when needed to hold the VRR cap.",
+        "setting": "3D Resolution / DLSS",
+        "value": "100% or DLSS Performance if GPU-bound"
+      },
+      {
+        "category": "Graphics",
+        "reason": "Reduces visual noise and preserves snap-tracking clarity.",
+        "setting": "Motion Blur",
+        "value": "Off"
+      },
+      {
+        "category": "Graphics",
+        "reason": "Endgame effects spikes matter more than visual richness in the competitive lane.",
+        "setting": "Shadows / Effects",
+        "value": "Low"
+      },
+      {
+        "category": "Content",
+        "reason": "Avoids streaming hitches and unnecessary VRAM churn.",
+        "setting": "High Resolution Textures",
+        "value": "Off"
+      }
+    ],
+    "include_legacy_tweaks": false,
+    "is_emulator_profile": false,
+    "is_online_profile": false,
+    "is_sdr_only": false,
+    "network_scope": "none",
+    "optimization_target": "low_latency_high_fps",
+    "requires_reflex": true,
+    "settings": {
+      "AudioEngineHandler": {
+        "disable_enhancements": true
+      },
+      "ColorProfileSettingsHandler": {
+        "digital_vibrance": 50,
+        "game_type": "competitive_fps",
+        "icc_profile": "native",
+        "show_osd_guidance": true
+      },
+      "CpuAffinityHandler": {
+        "strategy": null
+      },
+      "DisplayColorRangeHandler": {
+        "dynamic_range": "full"
+      },
+      "FortniteConfigHandler": {
+        "auto_vrr_fps_cap": true,
+        "fullscreen_mode": 0,
+        "hdr_nits": 1000,
+        "hdr_output": true,
+        "vsync": false
+      },
+      "GameDvrHandler": {
+        "hard_disable": true
+      },
+      "GraphicsSettingsHandler": {
+        "disable_auto_color_management": true,
+        "disable_global_fso": true
+      },
+      "InterruptModeHandler": {
+        "enable_msi": true
+      },
+      "MouseSettingsHandler": {
+        "disable_acceleration": true,
+        "set_linear_curve": true
+      },
+      "NetworkSettingsHandler": {
+        "disable_nagle": false,
+        "preset": "default"
+      },
+      "NicDriverHandler": {
+        "nic_tuning": true
+      },
+      "NvidiaSettingsHandler": {
+        "auto_vrr_fps_cap": true,
+        "global_vrr_mode": "fullscreen_only",
+        "preset": "reflex_gsync",
+        "profile_aliases": [
+          "Fortnite - HDR",
+          "Fortnite (Streaming)",
+          "Fortnite (Streaming HDR)"
+        ],
+        "profile_name": "Fortnite",
+        "vrr_app_override": "allow"
+      },
+      "PowerSettingsHandler": {
+        "active_plan": "ultimate_performance",
+        "disable_core_parking": true,
+        "disable_pcie_power_saving": true,
+        "disable_usb_suspend": true,
+        "ensure_ultimate_performance": true,
+        "processor_max_performance": true,
+        "processor_min_state": 100
+      },
+      "ProcessPriorityHandler": {
+        "cpu_priority": 3,
+        "io_priority": 3
+      },
+      "RegistrySettingsHandler": {
+        "fullscreen_optimizations": {
+          "FortniteClient-Win64-Shipping.exe": true,
+          "FortniteClient-Win64-Shipping_BE.exe": true,
+          "FortniteClient-Win64-Shipping_EAC.exe": true,
+          "FortniteClient-Win64-Shipping_EAC_EOS.exe": true
+        },
+        "game_priority": {
+          "gpu_priority": 8,
+          "priority": 6,
+          "scheduling_category": "High"
+        },
+        "win32_priority_separation": 42
+      },
+      "WindowsSettingsHandler": {
+        "advanced_color": true,
+        "auto_hdr": false,
+        "game_bar": false,
+        "game_dvr": false,
+        "game_mode": true,
+        "hags": true,
+        "hdr": true,
+        "max_refresh_rate": true,
+        "sdr_white_level_nits": 200,
+        "vrr_optimize": false,
+        "windowed_optimizations": false
+      }
+    }
+  },
   "fortnite-hdr": {
     "allows_aggressive_settings": false,
     "application_scope": "system_plus_native_config",

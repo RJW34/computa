@@ -131,6 +131,49 @@ def test_detect_and_verify_active_read_current_values(tmp_path: Path) -> None:
     assert verify["all_active"] is True
 
 
+def test_verify_active_ignores_framework_reboot_pending_key(tmp_path: Path) -> None:
+    """The applier threads a synthetic ``_reboot_pending`` key into every
+    handler's verify settings. It is not a GameUserSettings.ini key, so the UE
+    handler must ignore it; otherwise a critical-verify config handler
+    (FortniteConfigHandler.is_critical_verify=True) would falsely roll back a
+    correct apply on every profile switch.
+    """
+    config_dir = tmp_path / "FortniteGame" / "Saved" / "Config" / "WindowsClient"
+    ini_path = config_dir / "GameUserSettings.ini"
+    _write_game_user_settings(
+        ini_path,
+        "\n".join(
+            [
+                "PreferredFullscreenMode=0",
+                "LastConfirmedFullscreenMode=0",
+                "bUseVSync=False",
+                "FrameRateLimit=297",
+                "bUseHDRDisplayOutput=True",
+                "HDRDisplayOutputNits=1000",
+            ]
+        )
+        + "\n",
+    )
+
+    with patch.object(FortniteConfigHandler, "_get_config_dir", return_value=config_dir):
+        handler = FortniteConfigHandler()
+        verify = handler.verify_active(
+            {
+                "fullscreen_mode": 0,
+                "vsync": False,
+                "frame_rate_limit": 297,
+                "hdr_output": True,
+                "hdr_nits": 1000,
+                # Injected by ProfileApplier._verify_settings for reboot-gated
+                # handlers; must not be verified against the INI.
+                "_reboot_pending": False,
+            }
+        )
+
+    assert verify["all_active"] is True
+    assert "_reboot_pending" not in verify["settings"]
+
+
 def test_backup_restore_round_trip(tmp_path: Path) -> None:
     config_dir = tmp_path / "FortniteGame" / "Saved" / "Config" / "WindowsClient"
     ini_path = config_dir / "GameUserSettings.ini"
