@@ -481,6 +481,78 @@ def test_apply_surfaces_post_write_window_mode_drift(tmp_path: Path) -> None:
     assert any("window_mode" in n and "drifted" in n for n in notices), notices
 
 
+REFLEX_INI = """\
+[Render.13]
+WindowMode = "1"
+LimitToRefresh = "0"
+ReflexMode = "2"
+
+[Sound.1]
+MasterVolume = "50"
+"""
+
+
+def test_detect_reads_reflex_mode(tmp_path: Path) -> None:
+    """ReflexMode is read-only but surfaced so the manual step can be confirmed."""
+    ini_path = tmp_path / "Settings_v0.ini"
+    _write_settings_ini(ini_path, REFLEX_INI)
+
+    with patch("abso.settings.ow2_config._get_ow2_settings_path", return_value=ini_path):
+        detected = OW2ConfigHandler().detect()
+
+    assert detected["reflex_mode"] == 2
+
+
+def test_apply_ignores_expected_reflex_mode(tmp_path: Path) -> None:
+    """expected_reflex_mode is advisory: accepted but never written to the INI."""
+    ini_path = tmp_path / "Settings_v0.ini"
+    _write_settings_ini(ini_path, SAMPLE_INI)
+
+    with patch("abso.settings.ow2_config._get_ow2_settings_path", return_value=ini_path):
+        result = OW2ConfigHandler().apply({"window_mode": 0, "expected_reflex_mode": 2})
+
+    assert result["success"] is True  # not rejected as an unsupported key
+    content = ini_path.read_text(encoding="utf-8")
+    assert 'WindowMode = "0"' in content
+    assert "ReflexMode" not in content  # ABSO must never write Reflex
+
+
+def test_verify_reflex_manual_step_satisfied(tmp_path: Path) -> None:
+    """A matching ReflexMode is reported satisfied without affecting all_active."""
+    ini_path = tmp_path / "Settings_v0.ini"
+    _write_settings_ini(ini_path, REFLEX_INI)
+
+    with patch("abso.settings.ow2_config._get_ow2_settings_path", return_value=ini_path):
+        verify = OW2ConfigHandler().verify_active(
+            {"window_mode": 1, "expected_reflex_mode": 2}
+        )
+
+    assert verify["all_active"] is True
+    steps = verify["manual_steps"]
+    assert len(steps) == 1
+    assert steps[0]["key"] == "reflex_mode"
+    assert steps[0]["satisfied"] is True
+    assert steps[0]["current"] == 2
+    assert steps[0]["expected_label"] == "Enabled + Boost"
+
+
+def test_verify_reflex_manual_step_unsatisfied_is_non_blocking(tmp_path: Path) -> None:
+    """An unset Reflex is flagged but must NOT flip the profile to inactive."""
+    ini = REFLEX_INI.replace('ReflexMode = "2"', 'ReflexMode = "0"')
+    ini_path = tmp_path / "Settings_v0.ini"
+    _write_settings_ini(ini_path, ini)
+
+    with patch("abso.settings.ow2_config._get_ow2_settings_path", return_value=ini_path):
+        verify = OW2ConfigHandler().verify_active(
+            {"window_mode": 1, "expected_reflex_mode": 2}
+        )
+
+    # window_mode matches, so the profile is still "active"; Reflex is advisory.
+    assert verify["all_active"] is True
+    assert verify["manual_steps"][0]["satisfied"] is False
+    assert verify["manual_steps"][0]["current_label"] == "Off"
+
+
 def test_apply_reports_no_drift_when_write_holds(tmp_path: Path) -> None:
     """Happy path: no sabotage, no drift notices."""
     ini_path = tmp_path / "Settings_v0.ini"

@@ -306,6 +306,69 @@ class TestGraphicsApply:
         assert "compositor path" in setting["note"]
 
 
+class TestGraphicsVerifyAppliedKeys:
+    """Verify the FSO / GameDVR / ACM keys that apply() writes but used to skip."""
+
+    @patch.object(GraphicsSettingsHandler, "detect")
+    def test_verify_global_fso_active(self, mock_detect):
+        mock_detect.return_value = {"global_fso_disabled": False}
+        result = GraphicsSettingsHandler().verify_active({"disable_global_fso": False})
+        assert result["all_active"] is True
+        assert result["settings"]["global_fso_disabled"]["active"] is True
+
+    @patch.object(GraphicsSettingsHandler, "detect")
+    def test_verify_global_fso_mismatch_fails(self, mock_detect):
+        mock_detect.return_value = {"global_fso_disabled": False}
+        result = GraphicsSettingsHandler().verify_active({"disable_global_fso": True})
+        assert result["all_active"] is False
+        assert result["pending_apply_settings"] == ["disable_global_fso"]
+        assert result["settings"]["global_fso_disabled"]["active"] is False
+
+    @patch.object(GraphicsSettingsHandler, "detect")
+    def test_verify_game_dvr_behavior_mismatch_fails(self, mock_detect):
+        mock_detect.return_value = {"game_dvr_behavior": 0}
+        result = GraphicsSettingsHandler().verify_active({"game_dvr_behavior": 2})
+        assert result["all_active"] is False
+        assert result["pending_apply_settings"] == ["game_dvr_behavior"]
+
+    @patch.object(GraphicsSettingsHandler, "detect")
+    def test_verify_acm_known_mismatch_fails(self, mock_detect):
+        # ACM is ON but the profile wants it disabled (target_enabled=False).
+        mock_detect.return_value = {
+            "auto_color_management": {"global": True, "per_monitor": {}}
+        }
+        result = GraphicsSettingsHandler().verify_active(
+            {"disable_auto_color_management": True}
+        )
+        assert result["all_active"] is False
+        assert result["pending_apply_settings"] == ["disable_auto_color_management"]
+        assert result["settings"]["auto_color_management"]["verifiable"] is True
+
+    @patch.object(GraphicsSettingsHandler, "detect")
+    def test_verify_acm_known_match_active(self, mock_detect):
+        mock_detect.return_value = {
+            "auto_color_management": {"global": False, "per_monitor": {}}
+        }
+        result = GraphicsSettingsHandler().verify_active(
+            {"disable_auto_color_management": True}
+        )
+        assert result["all_active"] is True
+        assert result["settings"]["auto_color_management"]["active"] is True
+
+    @patch.object(GraphicsSettingsHandler, "detect")
+    def test_verify_acm_unverifiable_does_not_fail(self, mock_detect):
+        # No global value and no enumerated monitors -> indeterminate, not wrong.
+        mock_detect.return_value = {
+            "auto_color_management": {"global": None, "per_monitor": {}}
+        }
+        result = GraphicsSettingsHandler().verify_active(
+            {"disable_auto_color_management": True}
+        )
+        assert result["all_active"] is True
+        assert result["settings"]["auto_color_management"]["verifiable"] is False
+        assert "pending_apply_settings" not in result
+
+
 class TestGraphicsBackupRestore:
     """Tests for GraphicsSettingsHandler backup/restore."""
 

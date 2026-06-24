@@ -33,7 +33,28 @@ def test_summarize_profile_verification_reports_pending_apply_first() -> None:
         "pending_apply_settings": ["GraphicsSettingsHandler.mpo_disabled"],
         "pending_reboot_gated_settings": ["OtherHandler.setting"],
         "mismatched_handlers": ["GraphicsSettingsHandler"],
+        "manual_steps": [],
     }
+
+
+def test_summarize_profile_verification_passes_through_manual_steps() -> None:
+    """Non-blocking manual steps (e.g. OW2 Reflex) surface without changing status."""
+    step = {
+        "handler": "OW2ConfigHandler",
+        "key": "reflex_mode",
+        "satisfied": True,
+        "expected": 2,
+        "current": 2,
+    }
+    summary = summarize_profile_verification(
+        "overwatch2-gsync-hdr",
+        {"all_active": True, "handlers": {}, "manual_steps": [step]},
+        checked_at=datetime(2026, 5, 26, 5, 50),
+    )
+
+    assert summary["status"] == "active"
+    assert summary["all_active"] is True
+    assert summary["manual_steps"] == [step]
 
 
 def test_summarize_profile_verification_reports_pending_reboot() -> None:

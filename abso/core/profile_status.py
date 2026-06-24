@@ -16,6 +16,7 @@ def summarize_profile_verification(
     """Return a compact status summary from a full profile verification payload."""
     pending_apply = list(verify_result.get("pending_apply_settings") or [])
     pending_reboot_gated = list(verify_result.get("pending_reboot_gated_settings") or [])
+    manual_steps = list(verify_result.get("manual_steps") or [])
     handlers = verify_result.get("handlers", {})
     mismatched_handlers = [
         handler_name
@@ -40,6 +41,7 @@ def summarize_profile_verification(
         "pending_apply_settings": pending_apply,
         "pending_reboot_gated_settings": pending_reboot_gated,
         "mismatched_handlers": mismatched_handlers,
+        "manual_steps": manual_steps,
     }
 
 
@@ -66,5 +68,6 @@ def build_profile_verification_summary(
             "pending_apply_settings": [],
             "pending_reboot_gated_settings": [],
             "mismatched_handlers": [],
+            "manual_steps": [],
             "error": str(exc),
         }

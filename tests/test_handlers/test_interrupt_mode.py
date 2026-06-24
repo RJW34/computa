@@ -74,12 +74,61 @@ class TestVerifyRestore:
     @patch.object(InterruptModeHandler, "_read_msi", return_value=1)
     @patch.object(InterruptModeHandler, "_get_gpu_pnp_ids", return_value=[_GPU])
     def test_verify_active_true(self, _ids, _read):
-        assert InterruptModeHandler().verify_active({"enable_msi": True})["all_active"] is True
+        # Written and no MSI-specific reboot pending -> live/active.
+        result = InterruptModeHandler().verify_active(
+            {"enable_msi": True, "_reboot_reasons": []}
+        )
+        assert result["all_active"] is True
+        setting = result["settings"][f"msi:{_GPU.split(chr(92))[1]}"]
+        assert setting["registry_target_written"] is True
+        assert setting["active"] is True
 
     @patch.object(InterruptModeHandler, "_read_msi", return_value=0)
     @patch.object(InterruptModeHandler, "_get_gpu_pnp_ids", return_value=[_GPU])
     def test_verify_active_false(self, _ids, _read):
-        assert InterruptModeHandler().verify_active({"enable_msi": True})["all_active"] is False
+        result = InterruptModeHandler().verify_active(
+            {"enable_msi": True, "_reboot_reasons": []}
+        )
+        assert result["all_active"] is False
+        assert result["pending_apply_settings"]
+
+    @patch.object(InterruptModeHandler, "_read_msi", return_value=1)
+    @patch.object(InterruptModeHandler, "_get_gpu_pnp_ids", return_value=[_GPU])
+    def test_verify_written_but_reboot_pending_is_not_yet_active(self, _ids, _read):
+        # Freshly written MSI mode (==1) but the MSI reboot reason is still
+        # pending: must report reboot-gated, NOT a false "active".
+        result = InterruptModeHandler().verify_active(
+            {"enable_msi": True, "_reboot_reasons": ["InterruptModeHandler.msi_mode"]}
+        )
+        assert result["all_active"] is False
+        key = f"msi:{_GPU.split(chr(92))[1]}"
+        assert result["pending_reboot_gated_settings"] == [key]
+        setting = result["settings"][key]
+        assert setting["registry_target_written"] is True
+        assert setting["active"] is False
+        assert setting["reboot_gated"] is True
+
+    @patch.object(InterruptModeHandler, "_read_msi", return_value=1)
+    @patch.object(InterruptModeHandler, "_get_gpu_pnp_ids", return_value=[_GPU])
+    def test_verify_unrelated_reboot_reason_keeps_live_msi_active(self, _ids, _read):
+        # An unrelated reboot reason must NOT mislabel an already-committed MSI.
+        result = InterruptModeHandler().verify_active(
+            {"enable_msi": True, "_reboot_reasons": ["GraphicsSettingsHandler.mpo_disabled"]}
+        )
+        assert result["all_active"] is True
+
+    @patch.object(InterruptModeHandler, "_get_gpu_pnp_ids", return_value=[])
+    def test_verify_unresolved_gpu_fails_closed(self, _ids):
+        # WMI returned no GPU: cannot confirm -> fail closed, not vacuously True.
+        result = InterruptModeHandler().verify_active(
+            {"enable_msi": True, "_reboot_reasons": []}
+        )
+        assert result["all_active"] is False
+        assert result["pending_apply_settings"] == ["msi_mode"]
+        assert "msi:unresolved" in result["settings"]
+
+    def test_verify_noop_without_flag(self):
+        assert InterruptModeHandler().verify_active({})["all_active"] is True
 
     @patch.object(InterruptModeHandler, "_restore_msi")
     def test_restore_writes_each_gpu(self, mock_restore):

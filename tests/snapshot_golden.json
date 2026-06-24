@@ -2278,6 +2278,7 @@
         "dynamic_render_scale": false,
         "dynamic_render_scale_v2": false,
         "effects_quality": 1,
+        "expected_reflex_mode": 2,
         "fullscreen_window": false,
         "fullscreen_window_enabled": false,
         "gfx_preset": 1,
@@ -2457,6 +2458,7 @@
         "dynamic_render_scale": false,
         "dynamic_render_scale_v2": false,
         "effects_quality": 1,
+        "expected_reflex_mode": 2,
         "fullscreen_window": false,
         "fullscreen_window_enabled": false,
         "gfx_preset": 1,
@@ -2660,6 +2662,7 @@
         "dynamic_render_scale": false,
         "dynamic_render_scale_v2": false,
         "effects_quality": 1,
+        "expected_reflex_mode": 2,
         "fullscreen_window": false,
         "fullscreen_window_enabled": false,
         "gfx_preset": 1,
@@ -2859,6 +2862,7 @@
         "dynamic_render_scale": false,
         "dynamic_render_scale_v2": false,
         "effects_quality": 1,
+        "expected_reflex_mode": 2,
         "fullscreen_window": false,
         "fullscreen_window_enabled": false,
         "gfx_preset": 1,
@@ -3255,6 +3259,7 @@
         "preset": "default"
       },
       "NvidiaSettingsHandler": {
+        "global_vrr_mode": "fullscreen_and_windowed",
         "preset": "balanced",
         "profile_aliases": [
           "PACDeluxe (Streaming)"
@@ -3395,6 +3400,7 @@
         "preset": "default"
       },
       "NvidiaSettingsHandler": {
+        "global_vrr_mode": "fullscreen_and_windowed",
         "preset": "balanced",
         "vrr_app_override": "allow",
         "vsync": "on"

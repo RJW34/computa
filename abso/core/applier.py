@@ -1050,6 +1050,13 @@ class ProfileApplier:
                 handler_result = handler.verify_active(verify_settings)
                 results["handlers"][handler_name] = handler_result
 
+                # Non-blocking manual steps (e.g. OW2 in-game Reflex toggle) are
+                # surfaced separately so they never affect all_active/status.
+                for step in handler_result.get("manual_steps", []) or []:
+                    results.setdefault("manual_steps", []).append(
+                        {"handler": handler_name, **step}
+                    )
+
                 if not handler_result.get("all_active", True):
                     results["all_active"] = False
                     for setting_name in handler_result.get("pending_apply_settings", []):
@@ -1071,6 +1078,8 @@ class ProfileApplier:
             results.pop("pending_apply_settings", None)
         if not results["pending_reboot_gated_settings"]:
             results.pop("pending_reboot_gated_settings", None)
+        if not results.get("manual_steps"):
+            results.pop("manual_steps", None)
 
         return results
 

@@ -54,6 +54,12 @@ class PokemonAutoChessProfile(WebGLBaseProfile):
                 "preset": "balanced",
                 "vrr_app_override": "allow",
                 "vsync": "on",
+                # Borderless/windowed G-SYNC needs THREE enablers: the two Windows
+                # windowed-VRR flags (set by WebGLBaseProfile) AND the NVIDIA
+                # global VRR mode. Without this the driver global VRR mode is
+                # never reconciled, so windowed G-SYNC can silently fail to engage
+                # when switching in from a no-sync profile.
+                "global_vrr_mode": "fullscreen_and_windowed",
             },
         }
 

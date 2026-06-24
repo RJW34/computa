@@ -60,6 +60,16 @@ class OW2ConfigHandler(SettingsHandler):
     AUTO_VRR_FPS_CAP_KEY = "auto_vrr_fps_cap"
     VRR_CAP_POLICY_KEY = "vrr_cap_policy"
 
+    # ReflexMode is the in-game NVIDIA Reflex toggle. ABSO never *writes* it
+    # (the key is not stable across OW2 patches and is unsafe to author from
+    # outside), but it lives in the same [Render.X] section ABSO already parses,
+    # so it can be read back to confirm the user's manual Reflex step. A profile
+    # declares the expected mode via ``expected_reflex_mode`` and verify surfaces
+    # a non-blocking manual-step confirmation.
+    EXPECTED_REFLEX_MODE_KEY = "expected_reflex_mode"
+    REFLEX_MODE_INI_KEY = "ReflexMode"
+    REFLEX_MODE_LABELS = {0: "Off", 1: "Enabled", 2: "Enabled + Boost"}
+
     # Matches versioned render section headers like [Render.13]
     RENDER_SECTION_RE = re.compile(r"^\[Render\.\d+\]$")
 
@@ -135,6 +145,13 @@ class OW2ConfigHandler(SettingsHandler):
                 profile_key = ini_to_profile.get(ini_key)
                 if profile_key is not None:
                     result[profile_key] = self._coerce_detected(raw_value)
+
+            # ReflexMode is read-only (never in MUTABLE_SETTINGS), surfaced so the
+            # manual in-game Reflex toggle can be confirmed.
+            if self.REFLEX_MODE_INI_KEY in render_values:
+                result["reflex_mode"] = self._coerce_detected(
+                    render_values[self.REFLEX_MODE_INI_KEY]
+                )
         except Exception as e:
             logger.error("Failed to read OW2 config: %s", e)
 
@@ -194,6 +211,9 @@ class OW2ConfigHandler(SettingsHandler):
         """Apply OW2 render settings to Settings_v0.ini."""
         settings = dict(settings)  # Don't mutate caller's dict
 
+        # ReflexMode is advisory-only — strip it before allowed-key validation
+        # so the manual-step declaration never reaches the writer.
+        settings, _expected_reflex = self._pop_expected_reflex_mode(settings)
         settings = self._resolve_auto_vrr_fps_cap(settings)
 
         invalid = validate_allowed_keys(
@@ -280,6 +300,7 @@ class OW2ConfigHandler(SettingsHandler):
 
     def verify_active(self, settings: dict[str, Any]) -> dict[str, Any]:
         """Verify requested OW2 config values are active."""
+        settings, expected_reflex = self._pop_expected_reflex_mode(settings)
         current = self.detect()
         results: dict[str, Any] = {"all_active": True, "settings": {}}
 
@@ -306,7 +327,43 @@ class OW2ConfigHandler(SettingsHandler):
             if not is_active:
                 results["all_active"] = False
 
+        # Reflex is a manual in-game toggle ABSO cannot safely write. Confirm it
+        # as a NON-blocking manual step so a not-yet-set Reflex never flips the
+        # profile's all_active (which would falsely read as "profile broken").
+        if expected_reflex is not None:
+            current_reflex = current.get("reflex_mode")
+            results.setdefault("manual_steps", []).append({
+                "key": "reflex_mode",
+                "label": "NVIDIA Reflex (in-game)",
+                "current": current_reflex,
+                "current_label": self.REFLEX_MODE_LABELS.get(current_reflex, "unknown"),
+                "expected": expected_reflex,
+                "expected_label": self.REFLEX_MODE_LABELS.get(
+                    expected_reflex, str(expected_reflex)
+                ),
+                "satisfied": current_reflex == expected_reflex,
+            })
+
         return results
+
+    def _pop_expected_reflex_mode(
+        self, settings: dict[str, Any]
+    ) -> tuple[dict[str, Any], int | None]:
+        """Split off the advisory ``expected_reflex_mode`` key.
+
+        ReflexMode is never written by ABSO (not in MUTABLE_SETTINGS), so this
+        key must be removed before apply's allowed-key validation and before
+        verify builds its replacements. Returns the cleaned settings and the
+        parsed expected mode (or None when absent / unparseable).
+        """
+        settings = dict(settings)
+        raw = settings.pop(self.EXPECTED_REFLEX_MODE_KEY, None)
+        if raw is None:
+            return settings, None
+        try:
+            return settings, int(raw)
+        except (TypeError, ValueError):
+            return settings, None
 
     def backup(self) -> dict[str, Any]:
         """Backup the entire Settings_v0.ini for lossless restore."""

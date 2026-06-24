@@ -559,6 +559,10 @@ class Overwatch2GSyncProfile(_Overwatch2BaseProfile):
                 # Match the driver-side OW2 Reflex/G-SYNC target so verify,
                 # tray state, and the in-game cap all report the same value.
                 **self._ow2_reflex_gsync_cap_settings(),
+                # G-SYNC lanes recommend Reflex "Enabled + Boost" (ReflexMode 2).
+                # ABSO can't safely write it, but declares it so verify confirms
+                # the manual in-game step.
+                "expected_reflex_mode": 2,
             },
         }
 
@@ -722,6 +726,10 @@ class Overwatch2GSyncHDRProfile(_Overwatch2BaseProfile):
                 # abso.yaml: ``auto_vrr_fps_cap: false`` plus an explicit
                 # ``frame_rate_cap: <int>``.
                 **self._ow2_reflex_gsync_cap_settings(),
+                # G-SYNC lanes recommend Reflex "Enabled + Boost" (ReflexMode 2).
+                # ABSO can't safely write it, but declares it so verify confirms
+                # the manual in-game step.
+                "expected_reflex_mode": 2,
             },
         }
 
@@ -875,6 +883,8 @@ class Overwatch2GSyncCaptureProfile(_Overwatch2BaseProfile):
             "OW2ConfigHandler": {
                 **self._borderless_ow2_settings(),
                 **self._ow2_reflex_gsync_cap_settings(),
+                # G-SYNC lanes recommend Reflex "Enabled + Boost" (ReflexMode 2).
+                "expected_reflex_mode": 2,
             },
         }
 
@@ -1015,6 +1025,8 @@ class Overwatch2GSyncHDRCaptureProfile(_Overwatch2BaseProfile):
             "OW2ConfigHandler": {
                 **self._borderless_ow2_settings(),
                 **self._ow2_reflex_gsync_cap_settings(),
+                # G-SYNC lanes recommend Reflex "Enabled + Boost" (ReflexMode 2).
+                "expected_reflex_mode": 2,
             },
         }
 

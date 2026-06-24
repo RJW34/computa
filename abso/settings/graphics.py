@@ -283,7 +283,67 @@ class GraphicsSettingsHandler(SettingsHandler):
                 results.setdefault("pending_reboot_gated_settings", []).append("mpo_disabled")
                 results["all_active"] = False
 
+        # These three are applied by apply() but were previously never verified,
+        # so a failed FSO / GameDVR / ACM write would pass verify silently. They
+        # take effect immediately (no reboot gate), so a plain live read-back is
+        # an honest check.
+        if "disable_global_fso" in settings:
+            target_disabled = bool(settings["disable_global_fso"])
+            current_disabled = bool(current.get("global_fso_disabled"))
+            active = current_disabled == target_disabled
+            results["settings"]["global_fso_disabled"] = {
+                "target": target_disabled,
+                "current": current.get("global_fso_disabled"),
+                "active": active,
+            }
+            if not active:
+                results.setdefault("pending_apply_settings", []).append("disable_global_fso")
+                results["all_active"] = False
+
+        if "game_dvr_behavior" in settings:
+            target_behavior = int(settings["game_dvr_behavior"])
+            current_behavior = current.get("game_dvr_behavior")
+            active = current_behavior == target_behavior
+            results["settings"]["game_dvr_behavior"] = {
+                "target": target_behavior,
+                "current": current_behavior,
+                "active": active,
+            }
+            if not active:
+                results.setdefault("pending_apply_settings", []).append("game_dvr_behavior")
+                results["all_active"] = False
+
+        if "disable_auto_color_management" in settings:
+            target_enabled = not bool(settings["disable_auto_color_management"])
+            acm_state = current.get("auto_color_management")
+            known = self._acm_state_known(acm_state)
+            matches = self._auto_color_management_matches(acm_state, target_enabled)
+            results["settings"]["auto_color_management"] = {
+                "target_enabled": target_enabled,
+                "current": acm_state,
+                "active": matches,
+                # When ACM state can't be read at all (no global value, no
+                # enumerated monitors), it is unverifiable rather than wrong;
+                # do not fail verify on an indeterminate read.
+                "verifiable": known,
+            }
+            if known and not matches:
+                results.setdefault("pending_apply_settings", []).append(
+                    "disable_auto_color_management"
+                )
+                results["all_active"] = False
+
         return results
+
+    @staticmethod
+    def _acm_state_known(state: dict[str, Any] | None) -> bool:
+        """Return True when ACM state has at least one concrete value to verify."""
+        if not isinstance(state, dict):
+            return False
+        if state.get("global") is not None:
+            return True
+        per_monitor = state.get("per_monitor")
+        return isinstance(per_monitor, dict) and bool(per_monitor)
 
     def backup(self) -> dict[str, Any]:
         """Backup current graphics settings."""

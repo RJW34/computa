@@ -127,20 +127,82 @@ class InterruptModeHandler(SettingsHandler):
         return True
 
     def verify_active(self, settings: dict[str, Any]) -> dict[str, Any]:
-        """Verify MSISupported=1 is written (reboot commits the live change)."""
+        """Verify GPU MSI mode, honestly accounting for its reboot gate.
+
+        MSISupported is a plain DWORD, but the interrupt-mode change only goes
+        live after a reboot. Like ``GraphicsSettingsHandler`` does for MPO, this
+        must not report a freshly-written value as fully active while the commit
+        is still pending — otherwise the user is told MSI mode is live when it is
+        not. Gating uses the MSI-*specific* reboot reason
+        (``InterruptModeHandler.msi_mode``) rather than the global reboot bit, so
+        an already-committed MSI mode is never mislabeled just because some other
+        setting happens to need a reboot.
+        """
         results: dict[str, Any] = {"all_active": True, "settings": {}}
         if not settings.get("enable_msi"):
             return results
-        for pnp_id, value in self.detect().get("gpu_msi", {}).items():
-            active = value == 1
-            results["settings"][f"msi:{self._short_id(pnp_id)}"] = {
+
+        gpu_msi = self.detect().get("gpu_msi", {})
+        if not gpu_msi:
+            # No GPU PCI instance resolved (WMI failure or no PCI GPU). A
+            # requested MSI enable that cannot be confirmed must fail closed
+            # rather than report a vacuous all-active. is_critical_verify=False
+            # keeps this a WARNING, not a CRITICAL apply failure.
+            results["all_active"] = False
+            results["settings"]["msi:unresolved"] = {
+                "target": 1,
+                "current": None,
+                "active": False,
+                "note": (
+                    "No GPU PCI instance resolved; MSI mode could not be "
+                    "verified (WMI unavailable?)."
+                ),
+            }
+            results.setdefault("pending_apply_settings", []).append("msi_mode")
+            return results
+
+        msi_reboot_pending = self._msi_reboot_pending(settings)
+        for pnp_id, value in gpu_msi.items():
+            written = value == 1
+            # Reboot-gated: registry written != live until the reboot commits it.
+            live = written and not msi_reboot_pending
+            key = f"msi:{self._short_id(pnp_id)}"
+            results["settings"][key] = {
                 "target": 1,
                 "current": value,
-                "active": active,
+                "active": live,
+                "reboot_gated": True,
+                "activation": "after_reboot",
+                "registry_target_written": written,
+                "live_activation_verifiable": False,
             }
-            if not active:
+            if not written:
                 results["all_active"] = False
+                results.setdefault("pending_apply_settings", []).append(key)
+            elif msi_reboot_pending:
+                results["all_active"] = False
+                results.setdefault("pending_reboot_gated_settings", []).append(key)
         return results
+
+    @staticmethod
+    def _msi_reboot_pending(settings: dict[str, Any]) -> bool:
+        """Return True when an MSI-mode change is written but not yet committed.
+
+        Reads the MSI-specific reboot reason from the injected
+        ``_reboot_reasons`` (when a caller threads it through), otherwise falls
+        back to the persisted state snapshot. Never raises — a state-IO failure
+        degrades to "not pending" so verify can still run.
+        """
+        reasons = settings.get("_reboot_reasons")
+        if reasons is None:
+            try:
+                from abso.core.app_paths import app_state_file
+                from abso.core.state_store import read_state_snapshot
+
+                reasons = read_state_snapshot([app_state_file()]).get("reboot_reasons") or []
+            except Exception:  # noqa: BLE001 — verify must never fail on state IO
+                reasons = []
+        return "InterruptModeHandler.msi_mode" in set(reasons)
 
     # -- helpers -----------------------------------------------------------
 
