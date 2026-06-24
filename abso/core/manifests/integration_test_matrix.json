@@ -307,6 +307,21 @@
       }
     },
     {
+      "id": "apply-fortnite-gsync-hdr",
+      "profile_id": "fortnite-gsync-hdr",
+      "kind": "apply_profile",
+      "assumptions": [
+        "administrator",
+        "nvidia_gpu",
+        "vrr_confirmed",
+        "hdr_capable"
+      ],
+      "expected": {
+        "transaction_state": "committed",
+        "apply_success": true
+      }
+    },
+    {
       "id": "apply-overwatch2",
       "profile_id": "overwatch2",
       "kind": "apply_profile",
