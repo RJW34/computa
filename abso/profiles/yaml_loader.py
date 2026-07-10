@@ -205,6 +205,7 @@ class BalancedBaseProfile(BaseProfile):
             "MouseSettingsHandler": {
                 "disable_acceleration": True,
                 "set_linear_curve": True,
+                "mouse_sensitivity": 10,
             },
             "GraphicsSettingsHandler": {
                 "disable_global_fso": True,

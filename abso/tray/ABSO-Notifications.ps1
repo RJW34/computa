@@ -67,19 +67,24 @@ function _Evict-DedupMap {
 # cyan is the brand color - it appears on the left rail, corner brackets,
 # rule, and Hz badge. Status hues (moss/ochre/coral) only override the
 # accent for non-info toasts.
-$script:Penumbra = @{
-    Ink100   = [System.Drawing.Color]::FromArgb(255, 14, 18, 26)    # base
-    Ink200   = [System.Drawing.Color]::FromArgb(255, 19, 24, 36)    # gradient bottom
-    Ink300   = [System.Drawing.Color]::FromArgb(255, 27, 34, 48)    # elevated / label bg
-    Ink150   = [System.Drawing.Color]::FromArgb(255, 17, 21, 31)    # label background midpoint
-    Paper    = [System.Drawing.Color]::FromArgb(255, 232, 234, 240) # primary text
-    Mist     = [System.Drawing.Color]::FromArgb(255, 150, 168, 180) # secondary text (slightly cooled)
-    Fog      = [System.Drawing.Color]::FromArgb(255, 95, 115, 130)  # tertiary / mono
-    Rule     = [System.Drawing.Color]::FromArgb(70, 0, 245, 212)    # phosphor hairline
-    Lagoon   = [System.Drawing.Color]::FromArgb(255, 0, 245, 212)   # phosphor cyan (info / active) - primary brand
-    Moss     = [System.Drawing.Color]::FromArgb(255, 139, 247, 168) # success - chartreuse phosphor
-    Ochre    = [System.Drawing.Color]::FromArgb(255, 255, 187, 80)  # warning - amber CRT
-    Coral    = [System.Drawing.Color]::FromArgb(255, 255, 80, 110)  # error - hot magenta-red
+$script:Penumbra = if (Get-Command Get-TrayThemePalette -ErrorAction SilentlyContinue) {
+    Get-TrayThemePalette
+}
+else {
+    @{
+        Ink100   = [System.Drawing.Color]::FromArgb(255, 14, 18, 26)    # base
+        Ink200   = [System.Drawing.Color]::FromArgb(255, 19, 24, 36)    # gradient bottom
+        Ink300   = [System.Drawing.Color]::FromArgb(255, 27, 34, 48)    # elevated / label bg
+        Ink150   = [System.Drawing.Color]::FromArgb(255, 17, 21, 31)    # label background midpoint
+        Paper    = [System.Drawing.Color]::FromArgb(255, 232, 238, 246) # primary text
+        Mist     = [System.Drawing.Color]::FromArgb(255, 150, 162, 183) # secondary text
+        Fog      = [System.Drawing.Color]::FromArgb(255, 92, 104, 128)  # tertiary / mono
+        Rule     = [System.Drawing.Color]::FromArgb(70, 0, 245, 212)    # phosphor hairline
+        Lagoon   = [System.Drawing.Color]::FromArgb(255, 0, 245, 212)   # phosphor cyan
+        Moss     = [System.Drawing.Color]::FromArgb(255, 123, 227, 158) # success
+        Ochre    = [System.Drawing.Color]::FromArgb(255, 229, 165, 71)  # warning
+        Coral    = [System.Drawing.Color]::FromArgb(255, 255, 107, 107) # error
+    }
 }
 
 # Font cache (resolved once with full fallback chain).
@@ -676,7 +681,8 @@ function _Build-ToastForm {
         [string]$ProfileModeBadge = "",
         [switch]$ProfileFavoriteBadge,
         [string]$ActionName = "",
-        [System.Drawing.Color]$ActionColor = [System.Drawing.Color]::Empty
+        [System.Drawing.Color]$ActionColor = [System.Drawing.Color]::Empty,
+        [object[]]$ActionButtons = @()
     )
     _Ensure-Fonts
 
@@ -699,6 +705,10 @@ function _Build-ToastForm {
     $bodyY     = 82    # was 74; matches rule offset + 14
     $footerH   = 18
     $bodyWidth = $script:ToastWidth - $gutterX - 20
+    $toastActions = @($ActionButtons | Where-Object { $_ -and -not [string]::IsNullOrWhiteSpace("$($_.Label)") } | Select-Object -First 2)
+    $hasToastActions = ($toastActions.Count -gt 0)
+    $buttonH = 24
+    $buttonGap = 8
 
     # Wrap-aware height: use GDI+ MeasureString against the real body font and
     # width so multi-line wrap is sized accurately for Cascadia Code, which is
@@ -715,11 +725,13 @@ function _Build-ToastForm {
         $bodyHeight = [Math]::Min(85, [Math]::Max(16,
             [int][Math]::Ceiling($Message.Length / 56.0) * 17))
     }
-    $bodyHeight = [Math]::Min($bodyHeight, 85)   # hard cap = ~5 lines
+    $bodyHeightCap = if ($hasToastActions) { 62 } else { 85 }
+    $bodyHeight = [Math]::Min($bodyHeight, $bodyHeightCap)
 
-    $height = $bodyY + $bodyHeight + 14 + $footerH + 10
+    $actionAreaH = if ($hasToastActions) { $buttonH + $buttonGap } else { 0 }
+    $height = $bodyY + $bodyHeight + 14 + $actionAreaH + $footerH + 10
     $height = [Math]::Max($height, 124)
-    $height = [Math]::Min($height, 210)
+    $height = [Math]::Min($height, 232)
 
     $form = New-Object System.Windows.Forms.Form
     $form.Text             = ""
@@ -818,6 +830,42 @@ function _Build-ToastForm {
     $bodyLabel.Size      = New-Object System.Drawing.Size($bodyWidth, $bodyHeight)
     $form.Controls.Add($bodyLabel)
 
+    $actionControls = @()
+    if ($hasToastActions) {
+        $buttonY = $bodyY + $bodyHeight + 8
+        $buttonW = if ($toastActions.Count -gt 1) {
+            [Math]::Max(112, [Math]::Min(146, [int][Math]::Floor(($bodyWidth - $buttonGap) / 2)))
+        }
+        else {
+            [Math]::Max(118, [Math]::Min(156, [int][Math]::Floor($bodyWidth * 0.44)))
+        }
+        $buttonX = $gutterX
+
+        foreach ($action in $toastActions) {
+            $button = New-Object System.Windows.Forms.Button
+            $button.Text = "$($action.Label)"
+            $button.Tag = $action
+            $button.Font = $script:Font_Eyebrow
+            $button.ForeColor = $script:Penumbra.Paper
+            $button.BackColor = $script:Penumbra.Ink200
+            $button.Location = New-Object System.Drawing.Point($buttonX, $buttonY)
+            $button.Size = New-Object System.Drawing.Size($buttonW, $buttonH)
+            $button.Cursor = [System.Windows.Forms.Cursors]::Hand
+            $button.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
+            $button.FlatAppearance.BorderColor = $TypeMeta.Accent
+            $button.FlatAppearance.BorderSize = 1
+            $button.FlatAppearance.MouseOverBackColor = [System.Drawing.Color]::FromArgb(
+                34, $TypeMeta.Accent.R, $TypeMeta.Accent.G, $TypeMeta.Accent.B
+            )
+            $button.FlatAppearance.MouseDownBackColor = [System.Drawing.Color]::FromArgb(
+                52, $TypeMeta.Accent.R, $TypeMeta.Accent.G, $TypeMeta.Accent.B
+            )
+            $form.Controls.Add($button)
+            $actionControls += $button
+            $buttonX += $buttonW + $buttonGap
+        }
+    }
+
     # Footer (Cascadia Code mono, fog)
     $footerLabel = New-Object System.Windows.Forms.Label
     $footerLabel.Text      = $FooterText
@@ -844,6 +892,7 @@ function _Build-ToastForm {
         DismissHost = $dismissHost
         ProfileImageBox = $profileImageBox
         ProfileImage = $profileImage
+        ActionButtons = @($actionControls)
         Height      = $height
     }
 }
@@ -894,7 +943,8 @@ function Show-ThemedToast {
         [string]$ProfileModeBadge = "",
         [switch]$ProfileFavoriteBadge,
         [string]$ActionName = "",
-        [System.Drawing.Color]$ActionColor = [System.Drawing.Color]::Empty
+        [System.Drawing.Color]$ActionColor = [System.Drawing.Color]::Empty,
+        [object[]]$ActionButtons = @()
     )
 
     try {
@@ -929,6 +979,7 @@ function Show-ThemedToast {
                 ProfileColor = $ProfileColor; ProfileActiveBadge = [bool]$ProfileActiveBadge
                 ProfileModeBadge = $ProfileModeBadge; ProfileFavoriteBadge = [bool]$ProfileFavoriteBadge
                 ActionName = $ActionName; ActionColor = $ActionColor
+                ActionButtons = @($ActionButtons)
             }
             # Error preempts the oldest Info/Success so critical signals always surface
             if ($typeMeta.Priority -ge 4) {
@@ -966,7 +1017,8 @@ function Show-ThemedToast {
             -ProfileGameGroup $ProfileGameGroup -ProfileCategory $ProfileCategory `
             -ProfileColor $ProfileColor -ProfileActiveBadge:$ProfileActiveBadge `
             -ProfileModeBadge $ProfileModeBadge -ProfileFavoriteBadge:$ProfileFavoriteBadge `
-            -ActionName $ActionName -ActionColor $ActionColor
+            -ActionName $ActionName -ActionColor $ActionColor `
+            -ActionButtons @($ActionButtons)
     } catch {
         if (Get-Command Write-TrayLog -ErrorAction SilentlyContinue) {
             Write-TrayLog "Show-ThemedToast failed: $($_.Exception.Message)" -Level "ERROR"
@@ -985,7 +1037,8 @@ function _Spawn-Toast {
         [string]$ProfileModeBadge = "",
         [switch]$ProfileFavoriteBadge,
         [string]$ActionName = "",
-        [System.Drawing.Color]$ActionColor = [System.Drawing.Color]::Empty
+        [System.Drawing.Color]$ActionColor = [System.Drawing.Color]::Empty,
+        [object[]]$ActionButtons = @()
     )
 
     $script:ToastChapterSeq++
@@ -997,7 +1050,8 @@ function _Spawn-Toast {
         -ProfileGameGroup $ProfileGameGroup -ProfileCategory $ProfileCategory `
         -ProfileColor $ProfileColor -ProfileActiveBadge:$ProfileActiveBadge `
         -ProfileModeBadge $ProfileModeBadge -ProfileFavoriteBadge:$ProfileFavoriteBadge `
-        -ActionName $ActionName -ActionColor $ActionColor
+        -ActionName $ActionName -ActionColor $ActionColor `
+        -ActionButtons @($ActionButtons)
     $form = $built.Form
 
     $slotIndex = $script:ActiveToasts.Count
@@ -1016,6 +1070,7 @@ function _Spawn-Toast {
         DismissHost    = $built.DismissHost
         ProfileImageBox= $built.ProfileImageBox
         ProfileImage   = $built.ProfileImage
+        ActionButtons  = @($built.ActionButtons)
         Height         = $built.Height
         CurrentY       = $targetY
         TargetY        = $targetY
@@ -1040,6 +1095,22 @@ function _Spawn-Toast {
     $built.FooterLabel.Add_Click($closeHandler)
     $built.EyebrowLabel.Add_Click($closeHandler)
     if ($built.ProfileImageBox) { $built.ProfileImageBox.Add_Click($closeHandler) }
+    foreach ($button in @($built.ActionButtons)) {
+        if (-not $button) { continue }
+        $button.Add_Click({
+            param($s, $e)
+            try {
+                if (Get-Command Invoke-TrayToastAction -ErrorAction SilentlyContinue) {
+                    Invoke-TrayToastAction -Action $s.Tag
+                }
+            } catch {
+                if (Get-Command Write-TrayLog -ErrorAction SilentlyContinue) {
+                    Write-TrayLog "Toast action failed: $($_.Exception.Message)" -Level "ERROR"
+                }
+            }
+            _Dismiss-ActiveToast -Toast $toast -Fast
+        }.GetNewClosure())
+    }
 
     $form.Show()
 
@@ -1224,7 +1295,8 @@ function _Drain-ToastQueue {
             -ProfileGameGroup $q.ProfileGameGroup -ProfileCategory $q.ProfileCategory `
             -ProfileColor $q.ProfileColor -ProfileActiveBadge:([bool]$q.ProfileActiveBadge) `
             -ProfileModeBadge $q.ProfileModeBadge -ProfileFavoriteBadge:([bool]$q.ProfileFavoriteBadge) `
-            -ActionName $q.ActionName -ActionColor $q.ActionColor
+            -ActionName $q.ActionName -ActionColor $q.ActionColor `
+            -ActionButtons @($q.ActionButtons)
     }
 }
 
@@ -1784,7 +1856,8 @@ function Show-ABSONotification {
         [int]$Duration = 4500,
         [string]$MetaText = "",
         [string]$ActionName = "",
-        [System.Drawing.Color]$ActionColor = [System.Drawing.Color]::Empty
+        [System.Drawing.Color]$ActionColor = [System.Drawing.Color]::Empty,
+        [object[]]$ActionButtons = @()
     )
     if (Get-Command Set-TransientNotificationTooltip -ErrorAction SilentlyContinue) {
         Set-TransientNotificationTooltip -Title $Title -Message $Message
@@ -1806,7 +1879,8 @@ function Show-ABSONotification {
         -Duration $Duration `
         -MetaText $MetaText `
         -ActionName $ActionName `
-        -ActionColor $ActionColor
+        -ActionColor $ActionColor `
+        -ActionButtons @($ActionButtons)
 }
 
 # ============================================================================

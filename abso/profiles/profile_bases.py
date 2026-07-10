@@ -302,7 +302,8 @@ class Rivals2BaseProfile(BaseProfile):
 
     @property
     def graphics_api(self) -> Literal["dx11", "dx12", "vulkan", "opengl", "unknown"]:
-        return "dx12"
+        # Steam's published PC requirements list DirectX 11 for Rivals 2.
+        return "dx11"
 
     @property
     def include_nvidia_notifications(self) -> bool:
@@ -417,6 +418,7 @@ class Rivals2BaseProfile(BaseProfile):
             "MouseSettingsHandler": {
                 "disable_acceleration": True,
                 "set_linear_curve": True,
+                "mouse_sensitivity": 10,
             },
             "GraphicsSettingsHandler": {
                 "disable_global_fso": True,
@@ -599,6 +601,7 @@ class EmulatorLatencyBaseProfile(BaseProfile):
             "MouseSettingsHandler": {
                 "disable_acceleration": True,
                 "set_linear_curve": True,
+                "mouse_sensitivity": 10,
             },
             "GraphicsSettingsHandler": {
                 "disable_global_fso": True,
@@ -827,6 +830,7 @@ class ReflexShooterBaseProfile(BaseProfile):
             "MouseSettingsHandler": {
                 "disable_acceleration": True,
                 "set_linear_curve": True,
+                "mouse_sensitivity": 10,
             },
             "GraphicsSettingsHandler": {
                 "disable_global_fso": True,

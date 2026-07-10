@@ -86,7 +86,7 @@ class Rivals2GSyncProfile(Rivals2BaseProfile):
                 # this profile instead of relying on the global flip alone.
                 "global_vrr_mode": "fullscreen_only",
                 "vrr_app_override": "allow",
-                # Keep UE5 driver threading consistent with the no-sync Rivals
+                # Keep driver threading consistent with the no-sync Rivals
                 # lanes; the generic fighting-game preset defaults this on.
                 "threaded_optimization": "off",
             },
@@ -135,8 +135,8 @@ class Rivals2GSyncProfile(Rivals2BaseProfile):
                 "setting": "Low Latency Mode",
                 "value": "On",
                 "reason": (
-                    "Reduces render queue depth. Limited effect in DX12/UE5 but 'On' is correct "
-                    "(not 'Off' — Rivals 2 has no Reflex). If stuttering occurs, try 'Off' or "
+                    "Reduces render queue depth on the published DX11 path. 'On' is correct "
+                    "(not 'Off' - Rivals 2 has no Reflex). If stuttering occurs, try 'Off' or "
                     "set Pre-Rendered Frames to 2 via Nvidia Profile Inspector."
                 ),
             },
@@ -183,6 +183,11 @@ class Rivals2GSyncProfile(Rivals2BaseProfile):
             },
         ]
 
+    def get_post_apply_notes(self) -> list[str]:
+        return [
+            "Rivals 2 manual: use exclusive fullscreen, in-game V-Sync Off, and the refresh-minus-3 FPS cap for G-SYNC."
+        ]
+
 
 class Rivals2GSyncHDRProfile(Rivals2GSyncProfile):
     """Offline G-SYNC Rivals 2 profile with Windows HDR composition enabled."""
@@ -224,13 +229,13 @@ class Rivals2OnlineGSyncProfile(Rivals2BaseProfile):
     """Rollback-safe G-SYNC profile for Rivals 2 online play.
 
     Same G-SYNC setup as the general profile but with stability constraints
-    for SnapNet rollback netcode. Threaded optimization forced off to prevent
-    UE5 driver contention.
+    for SnapNet rollback netcode. Threaded optimization is forced off to avoid
+    extra driver-side timing variability.
     """
 
     @property
     def allow_dual_limiter(self) -> bool:
-        # Same rationale as Rivals2GSyncProfile: UE5 rewrites
+        # Same rationale as Rivals2GSyncProfile: the game rewrites
         # GameUserSettings.ini on exit, so ABSO keeps the driver cap as a
         # safety net alongside the in-game cap. Both resolve to the same
         # refresh - 3 VRR cap.
@@ -297,7 +302,7 @@ class Rivals2OnlineGSyncProfile(Rivals2BaseProfile):
                 # Explicit per-app VRR allow, symmetric with the no-sync lanes'
                 # explicit force_off (vrr_fighting_game sets neither).
                 "vrr_app_override": "allow",
-                # Override preset default — UE5 driver contention risk with rollback
+                # Override preset default - driver timing variability risk with rollback
                 "threaded_optimization": "off",
             },
             "Rivals2ConfigHandler": {
@@ -325,7 +330,7 @@ class Rivals2OnlineGSyncProfile(Rivals2BaseProfile):
                 "reason": (
                     "Tear-free VRR for online play. Stability constraints applied for "
                     "SnapNet rollback netcode. Threaded optimization OFF to prevent "
-                    "UE5 driver contention during rollback recovery."
+                    "driver-side timing variability during rollback recovery."
                 ),
             },
             {
@@ -344,7 +349,7 @@ class Rivals2OnlineGSyncProfile(Rivals2BaseProfile):
                 "category": "NVIDIA Control Panel",
                 "setting": "Threaded Optimization",
                 "value": "Off",
-                "reason": "OFF — prevents UE5 driver contention that can destabilize rollback timing.",
+                "reason": "OFF - avoids extra driver-side timing variability during rollback.",
             },
             {
                 "category": "NVIDIA Control Panel",
@@ -382,6 +387,11 @@ class Rivals2OnlineGSyncProfile(Rivals2BaseProfile):
                 "value": "Tear-free, stable frametimes, no rollback dropouts",
                 "reason": "G-SYNC smooths frame delivery. Conservative priority prevents timing contention.",
             },
+        ]
+
+    def get_post_apply_notes(self) -> list[str]:
+        return [
+            "Rivals 2 manual: keep in-game V-Sync Off and use the refresh-minus-3 cap; disable external caps for online rollback."
         ]
 
 

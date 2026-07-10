@@ -548,6 +548,14 @@ class SlippiMeleeProfile(EmulatorLatencyBaseProfile):
             },
         ]
 
+    def get_post_apply_notes(self) -> list[str]:
+        return [
+            (
+                "Slippi manual: confirm Dolphin backend and controller adapter; "
+                "try Vulkan first, D3D12 if Vulkan stutters, VSync Off for no-sync."
+            )
+        ]
+
 
 class SlippiMeleeUniversalProfile(SlippiMeleeProfile):
     """No-sync Slippi profile with fixed HAGS (no reboot required).
@@ -759,6 +767,14 @@ class SlippiMeleeConsoleParityProfile(SlippiMeleeProfile):
                     "Melee is fixed 60fps. VRR is not required for this parity profile and can alter pacing feel."
                 ),
             },
+        ]
+
+    def get_post_apply_notes(self) -> list[str]:
+        return [
+            (
+                "Slippi manual: use Dolphin VSync On and 60Hz output for "
+                "console-parity testing; confirm controller adapter settings."
+            )
         ]
 
 

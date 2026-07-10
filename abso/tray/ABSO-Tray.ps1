@@ -161,6 +161,7 @@ function Apply-DwmWindowEffects {
 # ============================================================================
 
 $script:ScriptDir = $PSScriptRoot
+. (Join-Path $script:ScriptDir "ABSO-Theme.ps1")
 . (Join-Path $script:ScriptDir "ABSO-Icons.ps1")
 . (Join-Path $script:ScriptDir "ABSO-Notifications.ps1")
 . (Join-Path $script:ScriptDir "ABSO-Settings.ps1")
@@ -416,6 +417,7 @@ function Test-IsVrrPrerequisiteError {
         $Message -match "VRR/G-SYNC support" -or
         $Message -match "Adaptive Sync/FreeSync" -or
         $Message -match "Enable G-SYNC in NVIDIA Control Panel" -or
+        $Message -match "strict G-SYNC path is blocked" -or
         $Message -match "fullscreen-exclusive profile requires overlays" -or
         $Message -match "primary display .* does not report confirmed VRR/G-SYNC support"
     )
@@ -517,14 +519,14 @@ function Get-ApplyWarningMessages {
 
     if ($Json.data -and $Json.data.warnings) {
         foreach ($warning in @($Json.data.warnings)) {
-            Add-UniqueTrayMessage -Target $messages -Message "$warning"
+            Add-UniqueTrayMessage -Target $messages -Message (Convert-ApplyWarningTextToPlainEnglish -Message "$warning")
         }
     }
 
     if ($Json.data -and $Json.data.transaction -and $Json.data.transaction.checkpoints) {
         foreach ($checkpoint in @($Json.data.transaction.checkpoints)) {
             if ("$($checkpoint.status)".ToLowerInvariant() -eq "warn") {
-                Add-UniqueTrayMessage -Target $messages -Message "$($checkpoint.message)"
+                Add-UniqueTrayMessage -Target $messages -Message (Convert-ApplyWarningTextToPlainEnglish -Message "$($checkpoint.message)")
             }
         }
     }
@@ -539,11 +541,40 @@ function Get-ApplyWarningMessages {
             else {
                 "$($issue.message)"
             }
-            Add-UniqueTrayMessage -Target $messages -Message $detail
+            Add-UniqueTrayMessage -Target $messages -Message (Convert-ApplyWarningTextToPlainEnglish -Message $detail)
         }
     }
 
     return @($messages)
+}
+
+function Convert-ApplyWarningTextToPlainEnglish {
+    param([AllowNull()][string]$Message)
+
+    $friendly = Format-TrayUserFacingText -Text $Message
+    if ([string]::IsNullOrWhiteSpace($friendly)) { return $null }
+
+    if ($friendly -match "NVIDIA profile binding needs one manual step:\s*(?<action>Add .+)") {
+        return "Manual NVIDIA step: $($Matches.action)"
+    }
+
+    if ($friendly -match "NVIDIA app binding requires manual action:\s*ABSO could not prove that (?<exe>.+?) already belong to NVIDIA profile '(?<profile>[^']+)'") {
+        $exe = $Matches.exe.Trim()
+        $profile = $Matches.profile.Trim()
+        return "Manual NVIDIA step: Add $exe to NVIDIA profile '$profile' in NVIDIA Control Panel, then apply again."
+    }
+
+    if ($friendly -match "ABSO could not prove that (?<exe>.+?) already belong to NVIDIA profile '(?<profile>[^']+)'") {
+        $exe = $Matches.exe.Trim()
+        $profile = $Matches.profile.Trim()
+        return "Manual NVIDIA step: Add $exe to NVIDIA profile '$profile' in NVIDIA Control Panel, then apply again."
+    }
+
+    if ($friendly -match "^(Compliance warnings detected|Verification reported mismatches)$") {
+        return $null
+    }
+
+    return $friendly
 }
 
 function Get-ApplyNoticeMessages {
@@ -553,11 +584,202 @@ function Get-ApplyNoticeMessages {
 
     if ($Json.data -and $Json.data.notices) {
         foreach ($notice in @($Json.data.notices)) {
-            Add-UniqueTrayMessage -Target $messages -Message "$notice"
+            Add-UniqueTrayMessage -Target $messages -Message (Convert-ApplyNoticeTextToPlainEnglish -Message "$notice")
         }
     }
 
     return @($messages)
+}
+
+function Convert-ApplyNoticeTextToPlainEnglish {
+    param([AllowNull()][string]$Message)
+
+    $friendly = Format-TrayUserFacingText -Text $Message
+    if ([string]::IsNullOrWhiteSpace($friendly)) { return $null }
+
+    if ($friendly -match "NVIDIA predefined profile '(?<profile>[^']+)' already exists") {
+        return "NVIDIA profile '$($Matches.profile)' was updated; exact app ownership could not be read."
+    }
+
+    if ($friendly -match "Proceeding with stable NVIDIA profile reuse:.*Profile '(?<profile>[^']+)'") {
+        return "NVIDIA profile '$($Matches.profile)' was reused; exact app ownership could not be read."
+    }
+
+    if ($friendly -match "Profile '(?<profile>[^']+)' already exists and has bound applications") {
+        return "NVIDIA profile '$($Matches.profile)' was updated; exact app ownership could not be read."
+    }
+
+    return $friendly
+}
+
+function Convert-ApplyFailureTextToPlainEnglish {
+    param(
+        [AllowNull()][string]$Message,
+        [AllowNull()]$Json
+    )
+
+    $raw = if ([string]::IsNullOrWhiteSpace($Message)) { "" } else { "$Message".Trim() }
+    $friendly = Format-TrayUserFacingText -Text $raw
+    if ([string]::IsNullOrWhiteSpace($friendly)) { $friendly = $raw }
+
+    $searchText = $friendly
+    if ($Json.data -and $Json.data.compliance -and $Json.data.compliance.issues) {
+        foreach ($issue in @($Json.data.compliance.issues)) {
+            if ($issue.details) { $searchText += " $($issue.details)" }
+            if ($issue.message) { $searchText += " $($issue.message)" }
+        }
+    }
+
+    $restoredPrefix = ""
+    if ($Json.data -and $Json.data.transaction -and $Json.data.transaction.rollback_performed) {
+        $restoredPrefix = " Previous settings were restored."
+    }
+
+    if ($searchText -match "ABSO could not prove that (?<exe>.+?) already belong to NVIDIA profile '(?<profile>[^']+)'") {
+        $exe = $Matches.exe.Trim()
+        $profile = $Matches.profile.Trim()
+        return "Not applied.$restoredPrefix Add $exe to NVIDIA profile '$profile' in NVIDIA Control Panel, then apply again."
+    }
+
+    if ($searchText -match "Executable binding could not be proven for:\s*(?<exe>[^.;]+)") {
+        $exe = $Matches.exe.Trim()
+        return "Not applied.$restoredPrefix NVIDIA could not confirm the game is attached to the right driver profile. Add $exe in NVIDIA Control Panel, then apply again."
+    }
+
+    if ($friendly -match "Mixed-refresh display path blocks strict VRR") {
+        return "Not applied. This strict G-SYNC path is blocked by the current display setup. Use the safe fallback profile or fix the display path, then apply again."
+    }
+
+    if ($friendly -match "NVIDIA backup unavailable: Nvidia Profile Inspector was not found") {
+        return "Not applied. NVIDIA Profile Inspector is missing, so ABSO could not safely back up driver settings. Restore NPI, then apply again."
+    }
+
+    if ($friendly -match "Critical compliance failure; restored backup automatically") {
+        return "Not applied. Previous settings were restored because verification found a blocking mismatch. Open the tray log for the exact handler."
+    }
+
+    if ($friendly -match "Backend reported failure without a detailed error message") {
+        return "Not applied. The backend did not return a detailed reason. Open the tray log for the raw command output."
+    }
+
+    if ($friendly -match "^(Not applied\.|Profile missing|Apply timed out)") {
+        return $friendly
+    }
+
+    return "Not applied. $friendly"
+}
+
+function Get-ApplyPostApplyNoteMessages {
+    param($Json)
+
+    $messages = [System.Collections.Generic.List[string]]::new()
+
+    if ($Json.data -and $Json.data.post_apply_notes) {
+        foreach ($note in @($Json.data.post_apply_notes)) {
+            Add-UniqueTrayMessage -Target $messages -Message "$note"
+        }
+    }
+
+    return @($messages)
+}
+
+function Add-NvidiaManualBindingToastActionsFromText {
+    param(
+        [System.Collections.Generic.List[object]]$Target,
+        [AllowNull()][string]$Text
+    )
+
+    if (-not $Target) { return }
+    if ($Target.Count -ge 2) { return }
+    if ([string]::IsNullOrWhiteSpace($Text)) { return }
+
+    $message = "$Text"
+    if ($message -match "Add (?<exe>.+?) to NVIDIA profile '(?<profile>[^']+)") {
+        $exe = $Matches.exe.Trim()
+        $profile = $Matches.profile.Trim()
+        Add-TrayToastActionButton -Target $Target -Button (New-TrayToastActionButton `
+            -Kind "open_nvidia_profile_inspector" `
+            -Label "Open NPI" `
+            -ProfileName $profile `
+            -Executable $exe)
+        if ($Target.Count -lt 2 -and -not [string]::IsNullOrWhiteSpace($exe)) {
+            Add-TrayToastActionButton -Target $Target -Button (New-TrayToastActionButton `
+                -Kind "copy_text" `
+                -Label "Copy EXE" `
+                -Text $exe `
+                -ProfileName $profile `
+                -Executable $exe)
+        }
+        return
+    }
+
+    if ($message -match "Add (?<exe>[^.;]+?) in NVIDIA Control Panel") {
+        $exe = $Matches.exe.Trim()
+        Add-TrayToastActionButton -Target $Target -Button (New-TrayToastActionButton `
+            -Kind "open_nvidia_control_panel" `
+            -Label "Open NVIDIA" `
+            -Executable $exe)
+        if ($Target.Count -lt 2 -and -not [string]::IsNullOrWhiteSpace($exe)) {
+            Add-TrayToastActionButton -Target $Target -Button (New-TrayToastActionButton `
+                -Kind "copy_text" `
+                -Label "Copy EXE" `
+                -Text $exe `
+                -Executable $exe)
+        }
+    }
+}
+
+function Get-ApplyManualActionButtons {
+    param($Json)
+
+    $buttons = [System.Collections.Generic.List[object]]::new()
+
+    if ($Json.data -and $Json.data.manual_actions) {
+        foreach ($action in @($Json.data.manual_actions)) {
+            $kind = Get-TrayToastActionValue -Action $action -Names @("type", "Type", "kind", "Kind")
+            $label = Get-TrayToastActionValue -Action $action -Names @("label", "Label")
+            $profileName = Get-TrayToastActionValue -Action $action -Names @("profile_name", "ProfileName")
+            $executable = Get-TrayToastActionValue -Action $action -Names @("executable", "Executable")
+            $text = Get-TrayToastActionValue -Action $action -Names @("text", "Text")
+            $uri = Get-TrayToastActionValue -Action $action -Names @("uri", "Uri")
+            Add-TrayToastActionButton -Target $buttons -Button (New-TrayToastActionButton `
+                -Kind "$kind" `
+                -Label "$label" `
+                -ProfileName "$profileName" `
+                -Executable "$executable" `
+                -Text "$text" `
+                -Uri "$uri")
+            if ($buttons.Count -ge 2) { break }
+        }
+    }
+
+    if ($buttons.Count -lt 2) {
+        foreach ($warning in @(Get-ApplyWarningMessages -Json $Json)) {
+            Add-NvidiaManualBindingToastActionsFromText -Target $buttons -Text "$warning"
+            if ($buttons.Count -ge 2) { break }
+        }
+    }
+
+    return @($buttons)
+}
+
+function Get-ApplyFailureActionButtons {
+    param(
+        [AllowNull()][string]$Message,
+        [AllowNull()]$Json
+    )
+
+    $buttons = [System.Collections.Generic.List[object]]::new()
+    Add-NvidiaManualBindingToastActionsFromText -Target $buttons -Text $Message
+
+    if ($buttons.Count -lt 2 -and $Json) {
+        foreach ($warning in @(Get-ApplyWarningMessages -Json $Json)) {
+            Add-NvidiaManualBindingToastActionsFromText -Target $buttons -Text "$warning"
+            if ($buttons.Count -ge 2) { break }
+        }
+    }
+
+    return @($buttons)
 }
 
 function Get-WarningSummaryText {
@@ -609,19 +831,25 @@ function Get-ApplyFailureMessage {
 
     if ($FailedHandlers.Count -gt 0) {
         $friendlyHandlers = @($FailedHandlers | ForEach-Object { Format-TrayUserFacingText -Text "$_" })
-        return "Failed settings: $($friendlyHandlers -join ', ')"
+        return (Convert-ApplyFailureTextToPlainEnglish `
+            -Message "Failed settings: $($friendlyHandlers -join ', ')" `
+            -Json $Json)
     }
     elseif ($Json.error) {
-        return (Format-TrayUserFacingText -Text "$($Json.error)")
+        return (Convert-ApplyFailureTextToPlainEnglish -Message "$($Json.error)" -Json $Json)
     }
     elseif ($Json.data -and $Json.data.error) {
-        return (Format-TrayUserFacingText -Text "$($Json.data.error)")
+        return (Convert-ApplyFailureTextToPlainEnglish -Message "$($Json.data.error)" -Json $Json)
     }
     elseif ($Json.data -and $Json.data.failed_settings -and $Json.data.failed_settings.Count -gt 0) {
-        return (Format-TrayUserFacingText -Text ($Json.data.failed_settings -join "; "))
+        return (Convert-ApplyFailureTextToPlainEnglish `
+            -Message ($Json.data.failed_settings -join "; ") `
+            -Json $Json)
     }
 
-    return "Backend reported failure without a detailed error message (exit code: $(Get-ExitCodeDescriptor -ExitCode $ExitCode))"
+    return (Convert-ApplyFailureTextToPlainEnglish `
+        -Message "Backend reported failure without a detailed error message (exit code: $(Get-ExitCodeDescriptor -ExitCode $ExitCode))" `
+        -Json $Json)
 }
 
 function Get-TrayProfileGameGroup {
@@ -793,35 +1021,43 @@ function Test-SoundFilesExist {
 # DARK THEME COLORS
 # ============================================================================
 
-# Penumbra palette - editorial tech, ink + single-accent-per-state.
-# Key names retained from the previous palette so the rest of the tray
-# inherits the new look without touching 100+ callsites; the hex values
-# are completely refreshed.
-$script:Colors = @{
-    Background      = [System.Drawing.Color]::FromArgb(255, 14, 18, 26)    # ink-100
-    BackgroundDark  = [System.Drawing.Color]::FromArgb(255, 10, 14, 21)    # ink-000 (deepest)
-    BackgroundLight = [System.Drawing.Color]::FromArgb(255, 27, 34, 48)    # ink-300 elevated
-    Hover           = [System.Drawing.Color]::FromArgb(255, 36, 48, 71)    # ink-400 hover
-    HoverBright     = [System.Drawing.Color]::FromArgb(255, 47, 59, 83)    # ink-500 pressed
-    Text            = [System.Drawing.Color]::FromArgb(255, 232, 234, 240) # paper
-    TextDim         = [System.Drawing.Color]::FromArgb(255, 140, 149, 168) # mist
-    TextDisabled    = [System.Drawing.Color]::FromArgb(255, 90, 98, 118)   # fog
-    Border          = [System.Drawing.Color]::FromArgb(255, 31, 40, 57)    # rule-strong
-    Separator       = [System.Drawing.Color]::FromArgb(255, 26, 34, 51)    # rule-soft
-    AccentGold      = [System.Drawing.Color]::FromArgb(255, 0, 245, 212)  # phosphor cyan (primary; key name kept)
-    AccentGreen     = [System.Drawing.Color]::FromArgb(255, 123, 227, 158) # moss
-    AccentBlue      = [System.Drawing.Color]::FromArgb(255, 111, 184, 255) # azure
-    AccentPurple    = [System.Drawing.Color]::FromArgb(255, 183, 156, 255) # orchid
-    AccentAmber     = [System.Drawing.Color]::FromArgb(255, 229, 165, 71)  # ochre
-    AccentRed       = [System.Drawing.Color]::FromArgb(255, 255, 107, 107) # coral
-    AccentTeal      = [System.Drawing.Color]::FromArgb(255, 63, 184, 171)  # lagoon-dim
-    FavoriteStar    = [System.Drawing.Color]::FromArgb(255, 229, 165, 71)  # ochre (favorites read as 'curated')
-    CatFighting     = [System.Drawing.Color]::FromArgb(255, 255, 123, 123) # coral-warm
-    CatARPG         = [System.Drawing.Color]::FromArgb(255, 183, 156, 255) # orchid
-    CatShooter      = [System.Drawing.Color]::FromArgb(255, 111, 184, 255) # azure
-    CatStreaming    = [System.Drawing.Color]::FromArgb(255, 77, 216, 201)  # lagoon
-    CatOther        = [System.Drawing.Color]::FromArgb(255, 123, 227, 158) # moss
-    CatProd         = [System.Drawing.Color]::FromArgb(255, 229, 165, 71)  # ochre
+# Shared Penumbra palette. Key names are kept stable for existing callsites,
+# but all values come from ABSO-Theme.ps1 so every tray surface stays aligned.
+if (Get-Command Get-TrayThemePalette -ErrorAction SilentlyContinue) {
+    $script:Colors = Get-TrayThemePalette
+}
+else {
+    $script:Colors = @{
+        Background      = [System.Drawing.Color]::FromArgb(255, 14, 18, 26)
+        BackgroundDark  = [System.Drawing.Color]::FromArgb(255, 8, 11, 17)
+        BackgroundLight = [System.Drawing.Color]::FromArgb(255, 27, 34, 48)
+        Hover           = [System.Drawing.Color]::FromArgb(255, 36, 48, 71)
+        HoverBright     = [System.Drawing.Color]::FromArgb(255, 47, 59, 83)
+        Text            = [System.Drawing.Color]::FromArgb(255, 232, 238, 246)
+        TextDim         = [System.Drawing.Color]::FromArgb(255, 150, 162, 183)
+        TextDisabled    = [System.Drawing.Color]::FromArgb(255, 92, 104, 128)
+        Border          = [System.Drawing.Color]::FromArgb(255, 41, 54, 78)
+        Separator       = [System.Drawing.Color]::FromArgb(255, 26, 34, 51)
+        AccentGold      = [System.Drawing.Color]::FromArgb(255, 0, 245, 212)
+        AccentGreen     = [System.Drawing.Color]::FromArgb(255, 123, 227, 158)
+        AccentBlue      = [System.Drawing.Color]::FromArgb(255, 111, 184, 255)
+        AccentPurple    = [System.Drawing.Color]::FromArgb(255, 183, 156, 255)
+        AccentAmber     = [System.Drawing.Color]::FromArgb(255, 229, 165, 71)
+        AccentRed       = [System.Drawing.Color]::FromArgb(255, 255, 107, 107)
+        AccentTeal      = [System.Drawing.Color]::FromArgb(255, 63, 184, 171)
+        FavoriteStar    = [System.Drawing.Color]::FromArgb(255, 229, 165, 71)
+        CategoryDesktop = [System.Drawing.Color]::FromArgb(255, 0, 245, 212)
+        CategoryFighting = [System.Drawing.Color]::FromArgb(255, 255, 123, 123)
+        CategoryShooter = [System.Drawing.Color]::FromArgb(255, 111, 184, 255)
+        CategoryRpg     = [System.Drawing.Color]::FromArgb(255, 183, 156, 255)
+        CategoryOther   = [System.Drawing.Color]::FromArgb(255, 123, 227, 158)
+        CatFighting     = [System.Drawing.Color]::FromArgb(255, 255, 123, 123)
+        CatARPG         = [System.Drawing.Color]::FromArgb(255, 183, 156, 255)
+        CatShooter      = [System.Drawing.Color]::FromArgb(255, 111, 184, 255)
+        CatStreaming    = [System.Drawing.Color]::FromArgb(255, 77, 216, 201)
+        CatOther        = [System.Drawing.Color]::FromArgb(255, 123, 227, 158)
+        CatProd         = [System.Drawing.Color]::FromArgb(255, 229, 165, 71)
+    }
 }
 
 # ============================================================================
@@ -1533,7 +1769,8 @@ function Show-TrayToast {
         [string]$ProfileModeBadge = "",
         [switch]$ProfileFavoriteBadge,
         [string]$ActionName = "",
-        [System.Drawing.Color]$ActionColor = [System.Drawing.Color]::Empty
+        [System.Drawing.Color]$ActionColor = [System.Drawing.Color]::Empty,
+        [object[]]$ActionButtons = @()
     )
 
     Set-TransientNotificationTooltip -Title $Title -Message $Message
@@ -1553,7 +1790,8 @@ function Show-TrayToast {
             -ProfileModeBadge $ProfileModeBadge `
             -ProfileFavoriteBadge:$ProfileFavoriteBadge `
             -ActionName $ActionName `
-            -ActionColor $ActionColor
+            -ActionColor $ActionColor `
+            -ActionButtons @($ActionButtons)
     }
 }
 
@@ -1571,7 +1809,8 @@ function Show-Notification {
         [string]$ProfileModeBadge = "",
         [switch]$ProfileFavoriteBadge,
         [string]$ActionName = "",
-        [System.Drawing.Color]$ActionColor = [System.Drawing.Color]::Empty
+        [System.Drawing.Color]$ActionColor = [System.Drawing.Color]::Empty,
+        [object[]]$ActionButtons = @()
     )
 
     # Pass Type through verbatim. Prior versions mapped Success -> Info,
@@ -1590,7 +1829,282 @@ function Show-Notification {
         -ProfileModeBadge $ProfileModeBadge `
         -ProfileFavoriteBadge:$ProfileFavoriteBadge `
         -ActionName $ActionName `
-        -ActionColor $ActionColor
+        -ActionColor $ActionColor `
+        -ActionButtons @($ActionButtons)
+}
+
+function Get-TrayToastActionValue {
+    param(
+        [AllowNull()][object]$Action,
+        [string[]]$Names
+    )
+
+    if (-not $Action) { return $null }
+    foreach ($name in @($Names)) {
+        if ([string]::IsNullOrWhiteSpace($name)) { continue }
+        if ($Action -is [hashtable] -and $Action.ContainsKey($name)) {
+            return $Action[$name]
+        }
+        $prop = $Action.PSObject.Properties[$name]
+        if ($prop) { return $prop.Value }
+    }
+    return $null
+}
+
+function New-TrayToastActionButton {
+    param(
+        [AllowNull()][string]$Kind,
+        [AllowNull()][string]$Label,
+        [AllowNull()][string]$ProfileName = "",
+        [AllowNull()][string]$Executable = "",
+        [AllowNull()][string]$Text = "",
+        [AllowNull()][string]$Uri = ""
+    )
+
+    $safeKind = if ([string]::IsNullOrWhiteSpace($Kind)) { "" } else { "$Kind".Trim().ToLowerInvariant() }
+    $safeLabel = if ([string]::IsNullOrWhiteSpace($Label)) { "" } else { "$Label".Trim() }
+    if ([string]::IsNullOrWhiteSpace($safeKind) -or [string]::IsNullOrWhiteSpace($safeLabel)) {
+        return $null
+    }
+
+    if ($safeKind -notin @(
+        "open_nvidia_profile_inspector",
+        "open_nvidia_control_panel",
+        "copy_text",
+        "open_windows_settings"
+    )) {
+        return $null
+    }
+
+    return [pscustomobject]@{
+        Kind = $safeKind
+        Type = $safeKind
+        Label = $safeLabel
+        ProfileName = if ([string]::IsNullOrWhiteSpace($ProfileName)) { "" } else { "$ProfileName".Trim() }
+        Executable = if ([string]::IsNullOrWhiteSpace($Executable)) { "" } else { "$Executable".Trim() }
+        Text = if ([string]::IsNullOrWhiteSpace($Text)) { "" } else { "$Text".Trim() }
+        Uri = if ([string]::IsNullOrWhiteSpace($Uri)) { "" } else { "$Uri".Trim() }
+    }
+}
+
+function Add-TrayToastActionButton {
+    param(
+        [System.Collections.Generic.List[object]]$Target,
+        [AllowNull()][object]$Button
+    )
+
+    if (-not $Target -or -not $Button) { return }
+    if ($Target.Count -ge 2) { return }
+
+    $kind = Get-TrayToastActionValue -Action $Button -Names @("Kind", "kind", "Type", "type")
+    $label = Get-TrayToastActionValue -Action $Button -Names @("Label", "label")
+    $profileName = Get-TrayToastActionValue -Action $Button -Names @("ProfileName", "profile_name")
+    $executable = Get-TrayToastActionValue -Action $Button -Names @("Executable", "executable")
+    $text = Get-TrayToastActionValue -Action $Button -Names @("Text", "text")
+    $uri = Get-TrayToastActionValue -Action $Button -Names @("Uri", "uri")
+    $key = @("$kind", "$label", "$profileName", "$executable", "$text", "$uri") -join "|"
+
+    foreach ($existing in @($Target)) {
+        $existingKey = @(
+            "$(Get-TrayToastActionValue -Action $existing -Names @("Kind", "kind", "Type", "type"))",
+            "$(Get-TrayToastActionValue -Action $existing -Names @("Label", "label"))",
+            "$(Get-TrayToastActionValue -Action $existing -Names @("ProfileName", "profile_name"))",
+            "$(Get-TrayToastActionValue -Action $existing -Names @("Executable", "executable"))",
+            "$(Get-TrayToastActionValue -Action $existing -Names @("Text", "text"))",
+            "$(Get-TrayToastActionValue -Action $existing -Names @("Uri", "uri"))"
+        ) -join "|"
+        if ($existingKey -eq $key) { return }
+    }
+
+    [void]$Target.Add($Button)
+}
+
+function Set-TrayClipboardText {
+    param([AllowNull()][string]$Text)
+
+    if ([string]::IsNullOrWhiteSpace($Text)) { return $false }
+    try {
+        [System.Windows.Forms.Clipboard]::SetText("$Text")
+        return $true
+    }
+    catch {
+        Write-TrayLog "Clipboard write failed: $($_.Exception.Message)" -Level "WARN"
+        return $false
+    }
+}
+
+function Find-NvidiaProfileInspectorPath {
+    $candidates = [System.Collections.Generic.List[string]]::new()
+
+    foreach ($path in @(
+        (Join-Path (Get-Location).Path "nvidiaProfileInspector.exe"),
+        (Join-Path (Get-Location).Path "tools\nvidiaProfileInspector.exe"),
+        (Join-Path (Get-Location).Path "tools\npi\nvidiaProfileInspector.exe"),
+        (Join-Path $PSScriptRoot "tools\npi\nvidiaProfileInspector.exe")
+    )) {
+        if (-not [string]::IsNullOrWhiteSpace($path)) { [void]$candidates.Add($path) }
+    }
+
+    try {
+        $scriptParent = Split-Path -Path $PSScriptRoot -Parent
+        if ($scriptParent) {
+            [void]$candidates.Add((Join-Path $scriptParent "tools\npi\nvidiaProfileInspector.exe"))
+        }
+    } catch {}
+
+    if ($script:ProjectRoot) {
+        foreach ($relative in @(
+            "nvidiaProfileInspector.exe",
+            "tools\nvidiaProfileInspector.exe",
+            "tools\npi\nvidiaProfileInspector.exe"
+        )) {
+            [void]$candidates.Add((Join-Path $script:ProjectRoot $relative))
+        }
+    }
+
+    if ($HOME) {
+        [void]$candidates.Add((Join-Path $HOME "nvidiaProfileInspector\nvidiaProfileInspector.exe"))
+        [void]$candidates.Add((Join-Path $HOME "Tools\nvidiaProfileInspector\nvidiaProfileInspector.exe"))
+    }
+    if ($env:ProgramFiles) {
+        [void]$candidates.Add((Join-Path $env:ProgramFiles "nvidiaProfileInspector\nvidiaProfileInspector.exe"))
+    }
+    if (${env:ProgramFiles(x86)}) {
+        [void]$candidates.Add((Join-Path ${env:ProgramFiles(x86)} "nvidiaProfileInspector\nvidiaProfileInspector.exe"))
+    }
+    if ($env:LOCALAPPDATA) {
+        [void]$candidates.Add((Join-Path $env:LOCALAPPDATA "nvidiaProfileInspector\nvidiaProfileInspector.exe"))
+    }
+
+    foreach ($candidate in @($candidates)) {
+        try {
+            if (-not [string]::IsNullOrWhiteSpace($candidate) -and (Test-Path -LiteralPath $candidate -PathType Leaf)) {
+                return (Resolve-Path -LiteralPath $candidate).Path
+            }
+        } catch {}
+    }
+    return $null
+}
+
+function Open-NvidiaControlPanelFromToast {
+    $candidates = [System.Collections.Generic.List[string]]::new()
+    if ($env:ProgramFiles) {
+        [void]$candidates.Add((Join-Path $env:ProgramFiles "NVIDIA Corporation\Control Panel Client\nvcplui.exe"))
+    }
+    if (${env:ProgramFiles(x86)}) {
+        [void]$candidates.Add((Join-Path ${env:ProgramFiles(x86)} "NVIDIA Corporation\Control Panel Client\nvcplui.exe"))
+    }
+
+    foreach ($candidate in @($candidates)) {
+        try {
+            if (-not [string]::IsNullOrWhiteSpace($candidate) -and (Test-Path -LiteralPath $candidate -PathType Leaf)) {
+                Start-Process -FilePath $candidate
+                return $true
+            }
+        } catch {}
+    }
+
+    try {
+        Start-Process -FilePath "nvcplui.exe"
+        return $true
+    } catch {}
+
+    try {
+        Start-Process -FilePath "ms-settings:display-advancedgraphics"
+        return $true
+    } catch {}
+
+    return $false
+}
+
+function Open-NvidiaProfileInspectorFromToast {
+    param(
+        [AllowNull()][string]$ProfileName,
+        [AllowNull()][string]$Executable
+    )
+
+    $clipboardLines = [System.Collections.Generic.List[string]]::new()
+    if (-not [string]::IsNullOrWhiteSpace($ProfileName)) {
+        [void]$clipboardLines.Add("NVIDIA profile: $($ProfileName.Trim())")
+    }
+    if (-not [string]::IsNullOrWhiteSpace($Executable)) {
+        [void]$clipboardLines.Add("Executable: $($Executable.Trim())")
+    }
+    $copied = $false
+    if ($clipboardLines.Count -gt 0) {
+        $copied = Set-TrayClipboardText -Text ($clipboardLines -join [Environment]::NewLine)
+    }
+
+    $npiPath = Find-NvidiaProfileInspectorPath
+    if ($npiPath) {
+        try {
+            Start-Process -FilePath $npiPath -WorkingDirectory (Split-Path -LiteralPath $npiPath -Parent)
+            $message = if ($copied) {
+                "NPI opened. Profile and EXE were copied for the manual binding step."
+            }
+            else {
+                "NPI opened. Add the game EXE to the NVIDIA profile, then apply again."
+            }
+            Show-Notification -Title "Manual NVIDIA step" -Message $message -Type "Info" -ActionName "NVIDIA" -ActionColor $script:Colors.AccentGreen
+            return
+        }
+        catch {
+            Write-TrayLog "Failed to open NPI from toast: $($_.Exception.Message)" -Level "WARN"
+        }
+    }
+
+    if (Open-NvidiaControlPanelFromToast) {
+        $message = if ($copied) {
+            "NPI was not found. Opened NVIDIA settings instead; profile and EXE were copied."
+        }
+        else {
+            "NPI was not found. Opened NVIDIA settings instead."
+        }
+        Show-Notification -Title "Manual NVIDIA step" -Message $message -Type "Warning" -ActionName "NVIDIA" -ActionColor $script:Colors.AccentAmber
+        return
+    }
+
+    Show-Notification -Title "Manual NVIDIA step" -Message "NPI was not found and NVIDIA settings did not open. Install NPI, then apply again." -Type "Warning" -ActionName "NVIDIA" -ActionColor $script:Colors.AccentAmber
+}
+
+function Invoke-TrayToastAction {
+    param([AllowNull()][object]$Action)
+
+    if (-not $Action) { return }
+    $kind = Get-TrayToastActionValue -Action $Action -Names @("Kind", "kind", "type", "Type")
+    $kind = if ([string]::IsNullOrWhiteSpace($kind)) { "" } else { "$kind".Trim().ToLowerInvariant() }
+    $profileName = Get-TrayToastActionValue -Action $Action -Names @("ProfileName", "profile_name")
+    $executable = Get-TrayToastActionValue -Action $Action -Names @("Executable", "executable")
+
+    switch ($kind) {
+        "open_nvidia_profile_inspector" {
+            Write-TrayLog "Toast action: open NVIDIA Profile Inspector"
+            Open-NvidiaProfileInspectorFromToast -ProfileName "$profileName" -Executable "$executable"
+        }
+        "open_nvidia_control_panel" {
+            Write-TrayLog "Toast action: open NVIDIA settings"
+            if (-not (Open-NvidiaControlPanelFromToast)) {
+                Show-Notification -Title "NVIDIA settings" -Message "NVIDIA settings did not open." -Type "Warning" -ActionName "NVIDIA" -ActionColor $script:Colors.AccentAmber
+            }
+        }
+        "copy_text" {
+            $text = Get-TrayToastActionValue -Action $Action -Names @("Text", "text")
+            if ([string]::IsNullOrWhiteSpace($text)) { $text = "$executable" }
+            if (Set-TrayClipboardText -Text "$text") {
+                Show-Notification -Title "Copied" -Message "Copied to clipboard." -Type "Success" -ActionName "Copy" -ActionColor $script:Colors.AccentGreen
+            }
+        }
+        "open_windows_settings" {
+            $uri = Get-TrayToastActionValue -Action $Action -Names @("Uri", "uri")
+            if (-not [string]::IsNullOrWhiteSpace($uri) -and "$uri" -like "ms-settings:*") {
+                Write-TrayLog "Toast action: open Windows settings $uri"
+                Start-Process -FilePath "$uri"
+            }
+        }
+        default {
+            Write-TrayLog "Ignored unsupported toast action kind: $kind" -Level "WARN"
+        }
+    }
 }
 
 # ============================================================================
@@ -1721,6 +2235,7 @@ function Write-TrayRuntimeMarker {
 
         $moduleHashes = [ordered]@{}
         foreach ($moduleName in @(
+            "ABSO-Theme.ps1",
             "ABSO-Icons.ps1",
             "ABSO-Notifications.ps1",
             "ABSO-Settings.ps1",
@@ -2711,15 +3226,15 @@ foreach ($cat in ($allCategories | Sort-Object)) {
     if ($script:CategoryOrder -notcontains $cat) { $script:CategoryOrder += $cat }
 }
 $script:CategoryColors = @{
-    "Desktop"      = $script:Colors.CatProd
-    "Productivity" = $script:Colors.CatProd
-    "Fighting"     = $script:Colors.CatFighting
-    "RPGs"         = $script:Colors.CatARPG
-    "ARPG"         = $script:Colors.CatARPG
-    "Shooters"     = $script:Colors.CatShooter
-    "Shooter"      = $script:Colors.CatShooter
-    "Streaming"    = $script:Colors.CatStreaming
-    "Other"        = $script:Colors.CatOther
+    "Desktop"      = $script:Colors.CategoryDesktop
+    "Productivity" = $script:Colors.CategoryDesktop
+    "Fighting"     = $script:Colors.CategoryFighting
+    "RPGs"         = $script:Colors.CategoryRpg
+    "ARPG"         = $script:Colors.CategoryRpg
+    "Shooters"     = $script:Colors.CategoryShooter
+    "Shooter"      = $script:Colors.CategoryShooter
+    "Streaming"    = $script:Colors.CategoryDesktop
+    "Other"        = $script:Colors.CategoryOther
 }
 
 # ============================================================================
@@ -2750,6 +3265,27 @@ function Blend-Color {
     return [System.Drawing.Color]::FromArgb(255, $r, $g, $b)
 }
 
+function Get-TraySectionHeaderTint {
+    param([string]$Section)
+
+    switch -Regex ($Section) {
+        "^Favorites$" { return (Blend-Color -Base $script:Colors.FavoriteStar -Overlay $script:Colors.Text -Ratio 0.42) }
+        "^Recent$" { return (Blend-Color -Base $script:Colors.AccentBlue -Overlay $script:Colors.Text -Ratio 0.36) }
+        "^Profiles$" { return (Blend-Color -Base $script:Colors.AccentGold -Overlay $script:Colors.Text -Ratio 0.30) }
+        default { return $script:Colors.TextDim }
+    }
+}
+
+function Get-TrayCategoryHeaderTint {
+    param(
+        [string]$Category,
+        [System.Drawing.Color]$CategoryColor
+    )
+
+    $baseColor = if ($CategoryColor) { $CategoryColor } else { Get-CategoryColor -Category $Category -Fallback $script:Colors.TextDim }
+    return (Blend-Color -Base $baseColor -Overlay $script:Colors.Text -Ratio 0.28)
+}
+
 function Dim-Color {
     param(
         [System.Drawing.Color]$Color,
@@ -2773,14 +3309,16 @@ public class DarkThemeRenderer : ToolStripProfessionalRenderer
 {
     // Penumbra palette - editorial tech, deep ink with a single lagoon accent.
     private static readonly Color BgColor = Color.FromArgb(255, 14, 18, 26);   // ink-100
-    private static readonly Color BgDark = Color.FromArgb(255, 10, 14, 21);    // ink-000
+    private static readonly Color BgDark = Color.FromArgb(255, 8, 11, 17);     // ink-000
     private static readonly Color BgSubtle = Color.FromArgb(255, 19, 24, 36);  // ink-200
     private static readonly Color SepColor = Color.FromArgb(255, 26, 34, 51);  // rule-soft
-    private static readonly Color BorderColor = Color.FromArgb(255, 31, 40, 57); // rule-strong
+    private static readonly Color BorderColor = Color.FromArgb(255, 41, 54, 78); // rule-strong
     private static readonly Color AccentGold = Color.FromArgb(255, 0, 245, 212);  // phosphor cyan (key name kept for diff hygiene)
     private static readonly Color AccentGoldDim = Color.FromArgb(60, 0, 245, 212);
+    private static readonly Color TextPaper = Color.FromArgb(255, 232, 238, 246);
+    private static readonly Color TextMist = Color.FromArgb(255, 150, 162, 183);
     public static int PulseFrame = 0;
-    private const int SafeMenuMaxWidth = 760;
+    private const int SafeMenuMaxWidth = 520;
 
     public DarkThemeRenderer() : base(new DarkColorTable()) { }
 
@@ -2808,9 +3346,25 @@ public class DarkThemeRenderer : ToolStripProfessionalRenderer
         return new Rectangle(insetX, insetY, Math.Max(1, width - (insetX * 2)), Math.Max(1, height - (insetY * 2)));
     }
 
+    private static Rectangle GetBoundedRowRect(Rectangle rect, int maxWidth, int minWidth)
+    {
+        int boundedWidth = Math.Min(rect.Width, Math.Max(1, maxWidth));
+        boundedWidth = Math.Max(Math.Min(rect.Width, Math.Max(1, minWidth)), boundedWidth);
+        return new Rectangle(rect.X, rect.Y, Math.Max(1, boundedWidth), rect.Height);
+    }
+
     private static int GetSafeChipRight(ToolStripItem item)
     {
         return Math.Max(48, GetSafeItemWidth(item) - 24);
+    }
+
+    private static Color MixColor(Color baseColor, Color overlay, double ratio)
+    {
+        ratio = Math.Max(0.0, Math.Min(1.0, ratio));
+        int r = (int)Math.Round(baseColor.R * (1.0 - ratio) + overlay.R * ratio);
+        int g = (int)Math.Round(baseColor.G * (1.0 - ratio) + overlay.G * ratio);
+        int b = (int)Math.Round(baseColor.B * (1.0 - ratio) + overlay.B * ratio);
+        return Color.FromArgb(255, Math.Max(0, Math.Min(255, r)), Math.Max(0, Math.Min(255, g)), Math.Max(0, Math.Min(255, b)));
     }
 
     // Paint the entire menu background with a subtle vertical gradient
@@ -2995,23 +3549,23 @@ public class DarkThemeRenderer : ToolStripProfessionalRenderer
                 g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
 
                 int textX = hasHeroImage ? 54 : 28;
-                // Profile name: editorial serif (Sitka Banner -> Cambria -> Constantia -> Georgia)
+                // Profile name: same Windows UI face as every tray label.
                 Color brightTint = Color.FromArgb(255,
                     Math.Min(255, tint.R + 40),
                     Math.Min(255, tint.G + 40),
                     Math.Min(255, tint.B + 40));
-                Font heroFont = ResolveHeroFont(11.5f, FontStyle.Regular);
+                Font heroFont = ResolveHeroFont(13.0f, FontStyle.Regular);
                 using (heroFont)
                 using (var brush = new SolidBrush(brightTint))
                 {
                     g.DrawString(name, heroFont, brush, textX, 4);
                 }
 
-                // Subtitle: tracked all-caps eyebrow in Bahnschrift Condensed
+                // Subtitle: same UI face, scaled down for hierarchy.
                 if (!string.IsNullOrEmpty(subtitle))
                 {
                     Color dimTint = Color.FromArgb(180, tint.R, tint.G, tint.B);
-                    Font eyebrowFont = ResolveEyebrowFont(7.0f);
+                    Font eyebrowFont = ResolveEyebrowFont(8.3f);
                     using (eyebrowFont)
                     using (var brush = new SolidBrush(dimTint))
                     {
@@ -3143,46 +3697,91 @@ public class DarkThemeRenderer : ToolStripProfessionalRenderer
                 }
             }
 
+            // --- Game group rows: readable lane entries with color carried by rails/icons ---
+            if (e.Item.AccessibleName == "__game_group_row__")
+            {
+                Color tint = e.Item.ForeColor;
+                Rectangle laneRect = GetBoundedRowRect(rect, 350, 190);
+                if (laneRect.Width > 0 && laneRect.Height > 0)
+                {
+                    using (var brush = new LinearGradientBrush(
+                        laneRect,
+                        Color.FromArgb(20, tint.R, tint.G, tint.B),
+                        Color.FromArgb(4, tint.R, tint.G, tint.B),
+                        LinearGradientMode.Horizontal))
+                    {
+                        FillRoundRect(g, brush, laneRect, 4);
+                    }
+
+                    var railRect = new Rectangle(laneRect.X + 5, laneRect.Y + 4, 4, Math.Max(3, laneRect.Height - 8));
+                    using (var railBrush = new LinearGradientBrush(
+                        railRect,
+                        Color.FromArgb(70, tint.R, tint.G, tint.B),
+                        Color.FromArgb(220, tint.R, tint.G, tint.B),
+                        LinearGradientMode.Vertical))
+                    {
+                        FillRoundRect(g, railBrush, railRect, 2);
+                    }
+
+                    using (var pen = new Pen(Color.FromArgb(64, tint.R, tint.G, tint.B), 1f))
+                    {
+                        g.DrawLine(pen, laneRect.X + 18, laneRect.Y + 1, Math.Min(laneRect.Right - 14, laneRect.X + 128), laneRect.Y + 1);
+                    }
+                }
+            }
+
             // --- Section headers: disabled + bold items (section/category bands) ---
             if (!e.Item.Enabled && e.Item.Font != null && e.Item.Font.Bold)
             {
                 Color tint = e.Item.ForeColor;
                 bool isSectionHeader = e.Item.AccessibleName == "__section_header__";
+                bool isCategoryHeader = e.Item.AccessibleName == "__category_header__";
+                int fillAlpha = isCategoryHeader ? 18 : 14;
+                int lineAlpha = isCategoryHeader ? 90 : 72;
 
-                // Gradient background: category color alpha 18 -> 0
+                // Header bands use color as structure; selectable rows use color as text.
                 using (var brush = new LinearGradientBrush(
                     new Rectangle(0, 0, Math.Max(1, w), Math.Max(1, h)),
-                    Color.FromArgb(18, tint.R, tint.G, tint.B),
-                    Color.FromArgb(0, tint.R, tint.G, tint.B),
+                    Color.FromArgb(fillAlpha, tint.R, tint.G, tint.B),
+                    Color.FromArgb(isCategoryHeader ? 3 : 1, tint.R, tint.G, tint.B),
                     LinearGradientMode.Horizontal))
                 {
                     g.FillRectangle(brush, 0, 0, w, h);
                 }
 
-                // Bottom accent line: category color alpha 40
-                using (var pen = new Pen(Color.FromArgb(40, tint.R, tint.G, tint.B), 1f))
+                var railRect = new Rectangle(5, 4, isCategoryHeader ? 5 : 6, Math.Max(2, h - 8));
+                using (var railBrush = new LinearGradientBrush(
+                    railRect,
+                    Color.FromArgb(isCategoryHeader ? 205 : 150, tint.R, tint.G, tint.B),
+                    Color.FromArgb(isCategoryHeader ? 78 : 46, tint.R, tint.G, tint.B),
+                    LinearGradientMode.Vertical))
                 {
-                    int lineY = h - 1;
-                    g.DrawLine(pen, 28, lineY, w - 8, lineY);
+                    FillRoundRect(g, railBrush, railRect, 2);
                 }
 
-                if (isSectionHeader && w > 80)
+                using (var pen = new Pen(Color.FromArgb(lineAlpha, tint.R, tint.G, tint.B), 1f))
                 {
-                    double wave = (Math.Sin(PulseFrame / 7.0) + 1.0) / 2.0;
-                    int railAlpha = 46 + (int)(wave * 48);
-                    using (var railPen = new Pen(Color.FromArgb(railAlpha, tint.R, tint.G, tint.B), 1.2f))
+                    int lineY = h - 1;
+                    g.DrawLine(pen, 18, lineY, Math.Min(w - 10, 380), lineY);
+                }
+
+                if (isCategoryHeader && w > 90)
+                {
+                    using (var railPen = new Pen(Color.FromArgb(150, tint.R, tint.G, tint.B), 1.2f))
                     {
                         railPen.StartCap = LineCap.Round;
                         railPen.EndCap = LineCap.Round;
-                        g.DrawLine(railPen, 34, 3, Math.Min(w - 16, 78), 3);
+                        g.DrawLine(railPen, 22, 3, Math.Min(w - 18, 118), 3);
                     }
-
-                    int sweepWidth = Math.Max(28, Math.Min(72, w / 4));
-                    int sweepTravel = Math.Max(1, w - sweepWidth - 58);
-                    int sweepX = 34 + ((PulseFrame * 3) % sweepTravel);
-                    using (var sweepPen = new Pen(Color.FromArgb(36 + (int)(wave * 34), tint.R, tint.G, tint.B), 1f))
+                }
+                else if (isSectionHeader && w > 120)
+                {
+                    Color labelGlow = MixColor(tint, Color.White, 0.45);
+                    using (var railPen = new Pen(Color.FromArgb(94, labelGlow.R, labelGlow.G, labelGlow.B), 1.15f))
                     {
-                        g.DrawLine(sweepPen, sweepX, h - 3, Math.Min(w - 12, sweepX + sweepWidth), h - 3);
+                        railPen.StartCap = LineCap.Round;
+                        railPen.EndCap = LineCap.Round;
+                        g.DrawLine(railPen, 22, 3, Math.Min(w - 18, 150), 3);
                     }
                 }
                 return;
@@ -3197,28 +3796,29 @@ public class DarkThemeRenderer : ToolStripProfessionalRenderer
                 double wave = (Math.Sin(PulseFrame / 4.0) + 1.0) / 2.0;
                 int fillAlpha = 24 + (int)(wave * 18);
                 int ringAlpha = 52 + (int)(wave * 58);
+                Rectangle activeRect = GetBoundedRowRect(rect, 430, 250);
 
-                if (rect.Width > 0 && rect.Height > 0)
+                if (activeRect.Width > 0 && activeRect.Height > 0)
                 {
                     using (var brush = new LinearGradientBrush(
-                        rect,
+                        activeRect,
                         Color.FromArgb(fillAlpha, tint.R, tint.G, tint.B),
                         Color.FromArgb(10, tint.R, tint.G, tint.B),
                         LinearGradientMode.Horizontal))
                     {
-                        FillRoundRect(g, brush, rect, 5);
+                        FillRoundRect(g, brush, activeRect, 5);
                     }
                     using (var pen = new Pen(Color.FromArgb(ringAlpha, tint.R, tint.G, tint.B), 1f))
                     {
-                        DrawRoundRect(g, pen, rect, 5);
+                        DrawRoundRect(g, pen, activeRect, 5);
                     }
 
-                    int sweepWidth = Math.Max(36, Math.Min(84, rect.Width / 3));
-                    int sweepTravel = Math.Max(1, rect.Width - sweepWidth - 18);
-                    int sweepX = rect.X + 9 + ((PulseFrame * 7) % sweepTravel);
+                    int sweepWidth = Math.Max(36, Math.Min(84, activeRect.Width / 3));
+                    int sweepTravel = Math.Max(1, activeRect.Width - sweepWidth - 18);
+                    int sweepX = activeRect.X + 9 + ((PulseFrame * 7) % sweepTravel);
                     using (var sweepPen = new Pen(Color.FromArgb(80 + (int)(wave * 85), tint.R, tint.G, tint.B), 1.25f))
                     {
-                        g.DrawLine(sweepPen, sweepX, rect.Y + 2, Math.Min(rect.Right - 9, sweepX + sweepWidth), rect.Y + 2);
+                        g.DrawLine(sweepPen, sweepX, activeRect.Y + 2, Math.Min(activeRect.Right - 9, sweepX + sweepWidth), activeRect.Y + 2);
                     }
                 }
 
@@ -3231,22 +3831,23 @@ public class DarkThemeRenderer : ToolStripProfessionalRenderer
             if (e.Item.Selected && e.Item.Enabled)
             {
                 Color tint = e.Item.ForeColor;
+                Rectangle selectedRect = GetBoundedRowRect(rect, 440, 250);
 
-                if (rect.Width > 0 && rect.Height > 0)
+                if (selectedRect.Width > 0 && selectedRect.Height > 0)
                 {
                     // Gradient fill: category-tinted with subtle horizontal gradient
                     using (var brush = new LinearGradientBrush(
-                        rect, Color.FromArgb(35, tint.R, tint.G, tint.B),
+                        selectedRect, Color.FromArgb(35, tint.R, tint.G, tint.B),
                         Color.FromArgb(12, tint.R, tint.G, tint.B),
                         LinearGradientMode.Horizontal))
                     {
-                        FillRoundRect(g, brush, rect, 5);
+                        FillRoundRect(g, brush, selectedRect, 5);
                     }
 
                     // Subtle border
                     using (var pen = new Pen(Color.FromArgb(40, tint.R, tint.G, tint.B), 1f))
                     {
-                        DrawRoundRect(g, pen, rect, 5);
+                        DrawRoundRect(g, pen, selectedRect, 5);
                     }
                 }
 
@@ -3286,7 +3887,7 @@ public class DarkThemeRenderer : ToolStripProfessionalRenderer
 
                 // Right-edge gradient fade for card depth
                 int fadeW = 30;
-                var fadeRect = new Rectangle(w - fadeW, rect.Y, fadeW, rect.Height);
+                var fadeRect = new Rectangle(selectedRect.Right - fadeW, selectedRect.Y, fadeW, selectedRect.Height);
                 if (fadeRect.Width > 0 && fadeRect.Height > 0)
                 {
                     using (var brush = new LinearGradientBrush(
@@ -3401,7 +4002,7 @@ public class DarkThemeRenderer : ToolStripProfessionalRenderer
                 string[] chips = chipRaw.Split(new char[] { '|' }, StringSplitOptions.RemoveEmptyEntries);
                 int chipRight = GetSafeChipRight(e.Item);
 
-                using (var chipFont = ResolveEyebrowFont(6.6f))
+                using (var chipFont = ResolveEyebrowFont(7.0f))
                 using (var chipTextBrush = new SolidBrush(Color.FromArgb(226, 232, 234, 240)))
                 using (var chipFormat = new StringFormat())
                 {
@@ -3494,10 +4095,10 @@ public class DarkThemeRenderer : ToolStripProfessionalRenderer
 
                 if (hasChip)
                 {
-                    using (var chipMeasureFont = ResolveEyebrowFont(6.7f))
+                    using (var chipMeasureFont = ResolveEyebrowFont(7.4f))
                     {
                         SizeF chipSize = e.Graphics.MeasureString(chip, chipMeasureFont);
-                        int chipWidth = Math.Max(36, Math.Min(64, (int)Math.Ceiling(chipSize.Width) + 12));
+                        int chipWidth = Math.Max(42, Math.Min(88, (int)Math.Ceiling(chipSize.Width) + 12));
                         int chipX = chipRight - chipWidth;
                         if (chipX > textRect.X + 68)
                         {
@@ -3511,7 +4112,7 @@ public class DarkThemeRenderer : ToolStripProfessionalRenderer
                     : new Rectangle(textRect.X, textRect.Y, Math.Max(18, chipRect.X - textRect.X - 8), textRect.Height);
                 using (var labelFormat = new StringFormat())
                 using (var labelBrush = new SolidBrush(e.Item.ForeColor))
-                using (var labelFont = ResolveEyebrowFont(7.6f))
+                using (var labelFont = ResolveEyebrowFont(9.6f))
                 {
                     labelFormat.Trimming = StringTrimming.EllipsisCharacter;
                     labelFormat.FormatFlags = StringFormatFlags.NoWrap;
@@ -3535,7 +4136,7 @@ public class DarkThemeRenderer : ToolStripProfessionalRenderer
                     {
                         DrawRoundRect(e.Graphics, chipPen, chipRect, 4);
                     }
-                    using (var chipFont = ResolveEyebrowFont(6.7f))
+                    using (var chipFont = ResolveEyebrowFont(7.4f))
                     using (var chipTextBrush = new SolidBrush(Color.FromArgb(228, 232, 234, 240)))
                     using (var chipFormat = new StringFormat())
                     {
@@ -3551,6 +4152,27 @@ public class DarkThemeRenderer : ToolStripProfessionalRenderer
             catch {}
         }
 
+        if (e.Item.AccessibleName == "__game_group_row__")
+        {
+            try
+            {
+                Rectangle textRect = e.TextRectangle;
+                Color labelColor = TextPaper;
+                Rectangle labelRect = new Rectangle(textRect.X, textRect.Y, Math.Max(18, textRect.Width - 8), textRect.Height);
+                using (var labelFormat = new StringFormat())
+                using (var labelBrush = new SolidBrush(labelColor))
+                {
+                    labelFormat.Trimming = StringTrimming.EllipsisCharacter;
+                    labelFormat.FormatFlags = StringFormatFlags.NoWrap;
+                    labelFormat.LineAlignment = StringAlignment.Center;
+                    e.Graphics.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
+                    e.Graphics.DrawString((e.Text ?? "").Trim(), e.TextFont, labelBrush, labelRect, labelFormat);
+                }
+                return;
+            }
+            catch {}
+        }
+
         if (e.Item.AccessibleName == "__category_header__" || e.Item.AccessibleName == "__section_header__")
         {
             try
@@ -3559,8 +4181,15 @@ public class DarkThemeRenderer : ToolStripProfessionalRenderer
                 int chipRight = GetSafeChipRight(e.Item);
                 string chipRaw = e.Item.AccessibleDescription ?? "";
                 string[] chips = chipRaw.Split(new char[] { '|' }, StringSplitOptions.RemoveEmptyEntries);
+                bool isSectionHeader = e.Item.AccessibleName == "__section_header__";
+                bool isCategoryHeader = e.Item.AccessibleName == "__category_header__";
+                float labelSize = isSectionHeader ? 16.4f : 13.8f;
+                int labelAlpha = isSectionHeader ? 255 : 248;
+                Color labelColor = isCategoryHeader
+                    ? TextPaper
+                    : MixColor(e.Item.ForeColor, TextPaper, 0.72);
 
-                using (var chipFont = ResolveEyebrowFont(6.8f))
+                using (var chipFont = ResolveEyebrowFont(6.6f))
                 using (var chipTextBrush = new SolidBrush(Color.FromArgb(225, 232, 234, 240)))
                 using (var chipFormat = new StringFormat())
                 {
@@ -3574,7 +4203,7 @@ public class DarkThemeRenderer : ToolStripProfessionalRenderer
                         string chip = chips[i].Trim();
                         if (string.IsNullOrWhiteSpace(chip)) continue;
                         SizeF chipSize = e.Graphics.MeasureString(chip, chipFont);
-                        int chipWidth = Math.Max(38, Math.Min(76, (int)Math.Ceiling(chipSize.Width) + 12));
+                        int chipWidth = Math.Max(38, Math.Min(72, (int)Math.Ceiling(chipSize.Width) + 12));
                         int chipX = chipRight - chipWidth;
                         if (chipX <= textRect.X + 68) continue;
 
@@ -3603,8 +4232,8 @@ public class DarkThemeRenderer : ToolStripProfessionalRenderer
                     Math.Max(22, chipRight - textRect.X - 8),
                     textRect.Height);
                 using (var labelFormat = new StringFormat())
-                using (var labelFont = ResolveEyebrowFont(8.0f))
-                using (var labelBrush = new SolidBrush(e.Item.ForeColor))
+                using (var labelFont = ResolveEyebrowFont(labelSize))
+                using (var labelBrush = new SolidBrush(Color.FromArgb(labelAlpha, labelColor.R, labelColor.G, labelColor.B)))
                 {
                     labelFormat.Trimming = StringTrimming.EllipsisCharacter;
                     labelFormat.FormatFlags = StringFormatFlags.NoWrap;
@@ -3634,7 +4263,7 @@ public class DarkThemeRenderer : ToolStripProfessionalRenderer
                 string chipRaw = e.Item.AccessibleDescription ?? "";
                 string[] chips = chipRaw.Split(new char[] { '|' }, StringSplitOptions.RemoveEmptyEntries);
 
-                using (var chipFont = ResolveEyebrowFont(6.8f))
+                using (var chipFont = ResolveEyebrowFont(7.0f))
                 using (var chipTextBrush = new SolidBrush(Color.FromArgb(230, 232, 234, 240)))
                 using (var chipFormat = new StringFormat())
                 {
@@ -3648,7 +4277,7 @@ public class DarkThemeRenderer : ToolStripProfessionalRenderer
                         string chip = chips[i].Trim();
                         if (string.IsNullOrWhiteSpace(chip)) continue;
                         SizeF chipSize = e.Graphics.MeasureString(chip, chipFont);
-                        int chipWidth = Math.Max(32, Math.Min(68, (int)Math.Ceiling(chipSize.Width) + 12));
+                        int chipWidth = Math.Max(36, Math.Min(76, (int)Math.Ceiling(chipSize.Width) + 12));
                         int chipX = chipRight - chipWidth;
                         if (chipX <= textRect.X + 86) continue;
 
@@ -3677,7 +4306,7 @@ public class DarkThemeRenderer : ToolStripProfessionalRenderer
                     Math.Max(22, chipRight - textRect.X - 8),
                     textRect.Height);
                 using (var labelFormat = new StringFormat())
-                using (var labelFont = ResolveEyebrowFont(7.0f))
+                using (var labelFont = ResolveEyebrowFont(8.0f))
                 using (var labelBrush = new SolidBrush(e.Item.ForeColor))
                 {
                     labelFormat.Trimming = StringTrimming.EllipsisCharacter;
@@ -3702,14 +4331,14 @@ public class DarkThemeRenderer : ToolStripProfessionalRenderer
                 int chipRight = GetSafeChipRight(e.Item);
                 if (hasChip)
                 {
-                    using (var chipMeasureFont = ResolveEyebrowFont(7.0f))
+                    using (var chipMeasureFont = ResolveEyebrowFont(7.2f))
                     {
                         for (int i = chips.Length - 1; i >= 0; i--)
                         {
                             string chip = chips[i].Trim();
                             if (string.IsNullOrWhiteSpace(chip)) continue;
                             SizeF chipSize = e.Graphics.MeasureString(chip, chipMeasureFont);
-                            int chipWidth = Math.Max(38, Math.Min(66, (int)Math.Ceiling(chipSize.Width) + 14));
+                            int chipWidth = Math.Max(42, Math.Min(76, (int)Math.Ceiling(chipSize.Width) + 14));
                             int chipX = chipRight - chipWidth;
                             if (chipX <= textRect.X + 18) continue;
                             chipRight = chipX - 4;
@@ -3725,7 +4354,8 @@ public class DarkThemeRenderer : ToolStripProfessionalRenderer
                     format.Trimming = StringTrimming.EllipsisCharacter;
                     format.FormatFlags = StringFormatFlags.NoWrap;
                     format.LineAlignment = StringAlignment.Center;
-                    using (var brush = new SolidBrush(e.TextColor))
+                    Color rowTextColor = e.Item.AccessibleName == "__backup_menu_item__" ? TextMist : TextPaper;
+                    using (var brush = new SolidBrush(rowTextColor))
                     {
                         e.Graphics.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
                         e.Graphics.DrawString(e.Text, e.TextFont, brush, labelRect, format);
@@ -3741,7 +4371,7 @@ public class DarkThemeRenderer : ToolStripProfessionalRenderer
                     int chipFillAlpha = isActiveProfileChip ? 72 + (int)(chipWave * 24) : 62;
                     int chipFadeAlpha = isActiveProfileChip ? 26 + (int)(chipWave * 16) : 22;
                     int chipEdgeAlpha = isActiveProfileChip ? 105 + (int)(chipWave * 70) : 90;
-                    using (var chipFont = ResolveEyebrowFont(7.0f))
+                    using (var chipFont = ResolveEyebrowFont(7.2f))
                     using (var chipTextBrush = new SolidBrush(Color.FromArgb(230, 232, 234, 240)))
                     using (var chipFormat = new StringFormat())
                     {
@@ -3755,7 +4385,7 @@ public class DarkThemeRenderer : ToolStripProfessionalRenderer
                             string chip = chips[i].Trim();
                             if (string.IsNullOrWhiteSpace(chip)) continue;
                             SizeF chipSize = e.Graphics.MeasureString(chip, chipFont);
-                            int chipWidth = Math.Max(38, Math.Min(66, (int)Math.Ceiling(chipSize.Width) + 14));
+                            int chipWidth = Math.Max(42, Math.Min(76, (int)Math.Ceiling(chipSize.Width) + 14));
                             int chipX = chipRight - chipWidth;
                             if (chipX <= textRect.X + 18) continue;
                             Rectangle chipRect = new Rectangle(
@@ -3832,16 +4462,13 @@ public class DarkThemeRenderer : ToolStripProfessionalRenderer
         return path;
     }
 
-    // Penumbra font resolvers. WinForms silently substitutes Microsoft Sans
-    // Serif for missing families, so each candidate is constructed and the
-    // resolved family is verified before returning.
+    // Tray typography uses the Windows UI face everywhere; size and weight
+    // carry hierarchy instead of switching families between rows.
     private static readonly string[] HeroFontStack = new[] {
-        "Bahnschrift SemiBold Condensed", "Bahnschrift Condensed",
-        "Bahnschrift SemiBold", "Bahnschrift", "Segoe UI Semibold"
+        "Segoe UI"
     };
     private static readonly string[] EyebrowFontStack = new[] {
-        "Bahnschrift SemiCondensed", "Bahnschrift Condensed",
-        "Bahnschrift", "Segoe UI Semibold"
+        "Segoe UI"
     };
 
     private static Font ResolveFontStack(string[] families, float size, FontStyle style)
@@ -3901,26 +4528,18 @@ public class DarkColorTable : ProfessionalColorTable
 # ============================================================================
 
 # Cached shared fonts (disposed in finally block).
-# Penumbra type system: refined editorial serif for hero copy, condensed
-# tracked caps for eyebrows, monospace for telemetry.
-$script:FontNormal  = New-Object System.Drawing.Font("Segoe UI", 9)
-$script:FontBold    = New-Object System.Drawing.Font("Segoe UI", 9, [System.Drawing.FontStyle]::Bold)
-$script:FontEyebrow = [DarkThemeRenderer]::ResolveEyebrowFont(7.0)
-$script:FontHero    = [DarkThemeRenderer]::ResolveHeroFont(11.5, [System.Drawing.FontStyle]::Bold)
-$script:FontMono    = $null
-foreach ($mono in @("Cascadia Mono", "Cascadia Code", "Consolas")) {
-    try {
-        $candidate = New-Object System.Drawing.Font($mono, 7.75)
-        if ($candidate.FontFamily.Name -ieq $mono -or $candidate.Name -ilike "$mono*") {
-            $script:FontMono = $candidate
-            break
-        }
-        $candidate.Dispose()
-    } catch {}
-}
-if (-not $script:FontMono) { $script:FontMono = New-Object System.Drawing.Font("Consolas", 7.75) }
+# Tray type system: Segoe UI everywhere, with scale/weight/color carrying hierarchy.
+$script:FontNormal  = New-Object System.Drawing.Font("Segoe UI", 10.0)
+$script:FontBold    = New-Object System.Drawing.Font("Segoe UI", 10.0, [System.Drawing.FontStyle]::Bold)
+$script:FontEyebrow = [DarkThemeRenderer]::ResolveEyebrowFont(8.6)
+$script:FontHero    = [DarkThemeRenderer]::ResolveHeroFont(13.0, [System.Drawing.FontStyle]::Bold)
+$script:FontMenuRow = New-Object System.Drawing.Font("Segoe UI", 10.5)
+$script:FontMenuRowBold = New-Object System.Drawing.Font("Segoe UI", 10.5, [System.Drawing.FontStyle]::Bold)
+$script:FontSectionHeader = [DarkThemeRenderer]::ResolveEyebrowFont(16.4)
+$script:FontCategoryHeader = [DarkThemeRenderer]::ResolveEyebrowFont(13.8)
+$script:FontMono    = New-Object System.Drawing.Font("Segoe UI", 9.0)
 
-$script:TrayMenuPreferredWidth = 760
+$script:TrayMenuPreferredWidth = 520
 $script:TrayMenuMinimumWidth = 360
 $script:TrayMenuScreenMargin = 48
 $script:IconState = "Idle"
@@ -3987,6 +4606,15 @@ function Set-TrayCommandItemVisualState {
     $Item.AccessibleName = "__flyout_command__"
     $Item.AccessibleDescription = if ([string]::IsNullOrWhiteSpace($ChipText)) { "" } else { $ChipText.Trim().ToUpperInvariant() }
     $Item.Padding = New-Object System.Windows.Forms.Padding(0, 0, $PaddingRight, 0)
+}
+
+function Set-TrayGameGroupRowVisualState {
+    param([System.Windows.Forms.ToolStripMenuItem]$Item)
+
+    if (-not $Item) { return }
+    $Item.AccessibleName = "__game_group_row__"
+    $Item.AccessibleDescription = ""
+    $Item.Padding = New-Object System.Windows.Forms.Padding(0)
 }
 
 function Get-TrayMenuWidthBudget {
@@ -4360,6 +4988,8 @@ function Apply-Profile {
 
             $applyWarnings = Get-ApplyWarningMessages -Json $json
             $applyNotices = Get-ApplyNoticeMessages -Json $json
+            $applyPostApplyNotes = Get-ApplyPostApplyNoteMessages -Json $json
+            $applyActionButtons = Get-ApplyManualActionButtons -Json $json
             $applySummaryLevel = Get-ApplySummaryLevel -Json $json
             # Build the toast body separately from the title. The TITLE is the bare
             # profile display name (clean, no parens, no pipes); the BODY is the
@@ -4386,6 +5016,12 @@ function Apply-Profile {
                 $extras += ("Note: " + $applyNotices[0])
                 if ($applyNotices.Count -gt 1) {
                     $extras += ("(+$($applyNotices.Count - 1) more - see tray log)")
+                }
+            }
+            if ($applyPostApplyNotes.Count -gt 0) {
+                $extras += ("Manual: " + $applyPostApplyNotes[0])
+                if ($applyPostApplyNotes.Count -gt 1) {
+                    $extras += ("(+$($applyPostApplyNotes.Count - 1) more manual notes - see tray log)")
                 }
             }
             # Compose caveats into a sentence rather than just appending the first.
@@ -4431,6 +5067,12 @@ function Apply-Profile {
             else {
                 Write-TrayLog "Profile apply completed: $appliedProfileId"
                 Update-ProgressOverlay -StepText "Profile apply completed"
+            }
+            foreach ($note in $applyPostApplyNotes) {
+                Write-TrayLog "Apply manual note [$appliedProfileId]: $note"
+            }
+            if ($applyActionButtons.Count -gt 0) {
+                Write-TrayLog "Apply manual actions [$appliedProfileId]: $($applyActionButtons.Count)"
             }
 
             Start-Sleep -Milliseconds 500
@@ -4483,7 +5125,7 @@ function Apply-Profile {
                 Play-VrrWarningSound
                 Write-TrayLog "No-Sync OSD reminder shown for transition: $previousProfileId -> $appliedProfileId"
                 Play-ApplySuccessIconAnimation
-                Show-TrayToast @toastProfileVisual -Title $toastTitle -Message $msg -Type "Warning" -Duration 6000 -MetaText $toastMetaText -BypassDedup
+                Show-TrayToast @toastProfileVisual -Title $toastTitle -Message $msg -Type "Warning" -Duration 6000 -MetaText $toastMetaText -ActionButtons @($applyActionButtons) -BypassDedup
             }
             elseif ($needsNoSyncOsdReminder -and $ddciDisabled) {
                 # ABSO already disabled monitor Adaptive Sync via DDC/CI — give the user
@@ -4492,7 +5134,7 @@ function Apply-Profile {
                 Write-TrayLog "Monitor Adaptive Sync auto-disabled via DDC/CI for: $previousProfileId -> $appliedProfileId"
                 Play-SuccessSound
                 Play-ApplySuccessIconAnimation
-                Show-TrayToast @toastProfileVisual -Title $toastTitle -Message $msg -Type "Success" -Duration 5000 -MetaText $toastMetaText -BypassDedup
+                Show-TrayToast @toastProfileVisual -Title $toastTitle -Message $msg -Type "Success" -Duration 5000 -MetaText $toastMetaText -ActionButtons @($applyActionButtons) -BypassDedup
             }
             elseif ($syncTransition -eq "to_sync" -and $ddciEnabled) {
                 # Symmetric feedback: tell the user ABSO re-enabled their firmware Adaptive
@@ -4501,14 +5143,14 @@ function Apply-Profile {
                 Write-TrayLog "Monitor Adaptive Sync auto-enabled via DDC/CI for: $previousProfileId -> $appliedProfileId"
                 Play-SuccessSound
                 Play-ApplySuccessIconAnimation
-                Show-TrayToast @toastProfileVisual -Title $toastTitle -Message $msg -Type "Success" -Duration 5000 -MetaText $toastMetaText -BypassDedup
+                Show-TrayToast @toastProfileVisual -Title $toastTitle -Message $msg -Type "Success" -Duration 5000 -MetaText $toastMetaText -ActionButtons @($applyActionButtons) -BypassDedup
             }
             elseif ($applySummaryLevel -eq "warning") {
                 # Apply succeeded but a real (non-soft) warning was raised. Use the warning
                 # sound + amber toast so the user actually realizes something needs attention.
                 Play-VrrWarningSound
                 Play-ApplySuccessIconAnimation
-                Show-TrayToast @toastProfileVisual -Title $toastTitle -Message $msg -Type "Warning" -Duration 6000 -MetaText $toastMetaText -BypassDedup
+                Show-TrayToast @toastProfileVisual -Title $toastTitle -Message $msg -Type "Warning" -Duration 6000 -MetaText $toastMetaText -ActionButtons @($applyActionButtons) -BypassDedup
             }
             elseif ($applySummaryLevel -eq "caution") {
                 # Soft environmental warnings (mixed refresh, MPO glitch risk, etc.).
@@ -4516,17 +5158,17 @@ function Apply-Profile {
                 # should still notice the caveat without it shouting "error".
                 Play-SuccessSound
                 Play-ApplySuccessIconAnimation
-                Show-TrayToast @toastProfileVisual -Title $toastTitle -Message $msg -Type "Warning" -Duration 6000 -MetaText $toastMetaText -BypassDedup
+                Show-TrayToast @toastProfileVisual -Title $toastTitle -Message $msg -Type "Warning" -Duration 6000 -MetaText $toastMetaText -ActionButtons @($applyActionButtons) -BypassDedup
             }
             elseif ($applyNotices.Count -gt 0) {
                 Play-SuccessSound
                 Play-ApplySuccessIconAnimation
-                Show-TrayToast @toastProfileVisual -Title $toastTitle -Message $msg -Type "Success" -Duration 6000 -MetaText $toastMetaText -BypassDedup
+                Show-TrayToast @toastProfileVisual -Title $toastTitle -Message $msg -Type "Success" -Duration 6000 -MetaText $toastMetaText -ActionButtons @($applyActionButtons) -BypassDedup
             }
             else {
                 Play-SuccessSound
                 Play-ApplySuccessIconAnimation
-                Show-TrayToast @toastProfileVisual -Title $toastTitle -Message $msg -Type "Success" -MetaText $toastMetaText -BypassDedup
+                Show-TrayToast @toastProfileVisual -Title $toastTitle -Message $msg -Type "Success" -MetaText $toastMetaText -ActionButtons @($applyActionButtons) -BypassDedup
             }
 
             $script:activeProfile = $appliedProfileId
@@ -4569,12 +5211,13 @@ function Apply-Profile {
             }
             Set-IconState -State "Error"
             $notifyType = if ($isVrrPrereqError) { "Warning" } else { "Error" }
-            # Use the profile name as the toast title and name the failed action in
-            # the body so the popup is clear even when multiple tray actions run.
+            # Use the profile name as the toast title; Get-ApplyFailureMessage
+            # already returns a concise "Not applied..." sentence with next steps.
             $failureTitle = $profileTitle
             $failureVisual = Get-TrayProfileToastVisualArgs -ProfileId $ProfileId -Profile $profile
-            Show-Notification @failureVisual -Title $failureTitle -Message "Apply failed: $err" -Type $notifyType -MetaText $ProfileId
-            $script:LastAction = "Apply failed: $err"
+            $failureActionButtons = Get-ApplyFailureActionButtons -Message $err -Json $json
+            Show-Notification @failureVisual -Title $failureTitle -Message $err -Type $notifyType -MetaText $ProfileId -ActionButtons @($failureActionButtons)
+            $script:LastAction = $err
             $script:LastActionTime = Get-Date
             Update-MenuState
         }
@@ -5569,7 +6212,7 @@ function New-TrayLastActionStatusBitmap {
         '^(Tray audio cues)' {
             $action = "Sound"; $color = $script:Colors.AccentBlue; break
         }
-        '^(Profile missing|Profile not found|Apply timed out|Apply failed:|Applied|Failed:|Error:)' {
+        '^(Profile missing|Profile not found|Apply timed out|Apply failed:|Not applied\.|Applied|Failed:|Error:)' {
             $action = "Apply"; $color = $script:Colors.AccentAmber; break
         }
         default {
@@ -8322,7 +8965,7 @@ public class HotkeyMessageWindow : NativeWindow {
     $header.Enabled = $false
     $header.BackColor = $script:Colors.BackgroundDark
     $header.ForeColor = $script:Colors.AccentGold
-    $header.Font = [DarkThemeRenderer]::ResolveHeroFont(11.0, [System.Drawing.FontStyle]::Bold)
+    $header.Font = [DarkThemeRenderer]::ResolveHeroFont(12.6, [System.Drawing.FontStyle]::Bold)
     $header.Image = New-ActionBitmap -Action "Brand" -Color $script:Colors.AccentGold
     $menu.Items.Add($header) | Out-Null
 
@@ -8333,12 +8976,12 @@ public class HotkeyMessageWindow : NativeWindow {
     $script:statusItem = New-Object System.Windows.Forms.ToolStripMenuItem
     $script:statusItem.Tag = "__hero_banner__"
     $script:statusItem.AutoSize = $false
-    $script:statusItem.Size = New-Object System.Drawing.Size(280, 48)
+    $script:statusItem.Size = New-Object System.Drawing.Size(480, 48)
     $script:statusItem.Padding = New-Object System.Windows.Forms.Padding(0)
     $script:statusItem.Margin = New-Object System.Windows.Forms.Padding(0)
     $script:statusItem.Enabled = $false
     $script:statusItem.BackColor = $script:Colors.BackgroundDark
-    $script:statusItem.Font = New-Object System.Drawing.Font("Segoe UI", 9, [System.Drawing.FontStyle]::Bold)
+    $script:statusItem.Font = $script:FontMenuRowBold
     Set-TrayActiveStatusItemFromState
     $menu.Items.Add($script:statusItem) | Out-Null
 
@@ -8363,7 +9006,7 @@ public class HotkeyMessageWindow : NativeWindow {
     $script:auditStatusItem.Enabled = $false
     $script:auditStatusItem.BackColor = $script:Colors.BackgroundDark
     $script:auditStatusItem.ForeColor = $script:Colors.AccentGreen
-    $script:auditStatusItem.Font = New-Object System.Drawing.Font("Segoe UI", 8)
+    $script:auditStatusItem.Font = New-Object System.Drawing.Font("Segoe UI", 8.6)
     $script:auditStatusItem.Image = New-AuditStatusBitmap -Color $script:Colors.AccentGreen
     $script:auditStatusItem.Visible = $false
     $menu.Items.Add($script:auditStatusItem) | Out-Null
@@ -8373,10 +9016,10 @@ public class HotkeyMessageWindow : NativeWindow {
     $menu.Items.Add((New-Object System.Windows.Forms.ToolStripSeparator)) | Out-Null
 
     $searchBox = New-Object System.Windows.Forms.ToolStripTextBox
-    $searchBox.Size = New-Object System.Drawing.Size(250, 24)
+    $searchBox.Size = New-Object System.Drawing.Size(300, 26)
     $searchBox.BackColor = $script:Colors.BackgroundLight
     $searchBox.ForeColor = $script:Colors.Text
-    $searchBox.Font = New-Object System.Drawing.Font("Segoe UI", 9)
+    $searchBox.Font = $script:FontMenuRow
     $searchBox.ToolTipText = "Search profiles... (type to filter)"
     # Placeholder text
     $searchBox.Text = "Search profiles..."
@@ -8757,7 +9400,7 @@ public class HotkeyMessageWindow : NativeWindow {
         if (-not [string]::IsNullOrWhiteSpace($ExtraChipText)) { $chips += $ExtraChipText.Trim().ToUpperInvariant() }
         if (-not [string]::IsNullOrWhiteSpace($stateChipText)) { $chips += $stateChipText }
         if ($chips.Count -le 0) {
-            $Item.AccessibleName = ""
+            $Item.AccessibleName = "__profile_menu_item__"
             $Item.AccessibleDescription = ""
             $Item.Padding = New-Object System.Windows.Forms.Padding(0)
             Set-TrayProfileMenuItemTooltipState -Item $Item -StateText $stateTooltipText
@@ -8805,7 +9448,7 @@ public class HotkeyMessageWindow : NativeWindow {
 
         $gameLabel = if ($GameCount -eq 1) { "game" } else { "games" }
         $profileLabel = if ($ProfileCount -eq 1) { "profile" } else { "profiles" }
-        return "$GameCount $gameLabel|$ProfileCount $profileLabel"
+        return "$GameCount $gameLabel, $ProfileCount $profileLabel"
     }
 
     function Get-TraySectionHeaderSummaryChips {
@@ -8818,13 +9461,12 @@ public class HotkeyMessageWindow : NativeWindow {
 
         $safeItemCount = [Math]::Max(0, $ItemCount)
         $itemLabel = if ($safeItemCount -eq 1) { $ItemSingular } else { $ItemPlural }
-        $chips = @("$safeItemCount $itemLabel")
         if ($GameCount -gt 0) {
             $safeGameCount = [Math]::Max(0, $GameCount)
             $gameLabel = if ($safeGameCount -eq 1) { "game" } else { "games" }
-            $chips += "$safeGameCount $gameLabel"
+            return "$safeItemCount $itemLabel, $safeGameCount $gameLabel"
         }
-        return ($chips -join "|")
+        return "$safeItemCount $itemLabel"
     }
 
     function Set-TraySectionHeaderVisualState {
@@ -8835,8 +9477,11 @@ public class HotkeyMessageWindow : NativeWindow {
 
         if (-not $Item) { return }
         $Item.AccessibleName = "__section_header__"
-        $Item.AccessibleDescription = if ([string]::IsNullOrWhiteSpace($ChipText)) { "" } else { $ChipText.Trim() }
-        $Item.Padding = New-Object System.Windows.Forms.Padding(0, 0, 94, 0)
+        $Item.AccessibleDescription = ""
+        if (-not [string]::IsNullOrWhiteSpace($ChipText)) {
+            $Item.ToolTipText = $ChipText.Trim()
+        }
+        $Item.Padding = New-Object System.Windows.Forms.Padding(0)
     }
 
     # ─── FAVORITES ───
@@ -8867,8 +9512,8 @@ public class HotkeyMessageWindow : NativeWindow {
         $favLabel.Text = "FAVORITES"
         $favLabel.Enabled = $false
         $favLabel.BackColor = $script:Colors.Background
-        $favLabel.ForeColor = $script:Colors.FavoriteStar
-        $favLabel.Font = $script:FontEyebrow
+        $favLabel.ForeColor = Get-TraySectionHeaderTint -Section "Favorites"
+        $favLabel.Font = $script:FontSectionHeader
         Set-TraySectionHeaderVisualState `
             -Item $favLabel `
             -ChipText (Get-TraySectionHeaderSummaryChips `
@@ -8876,12 +9521,7 @@ public class HotkeyMessageWindow : NativeWindow {
                 -ItemSingular "favorite" `
                 -ItemPlural "favorites" `
                 -GameCount $favoriteHeaderGroupKeys.Count)
-        if ($favoriteHeaderGameGroups.Count -gt 0 -and (Get-Command New-FavoriteGameMosaicBitmap -ErrorAction SilentlyContinue)) {
-            $favLabel.Image = New-FavoriteGameMosaicBitmap -GameGroups @($favoriteHeaderGameGroups) -Color $script:Colors.FavoriteStar -Category "Other"
-        }
-        else {
-            $favLabel.Image = New-ActionBitmap -Action "Favorite" -Color $script:Colors.FavoriteStar
-        }
+        $favLabel.Image = $null
         $menu.Items.Add($favLabel) | Out-Null
         $script:favSectionLabel = $favLabel
 
@@ -8899,7 +9539,7 @@ public class HotkeyMessageWindow : NativeWindow {
                 -FavoriteBadge $true
             $item.BackColor = $script:Colors.Background
             $item.ForeColor = $gameColor
-            $item.Font = New-Object System.Drawing.Font("Segoe UI", 9)
+            $item.Font = $script:FontMenuRow
             Set-TrayProfileMenuItemMetadata -Item $item -ProfileId $favId -Profile $p
             $item.Add_Click({
                 param($s, $ev)
@@ -8938,8 +9578,8 @@ public class HotkeyMessageWindow : NativeWindow {
         $recentLabel.Text = "RECENT"
         $recentLabel.Enabled = $false
         $recentLabel.BackColor = $script:Colors.Background
-        $recentLabel.ForeColor = $script:Colors.TextDim
-        $recentLabel.Font = $script:FontEyebrow
+        $recentLabel.ForeColor = Get-TraySectionHeaderTint -Section "Recent"
+        $recentLabel.Font = $script:FontSectionHeader
         Set-TraySectionHeaderVisualState `
             -Item $recentLabel `
             -ChipText (Get-TraySectionHeaderSummaryChips `
@@ -8947,12 +9587,7 @@ public class HotkeyMessageWindow : NativeWindow {
                 -ItemSingular "recent" `
                 -ItemPlural "recent" `
                 -GameCount $recentHeaderGameGroups.Count)
-        if ($recentHeaderGameGroups.Count -gt 0 -and (Get-Command New-GameMosaicBitmap -ErrorAction SilentlyContinue)) {
-            $recentLabel.Image = New-GameMosaicBitmap -GameGroups @($recentHeaderGameGroups) -Color $script:Colors.TextDim -Category "Other"
-        }
-        else {
-            $recentLabel.Image = New-ActionBitmap -Action "Recent" -Color $script:Colors.TextDim
-        }
+        $recentLabel.Image = $null
         $menu.Items.Add($recentLabel) | Out-Null
 
         $shownRecent = 0
@@ -8976,7 +9611,7 @@ public class HotkeyMessageWindow : NativeWindow {
                 -ShowSyncBadge $true
             $item.BackColor = $script:Colors.Background
             $item.ForeColor = $gameColor
-            $item.Font = New-Object System.Drawing.Font("Segoe UI", 9)
+            $item.Font = $script:FontMenuRow
             Set-TrayProfileMenuItemMetadata -Item $item -ProfileId $rId -Profile $p -ExtraChipText "RECENT"
             $item.Add_Click({
                 param($s, $ev)
@@ -9013,8 +9648,8 @@ public class HotkeyMessageWindow : NativeWindow {
     $profilesLabel.Text = "PROFILES"
     $profilesLabel.Enabled = $false
     $profilesLabel.BackColor = $script:Colors.BackgroundDark
-    $profilesLabel.ForeColor = [System.Drawing.Color]::FromArgb(255, 100, 110, 130)
-    $profilesLabel.Font = $script:FontEyebrow
+    $profilesLabel.ForeColor = Get-TraySectionHeaderTint -Section "Profiles"
+    $profilesLabel.Font = $script:FontSectionHeader
     Set-TraySectionHeaderVisualState `
         -Item $profilesLabel `
         -ChipText (Get-TraySectionHeaderSummaryChips `
@@ -9022,12 +9657,7 @@ public class HotkeyMessageWindow : NativeWindow {
             -ItemSingular "profile" `
             -ItemPlural "profiles" `
             -GameCount $profilesHeaderGroupKeys.Count)
-    if ($profilesHeaderGameGroups.Count -gt 0 -and (Get-Command New-GameMosaicBitmap -ErrorAction SilentlyContinue)) {
-        $profilesLabel.Image = New-GameMosaicBitmap -GameGroups @($profilesHeaderGameGroups) -Color $profilesLabel.ForeColor -Category "Other"
-    }
-    else {
-        $profilesLabel.Image = New-ActionBitmap -Action "Profiles" -Color $profilesLabel.ForeColor
-    }
+    $profilesLabel.Image = $null
     $menu.Items.Add($profilesLabel) | Out-Null
 
     # Helper to create a profile menu item (used in both direct items and submenus)
@@ -9050,7 +9680,7 @@ public class HotkeyMessageWindow : NativeWindow {
         $item.Tag = $ProfileId
         $item.BackColor = $script:Colors.Background
         $item.ForeColor = $gameColor
-        $item.Font = New-Object System.Drawing.Font("Segoe UI", 9)
+        $item.Font = $script:FontMenuRow
 
         Set-TrayProfileMenuItemMetadata -Item $item -ProfileId $ProfileId -Profile $p
 
@@ -9079,13 +9709,13 @@ public class HotkeyMessageWindow : NativeWindow {
         else {
             $CategoryColor
         }
-        $variantLabel = if ($VariantCount -eq 1) { "1 profile" } else { "$VariantCount variants" }
+        $variantLabel = if ($VariantCount -eq 1) { "1 choice" } else { "$VariantCount choices" }
         $headerItem = New-Object System.Windows.Forms.ToolStripMenuItem
         $headerItem.Text = "$($GroupInfo.Name)  |  $variantLabel"
         $headerItem.Tag = "__game_flyout_header__"
         $headerItem.AccessibleName = "__game_flyout_header__"
         $headerItem.AccessibleDescription = Get-GameFlyoutHeaderSummaryChips -ProfileIds $ProfileIds
-        $headerItem.Padding = New-Object System.Windows.Forms.Padding(0, 0, 72, 0)
+        $headerItem.Padding = New-Object System.Windows.Forms.Padding(0, 0, 76, 0)
         $headerItem.Enabled = $false
         $headerItem.BackColor = $script:Colors.BackgroundDark
         $headerItem.ForeColor = $gameColor
@@ -9096,7 +9726,7 @@ public class HotkeyMessageWindow : NativeWindow {
     }
 
     # Group visible profiles by category, then by game. Each game appears once;
-    # SDR/HDR/sync/capture variants live under that game's flyout.
+    # SDR/HDR/sync/capture choices live under that game's flyout.
     $catGameGroups = [ordered]@{}
 
     foreach ($id in $script:Profiles.Keys) {
@@ -9140,19 +9770,14 @@ public class HotkeyMessageWindow : NativeWindow {
         $catItem.Text = $cat
         $catItem.Tag = $cat
         $catItem.AccessibleName = "__category_header__"
-        $catItem.AccessibleDescription = Get-CategoryHeaderSummaryChips -GameCount $catGameCount -ProfileCount $catProfileCount
-        $catItem.Padding = New-Object System.Windows.Forms.Padding(0, 0, 92, 0)
-        $categorySampleGameGroups = @($catGameGroups[$cat].Keys | Sort-Object | Select-Object -First 3)
-        if (Get-Command New-GameMosaicBitmap -ErrorAction SilentlyContinue) {
-            $catItem.Image = New-GameMosaicBitmap -GameGroups $categorySampleGameGroups -Color $catColor -Category $cat
-        }
-        else {
-            $catItem.Image = New-CategoryBitmap -Category $cat -Color $catColor
-        }
+        $catItem.AccessibleDescription = ""
+        $catItem.ToolTipText = Get-CategoryHeaderSummaryChips -GameCount $catGameCount -ProfileCount $catProfileCount
+        $catItem.Padding = New-Object System.Windows.Forms.Padding(0)
+        $catItem.Image = $null
         $catItem.Enabled = $false
         $catItem.BackColor = $script:Colors.Background
-        $catItem.ForeColor = $catColor
-        $catItem.Font = [DarkThemeRenderer]::ResolveEyebrowFont(8.0)
+        $catItem.ForeColor = Get-TrayCategoryHeaderTint -Category $cat -CategoryColor $catColor
+        $catItem.Font = $script:FontCategoryHeader
         $menu.Items.Add($catItem) | Out-Null
         $script:categoryHeaders += $catItem
 
@@ -9196,10 +9821,10 @@ public class HotkeyMessageWindow : NativeWindow {
                 $submenuItem.Image = New-TrayGameGroupMedallionBitmap -GameGroup $gameGroup -Color $submenuGameColor -Category $cat
                 $submenuItem.BackColor = $script:Colors.Background
                 $submenuItem.ForeColor = $submenuGameColor
-                $submenuItem.Font = New-Object System.Drawing.Font("Segoe UI", 9)
-                $profileVariantChip = if ($profileIds.Count -eq 1) { "PROFILE" } else { "$($profileIds.Count) VAR" }
-                $submenuItem.ToolTipText = "Profile variants for $($groupInfo.Name): $($profileIds.Count)"
-                Set-TrayCommandItemVisualState -Item $submenuItem -ChipText $profileVariantChip -PaddingRight 72
+                $submenuItem.Font = $script:FontMenuRowBold
+                $profileVariantChip = ""
+                $submenuItem.ToolTipText = "Open profile choices for $($groupInfo.Name): $($profileIds.Count)"
+                Set-TrayGameGroupRowVisualState -Item $submenuItem
 
                 $flyoutHeader = New-GameFlyoutHeaderItem `
                     -GroupInfo $groupInfo `
@@ -9231,7 +9856,7 @@ public class HotkeyMessageWindow : NativeWindow {
     $actionsMenu.Text = "Actions"
     $actionsMenu.BackColor = $script:Colors.Background
     $actionsMenu.ForeColor = $script:Colors.AccentAmber
-    $actionsMenu.Font = New-Object System.Drawing.Font("Segoe UI", 9)
+    $actionsMenu.Font = $script:FontMenuRowBold
     $actionsMenu.Image = New-ActionBitmap -Action "Actions" -Color $script:Colors.AccentAmber
     $actionsMenu.AccessibleName = "__flyout_command__"
     $actionsMenu.AccessibleDescription = "TOOLS"
@@ -9243,7 +9868,7 @@ public class HotkeyMessageWindow : NativeWindow {
     $script:restoreItem.Enabled = $false
     $script:restoreItem.BackColor = $script:Colors.Background
     $script:restoreItem.ForeColor = $script:Colors.AccentAmber
-    $script:restoreItem.Font = New-Object System.Drawing.Font("Segoe UI", 9)
+    $script:restoreItem.Font = $script:FontMenuRow
     $script:restoreItem.Image = New-ActionBitmap -Action "Restore" -Color $script:Colors.AccentAmber
     $script:restoreItem.ToolTipText = "Restore the last backup before profile was applied"
     Set-TrayCommandItemVisualState -Item $script:restoreItem -ChipText "RESTORE"
@@ -9255,7 +9880,7 @@ public class HotkeyMessageWindow : NativeWindow {
     $auditItem.Text = "Run System Audit"
     $auditItem.BackColor = $script:Colors.Background
     $auditItem.ForeColor = $script:Colors.AccentBlue
-    $auditItem.Font = New-Object System.Drawing.Font("Segoe UI", 9)
+    $auditItem.Font = $script:FontMenuRow
     $auditItem.Image = New-ActionBitmap -Action "Audit" -Color $script:Colors.AccentBlue
     $auditItem.ToolTipText = "Scan the current audit scope for optimization issues"
     Set-TrayCommandItemVisualState -Item $auditItem -ChipText "AUDIT"
@@ -9269,7 +9894,7 @@ public class HotkeyMessageWindow : NativeWindow {
     $script:applyPendingItem.Visible = $false
     $script:applyPendingItem.BackColor = $script:Colors.Background
     $script:applyPendingItem.ForeColor = $script:Colors.AccentAmber
-    $script:applyPendingItem.Font = New-Object System.Drawing.Font("Segoe UI", 9)
+    $script:applyPendingItem.Font = $script:FontMenuRow
     $script:applyPendingItem.Image = New-ActionBitmap -Action "PendingFix" -Color $script:Colors.TextDisabled
     $script:applyPendingItem.ToolTipText = "No verifier-reported pending fixes for the active profile"
     Set-TrayCommandItemVisualState -Item $script:applyPendingItem -ChipText "FIX"
@@ -9283,7 +9908,7 @@ public class HotkeyMessageWindow : NativeWindow {
     $resetDisplayItem.Text = "Reset Display Pipeline..."
     $resetDisplayItem.BackColor = $script:Colors.Background
     $resetDisplayItem.ForeColor = $script:Colors.AccentAmber
-    $resetDisplayItem.Font = New-Object System.Drawing.Font("Segoe UI", 9)
+    $resetDisplayItem.Font = $script:FontMenuRow
     $resetDisplayItem.Image = New-ActionBitmap -Action "Reset" -Color $script:Colors.AccentAmber
     $resetDisplayItem.ToolTipText = "Advanced recovery: sends Ctrl+Win+Shift+B x2 and may blank monitors for a few seconds."
     Set-TrayCommandItemVisualState -Item $resetDisplayItem -ChipText "RESET"
@@ -9418,7 +10043,7 @@ public class HotkeyMessageWindow : NativeWindow {
     $backupsItem.Text = "Backups ($backupTime)"
     $backupsItem.BackColor = $script:Colors.Background
     $backupsItem.ForeColor = $script:Colors.AccentPurple
-    $backupsItem.Font = New-Object System.Drawing.Font("Segoe UI", 9)
+    $backupsItem.Font = $script:FontMenuRowBold
     if ($backupHeaderGameGroups.Count -gt 0 -and (Get-Command New-BackupGameMosaicBitmap -ErrorAction SilentlyContinue)) {
         $backupsItem.Image = New-BackupGameMosaicBitmap -GameGroups @($backupHeaderGameGroups) -Color $script:Colors.AccentPurple -Category "Other"
     }
@@ -9436,7 +10061,7 @@ public class HotkeyMessageWindow : NativeWindow {
     $openBackupsItem.Text = "Open Backups Folder"
     $openBackupsItem.BackColor = $script:Colors.Background
     $openBackupsItem.ForeColor = $script:Colors.Text
-    $openBackupsItem.Font = New-Object System.Drawing.Font("Segoe UI", 9)
+    $openBackupsItem.Font = $script:FontMenuRow
     $openBackupsItem.Image = New-ActionBitmap -Action "Folder" -Color $script:Colors.AccentPurple
     $openBackupsItem.ToolTipText = "Open the current backups folder"
     Set-TrayCommandItemVisualState -Item $openBackupsItem -ChipText "FOLDER"
@@ -9451,7 +10076,7 @@ public class HotkeyMessageWindow : NativeWindow {
         $noBackupsItem.Enabled = $false
         $noBackupsItem.BackColor = $script:Colors.BackgroundDark
         $noBackupsItem.ForeColor = $script:Colors.TextDisabled
-        $noBackupsItem.Font = New-Object System.Drawing.Font("Segoe UI", 9)
+        $noBackupsItem.Font = $script:FontMenuRow
         $noBackupsItem.Image = New-ActionBitmap -Action "Backups" -Color $script:Colors.TextDisabled
         $noBackupsItem.ToolTipText = "No backup folders were found in installed or workspace backup locations."
         $backupsItem.DropDownItems.Add($noBackupsItem) | Out-Null
@@ -9463,7 +10088,7 @@ public class HotkeyMessageWindow : NativeWindow {
         $bItem.Tag = $backup.Name
         $bItem.BackColor = $script:Colors.Background
         $bItem.ForeColor = $script:Colors.TextDim
-        $bItem.Font = New-Object System.Drawing.Font("Consolas", 8)
+        $bItem.Font = $script:FontMono
         $bItem.AccessibleName = "__backup_menu_item__"
         $bItem.AccessibleDescription = Get-BackupSourceChipText -Source $backup.Source
         $bItem.Padding = New-Object System.Windows.Forms.Padding(0, 0, 70, 0)
@@ -9591,7 +10216,7 @@ public class HotkeyMessageWindow : NativeWindow {
     $quickPanelItem.Text = if ($quickPanelIsVisible) { "Close Quick Panel" } else { "Open Quick Panel" }
     $quickPanelItem.BackColor = $script:Colors.Background
     $quickPanelItem.ForeColor = $script:Colors.AccentGreen
-    $quickPanelItem.Font = New-Object System.Drawing.Font("Segoe UI", 9)
+    $quickPanelItem.Font = $script:FontMenuRow
     $quickPanelItem.Image = New-ActionBitmap -Action "QuickPanel" -Color $script:Colors.AccentGreen
     $quickPanelItem.ToolTipText = if ($quickPanelIsVisible) {
         "Close the visible floating quick-access panel"
@@ -9647,7 +10272,7 @@ public class HotkeyMessageWindow : NativeWindow {
     $refreshProfilesItem.Text = "Refresh Profiles"
     $refreshProfilesItem.BackColor = $script:Colors.Background
     $refreshProfilesItem.ForeColor = $script:Colors.AccentBlue
-    $refreshProfilesItem.Font = New-Object System.Drawing.Font("Segoe UI", 9)
+    $refreshProfilesItem.Font = $script:FontMenuRow
     $refreshProfilesItem.Image = New-ActionBitmap -Action "Refresh" -Color $script:Colors.AccentBlue
     $refreshProfilesItem.ToolTipText = "Reload the profile list and user profiles; no profile is applied."
     Set-TrayCommandItemVisualState -Item $refreshProfilesItem -ChipText "REFRESH"
@@ -9687,7 +10312,7 @@ public class HotkeyMessageWindow : NativeWindow {
     $openProfilesItem.Text = "Open Profiles Folder"
     $openProfilesItem.BackColor = $script:Colors.Background
     $openProfilesItem.ForeColor = $script:Colors.TextDim
-    $openProfilesItem.Font = New-Object System.Drawing.Font("Segoe UI", 9)
+    $openProfilesItem.Font = $script:FontMenuRow
     $openProfilesItem.Image = New-ActionBitmap -Action "Folder" -Color $script:Colors.TextDim
     $openProfilesItem.ToolTipText = "Open user profiles folder in Explorer"
     Set-TrayCommandItemVisualState -Item $openProfilesItem -ChipText "FOLDER"
@@ -9701,7 +10326,7 @@ public class HotkeyMessageWindow : NativeWindow {
     $clearMemoryItem.Text = "Clear Standby List"
     $clearMemoryItem.BackColor = $script:Colors.Background
     $clearMemoryItem.ForeColor = $script:Colors.AccentBlue
-    $clearMemoryItem.Font = New-Object System.Drawing.Font("Segoe UI", 9)
+    $clearMemoryItem.Font = $script:FontMenuRow
     $clearMemoryItem.Image = New-ActionBitmap -Action "Memory" -Color $script:Colors.AccentBlue
     $clearMemoryItem.ToolTipText = "Requests a standby-memory purge; does not close apps or change profiles"
     Set-TrayCommandItemVisualState -Item $clearMemoryItem -ChipText "MEMORY"
@@ -9766,7 +10391,7 @@ public class HotkeyMessageWindow : NativeWindow {
     $settingsMenu.Text = "Settings"
     $settingsMenu.BackColor = $script:Colors.Background
     $settingsMenu.ForeColor = $script:Colors.Text
-    $settingsMenu.Font = New-Object System.Drawing.Font("Segoe UI", 9)
+    $settingsMenu.Font = $script:FontMenuRowBold
     $settingsMenu.Image = New-ActionBitmap -Action "Settings" -Color $script:Colors.Text
     $settingsMenu.AccessibleName = "__flyout_command__"
     $settingsMenu.AccessibleDescription = "PREFS"
@@ -9777,7 +10402,7 @@ public class HotkeyMessageWindow : NativeWindow {
     $script:startupItem = New-Object System.Windows.Forms.ToolStripMenuItem
     $script:startupItem.BackColor = $script:Colors.Background
     $script:startupItem.ForeColor = $script:Colors.Text
-    $script:startupItem.Font = New-Object System.Drawing.Font("Segoe UI", 9)
+    $script:startupItem.Font = $script:FontMenuRow
     Set-StartupMenuState -StartupStatus $startupStatus
     $script:startupItem.Add_Click({ Toggle-Startup })
     $settingsMenu.DropDownItems.Add($script:startupItem) | Out-Null
@@ -9788,7 +10413,7 @@ public class HotkeyMessageWindow : NativeWindow {
     $script:notifyToggle.Checked = $script:EnableBalloonNotifications
     $script:notifyToggle.BackColor = $script:Colors.Background
     $script:notifyToggle.ForeColor = $script:Colors.Text
-    $script:notifyToggle.Font = New-Object System.Drawing.Font("Segoe UI", 9)
+    $script:notifyToggle.Font = $script:FontMenuRow
     $script:notifyToggle.Image = New-ActionBitmap -Action "Toast" -Color $script:Colors.Text
     $script:notifyToggle.ToolTipText = "Toggle themed toast popups; tray hover/status text still updates"
     Set-TrayCommandItemVisualState -Item $script:notifyToggle -ChipText "TOAST"
@@ -9810,7 +10435,7 @@ public class HotkeyMessageWindow : NativeWindow {
     $soundToggle.Checked = $script:TrayConfig.soundEnabled
     $soundToggle.BackColor = $script:Colors.Background
     $soundToggle.ForeColor = $script:Colors.Text
-    $soundToggle.Font = New-Object System.Drawing.Font("Segoe UI", 9)
+    $soundToggle.Font = $script:FontMenuRow
     $soundToggle.Image = New-ActionBitmap -Action "Sound" -Color $script:Colors.Text
     $soundToggle.ToolTipText = "Toggle tray audio cues; toasts and status text still update"
     Set-TrayCommandItemVisualState -Item $soundToggle -ChipText "AUDIO"
@@ -9832,7 +10457,7 @@ public class HotkeyMessageWindow : NativeWindow {
     $settingsPanelItem.Text = "Open Settings..."
     $settingsPanelItem.BackColor = $script:Colors.Background
     $settingsPanelItem.ForeColor = $script:Colors.Text
-    $settingsPanelItem.Font = New-Object System.Drawing.Font("Segoe UI", 9)
+    $settingsPanelItem.Font = $script:FontMenuRow
     $settingsPanelItem.Image = New-ActionBitmap -Action "Settings" -Color $script:Colors.Text
     Set-TrayCommandItemVisualState -Item $settingsPanelItem -ChipText "CONFIG"
     $settingsPanelItem.Add_Click({
@@ -9852,7 +10477,7 @@ public class HotkeyMessageWindow : NativeWindow {
     $logItem.Text = "View Tray Log File"
     $logItem.BackColor = $script:Colors.Background
     $logItem.ForeColor = $script:Colors.TextDim
-    $logItem.Font = New-Object System.Drawing.Font("Segoe UI", 9)
+    $logItem.Font = $script:FontMenuRow
     $logItem.Image = New-ActionBitmap -Action "Log" -Color $script:Colors.TextDim
     $logItem.ToolTipText = "Opens current tray log: $script:LogFile"
     Set-TrayCommandItemVisualState -Item $logItem -ChipText "LOG"
@@ -9864,7 +10489,7 @@ public class HotkeyMessageWindow : NativeWindow {
     $configFolderItem.Text = "Open Tray Settings Folder"
     $configFolderItem.BackColor = $script:Colors.Background
     $configFolderItem.ForeColor = $script:Colors.TextDim
-    $configFolderItem.Font = New-Object System.Drawing.Font("Segoe UI", 9)
+    $configFolderItem.Font = $script:FontMenuRow
     $configFolderItem.Image = New-ActionBitmap -Action "Folder" -Color $script:Colors.TextDim
     $configFolderItem.ToolTipText = "Opens tray-config.json storage: $(Get-TrayConfigDir)"
     Set-TrayCommandItemVisualState -Item $configFolderItem -ChipText "FOLDER"
@@ -9876,7 +10501,7 @@ public class HotkeyMessageWindow : NativeWindow {
     $runtimeFolderItem.Text = "Open Installed Runtime Folder"
     $runtimeFolderItem.BackColor = $script:Colors.Background
     $runtimeFolderItem.ForeColor = $script:Colors.TextDim
-    $runtimeFolderItem.Font = New-Object System.Drawing.Font("Segoe UI", 9)
+    $runtimeFolderItem.Font = $script:FontMenuRow
     $runtimeFolderItem.Image = New-ActionBitmap -Action "Folder" -Color $script:Colors.TextDim
     $runtimeFolderItem.ToolTipText = "Opens abso.yaml, installed binaries, backups, and deployed tray assets"
     Set-TrayCommandItemVisualState -Item $runtimeFolderItem -ChipText "RUNTIME"
@@ -9896,7 +10521,7 @@ public class HotkeyMessageWindow : NativeWindow {
     $script:statusBarItem.Enabled = $false
     $script:statusBarItem.BackColor = $script:Colors.BackgroundDark
     $script:statusBarItem.ForeColor = [System.Drawing.Color]::FromArgb(255, 100, 100, 110)
-    $script:statusBarItem.Font = New-Object System.Drawing.Font("Consolas", 7.5)
+    $script:statusBarItem.Font = $script:FontMono
     $script:statusBarItem.Image = New-ActionBitmap -Action "Info" -Color $script:statusBarItem.ForeColor
     $menu.Items.Add($script:statusBarItem) | Out-Null
 
@@ -9909,7 +10534,7 @@ public class HotkeyMessageWindow : NativeWindow {
     $restartItem.Text = "Restart Tray"
     $restartItem.BackColor = $script:Colors.Background
     $restartItem.ForeColor = $script:Colors.TextDim
-    $restartItem.Font = New-Object System.Drawing.Font("Segoe UI", 9)
+    $restartItem.Font = $script:FontMenuRow
     $restartItem.Image = New-ActionBitmap -Action "Refresh" -Color $script:Colors.TextDim
     $restartItem.Add_Click({
         $restartToken = [guid]::NewGuid().ToString("N")
@@ -9953,7 +10578,7 @@ public class HotkeyMessageWindow : NativeWindow {
     $aboutItem.Text = "About A.B.S.O."
     $aboutItem.BackColor = $script:Colors.Background
     $aboutItem.ForeColor = $script:Colors.TextDim
-    $aboutItem.Font = New-Object System.Drawing.Font("Segoe UI", 9)
+    $aboutItem.Font = $script:FontMenuRow
     $aboutItem.Image = New-ActionBitmap -Action "Info" -Color $script:Colors.TextDim
     $aboutItem.Add_Click({ Show-AboutPanel })
     $menu.Items.Add($aboutItem) | Out-Null
@@ -9963,7 +10588,7 @@ public class HotkeyMessageWindow : NativeWindow {
     $exitItem.Text = "Exit"
     $exitItem.BackColor = $script:Colors.Background
     $exitItem.ForeColor = $script:Colors.TextDim
-    $exitItem.Font = New-Object System.Drawing.Font("Segoe UI", 9)
+    $exitItem.Font = $script:FontMenuRow
     $exitItem.Image = New-ActionBitmap -Action "Exit" -Color $script:Colors.TextDim
     $exitItem.Add_Click({
         if ($script:HotkeyWindow) { Unregister-GlobalHotkeys -WindowHandle $script:HotkeyWindow.Handle }
@@ -10059,9 +10684,15 @@ public class HotkeyMessageWindow : NativeWindow {
     # ─── LAUNCH SANITIZER (kill overlays/capture/sync while game is alive) ───
     Start-LaunchSanitizerTimer
 
-    # Read-only post-startup verification so the tray distinguishes a remembered
-    # active profile from one that still needs an elevated apply/reboot step.
-    Start-ActiveProfileVerificationTimer -DelayMilliseconds 1500
+    # Do not run full profile verification automatically on tray startup.
+    # Even though ``state --json --verify`` is read-only, it still exercises
+    # display/NVIDIA/readback paths and has correlated with black compositor
+    # blinks on mixed-refresh VRR systems. Startup only restores remembered
+    # state; explicit same-profile clicks, apply, and pending-fix actions still
+    # run verification before deciding whether to write anything.
+    if (-not [string]::IsNullOrWhiteSpace([string]$script:activeProfile)) {
+        Write-TrayLog "Startup profile verification deferred; active profile restored from remembered state only"
+    }
 
     # Narrow one-shot command file used by local automation to ask the already
     # elevated tray to run vetted tray actions. Currently only supports the
@@ -10163,7 +10794,7 @@ finally {
     # Phosphor type-system fonts (added during the Tron HUD overhaul) -
     # previously leaked on exit because the finally block only knew about
     # the legacy FontNormal / FontBold pair.
-    foreach ($fontVar in @('FontEyebrow','FontHero','FontMono')) {
+    foreach ($fontVar in @('FontEyebrow','FontHero','FontMono','FontMenuRow','FontMenuRowBold','FontSectionHeader','FontCategoryHeader')) {
         $fontObj = Get-Variable -Scope Script -Name $fontVar -ValueOnly -ErrorAction SilentlyContinue
         if ($fontObj) {
             try { $fontObj.Dispose() } catch {}

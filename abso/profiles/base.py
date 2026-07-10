@@ -598,6 +598,14 @@ class BaseProfile(ABC):
         """
         pass
 
+    def get_post_apply_notes(self) -> list[str]:
+        """Get short manual follow-up notes for apply-success surfaces.
+
+        The full in-game report can be verbose. Return only high-priority
+        manual actions that belong in a tray toast after a successful apply.
+        """
+        return []
+
     def generate_in_game_report(self) -> str:
         """Generate markdown report of in-game settings.
 

@@ -106,6 +106,25 @@ class TestMouseAudit:
         assert len(accel_issues) == 0
 
     @patch.object(MouseSettingsHandler, "detect")
+    def test_audit_flags_y_curve_separately(self, mock_detect):
+        """X/Y curve templates are axis-specific and both must be checked."""
+        mock_detect.return_value = {
+            "mouse_speed": 0,
+            "mouse_threshold1": 0,
+            "mouse_threshold2": 0,
+            "enhanced_pointer_precision": False,
+            "smooth_mouse_x_curve": list(MouseSettingsHandler.LINEAR_X_CURVE),
+            "smooth_mouse_y_curve": list(MouseSettingsHandler.LINEAR_X_CURVE),
+            "is_acceleration_disabled": True,
+        }
+
+        handler = MouseSettingsHandler()
+        issues = handler.audit()
+
+        assert any(i.title == "Mouse Y curve is not linear" for i in issues)
+        assert not any(i.title == "Mouse X curve is not linear" for i in issues)
+
+    @patch.object(MouseSettingsHandler, "detect")
     def test_audit_epp_enabled_mentioned(self, mock_detect):
         """Test audit mentions Enhanced Pointer Precision when enabled."""
         mock_detect.return_value = {
@@ -148,6 +167,28 @@ class TestMouseApply:
         assert result["success"] is True
         mock_set_speed.assert_called_once_with(0)
 
+    @patch.object(MouseSettingsHandler, "_notify_pointer_speed_change")
+    @patch("abso.settings.mouse.winreg")
+    def test_set_mouse_sensitivity_notifies_pointer_speed(self, mock_winreg, mock_notify):
+        """MouseSensitivity changes must be broadcast with SPI_SETMOUSESPEED."""
+        mock_key = MagicMock()
+        mock_winreg.OpenKey.return_value = mock_key
+        mock_winreg.HKEY_CURRENT_USER = winreg.HKEY_CURRENT_USER
+        mock_winreg.KEY_ALL_ACCESS = winreg.KEY_ALL_ACCESS
+        mock_winreg.REG_SZ = winreg.REG_SZ
+
+        handler = MouseSettingsHandler()
+        handler._set_mouse_sensitivity(30)
+
+        mock_winreg.SetValueEx.assert_called_once_with(
+            mock_key,
+            "MouseSensitivity",
+            0,
+            winreg.REG_SZ,
+            "20",
+        )
+        mock_notify.assert_called_once_with(20)
+
     @patch.object(MouseSettingsHandler, "_set_mouse_speed")
     def test_apply_handles_permission_error(self, mock_set_speed):
         """Test apply handles permission errors."""
@@ -184,8 +225,9 @@ class TestMouseBackupRestore:
         assert result == expected
 
     @patch("abso.settings.mouse.winreg")
+    @patch.object(MouseSettingsHandler, "_notify_pointer_speed_change")
     @patch.object(MouseSettingsHandler, "_notify_settings_change")
-    def test_restore_applies_settings(self, mock_notify, mock_winreg):
+    def test_restore_applies_settings(self, mock_notify, mock_pointer_notify, mock_winreg):
         """Test restore applies backed up settings via registry."""
         mock_key = MagicMock()
         mock_winreg.OpenKey.return_value = mock_key
@@ -195,6 +237,7 @@ class TestMouseBackupRestore:
 
         backup_data = {
             "mouse_speed": 0,
+            "mouse_sensitivity": 10,
             "mouse_threshold1": 0,
             "mouse_threshold2": 0,
         }
@@ -205,6 +248,7 @@ class TestMouseBackupRestore:
         assert result is True
         mock_winreg.SetValueEx.assert_called()
         mock_notify.assert_called_once()
+        mock_pointer_notify.assert_called_once_with(10)
 
     @patch("abso.settings.mouse.winreg")
     def test_restore_returns_false_on_failure(self, mock_winreg):
@@ -278,3 +322,23 @@ class TestMouseVerify:
         assert result["all_active"] is False
         assert result["settings"]["disable_acceleration"]["active"] is False
         assert result["settings"]["mouse_sensitivity"]["active"] is False
+
+    @patch.object(MouseSettingsHandler, "detect")
+    def test_verify_rejects_swapped_linear_curves(self, mock_detect):
+        """A swapped X/Y curve pair must not verify as a clean linear curve."""
+        mock_detect.return_value = {
+            "mouse_speed": 0,
+            "mouse_sensitivity": 10,
+            "mouse_threshold1": 0,
+            "mouse_threshold2": 0,
+            "enhanced_pointer_precision": False,
+            "smooth_mouse_x_curve": list(MouseSettingsHandler.LINEAR_Y_CURVE),
+            "smooth_mouse_y_curve": list(MouseSettingsHandler.LINEAR_X_CURVE),
+            "is_acceleration_disabled": True,
+        }
+
+        handler = MouseSettingsHandler()
+        result = handler.verify_active({"set_linear_curve": True})
+
+        assert result["all_active"] is False
+        assert result["settings"]["set_linear_curve"]["active"] is False

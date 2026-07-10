@@ -9,7 +9,7 @@ from click.testing import CliRunner
 
 import abso.main as abso_main
 from abso.core import apply_hooks
-from abso.core.applier import ApplyResult
+from abso.core.applier import ApplyResult, ProfileApplier
 from abso.core.apply_feedback import determine_apply_summary_level
 from abso.core.multimon_detector import DisplayEnvironment, MultiMonitorResult
 from abso.main import cli
@@ -389,6 +389,39 @@ class TestCLIAudit:
 class TestCLIApply:
     """Test apply command error handling."""
 
+    def test_collect_manual_actions_builds_nvidia_toast_buttons(self):
+        """NVIDIA manual binding steps should become allowlisted tray actions."""
+        steps = [
+            {
+                "key": "nvidia_app_binding",
+                "label": "NVIDIA profile binding",
+                "profile_name": "Rivals 2 Online",
+                "executables": ["Rivals2-Win64-Shipping.exe"],
+                "satisfied": False,
+            },
+            {
+                "key": "open_anything",
+                "profile_name": "Ignored",
+                "executables": ["ignored.exe"],
+            },
+        ]
+
+        assert abso_main._collect_manual_actions(steps) == [
+            {
+                "type": "open_nvidia_profile_inspector",
+                "label": "Open NPI",
+                "profile_name": "Rivals 2 Online",
+                "executable": "Rivals2-Win64-Shipping.exe",
+            },
+            {
+                "type": "copy_text",
+                "label": "Copy EXE",
+                "text": "Rivals2-Win64-Shipping.exe",
+                "profile_name": "Rivals 2 Online",
+                "executable": "Rivals2-Win64-Shipping.exe",
+            },
+        ]
+
     def test_apply_invalid_profile(self):
         """Test apply with invalid profile name gives error."""
         runner = CliRunner()
@@ -463,6 +496,7 @@ class TestCLIApply:
 
         mock_manager = mock_tx_manager_cls.return_value
         mock_manager.execute.return_value = tx_result
+        mock_manager.applier = ProfileApplier()
 
         runner = CliRunner()
         state_file = tmp_path / ".abso_state.json"
@@ -481,6 +515,12 @@ class TestCLIApply:
             "Verification mismatch in NvidiaSettingsHandler",
         ]
         assert payload["data"]["notices"] == ["Reusing existing bound NVIDIA profile 'Slippi'."]
+        assert payload["data"]["post_apply_notes"] == [
+            (
+                "Slippi manual: confirm Dolphin backend and controller adapter; "
+                "try Vulkan first, D3D12 if Vulkan stutters, VSync Off for no-sync."
+            )
+        ]
         assert payload["data"]["summary_level"] == "warning"
         mock_manager.execute.assert_called_once_with(
             profile_id="slippi-melee",

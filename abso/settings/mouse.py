@@ -32,6 +32,10 @@ class MouseSettingsHandler(SettingsHandler):
 
     # Registry paths
     MOUSE_KEY = r"Control Panel\Mouse"
+    SPI_SETMOUSE = 0x0004
+    SPI_SETMOUSESPEED = 0x0071
+    SPIF_UPDATEINIFILE = 0x01
+    SPIF_SENDCHANGE = 0x02
 
     # Linear (1:1) mouse curves - no acceleration
     # These are the raw bytes for a perfectly linear response
@@ -94,10 +98,31 @@ class MouseSettingsHandler(SettingsHandler):
                 category="mouse",
             ))
 
-        # Check for non-linear curves even if other settings are correct
-        if not self._is_curve_linear(current.get("smooth_mouse_x_curve")):
+        # Check for non-linear curves even if other settings are correct.
+        # X and Y curves are intentionally different byte sequences; treating
+        # either template as valid for both axes can hide a swapped/corrupt
+        # mouse curve and falsely report the profile clean.
+        if not self._is_curve_linear(
+            current.get("smooth_mouse_x_curve"),
+            self.LINEAR_X_CURVE,
+        ):
             issues.append(Issue(
                 title="Mouse X curve is not linear",
+                severity="info",
+                current_value="Non-linear curve",
+                optimal_value="Linear (1:1) curve",
+                explanation=(
+                    "Windows applies a curve to mouse input that can affect precision. "
+                    "A linear curve ensures consistent 1:1 input translation."
+                ),
+                category="mouse",
+            ))
+        if not self._is_curve_linear(
+            current.get("smooth_mouse_y_curve"),
+            self.LINEAR_Y_CURVE,
+        ):
+            issues.append(Issue(
+                title="Mouse Y curve is not linear",
                 severity="info",
                 current_value="Non-linear curve",
                 optimal_value="Linear (1:1) curve",
@@ -145,6 +170,7 @@ class MouseSettingsHandler(SettingsHandler):
     def restore(self, data: dict[str, Any]) -> bool:
         """Restore mouse settings from backup."""
         try:
+            restored_sensitivity: int | None = None
             key = winreg.OpenKey(
                 winreg.HKEY_CURRENT_USER,
                 self.MOUSE_KEY,
@@ -155,7 +181,8 @@ class MouseSettingsHandler(SettingsHandler):
                 if "mouse_speed" in data and data["mouse_speed"] is not None:
                     winreg.SetValueEx(key, "MouseSpeed", 0, winreg.REG_SZ, str(data["mouse_speed"]))
                 if "mouse_sensitivity" in data and data["mouse_sensitivity"] is not None:
-                    winreg.SetValueEx(key, "MouseSensitivity", 0, winreg.REG_SZ, str(data["mouse_sensitivity"]))
+                    restored_sensitivity = self._normalize_mouse_sensitivity(data["mouse_sensitivity"])
+                    winreg.SetValueEx(key, "MouseSensitivity", 0, winreg.REG_SZ, str(restored_sensitivity))
                 if "mouse_threshold1" in data and data["mouse_threshold1"] is not None:
                     winreg.SetValueEx(key, "MouseThreshold1", 0, winreg.REG_SZ, str(data["mouse_threshold1"]))
                 if "mouse_threshold2" in data and data["mouse_threshold2"] is not None:
@@ -169,6 +196,8 @@ class MouseSettingsHandler(SettingsHandler):
 
             # Apply changes immediately
             self._notify_settings_change()
+            if restored_sensitivity is not None:
+                self._notify_pointer_speed_change(restored_sensitivity)
             return True
 
         except Exception as e:
@@ -195,8 +224,14 @@ class MouseSettingsHandler(SettingsHandler):
         if "set_linear_curve" in settings:
             target = bool(settings["set_linear_curve"])
             current_value = (
-                self._is_curve_linear(current.get("smooth_mouse_x_curve"))
-                and self._is_curve_linear(current.get("smooth_mouse_y_curve"))
+                self._is_curve_linear(
+                    current.get("smooth_mouse_x_curve"),
+                    self.LINEAR_X_CURVE,
+                )
+                and self._is_curve_linear(
+                    current.get("smooth_mouse_y_curve"),
+                    self.LINEAR_Y_CURVE,
+                )
             )
             is_active = current_value == target
             results["settings"]["set_linear_curve"] = {
@@ -311,11 +346,16 @@ class MouseSettingsHandler(SettingsHandler):
             return True
         return bool(speed == 1 and thresh1 == 0 and thresh2 == 0)
 
-    def _is_curve_linear(self, curve: list[int] | None) -> bool:
+    def _is_curve_linear(
+        self,
+        curve: list[int] | bytes | None,
+        expected_curve: bytes | None = None,
+    ) -> bool:
         """Check if a curve is linear (matches our linear curve)."""
         if curve is None:
             return False
-        return bytes(curve) == self.LINEAR_X_CURVE or bytes(curve) == self.LINEAR_Y_CURVE
+        expected = expected_curve or self.LINEAR_X_CURVE
+        return bytes(curve) == expected
 
     def _set_mouse_speed(self, speed: int) -> None:
         """Set MouseSpeed value."""
@@ -333,6 +373,7 @@ class MouseSettingsHandler(SettingsHandler):
     def _set_mouse_sensitivity(self, sensitivity: int) -> None:
         """Set mouse sensitivity (pointer speed slider, 1-20)."""
         # Sensitivity is stored in MouseSensitivity
+        normalized = self._normalize_mouse_sensitivity(sensitivity)
         key = winreg.OpenKey(
             winreg.HKEY_CURRENT_USER,
             self.MOUSE_KEY,
@@ -340,11 +381,16 @@ class MouseSettingsHandler(SettingsHandler):
             winreg.KEY_ALL_ACCESS
         )
         try:
-            # Clamp to valid range
-            sensitivity = max(1, min(20, sensitivity))
-            winreg.SetValueEx(key, "MouseSensitivity", 0, winreg.REG_SZ, str(sensitivity))
+            winreg.SetValueEx(key, "MouseSensitivity", 0, winreg.REG_SZ, str(normalized))
         finally:
             winreg.CloseKey(key)
+
+        self._notify_pointer_speed_change(normalized)
+
+    @staticmethod
+    def _normalize_mouse_sensitivity(sensitivity: Any) -> int:
+        """Clamp the Windows pointer speed slider value to 1-20."""
+        return max(1, min(20, int(sensitivity)))
 
     def _disable_acceleration(self) -> None:
         """Disable all mouse acceleration."""
@@ -414,9 +460,30 @@ class MouseSettingsHandler(SettingsHandler):
             except Exception:
                 pass
 
-            # SPI_SETMOUSE = 0x0004, SPIF_UPDATEINIFILE | SPIF_SENDCHANGE = 0x03
             ctypes.windll.user32.SystemParametersInfoW(
-                0x0004, 0, ctypes.byref(mouse_params), 0x03,
+                self.SPI_SETMOUSE,
+                0,
+                ctypes.byref(mouse_params),
+                self.SPIF_UPDATEINIFILE | self.SPIF_SENDCHANGE,
             )
         except Exception as e:
             logger.debug(f"Failed to notify settings change: {e}")
+
+    def _notify_pointer_speed_change(self, sensitivity: int | None = None) -> None:
+        """Notify Windows that the pointer speed slider changed."""
+        try:
+            import ctypes
+
+            if sensitivity is None:
+                sensitivity = self._get_mouse_sensitivity()
+            if sensitivity is None:
+                return
+            normalized = self._normalize_mouse_sensitivity(sensitivity)
+            ctypes.windll.user32.SystemParametersInfoW(
+                self.SPI_SETMOUSESPEED,
+                0,
+                ctypes.c_void_p(normalized),
+                self.SPIF_UPDATEINIFILE | self.SPIF_SENDCHANGE,
+            )
+        except Exception as e:
+            logger.debug(f"Failed to notify pointer speed change: {e}")

@@ -15,16 +15,21 @@ $script:QuickPanelToolTip = $null
 # ============================================================================
 # PHOSPHOR PALETTE (mirrors $script:Penumbra in ABSO-Notifications.ps1)
 # ============================================================================
-$script:QPPalette = @{
-    Ink100   = [System.Drawing.Color]::FromArgb(255, 14, 18, 26)
-    Ink150   = [System.Drawing.Color]::FromArgb(255, 17, 21, 31)
-    Ink200   = [System.Drawing.Color]::FromArgb(255, 19, 24, 36)
-    Ink300   = [System.Drawing.Color]::FromArgb(255, 27, 34, 48)
-    Paper    = [System.Drawing.Color]::FromArgb(255, 232, 234, 240)
-    Mist     = [System.Drawing.Color]::FromArgb(255, 150, 168, 180)
-    Fog      = [System.Drawing.Color]::FromArgb(255, 95, 115, 130)
-    Lagoon   = [System.Drawing.Color]::FromArgb(255, 0, 245, 212)   # phosphor cyan
-    Rule     = [System.Drawing.Color]::FromArgb(70, 0, 245, 212)
+$script:QPPalette = if (Get-Command Get-TrayThemePalette -ErrorAction SilentlyContinue) {
+    Get-TrayThemePalette
+}
+else {
+    @{
+        Ink100   = [System.Drawing.Color]::FromArgb(255, 14, 18, 26)
+        Ink150   = [System.Drawing.Color]::FromArgb(255, 17, 21, 31)
+        Ink200   = [System.Drawing.Color]::FromArgb(255, 19, 24, 36)
+        Ink300   = [System.Drawing.Color]::FromArgb(255, 27, 34, 48)
+        Paper    = [System.Drawing.Color]::FromArgb(255, 232, 238, 246)
+        Mist     = [System.Drawing.Color]::FromArgb(255, 150, 162, 183)
+        Fog      = [System.Drawing.Color]::FromArgb(255, 92, 104, 128)
+        Lagoon   = [System.Drawing.Color]::FromArgb(255, 0, 245, 212)   # phosphor cyan
+        Rule     = [System.Drawing.Color]::FromArgb(70, 0, 245, 212)
+    }
 }
 
 $script:QPFont_Eyebrow = $null

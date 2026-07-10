@@ -10,10 +10,10 @@ Goals:
 
 NVCP Settings (per-game for Rivals2.exe):
 - V-Sync: OFF (no sync, tearing accepted)
-- Low Latency Mode: ON (DX12/UE5 impact must be measured per driver/game)
+- Low Latency Mode: ON (DX11 queue control; measure per driver/game)
 - Max Frame Rate: OFF (uncapped)
 - Power Management: Prefer Maximum Performance
-- Threaded Optimization: OFF (UE5 driver contention)
+- Threaded Optimization: OFF (fighting-game stability)
 - G-SYNC: OFF (no VRR queueing path)
 
 External Tools: RTSS, frame pacing hooks ALLOWED.
@@ -71,8 +71,8 @@ class Rivals2OfflineProfile(Rivals2BaseProfile):
 
     @property
     def graphics_api(self) -> Literal["dx11", "dx12", "vulkan", "opengl", "unknown"]:
-        """Rivals 2 uses DirectX 12 (UE5)."""
-        return "dx12"
+        """Steam's published PC requirements list DirectX 11 for Rivals 2."""
+        return "dx11"
 
     @property
     def allows_aggressive_settings(self) -> bool:
@@ -93,8 +93,8 @@ class Rivals2OfflineProfile(Rivals2BaseProfile):
                 "processor_min_state": 100,
             },
             "NvidiaSettingsHandler": {
-                # Rivals 2 is DX12/UE5. Driver LLM impact is less deterministic
-                # than DX11; use On rather than Ultra and measure locally.
+                # Rivals 2 publishes a DX11 requirement. Use On rather than
+                # Ultra for queue control without the harsher limiter behavior.
                 "low_latency_mode": "on",
                 "power_management": "prefer_max_performance",
                 "vsync": "off",  # No sync, accept tearing
@@ -103,7 +103,7 @@ class Rivals2OfflineProfile(Rivals2BaseProfile):
                 "global_vrr_mode": "off",  # Enforce global VRR off for clean no-sync transitions
                 "max_frame_rate": "off",  # Uncapped
                 "shader_cache": "unlimited",
-                "threaded_optimization": "off",  # OFF — UE5 driver contention
+                "threaded_optimization": "off",  # OFF - fighting-game stability
                 "triple_buffering": "off",
             },
             "Rivals2ConfigHandler": {
@@ -145,8 +145,8 @@ class Rivals2OfflineProfile(Rivals2BaseProfile):
                 "value": "On",
                 "reason": (
                     "Driver LLM can reduce render queueing in supported paths. "
-                    "DX12/UE5 behavior is game-controlled enough that ABSO does "
-                    "not claim a fixed latency win."
+                    "ABSO uses On, not Ultra, to reduce queue depth without "
+                    "claiming a fixed latency win."
                 ),
             },
             {
@@ -173,6 +173,11 @@ class Rivals2OfflineProfile(Rivals2BaseProfile):
                 "value": "Uncapped FPS, no sync overhead",
                 "reason": "FPS should run uncapped without hitching. Tearing is expected.",
             },
+        ]
+
+    def get_post_apply_notes(self) -> list[str]:
+        return [
+            "Rivals 2 manual: keep in-game V-Sync Off and fullscreen exclusive; RTSS/external caps are allowed only offline."
         ]
 
 

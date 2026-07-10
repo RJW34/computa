@@ -9,6 +9,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 TRAY_SCRIPT = REPO_ROOT / "abso" / "tray" / "ABSO-Tray.ps1"
+THEME_SCRIPT = REPO_ROOT / "abso" / "tray" / "ABSO-Theme.ps1"
 ICONS_SCRIPT = REPO_ROOT / "abso" / "tray" / "ABSO-Icons.ps1"
 NOTIFICATIONS_SCRIPT = REPO_ROOT / "abso" / "tray" / "ABSO-Notifications.ps1"
 INSTALL_SCRIPT = REPO_ROOT / "abso" / "tray" / "Install-Startup.ps1"
@@ -120,8 +121,8 @@ def test_startup_restore_refreshes_last_profile_state() -> None:
     assert "Startup restore [$($startupProfile.source)]" not in script
 
 
-def test_tray_runs_read_only_state_verification() -> None:
-    """Tray startup/apply status must verify state without applying profiles."""
+def test_tray_runs_read_only_state_verification_on_explicit_refresh() -> None:
+    """Tray explicit/apply status paths must verify state without applying profiles."""
     script = TRAY_SCRIPT.read_text(encoding="utf-8")
     assert 'Get-AbsoBackendArgs -CommandArgs @("state", "--json", "--verify")' in script
     assert "Refreshes the tray's read-only view" in script
@@ -131,6 +132,18 @@ def test_tray_runs_read_only_state_verification() -> None:
     assert "Start-ActiveProfileVerificationProcess" in script
     assert "Complete-ActiveProfileVerificationIfReady" in script
     assert "$proc.WaitForExit(20000)" not in script
+
+
+def test_tray_defers_startup_profile_verification() -> None:
+    """Tray startup must not spawn display/NVIDIA verifier readback automatically."""
+    script = TRAY_SCRIPT.read_text(encoding="utf-8")
+    startup_section = script.split("# Only play restart sound once the new tray instance has fully initialized.", 1)[1].split(
+        "# Narrow one-shot command file used by local automation",
+        1,
+    )[0]
+
+    assert "Startup profile verification deferred" in startup_section
+    assert "Start-ActiveProfileVerificationTimer" not in startup_section
 
 
 def test_launch_sanitizer_sweep_does_not_block_ui_thread() -> None:
@@ -351,7 +364,7 @@ def test_profile_apply_timeout_toast_keeps_profile_visuals() -> None:
 
 
 def test_profile_apply_failure_names_failed_action() -> None:
-    """Profile apply failures should not show a bare Failed/Error toast body."""
+    """Profile apply failures should use the plain-English not-applied body."""
     script = TRAY_SCRIPT.read_text(encoding="utf-8")
     apply_section = script.split("function Apply-Profile", 1)[1].split(
         "function Apply-PendingProfileFixes",
@@ -362,10 +375,14 @@ def test_profile_apply_failure_names_failed_action() -> None:
         1,
     )[0]
 
-    assert 'Show-Notification @failureVisual -Title $failureTitle -Message "Apply failed: $err"' in (
+    assert "Convert-ApplyFailureTextToPlainEnglish" in script
+    assert 'Show-Notification @failureVisual -Title $failureTitle -Message $err' in failure_section
+    assert "$script:LastAction = $err" in failure_section
+    assert "Not applied.$restoredPrefix Add $exe to NVIDIA profile" in script
+    assert 'Show-Notification @failureVisual -Title $failureTitle -Message "Apply failed: $err"' not in (
         failure_section
     )
-    assert '$script:LastAction = "Apply failed: $err"' in failure_section
+    assert '$script:LastAction = "Apply failed: $err"' not in failure_section
     assert '-Message "Failed: $err"' not in failure_section
     assert '$script:LastAction = "Failed: $err"' not in failure_section
 
@@ -416,6 +433,77 @@ def test_apply_success_seeds_verifier_state_before_menu_surfaces_refresh() -> No
         apply_success_section.index("Set-ActiveProfileVerificationSeedFromApplyData -Data $json.data")
         < apply_success_section.index("Start-ActiveProfileVerificationTimer -DelayMilliseconds 500")
     )
+
+
+def test_apply_success_surfaces_post_apply_manual_notes() -> None:
+    """Apply success toast should surface profile-specific manual game steps."""
+    script = TRAY_SCRIPT.read_text(encoding="utf-8")
+    apply_success_section = script.split("if ($applySucceeded) {", 1)[1].split(
+        "else {\n            $err = Get-ApplyFailureMessage",
+        1,
+    )[0]
+
+    assert "function Get-ApplyPostApplyNoteMessages" in script
+    assert "$Json.data.post_apply_notes" in script
+    assert "$applyPostApplyNotes = Get-ApplyPostApplyNoteMessages -Json $json" in (
+        apply_success_section
+    )
+    assert '$extras += ("Manual: " + $applyPostApplyNotes[0])' in apply_success_section
+    assert 'Write-TrayLog "Apply manual note [$appliedProfileId]: $note"' in (
+        apply_success_section
+    )
+
+
+def test_apply_notifications_support_allowlisted_manual_action_buttons() -> None:
+    """Manual post-apply steps should expose safe toast buttons when possible."""
+    tray = TRAY_SCRIPT.read_text(encoding="utf-8")
+    notifications = NOTIFICATIONS_SCRIPT.read_text(encoding="utf-8")
+    apply_success_section = tray.split("if ($applySucceeded) {", 1)[1].split(
+        "else {\n            $err = Get-ApplyFailureMessage",
+        1,
+    )[0]
+    apply_failure_section = tray.split("else {\n            $err = Get-ApplyFailureMessage", 1)[1].split(
+        "catch {",
+        1,
+    )[0]
+
+    assert "[object[]]$ActionButtons = @()" in notifications
+    assert "$toastActions = @($ActionButtons" in notifications
+    assert "Invoke-TrayToastAction -Action $s.Tag" in notifications
+    assert "-ActionButtons @($q.ActionButtons)" in notifications
+    assert "function Get-ApplyManualActionButtons" in tray
+    assert "function Get-ApplyFailureActionButtons" in tray
+    assert "function Invoke-TrayToastAction" in tray
+    assert '"open_nvidia_profile_inspector"' in tray
+    assert '"open_nvidia_control_panel"' in tray
+    assert '"copy_text"' in tray
+    assert '"open_windows_settings"' in tray
+    assert "$applyActionButtons = Get-ApplyManualActionButtons -Json $json" in apply_success_section
+    assert apply_success_section.count("-ActionButtons @($applyActionButtons)") >= 7
+    assert "$failureActionButtons = Get-ApplyFailureActionButtons -Message $err -Json $json" in apply_failure_section
+    assert "-ActionButtons @($failureActionButtons)" in apply_failure_section
+    assert "Start-Process -FilePath \"$uri\"" in tray
+    assert 'if (-not [string]::IsNullOrWhiteSpace($uri) -and "$uri" -like "ms-settings:*")' in tray
+
+
+def test_apply_success_warnings_are_plain_english() -> None:
+    """Apply warning toasts should show actionable user steps, not raw backend proof text."""
+    script = TRAY_SCRIPT.read_text(encoding="utf-8")
+    warning_section = script.split("function Get-ApplyWarningMessages", 1)[1].split(
+        "function Get-ApplyNoticeMessages",
+        1,
+    )[0]
+
+    assert "function Convert-ApplyWarningTextToPlainEnglish" in script
+    assert "Convert-ApplyWarningTextToPlainEnglish -Message \"$warning\"" in warning_section
+    assert "Convert-ApplyWarningTextToPlainEnglish -Message \"$($checkpoint.message)\"" in (
+        warning_section
+    )
+    assert "Manual NVIDIA step: Add $exe to NVIDIA profile '$profile' in NVIDIA Control Panel" in (
+        script
+    )
+    assert 'return $null' in script
+    assert 'Add-UniqueTrayMessage -Target $messages -Message "$warning"' not in warning_section
 
 
 def test_apply_pending_success_seeds_verifier_state_before_menu_refresh() -> None:
@@ -515,7 +603,9 @@ def test_tray_user_status_replaces_raw_handler_identifiers() -> None:
     assert "$normalized = Format-TrayUserFacingText -Text $Message" in script
     assert 'return (Format-TrayUserFacingText -Text "$($reasons[0])")' in script
     assert 'return (Format-TrayUserFacingText -Text "$($pending[0])")' in script
-    assert 'return "Failed settings: $($friendlyHandlers -join \', \')"' in script
+    assert "$friendlyHandlers = @($FailedHandlers | ForEach-Object { Format-TrayUserFacingText -Text \"$_\" })" in script
+    assert '-Message "Failed settings: $($friendlyHandlers -join \', \')"' in script
+    assert 'return "Failed settings: $($friendlyHandlers -join \', \')"' not in script
     assert '"Handler failures: $($FailedHandlers -join \', \')"' not in script
 
 
@@ -992,18 +1082,49 @@ def test_tray_menu_renderer_uses_bounded_chip_layout() -> None:
         1,
     )[0]
 
-    assert "private const int SafeMenuMaxWidth = 760;" in renderer_section
+    assert "private const int SafeMenuMaxWidth = 520;" in renderer_section
     assert "private static int GetSafeItemWidth(ToolStripItem item)" in renderer_section
     assert "if (ownerWidth > 0) width = width > 0 ? Math.Min(width, ownerWidth) : ownerWidth;" in renderer_section
+    assert "private static Rectangle GetBoundedRowRect(Rectangle rect, int maxWidth, int minWidth)" in renderer_section
     assert "private static int GetSafeChipRight(ToolStripItem item)" in renderer_section
     assert "int chipRight = GetSafeChipRight(e.Item);" in renderer_section
     assert "e.Item.Width - 24" not in renderer_section
-    assert "$script:TrayMenuPreferredWidth = 760" in script
+    assert "$script:TrayMenuPreferredWidth = 520" in script
     assert "$script:TrayMenuScreenMargin = 48" in script
     assert "$DropDown.MinimumSize = New-Object System.Drawing.Size($minimumWidth, 0)" in menu_width_section
     assert "$DropDown.MaximumSize = New-Object System.Drawing.Size($widthBudget, 0)" in menu_width_section
     assert "Set-TrayDropDownWidthBudget -DropDown $menu" in menu_creation_section
     assert "Set-TrayDropDownWidthBudget -DropDown $item.DropDown" in menu_creation_section
+
+
+def test_profile_launcher_uses_readable_spacing_and_plain_choice_labels() -> None:
+    """Profile launcher rows should use the menu width for readable choices."""
+    script = TRAY_SCRIPT.read_text(encoding="utf-8")
+
+    assert '$script:FontNormal  = New-Object System.Drawing.Font("Segoe UI", 10.0)' in script
+    assert '$script:FontMenuRow = New-Object System.Drawing.Font("Segoe UI", 10.5)' in script
+    assert "$script:FontSectionHeader = [DarkThemeRenderer]::ResolveEyebrowFont(16.4)" in script
+    assert "$script:FontCategoryHeader = [DarkThemeRenderer]::ResolveEyebrowFont(13.8)" in script
+    assert '$script:FontMono    = New-Object System.Drawing.Font("Segoe UI", 9.0)' in script
+    assert '"Bahnschrift' not in script
+    assert '"Cascadia' not in script
+    assert '"Consolas"' not in script
+    assert "$script:TrayMenuMinimumWidth = 360" in script
+    assert "$script:statusItem.Size = New-Object System.Drawing.Size(480, 48)" in script
+    assert "$script:statusItem.Font = $script:FontMenuRowBold" in script
+    assert "$searchBox.Size = New-Object System.Drawing.Size(300, 26)" in script
+    assert "$searchBox.Font = $script:FontMenuRow" in script
+    assert "Font heroFont = ResolveHeroFont(13.0f, FontStyle.Regular);" in script
+    assert "float labelSize = isSectionHeader ? 16.4f : 13.8f;" in script
+    assert "int labelAlpha = isSectionHeader ? 255 : 248;" in script
+    assert "Color labelColor = isCategoryHeader" in script
+    assert "private static readonly Color TextPaper = Color.FromArgb(255, 232, 238, 246);" in script
+    assert 'Color rowTextColor = e.Item.AccessibleName == "__backup_menu_item__" ? TextMist : TextPaper;' in script
+    assert '$variantLabel = if ($VariantCount -eq 1) { "1 choice" } else { "$VariantCount choices" }' in script
+    assert '$profileVariantChip = ""' in script
+    assert '$submenuItem.ToolTipText = "Open profile choices for $($groupInfo.Name): $($profileIds.Count)"' in script
+    assert "Set-TrayGameGroupRowVisualState -Item $submenuItem" in script
+    assert '"$($profileIds.Count) VAR"' not in script
 
 
 def test_tray_surfaces_verification_in_progress_truthfully() -> None:
@@ -1085,8 +1206,8 @@ def test_active_profile_status_handles_catalog_mismatch_truthfully() -> None:
     assert "$script:Profiles.Contains($script:activeProfile)" not in script
 
 
-def test_tray_menu_section_headers_have_visual_glyphs() -> None:
-    """Frequent section headers should not be plain text-only menu rows."""
+def test_tray_menu_section_headers_are_colored_bands_not_profile_rows() -> None:
+    """Section/category headers should use color as structure, not profile-row text."""
     script = TRAY_SCRIPT.read_text(encoding="utf-8")
     renderer_section = script.split("// --- Section headers: disabled + bold items (section/category bands) ---", 1)[1].split(
         "var profileMenuItem = e.Item as ToolStripMenuItem;",
@@ -1094,25 +1215,32 @@ def test_tray_menu_section_headers_have_visual_glyphs() -> None:
     )[0]
 
     assert 'bool isSectionHeader = e.Item.AccessibleName == "__section_header__";' in renderer_section
-    assert "double wave = (Math.Sin(PulseFrame / 7.0) + 1.0) / 2.0;" in renderer_section
-    assert "int sweepX = 34 + ((PulseFrame * 3) % sweepTravel);" in renderer_section
+    assert 'bool isCategoryHeader = e.Item.AccessibleName == "__category_header__";' in renderer_section
+    assert "int fillAlpha = isCategoryHeader ? 18 : 14;" in renderer_section
+    assert "int lineAlpha = isCategoryHeader ? 90 : 72;" in renderer_section
+    assert "Header bands use color as structure; selectable rows use color as text." in renderer_section
+    assert "var railRect = new Rectangle(5, 4, isCategoryHeader ? 5 : 6, Math.Max(2, h - 8));" in renderer_section
+    assert "Color labelGlow = MixColor(tint, Color.White, 0.45);" in renderer_section
+    assert "double wave = (Math.Sin(PulseFrame / 7.0) + 1.0) / 2.0;" not in renderer_section
+    assert "sweepX = 34 + ((PulseFrame * 3) % sweepTravel)" not in renderer_section
     assert 'if (e.Item.AccessibleName == "__category_header__" || e.Item.AccessibleName == "__section_header__")' in script
     assert "function Get-TraySectionHeaderSummaryChips" in script
     assert "function Set-TraySectionHeaderVisualState" in script
     assert '$Item.AccessibleName = "__section_header__"' in script
-    assert "$Item.Padding = New-Object System.Windows.Forms.Padding(0, 0, 94, 0)" in script
-    assert "$favLabel.Image = New-FavoriteGameMosaicBitmap -GameGroups @($favoriteHeaderGameGroups) -Color $script:Colors.FavoriteStar -Category \"Other\"" in script
-    assert '$favLabel.Image = New-ActionBitmap -Action "Favorite" -Color $script:Colors.FavoriteStar' in script
-    assert "$recentLabel.Image = New-GameMosaicBitmap -GameGroups @($recentHeaderGameGroups) -Color $script:Colors.TextDim -Category \"Other\"" in script
-    assert '$recentLabel.Image = New-ActionBitmap -Action "Recent" -Color $script:Colors.TextDim' in script
-    assert "$profilesLabel.Image = New-GameMosaicBitmap -GameGroups @($profilesHeaderGameGroups) -Color $profilesLabel.ForeColor -Category \"Other\"" in script
-    assert '$profilesLabel.Image = New-ActionBitmap -Action "Profiles" -Color $profilesLabel.ForeColor' in script
+    assert '$Item.AccessibleDescription = ""' in script
+    assert "$Item.ToolTipText = $ChipText.Trim()" in script
+    assert "$Item.Padding = New-Object System.Windows.Forms.Padding(0)" in script
+    assert "function Get-TraySectionHeaderTint" in script
+    assert "function Get-TrayCategoryHeaderTint" in script
+    assert "$favLabel.Image = $null" in script
+    assert "$recentLabel.Image = $null" in script
+    assert "$profilesLabel.Image = $null" in script
     assert "$backupsItem.Image = New-BackupGameMosaicBitmap -GameGroups @($backupHeaderGameGroups) -Color $script:Colors.AccentPurple -Category \"Other\"" in script
     assert '$backupsItem.Image = New-ActionBitmap -Action "Backups" -Color $script:Colors.AccentPurple' in script
 
 
-def test_favorites_section_header_previews_favorite_game_marks() -> None:
-    """Favorites section header should show pinned game marks with a favorite affordance."""
+def test_favorites_section_header_stays_quiet_without_game_marks() -> None:
+    """Favorites section header should stay lighter than selectable profile rows."""
     script = TRAY_SCRIPT.read_text(encoding="utf-8")
     favorites_section = script.split("# ─── FAVORITES ───", 1)[1].split(
         "# ─── RECENT ───",
@@ -1130,17 +1258,18 @@ def test_favorites_section_header_previews_favorite_game_marks() -> None:
     assert "[void]$favoriteHeaderGameGroups.Add($favoriteGroup)" in favorites_section
     assert "if ($favoriteHeaderGameGroups.Count -ge 3) { break }" not in favorites_section
     assert "Set-TraySectionHeaderVisualState `" in favorites_section
+    assert '$favLabel.ForeColor = Get-TraySectionHeaderTint -Section "Favorites"' in favorites_section
     assert "-ItemCount $favProfiles.Count `" in favorites_section
     assert '-ItemSingular "favorite" `' in favorites_section
     assert '-ItemPlural "favorites" `' in favorites_section
     assert "-GameCount $favoriteHeaderGroupKeys.Count" in favorites_section
-    assert "$favoriteHeaderGameGroups.Count -gt 0 -and (Get-Command New-FavoriteGameMosaicBitmap -ErrorAction SilentlyContinue)" in favorites_section
-    assert "$favLabel.Image = New-FavoriteGameMosaicBitmap -GameGroups @($favoriteHeaderGameGroups) -Color $script:Colors.FavoriteStar -Category \"Other\"" in favorites_section
-    assert '$favLabel.Image = New-ActionBitmap -Action "Favorite" -Color $script:Colors.FavoriteStar' in favorites_section
+    assert "$favLabel.Image = $null" in favorites_section
+    assert "New-FavoriteGameMosaicBitmap" not in favorites_section
+    assert 'New-ActionBitmap -Action "Favorite"' not in favorites_section
 
 
-def test_recent_section_header_previews_recent_game_marks() -> None:
-    """Recent section header should preview real recent game marks before falling back to a generic glyph."""
+def test_recent_section_header_stays_quiet_without_game_marks() -> None:
+    """Recent section header should not add another icon row above recent profiles."""
     script = TRAY_SCRIPT.read_text(encoding="utf-8")
     recent_section = script.split("# ─── RECENT ───", 1)[1].split(
         "# ─── PROFILES (game submenus with sync badges) ───",
@@ -1159,17 +1288,18 @@ def test_recent_section_header_previews_recent_game_marks() -> None:
     assert "[void]$recentHeaderGameGroups.Add($recentGroup)" in recent_section
     assert "if ($recentHeaderGameGroups.Count -ge 3) { break }" in recent_section
     assert "Set-TraySectionHeaderVisualState `" in recent_section
+    assert '$recentLabel.ForeColor = Get-TraySectionHeaderTint -Section "Recent"' in recent_section
     assert "-ItemCount $recentDisplayCount `" in recent_section
     assert '-ItemSingular "recent" `' in recent_section
     assert '-ItemPlural "recent" `' in recent_section
     assert "-GameCount $recentHeaderGameGroups.Count" in recent_section
-    assert "$recentHeaderGameGroups.Count -gt 0 -and (Get-Command New-GameMosaicBitmap -ErrorAction SilentlyContinue)" in recent_section
-    assert "$recentLabel.Image = New-GameMosaicBitmap -GameGroups @($recentHeaderGameGroups) -Color $script:Colors.TextDim -Category \"Other\"" in recent_section
-    assert '$recentLabel.Image = New-ActionBitmap -Action "Recent" -Color $script:Colors.TextDim' in recent_section
+    assert "$recentLabel.Image = $null" in recent_section
+    assert "New-GameMosaicBitmap -GameGroups @($recentHeaderGameGroups)" not in recent_section
+    assert 'New-ActionBitmap -Action "Recent"' not in recent_section
 
 
-def test_profiles_section_header_previews_visible_game_marks() -> None:
-    """Profiles section header should preview visible game groups before category bands."""
+def test_profiles_section_header_stays_quiet_without_game_marks() -> None:
+    """Profiles section header should be a divider, not another game-mark row."""
     script = TRAY_SCRIPT.read_text(encoding="utf-8")
     profiles_section = script.split("# ─── PROFILES (game submenus with sync badges) ───", 1)[1].split(
         "# Helper to create a profile menu item",
@@ -1189,13 +1319,14 @@ def test_profiles_section_header_previews_visible_game_marks() -> None:
     assert "[void]$profilesHeaderGameGroups.Add($profileHeaderGroup)" in profiles_section
     assert "if ($profilesHeaderGameGroups.Count -ge 3) { break }" not in profiles_section
     assert "Set-TraySectionHeaderVisualState `" in profiles_section
+    assert '$profilesLabel.ForeColor = Get-TraySectionHeaderTint -Section "Profiles"' in profiles_section
     assert "-ItemCount $profilesVisibleCount `" in profiles_section
     assert '-ItemSingular "profile" `' in profiles_section
     assert '-ItemPlural "profiles" `' in profiles_section
     assert "-GameCount $profilesHeaderGroupKeys.Count" in profiles_section
-    assert "$profilesHeaderGameGroups.Count -gt 0 -and (Get-Command New-GameMosaicBitmap -ErrorAction SilentlyContinue)" in profiles_section
-    assert "$profilesLabel.Image = New-GameMosaicBitmap -GameGroups @($profilesHeaderGameGroups) -Color $profilesLabel.ForeColor -Category \"Other\"" in profiles_section
-    assert '$profilesLabel.Image = New-ActionBitmap -Action "Profiles" -Color $profilesLabel.ForeColor' in profiles_section
+    assert "$profilesLabel.Image = $null" in profiles_section
+    assert "New-GameMosaicBitmap -GameGroups @($profilesHeaderGameGroups)" not in profiles_section
+    assert 'New-ActionBitmap -Action "Profiles"' not in profiles_section
 
 
 def test_tray_top_level_rows_use_icons_without_fake_padding() -> None:
@@ -2255,8 +2386,11 @@ def test_active_profile_menu_row_has_renderer_driven_pulse() -> None:
     assert 'bool isActiveProfileRow = e.Item.AccessibleName == "__profile_menu_item__" &&' in script
     assert "profileMenuItem != null && profileMenuItem.Checked" in script
     assert "double wave = (Math.Sin(PulseFrame / 4.0) + 1.0) / 2.0;" in script
-    assert "int sweepX = rect.X + 9 + ((PulseFrame * 7) % sweepTravel);" in script
-    assert "g.DrawLine(sweepPen, sweepX, rect.Y + 2, Math.Min(rect.Right - 9, sweepX + sweepWidth), rect.Y + 2);" in script
+    assert "Rectangle activeRect = GetBoundedRowRect(rect, 430, 250);" in script
+    assert "FillRoundRect(g, brush, activeRect, 5)" in script
+    assert "DrawRoundRect(g, pen, activeRect, 5)" in script
+    assert "int sweepX = activeRect.X + 9 + ((PulseFrame * 7) % sweepTravel);" in script
+    assert "g.DrawLine(sweepPen, sweepX, activeRect.Y + 2, Math.Min(activeRect.Right - 9, sweepX + sweepWidth), activeRect.Y + 2);" in script
     assert "double chipWave = (Math.Sin(PulseFrame / 4.5) + 1.0) / 2.0;" in script
     assert "e.Graphics.DrawLine(chipSweepPen, chipSweepX, chipRect.Y + 2, Math.Min(chipRect.Right - 4, chipSweepX + sweepWidth), chipRect.Y + 2);" in script
     assert "$script:TrayMenuPulseTimer = $null" in script
@@ -2272,6 +2406,20 @@ def test_active_profile_menu_row_has_renderer_driven_pulse() -> None:
     assert "Start-TrayMenuPulseTimer" in script
     assert "function Stop-TrayMenuPulseTimer" in script
     assert "Stop-TrayMenuPulseTimer" in script
+
+
+def test_tray_row_highlights_are_bounded_to_content() -> None:
+    """Hover and active treatments should not paint empty full-width slabs."""
+    script = TRAY_SCRIPT.read_text(encoding="utf-8")
+    hover_section = script.split("if (e.Item.Selected && e.Item.Enabled)", 1)[1].split(
+        "else if (e.Item.Pressed)",
+        1,
+    )[0]
+
+    assert "Rectangle selectedRect = GetBoundedRowRect(rect, 440, 250);" in hover_section
+    assert "FillRoundRect(g, brush, selectedRect, 5)" in hover_section
+    assert "DrawRoundRect(g, pen, selectedRect, 5)" in hover_section
+    assert "var fadeRect = new Rectangle(selectedRect.Right - fadeW, selectedRect.Y, fadeW, selectedRect.Height);" in hover_section
 
 
 def test_game_flyouts_have_identity_headers_without_breaking_search() -> None:
@@ -2290,13 +2438,15 @@ def test_game_flyouts_have_identity_headers_without_breaking_search() -> None:
     assert '$headerItem.Tag = "__game_flyout_header__"' in script
     assert '$headerItem.AccessibleName = "__game_flyout_header__"' in script
     assert "$headerItem.AccessibleDescription = Get-GameFlyoutHeaderSummaryChips -ProfileIds $ProfileIds" in script
-    assert "$headerItem.Padding = New-Object System.Windows.Forms.Padding(0, 0, 72, 0)" in script
+    assert "$headerItem.Padding = New-Object System.Windows.Forms.Padding(0, 0, 76, 0)" in script
     assert '$headerItem.Text = "$($GroupInfo.Name)  |  $variantLabel"' in script
     assert "$headerItem.Image = New-TrayGameGroupMedallionBitmap -GameGroup $GameGroup -Color $gameColor -Category $Category" in script
     assert "$submenuItem.Image = New-TrayGameGroupMedallionBitmap -GameGroup $gameGroup -Color $submenuGameColor -Category $cat" in script
-    assert '$profileVariantChip = if ($profileIds.Count -eq 1) { "PROFILE" } else { "$($profileIds.Count) VAR" }' in script
-    assert '$submenuItem.ToolTipText = "Profile variants for $($groupInfo.Name): $($profileIds.Count)"' in script
-    assert "Set-TrayCommandItemVisualState -Item $submenuItem -ChipText $profileVariantChip -PaddingRight 72" in script
+    assert '$profileVariantChip = ""' in script
+    assert '$submenuItem.ToolTipText = "Open profile choices for $($groupInfo.Name): $($profileIds.Count)"' in script
+    assert "function Set-TrayGameGroupRowVisualState" in script
+    assert '$Item.AccessibleName = "__game_group_row__"' in script
+    assert "Set-TrayGameGroupRowVisualState -Item $submenuItem" in script
     assert '$headerItem.ToolTipText = "Game group header for $($GroupInfo.Name): $variantLabel"' in script
     assert "$flyoutHeader = New-GameFlyoutHeaderItem `" in script
     assert "-ProfileIds $profileIds" in script
@@ -2307,6 +2457,25 @@ def test_game_flyouts_have_identity_headers_without_breaking_search() -> None:
 def test_game_group_menu_rows_use_compact_medallions() -> None:
     """Game group rows should get the newer ringed mark without changing profile variant badges."""
     script = TRAY_SCRIPT.read_text(encoding="utf-8")
+    game_row_background = script.split("// --- Game group rows: readable lane entries with color carried by rails/icons ---", 1)[1].split(
+        "// --- Section headers",
+        1,
+    )[0]
+    game_row_text = script.split('if (e.Item.AccessibleName == "__game_group_row__")', 2)[2].split(
+        'if (e.Item.AccessibleName == "__category_header__" || e.Item.AccessibleName == "__section_header__")',
+        1,
+    )[0]
+
+    assert 'e.Item.AccessibleName == "__game_group_row__"' in game_row_background
+    assert "Rectangle laneRect = GetBoundedRowRect(rect, 350, 190);" in game_row_background
+    assert "Color.FromArgb(20, tint.R, tint.G, tint.B)" in game_row_background
+    assert "FillRoundRect(g, brush, laneRect, 4)" in game_row_background
+    assert "var railRect = new Rectangle(laneRect.X + 5, laneRect.Y + 4, 4, Math.Max(3, laneRect.Height - 8));" in game_row_background
+    assert "g.DrawLine(pen, laneRect.X + 18, laneRect.Y + 1, Math.Min(laneRect.Right - 14, laneRect.X + 128), laneRect.Y + 1);" in game_row_background
+    assert "Color labelColor = TextPaper;" in game_row_text
+    assert "ResolveEyebrowFont(11.0f)" not in game_row_text
+    assert 'e.Graphics.DrawString((e.Text ?? "").Trim(), e.TextFont, labelBrush, labelRect, labelFormat);' in game_row_text
+
     medallion_section = script.split("function New-TrayGameGroupMedallionBitmap", 1)[1].split(
         "function Get-TrayProfileMenuAccent",
         1,
@@ -2332,8 +2501,8 @@ def test_game_group_menu_rows_use_compact_medallions() -> None:
     assert "New-TrayGameGroupMedallionBitmap" not in profile_image_section
 
 
-def test_game_mosaic_bitmap_replaces_category_placeholder_for_category_headers() -> None:
-    """Category bands should preview actual game marks instead of broad placeholders."""
+def test_category_headers_avoid_game_mark_icons() -> None:
+    """Category bands should not look like selectable game/profile rows."""
     icon_script = ICONS_SCRIPT.read_text(encoding="utf-8")
     tray_script = TRAY_SCRIPT.read_text(encoding="utf-8")
     mosaic_section = icon_script.split("function New-GameMosaicBitmap", 1)[1].split(
@@ -2351,25 +2520,27 @@ def test_game_mosaic_bitmap_replaces_category_placeholder_for_category_headers()
     assert "New-GameBitmap -GameGroup $group -Color $markColor -Category $Category" in mosaic_section
     assert "Get-GameAccentColor -GameGroup $group -FallbackColor $baseColor" in mosaic_section
     assert "$g.DrawImage($mark, $rect)" in mosaic_section
-    assert "$categorySampleGameGroups = @($catGameGroups[$cat].Keys | Sort-Object | Select-Object -First 3)" in category_section
-    assert "$catItem.Image = New-GameMosaicBitmap -GameGroups $categorySampleGameGroups -Color $catColor -Category $cat" in category_section
-    assert "$catItem.Image = New-CategoryBitmap -Category $cat -Color $catColor" in category_section
+    assert "$catItem.Image = $null" in category_section
+    assert "New-GameMosaicBitmap -GameGroups $categorySampleGameGroups" not in category_section
+    assert "New-CategoryBitmap -Category $cat" not in category_section
 
 
-def test_category_headers_show_profile_and_game_counts_without_breaking_filtering() -> None:
-    """Top-level category bands should summarize their visible game/profile count."""
+def test_category_headers_keep_counts_in_tooltips_without_breaking_filtering() -> None:
+    """Top-level category bands should not draw visible count badges."""
     script = TRAY_SCRIPT.read_text(encoding="utf-8")
     assert 'if (e.Item.AccessibleName == "__category_header__" || e.Item.AccessibleName == "__section_header__")' in script
     assert 'string chipRaw = e.Item.AccessibleDescription ?? "";' in script
     assert "e.Graphics.DrawString(chip, chipFont, chipTextBrush, chipRect, chipFormat)" in script
     assert 'e.Graphics.DrawString((e.Item.Text ?? "").Trim().ToUpperInvariant(), labelFont, labelBrush, labelRect, labelFormat)' in script
     assert "function Get-CategoryHeaderSummaryChips" in script
-    assert 'return "$GameCount $gameLabel|$ProfileCount $profileLabel"' in script
+    assert 'return "$GameCount $gameLabel, $ProfileCount $profileLabel"' in script
     assert "$catGameCount = @($catGameGroups[$cat].Keys).Count" in script
     assert "$catProfileCount += @($catGameGroups[$cat][$gameGroupKey]).Count" in script
     assert '$catItem.AccessibleName = "__category_header__"' in script
-    assert "$catItem.AccessibleDescription = Get-CategoryHeaderSummaryChips -GameCount $catGameCount -ProfileCount $catProfileCount" in script
-    assert "$catItem.Padding = New-Object System.Windows.Forms.Padding(0, 0, 92, 0)" in script
+    assert '$catItem.AccessibleDescription = ""' in script
+    assert "$catItem.ToolTipText = Get-CategoryHeaderSummaryChips -GameCount $catGameCount -ProfileCount $catProfileCount" in script
+    assert "$catItem.Padding = New-Object System.Windows.Forms.Padding(0)" in script
+    assert "$catItem.ForeColor = Get-TrayCategoryHeaderTint -Category $cat -CategoryColor $catColor" in script
     assert "$catItem.Tag = $cat" in script
 
 
@@ -3447,7 +3618,7 @@ def test_tray_status_bar_maps_last_action_to_specific_glyphs() -> None:
     )
     assert "'^(Toast popups)'" in action_section
     assert "'^(Tray audio cues)'" in action_section
-    assert "'^(Profile missing|Profile not found|Apply timed out|Apply failed:|Applied|Failed:|Error:)'" in (
+    assert "'^(Profile missing|Profile not found|Apply timed out|Apply failed:|Not applied\\.|Applied|Failed:|Error:)'" in (
         action_section
     )
     assert "return New-ActionBitmap -Action $action -Color $color" in action_section
@@ -3901,10 +4072,26 @@ def test_tray_writes_runtime_marker_for_health_staleness_checks() -> None:
     assert '"tray-runtime.json"' in script
     assert "script_hash_sha256" in script
     assert "module_hashes = $moduleHashes" in script
+    assert '"ABSO-Theme.ps1"' in script
     assert '"ABSO-QuickPanel.ps1"' in script
     assert '"ABSO-Icons.ps1"' in script
     assert "Get-FileHash -Algorithm SHA256" in script
     assert "Write-TrayRuntimeMarker" in script
+
+
+def test_tray_uses_shared_theme_tokens_across_surfaces() -> None:
+    """Menu, toasts, and quick panel should share one visual token source."""
+    tray = TRAY_SCRIPT.read_text(encoding="utf-8")
+    theme = THEME_SCRIPT.read_text(encoding="utf-8")
+    notifications = NOTIFICATIONS_SCRIPT.read_text(encoding="utf-8")
+    quick_panel = QUICK_PANEL_SCRIPT.read_text(encoding="utf-8")
+
+    assert '. (Join-Path $script:ScriptDir "ABSO-Theme.ps1")' in tray
+    assert "function Get-TrayThemePalette" in theme
+    assert "CategoryDesktop" in theme
+    assert "$script:Colors = Get-TrayThemePalette" in tray
+    assert "$script:Penumbra = if (Get-Command Get-TrayThemePalette" in notifications
+    assert "$script:QPPalette = if (Get-Command Get-TrayThemePalette" in quick_panel
 
 
 def test_tray_display_pipeline_reset_requires_warning_confirmation() -> None:
@@ -4061,8 +4248,8 @@ def test_background_catalog_refresh_logs_honest_write_state() -> None:
 def test_clean_verification_surfaces_verified_status_on_fresh_session() -> None:
     """The first clean verification of a session must write a positive status.
 
-    After an OS reboot the tray starts with an empty last-action line; if the
-    startup verification comes back clean it should affirmatively show
+    After an OS reboot the tray may start with an empty last-action line; if a
+    user-triggered verification comes back clean it should affirmatively show
     "Verified active: <profile>" so the user knows the pre-reboot
     "Windows restart required" notice no longer applies."""
     script = TRAY_SCRIPT.read_text(encoding="utf-8")

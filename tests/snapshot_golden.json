@@ -111,6 +111,7 @@
       },
       "MouseSettingsHandler": {
         "disable_acceleration": true,
+        "mouse_sensitivity": 10,
         "set_linear_curve": true
       },
       "NetworkSettingsHandler": {
@@ -280,6 +281,7 @@
       },
       "MouseSettingsHandler": {
         "disable_acceleration": true,
+        "mouse_sensitivity": 10,
         "set_linear_curve": true
       },
       "NetworkSettingsHandler": {
@@ -451,6 +453,7 @@
       },
       "MouseSettingsHandler": {
         "disable_acceleration": true,
+        "mouse_sensitivity": 10,
         "set_linear_curve": true
       },
       "NetworkSettingsHandler": {
@@ -624,6 +627,7 @@
       },
       "MouseSettingsHandler": {
         "disable_acceleration": true,
+        "mouse_sensitivity": 10,
         "set_linear_curve": true
       },
       "NetworkSettingsHandler": {
@@ -793,6 +797,7 @@
       },
       "MouseSettingsHandler": {
         "disable_acceleration": true,
+        "mouse_sensitivity": 10,
         "set_linear_curve": true
       },
       "NetworkSettingsHandler": {
@@ -945,6 +950,7 @@
       },
       "MouseSettingsHandler": {
         "disable_acceleration": true,
+        "mouse_sensitivity": 10,
         "set_linear_curve": true
       },
       "NetworkSettingsHandler": {
@@ -1126,6 +1132,7 @@
       },
       "MouseSettingsHandler": {
         "disable_acceleration": true,
+        "mouse_sensitivity": 10,
         "set_linear_curve": true
       },
       "NetworkSettingsHandler": {
@@ -1323,6 +1330,7 @@
       },
       "MouseSettingsHandler": {
         "disable_acceleration": true,
+        "mouse_sensitivity": 10,
         "set_linear_curve": true
       },
       "NetworkSettingsHandler": {
@@ -1525,6 +1533,7 @@
       },
       "MouseSettingsHandler": {
         "disable_acceleration": true,
+        "mouse_sensitivity": 10,
         "set_linear_curve": true
       },
       "NetworkSettingsHandler": {
@@ -1729,6 +1738,7 @@
       },
       "MouseSettingsHandler": {
         "disable_acceleration": true,
+        "mouse_sensitivity": 10,
         "set_linear_curve": true
       },
       "NetworkSettingsHandler": {
@@ -1926,6 +1936,7 @@
       },
       "MouseSettingsHandler": {
         "disable_acceleration": true,
+        "mouse_sensitivity": 10,
         "set_linear_curve": true
       },
       "NetworkSettingsHandler": {
@@ -2041,6 +2052,12 @@
       },
       {
         "category": "Graphics",
+        "reason": "ABSO keeps native internal resolution for clarity and consistent aim feel. Lower values can raise FPS on GPU-bound systems, but they are a manual quality tradeoff, not a universal latency win.",
+        "setting": "Custom Render Scale",
+        "value": "100% baseline; test 80-90% only if GPU-bound"
+      },
+      {
+        "category": "Graphics",
         "reason": "Improves frame-time consistency in team fights.",
         "setting": "Shadows / Effects",
         "value": "Low"
@@ -2080,6 +2097,7 @@
       },
       "MouseSettingsHandler": {
         "disable_acceleration": true,
+        "mouse_sensitivity": 10,
         "set_linear_curve": true
       },
       "NetworkSettingsHandler": {
@@ -2215,6 +2233,12 @@
       },
       {
         "category": "Graphics",
+        "reason": "ABSO keeps native internal resolution for clarity and consistent aim feel. Lower values can raise FPS on GPU-bound systems, but they are a manual quality tradeoff, not a universal latency win.",
+        "setting": "Custom Render Scale",
+        "value": "100% baseline; test 80-90% only if GPU-bound"
+      },
+      {
+        "category": "Graphics",
         "reason": "Reduces frame-time spikes during heavy ability usage.",
         "setting": "Shadows / Effects",
         "value": "Low"
@@ -2256,6 +2280,7 @@
       },
       "MouseSettingsHandler": {
         "disable_acceleration": true,
+        "mouse_sensitivity": 10,
         "set_linear_curve": true
       },
       "NetworkSettingsHandler": {
@@ -2395,6 +2420,12 @@
       },
       {
         "category": "Graphics",
+        "reason": "ABSO keeps native internal resolution for clarity and consistent aim feel. Lower values can raise FPS on GPU-bound systems, but they are a manual quality tradeoff, not a universal latency win.",
+        "setting": "Custom Render Scale",
+        "value": "100% baseline; test 80-90% only if GPU-bound"
+      },
+      {
+        "category": "Graphics",
         "reason": "Reduces frame-time spikes during heavy team fights and capture load.",
         "setting": "Shadows / Effects",
         "value": "Low"
@@ -2436,6 +2467,7 @@
       },
       "MouseSettingsHandler": {
         "disable_acceleration": true,
+        "mouse_sensitivity": 10,
         "set_linear_curve": true
       },
       "NetworkSettingsHandler": {
@@ -2599,6 +2631,12 @@
       },
       {
         "category": "Graphics",
+        "reason": "ABSO keeps native internal resolution for clarity and consistent aim feel. Lower values can raise FPS on GPU-bound systems, but they are a manual quality tradeoff, not a universal latency win.",
+        "setting": "Custom Render Scale",
+        "value": "100% baseline; test 80-90% only if GPU-bound"
+      },
+      {
+        "category": "Graphics",
         "reason": "Reduces frame-time spikes during heavy ability usage.",
         "setting": "Shadows / Effects",
         "value": "Low"
@@ -2640,6 +2678,7 @@
       },
       "MouseSettingsHandler": {
         "disable_acceleration": true,
+        "mouse_sensitivity": 10,
         "set_linear_curve": true
       },
       "NetworkSettingsHandler": {
@@ -2799,6 +2838,12 @@
       },
       {
         "category": "Graphics",
+        "reason": "ABSO keeps native internal resolution for clarity and consistent aim feel. Lower values can raise FPS on GPU-bound systems, but they are a manual quality tradeoff, not a universal latency win.",
+        "setting": "Custom Render Scale",
+        "value": "100% baseline; test 80-90% only if GPU-bound"
+      },
+      {
+        "category": "Graphics",
         "reason": "Reduces frame-time spikes during heavy team fights and capture load.",
         "setting": "Shadows / Effects",
         "value": "Low"
@@ -2840,6 +2885,7 @@
       },
       "MouseSettingsHandler": {
         "disable_acceleration": true,
+        "mouse_sensitivity": 10,
         "set_linear_curve": true
       },
       "NetworkSettingsHandler": {
@@ -2981,6 +3027,12 @@
       },
       {
         "category": "Graphics",
+        "reason": "ABSO keeps native internal resolution for clarity and consistent aim feel. Lower values can raise FPS on GPU-bound systems, but they are a manual quality tradeoff, not a universal latency win.",
+        "setting": "Custom Render Scale",
+        "value": "100% baseline; test 80-90% only if GPU-bound"
+      },
+      {
+        "category": "Graphics",
         "reason": "Improves frame-time consistency in team fights.",
         "setting": "Shadows / Effects",
         "value": "Low"
@@ -3045,6 +3097,7 @@
       },
       "MouseSettingsHandler": {
         "disable_acceleration": true,
+        "mouse_sensitivity": 10,
         "set_linear_curve": true
       },
       "NetworkSettingsHandler": {
@@ -3664,7 +3717,7 @@
     "allows_aggressive_settings": false,
     "application_scope": "system_plus_native_config",
     "display_name": "Rivals 2 - Offline GSYNC",
-    "graphics_api": "dx12",
+    "graphics_api": "dx11",
     "handlers": [
       "WindowsSettingsHandler",
       "PowerSettingsHandler",
@@ -3701,7 +3754,7 @@
       },
       {
         "category": "NVIDIA Control Panel",
-        "reason": "Reduces render queue depth. Limited effect in DX12/UE5 but 'On' is correct (not 'Off' \u2014 Rivals 2 has no Reflex). If stuttering occurs, try 'Off' or set Pre-Rendered Frames to 2 via Nvidia Profile Inspector.",
+        "reason": "Reduces render queue depth on the published DX11 path. 'On' is correct (not 'Off' - Rivals 2 has no Reflex). If stuttering occurs, try 'Off' or set Pre-Rendered Frames to 2 via Nvidia Profile Inspector.",
         "setting": "Low Latency Mode",
         "value": "On"
       },
@@ -3761,6 +3814,7 @@
       },
       "MouseSettingsHandler": {
         "disable_acceleration": true,
+        "mouse_sensitivity": 10,
         "set_linear_curve": true
       },
       "NetworkSettingsHandler": {
@@ -3842,7 +3896,7 @@
     "allows_aggressive_settings": false,
     "application_scope": "system_plus_native_config",
     "display_name": "Rivals 2 - Offline GSYNC HDR",
-    "graphics_api": "dx12",
+    "graphics_api": "dx11",
     "handlers": [
       "WindowsSettingsHandler",
       "PowerSettingsHandler",
@@ -3909,7 +3963,7 @@
       },
       {
         "category": "NVIDIA Control Panel",
-        "reason": "Reduces render queue depth. Limited effect in DX12/UE5 but 'On' is correct (not 'Off' \u2014 Rivals 2 has no Reflex). If stuttering occurs, try 'Off' or set Pre-Rendered Frames to 2 via Nvidia Profile Inspector.",
+        "reason": "Reduces render queue depth on the published DX11 path. 'On' is correct (not 'Off' - Rivals 2 has no Reflex). If stuttering occurs, try 'Off' or set Pre-Rendered Frames to 2 via Nvidia Profile Inspector.",
         "setting": "Low Latency Mode",
         "value": "On"
       },
@@ -3970,6 +4024,7 @@
       },
       "MouseSettingsHandler": {
         "disable_acceleration": true,
+        "mouse_sensitivity": 10,
         "set_linear_curve": true
       },
       "NetworkSettingsHandler": {
@@ -4053,7 +4108,7 @@
     "allows_aggressive_settings": true,
     "application_scope": "system_plus_native_config",
     "display_name": "Rivals 2 - Offline No Sync",
-    "graphics_api": "dx12",
+    "graphics_api": "dx11",
     "handlers": [
       "WindowsSettingsHandler",
       "PowerSettingsHandler",
@@ -4090,7 +4145,7 @@
       },
       {
         "category": "NVIDIA Control Panel",
-        "reason": "Driver LLM can reduce render queueing in supported paths. DX12/UE5 behavior is game-controlled enough that ABSO does not claim a fixed latency win.",
+        "reason": "Driver LLM can reduce render queueing in supported paths. ABSO uses On, not Ultra, to reduce queue depth without claiming a fixed latency win.",
         "setting": "Low Latency Mode",
         "value": "On"
       },
@@ -4144,6 +4199,7 @@
       },
       "MouseSettingsHandler": {
         "disable_acceleration": true,
+        "mouse_sensitivity": 10,
         "set_linear_curve": true
       },
       "NetworkSettingsHandler": {
@@ -4230,7 +4286,7 @@
     "allows_aggressive_settings": true,
     "application_scope": "system_plus_native_config",
     "display_name": "Rivals 2 - Offline No Sync HDR",
-    "graphics_api": "dx12",
+    "graphics_api": "dx11",
     "handlers": [
       "WindowsSettingsHandler",
       "PowerSettingsHandler",
@@ -4297,7 +4353,7 @@
       },
       {
         "category": "NVIDIA Control Panel",
-        "reason": "Driver LLM can reduce render queueing in supported paths. DX12/UE5 behavior is game-controlled enough that ABSO does not claim a fixed latency win.",
+        "reason": "Driver LLM can reduce render queueing in supported paths. ABSO uses On, not Ultra, to reduce queue depth without claiming a fixed latency win.",
         "setting": "Low Latency Mode",
         "value": "On"
       },
@@ -4352,6 +4408,7 @@
       },
       "MouseSettingsHandler": {
         "disable_acceleration": true,
+        "mouse_sensitivity": 10,
         "set_linear_curve": true
       },
       "NetworkSettingsHandler": {
@@ -4440,7 +4497,7 @@
     "allows_aggressive_settings": false,
     "application_scope": "system_plus_native_config",
     "display_name": "Rivals 2 - Online No Sync",
-    "graphics_api": "dx12",
+    "graphics_api": "dx11",
     "handlers": [
       "WindowsSettingsHandler",
       "PowerSettingsHandler",
@@ -4483,7 +4540,7 @@
       },
       {
         "category": "NVIDIA Control Panel",
-        "reason": "OFF - prevents UE5 driver contention issues.",
+        "reason": "OFF - avoids extra driver-side timing variability during rollback.",
         "setting": "Threaded Optimization",
         "value": "OFF"
       },
@@ -4549,6 +4606,7 @@
       },
       "MouseSettingsHandler": {
         "disable_acceleration": true,
+        "mouse_sensitivity": 10,
         "set_linear_curve": true
       },
       "NetworkSettingsHandler": {
@@ -4632,7 +4690,7 @@
     "allows_aggressive_settings": false,
     "application_scope": "system_plus_native_config",
     "display_name": "Rivals 2 - Online GSYNC",
-    "graphics_api": "dx12",
+    "graphics_api": "dx11",
     "handlers": [
       "WindowsSettingsHandler",
       "PowerSettingsHandler",
@@ -4651,7 +4709,7 @@
     "in_game_settings": [
       {
         "category": "=== ONLINE G-SYNC PROFILE ===",
-        "reason": "Tear-free VRR for online play. Stability constraints applied for SnapNet rollback netcode. Threaded optimization OFF to prevent UE5 driver contention during rollback recovery.",
+        "reason": "Tear-free VRR for online play. Stability constraints applied for SnapNet rollback netcode. Threaded optimization OFF to prevent driver-side timing variability during rollback recovery.",
         "setting": "Overview",
         "value": "G-SYNC ON, Rollback-Safe, Stability-Focused"
       },
@@ -4669,7 +4727,7 @@
       },
       {
         "category": "NVIDIA Control Panel",
-        "reason": "OFF \u2014 prevents UE5 driver contention that can destabilize rollback timing.",
+        "reason": "OFF - avoids extra driver-side timing variability during rollback.",
         "setting": "Threaded Optimization",
         "value": "Off"
       },
@@ -4729,6 +4787,7 @@
       },
       "MouseSettingsHandler": {
         "disable_acceleration": true,
+        "mouse_sensitivity": 10,
         "set_linear_curve": true
       },
       "NetworkSettingsHandler": {
@@ -4807,7 +4866,7 @@
     "allows_aggressive_settings": false,
     "application_scope": "system_plus_native_config",
     "display_name": "Rivals 2 - Online GSYNC HDR",
-    "graphics_api": "dx12",
+    "graphics_api": "dx11",
     "handlers": [
       "WindowsSettingsHandler",
       "PowerSettingsHandler",
@@ -4856,7 +4915,7 @@
       },
       {
         "category": "=== ONLINE G-SYNC PROFILE ===",
-        "reason": "Tear-free VRR for online play. Stability constraints applied for SnapNet rollback netcode. Threaded optimization OFF to prevent UE5 driver contention during rollback recovery.",
+        "reason": "Tear-free VRR for online play. Stability constraints applied for SnapNet rollback netcode. Threaded optimization OFF to prevent driver-side timing variability during rollback recovery.",
         "setting": "Overview",
         "value": "G-SYNC ON, Rollback-Safe, Stability-Focused"
       },
@@ -4874,7 +4933,7 @@
       },
       {
         "category": "NVIDIA Control Panel",
-        "reason": "OFF \u2014 prevents UE5 driver contention that can destabilize rollback timing.",
+        "reason": "OFF - avoids extra driver-side timing variability during rollback.",
         "setting": "Threaded Optimization",
         "value": "Off"
       },
@@ -4935,6 +4994,7 @@
       },
       "MouseSettingsHandler": {
         "disable_acceleration": true,
+        "mouse_sensitivity": 10,
         "set_linear_curve": true
       },
       "NetworkSettingsHandler": {
@@ -5015,7 +5075,7 @@
     "allows_aggressive_settings": false,
     "application_scope": "system_plus_native_config",
     "display_name": "Rivals 2 - Online No Sync HDR",
-    "graphics_api": "dx12",
+    "graphics_api": "dx11",
     "handlers": [
       "WindowsSettingsHandler",
       "PowerSettingsHandler",
@@ -5088,7 +5148,7 @@
       },
       {
         "category": "NVIDIA Control Panel",
-        "reason": "OFF - prevents UE5 driver contention issues.",
+        "reason": "OFF - avoids extra driver-side timing variability during rollback.",
         "setting": "Threaded Optimization",
         "value": "OFF"
       },
@@ -5155,6 +5215,7 @@
       },
       "MouseSettingsHandler": {
         "disable_acceleration": true,
+        "mouse_sensitivity": 10,
         "set_linear_curve": true
       },
       "NetworkSettingsHandler": {
@@ -5467,6 +5528,7 @@
       },
       "MouseSettingsHandler": {
         "disable_acceleration": true,
+        "mouse_sensitivity": 10,
         "set_linear_curve": true
       },
       "NetworkSettingsHandler": {
@@ -5791,6 +5853,7 @@
       },
       "MouseSettingsHandler": {
         "disable_acceleration": true,
+        "mouse_sensitivity": 10,
         "set_linear_curve": true
       },
       "NetworkSettingsHandler": {
@@ -5960,6 +6023,7 @@
       },
       "MouseSettingsHandler": {
         "disable_acceleration": true,
+        "mouse_sensitivity": 10,
         "set_linear_curve": true
       },
       "NetworkSettingsHandler": {
@@ -6154,6 +6218,7 @@
       },
       "MouseSettingsHandler": {
         "disable_acceleration": true,
+        "mouse_sensitivity": 10,
         "set_linear_curve": true
       },
       "NetworkSettingsHandler": {
@@ -6512,6 +6577,7 @@
       },
       "MouseSettingsHandler": {
         "disable_acceleration": true,
+        "mouse_sensitivity": 10,
         "set_linear_curve": true
       },
       "NetworkSettingsHandler": {
@@ -6845,6 +6911,7 @@
       },
       "MouseSettingsHandler": {
         "disable_acceleration": true,
+        "mouse_sensitivity": 10,
         "set_linear_curve": true
       },
       "NetworkSettingsHandler": {
@@ -7201,6 +7268,7 @@
       },
       "MouseSettingsHandler": {
         "disable_acceleration": true,
+        "mouse_sensitivity": 10,
         "set_linear_curve": true
       },
       "NetworkSettingsHandler": {

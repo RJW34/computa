@@ -933,6 +933,68 @@ class TestNvidiaApply:
         assert verify["all_active"] is False
         assert "Exact NVIDIA executable binding could not be confirmed." in verify["setting_failures"]
 
+    @patch("abso.settings.nvidia.nvapi_drs.DRSProfileManager")
+    def test_verify_active_reports_manual_binding_step_without_failing_opted_in_profile(
+        self,
+        mock_manager_cls,
+    ):
+        """Manual NVIDIA binding should be advisory for stable opted-in profile families."""
+        mock_manager = MagicMock()
+        fake_drs = MagicMock()
+        fake_drs.find_profile_by_name.return_value = object()
+
+        class _Ctx:
+            def __enter__(self_inner):
+                return fake_drs
+
+            def __exit__(self_inner, exc_type, exc, tb):
+                return False
+
+        mock_manager._drs = _Ctx()
+        mock_manager._get_application_owner_profile_name.return_value = None
+        mock_manager._profile_contains_application.return_value = False
+        mock_manager.probe_profile_binding.return_value = {
+            "app_binding_safe": False,
+            "app_binding_state": "manual_required",
+            "app_binding_note": (
+                "ABSO could not prove that Rivals2-Win64-Shipping.exe already belong "
+                "to NVIDIA profile 'Rivals 2 Online'."
+            ),
+        }
+        mock_manager.get_app_settings.return_value = {
+            "_profile": "Rivals 2 Online",
+            "vrr_app_override": 0x00000000,
+        }
+        mock_manager._resolve_setting.return_value = (0x10A879CF, 0x00000000)
+        mock_manager_cls.return_value = mock_manager
+
+        verify = NvidiaSettingsHandler().verify_active({
+            "vrr_app_override": "allow",
+            "executables": ["Rivals2-Win64-Shipping.exe"],
+            "game_name": "Rivals 2 Online",
+            "profile_name": "Rivals 2 Online",
+            "require_exact_binding": True,
+            "allow_unverified_existing_profile_reuse": True,
+        })
+
+        assert verify["all_active"] is True
+        assert verify["setting_failures"] == []
+        assert verify["scope"] == "profile_settings_manual_binding_required"
+        assert verify["pending_manual_binding"] == {
+            "profile_name": "Rivals 2 Online",
+            "executables": ["Rivals2-Win64-Shipping.exe"],
+            "action": (
+                "Add Rivals2-Win64-Shipping.exe to NVIDIA profile 'Rivals 2 Online' "
+                "in NVIDIA Control Panel, then apply again."
+            ),
+        }
+        step = verify["manual_steps"][0]
+        assert step["key"] == "nvidia_app_binding"
+        assert step["label"] == "NVIDIA profile binding"
+        assert step["profile_name"] == "Rivals 2 Online"
+        assert step["executables"] == ["Rivals2-Win64-Shipping.exe"]
+        assert step["action_kind"] == "nvidia_profile_binding"
+
     @patch("abso.settings.windows.WindowsSettingsHandler._get_refresh_rate_info")
     @patch("abso.core.detector.HardwareDetector.detect_monitors")
     def test_detect_primary_refresh_rate_falls_back_to_windows_handler(
@@ -1163,6 +1225,36 @@ class TestNvidiaPreflight:
 
         assert result["success"] is True
         assert any("Proceeding with stable NVIDIA profile reuse" in notice for notice in result["notices"])
+
+    @patch("abso.settings.nvidia.nvapi_drs.DRSProfileManager.probe_profile_binding")
+    def test_preflight_allows_manual_binding_when_stable_profile_opted_in(self, mock_probe):
+        mock_probe.return_value = {
+            "app_binding_exact": False,
+            "app_binding_safe": False,
+            "app_binding_state": "manual_required",
+            "app_binding_note": (
+                "ABSO could not prove that Rivals2-Win64-Shipping.exe already belong "
+                "to NVIDIA profile 'Rivals 2 Online'."
+            ),
+        }
+
+        handler = NvidiaSettingsHandler()
+        result = handler.preflight({
+            "preset": "vrr_fighting_game",
+            "executables": ["Rivals2-Win64-Shipping.exe"],
+            "profile_name": "Rivals 2 Online",
+            "require_exact_binding": True,
+            "allow_unverified_existing_profile_reuse": True,
+        })
+
+        assert result["success"] is True
+        assert result["warnings"] == [
+            (
+                "NVIDIA profile binding needs one manual step: Add "
+                "Rivals2-Win64-Shipping.exe to NVIDIA profile 'Rivals 2 Online' "
+                "in NVIDIA Control Panel, then apply again."
+            )
+        ]
 
     @patch("abso.settings.nvidia.nvapi_drs.DRSProfileManager.probe_profile_binding")
     def test_preflight_allows_missing_profile_when_probe_says_safe_to_create(self, mock_probe):

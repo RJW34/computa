@@ -52,6 +52,9 @@ _CENTRAL_PROCESSOR_KEY = r"HARDWARE\DESCRIPTION\System\CentralProcessor"
 _APPCOMPAT_LAYERS_KEY = (
     r"Software\Microsoft\Windows NT\CurrentVersion\AppCompatFlags\Layers"
 )
+_WIN_ERR_FILE_NOT_FOUND = 2
+_APPCOMPAT_LAYER_MARKER = "~"
+_AFFINITY_TOKEN_PREFIX = "PROCESSORAFFINITYMASK="
 
 
 class CpuAffinityHandler(SettingsHandler):
@@ -483,13 +486,36 @@ class CpuAffinityHandler(SettingsHandler):
         """
         for token in layers_value.split():
             upper = token.upper()
-            if upper.startswith("PROCESSORAFFINITYMASK="):
+            if upper.startswith(_AFFINITY_TOKEN_PREFIX):
                 hex_str = upper.split("=", 1)[1]
                 try:
                     return int(hex_str, 16)
                 except ValueError:
                     return None
         return None
+
+    @staticmethod
+    def _is_registry_value_missing(exc: OSError) -> bool:
+        """Return True only for the registry value/key-not-found case."""
+        return isinstance(exc, FileNotFoundError) or (
+            getattr(exc, "winerror", None) == _WIN_ERR_FILE_NOT_FOUND
+        )
+
+    @staticmethod
+    def _appcompat_tokens_without_affinity(layers_value: str) -> list[str]:
+        """Return compatibility tokens, excluding marker and affinity token."""
+        return [
+            token
+            for token in layers_value.split()
+            if token
+            and token != _APPCOMPAT_LAYER_MARKER
+            and not token.upper().startswith(_AFFINITY_TOKEN_PREFIX)
+        ]
+
+    @staticmethod
+    def _format_appcompat_layers(tokens: list[str]) -> str:
+        """Format non-empty AppCompat layer tokens with the marker prefix."""
+        return f"{_APPCOMPAT_LAYER_MARKER} {' '.join(tokens)}"
 
     # ------------------------------------------------------------------
     # Affinity application helpers
@@ -558,21 +584,24 @@ class CpuAffinityHandler(SettingsHandler):
             ) from exc
 
         try:
-            # Read any existing flags for this executable.
-            existing_flags = ""
-            with contextlib.suppress(OSError):
-                existing_flags = str(
-                    winreg.QueryValueEx(key, exe_name)[0]
-                )
+            # Read any existing flags for this executable. Treating every
+            # QueryValueEx failure as "no value" is unsafe: a transient access
+            # error would drop HIGHDPIAWARE / FSO / RUNASINVOKER tokens.
+            try:
+                existing_flags = str(winreg.QueryValueEx(key, exe_name)[0])
+            except OSError as exc:
+                if self._is_registry_value_missing(exc):
+                    existing_flags = ""
+                else:
+                    raise RegistryWriteError(
+                        f"Failed to read AppCompatFlags\\Layers[{exe_name}]",
+                        details=str(exc),
+                    ) from exc
 
             # Strip old affinity flag if present, then append the new one.
-            tokens = [
-                t
-                for t in existing_flags.split()
-                if not t.upper().startswith("PROCESSORAFFINITYMASK=")
-            ]
-            tokens.append(f"PROCESSORAFFINITYMASK={mask:X}")
-            new_value = " ".join(tokens).strip()
+            tokens = self._appcompat_tokens_without_affinity(existing_flags)
+            tokens.append(f"{_AFFINITY_TOKEN_PREFIX}{mask:X}")
+            new_value = self._format_appcompat_layers(tokens)
 
             winreg.SetValueEx(
                 key, exe_name, 0, winreg.REG_SZ, new_value
@@ -601,30 +630,44 @@ class CpuAffinityHandler(SettingsHandler):
                 0,
                 winreg.KEY_ALL_ACCESS,
             )
-        except OSError:
-            return  # Key does not exist -- nothing to remove.
+        except OSError as exc:
+            if self._is_registry_value_missing(exc):
+                return  # Key does not exist -- nothing to remove.
+            raise RegistryWriteError(
+                "Cannot open AppCompatFlags\\Layers for affinity restore",
+                details=str(exc),
+            ) from exc
 
         try:
             try:
-                existing_flags = str(
-                    winreg.QueryValueEx(key, exe_name)[0]
-                )
-            except OSError:
-                return  # No value for this exe.
+                existing_flags = str(winreg.QueryValueEx(key, exe_name)[0])
+            except OSError as exc:
+                if self._is_registry_value_missing(exc):
+                    return  # No value for this exe.
+                raise RegistryWriteError(
+                    f"Failed to read AppCompatFlags\\Layers[{exe_name}]",
+                    details=str(exc),
+                ) from exc
 
-            remaining = [
-                t
-                for t in existing_flags.split()
-                if not t.upper().startswith("PROCESSORAFFINITYMASK=")
-            ]
+            remaining = self._appcompat_tokens_without_affinity(existing_flags)
 
             if remaining:
                 winreg.SetValueEx(
-                    key, exe_name, 0, winreg.REG_SZ, " ".join(remaining)
+                    key,
+                    exe_name,
+                    0,
+                    winreg.REG_SZ,
+                    self._format_appcompat_layers(remaining),
                 )
             else:
-                with contextlib.suppress(OSError):
+                try:
                     winreg.DeleteValue(key, exe_name)
+                except OSError as exc:
+                    if not self._is_registry_value_missing(exc):
+                        raise RegistryWriteError(
+                            f"Failed to delete affinity for {exe_name}",
+                            details=str(exc),
+                        ) from exc
 
             logger.info("Removed AppCompatFlags affinity for %s", exe_name)
         finally:

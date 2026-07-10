@@ -330,6 +330,9 @@ def _build_same_profile_apply_noop_payload(
         "failed_settings": [],
         "warnings": [],
         "notices": [notice],
+        "post_apply_notes": [],
+        "manual_steps": [],
+        "manual_actions": [],
         "summary_level": "notice",
         "changed": False,
         "changed_settings": [],
@@ -341,6 +344,86 @@ def _build_same_profile_apply_noop_payload(
         "display_reset": None,
         "verification": verification,
     }
+
+
+def _collect_post_apply_notes(applier: ProfileApplier, profile_name: str) -> list[str]:
+    """Return user-facing manual follow-up notes for a profile apply."""
+    try:
+        profile = applier._get_profile(profile_name)
+    except Exception as exc:  # noqa: BLE001 - manual notes must never break apply JSON
+        logger.warning("Failed to load post-apply notes for %s: %s", profile_name, exc)
+        return []
+
+    notes: list[str] = []
+    for note in profile.get_post_apply_notes():
+        if not isinstance(note, str):
+            continue
+        append_unique_message(notes, note.strip())
+    return notes
+
+
+def _collect_manual_steps_from_transaction(tx: Any) -> list[dict[str, Any]]:
+    """Return non-blocking manual verification steps from an apply transaction."""
+    verify_result = getattr(tx, "verify_result", None)
+    if not isinstance(verify_result, dict):
+        return []
+    steps: list[dict[str, Any]] = []
+    for step in verify_result.get("manual_steps") or []:
+        if isinstance(step, dict):
+            steps.append(dict(step))
+    return steps
+
+
+def _collect_manual_actions(manual_steps: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Build allowlisted user-assist actions for manual steps.
+
+    Actions are intentionally data-only. The tray maps these types to local,
+    allowlisted handlers instead of executing commands from backend JSON.
+    """
+    actions: list[dict[str, Any]] = []
+    seen: set[tuple[str, str, str, str]] = set()
+
+    def add_action(action: dict[str, Any]) -> None:
+        action_type = str(action.get("type") or "").strip()
+        label = str(action.get("label") or "").strip()
+        profile_name = str(action.get("profile_name") or "").strip()
+        executable = str(action.get("executable") or "").strip()
+        key = (action_type, label, profile_name, executable)
+        if not action_type or not label or key in seen:
+            return
+        seen.add(key)
+        actions.append(action)
+
+    for step in manual_steps:
+        if step.get("key") != "nvidia_app_binding":
+            continue
+
+        profile_name = str(step.get("profile_name") or step.get("expected") or "").strip()
+        executables = [
+            str(exe).strip()
+            for exe in step.get("executables") or []
+            if str(exe).strip()
+        ]
+        executable = executables[0] if executables else ""
+        if not profile_name and not executable:
+            continue
+
+        add_action({
+            "type": "open_nvidia_profile_inspector",
+            "label": "Open NPI",
+            "profile_name": profile_name,
+            "executable": executable,
+        })
+        if executable:
+            add_action({
+                "type": "copy_text",
+                "label": "Copy EXE",
+                "text": executable,
+                "profile_name": profile_name,
+                "executable": executable,
+            })
+
+    return actions
 
 
 def _build_pending_apply_as_apply_payload(
@@ -387,6 +470,9 @@ def _build_pending_apply_as_apply_payload(
         "failed_settings": [],
         "warnings": warnings,
         "notices": notices,
+        "post_apply_notes": _collect_post_apply_notes(ProfileApplier(), profile_name),
+        "manual_steps": [],
+        "manual_actions": [],
         "summary_level": summary_level,
         "changed": bool(pending_result.get("changed")),
         "changed_settings": list(pending_result.get("changed_settings") or []),
@@ -1074,6 +1160,9 @@ def apply(
         fallback_applied = bool(fallback_chain)
         apply_warnings = collect_apply_warnings(tx, result)
         apply_notices = collect_apply_notices(result)
+        post_apply_notes = _collect_post_apply_notes(tx_manager.applier, actual_profile_name)
+        manual_steps = _collect_manual_steps_from_transaction(tx)
+        manual_actions = _collect_manual_actions(manual_steps)
         if same_current_profile and not no_backup:
             append_unique_message(
                 apply_notices,
@@ -1146,6 +1235,9 @@ def apply(
                     "failed_settings": failed_settings,
                     "warnings": apply_warnings,
                     "notices": apply_notices,
+                    "post_apply_notes": post_apply_notes,
+                    "manual_steps": manual_steps,
+                    "manual_actions": manual_actions,
                     "summary_level": apply_summary_level,
                     "changed_settings": result.changed_settings if result else [],
                     "capabilities": (
@@ -1734,6 +1826,9 @@ def reapply(json_output: bool) -> None:
         fallback_applied = bool(fallback_chain)
         warnings = collect_apply_warnings(tx, result)
         notices = collect_apply_notices(result)
+        post_apply_notes = _collect_post_apply_notes(tx_manager.applier, actual_profile)
+        manual_steps = _collect_manual_steps_from_transaction(tx)
+        manual_actions = _collect_manual_actions(manual_steps)
         if fallback_applied and actual_profile != current_profile:
             fallback_reason = ""
             last_fallback = fallback_chain[-1] if isinstance(fallback_chain[-1], dict) else {}
@@ -1767,6 +1862,9 @@ def reapply(json_output: bool) -> None:
                     "fallback_chain": fallback_chain,
                     "warnings": warnings,
                     "notices": notices,
+                    "post_apply_notes": post_apply_notes,
+                    "manual_steps": manual_steps,
+                    "manual_actions": manual_actions,
                     "summary_level": summary_level,
                     "error": tx.error if not reapply_succeeded else None,
                     "transaction": tx.to_dict(),

@@ -236,6 +236,28 @@ class _Overwatch2BaseProfile(ReflexShooterBaseProfile):
             "vrr_cap_policy": OW2_REFLEX_GSYNC_CAP_POLICY,
         }
 
+    @staticmethod
+    def _custom_render_scale_guidance() -> dict[str, str]:
+        return {
+            "category": "Graphics",
+            "setting": "Custom Render Scale",
+            "value": "100% baseline; test 80-90% only if GPU-bound",
+            "reason": (
+                "ABSO keeps native internal resolution for clarity and consistent aim feel. "
+                "Lower values can raise FPS on GPU-bound systems, but they are a manual "
+                "quality tradeoff, not a universal latency win."
+            ),
+        }
+
+    @staticmethod
+    def _ow2_gsync_post_apply_notes() -> list[str]:
+        return [
+            (
+                "OW2 manual: set Reflex to Enabled + Boost; keep Dynamic Render "
+                "Scale Off and Custom Render Scale 100% unless GPU-bound."
+            )
+        ]
+
     def _base_overrides(self) -> dict[str, dict[str, Any]]:
         return {
             "WindowsSettingsHandler": {
@@ -370,12 +392,21 @@ class Overwatch2Profile(_Overwatch2BaseProfile):
                 "value": "Off",
                 "reason": "Avoid frametime variance from dynamic scaling.",
             },
+            self._custom_render_scale_guidance(),
             {
                 "category": "Graphics",
                 "setting": "Shadows / Effects",
                 "value": "Low",
                 "reason": "Improves frame-time consistency in team fights.",
             },
+        ]
+
+    def get_post_apply_notes(self) -> list[str]:
+        return [
+            (
+                "OW2 manual: Dynamic Render Scale Off, Custom Render Scale 100%; "
+                "try 80-90 only if GPU-bound. Reflex Off unless GPU usage stays above 90%."
+            )
         ]
 
 
@@ -608,6 +639,7 @@ class Overwatch2GSyncProfile(_Overwatch2BaseProfile):
                 "value": "Off",
                 "reason": "Avoid large frame pacing oscillations.",
             },
+            self._custom_render_scale_guidance(),
             {
                 "category": "Graphics",
                 "setting": "Shadows / Effects",
@@ -615,6 +647,9 @@ class Overwatch2GSyncProfile(_Overwatch2BaseProfile):
                 "reason": "Reduces frame-time spikes during heavy ability usage.",
             },
         ]
+
+    def get_post_apply_notes(self) -> list[str]:
+        return self._ow2_gsync_post_apply_notes()
 
 
 class Overwatch2GSyncHDRProfile(_Overwatch2BaseProfile):
@@ -799,6 +834,7 @@ class Overwatch2GSyncHDRProfile(_Overwatch2BaseProfile):
                 "value": "Off",
                 "reason": "Avoid large frame pacing oscillations.",
             },
+            self._custom_render_scale_guidance(),
             {
                 "category": "Graphics",
                 "setting": "Shadows / Effects",
@@ -806,6 +842,9 @@ class Overwatch2GSyncHDRProfile(_Overwatch2BaseProfile):
                 "reason": "Reduces frame-time spikes during heavy ability usage.",
             },
         ]
+
+    def get_post_apply_notes(self) -> list[str]:
+        return self._ow2_gsync_post_apply_notes()
 
 
 class Overwatch2GSyncCaptureProfile(_Overwatch2BaseProfile):
@@ -930,6 +969,7 @@ class Overwatch2GSyncCaptureProfile(_Overwatch2BaseProfile):
                 "value": "Off",
                 "reason": "Avoid frame pacing swings while recording/clipping.",
             },
+            self._custom_render_scale_guidance(),
             {
                 "category": "Graphics",
                 "setting": "Shadows / Effects",
@@ -937,6 +977,9 @@ class Overwatch2GSyncCaptureProfile(_Overwatch2BaseProfile):
                 "reason": "Reduces frame-time spikes during heavy team fights and capture load.",
             },
         ]
+
+    def get_post_apply_notes(self) -> list[str]:
+        return self._ow2_gsync_post_apply_notes()
 
 
 class Overwatch2GSyncHDRCaptureProfile(_Overwatch2BaseProfile):
@@ -1090,6 +1133,7 @@ class Overwatch2GSyncHDRCaptureProfile(_Overwatch2BaseProfile):
                 "value": "Off",
                 "reason": "Avoid frame pacing swings while recording/clipping.",
             },
+            self._custom_render_scale_guidance(),
             {
                 "category": "Graphics",
                 "setting": "Shadows / Effects",
@@ -1097,3 +1141,6 @@ class Overwatch2GSyncHDRCaptureProfile(_Overwatch2BaseProfile):
                 "reason": "Reduces frame-time spikes during heavy team fights and capture load.",
             },
         ]
+
+    def get_post_apply_notes(self) -> list[str]:
+        return self._ow2_gsync_post_apply_notes()

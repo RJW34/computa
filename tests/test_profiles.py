@@ -338,6 +338,17 @@ class TestProfileLoading:
         assert online_gsync_hdr.is_sdr_only is False
         assert gsync.mixed_refresh_safe_fallback_profile_id == "rivals2-offline"
         assert gsync_hdr.mixed_refresh_safe_fallback_profile_id == "rivals2-offline-hdr"
+        for profile in (
+            offline,
+            offline_hdr,
+            online,
+            online_hdr,
+            gsync,
+            gsync_hdr,
+            online_gsync,
+            online_gsync_hdr,
+        ):
+            assert profile.graphics_api == "dx11", profile.profile_id
         assert online_gsync.mixed_refresh_safe_fallback_profile_id == "rivals2-online"
         assert (
             online_gsync_hdr.mixed_refresh_safe_fallback_profile_id
@@ -1240,6 +1251,19 @@ class TestAllProfilesLoad:
         for handler in profile.get_handlers():
             settings = profile.get_settings(handler.__class__.__name__)
             assert isinstance(settings, dict)
+
+    def test_mouse_profiles_target_windows_default_pointer_speed(self, profile_entry):
+        """Profiles that manage mouse state must enforce the 6/11 pointer slider."""
+        profile_id, profile = profile_entry
+        handler_names = [handler.__class__.__name__ for handler in profile.get_handlers()]
+        if "MouseSettingsHandler" not in handler_names:
+            return
+
+        settings = profile.get_settings("MouseSettingsHandler")
+
+        assert settings["disable_acceleration"] is True, profile_id
+        assert settings["set_linear_curve"] is True, profile_id
+        assert settings["mouse_sensitivity"] == 10, profile_id
 
 
 class TestFullscreenOptimizationsPerExe:

@@ -329,7 +329,7 @@ PROFILE_CATALOG: OrderedDict[str, ProfileCatalogEntry] = OrderedDict(
             tray_subtitle="Strict SDR G-SYNC | LLM ON | VSync Safety Net | Offline Only",
             tray_description=(
                 "Offline/training Rivals 2 strict fullscreen-only G-SYNC SDR profile. "
-                "Uses refresh - 3 FPS caps and disables UE5 driver threaded optimization."
+                "Uses refresh - 3 FPS caps and disables driver threaded optimization."
             ),
             sync_mode="on",
         ),
@@ -350,7 +350,7 @@ PROFILE_CATALOG: OrderedDict[str, ProfileCatalogEntry] = OrderedDict(
             tray_subtitle="Strict SDR G-SYNC | LLM ON | Rollback-Safe",
             tray_description=(
                 "Rollback-safe Rivals 2 online strict fullscreen-only G-SYNC SDR profile. "
-                "Threaded optimization off for UE5 rollback stability."
+                "Threaded optimization off for rollback stability."
             ),
             sync_mode="on",
         ),

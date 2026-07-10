@@ -62,6 +62,13 @@ VERIFICATION_SETTING_IDS = {
 }
 
 
+_UNVERIFIED_PROFILE_REUSE_STATES = {
+    "reused_family_profile",
+    "existing_profile_unverified",
+}
+_MANUAL_BINDING_STATES = {"manual_required"}
+
+
 class NvidiaSettingsHandler(SettingsHandler):
     """Handles Nvidia GPU settings via Profile Inspector.
 
@@ -236,6 +243,37 @@ class NvidiaSettingsHandler(SettingsHandler):
             if key in allowed_keys
         }
 
+    @staticmethod
+    def _normalized_binding_state(payload: dict[str, Any]) -> str:
+        return str(payload.get("app_binding_state") or "").strip().lower()
+
+    @staticmethod
+    def _format_manual_binding_action(
+        *,
+        executables: list[str],
+        profile_name: str,
+    ) -> str:
+        exe_text = ", ".join(executables) if executables else "the game executable"
+        return (
+            f"Add {exe_text} to NVIDIA profile '{profile_name}' in NVIDIA Control Panel, "
+            "then apply again."
+        )
+
+    @classmethod
+    def _binding_probe_is_acceptable(
+        cls,
+        probe: dict[str, Any],
+        *,
+        allow_unverified_existing_profile_reuse: bool,
+    ) -> bool:
+        if bool(probe.get("app_binding_safe", probe.get("app_binding_exact", False))):
+            return True
+        if not allow_unverified_existing_profile_reuse:
+            return False
+        return cls._normalized_binding_state(probe) in (
+            _UNVERIFIED_PROFILE_REUSE_STATES | _MANUAL_BINDING_STATES
+        )
+
     def preflight(self, settings: dict[str, Any]) -> dict[str, Any]:
         """Validate strict NVIDIA profile prerequisites before apply."""
         requested = self._extract_requested_settings(settings)
@@ -272,14 +310,11 @@ class NvidiaSettingsHandler(SettingsHandler):
                 "notices": [],
             }
 
-        binding_ok = bool(probe.get("app_binding_safe", probe.get("app_binding_exact", False)))
-        if (
-            not binding_ok
-            and allow_unverified_existing_profile_reuse
-            and str(probe.get("app_binding_state") or "").strip().lower()
-            in {"reused_family_profile", "existing_profile_unverified"}
-        ):
-            binding_ok = True
+        binding_state = self._normalized_binding_state(probe)
+        binding_ok = self._binding_probe_is_acceptable(
+            probe,
+            allow_unverified_existing_profile_reuse=allow_unverified_existing_profile_reuse,
+        )
         if not binding_ok:
             return {
                 "success": False,
@@ -296,11 +331,22 @@ class NvidiaSettingsHandler(SettingsHandler):
         if selection_note:
             notices.append(str(selection_note))
         binding_note = probe.get("app_binding_note")
+        if binding_state in _MANUAL_BINDING_STATES:
+            warnings = [
+                "NVIDIA profile binding needs one manual step: "
+                + self._format_manual_binding_action(
+                    executables=executables,
+                    profile_name=str(requested["driver_profile_name"] or requested["game_name"]),
+                )
+            ]
+            return {
+                "success": True,
+                "error": None,
+                "warnings": warnings,
+                "notices": notices,
+            }
         if binding_note:
-            if str(probe.get("app_binding_state") or "").strip().lower() in {
-                "reused_family_profile",
-                "existing_profile_unverified",
-            }:
+            if binding_state in _UNVERIFIED_PROFILE_REUSE_STATES:
                 notices.append(f"Proceeding with stable NVIDIA profile reuse: {binding_note}")
             else:
                 notices.append(str(binding_note))
@@ -906,24 +952,13 @@ class NvidiaSettingsHandler(SettingsHandler):
                                     profile_aliases=driver_profile_aliases,
                                 )
                                 result["binding_probe_state"] = probe.get("app_binding_state")
-                                probe_safe = bool(
-                                    probe.get(
-                                        "app_binding_safe",
-                                        probe.get("app_binding_exact", False),
-                                    )
+                                probe_state = self._normalized_binding_state(probe)
+                                probe_safe = self._binding_probe_is_acceptable(
+                                    probe,
+                                    allow_unverified_existing_profile_reuse=(
+                                        allow_unverified_existing_profile_reuse
+                                    ),
                                 )
-                                if (
-                                    not probe_safe
-                                    and allow_unverified_existing_profile_reuse
-                                    and str(probe.get("app_binding_state") or "")
-                                    .strip()
-                                    .lower()
-                                    in {
-                                        "reused_family_profile",
-                                        "existing_profile_unverified",
-                                    }
-                                ):
-                                    probe_safe = True
 
                                 probe_note = probe.get("app_binding_note")
                                 if probe_note:
@@ -932,12 +967,35 @@ class NvidiaSettingsHandler(SettingsHandler):
                                 if probe_safe:
                                     mismatched_bindings = []
                                     unresolved_bindings = []
-                                    binding_owner_profiles = dict.fromkeys(
-                                        executables,
-                                        effective_profile_name,
-                                    )
-                                    result["binding_owner_profiles"] = binding_owner_profiles
-                                    result["scope"] = "profile_and_safe_binding_probe"
+                                    if probe_state in _MANUAL_BINDING_STATES:
+                                        action = self._format_manual_binding_action(
+                                            executables=executables,
+                                            profile_name=effective_profile_name,
+                                        )
+                                        result.setdefault("manual_steps", []).append({
+                                            "key": "nvidia_app_binding",
+                                            "label": "NVIDIA profile binding",
+                                            "current": "not confirmed",
+                                            "expected": effective_profile_name,
+                                            "expected_label": action,
+                                            "profile_name": effective_profile_name,
+                                            "executables": list(executables),
+                                            "action_kind": "nvidia_profile_binding",
+                                            "satisfied": False,
+                                        })
+                                        result["pending_manual_binding"] = {
+                                            "profile_name": effective_profile_name,
+                                            "executables": list(executables),
+                                            "action": action,
+                                        }
+                                        result["scope"] = "profile_settings_manual_binding_required"
+                                    else:
+                                        binding_owner_profiles = dict.fromkeys(
+                                            executables,
+                                            effective_profile_name,
+                                        )
+                                        result["binding_owner_profiles"] = binding_owner_profiles
+                                        result["scope"] = "profile_and_safe_binding_probe"
                                 else:
                                     result["setting_failures"].append(
                                         str(
@@ -962,7 +1020,7 @@ class NvidiaSettingsHandler(SettingsHandler):
                                 result["notes"].append(
                                     "Executable membership was confirmed on the effective NVIDIA profile."
                                 )
-                        elif require_exact_binding:
+                        elif require_exact_binding and not result.get("pending_manual_binding"):
                             result["setting_failures"].append(
                                 "Executable binding could not be proven for: "
                                 + ", ".join(sorted(unresolved_bindings))

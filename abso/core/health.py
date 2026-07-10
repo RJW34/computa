@@ -32,6 +32,7 @@ from abso.tray import ensure_tray_running, get_startup_status
 from abso.utils.atomic_io import atomic_write_json
 
 TRAY_RUNTIME_MODULES: tuple[str, ...] = (
+    "ABSO-Theme.ps1",
     "ABSO-Icons.ps1",
     "ABSO-Notifications.ps1",
     "ABSO-Settings.ps1",

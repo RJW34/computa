@@ -237,6 +237,14 @@ class _DeadlockBaseProfile(ReflexShooterBaseProfile):
             },
         ]
 
+    def get_post_apply_notes(self) -> list[str]:
+        return [
+            (
+                "Deadlock manual: set NVIDIA Reflex to On + Boost; keep in-game "
+                "VSync Off and fullscreen exclusive."
+            )
+        ]
+
 
 class DeadlockProfile(_DeadlockBaseProfile):
     """Deadlock no-sync SDR profile (latency-focused lane)."""

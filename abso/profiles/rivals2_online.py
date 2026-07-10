@@ -17,7 +17,7 @@ NVCP Settings (per-game for Rivals2.exe):
 - G-SYNC / VRR: OFF (no VRR for online)
 - Low Latency Mode: ON (NOT Ultra!)
 - Max Frame Rate: OFF (no external limiters)
-- Threaded Optimization: OFF (UE5 driver contention)
+- Threaded Optimization: OFF (rollback/fighting-game stability)
 - Power Management: Prefer Maximum Performance
 
 External Tools: RTSS, frame pacing hooks DISABLED.
@@ -86,8 +86,8 @@ class Rivals2OnlineProfile(Rivals2BaseProfile):
 
     @property
     def graphics_api(self) -> Literal["dx11", "dx12", "vulkan", "opengl", "unknown"]:
-        """Rivals 2 uses DirectX 12 (UE5)."""
-        return "dx12"
+        """Steam's published PC requirements list DirectX 11 for Rivals 2."""
+        return "dx11"
 
     @property
     def allows_aggressive_settings(self) -> bool:
@@ -123,7 +123,7 @@ class Rivals2OnlineProfile(Rivals2BaseProfile):
                 "global_vrr_mode": "off",  # Enforce global VRR off for clean no-sync transitions
                 "max_frame_rate": "off",  # Uncapped - no external limiters for online play
                 "shader_cache": "unlimited",
-                "threaded_optimization": "off",  # OFF - UE5 driver contention
+                "threaded_optimization": "off",  # OFF - rollback/fighting-game stability
                 "triple_buffering": "off",  # OFF - irrelevant without VSync
             },
             "ProcessPriorityHandler": {
@@ -173,7 +173,7 @@ class Rivals2OnlineProfile(Rivals2BaseProfile):
                 "category": "NVIDIA Control Panel",
                 "setting": "Threaded Optimization",
                 "value": "OFF",
-                "reason": "OFF - prevents UE5 driver contention issues.",
+                "reason": "OFF - avoids extra driver-side timing variability during rollback.",
             },
             {
                 "category": "NVIDIA Control Panel",
@@ -211,6 +211,11 @@ class Rivals2OnlineProfile(Rivals2BaseProfile):
                 "value": "Minor frametime variance OK, no persistent VRR dropouts",
                 "reason": "Rollback resync frames must not cause cascading frame loss.",
             },
+        ]
+
+    def get_post_apply_notes(self) -> list[str]:
+        return [
+            "Rivals 2 manual: disable RTSS/external FPS caps for online rollback; keep in-game V-Sync Off and uncapped."
         ]
 
 

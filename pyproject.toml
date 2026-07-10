@@ -45,6 +45,7 @@ dev = [
     "black>=24.0.0",
     "mypy>=1.8.0",
     "pre-commit>=3.6.0",
+    "pyinstaller>=6.0.0",
 ]
 
 [project.scripts]
@@ -64,7 +65,7 @@ testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
-addopts = "-v --tb=short"
+addopts = "-v --tb=short -m 'not integration'"
 asyncio_default_fixture_loop_scope = "function"
 markers = [
     "integration: marks tests that exercise real or simulated end-to-end system flows",

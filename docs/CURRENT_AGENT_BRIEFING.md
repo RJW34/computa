@@ -1,6 +1,6 @@
 # Current Agent Briefing
 
-Last updated: 2026-06-17 America/New_York
+Last updated: 2026-07-09 America/New_York
 
 > **MACHINE-SPECIFIC — read `docs/NEW_MACHINE_SETUP.md` first if this repo was
 > just cloned onto a different PC.** Everything below describes the live state of
@@ -15,6 +15,125 @@ Last updated: 2026-06-17 America/New_York
 This is the first live-state file for agents arriving with no prior session
 context. Historical handoffs and old plans belong in `docs/archive/`; this file
 is the current operational truth for this PC.
+
+## 2026-07-09 Startup Verification Flicker Trace + Deploy
+
+User reported a black monitor blink after being told no profile apply or
+display/HDR change had run. Trace result: no profile apply, display reset, HDR
+toggle, or NVIDIA write was found for the reported window, but the tray was
+automatically launching `abso.exe state --json --verify` shortly after every tray
+startup. Tray log examples:
+
+- 2026-07-08 16:19:11: `Starting read-only state verification:
+  C:\Users\mtoli\AppData\Local\AdaptiveBattleStationOptimizer\abso.exe state
+  --json --verify`
+- 2026-07-08 16:19:15: `Active profile verifies clean on fresh session; surfacing
+  verified status`
+
+Follow-up trace after the user challenged "no display/HDR changes": Windows
+Kernel-PnP did log real monitor link drops for `DISPLAY\GSM784C`
+(`Generic Monitor (LG ULTRAGEAR)`) plus the associated NVIDIA audio endpoints.
+The drops occurred at 2026-07-09 16:05:42/16:05:46, 16:15:42/16:15:46,
+16:22:14/16:22:18, 16:29:11/16:29:15, and again at 16:46:18/16:46:22 during
+the final verification window. The only ABSO profile backup in the same
+14:00-16:40 window was the mouse-only backup at 16:30:53; deploy backups at
+16:09, 16:16, and 16:23 replaced `abso.exe` and were after the nearest display
+drop clusters. There was still no matching evidence of `nvlddmkm`, DWM crash,
+HDR toggle, display reset, NVIDIA save, or profile apply. The correct conclusion
+is narrower: no ABSO display/HDR/profile write was performed, but the display
+link did blink. The repeated Kernel-PnP `surprise removed` records indicate a
+real monitor-link/bus drop on `DISPLAY\GSM784C`, and the mixed-refresh VRR/HDR
+topology remains an unresolved display-link stability risk independent of the
+mouse/DPI fixes.
+
+Fix deployed:
+
+- `abso/tray/ABSO-Tray.ps1` no longer starts full profile verification
+  automatically on tray startup. Startup only restores remembered state. Explicit
+  same-profile clicks, profile apply success, and pending-fix flows still verify
+  before deciding whether anything needs to be written.
+- `MouseSettingsHandler` now verifies the X and Y smooth mouse curves against
+  their axis-specific linear templates. The old generic check could falsely pass
+  swapped/corrupt X/Y curves.
+- `CpuAffinityHandler` now token-patches AppCompat affinity values safely. It
+  preserves `HIGHDPIAWARE`, `DISABLEDXMAXIMIZEDWINDOWEDMODE`, `RUNASINVOKER`,
+  and other Layers tokens, aborts on non-missing registry read errors instead of
+  rewriting a truncated value, and deletes marker-only affinity values cleanly on
+  restore. This was the direct remaining DPI-risk path after the FSO handler had
+  already been fixed.
+- Build dependency fixed: `pyinstaller>=6.0.0` added to `requirements.txt` and
+  the dev extra, then installed into `.venv` with `ensurepip` + `pip install -r
+  requirements.txt`.
+- Tests before final deploy: full `pytest -q` = 2366 passed / 3 skipped; `ruff check .`
+  passed.
+- Gaming mouse profiles now explicitly set `MouseSensitivity=10` (Windows 6/11)
+  in addition to acceleration off and axis-correct linear curves. Live readback
+  showed this PC was at `MouseSensitivity=11`, which is a pointer-speed scalar
+  left outside the old "linear 1:1" target.
+- `MouseSettingsHandler` now broadcasts pointer-speed changes with
+  `SystemParametersInfoW(SPI_SETMOUSESPEED)` so a profile apply/restore updates
+  the active Windows pointer-speed state immediately, not just the registry.
+- Repo-only test harness fix: pytest default selection now excludes `integration` tests with
+  `-m 'not integration'`. `tests/test_integration` documents that live Windows
+  registry/WMI/system-state tests require explicit opt-in, but the previous
+  `addopts` did not enforce that policy during a plain full-suite run.
+- Final deploy: `.\.venv\Scripts\python.exe build.py deploy` succeeded at
+  2026-07-09 16:30 America/New_York. Installed backend:
+  `%LOCALAPPDATA%\AdaptiveBattleStationOptimizer\abso.exe`, 18,014,058 bytes,
+  SHA256 `4D554FBE0209B0687778AE3E22929D84A1780F9C0004F300D4B6E3A5E7F85A0D`.
+  Previous backend backup:
+  `%LOCALAPPDATA%\AdaptiveBattleStationOptimizer\deploy-backups\abso.exe.bak-20260709-163025`.
+  The earlier 16:09 deploy updated 2 tray files; later deploys updated the
+  backend only.
+
+Live tray state: the stale elevated tray process PID 30916 was stopped and
+restarted through the registered `ABSO-Tray-Startup` scheduled task during the
+16:30 fix. A later tray UI refactor was deployed at 2026-07-09 18:41
+America/New_York with `.\.venv\Scripts\python.exe build.py deploy`; the current
+runtime marker PID is 38588 with script hash
+`8162f1b77801cfe0ac9950c6c198e0ae34a8b17271fe61098bc0d0234f4cb640`, matching
+the installed tray script. The marker includes the new shared theme module
+`ABSO-Theme.ps1` with hash
+`ff88222b5b781bd2a9b51cae17a659f4edc12a492824111e91c109551f375110`. Tray log
+at 2026-07-09 18:41:47 confirms `Startup profile verification deferred; active
+profile restored from remembered state only`; no startup `state --json --verify`
+launch followed. Do not run `state --json --verify` merely as a post-deploy
+proof on this setup; use file/hash/log evidence unless the user explicitly asks
+for live verification.
+
+Tray UI refactor deployed at 18:41:
+
+- Added `abso/tray/ABSO-Theme.ps1` as the shared menu/toast/quick-panel theme
+  token source.
+- Main tray menu now uses larger section/category headers, neutral owner-drawn
+  profile/game-row text, shorter bounded hover/active lanes, and category role
+  colors that decorate rails/icons/chips instead of replacing row text.
+- `ABSO-Notifications.ps1` and `ABSO-QuickPanel.ps1` now consume the shared
+  palette when loaded by the tray.
+- Runtime health now hashes `ABSO-Theme.ps1`; `abso.exe health --json` after
+  deploy reported `tray_runtime_marker: ok` and summary `10 ok / 0 warning / 0
+  error`.
+- Verification before deploy: PowerShell parser OK for theme/tray/notification/
+  quick-panel scripts; `pytest tests/test_tray_script_static.py
+  tests/test_core/test_health.py -q` = 170 passed; `ruff check .` passed.
+
+Read-only live checks after deploy:
+
+- Active state file reports `current_profile: overwatch2-gsync-hdr-capture`,
+  applied 2026-07-09 17:03:11, no reboot pending.
+- HKCU AppCompat OW2 entry currently reads `Overwatch.exe = ~
+  PROCESSORAFFINITYMASK=FFFFFFFF`.
+- HKCU AppCompat Rivals 2 shipping path currently includes `~
+  PERPROCESSSYSTEMDPIFORCEOFF`; future CPU-affinity writes now preserve that DPI
+  token instead of risking truncation on read failure.
+- Mouse-only live correction was applied through `MouseSettingsHandler` after a
+  mouse-only backup at
+  `%LOCALAPPDATA%\AdaptiveBattleStationOptimizer\backups\2026-07-09_163053`.
+  Before correction, registry `MouseSensitivity=11` and active
+  `SPI_GETMOUSESPEED=11`. After correction, registry `MouseSensitivity=10`,
+  active `SPI_GETMOUSESPEED=10`, acceleration remains disabled, and
+  SmoothMouseXCurve/SmoothMouseYCurve match ABSO's axis-specific linear
+  templates.
 
 ## 2026-06-19 (session 2) Implemented all A/B/C/D improvements + live-verified (not committed/deployed)
 
