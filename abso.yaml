@@ -22,3 +22,17 @@ ddci:
 # Do not re-add an MPO override here without re-validating windowed VRR;
 # the applier now warns whenever a config override contradicts an explicit
 # profile declaration.
+
+# NOTE (2026-07-14): Logitech G HUB protected from the launch-time process
+# sweep. The strict (non-capture-safe) gaming lanes carry lghub* in their
+# always-safe killset; killing lghub_agent.exe mid-session reverted the
+# mouse to onboard defaults (wrong DPI, DPI-shift buttons falling through
+# to game keybinds in OW2). This machine's mouse relies on G HUB software
+# profiles, so protect wins over every profile killset by design.
+# Keep in sync with the installed copy at
+# %LOCALAPPDATA%\AdaptiveBattleStationOptimizer\abso.yaml.
+process_overrides:
+  protect:
+    - lghub.exe
+    - lghub_agent.exe
+    - lghub_updater.exe

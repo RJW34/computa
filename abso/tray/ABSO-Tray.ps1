@@ -1150,6 +1150,15 @@ function Reset-ActiveProfileVerificationState {
     $script:ActiveProfileStateRebootReasons = @()
 }
 
+# Startup verification is deferred (see the deferral note near the end of
+# Initialize), so nothing seeds these until the first apply or verify runs.
+# Uninitialized ($null) lists wrapped in @() have Count 1, which made
+# Get-ActiveProfileRebootPendingText fall through to its "profile changes"
+# fallback and render a phantom "Windows restart required" banner on every
+# cold start. Initialize the state explicitly so renderers see empty, not
+# $null.
+Reset-ActiveProfileVerificationState
+
 function Set-ActiveProfileVerificationSeedFromApplyData {
     <#
     .SYNOPSIS
@@ -1244,7 +1253,12 @@ function Get-ActiveProfilePendingApplyText {
 }
 
 function Get-ActiveProfileRebootPendingText {
-    $pending = @($script:ActiveProfilePendingRebootSettings)
+    # Filter blanks so an unseeded $null list reads as empty; @($null) has
+    # Count 1 and previously defeated both early-return guards below.
+    $pending = @(
+        @($script:ActiveProfilePendingRebootSettings) |
+            Where-Object { -not [string]::IsNullOrWhiteSpace("$($_)") }
+    )
     if (
         $script:ActiveProfileVerificationStatus -eq "active" -and
         $pending.Count -eq 0
@@ -1259,7 +1273,10 @@ function Get-ActiveProfileRebootPendingText {
     ) {
         return $null
     }
-    $reasons = @($script:ActiveProfileStateRebootReasons)
+    $reasons = @(
+        @($script:ActiveProfileStateRebootReasons) |
+            Where-Object { -not [string]::IsNullOrWhiteSpace("$($_)") }
+    )
     if ($reasons.Count -gt 0 -and -not [string]::IsNullOrWhiteSpace("$($reasons[0])")) {
         return (Format-TrayUserFacingText -Text "$($reasons[0])")
     }
