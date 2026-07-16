@@ -863,7 +863,8 @@ function Get-TrayProfileGameGroup {
     }
 
     $variantSuffixes = @(
-        "-online-gsync-hdr", "-gsync-hdr-capture", "-gsync-capture",
+        "-online-gsync-hdr-capture", "-online-gsync-hdr",
+        "-gsync-hdr-capture", "-gsync-capture",
         "-online-gsync", "-offline-gsync-hdr",
         "-offline-hdr", "-online-hdr", "-console-parity-hdr",
         "-universal-hdr", "-gsync-hdr", "-tournament-sim-144hz",
@@ -9121,7 +9122,8 @@ public class HotkeyMessageWindow : NativeWindow {
     # appear once with their SDR/HDR/sync options underneath. The suffix list
     # remains only as a fallback for stale caches or user YAML profiles.
     $variantSuffixes = @(
-        "-online-gsync-hdr", "-gsync-hdr-capture", "-gsync-capture",
+        "-online-gsync-hdr-capture", "-online-gsync-hdr",
+        "-gsync-hdr-capture", "-gsync-capture",
         "-online-gsync", "-offline-gsync-hdr",
         "-offline-hdr", "-online-hdr", "-console-parity-hdr",
         "-universal-hdr", "-gsync-hdr", "-tournament-sim-144hz",

@@ -30,8 +30,10 @@ from abso.profiles.productivity_oled import ProductivityOLEDProfile
 from abso.profiles.rivals2 import Rivals2Profile
 from abso.profiles.rivals2_300hz_max import Rivals2_300HzMaxProfile
 from abso.profiles.rivals2_gsync import (
+    Rivals2GSyncHDRCaptureProfile,
     Rivals2GSyncHDRProfile,
     Rivals2GSyncProfile,
+    Rivals2OnlineGSyncHDRCaptureProfile,
     Rivals2OnlineGSyncHDRProfile,
     Rivals2OnlineGSyncProfile,
 )
@@ -63,8 +65,10 @@ __all__ = [
     "Rivals2_300HzMaxProfile",
     "Rivals2GSyncProfile",
     "Rivals2GSyncHDRProfile",
+    "Rivals2GSyncHDRCaptureProfile",
     "Rivals2OnlineGSyncProfile",
     "Rivals2OnlineGSyncHDRProfile",
+    "Rivals2OnlineGSyncHDRCaptureProfile",
     "Diablo4Profile",
     "Diablo4SDRProfile",
     "FortniteProfile",

@@ -196,8 +196,10 @@ def test_tray_manifest_groups_variants_by_game_once() -> None:
         "rivals2-online-hdr",
         "rivals2-gsync",
         "rivals2-gsync-hdr",
+        "rivals2-gsync-hdr-capture",
         "rivals2-online-gsync",
         "rivals2-online-gsync-hdr",
+        "rivals2-online-gsync-hdr-capture",
     }
     assert set(groups["slippi-melee"]) == {
         "slippi-melee",
@@ -230,10 +232,12 @@ def test_tray_rank_orders_rivals2_variants_for_users() -> None:
         "rivals2-online-hdr",
         "rivals2-online-gsync",
         "rivals2-online-gsync-hdr",
+        "rivals2-online-gsync-hdr-capture",
         "rivals2-offline",
         "rivals2-offline-hdr",
         "rivals2-gsync",
         "rivals2-gsync-hdr",
+        "rivals2-gsync-hdr-capture",
     ]
 
 
@@ -277,7 +281,9 @@ def test_rivals2_hdr_catalog_reports_windows_hdr_composition() -> None:
         "rivals2-offline-hdr",
         "rivals2-online-hdr",
         "rivals2-gsync-hdr",
+        "rivals2-gsync-hdr-capture",
         "rivals2-online-gsync-hdr",
+        "rivals2-online-gsync-hdr-capture",
     ):
         text = " ".join(
             str(manifest[profile_id].get(key, ""))

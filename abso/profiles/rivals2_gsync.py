@@ -16,6 +16,43 @@ from typing import Any
 from abso.profiles.profile_bases import Rivals2BaseProfile, merge_settings_map
 from abso.settings.registry import WIN32_PRIORITY_GAMING_ONLINE
 
+# Shared payload delta for the capture-safe siblings: swap the strict
+# exclusive-fullscreen + fullscreen-only VRR contract for the borderless
+# windowed G-SYNC flip path (same mechanism the OW2 capture lanes use).
+# Switching global_vrr_mode off "fullscreen_only" also drops the
+# overlay-free display-path gate that blocks apply while OBS runs.
+_CAPTURE_WINDOWED_VRR_OVERRIDES: dict[str, dict[str, Any]] = {
+    "WindowsSettingsHandler": {
+        "windowed_optimizations": True,
+        "vrr_optimize": True,
+    },
+    "NvidiaSettingsHandler": {
+        "global_vrr_mode": "fullscreen_and_windowed",
+    },
+    "Rivals2ConfigHandler": {
+        "fullscreen_mode": 1,  # UE windowed-fullscreen (borderless)
+    },
+}
+
+
+def _capture_display_mode_rows(rows: list[dict[str, str]]) -> list[dict[str, str]]:
+    """Rewrite the strict lanes' exclusive-fullscreen guidance for capture lanes."""
+    patched: list[dict[str, str]] = []
+    for row in rows:
+        if row.get("setting") == "Display Mode":
+            row = {
+                **row,
+                "value": "Borderless / Windowed Fullscreen",
+                "reason": (
+                    "Capture-safe lane: runs the Win11 borderless windowed G-SYNC "
+                    "path so OBS/Medal/overlays coexist with VRR. ABSO enables "
+                    "windowed VRR and windowed optimizations to keep the flip "
+                    "path fast."
+                ),
+            }
+        patched.append(row)
+    return patched
+
 
 class Rivals2GSyncProfile(Rivals2BaseProfile):
     """Low latency VRR profile for Rivals of Aether 2.
@@ -215,6 +252,12 @@ class Rivals2GSyncHDRProfile(Rivals2GSyncProfile):
     def mixed_refresh_safe_fallback_profile_id(self) -> str:
         return "rivals2-offline-hdr"
 
+    @property
+    def overlay_compatible_fallback_profile_id(self) -> str | None:
+        # Overlay-blocked applies (OBS/Medal running) reroute to the
+        # borderless capture-safe sibling instead of hard-failing.
+        return "rivals2-gsync-hdr-capture"
+
     def _settings_overrides(self) -> dict[str, dict[str, Any]]:
         return merge_settings_map(
             super()._settings_overrides(),
@@ -223,6 +266,65 @@ class Rivals2GSyncHDRProfile(Rivals2GSyncProfile):
 
     def get_in_game_settings(self) -> list[dict[str, str]]:
         return [*self._rivals2_hdr_guidance(), *super().get_in_game_settings()]
+
+
+class Rivals2GSyncHDRCaptureProfile(Rivals2GSyncHDRProfile):
+    """Capture-safe borderless sibling of the offline G-SYNC HDR lane.
+
+    Same VRR + Windows HDR composition contract as
+    :class:`Rivals2GSyncHDRProfile`, but on the borderless windowed G-SYNC
+    flip path with the capture / overlay / peripheral stack (OBS, Medal,
+    RTSS, overlays) kept alive at apply and game launch.
+    """
+
+    @property
+    def is_capture_safe(self) -> bool:
+        return True
+
+    @property
+    def profile_id(self) -> str:
+        return "rivals2-gsync-hdr-capture"
+
+    @property
+    def display_name(self) -> str:
+        return "Rivals 2 - Offline GSYNC HDR Capture-Safe"
+
+    @property
+    def description(self) -> str:
+        return (
+            "Offline G-SYNC Rivals 2 lane with Windows HDR composition on the "
+            "borderless windowed VRR path; keeps OBS/Medal/RTSS and overlays "
+            "alive. Rivals 2 currently advertises no native HDR support, so "
+            "native game HDR remains off."
+        )
+
+    @property
+    def requires_exact_nvidia_binding(self) -> bool:
+        # Windowed VRR drops the exclusive-fullscreen contract, but the
+        # NVIDIA app-binding proof stays mandatory like the strict lane.
+        return True
+
+    @property
+    def overlay_compatible_fallback_profile_id(self) -> str | None:
+        # This lane IS the overlay-compatible path; terminate the chain so
+        # the inherited strict-lane fallback cannot self-reference.
+        return None
+
+    def _settings_overrides(self) -> dict[str, dict[str, Any]]:
+        return merge_settings_map(
+            super()._settings_overrides(),
+            _CAPTURE_WINDOWED_VRR_OVERRIDES,
+        )
+
+    def get_in_game_settings(self) -> list[dict[str, str]]:
+        return _capture_display_mode_rows(super().get_in_game_settings())
+
+    def get_post_apply_notes(self) -> list[str]:
+        return [
+            "Rivals 2 manual: use Borderless / Windowed Fullscreen, in-game "
+            "V-Sync Off, and the refresh-minus-3 cap. OBS/overlays may stay "
+            "running on this lane."
+        ]
 
 
 class Rivals2OnlineGSyncProfile(Rivals2BaseProfile):
@@ -421,6 +523,12 @@ class Rivals2OnlineGSyncHDRProfile(Rivals2OnlineGSyncProfile):
     def mixed_refresh_safe_fallback_profile_id(self) -> str:
         return "rivals2-online-hdr"
 
+    @property
+    def overlay_compatible_fallback_profile_id(self) -> str | None:
+        # Overlay-blocked applies (OBS/Medal running) reroute to the
+        # borderless capture-safe sibling instead of hard-failing.
+        return "rivals2-online-gsync-hdr-capture"
+
     def _settings_overrides(self) -> dict[str, dict[str, Any]]:
         return merge_settings_map(
             super()._settings_overrides(),
@@ -429,5 +537,64 @@ class Rivals2OnlineGSyncHDRProfile(Rivals2OnlineGSyncProfile):
 
     def get_in_game_settings(self) -> list[dict[str, str]]:
         return [*self._rivals2_hdr_guidance(), *super().get_in_game_settings()]
+
+
+class Rivals2OnlineGSyncHDRCaptureProfile(Rivals2OnlineGSyncHDRProfile):
+    """Capture-safe borderless sibling of the online G-SYNC HDR lane.
+
+    Same rollback-safe VRR + Windows HDR composition contract as
+    :class:`Rivals2OnlineGSyncHDRProfile`, but on the borderless windowed
+    G-SYNC flip path with the capture / overlay / peripheral stack (OBS,
+    Medal, RTSS, overlays) kept alive at apply and game launch.
+    """
+
+    @property
+    def is_capture_safe(self) -> bool:
+        return True
+
+    @property
+    def profile_id(self) -> str:
+        return "rivals2-online-gsync-hdr-capture"
+
+    @property
+    def display_name(self) -> str:
+        return "Rivals 2 - Online GSYNC HDR Capture-Safe"
+
+    @property
+    def description(self) -> str:
+        return (
+            "Rollback-safe online G-SYNC Rivals 2 lane with Windows HDR "
+            "composition on the borderless windowed VRR path; keeps "
+            "OBS/Medal/RTSS and overlays alive. Rivals 2 currently advertises "
+            "no native HDR support, so native game HDR remains off."
+        )
+
+    @property
+    def requires_exact_nvidia_binding(self) -> bool:
+        # Windowed VRR drops the exclusive-fullscreen contract, but the
+        # NVIDIA app-binding proof stays mandatory like the strict lane.
+        return True
+
+    @property
+    def overlay_compatible_fallback_profile_id(self) -> str | None:
+        # This lane IS the overlay-compatible path; terminate the chain so
+        # the inherited strict-lane fallback cannot self-reference.
+        return None
+
+    def _settings_overrides(self) -> dict[str, dict[str, Any]]:
+        return merge_settings_map(
+            super()._settings_overrides(),
+            _CAPTURE_WINDOWED_VRR_OVERRIDES,
+        )
+
+    def get_in_game_settings(self) -> list[dict[str, str]]:
+        return _capture_display_mode_rows(super().get_in_game_settings())
+
+    def get_post_apply_notes(self) -> list[str]:
+        return [
+            "Rivals 2 manual: use Borderless / Windowed Fullscreen, in-game "
+            "V-Sync Off, and the refresh-minus-3 cap. OBS/overlays may stay "
+            "running on this lane."
+        ]
 
 

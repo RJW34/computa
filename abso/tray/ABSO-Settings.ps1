@@ -175,7 +175,8 @@ function Get-SettingsProfileGameGroup {
     }
 
     $variantSuffixes = @(
-        "-online-gsync-hdr", "-gsync-hdr-capture", "-gsync-capture",
+        "-online-gsync-hdr-capture", "-online-gsync-hdr",
+        "-gsync-hdr-capture", "-gsync-capture",
         "-online-gsync", "-offline-gsync-hdr",
         "-offline-hdr", "-online-hdr", "-console-parity-hdr",
         "-universal-hdr", "-gsync-hdr", "-tournament-sim-144hz",

@@ -4104,6 +4104,218 @@
       }
     }
   },
+  "rivals2-gsync-hdr-capture": {
+    "allows_aggressive_settings": false,
+    "application_scope": "system_plus_native_config",
+    "display_name": "Rivals 2 - Offline GSYNC HDR Capture-Safe",
+    "graphics_api": "dx11",
+    "handlers": [
+      "WindowsSettingsHandler",
+      "PowerSettingsHandler",
+      "RegistrySettingsHandler",
+      "NvidiaSettingsHandler",
+      "NvidiaNotificationHandler",
+      "NetworkSettingsHandler",
+      "MouseSettingsHandler",
+      "GraphicsSettingsHandler",
+      "ProcessPriorityHandler",
+      "CpuAffinityHandler",
+      "Rivals2ConfigHandler",
+      "ColorProfileSettingsHandler",
+      "DisplayColorRangeHandler"
+    ],
+    "in_game_settings": [
+      {
+        "category": "Windows HDR",
+        "reason": "This profile enables Windows HDR + WCG for OLED / Mini-LED comfort. Rivals 2 currently advertises no native HDR support, so the game remains SDR and Windows composites it into the HDR surface.",
+        "setting": "Use HDR (Settings > System > Display)",
+        "value": "On"
+      },
+      {
+        "category": "Windows HDR",
+        "reason": "ABSO sets the Windows SDR-in-HDR paper-white slider to 200 nits. Move it up or down until Rivals 2 matches your preferred desktop brightness.",
+        "setting": "SDR content brightness",
+        "value": "200 nits starting point; tune to taste"
+      },
+      {
+        "category": "Rivals 2 Video",
+        "reason": "Steam metadata reports hdr_support=0 for Rivals 2, so ABSO does not force Unreal's bUseHDRDisplayOutput flag. These HDR lanes are OS-level SDR-in-HDR composition variants, not native game HDR.",
+        "setting": "HDR Output",
+        "value": "Off in GameUserSettings.ini"
+      },
+      {
+        "category": "Windows HDR",
+        "reason": "Auto HDR applies synthetic expansion to SDR games. Rivals 2's competitive color path is kept as SDR inside Windows HDR composition instead.",
+        "setting": "Auto HDR",
+        "value": "Off"
+      },
+      {
+        "category": "Display",
+        "reason": "Windows HDR composition can add a small nonzero presentation cost. Use the SDR sibling when the leanest latency path matters more than HDR desktop comfort.",
+        "setting": "Exclusive Fullscreen vs SDR-in-HDR latency",
+        "value": "Accept a small HDR composition cost"
+      },
+      {
+        "category": "=== G-SYNC PROFILE ===",
+        "reason": "Tear-free low-latency VRR profile. VSync acts as safety net only - never activates with FPS capped below refresh rate. For 300Hz: cap at 297. For 240Hz: cap at 237. For 144Hz: cap at 141. (Blur Busters G-SYNC 101 convention.)",
+        "setting": "Overview",
+        "value": "G-SYNC ON, VSync ON (NVCP), refresh - 3 FPS cap"
+      },
+      {
+        "category": "NVIDIA Control Panel",
+        "reason": "Display > Set up G-SYNC. Check 'Enable G-SYNC' and 'Enable for full screen mode'.",
+        "setting": "Set up G-SYNC",
+        "value": "Enable G-SYNC, G-SYNC Compatible: ON"
+      },
+      {
+        "category": "NVIDIA Control Panel",
+        "reason": "Manage 3D Settings. Acts as SAFETY NET only with G-SYNC. With FPS capped below refresh, VSync never engages.",
+        "setting": "Vertical sync",
+        "value": "On"
+      },
+      {
+        "category": "NVIDIA Control Panel",
+        "reason": "Reduces render queue depth on the published DX11 path. 'On' is correct (not 'Off' - Rivals 2 has no Reflex). If stuttering occurs, try 'Off' or set Pre-Rendered Frames to 2 via Nvidia Profile Inspector.",
+        "setting": "Low Latency Mode",
+        "value": "On"
+      },
+      {
+        "category": "NVIDIA Control Panel",
+        "reason": "ABSO auto-detects your refresh rate and applies the Blur Busters G-SYNC 101 convention (refresh - 3: e.g. 297 @ 300Hz, 237 @ 240Hz, 141 @ 144Hz). Keeps G-SYNC active and V-SYNC from engaging.",
+        "setting": "Max Frame Rate",
+        "value": "refresh - 3 cap (auto-set by ABSO)"
+      },
+      {
+        "category": "In-Game Video",
+        "reason": "Capture-safe lane: runs the Win11 borderless windowed G-SYNC path so OBS/Medal/overlays coexist with VRR. ABSO enables windowed VRR and windowed optimizations to keep the flip path fast.",
+        "setting": "Display Mode",
+        "value": "Borderless / Windowed Fullscreen"
+      },
+      {
+        "category": "In-Game Video",
+        "reason": "ALWAYS disable in-game VSync with G-SYNC. NVCP VSync handles sync.",
+        "setting": "V-SYNC",
+        "value": "Off"
+      },
+      {
+        "category": "In-Game Video",
+        "reason": "Must cap below refresh for G-SYNC to work properly. In-game limiter has lower latency than NVCP/RTSS limiters.",
+        "setting": "Frame Rate Cap",
+        "value": "refresh - 3 cap (e.g., 297 for 300Hz)"
+      },
+      {
+        "category": "In-Game Video",
+        "reason": "Rivals 2 does not implement NVIDIA Reflex. LLM 'On' is set via NVCP instead. This is different from OW2/Fortnite where Reflex handles queue control.",
+        "setting": "NVIDIA Reflex",
+        "value": "Not available"
+      }
+    ],
+    "include_legacy_tweaks": false,
+    "is_emulator_profile": false,
+    "is_online_profile": false,
+    "is_sdr_only": false,
+    "network_scope": "none",
+    "optimization_target": "low_latency_vrr",
+    "requires_reflex": false,
+    "settings": {
+      "ColorProfileSettingsHandler": {
+        "digital_vibrance": 50,
+        "game_type": "competitive_fps",
+        "icc_profile": "native",
+        "show_osd_guidance": true
+      },
+      "CpuAffinityHandler": {
+        "strategy": null
+      },
+      "DisplayColorRangeHandler": {
+        "dynamic_range": "full"
+      },
+      "GraphicsSettingsHandler": {
+        "disable_auto_color_management": true,
+        "disable_global_fso": true
+      },
+      "MouseSettingsHandler": {
+        "disable_acceleration": true,
+        "mouse_sensitivity": 10,
+        "set_linear_curve": true
+      },
+      "NetworkSettingsHandler": {
+        "disable_nagle": false,
+        "preset": "default"
+      },
+      "NvidiaNotificationHandler": {
+        "disable_notifications": true
+      },
+      "NvidiaSettingsHandler": {
+        "auto_vrr_fps_cap": true,
+        "global_vrr_mode": "fullscreen_and_windowed",
+        "preset": "vrr_fighting_game",
+        "profile_aliases": [
+          "Rivals2-Win64-Shipping.exe",
+          "Rivals of Aether 2",
+          "Rivals 2 - Offline No Sync",
+          "Rivals 2 - Offline No Sync HDR",
+          "Rivals 2 - Offline GSYNC",
+          "Rivals 2 - Offline GSYNC HDR",
+          "Rivals 2: Offline / Training",
+          "Rivals 2: G-SYNC",
+          "Rivals 2: Offline HDR",
+          "Rivals 2: G-SYNC HDR",
+          "Rivals 2: 300Hz Maximum",
+          "Rivals 2: Tournament Sim (144Hz)"
+        ],
+        "profile_name": "Rivals 2",
+        "threaded_optimization": "off",
+        "vrr_app_override": "allow"
+      },
+      "PowerSettingsHandler": {
+        "active_plan": "ultimate_performance",
+        "disable_core_parking": true,
+        "disable_pcie_power_saving": true,
+        "disable_usb_suspend": true,
+        "ensure_ultimate_performance": true,
+        "processor_max_performance": true,
+        "processor_min_state": 100
+      },
+      "ProcessPriorityHandler": {
+        "cpu_priority": 3,
+        "io_priority": 3
+      },
+      "RegistrySettingsHandler": {
+        "fullscreen_optimizations": {
+          "Rivals2-Win64-Shipping.exe": true,
+          "Rivals2.exe": true,
+          "RivalsofAether2.exe": true
+        },
+        "game_priority": {
+          "gpu_priority": 8,
+          "priority": 6,
+          "scheduling_category": "High"
+        },
+        "win32_priority_separation": 42
+      },
+      "Rivals2ConfigHandler": {
+        "auto_vrr_fps_cap": true,
+        "fullscreen_mode": 1,
+        "hdr_output": false,
+        "raw_input": true,
+        "vsync": false
+      },
+      "WindowsSettingsHandler": {
+        "advanced_color": true,
+        "auto_hdr": false,
+        "game_bar": false,
+        "game_dvr": false,
+        "game_mode": true,
+        "hags": true,
+        "hdr": true,
+        "max_refresh_rate": true,
+        "sdr_white_level_nits": 200,
+        "vrr_optimize": true,
+        "windowed_optimizations": true
+      }
+    }
+  },
   "rivals2-offline": {
     "allows_aggressive_settings": true,
     "application_scope": "system_plus_native_config",
@@ -5068,6 +5280,215 @@
         "sdr_white_level_nits": 200,
         "vrr_optimize": false,
         "windowed_optimizations": false
+      }
+    }
+  },
+  "rivals2-online-gsync-hdr-capture": {
+    "allows_aggressive_settings": false,
+    "application_scope": "system_plus_native_config",
+    "display_name": "Rivals 2 - Online GSYNC HDR Capture-Safe",
+    "graphics_api": "dx11",
+    "handlers": [
+      "WindowsSettingsHandler",
+      "PowerSettingsHandler",
+      "RegistrySettingsHandler",
+      "NvidiaSettingsHandler",
+      "NvidiaNotificationHandler",
+      "NetworkSettingsHandler",
+      "MouseSettingsHandler",
+      "GraphicsSettingsHandler",
+      "ProcessPriorityHandler",
+      "CpuAffinityHandler",
+      "Rivals2ConfigHandler",
+      "ColorProfileSettingsHandler",
+      "DisplayColorRangeHandler"
+    ],
+    "in_game_settings": [
+      {
+        "category": "Windows HDR",
+        "reason": "This profile enables Windows HDR + WCG for OLED / Mini-LED comfort. Rivals 2 currently advertises no native HDR support, so the game remains SDR and Windows composites it into the HDR surface.",
+        "setting": "Use HDR (Settings > System > Display)",
+        "value": "On"
+      },
+      {
+        "category": "Windows HDR",
+        "reason": "ABSO sets the Windows SDR-in-HDR paper-white slider to 200 nits. Move it up or down until Rivals 2 matches your preferred desktop brightness.",
+        "setting": "SDR content brightness",
+        "value": "200 nits starting point; tune to taste"
+      },
+      {
+        "category": "Rivals 2 Video",
+        "reason": "Steam metadata reports hdr_support=0 for Rivals 2, so ABSO does not force Unreal's bUseHDRDisplayOutput flag. These HDR lanes are OS-level SDR-in-HDR composition variants, not native game HDR.",
+        "setting": "HDR Output",
+        "value": "Off in GameUserSettings.ini"
+      },
+      {
+        "category": "Windows HDR",
+        "reason": "Auto HDR applies synthetic expansion to SDR games. Rivals 2's competitive color path is kept as SDR inside Windows HDR composition instead.",
+        "setting": "Auto HDR",
+        "value": "Off"
+      },
+      {
+        "category": "Display",
+        "reason": "Windows HDR composition can add a small nonzero presentation cost. Use the SDR sibling when the leanest latency path matters more than HDR desktop comfort.",
+        "setting": "Exclusive Fullscreen vs SDR-in-HDR latency",
+        "value": "Accept a small HDR composition cost"
+      },
+      {
+        "category": "=== ONLINE G-SYNC PROFILE ===",
+        "reason": "Tear-free VRR for online play. Stability constraints applied for SnapNet rollback netcode. Threaded optimization OFF to prevent driver-side timing variability during rollback recovery.",
+        "setting": "Overview",
+        "value": "G-SYNC ON, Rollback-Safe, Stability-Focused"
+      },
+      {
+        "category": "NVIDIA Control Panel",
+        "reason": "Display > Set up G-SYNC. Check 'Enable G-SYNC' and 'Enable for full screen mode'.",
+        "setting": "Set up G-SYNC",
+        "value": "Enable G-SYNC, G-SYNC Compatible: ON"
+      },
+      {
+        "category": "NVIDIA Control Panel",
+        "reason": "NVCP VSync as safety net only. Never engages with FPS capped below refresh.",
+        "setting": "Vertical sync",
+        "value": "On (safety net)"
+      },
+      {
+        "category": "NVIDIA Control Panel",
+        "reason": "OFF - avoids extra driver-side timing variability during rollback.",
+        "setting": "Threaded Optimization",
+        "value": "Off"
+      },
+      {
+        "category": "NVIDIA Control Panel",
+        "reason": "Ultra can cause frame pacing issues and overrides FPS caps. 'On' reduces queue depth safely for online play.",
+        "setting": "Low Latency Mode",
+        "value": "On (NOT Ultra)"
+      },
+      {
+        "category": "In-Game Video",
+        "reason": "Capture-safe lane: runs the Win11 borderless windowed G-SYNC path so OBS/Medal/overlays coexist with VRR. ABSO enables windowed VRR and windowed optimizations to keep the flip path fast.",
+        "setting": "Display Mode",
+        "value": "Borderless / Windowed Fullscreen"
+      },
+      {
+        "category": "In-Game Video",
+        "reason": "NVCP VSync handles sync. In-game VSync must be off with G-SYNC.",
+        "setting": "V-SYNC",
+        "value": "Off"
+      },
+      {
+        "category": "In-Game Video",
+        "reason": "Keeps G-SYNC active and below the VSync ceiling. Use the in-game cap for lowest limiter latency.",
+        "setting": "Frame Rate Cap",
+        "value": "Refresh-scaled VRR cap"
+      },
+      {
+        "category": "Validation",
+        "reason": "G-SYNC smooths frame delivery. Conservative priority prevents timing contention.",
+        "setting": "Expected Behavior",
+        "value": "Tear-free, stable frametimes, no rollback dropouts"
+      }
+    ],
+    "include_legacy_tweaks": false,
+    "is_emulator_profile": false,
+    "is_online_profile": true,
+    "is_sdr_only": false,
+    "network_scope": "none",
+    "optimization_target": "stable_online_vrr",
+    "requires_reflex": false,
+    "settings": {
+      "ColorProfileSettingsHandler": {
+        "digital_vibrance": 50,
+        "game_type": "competitive_fps",
+        "icc_profile": "native",
+        "show_osd_guidance": true
+      },
+      "CpuAffinityHandler": {
+        "strategy": null
+      },
+      "DisplayColorRangeHandler": {
+        "dynamic_range": "full"
+      },
+      "GraphicsSettingsHandler": {
+        "disable_auto_color_management": true,
+        "disable_global_fso": true
+      },
+      "MouseSettingsHandler": {
+        "disable_acceleration": true,
+        "mouse_sensitivity": 10,
+        "set_linear_curve": true
+      },
+      "NetworkSettingsHandler": {
+        "disable_nagle": false,
+        "preset": "default"
+      },
+      "NvidiaNotificationHandler": {
+        "disable_notifications": true
+      },
+      "NvidiaSettingsHandler": {
+        "auto_vrr_fps_cap": true,
+        "global_vrr_mode": "fullscreen_and_windowed",
+        "preset": "vrr_fighting_game",
+        "profile_aliases": [
+          "Rivals 2 - Online No Sync",
+          "Rivals 2 - Online No Sync HDR",
+          "Rivals 2 - Online GSYNC",
+          "Rivals 2 - Online GSYNC HDR",
+          "Rivals 2: Online / Matchmaking",
+          "Rivals 2: Online G-SYNC",
+          "Rivals 2: Online HDR",
+          "Rivals 2: Online G-SYNC HDR",
+          "Rivals 2 (Streaming)"
+        ],
+        "profile_name": "Rivals 2 Online",
+        "threaded_optimization": "off",
+        "vrr_app_override": "allow"
+      },
+      "PowerSettingsHandler": {
+        "active_plan": "ultimate_performance",
+        "disable_core_parking": true,
+        "disable_pcie_power_saving": true,
+        "disable_usb_suspend": true,
+        "ensure_ultimate_performance": true,
+        "processor_max_performance": true,
+        "processor_min_state": 100
+      },
+      "ProcessPriorityHandler": {
+        "cpu_priority": 2,
+        "io_priority": 2
+      },
+      "RegistrySettingsHandler": {
+        "fullscreen_optimizations": {
+          "Rivals2-Win64-Shipping.exe": true,
+          "Rivals2.exe": true,
+          "RivalsofAether2.exe": true
+        },
+        "game_priority": {
+          "gpu_priority": 8,
+          "priority": 6,
+          "scheduling_category": "High"
+        },
+        "win32_priority_separation": 38
+      },
+      "Rivals2ConfigHandler": {
+        "auto_vrr_fps_cap": true,
+        "fullscreen_mode": 1,
+        "hdr_output": false,
+        "raw_input": true,
+        "vsync": false
+      },
+      "WindowsSettingsHandler": {
+        "advanced_color": true,
+        "auto_hdr": false,
+        "game_bar": false,
+        "game_dvr": false,
+        "game_mode": true,
+        "hags": true,
+        "hdr": true,
+        "max_refresh_rate": true,
+        "sdr_white_level_nits": 200,
+        "vrr_optimize": true,
+        "windowed_optimizations": true
       }
     }
   },

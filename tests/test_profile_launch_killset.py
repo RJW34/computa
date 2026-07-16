@@ -133,6 +133,8 @@ def test_non_strict_gaming_profiles_now_get_full_killset(profile_id, profiles_by
     [
         "overwatch2-gsync-capture",
         "overwatch2-gsync-hdr-capture",
+        "rivals2-gsync-hdr-capture",
+        "rivals2-online-gsync-hdr-capture",
     ],
 )
 def test_capture_safe_profiles_get_filtered_killset(profile_id, profiles_by_id) -> None:

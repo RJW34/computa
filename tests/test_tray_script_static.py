@@ -1673,6 +1673,7 @@ def test_tray_game_marks_cover_integration_matrix_variants() -> None:
         if scenario.get("kind") == "apply_profile" and scenario.get("profile_id")
     }
     variant_suffixes = [
+        "-online-gsync-hdr-capture",
         "-online-gsync-hdr",
         "-gsync-hdr-capture",
         "-gsync-capture",
