@@ -221,19 +221,47 @@ class _Overwatch2BaseProfile(ReflexShooterBaseProfile):
 
     @property
     def allow_dual_limiter(self) -> bool:
-        # OW2's G-SYNC variants deliberately layer the in-game cap (authoritative,
-        # preferred by Blur Busters when stable) and the NVIDIA driver cap (safety net).
-        # Both resolve through the same declared cap policy and catch each other
-        # when Settings_v0.ini drifts — OW2 is known to rewrite the INI on exit
-        # and on multi-monitor changes. The no-sync variant sets neither cap, so
+        # OW2's G-SYNC variants deliberately layer a DRIVER v3 cap
+        # (authoritative render pacer, 276 @ 300 Hz) with an in-game cap parked
+        # ABOVE it (refresh - 3). OW2's engine cap governs simulation cadence,
+        # not render pacing (CapFrameX per-frame testing, Oct 2025), and two
+        # limiters fighting at the same value is the failure mode that
+        # collapsed 1% lows under Reflex. Staggered caps still catch each
+        # other when Settings_v0.ini drifts — OW2 rewrites the INI on exit and
+        # on multi-monitor changes. The no-sync variant sets neither cap, so
         # this opt-in is harmless there.
         return True
 
     @staticmethod
-    def _ow2_reflex_gsync_cap_settings() -> dict[str, Any]:
+    def _ow2_gsync_driver_cap_settings() -> dict[str, Any]:
+        """Driver v3 FRL cap — the authoritative limiter on the G-SYNC lanes.
+
+        Resolves to 276 @ 300 Hz (~8% below refresh). The policy name predates
+        the Reflex-off switch (2026-07): the same frame-time-margin math that
+        matched Reflex's auto cap is also the right ULL/G-SYNC headroom, so
+        the cap VALUE is unchanged — only which limiter owns pacing changed.
+        """
         return {
             "auto_vrr_fps_cap": True,
             "vrr_cap_policy": OW2_REFLEX_GSYNC_CAP_POLICY,
+        }
+
+    @staticmethod
+    def _ow2_gsync_engine_cap_settings() -> dict[str, Any]:
+        """In-game cap parked ABOVE the driver cap (refresh - 3 = 297 @ 300 Hz).
+
+        OW2's engine cap only steadies simulation cadence; the driver v3 cap
+        does the render pacing. Keeping them staggered stops limiter fights —
+        per-frame CapFrameX testing (Oct 2025) showed in-game Reflex plus an
+        active reachable cap collapsing 1% lows to ~half the average, which is
+        why these lanes also expect the in-game Reflex toggle OFF.
+        """
+        return {
+            "auto_vrr_fps_cap": True,
+            "vrr_cap_policy": "refresh_minus_3",
+            # Verify surfaces the manual in-game Reflex toggle (Off) as a
+            # non-blocking step; ABSO cannot safely write the INI key.
+            "expected_reflex_mode": 0,
         }
 
     @staticmethod
@@ -253,8 +281,9 @@ class _Overwatch2BaseProfile(ReflexShooterBaseProfile):
     def _ow2_gsync_post_apply_notes() -> list[str]:
         return [
             (
-                "OW2 manual: set Reflex to Enabled + Boost; keep Dynamic Render "
-                "Scale Off and Custom Render Scale 100% unless GPU-bound."
+                "OW2 manual: set NVIDIA Reflex to Off (driver ULL Ultra + the "
+                "v3 cap own pacing on this lane); keep Dynamic Render Scale Off "
+                "and Custom Render Scale 100% unless GPU-bound."
             )
         ]
 
@@ -330,8 +359,11 @@ class Overwatch2Profile(_Overwatch2BaseProfile):
     def _variant_overrides(self) -> dict[str, dict[str, Any]]:
         return {
             "NvidiaSettingsHandler": {
-                # In-game Reflex OFF (GPU not saturated at 1440p Low).
-                # Driver preset disables LLM + VSync + VRR for pure no-sync.
+                # In-game Reflex ON + Boost: uncapped no-sync goes GPU-bound in
+                # team fights, which is Reflex's measured win case (per-frame
+                # OW2 testing shows no fps cost; CPU-bound lulls are neutral).
+                # Driver preset keeps LLM off so the engine owns the queue,
+                # and disables VSync + VRR for pure no-sync.
                 "preset": "reflex_no_sync",
                 # Use NVIDIA's predefined OW2 profile to avoid executable binding conflicts.
                 "profile_name": "Overwatch 2",
@@ -343,6 +375,10 @@ class Overwatch2Profile(_Overwatch2BaseProfile):
                 "window_mode": 0,
                 # Uncapped no-sync path (600 = OW2 max).
                 "frame_rate_cap": 600,
+                # Verify confirms the manual in-game Reflex step (On + Boost).
+                # Uncapped play is where Reflex's backpressure removal pays;
+                # its capped-lane pacing problems do not apply here.
+                "expected_reflex_mode": 2,
             },
         }
 
@@ -363,12 +399,13 @@ class Overwatch2Profile(_Overwatch2BaseProfile):
             {
                 "category": "Display",
                 "setting": "NVIDIA Reflex Low Latency",
-                "value": "Off (high-end GPU) / On+Boost (mid-range GPU)",
+                "value": "Enabled + Boost — set the in-game toggle manually",
                 "reason": (
-                    "On a high-end GPU at 1440p Low, the GPU is not saturated - Reflex "
-                    "throttles CPU frame submission without benefit, costing about 60 FPS. "
-                    "Higher uncapped FPS can reduce frame time when the system can sustain it. "
-                    "If your GPU is saturated (GPU usage above 90%), switch to On+Boost instead."
+                    "Uncapped no-sync play goes GPU-bound in team fights - exactly where "
+                    "per-frame OW2 testing shows Reflex removes render-queue backpressure "
+                    "at no measured fps cost; CPU-bound lulls are neutral. Reflex's pacing "
+                    "problems only appear when it fights a reachable frame cap (the G-SYNC "
+                    "lanes' scenario), which never happens on this uncapped lane."
                 ),
             },
             {
@@ -382,8 +419,9 @@ class Overwatch2Profile(_Overwatch2BaseProfile):
                 "setting": "Reduce Buffering",
                 "value": "On",
                 "reason": (
-                    "Essential with Reflex OFF - limits pre-render buffer to 1 frame. "
-                    "Only mechanism keeping render queue shallow."
+                    "Redundant while Reflex is Enabled (Reflex supersedes it, per-frame "
+                    "testing shows no difference) but harmless - and it keeps the render "
+                    "queue shallow if Reflex is ever toggled off."
                 ),
             },
             {
@@ -405,7 +443,8 @@ class Overwatch2Profile(_Overwatch2BaseProfile):
         return [
             (
                 "OW2 manual: Dynamic Render Scale Off, Custom Render Scale 100%; "
-                "try 80-90 only if GPU-bound. Reflex Off unless GPU usage stays above 90%."
+                "try 80-90 only if GPU-bound. Set NVIDIA Reflex to Enabled + Boost "
+                "(uncapped no-sync is Reflex's measured win case)."
             )
         ]
 
@@ -508,8 +547,9 @@ class Overwatch2NoSyncHDRProfile(Overwatch2Profile):
 class Overwatch2GSyncProfile(_Overwatch2BaseProfile):
     """Overwatch 2 G-SYNC profile.
 
-    Tear-free low-latency VRR profile. Uses Reflex + NVCP VSync safety net and
-    per-app VRR enabled.
+    Tear-free low-latency VRR profile. Driver ULL Ultra + a staggered driver
+    v3 / in-game cap pair own the pacing (in-game Reflex OFF per per-frame
+    CapFrameX findings), with NVCP VSync as safety net and per-app VRR enabled.
 
     Runs the same borderless windowed flip path as the capture-safe sibling;
     the difference is overlay handling, not the display path. This lane kills
@@ -573,12 +613,12 @@ class Overwatch2GSyncProfile(_Overwatch2BaseProfile):
                 "disable_auto_color_management": True,
             },
             "NvidiaSettingsHandler": {
-                "preset": "reflex_gsync",
+                "preset": "ull_gsync",
                 # Use NVIDIA's predefined OW2 profile to avoid executable binding conflicts.
                 "profile_name": "Overwatch 2",
-                # Enforce OW2's Reflex/G-SYNC cap policy; on the reference
-                # 300 Hz path this resolves to 276 FPS, not refresh - 3.
-                **self._ow2_reflex_gsync_cap_settings(),
+                # Driver v3 cap is the authoritative render pacer; the policy
+                # resolves to 276 FPS on the reference 300 Hz path.
+                **self._ow2_gsync_driver_cap_settings(),
                 "global_vrr_mode": "fullscreen_and_windowed",
             },
             "ColorProfileSettingsHandler": {
@@ -587,13 +627,10 @@ class Overwatch2GSyncProfile(_Overwatch2BaseProfile):
             },
             "OW2ConfigHandler": {
                 **self._borderless_ow2_settings(),
-                # Match the driver-side OW2 Reflex/G-SYNC target so verify,
-                # tray state, and the in-game cap all report the same value.
-                **self._ow2_reflex_gsync_cap_settings(),
-                # G-SYNC lanes recommend Reflex "Enabled + Boost" (ReflexMode 2).
-                # ABSO can't safely write it, but declares it so verify confirms
-                # the manual in-game step.
-                "expected_reflex_mode": 2,
+                # In-game cap parks ABOVE the driver cap (297 vs 276 @ 300 Hz)
+                # and the in-game Reflex toggle is expected OFF — see
+                # _ow2_gsync_engine_cap_settings for the measured rationale.
+                **self._ow2_gsync_engine_cap_settings(),
             },
         }
 
@@ -618,14 +655,14 @@ class Overwatch2GSyncProfile(_Overwatch2BaseProfile):
             {
                 "category": "Display",
                 "setting": "NVIDIA Reflex Low Latency",
-                "value": "Enabled + Boost — ABSO already set driver LLM off; flip the in-game toggle to finish",
-                "reason": "ABSO has already configured the driver side: NVIDIA LLM is OFF so the engine owns the render queue (Reflex's correct path). OW2's Reflex toggle lives in Settings_v0.ini behind a key that is not stable across patches and is not safely writable from outside; manually flip 'NVIDIA Reflex Low Latency' to 'Enabled + Boost' in Overwatch 2's Video settings once.",
+                "value": "Off — ABSO already set driver LLM to Ultra; flip the in-game toggle to finish",
+                "reason": "Per-frame CapFrameX testing (Oct 2025, RTX 4070 + G-SYNC) shows OW2's Reflex limiter fighting a reachable frame cap: identical average fps but 1% lows collapse to ~half the average with 2-10 ms frametime variance. Driver ULL Ultra + the driver v3 cap hold a flat frametime line instead. OW2's Reflex toggle is not safely writable from outside; manually set 'NVIDIA Reflex Low Latency' to 'Off' in Overwatch 2's Video settings once.",
             },
             {
                 "category": "Display",
                 "setting": "Frame Rate Cap",
-                "value": "Auto OW2 Reflex/G-SYNC cap (276 @ 300Hz; scales by refresh)",
-                "reason": "Set by ABSO through the OW2 Reflex/G-SYNC policy so the in-game cap and NVIDIA driver cap agree. On the 300 Hz reference path this is 276 FPS; no-sync OW2 profiles remain uncapped at 600.",
+                "value": "Auto staggered caps: driver v3 at 276, in-game at 297 (@300Hz; both scale by refresh)",
+                "reason": "The NVIDIA driver v3 limiter (276 @ 300 Hz, ~8% under refresh) is the authoritative render pacer; the in-game cap parks at refresh - 3 (297) ABOVE it because OW2's engine cap only steadies simulation cadence. Staggering stops limiter fights — the failure mode behind Reflex's 1%-low collapse. No-sync OW2 lanes remain uncapped at 600.",
             },
             {
                 "category": "Display",
@@ -746,25 +783,23 @@ class Overwatch2GSyncHDRProfile(_Overwatch2BaseProfile):
                 "disable_auto_color_management": True,
             },
             "NvidiaSettingsHandler": {
-                "preset": "reflex_gsync",
+                "preset": "ull_gsync",
                 "profile_name": "Overwatch 2",
-                # Enforce OW2's Reflex/G-SYNC cap policy; on the reference
-                # 300 Hz path this resolves to 276 FPS, not refresh - 3.
-                **self._ow2_reflex_gsync_cap_settings(),
+                # Driver v3 cap is the authoritative render pacer; the policy
+                # resolves to 276 FPS on the reference 300 Hz path.
+                **self._ow2_gsync_driver_cap_settings(),
                 "global_vrr_mode": "fullscreen_and_windowed",
             },
             "OW2ConfigHandler": {
                 **self._borderless_ow2_settings(),
-                # In-game cap matches the driver-side OW2 Reflex/G-SYNC cap
-                # so OW2 and NVCP agree on the target. To override, set
+                # In-game cap parks ABOVE the driver cap (297 vs 276 @ 300 Hz)
+                # and the in-game Reflex toggle is expected OFF — see
+                # _ow2_gsync_engine_cap_settings for the measured rationale.
+                # To override, set
                 # ``profile_overrides.overwatch2-gsync-hdr.ow2_config`` in
                 # abso.yaml: ``auto_vrr_fps_cap: false`` plus an explicit
                 # ``frame_rate_cap: <int>``.
-                **self._ow2_reflex_gsync_cap_settings(),
-                # G-SYNC lanes recommend Reflex "Enabled + Boost" (ReflexMode 2).
-                # ABSO can't safely write it, but declares it so verify confirms
-                # the manual in-game step.
-                "expected_reflex_mode": 2,
+                **self._ow2_gsync_engine_cap_settings(),
             },
         }
 
@@ -789,14 +824,14 @@ class Overwatch2GSyncHDRProfile(_Overwatch2BaseProfile):
             {
                 "category": "Display",
                 "setting": "NVIDIA Reflex Low Latency",
-                "value": "Enabled + Boost — ABSO already set driver LLM off; flip the in-game toggle to finish",
-                "reason": "ABSO has already configured the driver side: NVIDIA LLM is OFF so the engine owns the render queue (Reflex's correct path). OW2's Reflex toggle lives in Settings_v0.ini behind a key that is not stable across patches and is not safely writable from outside; manually flip 'NVIDIA Reflex Low Latency' to 'Enabled + Boost' in Overwatch 2's Video settings once.",
+                "value": "Off — ABSO already set driver LLM to Ultra; flip the in-game toggle to finish",
+                "reason": "Per-frame CapFrameX testing (Oct 2025, RTX 4070 + G-SYNC) shows OW2's Reflex limiter fighting a reachable frame cap: identical average fps but 1% lows collapse to ~half the average with 2-10 ms frametime variance. Driver ULL Ultra + the driver v3 cap hold a flat frametime line instead. OW2's Reflex toggle is not safely writable from outside; manually set 'NVIDIA Reflex Low Latency' to 'Off' in Overwatch 2's Video settings once.",
             },
             {
                 "category": "Display",
                 "setting": "Frame Rate Cap",
-                "value": "Auto OW2 Reflex/G-SYNC cap (276 @ 300Hz; scales by refresh)",
-                "reason": "Set by ABSO through the OW2 Reflex/G-SYNC policy so the in-game cap and NVIDIA driver cap agree. On the 300 Hz reference path this is 276 FPS; no-sync OW2 profiles remain uncapped at 600.",
+                "value": "Auto staggered caps: driver v3 at 276, in-game at 297 (@300Hz; both scale by refresh)",
+                "reason": "The NVIDIA driver v3 limiter (276 @ 300 Hz, ~8% under refresh) is the authoritative render pacer; the in-game cap parks at refresh - 3 (297) ABOVE it because OW2's engine cap only steadies simulation cadence. Staggering stops limiter fights — the failure mode behind Reflex's 1%-low collapse. No-sync OW2 lanes remain uncapped at 600.",
             },
             {
                 "category": "Display",
@@ -911,9 +946,9 @@ class Overwatch2GSyncCaptureProfile(_Overwatch2BaseProfile):
                 "disable_auto_color_management": True,
             },
             "NvidiaSettingsHandler": {
-                "preset": "reflex_gsync",
+                "preset": "ull_gsync",
                 "profile_name": "Overwatch 2",
-                **self._ow2_reflex_gsync_cap_settings(),
+                **self._ow2_gsync_driver_cap_settings(),
                 "global_vrr_mode": "fullscreen_and_windowed",
             },
             "ColorProfileSettingsHandler": {
@@ -921,9 +956,9 @@ class Overwatch2GSyncCaptureProfile(_Overwatch2BaseProfile):
             },
             "OW2ConfigHandler": {
                 **self._borderless_ow2_settings(),
-                **self._ow2_reflex_gsync_cap_settings(),
-                # G-SYNC lanes recommend Reflex "Enabled + Boost" (ReflexMode 2).
-                "expected_reflex_mode": 2,
+                # Staggered caps + in-game Reflex expected OFF — see
+                # _ow2_gsync_engine_cap_settings for the measured rationale.
+                **self._ow2_gsync_engine_cap_settings(),
             },
         }
 
@@ -948,14 +983,14 @@ class Overwatch2GSyncCaptureProfile(_Overwatch2BaseProfile):
             {
                 "category": "Display",
                 "setting": "NVIDIA Reflex Low Latency",
-                "value": "Enabled + Boost — ABSO already set driver LLM off; flip the in-game toggle to finish",
-                "reason": "ABSO has already configured the driver side: NVIDIA LLM is OFF so the engine owns the render queue (Reflex's correct path). OW2's Reflex toggle lives in Settings_v0.ini behind a key that is not stable across patches and is not safely writable from outside; manually flip 'NVIDIA Reflex Low Latency' to 'Enabled + Boost' in Overwatch 2's Video settings once.",
+                "value": "Off — ABSO already set driver LLM to Ultra; flip the in-game toggle to finish",
+                "reason": "Per-frame CapFrameX testing (Oct 2025, RTX 4070 + G-SYNC) shows OW2's Reflex limiter fighting a reachable frame cap: identical average fps but 1% lows collapse to ~half the average with 2-10 ms frametime variance. Driver ULL Ultra + the driver v3 cap hold a flat frametime line instead. OW2's Reflex toggle is not safely writable from outside; manually set 'NVIDIA Reflex Low Latency' to 'Off' in Overwatch 2's Video settings once.",
             },
             {
                 "category": "Display",
                 "setting": "Frame Rate Cap",
-                "value": "Auto OW2 Reflex/G-SYNC cap (276 @ 300Hz; scales by refresh)",
-                "reason": "Set by ABSO through the OW2 Reflex/G-SYNC policy so the in-game cap and NVIDIA driver cap agree. On the 300 Hz reference path this is 276 FPS; no-sync OW2 profiles remain uncapped at 600.",
+                "value": "Auto staggered caps: driver v3 at 276, in-game at 297 (@300Hz; both scale by refresh)",
+                "reason": "The NVIDIA driver v3 limiter (276 @ 300 Hz, ~8% under refresh) is the authoritative render pacer; the in-game cap parks at refresh - 3 (297) ABOVE it because OW2's engine cap only steadies simulation cadence. Staggering stops limiter fights — the failure mode behind Reflex's 1%-low collapse. No-sync OW2 lanes remain uncapped at 600.",
             },
             {
                 "category": "Display",
@@ -1060,16 +1095,16 @@ class Overwatch2GSyncHDRCaptureProfile(_Overwatch2BaseProfile):
                 "disable_auto_color_management": True,
             },
             "NvidiaSettingsHandler": {
-                "preset": "reflex_gsync",
+                "preset": "ull_gsync",
                 "profile_name": "Overwatch 2",
-                **self._ow2_reflex_gsync_cap_settings(),
+                **self._ow2_gsync_driver_cap_settings(),
                 "global_vrr_mode": "fullscreen_and_windowed",
             },
             "OW2ConfigHandler": {
                 **self._borderless_ow2_settings(),
-                **self._ow2_reflex_gsync_cap_settings(),
-                # G-SYNC lanes recommend Reflex "Enabled + Boost" (ReflexMode 2).
-                "expected_reflex_mode": 2,
+                # Staggered caps + in-game Reflex expected OFF — see
+                # _ow2_gsync_engine_cap_settings for the measured rationale.
+                **self._ow2_gsync_engine_cap_settings(),
             },
         }
 
@@ -1094,14 +1129,14 @@ class Overwatch2GSyncHDRCaptureProfile(_Overwatch2BaseProfile):
             {
                 "category": "Display",
                 "setting": "NVIDIA Reflex Low Latency",
-                "value": "Enabled + Boost — ABSO already set driver LLM off; flip the in-game toggle to finish",
-                "reason": "ABSO has already configured the driver side: NVIDIA LLM is OFF so the engine owns the render queue (Reflex's correct path). OW2's Reflex toggle lives in Settings_v0.ini behind a key that is not stable across patches and is not safely writable from outside; manually flip 'NVIDIA Reflex Low Latency' to 'Enabled + Boost' in Overwatch 2's Video settings once.",
+                "value": "Off — ABSO already set driver LLM to Ultra; flip the in-game toggle to finish",
+                "reason": "Per-frame CapFrameX testing (Oct 2025, RTX 4070 + G-SYNC) shows OW2's Reflex limiter fighting a reachable frame cap: identical average fps but 1% lows collapse to ~half the average with 2-10 ms frametime variance. Driver ULL Ultra + the driver v3 cap hold a flat frametime line instead. OW2's Reflex toggle is not safely writable from outside; manually set 'NVIDIA Reflex Low Latency' to 'Off' in Overwatch 2's Video settings once.",
             },
             {
                 "category": "Display",
                 "setting": "Frame Rate Cap",
-                "value": "Auto OW2 Reflex/G-SYNC cap (276 @ 300Hz; scales by refresh)",
-                "reason": "Set by ABSO through the OW2 Reflex/G-SYNC policy so the in-game cap and NVIDIA driver cap agree. On the 300 Hz reference path this is 276 FPS; no-sync OW2 profiles remain uncapped at 600.",
+                "value": "Auto staggered caps: driver v3 at 276, in-game at 297 (@300Hz; both scale by refresh)",
+                "reason": "The NVIDIA driver v3 limiter (276 @ 300 Hz, ~8% under refresh) is the authoritative render pacer; the in-game cap parks at refresh - 3 (297) ABOVE it because OW2's engine cap only steadies simulation cadence. Staggering stops limiter fights — the failure mode behind Reflex's 1%-low collapse. No-sync OW2 lanes remain uncapped at 600.",
             },
             {
                 "category": "Display",

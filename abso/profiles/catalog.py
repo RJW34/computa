@@ -505,13 +505,13 @@ PROFILE_CATALOG: OrderedDict[str, ProfileCatalogEntry] = OrderedDict(
         "overwatch2": ProfileCatalogEntry(
             profile_class=Overwatch2Profile,
             tray_category="Shooters",
-            tray_subtitle="No Sync SDR | Reflex OFF | VSync OFF | G-SYNC OFF",
+            tray_subtitle="No Sync SDR | Reflex ON+Boost (set in-game) | VSync OFF | G-SYNC OFF",
             sync_mode="off",
         ),
         "overwatch2-hdr": ProfileCatalogEntry(
             profile_class=Overwatch2NoSyncHDRProfile,
             tray_category="Shooters",
-            tray_subtitle="No Sync HDR | Reflex OFF | VSync OFF | G-SYNC OFF",
+            tray_subtitle="No Sync HDR | Reflex ON+Boost (set in-game) | VSync OFF | G-SYNC OFF",
             tray_description=(
                 "Minimum-latency no-sync Overwatch 2 with native HDR for "
                 "OLED / Mini-LED. Same sync/VRR contract as the SDR variant."
@@ -521,7 +521,7 @@ PROFILE_CATALOG: OrderedDict[str, ProfileCatalogEntry] = OrderedDict(
         "overwatch2-gsync": ProfileCatalogEntry(
             profile_class=Overwatch2GSyncProfile,
             tray_category="Shooters",
-            tray_subtitle="Overlay-Free SDR Borderless | Reflex (set in-game) | G-SYNC ON",
+            tray_subtitle="Overlay-Free SDR Borderless | Reflex OFF + ULL Ultra | G-SYNC ON",
             tray_description=(
                 "Low-latency Overwatch 2 G-SYNC on the same optimized borderless VRR "
                 "path as capture-safe, while stopping capture and overlay processes."
@@ -531,7 +531,7 @@ PROFILE_CATALOG: OrderedDict[str, ProfileCatalogEntry] = OrderedDict(
         "overwatch2-gsync-hdr": ProfileCatalogEntry(
             profile_class=Overwatch2GSyncHDRProfile,
             tray_category="Shooters",
-            tray_subtitle="Overlay-Free HDR Borderless | Reflex (set in-game) | G-SYNC ON",
+            tray_subtitle="Overlay-Free HDR Borderless | Reflex OFF + ULL Ultra | G-SYNC ON",
             tray_description=(
                 "Low-latency native-HDR Overwatch 2 G-SYNC on the optimized borderless "
                 "VRR path, while stopping capture and overlay processes."

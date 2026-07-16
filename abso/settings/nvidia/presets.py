@@ -288,6 +288,36 @@ NVIDIA_PRESETS: dict[str, dict[str, Any]] = {
             "reflex": "Set in-game NVIDIA Reflex to On + Boost.",
         },
     },
+    "ull_gsync": {
+        "description": "Driver ULL + G-SYNC profile - tear-free, driver-paced caps, in-game Reflex OFF",
+        "settings": {
+            "low_latency_mode": "ultra",  # Driver owns the queue; in-game Reflex stays OFF
+            "power_management": "prefer_max_performance",
+            "vsync": "on",  # NVCP safety net for VRR
+            "max_frame_rate": "off",  # Profiles layer the driver v3 cap via auto_vrr_fps_cap
+            "shader_cache": "unlimited",
+            "threaded_optimization": "on",
+            "triple_buffering": "off",
+            "vrr_app_override": "allow",
+            "vsync_tear_control": "disable",
+            "vsync_vrr_control": "enable",
+        },
+        "notes": {
+            "usage": (
+                "For games whose in-engine Reflex limiter measurably degrades frame "
+                "pacing under a reachable cap. OW2 per-frame CapFrameX testing "
+                "(Oct 2025, RTX 4070 + G-SYNC): Reflex ON turned a flat capped "
+                "frametime line into 2-10 ms variance with 1% lows near half the "
+                "average at identical average fps; ULL Ultra + the driver v3 cap "
+                "held the line flat."
+            ),
+            "reflex": "Set in-game NVIDIA Reflex to Off; driver ULL Ultra owns pacing.",
+            "fps_cap": (
+                "The driver v3 cap (~8% below refresh) is authoritative; park any "
+                "in-game cap ABOVE it so the two limiters never fight."
+            ),
+        },
+    },
     "reflex_game": {
         "description": "For games with NVIDIA Reflex - let Reflex handle latency",
         "settings": {
