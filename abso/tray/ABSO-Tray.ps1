@@ -4201,11 +4201,14 @@ public class DarkThemeRenderer : ToolStripProfessionalRenderer
                 string[] chips = chipRaw.Split(new char[] { '|' }, StringSplitOptions.RemoveEmptyEntries);
                 bool isSectionHeader = e.Item.AccessibleName == "__section_header__";
                 bool isCategoryHeader = e.Item.AccessibleName == "__category_header__";
-                float labelSize = isSectionHeader ? 16.4f : 13.8f;
-                int labelAlpha = isSectionHeader ? 255 : 248;
+                // Hierarchy pyramid: hero (13) > game rows (11.25) > category
+                // eyebrows (10.8, accent-tinted) > section eyebrows (9.8, dim).
+                // Wayfinding labels must never out-shout the content rows.
+                float labelSize = isSectionHeader ? 9.8f : 10.8f;
+                int labelAlpha = isSectionHeader ? 232 : 255;
                 Color labelColor = isCategoryHeader
-                    ? TextPaper
-                    : MixColor(e.Item.ForeColor, TextPaper, 0.72);
+                    ? MixColor(e.Item.ForeColor, TextPaper, 0.35)
+                    : MixColor(TextMist, e.Item.ForeColor, 0.30);
 
                 using (var chipFont = ResolveEyebrowFont(6.6f))
                 using (var chipTextBrush = new SolidBrush(Color.FromArgb(225, 232, 234, 240)))
@@ -4324,7 +4327,7 @@ public class DarkThemeRenderer : ToolStripProfessionalRenderer
                     Math.Max(22, chipRight - textRect.X - 8),
                     textRect.Height);
                 using (var labelFormat = new StringFormat())
-                using (var labelFont = ResolveEyebrowFont(8.0f))
+                using (var labelFont = ResolveEyebrowFont(8.4f))
                 using (var labelBrush = new SolidBrush(e.Item.ForeColor))
                 {
                     labelFormat.Trimming = StringTrimming.EllipsisCharacter;
@@ -4482,11 +4485,16 @@ public class DarkThemeRenderer : ToolStripProfessionalRenderer
 
     // Tray typography uses the Windows UI face everywhere; size and weight
     // carry hierarchy instead of switching families between rows.
+    // Segoe-only type system by design (see the static test pins that forbid
+    // Bahnschrift/Cascadia/Consolas). The Variable optical families are
+    // Win11-stock refinements of the same voice: Display tightens the hero,
+    // Small keeps 7-10pt eyebrow caps open and legible. Both fall back to
+    // classic Segoe UI on older builds.
     private static readonly string[] HeroFontStack = new[] {
-        "Segoe UI"
+        "Segoe UI Variable Display", "Segoe UI"
     };
     private static readonly string[] EyebrowFontStack = new[] {
-        "Segoe UI"
+        "Segoe UI Variable Small", "Segoe UI"
     };
 
     private static Font ResolveFontStack(string[] families, float size, FontStyle style)
@@ -4546,15 +4554,21 @@ public class DarkColorTable : ProfessionalColorTable
 # ============================================================================
 
 # Cached shared fonts (disposed in finally block).
-# Tray type system: Segoe UI everywhere, with scale/weight/color carrying hierarchy.
+# Tray type system: Segoe UI everywhere, with scale/weight/color carrying
+# hierarchy. The scale is a pyramid that keeps content above wayfinding:
+#   hero 13.0 bold > game/menu rows 11.25 > category eyebrows 10.8 (accent
+#   caps) > section eyebrows 9.8 (dim caps) > chips ~7 (caps).
+# Section/category headers deliberately render SMALLER than the rows they
+# label - the accent rail, tick, and rule carry the banding, so the label
+# can stay quiet instead of shouting over the game names.
 $script:FontNormal  = New-Object System.Drawing.Font("Segoe UI", 10.0)
 $script:FontBold    = New-Object System.Drawing.Font("Segoe UI", 10.0, [System.Drawing.FontStyle]::Bold)
 $script:FontEyebrow = [DarkThemeRenderer]::ResolveEyebrowFont(8.6)
 $script:FontHero    = [DarkThemeRenderer]::ResolveHeroFont(13.0, [System.Drawing.FontStyle]::Bold)
-$script:FontMenuRow = New-Object System.Drawing.Font("Segoe UI", 10.5)
-$script:FontMenuRowBold = New-Object System.Drawing.Font("Segoe UI", 10.5, [System.Drawing.FontStyle]::Bold)
-$script:FontSectionHeader = [DarkThemeRenderer]::ResolveEyebrowFont(16.4)
-$script:FontCategoryHeader = [DarkThemeRenderer]::ResolveEyebrowFont(13.8)
+$script:FontMenuRow = New-Object System.Drawing.Font("Segoe UI", 11.25)
+$script:FontMenuRowBold = New-Object System.Drawing.Font("Segoe UI", 11.25, [System.Drawing.FontStyle]::Bold)
+$script:FontSectionHeader = [DarkThemeRenderer]::ResolveEyebrowFont(9.8)
+$script:FontCategoryHeader = [DarkThemeRenderer]::ResolveEyebrowFont(10.8)
 $script:FontMono    = New-Object System.Drawing.Font("Segoe UI", 9.0)
 
 $script:TrayMenuPreferredWidth = 520
@@ -9500,7 +9514,9 @@ public class HotkeyMessageWindow : NativeWindow {
         if (-not [string]::IsNullOrWhiteSpace($ChipText)) {
             $Item.ToolTipText = $ChipText.Trim()
         }
-        $Item.Padding = New-Object System.Windows.Forms.Padding(0)
+        # Space-above > space-below so the band binds to the rows it labels
+        # (the eyebrow font is small; padding keeps the band proportionate).
+        $Item.Padding = New-Object System.Windows.Forms.Padding(0, 7, 0, 3)
     }
 
     # ─── FAVORITES ───
@@ -9791,7 +9807,8 @@ public class HotkeyMessageWindow : NativeWindow {
         $catItem.AccessibleName = "__category_header__"
         $catItem.AccessibleDescription = ""
         $catItem.ToolTipText = Get-CategoryHeaderSummaryChips -GameCount $catGameCount -ProfileCount $catProfileCount
-        $catItem.Padding = New-Object System.Windows.Forms.Padding(0)
+        # Match the section-header rhythm: bind the band downward to its rows.
+        $catItem.Padding = New-Object System.Windows.Forms.Padding(0, 5, 0, 2)
         $catItem.Image = $null
         $catItem.Enabled = $false
         $catItem.BackColor = $script:Colors.Background

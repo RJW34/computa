@@ -1101,10 +1101,13 @@ def test_profile_launcher_uses_readable_spacing_and_plain_choice_labels() -> Non
     """Profile launcher rows should use the menu width for readable choices."""
     script = TRAY_SCRIPT.read_text(encoding="utf-8")
 
+    # Type pyramid contract: content rows render LARGER than the section /
+    # category eyebrows that label them (hero 13 > rows 11.25 > category
+    # 10.8 > section 9.8). Wayfinding must never out-shout the game names.
     assert '$script:FontNormal  = New-Object System.Drawing.Font("Segoe UI", 10.0)' in script
-    assert '$script:FontMenuRow = New-Object System.Drawing.Font("Segoe UI", 10.5)' in script
-    assert "$script:FontSectionHeader = [DarkThemeRenderer]::ResolveEyebrowFont(16.4)" in script
-    assert "$script:FontCategoryHeader = [DarkThemeRenderer]::ResolveEyebrowFont(13.8)" in script
+    assert '$script:FontMenuRow = New-Object System.Drawing.Font("Segoe UI", 11.25)' in script
+    assert "$script:FontSectionHeader = [DarkThemeRenderer]::ResolveEyebrowFont(9.8)" in script
+    assert "$script:FontCategoryHeader = [DarkThemeRenderer]::ResolveEyebrowFont(10.8)" in script
     assert '$script:FontMono    = New-Object System.Drawing.Font("Segoe UI", 9.0)' in script
     assert '"Bahnschrift' not in script
     assert '"Cascadia' not in script
@@ -1115,9 +1118,13 @@ def test_profile_launcher_uses_readable_spacing_and_plain_choice_labels() -> Non
     assert "$searchBox.Size = New-Object System.Drawing.Size(300, 26)" in script
     assert "$searchBox.Font = $script:FontMenuRow" in script
     assert "Font heroFont = ResolveHeroFont(13.0f, FontStyle.Regular);" in script
-    assert "float labelSize = isSectionHeader ? 16.4f : 13.8f;" in script
-    assert "int labelAlpha = isSectionHeader ? 255 : 248;" in script
+    assert "float labelSize = isSectionHeader ? 9.8f : 10.8f;" in script
+    assert "int labelAlpha = isSectionHeader ? 232 : 255;" in script
     assert "Color labelColor = isCategoryHeader" in script
+    # Category eyebrows carry their accent color (mixed toward paper for
+    # legibility); section eyebrows stay dim mist with a whisper of accent.
+    assert "? MixColor(e.Item.ForeColor, TextPaper, 0.35)" in script
+    assert ": MixColor(TextMist, e.Item.ForeColor, 0.30);" in script
     assert "private static readonly Color TextPaper = Color.FromArgb(255, 232, 238, 246);" in script
     assert 'Color rowTextColor = e.Item.AccessibleName == "__backup_menu_item__" ? TextMist : TextPaper;' in script
     assert '$variantLabel = if ($VariantCount -eq 1) { "1 choice" } else { "$VariantCount choices" }' in script
@@ -2540,7 +2547,7 @@ def test_category_headers_keep_counts_in_tooltips_without_breaking_filtering() -
     assert '$catItem.AccessibleName = "__category_header__"' in script
     assert '$catItem.AccessibleDescription = ""' in script
     assert "$catItem.ToolTipText = Get-CategoryHeaderSummaryChips -GameCount $catGameCount -ProfileCount $catProfileCount" in script
-    assert "$catItem.Padding = New-Object System.Windows.Forms.Padding(0)" in script
+    assert "$catItem.Padding = New-Object System.Windows.Forms.Padding(0, 5, 0, 2)" in script
     assert "$catItem.ForeColor = Get-TrayCategoryHeaderTint -Category $cat -CategoryColor $catColor" in script
     assert "$catItem.Tag = $cat" in script
 
