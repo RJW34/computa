@@ -36,3 +36,21 @@ process_overrides:
     - lghub.exe
     - lghub_agent.exe
     - lghub_updater.exe
+
+# EXPERIMENT (2026-07-16, user-requested): no-sync HDR lane with driver LLM
+# Ultra instead of the lane's stock Reflex-oriented contract (reflex_no_sync
+# sets LLM off; user runs in-game Reflex OFF for this test). The applier will
+# warn that the override diverges from the preset — that is intentional here.
+# Evidence status: uncapped no-sync + Reflex ON is the measured-optimal config
+# (klasbo OW2 suite); this override exists to let the user A/B their own
+# hypothesis (uncapped + Reflex OFF + ULL Ultra) with CapFrameX.
+# REMOVE this block when the experiment concludes — see the 2026-06-09 MPO
+# note above for why stale profile_overrides are dangerous.
+profile_overrides:
+  overwatch2-hdr:
+    nvidia:
+      low_latency_mode: ultra
+    ow2_config:
+      # Track the user's intended in-game Reflex state (Off) for this
+      # experiment so verify's manual step reflects the test config.
+      expected_reflex_mode: 0
