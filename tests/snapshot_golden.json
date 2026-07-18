@@ -1,4 +1,684 @@
 {
+  "counter-strike-2": {
+    "allows_aggressive_settings": false,
+    "application_scope": "system_only",
+    "display_name": "Counter-Strike 2 - No Sync SDR",
+    "graphics_api": "dx11",
+    "handlers": [
+      "WindowsSettingsHandler",
+      "PowerSettingsHandler",
+      "RegistrySettingsHandler",
+      "NvidiaSettingsHandler",
+      "NetworkSettingsHandler",
+      "MouseSettingsHandler",
+      "GraphicsSettingsHandler",
+      "ProcessPriorityHandler",
+      "CpuAffinityHandler",
+      "ColorProfileSettingsHandler",
+      "DisplayColorRangeHandler",
+      "GameDvrHandler",
+      "InterruptModeHandler",
+      "AudioEngineHandler",
+      "NicDriverHandler"
+    ],
+    "in_game_settings": [
+      {
+        "category": "Display",
+        "reason": "Use this variant when you want the cleaner SDR path or do not have HDR active.",
+        "setting": "HDR",
+        "value": "Off"
+      },
+      {
+        "category": "Display",
+        "reason": "Matches the profile's sRGB clamp and avoids wide-gamut oversaturation in SDR.",
+        "setting": "Color Space",
+        "value": "SDR / default gamut"
+      },
+      {
+        "category": "Video",
+        "reason": "No-sync lane: Fullscreen avoids the DWM compositor tax and keeps the Source 2 present path deterministic.",
+        "setting": "Display Mode",
+        "value": "Fullscreen"
+      },
+      {
+        "category": "Video",
+        "reason": "No-sync mode avoids the VSync/VRR queueing path and accepts tearing.",
+        "setting": "Wait for Vertical Sync",
+        "value": "Disabled"
+      },
+      {
+        "category": "Video",
+        "reason": "ABSO has already configured the driver side: NVIDIA LLM is OFF so the engine owns the render queue (Reflex's correct path). The Source 2 video config is owned by the game and cannot be written from outside; toggle 'NVIDIA Reflex' to 'Enabled + Boost' in CS2's Video settings once to finish setup.",
+        "setting": "NVIDIA Reflex",
+        "value": "Enabled + Boost \u2014 ABSO already set driver LLM off; flip the in-game toggle to finish"
+      },
+      {
+        "category": "Video",
+        "reason": "No-sync lane: CS2 is CPU-bound at competitive settings and higher uncapped FPS lowers frame time. Cap if heat, noise, or pacing gets worse.",
+        "setting": "Maximum FPS in game (fps_max)",
+        "value": "0 (uncapped)"
+      },
+      {
+        "category": "Video",
+        "reason": "MSAA is CS2's main GPU cost lever; CMAA2 keeps the CPU-bound lane cheap while MSAA is affordable only when the GPU is not the bottleneck.",
+        "setting": "Multisampling Anti-Aliasing Mode",
+        "value": "CMAA2, or 2x-4x MSAA with GPU headroom"
+      },
+      {
+        "category": "Video",
+        "reason": "Smokes and utility fights are the most common source of frame-time spikes in CS2; competitive-low keeps the frame queue clean.",
+        "setting": "Shader / Particle / Effect Detail",
+        "value": "Low"
+      },
+      {
+        "category": "Video",
+        "reason": "Improves enemy visibility at negligible GPU cost.",
+        "setting": "Boost Player Contrast",
+        "value": "Enabled"
+      }
+    ],
+    "include_legacy_tweaks": false,
+    "is_emulator_profile": false,
+    "is_online_profile": false,
+    "is_sdr_only": true,
+    "network_scope": "none",
+    "optimization_target": "low_latency_high_fps",
+    "requires_reflex": true,
+    "settings": {
+      "AudioEngineHandler": {
+        "disable_enhancements": true
+      },
+      "ColorProfileSettingsHandler": {
+        "digital_vibrance": 45,
+        "game_type": "competitive_fps",
+        "icc_profile": "srgb",
+        "show_osd_guidance": true
+      },
+      "CpuAffinityHandler": {
+        "strategy": null
+      },
+      "DisplayColorRangeHandler": {
+        "dynamic_range": "full"
+      },
+      "GameDvrHandler": {
+        "hard_disable": true
+      },
+      "GraphicsSettingsHandler": {
+        "disable_global_fso": true
+      },
+      "InterruptModeHandler": {
+        "enable_msi": true
+      },
+      "MouseSettingsHandler": {
+        "disable_acceleration": true,
+        "mouse_sensitivity": 10,
+        "set_linear_curve": true
+      },
+      "NetworkSettingsHandler": {
+        "disable_nagle": false,
+        "preset": "default"
+      },
+      "NicDriverHandler": {
+        "nic_tuning": true
+      },
+      "NvidiaSettingsHandler": {
+        "global_vrr_mode": "off",
+        "preset": "reflex_no_sync",
+        "profile_aliases": [
+          "cs2.exe",
+          "Counter-Strike: Global Offensive"
+        ],
+        "profile_name": "Counter-Strike 2"
+      },
+      "PowerSettingsHandler": {
+        "active_plan": "ultimate_performance",
+        "disable_core_parking": true,
+        "disable_pcie_power_saving": true,
+        "disable_usb_suspend": true,
+        "ensure_ultimate_performance": true,
+        "processor_max_performance": true,
+        "processor_min_state": 100
+      },
+      "ProcessPriorityHandler": {
+        "cpu_priority": 3,
+        "io_priority": 3
+      },
+      "RegistrySettingsHandler": {
+        "fullscreen_optimizations": {
+          "cs2.exe": true
+        },
+        "game_priority": {
+          "gpu_priority": 8,
+          "priority": 6,
+          "scheduling_category": "High"
+        },
+        "win32_priority_separation": 42
+      },
+      "WindowsSettingsHandler": {
+        "auto_hdr": false,
+        "game_bar": false,
+        "game_dvr": false,
+        "game_mode": true,
+        "hags": true,
+        "hdr": false,
+        "max_refresh_rate": true,
+        "vrr_optimize": false,
+        "windowed_optimizations": false
+      }
+    }
+  },
+  "counter-strike-2-gsync": {
+    "allows_aggressive_settings": false,
+    "application_scope": "system_only",
+    "display_name": "Counter-Strike 2 - GSYNC SDR",
+    "graphics_api": "dx11",
+    "handlers": [
+      "WindowsSettingsHandler",
+      "PowerSettingsHandler",
+      "RegistrySettingsHandler",
+      "NvidiaSettingsHandler",
+      "NetworkSettingsHandler",
+      "MouseSettingsHandler",
+      "GraphicsSettingsHandler",
+      "ProcessPriorityHandler",
+      "CpuAffinityHandler",
+      "ColorProfileSettingsHandler",
+      "DisplayColorRangeHandler",
+      "GameDvrHandler",
+      "InterruptModeHandler",
+      "AudioEngineHandler",
+      "NicDriverHandler"
+    ],
+    "in_game_settings": [
+      {
+        "category": "Display",
+        "reason": "Use this variant when you want the cleaner SDR path or do not have HDR active.",
+        "setting": "HDR",
+        "value": "Off"
+      },
+      {
+        "category": "Display",
+        "reason": "Matches the profile's sRGB clamp and avoids wide-gamut oversaturation in SDR.",
+        "setting": "Color Space",
+        "value": "SDR / default gamut"
+      },
+      {
+        "category": "Video",
+        "reason": "This profile is tuned for fullscreen-only G-SYNC. Do not switch to windowed modes after launch.",
+        "setting": "Display Mode",
+        "value": "Fullscreen"
+      },
+      {
+        "category": "Video",
+        "reason": "Use NVCP VSync as the VRR safety net; keep the in-game toggle off.",
+        "setting": "Wait for Vertical Sync",
+        "value": "Disabled (in-game)"
+      },
+      {
+        "category": "Video",
+        "reason": "ABSO has already configured the driver side: NVIDIA LLM is OFF so the engine owns the render queue (Reflex's correct path). The Source 2 video config is owned by the game and cannot be written from outside; toggle 'NVIDIA Reflex' to 'Enabled + Boost' in CS2's Video settings once to finish setup.",
+        "setting": "NVIDIA Reflex",
+        "value": "Enabled + Boost \u2014 ABSO already set driver LLM off; flip the in-game toggle to finish"
+      },
+      {
+        "category": "Video",
+        "reason": "ABSO sets the NVCP limiter to refresh - 3 (Blur Busters G-SYNC 101 convention). Keeping fps_max at 0 leaves one deterministic limiter in the path and stops NVCP V-SYNC from engaging.",
+        "setting": "Maximum FPS in game (fps_max)",
+        "value": "0 (uncapped in-game; ABSO caps at the driver)"
+      },
+      {
+        "category": "Video",
+        "reason": "MSAA is CS2's main GPU cost lever; CMAA2 keeps the CPU-bound lane cheap while MSAA is affordable only when the GPU is not the bottleneck.",
+        "setting": "Multisampling Anti-Aliasing Mode",
+        "value": "CMAA2, or 2x-4x MSAA with GPU headroom"
+      },
+      {
+        "category": "Video",
+        "reason": "Smokes and utility fights are the most common source of frame-time spikes in CS2; competitive-low keeps the frame queue clean.",
+        "setting": "Shader / Particle / Effect Detail",
+        "value": "Low"
+      },
+      {
+        "category": "Video",
+        "reason": "Improves enemy visibility at negligible GPU cost.",
+        "setting": "Boost Player Contrast",
+        "value": "Enabled"
+      }
+    ],
+    "include_legacy_tweaks": false,
+    "is_emulator_profile": false,
+    "is_online_profile": false,
+    "is_sdr_only": true,
+    "network_scope": "none",
+    "optimization_target": "low_latency_high_fps",
+    "requires_reflex": true,
+    "settings": {
+      "AudioEngineHandler": {
+        "disable_enhancements": true
+      },
+      "ColorProfileSettingsHandler": {
+        "digital_vibrance": 45,
+        "game_type": "competitive_fps",
+        "icc_profile": "srgb",
+        "show_osd_guidance": true
+      },
+      "CpuAffinityHandler": {
+        "strategy": null
+      },
+      "DisplayColorRangeHandler": {
+        "dynamic_range": "full"
+      },
+      "GameDvrHandler": {
+        "hard_disable": true
+      },
+      "GraphicsSettingsHandler": {
+        "disable_global_fso": true
+      },
+      "InterruptModeHandler": {
+        "enable_msi": true
+      },
+      "MouseSettingsHandler": {
+        "disable_acceleration": true,
+        "mouse_sensitivity": 10,
+        "set_linear_curve": true
+      },
+      "NetworkSettingsHandler": {
+        "disable_nagle": false,
+        "preset": "default"
+      },
+      "NicDriverHandler": {
+        "nic_tuning": true
+      },
+      "NvidiaSettingsHandler": {
+        "auto_vrr_fps_cap": true,
+        "global_vrr_mode": "fullscreen_only",
+        "preset": "reflex_gsync",
+        "profile_aliases": [
+          "cs2.exe",
+          "Counter-Strike: Global Offensive"
+        ],
+        "profile_name": "Counter-Strike 2"
+      },
+      "PowerSettingsHandler": {
+        "active_plan": "ultimate_performance",
+        "disable_core_parking": true,
+        "disable_pcie_power_saving": true,
+        "disable_usb_suspend": true,
+        "ensure_ultimate_performance": true,
+        "processor_max_performance": true,
+        "processor_min_state": 100
+      },
+      "ProcessPriorityHandler": {
+        "cpu_priority": 3,
+        "io_priority": 3
+      },
+      "RegistrySettingsHandler": {
+        "fullscreen_optimizations": {
+          "cs2.exe": true
+        },
+        "game_priority": {
+          "gpu_priority": 8,
+          "priority": 6,
+          "scheduling_category": "High"
+        },
+        "win32_priority_separation": 42
+      },
+      "WindowsSettingsHandler": {
+        "auto_hdr": false,
+        "game_bar": false,
+        "game_dvr": false,
+        "game_mode": true,
+        "hags": true,
+        "hdr": false,
+        "max_refresh_rate": true,
+        "vrr_optimize": false,
+        "windowed_optimizations": false
+      }
+    }
+  },
+  "counter-strike-2-gsync-hdr": {
+    "allows_aggressive_settings": false,
+    "application_scope": "system_only",
+    "display_name": "Counter-Strike 2 - GSYNC HDR",
+    "graphics_api": "dx11",
+    "handlers": [
+      "WindowsSettingsHandler",
+      "PowerSettingsHandler",
+      "RegistrySettingsHandler",
+      "NvidiaSettingsHandler",
+      "NetworkSettingsHandler",
+      "MouseSettingsHandler",
+      "GraphicsSettingsHandler",
+      "ProcessPriorityHandler",
+      "CpuAffinityHandler",
+      "ColorProfileSettingsHandler",
+      "DisplayColorRangeHandler",
+      "GameDvrHandler",
+      "InterruptModeHandler",
+      "AudioEngineHandler",
+      "NicDriverHandler"
+    ],
+    "in_game_settings": [
+      {
+        "category": "Display (Windows)",
+        "reason": "Counter-Strike 2 has not shipped a native HDR toggle in the builds this profile was authored against. Windows HDR is on to keep the OS composition path consistent for OLED owners; the game itself renders SDR and is composited into the HDR surface. If CS2 ships an in-game HDR toggle later, enable it then - until then this is SDR-in-HDR composition.",
+        "setting": "HDR",
+        "value": "On (set by this profile for desktop comfort)"
+      },
+      {
+        "category": "Display (Windows)",
+        "reason": "Settings > System > Display > HDR > SDR content brightness. This profile sets 200 nits as the OLED baseline. If the desktop reads dim, push it up to 240-280.",
+        "setting": "SDR content brightness",
+        "value": "200 nits starting point; tune to taste"
+      },
+      {
+        "category": "Video",
+        "reason": "This profile is tuned for fullscreen-only G-SYNC. Do not switch to windowed modes after launch.",
+        "setting": "Display Mode",
+        "value": "Fullscreen"
+      },
+      {
+        "category": "Video",
+        "reason": "Use NVCP VSync as the VRR safety net; keep the in-game toggle off.",
+        "setting": "Wait for Vertical Sync",
+        "value": "Disabled (in-game)"
+      },
+      {
+        "category": "Video",
+        "reason": "ABSO has already configured the driver side: NVIDIA LLM is OFF so the engine owns the render queue (Reflex's correct path). The Source 2 video config is owned by the game and cannot be written from outside; toggle 'NVIDIA Reflex' to 'Enabled + Boost' in CS2's Video settings once to finish setup.",
+        "setting": "NVIDIA Reflex",
+        "value": "Enabled + Boost \u2014 ABSO already set driver LLM off; flip the in-game toggle to finish"
+      },
+      {
+        "category": "Video",
+        "reason": "ABSO sets the NVCP limiter to refresh - 3 (Blur Busters G-SYNC 101 convention). Keeping fps_max at 0 leaves one deterministic limiter in the path and stops NVCP V-SYNC from engaging.",
+        "setting": "Maximum FPS in game (fps_max)",
+        "value": "0 (uncapped in-game; ABSO caps at the driver)"
+      },
+      {
+        "category": "Video",
+        "reason": "MSAA is CS2's main GPU cost lever; CMAA2 keeps the CPU-bound lane cheap while MSAA is affordable only when the GPU is not the bottleneck.",
+        "setting": "Multisampling Anti-Aliasing Mode",
+        "value": "CMAA2, or 2x-4x MSAA with GPU headroom"
+      },
+      {
+        "category": "Video",
+        "reason": "Smokes and utility fights are the most common source of frame-time spikes in CS2; competitive-low keeps the frame queue clean.",
+        "setting": "Shader / Particle / Effect Detail",
+        "value": "Low"
+      },
+      {
+        "category": "Video",
+        "reason": "Improves enemy visibility at negligible GPU cost.",
+        "setting": "Boost Player Contrast",
+        "value": "Enabled"
+      }
+    ],
+    "include_legacy_tweaks": false,
+    "is_emulator_profile": false,
+    "is_online_profile": false,
+    "is_sdr_only": false,
+    "network_scope": "none",
+    "optimization_target": "low_latency_high_fps",
+    "requires_reflex": true,
+    "settings": {
+      "AudioEngineHandler": {
+        "disable_enhancements": true
+      },
+      "ColorProfileSettingsHandler": {
+        "digital_vibrance": 50,
+        "game_type": "competitive_fps",
+        "icc_profile": "native",
+        "show_osd_guidance": true
+      },
+      "CpuAffinityHandler": {
+        "strategy": null
+      },
+      "DisplayColorRangeHandler": {
+        "dynamic_range": "full"
+      },
+      "GameDvrHandler": {
+        "hard_disable": true
+      },
+      "GraphicsSettingsHandler": {
+        "disable_auto_color_management": true,
+        "disable_global_fso": true
+      },
+      "InterruptModeHandler": {
+        "enable_msi": true
+      },
+      "MouseSettingsHandler": {
+        "disable_acceleration": true,
+        "mouse_sensitivity": 10,
+        "set_linear_curve": true
+      },
+      "NetworkSettingsHandler": {
+        "disable_nagle": false,
+        "preset": "default"
+      },
+      "NicDriverHandler": {
+        "nic_tuning": true
+      },
+      "NvidiaSettingsHandler": {
+        "auto_vrr_fps_cap": true,
+        "global_vrr_mode": "fullscreen_only",
+        "preset": "reflex_gsync",
+        "profile_aliases": [
+          "cs2.exe",
+          "Counter-Strike: Global Offensive"
+        ],
+        "profile_name": "Counter-Strike 2"
+      },
+      "PowerSettingsHandler": {
+        "active_plan": "ultimate_performance",
+        "disable_core_parking": true,
+        "disable_pcie_power_saving": true,
+        "disable_usb_suspend": true,
+        "ensure_ultimate_performance": true,
+        "processor_max_performance": true,
+        "processor_min_state": 100
+      },
+      "ProcessPriorityHandler": {
+        "cpu_priority": 3,
+        "io_priority": 3
+      },
+      "RegistrySettingsHandler": {
+        "fullscreen_optimizations": {
+          "cs2.exe": true
+        },
+        "game_priority": {
+          "gpu_priority": 8,
+          "priority": 6,
+          "scheduling_category": "High"
+        },
+        "win32_priority_separation": 42
+      },
+      "WindowsSettingsHandler": {
+        "advanced_color": true,
+        "auto_hdr": false,
+        "game_bar": false,
+        "game_dvr": false,
+        "game_mode": true,
+        "hags": true,
+        "hdr": true,
+        "max_refresh_rate": true,
+        "sdr_white_level_nits": 200,
+        "vrr_optimize": false,
+        "windowed_optimizations": false
+      }
+    }
+  },
+  "counter-strike-2-hdr": {
+    "allows_aggressive_settings": false,
+    "application_scope": "system_only",
+    "display_name": "Counter-Strike 2 - No Sync HDR",
+    "graphics_api": "dx11",
+    "handlers": [
+      "WindowsSettingsHandler",
+      "PowerSettingsHandler",
+      "RegistrySettingsHandler",
+      "NvidiaSettingsHandler",
+      "NetworkSettingsHandler",
+      "MouseSettingsHandler",
+      "GraphicsSettingsHandler",
+      "ProcessPriorityHandler",
+      "CpuAffinityHandler",
+      "ColorProfileSettingsHandler",
+      "DisplayColorRangeHandler",
+      "GameDvrHandler",
+      "InterruptModeHandler",
+      "AudioEngineHandler",
+      "NicDriverHandler"
+    ],
+    "in_game_settings": [
+      {
+        "category": "Display (Windows)",
+        "reason": "Counter-Strike 2 has not shipped a native HDR toggle in the builds this profile was authored against. Windows HDR is on to keep the OS composition path consistent for OLED owners; the game itself renders SDR and is composited into the HDR surface. If CS2 ships an in-game HDR toggle later, enable it then - until then this is SDR-in-HDR composition.",
+        "setting": "HDR",
+        "value": "On (set by this profile for desktop comfort)"
+      },
+      {
+        "category": "Display (Windows)",
+        "reason": "Settings > System > Display > HDR > SDR content brightness. This profile sets 200 nits as the OLED baseline. If the desktop reads dim, push it up to 240-280.",
+        "setting": "SDR content brightness",
+        "value": "200 nits starting point; tune to taste"
+      },
+      {
+        "category": "Video",
+        "reason": "No-sync lane: Fullscreen avoids the DWM compositor tax and keeps the Source 2 present path deterministic.",
+        "setting": "Display Mode",
+        "value": "Fullscreen"
+      },
+      {
+        "category": "Video",
+        "reason": "No-sync mode avoids the VSync/VRR queueing path and accepts tearing.",
+        "setting": "Wait for Vertical Sync",
+        "value": "Disabled"
+      },
+      {
+        "category": "Video",
+        "reason": "ABSO has already configured the driver side: NVIDIA LLM is OFF so the engine owns the render queue (Reflex's correct path). The Source 2 video config is owned by the game and cannot be written from outside; toggle 'NVIDIA Reflex' to 'Enabled + Boost' in CS2's Video settings once to finish setup.",
+        "setting": "NVIDIA Reflex",
+        "value": "Enabled + Boost \u2014 ABSO already set driver LLM off; flip the in-game toggle to finish"
+      },
+      {
+        "category": "Video",
+        "reason": "No-sync lane: CS2 is CPU-bound at competitive settings and higher uncapped FPS lowers frame time. Cap if heat, noise, or pacing gets worse.",
+        "setting": "Maximum FPS in game (fps_max)",
+        "value": "0 (uncapped)"
+      },
+      {
+        "category": "Video",
+        "reason": "MSAA is CS2's main GPU cost lever; CMAA2 keeps the CPU-bound lane cheap while MSAA is affordable only when the GPU is not the bottleneck.",
+        "setting": "Multisampling Anti-Aliasing Mode",
+        "value": "CMAA2, or 2x-4x MSAA with GPU headroom"
+      },
+      {
+        "category": "Video",
+        "reason": "Smokes and utility fights are the most common source of frame-time spikes in CS2; competitive-low keeps the frame queue clean.",
+        "setting": "Shader / Particle / Effect Detail",
+        "value": "Low"
+      },
+      {
+        "category": "Video",
+        "reason": "Improves enemy visibility at negligible GPU cost.",
+        "setting": "Boost Player Contrast",
+        "value": "Enabled"
+      }
+    ],
+    "include_legacy_tweaks": false,
+    "is_emulator_profile": false,
+    "is_online_profile": false,
+    "is_sdr_only": false,
+    "network_scope": "none",
+    "optimization_target": "low_latency_high_fps",
+    "requires_reflex": true,
+    "settings": {
+      "AudioEngineHandler": {
+        "disable_enhancements": true
+      },
+      "ColorProfileSettingsHandler": {
+        "digital_vibrance": 50,
+        "game_type": "competitive_fps",
+        "icc_profile": "native",
+        "show_osd_guidance": true
+      },
+      "CpuAffinityHandler": {
+        "strategy": null
+      },
+      "DisplayColorRangeHandler": {
+        "dynamic_range": "full"
+      },
+      "GameDvrHandler": {
+        "hard_disable": true
+      },
+      "GraphicsSettingsHandler": {
+        "disable_auto_color_management": true,
+        "disable_global_fso": true
+      },
+      "InterruptModeHandler": {
+        "enable_msi": true
+      },
+      "MouseSettingsHandler": {
+        "disable_acceleration": true,
+        "mouse_sensitivity": 10,
+        "set_linear_curve": true
+      },
+      "NetworkSettingsHandler": {
+        "disable_nagle": false,
+        "preset": "default"
+      },
+      "NicDriverHandler": {
+        "nic_tuning": true
+      },
+      "NvidiaSettingsHandler": {
+        "global_vrr_mode": "off",
+        "preset": "reflex_no_sync",
+        "profile_aliases": [
+          "cs2.exe",
+          "Counter-Strike: Global Offensive"
+        ],
+        "profile_name": "Counter-Strike 2"
+      },
+      "PowerSettingsHandler": {
+        "active_plan": "ultimate_performance",
+        "disable_core_parking": true,
+        "disable_pcie_power_saving": true,
+        "disable_usb_suspend": true,
+        "ensure_ultimate_performance": true,
+        "processor_max_performance": true,
+        "processor_min_state": 100
+      },
+      "ProcessPriorityHandler": {
+        "cpu_priority": 3,
+        "io_priority": 3
+      },
+      "RegistrySettingsHandler": {
+        "fullscreen_optimizations": {
+          "cs2.exe": true
+        },
+        "game_priority": {
+          "gpu_priority": 8,
+          "priority": 6,
+          "scheduling_category": "High"
+        },
+        "win32_priority_separation": 42
+      },
+      "WindowsSettingsHandler": {
+        "advanced_color": true,
+        "auto_hdr": false,
+        "game_bar": false,
+        "game_dvr": false,
+        "game_mode": true,
+        "hags": true,
+        "hdr": true,
+        "max_refresh_rate": true,
+        "sdr_white_level_nits": 200,
+        "vrr_optimize": false,
+        "windowed_optimizations": false
+      }
+    }
+  },
   "deadlock": {
     "allows_aggressive_settings": false,
     "application_scope": "system_only",

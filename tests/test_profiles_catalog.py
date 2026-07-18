@@ -273,6 +273,20 @@ def test_deadlock_hdr_catalog_does_not_claim_native_hdr() -> None:
         assert "renders sdr" in text
 
 
+def test_cs2_hdr_catalog_does_not_claim_native_hdr() -> None:
+    """CS2 HDR lanes are Windows HDR composition, not native game HDR."""
+    manifest = {profile["id"]: profile for profile in get_profile_manifest()}
+
+    for profile_id in ("counter-strike-2-hdr", "counter-strike-2-gsync-hdr"):
+        text = " ".join(
+            str(manifest[profile_id].get(key, ""))
+            for key in ("description", "tray_subtitle", "tray_description")
+        ).lower()
+        assert "native hdr" not in text
+        assert "windows hdr" in text
+        assert "renders sdr" in text
+
+
 def test_rivals2_hdr_catalog_reports_windows_hdr_composition() -> None:
     """Rivals 2 HDR lanes must not claim native HDR support."""
     manifest = {profile["id"]: profile for profile in get_profile_manifest()}

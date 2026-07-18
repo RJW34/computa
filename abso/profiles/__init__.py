@@ -7,6 +7,12 @@ from abso.profiles.catalog import (
     get_profile_manifest,
     resolve_profile_id,
 )
+from abso.profiles.counter_strike_2 import (
+    CounterStrike2GSyncHDRProfile,
+    CounterStrike2GSyncProfile,
+    CounterStrike2HDRProfile,
+    CounterStrike2Profile,
+)
 from abso.profiles.deadlock import (
     DeadlockGSyncHDRProfile,
     DeadlockGSyncProfile,
@@ -85,6 +91,10 @@ __all__ = [
     "DeadlockHDRProfile",
     "DeadlockGSyncProfile",
     "DeadlockGSyncHDRProfile",
+    "CounterStrike2Profile",
+    "CounterStrike2HDRProfile",
+    "CounterStrike2GSyncProfile",
+    "CounterStrike2GSyncHDRProfile",
     "PokemonAutoChessProfile",
     "PACDeluxeProfile",
     "ProductivityOLEDProfile",

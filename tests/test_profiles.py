@@ -7,6 +7,12 @@ from unittest.mock import patch
 import pytest
 
 from abso.profiles import get_all_profiles
+from abso.profiles.counter_strike_2 import (
+    CounterStrike2GSyncHDRProfile,
+    CounterStrike2GSyncProfile,
+    CounterStrike2HDRProfile,
+    CounterStrike2Profile,
+)
 from abso.profiles.deadlock import (
     DeadlockGSyncHDRProfile,
     DeadlockGSyncProfile,
@@ -294,6 +300,123 @@ class TestProfileLoading:
             DeadlockHDRProfile,
             DeadlockGSyncProfile,
             DeadlockGSyncHDRProfile,
+        ):
+            profile = profile_cls()
+            assert profile.application_scope == "system_only", profile_cls.__name__
+            assert profile.enforces_reflex_in_config is False, profile_cls.__name__
+            assert profile.requires_reflex is True, profile_cls.__name__
+
+    def test_cs2_profiles_load(self):
+        """Counter-Strike 2 should expose the full GSYNC x HDR matrix (4 variants)."""
+        no_sync = CounterStrike2Profile()
+        no_sync_hdr = CounterStrike2HDRProfile()
+        gsync = CounterStrike2GSyncProfile()
+        gsync_hdr = CounterStrike2GSyncHDRProfile()
+
+        assert no_sync.profile_id == "counter-strike-2"
+        assert no_sync.display_name == "Counter-Strike 2 - No Sync SDR"
+        assert no_sync.is_sdr_only is True
+
+        assert no_sync_hdr.profile_id == "counter-strike-2-hdr"
+        assert no_sync_hdr.display_name == "Counter-Strike 2 - No Sync HDR"
+        assert no_sync_hdr.is_sdr_only is False
+
+        assert gsync.profile_id == "counter-strike-2-gsync"
+        assert gsync.display_name == "Counter-Strike 2 - GSYNC SDR"
+        assert gsync.is_sdr_only is True
+        assert gsync.requires_confirmed_vrr_support is True
+
+        assert gsync_hdr.profile_id == "counter-strike-2-gsync-hdr"
+        assert gsync_hdr.display_name == "Counter-Strike 2 - GSYNC HDR"
+        assert gsync_hdr.is_sdr_only is False
+        assert gsync_hdr.requires_confirmed_vrr_support is True
+        assert gsync.mixed_refresh_safe_fallback_profile_id == "counter-strike-2"
+        assert gsync_hdr.mixed_refresh_safe_fallback_profile_id == "counter-strike-2-hdr"
+
+    def test_cs2_detection_and_binding_target_the_single_binary(self):
+        """CS2 has one stable binary; detection and NVIDIA binding agree on it."""
+        for profile_cls in (
+            CounterStrike2Profile,
+            CounterStrike2HDRProfile,
+            CounterStrike2GSyncProfile,
+            CounterStrike2GSyncHDRProfile,
+        ):
+            profile = profile_cls()
+            assert profile.executable_hints == ["cs2.exe"]
+            assert profile.nvidia_binding_executables == ["cs2.exe"]
+
+    def test_cs2_no_sync_nvidia_settings(self):
+        """CS2 no-sync variants should disable global VRR and use reflex_no_sync preset."""
+        for profile_cls in (CounterStrike2Profile, CounterStrike2HDRProfile):
+            profile = profile_cls()
+            settings = profile.get_settings("NvidiaSettingsHandler")
+            assert settings["preset"] == "reflex_no_sync", profile_cls.__name__
+            assert settings["profile_name"] == "Counter-Strike 2", profile_cls.__name__
+            assert settings["global_vrr_mode"] == "off", profile_cls.__name__
+
+    def test_cs2_gsync_nvidia_settings(self):
+        """CS2 G-SYNC variants should run reflex_gsync on the strict VRR path."""
+        for profile_cls in (CounterStrike2GSyncProfile, CounterStrike2GSyncHDRProfile):
+            profile = profile_cls()
+            settings = profile.get_settings("NvidiaSettingsHandler")
+            assert settings["preset"] == "reflex_gsync", profile_cls.__name__
+            assert settings["profile_name"] == "Counter-Strike 2", profile_cls.__name__
+            assert settings["auto_vrr_fps_cap"] is True, profile_cls.__name__
+            assert settings["global_vrr_mode"] == "fullscreen_only", profile_cls.__name__
+
+    def test_cs2_hdr_variants_enable_windows_hdr_and_disable_auto_hdr(self):
+        """Both HDR variants use Windows HDR composition with Auto HDR off and ACM disabled."""
+        for profile_cls in (CounterStrike2HDRProfile, CounterStrike2GSyncHDRProfile):
+            profile = profile_cls()
+            win = profile.get_settings("WindowsSettingsHandler")
+            graphics = profile.get_settings("GraphicsSettingsHandler")
+            color = profile.get_settings("ColorProfileSettingsHandler")
+            assert win["hdr"] is True, profile_cls.__name__
+            assert win["auto_hdr"] is False, profile_cls.__name__
+            assert win["advanced_color"] is True, profile_cls.__name__
+            assert graphics["disable_auto_color_management"] is True, profile_cls.__name__
+            assert color["icc_profile"] == "native", profile_cls.__name__
+
+    def test_cs2_sdr_variants_disable_hdr(self):
+        """SDR variants should keep HDR off and use the sRGB color path."""
+        for profile_cls in (CounterStrike2Profile, CounterStrike2GSyncProfile):
+            profile = profile_cls()
+            win = profile.get_settings("WindowsSettingsHandler")
+            color = profile.get_settings("ColorProfileSettingsHandler")
+            assert win["hdr"] is False, profile_cls.__name__
+            assert win["auto_hdr"] is False, profile_cls.__name__
+            assert color["icc_profile"] == "srgb", profile_cls.__name__
+
+    def test_cs2_variants_disable_fso_for_the_binary(self):
+        """Every CS2 variant runs Fullscreen; FSO must be disabled per-exe."""
+        for profile_cls in (
+            CounterStrike2Profile,
+            CounterStrike2HDRProfile,
+            CounterStrike2GSyncProfile,
+            CounterStrike2GSyncHDRProfile,
+        ):
+            profile = profile_cls()
+            flags = profile.fullscreen_optimizations_per_exe
+            assert flags.get("cs2.exe") is True, profile_cls.__name__
+            registry_settings = profile.get_settings("RegistrySettingsHandler")
+            assert registry_settings["fullscreen_optimizations"]["cs2.exe"] is True
+
+    def test_cs2_gsync_variants_inherit_strict_display_path_contract(self):
+        """G-SYNC CS2 variants should match the strict fullscreen VRR contract."""
+        for profile_cls in (CounterStrike2GSyncProfile, CounterStrike2GSyncHDRProfile):
+            profile = profile_cls()
+            assert profile.uses_fullscreen_only_vrr_path is True, profile_cls.__name__
+            assert profile.display_path_requirements.require_overlay_free_path is True
+            assert profile.requires_exact_nvidia_binding is True, profile_cls.__name__
+            assert profile.auto_disable_blocking_overlays is True, profile_cls.__name__
+
+    def test_cs2_is_system_only_until_native_config_handler_lands(self):
+        """ABSO does not write CS2's Source 2 config; scope should reflect that."""
+        for profile_cls in (
+            CounterStrike2Profile,
+            CounterStrike2HDRProfile,
+            CounterStrike2GSyncProfile,
+            CounterStrike2GSyncHDRProfile,
         ):
             profile = profile_cls()
             assert profile.application_scope == "system_only", profile_cls.__name__

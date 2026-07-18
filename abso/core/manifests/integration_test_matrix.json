@@ -254,6 +254,62 @@
       }
     },
     {
+      "id": "apply-counter-strike-2",
+      "profile_id": "counter-strike-2",
+      "kind": "apply_profile",
+      "assumptions": [
+        "administrator",
+        "nvidia_gpu"
+      ],
+      "expected": {
+        "transaction_state": "committed",
+        "apply_success": true
+      }
+    },
+    {
+      "id": "apply-counter-strike-2-hdr",
+      "profile_id": "counter-strike-2-hdr",
+      "kind": "apply_profile",
+      "assumptions": [
+        "administrator",
+        "nvidia_gpu",
+        "hdr_capable"
+      ],
+      "expected": {
+        "transaction_state": "committed",
+        "apply_success": true
+      }
+    },
+    {
+      "id": "apply-counter-strike-2-gsync",
+      "profile_id": "counter-strike-2-gsync",
+      "kind": "apply_profile",
+      "assumptions": [
+        "administrator",
+        "nvidia_gpu",
+        "vrr_confirmed"
+      ],
+      "expected": {
+        "transaction_state": "committed",
+        "apply_success": true
+      }
+    },
+    {
+      "id": "apply-counter-strike-2-gsync-hdr",
+      "profile_id": "counter-strike-2-gsync-hdr",
+      "kind": "apply_profile",
+      "assumptions": [
+        "administrator",
+        "nvidia_gpu",
+        "vrr_confirmed",
+        "hdr_capable"
+      ],
+      "expected": {
+        "transaction_state": "committed",
+        "apply_success": true
+      }
+    },
+    {
       "id": "apply-deadlock",
       "profile_id": "deadlock",
       "kind": "apply_profile",

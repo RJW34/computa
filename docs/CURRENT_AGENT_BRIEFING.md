@@ -1,6 +1,6 @@
 # Current Agent Briefing
 
-Last updated: 2026-07-09 America/New_York
+Last updated: 2026-07-17 America/New_York
 
 > **MACHINE-SPECIFIC — read `docs/NEW_MACHINE_SETUP.md` first if this repo was
 > just cloned onto a different PC.** Everything below describes the live state of
@@ -15,6 +15,57 @@ Last updated: 2026-07-09 America/New_York
 This is the first live-state file for agents arriving with no prior session
 context. Historical handoffs and old plans belong in `docs/archive/`; this file
 is the current operational truth for this PC.
+
+## 2026-07-17 Counter-Strike 2 profile family added + deployed + tray restarted
+
+User requested a new Counter-Strike 2 variant set added to the live tray with
+verification. Shipped `abso/profiles/counter_strike_2.py` mirroring the
+Deadlock family (Source 2, Reflex-capable, no native HDR, `system_only` — no
+native config handler because CS2 rewrites its Source 2 video config under
+Steam userdata):
+
+- `counter-strike-2` (No Sync SDR), `counter-strike-2-hdr` (No Sync, Windows
+  HDR composition), `counter-strike-2-gsync` (strict fullscreen-only G-SYNC
+  SDR), `counter-strike-2-gsync-hdr` (strict G-SYNC + Windows HDR
+  composition). HDR lanes use the Deadlock/Rivals-2 SDR-in-HDR composition
+  wording (test-audited: `test_cs2_hdr_catalog_does_not_claim_native_hdr`).
+- Wiring: catalog imports + `BUILTIN_TRAY_UI` (group `counter-strike-2`,
+  ranks 500-530) + `PROFILE_CATALOG` (Shooters) + `PROFILE_ALIASES`
+  short ids (`cs2`, `cs2-hdr`, `cs2-gsync`, `cs2-gsync-hdr`); profiles
+  `__init__`; integration matrix scenarios (x4); Steam detection
+  (`game_detector.py` + `manifests/game_detection.json`: `cs2.exe`);
+  CS2 test blocks in `tests/test_profiles.py`; regenerated
+  `tests/snapshot_golden.json` (42 profiles) and
+  `abso/tray/profile-catalog-cache.json`. G-SYNC lanes: overlay-free display
+  path, exact NVIDIA binding, mixed-refresh fallbacks to the no-sync
+  siblings. NVIDIA identity `Counter-Strike 2` (alias: CS:GO-era profile,
+  same Steam app 730).
+- Offline gates: full `pytest -q` 2393 passed / 13 deselected (integration
+  opt-outs), `ruff check .` clean. No tray `.ps1` was modified (menu is
+  catalog-driven).
+- Deploy: `.\.venv\Scripts\python.exe build.py deploy` at 2026-07-17 ~17:56.
+  Backend `%LOCALAPPDATA%\AdaptiveBattleStationOptimizer\abso.exe` now
+  18,025,023 bytes; previous backend at
+  `deploy-backups\abso.exe.bak-20260717-175632`; tray assets 1 updated
+  (profile-catalog-cache.json, byte-identical to repo).
+- Tray restarted via `ABSO-Tray-Startup` (old PID 31988 -> new PID 4212).
+  NOTE: the pre-restart tray had been running the 2026-07-16 06:07 script
+  while tray assets were re-deployed at 06:16 (runtime marker hash
+  `e0f3c8d2...` vs installed `6a58d93d...`); this restart cleared that lag —
+  marker now records `6a58d93d...`, matching repo and installed.
+- Read-only verification only (no profile apply, no display/HDR mutation):
+  installed `abso.exe profiles` lists all four CS2 lanes; tray log shows
+  `Profile catalog loaded from cache (42 profiles, 17 aliases)` at 17:57:11
+  and background refresh `verified cache current (42 profiles)`;
+  `health --json` = 7 ok / 3 warning / 0 error with `tray_runtime_marker: ok`.
+- Pre-existing warnings unrelated to CS2 (do not chase as regressions):
+  `display_events`/`display_stability` are the standing mixed-refresh
+  topology warnings; `profile_verify` mismatch on active `overwatch2-hdr`
+  is the manual in-game OW2 Reflex step (current Enabled+Boost, lane now
+  expects Off after the 0f7e367 inversion) plus an AudioEngineHandler drift
+  with empty pending-apply.
+- Not committed (user did not request a commit); working tree holds the CS2
+  change set on branch `feat/fortnite-gsync-hdr-profile`.
 
 ## 2026-07-09 Startup Verification Flicker Trace + Deploy
 

@@ -12,6 +12,12 @@ from dataclasses import dataclass
 from typing import Any, Literal, get_args
 
 from abso.profiles.base import BaseProfile
+from abso.profiles.counter_strike_2 import (
+    CounterStrike2GSyncHDRProfile,
+    CounterStrike2GSyncProfile,
+    CounterStrike2HDRProfile,
+    CounterStrike2Profile,
+)
 from abso.profiles.deadlock import (
     DeadlockGSyncHDRProfile,
     DeadlockGSyncProfile,
@@ -223,6 +229,18 @@ BUILTIN_TRAY_UI: dict[str, TrayProfileUi] = {
     ),
     "overwatch2-gsync-hdr-capture": TrayProfileUi(
         "overwatch2", "Overwatch 2", "Capture-Safe G-SYNC (HDR)", 450
+    ),
+    "counter-strike-2": TrayProfileUi(
+        "counter-strike-2", "Counter-Strike 2", "No Sync (SDR)", 500
+    ),
+    "counter-strike-2-hdr": TrayProfileUi(
+        "counter-strike-2", "Counter-Strike 2", "No Sync (HDR)", 510
+    ),
+    "counter-strike-2-gsync": TrayProfileUi(
+        "counter-strike-2", "Counter-Strike 2", "G-SYNC (SDR)", 520
+    ),
+    "counter-strike-2-gsync-hdr": TrayProfileUi(
+        "counter-strike-2", "Counter-Strike 2", "G-SYNC (HDR)", 530
     ),
     "diablo4": TrayProfileUi("diablo4", "Diablo 4", "HDR", 100),
     "diablo4-sdr": TrayProfileUi("diablo4", "Diablo 4", "SDR", 110),
@@ -502,6 +520,50 @@ PROFILE_CATALOG: OrderedDict[str, ProfileCatalogEntry] = OrderedDict(
             ),
             sync_mode="on",
         ),
+        "counter-strike-2": ProfileCatalogEntry(
+            profile_class=CounterStrike2Profile,
+            tray_category="Shooters",
+            tray_subtitle="No Sync SDR | Reflex (set in-game) | VSync OFF | G-SYNC OFF",
+            tray_description=(
+                "Minimum-latency no-sync Counter-Strike 2 profile. ABSO tunes the "
+                "OS/driver path; enable Reflex Enabled + Boost manually in CS2's "
+                "video settings."
+            ),
+            sync_mode="off",
+        ),
+        "counter-strike-2-hdr": ProfileCatalogEntry(
+            profile_class=CounterStrike2HDRProfile,
+            tray_category="Shooters",
+            tray_subtitle="No Sync HDR | Reflex (set in-game) | VSync OFF | G-SYNC OFF",
+            tray_description=(
+                "Minimum-latency no-sync Counter-Strike 2 with Windows HDR on for "
+                "OLED / Mini-LED. CS2 currently renders SDR through the HDR "
+                "composition path."
+            ),
+            sync_mode="off",
+        ),
+        "counter-strike-2-gsync": ProfileCatalogEntry(
+            profile_class=CounterStrike2GSyncProfile,
+            tray_category="Shooters",
+            tray_subtitle="Strict SDR Exclusive | Reflex (set in-game) | G-SYNC ON",
+            tray_description=(
+                "Tear-free low-latency VRR Counter-Strike 2 profile on the strict "
+                "fullscreen-only G-SYNC path. Enable Reflex Enabled + Boost "
+                "manually in-game."
+            ),
+            sync_mode="on",
+        ),
+        "counter-strike-2-gsync-hdr": ProfileCatalogEntry(
+            profile_class=CounterStrike2GSyncHDRProfile,
+            tray_category="Shooters",
+            tray_subtitle="Strict HDR Exclusive | Reflex (set in-game) | G-SYNC ON",
+            tray_description=(
+                "Tear-free low-latency VRR Counter-Strike 2 with Windows HDR on "
+                "for OLED / Mini-LED. CS2 currently renders SDR through the HDR "
+                "composition path."
+            ),
+            sync_mode="on",
+        ),
         "overwatch2": ProfileCatalogEntry(
             profile_class=Overwatch2Profile,
             tray_category="Shooters",
@@ -615,6 +677,11 @@ PROFILE_ALIASES: dict[str, str] = {
     "slippi-melee-streaming": "slippi-melee",
     # Experimental/duplicate Slippi variants.
     "slippi-melee-vrr-lab": "slippi-melee",
+    # Short-form Counter-Strike 2 convenience ids (cs2 == counter-strike-2).
+    "cs2": "counter-strike-2",
+    "cs2-hdr": "counter-strike-2-hdr",
+    "cs2-gsync": "counter-strike-2-gsync",
+    "cs2-gsync-hdr": "counter-strike-2-gsync-hdr",
 }
 
 
