@@ -48,7 +48,7 @@ system change, NVIDIA GPU optional (for GPU-specific tuning).
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\activate
-pip install -r requirements.txt
+pip install -r requirements-dev.txt
 ```
 
 The repo's own tooling (`build.py`, `CLAUDE.md` examples) assumes the venv lives

@@ -52,14 +52,20 @@ Without NPI, NVIDIA tuning still works through the driver's NVAPI interface.
 
 ### From a release (recommended)
 
-Download `abso.exe` from the latest GitHub release, then from an elevated
-PowerShell:
+Download `abso.exe` and `install.ps1` from the latest GitHub release into the
+same folder, then:
 
 ```powershell
-.\install.ps1            # installs to %LOCALAPPDATA%, runs first-time setup
+powershell -ExecutionPolicy Bypass -File .\install.ps1
 ```
 
-or manually: put `abso.exe` anywhere and run `abso setup`.
+The installer copies `abso.exe` to `%LOCALAPPDATA%`, adds it to your user
+PATH, and launches the first-run setup wizard (elevated). Or manually: put
+`abso.exe` anywhere and run `abso setup` from an elevated terminal.
+
+`abso update-check` reports when a newer release is available; updating is a
+manual re-download (no auto-update). Maintainers: see
+[`docs/RELEASING.md`](docs/RELEASING.md).
 
 ### From source (developers)
 

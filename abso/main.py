@@ -3736,6 +3736,89 @@ def reset_display(json_output: bool, method: str, hotkey_repeat: int) -> None:
         sys.exit(1)
 
 
+# Official repository for release update checks; ABSO_UPDATE_REPO overrides
+# (owner/name) so forks can point at their own releases.
+DEFAULT_UPDATE_REPO = "RJW34/A.B.S.O."
+
+
+def _version_sort_key(version: str) -> tuple[int, ...]:
+    """Turn '1.2.3' (or 'v1.2.3-beta') into a comparable numeric tuple."""
+    parts: list[int] = []
+    for chunk in version.split("."):
+        digits = "".join(ch for ch in chunk if ch.isdigit())
+        parts.append(int(digits) if digits else 0)
+    return tuple(parts)
+
+
+@cli.command("update-check")
+@click.option("--json", "json_output", is_flag=True, help="Output as JSON for GUI integration")
+def update_check(json_output: bool) -> None:
+    """Check GitHub releases for a newer ABSO version.
+
+    Compares the installed version against the latest release tag. No
+    download or install happens — updating stays a manual, deliberate step.
+    """
+    import urllib.error
+    import urllib.request
+
+    from abso.__version__ import __version__
+
+    repo = os.environ.get("ABSO_UPDATE_REPO", DEFAULT_UPDATE_REPO)
+    url = f"https://api.github.com/repos/{repo}/releases/latest"
+    request = urllib.request.Request(
+        url,
+        headers={
+            "Accept": "application/vnd.github+json",
+            "User-Agent": f"abso/{__version__}",
+        },
+    )
+
+    try:
+        with urllib.request.urlopen(request, timeout=10) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+    except urllib.error.HTTPError as e:
+        message = (
+            f"Update check failed: HTTP {e.code} from {repo}"
+            + (" (no releases published yet?)" if e.code == 404 else "")
+        )
+        if json_output:
+            json_error(message)
+        console.print(f"[yellow]{message}[/yellow]")
+        sys.exit(1)
+    except Exception as e:
+        if json_output:
+            json_error(f"Update check failed: {e}")
+        console.print(f"[yellow]Update check failed: {e}[/yellow]")
+        sys.exit(1)
+
+    latest_tag = str(payload.get("tag_name") or "").strip()
+    latest = latest_tag.lstrip("vV")
+    update_available = bool(latest) and (
+        _version_sort_key(latest) > _version_sort_key(__version__)
+    )
+
+    data = {
+        "repo": repo,
+        "installed_version": __version__,
+        "latest_version": latest or None,
+        "update_available": update_available,
+        "release_url": payload.get("html_url"),
+    }
+
+    if json_output:
+        output_json(data)
+        return
+
+    console.print(f"Installed: {__version__}")
+    console.print(f"Latest:    {latest or 'unknown'}  ({repo})")
+    if update_available:
+        console.print(
+            f"[yellow]Update available.[/yellow] Download: {payload.get('html_url', '')}"
+        )
+    else:
+        console.print("[green]ABSO is up to date.[/green]")
+
+
 def main() -> None:
     """Main entry point."""
     cli()

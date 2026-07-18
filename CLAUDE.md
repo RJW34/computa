@@ -49,7 +49,7 @@ capture-safe variants where supported.
 # Environment setup (use the .venv name — build/deploy commands assume it)
 python -m venv .venv
 .\.venv\Scripts\activate
-pip install -r requirements.txt
+pip install -r requirements-dev.txt   # runtime deps + pytest/pyinstaller/ruff
 
 # CLI commands (requires admin elevation)
 python -m abso detect              # Hardware detection

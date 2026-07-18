@@ -1,0 +1,5 @@
+# Development and build tooling — not needed to run ABSO from source.
+-r requirements.txt
+pytest>=8.0.0
+pyinstaller>=6.0.0
+ruff>=0.4.0
