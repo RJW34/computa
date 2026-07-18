@@ -2240,6 +2240,33 @@ $script:AppVersion = "2.5.0"
 
 Write-TrayLog "ABSO backend resolved: $(Get-AbsoBackendCommandLine -CommandArgs @('--version'))"
 
+function Get-TrayFileSha256 {
+    <#
+    .SYNOPSIS
+    SHA256 of a file via .NET, without the Get-FileHash cmdlet.
+
+    The wscript-launched hidden PowerShell host can fail to autoload
+    Microsoft.PowerShell.Utility (observed on Canary builds), which makes
+    Get-FileHash a CommandNotFoundException and silently blanked every hash
+    in the runtime marker. Raw .NET needs no cmdlet resolution.
+    #>
+    param([string]$Path)
+
+    $stream = [System.IO.File]::OpenRead($Path)
+    try {
+        $sha = [System.Security.Cryptography.SHA256]::Create()
+        try {
+            return ([System.BitConverter]::ToString($sha.ComputeHash($stream)) -replace "-", "").ToLowerInvariant()
+        }
+        finally {
+            $sha.Dispose()
+        }
+    }
+    finally {
+        $stream.Dispose()
+    }
+}
+
 function Write-TrayRuntimeMarker {
     <#
     .SYNOPSIS
@@ -2263,8 +2290,8 @@ function Write-TrayRuntimeMarker {
         $scriptHash = $null
         $scriptLastWrite = $null
         try {
-            $scriptHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $scriptPath -ErrorAction Stop).Hash.ToLowerInvariant()
-            $scriptLastWrite = (Get-Item -LiteralPath $scriptPath -ErrorAction Stop).LastWriteTimeUtc.ToString("o")
+            $scriptHash = Get-TrayFileSha256 -Path $scriptPath
+            $scriptLastWrite = [System.IO.File]::GetLastWriteTimeUtc($scriptPath).ToString("o")
         } catch {}
 
         $moduleHashes = [ordered]@{}
@@ -2282,8 +2309,8 @@ function Write-TrayRuntimeMarker {
             try {
                 $moduleHashes[$moduleName] = [ordered]@{
                     path = $modulePath
-                    hash_sha256 = (Get-FileHash -Algorithm SHA256 -LiteralPath $modulePath -ErrorAction Stop).Hash.ToLowerInvariant()
-                    last_write_utc = (Get-Item -LiteralPath $modulePath -ErrorAction Stop).LastWriteTimeUtc.ToString("o")
+                    hash_sha256 = Get-TrayFileSha256 -Path $modulePath
+                    last_write_utc = [System.IO.File]::GetLastWriteTimeUtc($modulePath).ToString("o")
                 }
             } catch {}
         }
