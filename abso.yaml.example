@@ -1,0 +1,39 @@
+# A.B.S.O. Configuration
+# Adaptive Battle Station Optimizer
+#
+# Copy this file to `abso.yaml` (same folder) and adjust it for YOUR machine —
+# or run `abso config --init` to generate one. Everything here is optional;
+# ABSO runs with safe defaults when no config file exists.
+#
+# The config file is intentionally NOT part of the repository: it describes
+# one specific machine (monitor controller quirks, peripheral software that
+# must be protected, per-profile experiments) and should never be inherited
+# from someone else's setup.
+
+backup_dir: backups
+auto_backup: true
+log_level: INFO
+confirm_destructive: true
+
+# DDC/CI monitor control. Leave disabled unless you know your monitor's
+# controller responds well to DDC/CI writes. `controller_override` pins a
+# specific controller vendor when auto-detection picks the wrong one.
+# ddci:
+#   enabled: true
+#   controller_override: CVTE
+
+# Processes the launch-time sweep must never touch on THIS machine. Add your
+# peripheral software here if your mouse/keyboard/RGB depends on it staying
+# alive (Logitech G HUB, Razer Synapse, iCUE, ...).
+# process_overrides:
+#   protect:
+#     - lghub.exe
+#     - lghub_agent.exe
+
+# Per-profile setting overrides. These silently win over the profile on every
+# apply, so keep them rare, documented, and temporary — a stale override can
+# undo a profile improvement months later without any visible error.
+# profile_overrides:
+#   overwatch2-hdr:
+#     nvidia:
+#       low_latency_mode: ultra

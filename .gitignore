@@ -81,5 +81,14 @@ IMPROVEMENT_PLAN.md
 .power_switcher_state.json
 state/citadel_status.json
 
+# Machine-local files: personal per-machine config and live-machine docs.
+# These exist on configured machines but never ship with the repo.
+# See docs/LOCAL_ONLY_FILES.md. Start from abso.yaml.example.
+abso.yaml
+workflow.yaml
+docs/CURRENT_AGENT_BRIEFING.md
+docs/CODEX_HANDOFF_OW2_150FPS.md
+docs/archive/
+
 # Local Codex CLI working state
 .codex/

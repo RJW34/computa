@@ -367,7 +367,7 @@ def test_build_health_report_warns_on_stale_startup_task_action(tmp_path: Path) 
             "task_action_path_current": False,
             "task_action_arguments": '"C:\\repo\\abso\\tray\\ABSO-Tray.vbs"',
             "task_action_expected_vbs_path": (
-                "C:\\Users\\mtoli\\AppData\\Local\\AdaptiveBattleStationOptimizer"
+                "C:\\Users\\gamer\\AppData\\Local\\AdaptiveBattleStationOptimizer"
                 "\\abso\\tray\\ABSO-Tray.vbs"
             ),
         },
@@ -397,7 +397,7 @@ def test_build_health_report_accepts_installed_startup_task_action(tmp_path: Pat
             "task_action_path_current": False,
             "task_action_path_installed": True,
             "task_action_arguments": (
-                '"C:\\Users\\mtoli\\AppData\\Local\\AdaptiveBattleStationOptimizer'
+                '"C:\\Users\\gamer\\AppData\\Local\\AdaptiveBattleStationOptimizer'
                 '\\abso\\tray\\ABSO-StartupLaunch.ps1"'
             ),
         },

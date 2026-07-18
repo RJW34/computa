@@ -199,7 +199,7 @@ running, launches and drives Options → Controls, then exits menu").
 ## Verification data (reproducibility)
 
 ```
-$ ls "C:\Users\mtoli\Documents\Overwatch\Settings\"
+$ ls "C:\Users\<you>\Documents\Overwatch\Settings\"
 Settings_v0.ini
 
 $ wc -l "Settings_v0.ini"

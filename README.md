@@ -1,365 +1,205 @@
 # A.B.S.O.
 
-**Adaptive Battle Station Optimizer**
+**Adaptive Battle Station Optimizer** — a CLI-first Windows 11 gaming tuning
+tool that detects your hardware, audits your system configuration, and applies
+game-specific optimization profiles, with automatic backups and rollback for
+everything it touches.
 
-A.B.S.O. is a CLI-first Windows 11 gaming tuning tool that automatically detects your hardware, audits your system configuration, and applies game-specific profiles for competitive gaming.
+## What it does
 
-> **A.B.S.O.** stands for **A**daptive **B**attle **S**tation **O**ptimizer - an evidence-aware Windows gaming profile tool.
-
-## Features
-
-- **Hardware Detection** - Auto-detects GPU, CPU, RAM, and monitors (including G-Sync/VRR support)
-- **Configuration Audit** - Scans 15+ system areas for optimization opportunities
-- **Game Profiles** - Pre-configured optimization profiles for specific games
-- **Safe by Default** - Automatic backups before any changes
-- **Easy Restore** - One-click rollback to previous settings
-- **Live State Verification** - `state --json --verify`, `health --json`, and
-  targeted `apply-pending` checks for tray/GUI-safe remediation, including
-  tray runtime staleness detection after LocalAppData deploys and read-only
-  display-event evidence with optional channel-error reporting
-- **Passive Display Stability Diagnostics** - `display-diagnostics --json` and
-  `health --json` report active monitor topology, mixed-refresh/VRR risk
-  factors, active-profile reboot context, and whether clean event logs point
-  away from a physical disconnect
-- **Tray-Safe Reapply Flow** - selecting the already-active tray profile is
-  verify-gated to avoid redundant display/color writes
-- **Narrow Apply Preflight** - Windows settings probe only the requested
-  setting groups before apply, avoiding unrelated HDR/WCG/SDR-white/refresh
-  detection for registry-only toggles
-- **Narrow Profile Verification** - current-profile status verifies known
-  Game Mode, Game Bar/DVR, windowed VRR, and refresh-rate targets without
-  invoking unrelated Windows probes
-- **Grouped DirectX Readback** - Auto HDR, windowed optimizations, and VRR
-  optimize are parsed exactly from one registry read in hot detect/apply/verify
-  paths
-- **Deterministic DirectX Writes** - DirectX global settings preserve unknown
-  tokens while normalizing ABSO-owned Auto HDR/windowed/VRR flags to one clean
-  canonical set, not duplicate or conflicting pairs
-- **Backend No-Op Apply/Reapply Guard** - `apply <current-profile>` and
-  `reapply` verify first, skip the transaction when nothing is pending, or
-  route supported pending settings through targeted `apply-pending`
-- **No-Apply Launch Guard** - `launch <current-profile>` skips redundant apply
-  transactions when live verification is already clean
-- **Reboot-Gated Safety** - pending reboot-only verifier states are treated as
-  no-apply states instead of rerunning display-sensitive handlers
-- **Mixed-Monitor HDR Safety** - HDR profile writes skip known SDR-only active
-  targets instead of sending unnecessary display-config calls to every monitor
-
-## Quality Bar
-
-A.B.S.O. is being hardened against a stricter product standard than a typical tweak tool. The current quality rubric, agent protocol, and remediation roadmap live here:
-
-- [`docs/CURRENT_AGENT_BRIEFING.md`](docs/CURRENT_AGENT_BRIEFING.md) — current machine state, verified local build/deploy status, and monitor-flicker precautions for zero-context agents
-- [`AGENTS.md`](AGENTS.md) — root-level zero-context entrypoint for Codex-style agents
-- [`docs/AGENT_PROTOCOL.md`](docs/AGENT_PROTOCOL.md) — forward-looking start-here for any agent
-- [`docs/INDEX.md`](docs/INDEX.md)
-- [`docs/QUALITY_RUBRIC.md`](docs/QUALITY_RUBRIC.md)
-- [`docs/REMEDIATION_ROADMAP.md`](docs/REMEDIATION_ROADMAP.md)
-
-These documents define:
-
-- the fastest reading order for new agents
-- machine-role policy for implementation vs validation
-- what the project is allowed to claim
-- how profile quality is graded
-- what must be true before calling a profile "optimal"
-- the execution plan to raise the project to `A` grades across the board
+- **Hardware detection** — GPU (NVIDIA/AMD/Intel), CPU topology, monitors,
+  refresh rates, G-SYNC/FreeSync/VRR capability, HDR support
+- **Configuration audit** — scans 15+ system areas and explains what's
+  suboptimal for gaming and why
+- **Game profiles** — per-game optimization lanes (no-sync minimum latency,
+  G-SYNC/VRR, HDR, capture-safe variants) that tune Windows, power, input,
+  GPU driver, and display state together
+- **First-run calibration** — `abso setup` walks hardware detection, audit,
+  and profile selection, and adapts what it offers to *your* machine
+- **Safe by default** — timestamped backup of every setting before any change,
+  one-command restore, and a baseline captured at setup so you can always get
+  back to where you started
+- **System tray app** — one-click profile switching, game detection, and
+  status, with selectable icon/sound themes
+- **Live verification** — `state --json --verify` and `health --json` prove
+  whether the active profile is actually in effect instead of assuming it
 
 ## Requirements
 
-- Windows 10/11 (64-bit)
-- Python 3.11 or later
-- Administrator privileges (required for system changes)
-- NVIDIA GPU (optional, for GPU-specific optimizations)
+- Windows 10/11 (64-bit); Windows 11 has the deepest coverage
+- Administrator privileges (system settings require elevation)
+- **GPU:** any. NVIDIA gets the deepest driver tuning (per-app driver
+  profiles, Low Latency Mode, VRR overrides); AMD Radeon gets vendor-specific
+  registry tuning (Anti-Lag, Enhanced Sync, ULPS); other GPUs still get all
+  OS/power/input/display optimizations
+- Python 3.11+ **only for source installs** — the released `abso.exe` is
+  self-contained
 
 ### Optional: NVIDIA Profile Inspector
 
-For full NVIDIA GPU optimization (Low Latency Mode, Power Management, etc.), install NVIDIA Profile Inspector:
+For the deepest NVIDIA driver control, ABSO can use NVIDIA Profile Inspector:
 
-1. Download the latest release from [GitHub](https://github.com/Orbmu2k/nvidiaProfileInspector/releases)
-2. Extract to one of these locations (auto-detected):
+1. Download the latest release from
+   [Orbmu2k/nvidiaProfileInspector](https://github.com/Orbmu2k/nvidiaProfileInspector/releases)
+2. Extract to one of these auto-detected locations:
    - `tools/npi/nvidiaProfileInspector.exe` (project directory)
    - `%USERPROFILE%\nvidiaProfileInspector\nvidiaProfileInspector.exe`
-   - Any location in your PATH
+   - anywhere in your `PATH`
 
-A.B.S.O. will automatically detect NPI and use it for advanced NVIDIA settings. Without NPI, basic NVIDIA optimizations via the driver will still work.
+Without NPI, NVIDIA tuning still works through the driver's NVAPI interface.
 
 ## Installation
 
-1. Clone or download this repository
-2. Open a terminal in the project directory
-3. Create a virtual environment and install dependencies:
+### From a release (recommended)
+
+Download `abso.exe` from the latest GitHub release, then from an elevated
+PowerShell:
 
 ```powershell
-python -m venv .venv
+.\install.ps1            # installs to %LOCALAPPDATA%, runs first-time setup
+```
+
+or manually: put `abso.exe` anywhere and run `abso setup`.
+
+### From source (developers)
+
+```powershell
+git clone <this repo>
+cd windowsoptimizerabso
+python -m venv .venv          # tooling assumes the venv is named .venv
 .\.venv\Scripts\activate
 pip install -r requirements.txt
+python -m abso setup
 ```
 
-> The project's build/deploy tooling (`build.py`, and the examples in
-> `CLAUDE.md`) assumes the virtual environment lives at `.\.venv\`. Use that
-> name so documented commands like `.\.venv\Scripts\python.exe build.py deploy`
-> work without modification.
+Dev/build tooling (pytest, ruff, PyInstaller) lives in
+`requirements-dev.txt`.
 
-## Quick Start
+## First run
 
-### Interactive Mode (Recommended)
-
-Simply run A.B.S.O. without arguments to launch the interactive menu:
+Run the calibration wizard from an elevated terminal:
 
 ```powershell
-python -m abso
+abso setup
 ```
 
-You'll see a menu with options to:
-1. Run a system audit
-2. Apply a game profile
-3. Detect hardware
-4. Restore from backup
-5. View available profiles
+It detects your hardware, checks for known-problematic Windows updates,
+audits current settings, captures a **baseline backup** of your system, and
+offers the game profiles that match what your machine supports (HDR lanes on
+HDR displays, G-SYNC/VRR lanes on VRR displays, and so on). Nothing is applied
+without confirmation.
 
-### Command Line Mode
-
-For scripting or advanced users:
+## Everyday use
 
 ```powershell
-# Detect hardware
-python -m abso detect
-
-# Audit system configuration
-python -m abso audit
-python -m abso audit --verbose  # With detailed explanations
-
-# List available profiles
-python -m abso profiles
-
-# Apply a game profile
-python -m abso apply slippi-melee
-python -m abso apply rivals2-online
-python -m abso apply fortnite
-python -m abso apply diablo4
-
-# Check active profile health without changing display state
-python -m abso state --json --verify
-python -m abso health --json
-python -m abso health --json --full-verify  # Include full per-handler details
-python -m abso health --json --full-backups # Include recent backup rows
-
-# Sample only display flicker evidence without profile verification or writes
-python -m abso display-diagnostics --json
-python -m abso display-diagnostics --samples 6 --interval 10 --json
-python -m abso display-diagnostics --samples 6 --interval 10 --jsonl
-
-# Apply only supported missing pending settings, not a full profile
-python -m abso apply-pending overwatch2-gsync-hdr-capture --json
-
-# Restore from backup
-python -m abso restore latest
-python -m abso restore 20240115_143022  # Specific backup
+abso profiles                  # list available profiles for this machine
+abso apply overwatch2-gsync    # apply a profile (backup happens automatically)
+abso audit --verbose           # what would ABSO change, and why
+abso state --json --verify     # is the active profile actually in effect?
+abso health --json             # overall install/runtime health
+abso restore latest            # roll back the last apply
+abso uninstall                 # restore baseline + remove ABSO from the system
+abso tray --install-startup    # start the tray app with Windows
 ```
 
-## Available Game Profiles
+The tray app (`abso tray`) gives you one-click switching, shows the active
+profile, watches for game launches, and supports icon/sound theme packs — see
+`abso/tray/themes/README.md`.
 
-The tray lists each game once, then shows the available variants inside that game's flyout.
+## What profiles change
 
-| Game / target | Variants | Profile IDs |
-|---------------|----------|-------------|
-| Desktop / Productivity | SDR, HDR | `productivity`, `productivity-hdr` |
-| Rivals 2 | Online No Sync, Online G-SYNC, Offline No Sync, Offline G-SYNC; each in SDR and Windows HDR composition | `rivals2-online`, `rivals2-online-hdr`, `rivals2-online-gsync`, `rivals2-online-gsync-hdr`, `rivals2-offline`, `rivals2-offline-hdr`, `rivals2-gsync`, `rivals2-gsync-hdr` |
-| Super Smash Bros. Melee (Slippi) | Competitive No Sync, Console-Parity 60 Hz, Universal No Sync; each in SDR and Windows HDR composition | `slippi-melee`, `slippi-melee-hdr`, `slippi-melee-console-parity`, `slippi-melee-console-parity-hdr`, `slippi-melee-universal`, `slippi-melee-universal-hdr` |
-| SSBU / HewDraw Remix (Ryujinx) | Low-latency emulator | `ryujinx-ssbu` |
-| Deadlock | No Sync and G-SYNC; each in SDR and Windows HDR composition | `deadlock`, `deadlock-hdr`, `deadlock-gsync`, `deadlock-gsync-hdr` |
-| Fortnite | No Sync in SDR or HDR | `fortnite`, `fortnite-hdr` |
-| Marvel Rivals | G-SYNC in SDR or HDR | `marvel-rivals-sdr`, `marvel-rivals-hdr` |
-| Overwatch 2 | No Sync, strict G-SYNC, and capture-safe G-SYNC; each in SDR or HDR | `overwatch2`, `overwatch2-hdr`, `overwatch2-gsync`, `overwatch2-gsync-hdr`, `overwatch2-gsync-capture`, `overwatch2-gsync-hdr-capture` |
-| Diablo 4 | HDR or SDR | `diablo4`, `diablo4-sdr` |
-| Pokemon Auto Chess | Browser WebGL or native PACDeluxe client | `pokemon-auto-chess`, `pacdeluxe` |
+Exact settings vary per profile; this is what built-in profiles touch today.
 
-## What Profiles Change
+### Windows
+- Game Mode on; Game Bar / Game DVR capture off (per-user registry)
+- Hardware-Accelerated GPU Scheduling (HAGS) on most gaming profiles
+  (hardware/driver-dependent; first change needs a reboot)
+- Per-executable Fullscreen Optimizations (FSO) matched to each profile's
+  presentation path (exclusive fullscreen vs composited borderless)
+- Multi-Plane Overlay (MPO) is **not** disabled by default — disabling it can
+  break the Windows 11 VRR/compositor path
 
-A.B.S.O. applies optimizations across multiple system areas. Exact settings vary by profile; the list below describes what built-in profiles actually touch today.
+### Power
+- Ultimate Performance plan; USB selective suspend and PCIe link-state power
+  saving off; processor max state 100%
 
-### Windows Settings
-- Game Mode enabled
-- Game Bar / Game DVR disabled (per-user registry toggles; background capture policy is not globally enforced)
-- Hardware-Accelerated GPU Scheduling (HAGS) enabled on most gaming profiles (hardware/driver dependent; requires reboot on first change)
-- Windowed-game optimizations (FSO per-executable) tuned per profile
+### Input
+- Mouse acceleration off, linear response curves, enhanced pointer precision
+  off
 
-### Power Settings
-- Ultimate Performance power plan
-- USB selective suspend disabled
-- PCIe link-state power saving disabled
-- Processor maximum state set to 100%; selected offline profiles may also raise minimum processor state
+### GPU driver
+- **NVIDIA:** per-application driver profile (NPI / NVAPI DRS) with Low
+  Latency Mode, VSync, Power Management, Max Frame Rate, and VRR overrides per
+  profile. Native Reflex is preferred over driver LLM whenever the game
+  supports it; the Reflex toggle itself must still be enabled in-game
+- **AMD:** vendor registry tuning (Anti-Lag, Enhanced Sync, ULPS) mapped from
+  the same profile intents
+- VRR safety caps scale to *your* panel (default `refresh − 3`), not to any
+  hardcoded refresh rate
 
-### Graphics Settings
-- Per-executable Fullscreen Optimizations (FSO) forced on or off to match each profile's presentation path (exclusive fullscreen vs composited borderless)
-- Multi-Plane Overlay (MPO) is **not** disabled by default. Most profiles leave MPO enabled because disabling it can alter or break the Windows 11 VRR/compositor path on some systems
-- A local profile override may disable MPO for a specific capture-safe mixed-refresh setup. When that happens, `apply-pending` writes only the supported missing graphics target and marks the profile reboot-pending instead of re-running a full profile apply
+### Deliberately conservative
+- Network: built-in profiles keep Windows TCP defaults (most game traffic is
+  UDP; Nagle/autotuning tweaks don't help gameplay latency). TCP tuning exists
+  only as an opt-in preset
+- Services: no telemetry/search/Xbox service disabling — brittle, no measured
+  win on modern Windows 11
+- VBS / Memory Integrity: never silently disabled; explicit opt-in flow only
+- Legacy registry tweaks (`SystemResponsiveness`, `LargeSystemCache`, network
+  throttling index) sit behind an opt-in legacy flag
 
-### Input Settings
-- Mouse acceleration disabled
-- Linear mouse curves applied
-- Enhanced pointer precision disabled
+## Safety
 
-### Network Settings
-- Built-in profiles use the `default` network preset and do **not** disable Nagle, TCP auto-tuning, or ECN. Microsoft documents TCP receive-window autotuning default `normal` as a TCP throughput win, and most competitive gameplay traffic is UDP so Nagle/TCP tweaks don't meaningfully affect gameplay latency
-- TCP tuning (Nagle / autotuning / ECN / timestamps) is available as an opt-in preset but is not part of any built-in profile
-- Network throttling index changes (`NetworkThrottlingIndex = 0xFFFFFFFF`) are only applied under the opt-in legacy-tweaks flag
+Every apply first writes a timestamped backup (`backups/YYYY-MM-DD_HHMMSS/`)
+with a manifest of every component touched. `abso restore latest` (or a
+specific timestamp) rolls back. `abso setup` additionally captures a baseline
+snapshot, and `abso uninstall` returns the system to that baseline and removes
+ABSO's startup registration.
 
-### System Scheduler
-- Process priority boosted for the game's executable(s) via IFEO (risk-managed: can conflict with anti-cheat, audio, OBS, and launchers)
-- `Win32PrioritySeparation = 0x2A` is applied in most gaming base profiles; this is an old global tweak whose measured effect varies and should be considered experimental
-- `SystemResponsiveness = 10` is only applied under the opt-in legacy-tweaks flag
-
-### Background Services
-- ABSO does **not** disable telemetry, search indexer, or Xbox background services by default. Broad service disabling is out of scope because it causes brittle systems and has no reliable gaming win on modern Windows 11
-
-### Memory Management
-- `LargeSystemCache` and `DisablePagingExecutive` are only applied under the opt-in legacy-tweaks flag. They are not default for any built-in gaming profile
-
-### NVIDIA / VRR
-- Per-application NVIDIA driver profile (via NPI / NVAPI DRS) with Low Latency Mode, VSync, Power Management, Max Frame Rate, and VRR App Override tuned per profile
-- Native Reflex is preferred over driver Low Latency Mode whenever the game supports Reflex (CoD, Apex, Valorant, Fortnite, Overwatch 2, Diablo 4, Marvel Rivals). ABSO keeps driver LLM off for those games; the Reflex toggle itself must still be enabled in-game
-- ABSO's default manual VRR safety cap is `refresh - 3`. Overwatch 2 G-SYNC profiles are an explicit exception: they use the OW2 Reflex/G-SYNC policy, which resolves to `276` on the 300 Hz reference path. No-sync Overwatch 2 profiles remain uncapped at the game's `600` FPS ceiling
-
-### VBS / HVCI / Virtualization-Based Security
-- ABSO does **not** silently disable Memory Integrity (HVCI), Virtual Machine Platform, or hypervisor launch state. Disabling VBS is a security tradeoff and is only available through an explicit opt-in flow with warnings and a restore path
-
-## Safety Features
-
-### Automatic Backups
-
-Before applying any profile, A.B.S.O. automatically creates a backup of all settings that will be changed. Backups are stored in the `backups/` folder with timestamps.
-
-### Easy Restore
-
-If something doesn't work as expected, restore your previous settings:
-
-```powershell
-python -m abso restore latest
-```
-
-Or list and restore a specific backup:
-
-```powershell
-# Backups are named by timestamp: YYYY-MM-DD_HHMMSS
-python -m abso restore 2026-05-13_181906
-```
-
-### Skip Backup (Not Recommended)
-
-If you really need to skip the backup:
-
-```powershell
-python -m abso apply slippi-melee --no-backup
-```
-
-## In-Game Settings
-
-After applying a profile, A.B.S.O. generates a report with recommended in-game settings. These are saved to the `reports/` folder.
-
-For example, after applying the Rivals 2 profile, check:
-```
-reports/rivals2_settings.md
-```
-
-This includes game-specific recommendations for:
-- Display mode
-- VSync settings
-- Frame rate limits
-- NVIDIA Reflex
-- Graphics quality
-- Audio latency
+Some settings need one reboot the **first** time they change (HAGS, MPO,
+opt-in VBS/memory settings); profile switches after that are instant. `state
+--json --verify` distinguishes "not applied" from "applied, reboot pending".
 
 ## Troubleshooting
 
-### "Admin privileges required"
+- **"Admin privileges required"** — run the terminal as administrator; the
+  interactive mode prompts for elevation itself
+- **Changes not taking effect** — check `state --json --verify`; a
+  reboot-gated setting shows as written-but-pending rather than missing
+- **NVIDIA settings not applied** — confirm an NVIDIA GPU is present; some
+  settings need NPI (see above) or a driver restart
+- **Restore issues** — every backup folder contains `manifest.json` plus
+  per-component files that can be inspected and restored manually
 
-A.B.S.O. needs administrator access to modify system settings. Right-click your terminal and select "Run as administrator", or launch the interactive mode which will prompt for elevation.
-
-### Changes not taking effect
-
-Some optimizations require a system reboot **the first time they're applied**:
-- HAGS changes
-- VBS / Memory Integrity (HVCI) state changes (opt-in only)
-- Memory management settings (`DisablePagingExecutive`, opt-in legacy tweaks)
-- MPO (Multi-Plane Overlay) changes, when a profile opts into toggling MPO
-
-**Important:** Once you've applied a profile and rebooted, switching between profiles typically does NOT require another reboot. The kernel-level settings persist in the registry, so subsequent profile switches are instant.
-
-A.B.S.O. will notify you if a reboot may be required. Use `state --json --verify` or `health --json` to distinguish a missing pending apply from a reboot-gated setting whose registry target is already written.
-
-### Restoring doesn't work
-
-If automatic restore fails:
-1. Check the `backups/` folder for your backup
-2. The `manifest.json` file lists all changed settings
-3. Each component has its own backup file that can be manually inspected
-
-### NVIDIA settings not applied
-
-- Ensure you have an NVIDIA GPU
-- NVIDIA Profile Inspector may be required for some settings
-- Driver restart or reboot may be needed
-
-## Project Structure
+## Project structure
 
 ```
 abso/
-├── main.py                 # CLI entry point
-├── interactive.py          # Interactive menu system
-├── core/
-│   ├── detector.py         # Hardware detection
-│   ├── auditor.py          # Configuration auditing
-│   ├── applier.py          # Profile application
-│   ├── backup.py           # Backup/restore system
-│   ├── app_paths.py        # Installed LocalAppData paths
-│   ├── handler_registry.py # Central registry (one HandlerEntry per handler)
-│   ├── pending_apply.py    # Narrow targeted remediation path
-│   ├── profile_status.py   # Shared verification/status summaries
-│   ├── state_reconcile.py  # Reboot-pending reconciliation
-│   ├── state_store.py      # Active-profile state read/write helpers
-│   ├── compliance.py       # Post-apply compliance / severity escalation
-│   ├── kb_checker.py       # Known-bad Windows updates + supersession
-│   ├── bios_detector.py    # BIOS/firmware + Secure Boot cert state
+├── main.py                 # CLI entry point (Click)
+├── core/                   # detection, audit, apply, backup, verification
+│   ├── handler_registry.py # one HandlerEntry per settings handler
+│   ├── gpu_vendor.py       # GPU vendor resolution (NVIDIA/AMD/other)
 │   └── ...
-├── data/
-│   ├── hardware_db.py      # OEM / chassis / G-Sync model tables
-│   ├── monitor_osd.py      # Per-monitor OSD recommendations
-│   └── debloat_tweaks.yaml
-├── profiles/
-│   ├── base.py             # Base profile class
-│   ├── profile_bases.py    # Reflex / Emulator / Rivals2 family bases
-│   └── <game>.py           # Game-specific profiles
-├── settings/               # Settings handlers (~25)
-│   ├── base.py             # SettingsHandler interface
-│   ├── windows.py          # Windows settings
-│   ├── power.py            # Power plan settings
-│   ├── nvidia/             # NVIDIA package (NPI + NVAPI DRS)
-│   ├── registry.py         # Registry tweaks
-│   ├── xbox_mode.py        # 25H2 Xbox Mode rollout (detect-only)
-│   ├── ai_agents.py        # 25H2 AI taskbar agents (detect-only)
-│   └── ...
-├── tray/                   # PowerShell tray app
-└── utils/
-    ├── admin.py            # Admin elevation
-    ├── os_release.py       # OsRelease single source of truth
-    ├── registry.py         # Safe registry helpers
-    └── atomic_io.py        # Atomic JSON I/O
+├── data/                   # hardware/monitor lookup tables
+├── profiles/               # game profiles (data + logic)
+├── settings/               # ~25 settings handlers (windows, power, nvidia/, amd, ...)
+├── tray/                   # PowerShell tray app + theme packs
+└── utils/                  # admin elevation, registry, atomic IO
 ```
 
-For agents picking up this project on a **freshly cloned / new PC**, read
-[`docs/NEW_MACHINE_SETUP.md`](docs/NEW_MACHINE_SETUP.md) first. On an
-already-configured machine, read
-[`docs/CURRENT_AGENT_BRIEFING.md`](docs/CURRENT_AGENT_BRIEFING.md) first for
-the current live-PC state (machine-specific — re-verify on a fresh clone), then
-[`docs/AGENT_PROTOCOL.md`](docs/AGENT_PROTOCOL.md) for durable workflow and
-architecture rules.
+For development workflow, agent protocol, and quality standards see
+[`docs/AGENT_PROTOCOL.md`](docs/AGENT_PROTOCOL.md),
+[`docs/QUALITY_RUBRIC.md`](docs/QUALITY_RUBRIC.md), and
+[`docs/NEW_MACHINE_SETUP.md`](docs/NEW_MACHINE_SETUP.md). Files that
+intentionally exist only on a maintainer's machine are listed in
+[`docs/LOCAL_ONLY_FILES.md`](docs/LOCAL_ONLY_FILES.md).
 
 ## License
 
-This project is provided as-is for personal use. Use at your own risk.
+MIT — see [`LICENSE`](LICENSE).
 
 ## Disclaimer
 
-This tool modifies Windows system settings. While it includes backup and restore functionality, always ensure you have system restore points or full backups before making system changes. The authors are not responsible for any issues that may arise from using this tool.
+This tool modifies Windows system settings. It backs up everything it changes
+and can restore those backups, but you should still keep your own restore
+points for anything you can't afford to lose. The authors are not responsible
+for issues arising from use of this tool.

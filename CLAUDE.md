@@ -12,9 +12,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 > [`docs/AGENT_PROTOCOL.md`](docs/AGENT_PROTOCOL.md).** The briefing is the
 > live-machine truth for the active profile, installed build, monitor-flicker
 > status, LocalAppData deployment state, and reboot-gated work — but it is
-> machine-specific; on a fresh clone its live-state claims are history until
-> re-verified. The protocol is the durable workflow and architecture guide.
-> Everything below is a short-form orientation, not the authoritative source.
+> **machine-local and gitignored** (see
+> [`docs/LOCAL_ONLY_FILES.md`](docs/LOCAL_ONLY_FILES.md)); on a fresh clone it
+> does not exist and its role is served by `NEW_MACHINE_SETUP.md` until this
+> machine writes its own. The protocol is the durable workflow and
+> architecture guide. Everything below is a short-form orientation, not the
+> authoritative source.
 
 ## Project Overview
 

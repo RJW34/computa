@@ -217,7 +217,7 @@ def test_cli_tray_startup_status_accepts_installed_action_path():
         "task_name": "ABSO-Tray-Startup",
         "task_highest": True,
         "task_action_execute": "powershell.exe",
-        "task_action_arguments": '"C:\\Users\\mtoli\\AppData\\Local\\AdaptiveBattleStationOptimizer\\abso\\tray\\ABSO-StartupLaunch.ps1"',
+        "task_action_arguments": '"C:\\Users\\gamer\\AppData\\Local\\AdaptiveBattleStationOptimizer\\abso\\tray\\ABSO-StartupLaunch.ps1"',
         "task_action_path_current": False,
         "task_action_path_installed": True,
     }
