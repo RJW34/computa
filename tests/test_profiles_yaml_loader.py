@@ -34,6 +34,7 @@ settings:
         "PowerSettingsHandler",
         "RegistrySettingsHandler",
         "NvidiaSettingsHandler",
+        "AmdSettingsHandler",
         "NetworkSettingsHandler",
         "MouseSettingsHandler",
         "GraphicsSettingsHandler",
