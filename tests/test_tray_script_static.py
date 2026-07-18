@@ -4086,10 +4086,11 @@ def test_tray_writes_runtime_marker_for_health_staleness_checks() -> None:
     assert '"ABSO-Theme.ps1"' in script
     assert '"ABSO-QuickPanel.ps1"' in script
     assert '"ABSO-Icons.ps1"' in script
-    # Marker hashing must use raw .NET, not Get-FileHash: the wscript-spawned
-    # hidden host can fail to autoload Microsoft.PowerShell.Utility, which
-    # silently blanked every hash in the runtime marker.
-    assert "Get-FileHash" not in script
+    # Marker hashing must use raw .NET, not the Get-FileHash cmdlet: the
+    # wscript-spawned hidden host can fail to autoload
+    # Microsoft.PowerShell.Utility, which silently blanked every hash in the
+    # runtime marker. (The cmdlet name may appear in comments explaining this.)
+    assert "Get-FileHash -Algorithm" not in script
     assert "function Get-TrayFileSha256" in script
     assert "[System.Security.Cryptography.SHA256]::Create()" in script
     assert "Write-TrayRuntimeMarker" in script
