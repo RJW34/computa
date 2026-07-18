@@ -1,20 +1,20 @@
 #!/usr/bin/env python
-r"""Build script for A.B.S.O. (CLI + GUI).
+r"""Build script for computa (CLI + GUI).
 
 Commands:
     .\.venv\Scripts\python.exe build.py           # Build CLI only (default)
-    .\.venv\Scripts\python.exe build.py cli       # Build CLI only (dist/abso.exe)
+    .\.venv\Scripts\python.exe build.py cli       # Build CLI only (dist/computa.exe)
     .\.venv\Scripts\python.exe build.py gui       # Build GUI with Tauri (requires CLI)
     .\.venv\Scripts\python.exe build.py all       # Build both CLI and GUI installer
     .\.venv\Scripts\python.exe build.py deploy    # Build CLI and deploy local runtime assets
-    .\.venv\Scripts\python.exe build.py deploy-existing  # Deploy existing dist/abso.exe
+    .\.venv\Scripts\python.exe build.py deploy-existing  # Deploy existing dist/computa.exe
     .\.venv\Scripts\python.exe build.py dev       # Set up for GUI development
 
 Use a Python interpreter with PyInstaller installed. On this PC that is the
 repo-local .venv interpreter above; other launchers may not have PyInstaller.
 
 Output:
-    dist/abso.exe                                    - Standalone CLI
+    dist/computa.exe                                 - Standalone CLI
     gui/src-tauri/target/release/bundle/msi/*.msi   - Windows installer
     gui/src-tauri/target/release/bundle/nsis/*.exe  - NSIS installer
 """
@@ -143,7 +143,7 @@ def check_build_prerequisites() -> bool:
 
 def verify_output() -> bool:
     """Verify the output executable was created."""
-    exe_path = DIST_DIR / "abso.exe"
+    exe_path = DIST_DIR / "computa.exe"
 
     if not exe_path.exists():
         print(f"ERROR: Executable not found: {exe_path}")
@@ -161,7 +161,7 @@ def copy_cli_to_gui() -> bool:
     """Copy the built CLI to the GUI binaries directory."""
     print("\nCopying CLI to GUI binaries...")
 
-    cli_exe = DIST_DIR / "abso.exe"
+    cli_exe = DIST_DIR / "computa.exe"
     if not cli_exe.exists():
         print(f"ERROR: CLI not found at {cli_exe}")
         return False
@@ -169,8 +169,9 @@ def copy_cli_to_gui() -> bool:
     # Create binaries directory
     GUI_BINARIES_DIR.mkdir(parents=True, exist_ok=True)
 
-    # Tauri expects: abso-{target_triple}.exe
-    # Copy for both MSVC and GNU targets to support different build environments
+    # Tauri expects: abso-{target_triple}.exe — the sidecar names are an
+    # internal GUI contract and keep the legacy abso prefix even though the
+    # public CLI is computa.exe.
     targets = [
         "abso-x86_64-pc-windows-msvc.exe",
         "abso-x86_64-pc-windows-gnu.exe",
@@ -381,7 +382,7 @@ def _sync_gui_executable(
 
 def deploy_local_runtime(install_dir: Path | None = None) -> dict[str, object]:
     """Deploy the built backend and runtime assets to LocalAppData."""
-    cli_exe = DIST_DIR / "abso.exe"
+    cli_exe = DIST_DIR / "computa.exe"
     if not cli_exe.exists():
         raise FileNotFoundError(f"CLI not found at {cli_exe}")
 
@@ -392,14 +393,28 @@ def deploy_local_runtime(install_dir: Path | None = None) -> dict[str, object]:
     backup_dir.mkdir(parents=True, exist_ok=True)
     stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
 
-    installed_exe = install_root / "abso.exe"
+    installed_exe = install_root / "computa.exe"
     backend_result = _sync_file_with_backup(
         source=cli_exe,
         target=installed_exe,
         backup_dir=backup_dir,
-        backup_name="abso.exe",
+        backup_name="computa.exe",
         stamp=stamp,
     )
+
+    # Pre-rebrand installs shipped the backend as abso.exe; move any stale
+    # copy into deploy-backups so nothing on the machine keeps running (or
+    # resolving) the old binary.
+    legacy_exe = install_root / "abso.exe"
+    legacy_backend_migrated = False
+    if legacy_exe.exists():
+        legacy_backup = _unique_backup_path(backup_dir, "abso.exe", stamp)
+        try:
+            legacy_exe.rename(legacy_backup)
+            legacy_backend_migrated = True
+        except OSError:
+            # A running process may hold the old exe; the next deploy retries.
+            pass
 
     # Keep GUI sidecars aligned with the backend used by the installed GUI.
     copy_cli_to_gui()
@@ -450,6 +465,7 @@ def deploy_local_runtime(install_dir: Path | None = None) -> dict[str, object]:
         "config": str(config_target) if config_target else None,
         "config_copied": config_copied,
         "migrated_backups": migrated_backups,
+        "legacy_backend_migrated": legacy_backend_migrated,
     }
 
 
@@ -562,7 +578,7 @@ def build_gui() -> bool:
 def build_cli() -> bool:
     """Build the CLI with PyInstaller."""
     print("=" * 60)
-    print("A.B.S.O. CLI Build")
+    print("computa CLI Build")
     print("=" * 60)
 
     if not check_build_prerequisites():

@@ -43,9 +43,9 @@ $health = if (-not $currentProfile) {
     'healthy'
 }
 $headline = if ($currentProfile) {
-    "Profile '$currentProfile' is the last stamped A.B.S.O. state."
+    "Profile '$currentProfile' is the last stamped computa state."
 } else {
-    'A.B.S.O. has no stamped active profile yet.'
+    'computa has no stamped active profile yet.'
 }
 
 $signals = @(

@@ -63,14 +63,14 @@ def test_deploy_local_runtime_copies_runtime_assets(tmp_path, monkeypatch):
     gui_bins.mkdir(parents=True)
     gui_release.mkdir(parents=True)
 
-    (dist / "abso.exe").write_bytes(b"new backend")
+    (dist / "computa.exe").write_bytes(b"new backend")
     (gui_release / "abso-gui.exe").write_bytes(b"new gui")
     (tray / "ABSO-Tray.ps1").write_text("# tray", encoding="utf-8")
     (tray / "Install-Startup.ps1").write_text("# installer", encoding="utf-8")
     (root / "abso.yaml").write_text("backup_dir: backups\n", encoding="utf-8")
     (backups / "metadata.json").write_text("{}", encoding="utf-8")
-    (install / "abso.exe").parent.mkdir(parents=True)
-    (install / "abso.exe").write_bytes(b"old backend")
+    (install / "computa.exe").parent.mkdir(parents=True)
+    (install / "computa.exe").write_bytes(b"old backend")
     (install / "abso-gui.exe").write_bytes(b"old gui")
 
     monkeypatch.setattr(build, "ROOT_DIR", root)
@@ -80,7 +80,7 @@ def test_deploy_local_runtime_copies_runtime_assets(tmp_path, monkeypatch):
 
     result = build.deploy_local_runtime(install_dir=install)
 
-    assert (install / "abso.exe").read_bytes() == b"new backend"
+    assert (install / "computa.exe").read_bytes() == b"new backend"
     assert (install / "abso-gui.exe").read_bytes() == b"new gui"
     assert (install / "abso.yaml").read_text(encoding="utf-8") == "backup_dir: backups\n"
     assert (install / "abso" / "tray" / "ABSO-Tray.ps1").exists()
@@ -117,7 +117,7 @@ def test_deploy_local_runtime_copies_profile_cache_and_removes_legacy_sidecar_co
     tray.mkdir(parents=True)
     installed_tray.mkdir(parents=True)
 
-    (dist / "abso.exe").write_bytes(b"backend")
+    (dist / "computa.exe").write_bytes(b"backend")
     (tray / "profile-catalog-cache.json").write_text('{"profiles":[]}', encoding="utf-8")
     (tray / "_restart-tray.ps1").write_text("# deprecated", encoding="utf-8")
     (tray / "tray-config.json").write_text('{"stale":true}', encoding="utf-8")
@@ -153,8 +153,8 @@ def test_deploy_local_runtime_skips_identical_backend_executable(tmp_path, monke
 
     dist.mkdir(parents=True)
     install.mkdir(parents=True)
-    (dist / "abso.exe").write_bytes(b"same backend")
-    (install / "abso.exe").write_bytes(b"same backend")
+    (dist / "computa.exe").write_bytes(b"same backend")
+    (install / "computa.exe").write_bytes(b"same backend")
 
     monkeypatch.setattr(build, "ROOT_DIR", root)
     monkeypatch.setattr(build, "DIST_DIR", dist)
@@ -163,13 +163,13 @@ def test_deploy_local_runtime_skips_identical_backend_executable(tmp_path, monke
 
     result = build.deploy_local_runtime(install_dir=install)
 
-    assert (install / "abso.exe").read_bytes() == b"same backend"
+    assert (install / "computa.exe").read_bytes() == b"same backend"
     assert result["installed_length"] == len(b"same backend")
     assert result["backend"]["available"] is True
     assert result["backend"]["copied"] is False
     assert result["backend"]["backup"] is None
     assert result["backup"] is None
-    assert not list((install / "deploy-backups").glob("abso.exe.bak-*"))
+    assert not list((install / "deploy-backups").glob("computa.exe.bak-*"))
 
 
 def test_sync_file_with_backup_does_not_overwrite_same_second_backup(tmp_path):
@@ -178,7 +178,7 @@ def test_sync_file_with_backup_does_not_overwrite_same_second_backup(tmp_path):
     target = tmp_path / "target.exe"
     backup_dir = tmp_path / "deploy-backups"
     backup_dir.mkdir()
-    existing_backup = backup_dir / "abso.exe.bak-20260526-093000"
+    existing_backup = backup_dir / "computa.exe.bak-20260526-093000"
 
     source.write_bytes(b"new backend")
     target.write_bytes(b"old backend")
@@ -188,14 +188,14 @@ def test_sync_file_with_backup_does_not_overwrite_same_second_backup(tmp_path):
         source=source,
         target=target,
         backup_dir=backup_dir,
-        backup_name="abso.exe",
+        backup_name="computa.exe",
         stamp="20260526-093000",
     )
 
     assert target.read_bytes() == b"new backend"
     assert existing_backup.read_bytes() == b"previous backup"
-    assert (backup_dir / "abso.exe.bak-20260526-093000-2").read_bytes() == b"old backend"
-    assert result["backup"] == str(backup_dir / "abso.exe.bak-20260526-093000-2")
+    assert (backup_dir / "computa.exe.bak-20260526-093000-2").read_bytes() == b"old backend"
+    assert result["backup"] == str(backup_dir / "computa.exe.bak-20260526-093000-2")
 
 
 def test_copy_file_if_changed_renames_aside_when_overwrite_is_blocked(
@@ -239,7 +239,7 @@ def test_copy_cli_to_gui_skips_identical_sidecar_writes(tmp_path, monkeypatch):
 
     dist.mkdir(parents=True)
     gui_bins.mkdir(parents=True)
-    (dist / "abso.exe").write_bytes(b"same backend")
+    (dist / "computa.exe").write_bytes(b"same backend")
     for name in sidecar_names:
         sidecar = gui_bins / name
         sidecar.write_bytes(b"same backend")
@@ -269,8 +269,8 @@ def test_deploy_local_runtime_skips_identical_tray_assets_and_config(tmp_path, m
     installed_tray.mkdir(parents=True)
     install.mkdir(parents=True, exist_ok=True)
 
-    (dist / "abso.exe").write_bytes(b"same backend")
-    (install / "abso.exe").write_bytes(b"same backend")
+    (dist / "computa.exe").write_bytes(b"same backend")
+    (install / "computa.exe").write_bytes(b"same backend")
     (tray / "ABSO-Tray.ps1").write_text("# tray", encoding="utf-8")
     (tray / "Install-Startup.ps1").write_text("# installer", encoding="utf-8")
     (installed_tray / "ABSO-Tray.ps1").write_text("# tray", encoding="utf-8")
@@ -313,7 +313,7 @@ def test_deploy_local_runtime_does_not_overwrite_existing_backup_dirs(tmp_path, 
     dist.mkdir(parents=True)
     source_backup.mkdir(parents=True)
     existing_backup.mkdir(parents=True)
-    (dist / "abso.exe").write_bytes(b"backend")
+    (dist / "computa.exe").write_bytes(b"backend")
     (source_backup / "metadata.json").write_text('{"source": true}', encoding="utf-8")
     (existing_backup / "metadata.json").write_text('{"installed": true}', encoding="utf-8")
 
@@ -341,7 +341,7 @@ def test_deploy_local_runtime_skips_identical_gui_executable(tmp_path, monkeypat
     dist.mkdir(parents=True)
     gui_release.mkdir(parents=True)
     install.mkdir(parents=True)
-    (dist / "abso.exe").write_bytes(b"backend")
+    (dist / "computa.exe").write_bytes(b"backend")
     (gui_release / "abso-gui.exe").write_bytes(b"same gui")
     (install / "abso-gui.exe").write_bytes(b"same gui")
 

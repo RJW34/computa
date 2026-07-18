@@ -14,7 +14,7 @@ was mid-way through debugging Overwatch 2 secondary-monitor black flashes. On a
 freshly cloned machine, those "live state" claims are **history, not truth**:
 
 - No ABSO build is deployed to `%LOCALAPPDATA%\AdaptiveBattleStationOptimizer\`
-  yet — the installed `abso.exe`, tray runtime, and state file do not exist here.
+  yet — the installed `computa.exe`, tray runtime, and state file do not exist here.
 - **No profile is applied. Nothing is reboot-pending.** The system is unmodified.
 - The active profile, PIDs, build hashes, and deploy timestamps in
   `docs/CURRENT_AGENT_BRIEFING.md` and the "Current Live-PC Constraint" section
@@ -27,7 +27,7 @@ machine's actual state with the read-only commands in step 2.
 
 ## What ABSO is (30-second version)
 
-**A.B.S.O.** (Adaptive Battle Station Optimizer) is a CLI-first Windows 11
+**computa** (formerly A.B.S.O.) is a CLI-first Windows 11
 gaming-optimization tool. It auto-detects hardware (GPU/CPU/RAM/monitors),
 audits system configuration, and applies game-specific optimization profiles
 (NVIDIA driver settings, power plan, Windows toggles, mouse/input, per-exe

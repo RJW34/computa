@@ -1,4 +1,4 @@
-"""Custom exceptions for A.B.S.O. (Adaptive Battle Station Optimizer).
+"""Custom exceptions for computa.
 
 This module defines a hierarchy of exceptions for specific error conditions,
 enabling more precise error handling and better error messages.

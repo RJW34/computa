@@ -1,4 +1,4 @@
-# A.B.S.O. Remediation Roadmap
+# computa Remediation Roadmap
 
 > **Status update 2026-05-13.** Phase 4 (Deep Verification Coverage) is
 > partially complete — see PR-09 below. The forward-looking backlog
@@ -7,7 +7,7 @@
 > single-developer, single-machine project — ignore the historical multi-host
 > "machine role" framing below; see Agent Protocol §2 for the current model.
 
-This roadmap is the execution plan for raising A.B.S.O. from its March 26, 2026 baseline (`C+` overall) to `A` grades across the board.
+This roadmap is the execution plan for raising computa from its March 26, 2026 baseline (`C+` overall) to `A` grades across the board.
 
 The emphasis is not "more features." The emphasis is:
 

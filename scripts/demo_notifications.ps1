@@ -30,19 +30,19 @@ function Write-TrayLog {
 
 # Sequence: cyan Info, phosphor Success, amber Warning, an Info dup that
 # should be silently deduped, and finally an Error that preempts when full.
-Show-ThemedToast -Title "A.B.S.O." -Message "Profile catalog refreshed. 22 profiles, 17 aliases loaded." -Type "Info" -MetaText "v2.5.0"
+Show-ThemedToast -Title "computa" -Message "Profile catalog refreshed. 22 profiles, 17 aliases loaded." -Type "Info" -MetaText "v2.5.0"
 Start-Sleep -Milliseconds 220
-Show-ThemedToast -Title "A.B.S.O." -Message "Rivals 2 Online applied. 12 handlers tuned in 4.2 s." -Type "Success" -MetaText "backup 2026-04-18_014221"
+Show-ThemedToast -Title "computa" -Message "Rivals 2 Online applied. 12 handlers tuned in 4.2 s." -Type "Success" -MetaText "backup 2026-04-18_014221"
 Start-Sleep -Milliseconds 220
-Show-ThemedToast -Title "A.B.S.O." -Message "Mixed refresh rates detected (59.95 Hz to 300 Hz) on the gaming display." -Type "Warning" -MetaText "multimon"
+Show-ThemedToast -Title "computa" -Message "Mixed refresh rates detected (59.95 Hz to 300 Hz) on the gaming display." -Type "Warning" -MetaText "multimon"
 Start-Sleep -Milliseconds 220
 
 # Dedup: this one is identical to the first, fired within 2 s
-Show-ThemedToast -Title "A.B.S.O." -Message "Profile catalog refreshed. 22 profiles, 17 aliases loaded." -Type "Info" -MetaText "dedup test"
+Show-ThemedToast -Title "computa" -Message "Profile catalog refreshed. 22 profiles, 17 aliases loaded." -Type "Info" -MetaText "dedup test"
 
 Start-Sleep -Milliseconds 400
 # Error: should preempt the oldest low-priority toast if the stack is full
-Show-ThemedToast -Title "A.B.S.O." -Message "NVIDIA profile 'Diablo IV' does not exist. Launch the game once to seed it." -Type "Error" -MetaText "preflight"
+Show-ThemedToast -Title "computa" -Message "NVIDIA profile 'Diablo IV' does not exist. Launch the game once to seed it." -Type "Error" -MetaText "preflight"
 
 # Keep the process alive long enough for the user to observe
 Write-Host "Demo toasts dispatched. Keeping alive for 12 s so you can observe."

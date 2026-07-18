@@ -1,9 +1,11 @@
-# A.B.S.O.
+# computa
 
-**Adaptive Battle Station Optimizer** — a CLI-first Windows 11 gaming tuning
-tool that detects your hardware, audits your system configuration, and applies
-game-specific optimization profiles, with automatic backups and rollback for
-everything it touches.
+**Per-game Windows optimization, with a backup of everything it touches.**
+
+computa is a CLI-first Windows 11 gaming tuning tool: it detects your
+hardware, audits your system configuration, and applies game-specific
+optimization profiles — Windows, power, input, GPU driver, and display state
+together — with automatic backups and one-command rollback.
 
 ## What it does
 
@@ -14,7 +16,7 @@ everything it touches.
 - **Game profiles** — per-game optimization lanes (no-sync minimum latency,
   G-SYNC/VRR, HDR, capture-safe variants) that tune Windows, power, input,
   GPU driver, and display state together
-- **First-run calibration** — `abso setup` walks hardware detection, audit,
+- **First-run calibration** — `computa setup` walks hardware detection, audit,
   and profile selection, and adapts what it offers to *your* machine
 - **Safe by default** — timestamped backup of every setting before any change,
   one-command restore, and a baseline captured at setup so you can always get
@@ -32,12 +34,12 @@ everything it touches.
   profiles, Low Latency Mode, VRR overrides); AMD Radeon gets vendor-specific
   registry tuning (Anti-Lag, Enhanced Sync, ULPS); other GPUs still get all
   OS/power/input/display optimizations
-- Python 3.11+ **only for source installs** — the released `abso.exe` is
+- Python 3.11+ **only for source installs** — the released `computa.exe` is
   self-contained
 
 ### Optional: NVIDIA Profile Inspector
 
-For the deepest NVIDIA driver control, ABSO can use NVIDIA Profile Inspector:
+For the deepest NVIDIA driver control, computa can use NVIDIA Profile Inspector:
 
 1. Download the latest release from
    [Orbmu2k/nvidiaProfileInspector](https://github.com/Orbmu2k/nvidiaProfileInspector/releases)
@@ -52,18 +54,18 @@ Without NPI, NVIDIA tuning still works through the driver's NVAPI interface.
 
 ### From a release (recommended)
 
-Download `abso.exe` and `install.ps1` from the latest GitHub release into the
+Download `computa.exe` and `install.ps1` from the latest GitHub release into the
 same folder, then:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\install.ps1
 ```
 
-The installer copies `abso.exe` to `%LOCALAPPDATA%`, adds it to your user
+The installer copies `computa.exe` to `%LOCALAPPDATA%`, adds it to your user
 PATH, and launches the first-run setup wizard (elevated). Or manually: put
-`abso.exe` anywhere and run `abso setup` from an elevated terminal.
+`computa.exe` anywhere and run `computa setup` from an elevated terminal.
 
-`abso update-check` reports when a newer release is available; updating is a
+`computa update-check` reports when a newer release is available; updating is a
 manual re-download (no auto-update). Maintainers: see
 [`docs/RELEASING.md`](docs/RELEASING.md).
 
@@ -71,7 +73,7 @@ manual re-download (no auto-update). Maintainers: see
 
 ```powershell
 git clone <this repo>
-cd windowsoptimizerabso
+cd computa
 python -m venv .venv          # tooling assumes the venv is named .venv
 .\.venv\Scripts\activate
 pip install -r requirements.txt
@@ -86,7 +88,7 @@ Dev/build tooling (pytest, ruff, PyInstaller) lives in
 Run the calibration wizard from an elevated terminal:
 
 ```powershell
-abso setup
+computa setup
 ```
 
 It detects your hardware, checks for known-problematic Windows updates,
@@ -98,17 +100,17 @@ without confirmation.
 ## Everyday use
 
 ```powershell
-abso profiles                  # list available profiles for this machine
-abso apply overwatch2-gsync    # apply a profile (backup happens automatically)
-abso audit --verbose           # what would ABSO change, and why
-abso state --json --verify     # is the active profile actually in effect?
-abso health --json             # overall install/runtime health
-abso restore latest            # roll back the last apply
-abso uninstall                 # restore baseline + remove ABSO from the system
-abso tray --install-startup    # start the tray app with Windows
+computa profiles                  # list available profiles for this machine
+computa apply overwatch2-gsync    # apply a profile (backup happens automatically)
+computa audit --verbose           # what would computa change, and why
+computa state --json --verify     # is the active profile actually in effect?
+computa health --json             # overall install/runtime health
+computa restore latest            # roll back the last apply
+computa uninstall                 # restore baseline + remove computa from the system
+computa tray --install-startup    # start the tray app with Windows
 ```
 
-The tray app (`abso tray`) gives you one-click switching, shows the active
+The tray app (`computa tray`) gives you one-click switching, shows the active
 profile, watches for game launches, and supports icon/sound theme packs — see
 `abso/tray/themes/README.md`.
 
@@ -156,10 +158,10 @@ Exact settings vary per profile; this is what built-in profiles touch today.
 ## Safety
 
 Every apply first writes a timestamped backup (`backups/YYYY-MM-DD_HHMMSS/`)
-with a manifest of every component touched. `abso restore latest` (or a
-specific timestamp) rolls back. `abso setup` additionally captures a baseline
-snapshot, and `abso uninstall` returns the system to that baseline and removes
-ABSO's startup registration.
+with a manifest of every component touched. `computa restore latest` (or a
+specific timestamp) rolls back. `computa setup` additionally captures a baseline
+snapshot, and `computa uninstall` returns the system to that baseline and removes
+computa's startup registration.
 
 Some settings need one reboot the **first** time they change (HAGS, MPO,
 opt-in VBS/memory settings); profile switches after that are instant. `state

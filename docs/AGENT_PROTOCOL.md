@@ -1,4 +1,4 @@
-# A.B.S.O. Agent Protocol
+# computa Agent Protocol
 
 **Freshly cloned onto a new PC? Read `docs/NEW_MACHINE_SETUP.md` first** to set
 up the dev environment and establish this machine's real state. This is a
@@ -47,7 +47,7 @@ and PR slices that have since changed.
 
 ## 2. Development & test machine
 
-A.B.S.O. is a single-developer project. Whatever PC the repo is checked out on
+computa is a single-developer project. Whatever PC the repo is checked out on
 is the one machine that does everything — coding, tests, live validation, and
 release signoff. There is no multi-machine role split and no cross-machine
 coordination; treat the machine you're operating on as a standalone testing
@@ -106,11 +106,11 @@ What still needs explicit approval:
 **Required protocol when testing in prod:**
 
 1. Run the read-only commands first (`detect`, `audit`, `bios`).
-2. Take a manual baseline backup via `abso backup-create`.
+2. Take a manual baseline backup via `computa backup-create`.
 3. Apply the target profile.
-4. Run `abso verify <profile>` and `abso state`.
-5. Restore via `abso restore latest`.
-6. Confirm `abso state` shows no active profile (or the prior state).
+4. Run `computa verify <profile>` and `computa state`.
+5. Restore via `computa restore latest`.
+6. Confirm `computa state` shows no active profile (or the prior state).
 
 This sequence has been validated end-to-end and does not leave the machine in a
 broken state.

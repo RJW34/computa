@@ -1,7 +1,7 @@
 """Configuration file management.
 
 This module handles loading, saving, and validating YAML configuration files
-for A.B.S.O. (Adaptive Battle Station Optimizer) user preferences and custom settings.
+for computa user preferences and custom settings.
 """
 
 from __future__ import annotations
@@ -551,8 +551,8 @@ class ConfigManager:
 
             # Add header comment
             yaml_content = (
-                "# A.B.S.O. Configuration\n"
-                "# Adaptive Battle Station Optimizer\n"
+                "# computa Configuration\n"
+                "# Per-game Windows optimization\n"
                 "# See docs/API.md for configuration options\n\n"
             )
             yaml_content += yaml.dump(
@@ -573,8 +573,8 @@ class ConfigManager:
 
     def create_default(self) -> None:
         """Create a default configuration file with comments."""
-        default_yaml = """# A.B.S.O. Configuration
-# Adaptive Battle Station Optimizer
+        default_yaml = """# computa Configuration
+# Per-game Windows optimization
 # See docs/API.md for configuration options
 
 # Directory for storing backups (relative to working directory)

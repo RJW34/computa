@@ -1,4 +1,4 @@
-"""Constants for A.B.S.O. (Adaptive Battle Station Optimizer).
+"""Constants for computa.
 
 This module centralizes registry paths, Windows API constants, and other
 magic values used throughout the codebase.

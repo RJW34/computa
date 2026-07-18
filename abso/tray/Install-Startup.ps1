@@ -1,4 +1,4 @@
-# Install-Startup.ps1 - Add/Remove A.B.S.O. tray from Windows startup
+# Install-Startup.ps1 - Add/Remove computa tray from Windows startup
 # Usage:
 #   .\Install-Startup.ps1 -Install         # Add to startup (Task Scheduler first, shortcut fallback)
 #   .\Install-Startup.ps1 -Uninstall       # Remove startup registration
@@ -17,7 +17,7 @@ $ShortcutPath = Join-Path $StartupFolder "ABSO-Tray.lnk"
 $VBSPath = Join-Path $PSScriptRoot "ABSO-Tray.vbs"
 $StartupLauncherPath = Join-Path $PSScriptRoot "ABSO-StartupLaunch.ps1"
 $TaskName = "ABSO-Tray-Startup"
-$TaskDescription = "Start A.B.S.O. tray at user logon with highest privileges"
+$TaskDescription = "Start computa tray at user logon with highest privileges"
 $CurrentUser = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
 
 function Test-IsAdministrator {
@@ -69,7 +69,7 @@ function Invoke-ElevatedSelf {
         exit $proc.ExitCode
     }
     catch {
-        $message = "Administrator privileges are required to update A.B.S.O. startup registration. $($_.Exception.Message)"
+        $message = "Administrator privileges are required to update computa startup registration. $($_.Exception.Message)"
         if ($Json) {
             Write-JsonResult ([ordered]@{
                 success = $false
@@ -240,7 +240,7 @@ function Create-Shortcut {
         $Shortcut.TargetPath = "powershell.exe"
         $Shortcut.Arguments = "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$StartupLauncherPath`""
         $Shortcut.WorkingDirectory = $PSScriptRoot
-        $Shortcut.Description = "A.B.S.O. System Tray"
+        $Shortcut.Description = "computa System Tray"
         $Shortcut.Save()
     }
     finally {
@@ -302,7 +302,7 @@ if ($Status) {
     }
     elseif ($statusObj.installed) {
         $modeLabel = if ($statusObj.mode -eq "scheduled_task") { "Task Scheduler" } else { "Startup shortcut" }
-        Write-Host "A.B.S.O. Tray is installed in Windows startup" -ForegroundColor Green
+        Write-Host "computa Tray is installed in Windows startup" -ForegroundColor Green
         Write-Host "Mode: $modeLabel"
         if ($statusObj.task_installed) {
             Write-Host "Task: $($statusObj.task_name)"
@@ -316,7 +316,7 @@ if ($Status) {
         }
     }
     else {
-        Write-Host "A.B.S.O. Tray is NOT in Windows startup" -ForegroundColor Yellow
+        Write-Host "computa Tray is NOT in Windows startup" -ForegroundColor Yellow
     }
     exit 0
 }
@@ -363,7 +363,7 @@ if ($Install) {
         }
         $result.success = $true
         $result.mode = "scheduled_task"
-        $result.message = "A.B.S.O. Tray registered via Task Scheduler."
+        $result.message = "computa Tray registered via Task Scheduler."
     }
     catch {
         $taskError = "$($_.Exception.Message)"
@@ -373,7 +373,7 @@ if ($Install) {
             $result.success = $true
             $result.mode = "scheduled_task"
             $result.warning = "Task Scheduler update failed, but an existing startup task is already installed: $taskError"
-            $result.message = "A.B.S.O. Tray will continue using the existing startup task."
+            $result.message = "computa Tray will continue using the existing startup task."
             try {
                 Remove-Shortcut
             }
@@ -387,7 +387,7 @@ if ($Install) {
                 Create-Shortcut
                 $result.success = $true
                 $result.mode = "startup_shortcut"
-                $result.message = "A.B.S.O. Tray registered via Startup shortcut fallback."
+                $result.message = "computa Tray registered via Startup shortcut fallback."
             }
             catch {
                 $result.error = "Startup shortcut install failed: $($_.Exception.Message)"
@@ -401,7 +401,7 @@ if ($Install) {
         Write-JsonResult $result
     }
     elseif ($result.success) {
-        Write-Host "A.B.S.O. Tray added to Windows startup" -ForegroundColor Green
+        Write-Host "computa Tray added to Windows startup" -ForegroundColor Green
         Write-Host "Mode: $($result.mode)"
         if ($result.warning) {
             Write-Host "Warning: $($result.warning)" -ForegroundColor Yellow
@@ -411,7 +411,7 @@ if ($Install) {
         Write-Host "To start now, run: powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$StartupLauncherPath`""
     }
     else {
-        Write-Host "Failed to add A.B.S.O. Tray to startup" -ForegroundColor Red
+        Write-Host "Failed to add computa Tray to startup" -ForegroundColor Red
         if ($result.warning) {
             Write-Host "Warning: $($result.warning)" -ForegroundColor Yellow
         }
@@ -467,10 +467,10 @@ if ($Uninstall) {
     }
     elseif ($result.success) {
         if ($result.removed_task -or $result.removed_shortcut) {
-            Write-Host "A.B.S.O. Tray removed from Windows startup" -ForegroundColor Green
+            Write-Host "computa Tray removed from Windows startup" -ForegroundColor Green
         }
         else {
-            Write-Host "A.B.S.O. Tray was not registered in startup" -ForegroundColor Yellow
+            Write-Host "computa Tray was not registered in startup" -ForegroundColor Yellow
         }
     }
     else {
@@ -484,10 +484,10 @@ if ($Uninstall) {
 
 # Default: show usage
 Write-Host ""
-Write-Host "A.B.S.O. Tray Startup Installer" -ForegroundColor Cyan
+Write-Host "computa Tray Startup Installer" -ForegroundColor Cyan
 Write-Host ""
 Write-Host "Usage:"
-Write-Host "  -Install         Add A.B.S.O. tray to Windows startup"
+Write-Host "  -Install         Add computa tray to Windows startup"
 Write-Host "  -Uninstall       Remove from startup"
 Write-Host "  -Status          Check if installed in startup"
 Write-Host "  -Status -Json    Emit machine-readable status"

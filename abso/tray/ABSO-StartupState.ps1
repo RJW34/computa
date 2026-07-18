@@ -1,4 +1,4 @@
-# ABSO-StartupState.ps1 - Startup profile state resolution helpers for A.B.S.O. tray
+# ABSO-StartupState.ps1 - Startup profile state resolution helpers for computa tray
 
 function Write-StartupStateLog {
     param(

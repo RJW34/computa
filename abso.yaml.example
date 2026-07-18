@@ -2,7 +2,7 @@
 # Adaptive Battle Station Optimizer
 #
 # Copy this file to `abso.yaml` (same folder) and adjust it for YOUR machine —
-# or run `abso config --init` to generate one. Everything here is optional;
+# or run `computa config --init` to generate one. Everything here is optional;
 # ABSO runs with safe defaults when no config file exists.
 #
 # The config file is intentionally NOT part of the repository: it describes

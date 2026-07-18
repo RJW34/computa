@@ -1,4 +1,4 @@
-# ABSO-Settings.ps1 - Settings panel and config persistence for A.B.S.O. tray
+# ABSO-Settings.ps1 - Settings panel and config persistence for computa tray
 
 $script:ConfigDir = Join-Path $env:APPDATA "ABSO"
 $script:ConfigFile = Join-Path $script:ConfigDir "tray-config.json"
@@ -901,7 +901,7 @@ function Show-SettingsPanel {
     }
 
     $form = New-Object System.Windows.Forms.Form
-    $form.Text = "A.B.S.O. Settings"
+    $form.Text = "computa Settings"
     $form.ClientSize = New-Object System.Drawing.Size(404, 760)
     $form.MinimumSize = New-Object System.Drawing.Size(420, 780)
     $form.FormBorderStyle = [System.Windows.Forms.FormBorderStyle]::FixedDialog

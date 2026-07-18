@@ -1,8 +1,8 @@
-# A.B.S.O. Troubleshooting Guide
+# computa Troubleshooting Guide
 
-**Adaptive Battle Station Optimizer**
+**Per-game Windows optimization**
 
-This guide helps diagnose and resolve common issues with A.B.S.O.
+This guide helps diagnose and resolve common issues with computa
 
 ## Table of Contents
 
@@ -67,7 +67,7 @@ pip install -r requirements.txt
 
 ## Permission Errors
 
-> **Note:** A.B.S.O. requires administrator privileges for most operations.
+> **Note:** computa requires administrator privileges for most operations.
 
 ### "Access Denied" or "Requires Administrator"
 
@@ -78,10 +78,10 @@ pip install -r requirements.txt
    - Right-click Command Prompt or PowerShell
    - Select "Run as administrator"
    - Navigate to project directory
-   - Run A.B.S.O.
+   - Run computa
 
 2. **Or use the elevation prompt:**
-   A.B.S.O. will offer to re-launch with admin privileges if needed.
+   computa will offer to re-launch with admin privileges if needed.
 
 ### Registry Access Denied
 
@@ -159,7 +159,7 @@ pip install -r requirements.txt
 
 ### Understanding When Reboots Are Actually Needed
 
-A.B.S.O. may report "reboot required" after applying a profile, but **you don't always need to reboot**. Here's when you actually need to:
+computa may report "reboot required" after applying a profile, but **you don't always need to reboot**. Here's when you actually need to:
 
 **Reboot IS required:**
 - First time applying a profile that includes Memory or MPO settings
@@ -313,7 +313,7 @@ If a profile is applied outside the tray, tray startup must not let stale
 older lone state files still lose to newer corroborated tray cache. Startup
 state repair writes UTF-8 without BOM so Python `state --json --verify` and
 `health --json` can parse the file.
-The backend has the same guard: `abso apply <current-profile> --json` should
+The backend has the same guard: `computa apply <current-profile> --json` should
 return `changed: false` and `transaction: null` when verification is already
 clean. If verification reports pending apply settings, backend `apply` should
 use the targeted pending-fix path and fail closed for unsupported settings.
@@ -332,11 +332,11 @@ Their writes also create each tracked flag once when Windows has no existing
 value, and normalize all ABSO-owned tracked flags on every write while
 preserving unknown tokens. This avoids stale duplicate Auto HDR/windowed/VRR
 flag pairs from making a profile look active but fail on a later no-op apply.
-`abso reapply --json` should behave the same for the current profile: no-op
+`computa reapply --json` should behave the same for the current profile: no-op
 when already active, route supported pending apply settings through the
 targeted pending-fix path, fail closed for unsupported pending settings, and
 avoid a full transaction for reboot-gated-only states.
-`abso launch <current-profile> --json` should also skip the apply transaction
+`computa launch <current-profile> --json` should also skip the apply transaction
 when verification is already clean, unless `--restore-on-exit` is explicitly
 requested.
 If verification reports only `pending_reboot_gated_settings`, do not run full
@@ -345,15 +345,15 @@ apply or reapply; reboot is the commit step for those settings.
 After reboot, run:
 
 ```powershell
-%LOCALAPPDATA%\AdaptiveBattleStationOptimizer\abso.exe state --json --verify
-%LOCALAPPDATA%\AdaptiveBattleStationOptimizer\abso.exe health --json
+%LOCALAPPDATA%\AdaptiveBattleStationOptimizer\computa.exe state --json --verify
+%LOCALAPPDATA%\AdaptiveBattleStationOptimizer\computa.exe health --json
 ```
 
 If flicker continues after a reboot with clean verification, collect Windows
 System event evidence through:
 
 ```powershell
-%LOCALAPPDATA%\AdaptiveBattleStationOptimizer\abso.exe health --json
+%LOCALAPPDATA%\AdaptiveBattleStationOptimizer\computa.exe health --json
 ```
 
 The health report includes `checks.display_events`, a read-only scan of recent
@@ -428,7 +428,7 @@ print(f"Failed: {result.failed_settings}")
 **Common Causes:**
 1. **Permission issues:** Run as Administrator
 2. **Missing dependencies:** Check Nvidia Profile Inspector is installed
-3. **Antivirus blocking:** Add exception for A.B.S.O.
+3. **Antivirus blocking:** Add exception for computa
 
 ### Nvidia Settings Not Applied
 
@@ -436,7 +436,7 @@ print(f"Failed: {result.failed_settings}")
 
 **Solutions:**
 1. Install [Nvidia Profile Inspector](https://github.com/Orbmu2k/nvidiaProfileInspector/releases)
-2. Place `nvidiaProfileInspector.exe` in system PATH or A.B.S.O. directory
+2. Place `nvidiaProfileInspector.exe` in system PATH or computa directory
 3. Ensure Nvidia driver is up to date
 4. Close any Nvidia applications during apply
 
@@ -540,7 +540,7 @@ print(f"Failed: {result.failed_settings}")
 
 ### Reverting All Changes
 
-If A.B.S.O. caused issues:
+If computa caused issues:
 
 1. **From Backup:**
    ```bash
@@ -568,11 +568,11 @@ If A.B.S.O. caused issues:
 
 ### Creating a System Restore Point
 
-Before using A.B.S.O., create a Windows restore point:
+Before using computa, create a Windows restore point:
 
 1. Search "Create a restore point" in Windows
 2. Click "Create" button
-3. Name it "Before A.B.S.O."
+3. Name it "Before computa"
 
 ### Emergency Recovery
 
@@ -586,7 +586,7 @@ If Windows is unstable after applying settings:
 2. **System Restore:**
    - Boot to Windows Recovery
    - Choose System Restore
-   - Select restore point before A.B.S.O.
+   - Select restore point before computa
 
 ---
 
@@ -613,7 +613,7 @@ python -m abso audit --verbose
 
 ### View Debug Logs
 
-A.B.S.O. uses Python's logging module:
+computa uses Python's logging module:
 
 ```python
 import logging
@@ -625,7 +625,7 @@ logging.basicConfig(level=logging.DEBUG)
 ```python
 import traceback
 try:
-    # A.B.S.O. operation
+    # computa operation
 except Exception as e:
     traceback.print_exc()
 ```

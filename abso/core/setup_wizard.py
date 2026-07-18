@@ -113,10 +113,12 @@ class SetupWizard:
         self._print_summary()
 
     def _print_welcome(self) -> None:
+        from abso.__version__ import __version__
+
         header = Text()
-        header.append("A.B.S.O.", style="bold cyan")
-        header.append(" v2.0.0\n", style="dim")
-        header.append("Adaptive Battle Station Optimizer\n", style="italic")
+        header.append("computa", style="bold cyan")
+        header.append(f" v{__version__}\n", style="dim")
+        header.append("Per-game Windows optimization, with backups for everything it touches\n", style="italic")
         header.append("First-time setup wizard", style="dim")
 
         console.print()
@@ -279,7 +281,7 @@ class SetupWizard:
                 console.print("  [dim]Issues will be fixed when a profile is applied.[/dim]")
                 self.fixes_applied = fixable_count
             else:
-                console.print("  [dim]Skipped. You can run 'abso audit' later.[/dim]")
+                console.print("  [dim]Skipped. You can run 'computa audit' later.[/dim]")
 
         console.print()
 
@@ -324,11 +326,11 @@ class SetupWizard:
             "  A baseline records your system as it is [bold]right now[/bold], before ABSO"
         )
         console.print(
-            "  changes anything. 'abso uninstall' restores it to remove ABSO cleanly."
+            "  changes anything. 'computa uninstall' restores it to remove ABSO cleanly."
         )
 
         if not Confirm.ask("  Capture the baseline backup?", default=True):
-            console.print("  [dim]Skipped. 'abso backup-create' can capture one later.[/dim]")
+            console.print("  [dim]Skipped. 'computa backup-create' can capture one later.[/dim]")
             console.print()
             return
 
@@ -403,7 +405,7 @@ class SetupWizard:
 
             if not suggestions:
                 console.print("  [dim]No supported games detected.[/dim]")
-                console.print("  [dim]You can manually apply a profile with 'abso apply <profile>'.[/dim]")
+                console.print("  [dim]You can manually apply a profile with 'computa apply <profile>'.[/dim]")
                 console.print()
                 return {}
 
@@ -488,7 +490,7 @@ class SetupWizard:
 
         idx = int(choice)
         if idx == skip_idx:
-            console.print("  [dim]Skipped. Run 'abso apply <profile>' later.[/dim]")
+            console.print("  [dim]Skipped. Run 'computa apply <profile>' later.[/dim]")
             console.print()
             return None
 
@@ -557,7 +559,7 @@ class SetupWizard:
             default=True,
         ):
             console.print(
-                "  [dim]Skipped. 'abso tray --install-startup' sets it up later.[/dim]"
+                "  [dim]Skipped. 'computa tray --install-startup' sets it up later.[/dim]"
             )
             console.print()
             return
@@ -580,7 +582,7 @@ class SetupWizard:
             console.print("  [green]Tray registered to start with Windows.[/green]")
         except Exception as e:
             console.print(f"  [red]Tray autostart registration failed: {e}[/red]")
-            console.print("  [dim]You can retry with 'abso tray --install-startup'.[/dim]")
+            console.print("  [dim]You can retry with 'computa tray --install-startup'.[/dim]")
 
         console.print()
 
@@ -612,7 +614,7 @@ class SetupWizard:
         if self.baseline_backup_id:
             lines.append(
                 f"[green]Baseline backup captured: {self.baseline_backup_id}[/green] "
-                "[dim]('abso uninstall' restores it)[/dim]"
+                "[dim]('computa uninstall' restores it)[/dim]"
             )
         if self.tray_autostart_installed:
             lines.append("[green]Tray registered to start with Windows[/green]")
@@ -626,8 +628,8 @@ class SetupWizard:
             lines.append("[dim]Setup complete. No changes made.[/dim]")
 
         lines.append("")
-        lines.append("[dim]Run 'abso setup' anytime to reconfigure.[/dim]")
-        lines.append("[dim]Run 'abso apply <profile>' to switch profiles.[/dim]")
+        lines.append("[dim]Run 'computa setup' anytime to reconfigure.[/dim]")
+        lines.append("[dim]Run 'computa apply <profile>' to switch profiles.[/dim]")
 
         console.print(Panel(
             "\n".join(lines),

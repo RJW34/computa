@@ -1,4 +1,4 @@
-# ABSO-Tray.ps1 - System tray for A.B.S.O. with Dark Theme (Modernized)
+# ABSO-Tray.ps1 - System tray for computa with Dark Theme (Modernized)
 # Memory: ~25-35MB | CPU: Near-zero when idle
 # Left-click shows profile menu, applies via CLI, monitors game lifecycle
 # Features: Dynamic icons, favorites, search, progress overlay, hotkeys, settings
@@ -35,8 +35,8 @@ if (-not $isAdmin) {
     catch {
         Add-Type -AssemblyName System.Windows.Forms
         [System.Windows.Forms.MessageBox]::Show(
-            "A.B.S.O. Tray requires administrator privileges to apply profiles.`n`nPlease run as Administrator.",
-            "A.B.S.O.",
+            "computa Tray requires administrator privileges to apply profiles.`n`nPlease run as Administrator.",
+            "computa",
             [System.Windows.Forms.MessageBoxButtons]::OK,
             [System.Windows.Forms.MessageBoxIcon]::Warning
         )
@@ -1689,7 +1689,7 @@ function Set-NotifyIconTooltipText {
 
     if (-not $script:notifyIcon) { return }
 
-    $tooltipText = if ([string]::IsNullOrWhiteSpace($Text)) { "A.B.S.O." } else { $Text.Trim() }
+    $tooltipText = if ([string]::IsNullOrWhiteSpace($Text)) { "computa" } else { $Text.Trim() }
     if ($tooltipText.Length -gt 63) {
         $tooltipText = $tooltipText.Substring(0, 60) + "..."
     }
@@ -1713,25 +1713,25 @@ function Get-TrayStateTooltipText {
         $rebootPendingText = Get-ActiveProfileRebootPendingText
         if ($pendingApplyText) {
             if ($script:ActiveProfileVerificationStatus -eq "mismatch") {
-                return "A.B.S.O. - Profile mismatch: $profileName"
+                return "computa - Profile mismatch: $profileName"
             }
-            return "A.B.S.O. - Pending profile fix: $profileName"
+            return "computa - Pending profile fix: $profileName"
         }
         if ($rebootPendingText) {
-            return "A.B.S.O. - Windows restart required: $profileName"
+            return "computa - Windows restart required: $profileName"
         }
         if (Get-ActiveProfileVerificationInProgressText) {
-            return "A.B.S.O. - Checking profile state: $profileName"
+            return "computa - Checking profile state: $profileName"
         }
     }
     if ($activeRecord.Id -and $activeRecord.InCatalog) {
         $p = $activeRecord.Profile
-        return "A.B.S.O. - $(Get-TrayProfileObjectDisplayName -Profile $p -Fallback $activeRecord.Id)"
+        return "computa - $(Get-TrayProfileObjectDisplayName -Profile $p -Fallback $activeRecord.Id)"
     }
     if ($activeRecord.Id) {
-        return "A.B.S.O. - Profile missing from current list: $($activeRecord.DisplayName)"
+        return "computa - Profile missing from current list: $($activeRecord.DisplayName)"
     }
-    return "A.B.S.O. - Ready"
+    return "computa - Ready"
 }
 
 function Restore-TrayTooltipFromState {
@@ -1781,7 +1781,7 @@ function Set-TransientNotificationTooltip {
 
 function Show-TrayToast {
     param(
-        [string]$Title = "A.B.S.O.",
+        [string]$Title = "computa",
         [string]$Message = "",
         [ValidateSet("Info","Warning","Error","Success")]
         [string]$Type = "Info",
@@ -2165,7 +2165,15 @@ $script:ProjectRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
 # Fall back to source Python for development sessions.
 $script:PythonExe = $null
 $script:AbsoBackendArgsPrefix = @()
-$installedBackend = Join-Path $env:LOCALAPPDATA "AdaptiveBattleStationOptimizer\abso.exe"
+$installedBackend = Join-Path $env:LOCALAPPDATA "AdaptiveBattleStationOptimizer\computa.exe"
+if (-not (Test-Path $installedBackend)) {
+    # Pre-rebrand deploys shipped the backend as abso.exe; keep resolving it
+    # until the next deploy migrates the install.
+    $legacyBackend = Join-Path $env:LOCALAPPDATA "AdaptiveBattleStationOptimizer\abso.exe"
+    if (Test-Path $legacyBackend) {
+        $installedBackend = $legacyBackend
+    }
+}
 if (Test-Path $installedBackend) {
     $script:PythonExe = $installedBackend
 }
@@ -4907,7 +4915,7 @@ function Apply-Profile {
 
     # Show applying state
     Set-IconState -State "Applying"
-    Set-TrayOperationTooltipText -Text "A.B.S.O. - Applying..."
+    Set-TrayOperationTooltipText -Text "computa - Applying..."
 
     # Show progress overlay
     $progressVisual = Get-TrayProfileToastVisualArgs -ProfileId $ProfileId -Profile $profile
@@ -5288,7 +5296,7 @@ function Apply-PendingProfileFixes {
     param([switch]$Force)
 
     if ([string]::IsNullOrWhiteSpace([string]$script:activeProfile)) {
-        Show-Notification -Title "A.B.S.O." -Message "No active profile to repair" -Type "Info" -ActionName "Apply" -ActionColor $script:Colors.AccentAmber
+        Show-Notification -Title "computa" -Message "No active profile to repair" -Type "Info" -ActionName "Apply" -ActionColor $script:Colors.AccentAmber
         Set-TrayLastAction -Message "No active profile to repair"
         Update-MenuState
         return
@@ -5309,7 +5317,7 @@ function Apply-PendingProfileFixes {
             -ProfileId $script:activeProfile `
             -Profile $activeRecord.Profile `
             -ActiveBadge
-        $pendingNoopTitle = if ($activeRecord.Id) { $activeRecord.DisplayName } else { "A.B.S.O." }
+        $pendingNoopTitle = if ($activeRecord.Id) { $activeRecord.DisplayName } else { "computa" }
         Show-Notification @pendingNoopVisual -Title $pendingNoopTitle -Message "No pending profile fixes found" -Type "Info" -MetaText $script:activeProfile
         Set-TrayLastAction -Message "No pending profile fixes found"
         Update-MenuState
@@ -5321,7 +5329,7 @@ function Apply-PendingProfileFixes {
 
     Write-TrayLog "Apply-PendingProfileFixes called for '$script:activeProfile' ($pendingText)"
     Set-IconState -State "Applying"
-    Set-TrayOperationTooltipText -Text "A.B.S.O. - Applying pending profile fixes..."
+    Set-TrayOperationTooltipText -Text "computa - Applying pending profile fixes..."
     $pendingProgressVisual = Get-TrayProfileToastVisualArgs `
         -ProfileId $script:activeProfile `
         -Profile $activeRecord.Profile `
@@ -5375,7 +5383,7 @@ function Apply-PendingProfileFixes {
             -ProfileId $script:activeProfile `
             -Profile $activeRecord.Profile `
             -ActiveBadge
-        $pendingTitle = if ($activeRecord.Id) { $activeRecord.DisplayName } else { "A.B.S.O." }
+        $pendingTitle = if ($activeRecord.Id) { $activeRecord.DisplayName } else { "computa" }
         if ($changedSettings.Count -gt 0) {
             Write-TrayLog "Pending profile fixes applied: $($changedSettings -join ', ')"
             Play-SuccessSound
@@ -5408,7 +5416,7 @@ function Apply-PendingProfileFixes {
             -ProfileId $script:activeProfile `
             -Profile $activeRecord.Profile `
             -ActiveBadge
-        $pendingFailureTitle = if ($activeRecord.Id) { $activeRecord.DisplayName } else { "A.B.S.O." }
+        $pendingFailureTitle = if ($activeRecord.Id) { $activeRecord.DisplayName } else { "computa" }
         Show-Notification @pendingFailureVisual -Title $pendingFailureTitle -Message "Pending profile fixes failed: $($_.Exception.Message)" -Type "Error" -MetaText $script:activeProfile
         $script:LastAction = "Pending profile fixes failed: $($_.Exception.Message)"
         $script:LastActionTime = Get-Date
@@ -5469,7 +5477,7 @@ function Invoke-TrayCommandFile {
 
 function Restore-Settings {
     Set-IconState -State "Applying"
-    Set-TrayOperationTooltipText -Text "A.B.S.O. - Restoring..."
+    Set-TrayOperationTooltipText -Text "computa - Restoring..."
     Show-ProgressOverlay `
         -Title "Restoring Settings" `
         -StepText "Restoring previous configuration..." `
@@ -5496,7 +5504,7 @@ function Restore-Settings {
             $proc.Kill()
             $proc.Dispose()
             Close-ProgressOverlay
-            Show-Notification -Title "A.B.S.O." -Message "Restore timed out after 120s" -Type "Error" -ActionName "Restore" -ActionColor $script:Colors.AccentAmber
+            Show-Notification -Title "computa" -Message "Restore timed out after 120s" -Type "Error" -ActionName "Restore" -ActionColor $script:Colors.AccentAmber
             Set-IconState -State "Error"
             Set-TrayLastAction -Message "Restore timed out after 120s"
             Update-MenuState
@@ -5524,7 +5532,7 @@ function Restore-Settings {
 
         if ($exitCodeOk -and $json.success -and $json.data -and $json.data.success) {
             Close-ProgressOverlay
-            Show-Notification -Title "A.B.S.O." -Message "Settings restored" -Type "Success" -ActionName "Restore" -ActionColor $script:Colors.AccentGreen
+            Show-Notification -Title "computa" -Message "Settings restored" -Type "Success" -ActionName "Restore" -ActionColor $script:Colors.AccentGreen
             $script:activeProfile = $null
             Reset-ActiveProfileVerificationState
             Set-TrayLastAction -Message "Restored settings"
@@ -5543,7 +5551,7 @@ function Restore-Settings {
                 "Backend reported restore failure without a detailed error message (exit code: $(Get-ExitCodeDescriptor -ExitCode $exitCode))"
             }
             Close-ProgressOverlay
-            Show-Notification -Title "A.B.S.O." -Message "Restore failed: $restoreError" -Type "Error" -ActionName "Restore" -ActionColor $script:Colors.AccentAmber
+            Show-Notification -Title "computa" -Message "Restore failed: $restoreError" -Type "Error" -ActionName "Restore" -ActionColor $script:Colors.AccentAmber
             Set-IconState -State "Error"
             Set-TrayLastAction -Message "Restore failed: $restoreError"
             Update-MenuState
@@ -5551,7 +5559,7 @@ function Restore-Settings {
     }
     catch {
         Close-ProgressOverlay
-        Show-Notification -Title "A.B.S.O." -Message "Restore failed: $($_.Exception.Message)" -Type "Error" -ActionName "Restore" -ActionColor $script:Colors.AccentAmber
+        Show-Notification -Title "computa" -Message "Restore failed: $($_.Exception.Message)" -Type "Error" -ActionName "Restore" -ActionColor $script:Colors.AccentAmber
         Set-IconState -State "Error"
         Set-TrayLastAction -Message "Restore failed: $($_.Exception.Message)"
         Update-MenuState
@@ -6381,7 +6389,7 @@ function Get-TrayProfileObjectDisplayName {
     if (-not [string]::IsNullOrWhiteSpace($Fallback)) {
         return (Format-TrayUserFacingText -Text $Fallback)
     }
-    return "A.B.S.O."
+    return "computa"
 }
 
 function Get-ActiveTrayProfileRecord {
@@ -6810,7 +6818,7 @@ function Complete-AuditIfReady {
         }
 
         if (-not $rawOutput) {
-            Show-Notification -Title "A.B.S.O. Audit" -Message "Audit failed: runtime returned no status" -Type "Error" -ActionName "Audit" -ActionColor $script:Colors.AccentBlue
+            Show-Notification -Title "computa Audit" -Message "Audit failed: runtime returned no status" -Type "Error" -ActionName "Audit" -ActionColor $script:Colors.AccentBlue
             Set-IconState -State "Error"
             Set-TrayAuditStatusItem -Text "Audit Failed" -Color $script:Colors.AccentAmber -ChipText "AUDIT|FAIL" -IssueBadge
             $script:LastAction = "Audit failed: runtime returned no status"
@@ -6819,7 +6827,7 @@ function Complete-AuditIfReady {
 
         $json = Invoke-JsonSafe -Text $rawOutput -Source 'Audit'
         if ($null -eq $json) {
-            Show-Notification -Title "A.B.S.O. Audit" -Message "Audit failed: runtime status unreadable" -Type "Error" -ActionName "Audit" -ActionColor $script:Colors.AccentBlue
+            Show-Notification -Title "computa Audit" -Message "Audit failed: runtime status unreadable" -Type "Error" -ActionName "Audit" -ActionColor $script:Colors.AccentBlue
             Set-IconState -State "Error"
             Set-TrayAuditStatusItem -Text "Audit Failed" -Color $script:Colors.AccentAmber -ChipText "AUDIT|FAIL" -IssueBadge
             $script:LastAction = "Audit failed: runtime status unreadable"
@@ -6827,7 +6835,7 @@ function Complete-AuditIfReady {
         }
         if (-not $json.success -or -not $json.data) {
             $auditError = if ($json.error) { "$($json.error)" } else { "runtime status unreadable" }
-            Show-Notification -Title "A.B.S.O. Audit" -Message "Audit failed: $auditError" -Type "Error" -ActionName "Audit" -ActionColor $script:Colors.AccentBlue
+            Show-Notification -Title "computa Audit" -Message "Audit failed: $auditError" -Type "Error" -ActionName "Audit" -ActionColor $script:Colors.AccentBlue
             Set-IconState -State "Error"
             Set-TrayAuditStatusItem -Text "Audit Failed" -Color $script:Colors.AccentAmber -ChipText "AUDIT|FAIL" -IssueBadge
             $script:LastAction = "Audit failed: $auditError"
@@ -6839,7 +6847,7 @@ function Complete-AuditIfReady {
         $script:AuditIssueCount = $issueCount
 
         if ($issueCount -eq 0) {
-            Show-Notification -Title "A.B.S.O. Audit" -Message "No issues detected by the current audit scope." -Type "Success" -ActionName "Audit" -ActionColor $script:Colors.AccentBlue
+            Show-Notification -Title "computa Audit" -Message "No issues detected by the current audit scope." -Type "Success" -ActionName "Audit" -ActionColor $script:Colors.AccentBlue
             $auditActionMessage = "Audit clean: no issues in scope"
             Set-IconState -State $(if ($script:activeProfile) { "Active" } else { "Idle" })
         }
@@ -6860,7 +6868,7 @@ function Complete-AuditIfReady {
                 }
                 Write-TrayLog "Audit issue ${issueIndex}/${issueCount}: $(Format-TrayUserFacingText -Text $issueText)" -Level "WARN"
             }
-            Show-Notification -Title "A.B.S.O. Audit" -Message "$issueCount $auditIssueLabel found. See tray log for details." -Type "Warning" -ActionName "Audit" -ActionColor $script:Colors.AccentBlue
+            Show-Notification -Title "computa Audit" -Message "$issueCount $auditIssueLabel found. See tray log for details." -Type "Warning" -ActionName "Audit" -ActionColor $script:Colors.AccentBlue
             $auditActionMessage = "Audit ${auditIssueLabel} found: $issueCount"
             Set-IconState -State "Warning"
         }
@@ -6882,7 +6890,7 @@ function Complete-AuditIfReady {
     }
     catch {
         Write-TrayLog "Audit failed: $($_.Exception.Message)" -Level "ERROR"
-        Show-Notification -Title "A.B.S.O." -Message "Audit failed: $($_.Exception.Message)" -Type "Error" -ActionName "Audit" -ActionColor $script:Colors.AccentBlue
+        Show-Notification -Title "computa" -Message "Audit failed: $($_.Exception.Message)" -Type "Error" -ActionName "Audit" -ActionColor $script:Colors.AccentBlue
         Set-IconState -State "Error"
         Set-TrayAuditStatusItem -Text "Audit Failed" -Color $script:Colors.AccentAmber -ChipText "AUDIT|FAIL" -IssueBadge
         $script:LastAction = "Audit failed: $($_.Exception.Message)"
@@ -6896,7 +6904,7 @@ function Complete-AuditIfReady {
 
 function Run-Audit {
     if (Test-AuditInFlight) {
-        Show-Notification -Title "A.B.S.O. Audit" -Message "Audit is already running." -Type "Info" -ActionName "Audit" -ActionColor $script:Colors.AccentBlue
+        Show-Notification -Title "computa Audit" -Message "Audit is already running." -Type "Info" -ActionName "Audit" -ActionColor $script:Colors.AccentBlue
         Set-TrayLastAction -Message "Audit already running"
         Update-MenuState
         return
@@ -6904,7 +6912,7 @@ function Run-Audit {
 
     Write-TrayLog "Running audit..."
     Set-IconState -State "Applying"
-    Set-TrayOperationTooltipText -Text "A.B.S.O. - Running Audit..."
+    Set-TrayOperationTooltipText -Text "computa - Running Audit..."
     $script:LastAction = "Audit running"
     $script:LastActionTime = Get-Date
     Set-TrayAuditStatusItem -Text "Audit Running" -Color $script:Colors.AccentBlue -ChipText "AUDIT|RUN"
@@ -6928,7 +6936,7 @@ function Run-Audit {
     }
     catch {
         Write-TrayLog "Audit failed: $($_.Exception.Message)" -Level "ERROR"
-        Show-Notification -Title "A.B.S.O." -Message "Audit failed: $($_.Exception.Message)" -Type "Error" -ActionName "Audit" -ActionColor $script:Colors.AccentBlue
+        Show-Notification -Title "computa" -Message "Audit failed: $($_.Exception.Message)" -Type "Error" -ActionName "Audit" -ActionColor $script:Colors.AccentBlue
         Set-IconState -State "Error"
         Set-TrayAuditStatusItem -Text "Audit Failed" -Color $script:Colors.AccentAmber -ChipText "AUDIT|FAIL" -IssueBadge
         $script:LastAction = "Audit failed: $($_.Exception.Message)"
@@ -6948,13 +6956,13 @@ function Open-BackupsFolder {
         }
         catch {
             Write-TrayLog "Failed to open backups folder: $($_.Exception.Message)" -Level "ERROR"
-            Show-Notification -Title "A.B.S.O." -Message "Failed to open backups folder: $($_.Exception.Message)" -Type "Error" -ActionName "Folder" -ActionColor $script:Colors.AccentPurple
+            Show-Notification -Title "computa" -Message "Failed to open backups folder: $($_.Exception.Message)" -Type "Error" -ActionName "Folder" -ActionColor $script:Colors.AccentPurple
             Set-TrayLastAction -Message "Open backups failed: $($_.Exception.Message)"
             Update-MenuState
         }
     }
     else {
-        Show-Notification -Title "A.B.S.O." -Message "Current backups folder not found. Applying a profile creates it." -Type "Info" -ActionName "Backups" -ActionColor $script:Colors.AccentPurple
+        Show-Notification -Title "computa" -Message "Current backups folder not found. Applying a profile creates it." -Type "Info" -ActionName "Backups" -ActionColor $script:Colors.AccentPurple
         Set-TrayLastAction -Message "Current backups folder not found"
         Update-MenuState
     }
@@ -6971,7 +6979,7 @@ function Open-LogFile {
     }
     catch {
         Write-TrayLog "Failed to open tray log file: $($_.Exception.Message)" -Level "ERROR"
-        Show-Notification -Title "A.B.S.O." -Message "Failed to open tray log: $($_.Exception.Message)" -Type "Error" -ActionName "Log" -ActionColor $script:Colors.TextDim
+        Show-Notification -Title "computa" -Message "Failed to open tray log: $($_.Exception.Message)" -Type "Error" -ActionName "Log" -ActionColor $script:Colors.TextDim
         Set-TrayLastAction -Message "Open tray log failed: $($_.Exception.Message)"
         Update-MenuState
     }
@@ -6999,7 +7007,7 @@ function Open-ConfigFolder {
     }
     catch {
         Write-TrayLog "Failed to open tray settings folder: $($_.Exception.Message)" -Level "ERROR"
-        Show-Notification -Title "A.B.S.O." -Message "Failed to open tray settings folder: $($_.Exception.Message)" -Type "Error" -ActionName "Folder" -ActionColor $script:Colors.TextDim
+        Show-Notification -Title "computa" -Message "Failed to open tray settings folder: $($_.Exception.Message)" -Type "Error" -ActionName "Folder" -ActionColor $script:Colors.TextDim
         Set-TrayLastAction -Message "Open tray settings failed: $($_.Exception.Message)"
         Update-MenuState
     }
@@ -7017,7 +7025,7 @@ function Open-RuntimeFolder {
     }
     catch {
         Write-TrayLog "Failed to open installed runtime folder: $($_.Exception.Message)" -Level "ERROR"
-        Show-Notification -Title "A.B.S.O." -Message "Failed to open runtime folder: $($_.Exception.Message)" -Type "Error" -ActionName "Folder" -ActionColor $script:Colors.TextDim
+        Show-Notification -Title "computa" -Message "Failed to open runtime folder: $($_.Exception.Message)" -Type "Error" -ActionName "Folder" -ActionColor $script:Colors.TextDim
         Set-TrayLastAction -Message "Open runtime folder failed: $($_.Exception.Message)"
         Update-MenuState
     }
@@ -7035,7 +7043,7 @@ function Open-ProfilesFolder {
     }
     catch {
         Write-TrayLog "Failed to open user profiles folder: $($_.Exception.Message)" -Level "ERROR"
-        Show-Notification -Title "A.B.S.O." -Message "Failed to open profiles folder: $($_.Exception.Message)" -Type "Error" -ActionName "Folder" -ActionColor $script:Colors.TextDim
+        Show-Notification -Title "computa" -Message "Failed to open profiles folder: $($_.Exception.Message)" -Type "Error" -ActionName "Folder" -ActionColor $script:Colors.TextDim
         Set-TrayLastAction -Message "Open profiles folder failed: $($_.Exception.Message)"
         Update-MenuState
     }
@@ -7324,11 +7332,11 @@ function Set-StartupMenuState {
             "Auto-start task points at different tray files; toggle auto-start to rewrite it"
         }
         else {
-            "Start A.B.S.O. Tray when Windows starts (configured via $modeLabel)"
+            "Start computa Tray when Windows starts (configured via $modeLabel)"
         }
     }
     else {
-        "Start A.B.S.O. Tray when Windows starts"
+        "Start computa Tray when Windows starts"
     }
     Set-TrayCommandItemVisualState -Item $script:startupItem -ChipText $startupChipText
 }
@@ -7336,7 +7344,7 @@ function Set-StartupMenuState {
 function Toggle-Startup {
     $installScript = Join-Path $script:ScriptDir "Install-Startup.ps1"
     if (-not (Test-Path $installScript)) {
-        Show-Notification -Title "A.B.S.O." -Message "Startup installer not found" -Type "Error" -ActionName "Startup" -ActionColor $script:Colors.AccentAmber
+        Show-Notification -Title "computa" -Message "Startup installer not found" -Type "Error" -ActionName "Startup" -ActionColor $script:Colors.AccentAmber
         Write-TrayLog "Toggle-Startup failed: missing installer script at $installScript" -Level "ERROR"
         Set-TrayLastAction -Message "Startup update failed: installer not found"
         Update-MenuState
@@ -7346,7 +7354,7 @@ function Toggle-Startup {
     $before = Get-StartupStatus
     $operation = if ($before.installed) { "-Uninstall" } else { "-Install" }
 
-    Set-TrayOperationTooltipText -Text "A.B.S.O. - Updating startup..."
+    Set-TrayOperationTooltipText -Text "computa - Updating startup..."
     Set-TrayLastAction -Message "Startup update running"
     Update-MenuState
 
@@ -7365,7 +7373,7 @@ function Toggle-Startup {
         }
     }
     catch {
-        Show-Notification -Title "A.B.S.O." -Message "Startup update failed: $($_.Exception.Message)" -Type "Error" -ActionName "Startup" -ActionColor $script:Colors.AccentAmber
+        Show-Notification -Title "computa" -Message "Startup update failed: $($_.Exception.Message)" -Type "Error" -ActionName "Startup" -ActionColor $script:Colors.AccentAmber
         Write-TrayLog "Toggle-Startup failed: $($_.Exception.Message)" -Level "ERROR"
         Set-TrayLastAction -Message "Startup update failed: $($_.Exception.Message)"
         Update-MenuState
@@ -7384,7 +7392,7 @@ function Toggle-Startup {
             "Added to Windows startup ($modeLabel): $installerWarning"
         }
         $startupType = if ([string]::IsNullOrWhiteSpace($installerWarning)) { "Info" } else { "Warning" }
-        Show-Notification -Title "A.B.S.O." -Message $startupMessage -Type $startupType -ActionName "Startup" -ActionColor $script:Colors.AccentBlue
+        Show-Notification -Title "computa" -Message $startupMessage -Type $startupType -ActionName "Startup" -ActionColor $script:Colors.AccentBlue
         Write-TrayLog "Startup enabled via mode: $($after.mode)"
         if ([string]::IsNullOrWhiteSpace($installerWarning)) {
             Set-TrayLastAction -Message "Startup enabled: $modeLabel"
@@ -7401,7 +7409,7 @@ function Toggle-Startup {
             "Removed from Windows startup: $installerWarning"
         }
         $startupType = if ([string]::IsNullOrWhiteSpace($installerWarning)) { "Info" } else { "Warning" }
-        Show-Notification -Title "A.B.S.O." -Message $startupMessage -Type $startupType -ActionName "Startup" -ActionColor $script:Colors.AccentBlue
+        Show-Notification -Title "computa" -Message $startupMessage -Type $startupType -ActionName "Startup" -ActionColor $script:Colors.AccentBlue
         Write-TrayLog "Startup disabled"
         if ([string]::IsNullOrWhiteSpace($installerWarning)) {
             Set-TrayLastAction -Message "Startup disabled"
@@ -7418,7 +7426,7 @@ function Toggle-Startup {
         else {
             "Startup unchanged; still ${state}: $installerWarning"
         }
-        Show-Notification -Title "A.B.S.O." -Message $unchangedMessage -Type "Warning" -ActionName "Startup" -ActionColor $script:Colors.AccentBlue
+        Show-Notification -Title "computa" -Message $unchangedMessage -Type "Warning" -ActionName "Startup" -ActionColor $script:Colors.AccentBlue
         Write-TrayLog "Toggle-Startup no state change detected (before=$($before.installed), after=$($after.installed))" -Level "WARN"
         Set-TrayLastAction -Message "Startup unchanged: $state"
     }
@@ -8142,7 +8150,7 @@ function Apply-LaunchSweepPayload {
                 Get-TrayProfileDisplayName -ProfileId $ProfileId
             }
             else {
-                "A.B.S.O. Launch Sanitizer"
+                "computa Launch Sanitizer"
             }
             Show-Notification @sanitizerVisual -Title $sanitizerTitle `
                 -Message "Launch sanitizer stopped: $summary" `
@@ -8450,7 +8458,7 @@ function Show-AboutPanel {
 
     $hotkeyText = Get-HotkeyRegistrationSummaryText -Config $script:TrayConfig
     $form = New-Object System.Windows.Forms.Form
-    $form.Text = "About A.B.S.O."
+    $form.Text = "About computa"
     $form.Size = New-Object System.Drawing.Size(430, 398)
     $form.FormBorderStyle = [System.Windows.Forms.FormBorderStyle]::FixedDialog
     $form.MaximizeBox = $false
@@ -8531,7 +8539,7 @@ function Show-AboutPanel {
     $header.Controls.Add($brandBox)
 
     $title = New-Object System.Windows.Forms.Label
-    $title.Text = "A.B.S.O. v$($script:AppVersion)"
+    $title.Text = "computa v$($script:AppVersion)"
     $title.Location = New-Object System.Drawing.Point(72, 16)
     $title.Size = New-Object System.Drawing.Size(210, 24)
     $title.ForeColor = $script:Colors.Text
@@ -8541,7 +8549,7 @@ function Show-AboutPanel {
     $header.Controls.Add($title)
 
     $subtitle = New-Object System.Windows.Forms.Label
-    $subtitle.Text = "Adaptive Battle Station Optimizer"
+    $subtitle.Text = "Per-game Windows optimization"
     $subtitle.Location = New-Object System.Drawing.Point(73, 39)
     $subtitle.Size = New-Object System.Drawing.Size(242, 18)
     $subtitle.ForeColor = $script:Colors.TextDim
@@ -8820,7 +8828,7 @@ function Start-TrayApp {
 
     $script:notifyIcon = New-Object System.Windows.Forms.NotifyIcon
     Set-IconState -State "Idle"
-    Set-TrayOperationTooltipText -Text "A.B.S.O. - Ready"
+    Set-TrayOperationTooltipText -Text "computa - Ready"
     $script:notifyIcon.Visible = $true
     Start-StartupIconSelfHeal
 
@@ -8927,7 +8935,7 @@ public class HotkeyMessageWindow : NativeWindow {
                     Restore-Settings
                 }
                 else {
-                    Show-Notification -Title "A.B.S.O." -Message "No active profile to restore. Apply a profile first." -Type "Info" -ActionName "Restore" -ActionColor $script:Colors.AccentAmber
+                    Show-Notification -Title "computa" -Message "No active profile to restore. Apply a profile first." -Type "Info" -ActionName "Restore" -ActionColor $script:Colors.AccentAmber
                     Set-TrayLastAction -Message "Restore hotkey ignored: no active profile"
                     Update-MenuState
                 }
@@ -9009,7 +9017,7 @@ public class HotkeyMessageWindow : NativeWindow {
     # ─── HEADER ───
 
     $header = New-Object System.Windows.Forms.ToolStripMenuItem
-    $header.Text = "A.B.S.O.   v$($script:AppVersion)"
+    $header.Text = "computa   v$($script:AppVersion)"
     $header.Enabled = $false
     $header.BackColor = $script:Colors.BackgroundDark
     $header.ForeColor = $script:Colors.AccentGold
@@ -9968,7 +9976,7 @@ public class HotkeyMessageWindow : NativeWindow {
         Write-TrayLog "User invoked Reset Display Pipeline from tray menu"
         $confirm = [System.Windows.Forms.MessageBox]::Show(
             "This sends Ctrl+Win+Shift+B twice and can blank or disconnect monitors for a few seconds.`n`nUse only for explicit live display recovery, not routine profile verification.`n`nContinue?",
-            "A.B.S.O. Display Pipeline Reset",
+            "computa Display Pipeline Reset",
             [System.Windows.Forms.MessageBoxButtons]::YesNo,
             [System.Windows.Forms.MessageBoxIcon]::Warning,
             [System.Windows.Forms.MessageBoxDefaultButton]::Button2
@@ -9994,7 +10002,7 @@ public class HotkeyMessageWindow : NativeWindow {
                 try { $proc.Dispose() } catch {}
                 $proc = $null
                 Write-TrayLog "Reset Display timed out after 30s" -Level "ERROR"
-                Show-Notification -Title "A.B.S.O." `
+                Show-Notification -Title "computa" `
                     -Message "Display reset timed out after 30s" -Type "Error" `
                     -ActionName "Reset" -ActionColor $script:Colors.AccentAmber
                 Set-TrayLastAction -Message "Display reset timed out after 30s"
@@ -10021,7 +10029,7 @@ public class HotkeyMessageWindow : NativeWindow {
                 if ($exitCodeOk -and $null -ne $j -and $j.success -and $j.data -and $j.data.success -and $null -ne $result) {
                     $count = $result.sent_count
                     if (-not $count) { $count = 0 }
-                    Show-Notification -Title "A.B.S.O." `
+                    Show-Notification -Title "computa" `
                         -Message "Display pipeline reset ($count combo(s) sent)" -Type "Success" `
                         -ActionName "Reset" -ActionColor $script:Colors.AccentAmber
                     Set-TrayLastAction -Message "Display reset: $count combo(s) sent"
@@ -10029,7 +10037,7 @@ public class HotkeyMessageWindow : NativeWindow {
                 }
                 elseif ($null -eq $j) {
                     Write-TrayLog "Reset Display: CLI produced unparseable JSON" -Level "ERROR"
-                    Show-Notification -Title "A.B.S.O." `
+                    Show-Notification -Title "computa" `
                         -Message "Display reset failed: runtime status unreadable. See tray log." -Type "Error" `
                         -ActionName "Reset" -ActionColor $script:Colors.AccentAmber
                     Set-TrayLastAction -Message "Display reset failed: runtime status unreadable"
@@ -10038,7 +10046,7 @@ public class HotkeyMessageWindow : NativeWindow {
                 else {
                     $err = if ($j.error) { $j.error } elseif ($j.data -and $j.data.result -and $j.data.result.error) { $j.data.result.error } elseif ($null -ne $exitCode -and $exitCode -ne 0) { "runtime exit code $exitCode" } else { "runtime error not reported" }
                     Write-TrayLog "Reset Display reported failure: $err" -Level "ERROR"
-                    Show-Notification -Title "A.B.S.O." `
+                    Show-Notification -Title "computa" `
                         -Message "Display reset failed: $err" -Type "Error" `
                         -ActionName "Reset" -ActionColor $script:Colors.AccentAmber
                     Set-TrayLastAction -Message "Display reset failed: $err"
@@ -10047,7 +10055,7 @@ public class HotkeyMessageWindow : NativeWindow {
             }
             else {
                 Write-TrayLog "Reset Display: CLI produced no output" -Level "ERROR"
-                Show-Notification -Title "A.B.S.O." `
+                Show-Notification -Title "computa" `
                     -Message "Display reset failed: runtime returned no status" -Type "Error" `
                     -ActionName "Reset" -ActionColor $script:Colors.AccentAmber
                 Set-TrayLastAction -Message "Display reset failed: runtime returned no status"
@@ -10056,7 +10064,7 @@ public class HotkeyMessageWindow : NativeWindow {
         }
         catch {
             Write-TrayLog "Reset Display threw: $($_.Exception.Message)" -Level "ERROR"
-            Show-Notification -Title "A.B.S.O." `
+            Show-Notification -Title "computa" `
                 -Message "Display reset failed: $($_.Exception.Message)" -Type "Error" `
                 -ActionName "Reset" -ActionColor $script:Colors.AccentAmber
             Set-TrayLastAction -Message "Display reset failed: $($_.Exception.Message)"
@@ -10170,7 +10178,7 @@ public class HotkeyMessageWindow : NativeWindow {
         $capturedLabel = $backup.Label
         $capturedProfileId = $backupProfileId
         $bItem.Add_Click({
-            Set-TrayOperationTooltipText -Text "A.B.S.O. - Restoring..."
+            Set-TrayOperationTooltipText -Text "computa - Restoring..."
             $restoreProfile = $null
             if (
                 -not [string]::IsNullOrWhiteSpace($capturedProfileId) -and
@@ -10180,7 +10188,7 @@ public class HotkeyMessageWindow : NativeWindow {
                 $restoreProfile = $script:Profiles[$capturedProfileId]
             }
             $restoreVisual = Get-TrayProfileToastVisualArgs -ProfileId $capturedProfileId -Profile $restoreProfile
-            $restoreTitle = if (-not [string]::IsNullOrWhiteSpace($capturedProfileId)) { Get-TrayProfileDisplayName -ProfileId $capturedProfileId } else { "A.B.S.O." }
+            $restoreTitle = if (-not [string]::IsNullOrWhiteSpace($capturedProfileId)) { Get-TrayProfileDisplayName -ProfileId $capturedProfileId } else { "computa" }
             $restoreMetaText = if (-not [string]::IsNullOrWhiteSpace($capturedProfileId)) { $capturedProfileId } else { $capturedName }
             try {
                 $tf = [System.IO.Path]::GetTempFileName()
@@ -10299,7 +10307,7 @@ public class HotkeyMessageWindow : NativeWindow {
                     Show-Notification @quickPanelEmptyVisual -Title $quickPanelEmptyTitle -Message $quickPanelEmpty.Message -Type "Info" -MetaText $quickPanelEmpty.ProfileId
                 }
                 else {
-                    Show-Notification -Title "A.B.S.O. Quick Panel" -Message $quickPanelEmpty.Message -Type "Info" -ActionName "QuickPanel" -ActionColor $script:Colors.AccentBlue
+                    Show-Notification -Title "computa Quick Panel" -Message $quickPanelEmpty.Message -Type "Info" -ActionName "QuickPanel" -ActionColor $script:Colors.AccentBlue
                 }
                 Set-TrayLastAction -Message $quickPanelEmpty.LastAction
             }
@@ -10334,17 +10342,17 @@ public class HotkeyMessageWindow : NativeWindow {
             $profileCount = if ($script:Profiles) { $script:Profiles.Count } else { 0 }
             $catalogSource = if ($script:ProfileCatalogLastSource) { "$($script:ProfileCatalogLastSource)" } else { "source not reported" }
             if ($profileCount -le 0) {
-                Show-Notification -Title "A.B.S.O." -Message "Profile refresh failed: no profiles loaded" -Type "Error" -ActionName "Refresh" -ActionColor $script:Colors.AccentBlue
+                Show-Notification -Title "computa" -Message "Profile refresh failed: no profiles loaded" -Type "Error" -ActionName "Refresh" -ActionColor $script:Colors.AccentBlue
                 Write-TrayLog "Profile refresh via menu loaded zero profiles" -Level "ERROR"
                 Set-TrayLastAction -Message "Profile refresh failed: no profiles loaded"
             }
             elseif ($script:ProfileCatalogUsedFallback) {
-                Show-Notification -Title "A.B.S.O." -Message "Profiles loaded from built-in fallback profile list ($profileCount profiles)" -Type "Warning" -ActionName "Refresh" -ActionColor $script:Colors.AccentBlue
+                Show-Notification -Title "computa" -Message "Profiles loaded from built-in fallback profile list ($profileCount profiles)" -Type "Warning" -ActionName "Refresh" -ActionColor $script:Colors.AccentBlue
                 Write-TrayLog "Profiles refreshed via menu from built-in fallback ($profileCount profiles)" -Level "WARN"
                 Set-TrayLastAction -Message "Profiles fallback list loaded: $profileCount"
             }
             else {
-                Show-Notification -Title "A.B.S.O." -Message "Profiles refreshed from $catalogSource ($profileCount profiles loaded)" -Type "Success" -ActionName "Refresh" -ActionColor $script:Colors.AccentBlue
+                Show-Notification -Title "computa" -Message "Profiles refreshed from $catalogSource ($profileCount profiles loaded)" -Type "Success" -ActionName "Refresh" -ActionColor $script:Colors.AccentBlue
                 Write-TrayLog "Profiles refreshed via menu from $catalogSource ($profileCount profiles)"
                 Set-TrayLastAction -Message "Profiles refreshed: $profileCount from $catalogSource"
             }
@@ -10352,7 +10360,7 @@ public class HotkeyMessageWindow : NativeWindow {
         }
         catch {
             Write-TrayLog "Failed to refresh profiles: $($_.Exception.Message)" -Level "ERROR"
-            Show-Notification -Title "A.B.S.O." -Message "Profile refresh failed: $($_.Exception.Message)" -Type "Error" -ActionName "Refresh" -ActionColor $script:Colors.AccentBlue
+            Show-Notification -Title "computa" -Message "Profile refresh failed: $($_.Exception.Message)" -Type "Error" -ActionName "Refresh" -ActionColor $script:Colors.AccentBlue
             Set-TrayLastAction -Message "Profile refresh failed: $($_.Exception.Message)"
             Update-MenuState
         }
@@ -10399,7 +10407,7 @@ public class HotkeyMessageWindow : NativeWindow {
                 $proc.Kill()
                 $proc.Dispose()
                 Remove-Item $tempFile -Force -ErrorAction SilentlyContinue
-                Show-Notification -Title "A.B.S.O." -Message "Standby clear timed out after 15s" -Type "Error" -ActionName "Memory" -ActionColor $script:Colors.AccentBlue
+                Show-Notification -Title "computa" -Message "Standby clear timed out after 15s" -Type "Error" -ActionName "Memory" -ActionColor $script:Colors.AccentBlue
                 Set-TrayLastAction -Message "Standby clear timed out after 15s"
                 Update-MenuState
                 return
@@ -10408,7 +10416,7 @@ public class HotkeyMessageWindow : NativeWindow {
             $raw = Get-Content $tempFile -Raw -ErrorAction SilentlyContinue
             Remove-Item $tempFile -Force -ErrorAction SilentlyContinue
             if (-not $raw) {
-                Show-Notification -Title "A.B.S.O." -Message "Standby clear failed: runtime returned no status" -Type "Error" -ActionName "Memory" -ActionColor $script:Colors.AccentBlue
+                Show-Notification -Title "computa" -Message "Standby clear failed: runtime returned no status" -Type "Error" -ActionName "Memory" -ActionColor $script:Colors.AccentBlue
                 Set-TrayLastAction -Message "Standby clear failed: runtime returned no status"
                 Update-MenuState
                 return
@@ -10416,19 +10424,19 @@ public class HotkeyMessageWindow : NativeWindow {
             $json = $raw | ConvertFrom-Json
             if ($json.success -and $json.data) {
                 $freed = $json.data.freed_mb
-                Show-Notification -Title "A.B.S.O." -Message "Standby list cleared. Freed ~${freed}MB" -Type "Success" -ActionName "Memory" -ActionColor $script:Colors.AccentBlue
+                Show-Notification -Title "computa" -Message "Standby list cleared. Freed ~${freed}MB" -Type "Success" -ActionName "Memory" -ActionColor $script:Colors.AccentBlue
                 Write-TrayLog "Standby list cleared: freed ${freed}MB"
                 Set-TrayLastAction -Message "Standby list cleared: ~${freed}MB"
                 Update-MenuState
             } else {
                 $clearError = if ($json.error) { "$($json.error)" } elseif ($json.data -and $json.data.error) { "$($json.data.error)" } else { "runtime error not reported" }
-                Show-Notification -Title "A.B.S.O." -Message "Standby clear failed: $clearError" -Type "Error" -ActionName "Memory" -ActionColor $script:Colors.AccentBlue
+                Show-Notification -Title "computa" -Message "Standby clear failed: $clearError" -Type "Error" -ActionName "Memory" -ActionColor $script:Colors.AccentBlue
                 Set-TrayLastAction -Message "Standby clear failed: $clearError"
                 Update-MenuState
             }
         } catch {
             Write-TrayLog "Clear standby failed: $($_.Exception.Message)" -Level "ERROR"
-            Show-Notification -Title "A.B.S.O." -Message "Standby clear failed: $($_.Exception.Message)" -Type "Error" -ActionName "Memory" -ActionColor $script:Colors.AccentBlue
+            Show-Notification -Title "computa" -Message "Standby clear failed: $($_.Exception.Message)" -Type "Error" -ActionName "Memory" -ActionColor $script:Colors.AccentBlue
             Set-TrayLastAction -Message "Standby clear failed: $($_.Exception.Message)"
             Update-MenuState
         }
@@ -10620,14 +10628,14 @@ public class HotkeyMessageWindow : NativeWindow {
             Set-TrayLastAction -Message "Tray restart failed: $($_.Exception.Message)"
             Restore-TrayTooltipFromState -Force
             Update-MenuState
-            Show-Notification -Title "A.B.S.O." -Message "Tray restart failed: $($_.Exception.Message)" -Type "Error" -ActionName "Refresh" -ActionColor $script:Colors.AccentAmber
+            Show-Notification -Title "computa" -Message "Tray restart failed: $($_.Exception.Message)" -Type "Error" -ActionName "Refresh" -ActionColor $script:Colors.AccentAmber
         }
     })
     $menu.Items.Add($restartItem) | Out-Null
 
     # About
     $aboutItem = New-Object System.Windows.Forms.ToolStripMenuItem
-    $aboutItem.Text = "About A.B.S.O."
+    $aboutItem.Text = "About computa"
     $aboutItem.BackColor = $script:Colors.Background
     $aboutItem.ForeColor = $script:Colors.TextDim
     $aboutItem.Font = $script:FontMenuRow
@@ -10674,7 +10682,7 @@ public class HotkeyMessageWindow : NativeWindow {
     $script:notifyIcon.Add_DoubleClick({
         param($s, $ev)
         if ($script:TrayConfig.favorites.Count -le 0) {
-            Show-Notification -Title "A.B.S.O." -Message "No favorite profile configured for double-click." -Type "Info" -ActionName "Favorite" -ActionColor $script:Colors.AccentAmber
+            Show-Notification -Title "computa" -Message "No favorite profile configured for double-click." -Type "Info" -ActionName "Favorite" -ActionColor $script:Colors.AccentAmber
             Set-TrayLastAction -Message "Double-click ignored: no favorite"
             Update-MenuState
             return
@@ -10782,8 +10790,8 @@ catch {
     } catch {}
     try {
         [System.Windows.Forms.MessageBox]::Show(
-            "A.B.S.O. Tray encountered a fatal error and exited.`n`n$fatal`n`nSee log: $($script:LogFile)",
-            "A.B.S.O.",
+            "computa Tray encountered a fatal error and exited.`n`n$fatal`n`nSee log: $($script:LogFile)",
+            "computa",
             [System.Windows.Forms.MessageBoxButtons]::OK,
             [System.Windows.Forms.MessageBoxIcon]::Error
         ) | Out-Null

@@ -1,6 +1,6 @@
-# A.B.S.O. Quality Rubric
+# computa Quality Rubric
 
-This document defines the shipping bar for A.B.S.O. It exists to prevent drift from "interesting tweak collection" toward "state-of-the-art Windows gaming optimization product."
+This document defines the shipping bar for computa It exists to prevent drift from "interesting tweak collection" toward "state-of-the-art Windows gaming optimization product."
 
 The standard is simple:
 
@@ -178,7 +178,7 @@ Rules:
 
 ## Evidence & Validation Discipline
 
-A.B.S.O. is developed and validated on a single machine — whatever PC the repo
+computa is developed and validated on a single machine — whatever PC the repo
 is checked out on (see `docs/AGENT_PROTOCOL.md` §2). There is no multi-host role
 split; the same box does coding, validation, and signoff. What matters is the
 evidence standard, not which machine produced it:

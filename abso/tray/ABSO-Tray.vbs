@@ -1,4 +1,4 @@
-' ABSO-Tray.vbs - Hidden launcher for A.B.S.O. tray application
+' ABSO-Tray.vbs - Hidden launcher for computa tray application
 ' Starts PowerShell completely hidden (no console window flash)
 
 Set objShell = CreateObject("WScript.Shell")

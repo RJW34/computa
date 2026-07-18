@@ -178,14 +178,14 @@ def test_launch_sanitizer_toast_uses_triggering_profile_visuals() -> None:
     ) in sanitizer_section
     assert "$sanitizerTitle = if ($sanitizerProfile) {" in sanitizer_section
     assert "Get-TrayProfileDisplayName -ProfileId $ProfileId" in sanitizer_section
-    assert '"A.B.S.O. Launch Sanitizer"' in sanitizer_section
+    assert '"computa Launch Sanitizer"' in sanitizer_section
     assert (
         'Show-Notification @sanitizerVisual -Title $sanitizerTitle `\n'
         '                -Message "Launch sanitizer stopped: $summary" `\n'
         '                -Type "Success" `\n'
         "                -MetaText $ProfileId"
     ) in sanitizer_section
-    assert 'Show-Notification -Title "A.B.S.O. Launch Sanitizer"' not in sanitizer_section
+    assert 'Show-Notification -Title "computa Launch Sanitizer"' not in sanitizer_section
     assert '-Message "Stopped: $summary"' not in sanitizer_section
 
 
@@ -204,8 +204,11 @@ def test_tray_audit_action_does_not_block_ui_thread() -> None:
 
 
 def test_tray_prefers_installed_backend_before_source_python() -> None:
-    """Deployed tray runtime should use installed abso.exe when present."""
+    """Deployed tray runtime should use installed computa.exe when present."""
     script = TRAY_SCRIPT.read_text(encoding="utf-8")
+    assert 'AdaptiveBattleStationOptimizer\\computa.exe' in script
+    # Pre-rebrand installs shipped abso.exe; the tray keeps resolving it until
+    # the next deploy migrates the install.
     assert 'AdaptiveBattleStationOptimizer\\abso.exe' in script
     assert "Prefer the installed packaged backend" in script
     assert "Get-AbsoBackendArgs" in script
@@ -248,7 +251,7 @@ def test_tray_surfaces_verification_mismatch_state() -> None:
     assert 'Profile mismatch: $pendingText' in verify_section
     assert '$script:ActiveProfileVerificationStatus -ne "mismatch"' in same_active_section
     assert '$lastActionText.StartsWith("Profile mismatch:")' in script
-    assert 'return "A.B.S.O. - Profile mismatch: $profileName"' in script
+    assert 'return "computa - Profile mismatch: $profileName"' in script
     assert 'return "Active state: profile mismatch for $pendingText"' in script
     assert "Apply-PendingProfileFixes routing mismatch" in script
     assert "Reapply Active Profile: $pendingApplyTextForAction" in menu_state_section
@@ -359,7 +362,7 @@ def test_profile_apply_timeout_toast_keeps_profile_visuals() -> None:
         'Show-Notification @timeoutVisual -Title $timeoutTitle '
         '-Message "Apply timed out after 120s" -Type "Error" -MetaText $ProfileId'
     ) in timeout_section
-    assert 'Show-Notification -Title "A.B.S.O." -Message "Apply timed out after 120s"' not in timeout_section
+    assert 'Show-Notification -Title "computa" -Message "Apply timed out after 120s"' not in timeout_section
     assert 'Set-TrayLastAction -Message "Apply timed out after 120s"' in timeout_section
 
 
@@ -652,7 +655,7 @@ def test_tray_about_hotkeys_report_actual_registration_status() -> None:
     assert "$aboutItem.Add_Click({ Show-AboutPanel })" in tray
     assert "No active profile to restore. Apply a profile first." in tray
     assert (
-        'Show-Notification -Title "A.B.S.O." -Message "No active profile to restore. Apply a profile first." '
+        'Show-Notification -Title "computa" -Message "No active profile to restore. Apply a profile first." '
         '-Type "Info" -ActionName "Restore" -ActionColor $script:Colors.AccentAmber'
     ) in tray
     assert 'Set-TrayLastAction -Message "Restore hotkey ignored: no active profile"' in tray
@@ -1142,12 +1145,12 @@ def test_tray_surfaces_verification_in_progress_truthfully() -> None:
     assert "if (Get-ActiveProfilePendingApplyText) { return $null }" in script
     assert "if (Get-ActiveProfileRebootPendingText) { return $null }" in script
     assert 'return "checking profile state"' in script
-    assert 'return "A.B.S.O. - Checking profile state: $profileName"' in script
+    assert 'return "computa - Checking profile state: $profileName"' in script
     assert '$verificationProgressText = Get-ActiveProfileVerificationInProgressText' in script
     assert 'Add-UniqueTrayMessage -Target $statusParts -Message "Checking profile state"' in script
     assert '$script:statusItem.Text = "$profileDisplayName|Checking profile state..."' in script
     assert "$script:statusItem.ForeColor = $script:Colors.AccentBlue" in script
-    assert 'return "A.B.S.O. - Verified active: $($p.Name)"' not in script
+    assert 'return "computa - Verified active: $($p.Name)"' not in script
 
 
 def test_tray_notification_tooltip_restores_current_state() -> None:
@@ -1165,21 +1168,21 @@ def test_tray_notification_tooltip_restores_current_state() -> None:
     assert 'Stop-NotificationTooltipRestoreTimer' in script
     assert "function Set-TrayOperationTooltipText" in script
     assert "Stop-NotificationTooltipRestoreTimer\n    Set-NotifyIconTooltipText -Text $Text" in script
-    assert 'Set-TrayOperationTooltipText -Text "A.B.S.O. - Applying..."' in script
-    assert 'Set-TrayOperationTooltipText -Text "A.B.S.O. - Applying pending profile fixes..."' in script
-    assert 'Set-TrayOperationTooltipText -Text "A.B.S.O. - Restoring..."' in script
-    assert 'Set-TrayOperationTooltipText -Text "A.B.S.O. - Running Audit..."' in script
-    assert '$script:notifyIcon.Text = "A.B.S.O. - Applying..."' not in script
-    assert '$script:notifyIcon.Text = "A.B.S.O. - Applying pending profile fixes..."' not in script
+    assert 'Set-TrayOperationTooltipText -Text "computa - Applying..."' in script
+    assert 'Set-TrayOperationTooltipText -Text "computa - Applying pending profile fixes..."' in script
+    assert 'Set-TrayOperationTooltipText -Text "computa - Restoring..."' in script
+    assert 'Set-TrayOperationTooltipText -Text "computa - Running Audit..."' in script
+    assert '$script:notifyIcon.Text = "computa - Applying..."' not in script
+    assert '$script:notifyIcon.Text = "computa - Applying pending profile fixes..."' not in script
     assert "Applying pending fix" not in script
-    assert '$script:notifyIcon.Text = "A.B.S.O. - Restoring..."' not in script
-    assert '$script:notifyIcon.Text = "A.B.S.O. - Running Audit..."' not in script
+    assert '$script:notifyIcon.Text = "computa - Restoring..."' not in script
+    assert '$script:notifyIcon.Text = "computa - Running Audit..."' not in script
     assert '$script:notifyIcon.Text = "$Title - $Message".Substring' not in script
     assert '$profileName = if (' in script
     assert '-not [string]::IsNullOrWhiteSpace("$($activeRecord.Profile.Name)")' in script
-    assert 'return "A.B.S.O. - Windows restart required: $profileName"' in script
-    assert 'return "A.B.S.O. - Checking profile state: $profileName"' in script
-    assert 'return "A.B.S.O. - Restart required: $($p.Name)"' not in script
+    assert 'return "computa - Windows restart required: $profileName"' in script
+    assert 'return "computa - Checking profile state: $profileName"' in script
+    assert 'return "computa - Restart required: $($p.Name)"' not in script
     menu_state_section = script.split("function Update-MenuState", 1)[1].split(
         "# ============================================================================\n# SYSTEM INFO",
         1,
@@ -1193,7 +1196,7 @@ def test_active_profile_status_handles_catalog_mismatch_truthfully() -> None:
     script = TRAY_SCRIPT.read_text(encoding="utf-8")
     assert "function Get-ActiveTrayProfileRecord" in script
     assert "function Set-TrayActiveStatusItemFromState" in script
-    assert 'return "A.B.S.O. - Profile missing from current list: $($activeRecord.DisplayName)"' in script
+    assert 'return "computa - Profile missing from current list: $($activeRecord.DisplayName)"' in script
     assert '$script:statusItem.Text = "$($activeRecord.DisplayName)|Active profile not in current profile list"' in script
     assert '$profileDisplayName = if (' in script
     assert '-not [string]::IsNullOrWhiteSpace("$($activeRecord.Profile.Name)")' in script
@@ -1204,7 +1207,7 @@ def test_active_profile_status_handles_catalog_mismatch_truthfully() -> None:
     assert 'Set-TrayStatusHeroImage -ProfileId $activeRecord.Id -Profile $activeRecord.Profile -ActiveBadge -WindowsRestartBadge' in script
     assert 'Set-TrayStatusHeroImage -ProfileId $activeRecord.Id -Profile $activeRecord.Profile -ActiveBadge -VerificationBadge' in script
     assert '$script:statusItem.Text = "$($p.Name)|Restart required: $rebootPendingText"' not in script
-    assert 'return "A.B.S.O. - Catalog missing: $($activeRecord.DisplayName)"' not in script
+    assert 'return "computa - Catalog missing: $($activeRecord.DisplayName)"' not in script
     assert "Active profile not in loaded catalog" not in script
     assert "$script:statusItem.ForeColor = $script:Colors.AccentAmber" in script
     assert "Set-TrayStatusHeroImage -ProfileId $activeRecord.Id -Profile $null -ActiveBadge" in script
@@ -1339,19 +1342,19 @@ def test_profiles_section_header_stays_quiet_without_game_marks() -> None:
 def test_tray_top_level_rows_use_icons_without_fake_padding() -> None:
     """Top-level tray rows with real icons should not rely on leading spaces."""
     script = TRAY_SCRIPT.read_text(encoding="utf-8")
-    assert '$header.Text = "A.B.S.O.   v$($script:AppVersion)"' in script
+    assert '$header.Text = "computa   v$($script:AppVersion)"' in script
     assert '$header.Image = New-ActionBitmap -Action "Brand" -Color $script:Colors.AccentGold' in script
     assert '$actionsMenu.Text = "Actions"' in script
     assert '$actionsMenu.Image = New-ActionBitmap -Action "Actions" -Color $script:Colors.AccentAmber' in script
     assert '$settingsMenu.Text = "Settings"' in script
     assert '$restartItem.Text = "Restart Tray"' in script
-    assert '$aboutItem.Text = "About A.B.S.O."' in script
+    assert '$aboutItem.Text = "About computa"' in script
     assert '$exitItem.Text = "Exit"' in script
-    assert '$header.Text = "  A.B.S.O.   v$($script:AppVersion)"' not in script
+    assert '$header.Text = "  computa   v$($script:AppVersion)"' not in script
     assert '$actionsMenu.Text = "  Actions"' not in script
     assert '$settingsMenu.Text = "  Settings"' not in script
     assert '$restartItem.Text = "  Restart Tray"' not in script
-    assert '$aboutItem.Text = "  About A.B.S.O."' not in script
+    assert '$aboutItem.Text = "  About computa"' not in script
     assert '$exitItem.Text = "  Exit"' not in script
 
 
@@ -1500,7 +1503,7 @@ def test_folder_log_memory_reset_and_info_action_icons_are_defined() -> None:
         "Close",
     ]:
         assert f'"{action}" {{' in script
-    assert "A.B.S.O. angular station mark with a small optimizer spark." in script
+    assert "computa angular station mark with a small optimizer spark." in script
     assert "Stacked command chevrons for primary tray actions." in script
     assert "Search result lens with three scan ticks." in script
     assert "Filled star for pinned favorite profiles." in script
@@ -2677,7 +2680,7 @@ def test_profile_toast_visual_args_fallback_to_profile_id_art() -> None:
     ) in apply_profile_section
     assert 'Set-IconState -State "Warning"' in apply_profile_section
     assert 'Set-TrayLastAction -Message "Profile missing from current list: $missingProfileTitle"' in apply_profile_section
-    assert 'Show-Notification -Title "A.B.S.O." -Message "Profile not found: $ProfileId"' not in (
+    assert 'Show-Notification -Title "computa" -Message "Profile not found: $ProfileId"' not in (
         apply_profile_section
     )
     assert 'Set-TrayLastAction -Message "Profile not found: $ProfileId"' not in apply_profile_section
@@ -3104,7 +3107,7 @@ def test_tray_quick_panel_toggle_tracks_actual_visibility() -> None:
     assert "$quickPanelEmptyTitle = Get-TrayProfileDisplayName -ProfileId $quickPanelEmpty.ProfileId" in script
     assert "Show-Notification @quickPanelEmptyVisual -Title $quickPanelEmptyTitle -Message $quickPanelEmpty.Message -Type \"Info\" -MetaText $quickPanelEmpty.ProfileId" in script
     assert (
-        'Show-Notification -Title "A.B.S.O. Quick Panel" -Message $quickPanelEmpty.Message '
+        'Show-Notification -Title "computa Quick Panel" -Message $quickPanelEmpty.Message '
         '-Type "Info" -ActionName "QuickPanel" -ActionColor $script:Colors.AccentBlue'
     ) in script
     assert "Set-TrayLastAction -Message $quickPanelEmpty.LastAction" in script
@@ -3270,7 +3273,7 @@ def test_tray_log_action_is_explicit_and_not_silent() -> None:
     assert 'Start-Process "notepad.exe" -ArgumentList $script:LogFile -ErrorAction Stop' in script
     assert 'Write-TrayLog "Failed to open tray log file: $($_.Exception.Message)" -Level "ERROR"' in script
     assert (
-        'Show-Notification -Title "A.B.S.O." -Message "Failed to open tray log: $($_.Exception.Message)" '
+        'Show-Notification -Title "computa" -Message "Failed to open tray log: $($_.Exception.Message)" '
         '-Type "Error" -ActionName "Log" -ActionColor $script:Colors.TextDim'
     ) in script
     assert '$logItem.Text = "View Tray Log File"' in script
@@ -3366,7 +3369,7 @@ def test_tray_backup_restore_toasts_use_manifest_profile_visuals() -> None:
     assert "$restoreVisual = Get-TrayProfileToastVisualArgs -ProfileId $capturedProfileId -Profile $restoreProfile" in (
         restore_backup_section
     )
-    assert '$restoreTitle = if (-not [string]::IsNullOrWhiteSpace($capturedProfileId)) { Get-TrayProfileDisplayName -ProfileId $capturedProfileId } else { "A.B.S.O." }' in restore_backup_section
+    assert '$restoreTitle = if (-not [string]::IsNullOrWhiteSpace($capturedProfileId)) { Get-TrayProfileDisplayName -ProfileId $capturedProfileId } else { "computa" }' in restore_backup_section
     assert (
         '$restoreMetaText = if (-not [string]::IsNullOrWhiteSpace($capturedProfileId)) '
         "{ $capturedProfileId } else { $capturedName }"
@@ -3397,11 +3400,11 @@ def test_tray_backup_restore_toasts_use_manifest_profile_visuals() -> None:
         'Show-Notification @restoreVisual -Title $restoreTitle -Message "Restore failed: $($_.Exception.Message)" '
         '-Type "Error" -MetaText $restoreMetaText'
     ) in restore_backup_section
-    assert 'Show-Notification -Title "A.B.S.O." -Message "Restored from: $capturedLabel"' not in (
+    assert 'Show-Notification -Title "computa" -Message "Restored from: $capturedLabel"' not in (
         restore_backup_section
     )
-    assert 'Show-Notification -Title "A.B.S.O." -Message "Restore failed' not in restore_backup_section
-    assert 'Show-Notification -Title "A.B.S.O." -Message "Restore timed out: $capturedLabel"' not in (
+    assert 'Show-Notification -Title "computa" -Message "Restore failed' not in restore_backup_section
+    assert 'Show-Notification -Title "computa" -Message "Restore timed out: $capturedLabel"' not in (
         restore_backup_section
     )
 
@@ -3482,7 +3485,7 @@ def test_tray_backup_restore_timeout_replaces_restoring_state() -> None:
         "}.GetNewClosure())",
         1,
     )[0]
-    assert 'Set-TrayOperationTooltipText -Text "A.B.S.O. - Restoring..."' in restore_backup_section
+    assert 'Set-TrayOperationTooltipText -Text "computa - Restoring..."' in restore_backup_section
     assert "-NoNewWindow -PassThru -WorkingDirectory $script:ProjectRoot `" in restore_backup_section
     assert "-RedirectStandardOutput $tf -RedirectStandardError $errFile" in restore_backup_section
     assert "$completed = $proc.WaitForExit(120000)" in restore_backup_section
@@ -3674,28 +3677,28 @@ def test_tray_has_dedicated_windows_restart_status_glyph() -> None:
     )[0]
     assert "Restore-TrayTooltipFromState" in restore_settings_section
     assert (
-        'Show-Notification -Title "A.B.S.O." -Message "Restore timed out after 120s" '
+        'Show-Notification -Title "computa" -Message "Restore timed out after 120s" '
         '-Type "Error" -ActionName "Restore" -ActionColor $script:Colors.AccentAmber'
     ) in restore_settings_section
     assert (
-        'Show-Notification -Title "A.B.S.O." -Message "Settings restored" '
+        'Show-Notification -Title "computa" -Message "Settings restored" '
         '-Type "Success" -ActionName "Restore" -ActionColor $script:Colors.AccentGreen'
     ) in restore_settings_section
     assert (
-        'Show-Notification -Title "A.B.S.O." -Message "Restore failed: $restoreError" '
+        'Show-Notification -Title "computa" -Message "Restore failed: $restoreError" '
         '-Type "Error" -ActionName "Restore" -ActionColor $script:Colors.AccentAmber'
     ) in restore_settings_section
     assert (
-        'Show-Notification -Title "A.B.S.O." -Message "Restore failed: $($_.Exception.Message)" '
+        'Show-Notification -Title "computa" -Message "Restore failed: $($_.Exception.Message)" '
         '-Type "Error" -ActionName "Restore" -ActionColor $script:Colors.AccentAmber'
     ) in restore_settings_section
     assert 'Set-IconState -State "Error"' in restore_settings_section
-    assert 'Show-Notification -Title "A.B.S.O." -Message "Failed: $restoreError" -Type "Warning"' not in restore_settings_section
-    assert 'Show-Notification -Title "A.B.S.O." -Message "Error: $($_.Exception.Message)" -Type "Warning"' not in restore_settings_section
+    assert 'Show-Notification -Title "computa" -Message "Failed: $restoreError" -Type "Warning"' not in restore_settings_section
+    assert 'Show-Notification -Title "computa" -Message "Error: $($_.Exception.Message)" -Type "Warning"' not in restore_settings_section
     assert 'Set-IconState -State "Warning"' not in restore_settings_section
     assert 'throw "runtime returned no restore status"' in restore_settings_section
     assert 'throw "No output"' not in restore_settings_section
-    assert '$script:notifyIcon.Text = "A.B.S.O."' not in restore_settings_section
+    assert '$script:notifyIcon.Text = "computa"' not in restore_settings_section
     assert "$lastActionTimeMessage = Get-TrayLastActionTimeMessage -Value $script:LastActionTime" in script
     assert "$statusShouldShowActionTime = (" in script
     assert "[string]::IsNullOrWhiteSpace($pendingApplyText)" in script
@@ -3742,11 +3745,11 @@ def test_tray_action_toasts_update_durable_status() -> None:
     assert 'Set-TrayLastAction -Message "Standby clear failed: $clearError"' in script
     assert 'Set-TrayLastAction -Message "Standby clear failed"' not in script
     assert (
-        'Show-Notification -Title "A.B.S.O." -Message "Standby list cleared. Freed ~${freed}MB" '
+        'Show-Notification -Title "computa" -Message "Standby list cleared. Freed ~${freed}MB" '
         '-Type "Success" -ActionName "Memory" -ActionColor $script:Colors.AccentBlue'
     ) in script
     assert (
-        'Show-Notification -Title "A.B.S.O." -Message "Standby clear failed: runtime returned no status" '
+        'Show-Notification -Title "computa" -Message "Standby clear failed: runtime returned no status" '
         '-Type "Error" -ActionName "Memory" -ActionColor $script:Colors.AccentBlue'
     ) in script
 
@@ -3788,12 +3791,12 @@ def test_tray_settings_and_folder_actions_update_durable_status() -> None:
     assert '$auditActionMessage = "Audit completed: no details"' not in script
     assert 'Write-TrayLog "Audit issue ${issueIndex}/${issueCount}: $(Format-TrayUserFacingText -Text $issueText)" -Level "WARN"' in script
     assert (
-        'Show-Notification -Title "A.B.S.O. Audit" -Message "$issueCount $auditIssueLabel found. See tray log for details." '
+        'Show-Notification -Title "computa Audit" -Message "$issueCount $auditIssueLabel found. See tray log for details." '
         '-Type "Warning" -ActionName "Audit" -ActionColor $script:Colors.AccentBlue'
     ) in script
     assert "issue(s)" not in script
     assert (
-        'Show-Notification -Title "A.B.S.O. Audit" -Message "No issues detected by the current audit scope." '
+        'Show-Notification -Title "computa Audit" -Message "No issues detected by the current audit scope." '
         '-Type "Success" -ActionName "Audit" -ActionColor $script:Colors.AccentBlue'
     ) in script
     assert "Run 'abso audit' for details" not in script
@@ -3801,24 +3804,24 @@ def test_tray_settings_and_folder_actions_update_durable_status() -> None:
     assert 'Set-TrayLastAction -Message "Open backups failed: $($_.Exception.Message)"' in script
     assert 'Set-TrayLastAction -Message "Open backups failed"' not in script
     assert (
-        'Show-Notification -Title "A.B.S.O." -Message "Failed to open backups folder: $($_.Exception.Message)" '
+        'Show-Notification -Title "computa" -Message "Failed to open backups folder: $($_.Exception.Message)" '
         '-Type "Error" -ActionName "Folder" -ActionColor $script:Colors.AccentPurple'
     ) in script
-    assert 'Show-Notification -Title "A.B.S.O." -Message "Failed to open folder: $($_.Exception.Message)"' not in script
+    assert 'Show-Notification -Title "computa" -Message "Failed to open folder: $($_.Exception.Message)"' not in script
     assert (
-        'Show-Notification -Title "A.B.S.O." -Message "Current backups folder not found. Applying a profile creates it." '
+        'Show-Notification -Title "computa" -Message "Current backups folder not found. Applying a profile creates it." '
         '-Type "Info" -ActionName "Backups" -ActionColor $script:Colors.AccentPurple'
     ) in script
     assert 'Set-TrayLastAction -Message "Current backups folder not found"' in script
-    assert 'Show-Notification -Title "A.B.S.O." -Message "No backups have been created yet"' not in script
+    assert 'Show-Notification -Title "computa" -Message "No backups have been created yet"' not in script
     assert 'Set-TrayLastAction -Message "No backups created yet"' not in script
-    assert 'Show-Notification -Title "A.B.S.O." -Message "No backups folder found" -Type "Warning"' not in script
+    assert 'Show-Notification -Title "computa" -Message "No backups folder found" -Type "Warning"' not in script
     assert 'Set-TrayLastAction -Message "No backups folder found"' not in script
     assert 'Set-TrayLastAction -Message "Opened tray log file"' in script
     assert 'Set-TrayLastAction -Message "Open tray log failed: $($_.Exception.Message)"' in script
     assert 'Set-TrayLastAction -Message "Open tray log failed"' not in script
     assert (
-        'Show-Notification -Title "A.B.S.O." -Message "Failed to open tray log: $($_.Exception.Message)" '
+        'Show-Notification -Title "computa" -Message "Failed to open tray log: $($_.Exception.Message)" '
         '-Type "Error" -ActionName "Log" -ActionColor $script:Colors.TextDim'
     ) in script
     assert 'Set-TrayLastAction -Message "Opened tray settings folder"' in script
@@ -3908,15 +3911,15 @@ def test_tray_profile_refresh_reports_actual_catalog_source() -> None:
     assert 'Profiles refreshed from $catalogSource ($profileCount profiles loaded)' in tray
     assert 'Profile refresh failed: no profiles loaded' in tray
     assert (
-        'Show-Notification -Title "A.B.S.O." -Message "Profiles refreshed from $catalogSource ($profileCount profiles loaded)" '
+        'Show-Notification -Title "computa" -Message "Profiles refreshed from $catalogSource ($profileCount profiles loaded)" '
         '-Type "Success" -ActionName "Refresh" -ActionColor $script:Colors.AccentBlue'
     ) in tray
     assert (
-        'Show-Notification -Title "A.B.S.O." -Message "Profiles loaded from built-in fallback profile list ($profileCount profiles)" '
+        'Show-Notification -Title "computa" -Message "Profiles loaded from built-in fallback profile list ($profileCount profiles)" '
         '-Type "Warning" -ActionName "Refresh" -ActionColor $script:Colors.AccentBlue'
     ) in tray
     assert (
-        'Show-Notification -Title "A.B.S.O." -Message "Profile refresh failed: no profiles loaded" '
+        'Show-Notification -Title "computa" -Message "Profile refresh failed: no profiles loaded" '
         '-Type "Error" -ActionName "Refresh" -ActionColor $script:Colors.AccentBlue'
     ) in tray
     assert 'Profiles refreshed ($($script:Profiles.Count) profiles loaded)' not in tray
@@ -3929,10 +3932,10 @@ def test_tray_noop_notifications_update_durable_status() -> None:
     assert 'Set-TrayLastAction -Message "Profile missing from current list: $missingProfileTitle"' in script
     assert 'Set-TrayLastAction -Message "Apply timed out after 120s"' in script
     assert (
-        'Show-Notification -Title "A.B.S.O." -Message "No active profile to repair" '
+        'Show-Notification -Title "computa" -Message "No active profile to repair" '
         '-Type "Info" -ActionName "Apply" -ActionColor $script:Colors.AccentAmber'
     ) in script
-    assert 'Show-Notification -Title "A.B.S.O." -Message "No active profile to repair" -Type "Warning"' not in script
+    assert 'Show-Notification -Title "computa" -Message "No active profile to repair" -Type "Warning"' not in script
     assert 'Set-TrayLastAction -Message "No active profile to repair"' in script
     assert 'Set-TrayLastAction -Message "No pending profile fixes found"' in script
     assert 'Set-TrayLastAction -Message "Restore hotkey ignored: no active profile"' in script
@@ -3951,7 +3954,7 @@ def test_tray_noop_notifications_update_durable_status() -> None:
     assert 'Default startup reminder profile \'$defaultProfileId\' is not in the loaded catalog' not in script
     assert 'Set-TrayLastAction -Message "Double-click ignored: no favorite"' in script
     assert (
-        'Show-Notification -Title "A.B.S.O." -Message "No favorite profile configured for double-click." '
+        'Show-Notification -Title "computa" -Message "No favorite profile configured for double-click." '
         '-Type "Info" -ActionName "Favorite" -ActionColor $script:Colors.AccentAmber'
     ) in script
     assert 'Favorite profile is not in the current profile list.' in script
@@ -3988,7 +3991,7 @@ def test_default_profile_startup_reminder_keeps_profile_visuals() -> None:
     assert 'Show-Notification @defaultReminderVisual -Title $defProfile.Name' not in reminder_section
     assert 'Set-TrayLastAction -Message "Startup reminder: $defaultReminderTitle"' in reminder_section
     assert 'Set-TrayLastAction -Message "Startup reminder: $($defProfile.Name)"' not in reminder_section
-    assert 'Show-Notification -Title "A.B.S.O." -Message "Default profile ready:' not in reminder_section
+    assert 'Show-Notification -Title "computa" -Message "Default profile ready:' not in reminder_section
     assert "not auto-applying" in reminder_section
 
 
@@ -4002,7 +4005,7 @@ def test_apply_pending_noop_notices_keep_active_profile_visuals() -> None:
 
     assert "$activeRecord = Get-ActiveTrayProfileRecord" in pending_section
     assert "$pendingNoopVisual = Get-TrayProfileToastVisualArgs `" in pending_section
-    assert "$pendingNoopTitle = if ($activeRecord.Id) { $activeRecord.DisplayName } else { \"A.B.S.O.\" }" in (
+    assert "$pendingNoopTitle = if ($activeRecord.Id) { $activeRecord.DisplayName } else { \"computa\" }" in (
         pending_section
     )
     assert (
@@ -4010,7 +4013,7 @@ def test_apply_pending_noop_notices_keep_active_profile_visuals() -> None:
         '-Message "No pending profile fixes found" -Type "Info" -MetaText $script:activeProfile'
     ) in pending_section
     assert "$pendingToastVisual = Get-TrayProfileToastVisualArgs `" in pending_section
-    assert "$pendingTitle = if ($activeRecord.Id) { $activeRecord.DisplayName } else { \"A.B.S.O.\" }" in (
+    assert "$pendingTitle = if ($activeRecord.Id) { $activeRecord.DisplayName } else { \"computa\" }" in (
         pending_section
     )
     assert (
@@ -4020,11 +4023,11 @@ def test_apply_pending_noop_notices_keep_active_profile_visuals() -> None:
     assert 'else { "reason not reported" }' in pending_section
     assert 'else { "unknown error" }' not in pending_section
     assert '$script:LastAction = "No pending profile fix needed"' in pending_section
-    assert 'Show-Notification -Title "A.B.S.O." -Message "No pending profile fixes found"' not in pending_section
-    assert 'Show-Notification -Title "A.B.S.O." -Message "No pending write was needed"' not in pending_section
+    assert 'Show-Notification -Title "computa" -Message "No pending profile fixes found"' not in pending_section
+    assert 'Show-Notification -Title "computa" -Message "No pending write was needed"' not in pending_section
     assert "No pending write was needed" not in pending_section
     assert (
-        'Show-Notification -Title "A.B.S.O." -Message "No active profile to repair" '
+        'Show-Notification -Title "computa" -Message "No active profile to repair" '
         '-Type "Info" -ActionName "Apply" -ActionColor $script:Colors.AccentAmber'
     ) in pending_section
 
@@ -4069,7 +4072,7 @@ def test_tray_restart_sound_marker_is_token_scoped() -> None:
     assert 'Set-TrayLastAction -Message "Tray restart failed: $($_.Exception.Message)"' in restart_section
     assert "Restore-TrayTooltipFromState -Force" in restart_section
     assert "Update-MenuState" in restart_section
-    assert 'Show-Notification -Title "A.B.S.O." -Message "Tray restart failed: $($_.Exception.Message)" -Type "Error" -ActionName "Refresh" -ActionColor $script:Colors.AccentAmber' in restart_section
+    assert 'Show-Notification -Title "computa" -Message "Tray restart failed: $($_.Exception.Message)" -Type "Error" -ActionName "Refresh" -ActionColor $script:Colors.AccentAmber' in restart_section
     assert 'Start-Process "wscript.exe"' not in restart_section
 
 
@@ -4118,7 +4121,7 @@ def test_tray_display_pipeline_reset_requires_warning_confirmation() -> None:
     assert "-RedirectStandardError $errFile" in reset_section
     assert "$completed = $proc.WaitForExit(30000)" in reset_section
     assert (
-        'Show-Notification -Title "A.B.S.O." `\n'
+        'Show-Notification -Title "computa" `\n'
         '                    -Message "Display reset timed out after 30s" -Type "Error" `\n'
         '                    -ActionName "Reset" -ActionColor $script:Colors.AccentAmber'
     ) in reset_section
@@ -4159,7 +4162,7 @@ def test_tray_startup_menu_tooltip_reports_stale_task_action() -> None:
     assert '$startupChipText = if ($startupActionIsStale) { "STALE" } else { "STARTUP" }' in startup_menu_section
     assert '"Auto-start task points at different tray files; toggle auto-start to rewrite it"' in startup_menu_section
     assert '"run startup repair or toggle auto-start"' not in startup_menu_section
-    assert '"Start A.B.S.O. Tray when Windows starts (configured via $modeLabel)"' in startup_menu_section
+    assert '"Start computa Tray when Windows starts (configured via $modeLabel)"' in startup_menu_section
 
 
 def test_tray_startup_installer_calls_are_timeout_status_aware() -> None:
@@ -4172,7 +4175,7 @@ def test_tray_startup_installer_calls_are_timeout_status_aware() -> None:
     assert 'Invoke-StartupInstallerJson -ScriptPath $installScript -CommandArgs @("-Status", "-Json") -TimeoutSeconds 15 -Source "StartupStatus"' in script
     assert 'Invoke-StartupInstallerJson -ScriptPath $installedScript -CommandArgs @("-Status", "-Json") -TimeoutSeconds 15 -Source "InstalledStartupStatus"' in script
     assert 'Invoke-StartupInstallerJson -ScriptPath $installedScript -CommandArgs @("-Install", "-Json") -TimeoutSeconds 120 -Source "StartupRepair"' in script
-    assert 'Set-TrayOperationTooltipText -Text "A.B.S.O. - Updating startup..."' in script
+    assert 'Set-TrayOperationTooltipText -Text "computa - Updating startup..."' in script
     assert 'Set-TrayLastAction -Message "Startup update running"' in script
     assert 'Invoke-StartupInstallerJson -ScriptPath $installScript -CommandArgs @($operation, "-Json") -TimeoutSeconds 120 -Source "Startup update"' in script
     assert '$result.Payload.PSObject.Properties["success"]' in script
@@ -4180,11 +4183,11 @@ def test_tray_startup_installer_calls_are_timeout_status_aware() -> None:
     assert '$installerWarning = "$($result.Payload.warning)"' in script
     assert '$startupType = if ([string]::IsNullOrWhiteSpace($installerWarning)) { "Info" } else { "Warning" }' in script
     assert (
-        'Show-Notification -Title "A.B.S.O." -Message $startupMessage -Type $startupType '
+        'Show-Notification -Title "computa" -Message $startupMessage -Type $startupType '
         '-ActionName "Startup" -ActionColor $script:Colors.AccentBlue'
     ) in script
     assert (
-        'Show-Notification -Title "A.B.S.O." -Message "Startup update failed: $($_.Exception.Message)" '
+        'Show-Notification -Title "computa" -Message "Startup update failed: $($_.Exception.Message)" '
         '-Type "Error" -ActionName "Startup" -ActionColor $script:Colors.AccentAmber'
     ) in script
     assert '& powershell.exe @args' not in script

@@ -21,7 +21,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**A.B.S.O.** (**A**daptive **B**attle **S**tation **O**ptimizer) is a CLI-first Windows 11 gaming optimization tool that:
+**computa** (formerly A.B.S.O.; the Python package and internal paths keep the legacy `abso` name) is a CLI-first Windows 11 gaming optimization tool that:
 - Auto-detects gaming hardware (GPU, CPU, monitor, etc.)
 - Audits system configuration for gaming optimization issues
 - Applies game-specific optimization profiles

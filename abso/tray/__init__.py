@@ -1,4 +1,4 @@
-"""A.B.S.O. System Tray Application.
+"""computa System Tray Application.
 
 Ultra-lightweight PowerShell-based tray for quick profile switching.
 
@@ -63,7 +63,7 @@ def get_tray_dir() -> Path:
 
 
 def start_tray() -> None:
-    """Start the A.B.S.O. system tray application."""
+    """Start the computa system tray application."""
     tray_dir = get_tray_dir()
     vbs_path = tray_dir / "ABSO-Tray.vbs"
 
@@ -77,7 +77,7 @@ def start_tray() -> None:
         cwd=str(tray_dir),
         creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0,
     )
-    print("A.B.S.O. tray started.")
+    print("computa tray started.")
 
 
 def install_startup(uninstall: bool = False) -> None:
@@ -265,7 +265,7 @@ def ensure_tray_running(start_if_missing: bool = False) -> dict[str, object]:
 if __name__ == "__main__":
     import argparse
 
-    parser = argparse.ArgumentParser(description="A.B.S.O. System Tray")
+    parser = argparse.ArgumentParser(description="computa System Tray")
     parser.add_argument(
         "--install-startup",
         action="store_true",

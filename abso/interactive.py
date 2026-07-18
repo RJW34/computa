@@ -1,4 +1,4 @@
-"""Interactive CLI interface for ABSO."""
+"""Interactive CLI interface for computa."""
 
 from __future__ import annotations
 
@@ -37,7 +37,7 @@ def clear_screen() -> None:
 def print_header() -> None:
     """Print the application header."""
     header = Text()
-    header.append("ABSO", style="bold cyan")
+    header.append("computa", style="bold cyan")
     header.append(" v0.1.0\n", style="dim")
     header.append("Windows Gaming Optimization Tool", style="italic")
 
@@ -233,7 +233,7 @@ def run_apply_profile(profile_id: str) -> None:
     if not is_admin():
         console.print(Panel(
             "[red]Administrator privileges are required to apply a profile.[/red]\n\n"
-            "Run ABSO as Administrator so backup, preflight, apply, verify, and rollback "
+            "Run computa as Administrator so backup, preflight, apply, verify, and rollback "
             "all operate through the same protected transaction path.",
             title="[red]Apply Blocked[/red]",
             border_style="red",
@@ -296,7 +296,7 @@ def run_apply_profile(profile_id: str) -> None:
             f"[green]Profile '{actual_profile_id}' apply completed.[/green]\n"
             f"{fallback_note}\n"
             f"[dim]Backup ID: {tx.backup_id or 'not created'}[/dim]\n"
-            f"[dim]Run 'abso verify {actual_profile_id}' to confirm handler state.[/dim]\n"
+            f"[dim]Run 'computa verify {actual_profile_id}' to confirm handler state.[/dim]\n"
             f"[dim]Use 'Restore Backup' to undo changes if needed.[/dim]",
             title="[green]Apply Completed[/green]",
             border_style="green"
@@ -568,7 +568,7 @@ def run_interactive() -> None:
     # Check for admin on startup
     if not is_admin():
         console.print()
-        console.print("[yellow]ABSO works best when run as Administrator.[/yellow]")
+        console.print("[yellow]computa works best when run as Administrator.[/yellow]")
         console.print("[dim]Some optimizations require elevated privileges.[/dim]")
         console.print()
 
@@ -614,7 +614,7 @@ def run_interactive() -> None:
 
         elif choice == "q":
             clear_screen()
-            console.print("[bold cyan]Thanks for using ABSO![/bold cyan]")
+            console.print("[bold cyan]Thanks for using computa![/bold cyan]")
             console.print("[dim]No further changes were made.[/dim]")
             console.print()
             break

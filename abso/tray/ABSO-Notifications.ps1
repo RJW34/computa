@@ -254,13 +254,13 @@ function _Derive-ToastTitle {
     # Cutting at 56 chars leaves unclosed parens. Cut at the first " (" or " |"
     # boundary so we keep the profile name intact and drop the mode list.
     $trim = "$RawTitle".Trim()
-    $genericTitles = @("A.B.S.O.", "A.B.S.O", "ABSO", "")
+    $genericTitles = @("computa", "Computa", "A.B.S.O.", "A.B.S.O", "ABSO", "")
     $title = $null
-    if ($genericTitles -notcontains $trim -and $trim -inotlike "A.B.S.O.*") {
+    if ($genericTitles -notcontains $trim -and $trim -inotlike "computa*" -and $trim -inotlike "A.B.S.O*") {
         $title = $trim
     }
-    elseif ($trim -ilike "A.B.S.O.*") {
-        $suffix = ($trim -replace '^A\.B\.S\.O\.?\s*', '').Trim()
+    elseif ($trim -ilike "computa*" -or $trim -ilike "A.B.S.O*") {
+        $suffix = ($trim -replace '^(computa|A\.B\.S\.O\.?)\s*', '').Trim()
         if ($suffix) { $title = $suffix }
     }
     if (-not $title) {
@@ -907,7 +907,7 @@ function Show-ThemedToast {
     Shows a Penumbra editorial notification. Supports stacking, queueing, dedup.
 
     .PARAMETER Title
-    Toast headline. If the generic "A.B.S.O." brand prefix is detected, a
+    Toast headline. If the generic "computa" brand prefix is detected, a
     contextual title is synthesized from the message body instead - the
     eyebrow above already carries the brand and state.
 
@@ -924,7 +924,7 @@ function Show-ThemedToast {
     Optional metadata appended to the footer after the timestamp (e.g. profile id).
     #>
     param(
-        [string]$Title = "A.B.S.O.",
+        [string]$Title = "computa",
         [string]$Message = "",
         [ValidateSet("Info","Warning","Error","Success")]
         [string]$Type = "Info",

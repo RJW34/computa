@@ -1,12 +1,12 @@
-# install.ps1 - A.B.S.O. end-user installer
+# install.ps1 - computa end-user installer
 #
-# Installs a released abso.exe into %LOCALAPPDATA%\AdaptiveBattleStationOptimizer,
+# Installs a released computa.exe into %LOCALAPPDATA%\AdaptiveBattleStationOptimizer,
 # optionally adds it to the user PATH, and launches the first-run setup wizard
-# (elevated). Ship this script next to abso.exe as a release asset.
+# (elevated). Ship this script next to computa.exe as a release asset.
 #
-# Usage (from the folder containing abso.exe):
+# Usage (from the folder containing computa.exe):
 #   powershell -ExecutionPolicy Bypass -File .\install.ps1
-#   powershell -ExecutionPolicy Bypass -File .\install.ps1 -ExePath C:\Downloads\abso.exe
+#   powershell -ExecutionPolicy Bypass -File .\install.ps1 -ExePath C:\Downloads\computa.exe
 #   powershell -ExecutionPolicy Bypass -File .\install.ps1 -NoSetup -NoPath
 
 param(
@@ -18,28 +18,28 @@ param(
 $ErrorActionPreference = "Stop"
 
 $installRoot = Join-Path $env:LOCALAPPDATA "AdaptiveBattleStationOptimizer"
-$installedExe = Join-Path $installRoot "abso.exe"
+$installedExe = Join-Path $installRoot "computa.exe"
 
 # Resolve the source executable: explicit param, else next to this script.
 if ([string]::IsNullOrWhiteSpace($ExePath)) {
-    $ExePath = Join-Path $PSScriptRoot "abso.exe"
+    $ExePath = Join-Path $PSScriptRoot "computa.exe"
 }
 if (-not (Test-Path $ExePath)) {
-    Write-Host "abso.exe not found at: $ExePath" -ForegroundColor Red
-    Write-Host "Download abso.exe from the latest release and place it next to this script,"
-    Write-Host "or pass -ExePath <path-to-abso.exe>."
+    Write-Host "computa.exe not found at: $ExePath" -ForegroundColor Red
+    Write-Host "Download computa.exe from the latest release and place it next to this script,"
+    Write-Host "or pass -ExePath <path-to-computa.exe>."
     exit 1
 }
 
 Write-Host ""
-Write-Host "A.B.S.O. installer" -ForegroundColor Cyan
+Write-Host "computa installer" -ForegroundColor Cyan
 Write-Host "  Source:  $ExePath"
 Write-Host "  Target:  $installedExe"
 Write-Host ""
 
 New-Item -ItemType Directory -Force -Path $installRoot | Out-Null
 Copy-Item -Path $ExePath -Destination $installedExe -Force
-Write-Host "Installed abso.exe." -ForegroundColor Green
+Write-Host "Installed computa.exe." -ForegroundColor Green
 
 if (-not $NoPath) {
     $userPath = [Environment]::GetEnvironmentVariable("Path", "User")
@@ -58,7 +58,7 @@ if (-not $NoPath) {
 if ($NoSetup) {
     Write-Host ""
     Write-Host "Skipped setup. Run this later from an elevated terminal:" -ForegroundColor Yellow
-    Write-Host "  abso setup"
+    Write-Host "  computa setup"
     exit 0
 }
 
@@ -69,12 +69,12 @@ try {
 }
 catch {
     Write-Host "Setup was not started ($($_.Exception.Message))." -ForegroundColor Yellow
-    Write-Host "Run it yourself from an elevated terminal:  abso setup"
+    Write-Host "Run it yourself from an elevated terminal:  computa setup"
 }
 
 Write-Host ""
 Write-Host "Done. Useful commands:" -ForegroundColor Cyan
-Write-Host "  abso profiles      list profiles available on this machine"
-Write-Host "  abso apply <id>    apply a profile (automatic backup first)"
-Write-Host "  abso restore latest  roll back the last apply"
-Write-Host "  abso uninstall     restore the setup baseline and remove ABSO"
+Write-Host "  computa profiles      list profiles available on this machine"
+Write-Host "  computa apply <id>    apply a profile (automatic backup first)"
+Write-Host "  computa restore latest  roll back the last apply"
+Write-Host "  computa uninstall     restore the setup baseline and remove ABSO"

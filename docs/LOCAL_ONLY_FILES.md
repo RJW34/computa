@@ -9,7 +9,7 @@ block silently wins over profile improvements on every apply).
 
 | Path | What it is | Fresh-clone behavior |
 |------|------------|----------------------|
-| `abso.yaml` | This machine's config: DDC/CI controller override, protected peripheral processes, per-profile experiments | Absent — ABSO runs on built-in defaults; create one from `abso.yaml.example` or `abso config --init` |
+| `abso.yaml` | This machine's config: DDC/CI controller override, protected peripheral processes, per-profile experiments | Absent — ABSO runs on built-in defaults; create one from `abso.yaml.example` or `computa config --init` |
 | `workflow.yaml` | Owner's private multi-project orchestration manifest (Citadel ecosystem) | Absent — nothing in ABSO reads it |
 | `abso/tray/themes/<name>/` (except `default/`) | Personal tray theme packs, possibly containing non-redistributable media | Absent — tray uses the self-contained `default` theme |
 | `docs/CURRENT_AGENT_BRIEFING.md` | Live-machine state journal for coding agents (active profile, deploy status, monitor-flicker history) | Absent — see `docs/NEW_MACHINE_SETUP.md` |

@@ -1,8 +1,8 @@
-# A.B.S.O. API Documentation
+# computa API Documentation
 
-**Adaptive Battle Station Optimizer**
+**Per-game Windows optimization**
 
-This document provides detailed API documentation for A.B.S.O.'s core modules and interfaces.
+This document provides detailed API documentation for computa's core modules and interfaces.
 
 ## Table of Contents
 

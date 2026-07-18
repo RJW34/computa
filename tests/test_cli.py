@@ -1,4 +1,4 @@
-"""CLI smoke tests for A.B.S.O."""
+"""CLI smoke tests for computa"""
 
 import json
 from datetime import datetime
@@ -39,7 +39,7 @@ class TestCLIHelp:
         result = runner.invoke(cli, ["--help"])
 
         assert result.exit_code == 0
-        assert "A.B.S.O." in result.output or "abso" in result.output.lower()
+        assert "computa" in result.output or "abso" in result.output.lower()
 
     def test_detect_help(self):
         """Test detect --help doesn't crash."""

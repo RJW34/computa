@@ -303,7 +303,7 @@ Windows VRR: On
 ## Document Metadata
 
 - **Created:** 2024-12-31
-- **Purpose:** A.B.S.O. project knowledge base
+- **Purpose:** computa project knowledge base
 - **Applies to:** Rivals of Aether 2, 300Hz monitors, NVIDIA GPUs
 - **Related files:**
   - `rivals2-300hz-lowest-latency-guide.md`

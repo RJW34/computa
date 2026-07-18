@@ -115,7 +115,7 @@ exe = EXE(
     a.binaries,
     a.datas,
     [],
-    name='abso',
+    name='computa',
     debug=False,
     bootloader_ignore_signals=False,
     # PyInstaller's ``strip`` option invokes an external GNU/Unix ``strip``

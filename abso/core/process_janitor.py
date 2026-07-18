@@ -301,7 +301,8 @@ NEVER_KILL_IMAGES: frozenset[str] = frozenset(
         "Ryujinx.exe",
         "Ryubing.exe",
         # --- ABSO + tray + interpreter (cannot kill self) ---
-        "abso.exe",
+        "computa.exe",
+        "abso.exe",  # pre-rebrand backend name
         "python.exe",
         "pythonw.exe",
         "powershell.exe",

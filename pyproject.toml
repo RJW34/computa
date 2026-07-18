@@ -5,12 +5,12 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "abso"
 version = "1.0.0"
-description = "Adaptive Battle Station Optimizer - Windows 11 gaming optimization CLI"
+description = "computa - per-game Windows 11 gaming optimization CLI"
 readme = "README.md"
 license = {text = "MIT"}
 requires-python = ">=3.11"
 authors = [
-    {name = "RJW34"}
+    {name = "Computa contributors"}
 ]
 keywords = ["gaming", "optimization", "windows", "nvidia", "latency"]
 classifiers = [
@@ -52,9 +52,9 @@ dev = [
 abso = "abso.main:cli"
 
 [project.urls]
-Homepage = "https://github.com/RJW34/A.B.S.O."
-Repository = "https://github.com/RJW34/A.B.S.O."
-Issues = "https://github.com/RJW34/A.B.S.O./issues"
+Homepage = "https://github.com/RJW34/computa"
+Repository = "https://github.com/RJW34/computa"
+Issues = "https://github.com/RJW34/computa/issues"
 
 [tool.setuptools.packages.find]
 where = ["."]

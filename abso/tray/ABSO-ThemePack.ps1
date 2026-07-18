@@ -1,4 +1,4 @@
-# ABSO-ThemePack.ps1 - Selectable icon/sound theme packs for the A.B.S.O. tray
+# ABSO-ThemePack.ps1 - Selectable icon/sound theme packs for the computa tray
 #
 # A theme is a folder under abso/tray/themes/<name>/ containing a theme.json
 # manifest plus any icon (.ico) and sound (.mp3/.wav) assets it references.

@@ -1,4 +1,4 @@
-# ABSO-Icons.ps1 - Dynamic icon generation module for A.B.S.O. tray
+# ABSO-Icons.ps1 - Dynamic icon generation module for computa tray
 # Generates tray icons programmatically using GDI+ with gradients and glow effects
 
 # Icon States:
@@ -2669,7 +2669,7 @@ function New-ActionBitmap {
 
     switch ($Action) {
         "Brand" {
-            # A.B.S.O. angular station mark with a small optimizer spark.
+            # computa angular station mark with a small optimizer spark.
             $g.FillEllipse($glowBrush, 1, 1, 14, 14)
 
             $hexBrush = New-Object System.Drawing.SolidBrush($Color)

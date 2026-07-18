@@ -1,7 +1,7 @@
 # Dolphin Emulator Latency Research Notes
 
 ## Document Purpose
-Comprehensive research notes for Dolphin emulator latency optimization, specifically for Slippi/Melee competitive play. This document serves as a knowledge base for the A.B.S.O. project.
+Comprehensive research notes for Dolphin emulator latency optimization, specifically for Slippi/Melee competitive play. This document serves as a knowledge base for the computa project.
 
 ---
 
@@ -229,7 +229,7 @@ Backend Multithreading: OFF
 ## Document Metadata
 
 - **Created:** 2026-02-02
-- **Purpose:** A.B.S.O. project knowledge base
+- **Purpose:** computa project knowledge base
 - **Applies to:** Slippi Dolphin, Competitive Melee, NVIDIA/AMD GPUs
 - **Related files:**
   - `abso/profiles/slippi_melee.py`

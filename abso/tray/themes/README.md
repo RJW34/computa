@@ -1,6 +1,6 @@
 # Tray Theme Packs
 
-The A.B.S.O. tray's icons and sound cues are themeable. A theme is a folder
+The computa tray's icons and sound cues are themeable. A theme is a folder
 under `abso/tray/themes/<name>/` containing a `theme.json` manifest plus any
 `.ico` / `.mp3` / `.wav` assets it references.
 

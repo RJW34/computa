@@ -13,6 +13,7 @@ import click
 from rich.console import Console
 from rich.panel import Panel
 
+from abso.__version__ import __version__
 from abso.core import state_reconcile, state_store
 from abso.core.app_paths import app_data_dir
 from abso.core.applier import ProfileApplier
@@ -488,10 +489,10 @@ def _build_pending_apply_as_apply_payload(
 
 
 @click.group(invoke_without_command=True)
-@click.version_option(version="0.1.0", prog_name="ABSO")
+@click.version_option(version=__version__, prog_name="computa")
 @click.pass_context
 def cli(ctx) -> None:
-    """ABSO - Windows Gaming Optimization Tool.
+    """computa - per-game Windows optimization.
 
     Detect hardware, audit configuration, and apply game-specific
     optimization profiles for competitive gaming.
@@ -979,7 +980,7 @@ def games(json_output: bool) -> None:
         for profile_name, matched_games in suggestions.items():
             game_names = ", ".join(g.name for g in matched_games)
             console.print(f"  [green]{profile_name}[/green] -> {game_names}")
-        console.print("\nRun [bold]abso apply <profile>[/bold] to optimize.")
+        console.print("\nRun [bold]computa apply <profile>[/bold] to optimize.")
 
 
 @cli.command()
@@ -1284,7 +1285,7 @@ def apply(
             else:
                 console.print(
                     f"\n[green]Profile '{actual_profile_name}' apply completed.[/green] "
-                    f"[dim]Run 'abso verify {actual_profile_name}' to confirm handler state.[/dim]"
+                    f"[dim]Run 'computa verify {actual_profile_name}' to confirm handler state.[/dim]"
                 )
 
             if result.requires_reboot and result.reboot_reasons:
@@ -1292,12 +1293,12 @@ def apply(
                 for reason in result.reboot_reasons:
                     console.print(f"  [yellow]- {reason}[/yellow]")
                 console.print(
-                    f"[dim]Run 'abso verify {actual_profile_name}' to re-check after reboot.[/dim]"
+                    f"[dim]Run 'computa verify {actual_profile_name}' to re-check after reboot.[/dim]"
                 )
             elif result.requires_reboot:
                 console.print("[yellow]Some changes may require a reboot.[/yellow]")
                 console.print(
-                    f"[dim]Run 'abso verify {actual_profile_name}' to re-check after reboot.[/dim]"
+                    f"[dim]Run 'computa verify {actual_profile_name}' to re-check after reboot.[/dim]"
                 )
 
             warning_prefix = "Caution" if apply_summary_level == "caution" else "Warning"
@@ -1703,9 +1704,9 @@ def reapply(json_output: bool) -> None:
     current_profile = get_current_profile()
     if not current_profile:
         if json_output:
-            json_error("No profile has been applied yet. Use 'abso apply <profile>' first.")
+            json_error("No profile has been applied yet. Use 'computa apply <profile>' first.")
         console.print("[red]Error: No profile has been applied yet.[/red]")
-        console.print("Use [bold]abso apply <profile>[/bold] first.")
+        console.print("Use [bold]computa apply <profile>[/bold] first.")
         sys.exit(1)
 
     try:
@@ -1900,7 +1901,7 @@ def reapply(json_output: bool) -> None:
             else:
                 console.print(
                     f"\n[green]Profile '{actual_profile}' re-apply completed.[/green] "
-                    f"[dim]Run 'abso verify {actual_profile}' to confirm handler state.[/dim]"
+                    f"[dim]Run 'computa verify {actual_profile}' to confirm handler state.[/dim]"
                 )
             warning_prefix = "Caution" if summary_level == "caution" else "Warning"
             for warning in warnings:
@@ -2087,7 +2088,7 @@ def restore(backup_id: str, json_output: bool) -> None:
 def uninstall(json_output: bool, assume_yes: bool, skip_restore: bool) -> None:
     """Restore the setup baseline and remove ABSO from this system.
 
-    Restores the baseline backup captured by 'abso setup' (system settings as
+    Restores the baseline backup captured by 'computa setup' (system settings as
     they were before ABSO), removes the tray's Windows-startup registration,
     and clears ABSO's active-profile state. Folders that may hold a running
     executable or your own data (the install folder, backups/, %APPDATA%\\ABSO)
@@ -2113,7 +2114,7 @@ def uninstall(json_output: bool, assume_yes: bool, skip_restore: bool) -> None:
             baseline_id = sorted(item["id"] for item in baselines)[0]
 
     if not json_output:
-        console.print(Panel("Uninstall A.B.S.O.", style="bold red"))
+        console.print(Panel("Uninstall computa", style="bold red"))
         if skip_restore:
             console.print("System settings will be left exactly as they are now.")
         elif baseline_id:
@@ -2121,7 +2122,7 @@ def uninstall(json_output: bool, assume_yes: bool, skip_restore: bool) -> None:
         else:
             console.print(
                 "[yellow]No baseline backup found — system settings will be left as "
-                "they are now. Use 'abso restore <id>' first if you want a specific "
+                "they are now. Use 'computa restore <id>' first if you want a specific "
                 "backup restored.[/yellow]"
             )
         if not assume_yes and not click.confirm("Continue?", default=False):
@@ -2413,7 +2414,7 @@ def report(profile_name: str, json_output: bool) -> None:
 @click.option("--uninstall-startup", is_flag=True, help="Remove tray from Windows startup")
 @click.option("--startup-status", is_flag=True, help="Show tray startup registration status")
 def tray(install_startup: bool, uninstall_startup: bool, startup_status: bool) -> None:
-    """Launch the A.B.S.O. system tray application.
+    """Launch the computa system tray application.
 
     The tray provides quick access to profile switching via left-click menu.
     It automatically pauses during gaming and restarts when the game exits.
@@ -2657,7 +2658,7 @@ def config(init: bool, show: bool) -> None:
     if show:
         if not config_manager.config_path.exists():
             console.print("[yellow]No configuration file found.[/yellow]")
-            console.print("Run [bold]abso config --init[/bold] to create one.")
+            console.print("Run [bold]computa config --init[/bold] to create one.")
             return
 
         console.print(Panel("Current Configuration", style="bold blue"))
@@ -2694,8 +2695,8 @@ def config(init: bool, show: bool) -> None:
         return
 
     # Default: show help
-    console.print("Use [bold]abso config --init[/bold] to create a configuration file.")
-    console.print("Use [bold]abso config --show[/bold] to view current settings.")
+    console.print("Use [bold]computa config --init[/bold] to create a configuration file.")
+    console.print("Use [bold]computa config --show[/bold] to view current settings.")
 
 
 @cli.command()
@@ -2941,9 +2942,9 @@ def benchmark_capture(
     evidence the quality rubric requires for "measured"/"optimal" grading.
     Run with the game already running:
 
-        abso benchmark-capture overwatch2-gsync-hdr --label baseline
+        computa benchmark-capture overwatch2-gsync-hdr --label baseline
         # (apply the profile, then relaunch/observe)
-        abso benchmark-capture overwatch2-gsync-hdr --label after
+        computa benchmark-capture overwatch2-gsync-hdr --label after
     """
     from rich.table import Table
 
@@ -2972,7 +2973,7 @@ def benchmark_capture(
                 f"[yellow]No benchmark artifacts stored for {profile_name} yet.[/yellow]"
             )
             console.print(
-                "[dim]Run 'abso benchmark-capture <profile> --label baseline' "
+                "[dim]Run 'computa benchmark-capture <profile> --label baseline' "
                 "with the game running.[/dim]"
             )
             return
@@ -3264,7 +3265,7 @@ def profile_create(
 
     Generates a starter YAML in ~/.abso/profiles/ that you can customize.
 
-    Example: abso profile-create my-game --game "My Game" --exe MyGame.exe --base reflex_shooter
+    Example: computa profile-create my-game --game "My Game" --exe MyGame.exe --base reflex_shooter
     """
     if not is_valid_profile_id(profile_id):
         console.print(
@@ -3307,7 +3308,7 @@ def profile_create(
     output_path.write_text(yaml_content, encoding="utf-8")
     console.print(f"[green]Profile created: {output_path}[/green]")
     console.print(
-        "Edit the YAML to customize, then run [bold]abso profiles[/bold] to confirm it loads."
+        "Edit the YAML to customize, then run [bold]computa profiles[/bold] to confirm it loads."
     )
 
 
@@ -3738,7 +3739,7 @@ def reset_display(json_output: bool, method: str, hotkey_repeat: int) -> None:
 
 # Official repository for release update checks; ABSO_UPDATE_REPO overrides
 # (owner/name) so forks can point at their own releases.
-DEFAULT_UPDATE_REPO = "RJW34/A.B.S.O."
+DEFAULT_UPDATE_REPO = "RJW34/computa"
 
 
 def _version_sort_key(version: str) -> tuple[int, ...]:
@@ -3760,8 +3761,6 @@ def update_check(json_output: bool) -> None:
     """
     import urllib.error
     import urllib.request
-
-    from abso.__version__ import __version__
 
     repo = os.environ.get("ABSO_UPDATE_REPO", DEFAULT_UPDATE_REPO)
     url = f"https://api.github.com/repos/{repo}/releases/latest"

@@ -132,7 +132,7 @@ class BenchmarkReportGenerator:
 
         # --- Header ---
         lines.append(separator)
-        lines.append("  A.B.S.O. Benchmark Report")
+        lines.append("  computa Benchmark Report")
         lines.append(separator)
         lines.append(f"  Timestamp : {datetime.now(tz=UTC).strftime('%Y-%m-%d %H:%M:%S UTC')}")
         if profile_id:
@@ -222,7 +222,7 @@ class BenchmarkReportGenerator:
 
         # --- Header ---
         lines.append(separator)
-        lines.append("  A.B.S.O. Benchmark Comparison Report")
+        lines.append("  computa Benchmark Comparison Report")
         lines.append(separator)
         lines.append(f"  Timestamp : {datetime.now(tz=UTC).strftime('%Y-%m-%d %H:%M:%S UTC')}")
         if profile_id:
