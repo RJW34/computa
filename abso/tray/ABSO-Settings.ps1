@@ -25,6 +25,9 @@ function Get-DefaultConfig {
         }
         showQuickPanel  = $false
         animationSpeed  = "normal"
+        # Icon/sound theme pack: a folder name under abso/tray/themes/.
+        # Takes effect on tray restart. See themes/README.md.
+        theme           = "default"
         recentProfiles  = @()
         profileHistory  = @()
         lastProfileState = $null

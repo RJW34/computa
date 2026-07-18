@@ -57,6 +57,13 @@ reports/
 tools/
 *.log
 
+# Tray theme packs: only the default theme (and docs) ship with the repo.
+# Personal/local themes — including media without redistribution rights —
+# stay on this machine.
+abso/tray/themes/*
+!abso/tray/themes/README.md
+!abso/tray/themes/default/
+
 # Session files
 SESSION_BOOKMARK.md
 IMPROVEMENT_PLAN.md

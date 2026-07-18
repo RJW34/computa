@@ -1,0 +1,19 @@
+{
+  "name": "ABSO Default",
+  "description": "Generated tray icons with Windows system sound cues. No media files required. Copy this folder to create your own theme - see themes/README.md.",
+  "icons": {
+    "idle": null,
+    "active": null,
+    "gaming": null,
+    "applying": null,
+    "warning": null,
+    "error": null,
+    "applySequence": []
+  },
+  "sounds": {
+    "success": "system:Asterisk",
+    "fail": "system:Hand",
+    "vrrWarning": "system:Exclamation",
+    "restart": "system:Asterisk"
+  }
+}

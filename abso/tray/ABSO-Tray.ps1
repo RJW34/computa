@@ -162,6 +162,7 @@ function Apply-DwmWindowEffects {
 
 $script:ScriptDir = $PSScriptRoot
 . (Join-Path $script:ScriptDir "ABSO-Theme.ps1")
+. (Join-Path $script:ScriptDir "ABSO-ThemePack.ps1")
 . (Join-Path $script:ScriptDir "ABSO-Icons.ps1")
 . (Join-Path $script:ScriptDir "ABSO-Notifications.ps1")
 . (Join-Path $script:ScriptDir "ABSO-Settings.ps1")
@@ -172,10 +173,9 @@ $script:ScriptDir = $PSScriptRoot
 # SOUND EFFECTS
 # ============================================================================
 
-$script:SoundFile = Join-Path $PSScriptRoot "pokemon-red_blue_yellow-save-game-sound-effect.mp3"
-$script:FailSoundFile = Join-Path $PSScriptRoot "hit-weak-not-very-effective.mp3"
-$script:VrrWarningSoundFile = Join-Path $PSScriptRoot "oot_navi_hey1.mp3"
-$script:RestartSoundFile = Join-Path $PSScriptRoot "pokemon-redblueyellow-item-found-sound-effect.mp3"
+# Sound cues resolve through the active theme pack (ABSO-ThemePack.ps1):
+# each event maps to a media file, a Windows system sound, or silence. The
+# built-in defaults are system sounds, so no media files need to ship.
 $script:MediaPlayer = $null
 $script:RestartSoundMarkerMaxAgeSeconds = 180
 try {
@@ -215,12 +215,14 @@ function Play-SoundFile {
 function Play-SuccessSound {
     try {
         if (-not $script:TrayConfig.soundEnabled) { return }
-        if (Test-Path $script:SoundFile) {
-            Play-SoundFile -FilePath $script:SoundFile -Volume $script:TrayConfig.soundVolume
+        $cue = Get-ThemeSoundCue -SoundEvent "success"
+        if ($cue.Type -eq "file") {
+            Play-SoundFile -FilePath $cue.Path -Volume $script:TrayConfig.soundVolume
             Write-TrayLog "Playing success sound"
         }
-        else {
-            Write-TrayLog "Sound file not found: $($script:SoundFile)" -Level "WARN"
+        elseif ($cue.Type -eq "system") {
+            Play-SystemSoundCue -Name $cue.Name | Out-Null
+            Write-TrayLog "Playing success system cue ($($cue.Name))"
         }
     }
     catch {
@@ -231,9 +233,14 @@ function Play-SuccessSound {
 function Play-FailSound {
     try {
         if (-not $script:TrayConfig.soundEnabled) { return }
-        if (Test-Path $script:FailSoundFile) {
-            Play-SoundFile -FilePath $script:FailSoundFile -Volume ([Math]::Min(1.0, $script:TrayConfig.soundVolume * 3))
+        $cue = Get-ThemeSoundCue -SoundEvent "fail"
+        if ($cue.Type -eq "file") {
+            Play-SoundFile -FilePath $cue.Path -Volume ([Math]::Min(1.0, $script:TrayConfig.soundVolume * 3))
             Write-TrayLog "Playing fail sound"
+        }
+        elseif ($cue.Type -eq "system") {
+            Play-SystemSoundCue -Name $cue.Name | Out-Null
+            Write-TrayLog "Playing fail system cue ($($cue.Name))"
         }
     }
     catch {
@@ -244,13 +251,14 @@ function Play-FailSound {
 function Play-VrrWarningSound {
     try {
         if (-not $script:TrayConfig.soundEnabled) { return }
-        if (Test-Path $script:VrrWarningSoundFile) {
-            Play-SoundFile -FilePath $script:VrrWarningSoundFile -Volume ([Math]::Min(1.0, $script:TrayConfig.soundVolume * 2.5))
+        $cue = Get-ThemeSoundCue -SoundEvent "vrrWarning"
+        if ($cue.Type -eq "file") {
+            Play-SoundFile -FilePath $cue.Path -Volume ([Math]::Min(1.0, $script:TrayConfig.soundVolume * 2.5))
             Write-TrayLog "Playing VRR warning sound"
         }
-        else {
-            Write-TrayLog "VRR warning sound file not found: $($script:VrrWarningSoundFile)" -Level "WARN"
-            Play-FailSound
+        elseif ($cue.Type -eq "system") {
+            Play-SystemSoundCue -Name $cue.Name | Out-Null
+            Write-TrayLog "Playing VRR warning system cue ($($cue.Name))"
         }
     }
     catch {
@@ -266,10 +274,17 @@ function Play-RestartSound {
             return
         }
 
-        if (-not (Test-Path $script:RestartSoundFile)) {
-            Write-TrayLog "Restart sound file not found: $($script:RestartSoundFile)" -Level "WARN"
+        $cue = Get-ThemeSoundCue -SoundEvent "restart"
+        if ($cue.Type -eq "none") {
+            Write-TrayLog "Restart sound skipped (theme silences it)"
             return
         }
+        if ($cue.Type -eq "system") {
+            Play-SystemSoundCue -Name $cue.Name | Out-Null
+            Write-TrayLog "Playing restart system cue ($($cue.Name))"
+            return
+        }
+        $restartSoundPath = $cue.Path
 
         if (-not ("AbsoMci" -as [type])) {
             Add-Type -TypeDefinition @"
@@ -287,7 +302,7 @@ public static class AbsoMci {
         $alias = "abso_restart_$PID"
 
         $errBuf = New-Object System.Text.StringBuilder 260
-        $openRc = [AbsoMci]::mciSendStringW("open `"$($script:RestartSoundFile)`" type mpegvideo alias $alias", $errBuf, $errBuf.Capacity, [IntPtr]::Zero)
+        $openRc = [AbsoMci]::mciSendStringW("open `"$restartSoundPath`" type mpegvideo alias $alias", $errBuf, $errBuf.Capacity, [IntPtr]::Zero)
         if ($openRc -ne 0) {
             throw "MCI open failed (code=$openRc, detail='$($errBuf.ToString())')"
         }
@@ -307,7 +322,9 @@ public static class AbsoMci {
         Write-TrayLog "Failed to play restart sound via MCI: $($_.Exception.Message)" -Level "WARN"
         # Fallback to shared MediaPlayer to keep behavior resilient on systems where MCI MP3 is unavailable.
         try {
-            Play-SoundFile -FilePath $script:RestartSoundFile -Volume $script:TrayConfig.soundVolume
+            $fallbackCue = Get-ThemeSoundCue -SoundEvent "restart"
+            if ($fallbackCue.Type -ne "file") { return }
+            Play-SoundFile -FilePath $fallbackCue.Path -Volume $script:TrayConfig.soundVolume
             Start-Sleep -Milliseconds 350
             Write-TrayLog "Restart sound fallback played via MediaPlayer"
         }
@@ -998,23 +1015,14 @@ function Test-SoundFilesExist {
     $script:SoundFilesChecked = $true
     $script:SoundFilesValid = $true
 
-    if (-not (Test-Path $script:SoundFile)) {
-        Write-TrayLog "SUCCESS SOUND FILE MISSING: $($script:SoundFile)" -Level "WARN"
-        $script:SoundFilesValid = $false
+    foreach ($soundEvent in @("success", "fail", "vrrWarning", "restart")) {
+        $cue = Get-ThemeSoundCue -SoundEvent $soundEvent
+        if ($cue.Type -eq "file" -and -not (Test-Path $cue.Path)) {
+            Write-TrayLog "THEME SOUND FILE MISSING ($soundEvent): $($cue.Path)" -Level "WARN"
+            $script:SoundFilesValid = $false
+        }
     }
-    if (-not (Test-Path $script:FailSoundFile)) {
-        Write-TrayLog "FAIL SOUND FILE MISSING: $($script:FailSoundFile)" -Level "WARN"
-        $script:SoundFilesValid = $false
-    }
-    if (-not (Test-Path $script:VrrWarningSoundFile)) {
-        Write-TrayLog "VRR WARNING SOUND FILE MISSING: $($script:VrrWarningSoundFile)" -Level "WARN"
-        $script:SoundFilesValid = $false
-    }
-    if (-not (Test-Path $script:RestartSoundFile)) {
-        Write-TrayLog "RESTART SOUND FILE MISSING: $($script:RestartSoundFile)" -Level "WARN"
-        $script:SoundFilesValid = $false
-    }
-    if ($script:SoundFilesValid) { Write-TrayLog "Sound files validated" }
+    if ($script:SoundFilesValid) { Write-TrayLog "Theme sound cues validated" }
     return $script:SoundFilesValid
 }
 
@@ -2254,6 +2262,7 @@ function Write-TrayRuntimeMarker {
         $moduleHashes = [ordered]@{}
         foreach ($moduleName in @(
             "ABSO-Theme.ps1",
+            "ABSO-ThemePack.ps1",
             "ABSO-Icons.ps1",
             "ABSO-Notifications.ps1",
             "ABSO-Settings.ps1",
@@ -4822,7 +4831,7 @@ function Wait-ExplorerShellReady {
 function Play-ApplySuccessIconAnimation {
     <#
     .SYNOPSIS
-    Plays "Pokeball -> pop -> Swampert" confirmation sequence, then stays on Active.
+    Plays the active theme's apply-success frame sequence, then stays on Active.
     #>
     try {
         $frames = Get-ApplySuccessIcons
@@ -4842,7 +4851,7 @@ function Play-ApplySuccessIconAnimation {
             Start-Sleep -Milliseconds $durations[$i]
         }
 
-        # Final frame is the steady active icon (Swampert)
+        # Final frame is the steady active icon
         Set-IconSafe -NewIcon $frames[$frames.Count - 1]
     }
     catch {

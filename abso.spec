@@ -18,7 +18,7 @@ EXCLUDES = [
 
 ROOT_DIR = Path(globals().get('__file__', 'abso.spec')).resolve().parent
 TRAY_DIR = ROOT_DIR / 'abso' / 'tray'
-TRAY_BUNDLE_EXTENSIONS = {'.ico', '.json', '.mp3', '.ps1', '.vbs'}
+TRAY_BUNDLE_EXTENSIONS = {'.ico', '.json', '.mp3', '.ps1', '.vbs', '.wav'}
 TRAY_BUNDLE_EXCLUDE_FILENAMES = {
     # Deprecated ad-hoc diagnostics used broad process killing and should not
     # ship into the one-file fallback bundle.
@@ -47,7 +47,25 @@ def _tray_data_files():
     ]
 
 
+def _tray_theme_data_files():
+    # Theme packs live in per-theme subfolders; whatever themes exist at build
+    # time (always themes/default, plus any local personal themes) ship with
+    # the bundle, preserving the themes/<name>/ layout.
+    themes_dir = TRAY_DIR / 'themes'
+    if not themes_dir.exists():
+        return []
+    return [
+        (
+            _repo_relative(path),
+            'abso\\tray\\' + '\\'.join(path.parent.relative_to(TRAY_DIR).parts),
+        )
+        for path in sorted(themes_dir.rglob('*'), key=lambda item: str(item).lower())
+        if path.is_file() and path.suffix.lower() in TRAY_BUNDLE_EXTENSIONS
+    ]
+
+
 TRAY_DATA_FILES = _tray_data_files()
+TRAY_THEME_DATA_FILES = _tray_theme_data_files()
 
 a = Analysis(
     ['abso\\__main__.py'],
@@ -62,7 +80,7 @@ a = Analysis(
         ('abso\\core\\manifests\\game_detection.json', 'abso\\core\\manifests'),
         ('abso\\core\\manifests\\integration_test_matrix.json', 'abso\\core\\manifests'),
         ('abso\\core\\manifests\\linter_rules.json', 'abso\\core\\manifests'),
-    ] + TRAY_DATA_FILES,
+    ] + TRAY_DATA_FILES + TRAY_THEME_DATA_FILES,
     hiddenimports=[
         'win32gui', 'win32process', 'win32security', 'pynvml', 'abso.core.vrr',
         # Process Lasso-class session-runtime modules. These are imported

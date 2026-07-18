@@ -3,11 +3,14 @@
 
 # Icon States:
 #   Idle            - Computer sprite (default ready state)
-#   Active          - Swampert (profile applied)
-#   Gaming          - Swampert (game detected and running)
-#   Applying        - Pokeball (profile being applied)
+#   Active          - Green check glow (profile applied)
+#   Gaming          - Blue play glow (game detected and running)
+#   Applying        - Purple spinner glow (profile being applied)
 #   Warning         - Orange warning indicator
 #   Error           - Red error indicator
+#
+# The active theme pack (ABSO-ThemePack.ps1) may override any state with an
+# .ico file; the generated icons above are the always-available fallback.
 
 Add-Type -TypeDefinition @"
 using System;
@@ -117,21 +120,16 @@ function New-ComputerIdleIcon {
 function Get-ApplySuccessIcons {
     <#
     .SYNOPSIS
-    Returns icon sequence for "pokeball -> pop -> Swampert".
+    Returns the active theme's apply-success animation frame sequence.
+    Empty when the theme defines none (the caller then skips the animation).
     #>
-    $iconDir = $PSScriptRoot
-    $paths = @(
-        (Join-Path $iconDir "favicon.ico"),
-        (Join-Path $iconDir "icon0260_f00_s0.ico"),
-        (Join-Path $iconDir "icon0260_f01_s0.ico"),
-        (Join-Path $iconDir "260 Swampert.ico")
-    )
-
     $icons = @()
-    foreach ($path in $paths) {
-        $icon = Get-IconFromIcoPath -Path $path
-        if ($icon) {
-            $icons += $icon
+    if (Get-Command Get-ThemeApplySequencePaths -ErrorAction SilentlyContinue) {
+        foreach ($path in (Get-ThemeApplySequencePaths)) {
+            $icon = Get-IconFromIcoPath -Path $path
+            if ($icon) {
+                $icons += $icon
+            }
         }
     }
     return $icons
@@ -318,31 +316,19 @@ function New-StateIcon {
         [string]$State = "Idle"
     )
 
-    $iconDir = $PSScriptRoot
+    # Active theme pack icon first, then the generated fallback.
+    if (Get-Command Get-ThemeIconPath -ErrorAction SilentlyContinue) {
+        $themedPath = Get-ThemeIconPath -State $State
+        if ($themedPath) {
+            $themedIcon = Get-IconFromIcoPath -Path $themedPath
+            if ($themedIcon) {
+                return $themedIcon
+            }
+        }
+    }
 
-    # Primary themed icon mapping first
     if ($State -eq "Idle") {
-        $idlePath = Join-Path $iconDir "pokemon_pc_idle.ico"
-        $idleIcon = Get-IconFromIcoPath -Path $idlePath
-        if ($idleIcon) {
-            return $idleIcon
-        }
         return New-ComputerIdleIcon
-    }
-
-    $themedPath = $null
-    if ($State -eq "Applying") {
-        $themedPath = Join-Path $iconDir "favicon.ico"
-    }
-    elseif ($State -eq "Active" -or $State -eq "Gaming") {
-        $themedPath = Join-Path $iconDir "260 Swampert.ico"
-    }
-
-    if ($themedPath) {
-        $themedIcon = Get-IconFromIcoPath -Path $themedPath
-        if ($themedIcon) {
-            return $themedIcon
-        }
     }
 
     $colors = $script:IconColors[$State]

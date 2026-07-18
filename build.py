@@ -38,7 +38,7 @@ GUI_DIR = ROOT_DIR / "gui"
 GUI_BINARIES_DIR = GUI_DIR / "src-tauri" / "binaries"
 APP_DIR_NAME = "AdaptiveBattleStationOptimizer"
 GUI_EXE_NAME = "abso-gui.exe"
-TRAY_RUNTIME_EXTENSIONS = frozenset({".ico", ".json", ".mp3", ".ps1", ".vbs"})
+TRAY_RUNTIME_EXTENSIONS = frozenset({".ico", ".json", ".mp3", ".ps1", ".vbs", ".wav"})
 TRAY_DEPLOY_EXCLUDE_FILENAMES = frozenset({
     # Deprecated ad-hoc diagnostics used broad process killing and should not
     # ship into the installed tray runtime.
@@ -50,6 +50,18 @@ TRAY_DEPLOY_EXCLUDE_FILENAMES = frozenset({
 TRAY_OBSOLETE_SIDECAR_FILENAMES = frozenset({
     "__init__.py",
     *TRAY_DEPLOY_EXCLUDE_FILENAMES,
+    # Pre-theme-pack media that used to sit in the tray root; these assets now
+    # live under themes/<name>/ and stale root copies should not linger in the
+    # installed runtime.
+    "260 Swampert.ico",
+    "pokemon_pc_idle.ico",
+    "favicon.ico",
+    "icon0260_f00_s0.ico",
+    "icon0260_f01_s0.ico",
+    "pokemon-red_blue_yellow-save-game-sound-effect.mp3",
+    "hit-weak-not-very-effective.mp3",
+    "oot_navi_hey1.mp3",
+    "pokemon-redblueyellow-item-found-sound-effect.mp3",
 })
 
 
@@ -272,6 +284,16 @@ def _iter_tray_runtime_files(tray_source: Path):
             yield path
 
 
+def _iter_tray_theme_files(tray_source: Path):
+    """Yield (source, relative) pairs for theme-pack files under themes/."""
+    themes_source = tray_source / "themes"
+    if not themes_source.exists():
+        return
+    for path in sorted(themes_source.rglob("*"), key=lambda item: str(item).lower()):
+        if path.is_file() and path.suffix.lower() in TRAY_RUNTIME_EXTENSIONS:
+            yield path, path.relative_to(tray_source)
+
+
 def _remove_obsolete_tray_sidecars(tray_target: Path) -> list[str]:
     """Remove known stale sidecar files that no current tray runtime reads."""
     removed: list[str] = []
@@ -396,6 +418,12 @@ def deploy_local_runtime(install_dir: Path | None = None) -> dict[str, object]:
         for path in _iter_tray_runtime_files(tray_source):
             tray_files += 1
             if _copy_file_if_changed(path, tray_target / path.name):
+                tray_updated_files += 1
+        for path, relative in _iter_tray_theme_files(tray_source):
+            theme_target = tray_target / relative
+            theme_target.parent.mkdir(parents=True, exist_ok=True)
+            tray_files += 1
+            if _copy_file_if_changed(path, theme_target):
                 tray_updated_files += 1
     tray_removed_files = _remove_obsolete_tray_sidecars(tray_target)
 
