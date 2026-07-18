@@ -967,7 +967,7 @@ def test_settings_panel_command_buttons_use_action_icons() -> None:
     )[0]
 
     assert (
-        '$profilesFolderBtn.Image = New-ActionBitmap -Action "Folder" -Color ([System.Drawing.Color]::FromArgb(255, 190, 190, 195))'
+        '$profilesFolderBtn.Image = New-ActionBitmap -Action "Folder" -Color ([System.Drawing.Color]::FromArgb(255, 155, 180, 178))'
         in settings_panel_section
     )
     assert (
@@ -975,7 +975,7 @@ def test_settings_panel_command_buttons_use_action_icons() -> None:
         in settings_panel_section
     )
     assert (
-        '$closeBtn.Image = New-ActionBitmap -Action "Close" -Color ([System.Drawing.Color]::FromArgb(255, 190, 190, 195))'
+        '$closeBtn.Image = New-ActionBitmap -Action "Close" -Color ([System.Drawing.Color]::FromArgb(255, 155, 180, 178))'
         in settings_panel_section
     )
     assert (
@@ -1128,7 +1128,7 @@ def test_profile_launcher_uses_readable_spacing_and_plain_choice_labels() -> Non
     # legibility); section eyebrows stay dim mist with a whisper of accent.
     assert "? MixColor(e.Item.ForeColor, TextPaper, 0.35)" in script
     assert ": MixColor(TextMist, e.Item.ForeColor, 0.30);" in script
-    assert "private static readonly Color TextPaper = Color.FromArgb(255, 232, 238, 246);" in script
+    assert "private static readonly Color TextPaper = Color.FromArgb(255, 222, 237, 234);" in script
     assert 'Color rowTextColor = e.Item.AccessibleName == "__backup_menu_item__" ? TextMist : TextPaper;' in script
     assert '$variantLabel = if ($VariantCount -eq 1) { "1 choice" } else { "$VariantCount choices" }' in script
     assert '$profileVariantChip = ""' in script

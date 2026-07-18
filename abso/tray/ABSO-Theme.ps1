@@ -17,73 +17,77 @@ function New-TrayThemeColor {
 }
 
 function Get-TrayThemePalette {
+    # "Phosphor bench instrument" tokens — shared with the computa GUI so the
+    # tray, toasts, quick panel, and desktop app read as one device. Ink
+    # surfaces carry a blue-green cast (deep bench, not neutral gray);
+    # phosphor teal is the single dominant signal, amber the secondary.
     $palette = @{
         # Ink surface stack.
-        Ink000          = New-TrayThemeColor 255 8 11 17
-        Ink100          = New-TrayThemeColor 255 14 18 26
-        Ink150          = New-TrayThemeColor 255 17 21 31
-        Ink200          = New-TrayThemeColor 255 19 24 36
-        Ink250          = New-TrayThemeColor 255 22 28 41
-        Ink300          = New-TrayThemeColor 255 27 34 48
-        Ink400          = New-TrayThemeColor 255 36 48 71
-        Ink500          = New-TrayThemeColor 255 47 59 83
+        Ink000          = New-TrayThemeColor 255 5 11 14
+        Ink100          = New-TrayThemeColor 255 9 17 21
+        Ink150          = New-TrayThemeColor 255 11 20 25
+        Ink200          = New-TrayThemeColor 255 13 23 28
+        Ink250          = New-TrayThemeColor 255 16 28 34
+        Ink300          = New-TrayThemeColor 255 21 36 43
+        Ink400          = New-TrayThemeColor 255 28 48 56
+        Ink500          = New-TrayThemeColor 255 36 61 70
 
         # Text and rules.
-        Paper           = New-TrayThemeColor 255 232 238 246
-        Mist            = New-TrayThemeColor 255 150 162 183
-        Fog             = New-TrayThemeColor 255 92 104 128
+        Paper           = New-TrayThemeColor 255 222 237 234
+        Mist            = New-TrayThemeColor 255 133 160 163
+        Fog             = New-TrayThemeColor 255 84 106 110
         Rule            = New-TrayThemeColor 70 0 245 212
-        RuleSoft        = New-TrayThemeColor 255 26 34 51
-        RuleStrong      = New-TrayThemeColor 255 41 54 78
+        RuleSoft        = New-TrayThemeColor 255 18 32 38
+        RuleStrong      = New-TrayThemeColor 255 29 52 57
 
         # Brand and status signals.
         Signal          = New-TrayThemeColor 255 0 245 212
         SignalRule      = New-TrayThemeColor 70 0 245 212
-        Success         = New-TrayThemeColor 255 123 227 158
-        Warning         = New-TrayThemeColor 255 229 165 71
-        Danger          = New-TrayThemeColor 255 255 107 107
-        Info            = New-TrayThemeColor 255 111 184 255
+        Success         = New-TrayThemeColor 255 61 222 147
+        Warning         = New-TrayThemeColor 255 245 184 64
+        Danger          = New-TrayThemeColor 255 255 92 120
+        Info            = New-TrayThemeColor 255 82 199 244
         Orchid          = New-TrayThemeColor 255 183 156 255
 
         # Category accents. These should decorate structure, icons, and chips,
         # not replace the primary row text color.
         CategoryDesktop = New-TrayThemeColor 255 0 245 212
-        CategoryFighting = New-TrayThemeColor 255 255 123 123
-        CategoryShooter = New-TrayThemeColor 255 111 184 255
+        CategoryFighting = New-TrayThemeColor 255 255 110 122
+        CategoryShooter = New-TrayThemeColor 255 82 199 244
         CategoryRpg     = New-TrayThemeColor 255 183 156 255
-        CategoryOther   = New-TrayThemeColor 255 123 227 158
-        CategoryActions = New-TrayThemeColor 255 229 165 71
-        CategorySettings = New-TrayThemeColor 255 166 176 197
+        CategoryOther   = New-TrayThemeColor 255 61 222 147
+        CategoryActions = New-TrayThemeColor 255 245 184 64
+        CategorySettings = New-TrayThemeColor 255 146 172 175
 
         # Legacy keys kept so existing callsites inherit the refreshed system.
-        Background      = New-TrayThemeColor 255 14 18 26
-        BackgroundDark  = New-TrayThemeColor 255 8 11 17
-        BackgroundLight = New-TrayThemeColor 255 27 34 48
-        Hover           = New-TrayThemeColor 255 36 48 71
-        HoverBright     = New-TrayThemeColor 255 47 59 83
-        Text            = New-TrayThemeColor 255 232 238 246
-        TextDim         = New-TrayThemeColor 255 150 162 183
-        TextDisabled    = New-TrayThemeColor 255 92 104 128
-        Border          = New-TrayThemeColor 255 41 54 78
-        Separator       = New-TrayThemeColor 255 26 34 51
+        Background      = New-TrayThemeColor 255 9 17 21
+        BackgroundDark  = New-TrayThemeColor 255 5 11 14
+        BackgroundLight = New-TrayThemeColor 255 21 36 43
+        Hover           = New-TrayThemeColor 255 28 48 56
+        HoverBright     = New-TrayThemeColor 255 36 61 70
+        Text            = New-TrayThemeColor 255 222 237 234
+        TextDim         = New-TrayThemeColor 255 133 160 163
+        TextDisabled    = New-TrayThemeColor 255 84 106 110
+        Border          = New-TrayThemeColor 255 29 52 57
+        Separator       = New-TrayThemeColor 255 18 32 38
         AccentGold      = New-TrayThemeColor 255 0 245 212
-        AccentGreen     = New-TrayThemeColor 255 123 227 158
-        AccentBlue      = New-TrayThemeColor 255 111 184 255
+        AccentGreen     = New-TrayThemeColor 255 61 222 147
+        AccentBlue      = New-TrayThemeColor 255 82 199 244
         AccentPurple    = New-TrayThemeColor 255 183 156 255
-        AccentAmber     = New-TrayThemeColor 255 229 165 71
-        AccentRed       = New-TrayThemeColor 255 255 107 107
-        AccentTeal      = New-TrayThemeColor 255 63 184 171
-        FavoriteStar    = New-TrayThemeColor 255 229 165 71
-        CatFighting     = New-TrayThemeColor 255 255 123 123
+        AccentAmber     = New-TrayThemeColor 255 245 184 64
+        AccentRed       = New-TrayThemeColor 255 255 92 120
+        AccentTeal      = New-TrayThemeColor 255 64 201 181
+        FavoriteStar    = New-TrayThemeColor 255 255 203 84
+        CatFighting     = New-TrayThemeColor 255 255 110 122
         CatARPG         = New-TrayThemeColor 255 183 156 255
-        CatShooter      = New-TrayThemeColor 255 111 184 255
-        CatStreaming    = New-TrayThemeColor 255 77 216 201
-        CatOther        = New-TrayThemeColor 255 123 227 158
-        CatProd         = New-TrayThemeColor 255 229 165 71
+        CatShooter      = New-TrayThemeColor 255 82 199 244
+        CatStreaming    = New-TrayThemeColor 255 64 201 181
+        CatOther        = New-TrayThemeColor 255 61 222 147
+        CatProd         = New-TrayThemeColor 255 245 184 64
         Lagoon          = New-TrayThemeColor 255 0 245 212
-        Moss            = New-TrayThemeColor 255 123 227 158
-        Ochre           = New-TrayThemeColor 255 229 165 71
-        Coral           = New-TrayThemeColor 255 255 107 107
+        Moss            = New-TrayThemeColor 255 61 222 147
+        Ochre           = New-TrayThemeColor 255 245 184 64
+        Coral           = New-TrayThemeColor 255 255 92 120
     }
 
     return $palette

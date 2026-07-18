@@ -20,13 +20,13 @@ $script:QPPalette = if (Get-Command Get-TrayThemePalette -ErrorAction SilentlyCo
 }
 else {
     @{
-        Ink100   = [System.Drawing.Color]::FromArgb(255, 14, 18, 26)
+        Ink100   = [System.Drawing.Color]::FromArgb(255, 9, 17, 21)
         Ink150   = [System.Drawing.Color]::FromArgb(255, 17, 21, 31)
         Ink200   = [System.Drawing.Color]::FromArgb(255, 19, 24, 36)
-        Ink300   = [System.Drawing.Color]::FromArgb(255, 27, 34, 48)
-        Paper    = [System.Drawing.Color]::FromArgb(255, 232, 238, 246)
-        Mist     = [System.Drawing.Color]::FromArgb(255, 150, 162, 183)
-        Fog      = [System.Drawing.Color]::FromArgb(255, 92, 104, 128)
+        Ink300   = [System.Drawing.Color]::FromArgb(255, 21, 36, 43)
+        Paper    = [System.Drawing.Color]::FromArgb(255, 222, 237, 234)
+        Mist     = [System.Drawing.Color]::FromArgb(255, 133, 160, 163)
+        Fog      = [System.Drawing.Color]::FromArgb(255, 84, 106, 110)
         Lagoon   = [System.Drawing.Color]::FromArgb(255, 0, 245, 212)   # phosphor cyan
         Rule     = [System.Drawing.Color]::FromArgb(70, 0, 245, 212)
     }
@@ -927,11 +927,11 @@ function Show-QuickPanel {
             "profile"
         }
         $stateRailColor = switch ($stateRailKind) {
-            "fix" { [System.Drawing.Color]::FromArgb(255, 255, 187, 80) }
+            "fix" { [System.Drawing.Color]::FromArgb(255, 245, 184, 64) }
             "restart" { [System.Drawing.Color]::FromArgb(255, 255, 126, 54) }
             "check" { [System.Drawing.Color]::FromArgb(255, 96, 180, 255) }
             "missing" { $script:QPPalette.Fog }
-            "favorite" { [System.Drawing.Color]::FromArgb(255, 229, 165, 71) }
+            "favorite" { [System.Drawing.Color]::FromArgb(255, 245, 184, 64) }
             default { $gameColor }
         }
         $capStateRailKind = $stateRailKind

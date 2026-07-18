@@ -265,7 +265,7 @@ function New-SettingsPreviewMedallionBitmap {
     #>
     param(
         [System.Drawing.Image]$Mark,
-        [System.Drawing.Color]$Color = [System.Drawing.Color]::FromArgb(255, 220, 180, 70),
+        [System.Drawing.Color]$Color = [System.Drawing.Color]::FromArgb(255, 245, 184, 64),
         [switch]$WarningBadge
     )
 
@@ -276,7 +276,7 @@ function New-SettingsPreviewMedallionBitmap {
     $g.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
     $g.Clear([System.Drawing.Color]::Transparent)
 
-    $backColor = [System.Drawing.Color]::FromArgb(255, 38, 38, 44)
+    $backColor = [System.Drawing.Color]::FromArgb(255, 16, 28, 34)
     $glowBrush = New-Object System.Drawing.SolidBrush -ArgumentList (
         [System.Drawing.Color]::FromArgb(48, $Color.R, $Color.G, $Color.B)
     )
@@ -361,7 +361,7 @@ function New-SettingsBrandHeaderPanel {
 
     $panel = New-Object System.Windows.Forms.Panel
     $panel.Size = New-Object System.Drawing.Size(380, 64)
-    $panel.BackColor = [System.Drawing.Color]::FromArgb(255, 14, 18, 26)
+    $panel.BackColor = [System.Drawing.Color]::FromArgb(255, 9, 17, 21)
     $panel.Tag = @{
         Accent = $Accent
         Frame = 0
@@ -381,8 +381,8 @@ function New-SettingsBrandHeaderPanel {
         $rect = New-Object System.Drawing.Rectangle(0, 0, [Math]::Max(1, $s.Width), [Math]::Max(1, $s.Height))
         $bgBrush = New-Object System.Drawing.Drawing2D.LinearGradientBrush(
             $rect,
-            [System.Drawing.Color]::FromArgb(255, 14, 18, 26),
-            [System.Drawing.Color]::FromArgb(255, 27, 34, 48),
+            [System.Drawing.Color]::FromArgb(255, 9, 17, 21),
+            [System.Drawing.Color]::FromArgb(255, 21, 36, 43),
             [System.Drawing.Drawing2D.LinearGradientMode]::ForwardDiagonal
         )
         $g.FillRectangle($bgBrush, $rect)
@@ -433,7 +433,7 @@ function New-SettingsBrandHeaderPanel {
     $title.Text = "TRAY SETTINGS"
     $title.Location = New-Object System.Drawing.Point(70, 12)
     $title.Size = New-Object System.Drawing.Size(190, 20)
-    $title.ForeColor = [System.Drawing.Color]::FromArgb(255, 238, 238, 242)
+    $title.ForeColor = [System.Drawing.Color]::FromArgb(255, 222, 237, 234)
     $title.BackColor = $panel.BackColor
     $title.Font = New-Object System.Drawing.Font("Segoe UI Semibold", 10, [System.Drawing.FontStyle]::Bold)
     $title.AutoEllipsis = $true
@@ -443,7 +443,7 @@ function New-SettingsBrandHeaderPanel {
     $subtitle.Text = "Reminder, surfaces, audio, hotkeys"
     $subtitle.Location = New-Object System.Drawing.Point(70, 34)
     $subtitle.Size = New-Object System.Drawing.Size(210, 16)
-    $subtitle.ForeColor = [System.Drawing.Color]::FromArgb(255, 150, 168, 180)
+    $subtitle.ForeColor = [System.Drawing.Color]::FromArgb(255, 133, 160, 163)
     $subtitle.BackColor = $panel.BackColor
     $subtitle.Font = New-Object System.Drawing.Font("Consolas", 7.5)
     $subtitle.AutoEllipsis = $true
@@ -456,7 +456,7 @@ function New-SettingsBrandHeaderPanel {
     $chip.Size = New-Object System.Drawing.Size(82, 18)
     $chip.TextAlign = [System.Drawing.ContentAlignment]::MiddleCenter
     $chip.ForeColor = [System.Drawing.Color]::FromArgb(255, 232, 234, 240)
-    $chip.BackColor = [System.Drawing.Color]::FromArgb(255, 27, 34, 48)
+    $chip.BackColor = [System.Drawing.Color]::FromArgb(255, 21, 36, 43)
     $chip.Font = New-Object System.Drawing.Font("Segoe UI Semibold", 7.5, [System.Drawing.FontStyle]::Bold)
     $chip.AutoEllipsis = $true
     $chip.AccessibleName = "Tray settings state"
@@ -475,7 +475,7 @@ function New-SettingsSectionHeaderPanel {
 
     $panel = New-Object System.Windows.Forms.Panel
     $panel.Size = New-Object System.Drawing.Size(350, 24)
-    $panel.BackColor = [System.Drawing.Color]::FromArgb(255, 26, 26, 30)
+    $panel.BackColor = [System.Drawing.Color]::FromArgb(255, 9, 17, 21)
     $panel.Tag = $Color
     $panel.Add_Paint({
         param($s, $e)
@@ -484,7 +484,7 @@ function New-SettingsSectionHeaderPanel {
         $accent = if ($s.Tag -is [System.Drawing.Color]) {
             $s.Tag
         } else {
-            [System.Drawing.Color]::FromArgb(255, 220, 180, 70)
+            [System.Drawing.Color]::FromArgb(255, 245, 184, 64)
         }
         $linePen = New-Object System.Drawing.Pen(
             [System.Drawing.Color]::FromArgb(95, $accent.R, $accent.G, $accent.B), 1
@@ -588,7 +588,7 @@ function Set-SettingsProfilePreview {
         try { $oldImage.Dispose() } catch {}
     }
 
-    $neutralColor = [System.Drawing.Color]::FromArgb(255, 220, 180, 70)
+    $neutralColor = [System.Drawing.Color]::FromArgb(255, 245, 184, 64)
     if ([string]::IsNullOrWhiteSpace($ProfileId)) {
         Set-SettingsPreviewPanelState -PreviewPanel $PreviewPanel -Color $neutralColor -State "none"
         $NameLabel.Text = "No startup reminder profile"
@@ -907,8 +907,8 @@ function Show-SettingsPanel {
     $form.FormBorderStyle = [System.Windows.Forms.FormBorderStyle]::FixedDialog
     $form.MaximizeBox = $false
     $form.StartPosition = [System.Windows.Forms.FormStartPosition]::CenterScreen
-    $form.BackColor = [System.Drawing.Color]::FromArgb(255, 26, 26, 30)
-    $form.ForeColor = [System.Drawing.Color]::FromArgb(255, 225, 225, 230)
+    $form.BackColor = [System.Drawing.Color]::FromArgb(255, 9, 17, 21)
+    $form.ForeColor = [System.Drawing.Color]::FromArgb(255, 222, 237, 234)
     $form.Font = New-Object System.Drawing.Font("Segoe UI", 9)
     $form.TopMost = $true
 
@@ -947,7 +947,7 @@ function Show-SettingsPanel {
     $genLabel = New-SettingsSectionHeaderPanel `
         -Text "STARTUP REMINDER" `
         -Action "Startup" `
-        -Color ([System.Drawing.Color]::FromArgb(255, 220, 180, 70))
+        -Color ([System.Drawing.Color]::FromArgb(255, 245, 184, 64))
     $genLabel.Location = New-Object System.Drawing.Point(16, $y)
     $form.Controls.Add($genLabel)
     $y += 28
@@ -964,8 +964,8 @@ function Show-SettingsPanel {
     $defCombo.Location = New-Object System.Drawing.Point(16, $y)
     $defCombo.Size = New-Object System.Drawing.Size(350, 28)
     $defCombo.DropDownStyle = [System.Windows.Forms.ComboBoxStyle]::DropDownList
-    $defCombo.BackColor = [System.Drawing.Color]::FromArgb(255, 38, 38, 44)
-    $defCombo.ForeColor = [System.Drawing.Color]::FromArgb(255, 225, 225, 230)
+    $defCombo.BackColor = [System.Drawing.Color]::FromArgb(255, 16, 28, 34)
+    $defCombo.ForeColor = [System.Drawing.Color]::FromArgb(255, 222, 237, 234)
     $defCombo.Items.Add("(None)") | Out-Null
     # Populate with available profiles
     if ($script:Profiles) {
@@ -998,9 +998,9 @@ function Show-SettingsPanel {
     $profilePreview = New-Object System.Windows.Forms.Panel
     $profilePreview.Location = New-Object System.Drawing.Point(16, $y)
     $profilePreview.Size = New-Object System.Drawing.Size(350, 66)
-    $profilePreview.BackColor = [System.Drawing.Color]::FromArgb(255, 38, 38, 44)
+    $profilePreview.BackColor = [System.Drawing.Color]::FromArgb(255, 16, 28, 34)
     $profilePreview.Tag = @{
-        Accent = [System.Drawing.Color]::FromArgb(255, 220, 180, 70)
+        Accent = [System.Drawing.Color]::FromArgb(255, 245, 184, 64)
         State = "none"
         Frame = 0
     }
@@ -1016,16 +1016,16 @@ function Show-SettingsPanel {
             $s.Tag
         }
         else {
-            [System.Drawing.Color]::FromArgb(255, 220, 180, 70)
+            [System.Drawing.Color]::FromArgb(255, 245, 184, 64)
         }
         $stateName = if ($previewState.ContainsKey("State")) { "$($previewState["State"])" } else { "reminder" }
         $frame = if ($previewState.ContainsKey("Frame")) { [int]$previewState["Frame"] } else { 0 }
         $stateColor = switch ($stateName) {
             "missing" { [System.Drawing.Color]::FromArgb(255, 245, 120, 92) }
-            "favorite" { [System.Drawing.Color]::FromArgb(255, 229, 165, 71) }
+            "favorite" { [System.Drawing.Color]::FromArgb(255, 245, 184, 64) }
             "capture" { [System.Drawing.Color]::FromArgb(255, 96, 180, 255) }
-            "hdr" { [System.Drawing.Color]::FromArgb(255, 255, 187, 80) }
-            "none" { [System.Drawing.Color]::FromArgb(255, 150, 168, 180) }
+            "hdr" { [System.Drawing.Color]::FromArgb(255, 245, 184, 64) }
+            "none" { [System.Drawing.Color]::FromArgb(255, 133, 160, 163) }
             default { $accent }
         }
         $barBrush = New-Object System.Drawing.SolidBrush($accent)
@@ -1091,7 +1091,7 @@ function Show-SettingsPanel {
     $previewName = New-Object System.Windows.Forms.Label
     $previewName.Location = New-Object System.Drawing.Point(56, 8)
     $previewName.Size = New-Object System.Drawing.Size(282, 18)
-    $previewName.ForeColor = [System.Drawing.Color]::FromArgb(255, 238, 238, 242)
+    $previewName.ForeColor = [System.Drawing.Color]::FromArgb(255, 222, 237, 234)
     $previewName.BackColor = $profilePreview.BackColor
     $previewName.Font = New-Object System.Drawing.Font("Segoe UI Semibold", 9)
     $previewName.AutoEllipsis = $true
@@ -1100,7 +1100,7 @@ function Show-SettingsPanel {
     $previewMeta = New-Object System.Windows.Forms.Label
     $previewMeta.Location = New-Object System.Drawing.Point(56, 27)
     $previewMeta.Size = New-Object System.Drawing.Size(282, 16)
-    $previewMeta.ForeColor = [System.Drawing.Color]::FromArgb(255, 160, 165, 176)
+    $previewMeta.ForeColor = [System.Drawing.Color]::FromArgb(255, 133, 160, 163)
     $previewMeta.BackColor = $profilePreview.BackColor
     $previewMeta.Font = New-Object System.Drawing.Font("Consolas", 7.5)
     $previewMeta.AutoEllipsis = $true
@@ -1109,7 +1109,7 @@ function Show-SettingsPanel {
     $previewNote = New-Object System.Windows.Forms.Label
     $previewNote.Location = New-Object System.Drawing.Point(56, 45)
     $previewNote.Size = New-Object System.Drawing.Size(282, 16)
-    $previewNote.ForeColor = [System.Drawing.Color]::FromArgb(255, 210, 184, 105)
+    $previewNote.ForeColor = [System.Drawing.Color]::FromArgb(255, 236, 191, 108)
     $previewNote.BackColor = $profilePreview.BackColor
     $previewNote.Font = New-Object System.Drawing.Font("Segoe UI", 7.5)
     $previewNote.AutoEllipsis = $true
@@ -1166,7 +1166,7 @@ function Show-SettingsPanel {
     $sep1.Add_Paint({
         param($s, $e)
         $sg = $e.Graphics
-        $goldColor = [System.Drawing.Color]::FromArgb(255, 220, 180, 70)
+        $goldColor = [System.Drawing.Color]::FromArgb(255, 245, 184, 64)
         $gradBrush = New-Object System.Drawing.Drawing2D.LinearGradientBrush(
             (New-Object System.Drawing.Point(0, 1)),
             (New-Object System.Drawing.Point($s.Width, 1)),
@@ -1202,7 +1202,7 @@ function Show-SettingsPanel {
     $toastCheck.Text = "Show themed toast popups"
     $toastCheck.Checked = [bool]$Config.notificationsEnabled
     $toastCheck.Location = New-Object System.Drawing.Point(16, $y)
-    $toastCheck.ForeColor = [System.Drawing.Color]::FromArgb(255, 220, 220, 220)
+    $toastCheck.ForeColor = [System.Drawing.Color]::FromArgb(255, 210, 228, 225)
     $toastCheck.AutoSize = $true
     $form.Controls.Add($toastCheck)
     $y += 23
@@ -1211,7 +1211,7 @@ function Show-SettingsPanel {
     $toastNote.Text = "Tray hover/status text still updates when popups are off."
     $toastNote.Location = New-Object System.Drawing.Point(36, $y)
     $toastNote.Size = New-Object System.Drawing.Size(330, 16)
-    $toastNote.ForeColor = [System.Drawing.Color]::FromArgb(255, 150, 168, 180)
+    $toastNote.ForeColor = [System.Drawing.Color]::FromArgb(255, 133, 160, 163)
     $toastNote.Font = New-Object System.Drawing.Font("Segoe UI", 7.5)
     $toastNote.AutoEllipsis = $true
     $form.Controls.Add($toastNote)
@@ -1221,7 +1221,7 @@ function Show-SettingsPanel {
     $quickPanelCheck.Text = "Restore Quick Panel on tray startup"
     $quickPanelCheck.Checked = [bool]$Config.showQuickPanel
     $quickPanelCheck.Location = New-Object System.Drawing.Point(16, $y)
-    $quickPanelCheck.ForeColor = [System.Drawing.Color]::FromArgb(255, 220, 220, 220)
+    $quickPanelCheck.ForeColor = [System.Drawing.Color]::FromArgb(255, 210, 228, 225)
     $quickPanelCheck.AutoSize = $true
     $form.Controls.Add($quickPanelCheck)
     $y += 23
@@ -1230,7 +1230,7 @@ function Show-SettingsPanel {
     $quickPanelNote.Text = "Shows an empty/profile-missing card instead of silently hiding."
     $quickPanelNote.Location = New-Object System.Drawing.Point(36, $y)
     $quickPanelNote.Size = New-Object System.Drawing.Size(330, 16)
-    $quickPanelNote.ForeColor = [System.Drawing.Color]::FromArgb(255, 150, 168, 180)
+    $quickPanelNote.ForeColor = [System.Drawing.Color]::FromArgb(255, 133, 160, 163)
     $quickPanelNote.Font = New-Object System.Drawing.Font("Segoe UI", 7.5)
     $quickPanelNote.AutoEllipsis = $true
     $form.Controls.Add($quickPanelNote)
@@ -1240,7 +1240,7 @@ function Show-SettingsPanel {
     $audioLabel = New-SettingsSectionHeaderPanel `
         -Text "AUDIO" `
         -Action "Sound" `
-        -Color ([System.Drawing.Color]::FromArgb(255, 220, 180, 70))
+        -Color ([System.Drawing.Color]::FromArgb(255, 245, 184, 64))
     $audioLabel.Location = New-Object System.Drawing.Point(16, $y)
     $form.Controls.Add($audioLabel)
     $y += 28
@@ -1249,7 +1249,7 @@ function Show-SettingsPanel {
     $soundCheck.Text = "Enable tray audio cues"
     $soundCheck.Checked = $Config.soundEnabled
     $soundCheck.Location = New-Object System.Drawing.Point(16, $y)
-    $soundCheck.ForeColor = [System.Drawing.Color]::FromArgb(255, 220, 220, 220)
+    $soundCheck.ForeColor = [System.Drawing.Color]::FromArgb(255, 210, 228, 225)
     $soundCheck.AutoSize = $true
     $form.Controls.Add($soundCheck)
     $y += 28
@@ -1267,7 +1267,7 @@ function Show-SettingsPanel {
     $volTrack.Maximum = 100
     $volTrack.Value = [int]($Config.soundVolume * 100)
     $volTrack.TickFrequency = 25
-    $volTrack.BackColor = [System.Drawing.Color]::FromArgb(255, 26, 26, 30)
+    $volTrack.BackColor = [System.Drawing.Color]::FromArgb(255, 9, 17, 21)
     $form.Controls.Add($volTrack)
 
     $volValueLabel = New-Object System.Windows.Forms.Label
@@ -1289,7 +1289,7 @@ function Show-SettingsPanel {
     $sep2.Add_Paint({
         param($s, $e)
         $sg = $e.Graphics
-        $goldColor = [System.Drawing.Color]::FromArgb(255, 220, 180, 70)
+        $goldColor = [System.Drawing.Color]::FromArgb(255, 245, 184, 64)
         $gradBrush = New-Object System.Drawing.Drawing2D.LinearGradientBrush(
             (New-Object System.Drawing.Point(0, 1)),
             (New-Object System.Drawing.Point($s.Width, 1)),
@@ -1316,7 +1316,7 @@ function Show-SettingsPanel {
     $hkLabel = New-SettingsSectionHeaderPanel `
         -Text "HOTKEYS" `
         -Action "Hotkey" `
-        -Color ([System.Drawing.Color]::FromArgb(255, 220, 180, 70))
+        -Color ([System.Drawing.Color]::FromArgb(255, 245, 184, 64))
     $hkLabel.Location = New-Object System.Drawing.Point(16, $y)
     $form.Controls.Add($hkLabel)
     $y += 28
@@ -1331,8 +1331,8 @@ function Show-SettingsPanel {
     $hk1Text.Text = $Config.hotkeys.openMenu
     $hk1Text.Location = New-Object System.Drawing.Point(120, $y)
     $hk1Text.Size = New-Object System.Drawing.Size(200, 26)
-    $hk1Text.BackColor = [System.Drawing.Color]::FromArgb(255, 38, 38, 44)
-    $hk1Text.ForeColor = [System.Drawing.Color]::FromArgb(255, 225, 225, 230)
+    $hk1Text.BackColor = [System.Drawing.Color]::FromArgb(255, 16, 28, 34)
+    $hk1Text.ForeColor = [System.Drawing.Color]::FromArgb(255, 222, 237, 234)
     $hk1Text.ReadOnly = $true
     $form.Controls.Add($hk1Text)
 
@@ -1351,8 +1351,8 @@ function Show-SettingsPanel {
     $hk2Text.Text = $Config.hotkeys.restore
     $hk2Text.Location = New-Object System.Drawing.Point(120, $y)
     $hk2Text.Size = New-Object System.Drawing.Size(200, 26)
-    $hk2Text.BackColor = [System.Drawing.Color]::FromArgb(255, 38, 38, 44)
-    $hk2Text.ForeColor = [System.Drawing.Color]::FromArgb(255, 225, 225, 230)
+    $hk2Text.BackColor = [System.Drawing.Color]::FromArgb(255, 16, 28, 34)
+    $hk2Text.ForeColor = [System.Drawing.Color]::FromArgb(255, 222, 237, 234)
     $hk2Text.ReadOnly = $true
     $form.Controls.Add($hk2Text)
 
@@ -1365,7 +1365,7 @@ function Show-SettingsPanel {
     $hkNote.Text = "Restore hotkey requires an active profile."
     $hkNote.Location = New-Object System.Drawing.Point(120, $y)
     $hkNote.Size = New-Object System.Drawing.Size(246, 16)
-    $hkNote.ForeColor = [System.Drawing.Color]::FromArgb(255, 160, 165, 176)
+    $hkNote.ForeColor = [System.Drawing.Color]::FromArgb(255, 133, 160, 163)
     $hkNote.Font = New-Object System.Drawing.Font("Segoe UI", 7.5)
     $hkNote.AutoEllipsis = $true
     $form.Controls.Add($hkNote)
@@ -1376,14 +1376,14 @@ function Show-SettingsPanel {
     $profilesFolderBtn.Text = "Open Profiles Folder"
     $profilesFolderBtn.Location = New-Object System.Drawing.Point(16, ($y + 10))
     $profilesFolderBtn.Size = New-Object System.Drawing.Size(180, 34)
-    $profilesFolderBtn.BackColor = [System.Drawing.Color]::FromArgb(255, 50, 50, 56)
-    $profilesFolderBtn.ForeColor = [System.Drawing.Color]::FromArgb(255, 190, 190, 195)
+    $profilesFolderBtn.BackColor = [System.Drawing.Color]::FromArgb(255, 21, 36, 43)
+    $profilesFolderBtn.ForeColor = [System.Drawing.Color]::FromArgb(255, 155, 180, 178)
     $profilesFolderBtn.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
     $profilesFolderBtn.FlatAppearance.BorderSize = 0
     $profilesFolderBtn.Font = New-Object System.Drawing.Font("Segoe UI", 9)
     $profilesFolderBtn.Cursor = [System.Windows.Forms.Cursors]::Hand
     if (Get-Command New-ActionBitmap -ErrorAction SilentlyContinue) {
-        $profilesFolderBtn.Image = New-ActionBitmap -Action "Folder" -Color ([System.Drawing.Color]::FromArgb(255, 190, 190, 195))
+        $profilesFolderBtn.Image = New-ActionBitmap -Action "Folder" -Color ([System.Drawing.Color]::FromArgb(255, 155, 180, 178))
         $profilesFolderBtn.ImageAlign = [System.Drawing.ContentAlignment]::MiddleLeft
         $profilesFolderBtn.TextImageRelation = [System.Windows.Forms.TextImageRelation]::ImageBeforeText
         $profilesFolderBtn.Padding = New-Object System.Windows.Forms.Padding(8, 0, 8, 0)
@@ -1436,14 +1436,14 @@ function Show-SettingsPanel {
     $closeBtn.Text = "Close"
     $closeBtn.Location = New-Object System.Drawing.Point(310, ($y + 10))
     $closeBtn.Size = New-Object System.Drawing.Size(90, 34)
-    $closeBtn.BackColor = [System.Drawing.Color]::FromArgb(255, 50, 50, 56)
-    $closeBtn.ForeColor = [System.Drawing.Color]::FromArgb(255, 190, 190, 195)
+    $closeBtn.BackColor = [System.Drawing.Color]::FromArgb(255, 21, 36, 43)
+    $closeBtn.ForeColor = [System.Drawing.Color]::FromArgb(255, 155, 180, 178)
     $closeBtn.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
     $closeBtn.FlatAppearance.BorderSize = 0
     $closeBtn.Font = New-Object System.Drawing.Font("Segoe UI", 9)
     $closeBtn.Cursor = [System.Windows.Forms.Cursors]::Hand
     if (Get-Command New-ActionBitmap -ErrorAction SilentlyContinue) {
-        $closeBtn.Image = New-ActionBitmap -Action "Close" -Color ([System.Drawing.Color]::FromArgb(255, 190, 190, 195))
+        $closeBtn.Image = New-ActionBitmap -Action "Close" -Color ([System.Drawing.Color]::FromArgb(255, 155, 180, 178))
         $closeBtn.ImageAlign = [System.Drawing.ContentAlignment]::MiddleLeft
         $closeBtn.TextImageRelation = [System.Windows.Forms.TextImageRelation]::ImageBeforeText
         $closeBtn.Padding = New-Object System.Windows.Forms.Padding(8, 0, 6, 0)
@@ -1673,7 +1673,7 @@ function Get-HotkeyRegistrationChipInfo {
     if ([string]::IsNullOrWhiteSpace($Name)) {
         return [pscustomobject]@{
             Text      = "UNKNOWN"
-            BackColor = [System.Drawing.Color]::FromArgb(255, 50, 50, 56)
+            BackColor = [System.Drawing.Color]::FromArgb(255, 21, 36, 43)
             ForeColor = [System.Drawing.Color]::FromArgb(255, 185, 185, 195)
         }
     }
@@ -1706,7 +1706,7 @@ function Get-HotkeyRegistrationChipInfo {
     return [pscustomobject]@{
         Text      = $text
         BackColor = [System.Drawing.Color]::FromArgb(255, 64, 45, 23)
-        ForeColor = [System.Drawing.Color]::FromArgb(255, 255, 187, 80)
+        ForeColor = [System.Drawing.Color]::FromArgb(255, 245, 184, 64)
     }
 }
 

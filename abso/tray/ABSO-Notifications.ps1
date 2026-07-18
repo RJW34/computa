@@ -72,18 +72,18 @@ $script:Penumbra = if (Get-Command Get-TrayThemePalette -ErrorAction SilentlyCon
 }
 else {
     @{
-        Ink100   = [System.Drawing.Color]::FromArgb(255, 14, 18, 26)    # base
+        Ink100   = [System.Drawing.Color]::FromArgb(255, 9, 17, 21)    # base
         Ink200   = [System.Drawing.Color]::FromArgb(255, 19, 24, 36)    # gradient bottom
-        Ink300   = [System.Drawing.Color]::FromArgb(255, 27, 34, 48)    # elevated / label bg
+        Ink300   = [System.Drawing.Color]::FromArgb(255, 21, 36, 43)    # elevated / label bg
         Ink150   = [System.Drawing.Color]::FromArgb(255, 17, 21, 31)    # label background midpoint
-        Paper    = [System.Drawing.Color]::FromArgb(255, 232, 238, 246) # primary text
-        Mist     = [System.Drawing.Color]::FromArgb(255, 150, 162, 183) # secondary text
-        Fog      = [System.Drawing.Color]::FromArgb(255, 92, 104, 128)  # tertiary / mono
+        Paper    = [System.Drawing.Color]::FromArgb(255, 222, 237, 234) # primary text
+        Mist     = [System.Drawing.Color]::FromArgb(255, 133, 160, 163) # secondary text
+        Fog      = [System.Drawing.Color]::FromArgb(255, 84, 106, 110)  # tertiary / mono
         Rule     = [System.Drawing.Color]::FromArgb(70, 0, 245, 212)    # phosphor hairline
         Lagoon   = [System.Drawing.Color]::FromArgb(255, 0, 245, 212)   # phosphor cyan
-        Moss     = [System.Drawing.Color]::FromArgb(255, 123, 227, 158) # success
-        Ochre    = [System.Drawing.Color]::FromArgb(255, 229, 165, 71)  # warning
-        Coral    = [System.Drawing.Color]::FromArgb(255, 255, 107, 107) # error
+        Moss     = [System.Drawing.Color]::FromArgb(255, 61, 222, 147) # success
+        Ochre    = [System.Drawing.Color]::FromArgb(255, 245, 184, 64)  # warning
+        Coral    = [System.Drawing.Color]::FromArgb(255, 255, 92, 120) # error
     }
 }
 
