@@ -2,6 +2,7 @@
 
 import json
 import logging
+import os
 import subprocess
 import sys
 from datetime import datetime
@@ -2073,6 +2074,122 @@ def restore(backup_id: str, json_output: bool) -> None:
             json_error(f"Error restoring backup: {e}")
         console.print(f"[red]Error restoring backup: {e}[/red]")
         sys.exit(1)
+
+
+@cli.command()
+@click.option("--json", "json_output", is_flag=True, help="Output as JSON for GUI integration")
+@click.option("--yes", "-y", "assume_yes", is_flag=True, help="Skip the confirmation prompt")
+@click.option(
+    "--skip-restore",
+    is_flag=True,
+    help="Only remove tray autostart and ABSO state; leave current system settings as-is",
+)
+def uninstall(json_output: bool, assume_yes: bool, skip_restore: bool) -> None:
+    """Restore the setup baseline and remove ABSO from this system.
+
+    Restores the baseline backup captured by 'abso setup' (system settings as
+    they were before ABSO), removes the tray's Windows-startup registration,
+    and clears ABSO's active-profile state. Folders that may hold a running
+    executable or your own data (the install folder, backups/, %APPDATA%\\ABSO)
+    are listed for manual deletion instead of being removed blindly.
+    """
+    if not is_admin():
+        if json_output:
+            json_error("Admin privileges required to uninstall")
+        console.print("[red]Error: Admin privileges required to uninstall.[/red]")
+        sys.exit(1)
+
+    state = _read_state_snapshot()
+    baseline_id = state.get("baseline_backup_id")
+    if not baseline_id and not skip_restore:
+        # Fall back to the oldest recorded baseline-type backup: the one
+        # closest to the pre-ABSO system state.
+        baselines = [
+            item
+            for item in list_backup_payloads(BACKUPS_DIR)
+            if item.get("backup_type") == "baseline"
+        ]
+        if baselines:
+            baseline_id = sorted(item["id"] for item in baselines)[0]
+
+    if not json_output:
+        console.print(Panel("Uninstall A.B.S.O.", style="bold red"))
+        if skip_restore:
+            console.print("System settings will be left exactly as they are now.")
+        elif baseline_id:
+            console.print(f"System settings will be restored from baseline: {baseline_id}")
+        else:
+            console.print(
+                "[yellow]No baseline backup found — system settings will be left as "
+                "they are now. Use 'abso restore <id>' first if you want a specific "
+                "backup restored.[/yellow]"
+            )
+        if not assume_yes and not click.confirm("Continue?", default=False):
+            console.print("[dim]Uninstall cancelled.[/dim]")
+            return
+    elif not assume_yes:
+        json_error("Pass --yes to uninstall in JSON mode")
+
+    result: dict[str, Any] = {
+        "baseline_backup_id": baseline_id,
+        "restore_performed": False,
+        "tray_autostart_removed": False,
+        "state_cleared": False,
+        "manual_cleanup": [],
+    }
+
+    if baseline_id and not skip_restore:
+        try:
+            restore_summary = BackupManager(BACKUPS_DIR).restore_backup(baseline_id).to_dict()
+            result["restore_performed"] = True
+            result["restore_summary"] = restore_summary
+            if not json_output:
+                if restore_summary.get("has_blocking_issues"):
+                    console.print(
+                        f"[yellow]{describe_restore_summary(restore_summary, blocking_only=True)}[/yellow]"
+                    )
+                else:
+                    console.print(f"[green]Baseline '{baseline_id}' restored.[/green]")
+        except Exception as e:
+            result["restore_error"] = str(e)
+            if not json_output:
+                console.print(f"[red]Baseline restore failed: {e}[/red]")
+
+    try:
+        from abso import tray as tray_module
+
+        tray_module.install_startup(uninstall=True)
+        result["tray_autostart_removed"] = True
+        if not json_output:
+            console.print("[green]Tray autostart registration removed.[/green]")
+    except Exception as e:
+        result["tray_autostart_error"] = str(e)
+        if not json_output:
+            console.print(f"[yellow]Tray autostart removal failed: {e}[/yellow]")
+
+    try:
+        clear_current_profile()
+        result["state_cleared"] = True
+    except Exception as e:
+        result["state_clear_error"] = str(e)
+
+    manual_paths = [
+        str(get_data_dir()),
+        str(BACKUPS_DIR),
+        str(Path(os.environ.get("APPDATA", "")) / "ABSO"),
+    ]
+    result["manual_cleanup"] = manual_paths
+
+    if json_output:
+        output_json(result)
+        return
+
+    console.print()
+    console.print("If the tray is currently running, exit it from its menu.")
+    console.print("Folders left for manual deletion (may contain the running exe or your data):")
+    for path in manual_paths:
+        console.print(f"  - {path}")
+    console.print("\n[green]ABSO uninstall complete.[/green]")
 
 
 @cli.command()

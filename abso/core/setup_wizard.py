@@ -18,7 +18,6 @@ from rich.table import Table
 from rich.text import Text
 
 from abso.core.app_paths import app_data_dir
-from abso.core.applier import ProfileApplier
 from abso.core.auditor import ConfigurationAuditor
 from abso.core.detector import HardwareDetector
 from abso.core.kb_checker import check_problematic_kbs, get_installed_kbs, uninstall_kb
@@ -58,14 +57,17 @@ class SetupWizard:
         self.fixes_applied = 0
         self.kbs_uninstalled = 0
         self.profile_applied: str | None = None
+        self.baseline_backup_id: str | None = None
+        self.config_created: Path | None = None
+        self.tray_autostart_installed = False
 
     def run(self) -> None:
         """Run the full setup wizard."""
         self._print_welcome()
 
-        # Step 1: Hardware detection (printed inline; the result isn't
-        # passed to later steps - they each query what they need on their own.)
-        self._step_hardware_detection()
+        # Step 1: Hardware detection — the result feeds capability-aware
+        # profile filtering later; other steps still query what they need.
+        hardware = self._step_hardware_detection()
 
         # Step 2: KB check
         self._step_kb_check()
@@ -73,15 +75,39 @@ class SetupWizard:
         # Step 3: System audit
         self._step_system_audit()
 
-        # Step 4: Game detection
+        # Step 4: Machine-local configuration file
+        self._step_config_bootstrap()
+
+        # Step 5: Baseline backup — the "get me back to before ABSO" anchor
+        self._step_baseline_backup()
+
+        # Step 6: Game detection
         suggestions = self._step_game_detection()
 
-        # Step 5: Profile selection
-        profile_id = self._step_profile_selection(suggestions)
+        # Step 7: Profile selection (filtered/annotated by capability)
+        profile_id = self._step_profile_selection(suggestions, hardware)
 
-        # Step 6: Apply
+        # Step 8: Apply
         if profile_id:
             self._step_apply_profile(profile_id)
+
+        # Step 9: Tray autostart
+        self._step_tray_autostart()
+
+        # Even without a profile apply, record that setup ran (and where the
+        # baseline lives) so first-run flows and uninstall can rely on it.
+        if not self.profile_applied and (self.baseline_backup_id or self.tray_autostart_installed):
+            try:
+                self._write_setup_state({
+                    "current_profile": None,
+                    "applied_at": None,
+                    "reboot_pending": False,
+                    "reboot_reasons": [],
+                    "setup_completed": True,
+                    "baseline_backup_id": self.baseline_backup_id,
+                })
+            except Exception as e:
+                logging.getLogger(__name__).error(f"Failed to save setup state: {e}")
 
         # Summary
         self._print_summary()
@@ -134,11 +160,25 @@ class SetupWizard:
         for part in parts:
             console.print(f"  {part}")
 
-        # GPU type note
+        # GPU vendor note — what optimization depth this machine gets
         if hardware.get("gpu"):
-            gpu_name = hardware["gpu"].get("name", "").upper()
-            if "NVIDIA" in gpu_name or "GEFORCE" in gpu_name or "RTX" in gpu_name or "GTX" in gpu_name:
-                console.print("  [green]NVIDIA GPU detected — full optimization available[/green]")
+            from abso.core.gpu_vendor import GpuVendor, classify_gpu_name
+
+            vendor = classify_gpu_name(hardware["gpu"].get("name", ""))
+            if vendor is GpuVendor.NVIDIA:
+                console.print(
+                    "  [green]NVIDIA GPU detected — full driver optimization available[/green]"
+                )
+            elif vendor is GpuVendor.AMD:
+                console.print(
+                    "  [green]AMD Radeon detected — Radeon driver tuning available "
+                    "(Anti-Lag, ULPS, Enhanced Sync)[/green]"
+                )
+            else:
+                console.print(
+                    "  [yellow]No vendor-specific GPU driver tuning for this GPU; all "
+                    "OS/power/input/display optimizations still apply.[/yellow]"
+                )
 
         console.print()
         return hardware
@@ -243,13 +283,108 @@ class SetupWizard:
 
         console.print()
 
+    def _step_config_bootstrap(self) -> None:
+        """Create a machine-local abso.yaml when none exists yet."""
+        console.print("[bold cyan]Step 4: CONFIGURATION[/bold cyan]")
+        console.print()
+
+        try:
+            from abso.core.config import ConfigManager
+
+            config_manager = ConfigManager()
+            if config_manager.config_path.exists():
+                console.print(
+                    f"  [dim]Using existing configuration: {config_manager.config_path}[/dim]"
+                )
+                console.print()
+                return
+
+            if Confirm.ask(
+                "  Create a machine-local abso.yaml with safe defaults?", default=True
+            ):
+                config_manager.create_default()
+                self.config_created = config_manager.config_path
+                console.print(f"  [green]Created {config_manager.config_path}[/green]")
+                console.print(
+                    "  [dim]Edit it later for per-machine tweaks (protected "
+                    "peripheral processes, profile overrides).[/dim]"
+                )
+            else:
+                console.print("  [dim]Skipped. ABSO runs on built-in defaults without one.[/dim]")
+        except Exception as e:
+            console.print(f"  [yellow]Config bootstrap unavailable: {e}[/yellow]")
+
+        console.print()
+
+    def _step_baseline_backup(self) -> None:
+        """Capture a pre-ABSO baseline of every backed-up settings domain."""
+        console.print("[bold cyan]Step 5: BASELINE BACKUP[/bold cyan]")
+        console.print()
+        console.print(
+            "  A baseline records your system as it is [bold]right now[/bold], before ABSO"
+        )
+        console.print(
+            "  changes anything. 'abso uninstall' restores it to remove ABSO cleanly."
+        )
+
+        if not Confirm.ask("  Capture the baseline backup?", default=True):
+            console.print("  [dim]Skipped. 'abso backup-create' can capture one later.[/dim]")
+            console.print()
+            return
+
+        try:
+            from abso.core.backup import BackupManager
+
+            self.backups_dir.mkdir(parents=True, exist_ok=True)
+            with Progress(
+                SpinnerColumn(),
+                TextColumn("[progress.description]{task.description}"),
+                transient=True,
+                console=console,
+            ) as progress:
+                task = progress.add_task("Backing up current settings...", total=None)
+                backup_manager = BackupManager(self.backups_dir)
+                self.baseline_backup_id = backup_manager.create_backup(
+                    profile_id=None,
+                    backup_type="baseline",
+                )
+                progress.update(task, description="Baseline captured!")
+                time.sleep(0.2)
+
+            console.print(f"  [green]Baseline saved: {self.baseline_backup_id}[/green]")
+        except Exception as e:
+            console.print(f"  [red]Baseline backup failed: {e}[/red]")
+
+        console.print()
+
+    def _display_supports_hdr(self) -> bool | None:
+        """Best-effort HDR capability probe. None means unknown."""
+        try:
+            from abso.settings.windows import WindowsSettingsHandler
+
+            summary = WindowsSettingsHandler()._get_hdr_state_summary()
+            if not summary.get("available"):
+                return None
+            return summary.get("hdr_capable_count", 0) > 0
+        except Exception:
+            return None
+
+    @staticmethod
+    def _any_vrr_capable_monitor(hardware: dict) -> bool | None:
+        """Whether any detected monitor looks VRR-capable. None means unknown."""
+        monitors = hardware.get("monitors") or []
+        if not monitors:
+            return None
+        capable_states = (True, "hardware", "likely")
+        return any(mon.get("vrr_supported") in capable_states for mon in monitors)
+
     def _step_game_detection(self) -> dict[str, str]:
         """Detect installed games and return profile suggestions.
 
         Returns:
             Dict mapping display string to profile ID.
         """
-        console.print("[bold cyan]Step 4: GAME DETECTION[/bold cyan]")
+        console.print("[bold cyan]Step 6: GAME DETECTION[/bold cyan]")
         console.print()
 
         try:
@@ -289,13 +424,22 @@ class SetupWizard:
             console.print()
             return {}
 
-    def _step_profile_selection(self, suggestions: dict[str, str]) -> str | None:
-        console.print("[bold cyan]Step 5: PROFILE SELECTION[/bold cyan]")
+    def _step_profile_selection(
+        self,
+        suggestions: dict[str, str],
+        hardware: dict | None = None,
+    ) -> str | None:
+        console.print("[bold cyan]Step 7: PROFILE SELECTION[/bold cyan]")
         console.print()
 
-        # Build list of choices: detected games + full profile list
-        applier = ProfileApplier()
-        all_profiles = applier.list_profiles()
+        hardware = hardware or {}
+        hdr_support = self._display_supports_hdr()
+        vrr_capable = self._any_vrr_capable_monitor(hardware)
+
+        # Build list of choices: detected games + capability-filtered catalog
+        from abso.profiles.catalog import get_profile_manifest
+
+        manifest = get_profile_manifest()
 
         # Suggested profiles first
         choices: list[tuple[str, str]] = []
@@ -305,10 +449,26 @@ class SetupWizard:
             choices.append((profile_id, display))
             suggested_ids.add(profile_id)
 
-        # Add remaining profiles
-        for p in all_profiles:
-            if p["id"] not in suggested_ids:
-                choices.append((p["id"], f"{p['display_name']} ({p['id']})"))
+        hidden_hdr_lanes = 0
+        for p in manifest:
+            if p["id"] in suggested_ids:
+                continue
+            # HDR composition lanes are meaningless without an HDR-capable
+            # display; drop them instead of offering settings that can't apply.
+            if hdr_support is False and p.get("requires_hdr_display"):
+                hidden_hdr_lanes += 1
+                continue
+            label = f"{p['display_name']} ({p['id']})"
+            if vrr_capable is False and p.get("sync_mode") == "on":
+                label += " [yellow](needs a VRR display)[/yellow]"
+            choices.append((p["id"], label))
+
+        if hidden_hdr_lanes:
+            console.print(
+                f"  [dim]{hidden_hdr_lanes} HDR profile variants hidden — no HDR-capable "
+                "display detected.[/dim]"
+            )
+            console.print()
 
         if not choices:
             console.print("  [dim]No profiles available.[/dim]")
@@ -337,7 +497,7 @@ class SetupWizard:
         return selected
 
     def _step_apply_profile(self, profile_id: str) -> None:
-        console.print("[bold cyan]Step 6: APPLY[/bold cyan]")
+        console.print("[bold cyan]Step 8: APPLY[/bold cyan]")
         console.print()
 
         self.backups_dir.mkdir(parents=True, exist_ok=True)
@@ -367,6 +527,7 @@ class SetupWizard:
                         "reboot_pending": result.requires_reboot,
                         "reboot_reasons": result.reboot_reasons,
                         "setup_completed": True,
+                        "baseline_backup_id": self.baseline_backup_id,
                     }
                     try:
                         self._write_setup_state(state)
@@ -383,6 +544,43 @@ class SetupWizard:
                 progress.update(apply_task, description=f"[red]Error: {e}[/red]")
 
             progress.stop_task(apply_task)
+
+        console.print()
+
+    def _step_tray_autostart(self) -> None:
+        """Offer to register the tray app to start with Windows."""
+        console.print("[bold cyan]Step 9: TRAY AUTOSTART[/bold cyan]")
+        console.print()
+
+        if not Confirm.ask(
+            "  Start the ABSO tray (one-click profile switching) with Windows?",
+            default=True,
+        ):
+            console.print(
+                "  [dim]Skipped. 'abso tray --install-startup' sets it up later.[/dim]"
+            )
+            console.print()
+            return
+
+        try:
+            from abso.tray import install_startup
+
+            with Progress(
+                SpinnerColumn(),
+                TextColumn("[progress.description]{task.description}"),
+                transient=True,
+                console=console,
+            ) as progress:
+                task = progress.add_task("Registering tray autostart...", total=None)
+                install_startup()
+                progress.update(task, description="Done!")
+                time.sleep(0.2)
+
+            self.tray_autostart_installed = True
+            console.print("  [green]Tray registered to start with Windows.[/green]")
+        except Exception as e:
+            console.print(f"  [red]Tray autostart registration failed: {e}[/red]")
+            console.print("  [dim]You can retry with 'abso tray --install-startup'.[/dim]")
 
         console.print()
 
@@ -409,6 +607,15 @@ class SetupWizard:
             lines.append(f"[green]{self.fixes_applied} system issues will be fixed by profile[/green]")
         if self.kbs_uninstalled > 0:
             lines.append(f"[green]{self.kbs_uninstalled} problematic KB(s) uninstalled[/green]")
+        if self.config_created:
+            lines.append(f"[green]Machine config created: {self.config_created}[/green]")
+        if self.baseline_backup_id:
+            lines.append(
+                f"[green]Baseline backup captured: {self.baseline_backup_id}[/green] "
+                "[dim]('abso uninstall' restores it)[/dim]"
+            )
+        if self.tray_autostart_installed:
+            lines.append("[green]Tray registered to start with Windows[/green]")
         if self.profile_applied:
             lines.append(f"[green]Profile applied: {self.profile_applied}[/green]")
         if self.needs_reboot:
