@@ -146,6 +146,28 @@ def add_legacy_system_tweaks(settings: dict[str, dict[str, Any]]) -> None:
     }
 
 
+def inject_amd_gaming_intent(
+    handler_name: str,
+    settings: dict[str, Any],
+    settings_map: dict[str, dict[str, Any]],
+) -> dict[str, Any]:
+    """Derive AMD Radeon settings from the profile's NVIDIA driver intent.
+
+    Profiles declare GPU intent once (in the NVIDIA settings map); on AMD
+    machines the AmdSettingsHandler in the chain receives the translated
+    Radeon baseline. An explicit ``AmdSettingsHandler`` entry in a profile's
+    settings map always wins over the derived one.
+    """
+    if handler_name != "AmdSettingsHandler" or settings:
+        return settings
+
+    from abso.settings.amd import amd_settings_from_nvidia_intent
+
+    return amd_settings_from_nvidia_intent(
+        settings_map.get("NvidiaSettingsHandler", {})
+    )
+
+
 def merged_handler_settings(profile: Any, handler_name: str) -> dict[str, Any]:
     """Resolve one handler's settings through the shared base merge pipeline."""
     settings_map = merge_settings_map(
@@ -155,6 +177,7 @@ def merged_handler_settings(profile: Any, handler_name: str) -> dict[str, Any]:
     settings = settings_map.get(handler_name, {})
     settings = inject_nvidia_profile_identity(profile, handler_name, settings)
     settings = inject_fullscreen_optimizations(profile, handler_name, settings)
+    settings = inject_amd_gaming_intent(handler_name, settings, settings_map)
     return settings
 
 
@@ -168,6 +191,7 @@ def build_standard_handlers(
     additional_handlers: list[SettingsHandler] | None = None,
 ) -> list[SettingsHandler]:
     """Build the common gaming handler chain in one drift-resistant place."""
+    from abso.settings.amd import AmdSettingsHandler
     from abso.settings.color import ColorProfileSettingsHandler
     from abso.settings.cpu_affinity import CpuAffinityHandler
     from abso.settings.display_range import DisplayColorRangeHandler
@@ -185,7 +209,12 @@ def build_standard_handlers(
         WindowsSettingsHandler(),
         PowerSettingsHandler(),
         RegistrySettingsHandler(),
+        # Vendor GPU handlers are both present and both self-guard on hardware
+        # presence: NVIDIA no-ops without an NVIDIA GPU, AMD no-ops without a
+        # Radeon. The AMD settings derive from the profile's NVIDIA intent via
+        # inject_amd_gaming_intent.
         NvidiaSettingsHandler(),
+        AmdSettingsHandler(),
     ]
 
     if include_nvidia_notifications:

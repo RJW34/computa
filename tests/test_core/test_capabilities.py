@@ -239,10 +239,25 @@ def test_capability_blocks_vrr_profile_when_target_gaming_display_lacks_confirme
     assert any("LG UltraGear" in f.message for f in report.findings if f.code == "VRR_REQUIRED_NOT_CONFIRMED")
 
 
-def test_capability_warns_on_non_nvidia_gpu() -> None:
+def test_capability_reports_amd_gpu_path_as_info() -> None:
     detector = MagicMock()
     detector.detect_monitors.return_value = [{"name": "Primary", "vrr_supported": True}]
     detector.detect_gpu.return_value = {"name": "AMD Radeon RX 7900 XTX"}
+    profile = _make_profile("rivals2-offline")
+
+    report = CapabilityEngine(detector).evaluate(profile)
+
+    amd_findings = [f for f in report.findings if f.code == "GPU_AMD_PATH"]
+    assert amd_findings
+    assert amd_findings[0].severity == "info"
+    assert "Radeon tuning" in amd_findings[0].message
+    assert not any(f.code == "GPU_NOT_NVIDIA" for f in report.findings)
+
+
+def test_capability_warns_on_gpu_without_vendor_tuning_path() -> None:
+    detector = MagicMock()
+    detector.detect_monitors.return_value = [{"name": "Primary", "vrr_supported": True}]
+    detector.detect_gpu.return_value = {"name": "Intel Arc(TM) B580 Graphics"}
     profile = _make_profile("rivals2-offline")
 
     report = CapabilityEngine(detector).evaluate(profile)

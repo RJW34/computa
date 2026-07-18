@@ -462,10 +462,26 @@ class CapabilityEngine:
             )
             return
 
-        gpu_name = str(gpu.get("name") or "").lower()
-        has_nvidia = any(marker in gpu_name for marker in ("nvidia", "geforce", "rtx", "gtx"))
+        from abso.core.gpu_vendor import GpuVendor, classify_gpu_name
 
-        if has_nvidia:
+        vendor = classify_gpu_name(str(gpu.get("name") or ""))
+
+        if vendor is GpuVendor.NVIDIA:
+            return
+
+        if vendor is GpuVendor.AMD:
+            report.findings.append(
+                CapabilityFinding(
+                    code="GPU_AMD_PATH",
+                    severity="info",
+                    message=(
+                        f"Detected AMD GPU '{gpu.get('name', 'Unknown')}': NVIDIA driver "
+                        f"settings in profile '{profile.profile_id}' will no-op and the "
+                        "Radeon tuning derived from the profile's GPU intent applies "
+                        "(Anti-Lag on, Enhanced Sync/Chill/Boost off, ULPS disabled)."
+                    ),
+                )
+            )
             return
 
         report.findings.append(
@@ -473,8 +489,10 @@ class CapabilityEngine:
                 code="GPU_NOT_NVIDIA",
                 severity="warning",
                 message=(
-                    f"Detected GPU '{gpu.get('name', 'Unknown')}' is not NVIDIA; "
-                    f"NVIDIA settings in profile '{profile.profile_id}' may not apply."
+                    f"Detected GPU '{gpu.get('name', 'Unknown')}' has no vendor-specific "
+                    f"driver tuning path; profile '{profile.profile_id}' still applies "
+                    "all OS/power/input/display optimizations, but GPU driver settings "
+                    "will not be changed."
                 ),
             )
         )

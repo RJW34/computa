@@ -9,6 +9,7 @@
       "PowerSettingsHandler",
       "RegistrySettingsHandler",
       "NvidiaSettingsHandler",
+      "AmdSettingsHandler",
       "NetworkSettingsHandler",
       "MouseSettingsHandler",
       "GraphicsSettingsHandler",
@@ -85,6 +86,13 @@
     "optimization_target": "low_latency_high_fps",
     "requires_reflex": true,
     "settings": {
+      "AmdSettingsHandler": {
+        "anti_lag": true,
+        "disable_ulps": true,
+        "enhanced_sync": false,
+        "radeon_boost": false,
+        "radeon_chill": false
+      },
       "AudioEngineHandler": {
         "disable_enhancements": true
       },
@@ -177,6 +185,7 @@
       "PowerSettingsHandler",
       "RegistrySettingsHandler",
       "NvidiaSettingsHandler",
+      "AmdSettingsHandler",
       "NetworkSettingsHandler",
       "MouseSettingsHandler",
       "GraphicsSettingsHandler",
@@ -253,6 +262,13 @@
     "optimization_target": "low_latency_high_fps",
     "requires_reflex": true,
     "settings": {
+      "AmdSettingsHandler": {
+        "anti_lag": true,
+        "disable_ulps": true,
+        "enhanced_sync": false,
+        "radeon_boost": false,
+        "radeon_chill": false
+      },
       "AudioEngineHandler": {
         "disable_enhancements": true
       },
@@ -346,6 +362,7 @@
       "PowerSettingsHandler",
       "RegistrySettingsHandler",
       "NvidiaSettingsHandler",
+      "AmdSettingsHandler",
       "NetworkSettingsHandler",
       "MouseSettingsHandler",
       "GraphicsSettingsHandler",
@@ -422,6 +439,13 @@
     "optimization_target": "low_latency_high_fps",
     "requires_reflex": true,
     "settings": {
+      "AmdSettingsHandler": {
+        "anti_lag": true,
+        "disable_ulps": true,
+        "enhanced_sync": false,
+        "radeon_boost": false,
+        "radeon_chill": false
+      },
       "AudioEngineHandler": {
         "disable_enhancements": true
       },
@@ -518,6 +542,7 @@
       "PowerSettingsHandler",
       "RegistrySettingsHandler",
       "NvidiaSettingsHandler",
+      "AmdSettingsHandler",
       "NetworkSettingsHandler",
       "MouseSettingsHandler",
       "GraphicsSettingsHandler",
@@ -594,6 +619,13 @@
     "optimization_target": "low_latency_high_fps",
     "requires_reflex": true,
     "settings": {
+      "AmdSettingsHandler": {
+        "anti_lag": true,
+        "disable_ulps": true,
+        "enhanced_sync": false,
+        "radeon_boost": false,
+        "radeon_chill": false
+      },
       "AudioEngineHandler": {
         "disable_enhancements": true
       },
@@ -689,6 +721,7 @@
       "PowerSettingsHandler",
       "RegistrySettingsHandler",
       "NvidiaSettingsHandler",
+      "AmdSettingsHandler",
       "NetworkSettingsHandler",
       "MouseSettingsHandler",
       "GraphicsSettingsHandler",
@@ -765,6 +798,13 @@
     "optimization_target": "low_latency_high_fps",
     "requires_reflex": true,
     "settings": {
+      "AmdSettingsHandler": {
+        "anti_lag": true,
+        "disable_ulps": true,
+        "enhanced_sync": false,
+        "radeon_boost": false,
+        "radeon_chill": false
+      },
       "AudioEngineHandler": {
         "disable_enhancements": true
       },
@@ -859,6 +899,7 @@
       "PowerSettingsHandler",
       "RegistrySettingsHandler",
       "NvidiaSettingsHandler",
+      "AmdSettingsHandler",
       "NetworkSettingsHandler",
       "MouseSettingsHandler",
       "GraphicsSettingsHandler",
@@ -935,6 +976,13 @@
     "optimization_target": "low_latency_high_fps",
     "requires_reflex": true,
     "settings": {
+      "AmdSettingsHandler": {
+        "anti_lag": true,
+        "disable_ulps": true,
+        "enhanced_sync": false,
+        "radeon_boost": false,
+        "radeon_chill": false
+      },
       "AudioEngineHandler": {
         "disable_enhancements": true
       },
@@ -1030,6 +1078,7 @@
       "PowerSettingsHandler",
       "RegistrySettingsHandler",
       "NvidiaSettingsHandler",
+      "AmdSettingsHandler",
       "NetworkSettingsHandler",
       "MouseSettingsHandler",
       "GraphicsSettingsHandler",
@@ -1106,6 +1155,13 @@
     "optimization_target": "low_latency_high_fps",
     "requires_reflex": true,
     "settings": {
+      "AmdSettingsHandler": {
+        "anti_lag": true,
+        "disable_ulps": true,
+        "enhanced_sync": false,
+        "radeon_boost": false,
+        "radeon_chill": false
+      },
       "AudioEngineHandler": {
         "disable_enhancements": true
       },
@@ -1204,6 +1260,7 @@
       "PowerSettingsHandler",
       "RegistrySettingsHandler",
       "NvidiaSettingsHandler",
+      "AmdSettingsHandler",
       "NetworkSettingsHandler",
       "MouseSettingsHandler",
       "GraphicsSettingsHandler",
@@ -1280,6 +1337,13 @@
     "optimization_target": "low_latency_high_fps",
     "requires_reflex": true,
     "settings": {
+      "AmdSettingsHandler": {
+        "anti_lag": true,
+        "disable_ulps": true,
+        "enhanced_sync": false,
+        "radeon_boost": false,
+        "radeon_chill": false
+      },
       "AudioEngineHandler": {
         "disable_enhancements": true
       },
@@ -1377,6 +1441,7 @@
       "PowerSettingsHandler",
       "RegistrySettingsHandler",
       "NvidiaSettingsHandler",
+      "AmdSettingsHandler",
       "NetworkSettingsHandler",
       "MouseSettingsHandler",
       "GraphicsSettingsHandler",
@@ -1449,6 +1514,13 @@
     "optimization_target": "balanced",
     "requires_reflex": true,
     "settings": {
+      "AmdSettingsHandler": {
+        "anti_lag": true,
+        "disable_ulps": true,
+        "enhanced_sync": false,
+        "radeon_boost": false,
+        "radeon_chill": false
+      },
       "ColorProfileSettingsHandler": {
         "digital_vibrance": 50,
         "game_type": "cinematic",
@@ -1540,6 +1612,7 @@
       "PowerSettingsHandler",
       "RegistrySettingsHandler",
       "NvidiaSettingsHandler",
+      "AmdSettingsHandler",
       "NetworkSettingsHandler",
       "MouseSettingsHandler",
       "GraphicsSettingsHandler",
@@ -1606,6 +1679,13 @@
     "optimization_target": "balanced",
     "requires_reflex": true,
     "settings": {
+      "AmdSettingsHandler": {
+        "anti_lag": true,
+        "disable_ulps": true,
+        "enhanced_sync": false,
+        "radeon_boost": false,
+        "radeon_chill": false
+      },
       "ColorProfileSettingsHandler": {
         "digital_vibrance": 45,
         "game_type": "cinematic",
@@ -1691,6 +1771,7 @@
       "PowerSettingsHandler",
       "RegistrySettingsHandler",
       "NvidiaSettingsHandler",
+      "AmdSettingsHandler",
       "NetworkSettingsHandler",
       "MouseSettingsHandler",
       "GraphicsSettingsHandler",
@@ -1780,6 +1861,13 @@
     "optimization_target": "low_latency_high_fps",
     "requires_reflex": true,
     "settings": {
+      "AmdSettingsHandler": {
+        "anti_lag": true,
+        "disable_ulps": true,
+        "enhanced_sync": false,
+        "radeon_boost": false,
+        "radeon_chill": false
+      },
       "AudioEngineHandler": {
         "disable_enhancements": true
       },
@@ -1881,6 +1969,7 @@
       "PowerSettingsHandler",
       "RegistrySettingsHandler",
       "NvidiaSettingsHandler",
+      "AmdSettingsHandler",
       "NetworkSettingsHandler",
       "MouseSettingsHandler",
       "GraphicsSettingsHandler",
@@ -1976,6 +2065,13 @@
     "optimization_target": "low_latency_high_fps",
     "requires_reflex": true,
     "settings": {
+      "AmdSettingsHandler": {
+        "anti_lag": true,
+        "disable_ulps": true,
+        "enhanced_sync": false,
+        "radeon_boost": false,
+        "radeon_chill": false
+      },
       "AudioEngineHandler": {
         "disable_enhancements": true
       },
@@ -2084,6 +2180,7 @@
       "PowerSettingsHandler",
       "RegistrySettingsHandler",
       "NvidiaSettingsHandler",
+      "AmdSettingsHandler",
       "NetworkSettingsHandler",
       "MouseSettingsHandler",
       "GraphicsSettingsHandler",
@@ -2179,6 +2276,13 @@
     "optimization_target": "low_latency_high_fps",
     "requires_reflex": true,
     "settings": {
+      "AmdSettingsHandler": {
+        "anti_lag": true,
+        "disable_ulps": true,
+        "enhanced_sync": false,
+        "radeon_boost": false,
+        "radeon_chill": false
+      },
       "AudioEngineHandler": {
         "disable_enhancements": true
       },
@@ -2284,6 +2388,7 @@
       "PowerSettingsHandler",
       "RegistrySettingsHandler",
       "NvidiaSettingsHandler",
+      "AmdSettingsHandler",
       "NetworkSettingsHandler",
       "MouseSettingsHandler",
       "GraphicsSettingsHandler",
@@ -2379,6 +2484,13 @@
     "optimization_target": "low_latency_high_fps",
     "requires_reflex": true,
     "settings": {
+      "AmdSettingsHandler": {
+        "anti_lag": true,
+        "disable_ulps": true,
+        "enhanced_sync": false,
+        "radeon_boost": false,
+        "radeon_chill": false
+      },
       "AudioEngineHandler": {
         "disable_enhancements": true
       },
@@ -2484,6 +2596,7 @@
       "PowerSettingsHandler",
       "RegistrySettingsHandler",
       "NvidiaSettingsHandler",
+      "AmdSettingsHandler",
       "NetworkSettingsHandler",
       "MouseSettingsHandler",
       "GraphicsSettingsHandler",
@@ -2579,6 +2692,13 @@
     "optimization_target": "low_latency_high_fps",
     "requires_reflex": true,
     "settings": {
+      "AmdSettingsHandler": {
+        "anti_lag": true,
+        "disable_ulps": true,
+        "enhanced_sync": false,
+        "radeon_boost": false,
+        "radeon_chill": false
+      },
       "AudioEngineHandler": {
         "disable_enhancements": true
       },
@@ -2680,6 +2800,7 @@
       "PowerSettingsHandler",
       "RegistrySettingsHandler",
       "NvidiaSettingsHandler",
+      "AmdSettingsHandler",
       "NetworkSettingsHandler",
       "MouseSettingsHandler",
       "GraphicsSettingsHandler",
@@ -2751,6 +2872,13 @@
     "optimization_target": "low_latency_high_fps",
     "requires_reflex": true,
     "settings": {
+      "AmdSettingsHandler": {
+        "anti_lag": true,
+        "disable_ulps": true,
+        "enhanced_sync": false,
+        "radeon_boost": false,
+        "radeon_chill": false
+      },
       "AudioEngineHandler": {
         "disable_enhancements": true
       },
@@ -2862,6 +2990,7 @@
       "PowerSettingsHandler",
       "RegistrySettingsHandler",
       "NvidiaSettingsHandler",
+      "AmdSettingsHandler",
       "NetworkSettingsHandler",
       "MouseSettingsHandler",
       "GraphicsSettingsHandler",
@@ -2933,6 +3062,13 @@
     "optimization_target": "low_latency_high_fps",
     "requires_reflex": true,
     "settings": {
+      "AmdSettingsHandler": {
+        "anti_lag": true,
+        "disable_ulps": true,
+        "enhanced_sync": false,
+        "radeon_boost": false,
+        "radeon_chill": false
+      },
       "AudioEngineHandler": {
         "disable_enhancements": true
       },
@@ -3049,6 +3185,7 @@
       "PowerSettingsHandler",
       "RegistrySettingsHandler",
       "NvidiaSettingsHandler",
+      "AmdSettingsHandler",
       "NetworkSettingsHandler",
       "MouseSettingsHandler",
       "GraphicsSettingsHandler",
@@ -3120,6 +3257,13 @@
     "optimization_target": "low_latency_high_fps",
     "requires_reflex": true,
     "settings": {
+      "AmdSettingsHandler": {
+        "anti_lag": true,
+        "disable_ulps": true,
+        "enhanced_sync": false,
+        "radeon_boost": false,
+        "radeon_chill": false
+      },
       "AudioEngineHandler": {
         "disable_enhancements": true
       },
@@ -3236,6 +3380,7 @@
       "PowerSettingsHandler",
       "RegistrySettingsHandler",
       "NvidiaSettingsHandler",
+      "AmdSettingsHandler",
       "NetworkSettingsHandler",
       "MouseSettingsHandler",
       "GraphicsSettingsHandler",
@@ -3331,6 +3476,13 @@
     "optimization_target": "low_latency_high_fps",
     "requires_reflex": true,
     "settings": {
+      "AmdSettingsHandler": {
+        "anti_lag": true,
+        "disable_ulps": true,
+        "enhanced_sync": false,
+        "radeon_boost": false,
+        "radeon_chill": false
+      },
       "AudioEngineHandler": {
         "disable_enhancements": true
       },
@@ -3449,6 +3601,7 @@
       "PowerSettingsHandler",
       "RegistrySettingsHandler",
       "NvidiaSettingsHandler",
+      "AmdSettingsHandler",
       "NetworkSettingsHandler",
       "MouseSettingsHandler",
       "GraphicsSettingsHandler",
@@ -3538,6 +3691,13 @@
     "optimization_target": "low_latency_high_fps",
     "requires_reflex": true,
     "settings": {
+      "AmdSettingsHandler": {
+        "anti_lag": true,
+        "disable_ulps": true,
+        "enhanced_sync": false,
+        "radeon_boost": false,
+        "radeon_chill": false
+      },
       "AudioEngineHandler": {
         "disable_enhancements": true
       },
@@ -3656,6 +3816,7 @@
       "PowerSettingsHandler",
       "RegistrySettingsHandler",
       "NvidiaSettingsHandler",
+      "AmdSettingsHandler",
       "NetworkSettingsHandler",
       "MouseSettingsHandler",
       "GraphicsSettingsHandler",
@@ -3751,6 +3912,13 @@
     "optimization_target": "low_latency_high_fps",
     "requires_reflex": true,
     "settings": {
+      "AmdSettingsHandler": {
+        "anti_lag": true,
+        "disable_ulps": true,
+        "enhanced_sync": false,
+        "radeon_boost": false,
+        "radeon_chill": false
+      },
       "AudioEngineHandler": {
         "disable_enhancements": true
       },
@@ -3865,6 +4033,7 @@
       "PowerSettingsHandler",
       "RegistrySettingsHandler",
       "NvidiaSettingsHandler",
+      "AmdSettingsHandler",
       "NetworkSettingsHandler",
       "GraphicsSettingsHandler",
       "ProcessPriorityHandler",
@@ -3977,6 +4146,13 @@
     "optimization_target": "smooth_framerate",
     "requires_reflex": false,
     "settings": {
+      "AmdSettingsHandler": {
+        "anti_lag": true,
+        "disable_ulps": true,
+        "enhanced_sync": false,
+        "radeon_boost": false,
+        "radeon_chill": false
+      },
       "ColorProfileSettingsHandler": {
         "digital_vibrance": 45,
         "game_type": "casual",
@@ -4042,6 +4218,7 @@
       "PowerSettingsHandler",
       "RegistrySettingsHandler",
       "NvidiaSettingsHandler",
+      "AmdSettingsHandler",
       "NetworkSettingsHandler",
       "GraphicsSettingsHandler",
       "ProcessPriorityHandler",
@@ -4118,6 +4295,13 @@
     "optimization_target": "balanced",
     "requires_reflex": false,
     "settings": {
+      "AmdSettingsHandler": {
+        "anti_lag": true,
+        "disable_ulps": true,
+        "enhanced_sync": false,
+        "radeon_boost": false,
+        "radeon_chill": false
+      },
       "ColorProfileSettingsHandler": {
         "digital_vibrance": 45,
         "game_type": "casual",
@@ -4405,6 +4589,7 @@
       "PowerSettingsHandler",
       "RegistrySettingsHandler",
       "NvidiaSettingsHandler",
+      "AmdSettingsHandler",
       "NvidiaNotificationHandler",
       "NetworkSettingsHandler",
       "MouseSettingsHandler",
@@ -4479,6 +4664,13 @@
     "optimization_target": "low_latency_vrr",
     "requires_reflex": false,
     "settings": {
+      "AmdSettingsHandler": {
+        "anti_lag": true,
+        "disable_ulps": true,
+        "enhanced_sync": false,
+        "radeon_boost": false,
+        "radeon_chill": false
+      },
       "ColorProfileSettingsHandler": {
         "digital_vibrance": 45,
         "game_type": "competitive_fps",
@@ -4584,6 +4776,7 @@
       "PowerSettingsHandler",
       "RegistrySettingsHandler",
       "NvidiaSettingsHandler",
+      "AmdSettingsHandler",
       "NvidiaNotificationHandler",
       "NetworkSettingsHandler",
       "MouseSettingsHandler",
@@ -4688,6 +4881,13 @@
     "optimization_target": "low_latency_vrr",
     "requires_reflex": false,
     "settings": {
+      "AmdSettingsHandler": {
+        "anti_lag": true,
+        "disable_ulps": true,
+        "enhanced_sync": false,
+        "radeon_boost": false,
+        "radeon_chill": false
+      },
       "ColorProfileSettingsHandler": {
         "digital_vibrance": 50,
         "game_type": "competitive_fps",
@@ -4796,6 +4996,7 @@
       "PowerSettingsHandler",
       "RegistrySettingsHandler",
       "NvidiaSettingsHandler",
+      "AmdSettingsHandler",
       "NvidiaNotificationHandler",
       "NetworkSettingsHandler",
       "MouseSettingsHandler",
@@ -4900,6 +5101,13 @@
     "optimization_target": "low_latency_vrr",
     "requires_reflex": false,
     "settings": {
+      "AmdSettingsHandler": {
+        "anti_lag": true,
+        "disable_ulps": true,
+        "enhanced_sync": false,
+        "radeon_boost": false,
+        "radeon_chill": false
+      },
       "ColorProfileSettingsHandler": {
         "digital_vibrance": 50,
         "game_type": "competitive_fps",
@@ -5008,6 +5216,7 @@
       "PowerSettingsHandler",
       "RegistrySettingsHandler",
       "NvidiaSettingsHandler",
+      "AmdSettingsHandler",
       "NvidiaNotificationHandler",
       "NetworkSettingsHandler",
       "MouseSettingsHandler",
@@ -5076,6 +5285,13 @@
     "optimization_target": "minimum_latency_offline",
     "requires_reflex": false,
     "settings": {
+      "AmdSettingsHandler": {
+        "anti_lag": true,
+        "disable_ulps": true,
+        "enhanced_sync": false,
+        "radeon_boost": false,
+        "radeon_chill": false
+      },
       "ColorProfileSettingsHandler": {
         "digital_vibrance": 45,
         "game_type": "competitive_fps",
@@ -5186,6 +5402,7 @@
       "PowerSettingsHandler",
       "RegistrySettingsHandler",
       "NvidiaSettingsHandler",
+      "AmdSettingsHandler",
       "NvidiaNotificationHandler",
       "NetworkSettingsHandler",
       "MouseSettingsHandler",
@@ -5284,6 +5501,13 @@
     "optimization_target": "minimum_latency_offline",
     "requires_reflex": false,
     "settings": {
+      "AmdSettingsHandler": {
+        "anti_lag": true,
+        "disable_ulps": true,
+        "enhanced_sync": false,
+        "radeon_boost": false,
+        "radeon_chill": false
+      },
       "ColorProfileSettingsHandler": {
         "digital_vibrance": 50,
         "game_type": "competitive_fps",
@@ -5397,6 +5621,7 @@
       "PowerSettingsHandler",
       "RegistrySettingsHandler",
       "NvidiaSettingsHandler",
+      "AmdSettingsHandler",
       "NvidiaNotificationHandler",
       "NetworkSettingsHandler",
       "MouseSettingsHandler",
@@ -5483,6 +5708,13 @@
     "optimization_target": "stable_online",
     "requires_reflex": false,
     "settings": {
+      "AmdSettingsHandler": {
+        "anti_lag": true,
+        "disable_ulps": true,
+        "enhanced_sync": false,
+        "radeon_boost": false,
+        "radeon_chill": false
+      },
       "ColorProfileSettingsHandler": {
         "digital_vibrance": 45,
         "game_type": "competitive_fps",
@@ -5590,6 +5822,7 @@
       "PowerSettingsHandler",
       "RegistrySettingsHandler",
       "NvidiaSettingsHandler",
+      "AmdSettingsHandler",
       "NvidiaNotificationHandler",
       "NetworkSettingsHandler",
       "MouseSettingsHandler",
@@ -5664,6 +5897,13 @@
     "optimization_target": "stable_online_vrr",
     "requires_reflex": false,
     "settings": {
+      "AmdSettingsHandler": {
+        "anti_lag": true,
+        "disable_ulps": true,
+        "enhanced_sync": false,
+        "radeon_boost": false,
+        "radeon_chill": false
+      },
       "ColorProfileSettingsHandler": {
         "digital_vibrance": 45,
         "game_type": "competitive_fps",
@@ -5766,6 +6006,7 @@
       "PowerSettingsHandler",
       "RegistrySettingsHandler",
       "NvidiaSettingsHandler",
+      "AmdSettingsHandler",
       "NvidiaNotificationHandler",
       "NetworkSettingsHandler",
       "MouseSettingsHandler",
@@ -5870,6 +6111,13 @@
     "optimization_target": "stable_online_vrr",
     "requires_reflex": false,
     "settings": {
+      "AmdSettingsHandler": {
+        "anti_lag": true,
+        "disable_ulps": true,
+        "enhanced_sync": false,
+        "radeon_boost": false,
+        "radeon_chill": false
+      },
       "ColorProfileSettingsHandler": {
         "digital_vibrance": 50,
         "game_type": "competitive_fps",
@@ -5975,6 +6223,7 @@
       "PowerSettingsHandler",
       "RegistrySettingsHandler",
       "NvidiaSettingsHandler",
+      "AmdSettingsHandler",
       "NvidiaNotificationHandler",
       "NetworkSettingsHandler",
       "MouseSettingsHandler",
@@ -6079,6 +6328,13 @@
     "optimization_target": "stable_online_vrr",
     "requires_reflex": false,
     "settings": {
+      "AmdSettingsHandler": {
+        "anti_lag": true,
+        "disable_ulps": true,
+        "enhanced_sync": false,
+        "radeon_boost": false,
+        "radeon_chill": false
+      },
       "ColorProfileSettingsHandler": {
         "digital_vibrance": 50,
         "game_type": "competitive_fps",
@@ -6184,6 +6440,7 @@
       "PowerSettingsHandler",
       "RegistrySettingsHandler",
       "NvidiaSettingsHandler",
+      "AmdSettingsHandler",
       "NvidiaNotificationHandler",
       "NetworkSettingsHandler",
       "MouseSettingsHandler",
@@ -6300,6 +6557,13 @@
     "optimization_target": "stable_online",
     "requires_reflex": false,
     "settings": {
+      "AmdSettingsHandler": {
+        "anti_lag": true,
+        "disable_ulps": true,
+        "enhanced_sync": false,
+        "radeon_boost": false,
+        "radeon_chill": false
+      },
       "ColorProfileSettingsHandler": {
         "digital_vibrance": 50,
         "game_type": "competitive_fps",
@@ -6410,6 +6674,7 @@
       "PowerSettingsHandler",
       "RegistrySettingsHandler",
       "NvidiaSettingsHandler",
+      "AmdSettingsHandler",
       "NetworkSettingsHandler",
       "MouseSettingsHandler",
       "GraphicsSettingsHandler",
@@ -6614,6 +6879,13 @@
     "optimization_target": "minimum_latency",
     "requires_reflex": false,
     "settings": {
+      "AmdSettingsHandler": {
+        "anti_lag": true,
+        "disable_ulps": true,
+        "enhanced_sync": false,
+        "radeon_boost": false,
+        "radeon_chill": false
+      },
       "ColorProfileSettingsHandler": {
         "digital_vibrance": 45,
         "game_type": "emulator",
@@ -6696,6 +6968,7 @@
       "PowerSettingsHandler",
       "RegistrySettingsHandler",
       "NvidiaSettingsHandler",
+      "AmdSettingsHandler",
       "NetworkSettingsHandler",
       "MouseSettingsHandler",
       "GraphicsSettingsHandler",
@@ -6925,6 +7198,13 @@
     "optimization_target": "minimum_latency",
     "requires_reflex": false,
     "settings": {
+      "AmdSettingsHandler": {
+        "anti_lag": true,
+        "disable_ulps": true,
+        "enhanced_sync": false,
+        "radeon_boost": false,
+        "radeon_chill": false
+      },
       "ColorProfileSettingsHandler": {
         "digital_vibrance": 45,
         "game_type": "emulator",
@@ -7028,6 +7308,7 @@
       "PowerSettingsHandler",
       "RegistrySettingsHandler",
       "NvidiaSettingsHandler",
+      "AmdSettingsHandler",
       "NetworkSettingsHandler",
       "MouseSettingsHandler",
       "GraphicsSettingsHandler",
@@ -7095,6 +7376,13 @@
     "optimization_target": "balanced",
     "requires_reflex": false,
     "settings": {
+      "AmdSettingsHandler": {
+        "anti_lag": true,
+        "disable_ulps": true,
+        "enhanced_sync": false,
+        "radeon_boost": false,
+        "radeon_chill": false
+      },
       "ColorProfileSettingsHandler": {
         "digital_vibrance": 45,
         "game_type": "emulator",
@@ -7198,6 +7486,7 @@
       "PowerSettingsHandler",
       "RegistrySettingsHandler",
       "NvidiaSettingsHandler",
+      "AmdSettingsHandler",
       "NetworkSettingsHandler",
       "MouseSettingsHandler",
       "GraphicsSettingsHandler",
@@ -7289,6 +7578,13 @@
     "optimization_target": "balanced",
     "requires_reflex": false,
     "settings": {
+      "AmdSettingsHandler": {
+        "anti_lag": true,
+        "disable_ulps": true,
+        "enhanced_sync": false,
+        "radeon_boost": false,
+        "radeon_chill": false
+      },
       "ColorProfileSettingsHandler": {
         "digital_vibrance": 50,
         "game_type": "emulator",
@@ -7395,6 +7691,7 @@
       "PowerSettingsHandler",
       "RegistrySettingsHandler",
       "NvidiaSettingsHandler",
+      "AmdSettingsHandler",
       "NetworkSettingsHandler",
       "MouseSettingsHandler",
       "GraphicsSettingsHandler",
@@ -7648,6 +7945,13 @@
     "optimization_target": "minimum_latency",
     "requires_reflex": false,
     "settings": {
+      "AmdSettingsHandler": {
+        "anti_lag": true,
+        "disable_ulps": true,
+        "enhanced_sync": false,
+        "radeon_boost": false,
+        "radeon_chill": false
+      },
       "ColorProfileSettingsHandler": {
         "digital_vibrance": 50,
         "game_type": "emulator",
@@ -7754,6 +8058,7 @@
       "PowerSettingsHandler",
       "RegistrySettingsHandler",
       "NvidiaSettingsHandler",
+      "AmdSettingsHandler",
       "NetworkSettingsHandler",
       "MouseSettingsHandler",
       "GraphicsSettingsHandler",
@@ -7983,6 +8288,13 @@
     "optimization_target": "minimum_latency",
     "requires_reflex": false,
     "settings": {
+      "AmdSettingsHandler": {
+        "anti_lag": true,
+        "disable_ulps": true,
+        "enhanced_sync": false,
+        "radeon_boost": false,
+        "radeon_chill": false
+      },
       "ColorProfileSettingsHandler": {
         "digital_vibrance": 45,
         "game_type": "emulator",
@@ -8086,6 +8398,7 @@
       "PowerSettingsHandler",
       "RegistrySettingsHandler",
       "NvidiaSettingsHandler",
+      "AmdSettingsHandler",
       "NetworkSettingsHandler",
       "MouseSettingsHandler",
       "GraphicsSettingsHandler",
@@ -8339,6 +8652,13 @@
     "optimization_target": "minimum_latency",
     "requires_reflex": false,
     "settings": {
+      "AmdSettingsHandler": {
+        "anti_lag": true,
+        "disable_ulps": true,
+        "enhanced_sync": false,
+        "radeon_boost": false,
+        "radeon_chill": false
+      },
       "ColorProfileSettingsHandler": {
         "digital_vibrance": 50,
         "game_type": "emulator",

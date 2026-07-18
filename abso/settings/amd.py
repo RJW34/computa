@@ -27,6 +27,50 @@ _AMD_DVR_KEY = r"Software\AMD\DVR"
 _AMD_CN_KEY = r"Software\AMD\CN"
 
 
+def amd_settings_from_nvidia_intent(
+    nvidia_settings: dict[str, Any],
+) -> dict[str, Any]:
+    """Translate a profile's NVIDIA driver intent into Radeon settings.
+
+    Profiles declare GPU intent once, in the NVIDIA settings map (presets like
+    ``reflex_game``, or explicit latency-oriented keys). Rather than making
+    every profile carry a parallel AMD block, the shared merge pipeline derives
+    the Radeon competitive baseline from that intent on AMD machines.
+
+    A gaming intent is recognized by any of: a named preset, ``prefer max
+    performance`` power management, or an active Low Latency Mode. Profiles
+    without one (e.g. Desktop/Productivity, which deliberately runs stock
+    driver pacing) derive nothing, leaving Radeon software untouched.
+    """
+    if not nvidia_settings:
+        return {}
+
+    preset = str(nvidia_settings.get("preset") or "")
+    power = str(nvidia_settings.get("power_management") or "").lower()
+    llm = str(nvidia_settings.get("low_latency_mode") or "").lower()
+    gaming_intent = (
+        bool(preset)
+        or power == "prefer_max_performance"
+        or llm in {"on", "ultra"}
+    )
+    if not gaming_intent:
+        return {}
+
+    return {
+        # ULPS power-gating is a documented multi-monitor micro-stutter source.
+        "disable_ulps": True,
+        # Anti-Lag is the Radeon analog of the profile's Reflex/LLM latency intent.
+        "anti_lag": True,
+        # Enhanced Sync adds a frame queue; VRR lanes use FreeSync and no-sync
+        # lanes want the raw path, so it stays off across gaming lanes.
+        "enhanced_sync": False,
+        # Chill (activity-based fps governor) and Boost (dynamic resolution)
+        # both trade latency consistency for other goals — off for gaming.
+        "radeon_chill": False,
+        "radeon_boost": False,
+    }
+
+
 def _read_reg_dword(
     hive: int,
     subkey: str,
@@ -145,6 +189,17 @@ class AmdSettingsHandler(SettingsHandler):
         return False
 
     # --- SettingsHandler interface --------------------------------------------
+
+    @property
+    def restore_guarantee(self) -> str:
+        """Radeon restore is best-effort.
+
+        Values that did not exist at backup time (fresh Radeon installs often
+        lack the HKCU keys until Radeon Software writes them) are skipped on
+        restore rather than deleted, so a restore can leave an ABSO-created
+        key behind.
+        """
+        return "partial"
 
     def detect(self) -> dict[str, Any]:
         """Detect AMD GPU presence and current driver/software settings.

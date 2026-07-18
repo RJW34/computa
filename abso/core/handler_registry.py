@@ -53,6 +53,7 @@ def _all_entries() -> list[HandlerEntry]:
     # All detect-only, audited, backed up; restore_guarantee = "none" keeps
     # backup-restore non-blocking even when the rollout is gated off.
     from abso.settings.ai_agents import AIAgentsSettingsHandler
+    from abso.settings.amd import AmdSettingsHandler
     from abso.settings.audio import AudioSettingsHandler
     from abso.settings.audio_engine import AudioEngineHandler
 
@@ -110,6 +111,15 @@ def _all_entries() -> list[HandlerEntry]:
             audit=True,
             backup=True,
             notes="restore_guarantee='none': NVIDIA profile restore is intentionally not automatic.",
+        ),
+        HandlerEntry(
+            AmdSettingsHandler,
+            audit=True,
+            backup=True,
+            notes="Self-guarding vendor twin of the NVIDIA row: audit/backup/apply "
+            "all no-op without a Radeon GPU, so registration is safe everywhere. "
+            "restore_guarantee='partial': keys absent at backup time are skipped, "
+            "not deleted, on restore.",
         ),
         HandlerEntry(
             TimerSettingsHandler,

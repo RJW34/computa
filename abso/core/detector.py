@@ -585,6 +585,31 @@ def _detect_gsync_from_nvidia_registry() -> dict[str, Any]:
     return result
 
 
+def _promote_vrr_via_amd_driver(vrr_info: dict[str, Any]) -> None:
+    """Promote EDID ``"hardware"`` VRR to confirmed on AMD Radeon machines.
+
+    The NVIDIA cross-reference reads an explicit global G-SYNC flag; Radeon
+    exposes no equivalent per-monitor registry state, so panel capability
+    (EDID FreeSync/Adaptive-Sync range) plus a present Radeon GPU is the
+    strongest confirmation available on AMD boxes. ``is_amd_gpu_present`` is a
+    cached classmethod, so tests can pin ``_amd_present_cached`` for
+    determinism.
+    """
+    if vrr_info.get("vrr_supported") != "hardware":
+        return
+    try:
+        from abso.settings.amd import AmdSettingsHandler
+
+        if not AmdSettingsHandler.is_amd_gpu_present():
+            return
+    except Exception as e:
+        logger.debug(f"AMD VRR cross-reference skipped: {e}")
+        return
+    vrr_info["vrr_supported"] = True
+    if not vrr_info.get("vrr_type"):
+        vrr_info["vrr_type"] = "freesync"
+
+
 # DEPRECATED: v2.0 — prefer EDID/registry detection
 def _is_known_gsync_monitor(monitor_name: str) -> tuple[bool, str | None]:
     """Check if monitor name matches known G-Sync monitor patterns.
@@ -1119,6 +1144,13 @@ class HardwareDetector:
                                 vrr_info["vrr_supported"] = True
                                 vrr_info["vrr_type"] = "gsync_compatible"
 
+                    # Method 2b: AMD driver cross-reference. Radeon has no
+                    # per-monitor global registry flag equivalent to the
+                    # NVIDIA G-SYNC state, so a FreeSync-capable panel (EDID
+                    # "hardware") plus a present Radeon GPU is the strongest
+                    # confirmation available on AMD boxes.
+                    _promote_vrr_via_amd_driver(vrr_info)
+
                     # Method 3: Fall back to heuristics
                     if vrr_info.get("vrr_supported") is None:
                         # High refresh rate monitors are typically VRR-capable
@@ -1382,6 +1414,9 @@ class HardwareDetector:
             elif max_refresh_rate > 60:
                 vrr_info["vrr_supported"] = True
                 vrr_info["vrr_type"] = "gsync_compatible"
+
+        # Step 2b: AMD driver cross-reference (see _promote_vrr_via_amd_driver)
+        _promote_vrr_via_amd_driver(vrr_info)
 
         # Step 3: Heuristics based on refresh rate
         if vrr_info.get("vrr_supported") is None:
