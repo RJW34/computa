@@ -1037,23 +1037,23 @@ if (Get-Command Get-TrayThemePalette -ErrorAction SilentlyContinue) {
 }
 else {
     $script:Colors = @{
-        Background      = [System.Drawing.Color]::FromArgb(255, 9, 17, 21)
-        BackgroundDark  = [System.Drawing.Color]::FromArgb(255, 5, 11, 14)
-        BackgroundLight = [System.Drawing.Color]::FromArgb(255, 21, 36, 43)
-        Hover           = [System.Drawing.Color]::FromArgb(255, 36, 48, 71)
-        HoverBright     = [System.Drawing.Color]::FromArgb(255, 47, 59, 83)
-        Text            = [System.Drawing.Color]::FromArgb(255, 222, 237, 234)
-        TextDim         = [System.Drawing.Color]::FromArgb(255, 133, 160, 163)
-        TextDisabled    = [System.Drawing.Color]::FromArgb(255, 84, 106, 110)
-        Border          = [System.Drawing.Color]::FromArgb(255, 41, 54, 78)
-        Separator       = [System.Drawing.Color]::FromArgb(255, 26, 34, 51)
+        Background      = [System.Drawing.Color]::FromArgb(255, 7, 24, 29)
+        BackgroundDark  = [System.Drawing.Color]::FromArgb(255, 4, 15, 18)
+        BackgroundLight = [System.Drawing.Color]::FromArgb(255, 16, 52, 60)
+        Hover           = [System.Drawing.Color]::FromArgb(255, 20, 66, 74)
+        HoverBright     = [System.Drawing.Color]::FromArgb(255, 25, 82, 90)
+        Text            = [System.Drawing.Color]::FromArgb(255, 225, 244, 240)
+        TextDim         = [System.Drawing.Color]::FromArgb(255, 148, 183, 182)
+        TextDisabled    = [System.Drawing.Color]::FromArgb(255, 95, 127, 127)
+        Border          = [System.Drawing.Color]::FromArgb(255, 26, 88, 90)
+        Separator       = [System.Drawing.Color]::FromArgb(255, 12, 44, 49)
         AccentGold      = [System.Drawing.Color]::FromArgb(255, 0, 245, 212)
         AccentGreen     = [System.Drawing.Color]::FromArgb(255, 61, 222, 147)
         AccentBlue      = [System.Drawing.Color]::FromArgb(255, 82, 199, 244)
         AccentPurple    = [System.Drawing.Color]::FromArgb(255, 183, 156, 255)
         AccentAmber     = [System.Drawing.Color]::FromArgb(255, 245, 184, 64)
         AccentRed       = [System.Drawing.Color]::FromArgb(255, 255, 92, 120)
-        AccentTeal      = [System.Drawing.Color]::FromArgb(255, 63, 184, 171)
+        AccentTeal      = [System.Drawing.Color]::FromArgb(255, 64, 201, 181)
         FavoriteStar    = [System.Drawing.Color]::FromArgb(255, 245, 184, 64)
         CategoryDesktop = [System.Drawing.Color]::FromArgb(255, 0, 245, 212)
         CategoryFighting = [System.Drawing.Color]::FromArgb(255, 255, 110, 122)
@@ -1063,7 +1063,7 @@ else {
         CatFighting     = [System.Drawing.Color]::FromArgb(255, 255, 110, 122)
         CatARPG         = [System.Drawing.Color]::FromArgb(255, 183, 156, 255)
         CatShooter      = [System.Drawing.Color]::FromArgb(255, 82, 199, 244)
-        CatStreaming    = [System.Drawing.Color]::FromArgb(255, 77, 216, 201)
+        CatStreaming    = [System.Drawing.Color]::FromArgb(255, 64, 201, 181)
         CatOther        = [System.Drawing.Color]::FromArgb(255, 61, 222, 147)
         CatProd         = [System.Drawing.Color]::FromArgb(255, 245, 184, 64)
     }
@@ -3377,15 +3377,15 @@ using System.Windows.Forms;
 public class DarkThemeRenderer : ToolStripProfessionalRenderer
 {
     // Penumbra palette - editorial tech, deep ink with a single lagoon accent.
-    private static readonly Color BgColor = Color.FromArgb(255, 9, 17, 21);   // ink-100
-    private static readonly Color BgDark = Color.FromArgb(255, 5, 11, 14);     // ink-000
-    private static readonly Color BgSubtle = Color.FromArgb(255, 19, 24, 36);  // ink-200
-    private static readonly Color SepColor = Color.FromArgb(255, 26, 34, 51);  // rule-soft
-    private static readonly Color BorderColor = Color.FromArgb(255, 41, 54, 78); // rule-strong
+    private static readonly Color BgColor = Color.FromArgb(255, 7, 24, 29);   // ink-100
+    private static readonly Color BgDark = Color.FromArgb(255, 4, 15, 18);     // ink-000
+    private static readonly Color BgSubtle = Color.FromArgb(255, 11, 35, 42);  // ink-200
+    private static readonly Color SepColor = Color.FromArgb(255, 12, 44, 49);  // rule-soft
+    private static readonly Color BorderColor = Color.FromArgb(255, 26, 88, 90); // rule-strong
     private static readonly Color AccentGold = Color.FromArgb(255, 0, 245, 212);  // phosphor cyan (key name kept for diff hygiene)
     private static readonly Color AccentGoldDim = Color.FromArgb(60, 0, 245, 212);
-    private static readonly Color TextPaper = Color.FromArgb(255, 222, 237, 234);
-    private static readonly Color TextMist = Color.FromArgb(255, 133, 160, 163);
+    private static readonly Color TextPaper = Color.FromArgb(255, 225, 244, 240);
+    private static readonly Color TextMist = Color.FromArgb(255, 148, 183, 182);
     public static int PulseFrame = 0;
     private const int SafeMenuMaxWidth = 520;
 
@@ -3558,8 +3558,8 @@ public class DarkThemeRenderer : ToolStripProfessionalRenderer
                     }
                     using (var backingBrush = new LinearGradientBrush(
                         new Rectangle(medallionX, medallionY, medallionSize, medallionSize),
-                        Color.FromArgb(215, 19, 24, 36),
-                        Color.FromArgb(230, 10, 14, 21),
+                        Color.FromArgb(215, 11, 35, 42),
+                        Color.FromArgb(230, 5, 19, 23),
                         LinearGradientMode.ForwardDiagonal))
                     {
                         g.FillEllipse(backingBrush, medallionX, medallionY, medallionSize, medallionSize);
@@ -3671,7 +3671,7 @@ public class DarkThemeRenderer : ToolStripProfessionalRenderer
                 }
                 else if (chipRaw.Contains("NO-DATA"))
                 {
-                    tint = Color.FromArgb(255, 84, 106, 110);
+                    tint = Color.FromArgb(255, 95, 127, 127);
                 }
 
                 double statusWave = (Math.Sin(PulseFrame / 5.5) + 1.0) / 2.0;
@@ -4072,7 +4072,7 @@ public class DarkThemeRenderer : ToolStripProfessionalRenderer
                 int chipRight = GetSafeChipRight(e.Item);
 
                 using (var chipFont = ResolveEyebrowFont(7.0f))
-                using (var chipTextBrush = new SolidBrush(Color.FromArgb(226, 232, 234, 240)))
+                using (var chipTextBrush = new SolidBrush(Color.FromArgb(226, 228, 246, 242)))
                 using (var chipFormat = new StringFormat())
                 {
                     chipFormat.Alignment = StringAlignment.Center;
@@ -4113,7 +4113,7 @@ public class DarkThemeRenderer : ToolStripProfessionalRenderer
                         }
                         else if (chip == "NO-DATA")
                         {
-                            tint = Color.FromArgb(255, 84, 106, 110);
+                            tint = Color.FromArgb(255, 95, 127, 127);
                         }
 
                         using (var chipBrush = new LinearGradientBrush(
@@ -4206,7 +4206,7 @@ public class DarkThemeRenderer : ToolStripProfessionalRenderer
                         DrawRoundRect(e.Graphics, chipPen, chipRect, 4);
                     }
                     using (var chipFont = ResolveEyebrowFont(7.4f))
-                    using (var chipTextBrush = new SolidBrush(Color.FromArgb(228, 232, 234, 240)))
+                    using (var chipTextBrush = new SolidBrush(Color.FromArgb(228, 228, 246, 242)))
                     using (var chipFormat = new StringFormat())
                     {
                         chipFormat.Alignment = StringAlignment.Center;
@@ -4262,7 +4262,7 @@ public class DarkThemeRenderer : ToolStripProfessionalRenderer
                     : MixColor(TextMist, e.Item.ForeColor, 0.30);
 
                 using (var chipFont = ResolveEyebrowFont(6.6f))
-                using (var chipTextBrush = new SolidBrush(Color.FromArgb(225, 232, 234, 240)))
+                using (var chipTextBrush = new SolidBrush(Color.FromArgb(225, 228, 246, 242)))
                 using (var chipFormat = new StringFormat())
                 {
                     chipFormat.Alignment = StringAlignment.Center;
@@ -4336,7 +4336,7 @@ public class DarkThemeRenderer : ToolStripProfessionalRenderer
                 string[] chips = chipRaw.Split(new char[] { '|' }, StringSplitOptions.RemoveEmptyEntries);
 
                 using (var chipFont = ResolveEyebrowFont(7.0f))
-                using (var chipTextBrush = new SolidBrush(Color.FromArgb(230, 232, 234, 240)))
+                using (var chipTextBrush = new SolidBrush(Color.FromArgb(230, 228, 246, 242)))
                 using (var chipFormat = new StringFormat())
                 {
                     chipFormat.Alignment = StringAlignment.Center;
@@ -4444,7 +4444,7 @@ public class DarkThemeRenderer : ToolStripProfessionalRenderer
                     int chipFadeAlpha = isActiveProfileChip ? 26 + (int)(chipWave * 16) : 22;
                     int chipEdgeAlpha = isActiveProfileChip ? 105 + (int)(chipWave * 70) : 90;
                     using (var chipFont = ResolveEyebrowFont(7.2f))
-                    using (var chipTextBrush = new SolidBrush(Color.FromArgb(230, 232, 234, 240)))
+                    using (var chipTextBrush = new SolidBrush(Color.FromArgb(230, 228, 246, 242)))
                     using (var chipFormat = new StringFormat())
                     {
                         chipFormat.Alignment = StringAlignment.Center;
@@ -4483,7 +4483,7 @@ public class DarkThemeRenderer : ToolStripProfessionalRenderer
                                 int sweepWidth = Math.Max(10, Math.Min(22, chipRect.Width / 2));
                                 int sweepTravel = Math.Max(1, chipRect.Width - sweepWidth - 8);
                                 int chipSweepX = chipRect.X + 4 + ((PulseFrame * 4) % sweepTravel);
-                                using (var chipSweepPen = new Pen(Color.FromArgb(68 + (int)(chipWave * 54), 232, 234, 240), 1.0f))
+                                using (var chipSweepPen = new Pen(Color.FromArgb(68 + (int)(chipWave * 54), 228, 246, 242), 1.0f))
                                 {
                                     chipSweepPen.StartCap = LineCap.Round;
                                     chipSweepPen.EndCap = LineCap.Round;
@@ -4579,24 +4579,24 @@ public class DarkThemeRenderer : ToolStripProfessionalRenderer
 
 public class DarkColorTable : ProfessionalColorTable
 {
-    public override Color MenuBorder { get { return Color.FromArgb(255, 29, 52, 57); } }
+    public override Color MenuBorder { get { return Color.FromArgb(255, 26, 88, 90); } }
     public override Color MenuItemBorder { get { return Color.Transparent; } }
-    public override Color MenuItemSelected { get { return Color.FromArgb(255, 28, 48, 56); } }
-    public override Color MenuItemSelectedGradientBegin { get { return Color.FromArgb(255, 16, 28, 34); } }
-    public override Color MenuItemSelectedGradientEnd { get { return Color.FromArgb(255, 16, 28, 34); } }
-    public override Color MenuItemPressedGradientBegin { get { return Color.FromArgb(255, 13, 23, 28); } }
-    public override Color MenuItemPressedGradientEnd { get { return Color.FromArgb(255, 13, 23, 28); } }
-    public override Color MenuStripGradientBegin { get { return Color.FromArgb(255, 9, 17, 21); } }
-    public override Color MenuStripGradientEnd { get { return Color.FromArgb(255, 9, 17, 21); } }
-    public override Color ToolStripDropDownBackground { get { return Color.FromArgb(255, 9, 17, 21); } }
-    public override Color ImageMarginGradientBegin { get { return Color.FromArgb(255, 9, 17, 21); } }
-    public override Color ImageMarginGradientMiddle { get { return Color.FromArgb(255, 9, 17, 21); } }
-    public override Color ImageMarginGradientEnd { get { return Color.FromArgb(255, 9, 17, 21); } }
-    public override Color SeparatorDark { get { return Color.FromArgb(255, 44, 44, 52); } }
+    public override Color MenuItemSelected { get { return Color.FromArgb(255, 20, 66, 74); } }
+    public override Color MenuItemSelectedGradientBegin { get { return Color.FromArgb(255, 13, 42, 50); } }
+    public override Color MenuItemSelectedGradientEnd { get { return Color.FromArgb(255, 13, 42, 50); } }
+    public override Color MenuItemPressedGradientBegin { get { return Color.FromArgb(255, 11, 35, 42); } }
+    public override Color MenuItemPressedGradientEnd { get { return Color.FromArgb(255, 11, 35, 42); } }
+    public override Color MenuStripGradientBegin { get { return Color.FromArgb(255, 7, 24, 29); } }
+    public override Color MenuStripGradientEnd { get { return Color.FromArgb(255, 7, 24, 29); } }
+    public override Color ToolStripDropDownBackground { get { return Color.FromArgb(255, 7, 24, 29); } }
+    public override Color ImageMarginGradientBegin { get { return Color.FromArgb(255, 7, 24, 29); } }
+    public override Color ImageMarginGradientMiddle { get { return Color.FromArgb(255, 7, 24, 29); } }
+    public override Color ImageMarginGradientEnd { get { return Color.FromArgb(255, 7, 24, 29); } }
+    public override Color SeparatorDark { get { return Color.FromArgb(255, 13, 42, 50); } }
     public override Color SeparatorLight { get { return Color.Transparent; } }
-    public override Color CheckBackground { get { return Color.FromArgb(255, 16, 28, 34); } }
-    public override Color CheckSelectedBackground { get { return Color.FromArgb(255, 48, 48, 55); } }
-    public override Color CheckPressedBackground { get { return Color.FromArgb(255, 13, 23, 28); } }
+    public override Color CheckBackground { get { return Color.FromArgb(255, 13, 42, 50); } }
+    public override Color CheckSelectedBackground { get { return Color.FromArgb(255, 16, 52, 60); } }
+    public override Color CheckPressedBackground { get { return Color.FromArgb(255, 11, 35, 42); } }
 }
 "@ -ReferencedAssemblies System.Windows.Forms,System.Drawing -ErrorAction SilentlyContinue
 
@@ -5737,7 +5737,7 @@ function Update-MenuState {
         if ($statusHasBackup -and $statusParts.Count -lt 2) { Add-UniqueTrayMessage -Target $statusParts -Message "Backup: $backupTime" }
         $statusBarText = if ($statusParts.Count -gt 0) { @($statusParts) -join '  |  ' } else { "Ready" }
         $script:statusBarItem.Text = "  $statusBarText"
-        $script:statusBarItem.ForeColor = [System.Drawing.Color]::FromArgb(255, 84, 106, 110)
+        $script:statusBarItem.ForeColor = [System.Drawing.Color]::FromArgb(255, 95, 127, 127)
         $script:statusBarItem.AccessibleDescription = Get-TrayStatusBarChipText `
             -PendingApplyText $pendingApplyText `
             -RebootPendingText $rebootPendingText `
@@ -5984,7 +5984,7 @@ function New-TrayDisplayTopologyBitmap {
     $dimBrush = New-Object System.Drawing.SolidBrush(
         [System.Drawing.Color]::FromArgb(120, $Color.R, $Color.G, $Color.B)
     )
-    $innerBrush = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::FromArgb(190, 10, 16, 24))
+    $innerBrush = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::FromArgb(190, 5, 19, 23))
     $accent = if ($isMixed) { $script:Colors.AccentAmber } elseif ($hasRate) { $script:Colors.AccentTeal } else { $Color }
     # Defensive: never let a missing/undefined theme color reach SolidBrush (a
     # null color throws "constructor not found" and takes down tray startup).
@@ -6904,7 +6904,7 @@ function Complete-AuditIfReady {
             if ($issueCount -gt 0) {
                 Set-TrayAuditStatusItem `
                     -Text "${auditStatusLabel}: $issueCount" `
-                    -Color ([System.Drawing.Color]::FromArgb(255, 240, 180, 60)) `
+                    -Color ([System.Drawing.Color]::FromArgb(255, 245, 184, 64)) `
                     -ChipText "AUDIT|ISSUES" `
                     -IssueBadge
             }
@@ -10607,7 +10607,7 @@ public class HotkeyMessageWindow : NativeWindow {
     $script:statusBarItem.AccessibleDescription = "READY"
     $script:statusBarItem.Enabled = $false
     $script:statusBarItem.BackColor = $script:Colors.BackgroundDark
-    $script:statusBarItem.ForeColor = [System.Drawing.Color]::FromArgb(255, 84, 106, 110)
+    $script:statusBarItem.ForeColor = [System.Drawing.Color]::FromArgb(255, 95, 127, 127)
     $script:statusBarItem.Font = $script:FontMono
     $script:statusBarItem.Image = New-ActionBitmap -Action "Info" -Color $script:statusBarItem.ForeColor
     $menu.Items.Add($script:statusBarItem) | Out-Null

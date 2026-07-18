@@ -23,22 +23,22 @@ function Get-TrayThemePalette {
     # phosphor teal is the single dominant signal, amber the secondary.
     $palette = @{
         # Ink surface stack.
-        Ink000          = New-TrayThemeColor 255 5 11 14
-        Ink100          = New-TrayThemeColor 255 9 17 21
-        Ink150          = New-TrayThemeColor 255 11 20 25
-        Ink200          = New-TrayThemeColor 255 13 23 28
-        Ink250          = New-TrayThemeColor 255 16 28 34
-        Ink300          = New-TrayThemeColor 255 21 36 43
-        Ink400          = New-TrayThemeColor 255 28 48 56
-        Ink500          = New-TrayThemeColor 255 36 61 70
+        Ink000          = New-TrayThemeColor 255 4 15 18
+        Ink100          = New-TrayThemeColor 255 7 24 29
+        Ink150          = New-TrayThemeColor 255 9 29 35
+        Ink200          = New-TrayThemeColor 255 11 35 42
+        Ink250          = New-TrayThemeColor 255 13 42 50
+        Ink300          = New-TrayThemeColor 255 16 52 60
+        Ink400          = New-TrayThemeColor 255 20 66 74
+        Ink500          = New-TrayThemeColor 255 25 82 90
 
         # Text and rules.
-        Paper           = New-TrayThemeColor 255 222 237 234
-        Mist            = New-TrayThemeColor 255 133 160 163
-        Fog             = New-TrayThemeColor 255 84 106 110
+        Paper           = New-TrayThemeColor 255 225 244 240
+        Mist            = New-TrayThemeColor 255 148 183 182
+        Fog             = New-TrayThemeColor 255 95 127 127
         Rule            = New-TrayThemeColor 70 0 245 212
-        RuleSoft        = New-TrayThemeColor 255 18 32 38
-        RuleStrong      = New-TrayThemeColor 255 29 52 57
+        RuleSoft        = New-TrayThemeColor 255 12 44 49
+        RuleStrong      = New-TrayThemeColor 255 26 88 90
 
         # Brand and status signals.
         Signal          = New-TrayThemeColor 255 0 245 212
@@ -57,19 +57,19 @@ function Get-TrayThemePalette {
         CategoryRpg     = New-TrayThemeColor 255 183 156 255
         CategoryOther   = New-TrayThemeColor 255 61 222 147
         CategoryActions = New-TrayThemeColor 255 245 184 64
-        CategorySettings = New-TrayThemeColor 255 146 172 175
+        CategorySettings = New-TrayThemeColor 255 158 192 192
 
         # Legacy keys kept so existing callsites inherit the refreshed system.
-        Background      = New-TrayThemeColor 255 9 17 21
-        BackgroundDark  = New-TrayThemeColor 255 5 11 14
-        BackgroundLight = New-TrayThemeColor 255 21 36 43
-        Hover           = New-TrayThemeColor 255 28 48 56
-        HoverBright     = New-TrayThemeColor 255 36 61 70
-        Text            = New-TrayThemeColor 255 222 237 234
-        TextDim         = New-TrayThemeColor 255 133 160 163
-        TextDisabled    = New-TrayThemeColor 255 84 106 110
-        Border          = New-TrayThemeColor 255 29 52 57
-        Separator       = New-TrayThemeColor 255 18 32 38
+        Background      = New-TrayThemeColor 255 7 24 29
+        BackgroundDark  = New-TrayThemeColor 255 4 15 18
+        BackgroundLight = New-TrayThemeColor 255 16 52 60
+        Hover           = New-TrayThemeColor 255 20 66 74
+        HoverBright     = New-TrayThemeColor 255 25 82 90
+        Text            = New-TrayThemeColor 255 225 244 240
+        TextDim         = New-TrayThemeColor 255 148 183 182
+        TextDisabled    = New-TrayThemeColor 255 95 127 127
+        Border          = New-TrayThemeColor 255 26 88 90
+        Separator       = New-TrayThemeColor 255 12 44 49
         AccentGold      = New-TrayThemeColor 255 0 245 212
         AccentGreen     = New-TrayThemeColor 255 61 222 147
         AccentBlue      = New-TrayThemeColor 255 82 199 244

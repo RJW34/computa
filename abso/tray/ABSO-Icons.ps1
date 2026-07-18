@@ -295,7 +295,7 @@ $script:IconColors = @{
         Glow   = [System.Drawing.Color]::FromArgb(255, 100, 80, 180)
     }
     Warning = @{
-        Center = [System.Drawing.Color]::FromArgb(255, 240, 180, 60)
+        Center = [System.Drawing.Color]::FromArgb(255, 245, 184, 64)
         Glow   = [System.Drawing.Color]::FromArgb(255, 200, 140, 30)
     }
     Error = @{
@@ -2180,7 +2180,7 @@ function New-ActiveGameBitmap {
                 (New-Object System.Drawing.PointF(3.4, 3.5))
             )
             $starShadowBrush = New-Object System.Drawing.SolidBrush(
-                [System.Drawing.Color]::FromArgb(210, 4, 10, 13)
+                [System.Drawing.Color]::FromArgb(210, 3, 12, 15)
             )
             $g.FillPolygon($starShadowBrush, $starShadowPoints)
             $starBrush = New-Object System.Drawing.SolidBrush(
@@ -2197,7 +2197,7 @@ function New-ActiveGameBitmap {
             # Active rows use the same top-right HDR/capture mode badge as
             # shortcut rows; capture wins over HDR when both are true.
             $modeShadowBrush = New-Object System.Drawing.SolidBrush(
-                [System.Drawing.Color]::FromArgb(210, 4, 10, 13)
+                [System.Drawing.Color]::FromArgb(210, 3, 12, 15)
             )
             $g.FillRectangle($modeShadowBrush, 10, 0, 6, 7)
             $modeColor = if ($normalizedModeBadge -eq "capture") {
@@ -2226,7 +2226,7 @@ function New-ActiveGameBitmap {
 
         # Compact badge keeps the game silhouette visible while marking active.
         $shadowBrush = New-Object System.Drawing.SolidBrush(
-            [System.Drawing.Color]::FromArgb(210, 4, 10, 13)
+            [System.Drawing.Color]::FromArgb(210, 3, 12, 15)
         )
         $g.FillEllipse($shadowBrush, 7, 7, 9, 9)
 
@@ -2362,7 +2362,7 @@ function New-FavoriteGameBitmap {
         )
 
         $shadowBrush = New-Object System.Drawing.SolidBrush(
-            [System.Drawing.Color]::FromArgb(210, 4, 10, 13)
+            [System.Drawing.Color]::FromArgb(210, 3, 12, 15)
         )
         $g.FillPolygon($shadowBrush, $shadowPoints)
 
@@ -3770,7 +3770,7 @@ function New-GameSyncBadgeBitmap {
             # Mode badge uses the top-right corner so favorite stars and sync
             # badges remain legible. Capture wins over HDR when both are true.
             $modeShadowBrush = New-Object System.Drawing.SolidBrush(
-                [System.Drawing.Color]::FromArgb(210, 4, 10, 13)
+                [System.Drawing.Color]::FromArgb(210, 3, 12, 15)
             )
             $g.FillRectangle($modeShadowBrush, 10, 0, 6, 7)
 

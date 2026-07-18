@@ -1128,7 +1128,7 @@ def test_profile_launcher_uses_readable_spacing_and_plain_choice_labels() -> Non
     # legibility); section eyebrows stay dim mist with a whisper of accent.
     assert "? MixColor(e.Item.ForeColor, TextPaper, 0.35)" in script
     assert ": MixColor(TextMist, e.Item.ForeColor, 0.30);" in script
-    assert "private static readonly Color TextPaper = Color.FromArgb(255, 222, 237, 234);" in script
+    assert "private static readonly Color TextPaper = Color.FromArgb(255, 225, 244, 240);" in script
     assert 'Color rowTextColor = e.Item.AccessibleName == "__backup_menu_item__" ? TextMist : TextPaper;' in script
     assert '$variantLabel = if ($VariantCount -eq 1) { "1 choice" } else { "$VariantCount choices" }' in script
     assert '$profileVariantChip = ""' in script

@@ -20,13 +20,13 @@ $script:QPPalette = if (Get-Command Get-TrayThemePalette -ErrorAction SilentlyCo
 }
 else {
     @{
-        Ink100   = [System.Drawing.Color]::FromArgb(255, 9, 17, 21)
+        Ink100   = [System.Drawing.Color]::FromArgb(255, 7, 24, 29)
         Ink150   = [System.Drawing.Color]::FromArgb(255, 17, 21, 31)
-        Ink200   = [System.Drawing.Color]::FromArgb(255, 19, 24, 36)
-        Ink300   = [System.Drawing.Color]::FromArgb(255, 21, 36, 43)
-        Paper    = [System.Drawing.Color]::FromArgb(255, 222, 237, 234)
-        Mist     = [System.Drawing.Color]::FromArgb(255, 133, 160, 163)
-        Fog      = [System.Drawing.Color]::FromArgb(255, 84, 106, 110)
+        Ink200   = [System.Drawing.Color]::FromArgb(255, 11, 35, 42)
+        Ink300   = [System.Drawing.Color]::FromArgb(255, 16, 52, 60)
+        Paper    = [System.Drawing.Color]::FromArgb(255, 225, 244, 240)
+        Mist     = [System.Drawing.Color]::FromArgb(255, 148, 183, 182)
+        Fog      = [System.Drawing.Color]::FromArgb(255, 95, 127, 127)
         Lagoon   = [System.Drawing.Color]::FromArgb(255, 0, 245, 212)   # phosphor cyan
         Rule     = [System.Drawing.Color]::FromArgb(70, 0, 245, 212)
     }
@@ -456,7 +456,7 @@ function New-QuickPanelGameMedallionBitmap {
                 [System.Drawing.Color]::FromArgb(255, 110, 118, 138)
             )
             $emptyBadgePen = New-Object System.Drawing.Pen -ArgumentList (
-                [System.Drawing.Color]::FromArgb(235, 232, 234, 240), 1.1
+                [System.Drawing.Color]::FromArgb(235, 228, 246, 242), 1.1
             )
             $emptyBadgePen.StartCap = [System.Drawing.Drawing2D.LineCap]::Round
             $emptyBadgePen.EndCap = [System.Drawing.Drawing2D.LineCap]::Round
