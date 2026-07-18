@@ -28,6 +28,10 @@ function Get-DefaultConfig {
         # Icon/sound theme pack: a folder name under abso/tray/themes/.
         # Takes effect on tray restart. See themes/README.md.
         theme           = "default"
+        # Per-machine tray curation: profile ids listed here stay applyable
+        # from the CLI but are hidden from the tray menu/quick panel (e.g.
+        # hide the SDR lanes on a machine that runs HDR exclusively).
+        hiddenProfiles  = @()
         recentProfiles  = @()
         profileHistory  = @()
         lastProfileState = $null

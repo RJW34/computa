@@ -317,10 +317,6 @@ PROFILE_CATALOG: OrderedDict[str, ProfileCatalogEntry] = OrderedDict(
                 "uncapped engine path, exclusive fullscreen."
             ),
             sync_mode="off",
-            # SDR lanes stay applyable (CLI + mixed-refresh fallbacks) but are
-            # hidden from the tray: this machine runs HDR lanes exclusively and
-            # the full SDR/HDR matrix read as duplicate entries in the flyout.
-            tray_visible=False,
         ),
         "rivals2-offline-hdr": ProfileCatalogEntry(
             profile_class=Rivals2OfflineHDRProfile,
@@ -342,8 +338,6 @@ PROFILE_CATALOG: OrderedDict[str, ProfileCatalogEntry] = OrderedDict(
                 "(not Ultra), external frame caps disabled."
             ),
             sync_mode="off",
-            # Hidden from the tray; see rivals2-offline note.
-            tray_visible=False,
         ),
         "rivals2-online-hdr": ProfileCatalogEntry(
             profile_class=Rivals2OnlineHDRProfile,
@@ -364,8 +358,6 @@ PROFILE_CATALOG: OrderedDict[str, ProfileCatalogEntry] = OrderedDict(
                 "Uses refresh - 3 FPS caps and disables driver threaded optimization."
             ),
             sync_mode="on",
-            # Hidden from the tray; see rivals2-offline note.
-            tray_visible=False,
         ),
         "rivals2-gsync-hdr": ProfileCatalogEntry(
             profile_class=Rivals2GSyncHDRProfile,
@@ -399,8 +391,6 @@ PROFILE_CATALOG: OrderedDict[str, ProfileCatalogEntry] = OrderedDict(
                 "Threaded optimization off for rollback stability."
             ),
             sync_mode="on",
-            # Hidden from the tray; see rivals2-offline note.
-            tray_visible=False,
         ),
         "rivals2-online-gsync-hdr": ProfileCatalogEntry(
             profile_class=Rivals2OnlineGSyncHDRProfile,
@@ -816,6 +806,12 @@ def get_profile_manifest() -> list[dict[str, Any]]:
                 "tray_rank": tray_rank,
                 "tray_visible": entry.tray_visible,
                 "sync_mode": entry.sync_mode,
+                # Machine-independent capability requirement: True for lanes
+                # that turn Windows HDR composition on. Clients (tray, setup
+                # wizard) filter these on displays without HDR support.
+                "requires_hdr_display": bool(
+                    profile.get_settings("WindowsSettingsHandler").get("hdr") is True
+                ),
                 "launch_process_killset": profile.launch_process_killset().to_dict(),
                 "requires_overlay_free_path": bool(
                     profile.display_path_requirements.require_overlay_free_path

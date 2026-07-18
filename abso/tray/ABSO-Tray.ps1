@@ -2676,6 +2676,13 @@ function Convert-CatalogEntriesToProfileMap {
         } elseif ($fallback -and $null -ne $fallback.TrayVisible) {
             try { $trayVisible = [bool]$fallback.TrayVisible } catch { $trayVisible = $true }
         }
+        # Per-machine curation: tray-config hiddenProfiles wins over catalog
+        # visibility, so users can slim the menu without patching the catalog.
+        if ($trayVisible -and $script:TrayConfig -and $script:TrayConfig.hiddenProfiles) {
+            if (@($script:TrayConfig.hiddenProfiles) -contains $id) {
+                $trayVisible = $false
+            }
+        }
 
         # Launch-time process janitor killset comes from the Python catalog
         # so the tray never has to hardcode game-specific overlay/sync lists.
