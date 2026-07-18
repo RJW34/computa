@@ -93,7 +93,9 @@ export const useAppStore = create<AppState>()(
       setPage: (page) => set({ currentPage: page }),
 
       // Theme
-      theme: 'system',
+      // The instrument defaults to its dark faceplate; light and system stay
+      // one toggle away.
+      theme: 'dark',
       setTheme: (theme) => {
         set({ theme });
         applyTheme(theme);

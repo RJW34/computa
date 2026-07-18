@@ -55,27 +55,29 @@ export function Header({ showBack, title }: HeaderProps) {
             </Button>
           )}
           <div className="brand-lockup">
-            <div className="brand-sigil">AB</div>
+            <div className="brand-sigil">cp</div>
             <div className="min-w-0">
-              <h1 className="truncate text-lg font-black leading-tight">
-                {title || 'A.B.S.O.'}
+              <h1 className="brand-word truncate">
+                {title ? title : (
+                  <>
+                    computa<b>_</b>
+                  </>
+                )}
               </h1>
-              <p className="truncate text-xs text-muted-foreground">
-                Adaptive Battle Station Optimizer
-              </p>
+              <p className="etch truncate">per-game windows optimization</p>
             </div>
           </div>
         </div>
 
-        <nav className="hidden xl:flex items-center gap-1 text-sm" aria-label="Primary">
+        <nav className="hidden xl:flex items-center gap-1.5" aria-label="Primary">
           {navItems.map(({ page, label, icon: Icon }) => (
             <button
               key={page}
               type="button"
-              className={cn('nav-pill', currentPage === page && 'nav-pill--active')}
+              className={cn('nav-switch', currentPage === page && 'nav-switch--active')}
               onClick={() => setPage(page)}
             >
-              <Icon className="h-4 w-4" />
+              <Icon className="h-3.5 w-3.5" />
               <span>{label}</span>
             </button>
           ))}

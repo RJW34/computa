@@ -64,6 +64,15 @@ export default {
         md: 'calc(var(--radius) - 2px)',
         sm: 'calc(var(--radius) - 4px)',
       },
+      fontFamily: {
+        display: ['"Oxanium Variable"', 'Oxanium', 'Bahnschrift', '"Segoe UI"', 'sans-serif'],
+        sans: ['"IBM Plex Sans"', 'Bahnschrift', '"Segoe UI Variable"', '"Segoe UI"', 'sans-serif'],
+        data: ['"IBM Plex Mono"', '"Cascadia Mono"', 'Consolas', 'monospace'],
+      },
+      boxShadow: {
+        phos: '0 0 18px hsl(var(--phos) / 0.25)',
+        'phos-strong': '0 0 28px hsl(var(--phos) / 0.4)',
+      },
       keyframes: {
         'accordion-down': {
           from: { height: '0' },

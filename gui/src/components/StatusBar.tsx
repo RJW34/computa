@@ -50,34 +50,40 @@ export function StatusBar() {
           <div className="status-pill">
             {isAdmin ? (
               <>
-                <Shield className="h-4 w-4 text-success" />
-                <span className="text-muted-foreground">Admin</span>
+                <span className="led led--on" aria-hidden="true" />
+                <Shield className="h-3.5 w-3.5 text-success" />
+                <span className="text-muted-foreground">ADMIN</span>
               </>
             ) : (
               <>
-                <ShieldOff className="h-4 w-4 text-warning" />
-                <span className="text-warning">Not Admin</span>
+                <span className="led led--warn" aria-hidden="true" />
+                <ShieldOff className="h-3.5 w-3.5 text-warning" />
+                <span className="text-warning">NOT ADMIN</span>
               </>
             )}
           </div>
 
           {/* Last backup */}
           <div className="status-pill hidden md:inline-flex">
-            <Clock className="h-4 w-4 text-muted-foreground" />
+            <Clock className="h-3.5 w-3.5 text-muted-foreground" />
             <span className="truncate text-muted-foreground">
               {latestBackup
-                ? `Last backup: ${formatRelativeTime(latestBackup.created_at)}`
-                : 'No backups'}
+                ? `BACKUP ${formatRelativeTime(latestBackup.created_at)}`
+                : 'NO BACKUPS'}
             </span>
           </div>
         </div>
 
         <div className="flex min-w-0 items-center gap-3">
           <div className="status-pill max-w-[58vw]">
+            <span
+              className={statusNeedsAttention ? 'led led--warn' : 'led led--on'}
+              aria-hidden="true"
+            />
             {statusNeedsAttention ? (
-              <AlertTriangle className="h-4 w-4 text-warning" />
+              <AlertTriangle className="h-3.5 w-3.5 text-warning" />
             ) : (
-              <Gamepad2 className="h-4 w-4 text-muted-foreground" />
+              <Gamepad2 className="h-3.5 w-3.5 text-muted-foreground" />
             )}
             <span
               className={

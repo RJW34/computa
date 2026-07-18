@@ -109,6 +109,7 @@ function App() {
     <div className="app-shell">
       {renderPage()}
       <StatusBar />
+      <div className="app-grain" aria-hidden="true" />
     </div>
   );
 }

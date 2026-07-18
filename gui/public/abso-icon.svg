@@ -1,10 +1,20 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
-  <defs>
-    <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#3b82f6;stop-opacity:1" />
-      <stop offset="100%" style="stop-color:#8b5cf6;stop-opacity:1" />
-    </linearGradient>
-  </defs>
-  <rect width="100" height="100" rx="20" fill="url(#grad)"/>
-  <text x="50" y="68" font-family="Arial, sans-serif" font-size="40" font-weight="bold" fill="white" text-anchor="middle">A</text>
+  <!-- computa: phosphor instrument plate -->
+  <rect width="100" height="100" rx="14" fill="#08131a"/>
+  <rect x="3" y="3" width="94" height="94" rx="11" fill="none" stroke="#0d2b30" stroke-width="2"/>
+  <!-- corner ticks -->
+  <path d="M12 20 V12 H20 M80 12 H88 V20 M88 80 V88 H80 M20 88 H12 V80" fill="none" stroke="#00f5d4" stroke-width="3" stroke-linecap="square" opacity="0.9"/>
+  <!-- scanlines -->
+  <g opacity="0.16" stroke="#9dfff0" stroke-width="1">
+    <line x1="10" y1="34" x2="90" y2="34"/>
+    <line x1="10" y1="44" x2="90" y2="44"/>
+    <line x1="10" y1="54" x2="90" y2="54"/>
+    <line x1="10" y1="64" x2="90" y2="64"/>
+    <line x1="10" y1="74" x2="90" y2="74"/>
+  </g>
+  <!-- phosphor c -->
+  <path d="M66 39 A20 20 0 1 0 66 61" fill="none" stroke="#00f5d4" stroke-width="9" stroke-linecap="round"/>
+  <path d="M66 39 A20 20 0 1 0 66 61" fill="none" stroke="#b6fff2" stroke-width="3" stroke-linecap="round" opacity="0.55"/>
+  <!-- cursor tick -->
+  <rect x="70" y="56" width="9" height="9" fill="#f5b840"/>
 </svg>
