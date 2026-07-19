@@ -1111,7 +1111,7 @@ def test_profile_launcher_uses_readable_spacing_and_plain_choice_labels() -> Non
     assert '$script:FontMenuRow = New-Object System.Drawing.Font("Segoe UI", 10.2)' in script
     assert "$script:FontSectionHeader = [DarkThemeRenderer]::ResolveEyebrowFont(9.8)" in script
     assert "$script:FontCategoryHeader = [DarkThemeRenderer]::ResolveEyebrowFont(10.8)" in script
-    assert '$script:FontMono    = New-Object System.Drawing.Font("Segoe UI", 9.0)' in script
+    assert '$script:FontMono    = [DarkThemeRenderer]::ResolveEyebrowFont(8.4)' in script
     assert '"Bahnschrift' not in script
     assert '"Cascadia' not in script
     assert '"Consolas"' not in script
