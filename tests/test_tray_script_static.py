@@ -1105,23 +1105,27 @@ def test_profile_launcher_uses_readable_spacing_and_plain_choice_labels() -> Non
     script = TRAY_SCRIPT.read_text(encoding="utf-8")
 
     # Type pyramid contract: content rows render LARGER than the section /
-    # category eyebrows that label them (hero 13 > rows 11.25 > category
-    # 10.8 > section 9.8). Wayfinding must never out-shout the game names.
+    # category eyebrows that label them (hero 13 > rows 10.2 > category
+    # 9.2 > section 8.4). Wayfinding must never out-shout the game names.
     assert '$script:FontNormal  = New-Object System.Drawing.Font("Segoe UI", 10.0)' in script
     assert '$script:FontMenuRow = New-Object System.Drawing.Font("Segoe UI", 10.2)' in script
     assert "$script:FontSectionHeader = [DarkThemeRenderer]::ResolveEyebrowFont(9.8)" in script
     assert "$script:FontCategoryHeader = [DarkThemeRenderer]::ResolveEyebrowFont(10.8)" in script
     assert '$script:FontMono    = [DarkThemeRenderer]::ResolveEyebrowFont(8.4)' in script
-    assert '"Bahnschrift' not in script
-    assert '"Cascadia' not in script
-    assert '"Consolas"' not in script
-    assert "$script:TrayMenuMinimumWidth = 360" in script
+    # Instrument type voices live ONLY in the shared resolver stacks (with
+    # Segoe fallbacks), never as ad-hoc Font constructions: Bahnschrift is
+    # the display voice, Cascadia Mono the etching/readout voice.
+    assert '"Bahnschrift", "Segoe UI Variable Display", "Segoe UI"' in script
+    assert '"Cascadia Mono SemiBold", "Cascadia Mono", "Consolas", "Segoe UI"' in script
+    assert 'New-Object System.Drawing.Font("Bahnschrift"' not in script
+    assert 'New-Object System.Drawing.Font("Cascadia' not in script
+    assert "$script:TrayMenuMinimumWidth = 420" in script
     assert "$script:statusItem.Size = New-Object System.Drawing.Size(480, 48)" in script
     assert "$script:statusItem.Font = $script:FontMenuRowBold" in script
     assert "$searchBox.Size = New-Object System.Drawing.Size(300, 26)" in script
     assert "$searchBox.Font = $script:FontMenuRow" in script
     assert "Font heroFont = ResolveHeroFont(13.0f, FontStyle.Regular);" in script
-    assert "float labelSize = isSectionHeader ? 9.8f : 10.8f;" in script
+    assert "float labelSize = isSectionHeader ? 8.4f : 9.2f;" in script
     assert "int labelAlpha = isSectionHeader ? 232 : 255;" in script
     assert "Color labelColor = isCategoryHeader" in script
     # Category eyebrows carry their accent color (mixed toward paper for
