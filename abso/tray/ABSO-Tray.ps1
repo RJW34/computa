@@ -4247,7 +4247,10 @@ public class DarkThemeRenderer : ToolStripProfessionalRenderer
             try
             {
                 Rectangle textRect = e.TextRectangle;
-                Color labelColor = TextPaper;
+                // Game rows carry their game accent (pulled well toward paper
+                // for readability) — the old forced-white neutral made the
+                // whole roster read as one default-looking block.
+                Color labelColor = MixColor(e.Item.ForeColor, TextPaper, 0.48);
                 Rectangle labelRect = new Rectangle(textRect.X, textRect.Y, Math.Max(18, textRect.Width - 8), textRect.Height);
                 using (var labelFormat = new StringFormat())
                 using (var labelBrush = new SolidBrush(labelColor))
@@ -4273,13 +4276,14 @@ public class DarkThemeRenderer : ToolStripProfessionalRenderer
                 string[] chips = chipRaw.Split(new char[] { '|' }, StringSplitOptions.RemoveEmptyEntries);
                 bool isSectionHeader = e.Item.AccessibleName == "__section_header__";
                 bool isCategoryHeader = e.Item.AccessibleName == "__category_header__";
-                // Hierarchy pyramid: hero (13) > game rows (10.2) > category
-                // eyebrows (9.2, accent-tinted mono) > section eyebrows (8.4,
-                // dim mono). Wayfinding labels never out-shout content rows.
-                float labelSize = isSectionHeader ? 8.4f : 9.2f;
+                // Section titles read as TITLES: category bands render in the
+                // Bahnschrift display voice, larger than the rows they label,
+                // in their accent color. Only minor section eyebrows (Actions/
+                // Settings groupings) stay small etched mono.
+                float labelSize = isSectionHeader ? 8.4f : 11.6f;
                 int labelAlpha = isSectionHeader ? 232 : 255;
                 Color labelColor = isCategoryHeader
-                    ? MixColor(e.Item.ForeColor, TextPaper, 0.35)
+                    ? MixColor(e.Item.ForeColor, TextPaper, 0.22)
                     : MixColor(TextMist, e.Item.ForeColor, 0.30);
 
                 using (var chipFont = ResolveEyebrowFont(6.6f))
@@ -4313,7 +4317,9 @@ public class DarkThemeRenderer : ToolStripProfessionalRenderer
                     Math.Max(22, chipRight - textRect.X - 8),
                     textRect.Height);
                 using (var labelFormat = new StringFormat())
-                using (var labelFont = ResolveEyebrowFont(labelSize))
+                using (var labelFont = isCategoryHeader
+                    ? ResolveHeroFont(labelSize, FontStyle.Bold)
+                    : ResolveEyebrowFont(labelSize))
                 using (var labelBrush = new SolidBrush(Color.FromArgb(labelAlpha, labelColor.R, labelColor.G, labelColor.B)))
                 {
                     labelFormat.Trimming = StringTrimming.EllipsisCharacter;
@@ -4423,7 +4429,9 @@ public class DarkThemeRenderer : ToolStripProfessionalRenderer
                     format.Trimming = StringTrimming.EllipsisCharacter;
                     format.FormatFlags = StringFormatFlags.NoWrap;
                     format.LineAlignment = StringAlignment.Center;
-                    Color rowTextColor = e.Item.AccessibleName == "__backup_menu_item__" ? TextMist : TextPaper;
+                    Color rowTextColor = e.Item.AccessibleName == "__backup_menu_item__"
+                        ? TextMist
+                        : MixColor(e.Item.ForeColor, TextPaper, 0.55);
                     using (var brush = new SolidBrush(rowTextColor))
                     {
                         e.Graphics.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
@@ -4605,8 +4613,10 @@ $script:FontNormal  = New-Object System.Drawing.Font("Segoe UI", 10.0)
 $script:FontBold    = New-Object System.Drawing.Font("Segoe UI", 10.0, [System.Drawing.FontStyle]::Bold)
 $script:FontEyebrow = [DarkThemeRenderer]::ResolveEyebrowFont(8.6)
 $script:FontHero    = [DarkThemeRenderer]::ResolveHeroFont(13.0, [System.Drawing.FontStyle]::Bold)
-$script:FontMenuRow = New-Object System.Drawing.Font("Segoe UI", 10.2)
-$script:FontMenuRowBold = New-Object System.Drawing.Font("Segoe UI", 10.2, [System.Drawing.FontStyle]::Bold)
+# Content rows speak the Bahnschrift display voice (Segoe fallback via the
+# resolver) — plain Segoe rows were what kept the menu looking stock-Windows.
+$script:FontMenuRow = [DarkThemeRenderer]::ResolveHeroFont(10.6, [System.Drawing.FontStyle]::Regular)
+$script:FontMenuRowBold = [DarkThemeRenderer]::ResolveHeroFont(10.6, [System.Drawing.FontStyle]::Bold)
 $script:FontSectionHeader = [DarkThemeRenderer]::ResolveEyebrowFont(9.8)
 $script:FontCategoryHeader = [DarkThemeRenderer]::ResolveEyebrowFont(10.8)
 $script:FontMono    = [DarkThemeRenderer]::ResolveEyebrowFont(8.4)

@@ -1108,7 +1108,7 @@ def test_profile_launcher_uses_readable_spacing_and_plain_choice_labels() -> Non
     # category eyebrows that label them (hero 13 > rows 10.2 > category
     # 9.2 > section 8.4). Wayfinding must never out-shout the game names.
     assert '$script:FontNormal  = New-Object System.Drawing.Font("Segoe UI", 10.0)' in script
-    assert '$script:FontMenuRow = New-Object System.Drawing.Font("Segoe UI", 10.2)' in script
+    assert "$script:FontMenuRow = [DarkThemeRenderer]::ResolveHeroFont(10.6, [System.Drawing.FontStyle]::Regular)" in script
     assert "$script:FontSectionHeader = [DarkThemeRenderer]::ResolveEyebrowFont(9.8)" in script
     assert "$script:FontCategoryHeader = [DarkThemeRenderer]::ResolveEyebrowFont(10.8)" in script
     assert '$script:FontMono    = [DarkThemeRenderer]::ResolveEyebrowFont(8.4)' in script
@@ -1125,15 +1125,21 @@ def test_profile_launcher_uses_readable_spacing_and_plain_choice_labels() -> Non
     assert "$searchBox.Size = New-Object System.Drawing.Size(300, 26)" in script
     assert "$searchBox.Font = $script:FontMenuRow" in script
     assert "Font heroFont = ResolveHeroFont(13.0f, FontStyle.Regular);" in script
-    assert "float labelSize = isSectionHeader ? 8.4f : 9.2f;" in script
+    # Category titles render LARGER than their rows (user-directed inversion
+    # of the old wayfinding-stays-small pyramid): Bahnschrift caps at 11.6
+    # over 10.6 content rows; minor section eyebrows stay small etched mono.
+    assert "float labelSize = isSectionHeader ? 8.4f : 11.6f;" in script
+    assert "? ResolveHeroFont(labelSize, FontStyle.Bold)" in script
     assert "int labelAlpha = isSectionHeader ? 232 : 255;" in script
     assert "Color labelColor = isCategoryHeader" in script
     # Category eyebrows carry their accent color (mixed toward paper for
     # legibility); section eyebrows stay dim mist with a whisper of accent.
-    assert "? MixColor(e.Item.ForeColor, TextPaper, 0.35)" in script
+    assert "? MixColor(e.Item.ForeColor, TextPaper, 0.22)" in script
     assert ": MixColor(TextMist, e.Item.ForeColor, 0.30);" in script
     assert "private static readonly Color TextPaper = Color.FromArgb(255, 225, 244, 240);" in script
-    assert 'Color rowTextColor = e.Item.AccessibleName == "__backup_menu_item__" ? TextMist : TextPaper;' in script
+    # Profile rows carry their accent pulled toward paper — forced-white rows
+    # made the whole roster read as one default block.
+    assert ": MixColor(e.Item.ForeColor, TextPaper, 0.55);" in script
     assert '$variantLabel = if ($VariantCount -eq 1) { "1 choice" } else { "$VariantCount choices" }' in script
     assert '$profileVariantChip = ""' in script
     assert '$submenuItem.ToolTipText = "Open profile choices for $($groupInfo.Name): $($profileIds.Count)"' in script
@@ -2491,7 +2497,7 @@ def test_game_group_menu_rows_use_compact_medallions() -> None:
     assert "FillRoundRect(g, brush, laneRect, 4)" in game_row_background
     assert "var railRect = new Rectangle(laneRect.X + 5, laneRect.Y + 4, 4, Math.Max(3, laneRect.Height - 8));" in game_row_background
     assert "g.DrawLine(pen, laneRect.X + 18, laneRect.Y + 1, Math.Min(laneRect.Right - 14, laneRect.X + 128), laneRect.Y + 1);" in game_row_background
-    assert "Color labelColor = TextPaper;" in game_row_text
+    assert "Color labelColor = MixColor(e.Item.ForeColor, TextPaper, 0.48);" in game_row_text
     assert "ResolveEyebrowFont(11.0f)" not in game_row_text
     assert 'e.Graphics.DrawString((e.Text ?? "").Trim(), e.TextFont, labelBrush, labelRect, labelFormat);' in game_row_text
 
