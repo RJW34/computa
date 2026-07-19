@@ -3427,6 +3427,56 @@ public class DarkThemeRenderer : ToolStripProfessionalRenderer
         return Math.Max(48, GetSafeItemWidth(item) - 24);
     }
 
+    // Semantic chip colors: a badge's meaning picks its tint, never the row's
+    // accent (a pale game accent used to turn every chip prototype-gray).
+    private static Color ChipTint(string chip, Color fallback)
+    {
+        string token = (chip ?? "").Trim().ToUpperInvariant();
+        int lastSpace = token.LastIndexOf(' ');
+        if (lastSpace > 0) token = token.Substring(lastSpace + 1);
+        switch (token)
+        {
+            case "G-SYNC": return Color.FromArgb(255, 0, 245, 212);
+            case "NO-SYNC": return Color.FromArgb(255, 148, 183, 182);
+            case "OFFLINE": return Color.FromArgb(255, 148, 183, 182);
+            case "SDR": return Color.FromArgb(255, 148, 183, 182);
+            case "CAPTURE": return Color.FromArgb(255, 82, 199, 244);
+            case "CAP": return Color.FromArgb(255, 82, 199, 244);
+            case "HDR": return Color.FromArgb(255, 245, 184, 64);
+            case "ONLINE": return Color.FromArgb(255, 61, 222, 147);
+            case "FIX": return Color.FromArgb(255, 245, 184, 64);
+            case "RESTART": return Color.FromArgb(255, 245, 184, 64);
+            case "MIXED": return Color.FromArgb(255, 245, 184, 64);
+            case "CHECK": return Color.FromArgb(255, 82, 199, 244);
+            case "PREVIEW": return Color.FromArgb(255, 82, 199, 244);
+            default: return fallback;
+        }
+    }
+
+    // Flat instrument chip: hairline border, faint flat fill, tint-lit mono
+    // text. Replaces the gradient pills that read as beveled buttons.
+    private static void DrawInstrumentChip(Graphics g, Font font, Rectangle rect, string text, Color tint, int edgeAlpha)
+    {
+        using (var fill = new SolidBrush(Color.FromArgb(28, tint.R, tint.G, tint.B)))
+        {
+            FillRoundRect(g, fill, rect, 3);
+        }
+        using (var pen = new Pen(Color.FromArgb(edgeAlpha, tint.R, tint.G, tint.B), 1f))
+        {
+            DrawRoundRect(g, pen, rect, 3);
+        }
+        using (var textBrush = new SolidBrush(Color.FromArgb(242,
+            Math.Min(255, tint.R + 60), Math.Min(255, tint.G + 60), Math.Min(255, tint.B + 60))))
+        using (var fmt = new StringFormat())
+        {
+            fmt.Alignment = StringAlignment.Center;
+            fmt.LineAlignment = StringAlignment.Center;
+            fmt.Trimming = StringTrimming.EllipsisCharacter;
+            fmt.FormatFlags = StringFormatFlags.NoWrap;
+            g.DrawString(text, font, textBrush, rect, fmt);
+        }
+    }
+
     private static Color MixColor(Color baseColor, Color overlay, double ratio)
     {
         ratio = Math.Max(0.0, Math.Min(1.0, ratio));
@@ -4116,19 +4166,8 @@ public class DarkThemeRenderer : ToolStripProfessionalRenderer
                             tint = Color.FromArgb(255, 95, 127, 127);
                         }
 
-                        using (var chipBrush = new LinearGradientBrush(
-                            chipRect,
-                            Color.FromArgb(50, tint.R, tint.G, tint.B),
-                            Color.FromArgb(15, tint.R, tint.G, tint.B),
-                            LinearGradientMode.Horizontal))
-                        {
-                            FillRoundRect(e.Graphics, chipBrush, chipRect, 4);
-                        }
-                        using (var chipPen = new Pen(Color.FromArgb(82, tint.R, tint.G, tint.B), 1f))
-                        {
-                            DrawRoundRect(e.Graphics, chipPen, chipRect, 4);
-                        }
-                        e.Graphics.DrawString(chip, chipFont, chipTextBrush, chipRect, chipFormat);
+                        tint = ChipTint(chip, tint);
+                        DrawInstrumentChip(e.Graphics, chipFont, chipRect, chip, tint, 120);
                         chipRight = chipX - 4;
                     }
                 }
@@ -4192,28 +4231,10 @@ public class DarkThemeRenderer : ToolStripProfessionalRenderer
 
                 if (!chipRect.IsEmpty)
                 {
-                    Color tint = e.Item.ForeColor;
-                    using (var chipBrush = new LinearGradientBrush(
-                        chipRect,
-                        Color.FromArgb(58, tint.R, tint.G, tint.B),
-                        Color.FromArgb(18, tint.R, tint.G, tint.B),
-                        LinearGradientMode.Horizontal))
-                    {
-                        FillRoundRect(e.Graphics, chipBrush, chipRect, 4);
-                    }
-                    using (var chipPen = new Pen(Color.FromArgb(84, tint.R, tint.G, tint.B), 1f))
-                    {
-                        DrawRoundRect(e.Graphics, chipPen, chipRect, 4);
-                    }
+                    Color tint = ChipTint(chip, e.Item.ForeColor);
                     using (var chipFont = ResolveEyebrowFont(7.4f))
-                    using (var chipTextBrush = new SolidBrush(Color.FromArgb(228, 228, 246, 242)))
-                    using (var chipFormat = new StringFormat())
                     {
-                        chipFormat.Alignment = StringAlignment.Center;
-                        chipFormat.LineAlignment = StringAlignment.Center;
-                        chipFormat.Trimming = StringTrimming.EllipsisCharacter;
-                        chipFormat.FormatFlags = StringFormatFlags.NoWrap;
-                        e.Graphics.DrawString(chip.ToUpperInvariant(), chipFont, chipTextBrush, chipRect, chipFormat);
+                        DrawInstrumentChip(e.Graphics, chipFont, chipRect, chip.ToUpperInvariant(), tint, 118);
                     }
                 }
                 return;
@@ -4252,10 +4273,10 @@ public class DarkThemeRenderer : ToolStripProfessionalRenderer
                 string[] chips = chipRaw.Split(new char[] { '|' }, StringSplitOptions.RemoveEmptyEntries);
                 bool isSectionHeader = e.Item.AccessibleName == "__section_header__";
                 bool isCategoryHeader = e.Item.AccessibleName == "__category_header__";
-                // Hierarchy pyramid: hero (13) > game rows (11.25) > category
-                // eyebrows (10.8, accent-tinted) > section eyebrows (9.8, dim).
-                // Wayfinding labels must never out-shout the content rows.
-                float labelSize = isSectionHeader ? 9.8f : 10.8f;
+                // Hierarchy pyramid: hero (13) > game rows (10.2) > category
+                // eyebrows (9.2, accent-tinted mono) > section eyebrows (8.4,
+                // dim mono). Wayfinding labels never out-shout content rows.
+                float labelSize = isSectionHeader ? 8.4f : 9.2f;
                 int labelAlpha = isSectionHeader ? 232 : 255;
                 Color labelColor = isCategoryHeader
                     ? MixColor(e.Item.ForeColor, TextPaper, 0.35)
@@ -4280,20 +4301,8 @@ public class DarkThemeRenderer : ToolStripProfessionalRenderer
                         if (chipX <= textRect.X + 68) continue;
 
                         Rectangle chipRect = new Rectangle(chipX, Math.Max(3, (e.Item.Height - 15) / 2), chipWidth, 15);
-                        Color tint = e.Item.ForeColor;
-                        using (var chipBrush = new LinearGradientBrush(
-                            chipRect,
-                            Color.FromArgb(46, tint.R, tint.G, tint.B),
-                            Color.FromArgb(14, tint.R, tint.G, tint.B),
-                            LinearGradientMode.Horizontal))
-                        {
-                            FillRoundRect(e.Graphics, chipBrush, chipRect, 4);
-                        }
-                        using (var chipPen = new Pen(Color.FromArgb(72, tint.R, tint.G, tint.B), 1f))
-                        {
-                            DrawRoundRect(e.Graphics, chipPen, chipRect, 4);
-                        }
-                        e.Graphics.DrawString(chip, chipFont, chipTextBrush, chipRect, chipFormat);
+                        Color tint = ChipTint(chip, e.Item.ForeColor);
+                        DrawInstrumentChip(e.Graphics, chipFont, chipRect, chip, tint, 110);
                         chipRight = chipX - 4;
                     }
                 }
@@ -4354,20 +4363,8 @@ public class DarkThemeRenderer : ToolStripProfessionalRenderer
                         if (chipX <= textRect.X + 86) continue;
 
                         Rectangle chipRect = new Rectangle(chipX, Math.Max(3, (e.Item.Height - 15) / 2), chipWidth, 15);
-                        Color tint = e.Item.ForeColor;
-                        using (var chipBrush = new LinearGradientBrush(
-                            chipRect,
-                            Color.FromArgb(50, tint.R, tint.G, tint.B),
-                            Color.FromArgb(16, tint.R, tint.G, tint.B),
-                            LinearGradientMode.Horizontal))
-                        {
-                            FillRoundRect(e.Graphics, chipBrush, chipRect, 4);
-                        }
-                        using (var chipPen = new Pen(Color.FromArgb(80, tint.R, tint.G, tint.B), 1f))
-                        {
-                            DrawRoundRect(e.Graphics, chipPen, chipRect, 4);
-                        }
-                        e.Graphics.DrawString(chip, chipFont, chipTextBrush, chipRect, chipFormat);
+                        Color tint = ChipTint(chip, e.Item.ForeColor);
+                        DrawInstrumentChip(e.Graphics, chipFont, chipRect, chip, tint, 118);
                         chipRight = chipX - 4;
                     }
                 }
@@ -4379,7 +4376,7 @@ public class DarkThemeRenderer : ToolStripProfessionalRenderer
                     textRect.Height);
                 using (var labelFormat = new StringFormat())
                 using (var labelFont = ResolveEyebrowFont(8.4f))
-                using (var labelBrush = new SolidBrush(e.Item.ForeColor))
+                using (var labelBrush = new SolidBrush(MixColor(e.Item.ForeColor, TextPaper, 0.55)))
                 {
                     labelFormat.Trimming = StringTrimming.EllipsisCharacter;
                     labelFormat.FormatFlags = StringFormatFlags.NoWrap;
@@ -4466,18 +4463,8 @@ public class DarkThemeRenderer : ToolStripProfessionalRenderer
                                 chipWidth,
                                 15);
 
-                            using (var chipBrush = new LinearGradientBrush(
-                                chipRect,
-                                Color.FromArgb(chipFillAlpha, tint.R, tint.G, tint.B),
-                                Color.FromArgb(chipFadeAlpha, tint.R, tint.G, tint.B),
-                                LinearGradientMode.Horizontal))
-                            {
-                                FillRoundRect(e.Graphics, chipBrush, chipRect, 4);
-                            }
-                            using (var chipPen = new Pen(Color.FromArgb(chipEdgeAlpha, tint.R, tint.G, tint.B), 1f))
-                            {
-                                DrawRoundRect(e.Graphics, chipPen, chipRect, 4);
-                            }
+                            Color chipColor = ChipTint(chip, tint);
+                            DrawInstrumentChip(e.Graphics, chipFont, chipRect, chip, chipColor, chipEdgeAlpha);
                             if (isActiveProfileChip && chipRect.Width > 26)
                             {
                                 int sweepWidth = Math.Max(10, Math.Min(22, chipRect.Width / 2));
@@ -4490,7 +4477,6 @@ public class DarkThemeRenderer : ToolStripProfessionalRenderer
                                     e.Graphics.DrawLine(chipSweepPen, chipSweepX, chipRect.Y + 2, Math.Min(chipRect.Right - 4, chipSweepX + sweepWidth), chipRect.Y + 2);
                                 }
                             }
-                            e.Graphics.DrawString(chip, chipFont, chipTextBrush, chipRect, chipFormat);
                             chipRight = chipX - 4;
                         }
                     }
@@ -4541,11 +4527,14 @@ public class DarkThemeRenderer : ToolStripProfessionalRenderer
     // Win11-stock refinements of the same voice: Display tightens the hero,
     // Small keeps 7-10pt eyebrow caps open and legible. Both fall back to
     // classic Segoe UI on older builds.
+    // Display face: Bahnschrift (Windows-native DIN) gives headers the
+    // engraved-faceplate voice the computa GUI uses; eyebrows/chips/readouts
+    // run in Cascadia Mono so every label reads as instrument etching.
     private static readonly string[] HeroFontStack = new[] {
-        "Segoe UI Variable Display", "Segoe UI"
+        "Bahnschrift", "Segoe UI Variable Display", "Segoe UI"
     };
     private static readonly string[] EyebrowFontStack = new[] {
-        "Segoe UI Variable Small", "Segoe UI"
+        "Cascadia Mono SemiBold", "Cascadia Mono", "Consolas", "Segoe UI"
     };
 
     private static Font ResolveFontStack(string[] families, float size, FontStyle style)
@@ -4616,14 +4605,14 @@ $script:FontNormal  = New-Object System.Drawing.Font("Segoe UI", 10.0)
 $script:FontBold    = New-Object System.Drawing.Font("Segoe UI", 10.0, [System.Drawing.FontStyle]::Bold)
 $script:FontEyebrow = [DarkThemeRenderer]::ResolveEyebrowFont(8.6)
 $script:FontHero    = [DarkThemeRenderer]::ResolveHeroFont(13.0, [System.Drawing.FontStyle]::Bold)
-$script:FontMenuRow = New-Object System.Drawing.Font("Segoe UI", 11.25)
-$script:FontMenuRowBold = New-Object System.Drawing.Font("Segoe UI", 11.25, [System.Drawing.FontStyle]::Bold)
+$script:FontMenuRow = New-Object System.Drawing.Font("Segoe UI", 10.2)
+$script:FontMenuRowBold = New-Object System.Drawing.Font("Segoe UI", 10.2, [System.Drawing.FontStyle]::Bold)
 $script:FontSectionHeader = [DarkThemeRenderer]::ResolveEyebrowFont(9.8)
 $script:FontCategoryHeader = [DarkThemeRenderer]::ResolveEyebrowFont(10.8)
-$script:FontMono    = New-Object System.Drawing.Font("Segoe UI", 9.0)
+$script:FontMono    = [DarkThemeRenderer]::ResolveEyebrowFont(8.4)
 
 $script:TrayMenuPreferredWidth = 520
-$script:TrayMenuMinimumWidth = 360
+$script:TrayMenuMinimumWidth = 420
 $script:TrayMenuScreenMargin = 48
 $script:IconState = "Idle"
 $script:ApplyAnimTimer = $null

@@ -1108,7 +1108,7 @@ def test_profile_launcher_uses_readable_spacing_and_plain_choice_labels() -> Non
     # category eyebrows that label them (hero 13 > rows 11.25 > category
     # 10.8 > section 9.8). Wayfinding must never out-shout the game names.
     assert '$script:FontNormal  = New-Object System.Drawing.Font("Segoe UI", 10.0)' in script
-    assert '$script:FontMenuRow = New-Object System.Drawing.Font("Segoe UI", 11.25)' in script
+    assert '$script:FontMenuRow = New-Object System.Drawing.Font("Segoe UI", 10.2)' in script
     assert "$script:FontSectionHeader = [DarkThemeRenderer]::ResolveEyebrowFont(9.8)" in script
     assert "$script:FontCategoryHeader = [DarkThemeRenderer]::ResolveEyebrowFont(10.8)" in script
     assert '$script:FontMono    = New-Object System.Drawing.Font("Segoe UI", 9.0)' in script
@@ -1377,7 +1377,7 @@ def test_tray_top_level_flyouts_render_as_command_pills() -> None:
     assert "int sweepX = rect.X + 14 + ((PulseFrame * 5) % sweepTravel);" in renderer_section
     assert "g.DrawLine(sweepPen, sweepX, rect.Y + 2, Math.Min(rect.Right - 10, sweepX + sweepWidth), rect.Y + 2);" in renderer_section
     assert 'e.Graphics.DrawString((e.Text ?? "").Trim().ToUpperInvariant(), labelFont, labelBrush, labelRect, labelFormat);' in text_section
-    assert "e.Graphics.DrawString(chip.ToUpperInvariant(), chipFont, chipTextBrush, chipRect, chipFormat);" in text_section
+    assert "DrawInstrumentChip(e.Graphics, chipFont, chipRect, chip.ToUpperInvariant(), tint, 118);" in text_section
     assert '$actionsMenu.AccessibleName = "__flyout_command__"' in script
     assert '$actionsMenu.AccessibleDescription = "TOOLS"' in script
     assert "$actionsMenu.Padding = New-Object System.Windows.Forms.Padding(0, 0, 56, 0)" in script
@@ -2322,9 +2322,13 @@ def test_profile_menu_rows_render_compact_status_chips() -> None:
     assert "for (int i = chips.Length - 1; i >= 0; i--)" in script
     assert "string chip = chips[i].Trim();" in script
     assert "int chipX = chipRight - chipWidth;" in script
-    assert "FillRoundRect(e.Graphics, chipBrush, chipRect, 4)" in script
-    assert "DrawRoundRect(e.Graphics, chipPen, chipRect, 4)" in script
-    assert "e.Graphics.DrawString(chip, chipFont, chipTextBrush, chipRect, chipFormat)" in script
+    # Chips draw through the shared flat-instrument helper (hairline border,
+    # flat fill, semantic tint) instead of per-site gradient pills.
+    assert "private static void DrawInstrumentChip(" in script
+    assert "private static Color ChipTint(" in script
+    assert "FillRoundRect(g, fill, rect, 3);" in script
+    assert "DrawRoundRect(g, pen, rect, 3);" in script
+    assert "DrawInstrumentChip(e.Graphics, chipFont, chipRect, chip, tint," in script
     assert "bool isActiveProfileChip = profileMenuItem != null && profileMenuItem.Checked;" in script
     assert "int chipEdgeAlpha = isActiveProfileChip ? 105 + (int)(chipWave * 70) : 90;" in script
     assert "int chipSweepX = chipRect.X + 4 + ((PulseFrame * 4) % sweepTravel);" in script
@@ -2438,7 +2442,7 @@ def test_game_flyouts_have_identity_headers_without_breaking_search() -> None:
     script = TRAY_SCRIPT.read_text(encoding="utf-8")
     assert 'if (e.Item.AccessibleName == "__game_flyout_header__")' in script
     assert 'string chipRaw = e.Item.AccessibleDescription ?? "";' in script
-    assert "e.Graphics.DrawString(chip, chipFont, chipTextBrush, chipRect, chipFormat)" in script
+    assert "DrawInstrumentChip(e.Graphics, chipFont, chipRect, chip, tint," in script
     assert "e.Graphics.DrawString(labelText.ToUpperInvariant(), labelFont, labelBrush, labelRect, labelFormat)" in script
     assert "function Get-GameFlyoutHeaderSummaryChips" in script
     assert '${syncOn} G-SYNC' in script
@@ -2541,7 +2545,7 @@ def test_category_headers_keep_counts_in_tooltips_without_breaking_filtering() -
     script = TRAY_SCRIPT.read_text(encoding="utf-8")
     assert 'if (e.Item.AccessibleName == "__category_header__" || e.Item.AccessibleName == "__section_header__")' in script
     assert 'string chipRaw = e.Item.AccessibleDescription ?? "";' in script
-    assert "e.Graphics.DrawString(chip, chipFont, chipTextBrush, chipRect, chipFormat)" in script
+    assert "DrawInstrumentChip(e.Graphics, chipFont, chipRect, chip, tint," in script
     assert 'e.Graphics.DrawString((e.Item.Text ?? "").Trim().ToUpperInvariant(), labelFont, labelBrush, labelRect, labelFormat)' in script
     assert "function Get-CategoryHeaderSummaryChips" in script
     assert 'return "$GameCount $gameLabel, $ProfileCount $profileLabel"' in script
