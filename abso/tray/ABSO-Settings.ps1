@@ -435,7 +435,7 @@ function New-SettingsBrandHeaderPanel {
     $title.Size = New-Object System.Drawing.Size(190, 20)
     $title.ForeColor = [System.Drawing.Color]::FromArgb(255, 225, 244, 240)
     $title.BackColor = $panel.BackColor
-    $title.Font = New-Object System.Drawing.Font("Segoe UI Semibold", 10, [System.Drawing.FontStyle]::Bold)
+    $title.Font = New-TrayThemeFont -Families @("Bahnschrift SemiBold", "Bahnschrift", "Segoe UI Semibold") -Size 10 -Style ([System.Drawing.FontStyle]::Bold)
     $title.AutoEllipsis = $true
     $panel.Controls.Add($title)
 
@@ -445,7 +445,7 @@ function New-SettingsBrandHeaderPanel {
     $subtitle.Size = New-Object System.Drawing.Size(210, 16)
     $subtitle.ForeColor = [System.Drawing.Color]::FromArgb(255, 148, 183, 182)
     $subtitle.BackColor = $panel.BackColor
-    $subtitle.Font = New-Object System.Drawing.Font("Consolas", 7.5)
+    $subtitle.Font = New-TrayThemeFont -Families @("Cascadia Mono", "Consolas") -Size 7.5
     $subtitle.AutoEllipsis = $true
     $panel.Controls.Add($subtitle)
 
@@ -457,7 +457,7 @@ function New-SettingsBrandHeaderPanel {
     $chip.TextAlign = [System.Drawing.ContentAlignment]::MiddleCenter
     $chip.ForeColor = [System.Drawing.Color]::FromArgb(255, 228, 246, 242)
     $chip.BackColor = [System.Drawing.Color]::FromArgb(255, 16, 52, 60)
-    $chip.Font = New-Object System.Drawing.Font("Segoe UI Semibold", 7.5, [System.Drawing.FontStyle]::Bold)
+    $chip.Font = New-TrayThemeFont -Families @("Bahnschrift SemiBold", "Bahnschrift", "Segoe UI Semibold") -Size 7.5 -Style ([System.Drawing.FontStyle]::Bold)
     $chip.AutoEllipsis = $true
     $chip.AccessibleName = "Tray settings state"
     $chip.AccessibleDescription = "Enabled tray popups, Quick Panel restore, and audio cues"
@@ -517,7 +517,7 @@ function New-SettingsSectionHeaderPanel {
     $label.Size = New-Object System.Drawing.Size(300, 18)
     $label.ForeColor = $Color
     $label.BackColor = $panel.BackColor
-    $label.Font = New-Object System.Drawing.Font("Segoe UI Semibold", 8.5, [System.Drawing.FontStyle]::Bold)
+    $label.Font = New-TrayThemeFont -Families @("Bahnschrift SemiBold", "Bahnschrift", "Segoe UI Semibold") -Size 8.5 -Style ([System.Drawing.FontStyle]::Bold)
     $label.AutoEllipsis = $true
     $panel.Controls.Add($label)
 
@@ -1093,7 +1093,7 @@ function Show-SettingsPanel {
     $previewName.Size = New-Object System.Drawing.Size(282, 18)
     $previewName.ForeColor = [System.Drawing.Color]::FromArgb(255, 225, 244, 240)
     $previewName.BackColor = $profilePreview.BackColor
-    $previewName.Font = New-Object System.Drawing.Font("Segoe UI Semibold", 9)
+    $previewName.Font = New-TrayThemeFont -Families @("Bahnschrift SemiBold", "Bahnschrift", "Segoe UI Semibold") -Size 9
     $previewName.AutoEllipsis = $true
     $profilePreview.Controls.Add($previewName)
 
@@ -1102,7 +1102,7 @@ function Show-SettingsPanel {
     $previewMeta.Size = New-Object System.Drawing.Size(282, 16)
     $previewMeta.ForeColor = [System.Drawing.Color]::FromArgb(255, 148, 183, 182)
     $previewMeta.BackColor = $profilePreview.BackColor
-    $previewMeta.Font = New-Object System.Drawing.Font("Consolas", 7.5)
+    $previewMeta.Font = New-TrayThemeFont -Families @("Cascadia Mono", "Consolas") -Size 7.5
     $previewMeta.AutoEllipsis = $true
     $profilePreview.Controls.Add($previewMeta)
 
@@ -1403,11 +1403,13 @@ function Show-SettingsPanel {
     $saveBtn.Text = "Save"
     $saveBtn.Location = New-Object System.Drawing.Point(210, ($y + 10))
     $saveBtn.Size = New-Object System.Drawing.Size(90, 34)
-    $saveBtn.BackColor = [System.Drawing.Color]::FromArgb(255, 70, 190, 110)
-    $saveBtn.ForeColor = [System.Drawing.Color]::FromArgb(255, 16, 16, 16)
+    # Primary action wears the phosphor signal (matches the GUI's primary
+    # button), not a loud one-off green.
+    $saveBtn.BackColor = [System.Drawing.Color]::FromArgb(255, 0, 245, 212)
+    $saveBtn.ForeColor = [System.Drawing.Color]::FromArgb(255, 4, 15, 18)
     $saveBtn.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
     $saveBtn.FlatAppearance.BorderSize = 0
-    $saveBtn.Font = New-Object System.Drawing.Font("Segoe UI Semibold", 9)
+    $saveBtn.Font = New-TrayThemeFont -Families @("Bahnschrift SemiBold", "Bahnschrift", "Segoe UI Semibold") -Size 9
     $saveBtn.Cursor = [System.Windows.Forms.Cursors]::Hand
     if (Get-Command New-ActionBitmap -ErrorAction SilentlyContinue) {
         $saveBtn.Image = New-ActionBitmap -Action "Save" -Color ([System.Drawing.Color]::FromArgb(255, 16, 16, 16))
@@ -1474,6 +1476,13 @@ function Show-SettingsPanel {
         $script:SettingsForm = $null
     })
     $form.Show()
+    # Dark-mode titlebar: the stock light chrome jars against the phosphor
+    # faceplate. DwmHelper ships in the tray host; guard for other hosts.
+    try {
+        if ("DwmHelper" -as [type]) {
+            [DwmHelper]::SetDarkMode($form.Handle)
+        }
+    } catch {}
 
     # Apply full DWM effects (rounded corners, dark mode, shadow, border color)
     try {
@@ -1719,7 +1728,7 @@ function New-HotkeyStatusChipLabel {
     $label.Size = New-Object System.Drawing.Size(68, 22)
     $label.BackColor = $chip.BackColor
     $label.ForeColor = $chip.ForeColor
-    $label.Font = New-Object System.Drawing.Font("Segoe UI Semibold", 7)
+    $label.Font = New-TrayThemeFont -Families @("Bahnschrift SemiBold", "Bahnschrift", "Segoe UI Semibold") -Size 7
     $label.TextAlign = [System.Drawing.ContentAlignment]::MiddleCenter
     $label.BorderStyle = [System.Windows.Forms.BorderStyle]::FixedSingle
     return $label
