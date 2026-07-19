@@ -1122,7 +1122,7 @@ def test_profile_launcher_uses_readable_spacing_and_plain_choice_labels() -> Non
     assert "$script:TrayMenuMinimumWidth = 420" in script
     assert "$script:statusItem.Size = New-Object System.Drawing.Size(480, 48)" in script
     assert "$script:statusItem.Font = $script:FontMenuRowBold" in script
-    assert "$searchBox.Size = New-Object System.Drawing.Size(300, 26)" in script
+    assert "$searchBox.Size = New-Object System.Drawing.Size(388, 26)" in script
     assert "$searchBox.Font = $script:FontMenuRow" in script
     assert "Font heroFont = ResolveHeroFont(13.0f, FontStyle.Regular);" in script
     # Category titles render LARGER than their rows (user-directed inversion
@@ -1229,18 +1229,18 @@ def test_active_profile_status_handles_catalog_mismatch_truthfully() -> None:
 def test_tray_menu_section_headers_are_colored_bands_not_profile_rows() -> None:
     """Section/category headers should use color as structure, not profile-row text."""
     script = TRAY_SCRIPT.read_text(encoding="utf-8")
-    renderer_section = script.split("// --- Section headers: disabled + bold items (section/category bands) ---", 1)[1].split(
+    renderer_section = script.split("// --- Section headers: disabled + bold items (section/category) ---", 1)[1].split(
         "var profileMenuItem = e.Item as ToolStripMenuItem;",
         1,
     )[0]
 
-    assert 'bool isSectionHeader = e.Item.AccessibleName == "__section_header__";' in renderer_section
-    assert 'bool isCategoryHeader = e.Item.AccessibleName == "__category_header__";' in renderer_section
-    assert "int fillAlpha = isCategoryHeader ? 18 : 14;" in renderer_section
-    assert "int lineAlpha = isCategoryHeader ? 90 : 72;" in renderer_section
-    assert "Header bands use color as structure; selectable rows use color as text." in renderer_section
-    assert "var railRect = new Rectangle(5, 4, isCategoryHeader ? 5 : 6, Math.Max(2, h - 8));" in renderer_section
-    assert "Color labelGlow = MixColor(tint, Color.White, 0.45);" in renderer_section
+    # Headers carry no band/rail/underline decoration in the background pass;
+    # the text pass draws a flush-left label (breaking the content indent
+    # line) with one trailing hairline rule — the non-clickable cue.
+    assert "Headers carry NO band/rail/underline decoration" in renderer_section
+    assert "LinearGradientBrush" not in renderer_section
+    assert "int headerX = 10;" in script
+    assert "int ruleY = e.Item.Height / 2;" in script
     assert "double wave = (Math.Sin(PulseFrame / 7.0) + 1.0) / 2.0;" not in renderer_section
     assert "sweepX = 34 + ((PulseFrame * 3) % sweepTravel)" not in renderer_section
     assert 'if (e.Item.AccessibleName == "__category_header__" || e.Item.AccessibleName == "__section_header__")' in script
@@ -2556,7 +2556,7 @@ def test_category_headers_keep_counts_in_tooltips_without_breaking_filtering() -
     assert 'if (e.Item.AccessibleName == "__category_header__" || e.Item.AccessibleName == "__section_header__")' in script
     assert 'string chipRaw = e.Item.AccessibleDescription ?? "";' in script
     assert "DrawInstrumentChip(e.Graphics, chipFont, chipRect, chip, tint," in script
-    assert 'e.Graphics.DrawString((e.Item.Text ?? "").Trim().ToUpperInvariant(), labelFont, labelBrush, labelRect, labelFormat)' in script
+    assert "e.Graphics.DrawString(headerText, labelFont, labelBrush, labelRect, labelFormat);" in script
     assert "function Get-CategoryHeaderSummaryChips" in script
     assert 'return "$GameCount $gameLabel, $ProfileCount $profileLabel"' in script
     assert "$catGameCount = @($catGameGroups[$cat].Keys).Count" in script
@@ -2564,7 +2564,7 @@ def test_category_headers_keep_counts_in_tooltips_without_breaking_filtering() -
     assert '$catItem.AccessibleName = "__category_header__"' in script
     assert '$catItem.AccessibleDescription = ""' in script
     assert "$catItem.ToolTipText = Get-CategoryHeaderSummaryChips -GameCount $catGameCount -ProfileCount $catProfileCount" in script
-    assert "$catItem.Padding = New-Object System.Windows.Forms.Padding(0, 5, 0, 2)" in script
+    assert "$catItem.Padding = New-Object System.Windows.Forms.Padding(0, 12, 0, 4)" in script
     assert "$catItem.ForeColor = Get-TrayCategoryHeaderTint -Category $cat -CategoryColor $catColor" in script
     assert "$catItem.Tag = $cat" in script
 

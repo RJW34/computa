@@ -3849,59 +3849,15 @@ public class DarkThemeRenderer : ToolStripProfessionalRenderer
                 }
             }
 
-            // --- Section headers: disabled + bold items (section/category bands) ---
+            // --- Section headers: disabled + bold items (section/category) ---
+            // Headers carry NO band/rail/underline decoration: the text pass
+            // draws a flush-left label with one trailing hairline rule. Paint
+            // the item's own BackColor so no default disabled surface leaks.
             if (!e.Item.Enabled && e.Item.Font != null && e.Item.Font.Bold)
             {
-                Color tint = e.Item.ForeColor;
-                bool isSectionHeader = e.Item.AccessibleName == "__section_header__";
-                bool isCategoryHeader = e.Item.AccessibleName == "__category_header__";
-                int fillAlpha = isCategoryHeader ? 18 : 14;
-                int lineAlpha = isCategoryHeader ? 90 : 72;
-
-                // Header bands use color as structure; selectable rows use color as text.
-                using (var brush = new LinearGradientBrush(
-                    new Rectangle(0, 0, Math.Max(1, w), Math.Max(1, h)),
-                    Color.FromArgb(fillAlpha, tint.R, tint.G, tint.B),
-                    Color.FromArgb(isCategoryHeader ? 3 : 1, tint.R, tint.G, tint.B),
-                    LinearGradientMode.Horizontal))
+                using (var backBrush = new SolidBrush(e.Item.BackColor))
                 {
-                    g.FillRectangle(brush, 0, 0, w, h);
-                }
-
-                var railRect = new Rectangle(5, 4, isCategoryHeader ? 5 : 6, Math.Max(2, h - 8));
-                using (var railBrush = new LinearGradientBrush(
-                    railRect,
-                    Color.FromArgb(isCategoryHeader ? 205 : 150, tint.R, tint.G, tint.B),
-                    Color.FromArgb(isCategoryHeader ? 78 : 46, tint.R, tint.G, tint.B),
-                    LinearGradientMode.Vertical))
-                {
-                    FillRoundRect(g, railBrush, railRect, 2);
-                }
-
-                using (var pen = new Pen(Color.FromArgb(lineAlpha, tint.R, tint.G, tint.B), 1f))
-                {
-                    int lineY = h - 1;
-                    g.DrawLine(pen, 18, lineY, Math.Min(w - 10, 380), lineY);
-                }
-
-                if (isCategoryHeader && w > 90)
-                {
-                    using (var railPen = new Pen(Color.FromArgb(150, tint.R, tint.G, tint.B), 1.2f))
-                    {
-                        railPen.StartCap = LineCap.Round;
-                        railPen.EndCap = LineCap.Round;
-                        g.DrawLine(railPen, 22, 3, Math.Min(w - 18, 118), 3);
-                    }
-                }
-                else if (isSectionHeader && w > 120)
-                {
-                    Color labelGlow = MixColor(tint, Color.White, 0.45);
-                    using (var railPen = new Pen(Color.FromArgb(94, labelGlow.R, labelGlow.G, labelGlow.B), 1.15f))
-                    {
-                        railPen.StartCap = LineCap.Round;
-                        railPen.EndCap = LineCap.Round;
-                        g.DrawLine(railPen, 22, 3, Math.Min(w - 18, 150), 3);
-                    }
+                    g.FillRectangle(backBrush, 0, 0, w, h);
                 }
                 return;
             }
@@ -4172,11 +4128,13 @@ public class DarkThemeRenderer : ToolStripProfessionalRenderer
                     }
                 }
 
+                // Center on the full item height: Bahnschrift/Cascadia metrics
+                // sit high inside WinForms' Segoe-assumed text rectangle.
                 Rectangle labelRect = new Rectangle(
                     textRect.X,
-                    textRect.Y,
+                    0,
                     Math.Max(24, chipRight - textRect.X - 8),
-                    textRect.Height);
+                    e.Item.Height);
                 using (var format = new StringFormat())
                 using (var brush = new SolidBrush(Color.FromArgb(206, e.Item.ForeColor.R, e.Item.ForeColor.G, e.Item.ForeColor.B)))
                 {
@@ -4216,8 +4174,8 @@ public class DarkThemeRenderer : ToolStripProfessionalRenderer
                 }
 
                 Rectangle labelRect = chipRect.IsEmpty
-                    ? textRect
-                    : new Rectangle(textRect.X, textRect.Y, Math.Max(18, chipRect.X - textRect.X - 8), textRect.Height);
+                    ? new Rectangle(textRect.X, 0, textRect.Width, e.Item.Height)
+                    : new Rectangle(textRect.X, 0, Math.Max(18, chipRect.X - textRect.X - 8), e.Item.Height);
                 using (var labelFormat = new StringFormat())
                 using (var labelBrush = new SolidBrush(e.Item.ForeColor))
                 using (var labelFont = ResolveEyebrowFont(9.6f))
@@ -4251,7 +4209,7 @@ public class DarkThemeRenderer : ToolStripProfessionalRenderer
                 // for readability) — the old forced-white neutral made the
                 // whole roster read as one default-looking block.
                 Color labelColor = MixColor(e.Item.ForeColor, TextPaper, 0.48);
-                Rectangle labelRect = new Rectangle(textRect.X, textRect.Y, Math.Max(18, textRect.Width - 8), textRect.Height);
+                Rectangle labelRect = new Rectangle(textRect.X, 0, Math.Max(18, textRect.Width - 8), e.Item.Height);
                 using (var labelFormat = new StringFormat())
                 using (var labelBrush = new SolidBrush(labelColor))
                 {
@@ -4311,11 +4269,11 @@ public class DarkThemeRenderer : ToolStripProfessionalRenderer
                     }
                 }
 
-                Rectangle labelRect = new Rectangle(
-                    textRect.X,
-                    textRect.Y,
-                    Math.Max(22, chipRight - textRect.X - 8),
-                    textRect.Height);
+                // Headers are LABELS, not rows: flush-left of the icon column
+                // (breaking the content indent line) with a trailing hairline
+                // rule to the right edge — the strongest non-clickable cue.
+                string headerText = (e.Item.Text ?? "").Trim().ToUpperInvariant();
+                int headerX = 10;
                 using (var labelFormat = new StringFormat())
                 using (var labelFont = isCategoryHeader
                     ? ResolveHeroFont(labelSize, FontStyle.Bold)
@@ -4326,7 +4284,26 @@ public class DarkThemeRenderer : ToolStripProfessionalRenderer
                     labelFormat.FormatFlags = StringFormatFlags.NoWrap;
                     labelFormat.LineAlignment = StringAlignment.Center;
                     e.Graphics.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
-                    e.Graphics.DrawString((e.Item.Text ?? "").Trim().ToUpperInvariant(), labelFont, labelBrush, labelRect, labelFormat);
+
+                    SizeF headerSize = e.Graphics.MeasureString(headerText, labelFont);
+                    Rectangle labelRect = new Rectangle(
+                        headerX,
+                        0,
+                        Math.Max(22, Math.Min((int)Math.Ceiling(headerSize.Width) + 6, chipRight - headerX - 8)),
+                        e.Item.Height);
+                    e.Graphics.DrawString(headerText, labelFont, labelBrush, labelRect, labelFormat);
+
+                    int ruleStart = labelRect.X + labelRect.Width + 8;
+                    int ruleEnd = chipRight - 6;
+                    if (ruleEnd > ruleStart + 12)
+                    {
+                        Color tint = e.Item.ForeColor;
+                        using (var rulePen = new Pen(Color.FromArgb(isCategoryHeader ? 72 : 44, tint.R, tint.G, tint.B), 1f))
+                        {
+                            int ruleY = e.Item.Height / 2;
+                            e.Graphics.DrawLine(rulePen, ruleStart, ruleY, ruleEnd, ruleY);
+                        }
+                    }
                 }
                 return;
             }
@@ -4349,6 +4326,16 @@ public class DarkThemeRenderer : ToolStripProfessionalRenderer
                 int chipRight = GetSafeChipRight(e.Item);
                 string chipRaw = e.Item.AccessibleDescription ?? "";
                 string[] chips = chipRaw.Split(new char[] { '|' }, StringSplitOptions.RemoveEmptyEntries);
+
+                // Repaint the header surface with the literal ink color. The
+                // disabled-item pipeline runs near-black BackColors through a
+                // ControlPaint-style adjustment that turns them system-gray
+                // (a red BackColor renders faithfully; ink does not), so the
+                // item's BackColor cannot be trusted here.
+                using (var headerBack = new SolidBrush(Color.FromArgb(255, 4, 15, 18)))
+                {
+                    e.Graphics.FillRectangle(headerBack, -4, -2, GetSafeItemWidth(e.Item) + 8, e.Item.Height + 4);
+                }
 
                 using (var chipFont = ResolveEyebrowFont(7.0f))
                 using (var chipTextBrush = new SolidBrush(Color.FromArgb(230, 228, 246, 242)))
@@ -4377,9 +4364,9 @@ public class DarkThemeRenderer : ToolStripProfessionalRenderer
 
                 Rectangle labelRect = new Rectangle(
                     textRect.X,
-                    textRect.Y,
+                    0,
                     Math.Max(22, chipRight - textRect.X - 8),
-                    textRect.Height);
+                    e.Item.Height);
                 using (var labelFormat = new StringFormat())
                 using (var labelFont = ResolveEyebrowFont(8.4f))
                 using (var labelBrush = new SolidBrush(MixColor(e.Item.ForeColor, TextPaper, 0.55)))
@@ -4422,8 +4409,8 @@ public class DarkThemeRenderer : ToolStripProfessionalRenderer
                 }
 
                 Rectangle labelRect = hasChip
-                    ? new Rectangle(textRect.X, textRect.Y, Math.Max(18, chipRight - textRect.X - 8), textRect.Height)
-                    : textRect;
+                    ? new Rectangle(textRect.X, 0, Math.Max(18, chipRight - textRect.X - 8), e.Item.Height)
+                    : new Rectangle(textRect.X, 0, textRect.Width, e.Item.Height);
                 using (var format = new StringFormat())
                 {
                     format.Trimming = StringTrimming.EllipsisCharacter;
@@ -9098,7 +9085,7 @@ public class HotkeyMessageWindow : NativeWindow {
     $menu.Items.Add((New-Object System.Windows.Forms.ToolStripSeparator)) | Out-Null
 
     $searchBox = New-Object System.Windows.Forms.ToolStripTextBox
-    $searchBox.Size = New-Object System.Drawing.Size(300, 26)
+    $searchBox.Size = New-Object System.Drawing.Size(388, 26)
     $searchBox.BackColor = $script:Colors.BackgroundLight
     $searchBox.ForeColor = $script:Colors.Text
     $searchBox.Font = $script:FontMenuRow
@@ -9857,8 +9844,8 @@ public class HotkeyMessageWindow : NativeWindow {
         $catItem.AccessibleName = "__category_header__"
         $catItem.AccessibleDescription = ""
         $catItem.ToolTipText = Get-CategoryHeaderSummaryChips -GameCount $catGameCount -ProfileCount $catProfileCount
-        # Match the section-header rhythm: bind the band downward to its rows.
-        $catItem.Padding = New-Object System.Windows.Forms.Padding(0, 5, 0, 2)
+        # Air above each section: headers separate blocks with space, not bands.
+        $catItem.Padding = New-Object System.Windows.Forms.Padding(0, 12, 0, 4)
         $catItem.Image = $null
         $catItem.Enabled = $false
         $catItem.BackColor = $script:Colors.Background
