@@ -3766,88 +3766,11 @@ public class DarkThemeRenderer : ToolStripProfessionalRenderer
                 return;
             }
 
-            // --- Top-level flyout commands: compact animated launcher pills ---
-            if (e.Item.AccessibleName == "__flyout_command__")
-            {
-                Color tint = e.Item.ForeColor;
-                double wave = (Math.Sin(PulseFrame / 5.0) + 1.0) / 2.0;
-                int fillAlpha = 22 + (int)(wave * 12);
-                int edgeAlpha = 42 + (int)(wave * 38);
-
-                if (rect.Width > 0 && rect.Height > 0)
-                {
-                    using (var brush = new LinearGradientBrush(
-                        rect,
-                        Color.FromArgb(fillAlpha, tint.R, tint.G, tint.B),
-                        Color.FromArgb(8, tint.R, tint.G, tint.B),
-                        LinearGradientMode.Horizontal))
-                    {
-                        FillRoundRect(g, brush, rect, 5);
-                    }
-                    using (var pen = new Pen(Color.FromArgb(edgeAlpha, tint.R, tint.G, tint.B), 1f))
-                    {
-                        DrawRoundRect(g, pen, rect, 5);
-                    }
-
-                    int railX = rect.X + 5;
-                    int railY = rect.Y + 5;
-                    int railH = Math.Max(4, rect.Height - 10);
-                    using (var railBrush = new LinearGradientBrush(
-                        new Rectangle(railX, railY, 3, railH),
-                        Color.FromArgb(60, tint.R, tint.G, tint.B),
-                        Color.FromArgb(210, tint.R, tint.G, tint.B),
-                        LinearGradientMode.Vertical))
-                    {
-                        FillRoundRect(g, railBrush, new Rectangle(railX, railY, 3, railH), 1);
-                    }
-
-                    int sweepWidth = Math.Max(34, Math.Min(70, rect.Width / 3));
-                    int sweepTravel = Math.Max(1, rect.Width - sweepWidth - 24);
-                    int sweepX = rect.X + 14 + ((PulseFrame * 5) % sweepTravel);
-                    using (var sweepPen = new Pen(Color.FromArgb(44 + (int)(wave * 44), tint.R, tint.G, tint.B), 1.0f))
-                    {
-                        g.DrawLine(sweepPen, sweepX, rect.Y + 2, Math.Min(rect.Right - 10, sweepX + sweepWidth), rect.Y + 2);
-                    }
-                }
-
-                using (var brush = new SolidBrush(Color.FromArgb(18 + (int)(wave * 14), tint.R, tint.G, tint.B)))
-                {
-                    g.FillEllipse(brush, 2, rect.Y - 2, 28, rect.Height + 4);
-                }
-            }
-
-            // --- Game group rows: readable lane entries with color carried by rails/icons ---
-            if (e.Item.AccessibleName == "__game_group_row__")
-            {
-                Color tint = e.Item.ForeColor;
-                Rectangle laneRect = GetBoundedRowRect(rect, 350, 190);
-                if (laneRect.Width > 0 && laneRect.Height > 0)
-                {
-                    using (var brush = new LinearGradientBrush(
-                        laneRect,
-                        Color.FromArgb(20, tint.R, tint.G, tint.B),
-                        Color.FromArgb(4, tint.R, tint.G, tint.B),
-                        LinearGradientMode.Horizontal))
-                    {
-                        FillRoundRect(g, brush, laneRect, 4);
-                    }
-
-                    var railRect = new Rectangle(laneRect.X + 5, laneRect.Y + 4, 4, Math.Max(3, laneRect.Height - 8));
-                    using (var railBrush = new LinearGradientBrush(
-                        railRect,
-                        Color.FromArgb(70, tint.R, tint.G, tint.B),
-                        Color.FromArgb(220, tint.R, tint.G, tint.B),
-                        LinearGradientMode.Vertical))
-                    {
-                        FillRoundRect(g, railBrush, railRect, 2);
-                    }
-
-                    using (var pen = new Pen(Color.FromArgb(64, tint.R, tint.G, tint.B), 1f))
-                    {
-                        g.DrawLine(pen, laneRect.X + 18, laneRect.Y + 1, Math.Min(laneRect.Right - 14, laneRect.X + 128), laneRect.Y + 1);
-                    }
-                }
-            }
+            // --- Top-level flyout commands and game group rows ---
+            // No always-on decoration: idle rows are bare surface (uniform
+            // emphasis — identity lives in medallions/chips, feedback in the
+            // hover/selected states). The old animated pills and per-row
+            // lanes marked SOME rows and not others, reading as asymmetry.
 
             // --- Section headers: disabled + bold items (section/category) ---
             // Headers carry NO band/rail/underline decoration: the text pass
@@ -4176,15 +4099,17 @@ public class DarkThemeRenderer : ToolStripProfessionalRenderer
                 Rectangle labelRect = chipRect.IsEmpty
                     ? new Rectangle(textRect.X, 0, textRect.Width, e.Item.Height)
                     : new Rectangle(textRect.X, 0, Math.Max(18, chipRect.X - textRect.X - 8), e.Item.Height);
+                // Top-level command rows speak the SAME voice as every other
+                // content row (item font, paper, original case) — the old
+                // mono-caps treatment made them read as a third text system.
                 using (var labelFormat = new StringFormat())
-                using (var labelBrush = new SolidBrush(e.Item.ForeColor))
-                using (var labelFont = ResolveEyebrowFont(9.6f))
+                using (var labelBrush = new SolidBrush(TextPaper))
                 {
                     labelFormat.Trimming = StringTrimming.EllipsisCharacter;
                     labelFormat.FormatFlags = StringFormatFlags.NoWrap;
                     labelFormat.LineAlignment = StringAlignment.Center;
                     e.Graphics.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
-                    e.Graphics.DrawString((e.Text ?? "").Trim().ToUpperInvariant(), labelFont, labelBrush, labelRect, labelFormat);
+                    e.Graphics.DrawString((e.Text ?? "").Trim(), e.TextFont, labelBrush, labelRect, labelFormat);
                 }
 
                 if (!chipRect.IsEmpty)
@@ -4205,10 +4130,10 @@ public class DarkThemeRenderer : ToolStripProfessionalRenderer
             try
             {
                 Rectangle textRect = e.TextRectangle;
-                // Game rows carry their game accent (pulled well toward paper
-                // for readability) — the old forced-white neutral made the
-                // whole roster read as one default-looking block.
-                Color labelColor = MixColor(e.Item.ForeColor, TextPaper, 0.48);
+                // Uniform emphasis: ALL content rows are paper, one voice, one
+                // weight. Game identity lives in the medallion and chips;
+                // per-row accent text read as inconsistency, not identity.
+                Color labelColor = TextPaper;
                 Rectangle labelRect = new Rectangle(textRect.X, 0, Math.Max(18, textRect.Width - 8), e.Item.Height);
                 using (var labelFormat = new StringFormat())
                 using (var labelBrush = new SolidBrush(labelColor))
@@ -4418,7 +4343,7 @@ public class DarkThemeRenderer : ToolStripProfessionalRenderer
                     format.LineAlignment = StringAlignment.Center;
                     Color rowTextColor = e.Item.AccessibleName == "__backup_menu_item__"
                         ? TextMist
-                        : MixColor(e.Item.ForeColor, TextPaper, 0.55);
+                        : TextPaper;
                     using (var brush = new SolidBrush(rowTextColor))
                     {
                         e.Graphics.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
@@ -5623,7 +5548,8 @@ function Update-MenuState {
                     [Math]::Min(255, $gameColor.G + 30),
                     [Math]::Min(255, $gameColor.B + 30)
                 )
-                $item.Font = $script:FontBold
+                # Bold is reserved for exactly one thing: the active profile.
+                $item.Font = $script:FontMenuRowBold
                 $item.BackColor = Blend-Color -Base $script:Colors.Background -Overlay $gameColor -Ratio 0.15
             }
             else {
@@ -5635,7 +5561,7 @@ function Update-MenuState {
                     -FavoriteBadge $favoriteBadge
                 Set-MenuItemImageSafe -Item $item -NewImage $newImage
                 $item.ForeColor = $gameColor
-                $item.Font = $script:FontNormal
+                $item.Font = $script:FontMenuRow
                 $item.BackColor = $script:Colors.Background
             }
         }
@@ -9894,7 +9820,7 @@ public class HotkeyMessageWindow : NativeWindow {
                 $submenuItem.Image = New-TrayGameGroupMedallionBitmap -GameGroup $gameGroup -Color $submenuGameColor -Category $cat
                 $submenuItem.BackColor = $script:Colors.Background
                 $submenuItem.ForeColor = $submenuGameColor
-                $submenuItem.Font = $script:FontMenuRowBold
+                $submenuItem.Font = $script:FontMenuRow
                 $profileVariantChip = ""
                 $submenuItem.ToolTipText = "Open profile choices for $($groupInfo.Name): $($profileIds.Count)"
                 Set-TrayGameGroupRowVisualState -Item $submenuItem
@@ -9929,7 +9855,7 @@ public class HotkeyMessageWindow : NativeWindow {
     $actionsMenu.Text = "Actions"
     $actionsMenu.BackColor = $script:Colors.Background
     $actionsMenu.ForeColor = $script:Colors.AccentAmber
-    $actionsMenu.Font = $script:FontMenuRowBold
+    $actionsMenu.Font = $script:FontMenuRow
     $actionsMenu.Image = New-ActionBitmap -Action "Actions" -Color $script:Colors.AccentAmber
     $actionsMenu.AccessibleName = "__flyout_command__"
     $actionsMenu.AccessibleDescription = "TOOLS"
@@ -10116,7 +10042,7 @@ public class HotkeyMessageWindow : NativeWindow {
     $backupsItem.Text = "Backups ($backupTime)"
     $backupsItem.BackColor = $script:Colors.Background
     $backupsItem.ForeColor = $script:Colors.AccentPurple
-    $backupsItem.Font = $script:FontMenuRowBold
+    $backupsItem.Font = $script:FontMenuRow
     if ($backupHeaderGameGroups.Count -gt 0 -and (Get-Command New-BackupGameMosaicBitmap -ErrorAction SilentlyContinue)) {
         $backupsItem.Image = New-BackupGameMosaicBitmap -GameGroups @($backupHeaderGameGroups) -Color $script:Colors.AccentPurple -Category "Other"
     }
@@ -10464,7 +10390,7 @@ public class HotkeyMessageWindow : NativeWindow {
     $settingsMenu.Text = "Settings"
     $settingsMenu.BackColor = $script:Colors.Background
     $settingsMenu.ForeColor = $script:Colors.Text
-    $settingsMenu.Font = $script:FontMenuRowBold
+    $settingsMenu.Font = $script:FontMenuRow
     $settingsMenu.Image = New-ActionBitmap -Action "Settings" -Color $script:Colors.Text
     $settingsMenu.AccessibleName = "__flyout_command__"
     $settingsMenu.AccessibleDescription = "PREFS"

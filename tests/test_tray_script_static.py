@@ -1137,9 +1137,10 @@ def test_profile_launcher_uses_readable_spacing_and_plain_choice_labels() -> Non
     assert "? MixColor(e.Item.ForeColor, TextPaper, 0.22)" in script
     assert ": MixColor(TextMist, e.Item.ForeColor, 0.30);" in script
     assert "private static readonly Color TextPaper = Color.FromArgb(255, 225, 244, 240);" in script
-    # Profile rows carry their accent pulled toward paper — forced-white rows
-    # made the whole roster read as one default block.
-    assert ": MixColor(e.Item.ForeColor, TextPaper, 0.55);" in script
+    # Uniform emphasis: all content rows render paper in one voice/weight;
+    # game identity lives in medallions and chips, bold marks only the
+    # active profile.
+    assert ": TextPaper;" in script
     assert '$variantLabel = if ($VariantCount -eq 1) { "1 choice" } else { "$VariantCount choices" }' in script
     assert '$profileVariantChip = ""' in script
     assert '$submenuItem.ToolTipText = "Open profile choices for $($groupInfo.Name): $($profileIds.Count)"' in script
@@ -1371,22 +1372,16 @@ def test_tray_top_level_rows_use_icons_without_fake_padding() -> None:
 def test_tray_top_level_flyouts_render_as_command_pills() -> None:
     """Primary flyouts should read as visual command launchers, not plain text rows."""
     script = TRAY_SCRIPT.read_text(encoding="utf-8")
-    renderer_section = script.split("// --- Top-level flyout commands: compact animated launcher pills ---", 1)[1].split(
-        "// --- Section headers",
-        1,
-    )[0]
     text_section = script.split('if (e.Item.AccessibleName == "__flyout_command__")', 1)[1].split(
         'if (e.Item.AccessibleName == "__category_header__" || e.Item.AccessibleName == "__section_header__")',
         1,
     )[0]
 
-    assert 'e.Item.AccessibleName == "__flyout_command__"' in renderer_section
-    assert "double wave = (Math.Sin(PulseFrame / 5.0) + 1.0) / 2.0;" in renderer_section
-    assert "FillRoundRect(g, brush, rect, 5)" in renderer_section
-    assert "DrawRoundRect(g, pen, rect, 5)" in renderer_section
-    assert "int sweepX = rect.X + 14 + ((PulseFrame * 5) % sweepTravel);" in renderer_section
-    assert "g.DrawLine(sweepPen, sweepX, rect.Y + 2, Math.Min(rect.Right - 10, sweepX + sweepWidth), rect.Y + 2);" in renderer_section
-    assert 'e.Graphics.DrawString((e.Text ?? "").Trim().ToUpperInvariant(), labelFont, labelBrush, labelRect, labelFormat);' in text_section
+    # Top-level commands speak the shared row voice — no always-on animated
+    # pill decoration, no mono-caps third text system. Chips stay.
+    assert "compact animated launcher pills" not in script
+    assert "No always-on decoration" in script
+    assert 'e.Graphics.DrawString((e.Text ?? "").Trim(), e.TextFont, labelBrush, labelRect, labelFormat);' in text_section
     assert "DrawInstrumentChip(e.Graphics, chipFont, chipRect, chip.ToUpperInvariant(), tint, 118);" in text_section
     assert '$actionsMenu.AccessibleName = "__flyout_command__"' in script
     assert '$actionsMenu.AccessibleDescription = "TOOLS"' in script
@@ -2482,22 +2477,15 @@ def test_game_flyouts_have_identity_headers_without_breaking_search() -> None:
 def test_game_group_menu_rows_use_compact_medallions() -> None:
     """Game group rows should get the newer ringed mark without changing profile variant badges."""
     script = TRAY_SCRIPT.read_text(encoding="utf-8")
-    game_row_background = script.split("// --- Game group rows: readable lane entries with color carried by rails/icons ---", 1)[1].split(
-        "// --- Section headers",
-        1,
-    )[0]
-    game_row_text = script.split('if (e.Item.AccessibleName == "__game_group_row__")', 2)[2].split(
+    game_row_text = script.split('if (e.Item.AccessibleName == "__game_group_row__")', 1)[1].split(
         'if (e.Item.AccessibleName == "__category_header__" || e.Item.AccessibleName == "__section_header__")',
         1,
     )[0]
 
-    assert 'e.Item.AccessibleName == "__game_group_row__"' in game_row_background
-    assert "Rectangle laneRect = GetBoundedRowRect(rect, 350, 190);" in game_row_background
-    assert "Color.FromArgb(20, tint.R, tint.G, tint.B)" in game_row_background
-    assert "FillRoundRect(g, brush, laneRect, 4)" in game_row_background
-    assert "var railRect = new Rectangle(laneRect.X + 5, laneRect.Y + 4, 4, Math.Max(3, laneRect.Height - 8));" in game_row_background
-    assert "g.DrawLine(pen, laneRect.X + 18, laneRect.Y + 1, Math.Min(laneRect.Right - 14, laneRect.X + 128), laneRect.Y + 1);" in game_row_background
-    assert "Color labelColor = MixColor(e.Item.ForeColor, TextPaper, 0.48);" in game_row_text
+    # Idle game rows carry NO always-on lane/rail decoration (uniform
+    # emphasis) and render uniform paper text in the shared row voice.
+    assert "Rectangle laneRect = GetBoundedRowRect(rect, 350, 190);" not in script
+    assert "Color labelColor = TextPaper;" in game_row_text
     assert "ResolveEyebrowFont(11.0f)" not in game_row_text
     assert 'e.Graphics.DrawString((e.Text ?? "").Trim(), e.TextFont, labelBrush, labelRect, labelFormat);' in game_row_text
 
