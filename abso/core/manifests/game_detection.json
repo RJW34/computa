@@ -42,12 +42,18 @@
       "registry_key": "SOFTWARE\\WOW6432Node\\Blizzard Entertainment\\Diablo IV",
       "executables": [
         "Diablo IV.exe"
+      ],
+      "uninstall_display_names": [
+        "Diablo IV"
       ]
     },
     "Overwatch 2": {
       "registry_key": "SOFTWARE\\WOW6432Node\\Blizzard Entertainment\\Overwatch",
       "executables": [
         "Overwatch.exe"
+      ],
+      "uninstall_display_names": [
+        "Overwatch"
       ]
     },
     "Call of Duty": {
@@ -55,6 +61,9 @@
       "executables": [
         "cod.exe",
         "ModernWarfare.exe"
+      ],
+      "uninstall_display_names": [
+        "Call of Duty"
       ]
     }
   },

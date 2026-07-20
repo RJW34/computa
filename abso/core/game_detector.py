@@ -53,14 +53,17 @@ DEFAULT_GAME_DETECTION_MANIFEST: dict[str, Any] = {
     "battle_net_games": {
         "Diablo IV": {
             "registry_key": r"SOFTWARE\WOW6432Node\Blizzard Entertainment\Diablo IV",
+            "uninstall_display_names": ["Diablo IV"],
             "executables": ["Diablo IV.exe"],
         },
         "Overwatch 2": {
             "registry_key": r"SOFTWARE\WOW6432Node\Blizzard Entertainment\Overwatch",
+            "uninstall_display_names": ["Overwatch"],
             "executables": ["Overwatch.exe"],
         },
         "Call of Duty": {
             "registry_key": r"SOFTWARE\WOW6432Node\Activision\Call of Duty",
+            "uninstall_display_names": ["Call of Duty"],
             "executables": ["cod.exe", "ModernWarfare.exe"],
         },
     },
@@ -426,6 +429,101 @@ def _detect_epic_games() -> list[InstalledGame]:
     return games
 
 
+_UNINSTALL_REGISTRY_ROOTS: tuple[tuple[int, str], ...] = (
+    (winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall"),
+    (
+        winreg.HKEY_LOCAL_MACHINE,
+        r"SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall",
+    ),
+    (winreg.HKEY_CURRENT_USER, r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall"),
+)
+
+
+def _iter_uninstall_entries():
+    """Yield (display_name, install_location) from the uninstall registry."""
+    for hive, root in _UNINSTALL_REGISTRY_ROOTS:
+        try:
+            root_key = winreg.OpenKey(hive, root)
+        except OSError:
+            continue
+        try:
+            index = 0
+            while True:
+                try:
+                    sub_name = winreg.EnumKey(root_key, index)
+                except OSError:
+                    break
+                index += 1
+                try:
+                    sub_key = winreg.OpenKey(root_key, sub_name)
+                except OSError:
+                    continue
+                try:
+                    try:
+                        display, _ = winreg.QueryValueEx(sub_key, "DisplayName")
+                    except OSError:
+                        continue
+                    try:
+                        location, _ = winreg.QueryValueEx(sub_key, "InstallLocation")
+                    except OSError:
+                        location = ""
+                    yield str(display), str(location)
+                finally:
+                    winreg.CloseKey(sub_key)
+        finally:
+            winreg.CloseKey(root_key)
+
+
+def _detect_battlenet_uninstall_fallback(
+    bnet_games_config: dict[str, dict[str, Any]],
+    already_found: set[str],
+) -> list[InstalledGame]:
+    """Find Battle.net games via the Windows uninstall registry.
+
+    Modern Battle.net installs stopped writing the legacy per-game keys
+    under ``Blizzard Entertainment``; the uninstall entries (DisplayName +
+    InstallLocation) are what current installs reliably register.
+    """
+    games: list[InstalledGame] = []
+    wanted: dict[str, tuple[str, dict[str, Any]]] = {}
+    for game_name, config in bnet_games_config.items():
+        if game_name in already_found:
+            continue
+        for display in config.get("uninstall_display_names") or []:
+            wanted[str(display).strip().lower()] = (game_name, config)
+    if not wanted:
+        return games
+
+    found: set[str] = set()
+    for display, location in _iter_uninstall_entries():
+        entry = wanted.get(display.strip().lower())
+        if entry is None:
+            continue
+        game_name, config = entry
+        if game_name in found:
+            continue
+        if not location:
+            continue
+        game_folder = Path(location)
+        if not game_folder.exists():
+            continue
+        for exe_name in config["executables"]:
+            # Root or one level down (Battle.net keeps some exes in
+            # subfolders like _retail_); bounded on purpose, no rglob.
+            if (game_folder / exe_name).exists() or any(
+                candidate.is_file() for candidate in game_folder.glob(f"*/{exe_name}")
+            ):
+                games.append(InstalledGame(
+                    name=game_name,
+                    executable=exe_name,
+                    install_path=game_folder,
+                    platform="battle_net",
+                ))
+                found.add(game_name)
+                break
+    return games
+
+
 def _detect_battlenet_games() -> list[InstalledGame]:
     """Detect installed Battle.net games."""
     games: list[InstalledGame] = []
@@ -469,6 +567,13 @@ def _detect_battlenet_games() -> list[InstalledGame]:
             winreg.CloseKey(key)
         except FileNotFoundError:
             pass
+
+    games.extend(
+        _detect_battlenet_uninstall_fallback(
+            bnet_games_config,
+            {game.name for game in games},
+        )
+    )
 
     return games
 

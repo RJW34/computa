@@ -289,6 +289,15 @@ class TestDetectBattlenetGames:
     @patch("abso.core.game_detector.winreg.OpenKey")
     def test_finds_game_from_registry(self, mock_open, mock_query, mock_close, tmp_path):
         """Test finds Battle.net game from registry."""
+        # The uninstall fallback would walk the same mocked winreg; keep this
+        # test scoped to the legacy per-game key path.
+        with patch(
+            "abso.core.game_detector._iter_uninstall_entries",
+            return_value=iter(()),
+        ):
+            return self._run_legacy_registry_case(mock_query, tmp_path)
+
+    def _run_legacy_registry_case(self, mock_query, tmp_path):
         # Create mock game structure
         game_folder = tmp_path / "Diablo IV"
         game_folder.mkdir()
@@ -311,7 +320,11 @@ class TestDetectBattlenetGames:
         (game_folder / "Overwatch.exe").touch()
 
         mock_query.return_value = (str(game_folder), 1)
-        result = _detect_battlenet_games()
+        with patch(
+            "abso.core.game_detector._iter_uninstall_entries",
+            return_value=iter(()),
+        ):
+            result = _detect_battlenet_games()
         ow_games = [g for g in result if "Overwatch" in g.name]
         assert len(ow_games) >= 1
 
@@ -446,3 +459,94 @@ class TestGetProfileSuggestions:
 
         result = get_profile_suggestions()
         assert result == {}
+
+
+class TestBattlenetUninstallFallback:
+    """Modern Battle.net installs register via the uninstall registry only."""
+
+    @staticmethod
+    def _config() -> dict:
+        return {
+            "Overwatch 2": {
+                "uninstall_display_names": ["Overwatch"],
+                "executables": ["Overwatch.exe"],
+            },
+            "Diablo IV": {
+                "uninstall_display_names": ["Diablo IV"],
+                "executables": ["Diablo IV.exe"],
+            },
+        }
+
+    def test_finds_games_via_uninstall_entries(self, tmp_path, monkeypatch):
+        from abso.core import game_detector
+
+        ow_dir = tmp_path / "Overwatch"
+        (ow_dir / "_retail_").mkdir(parents=True)
+        (ow_dir / "_retail_" / "Overwatch.exe").write_bytes(b"")
+        d4_dir = tmp_path / "Diablo IV"
+        d4_dir.mkdir()
+        (d4_dir / "Diablo IV.exe").write_bytes(b"")
+
+        entries = [
+            ("Battle.net", "C:\\does\\not\\matter"),
+            ("Overwatch", str(ow_dir)),  # exe one level down (_retail_)
+            ("Diablo IV", str(d4_dir)),  # exe at install root
+        ]
+        monkeypatch.setattr(
+            game_detector, "_iter_uninstall_entries", lambda: iter(entries)
+        )
+
+        games = game_detector._detect_battlenet_uninstall_fallback(
+            self._config(), set()
+        )
+
+        by_name = {g.name: g for g in games}
+        assert set(by_name) == {"Overwatch 2", "Diablo IV"}
+        assert by_name["Overwatch 2"].executable == "Overwatch.exe"
+        assert by_name["Overwatch 2"].platform == "battle_net"
+        assert by_name["Diablo IV"].install_path == d4_dir
+
+    def test_skips_already_found_missing_location_and_missing_exe(
+        self, tmp_path, monkeypatch
+    ):
+        from abso.core import game_detector
+
+        empty_dir = tmp_path / "Diablo IV"
+        empty_dir.mkdir()  # exists but holds no executable
+
+        entries = [
+            ("Overwatch", str(tmp_path)),  # would match, but already found
+            ("Diablo IV", str(empty_dir)),  # no exe inside
+            ("Call of Duty", ""),  # no InstallLocation recorded
+        ]
+        monkeypatch.setattr(
+            game_detector, "_iter_uninstall_entries", lambda: iter(entries)
+        )
+        config = self._config()
+        config["Call of Duty"] = {
+            "uninstall_display_names": ["Call of Duty"],
+            "executables": ["cod.exe"],
+        }
+
+        games = game_detector._detect_battlenet_uninstall_fallback(
+            config, {"Overwatch 2"}
+        )
+
+        assert games == []
+
+    def test_manifest_defaults_carry_uninstall_names(self):
+        from abso.core.game_detector import DEFAULT_GAME_DETECTION_MANIFEST
+
+        bnet = DEFAULT_GAME_DETECTION_MANIFEST["battle_net_games"]
+        assert bnet["Overwatch 2"]["uninstall_display_names"] == ["Overwatch"]
+        assert bnet["Diablo IV"]["uninstall_display_names"] == ["Diablo IV"]
+
+    def test_shipped_manifest_file_carries_uninstall_names(self):
+        manifest_path = (
+            Path(__file__).parent.parent.parent
+            / "abso" / "core" / "manifests" / "game_detection.json"
+        )
+        data = json.loads(manifest_path.read_text(encoding="utf-8-sig"))
+        bnet = data["battle_net_games"]
+        assert bnet["Overwatch 2"]["uninstall_display_names"] == ["Overwatch"]
+        assert bnet["Diablo IV"]["uninstall_display_names"] == ["Diablo IV"]

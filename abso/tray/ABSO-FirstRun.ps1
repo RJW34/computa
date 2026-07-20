@@ -351,7 +351,11 @@ function New-PhosphorCheckList {
     $list.DrawMode = [System.Windows.Forms.DrawMode]::OwnerDrawFixed
     $list.ItemHeight = S 19
     $list.SetBounds(1, 1, $frame.Width - 2, $frame.Height - 2)
-    $list.Tag = @{ Checked = (New-Object System.Collections.ArrayList); Hot = -1 }
+    $list.Tag = @{
+        Checked = (New-Object System.Collections.ArrayList)
+        Found = (New-Object System.Collections.ArrayList)
+        Hot = -1
+    }
     $frame.Controls.Add($list)
 
     $list.add_MouseClick({
@@ -413,7 +417,20 @@ function New-PhosphorCheckList {
         }
 
         $textX = $boxX + $boxSize + (S 8)
-        $textRect = New-Object System.Drawing.Rectangle($textX, $e.Bounds.Y, ($e.Bounds.Right - $textX), $e.Bounds.Height)
+        $textRight = $e.Bounds.Right
+        $isFound = ($sender.Tag.Found.Count -gt $e.Index) -and $sender.Tag.Found[$e.Index]
+        if ($isFound) {
+            # Provenance tag: this row came from the installed-game scan.
+            $tagW = S 48
+            $tagRect = New-Object System.Drawing.Rectangle(($e.Bounds.Right - $tagW - (S 6)), $e.Bounds.Y, $tagW, $e.Bounds.Height)
+            $tagFlags = [System.Windows.Forms.TextFormatFlags]::Right -bor `
+                [System.Windows.Forms.TextFormatFlags]::VerticalCenter -bor `
+                [System.Windows.Forms.TextFormatFlags]::NoPrefix
+            [System.Windows.Forms.TextRenderer]::DrawText(
+                $e.Graphics, "found", $FontEyebrow, $tagRect, $Mist, $rowBack, $tagFlags)
+            $textRight = $tagRect.X - (S 4)
+        }
+        $textRect = New-Object System.Drawing.Rectangle($textX, $e.Bounds.Y, ($textRight - $textX), $e.Bounds.Height)
         $textFlags = [System.Windows.Forms.TextFormatFlags]::Left -bor `
             [System.Windows.Forms.TextFormatFlags]::VerticalCenter -bor `
             [System.Windows.Forms.TextFormatFlags]::NoPrefix -bor `
@@ -432,16 +449,44 @@ $script:CatalogLoaded = $false
 # broken. Overlay an honest status inside the frame until the catalog
 # lands (or the probe fails).
 $script:SurveyEmpty = New-Object System.Windows.Forms.Label
-$script:SurveyEmpty.Text = "Looking for your games... you can keep going, this fills in by itself."
+$script:SurveyEmpty.Text = "Looking for your games`n`nYou can keep going - this fills in by itself."
 $script:SurveyEmpty.Font = $FontBody
 $script:SurveyEmpty.ForeColor = $Mist
 $script:SurveyEmpty.BackColor = $Ink0
 $script:SurveyEmpty.TextAlign = [System.Drawing.ContentAlignment]::MiddleCenter
-$script:SurveyEmpty.SetBounds(1, 1, $surveyList.Parent.Width - 2, $surveyList.Parent.Height - 2)
+$script:SurveyEmpty.SetBounds(1, 1, $surveyList.Parent.Width - 2, $surveyList.Parent.Height - 2 - (S 6))
 $surveyList.Parent.Controls.Add($script:SurveyEmpty)
 # Visibility swap, not z-order stacking: overlapping siblings paint
 # unpredictably under WM_PRINT, and the list has nothing to show anyway.
 $surveyList.Visible = $false
+
+# Scanning has to LOOK like scanning: cycling dots plus a Signal sweep
+# along the bottom edge of the frame while the probe runs.
+$script:ScanSweep = New-Object System.Windows.Forms.Panel
+$script:ScanSweep.BackColor = $Signal
+$script:ScanSweep.SetBounds(1, ($surveyList.Parent.Height - 1 - (S 3)), (S 90), (S 2))
+$surveyList.Parent.Controls.Add($script:ScanSweep)
+
+$script:ScanActive = $true
+$script:ScanTick = 0
+$script:ScanDots = 0
+$script:ScanTimer = New-Object System.Windows.Forms.Timer
+$script:ScanTimer.Interval = 120
+$script:ScanTimer.Add_Tick({
+    if (-not $script:ScanActive) { return }
+    $script:ScanTick++
+    $maxX = $surveyList.Parent.Width - 1 - $script:ScanSweep.Width
+    $newX = $script:ScanSweep.Left + (S 7)
+    if ($newX -gt $maxX) { $newX = 1 }
+    $script:ScanSweep.Left = $newX
+    if (($script:ScanTick % 5) -eq 0) {
+        $script:ScanDots = ($script:ScanDots + 1) % 4
+        $dots = "." * $script:ScanDots
+        $script:SurveyEmpty.Text = "Looking for your games$dots`n`nYou can keep going - this fills in by itself."
+        $lblHardware.Text = "Taking a look at your PC$dots"
+    }
+})
+$script:ScanTimer.Start()
 $y = $surveyList.Parent.Bottom + (S 4)
 $lblSurveyStatus = New-UiLabel -Parent $pageSurvey -Text "Still looking for installed games..." -Font $FontSub -Color $Mist -X $PadX -Y $y -Width $ContentW -Height (S 16)
 $y = $lblSurveyStatus.Bottom + (S 10)
@@ -531,7 +576,14 @@ $btnOpenTray.Add_Click({
 })
 
 # --- plan preflight (read-only) --------------------------------------------
+function Stop-ScanIndicator {
+    $script:ScanActive = $false
+    if ($script:ScanTimer) { $script:ScanTimer.Stop() }
+    if ($script:ScanSweep) { $script:ScanSweep.Visible = $false }
+}
+
 function Set-PlanProbeFailed {
+    Stop-ScanIndicator
     $lblHardware.Text = "Couldn't inspect this PC - that's okay, setup continues normally."
     $lblSurveyStatus.Text = "Couldn't scan this PC for games - the tray will show the full profile list."
     $script:SurveyEmpty.Text = "Couldn't scan for games - your tray will show every profile."
@@ -539,6 +591,7 @@ function Set-PlanProbeFailed {
 
 function Apply-PlanToUi {
     param($Plan)
+    Stop-ScanIndicator
     $lines = @()
     if ($Plan.hardware.gpu) { $lines += "GPU      $($Plan.hardware.gpu)" }
     if ($Plan.hardware.cpu) { $lines += "CPU      $($Plan.hardware.cpu)" }
@@ -580,18 +633,27 @@ function Apply-PlanToUi {
         $surveyList.Items.Clear()
         $surveyList.Tag.Checked.Clear()
         $script:GameKeys = @()
+        $surveyList.Tag.Found.Clear()
         foreach ($entry in $Plan.game_catalog) {
             $surveyList.Items.Add($entry.name) | Out-Null
             $surveyList.Tag.Checked.Add([bool]$entry.detected) | Out-Null
+            $surveyList.Tag.Found.Add([bool]$entry.detected) | Out-Null
             $script:GameKeys += $entry.key
         }
         $surveyList.Invalidate()
         $script:SurveyEmpty.Visible = $false
         $surveyList.Visible = $true
         $script:CatalogLoaded = $true
-        $detectedCount = @($Plan.game_catalog | Where-Object { $_.detected }).Count
-        if ($detectedCount -gt 0) {
-            $lblSurveyStatus.Text = "Found $detectedCount of these installed - pre-checked for you."
+        # Name the actual finds (real detected titles from Steam/Epic/
+        # Battle.net scans), not just a count - proof this isn't guesswork.
+        $foundNames = @()
+        foreach ($detectedEntry in $Plan.detected_games) { $foundNames += $detectedEntry.games }
+        $foundNames = @($foundNames | Select-Object -Unique)
+        if ($foundNames.Count -gt 3) {
+            $lblSurveyStatus.Text = "Found installed: $($foundNames[0..2] -join ', ') + $($foundNames.Count - 3) more - pre-checked."
+        }
+        elseif ($foundNames.Count -gt 0) {
+            $lblSurveyStatus.Text = "Found installed: $($foundNames -join ', ') - pre-checked."
         }
         else {
             $lblSurveyStatus.Text = "No installed games spotted - check whatever you play."
