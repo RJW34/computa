@@ -54,19 +54,21 @@ Without NPI, NVIDIA tuning still works through the driver's NVAPI interface.
 
 ### From a release (recommended)
 
-Download `computa.exe`, `install.ps1`, and `Install computa.cmd` from the
-latest GitHub release into the same folder, then double-click
-**`Install computa.cmd`**.
+Download **`computa-setup.exe`** from the latest GitHub release and
+double-click it — a standard Windows installer (per-user, no admin prompt
+for the install itself). It registers computa in Apps & Features, adds
+Start Menu shortcuts, and optionally puts `computa` on your PATH.
 
-A small setup window opens: it shows what was found on your PC, lets you
-toggle what setup may do (safety snapshot, tray on startup, PATH), and asks
-a short survey — which games you play (installed ones are pre-checked) and
-whether you use HDR, VRR, or streaming — so the tray menu only shows
-profiles you'd actually use. Installing never changes your Windows or game
-settings — you pick a game profile later, from the tray.
+The finish page offers to run **first-time setup**: a small window that
+shows what was found on your PC, lets you toggle what setup may do (safety
+snapshot, tray on startup), and asks a short survey — which games you play
+(installed ones are pre-checked) and whether you use HDR, VRR, or
+streaming — so the tray menu only shows profiles you'd actually use.
+Neither installing nor setup changes your Windows or game settings — you
+pick a game profile later, from the tray.
 
-Prefer a terminal? `powershell -ExecutionPolicy Bypass -File .\install.ps1
--Console` runs the classic text-mode install. Or fully manual: put
+Portable/power-user path: download `computa.exe` + `install.ps1` and run
+`powershell -ExecutionPolicy Bypass -File .\install.ps1` (console), or put
 `computa.exe` anywhere and run `computa setup` from an elevated terminal.
 
 `computa update-check` reports when a newer release is available; updating is a

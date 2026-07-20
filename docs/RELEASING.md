@@ -33,28 +33,34 @@ personal/local themes never ship.
 ```powershell
 git tag v1.2.0
 git push origin master --tags
-gh release create v1.2.0 dist\computa.exe scripts\install.ps1 `
-    "scripts\Install computa.cmd" `
+python build.py installer   # dist\computa-setup.exe (needs Inno Setup 6:
+                            #   winget install -e --id JRSoftware.InnoSetup --scope user)
+gh release create v1.2.0 dist\computa-setup.exe dist\computa.exe `
+    scripts\install.ps1 `
     --title "ABSO v1.2.0" --notes "Highlights..."
 ```
 
 Release assets:
 
-- `computa.exe` — the standalone CLI/tray runtime
-- `install.ps1` — the guided installer window (also has a `-Console`
-  text-mode fallback for power users)
-- `Install computa.cmd` — double-clickable shim that opens the installer
-  window with no console
+- `computa-setup.exe` — **the** installer: standard Windows wizard
+  (per-user, Apps & Features entry, Start Menu shortcuts, optional PATH),
+  finish page launches the first-run setup window
+- `computa.exe` — the standalone CLI/tray runtime (portable path)
+- `install.ps1` — portable console installer for power users
 
 ## 4. What users do
 
-1. Download all three assets into the same folder.
-2. Double-click `Install computa.cmd`.
-3. A small setup window shows what was found on their PC and what setup may
-   do (safety snapshot, tray autostart, PATH, optional bad-KB removal), asks
-   a games/display survey that tunes the tray's profile list to what they
-   actually play (via tray-config `hiddenProfiles`), then streams progress.
-   Installing never applies a profile — that happens later, from the tray.
+1. Download `computa-setup.exe` and double-click it.
+2. A familiar installer wizard runs (no console, no admin prompt for the
+   install itself), then offers "Run first-time setup now".
+3. The first-run window (one UAC prompt) shows what was found on their PC
+   and what setup may do (safety snapshot, tray autostart, optional bad-KB
+   removal), asks a games/display survey that tunes the tray's profile list
+   to what they actually play (via tray-config `hiddenProfiles`), then
+   streams progress. Nothing applies a profile — that happens later, from
+   the tray.
+4. Uninstalling from Apps & Features offers to restore the setup-time
+   baseline (`computa uninstall --yes` runs before file removal).
 
 `computa update-check` tells them when a newer release exists (set
 `ABSO_UPDATE_REPO` for forks). Updating is manual: download the new exe and

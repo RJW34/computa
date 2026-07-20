@@ -8,6 +8,7 @@ Commands:
     .\.venv\Scripts\python.exe build.py all       # Build both CLI and GUI installer
     .\.venv\Scripts\python.exe build.py deploy    # Build CLI and deploy local runtime assets
     .\.venv\Scripts\python.exe build.py deploy-existing  # Deploy existing dist/computa.exe
+    .\.venv\Scripts\python.exe build.py installer # Build dist/computa-setup.exe (Inno Setup)
     .\.venv\Scripts\python.exe build.py dev       # Set up for GUI development
 
 Use a Python interpreter with PyInstaller installed. On this PC that is the
@@ -632,6 +633,103 @@ def dev_setup() -> None:
     print("  npm run tauri:dev")
 
 
+def _find_iscc() -> Path | None:
+    """Locate the Inno Setup 6 compiler."""
+    candidates = []
+    env_override = os.environ.get("ISCC")
+    if env_override:
+        candidates.append(Path(env_override))
+    local_appdata = os.environ.get("LOCALAPPDATA")
+    if local_appdata:
+        candidates.append(Path(local_appdata) / "Programs" / "Inno Setup 6" / "ISCC.exe")
+    candidates.append(Path(r"C:\Program Files (x86)\Inno Setup 6\ISCC.exe"))
+    candidates.append(Path(r"C:\Program Files\Inno Setup 6\ISCC.exe"))
+    for candidate in candidates:
+        if candidate.is_file():
+            return candidate
+    return None
+
+
+def _installer_payload_tray_files(tray_source: Path):
+    """Yield (source, dest-relative) pairs for redistributable tray assets.
+
+    Only the default theme ships in the installer; personal theme packs
+    (non-redistributable media) never leave this machine.
+    """
+    for path in sorted(tray_source.iterdir(), key=lambda item: item.name.lower()):
+        if (
+            path.is_file()
+            and path.suffix.lower() in TRAY_RUNTIME_EXTENSIONS
+            and path.name not in TRAY_DEPLOY_EXCLUDE_FILENAMES
+        ):
+            yield path, Path("abso/tray") / path.name
+    default_theme = tray_source / "themes" / "default"
+    if default_theme.exists():
+        for path in sorted(default_theme.rglob("*"), key=lambda item: str(item).lower()):
+            if path.is_file():
+                yield path, Path("abso/tray/themes/default") / path.relative_to(default_theme)
+
+
+def build_installer() -> bool:
+    """Build dist/computa-setup.exe with Inno Setup."""
+    print("\nBuilding computa-setup.exe (Inno Setup)...")
+
+    exe = DIST_DIR / "computa.exe"
+    if not exe.exists():
+        print(f"  dist\\computa.exe not found ({exe}).")
+        print("  Build it first:  build.py cli")
+        return False
+
+    iscc = _find_iscc()
+    if iscc is None:
+        print("  Inno Setup 6 (ISCC.exe) not found.")
+        print("  Install it:  winget install -e --id JRSoftware.InnoSetup --scope user")
+        print("  Or set the ISCC env var to the full ISCC.exe path.")
+        return False
+
+    payload = BUILD_DIR / "installer-payload"
+    if payload.exists():
+        shutil.rmtree(payload)
+    (payload / "abso" / "tray").mkdir(parents=True)
+    shutil.copy2(exe, payload / "computa.exe")
+
+    tray_source = ROOT_DIR / "abso" / "tray"
+    count = 0
+    for source, relative in _installer_payload_tray_files(tray_source):
+        dest = payload / relative
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source, dest)
+        count += 1
+    print(f"  Payload: computa.exe + {count} tray files (themes: default only)")
+
+    version_ns: dict = {}
+    exec((ROOT_DIR / "abso" / "__version__.py").read_text(encoding="utf-8"), version_ns)
+    version = version_ns["__version__"]
+
+    result = subprocess.run(
+        [
+            str(iscc),
+            f"/DAppVer={version}",
+            f"/DPayloadDir={payload}",
+            f"/O{DIST_DIR}",
+            str(ROOT_DIR / "scripts" / "installer.iss"),
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        print("  ISCC failed:")
+        print(result.stdout[-2000:] if result.stdout else "")
+        print(result.stderr[-2000:] if result.stderr else "")
+        return False
+
+    setup_exe = DIST_DIR / "computa-setup.exe"
+    size_mb = setup_exe.stat().st_size / (1024 * 1024) if setup_exe.exists() else 0
+    print(f"  Built {setup_exe} ({size_mb:.1f} MB)")
+    return True
+
+
 def show_help() -> None:
     """Show usage help."""
     print(__doc__)
@@ -657,6 +755,8 @@ def main() -> int:
         return 0 if build_and_deploy() else 1
     elif command in ["deploy-existing", "deploy_existing"]:
         return 0 if deploy_existing_cli() else 1
+    elif command == "installer":
+        return 0 if build_installer() else 1
     elif command == "dev":
         dev_setup()
         return 0
