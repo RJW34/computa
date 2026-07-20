@@ -522,12 +522,67 @@ def interactive() -> None:
 
 
 @cli.command()
-def setup() -> None:
+@click.option(
+    "--plan",
+    "plan_mode",
+    is_flag=True,
+    hidden=True,
+    help="Print a read-only setup preflight as JSON and exit (no changes).",
+)
+@click.option(
+    "--unattended",
+    is_flag=True,
+    hidden=True,
+    help="Run selected setup actions non-interactively with JSON progress lines.",
+)
+@click.option("--baseline/--no-baseline", default=True, hidden=True)
+@click.option("--config/--no-config", "create_config", default=True, hidden=True)
+@click.option("--tray-autostart/--no-tray-autostart", default=False, hidden=True)
+@click.option("--remove-kb", "remove_kbs", multiple=True, hidden=True)
+def setup(
+    plan_mode: bool,
+    unattended: bool,
+    baseline: bool,
+    create_config: bool,
+    tray_autostart: bool,
+    remove_kbs: tuple[str, ...],
+) -> None:
     """Run the first-time setup wizard.
 
     Walks through hardware detection, Windows update checks, system audit,
-    game detection, and profile selection.
+    game detection, and profile selection. The hidden --plan/--unattended
+    modes power the GUI installer.
     """
+    if plan_mode:
+        from abso.core.setup_flow import build_setup_plan
+
+        print(json.dumps(build_setup_plan()))
+        return
+
+    if unattended:
+        if not is_admin():
+            print(
+                json.dumps({
+                    "event": "done",
+                    "success": False,
+                    "error": "admin_required",
+                }),
+                flush=True,
+            )
+            raise SystemExit(1)
+        from abso.core.setup_flow import UnattendedOptions, run_unattended_setup
+
+        result = run_unattended_setup(
+            UnattendedOptions(
+                baseline=baseline,
+                create_config=create_config,
+                tray_autostart=tray_autostart,
+                remove_kbs=tuple(remove_kbs),
+            ),
+            emit=lambda obj: print(json.dumps(obj), flush=True),
+        )
+        raise SystemExit(0 if result.get("success") else 1)
+
     if not is_admin():
         console.print("[red]Setup wizard requires admin privileges.[/red]")
         console.print("Please run from an elevated terminal.")

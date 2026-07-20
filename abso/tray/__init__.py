@@ -62,6 +62,46 @@ def get_tray_dir() -> Path:
     return module_dir
 
 
+def deploy_tray_assets(dest_root: Path | None = None) -> Path | None:
+    """Copy bundled tray assets to a durable directory beside the exe.
+
+    A bare-exe install (friend machines: install.ps1 only ships computa.exe)
+    has no tray files on disk; the frozen bundle extracts them to a transient
+    ``_MEI*`` directory that vanishes after exit. Deploying them beside the
+    exe keeps startup registration and tray launches pointing at paths that
+    survive reboots.
+
+    Args:
+        dest_root: Override the exe-side root (tests). When None and not
+            running frozen, this is a no-op returning None.
+
+    Returns:
+        The durable tray directory, or None when running from source.
+    """
+    import shutil
+
+    if dest_root is None:
+        if not getattr(sys, "frozen", False):
+            return None
+        dest_root = Path(sys.executable).resolve().parent
+
+    source = Path(__file__).resolve().parent
+    if not (source / "ABSO-Tray.ps1").exists():
+        raise FileNotFoundError(f"Bundled tray assets not found at {source}")
+
+    dest = dest_root / "abso" / "tray"
+    if source == dest.resolve():
+        return dest
+    dest.mkdir(parents=True, exist_ok=True)
+    shutil.copytree(
+        source,
+        dest,
+        dirs_exist_ok=True,
+        ignore=shutil.ignore_patterns("__pycache__", "*.pyc"),
+    )
+    return dest
+
+
 def start_tray() -> None:
     """Start the computa system tray application."""
     tray_dir = get_tray_dir()

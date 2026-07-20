@@ -34,21 +34,26 @@ personal/local themes never ship.
 git tag v1.2.0
 git push origin master --tags
 gh release create v1.2.0 dist\computa.exe scripts\install.ps1 `
+    "scripts\Install computa.cmd" `
     --title "ABSO v1.2.0" --notes "Highlights..."
 ```
 
 Release assets:
 
 - `computa.exe` — the standalone CLI/tray runtime
-- `install.ps1` — end-user installer (copies the exe to LocalAppData, adds it
-  to the user PATH, launches `computa setup` elevated)
+- `install.ps1` — the guided installer window (also has a `-Console`
+  text-mode fallback for power users)
+- `Install computa.cmd` — double-clickable shim that opens the installer
+  window with no console
 
 ## 4. What users do
 
-1. Download `computa.exe` and `install.ps1` into the same folder.
-2. `powershell -ExecutionPolicy Bypass -File .\install.ps1`
-3. Follow the setup wizard (hardware detection → baseline backup → profile
-   selection → tray autostart).
+1. Download all three assets into the same folder.
+2. Double-click `Install computa.cmd`.
+3. A small setup window shows what was found on their PC and what setup may
+   do (safety snapshot, tray autostart, PATH, optional bad-KB removal), then
+   streams progress. Installing never applies a profile — that happens later,
+   from the tray.
 
 `computa update-check` tells them when a newer release exists (set
 `ABSO_UPDATE_REPO` for forks). Updating is manual: download the new exe and
@@ -59,6 +64,6 @@ re-run `install.ps1`.
 - **Never zip your working folder as a "release".** Gitignored personal data
   lives there: `backups/` (real system snapshots), `abso.yaml`,
   `workflow.yaml`, personal theme packs, machine-state docs. Release only the
-  built `computa.exe` + `scripts/install.ps1`.
+  built `computa.exe` + `scripts/install.ps1` + `scripts/Install computa.cmd`.
 - Never build a release from a tree with uncommitted changes — `build.py`
   bundles whatever is on disk.

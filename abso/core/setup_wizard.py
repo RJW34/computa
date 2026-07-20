@@ -44,6 +44,23 @@ def is_first_run() -> bool:
     return not _get_state_file().exists()
 
 
+def write_setup_state(state_file: Path, state: dict) -> None:
+    """Write setup state through the shared active-profile state mirror."""
+    try:
+        from abso.main import STATE_FILE, _write_state_snapshot
+
+        if state_file.resolve() == STATE_FILE.resolve():
+            _write_state_snapshot(state)
+            return
+    except Exception:
+        pass
+
+    state_file.parent.mkdir(parents=True, exist_ok=True)
+    tmp = state_file.with_suffix(".tmp")
+    tmp.write_text(json.dumps(state, indent=2), encoding="utf-8")
+    os.replace(tmp, state_file)
+
+
 class SetupWizard:
     """Interactive first-run setup wizard."""
 
@@ -587,20 +604,7 @@ class SetupWizard:
         console.print()
 
     def _write_setup_state(self, state: dict) -> None:
-        """Write setup state through the shared active-profile state mirror."""
-        try:
-            from abso.main import STATE_FILE, _write_state_snapshot
-
-            if self.state_file.resolve() == STATE_FILE.resolve():
-                _write_state_snapshot(state)
-                return
-        except Exception:
-            pass
-
-        self.state_file.parent.mkdir(parents=True, exist_ok=True)
-        tmp = self.state_file.with_suffix(".tmp")
-        tmp.write_text(json.dumps(state, indent=2), encoding="utf-8")
-        os.replace(tmp, self.state_file)
+        write_setup_state(self.state_file, state)
 
     def _print_summary(self) -> None:
         lines = []

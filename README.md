@@ -54,15 +54,17 @@ Without NPI, NVIDIA tuning still works through the driver's NVAPI interface.
 
 ### From a release (recommended)
 
-Download `computa.exe` and `install.ps1` from the latest GitHub release into the
-same folder, then:
+Download `computa.exe`, `install.ps1`, and `Install computa.cmd` from the
+latest GitHub release into the same folder, then double-click
+**`Install computa.cmd`**.
 
-```powershell
-powershell -ExecutionPolicy Bypass -File .\install.ps1
-```
+A small setup window opens: it shows what was found on your PC, lets you
+toggle what setup may do (safety snapshot, tray on startup, PATH), and
+explains every step in plain language. Installing never changes your Windows
+or game settings — you pick a game profile later, from the tray.
 
-The installer copies `computa.exe` to `%LOCALAPPDATA%`, adds it to your user
-PATH, and launches the first-run setup wizard (elevated). Or manually: put
+Prefer a terminal? `powershell -ExecutionPolicy Bypass -File .\install.ps1
+-Console` runs the classic text-mode install. Or fully manual: put
 `computa.exe` anywhere and run `computa setup` from an elevated terminal.
 
 `computa update-check` reports when a newer release is available; updating is a
