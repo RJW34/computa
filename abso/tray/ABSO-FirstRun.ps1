@@ -21,7 +21,7 @@
 param(
     [switch]$SafeDefaults,
     [string]$BackendExe = "",
-    [ValidateSet("", "options", "survey", "progress", "done", "failed")]
+    [ValidateSet("", "options", "survey", "survey-empty", "progress", "done", "failed")]
     [string]$PreviewUi = "",
     [string]$PreviewShot = ""
 )
@@ -427,6 +427,21 @@ function New-PhosphorCheckList {
 $surveyList = New-PhosphorCheckList -Parent $pageSurvey -X $PadX -Y $y -Width $ContentW -RowCount 11
 $script:GameKeys = @()
 $script:CatalogLoaded = $false
+
+# The PC scan takes a while (~30s cold); an empty silent box reads as
+# broken. Overlay an honest status inside the frame until the catalog
+# lands (or the probe fails).
+$script:SurveyEmpty = New-Object System.Windows.Forms.Label
+$script:SurveyEmpty.Text = "Looking for your games... you can keep going, this fills in by itself."
+$script:SurveyEmpty.Font = $FontBody
+$script:SurveyEmpty.ForeColor = $Mist
+$script:SurveyEmpty.BackColor = $Ink0
+$script:SurveyEmpty.TextAlign = [System.Drawing.ContentAlignment]::MiddleCenter
+$script:SurveyEmpty.SetBounds(1, 1, $surveyList.Parent.Width - 2, $surveyList.Parent.Height - 2)
+$surveyList.Parent.Controls.Add($script:SurveyEmpty)
+# Visibility swap, not z-order stacking: overlapping siblings paint
+# unpredictably under WM_PRINT, and the list has nothing to show anyway.
+$surveyList.Visible = $false
 $y = $surveyList.Parent.Bottom + (S 4)
 $lblSurveyStatus = New-UiLabel -Parent $pageSurvey -Text "Still looking for installed games..." -Font $FontSub -Color $Mist -X $PadX -Y $y -Width $ContentW -Height (S 16)
 $y = $lblSurveyStatus.Bottom + (S 10)
@@ -516,6 +531,12 @@ $btnOpenTray.Add_Click({
 })
 
 # --- plan preflight (read-only) --------------------------------------------
+function Set-PlanProbeFailed {
+    $lblHardware.Text = "Couldn't inspect this PC - that's okay, setup continues normally."
+    $lblSurveyStatus.Text = "Couldn't scan this PC for games - the tray will show the full profile list."
+    $script:SurveyEmpty.Text = "Couldn't scan for games - your tray will show every profile."
+}
+
 function Apply-PlanToUi {
     param($Plan)
     $lines = @()
@@ -565,6 +586,8 @@ function Apply-PlanToUi {
             $script:GameKeys += $entry.key
         }
         $surveyList.Invalidate()
+        $script:SurveyEmpty.Visible = $false
+        $surveyList.Visible = $true
         $script:CatalogLoaded = $true
         $detectedCount = @($Plan.game_catalog | Where-Object { $_.detected }).Count
         if ($detectedCount -gt 0) {
@@ -576,6 +599,7 @@ function Apply-PlanToUi {
     }
     else {
         $lblSurveyStatus.Text = "Couldn't scan this PC for games - the tray will show the full profile list."
+        $script:SurveyEmpty.Text = "Couldn't scan for games - your tray will show every profile."
     }
     if ($Plan.hdr_capable -eq $true) { $displayList.Tag.Checked[0] = $true }
     if ($Plan.vrr_capable -eq $true) { $displayList.Tag.Checked[1] = $true }
@@ -594,7 +618,7 @@ function Start-PlanProbe {
             -WindowStyle Hidden -PassThru
     }
     catch {
-        $lblHardware.Text = "Couldn't inspect this PC - that's okay, setup continues normally."
+        Set-PlanProbeFailed
         return
     }
     $script:PlanTimer = New-Object System.Windows.Forms.Timer
@@ -605,7 +629,7 @@ function Start-PlanProbe {
             if ([DateTime]::UtcNow -gt $script:PlanDeadline) {
                 $script:PlanTimer.Stop()
                 try { $script:PlanProc.Kill() } catch {}
-                $lblHardware.Text = "Couldn't inspect this PC - that's okay, setup continues normally."
+                Set-PlanProbeFailed
             }
             return
         }
@@ -613,10 +637,10 @@ function Start-PlanProbe {
         try {
             $raw = [System.IO.File]::ReadAllText($script:PlanOut).Trim()
             if ($raw) { Apply-PlanToUi (ConvertFrom-Json ($raw -split "`n")[0]) }
-            else { $lblHardware.Text = "Couldn't inspect this PC - that's okay, setup continues normally." }
+            else { Set-PlanProbeFailed }
         }
         catch {
-            $lblHardware.Text = "Couldn't inspect this PC - that's okay, setup continues normally."
+            Set-PlanProbeFailed
         }
     })
     $script:PlanTimer.Start()
@@ -797,6 +821,9 @@ if ($previewMode) {
         }
         "survey" {
             Apply-PlanToUi (ConvertFrom-Json $cannedPlan)
+            Show-Page $pageSurvey
+        }
+        "survey-empty" {
             Show-Page $pageSurvey
         }
         "progress" {
