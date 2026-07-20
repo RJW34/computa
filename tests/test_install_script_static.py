@@ -80,10 +80,20 @@ def test_firstrun_has_survey_page() -> None:
     """Games + display survey: the tray gets tuned to what the user plays."""
     text = _firstrun()
     assert '"survey"' in text  # PreviewUi state
-    assert "CheckedListBox" in text
     assert "Your games" in text
     assert "Your display" in text
     assert "game_catalog" in text
+
+
+def test_firstrun_check_lists_are_owner_drawn() -> None:
+    """Stock CheckedListBox is banned: its themed border, blue selection bar,
+    and white check boxes cannot be restyled (it never raises DrawItem).
+    Both survey sections share the owner-drawn phosphor check list."""
+    text = _firstrun()
+    assert "New-Object System.Windows.Forms.CheckedListBox" not in text
+    assert "function New-PhosphorCheckList" in text
+    assert "SelectionMode]::None" in text
+    assert "OwnerDrawFixed" in text
 
 
 def test_firstrun_never_applies_a_profile() -> None:

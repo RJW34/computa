@@ -324,44 +324,127 @@ $y += S 18
 $surveyNote = New-UiLabel -Parent $pageSurvey -Text "Check what you play - the tray menu only shows profiles for those games. Desktop profiles are always included; leave everything unchecked to keep the full list." -Font $FontSub -Color $Mist -X $PadX -Y $y -Width $ContentW
 $y = $surveyNote.Bottom + (S 6)
 
-$surveyList = New-Object System.Windows.Forms.CheckedListBox
-$surveyList.BackColor = $Ink0
-$surveyList.ForeColor = $Paper
-$surveyList.BorderStyle = [System.Windows.Forms.BorderStyle]::FixedSingle
-$surveyList.CheckOnClick = $true
-$surveyList.IntegralHeight = $false
-$surveyList.Font = $FontBody
-$surveyList.SetBounds($PadX, $y, $ContentW, (S 200))
-$pageSurvey.Controls.Add($surveyList)
+# Owner-drawn phosphor check lists. NOT CheckedListBox: that control
+# owner-draws its items internally and never raises the public DrawItem
+# event, so its themed white boxes, blue selection bar, and focus cues
+# cannot be restyled. A plain ListBox with SelectionMode None + our own
+# check state (in .Tag) draws everything on the system: static hairline
+# frame, flat check squares, quiet ink hover, no selection concept at all.
+function New-PhosphorCheckList {
+    param(
+        [System.Windows.Forms.Control]$Parent,
+        [int]$X, [int]$Y, [int]$Width,
+        [int]$RowCount
+    )
+    $frame = New-Object System.Windows.Forms.Panel
+    $frame.BackColor = $Ink600
+    $frame.SetBounds($X, $Y, $Width, (2 + $RowCount * (S 19)))
+    $Parent.Controls.Add($frame)
+
+    $list = New-Object System.Windows.Forms.ListBox
+    $list.BackColor = $Ink0
+    $list.ForeColor = $Paper
+    $list.BorderStyle = [System.Windows.Forms.BorderStyle]::None
+    $list.SelectionMode = [System.Windows.Forms.SelectionMode]::None
+    $list.IntegralHeight = $false
+    $list.Font = $FontBody
+    $list.DrawMode = [System.Windows.Forms.DrawMode]::OwnerDrawFixed
+    $list.ItemHeight = S 19
+    $list.SetBounds(1, 1, $frame.Width - 2, $frame.Height - 2)
+    $list.Tag = @{ Checked = (New-Object System.Collections.ArrayList); Hot = -1 }
+    $frame.Controls.Add($list)
+
+    $list.add_MouseClick({
+        param($sender, $e)
+        $index = $sender.IndexFromPoint($e.Location)
+        if ($index -ge 0 -and $index -lt $sender.Tag.Checked.Count) {
+            $sender.Tag.Checked[$index] = -not $sender.Tag.Checked[$index]
+            $sender.Invalidate()
+        }
+    })
+    $list.add_MouseMove({
+        param($sender, $e)
+        $hot = $sender.IndexFromPoint($e.Location)
+        if ($hot -ne $sender.Tag.Hot) {
+            $sender.Tag.Hot = $hot
+            $sender.Invalidate()
+        }
+    })
+    $list.add_MouseLeave({
+        param($sender, $e)
+        if ($sender.Tag.Hot -ne -1) {
+            $sender.Tag.Hot = -1
+            $sender.Invalidate()
+        }
+    })
+    $list.add_DrawItem({
+        param($sender, $e)
+        if ($e.Index -lt 0) { return }
+        $rowBack = $Ink0
+        if ($e.Index -eq $sender.Tag.Hot) { $rowBack = $Ink300 }
+        $backBrush = New-Object System.Drawing.SolidBrush($rowBack)
+        $e.Graphics.FillRectangle($backBrush, $e.Bounds)
+        $backBrush.Dispose()
+
+        $boxSize = S 13
+        $boxX = $e.Bounds.X + (S 6)
+        $boxY = $e.Bounds.Y + [int](($e.Bounds.Height - $boxSize) / 2)
+        $isChecked = ($e.Index -lt $sender.Tag.Checked.Count) -and $sender.Tag.Checked[$e.Index]
+        if ($isChecked) {
+            $fillBrush = New-Object System.Drawing.SolidBrush($Signal)
+            $e.Graphics.FillRectangle($fillBrush, $boxX, $boxY, $boxSize, $boxSize)
+            $fillBrush.Dispose()
+            $oldSmoothing = $e.Graphics.SmoothingMode
+            $e.Graphics.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
+            $checkPen = New-Object System.Drawing.Pen($Ink0, [single]([math]::Max(1.5, $boxSize / 8.0)))
+            $points = @(
+                (New-Object System.Drawing.PointF(($boxX + $boxSize * 0.22), ($boxY + $boxSize * 0.52))),
+                (New-Object System.Drawing.PointF(($boxX + $boxSize * 0.42), ($boxY + $boxSize * 0.74))),
+                (New-Object System.Drawing.PointF(($boxX + $boxSize * 0.80), ($boxY + $boxSize * 0.28)))
+            )
+            $e.Graphics.DrawLines($checkPen, $points)
+            $checkPen.Dispose()
+            $e.Graphics.SmoothingMode = $oldSmoothing
+        }
+        else {
+            $boxPen = New-Object System.Drawing.Pen($Mist, 1)
+            $e.Graphics.DrawRectangle($boxPen, $boxX, $boxY, $boxSize - 1, $boxSize - 1)
+            $boxPen.Dispose()
+        }
+
+        $textX = $boxX + $boxSize + (S 8)
+        $textRect = New-Object System.Drawing.Rectangle($textX, $e.Bounds.Y, ($e.Bounds.Right - $textX), $e.Bounds.Height)
+        $textFlags = [System.Windows.Forms.TextFormatFlags]::Left -bor `
+            [System.Windows.Forms.TextFormatFlags]::VerticalCenter -bor `
+            [System.Windows.Forms.TextFormatFlags]::NoPrefix -bor `
+            [System.Windows.Forms.TextFormatFlags]::EndEllipsis
+        [System.Windows.Forms.TextRenderer]::DrawText(
+            $e.Graphics, [string]$sender.Items[$e.Index], $sender.Font, $textRect, $Paper, $rowBack, $textFlags)
+    })
+    $list
+}
+
+$surveyList = New-PhosphorCheckList -Parent $pageSurvey -X $PadX -Y $y -Width $ContentW -RowCount 11
 $script:GameKeys = @()
 $script:CatalogLoaded = $false
-$y = $surveyList.Bottom + (S 4)
+$y = $surveyList.Parent.Bottom + (S 4)
 $lblSurveyStatus = New-UiLabel -Parent $pageSurvey -Text "Still looking for installed games..." -Font $FontSub -Color $Mist -X $PadX -Y $y -Width $ContentW -Height (S 16)
 $y = $lblSurveyStatus.Bottom + (S 10)
 
 New-Eyebrow -Parent $pageSurvey -Text "Your display" -Y $y | Out-Null
 $y += S 20
 
-function New-SurveyCheck {
-    param([string]$Title, [int]$RowY)
-    $check = New-Object System.Windows.Forms.CheckBox
-    $check.Text = $Title
-    $check.Font = $FontBody
-    $check.ForeColor = $Paper
-    $check.BackColor = $Ink0
-    $check.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
-    $check.AutoSize = $false
-    $check.SetBounds($PadX, $RowY, $ContentW, (S 22))
-    $pageSurvey.Controls.Add($check)
-    $check
+# Same phosphor check rows as the game list - one check language per page.
+# Row indices: 0 = HDR, 1 = VRR, 2 = capture/streaming.
+$displayList = New-PhosphorCheckList -Parent $pageSurvey -X $PadX -Y $y -Width $ContentW -RowCount 3
+foreach ($displayRow in @(
+    "My monitor supports HDR and I use it",
+    "My monitor has G-SYNC / FreeSync (VRR) turned on",
+    "I stream or record gameplay (OBS, Medal, ...)")) {
+    $displayList.Items.Add($displayRow) | Out-Null
+    $displayList.Tag.Checked.Add($false) | Out-Null
 }
-
-$chkHdr = New-SurveyCheck -Title "My monitor supports HDR and I use it" -RowY $y
-$y += S 28
-$chkVrr = New-SurveyCheck -Title "My monitor has G-SYNC / FreeSync (VRR) turned on" -RowY $y
-$y += S 28
-$chkCapture = New-SurveyCheck -Title "I stream or record gameplay (OBS, Medal, ...)" -RowY $y
-$y += S 30
+$y = $displayList.Parent.Bottom + (S 12)
 New-UiLabel -Parent $pageSurvey -Text "Best guesses are pre-filled from your hardware. Nothing here is permanent - re-run setup or hide profiles from the tray anytime." -Font $FontSub -Color $Mist -X $PadX -Y $y -Width $ContentW | Out-Null
 
 $btnFinishSetup = New-InstallerButton -Parent $pageSurvey -Text "Finish setup" -X ($PadX + $ContentW - (S 132)) -Y $buttonY -Width (S 132) -Primary $true
@@ -474,12 +557,14 @@ function Apply-PlanToUi {
 
     if ($Plan.game_catalog -and $Plan.game_catalog.Count -gt 0) {
         $surveyList.Items.Clear()
+        $surveyList.Tag.Checked.Clear()
         $script:GameKeys = @()
         foreach ($entry in $Plan.game_catalog) {
-            $index = $surveyList.Items.Add($entry.name)
-            if ($entry.detected) { $surveyList.SetItemChecked($index, $true) }
+            $surveyList.Items.Add($entry.name) | Out-Null
+            $surveyList.Tag.Checked.Add([bool]$entry.detected) | Out-Null
             $script:GameKeys += $entry.key
         }
+        $surveyList.Invalidate()
         $script:CatalogLoaded = $true
         $detectedCount = @($Plan.game_catalog | Where-Object { $_.detected }).Count
         if ($detectedCount -gt 0) {
@@ -492,8 +577,9 @@ function Apply-PlanToUi {
     else {
         $lblSurveyStatus.Text = "Couldn't scan this PC for games - the tray will show the full profile list."
     }
-    if ($Plan.hdr_capable -eq $true) { $chkHdr.Checked = $true }
-    if ($Plan.vrr_capable -eq $true) { $chkVrr.Checked = $true }
+    if ($Plan.hdr_capable -eq $true) { $displayList.Tag.Checked[0] = $true }
+    if ($Plan.vrr_capable -eq $true) { $displayList.Tag.Checked[1] = $true }
+    $displayList.Invalidate()
 }
 
 function Start-PlanProbe {
@@ -625,13 +711,18 @@ function Start-Setup {
 
     # Survey answers: only filter when the catalog loaded and the user
     # actually picked games; unchecked-everything means keep the full list.
-    if ($script:CatalogLoaded -and $surveyList.CheckedIndices.Count -gt 0) {
-        foreach ($index in $surveyList.CheckedIndices) {
+    $gameChecked = $surveyList.Tag.Checked
+    $checkedIndices = @()
+    for ($index = 0; $index -lt $gameChecked.Count; $index++) {
+        if ($gameChecked[$index]) { $checkedIndices += $index }
+    }
+    if ($script:CatalogLoaded -and $checkedIndices.Count -gt 0) {
+        foreach ($index in $checkedIndices) {
             $backendArgs += @("--game", $script:GameKeys[$index])
         }
-        if ($chkHdr.Checked) { $backendArgs += "--hdr" } else { $backendArgs += "--no-hdr" }
-        if ($chkVrr.Checked) { $backendArgs += "--vrr" } else { $backendArgs += "--no-vrr" }
-        if ($chkCapture.Checked) { $backendArgs += "--capture" } else { $backendArgs += "--no-capture" }
+        if ($displayList.Tag.Checked[0]) { $backendArgs += "--hdr" } else { $backendArgs += "--no-hdr" }
+        if ($displayList.Tag.Checked[1]) { $backendArgs += "--vrr" } else { $backendArgs += "--no-vrr" }
+        if ($displayList.Tag.Checked[2]) { $backendArgs += "--capture" } else { $backendArgs += "--no-capture" }
     }
 
     $script:OutOffset = 0
