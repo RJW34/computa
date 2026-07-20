@@ -665,7 +665,18 @@ function Start-Install {
     $script:InstallTimer.Start()
 }
 
-$btnInstall.Add_Click({ Start-Install })
+$btnInstall.Add_Click({
+    try { Start-Install }
+    catch {
+        [System.Windows.Forms.MessageBox]::Show(
+            "The install couldn't start:`n$($_.Exception.Message)",
+            "computa setup",
+            [System.Windows.Forms.MessageBoxButtons]::OK,
+            [System.Windows.Forms.MessageBoxIcon]::Warning) | Out-Null
+        $btnInstall.Enabled = $true
+        $btnCancel.Enabled = $true
+    }
+})
 
 # --- preview mode (screenshot harness; canned data, installs nothing) ------
 if ($previewMode) {
