@@ -102,9 +102,29 @@ def deploy_tray_assets(dest_root: Path | None = None) -> Path | None:
     return dest
 
 
+def _ensure_durable_tray_dir() -> Path:
+    """Resolve a tray dir that outlives this process.
+
+    When a bare frozen exe only has the transient one-file extraction copy
+    (no durable install beside the exe), deploy the bundled assets first: a
+    tray launched from — or startup registration pointing at — the ``_MEI*``
+    dir breaks as soon as that dir is cleaned up.
+    """
+    tray_dir = get_tray_dir()
+    module_dir = Path(__file__).resolve().parent
+    if getattr(sys, "frozen", False) and tray_dir == module_dir:
+        try:
+            deployed = deploy_tray_assets()
+            if deployed is not None:
+                return deployed
+        except Exception as e:
+            print(f"Warning: couldn't deploy durable tray assets: {e}", file=sys.stderr)
+    return tray_dir
+
+
 def start_tray() -> None:
     """Start the computa system tray application."""
-    tray_dir = get_tray_dir()
+    tray_dir = _ensure_durable_tray_dir()
     vbs_path = tray_dir / "ABSO-Tray.vbs"
 
     if not vbs_path.exists():
@@ -122,7 +142,7 @@ def start_tray() -> None:
 
 def install_startup(uninstall: bool = False) -> None:
     """Install or uninstall from Windows startup."""
-    tray_dir = get_tray_dir()
+    tray_dir = _ensure_durable_tray_dir()
     installer = tray_dir / "Install-Startup.ps1"
 
     flag = "-Uninstall" if uninstall else "-Install"

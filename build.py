@@ -66,17 +66,35 @@ TRAY_OBSOLETE_SIDECAR_FILENAMES = frozenset({
 })
 
 
+def _rmtree_tolerant(path: Path) -> list[str]:
+    """Remove a tree, returning anything that couldn't be deleted (in use)."""
+    failures: list[str] = []
+
+    def _on_error(_func, target, _exc) -> None:
+        failures.append(str(target))
+
+    shutil.rmtree(path, onerror=_on_error)
+    return failures
+
+
 def clean_build() -> None:
-    """Remove previous build artifacts."""
+    """Remove previous build artifacts.
+
+    Tolerates in-use files: a computa-setup.exe with its wizard open (or a
+    running computa.exe) must not block rebuilding the CLI — the later build
+    steps overwrite their own outputs anyway.
+    """
     print("Cleaning previous build...")
 
-    if BUILD_DIR.exists():
-        shutil.rmtree(BUILD_DIR)
-        print(f"  Removed {BUILD_DIR}")
-
-    if DIST_DIR.exists():
-        shutil.rmtree(DIST_DIR)
-        print(f"  Removed {DIST_DIR}")
+    for target in (BUILD_DIR, DIST_DIR):
+        if not target.exists():
+            continue
+        failures = _rmtree_tolerant(target)
+        if failures:
+            kept = ", ".join(sorted({Path(item).name for item in failures})[:4])
+            print(f"  Removed {target} (kept in-use: {kept})")
+        else:
+            print(f"  Removed {target}")
 
     print("  Done.")
 

@@ -499,9 +499,13 @@ function Apply-PlanToUi {
 function Start-PlanProbe {
     param([string]$ProbeExe)
     $script:PlanOut = [System.IO.Path]::GetTempFileName()
+    $script:PlanErr = [System.IO.Path]::GetTempFileName()
     try {
+        # Both streams redirected: launched from wscript there is no console
+        # anywhere in the process tree for stderr to inherit.
         $script:PlanProc = Start-Process -FilePath $ProbeExe -ArgumentList "setup", "--plan" `
-            -RedirectStandardOutput $script:PlanOut -WindowStyle Hidden -PassThru
+            -RedirectStandardOutput $script:PlanOut -RedirectStandardError $script:PlanErr `
+            -WindowStyle Hidden -PassThru
     }
     catch {
         $lblHardware.Text = "Couldn't inspect this PC - that's okay, setup continues normally."

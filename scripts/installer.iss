@@ -29,6 +29,12 @@ DefaultDirName={localappdata}\AdaptiveBattleStationOptimizer
 DisableDirPage=yes
 DisableProgramGroupPage=yes
 PrivilegesRequired=lowest
+; computa targets Windows 11: handlers/auditor assume Win11 registry and
+; driver surfaces. Refuse older Windows with a clear dialog instead of a
+; half-working install.
+MinVersion=10.0.22000
+VersionInfoVersion={#AppVer}
+VersionInfoDescription=computa installer
 OutputBaseFilename=computa-setup
 WizardStyle=modern
 UninstallDisplayName=computa

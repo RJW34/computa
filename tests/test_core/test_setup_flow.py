@@ -322,6 +322,38 @@ def test_run_unattended_setup_writes_tray_survey_config(
     assert config["setupSurvey"]["capture"] is False
 
 
+def test_run_unattended_setup_skips_tray_assets_when_installer_managed(
+    tmp_path: Path,
+) -> None:
+    """computa-setup.exe layouts (unins000.exe present) own the tray files;
+    the exe bundle must never overwrite them (it may be a different build)."""
+    data_dir = tmp_path / "data"
+    data_dir.mkdir()
+    exe_dir = tmp_path / "app"
+    exe_dir.mkdir()
+    (exe_dir / "unins000.exe").write_bytes(b"")
+    fake_exe = exe_dir / "computa.exe"
+    fake_exe.write_bytes(b"")
+
+    events = _Collector()
+    with (
+        patch("sys.frozen", True, create=True),
+        patch("sys.executable", str(fake_exe)),
+        patch("abso.tray.deploy_tray_assets") as mock_deploy,
+    ):
+        result = run_unattended_setup(
+            UnattendedOptions(baseline=False, create_config=False, tray_autostart=False),
+            emit=events,
+            data_dir=data_dir,
+        )
+
+    assert result["success"] is True
+    mock_deploy.assert_not_called()
+    last = events.step_events("tray_assets")[-1]
+    assert last["status"] == "skipped"
+    assert "Installer-managed" in last["detail"]
+
+
 def test_deploy_tray_assets_copies_bundle(tmp_path: Path) -> None:
     from abso.tray import deploy_tray_assets
 

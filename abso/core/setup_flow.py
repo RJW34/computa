@@ -317,15 +317,33 @@ def run_unattended_setup(
 
     # 1) Tray assets: a bare-exe install has no tray files on disk; deploy the
     # bundled copies beside the exe so startup registration survives reboots.
+    # Installer-managed layouts (computa-setup.exe placed the tray files, and
+    # unins000.exe marks that) are left alone: the installer's copies are the
+    # source of truth there, and the exe bundle may be a different build.
     step("tray_assets", "running")
     try:
-        from abso.tray import deploy_tray_assets
-
-        deployed = deploy_tray_assets()
-        if deployed is None:
-            step("tray_assets", "skipped", "Running from source; tray files already in place.")
+        installer_managed = (
+            frozen
+            and (Path(sys.executable).resolve().parent / "unins000.exe").exists()
+        )
+        if installer_managed:
+            step(
+                "tray_assets",
+                "skipped",
+                "Installer-managed layout; tray files already in place.",
+            )
         else:
-            step("tray_assets", "ok", str(deployed))
+            from abso.tray import deploy_tray_assets
+
+            deployed = deploy_tray_assets()
+            if deployed is None:
+                step(
+                    "tray_assets",
+                    "skipped",
+                    "Running from source; tray files already in place.",
+                )
+            else:
+                step("tray_assets", "ok", str(deployed))
     except Exception as e:
         tray_assets_ok = False
         success = False

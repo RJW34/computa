@@ -142,3 +142,4 @@ def test_installer_iss_contract() -> None:
     assert "postinstall" in text  # finish page offers first-run setup
     assert "NeedsAddPath" in text  # PATH task adds without duplicating
     assert "'uninstall','--yes'" in text  # uninstall restores the baseline
+    assert "MinVersion=10.0.22000" in text  # Windows 11 only, refused clearly
