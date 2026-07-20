@@ -539,6 +539,10 @@ def interactive() -> None:
 @click.option("--config/--no-config", "create_config", default=True, hidden=True)
 @click.option("--tray-autostart/--no-tray-autostart", default=False, hidden=True)
 @click.option("--remove-kb", "remove_kbs", multiple=True, hidden=True)
+@click.option("--game", "survey_games", multiple=True, hidden=True)
+@click.option("--hdr/--no-hdr", "survey_hdr", default=None, hidden=True)
+@click.option("--vrr/--no-vrr", "survey_vrr", default=None, hidden=True)
+@click.option("--capture/--no-capture", "survey_capture", default=None, hidden=True)
 def setup(
     plan_mode: bool,
     unattended: bool,
@@ -546,6 +550,10 @@ def setup(
     create_config: bool,
     tray_autostart: bool,
     remove_kbs: tuple[str, ...],
+    survey_games: tuple[str, ...],
+    survey_hdr: bool | None,
+    survey_vrr: bool | None,
+    survey_capture: bool | None,
 ) -> None:
     """Run the first-time setup wizard.
 
@@ -578,6 +586,10 @@ def setup(
                 create_config=create_config,
                 tray_autostart=tray_autostart,
                 remove_kbs=tuple(remove_kbs),
+                games=tuple(survey_games),
+                hdr=survey_hdr,
+                vrr=survey_vrr,
+                capture=survey_capture,
             ),
             emit=lambda obj: print(json.dumps(obj), flush=True),
         )

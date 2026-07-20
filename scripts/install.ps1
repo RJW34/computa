@@ -31,7 +31,7 @@ param(
     [switch]$NoSetup,
     [switch]$NoPath,
     [switch]$SafeDefaults,
-    [ValidateSet("", "options", "progress", "done", "failed")]
+    [ValidateSet("", "options", "survey", "progress", "done", "failed")]
     [string]$PreviewUi = "",
     [string]$PreviewShot = ""
 )
@@ -350,12 +350,13 @@ function New-Page {
 }
 
 $pageOptions = New-Page
+$pageSurvey = New-Page
 $pageProgress = New-Page
 $pageDone = New-Page
 
 function Show-Page {
     param([System.Windows.Forms.Panel]$Page)
-    foreach ($p in @($pageOptions, $pageProgress, $pageDone)) { $p.Visible = ($p -eq $Page) }
+    foreach ($p in @($pageOptions, $pageSurvey, $pageProgress, $pageDone)) { $p.Visible = ($p -eq $Page) }
 }
 
 # --- options page ----------------------------------------------------------
@@ -390,10 +391,69 @@ $rowKb.Sub.Visible = $false
 $script:PlanKbIds = @()
 
 $buttonY = $pageH - (S 52)
-$btnInstall = New-InstallerButton -Parent $pageOptions -Text "Install" -X ($PadX + $ContentW - (S 116)) -Y $buttonY -Width (S 116) -Primary $true
+$btnNext = New-InstallerButton -Parent $pageOptions -Text "Next" -X ($PadX + $ContentW - (S 116)) -Y $buttonY -Width (S 116) -Primary $true
 $btnCancel = New-InstallerButton -Parent $pageOptions -Text "Cancel" -X ($PadX + $ContentW - (S 116) - (S 10) - (S 92)) -Y $buttonY -Width (S 92) -Primary $false
-$form.AcceptButton = $btnInstall
+$form.AcceptButton = $btnNext
 $btnCancel.Add_Click({ $form.Close() })
+
+# --- survey page (what do you play, what's your display) -------------------
+$y = S 6
+New-Eyebrow -Parent $pageSurvey -Text "Your games" -Y $y | Out-Null
+$y += S 18
+$surveyNote = New-UiLabel -Parent $pageSurvey -Text "Check what you play - the tray menu only shows profiles for those games. Desktop profiles are always included; leave everything unchecked to keep the full list." -Font $FontSub -Color $Mist -X $PadX -Y $y -Width $ContentW
+$y = $surveyNote.Bottom + (S 6)
+
+$surveyList = New-Object System.Windows.Forms.CheckedListBox
+$surveyList.BackColor = $Ink0
+$surveyList.ForeColor = $Paper
+$surveyList.BorderStyle = [System.Windows.Forms.BorderStyle]::FixedSingle
+$surveyList.CheckOnClick = $true
+$surveyList.IntegralHeight = $false
+$surveyList.Font = $FontBody
+$surveyList.SetBounds($PadX, $y, $ContentW, (S 200))
+$pageSurvey.Controls.Add($surveyList)
+$script:GameKeys = @()
+$script:CatalogLoaded = $false
+$y = $surveyList.Bottom + (S 4)
+$lblSurveyStatus = New-UiLabel -Parent $pageSurvey -Text "Still looking for installed games..." -Font $FontSub -Color $Mist -X $PadX -Y $y -Width $ContentW -Height (S 16)
+$y = $lblSurveyStatus.Bottom + (S 10)
+
+New-Eyebrow -Parent $pageSurvey -Text "Your display" -Y $y | Out-Null
+$y += S 20
+
+function New-SurveyCheck {
+    param([string]$Title, [int]$RowY)
+    $check = New-Object System.Windows.Forms.CheckBox
+    $check.Text = $Title
+    $check.Font = $FontBody
+    $check.ForeColor = $Paper
+    $check.BackColor = $Ink0
+    $check.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
+    $check.AutoSize = $false
+    $check.SetBounds($PadX, $RowY, $ContentW, (S 22))
+    $pageSurvey.Controls.Add($check)
+    $check
+}
+
+$chkHdr = New-SurveyCheck -Title "My monitor supports HDR and I use it" -RowY $y
+$y += S 28
+$chkVrr = New-SurveyCheck -Title "My monitor has G-SYNC / FreeSync (VRR) turned on" -RowY $y
+$y += S 28
+$chkCapture = New-SurveyCheck -Title "I stream or record gameplay (OBS, Medal, ...)" -RowY $y
+$y += S 30
+New-UiLabel -Parent $pageSurvey -Text "Best guesses are pre-filled from your hardware. Nothing here is permanent - re-run the installer or hide profiles from the tray anytime." -Font $FontSub -Color $Mist -X $PadX -Y $y -Width $ContentW | Out-Null
+
+$btnInstall = New-InstallerButton -Parent $pageSurvey -Text "Install" -X ($PadX + $ContentW - (S 116)) -Y $buttonY -Width (S 116) -Primary $true
+$btnBack = New-InstallerButton -Parent $pageSurvey -Text "Back" -X ($PadX + $ContentW - (S 116) - (S 10) - (S 92)) -Y $buttonY -Width (S 92) -Primary $false
+
+$btnNext.Add_Click({
+    Show-Page $pageSurvey
+    $form.AcceptButton = $btnInstall
+})
+$btnBack.Add_Click({
+    Show-Page $pageOptions
+    $form.AcceptButton = $btnNext
+})
 
 # --- progress page ---------------------------------------------------------
 $lblProgressHead = New-UiLabel -Parent $pageProgress -Text "Installing..." -Font $FontHeading -Color $Paper -X $PadX -Y (S 6) -Width $ContentW
@@ -490,6 +550,29 @@ function Apply-PlanToUi {
         $rowKb.Check.Visible = $true
         $rowKb.Sub.Visible = $true
     }
+
+    if ($Plan.game_catalog -and $Plan.game_catalog.Count -gt 0) {
+        $surveyList.Items.Clear()
+        $script:GameKeys = @()
+        foreach ($entry in $Plan.game_catalog) {
+            $index = $surveyList.Items.Add($entry.name)
+            if ($entry.detected) { $surveyList.SetItemChecked($index, $true) }
+            $script:GameKeys += $entry.key
+        }
+        $script:CatalogLoaded = $true
+        $detectedCount = @($Plan.game_catalog | Where-Object { $_.detected }).Count
+        if ($detectedCount -gt 0) {
+            $lblSurveyStatus.Text = "Found $detectedCount of these installed - pre-checked for you."
+        }
+        else {
+            $lblSurveyStatus.Text = "No installed games spotted - check whatever you play."
+        }
+    }
+    else {
+        $lblSurveyStatus.Text = "Couldn't scan this PC for games - the tray will show the full profile list."
+    }
+    if ($Plan.hdr_capable -eq $true) { $chkHdr.Checked = $true }
+    if ($Plan.vrr_capable -eq $true) { $chkVrr.Checked = $true }
 }
 
 function Start-PlanProbe {
@@ -605,7 +688,7 @@ function Show-DonePage {
 
 function Start-Install {
     $btnInstall.Enabled = $false
-    $btnCancel.Enabled = $false
+    $btnBack.Enabled = $false
 
     try {
         New-Item -ItemType Directory -Force -Path $script:InstallRoot | Out-Null
@@ -618,7 +701,7 @@ function Start-Install {
             [System.Windows.Forms.MessageBoxButtons]::OK,
             [System.Windows.Forms.MessageBoxIcon]::Warning) | Out-Null
         $btnInstall.Enabled = $true
-        $btnCancel.Enabled = $true
+        $btnBack.Enabled = $true
         return
     }
 
@@ -633,6 +716,17 @@ function Start-Install {
     if ($rowTray.Check.Checked) { $backendArgs += "--tray-autostart" } else { $backendArgs += "--no-tray-autostart" }
     if ($rowKb.Check.Visible -and $rowKb.Check.Checked) {
         foreach ($kbId in $script:PlanKbIds) { $backendArgs += @("--remove-kb", $kbId) }
+    }
+
+    # Survey answers: only filter when the catalog loaded and the user
+    # actually picked games; unchecked-everything means keep the full list.
+    if ($script:CatalogLoaded -and $surveyList.CheckedIndices.Count -gt 0) {
+        foreach ($index in $surveyList.CheckedIndices) {
+            $backendArgs += @("--game", $script:GameKeys[$index])
+        }
+        if ($chkHdr.Checked) { $backendArgs += "--hdr" } else { $backendArgs += "--no-hdr" }
+        if ($chkVrr.Checked) { $backendArgs += "--vrr" } else { $backendArgs += "--no-vrr" }
+        if ($chkCapture.Checked) { $backendArgs += "--capture" } else { $backendArgs += "--no-capture" }
     }
 
     $script:OutOffset = 0
@@ -674,7 +768,7 @@ $btnInstall.Add_Click({
             [System.Windows.Forms.MessageBoxButtons]::OK,
             [System.Windows.Forms.MessageBoxIcon]::Warning) | Out-Null
         $btnInstall.Enabled = $true
-        $btnCancel.Enabled = $true
+        $btnBack.Enabled = $true
     }
 })
 
@@ -685,12 +779,29 @@ if ($previewMode) {
  "hardware":{"gpu":"NVIDIA GeForce RTX 3080","cpu":"Intel(R) Core(TM) i7-12700K","ram_gb":32.0,"monitor":"Generic PnP Monitor @ 165Hz","monitor_count":2},
  "gpu_vendor":"nvidia","gpu_vendor_note":"NVIDIA GPU - full driver tuning available.",
  "problematic_kbs":[{"kb_id":"KB5074109","title":"Reported NVIDIA FPS regression","affected":"NVIDIA GPUs - reported FPS drops (impact varies by system)."}],
- "detected_games":[{"profile":"counter-strike-2","games":["Counter-Strike 2"]},{"profile":"fortnite","games":["Fortnite"]}]}
+ "detected_games":[{"profile":"counter-strike-2","games":["Counter-Strike 2"]},{"profile":"fortnite","games":["Fortnite"]}],
+ "hdr_capable":true,"vrr_capable":true,
+ "game_catalog":[
+  {"key":"slippi-melee","name":"Super Smash Bros. Melee (Slippi)","category":"Fighting","detected":false},
+  {"key":"rivals2","name":"Rivals 2","category":"Fighting","detected":false},
+  {"key":"diablo4","name":"Diablo 4","category":"RPGs","detected":false},
+  {"key":"fortnite","name":"Fortnite","category":"Shooters","detected":true},
+  {"key":"marvel-rivals","name":"Marvel Rivals","category":"Shooters","detected":false},
+  {"key":"deadlock","name":"Deadlock","category":"Shooters","detected":false},
+  {"key":"counter-strike-2","name":"Counter-Strike 2","category":"Shooters","detected":true},
+  {"key":"overwatch2","name":"Overwatch 2","category":"Shooters","detected":false},
+  {"key":"pokemon-auto-chess","name":"Pokemon Auto Chess","category":"Other","detected":false},
+  {"key":"pacdeluxe","name":"PACDeluxe (Pokemon Auto Chess)","category":"Other","detected":false},
+  {"key":"ryujinx-ssbu","name":"SSBU / HewDraw Remix (Ryujinx)","category":"Fighting","detected":false}]}
 '@
     switch ($PreviewUi) {
         "options" {
             Apply-PlanToUi (ConvertFrom-Json $cannedPlan)
             Show-Page $pageOptions
+        }
+        "survey" {
+            Apply-PlanToUi (ConvertFrom-Json $cannedPlan)
+            Show-Page $pageSurvey
         }
         "progress" {
             Add-StepRow -Id "tray_assets" -Label "Putting the tray helper's files in place"

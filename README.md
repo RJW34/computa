@@ -59,9 +59,11 @@ latest GitHub release into the same folder, then double-click
 **`Install computa.cmd`**.
 
 A small setup window opens: it shows what was found on your PC, lets you
-toggle what setup may do (safety snapshot, tray on startup, PATH), and
-explains every step in plain language. Installing never changes your Windows
-or game settings — you pick a game profile later, from the tray.
+toggle what setup may do (safety snapshot, tray on startup, PATH), and asks
+a short survey — which games you play (installed ones are pre-checked) and
+whether you use HDR, VRR, or streaming — so the tray menu only shows
+profiles you'd actually use. Installing never changes your Windows or game
+settings — you pick a game profile later, from the tray.
 
 Prefer a terminal? `powershell -ExecutionPolicy Bypass -File .\install.ps1
 -Console` runs the classic text-mode install. Or fully manual: put

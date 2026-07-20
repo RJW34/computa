@@ -57,8 +57,25 @@ def test_installer_backend_contract() -> None:
         "--tray-autostart",
         "--no-tray-autostart",
         "--remove-kb",
+        "--game",
+        "--hdr",
+        "--no-hdr",
+        "--vrr",
+        "--no-vrr",
+        "--capture",
+        "--no-capture",
     ):
         assert flag in text, f"missing backend flag wiring: {flag}"
+
+
+def test_installer_has_survey_page() -> None:
+    """Games + display survey: the tray gets tuned to what the user plays."""
+    text = _text()
+    assert '"survey"' in text  # PreviewUi state
+    assert "CheckedListBox" in text
+    assert "Your games" in text
+    assert "Your display" in text
+    assert "game_catalog" in text
 
 
 def test_installer_never_applies_a_profile() -> None:

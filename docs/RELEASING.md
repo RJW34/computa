@@ -51,9 +51,10 @@ Release assets:
 1. Download all three assets into the same folder.
 2. Double-click `Install computa.cmd`.
 3. A small setup window shows what was found on their PC and what setup may
-   do (safety snapshot, tray autostart, PATH, optional bad-KB removal), then
-   streams progress. Installing never applies a profile — that happens later,
-   from the tray.
+   do (safety snapshot, tray autostart, PATH, optional bad-KB removal), asks
+   a games/display survey that tunes the tray's profile list to what they
+   actually play (via tray-config `hiddenProfiles`), then streams progress.
+   Installing never applies a profile — that happens later, from the tray.
 
 `computa update-check` tells them when a newer release exists (set
 `ABSO_UPDATE_REPO` for forks). Updating is manual: download the new exe and

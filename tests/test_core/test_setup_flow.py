@@ -9,6 +9,7 @@ from unittest.mock import MagicMock, patch
 
 from abso.core.setup_flow import (
     UnattendedOptions,
+    _compute_hidden_profiles,
     _planned_steps,
     build_setup_plan,
     run_unattended_setup,
@@ -52,6 +53,7 @@ def test_build_setup_plan_shape() -> None:
     detector.detect_all.return_value = hardware
     with (
         patch("abso.core.detector.HardwareDetector", return_value=detector),
+        patch("abso.core.setup_flow._display_hdr_capable", return_value=True),
         patch("abso.core.kb_checker.get_installed_kbs", return_value=["KB123"]),
         patch("abso.core.kb_checker.check_problematic_kbs", return_value=[kb]),
         patch(
@@ -71,6 +73,14 @@ def test_build_setup_plan_shape() -> None:
     ]
     # Duplicate game names collapse for display.
     assert plan["detected_games"] == [{"profile": "fortnite", "games": ["Fortnite"]}]
+
+    # Survey inputs: capabilities + the game catalog with detection flags.
+    assert plan["hdr_capable"] is True
+    assert plan["vrr_capable"] is False  # monitors present, none VRR-capable
+    catalog = {entry["key"]: entry for entry in plan["game_catalog"]}
+    assert catalog["fortnite"]["detected"] is True
+    assert catalog["overwatch2"]["detected"] is False
+    assert "productivity" not in catalog  # Desktop is never surveyed
     json.dumps(plan)
 
 
@@ -228,6 +238,88 @@ def test_run_unattended_setup_removes_requested_kbs(tmp_path: Path) -> None:
     assert result["success"] is True
     assert result["needs_reboot"] is True
     assert result["reboot_reasons"] == ["KB5074109 removal"]
+
+
+def test_compute_hidden_profiles_filters_by_survey() -> None:
+    hidden = set(
+        _compute_hidden_profiles(("overwatch2",), hdr=False, vrr=False, capture=False)
+    )
+
+    # Unselected games disappear entirely.
+    assert "fortnite" in hidden
+    assert "counter-strike-2" in hidden
+    # The selected game keeps only variants matching the display answers.
+    assert "overwatch2" not in hidden  # no-sync SDR base
+    assert "overwatch2-hdr" in hidden  # HDR variant, hdr=False
+    assert "overwatch2-gsync" in hidden  # VRR variant, vrr=False
+    assert "overwatch2-gsync-hdr-capture" in hidden
+    # Desktop is never hidden by game selection, but respects display answers.
+    assert "productivity" not in hidden
+    assert "productivity-hdr" in hidden  # hdr=False
+
+
+def test_compute_hidden_profiles_capture_and_unknown_answers() -> None:
+    hidden = set(
+        _compute_hidden_profiles(("overwatch2",), hdr=True, vrr=True, capture=False)
+    )
+    assert "overwatch2-gsync-hdr" not in hidden
+    assert "overwatch2-gsync-hdr-capture" in hidden  # capture=False
+    assert "overwatch2-gsync-capture" in hidden
+
+    # Unknown display answers hide nothing beyond game selection.
+    hidden_unknown = set(
+        _compute_hidden_profiles(("overwatch2",), hdr=None, vrr=None, capture=None)
+    )
+    assert "overwatch2-hdr" not in hidden_unknown
+    assert "overwatch2-gsync-hdr-capture" not in hidden_unknown
+    assert "fortnite" in hidden_unknown
+
+
+def test_run_unattended_setup_writes_tray_survey_config(
+    tmp_path: Path, monkeypatch
+) -> None:
+    appdata = tmp_path / "roaming"
+    monkeypatch.setenv("APPDATA", str(appdata))
+    data_dir = tmp_path / "data"
+    data_dir.mkdir()
+
+    # Pre-existing tray config keys must survive the survey write.
+    config_dir = appdata / "ABSO"
+    config_dir.mkdir(parents=True)
+    (config_dir / "tray-config.json").write_text(
+        json.dumps({"theme": "default", "favorites": ["overwatch2-hdr"]}),
+        encoding="utf-8",
+    )
+
+    events = _Collector()
+    result = run_unattended_setup(
+        UnattendedOptions(
+            baseline=False,
+            create_config=False,
+            tray_autostart=False,
+            games=("overwatch2",),
+            hdr=False,
+            vrr=True,
+            capture=False,
+        ),
+        emit=events,
+        data_dir=data_dir,
+    )
+
+    assert result["success"] is True
+    assert "preferences" in events.start_step_ids()
+    assert events.step_events("preferences")[-1]["status"] == "ok"
+
+    config = json.loads((config_dir / "tray-config.json").read_text(encoding="utf-8"))
+    assert config["theme"] == "default"
+    assert config["favorites"] == ["overwatch2-hdr"]
+    assert "fortnite" in config["hiddenProfiles"]
+    assert "overwatch2" not in config["hiddenProfiles"]
+    assert "overwatch2-hdr" in config["hiddenProfiles"]  # hdr=False
+    assert config["setupSurvey"]["games"] == ["overwatch2"]
+    assert config["setupSurvey"]["hdr"] is False
+    assert config["setupSurvey"]["vrr"] is True
+    assert config["setupSurvey"]["capture"] is False
 
 
 def test_deploy_tray_assets_copies_bundle(tmp_path: Path) -> None:
