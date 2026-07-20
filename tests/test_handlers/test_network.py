@@ -43,7 +43,7 @@ class TestNetworkRestore:
                 }
             },
             "tcp_global": {
-                "autotuninglevel": "disabled",
+                "autotuninglevel": "normal",
             },
         }
 
@@ -53,7 +53,52 @@ class TestNetworkRestore:
         mock_open.assert_called_once()
         assert mock_set.call_count == 2
         mock_close.assert_called_once_with(mock_key)
+        mock_set_tcp_global.assert_called_once_with("autotuninglevel", "normal")
+
+    @patch.object(NetworkSettingsHandler, "_set_tcp_global_setting")
+    def test_restore_skips_nondefault_tcp_global(self, mock_set_tcp_global, monkeypatch):
+        """Restore refuses to move a TCP global away from the Windows default."""
+        monkeypatch.delenv("ABSO_RESTORE_NONDEFAULT_TCP_GLOBAL", raising=False)
+        mock_set_tcp_global.return_value = {"success": True}
+
+        handler = NetworkSettingsHandler()
+        data = {
+            "tcp_global": {
+                "autotuninglevel": "disabled",
+                "rss": "enabled",
+            }
+        }
+
+        result = handler.restore(data)
+
+        # Skipping the poisoned value is not a failure; the default-valued
+        # setting is still restored.
+        assert result is True
+        mock_set_tcp_global.assert_called_once_with("rss", "enabled")
+
+    @patch.object(NetworkSettingsHandler, "_set_tcp_global_setting")
+    def test_restore_nondefault_tcp_global_with_opt_in(self, mock_set_tcp_global, monkeypatch):
+        """The env opt-in restores non-default TCP globals for intentional setups."""
+        monkeypatch.setenv("ABSO_RESTORE_NONDEFAULT_TCP_GLOBAL", "1")
+        mock_set_tcp_global.return_value = {"success": True}
+
+        handler = NetworkSettingsHandler()
+        result = handler.restore({"tcp_global": {"autotuninglevel": "disabled"}})
+
+        assert result is True
         mock_set_tcp_global.assert_called_once_with("autotuninglevel", "disabled")
+
+    @patch.object(NetworkSettingsHandler, "_set_tcp_global_setting")
+    def test_restore_ungated_tcp_global_still_writes(self, mock_set_tcp_global, monkeypatch):
+        """Settings without a windows_default (ECN) restore without the opt-in."""
+        monkeypatch.delenv("ABSO_RESTORE_NONDEFAULT_TCP_GLOBAL", raising=False)
+        mock_set_tcp_global.return_value = {"success": True}
+
+        handler = NetworkSettingsHandler()
+        result = handler.restore({"tcp_global": {"ecncapability": "disabled"}})
+
+        assert result is True
+        mock_set_tcp_global.assert_called_once_with("ecncapability", "disabled")
 
     @patch("abso.settings.network.winreg.OpenKey")
     @patch("abso.settings.network.winreg.SetValueEx")

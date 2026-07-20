@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import contextlib
 import logging
+import os
 import subprocess
 import winreg
 from typing import Any
@@ -12,6 +13,12 @@ from abso.core.models import Issue
 from abso.settings.base import SettingsHandler
 
 logger = logging.getLogger(__name__)
+
+
+def restore_nondefault_tcp_global_enabled() -> bool:
+    """Whether restore may write TCP globals that differ from the Windows default."""
+    value = os.environ.get("ABSO_RESTORE_NONDEFAULT_TCP_GLOBAL", "")
+    return value.strip().lower() in {"1", "true", "yes", "on"}
 
 
 class NetworkSettingsHandler(SettingsHandler):
@@ -61,9 +68,15 @@ class NetworkSettingsHandler(SettingsHandler):
     # those use ``preset: "default"`` and leave these settings alone. These
     # descriptions avoid blanket "safe to disable" claims because modern
     # Windows networking does not behave that way in practice.
+    #
+    # ``windows_default`` is the Microsoft-documented default. restore() will
+    # not move a setting AWAY from it without the
+    # ``ABSO_RESTORE_NONDEFAULT_TCP_GLOBAL`` opt-in; settings without a
+    # ``windows_default`` key are never gated.
     TCP_GLOBAL_SETTINGS = {
         "autotuninglevel": {
             "gaming_value": "disabled",
+            "windows_default": "normal",
             "description": (
                 "TCP receive window auto-tuning. Microsoft recommends "
                 "'normal' for TCP throughput; only disable if you have a "
@@ -72,6 +85,8 @@ class NetworkSettingsHandler(SettingsHandler):
         },
         "ecncapability": {
             "gaming_value": "disabled",
+            # No windows_default: the client default has changed across
+            # Windows builds, so restore does not gate this setting.
             "description": (
                 "Explicit Congestion Notification. Small handshake overhead; "
                 "some middleboxes drop ECN-marked packets."
@@ -79,10 +94,12 @@ class NetworkSettingsHandler(SettingsHandler):
         },
         "rss": {
             "gaming_value": "enabled",
+            "windows_default": "enabled",
             "description": "Receive Side Scaling. Distributes load across CPU cores.",
         },
         "timestamps": {
             "gaming_value": "disabled",
+            "windows_default": "disabled",
             "description": "TCP timestamps. Small overhead, rarely matters for gaming.",
         },
     }
@@ -198,6 +215,11 @@ class NetworkSettingsHandler(SettingsHandler):
     def restore(self, data: dict[str, Any]) -> bool:
         """Restore network settings from backup.
 
+        TCP globals with a known ``windows_default`` are only written when the
+        backed-up value matches that default; restoring a non-default value
+        requires the ``ABSO_RESTORE_NONDEFAULT_TCP_GLOBAL`` opt-in. Skipped
+        settings log a warning and do not fail the restore.
+
         Args:
             data: Backup data from backup() containing interface settings.
 
@@ -255,6 +277,29 @@ class NetworkSettingsHandler(SettingsHandler):
 
         for setting_name, value in tcp_global.items():
             if value in {None, ""}:
+                continue
+            # Guard (2026-07-19): backups written while a pre-reform build's
+            # gaming preset was live recorded ``autotuninglevel: disabled`` as
+            # machine state, so a plain restore silently re-applied an
+            # abandoned tweak that caps every TCP connection near 40 Mbps.
+            # Moving a TCP global away from the Windows default is opt-in.
+            normalized = self._normalize_tcp_global_value(value)
+            windows_default = self.TCP_GLOBAL_SETTINGS.get(setting_name, {}).get(
+                "windows_default"
+            )
+            if (
+                windows_default is not None
+                and normalized != windows_default
+                and not restore_nondefault_tcp_global_enabled()
+            ):
+                logger.warning(
+                    "Skipping restore of TCP global %s=%s: it differs from the "
+                    "Windows default '%s'. Set ABSO_RESTORE_NONDEFAULT_TCP_GLOBAL=1 "
+                    "to restore non-default TCP globals intentionally.",
+                    setting_name,
+                    value,
+                    windows_default,
+                )
                 continue
             result = self._set_tcp_global_setting(setting_name, str(value))
             if not result["success"]:
