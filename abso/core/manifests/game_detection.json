@@ -1,9 +1,5 @@
 {
   "steam_game_patterns": {
-    "Rivals of Aether 2": [
-      "RivalsOfAether2.exe",
-      "RivalsOfAether2-Win64-Shipping.exe"
-    ],
     "Marvel Rivals": [
       "Marvel.exe",
       "Marvel-Win64-Shipping.exe"
@@ -17,6 +13,15 @@
     "Slippi Launcher": [
       "Slippi Dolphin.exe",
       "Dolphin.exe"
+    ],
+    "Rivals 2": [
+      "Rivals2.exe",
+      "Rivals2-Win64-Shipping.exe",
+      "RivalsofAether2.exe"
+    ],
+    "Deadlock": [
+      "deadlock.exe",
+      "project8.exe"
     ]
   },
   "epic_paths": [
@@ -26,15 +31,16 @@
     "E:\\Epic Games"
   ],
   "epic_game_patterns": {
-    "Rivals of Aether 2": [
-      "RivalsOfAether2.exe",
-      "RivalsOfAether2-Win64-Shipping.exe"
-    ],
     "Fortnite": [
       "FortniteClient-Win64-Shipping.exe",
       "FortniteClient-Win64-Shipping_EAC.exe",
       "FortniteClient-Win64-Shipping_BE.exe",
       "FortniteClient-Win64-Shipping_EAC_EOS.exe"
+    ],
+    "Rivals 2": [
+      "Rivals2.exe",
+      "Rivals2-Win64-Shipping.exe",
+      "RivalsofAether2.exe"
     ]
   },
   "battle_net_games": {
@@ -75,5 +81,15 @@
   "standalone_executables": [
     "Slippi Dolphin.exe",
     "Dolphin.exe"
-  ]
+  ],
+  "uninstall_games": {
+    "PACDeluxe": {
+      "uninstall_display_names": [
+        "PACDeluxe"
+      ],
+      "executables": [
+        "pac-deluxe.exe"
+      ]
+    }
+  }
 }

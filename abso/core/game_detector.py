@@ -29,9 +29,12 @@ class InstalledGame:
 
 DEFAULT_GAME_DETECTION_MANIFEST: dict[str, Any] = {
     "steam_game_patterns": {
-        "Rivals of Aether 2": ["RivalsOfAether2.exe", "RivalsOfAether2-Win64-Shipping.exe"],
+        # Executable names verified against real installs; the old
+        # "RivalsOfAether2.exe" guesses matched nothing on disk.
+        "Rivals 2": ["Rivals2.exe", "Rivals2-Win64-Shipping.exe", "RivalsofAether2.exe"],
         "Marvel Rivals": ["Marvel.exe", "Marvel-Win64-Shipping.exe"],
         "Counter-Strike 2": ["cs2.exe"],
+        "Deadlock": ["deadlock.exe", "project8.exe"],
         "Diablo IV": ["Diablo IV.exe"],
         "Slippi Launcher": ["Slippi Dolphin.exe", "Dolphin.exe"],
     },
@@ -42,7 +45,7 @@ DEFAULT_GAME_DETECTION_MANIFEST: dict[str, Any] = {
         "E:\\Epic Games",
     ],
     "epic_game_patterns": {
-        "Rivals of Aether 2": ["RivalsOfAether2.exe", "RivalsOfAether2-Win64-Shipping.exe"],
+        "Rivals 2": ["Rivals2.exe", "Rivals2-Win64-Shipping.exe", "RivalsofAether2.exe"],
         "Fortnite": [
             "FortniteClient-Win64-Shipping.exe",
             "FortniteClient-Win64-Shipping_EAC.exe",
@@ -65,6 +68,14 @@ DEFAULT_GAME_DETECTION_MANIFEST: dict[str, Any] = {
             "registry_key": r"SOFTWARE\WOW6432Node\Activision\Call of Duty",
             "uninstall_display_names": ["Call of Duty"],
             "executables": ["cod.exe", "ModernWarfare.exe"],
+        },
+    },
+    # Games registered only in the Windows uninstall registry (installed
+    # native apps outside Steam/Epic/Battle.net).
+    "uninstall_games": {
+        "PACDeluxe": {
+            "uninstall_display_names": ["PACDeluxe"],
+            "executables": ["pac-deluxe.exe"],
         },
     },
     "standalone_locations": [
@@ -107,6 +118,7 @@ def detect_installed_games() -> list[InstalledGame]:
         ("steam", _detect_steam_games),
         ("epic", _detect_epic_games),
         ("battle_net", _detect_battlenet_games),
+        ("uninstall", _detect_uninstall_games),
         ("standalone", _detect_standalone_games),
     ]
     for name, detector in detectors:
@@ -474,19 +486,21 @@ def _iter_uninstall_entries():
             winreg.CloseKey(root_key)
 
 
-def _detect_battlenet_uninstall_fallback(
-    bnet_games_config: dict[str, dict[str, Any]],
+def _detect_uninstall_registry_games(
+    games_config: dict[str, dict[str, Any]],
     already_found: set[str],
+    platform: str = "battle_net",
 ) -> list[InstalledGame]:
-    """Find Battle.net games via the Windows uninstall registry.
+    """Find games via the Windows uninstall registry.
 
-    Modern Battle.net installs stopped writing the legacy per-game keys
-    under ``Blizzard Entertainment``; the uninstall entries (DisplayName +
-    InstallLocation) are what current installs reliably register.
+    Matches uninstall entries by DisplayName and verifies the configured
+    executable exists under InstallLocation. Modern Battle.net installs
+    stopped writing legacy per-game keys, and installed native apps
+    (e.g. Tauri games) register here too.
     """
     games: list[InstalledGame] = []
     wanted: dict[str, tuple[str, dict[str, Any]]] = {}
-    for game_name, config in bnet_games_config.items():
+    for game_name, config in games_config.items():
         if game_name in already_found:
             continue
         for display in config.get("uninstall_display_names") or []:
@@ -502,6 +516,8 @@ def _detect_battlenet_uninstall_fallback(
         game_name, config = entry
         if game_name in found:
             continue
+        # Some installers record InstallLocation wrapped in literal quotes.
+        location = location.strip().strip('"')
         if not location:
             continue
         game_folder = Path(location)
@@ -517,11 +533,20 @@ def _detect_battlenet_uninstall_fallback(
                     name=game_name,
                     executable=exe_name,
                     install_path=game_folder,
-                    platform="battle_net",
+                    platform=platform,
                 ))
                 found.add(game_name)
                 break
     return games
+
+
+def _detect_uninstall_games() -> list[InstalledGame]:
+    """Detect installed native games registered in the uninstall registry."""
+    config: dict[str, dict[str, Any]] = GAME_DETECTION_MANIFEST.get(
+        "uninstall_games",
+        DEFAULT_GAME_DETECTION_MANIFEST["uninstall_games"],
+    )
+    return _detect_uninstall_registry_games(config, set(), platform="installer")
 
 
 def _detect_battlenet_games() -> list[InstalledGame]:
@@ -569,7 +594,7 @@ def _detect_battlenet_games() -> list[InstalledGame]:
             pass
 
     games.extend(
-        _detect_battlenet_uninstall_fallback(
+        _detect_uninstall_registry_games(
             bnet_games_config,
             {game.name for game in games},
         )

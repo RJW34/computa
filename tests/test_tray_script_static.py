@@ -1768,7 +1768,9 @@ def test_tray_game_marks_cover_detected_executable_names() -> None:
         "Diablo IV.exe",
         "cod.exe",
         "ModernWarfare.exe",
-        "RivalsOfAether2-Win64-Shipping.exe",
+        "Rivals2.exe",
+        "Rivals2-Win64-Shipping.exe",
+        "deadlock.exe",
         "Marvel-Win64-Shipping.exe",
         "FortniteClient-Win64-Shipping_EAC_EOS.exe",
         "Slippi Dolphin.exe",
@@ -1779,6 +1781,9 @@ def test_tray_game_marks_cover_detected_executable_names() -> None:
     assert '"cod-exe" = "call-of-duty"' in resolver_section
     assert '"modernwarfare-exe" = "call-of-duty"' in resolver_section
     assert '"rivalsofaether2-win64-shipping-exe" = "rivals2"' in resolver_section
+    assert '"rivals2-win64-shipping-exe" = "rivals2"' in resolver_section
+    assert '"deadlock-exe" = "deadlock"' in resolver_section
+    assert '"pac-deluxe-exe" = "pacdeluxe"' in resolver_section
     assert '"marvel-win64-shipping-exe" = "marvel-rivals"' in resolver_section
     assert '"fortniteclient-win64-shipping-eac-eos-exe" = "fortnite"' in resolver_section
     assert '"slippi-dolphin" = "slippi-melee"' in resolver_section
@@ -1797,8 +1802,9 @@ def test_tray_game_marks_cover_detected_storefront_names() -> None:
     steam_names = set(detection["steam_game_patterns"].keys())
     epic_names = set(detection["epic_game_patterns"].keys())
 
-    assert {"Rivals of Aether 2", "Marvel Rivals", "Diablo IV", "Slippi Launcher"} <= steam_names
-    assert {"Rivals of Aether 2", "Fortnite"} <= epic_names
+    assert {"Rivals 2", "Marvel Rivals", "Deadlock", "Diablo IV", "Slippi Launcher"} <= steam_names
+    assert {"Rivals 2", "Fortnite"} <= epic_names
+    assert '"rivals-2" = "rivals2"' in resolver_section
     assert '"rivals-of-aether-2" = "rivals2"' in resolver_section
     assert '"rivalsofaether2" = "rivals2"' in resolver_section
     assert '"slippi-launcher" = "slippi-melee"' in resolver_section

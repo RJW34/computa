@@ -50,6 +50,7 @@ class TestInstalledGame:
 class TestDetectInstalledGames:
     """Tests for detect_installed_games function."""
 
+    @patch("abso.core.game_detector._detect_uninstall_games", return_value=[])
     @patch("abso.core.game_detector._detect_standalone_games", return_value=[])
     @patch("abso.core.game_detector._detect_battlenet_games", return_value=[])
     @patch("abso.core.game_detector._detect_epic_games", return_value=[])
@@ -59,6 +60,7 @@ class TestDetectInstalledGames:
         result = detect_installed_games()
         assert result == []
 
+    @patch("abso.core.game_detector._detect_uninstall_games", return_value=[])
     @patch("abso.core.game_detector._detect_standalone_games", return_value=[])
     @patch("abso.core.game_detector._detect_battlenet_games", return_value=[])
     @patch("abso.core.game_detector._detect_epic_games", return_value=[])
@@ -77,6 +79,7 @@ class TestDetectInstalledGames:
         assert len(result) == 1
         assert result[0].platform == "steam"
 
+    @patch("abso.core.game_detector._detect_uninstall_games", return_value=[])
     @patch("abso.core.game_detector._detect_standalone_games", return_value=[])
     @patch("abso.core.game_detector._detect_battlenet_games", return_value=[])
     @patch("abso.core.game_detector._detect_epic_games")
@@ -496,7 +499,7 @@ class TestBattlenetUninstallFallback:
             game_detector, "_iter_uninstall_entries", lambda: iter(entries)
         )
 
-        games = game_detector._detect_battlenet_uninstall_fallback(
+        games = game_detector._detect_uninstall_registry_games(
             self._config(), set()
         )
 
@@ -528,7 +531,7 @@ class TestBattlenetUninstallFallback:
             "executables": ["cod.exe"],
         }
 
-        games = game_detector._detect_battlenet_uninstall_fallback(
+        games = game_detector._detect_uninstall_registry_games(
             config, {"Overwatch 2"}
         )
 
