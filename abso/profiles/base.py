@@ -448,7 +448,7 @@ class BaseProfile(ABC):
         if target == "productivity":
             return LaunchKillset()
 
-        _user_protect, user_kill = _load_user_process_overrides()
+        user_protect, user_kill = _load_user_process_overrides()
 
         # Capture-safe profiles deliberately preserve the capture / overlay
         # / peripheral stack so the profile name honors what it promises.
@@ -479,9 +479,17 @@ class BaseProfile(ABC):
             if image.lower() not in capture_filter
         )
 
+        # The user's protect list rides along on the killset instead of
+        # pruning the declared tuples. Two reasons: the declared tuples are
+        # what catalog.py serializes into the committed tray cache, which
+        # must stay machine-independent; and LaunchKillset.resolve() is the
+        # single chokepoint every sweep caller already goes through, so
+        # filtering there covers the launch sweep, the post-apply sweep, and
+        # the read-only launch-killset payload at once.
         return LaunchKillset(
             always_safe=tuple(merged_always_safe),
             opt_in=filtered_opt_in,
+            protected=user_protect,
         )
 
     @property

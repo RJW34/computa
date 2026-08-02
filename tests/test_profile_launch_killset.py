@@ -245,7 +245,10 @@ def test_strict_profiles_advertise_overlay_free_path_in_manifest() -> None:
         "OneDrive.exe",
         "Dropbox.exe",
         "GoogleDriveFS.exe",
-        # Peripheral daemons safe to kill on this hardware (G502 + K70 Lux RGB)
+        # Peripheral daemons. Declared killable by default for the frame-time
+        # win; machines whose peripherals rely on G HUB *software* profiles
+        # (rather than onboard memory) protect them via abso.yaml
+        # process_overrides.protect - see the protect-filter tests below.
         "lghub.exe",
         "lghub_agent.exe",
         "iCUE.exe",
@@ -383,6 +386,88 @@ def test_user_protect_override_extends_never_kill() -> None:
 
     assert result.stopped == []
     assert any("protected image" in w for w in result.warnings)
+
+
+def test_user_protect_override_is_filtered_from_resolved_killset() -> None:
+    """A protected image never reaches a sweep caller, in either tier.
+
+    Regression: ``launch_process_killset()`` used to load the protect list
+    and throw it away, so the only thing standing between a protected image
+    and ``taskkill`` was ``ProcessJanitor``'s own NEVER_KILL check. Anything
+    that resolved a killset without going through the janitor -- including
+    the read-only ``launch-killset`` payload the tray logs -- reported
+    protected images as kill targets.
+    """
+    from abso.core import process_janitor as janitor_module
+
+    with patch.object(
+        janitor_module,
+        "_load_user_process_overrides",
+        return_value=(frozenset({"lghub.exe", "lghub_agent.exe"}), ()),
+    ):
+        # Strict lane: lghub* live in the always-safe tier.
+        killset = get_profile_instances()["overwatch2-gsync-hdr"].launch_process_killset()
+
+        resolved = {name.lower() for name in killset.resolve()}
+        assert "lghub.exe" not in resolved
+        assert "lghub_agent.exe" not in resolved
+        # Unprotected always-safe entries are untouched.
+        assert "onedrive.exe" in resolved
+
+        resolved_opt_in = {name.lower() for name in killset.resolve(include_opt_in=True)}
+        assert "lghub.exe" not in resolved_opt_in
+        assert "searchindexer.exe" in resolved_opt_in
+
+
+def test_user_protect_override_filters_the_opt_in_tier_too() -> None:
+    """Protect wins over the opt-in tier, not just always-safe."""
+    from abso.core import process_janitor as janitor_module
+
+    with patch.object(
+        janitor_module,
+        "_load_user_process_overrides",
+        return_value=(frozenset({"searchindexer.exe"}), ()),
+    ):
+        killset = get_profile_instances()["overwatch2"].launch_process_killset()
+
+    resolved = {name.lower() for name in killset.resolve(include_opt_in=True)}
+    assert "searchindexer.exe" not in resolved
+    assert "searchprotocolhost.exe" in resolved
+
+
+def test_user_protect_override_does_not_change_the_serialized_killset() -> None:
+    """The catalog manifest must stay machine-independent.
+
+    ``abso/tray/profile-catalog-cache.json`` is committed and
+    ``tests/test_tray_profile_catalog_cache.py`` asserts it equals the live
+    manifest. If protect entries pruned the declared tuples, that cache
+    would differ on every machine with a protect list and the comparison
+    would fail for everyone but its author. Protect is a *resolve-time*
+    filter for exactly this reason.
+    """
+    from abso.core import process_janitor as janitor_module
+    from abso.profiles.catalog import get_profile_manifest
+
+    with patch.object(
+        janitor_module,
+        "_load_user_process_overrides",
+        return_value=(frozenset(), ()),
+    ):
+        baseline = {
+            entry["id"]: entry["launch_process_killset"] for entry in get_profile_manifest()
+        }
+
+    with patch.object(
+        janitor_module,
+        "_load_user_process_overrides",
+        return_value=(frozenset({"lghub.exe", "lghub_agent.exe"}), ()),
+    ):
+        with_protect = {
+            entry["id"]: entry["launch_process_killset"] for entry in get_profile_manifest()
+        }
+
+    assert with_protect == baseline
+    assert "lghub.exe" in baseline["overwatch2-gsync-hdr"]["always_safe"]
 
 
 def test_user_kill_override_appends_to_profile_killset() -> None:

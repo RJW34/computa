@@ -165,10 +165,26 @@ ALWAYS_SAFE_LAUNCH_KILLSET: tuple[str, ...] = (
     "DropboxUpdate.exe",
     "GoogleDriveFS.exe",
     "googledrivesync.exe",
-    # --- Peripheral vendor daemons (verified non-essential for user's hardware) ---
-    # Logitech G502 stores DPI/buttons in onboard memory after first save;
-    # G HUB is only required for LIGHTSYNC RGB animations, which do not
-    # matter mid-game.
+    # --- Peripheral vendor daemons (kill only when the device is programmed
+    #     onboard - see the caveat below) ---
+    # CAUTION (corrected 2026-08-02): the earlier note here claimed a G502
+    # "stores DPI/buttons in onboard memory after first save", so G HUB was
+    # only needed for LIGHTSYNC. That is wrong and it caused a real bug.
+    # G HUB has two mutually exclusive modes:
+    #
+    #   - Software profiles (default): button remaps to keystrokes/macros are
+    #     executed by lghub_agent.exe at runtime. Killing the agent reverts
+    #     the device to whatever is in onboard memory, which is NOT a copy of
+    #     the software profile. On the reference machine that silently
+    #     reverted DPI and dropped the G502's side buttons back to their
+    #     default Back/Forward HID codes mid-match.
+    #   - Onboard Memory Mode: assignments live in device firmware and do
+    #     survive the agent dying (and skip the agent's input round trip).
+    #
+    # So these stay in the always-safe tier because the frame-time win is
+    # real, but a machine whose peripherals rely on SOFTWARE profiles must
+    # list them in abso.yaml ``process_overrides.protect``. The reference
+    # machine does exactly that.
     "lghub.exe",
     "lghub_agent.exe",
     "lghub_updater.exe",
@@ -558,15 +574,37 @@ class LaunchKillset:
     ``always_safe`` is killed unconditionally when the janitor runs against
     this profile. ``opt_in`` is held back unless the caller explicitly opts
     in (tray config flag or CLI ``--include-opt-in``).
+
+    ``protected`` carries this machine's ``process_overrides.protect`` set
+    (lowercased) so :meth:`resolve` can drop those images before any caller
+    sweeps them. It is deliberately NOT serialized by :meth:`to_dict`: the
+    catalog manifest is a shared, committed artifact
+    (``abso/tray/profile-catalog-cache.json``, asserted against the live
+    manifest by ``tests/test_tray_profile_catalog_cache.py``) and must stay
+    byte-identical regardless of what any one machine protects.
     """
 
     always_safe: tuple[str, ...] = ()
     opt_in: tuple[str, ...] = ()
+    protected: frozenset[str] = frozenset()
 
     def resolve(self, *, include_opt_in: bool = False) -> list[str]:
+        """Return the images a caller may actually sweep.
+
+        Per-machine ``process_overrides.protect`` entries are filtered out
+        here, not only inside :class:`ProcessJanitor`, so every consumer of
+        the resolved list agrees on what will really be stopped: the launch
+        sweep, the post-apply sweep, and the read-only ``launch-killset``
+        payload the tray logs. The janitor keeps its own
+        :data:`NEVER_KILL_IMAGES` check as the backstop for callers that
+        hand-build an image list instead of going through a profile.
+        """
+        images = list(self.always_safe)
         if include_opt_in:
-            return list(self.always_safe) + list(self.opt_in)
-        return list(self.always_safe)
+            images += list(self.opt_in)
+        if not self.protected:
+            return images
+        return [image for image in images if image.lower() not in self.protected]
 
     def to_dict(self) -> dict[str, list[str]]:
         return {
