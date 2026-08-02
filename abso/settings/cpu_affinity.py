@@ -73,6 +73,10 @@ class CpuAffinityHandler(SettingsHandler):
     mask live through PowerShell ``ProcessorAffinity``.
     """
 
+    # backup() can reach WMI on the live-affinity path; keep it on the main
+    # thread during the concurrent backup scan (see SettingsHandler).
+    backup_requires_main_thread = True
+
     def __init__(self, executables: list[str] | None = None) -> None:
         """Initialize handler with list of executables to manage.
 

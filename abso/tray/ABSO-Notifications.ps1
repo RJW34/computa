@@ -139,20 +139,191 @@ function _Ensure-Fonts {
 # ============================================================================
 #
 # Reads the primary monitor's refresh rate once at module load and exposes
-# $script:FrameInterval (ms) for every animation timer. WinForms Timer can't
-# reliably fire faster than ~8ms (125fps), so that's the floor regardless of
-# refresh rate. Above 125Hz the panel will still feel buttery thanks to the
-# combination of shorter steps and ease curves. The Hz value is also shown
-# as a small badge so the user can see we're respecting their hardware.
+# $script:FrameInterval (ms) for every animation timer. Windows clamps
+# SetTimer (the engine under WinForms Timer) to a 10ms minimum, so the real
+# animation ceiling is ~100fps; Show-ProgressOverlay additionally raises the
+# OS timer resolution (timeBeginPeriod 1) for the overlay's lifetime so the
+# 10ms ticks actually land on schedule instead of on the default 15.6ms
+# system heartbeat. The Hz value is also shown as a small badge so the user
+# can see we're respecting their hardware.
+#
+# Detection is raw Win32 (EnumDisplaySettingsW on the primary display, where
+# every overlay renders): the previous Win32_VideoController CIM query
+# misreported this rig's 300Hz primary as 59Hz (secondary panel value), and
+# under the wscript-hidden PS 5.1 tray host cmdlet autoload is unreliable so
+# Get-CimInstance could silently fail to 60 anyway (see the Canary
+# hidden-host note in the repo docs). Raw .NET/P-Invoke works everywhere.
 $script:RefreshRate = 60
 $script:FrameInterval = 16
 
+if (-not ('ABSO.DisplayInfo' -as [type])) {
+    Add-Type -Namespace 'ABSO' -Name 'DisplayInfo' -MemberDefinition @'
+[System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential, CharSet = System.Runtime.InteropServices.CharSet.Unicode)]
+public struct DEVMODEW {
+    [System.Runtime.InteropServices.MarshalAs(System.Runtime.InteropServices.UnmanagedType.ByValTStr, SizeConst = 32)]
+    public string dmDeviceName;
+    public ushort dmSpecVersion;
+    public ushort dmDriverVersion;
+    public ushort dmSize;
+    public ushort dmDriverExtra;
+    public uint dmFields;
+    public int dmPositionX;
+    public int dmPositionY;
+    public uint dmDisplayOrientation;
+    public uint dmDisplayFixedOutput;
+    public short dmColor;
+    public short dmDuplex;
+    public short dmYResolution;
+    public short dmTTOption;
+    public short dmCollate;
+    [System.Runtime.InteropServices.MarshalAs(System.Runtime.InteropServices.UnmanagedType.ByValTStr, SizeConst = 32)]
+    public string dmFormName;
+    public ushort dmLogPixels;
+    public uint dmBitsPerPel;
+    public uint dmPelsWidth;
+    public uint dmPelsHeight;
+    public uint dmDisplayFlags;
+    public uint dmDisplayFrequency;
+    public uint dmICMMethod;
+    public uint dmICMIntent;
+    public uint dmMediaType;
+    public uint dmDitherType;
+    public uint dmReserved1;
+    public uint dmReserved2;
+    public uint dmPanningWidth;
+    public uint dmPanningHeight;
+}
+
+[System.Runtime.InteropServices.DllImport("user32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode)]
+public static extern bool EnumDisplaySettingsW(string lpszDeviceName, int iModeNum, ref DEVMODEW lpDevMode);
+
+public const int ENUM_CURRENT_SETTINGS = -1;
+
+public static int GetPrimaryDisplayFrequency() {
+    DEVMODEW dm = new DEVMODEW();
+    dm.dmSize = (ushort)System.Runtime.InteropServices.Marshal.SizeOf(typeof(DEVMODEW));
+    if (EnumDisplaySettingsW(null, ENUM_CURRENT_SETTINGS, ref dm)) {
+        return (int)dm.dmDisplayFrequency;
+    }
+    return 0;
+}
+'@
+}
+
+# High-resolution OS timer scope for the progress overlay lifetime only:
+# raises Thread.Sleep granularity for the frame pump's pacing thread.
+if (-not ('ABSO.TimerRes' -as [type])) {
+    Add-Type -Namespace 'ABSO' -Name 'TimerRes' -MemberDefinition @'
+[System.Runtime.InteropServices.DllImport("winmm.dll")]
+public static extern uint timeBeginPeriod(uint uPeriod);
+[System.Runtime.InteropServices.DllImport("winmm.dll")]
+public static extern uint timeEndPeriod(uint uPeriod);
+'@
+}
+$script:ProgressTimerResActive = $false
+
+# Frame pump: WinForms Timer rides WM_TIMER, which current Windows 11 builds
+# coalesce onto the 15.6ms system heartbeat regardless of interval or
+# timeBeginPeriod (measured 2026-07-22: avg frame 15.62ms). The pump paces
+# frames on a background thread with Stopwatch precision and marshals each
+# tick to the UI thread via BeginInvoke; the pending flag is backpressure so
+# a busy UI thread is never flooded (a missed frame is skipped, not queued),
+# and a 500ms watchdog un-sticks the flag if a posted tick never ran (e.g.
+# the form died mid-flight). Stop() joins the thread; all UI work still
+# happens on the UI thread, so the PS tick scriptblock stays runspace-safe.
+if (-not ('ABSO.FramePump' -as [type])) {
+    Add-Type -TypeDefinition @'
+using System;
+using System.Diagnostics;
+using System.Threading;
+using System.Windows.Forms;
+
+namespace ABSO {
+    public class FramePump {
+        private Thread _thread;
+        private volatile bool _running;
+        private int _intervalMs;
+        private Control _target;
+        private Delegate _tick;
+        private int _pending;
+        private double _lastPostMs;
+
+        public void Start(Control control, Delegate handler, int intervalMs) {
+            Stop();
+            _target = control;
+            _tick = handler;
+            _intervalMs = Math.Max(4, intervalMs);
+            _pending = 0;
+            _running = true;
+            _thread = new Thread(Loop);
+            _thread.IsBackground = true;
+            _thread.Priority = ThreadPriority.AboveNormal;
+            _thread.Start();
+        }
+
+        public void FrameDone() {
+            Interlocked.Exchange(ref _pending, 0);
+        }
+
+        public void Stop() {
+            _running = false;
+            Thread t = _thread;
+            _thread = null;
+            if (t != null) {
+                try { t.Join(250); } catch {}
+            }
+            _target = null;
+            _tick = null;
+            _pending = 0;
+        }
+
+        private void Loop() {
+            Stopwatch sw = Stopwatch.StartNew();
+            double next = sw.Elapsed.TotalMilliseconds;
+            while (_running) {
+                next += _intervalMs;
+                double now = sw.Elapsed.TotalMilliseconds;
+                if (next < now - (_intervalMs * 4)) {
+                    next = now + _intervalMs;  // resync after a long stall
+                }
+                double wait = next - now;
+                if (wait > 2.0) {
+                    try { Thread.Sleep((int)(wait - 1.5)); } catch {}
+                }
+                while (_running && sw.Elapsed.TotalMilliseconds < next) {
+                    Thread.SpinWait(60);
+                }
+                if (!_running) { break; }
+
+                double nowMs = sw.Elapsed.TotalMilliseconds;
+                if (_pending == 1 && (nowMs - _lastPostMs) > 500.0) {
+                    Interlocked.Exchange(ref _pending, 0);
+                }
+                if (Interlocked.CompareExchange(ref _pending, 1, 0) == 0) {
+                    Control target = _target;
+                    Delegate tick = _tick;
+                    try {
+                        if (target != null && tick != null && target.IsHandleCreated && !target.IsDisposed) {
+                            _lastPostMs = nowMs;
+                            target.BeginInvoke(tick);
+                        } else {
+                            Interlocked.Exchange(ref _pending, 0);
+                        }
+                    } catch {
+                        Interlocked.Exchange(ref _pending, 0);
+                    }
+                }
+            }
+        }
+    }
+}
+'@ -ReferencedAssemblies @('System.Windows.Forms')
+}
+$script:ProgressPump = $null
+
 function _Detect-RefreshRate {
     try {
-        $hz = (Get-CimInstance Win32_VideoController -ErrorAction SilentlyContinue |
-               Where-Object { $_.CurrentRefreshRate -gt 0 } |
-               Sort-Object CurrentRefreshRate -Descending |
-               Select-Object -First 1).CurrentRefreshRate
+        $hz = [ABSO.DisplayInfo]::GetPrimaryDisplayFrequency()
         if ($hz -ge 30 -and $hz -le 600) { return [int]$hz }
     } catch {}
     return 60
@@ -1392,6 +1563,16 @@ function Show-ProgressOverlay {
     $form.TopMost          = $true
     $form.ShowInTaskbar    = $false
     $form.Opacity          = 0
+    # DoubleBuffered is protected on Form; without it every partial repaint
+    # of the animated chrome regions is drawn straight to screen and reads
+    # as flicker at high tick rates.
+    try {
+        $doubleBuffered = $form.GetType().GetProperty(
+            "DoubleBuffered",
+            ([System.Reflection.BindingFlags]::Instance -bor [System.Reflection.BindingFlags]::NonPublic)
+        )
+        if ($doubleBuffered) { $doubleBuffered.SetValue($form, $true, $null) }
+    } catch {}
 
     # Progress overlay lives in the BOTTOM-left corner so it never collides
     # with the toast stack (bottom-right). Bottom-left also dodges IDE / browser
@@ -1677,24 +1858,54 @@ function Show-ProgressOverlay {
     $script:ProgressDismissButton = $cancelButton
     $script:ProgressDismissImage = $dismissImage
 
-    # Animation timer at monitor refresh rate (8ms floor for WinForms)
-    $timer = New-Object System.Windows.Forms.Timer
-    $script:ProgressTimer = $timer
-    $timer.Interval = $script:FrameInterval
+    # Animated chrome regions, precomputed once: the top-right quarter-arc
+    # spinner and (with a side mark) the medallion beacon. Repainting ONLY
+    # these each tick replaced the previous full-form Invalidate, which
+    # redrew the entire AntiAlias chrome every frame and blew the frame
+    # budget (measured 2026-07-22: ~40fps effective with 16-33ms jitter).
+    $script:ProgressSpinnerRect = New-Object System.Drawing.Rectangle(($width - 44), 12, 24, 24)
+    $script:ProgressBeaconRect = if ($hasSideMark) {
+        New-Object System.Drawing.Rectangle(16, 34, 62, 56)
+    } else {
+        $null
+    }
+
+    # Hold 1ms OS timer resolution for the overlay's lifetime so the 10ms
+    # WM_TIMER floor actually lands ~10ms apart instead of on the 15.6ms
+    # system heartbeat. Released in Close-ProgressOverlay and the tick
+    # self-dispose path.
+    if (-not $script:ProgressTimerResActive) {
+        try {
+            [ABSO.TimerRes]::timeBeginPeriod(1) | Out-Null
+            $script:ProgressTimerResActive = $true
+        } catch {}
+    }
+
     $script:ProgressAngle = 0
     $script:ProgressShimmerOffset = -60
     # Step the spinner so it completes ~1 revolution per 1.4s regardless of refresh
-    $angleStep = [Math]::Max(2, [int](360 * $script:FrameInterval / 1400))
-    $timer.Tag = $angleStep
-    $timer.Add_Tick({
+    $script:ProgressAngleStep = [Math]::Max(2, [int](360 * $script:FrameInterval / 1400))
+
+    # One frame of animation. Runs on the UI thread whether driven by the
+    # frame pump (BeginInvoke) or the fallback WinForms Timer.
+    $renderFrame = {
         try {
             # Form went away outside Close-ProgressOverlay (e.g. window
-            # forcibly destroyed): self-dispose so we don't leak a 125 Hz
-            # timer leaning on a dead form ref.
+            # forcibly destroyed): tear the drivers down so we don't leak a
+            # high-rate pump leaning on a dead form ref.
             if (-not $script:ProgressForm -or $script:ProgressForm.IsDisposed) {
-                $this.Stop(); $this.Dispose(); return
+                if ($script:ProgressPump) { try { $script:ProgressPump.Stop() } catch {} }
+                if ($script:ProgressTimer) {
+                    try { $script:ProgressTimer.Stop(); $script:ProgressTimer.Dispose() } catch {}
+                    $script:ProgressTimer = $null
+                }
+                if ($script:ProgressTimerResActive) {
+                    try { [ABSO.TimerRes]::timeEndPeriod(1) | Out-Null } catch {}
+                    $script:ProgressTimerResActive = $false
+                }
+                return
             }
-            $script:ProgressAngle = ($script:ProgressAngle + $this.Tag) % 360
+            $script:ProgressAngle = ($script:ProgressAngle + $script:ProgressAngleStep) % 360
             if ($script:ProgressFill) {
                 $barWidth = 120
                 $maxX = $script:ProgressTrack.Width
@@ -1702,16 +1913,42 @@ function Show-ProgressOverlay {
                 $x = if ($cycle -lt $maxX) { $cycle } else { $maxX * 2 - $cycle }
                 $x = [int]$x
                 if (($x + $barWidth) -gt $maxX) { $barWidth = $maxX - $x }
-                $script:ProgressFill.Location = New-Object System.Drawing.Point($x, 0)
-                $script:ProgressFill.Size = New-Object System.Drawing.Size([Math]::Max(1, $barWidth), 2)
+                $script:ProgressFill.SetBounds($x, 0, [Math]::Max(1, $barWidth), 2)
                 $script:ProgressShimmerOffset += 4
                 if ($script:ProgressShimmerOffset -gt $barWidth + 60) { $script:ProgressShimmerOffset = -60 }
                 $script:ProgressFill.Invalidate()
-                $script:ProgressForm.Invalidate()
+                $script:ProgressForm.Invalidate($script:ProgressSpinnerRect)
+                if ($script:ProgressBeaconRect) {
+                    $script:ProgressForm.Invalidate($script:ProgressBeaconRect)
+                }
             }
-        } catch { try { $this.Stop(); $this.Dispose() } catch {} }
-    })
-    $timer.Start()
+        } catch {}
+        finally {
+            if ($script:ProgressPump) { try { $script:ProgressPump.FrameDone() } catch {} }
+        }
+    }
+
+    # Preferred driver: the Stopwatch-paced frame pump (WM_TIMER is coalesced
+    # onto the 15.6ms heartbeat on current Windows builds). Fallback: plain
+    # WinForms Timer so a pump failure degrades to the old cadence, never to
+    # a frozen overlay.
+    $pumpStarted = $false
+    try {
+        if (-not $script:ProgressPump) { $script:ProgressPump = New-Object ABSO.FramePump }
+        $script:ProgressPump.Start($form, [System.Action]$renderFrame, $script:FrameInterval)
+        $pumpStarted = $true
+    } catch {
+        $script:ProgressPump = $null
+    }
+
+    if (-not $pumpStarted) {
+        $timer = New-Object System.Windows.Forms.Timer
+        $script:ProgressTimer = $timer
+        $timer.Interval = $script:FrameInterval
+        $capRender = $renderFrame
+        $timer.Add_Tick({ & $capRender }.GetNewClosure())
+        $timer.Start()
+    }
 
     $script:ProgressStartTime = Get-Date
     $elapsedTimer = New-Object System.Windows.Forms.Timer
@@ -1790,6 +2027,15 @@ function Update-ProgressOverlay {
 }
 
 function Close-ProgressOverlay {
+    # Stop the frame pump FIRST so no tick posts against a disposing form.
+    if ($script:ProgressPump) {
+        try { $script:ProgressPump.Stop() } catch {}
+    }
+    # Release the 1ms OS timer resolution held for the overlay's animation.
+    if ($script:ProgressTimerResActive) {
+        try { [ABSO.TimerRes]::timeEndPeriod(1) | Out-Null } catch {}
+        $script:ProgressTimerResActive = $false
+    }
     if ($script:ProgressElapsedTimer) {
         try { $script:ProgressElapsedTimer.Stop(); $script:ProgressElapsedTimer.Dispose() } catch {}
         $script:ProgressElapsedTimer = $null

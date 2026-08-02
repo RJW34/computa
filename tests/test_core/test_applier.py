@@ -90,10 +90,10 @@ class TestProfileApplierInit:
         assert "slippi-melee-universal" in ProfileApplier.PROFILES
         assert "cod-bo7" not in ProfileApplier.PROFILES
         assert "diablo4" in ProfileApplier.PROFILES
-        assert "rivals2-offline" in ProfileApplier.PROFILES
-        assert "rivals2-online" in ProfileApplier.PROFILES
+        assert "rivals2-nosync" in ProfileApplier.PROFILES
+        assert "rivals2-nosync-hdr" in ProfileApplier.PROFILES
         assert "rivals2-gsync" in ProfileApplier.PROFILES
-        assert "rivals2-online-gsync" in ProfileApplier.PROFILES
+        assert "rivals2-gsync-hdr" in ProfileApplier.PROFILES
         assert "overwatch2" in ProfileApplier.PROFILES
         assert "overwatch2-gsync" in ProfileApplier.PROFILES
 
@@ -890,18 +890,25 @@ class TestRealProfiles:
         assert "Diablo" in profile.display_name
 
     def test_rivals2_profile_loads(self):
-        """Legacy Rivals 2 id should canonicalize to the offline profile."""
+        """Legacy Rivals 2 id should canonicalize to the merged no-sync profile."""
         applier = ProfileApplier()
         profile = applier._get_profile("rivals2")
 
-        assert profile.profile_id == "rivals2-offline"
+        assert profile.profile_id == "rivals2-nosync"
 
-    def test_rivals2_300hz_alias_loads_offline_profile(self):
-        """Retired 300 Hz alias should canonicalize to the consolidated offline profile."""
+    def test_rivals2_300hz_alias_loads_nosync_profile(self):
+        """Retired 300 Hz alias should canonicalize to the merged no-sync profile."""
         applier = ProfileApplier()
         profile = applier._get_profile("rivals2-300hz-max")
 
-        assert profile.profile_id == "rivals2-offline"
+        assert profile.profile_id == "rivals2-nosync"
+
+    def test_retired_online_gsync_hdr_id_loads_merged_gsync_hdr(self):
+        """The pre-merge daily-driver ID must keep resolving (live tray configs use it)."""
+        applier = ProfileApplier()
+        profile = applier._get_profile("rivals2-online-gsync-hdr")
+
+        assert profile.profile_id == "rivals2-gsync-hdr"
 
 
 class TestProfileOverrides:

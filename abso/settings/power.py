@@ -47,10 +47,16 @@ class PowerSettingsHandler(SettingsHandler):
 
     def detect(self) -> dict[str, Any]:
         """Detect current power settings."""
+        # One /list answers both the plan inventory and the Ultimate
+        # Performance presence check (same name match as
+        # _find_ultimate_performance_guid).
+        plans = self._list_plans()
         return {
             "active_plan": self._get_active_plan(),
-            "available_plans": self._list_plans(),
-            "has_ultimate_performance": self._has_ultimate_performance(),
+            "available_plans": plans,
+            "has_ultimate_performance": any(
+                "ultimate performance" in plan["name"].lower() for plan in plans
+            ),
         }
 
     def audit(self) -> list[Issue]:
@@ -218,7 +224,10 @@ class PowerSettingsHandler(SettingsHandler):
             "active_plan_name": current.get("active_plan", {}).get("name"),
         }
 
-        # Backup power sub-settings via powercfg /query
+        # Backup power sub-settings via targeted powercfg /qh reads. Measured
+        # on real hardware (2026-07-22): five targeted /qh spawns cost ~88 ms
+        # total while one full /qh SCHEME_CURRENT dump costs ~438 ms — powercfg
+        # pays to enumerate every subgroup, so per-setting queries win here.
         backup_data["processor_min_state"] = self._get_power_setting(
             self.PROCESSOR_SUBGROUP, self.PROCESSOR_MIN_STATE
         )

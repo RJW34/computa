@@ -8,6 +8,7 @@ from abso.profiles.catalog import (
     resolve_profile_id,
 )
 from abso.profiles.counter_strike_2 import (
+    CounterStrike2GSyncHDRCaptureProfile,
     CounterStrike2GSyncHDRProfile,
     CounterStrike2GSyncProfile,
     CounterStrike2HDRProfile,
@@ -39,12 +40,8 @@ from abso.profiles.rivals2_gsync import (
     Rivals2GSyncHDRCaptureProfile,
     Rivals2GSyncHDRProfile,
     Rivals2GSyncProfile,
-    Rivals2OnlineGSyncHDRCaptureProfile,
-    Rivals2OnlineGSyncHDRProfile,
-    Rivals2OnlineGSyncProfile,
 )
-from abso.profiles.rivals2_offline import Rivals2OfflineHDRProfile, Rivals2OfflineProfile
-from abso.profiles.rivals2_online import Rivals2OnlineHDRProfile, Rivals2OnlineProfile
+from abso.profiles.rivals2_nosync import Rivals2NoSyncHDRProfile, Rivals2NoSyncProfile
 from abso.profiles.ryujinx_ssbu import RyujinxSSBUProfile
 from abso.profiles.slippi_melee import (
     SlippiMeleeConsoleParityHDRProfile,
@@ -64,17 +61,12 @@ __all__ = [
     "SlippiMeleeUniversalProfile",
     "SlippiMeleeUniversalHDRProfile",
     "Rivals2Profile",
-    "Rivals2OfflineProfile",
-    "Rivals2OfflineHDRProfile",
-    "Rivals2OnlineProfile",
-    "Rivals2OnlineHDRProfile",
+    "Rivals2NoSyncProfile",
+    "Rivals2NoSyncHDRProfile",
     "Rivals2_300HzMaxProfile",
     "Rivals2GSyncProfile",
     "Rivals2GSyncHDRProfile",
     "Rivals2GSyncHDRCaptureProfile",
-    "Rivals2OnlineGSyncProfile",
-    "Rivals2OnlineGSyncHDRProfile",
-    "Rivals2OnlineGSyncHDRCaptureProfile",
     "Diablo4Profile",
     "Diablo4SDRProfile",
     "FortniteProfile",
@@ -95,6 +87,7 @@ __all__ = [
     "CounterStrike2HDRProfile",
     "CounterStrike2GSyncProfile",
     "CounterStrike2GSyncHDRProfile",
+    "CounterStrike2GSyncHDRCaptureProfile",
     "PokemonAutoChessProfile",
     "PACDeluxeProfile",
     "ProductivityOLEDProfile",

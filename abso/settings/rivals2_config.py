@@ -65,6 +65,12 @@ class Rivals2ConfigHandler(SettingsHandler):
         "hdr_nits": "HDRDisplayOutputNits",
     }
 
+    # The game's own settings UI writes ``FrameRateLimit=999`` for its
+    # uncapped option; Unreal also treats ``0`` as no cap. Both mean the
+    # same effective state, so verification must not report drift when the
+    # game rewrites one sentinel over the other.
+    UNCAPPED_FRAME_RATE_SENTINEL = 999
+
     # These keys should never be mutated by profile automation.
     PROTECTED_INI_KEYS: set[str] = {
         "PlayerTag",
@@ -164,18 +170,22 @@ class Rivals2ConfigHandler(SettingsHandler):
         """Apply Rivals 2 game config settings."""
         settings = dict(settings)
 
+        vrr_cap_policy = settings.pop("vrr_cap_policy", None)
         if settings.pop("auto_vrr_fps_cap", False):
             try:
-                from abso.core.vrr import get_vrr_fps_cap
+                from abso.core.vrr import get_vrr_fps_cap_for_policy
                 from abso.settings.nvidia import NvidiaSettingsHandler
 
                 refresh_hz = NvidiaSettingsHandler()._detect_primary_refresh_rate()
                 if refresh_hz and refresh_hz > 0:
-                    settings["frame_rate_limit"] = get_vrr_fps_cap(refresh_hz)
+                    settings["frame_rate_limit"] = get_vrr_fps_cap_for_policy(
+                        refresh_hz, vrr_cap_policy
+                    )
                     logger.info(
-                        "Rivals 2 auto VRR FPS cap: %d (from %d Hz)",
+                        "Rivals 2 auto VRR FPS cap: %d (from %d Hz%s)",
                         settings["frame_rate_limit"],
                         refresh_hz,
+                        f", {vrr_cap_policy}" if vrr_cap_policy else "",
                     )
             except Exception as e:
                 logger.warning("Rivals 2 auto VRR FPS cap detection failed: %s", e)
@@ -276,17 +286,27 @@ class Rivals2ConfigHandler(SettingsHandler):
                 "requires_reboot": False,
             }
 
+    @classmethod
+    def _is_uncapped_frame_rate(cls, value: Any) -> bool:
+        """True when a FrameRateLimit value means "no cap" (0 or >= 999)."""
+        return isinstance(value, int | float) and not isinstance(value, bool) and (
+            value == 0 or value >= cls.UNCAPPED_FRAME_RATE_SENTINEL
+        )
+
     def verify_active(self, settings: dict[str, Any]) -> dict[str, Any]:
         """Verify requested Rivals 2 config values are active."""
         settings = dict(settings)
+        vrr_cap_policy = settings.pop("vrr_cap_policy", None)
         if settings.pop("auto_vrr_fps_cap", False):
             try:
-                from abso.core.vrr import get_vrr_fps_cap
+                from abso.core.vrr import get_vrr_fps_cap_for_policy
                 from abso.settings.nvidia import NvidiaSettingsHandler
 
                 refresh_hz = NvidiaSettingsHandler()._detect_primary_refresh_rate()
                 if refresh_hz and refresh_hz > 0:
-                    settings["frame_rate_limit"] = get_vrr_fps_cap(refresh_hz)
+                    settings["frame_rate_limit"] = get_vrr_fps_cap_for_policy(
+                        refresh_hz, vrr_cap_policy
+                    )
             except Exception as e:
                 logger.warning("Rivals 2 auto VRR FPS cap verification failed: %s", e)
 
@@ -303,6 +323,15 @@ class Rivals2ConfigHandler(SettingsHandler):
             target = settings[key]
             current_value = current.get(key)
             is_active = current_value == target
+            if (
+                not is_active
+                and key == "frame_rate_limit"
+                and self._is_uncapped_frame_rate(target)
+                and self._is_uncapped_frame_rate(current_value)
+            ):
+                # 0 and 999 are both "uncapped"; a game-side rewrite between
+                # the two sentinels is not real drift.
+                is_active = True
             results["settings"][key] = {
                 "target": target,
                 "current": current_value,

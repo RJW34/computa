@@ -2355,36 +2355,44 @@ $script:FallbackProfiles = [ordered]@{
         Rank = 10
     }
 
-    # --- Fighting Games: Rivals 2 ---
-    "rivals2-offline"   = @{
-        Name     = "Rivals 2 - Offline No Sync"
-        Sub      = "No Sync | LLM ON | Uncapped | Offline Only"
+    # --- Fighting Games: Rivals 2 (merged rollback-safe lanes) ---
+    "rivals2-nosync"    = @{
+        Name     = "Rivals 2 - No Sync"
+        Sub      = "No Sync | LLM ON | Rollback-Safe"
         Cat      = "Fighting"
-        Desc     = "Latency-focused no-sync profile for training/local play (NOT for online)"
+        Desc     = "Rollback-safe no-sync lane for online play and training"
         Exes     = @("Rivals2-Win64-Shipping.exe", "RivalsofAether2.exe", "Rivals2.exe")
         SyncMode = "off"
     }
-    "rivals2-online"    = @{
-        Name     = "Rivals 2 - Online No Sync"
-        Sub      = "No Sync | LLM ON | Rollback-Safe"
+    "rivals2-nosync-hdr" = @{
+        Name     = "Rivals 2 - No Sync HDR"
+        Sub      = "No Sync HDR | LLM ON | Rollback-Safe"
         Cat      = "Fighting"
-        Desc     = "Stable rollback-safe settings for online play (prioritizes stability)"
+        Desc     = "Rollback-safe no-sync lane with Windows HDR composition"
         Exes     = @("Rivals2-Win64-Shipping.exe", "RivalsofAether2.exe", "Rivals2.exe")
         SyncMode = "off"
     }
     "rivals2-gsync" = @{
-        Name     = "Rivals 2 - Offline GSYNC"
-        Sub      = "G-SYNC ON | LLM ON | VSync Safety Net | Offline Only"
+        Name     = "Rivals 2 - G-SYNC"
+        Sub      = "G-SYNC ON | LLM ON | VSync Safety Net | Rollback-Safe"
         Cat      = "Fighting"
-        Desc     = "Low latency VRR profile (G-SYNC ON, VSync safety net)"
+        Desc     = "Rollback-safe tear-free VRR lane (G-SYNC ON, VSync safety net)"
         Exes     = @("Rivals2-Win64-Shipping.exe", "RivalsofAether2.exe", "Rivals2.exe")
         SyncMode = "on"
     }
-    "rivals2-online-gsync" = @{
-        Name     = "Rivals 2 - Online GSYNC"
-        Sub      = "G-SYNC ON | LLM ON | Rollback-Safe"
+    "rivals2-gsync-hdr" = @{
+        Name     = "Rivals 2 - G-SYNC HDR"
+        Sub      = "G-SYNC HDR | LLM ON | VSync Safety Net | Rollback-Safe"
         Cat      = "Fighting"
-        Desc     = "Rollback-safe VRR profile (G-SYNC ON, stability-focused)"
+        Desc     = "Rollback-safe G-SYNC lane with Windows HDR composition"
+        Exes     = @("Rivals2-Win64-Shipping.exe", "RivalsofAether2.exe", "Rivals2.exe")
+        SyncMode = "on"
+    }
+    "rivals2-gsync-hdr-capture" = @{
+        Name     = "Rivals 2 - G-SYNC HDR Capture-Safe"
+        Sub      = "HDR Capture-Safe | Borderless VRR | Keeps OBS/Overlays"
+        Cat      = "Fighting"
+        Desc     = "Rollback-safe borderless VRR lane that keeps OBS/Medal/overlays alive"
         Exes     = @("Rivals2-Win64-Shipping.exe", "RivalsofAether2.exe", "Rivals2.exe")
         SyncMode = "on"
     }
@@ -4635,6 +4643,61 @@ function Set-TrayDropDownWidthBudget {
     $DropDown.MinimumSize = New-Object System.Drawing.Size($minimumWidth, 0)
     $DropDown.MaximumSize = New-Object System.Drawing.Size($widthBudget, 0)
     $DropDown.AutoSize = $true
+}
+
+function Get-TraySubmenuDropDownDirection {
+    <#
+    .SYNOPSIS
+    Picks the drop side for a root-level flyout against the root menu's own screen.
+
+    .DESCRIPTION
+    WinForms' default submenu direction math checks fit against the virtual
+    desktop, so with a second monitor beside the tray a game-variant flyout
+    that no longer fits next to the menu opens across the monitor seam
+    instead of flipping to the other side (reproduced live 2026-07-22:
+    root menu right edge at x=2552 on the primary, flyout at x=2560 on the
+    secondary). Deciding against the working area of the screen that hosts
+    the root menu restores the single-monitor flip behavior, so flyouts stay
+    attached to the menu on the same display.
+    #>
+    param([System.Windows.Forms.ToolStripMenuItem]$Item)
+
+    $default = [System.Windows.Forms.ToolStripDropDownDirection]::Default
+    try {
+        if (-not $Item -or -not $Item.Owner) { return $default }
+        $owner = $Item.Owner
+        if (-not $owner.Visible) { return $default }
+
+        $ownerBounds = $owner.Bounds
+        $screen = [System.Windows.Forms.Screen]::FromRectangle($ownerBounds)
+        if (-not $screen) { return $default }
+        $workArea = $screen.WorkingArea
+
+        $dropWidth = 0
+        try {
+            $preferred = $Item.DropDown.GetPreferredSize([System.Drawing.Size]::Empty)
+            $dropWidth = [int]$preferred.Width
+        } catch {}
+        $widthBudget = Get-TrayMenuWidthBudget
+        if ($dropWidth -le 0 -or $dropWidth -gt $widthBudget) { $dropWidth = $widthBudget }
+
+        $seamMargin = 4
+        $spaceRight = $workArea.Right - $ownerBounds.Right
+        $spaceLeft = $ownerBounds.Left - $workArea.Left
+        if ($spaceRight -ge ($dropWidth + $seamMargin)) {
+            return [System.Windows.Forms.ToolStripDropDownDirection]::Right
+        }
+        if ($spaceLeft -ge ($dropWidth + $seamMargin)) {
+            return [System.Windows.Forms.ToolStripDropDownDirection]::Left
+        }
+        # Neither side fits cleanly; take the roomier side instead of the seam.
+        if ($spaceLeft -ge $spaceRight) {
+            return [System.Windows.Forms.ToolStripDropDownDirection]::Left
+        }
+        return [System.Windows.Forms.ToolStripDropDownDirection]::Right
+    } catch {
+        return $default
+    }
 }
 
 function Invoke-TrayMenuPulseInvalidation {
@@ -7776,6 +7839,7 @@ $script:LaunchSanitizerActiveIntervalMs = 10000
 $script:LaunchSanitizerTimer = $null
 $script:LaunchSanitizerActiveProfileId = $null
 $script:LaunchSanitizerLastSweepStopped = @{}
+$script:LaunchSanitizerLoggedStderr = @{}
 $script:LaunchSanitizerGameWasAlive = $false
 $script:LaunchSanitizerSweepProc = $null
 $script:LaunchSanitizerSweepPollTimer = $null
@@ -7797,17 +7861,28 @@ if (-not ('ABSO.PowerState' -as [type])) {
     Add-Type -Namespace 'ABSO' -Name 'PowerState' -MemberDefinition @'
 [System.Runtime.InteropServices.DllImport("kernel32.dll", SetLastError = true)]
 public static extern uint SetThreadExecutionState(uint esFlags);
+
+// The execution-state constants live in C# on purpose: PowerShell 5.1 parses
+// the hex literal 0x80000000 as a negative Int32, so a PS-side uint32 cast of
+// it threw InvalidCastIConvertible at script load, left the script-scope
+// constant empty, and every Set-AbsoKeepAwake tick failed with "Specified
+// cast is not valid" (keep-awake never actually asserted; first logged
+// 2026-07-09).
+public const uint ES_CONTINUOUS       = 0x80000000;
+public const uint ES_SYSTEM_REQUIRED  = 0x00000001;
+public const uint ES_DISPLAY_REQUIRED = 0x00000002;
+public const uint ES_AWAKE = ES_CONTINUOUS | ES_SYSTEM_REQUIRED | ES_DISPLAY_REQUIRED;
 '@
 }
 $script:KeepAwakeAsserted   = $false
-$script:ES_CONTINUOUS       = [uint32]0x80000000
-$script:ES_SYSTEM_REQUIRED  = [uint32]0x00000001
-$script:ES_DISPLAY_REQUIRED = [uint32]0x00000002
 
 function Set-AbsoKeepAwake {
     try {
-        $flags = [uint32]($script:ES_CONTINUOUS -bor $script:ES_SYSTEM_REQUIRED -bor $script:ES_DISPLAY_REQUIRED)
-        [ABSO.PowerState]::SetThreadExecutionState($flags) | Out-Null
+        $previous = [ABSO.PowerState]::SetThreadExecutionState([ABSO.PowerState]::ES_AWAKE)
+        if ($previous -eq [uint32]0) {
+            Write-TrayLog "KeepAwake: SetThreadExecutionState rejected the request (returned 0)" -Level "WARN"
+            return
+        }
         if (-not $script:KeepAwakeAsserted) {
             Write-TrayLog "KeepAwake: inhibiting system/display sleep for active game session"
         }
@@ -7821,7 +7896,7 @@ function Set-AbsoKeepAwake {
 function Clear-AbsoKeepAwake {
     if (-not $script:KeepAwakeAsserted) { return }
     try {
-        [ABSO.PowerState]::SetThreadExecutionState($script:ES_CONTINUOUS) | Out-Null
+        [ABSO.PowerState]::SetThreadExecutionState([ABSO.PowerState]::ES_CONTINUOUS) | Out-Null
         Write-TrayLog "KeepAwake: released sleep inhibitor"
     }
     catch {}
@@ -8132,7 +8207,17 @@ function Complete-LaunchSweepIfReady {
         $stdout = Get-Content $script:LaunchSanitizerSweepOutputFile -Raw -ErrorAction SilentlyContinue
         $stderr = Get-Content $script:LaunchSanitizerSweepErrorFile -Raw -ErrorAction SilentlyContinue
         if ($stderr) {
-            Write-TrayLog "LaunchSanitizer stderr: $stderr" -Level "WARN"
+            # Sweeps repeat every 10 s while a game is alive, and expected
+            # janitor chatter (e.g. "refused to sweep protected image" for
+            # process_overrides.protect entries) repeats identically each
+            # tick. Log each distinct stderr blob once per game session so
+            # the first occurrence stays visible as evidence without
+            # flooding the log every tick.
+            $stderrKey = "$stderr".Trim()
+            if (-not $script:LaunchSanitizerLoggedStderr.ContainsKey($stderrKey)) {
+                $script:LaunchSanitizerLoggedStderr[$stderrKey] = $true
+                Write-TrayLog "LaunchSanitizer stderr: $stderr" -Level "WARN"
+            }
         }
         if ($null -ne $exitCode -and $exitCode -ne 0) {
             Write-TrayLog "LaunchSanitizer: launch-sweep exited $exitCode" -Level "WARN"
@@ -8262,6 +8347,7 @@ function Invoke-LaunchSanitizerTick {
             if ($script:LaunchSanitizerGameWasAlive) {
                 Write-TrayLog "LaunchSanitizer: $profileId game exited; resuming idle cadence"
                 $script:LaunchSanitizerLastSweepStopped = @{}
+                $script:LaunchSanitizerLoggedStderr = @{}
             }
             $script:LaunchSanitizerGameWasAlive = $false
             $script:LaunchSanitizerActiveProfileId = $profileId
@@ -8940,6 +9026,15 @@ public class HotkeyMessageWindow : NativeWindow {
         $item = $e.Item
         if ($item -is [System.Windows.Forms.ToolStripMenuItem]) {
             Set-TrayDropDownWidthBudget -DropDown $item.DropDown
+            # Keep flyouts attached on multi-monitor rigs: pick the drop side
+            # against the root menu's own screen before the dropdown positions,
+            # so a variant flyout never opens across the monitor seam.
+            $item.Add_DropDownOpening({
+                param($senderItem, $openingArgs)
+                try {
+                    $senderItem.DropDownDirection = Get-TraySubmenuDropDownDirection -Item $senderItem
+                } catch {}
+            })
             $item.DropDown.Add_Opened({
                 param($ds, $de)
                 try {

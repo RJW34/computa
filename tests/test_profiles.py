@@ -8,6 +8,7 @@ import pytest
 
 from abso.profiles import get_all_profiles
 from abso.profiles.counter_strike_2 import (
+    CounterStrike2GSyncHDRCaptureProfile,
     CounterStrike2GSyncHDRProfile,
     CounterStrike2GSyncProfile,
     CounterStrike2HDRProfile,
@@ -40,11 +41,8 @@ from abso.profiles.rivals2 import Rivals2Profile
 from abso.profiles.rivals2_gsync import (
     Rivals2GSyncHDRProfile,
     Rivals2GSyncProfile,
-    Rivals2OnlineGSyncHDRProfile,
-    Rivals2OnlineGSyncProfile,
 )
-from abso.profiles.rivals2_offline import Rivals2OfflineHDRProfile, Rivals2OfflineProfile
-from abso.profiles.rivals2_online import Rivals2OnlineHDRProfile, Rivals2OnlineProfile
+from abso.profiles.rivals2_nosync import Rivals2NoSyncHDRProfile, Rivals2NoSyncProfile
 from abso.profiles.slippi_melee import (
     SlippiMeleeConsoleParityHDRProfile,
     SlippiMeleeConsoleParityProfile,
@@ -333,6 +331,86 @@ class TestProfileLoading:
         assert gsync.mixed_refresh_safe_fallback_profile_id == "counter-strike-2"
         assert gsync_hdr.mixed_refresh_safe_fallback_profile_id == "counter-strike-2-hdr"
 
+        hdr_capture = CounterStrike2GSyncHDRCaptureProfile()
+        assert hdr_capture.profile_id == "counter-strike-2-gsync-hdr-capture"
+        assert hdr_capture.display_name == "Counter-Strike 2 - GSYNC HDR Capture-Safe"
+        assert hdr_capture.is_sdr_only is False
+        assert hdr_capture.requires_confirmed_vrr_support is True
+
+    def test_cs2_gsync_hdr_falls_back_to_the_capture_lane_when_overlays_block(self):
+        """Overlay-blocked strict HDR applies should reroute, not kill the recorder."""
+        gsync_hdr = CounterStrike2GSyncHDRProfile()
+        capture = CounterStrike2GSyncHDRCaptureProfile()
+
+        assert (
+            gsync_hdr.overlay_compatible_fallback_profile_id
+            == "counter-strike-2-gsync-hdr-capture"
+        )
+        # The capture lane terminates the chain so it cannot self-reference.
+        assert capture.overlay_compatible_fallback_profile_id is None
+        # Mixed-refresh fallback stays the no-sync HDR lane for both.
+        assert capture.mixed_refresh_safe_fallback_profile_id == "counter-strike-2-hdr"
+
+    def test_cs2_capture_lane_uses_borderless_windowed_vrr_path(self):
+        """Capture-safe CS2 keeps HDR but swaps the strict path for borderless VRR."""
+        capture = CounterStrike2GSyncHDRCaptureProfile()
+
+        win = capture.get_settings("WindowsSettingsHandler")
+        nvidia = capture.get_settings("NvidiaSettingsHandler")
+        graphics = capture.get_settings("GraphicsSettingsHandler")
+
+        # HDR contract carries over from the strict HDR sibling.
+        assert win["hdr"] is True
+        assert win["advanced_color"] is True
+        assert win["auto_hdr"] is False
+        assert win["sdr_white_level_nits"] == 200
+        assert graphics["disable_auto_color_management"] is True
+
+        # Borderless windowed flip path.
+        assert win["windowed_optimizations"] is True
+        assert win["vrr_optimize"] is True
+        assert graphics["disable_global_fso"] is False
+        assert nvidia["preset"] == "reflex_gsync"
+        assert nvidia["global_vrr_mode"] == "fullscreen_and_windowed"
+        assert nvidia["auto_vrr_fps_cap"] is True
+
+        # Stale FSO-disable entries from a strict apply get cleared.
+        assert capture.fullscreen_optimizations_per_exe == {"cs2.exe": False}
+        registry_settings = capture.get_settings("RegistrySettingsHandler")
+        assert registry_settings["fullscreen_optimizations"]["cs2.exe"] is False
+
+        # In-game guidance must point at borderless, not exclusive fullscreen.
+        display_mode = next(
+            row
+            for row in capture.get_in_game_settings()
+            if row.get("setting") == "Display Mode"
+        )
+        assert "windowed" in display_mode["value"].lower()
+
+    def test_cs2_capture_lane_keeps_the_capture_stack_alive(self):
+        """The whole point of this lane: Medal/OBS survive apply and game launch."""
+        capture = CounterStrike2GSyncHDRCaptureProfile()
+
+        assert capture.is_capture_safe is True
+        assert capture.display_path_requirements.require_overlay_free_path is False
+        assert capture.auto_disable_blocking_overlays is False
+        # NVIDIA app-binding proof stays mandatory even off the strict path.
+        assert capture.requires_exact_nvidia_binding is True
+
+        killset = capture.launch_process_killset()
+        images = {img.lower() for img in killset.always_safe} | {
+            img.lower() for img in killset.opt_in
+        }
+        for survivor in ("medal.exe", "medalencoder.exe", "obs64.exe", "rtss.exe"):
+            assert survivor not in images, survivor
+
+        # The strict sibling still stops them.
+        strict_killset = CounterStrike2GSyncHDRProfile().launch_process_killset()
+        strict_images = {img.lower() for img in strict_killset.always_safe} | {
+            img.lower() for img in strict_killset.opt_in
+        }
+        assert "medal.exe" in strict_images
+
     def test_cs2_detection_and_binding_target_the_single_binary(self):
         """CS2 has one stable binary; detection and NVIDIA binding agree on it."""
         for profile_cls in (
@@ -340,10 +418,13 @@ class TestProfileLoading:
             CounterStrike2HDRProfile,
             CounterStrike2GSyncProfile,
             CounterStrike2GSyncHDRProfile,
+            CounterStrike2GSyncHDRCaptureProfile,
         ):
             profile = profile_cls()
             assert profile.executable_hints == ["cs2.exe"]
             assert profile.nvidia_binding_executables == ["cs2.exe"]
+            assert "Counter-strike 2" in profile.nvidia_profile_aliases
+            assert "Counter-strike: Global Offensive" in profile.nvidia_profile_aliases
 
     def test_cs2_no_sync_nvidia_settings(self):
         """CS2 no-sync variants should disable global VRR and use reflex_no_sync preset."""
@@ -366,7 +447,11 @@ class TestProfileLoading:
 
     def test_cs2_hdr_variants_enable_windows_hdr_and_disable_auto_hdr(self):
         """Both HDR variants use Windows HDR composition with Auto HDR off and ACM disabled."""
-        for profile_cls in (CounterStrike2HDRProfile, CounterStrike2GSyncHDRProfile):
+        for profile_cls in (
+            CounterStrike2HDRProfile,
+            CounterStrike2GSyncHDRProfile,
+            CounterStrike2GSyncHDRCaptureProfile,
+        ):
             profile = profile_cls()
             win = profile.get_settings("WindowsSettingsHandler")
             graphics = profile.get_settings("GraphicsSettingsHandler")
@@ -388,7 +473,12 @@ class TestProfileLoading:
             assert color["icc_profile"] == "srgb", profile_cls.__name__
 
     def test_cs2_variants_disable_fso_for_the_binary(self):
-        """Every CS2 variant runs Fullscreen; FSO must be disabled per-exe."""
+        """Every exclusive-fullscreen CS2 variant must disable FSO per-exe.
+
+        The capture lane is deliberately excluded - it runs borderless and
+        clears the flag instead (see
+        test_cs2_capture_lane_uses_borderless_windowed_vrr_path).
+        """
         for profile_cls in (
             CounterStrike2Profile,
             CounterStrike2HDRProfile,
@@ -417,6 +507,7 @@ class TestProfileLoading:
             CounterStrike2HDRProfile,
             CounterStrike2GSyncProfile,
             CounterStrike2GSyncHDRProfile,
+            CounterStrike2GSyncHDRCaptureProfile,
         ):
             profile = profile_cls()
             assert profile.application_scope == "system_only", profile_cls.__name__
@@ -433,54 +524,31 @@ class TestProfileLoading:
         assert "Marvel Rivals" in hdr.display_name
 
     def test_rivals2_consolidated_profiles_load(self):
-        """The canonical Rivals 2 matrix should expose SDR and HDR lanes."""
-        offline = Rivals2OfflineProfile()
-        offline_hdr = Rivals2OfflineHDRProfile()
-        online = Rivals2OnlineProfile()
-        online_hdr = Rivals2OnlineHDRProfile()
+        """The merged Rivals 2 matrix: 5 rollback-safe lanes, all online-safe."""
+        nosync = Rivals2NoSyncProfile()
+        nosync_hdr = Rivals2NoSyncHDRProfile()
         gsync = Rivals2GSyncProfile()
         gsync_hdr = Rivals2GSyncHDRProfile()
-        online_gsync = Rivals2OnlineGSyncProfile()
-        online_gsync_hdr = Rivals2OnlineGSyncHDRProfile()
 
-        assert offline.profile_id == "rivals2-offline"
-        assert offline.is_sdr_only is True
-        assert offline_hdr.profile_id == "rivals2-offline-hdr"
-        assert offline_hdr.is_sdr_only is False
-        assert online.profile_id == "rivals2-online"
-        assert online.is_sdr_only is True
-        assert online_hdr.profile_id == "rivals2-online-hdr"
-        assert online_hdr.is_sdr_only is False
+        assert nosync.profile_id == "rivals2-nosync"
+        assert nosync.is_sdr_only is True
+        assert nosync_hdr.profile_id == "rivals2-nosync-hdr"
+        assert nosync_hdr.is_sdr_only is False
         assert gsync.profile_id == "rivals2-gsync"
         assert gsync.is_sdr_only is True
         assert gsync_hdr.profile_id == "rivals2-gsync-hdr"
         assert gsync_hdr.is_sdr_only is False
-        assert online_gsync.profile_id == "rivals2-online-gsync"
-        assert online_gsync.is_sdr_only is True
-        assert online_gsync_hdr.profile_id == "rivals2-online-gsync-hdr"
-        assert online_gsync_hdr.is_sdr_only is False
-        assert gsync.mixed_refresh_safe_fallback_profile_id == "rivals2-offline"
-        assert gsync_hdr.mixed_refresh_safe_fallback_profile_id == "rivals2-offline-hdr"
-        for profile in (
-            offline,
-            offline_hdr,
-            online,
-            online_hdr,
-            gsync,
-            gsync_hdr,
-            online_gsync,
-            online_gsync_hdr,
-        ):
+        assert gsync.mixed_refresh_safe_fallback_profile_id == "rivals2-nosync"
+        assert gsync_hdr.mixed_refresh_safe_fallback_profile_id == "rivals2-nosync-hdr"
+        for profile in (nosync, nosync_hdr, gsync, gsync_hdr):
             assert profile.graphics_api == "dx11", profile.profile_id
-        assert online_gsync.mixed_refresh_safe_fallback_profile_id == "rivals2-online"
-        assert (
-            online_gsync_hdr.mixed_refresh_safe_fallback_profile_id
-            == "rivals2-online-hdr"
-        )
+            # 2026-07 consolidation: every merged lane is matchmaking-safe.
+            assert profile.is_online_profile is True, profile.profile_id
+            assert profile.allows_aggressive_settings is False, profile.profile_id
 
     def test_profiles_expose_canonical_nvidia_binding_executables(self):
         """NVIDIA binding should target canonical binaries, not broad detection aliases."""
-        rivals = Rivals2OnlineGSyncProfile()
+        rivals = Rivals2GSyncProfile()
         marvel = MarvelRivalsHDRProfile()
         slippi = SlippiMeleeProfile()
 
@@ -551,17 +619,11 @@ class TestProfileHandlers:
         assert "NvidiaSettingsHandler" in handler_names
         assert "NetworkSettingsHandler" in handler_names
 
-    def test_rivals2_online_includes_game_config_handler(self):
-        """Online profile should include the Rivals2ConfigHandler for INI tuning."""
-        profile = Rivals2OnlineProfile()
-        handler_names = [h.__class__.__name__ for h in profile.get_handlers()]
-        assert "Rivals2ConfigHandler" in handler_names
-
-    def test_rivals2_base_profile_includes_game_config_guarded_handler(self):
-        """Base Rivals2 profile includes config handler for explicit game INI tuning."""
-        profile = Rivals2OfflineProfile()
-        handler_names = [h.__class__.__name__ for h in profile.get_handlers()]
-        assert "Rivals2ConfigHandler" in handler_names
+    def test_rivals2_lanes_include_game_config_handler(self):
+        """Merged Rivals lanes include the Rivals2ConfigHandler for INI tuning."""
+        for profile in (Rivals2NoSyncProfile(), Rivals2GSyncProfile()):
+            handler_names = [h.__class__.__name__ for h in profile.get_handlers()]
+            assert "Rivals2ConfigHandler" in handler_names, profile.profile_id
 
 
 class TestProfileSettings:
@@ -914,8 +976,6 @@ class TestProfileSettings:
             MarvelRivalsHDRProfile(),
             Rivals2GSyncProfile(),
             Rivals2GSyncHDRProfile(),
-            Rivals2OnlineGSyncProfile(),
-            Rivals2OnlineGSyncHDRProfile(),
         ]
 
         for profile in strict_profiles:
@@ -1088,29 +1148,22 @@ class TestProfileSettings:
         assert settings["preset"] == "default"
 
     def test_rivals2_nvidia_settings_use_stable_profile_identity(self):
-        """Offline/general Rivals profiles should target a shared stable NVIDIA profile."""
-        profile = Rivals2OfflineProfile()
-        settings = profile.get_settings("NvidiaSettingsHandler")
+        """All merged Rivals lanes share ONE stable NVIDIA profile family."""
+        for profile in (Rivals2NoSyncProfile(), Rivals2GSyncProfile()):
+            settings = profile.get_settings("NvidiaSettingsHandler")
+            assert settings["profile_name"] == "Rivals 2", profile.profile_id
+            assert "Rivals2-Win64-Shipping.exe" in settings["profile_aliases"]
+            # The pre-merge online family must be reusable, not orphaned.
+            assert "Rivals 2 Online" in settings["profile_aliases"]
 
-        assert settings["profile_name"] == "Rivals 2"
-        assert "Rivals2-Win64-Shipping.exe" in settings["profile_aliases"]
-
-    def test_rivals2_legacy_alias_still_resolves_to_offline_behavior(self):
-        """Legacy generic Rivals alias should preserve offline handler behavior."""
+    def test_rivals2_legacy_alias_still_resolves_to_nosync_behavior(self):
+        """Legacy generic Rivals alias should preserve merged no-sync behavior."""
         profile = Rivals2Profile()
         settings = profile.get_settings("NvidiaSettingsHandler")
 
         assert profile.profile_id == "rivals2"
         assert settings["profile_name"] == "Rivals 2"
         assert "Rivals2-Win64-Shipping.exe" in settings["profile_aliases"]
-
-    def test_rivals2_online_nvidia_settings_use_stable_profile_identity(self):
-        """Online Rivals profiles should target a separate stable NVIDIA profile family."""
-        profile = Rivals2OnlineProfile()
-        settings = profile.get_settings("NvidiaSettingsHandler")
-
-        assert settings["profile_name"] == "Rivals 2 Online"
-        assert "Rivals 2: Online G-SYNC" in settings["profile_aliases"]
 
     def test_rivals2_gsync_nvidia_settings_use_stable_profile_identity(self):
         """Rivals 2 G-SYNC should not create a variant-named NVIDIA profile."""
@@ -1119,25 +1172,19 @@ class TestProfileSettings:
 
         assert settings["profile_name"] == "Rivals 2"
         assert settings["preset"] == "vrr_fighting_game"
-        assert settings["threaded_optimization"] == "off"
+        # CPU-bound UE5/DX11: driver worker threads stay on (preset default,
+        # asserted explicitly so a preset change can't silently regress it).
+        assert settings["threaded_optimization"] == "on"
+        # 60 Hz sim grid: cap snaps to the largest multiple of 60 below
+        # refresh - 3 instead of the generic off-grid refresh - 3 value.
+        assert settings["vrr_cap_policy"] == "fighting_60hz_vrr"
         assert "Rivals2-Win64-Shipping.exe" in settings["profile_aliases"]
-
-    def test_rivals2_online_gsync_nvidia_settings_use_stable_profile_identity(self):
-        """Rivals 2 online G-SYNC should reuse the online Rivals NVIDIA profile family."""
-        profile = Rivals2OnlineGSyncProfile()
-        settings = profile.get_settings("NvidiaSettingsHandler")
-
-        assert settings["profile_name"] == "Rivals 2 Online"
-        assert settings["preset"] == "vrr_fighting_game"
-        assert "Rivals 2: Online / Matchmaking" in settings["profile_aliases"]
 
     def test_rivals2_hdr_variants_enable_windows_hdr_not_native_hdr(self):
         """Rivals 2 HDR lanes are Windows SDR-in-HDR composition, not native game HDR."""
         for profile_cls in (
-            Rivals2OfflineHDRProfile,
-            Rivals2OnlineHDRProfile,
+            Rivals2NoSyncHDRProfile,
             Rivals2GSyncHDRProfile,
-            Rivals2OnlineGSyncHDRProfile,
         ):
             profile = profile_cls()
             win = profile.get_settings("WindowsSettingsHandler")
@@ -1157,10 +1204,8 @@ class TestProfileSettings:
     def test_rivals2_hdr_variants_preserve_parent_latency_knobs(self):
         """HDR variants should differ from SDR only on Windows/color/HDR composition knobs."""
         pairs = (
-            (Rivals2OfflineProfile(), Rivals2OfflineHDRProfile()),
-            (Rivals2OnlineProfile(), Rivals2OnlineHDRProfile()),
+            (Rivals2NoSyncProfile(), Rivals2NoSyncHDRProfile()),
             (Rivals2GSyncProfile(), Rivals2GSyncHDRProfile()),
-            (Rivals2OnlineGSyncProfile(), Rivals2OnlineGSyncHDRProfile()),
         )
         preserved_handlers = (
             "NvidiaSettingsHandler",
@@ -1180,7 +1225,7 @@ class TestProfileSettings:
 
     def test_rivals2_hdr_guidance_is_honest_about_native_hdr(self):
         """HDR guidance should not claim native Rivals 2 HDR support."""
-        profile = Rivals2OfflineHDRProfile()
+        profile = Rivals2NoSyncHDRProfile()
         guidance = profile.get_in_game_settings()
         settings_named = {entry.get("setting") for entry in guidance}
         combined = " ".join(
@@ -1201,7 +1246,27 @@ class TestProfileSettings:
         config = profile.get_settings("Rivals2ConfigHandler")
 
         assert config["auto_vrr_fps_cap"] is True
+        assert config["vrr_cap_policy"] == "fighting_60hz_vrr"
         assert config["hdr_output"] is False
+
+    def test_rivals2_no_sync_lane_uses_sim_grid_frame_cap(self):
+        """The merged no-sync lane caps at the largest multiple of 60 at/below refresh."""
+        nosync_config = Rivals2NoSyncProfile().get_settings("Rivals2ConfigHandler")
+
+        assert nosync_config["auto_vrr_fps_cap"] is True
+        assert nosync_config["vrr_cap_policy"] == "fighting_60hz_nosync"
+        assert "frame_rate_limit" not in nosync_config
+
+    def test_rivals2_lanes_keep_threaded_optimization_on(self):
+        """CPU-bound UE5/DX11: no Rivals lane forces threaded optimization off."""
+        for profile in (
+            Rivals2NoSyncProfile(),
+            Rivals2NoSyncHDRProfile(),
+            Rivals2GSyncProfile(),
+            Rivals2GSyncHDRProfile(),
+        ):
+            nvidia = profile.get_settings("NvidiaSettingsHandler")
+            assert nvidia["threaded_optimization"] == "on", profile.profile_id
 
     def test_unknown_handler_returns_empty(self):
         """Test that unknown handler name returns empty dict."""
@@ -1445,14 +1510,10 @@ class TestFullscreenOptimizationsPerExe:
         """Every Rivals 2 variant ships fullscreen_mode=0 and wants true exclusive."""
         for profile_cls in (
             Rivals2Profile,
-            Rivals2OfflineProfile,
-            Rivals2OfflineHDRProfile,
-            Rivals2OnlineProfile,
-            Rivals2OnlineHDRProfile,
+            Rivals2NoSyncProfile,
+            Rivals2NoSyncHDRProfile,
             Rivals2GSyncProfile,
             Rivals2GSyncHDRProfile,
-            Rivals2OnlineGSyncProfile,
-            Rivals2OnlineGSyncHDRProfile,
         ):
             profile = profile_cls()
             flags = profile.fullscreen_optimizations_per_exe
@@ -1665,18 +1726,17 @@ class TestProfileOptimalityConsistency:
         for profile_cls in (
             Rivals2GSyncProfile,
             Rivals2GSyncHDRProfile,
-            Rivals2OnlineGSyncProfile,
-            Rivals2OnlineGSyncHDRProfile,
         ):
             nvidia = profile_cls().get_settings("NvidiaSettingsHandler")
             assert nvidia.get("vrr_app_override") == "allow", profile_cls.__name__
 
-    def test_rivals2_online_lanes_share_priority_separation(self) -> None:
-        """Both online Rivals 2 lanes (no-sync + G-SYNC) use the ONLINE value."""
+    def test_rivals2_lanes_share_online_priority_separation(self) -> None:
+        """Every merged Rivals 2 lane uses the ONLINE scheduler value."""
         for profile_cls in (
-            Rivals2OnlineProfile,
-            Rivals2OnlineGSyncProfile,
-            Rivals2OnlineGSyncHDRProfile,
+            Rivals2NoSyncProfile,
+            Rivals2NoSyncHDRProfile,
+            Rivals2GSyncProfile,
+            Rivals2GSyncHDRProfile,
         ):
             reg = profile_cls().get_settings("RegistrySettingsHandler")
             assert (

@@ -157,6 +157,84 @@ def test_apply_auto_vrr_fps_cap_uses_detected_refresh(tmp_path: Path) -> None:
     assert "FrameRateLimit=297" in content
 
 
+def test_apply_auto_vrr_fps_cap_honors_fighting_60hz_policy(tmp_path: Path) -> None:
+    """Rivals lanes snap the cap to the 60 Hz sim grid (240 @ 300 Hz)."""
+    config_dir = tmp_path / "Rivals2" / "Saved" / "Config" / "Windows"
+    ini_path = config_dir / "GameUserSettings.ini"
+    _write_game_user_settings(
+        ini_path,
+        "\n".join(
+            [
+                "FullscreenMode=0",
+                "bUseVSync=False",
+                "FrameRateLimit=999",
+            ]
+        )
+        + "\n",
+    )
+
+    with (
+        patch("abso.settings.rivals2_config._get_rivals2_config_dir", return_value=config_dir),
+        patch("abso.settings.nvidia.NvidiaSettingsHandler._detect_primary_refresh_rate", return_value=300),
+    ):
+        handler = Rivals2ConfigHandler()
+        result = handler.apply(
+            {"auto_vrr_fps_cap": True, "vrr_cap_policy": "fighting_60hz_vrr"}
+        )
+
+    assert result["success"] is True
+    assert "FrameRateLimit=240" in ini_path.read_text(encoding="utf-8")
+
+
+def test_apply_nosync_policy_caps_at_refresh_multiple(tmp_path: Path) -> None:
+    """The online no-sync lane caps at the largest multiple of 60 <= refresh."""
+    config_dir = tmp_path / "Rivals2" / "Saved" / "Config" / "Windows"
+    ini_path = config_dir / "GameUserSettings.ini"
+    _write_game_user_settings(ini_path, "FullscreenMode=0\nFrameRateLimit=0\n")
+
+    with (
+        patch("abso.settings.rivals2_config._get_rivals2_config_dir", return_value=config_dir),
+        patch("abso.settings.nvidia.NvidiaSettingsHandler._detect_primary_refresh_rate", return_value=300),
+    ):
+        handler = Rivals2ConfigHandler()
+        result = handler.apply(
+            {"auto_vrr_fps_cap": True, "vrr_cap_policy": "fighting_60hz_nosync"}
+        )
+
+    assert result["success"] is True
+    assert "FrameRateLimit=300" in ini_path.read_text(encoding="utf-8")
+
+
+def test_verify_treats_0_and_999_frame_rate_as_equivalent_uncapped(tmp_path: Path) -> None:
+    """The game's UI writes 999 for uncapped; UE treats 0 the same. No drift."""
+    config_dir = tmp_path / "Rivals2" / "Saved" / "Config" / "Windows"
+    ini_path = config_dir / "GameUserSettings.ini"
+    _write_game_user_settings(ini_path, "FrameRateLimit=999\n")
+
+    with patch("abso.settings.rivals2_config._get_rivals2_config_dir", return_value=config_dir):
+        handler = Rivals2ConfigHandler()
+        verify_zero_target = handler.verify_active({"frame_rate_limit": 0})
+        verify_native_target = handler.verify_active({"frame_rate_limit": 999})
+
+    assert verify_zero_target["settings"]["frame_rate_limit"]["active"] is True
+    assert verify_zero_target["all_active"] is True
+    assert verify_native_target["settings"]["frame_rate_limit"]["active"] is True
+
+
+def test_verify_real_cap_mismatch_still_reports_drift(tmp_path: Path) -> None:
+    """Uncapped equivalence must not swallow genuine cap drift."""
+    config_dir = tmp_path / "Rivals2" / "Saved" / "Config" / "Windows"
+    ini_path = config_dir / "GameUserSettings.ini"
+    _write_game_user_settings(ini_path, "FrameRateLimit=999\n")
+
+    with patch("abso.settings.rivals2_config._get_rivals2_config_dir", return_value=config_dir):
+        handler = Rivals2ConfigHandler()
+        verify = handler.verify_active({"frame_rate_limit": 240})
+
+    assert verify["settings"]["frame_rate_limit"]["active"] is False
+    assert verify["all_active"] is False
+
+
 def test_detect_reads_hdr_settings(tmp_path: Path) -> None:
     config_dir = tmp_path / "Rivals2" / "Saved" / "Config" / "Windows"
     ini_path = config_dir / "GameUserSettings.ini"

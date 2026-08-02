@@ -34,6 +34,10 @@ class InterruptModeHandler(SettingsHandler):
     # CRITICAL apply failure.
     is_critical_verify = False
 
+    # backup() resolves GPU PCI instances via WMI; keep it on the main thread
+    # during the concurrent backup scan (see SettingsHandler).
+    backup_requires_main_thread = True
+
     @property
     def restore_guarantee(self) -> str:
         # Best-effort: the Enum\PCI keys can be ACL-restricted, so a failed

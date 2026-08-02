@@ -18,7 +18,7 @@ class TestKeepAwakeFlag:
     def test_non_emulator_profiles_do_not_keep_awake(self) -> None:
         # Fullscreen shooters self-assert display-required; desktop must sleep.
         assert _profile("overwatch2").keep_awake_while_gaming is False
-        assert _profile("rivals2-online").keep_awake_while_gaming is False
+        assert _profile("rivals2-nosync").keep_awake_while_gaming is False
         assert _profile("productivity").keep_awake_while_gaming is False
 
 

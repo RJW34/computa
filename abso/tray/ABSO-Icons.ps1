@@ -788,10 +788,10 @@ function Resolve-GameVisualIdentityGroup {
         "-online-gsync-hdr-capture", "-online-gsync-hdr",
         "-gsync-hdr-capture", "-gsync-capture",
         "-online-gsync", "-offline-gsync-hdr",
-        "-offline-hdr", "-online-hdr", "-console-parity-hdr",
+        "-offline-hdr", "-online-hdr", "-nosync-hdr", "-console-parity-hdr",
         "-universal-hdr", "-gsync-hdr", "-tournament-sim-144hz",
         "-console-parity", "-300hz-max", "-streaming-hdr", "-streaming",
-        "-offline", "-online", "-vrr-lab", "-gsync", "-hdr", "-sdr",
+        "-offline", "-online", "-nosync", "-vrr-lab", "-gsync", "-hdr", "-sdr",
         "-universal", "-capture"
     )
     foreach ($suffix in $variantSuffixes) {

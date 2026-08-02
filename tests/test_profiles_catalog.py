@@ -50,12 +50,28 @@ def test_catalog_keys_match_profile_id_property() -> None:
         assert entry.profile_class().profile_id == profile_id
 
 
-def test_retired_rivals_aliases_resolve_to_offline_profile() -> None:
-    """Retired generic Rivals ids should canonicalize to the consolidated offline lane."""
+def test_retired_rivals_aliases_resolve_to_nosync_profile() -> None:
+    """Retired generic Rivals ids should canonicalize to the merged no-sync lane."""
     assert "rivals2" not in PROFILE_CATALOG
     assert "rivals2-300hz-max" not in PROFILE_CATALOG
-    assert resolve_profile_id("rivals2") == "rivals2-offline"
-    assert resolve_profile_id("rivals2-300hz-max") == "rivals2-offline"
+    assert resolve_profile_id("rivals2") == "rivals2-nosync"
+    assert resolve_profile_id("rivals2-300hz-max") == "rivals2-nosync"
+
+
+def test_retired_offline_online_split_ids_resolve_to_merged_lanes() -> None:
+    """2026-07 consolidation: every pre-merge lane ID redirects to its successor."""
+    retired_to_canonical = {
+        "rivals2-offline": "rivals2-nosync",
+        "rivals2-offline-hdr": "rivals2-nosync-hdr",
+        "rivals2-online": "rivals2-nosync",
+        "rivals2-online-hdr": "rivals2-nosync-hdr",
+        "rivals2-online-gsync": "rivals2-gsync",
+        "rivals2-online-gsync-hdr": "rivals2-gsync-hdr",
+        "rivals2-online-gsync-hdr-capture": "rivals2-gsync-hdr-capture",
+    }
+    for retired, canonical in retired_to_canonical.items():
+        assert retired not in PROFILE_CATALOG, retired
+        assert resolve_profile_id(retired) == canonical, retired
 
 
 def test_profile_id_conflict_kind_distinguishes_reserved_ids() -> None:
@@ -91,15 +107,13 @@ def test_user_profiles_cannot_shadow_retired_aliases(tmp_path, monkeypatch) -> N
 
     assert "custom-rivals2" in manifest
     assert "rivals2" not in manifest
-    assert resolve_profile_id("rivals2") == "rivals2-offline"
+    assert resolve_profile_id("rivals2") == "rivals2-nosync"
 
 
 def test_rivals2_hdr_variants_are_registered_and_streaming_aliases_resolve() -> None:
     """Rivals 2 should expose explicit HDR tray entries while retired streaming ids resolve."""
-    assert "rivals2-offline-hdr" in PROFILE_CATALOG
-    assert "rivals2-online-hdr" in PROFILE_CATALOG
+    assert "rivals2-nosync-hdr" in PROFILE_CATALOG
     assert "rivals2-gsync-hdr" in PROFILE_CATALOG
-    assert "rivals2-online-gsync-hdr" in PROFILE_CATALOG
     assert "rivals2-tournament-sim-144hz" not in PROFILE_CATALOG
     assert "fortnite-streaming" not in PROFILE_CATALOG
     assert "fortnite-streaming-hdr" not in PROFILE_CATALOG
@@ -112,19 +126,17 @@ def test_rivals2_hdr_variants_are_registered_and_streaming_aliases_resolve() -> 
     assert "slippi-melee-streaming" not in PROFILE_CATALOG
     assert "slippi-melee-vrr-lab" not in PROFILE_CATALOG
 
-    assert resolve_profile_id("rivals2-offline-hdr") == "rivals2-offline-hdr"
-    assert resolve_profile_id("rivals2-online-hdr") == "rivals2-online-hdr"
+    assert resolve_profile_id("rivals2-nosync-hdr") == "rivals2-nosync-hdr"
     assert resolve_profile_id("rivals2-gsync-hdr") == "rivals2-gsync-hdr"
-    assert resolve_profile_id("rivals2-online-gsync-hdr") == "rivals2-online-gsync-hdr"
-    assert resolve_profile_id("rivals2-tournament-sim-144hz") == "rivals2-offline"
+    assert resolve_profile_id("rivals2-tournament-sim-144hz") == "rivals2-nosync"
     assert resolve_profile_id("fortnite-streaming") == "fortnite"
     assert resolve_profile_id("fortnite-streaming-hdr") == "fortnite-hdr"
     assert resolve_profile_id("overwatch2-gsync-streaming") == "overwatch2-gsync"
     assert resolve_profile_id("overwatch2-gsync-hdr-streaming") == "overwatch2-gsync-hdr"
     assert resolve_profile_id("pacdeluxe-streaming") == "pacdeluxe"
     assert resolve_profile_id("ryujinx-ssbu-streaming") == "ryujinx-ssbu"
-    assert resolve_profile_id("rivals2-streaming") == "rivals2-online"
-    assert resolve_profile_id("rivals2-streaming-hdr") == "rivals2-online-hdr"
+    assert resolve_profile_id("rivals2-streaming") == "rivals2-nosync"
+    assert resolve_profile_id("rivals2-streaming-hdr") == "rivals2-nosync-hdr"
     assert resolve_profile_id("slippi-melee-streaming") == "slippi-melee"
     assert resolve_profile_id("slippi-melee-vrr-lab") == "slippi-melee"
 
@@ -190,16 +202,11 @@ def test_tray_manifest_groups_variants_by_game_once() -> None:
         assert len(names) == 1
 
     assert set(groups["rivals2"]) == {
-        "rivals2-offline",
-        "rivals2-offline-hdr",
-        "rivals2-online",
-        "rivals2-online-hdr",
+        "rivals2-nosync",
+        "rivals2-nosync-hdr",
         "rivals2-gsync",
         "rivals2-gsync-hdr",
         "rivals2-gsync-hdr-capture",
-        "rivals2-online-gsync",
-        "rivals2-online-gsync-hdr",
-        "rivals2-online-gsync-hdr-capture",
     }
     assert set(groups["slippi-melee"]) == {
         "slippi-melee",
@@ -220,7 +227,7 @@ def test_tray_manifest_groups_variants_by_game_once() -> None:
 
 
 def test_tray_rank_orders_rivals2_variants_for_users() -> None:
-    """Rivals 2 tray variants should sort by online/offline, then sync, then HDR."""
+    """Rivals 2 tray variants sort most-used first: G-SYNC HDR, capture, then hidden-tier lanes."""
     profiles = [
         profile
         for profile in get_profile_manifest()
@@ -228,16 +235,11 @@ def test_tray_rank_orders_rivals2_variants_for_users() -> None:
     ]
 
     assert [profile["id"] for profile in sorted(profiles, key=lambda item: item["tray_rank"])] == [
-        "rivals2-online",
-        "rivals2-online-hdr",
-        "rivals2-online-gsync",
-        "rivals2-online-gsync-hdr",
-        "rivals2-online-gsync-hdr-capture",
-        "rivals2-offline",
-        "rivals2-offline-hdr",
-        "rivals2-gsync",
         "rivals2-gsync-hdr",
         "rivals2-gsync-hdr-capture",
+        "rivals2-gsync",
+        "rivals2-nosync-hdr",
+        "rivals2-nosync",
     ]
 
 
@@ -292,12 +294,9 @@ def test_rivals2_hdr_catalog_reports_windows_hdr_composition() -> None:
     manifest = {profile["id"]: profile for profile in get_profile_manifest()}
 
     for profile_id in (
-        "rivals2-offline-hdr",
-        "rivals2-online-hdr",
+        "rivals2-nosync-hdr",
         "rivals2-gsync-hdr",
         "rivals2-gsync-hdr-capture",
-        "rivals2-online-gsync-hdr",
-        "rivals2-online-gsync-hdr-capture",
     ):
         text = " ".join(
             str(manifest[profile_id].get(key, ""))

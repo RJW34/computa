@@ -252,12 +252,47 @@ class TestPowerApply:
         assert result["error"] is not None
 
 
+class TestPowerDetectPlanReuse:
+    """detect() derives Ultimate Performance presence from one /list result."""
+
+    @patch.object(PowerSettingsHandler, "_get_active_plan")
+    @patch.object(PowerSettingsHandler, "_run_powercfg")
+    def test_detect_spawns_one_list_query(self, mock_run, mock_active):
+        """has_ultimate_performance reuses the /list output (no second spawn)."""
+        mock_active.return_value = {"guid": "g", "name": "Balanced"}
+        mock_run.return_value = MagicMock(
+            returncode=0,
+            stdout=(
+                "Power Scheme GUID: 11111111-2222-3333-4444-555555555555  (Balanced)\n"
+                "Power Scheme GUID: 22222222-3333-4444-5555-666666666666  "
+                "(Ultimate Performance)\n"
+            ),
+        )
+
+        handler = PowerSettingsHandler()
+        result = handler.detect()
+
+        assert result["has_ultimate_performance"] is True
+        list_calls = [c for c in mock_run.call_args_list if c.args and c.args[0] == "/list"]
+        assert len(list_calls) == 1
+
+    @patch.object(PowerSettingsHandler, "_get_active_plan")
+    @patch.object(PowerSettingsHandler, "_list_plans")
+    def test_detect_reports_missing_ultimate_performance(self, mock_list, mock_active):
+        mock_active.return_value = {"guid": "g", "name": "Balanced"}
+        mock_list.return_value = [{"guid": "g", "name": "Balanced"}]
+
+        handler = PowerSettingsHandler()
+        assert handler.detect()["has_ultimate_performance"] is False
+
+
 class TestPowerBackupRestore:
     """Tests for PowerSettingsHandler backup/restore."""
 
+    @patch.object(PowerSettingsHandler, "_get_power_setting", return_value=None)
     @patch.object(PowerSettingsHandler, "detect")
-    def test_backup_returns_active_plan(self, mock_detect):
-        """Test backup returns active plan GUID."""
+    def test_backup_returns_active_plan(self, mock_detect, mock_single):
+        """Test backup returns active plan GUID via per-setting reads."""
         mock_detect.return_value = {
             "active_plan": {"guid": "test-guid-123", "name": "Test Plan"},
         }
@@ -266,6 +301,9 @@ class TestPowerBackupRestore:
         result = handler.backup()
 
         assert result["active_plan"] == "test-guid-123"
+        # The five sub-settings are read with targeted queries (measured
+        # faster than a full /qh dump on real hardware).
+        assert mock_single.call_count == 5
 
     @patch.object(PowerSettingsHandler, "_set_active_plan")
     def test_restore_sets_active_plan(self, mock_set_active):

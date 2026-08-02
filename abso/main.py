@@ -1071,7 +1071,7 @@ def apply(
 ) -> None:
     """Apply a game optimization profile.
 
-    PROFILE_NAME is the profile to apply (e.g., slippi-melee, rivals2-online, diablo4).
+    PROFILE_NAME is the profile to apply (e.g., slippi-melee, rivals2-nosync, diablo4).
     """
     profile_name = resolve_profile_id(profile_name) or profile_name
     current_profile = get_current_profile()
@@ -1993,7 +1993,7 @@ def reapply(json_output: bool) -> None:
 def verify(profile_name: str, json_output: bool) -> None:
     """Verify that a profile's verifiable settings are active.
 
-    PROFILE_NAME is the profile to verify (e.g., slippi-melee, rivals2-online, diablo4).
+    PROFILE_NAME is the profile to verify (e.g., slippi-melee, rivals2-nosync, diablo4).
 
     This checks every handler that implements verify_active and helps confirm
     the machine is actually in the intended end state after apply.

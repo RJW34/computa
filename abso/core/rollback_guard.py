@@ -69,9 +69,16 @@ class RollbackGuard:
         "matchmaking",
     }
 
-    # Profile IDs that are explicitly online profiles
+    # Profile IDs that are explicitly online profiles (fallback for profiles
+    # without the is_online_profile property; the merged Rivals lanes all
+    # report True via metadata, these are belt-and-suspenders).
     ONLINE_PROFILE_IDS = {
-        "rivals2-online",
+        "rivals2-nosync",
+        "rivals2-nosync-hdr",
+        "rivals2-gsync",
+        "rivals2-gsync-hdr",
+        "rivals2-gsync-hdr-capture",
+        "rivals2-online",  # retired ID, kept for stale references
     }
 
     # Prohibited NVIDIA settings for rollback profiles

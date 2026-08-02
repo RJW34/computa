@@ -363,7 +363,7 @@ profile_overrides:
         config_path = tmp_path / "config.yaml"
         config_path.write_text("""
 profile_overrides:
-  rivals2-offline:
+  rivals2-nosync:
     nvidia:
       preset: minimum_latency
 """)
@@ -389,7 +389,7 @@ profile_overrides:
         manager = ConfigManager(config_path)
         manager.load()
 
-        overrides = manager.get_profile_overrides("rivals2-offline")
+        overrides = manager.get_profile_overrides("rivals2-nosync")
 
         assert overrides is not None
         assert overrides.nvidia["preset"] == "minimum_latency"

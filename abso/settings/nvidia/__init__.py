@@ -1180,7 +1180,7 @@ class NvidiaSettingsHandler(SettingsHandler):
                 name = profile.get("name", "")
                 num_apps = profile.get("num_apps", 0)
 
-                # Skip the profile we're about to use
+                # Skip the exact profile we're about to use.
                 if name == target_profile_name:
                     continue
 
@@ -1191,7 +1191,8 @@ class NvidiaSettingsHandler(SettingsHandler):
                 # Match patterns: "ABSO - <anything>", "<base> - <variant>"
                 name_lower = name.lower()
                 if (
-                    name_lower.startswith("abso -")
+                    name_lower == base_lower
+                    or name_lower.startswith("abso -")
                     or name_lower.startswith(f"{base_lower} -")
                     or name_lower.startswith(f"{base_lower} –")  # en-dash variant
                 ):

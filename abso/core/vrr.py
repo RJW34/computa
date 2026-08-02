@@ -108,6 +108,17 @@ VRR_FPS_CAPS: dict[int, int] = {
 
 OW2_REFLEX_GSYNC_CAP_POLICY = "ow2_reflex_gsync"
 
+# Fixed-60Hz-simulation fighting games (Rivals 2 and similar platform
+# fighters) tick game logic on a hard 60 Hz grid. Community testing on
+# Rivals 2 consistently shows that only render caps that are whole
+# multiples of 60 produce an even sim-to-photon cadence; generic
+# ``refresh - 3`` caps (297 @ 300 Hz, 237 @ 240 Hz, 141 @ 144 Hz) land
+# off-grid, alternating 4/5 rendered frames per sim tick, which reads as
+# low-frequency micro-stutter. These policies snap caps to the sim grid.
+FIGHTING_SIM_RATE_HZ = 60
+FIGHTING_60HZ_VRR_CAP_POLICY = "fighting_60hz_vrr"
+FIGHTING_60HZ_NOSYNC_CAP_POLICY = "fighting_60hz_nosync"
+
 REFLEX_GSYNC_FRAME_TIME_MARGIN_MS = 0.29
 
 REFLEX_GSYNC_FPS_CAPS: dict[int, int] = {
@@ -173,6 +184,35 @@ def get_reflex_gsync_fps_cap(refresh_rate: int | float) -> int:
     return max(1, min(rounded_refresh - 1, round(1000.0 / frame_time_ms)))
 
 
+def get_fighting_60hz_vrr_cap(refresh_rate: int | float) -> int:
+    """VRR cap for fixed-60Hz-sim games: largest multiple of 60 <= refresh - 3.
+
+    Keeps the cap below refresh so G-SYNC stays engaged and the NVCP V-SYNC
+    safety net never trips, while landing on the 60 Hz sim grid for an even
+    frames-per-tick cadence (240 @ 300 Hz, 180 @ 240 Hz, 120 @ 144 Hz).
+    Falls back to the generic ``refresh - 3`` cap when no multiple of 60
+    fits under the margin (i.e. 60 Hz panels).
+    """
+    rounded = round(float(refresh_rate))
+    snapped = ((rounded - 3) // FIGHTING_SIM_RATE_HZ) * FIGHTING_SIM_RATE_HZ
+    if snapped >= FIGHTING_SIM_RATE_HZ:
+        return snapped
+    return get_vrr_fps_cap(rounded)
+
+
+def get_fighting_60hz_nosync_cap(refresh_rate: int | float) -> int:
+    """No-sync cap for fixed-60Hz-sim games: largest multiple of 60 <= refresh.
+
+    Without G-SYNC/V-SYNC in the path there is no below-refresh margin to
+    protect; the cap exists to hold the 60 Hz sim-grid cadence and keep
+    render load bounded (preserving CPU headroom for rollback
+    resimulation bursts) instead of rendering unbounded duplicate frames.
+    """
+    rounded = round(float(refresh_rate))
+    snapped = (rounded // FIGHTING_SIM_RATE_HZ) * FIGHTING_SIM_RATE_HZ
+    return max(FIGHTING_SIM_RATE_HZ, snapped)
+
+
 def get_vrr_fps_cap_for_policy(
     refresh_rate: int | float,
     policy: str | None = None,
@@ -183,6 +223,10 @@ def get_vrr_fps_cap_for_policy(
         return get_vrr_fps_cap(refresh_rate)
     if normalized in {OW2_REFLEX_GSYNC_CAP_POLICY, "reflex_gsync"}:
         return get_reflex_gsync_fps_cap(refresh_rate)
+    if normalized in {FIGHTING_60HZ_VRR_CAP_POLICY, "fighting_60hz"}:
+        return get_fighting_60hz_vrr_cap(refresh_rate)
+    if normalized == FIGHTING_60HZ_NOSYNC_CAP_POLICY:
+        return get_fighting_60hz_nosync_cap(refresh_rate)
     raise ValueError(f"Unknown VRR FPS cap policy: {policy!r}")
 
 

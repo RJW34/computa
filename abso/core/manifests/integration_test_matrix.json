@@ -83,8 +83,8 @@
       }
     },
     {
-      "id": "apply-rivals2-offline",
-      "profile_id": "rivals2-offline",
+      "id": "apply-rivals2-nosync",
+      "profile_id": "rivals2-nosync",
       "kind": "apply_profile",
       "assumptions": [
         "administrator",
@@ -96,35 +96,8 @@
       }
     },
     {
-      "id": "apply-rivals2-offline-hdr",
-      "profile_id": "rivals2-offline-hdr",
-      "kind": "apply_profile",
-      "assumptions": [
-        "administrator",
-        "nvidia_gpu",
-        "hdr_capable"
-      ],
-      "expected": {
-        "transaction_state": "committed",
-        "apply_success": true
-      }
-    },
-    {
-      "id": "apply-rivals2-online",
-      "profile_id": "rivals2-online",
-      "kind": "apply_profile",
-      "assumptions": [
-        "administrator",
-        "nvidia_gpu"
-      ],
-      "expected": {
-        "transaction_state": "committed",
-        "apply_success": true
-      }
-    },
-    {
-      "id": "apply-rivals2-online-hdr",
-      "profile_id": "rivals2-online-hdr",
+      "id": "apply-rivals2-nosync-hdr",
+      "profile_id": "rivals2-nosync-hdr",
       "kind": "apply_profile",
       "assumptions": [
         "administrator",
@@ -166,52 +139,8 @@
       }
     },
     {
-      "id": "apply-rivals2-online-gsync",
-      "profile_id": "rivals2-online-gsync",
-      "kind": "apply_profile",
-      "assumptions": [
-        "administrator",
-        "nvidia_gpu",
-        "vrr_confirmed"
-      ],
-      "expected": {
-        "transaction_state": "committed",
-        "apply_success": true
-      }
-    },
-    {
       "id": "apply-rivals2-gsync-hdr-capture",
       "profile_id": "rivals2-gsync-hdr-capture",
-      "kind": "apply_profile",
-      "assumptions": [
-        "administrator",
-        "nvidia_gpu",
-        "vrr_confirmed",
-        "hdr_capable"
-      ],
-      "expected": {
-        "transaction_state": "committed",
-        "apply_success": true
-      }
-    },
-    {
-      "id": "apply-rivals2-online-gsync-hdr-capture",
-      "profile_id": "rivals2-online-gsync-hdr-capture",
-      "kind": "apply_profile",
-      "assumptions": [
-        "administrator",
-        "nvidia_gpu",
-        "vrr_confirmed",
-        "hdr_capable"
-      ],
-      "expected": {
-        "transaction_state": "committed",
-        "apply_success": true
-      }
-    },
-    {
-      "id": "apply-rivals2-online-gsync-hdr",
-      "profile_id": "rivals2-online-gsync-hdr",
       "kind": "apply_profile",
       "assumptions": [
         "administrator",
@@ -297,6 +226,21 @@
     {
       "id": "apply-counter-strike-2-gsync-hdr",
       "profile_id": "counter-strike-2-gsync-hdr",
+      "kind": "apply_profile",
+      "assumptions": [
+        "administrator",
+        "nvidia_gpu",
+        "vrr_confirmed",
+        "hdr_capable"
+      ],
+      "expected": {
+        "transaction_state": "committed",
+        "apply_success": true
+      }
+    },
+    {
+      "id": "apply-counter-strike-2-gsync-hdr-capture",
+      "profile_id": "counter-strike-2-gsync-hdr-capture",
       "kind": "apply_profile",
       "assumptions": [
         "administrator",

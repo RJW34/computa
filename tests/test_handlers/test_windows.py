@@ -2125,10 +2125,9 @@ class TestHdrProfilesWCGIntegration:
             ("abso.profiles.marvel_rivals", "MarvelRivalsHDRProfile"),
             ("abso.profiles.fortnite", "FortniteHDRProfile"),
             ("abso.profiles.diablo4", "Diablo4Profile"),
-            ("abso.profiles.rivals2_offline", "Rivals2OfflineHDRProfile"),
-            ("abso.profiles.rivals2_online", "Rivals2OnlineHDRProfile"),
+            ("abso.profiles.rivals2_nosync", "Rivals2NoSyncHDRProfile"),
             ("abso.profiles.rivals2_gsync", "Rivals2GSyncHDRProfile"),
-            ("abso.profiles.rivals2_gsync", "Rivals2OnlineGSyncHDRProfile"),
+            ("abso.profiles.rivals2_gsync", "Rivals2GSyncHDRCaptureProfile"),
         ],
     )
     def test_hdr_profiles_pair_hdr_with_advanced_color(

@@ -1,16 +1,16 @@
 """Legacy Rivals 2 profile alias.
 
 This ID remains importable for compatibility, but the shipped catalog now
-consolidates generic Rivals usage onto the explicit offline/training lane.
+consolidates generic Rivals usage onto the merged no-sync lane.
 """
 
 from __future__ import annotations
 
-from abso.profiles.rivals2_offline import Rivals2OfflineProfile
+from abso.profiles.rivals2_nosync import Rivals2NoSyncProfile
 
 
-class Rivals2Profile(Rivals2OfflineProfile):
-    """Backward-compatible alias of the offline/training Rivals 2 profile."""
+class Rivals2Profile(Rivals2NoSyncProfile):
+    """Backward-compatible alias of the merged no-sync Rivals 2 profile."""
 
     @property
     def profile_id(self) -> str:
@@ -22,4 +22,4 @@ class Rivals2Profile(Rivals2OfflineProfile):
 
     @property
     def description(self) -> str:
-        return "Legacy alias for the offline/training Rivals 2 profile"
+        return "Legacy alias for the merged no-sync Rivals 2 profile"

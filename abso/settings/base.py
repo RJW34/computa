@@ -16,6 +16,12 @@ class SettingsHandler(ABC):
     this interface to provide consistent behavior across the application.
     """
 
+    # The backup scan runs handlers concurrently on worker threads. Handlers
+    # whose backup() reaches COM/WMI must set this True so the scan keeps them
+    # on the main thread: WMI proxies created inside a worker apartment leak a
+    # release-after-CoUninitialize warning at interpreter shutdown.
+    backup_requires_main_thread: bool = False
+
     @abstractmethod
     def detect(self) -> dict[str, Any]:
         """Detect current state of settings.

@@ -1243,6 +1243,48 @@ class DRSProfileManager:
             return {}
 
     @staticmethod
+    def _profile_name_matches(left: str | None, right: str | None) -> bool:
+        """Return whether two DRS profile names should be treated as the same family."""
+        if left is None or right is None:
+            return False
+        return str(left).casefold() == str(right).casefold()
+
+    @classmethod
+    def _matching_profile_infos(
+        cls,
+        profile_index: dict[str, dict[str, Any]],
+        profile_name: str,
+    ) -> list[dict[str, Any]]:
+        """Return exact and case-insensitive matches for a driver profile name.
+
+        NVIDIA's predefined database is not capitalization-stable across all
+        titles and driver branches (for example, "Counter-strike 2" vs
+        "Counter-Strike 2"). Prefer exact matches first, then same-name
+        matches with the driver's actual casing.
+        """
+        matches: list[dict[str, Any]] = []
+        exact = profile_index.get(profile_name)
+        if exact:
+            matches.append(exact)
+
+        for name, info in profile_index.items():
+            if name == profile_name:
+                continue
+            if cls._profile_name_matches(name, profile_name):
+                matches.append(info)
+
+        return matches
+
+    @staticmethod
+    def _profile_app_count(profile_info: dict[str, Any] | None) -> int:
+        if not profile_info:
+            return 0
+        try:
+            return int(profile_info.get("num_apps", 0))
+        except (TypeError, ValueError):
+            return 0
+
+    @staticmethod
     def _is_predefined_profile(profile_info: dict[str, Any] | None) -> bool:
         """Return whether a profile comes from NVIDIA's predefined database."""
         return bool(profile_info and profile_info.get("is_predefined"))
@@ -1320,28 +1362,46 @@ class DRSProfileManager:
 
         Preference order:
         1. Requested profile when it already exists and is bound.
-        2. First bound legacy alias profile.
-        3. Requested profile (existing but unbound, or to be created).
+        2. Bound case-insensitive match for the requested profile.
+        3. First bound legacy alias profile (also case-insensitive).
+        4. Requested profile (existing but unbound, or to be created).
         """
         profile_index = cls._build_profile_index(drs)
+        requested_matches = cls._matching_profile_infos(profile_index, requested_profile_name)
         requested_info = profile_index.get(requested_profile_name)
-        requested_num_apps = int(requested_info.get("num_apps", 0)) if requested_info else 0
+        requested_num_apps = cls._profile_app_count(requested_info)
 
         if requested_info and requested_num_apps > 0:
             return requested_profile_name, requested_num_apps, None
+
+        for info in requested_matches:
+            actual_name = str(info.get("name") or "")
+            actual_num_apps = cls._profile_app_count(info)
+            if actual_name == requested_profile_name or actual_num_apps <= 0:
+                continue
+            return (
+                actual_name,
+                actual_num_apps,
+                (
+                    f"Reusing existing bound NVIDIA profile '{actual_name}' "
+                    f"instead of unbound requested profile '{requested_profile_name}'."
+                ),
+            )
 
         for alias in profile_aliases or []:
             if not alias or alias == requested_profile_name:
                 continue
 
-            alias_info = profile_index.get(alias)
-            alias_num_apps = int(alias_info.get("num_apps", 0)) if alias_info else 0
-            if alias_info and alias_num_apps > 0:
+            for alias_info in cls._matching_profile_infos(profile_index, alias):
+                alias_num_apps = cls._profile_app_count(alias_info)
+                if alias_num_apps <= 0:
+                    continue
+                alias_name = str(alias_info.get("name") or alias)
                 return (
-                    alias,
+                    alias_name,
                     alias_num_apps,
                     (
-                        f"Reusing existing bound NVIDIA profile '{alias}' "
+                        f"Reusing existing bound NVIDIA profile '{alias_name}' "
                         f"instead of unbound requested profile '{requested_profile_name}'."
                     ),
                 )

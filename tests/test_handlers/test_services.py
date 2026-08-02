@@ -8,8 +8,9 @@ from abso.settings.services import ServicesSettingsHandler
 class TestServicesDetect:
     """Tests for ServicesSettingsHandler.detect()."""
 
+    @patch("abso.settings.services.query_services", return_value=None)
     @patch.object(ServicesSettingsHandler, "_get_service_info")
-    def test_detect_returns_services_dict(self, mock_get_info):
+    def test_detect_returns_services_dict(self, mock_get_info, _mock_bulk):
         """Test detect returns dictionary with services key."""
         mock_get_info.return_value = {
             "exists": True,
@@ -23,9 +24,10 @@ class TestServicesDetect:
         assert "services" in result
         assert isinstance(result["services"], dict)
 
+    @patch("abso.settings.services.query_services", return_value=None)
     @patch.object(ServicesSettingsHandler, "_get_service_info")
-    def test_detect_queries_all_gaming_services(self, mock_get_info):
-        """Test detect queries all configured gaming services."""
+    def test_detect_queries_all_gaming_services(self, mock_get_info, _mock_bulk):
+        """Test detect falls back per-service when the bulk SCM query fails."""
         mock_get_info.return_value = {"exists": True, "start_type": 2}
 
         handler = ServicesSettingsHandler()
@@ -34,8 +36,9 @@ class TestServicesDetect:
         # Should have queried each service in GAMING_SERVICES
         assert mock_get_info.call_count == len(handler.GAMING_SERVICES)
 
+    @patch("abso.settings.services.query_services", return_value=None)
     @patch.object(ServicesSettingsHandler, "_get_service_info")
-    def test_detect_handles_missing_service(self, mock_get_info):
+    def test_detect_handles_missing_service(self, mock_get_info, _mock_bulk):
         """Test detect handles services that don't exist."""
         mock_get_info.return_value = {"exists": False}
 
@@ -44,6 +47,41 @@ class TestServicesDetect:
 
         # Should not crash, should return empty/false for missing services
         assert result is not None
+
+    @patch.object(ServicesSettingsHandler, "_get_service_info")
+    def test_detect_uses_bulk_scm_answers_without_sc_spawns(self, mock_get_info):
+        """A definitive bulk answer must not trigger any per-service sc query."""
+        bulk = {
+            name: {"exists": True, "start_type": 3, "state": "stopped"}
+            for name in ServicesSettingsHandler.GAMING_SERVICES
+        }
+        with patch("abso.settings.services.query_services", return_value=bulk):
+            handler = ServicesSettingsHandler()
+            result = handler.detect()
+
+        assert mock_get_info.call_count == 0
+        assert all(
+            info == {"exists": True, "start_type": 3, "state": "stopped"}
+            for info in result["services"].values()
+        )
+
+    @patch.object(ServicesSettingsHandler, "_get_service_info")
+    def test_detect_falls_back_per_service_on_indefinite_bulk_answer(self, mock_get_info):
+        """A None entry in the bulk result falls back to sc for that service only."""
+        names = list(ServicesSettingsHandler.GAMING_SERVICES)
+        bulk: dict = {
+            name: {"exists": True, "start_type": 2, "state": "running"} for name in names
+        }
+        bulk[names[0]] = None  # e.g. access denied on OpenService
+        mock_get_info.return_value = {"exists": True, "start_type": 4, "state": None}
+
+        with patch("abso.settings.services.query_services", return_value=bulk):
+            handler = ServicesSettingsHandler()
+            result = handler.detect()
+
+        mock_get_info.assert_called_once_with(names[0])
+        assert result["services"][names[0]]["start_type"] == 4
+        assert result["services"][names[1]]["start_type"] == 2
 
 
 class TestServicesAudit:

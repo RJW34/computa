@@ -8,6 +8,7 @@ from typing import Any, Literal, cast
 
 from abso.core.models import Issue
 from abso.settings.base import SettingsHandler
+from abso.utils.win_services import query_services
 
 # Type alias for severity levels
 SeverityType = Literal["critical", "warning", "info"]
@@ -85,13 +86,22 @@ class ServicesSettingsHandler(SettingsHandler):
     START_DISABLED = 4
 
     def detect(self) -> dict[str, Any]:
-        """Detect current service states."""
+        """Detect current service states.
+
+        Queries all services over one SCM connection; any service the bulk
+        query cannot answer definitively falls back to the per-service
+        ``sc`` reader.
+        """
         result: dict[str, Any] = {
             "services": {},
         }
 
-        for service_name in self.GAMING_SERVICES:
-            service_info = self._get_service_info(service_name)
+        names = list(self.GAMING_SERVICES)
+        bulk = query_services(names) or {}
+        for service_name in names:
+            service_info = bulk.get(service_name)
+            if service_info is None:
+                service_info = self._get_service_info(service_name)
             result["services"][service_name] = service_info
 
         return result

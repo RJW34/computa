@@ -128,6 +128,91 @@ def test_apply_settings_to_app_reuses_bound_legacy_alias_when_requested_profile_
     fake_drs.find_profile_by_name.assert_called_with("Rivals 2 Online")
 
 
+def test_probe_profile_binding_reuses_bound_case_variant_before_empty_exact_duplicate():
+    """Case-only NVIDIA profile name drift should not strand a strict profile on an empty duplicate."""
+    manager = DRSProfileManager()
+
+    empty_duplicate = object()
+    bound_predefined = object()
+    fake_drs = MagicMock()
+    fake_drs.enumerate_profiles.return_value = [
+        {"name": "Counter-Strike 2", "num_apps": 0, "is_predefined": False},
+        {"name": "Counter-strike 2", "num_apps": 2, "is_predefined": True},
+    ]
+    fake_drs.find_profile_by_name.side_effect = lambda name: {
+        "Counter-Strike 2": empty_duplicate,
+        "Counter-strike 2": bound_predefined,
+    }.get(name)
+    fake_drs.find_application_owner.return_value = None
+    fake_drs.get_application_info.return_value = None
+
+    class _Ctx:
+        def __enter__(self):
+            return fake_drs
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+    manager._drs = _Ctx()
+
+    result = manager.probe_profile_binding(
+        ["cs2.exe"],
+        profile_name="Counter-Strike 2",
+    )
+
+    assert result["profile_name"] == "Counter-strike 2"
+    assert result["app_binding_safe"] is True
+    assert result["app_binding_state"] == "predefined_profile_trusted"
+    assert "Reusing existing bound NVIDIA profile 'Counter-strike 2'" in (
+        result["profile_selection_note"]
+    )
+
+
+def test_apply_settings_to_app_reuses_bound_case_variant_before_empty_exact_duplicate():
+    """Apply should update the bound driver profile instead of an empty case-variant duplicate."""
+    manager = DRSProfileManager()
+
+    empty_duplicate = object()
+    bound_predefined = object()
+    fake_drs = MagicMock()
+    fake_drs.enumerate_profiles.return_value = [
+        {"name": "Counter-Strike 2", "num_apps": 0, "is_predefined": False},
+        {"name": "Counter-strike 2", "num_apps": 2, "is_predefined": True},
+    ]
+    fake_drs.find_profile_by_name.side_effect = lambda name: {
+        "Counter-Strike 2": empty_duplicate,
+        "Counter-strike 2": bound_predefined,
+    }.get(name)
+    fake_drs.add_application_to_profile.side_effect = (
+        lambda profile, exe: setattr(fake_drs, "_app_binding_statuses", {exe: "already_in_use"})
+    )
+    fake_drs.find_application_owner.return_value = None
+    fake_drs.get_application_info.return_value = None
+
+    class _Ctx:
+        def __enter__(self):
+            return fake_drs
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+    manager._drs = _Ctx()
+    manager._apply_single_setting = MagicMock()
+
+    result = manager.apply_settings_to_app(
+        "cs2.exe",
+        {"vsync": "on"},
+        profile_name="Counter-Strike 2",
+    )
+
+    assert result["profile_name"] == "Counter-strike 2"
+    assert result["app_bound"] is True
+    assert result["app_binding_safe"] is True
+    assert result["app_binding_state"] == "predefined_profile_trusted"
+    assert result["settings_applied"]["vsync"] == "on"
+    fake_drs.find_profile_by_name.assert_called_with("Counter-strike 2")
+
+
 def test_apply_settings_to_app_confirms_existing_binding_when_owner_matches_selected_profile():
     """Existing binding should count as exact when ownership resolves to the selected profile."""
     manager = DRSProfileManager()

@@ -7,6 +7,7 @@ import logging
 import os
 import shutil
 import time
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -24,6 +25,11 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 DEFAULT_MAX_BACKUPS = 20
+
+# Handler backup() scans are independent read-only state exports dominated by
+# subprocess/IO waits, so they overlap safely. Override with
+# ABSO_BACKUP_SCAN_WORKERS (1 forces the sequential in-thread path).
+DEFAULT_BACKUP_SCAN_WORKERS = 8
 
 # Handlers declaring this restore_guarantee cannot be restored end-to-end
 # (e.g. timer resolution reverts on process exit, so there is nothing to
@@ -73,6 +79,80 @@ class BackupRestoreSummary:
             "skipped_components": list(self.skipped_components),
             "failed_components": list(self.failed_components),
         }
+
+
+def _resolve_scan_workers(handler_count: int) -> int:
+    """Resolve the backup scan concurrency, honoring the env override."""
+    raw = os.environ.get("ABSO_BACKUP_SCAN_WORKERS", "")
+    try:
+        configured = int(raw) if raw.strip() else DEFAULT_BACKUP_SCAN_WORKERS
+    except ValueError:
+        configured = DEFAULT_BACKUP_SCAN_WORKERS
+    return max(1, min(configured, handler_count)) if handler_count else 1
+
+
+def _scan_handler_backup(handler: SettingsHandler) -> dict[str, Any]:
+    """Run one handler's backup() export, categorizing errors like the old loop.
+
+    Returns a result record instead of raising so the concurrent scan never
+    loses the error taxonomy. Truly unexpected exceptions are carried back for
+    the caller to re-raise (matching the previous sequential behavior where
+    they aborted the whole backup).
+
+    Handlers whose backup() reaches COM/WMI must set
+    ``backup_requires_main_thread`` so the scan never runs them on a worker
+    thread — a worker-apartment WMI proxy leaks a release-after-
+    CoUninitialize warning at interpreter shutdown.
+    """
+    start = time.perf_counter()
+    try:
+        data = handler.backup()
+        record: dict[str, Any] = {"status": "ok", "data": data}
+    except PermissionError as e:
+        record = {"status": "error", "error": f"Permission denied: {e}", "exception": e}
+    except OSError as e:
+        record = {"status": "error", "error": f"OS error: {e}", "exception": e}
+    except (ValueError, TypeError) as e:
+        record = {"status": "error", "error": f"Data error: {e}", "exception": e}
+    except BaseException as e:  # noqa: BLE001 - carried back and re-raised by the caller
+        record = {"status": "raise", "exception": e}
+    record["duration_ms"] = round((time.perf_counter() - start) * 1000.0, 1)
+    return record
+
+
+def _run_backup_scan(
+    handlers: list[SettingsHandler],
+    workers: int,
+) -> list[dict[str, Any]]:
+    """Scan every handler's backup() and return records in handler order.
+
+    Handlers marked ``backup_requires_main_thread`` (COM/WMI users) run on
+    the calling thread while the rest overlap on the pool; with ``workers``
+    <= 1 everything runs sequentially on the calling thread exactly like the
+    original loop.
+    """
+    if workers <= 1 or len(handlers) <= 1:
+        return [_scan_handler_backup(handler) for handler in handlers]
+
+    records: list[dict[str, Any] | None] = [None] * len(handlers)
+    pool_indexes = [
+        index
+        for index, handler in enumerate(handlers)
+        if not getattr(handler, "backup_requires_main_thread", False)
+    ]
+    main_indexes = [index for index in range(len(handlers)) if index not in set(pool_indexes)]
+
+    with ThreadPoolExecutor(max_workers=min(workers, max(1, len(pool_indexes)))) as pool:
+        futures = {
+            index: pool.submit(_scan_handler_backup, handlers[index]) for index in pool_indexes
+        }
+        # Main-thread handlers run while the pool drains in the background.
+        for index in main_indexes:
+            records[index] = _scan_handler_backup(handlers[index])
+        for index, future in futures.items():
+            records[index] = future.result()
+
+    return [record for record in records if record is not None]
 
 
 def _get_backup_handlers() -> list[SettingsHandler]:
@@ -171,64 +251,77 @@ class BackupManager:
         }
 
         try:
-            for handler in self.handlers:
+            handlers = list(self.handlers)
+            workers = _resolve_scan_workers(len(handlers))
+            scan_start = time.perf_counter()
+            # State exports are independent read-only scans; overlapping them
+            # collapses the wall time to the slowest single handler.
+            scan_records = _run_backup_scan(handlers, workers)
+            manifest["scan_wall_ms"] = round((time.perf_counter() - scan_start) * 1000.0, 1)
+            manifest["scan_workers"] = workers
+
+            for handler, record in zip(handlers, scan_records, strict=True):
                 handler_name = handler.__class__.__name__
                 restore_guarantee = str(getattr(handler, "restore_guarantee", "full"))
+                duration_ms = record.get("duration_ms")
 
+                if record["status"] == "raise":
+                    # Unexpected exception type: abort the whole backup, same
+                    # as when the sequential loop let it propagate.
+                    raise record["exception"]
+
+                if record["status"] == "error":
+                    logger.error(
+                        "Error backing up %s: %s", handler_name, record["error"]
+                    )
+                    manifest["components"][handler_name] = {
+                        "file": None,
+                        "success": False,
+                        "restore_guarantee": restore_guarantee,
+                        "error": record["error"],
+                        "duration_ms": duration_ms,
+                    }
+                    continue
+
+                data = record["data"]
                 try:
-                    data = handler.backup()
-
                     component_path = staging_path / f"{handler_name}.json"
                     atomic_write_json(component_path, data, indent=2)
-
-                    component_success = True
-                    component_note = None
-                    if isinstance(data, dict):
-                        component_success = bool(data.get("success", True))
-                        component_note = data.get("note") or data.get("error")
-
-                    manifest["components"][handler_name] = {
-                        "file": f"{handler_name}.json",
-                        "success": component_success,
-                        "restore_guarantee": restore_guarantee,
-                    }
-
-                    if component_note:
-                        manifest["components"][handler_name]["note"] = str(component_note)
-
-                    if component_success:
-                        logger.info(f"Backed up {handler_name}")
-                    else:
-                        logger.warning(
-                            "Backed up %s with restore unavailable: %s",
-                            handler_name,
-                            component_note or "No restore path was reported",
-                        )
-
-                except PermissionError as e:
-                    logger.error(f"Permission denied backing up {handler_name}: {e}")
-                    manifest["components"][handler_name] = {
-                        "file": None,
-                        "success": False,
-                        "restore_guarantee": restore_guarantee,
-                        "error": f"Permission denied: {e}",
-                    }
-                except OSError as e:
-                    logger.error(f"OS error backing up {handler_name}: {e}")
-                    manifest["components"][handler_name] = {
-                        "file": None,
-                        "success": False,
-                        "restore_guarantee": restore_guarantee,
-                        "error": f"OS error: {e}",
-                    }
-                except (ValueError, TypeError) as e:
-                    logger.error(f"Data error backing up {handler_name}: {e}")
+                except (OSError, ValueError, TypeError) as e:
+                    logger.error(f"Failed writing backup component {handler_name}: {e}")
                     manifest["components"][handler_name] = {
                         "file": None,
                         "success": False,
                         "restore_guarantee": restore_guarantee,
                         "error": f"Data error: {e}",
+                        "duration_ms": duration_ms,
                     }
+                    continue
+
+                component_success = True
+                component_note = None
+                if isinstance(data, dict):
+                    component_success = bool(data.get("success", True))
+                    component_note = data.get("note") or data.get("error")
+
+                manifest["components"][handler_name] = {
+                    "file": f"{handler_name}.json",
+                    "success": component_success,
+                    "restore_guarantee": restore_guarantee,
+                    "duration_ms": duration_ms,
+                }
+
+                if component_note:
+                    manifest["components"][handler_name]["note"] = str(component_note)
+
+                if component_success:
+                    logger.info(f"Backed up {handler_name}")
+                else:
+                    logger.warning(
+                        "Backed up %s with restore unavailable: %s",
+                        handler_name,
+                        component_note or "No restore path was reported",
+                    )
 
             manifest_path = staging_path / "manifest.json"
             atomic_write_json(manifest_path, manifest, indent=2)

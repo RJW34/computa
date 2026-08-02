@@ -1696,6 +1696,7 @@ def test_tray_game_marks_cover_integration_matrix_variants() -> None:
         "-offline-gsync-hdr",
         "-offline-hdr",
         "-online-hdr",
+        "-nosync-hdr",
         "-console-parity-hdr",
         "-universal-hdr",
         "-gsync-hdr",
@@ -1706,6 +1707,7 @@ def test_tray_game_marks_cover_integration_matrix_variants() -> None:
         "-streaming",
         "-offline",
         "-online",
+        "-nosync",
         "-vrr-lab",
         "-gsync",
         "-hdr",
@@ -4283,3 +4285,141 @@ def test_clean_verification_surfaces_verified_status_on_fresh_session() -> None:
     # Both the stale-replacement and fresh-session branches write the same
     # affirmative status format.
     assert script.count('$script:LastAction = "Verified active: $activeName"') >= 2
+
+
+def test_submenu_drop_direction_is_decided_against_root_menu_screen() -> None:
+    """Game-variant flyouts must never open across a monitor seam.
+
+    Live repro (2026-07-22, two 2560x1440 monitors side by side): the root
+    tray menu hugged the primary's right edge (right edge x=2552) and the
+    game flyout opened at x=2560 — entirely on the secondary monitor —
+    because WinForms checks submenu fit against the virtual desktop, not the
+    root menu's own screen. The fix picks DropDownDirection from the working
+    area of the screen hosting the root menu, restoring single-monitor flip
+    behavior.
+    """
+    script = TRAY_SCRIPT.read_text(encoding="utf-8")
+
+    # The decision helper exists and anchors to the root menu's screen.
+    helper = re.search(
+        r"function Get-TraySubmenuDropDownDirection\s*\{(.*?)\n\}",
+        script,
+        re.DOTALL,
+    )
+    assert helper, "Get-TraySubmenuDropDownDirection helper is missing"
+    body = helper.group(1)
+    assert "[System.Windows.Forms.Screen]::FromRectangle($ownerBounds)" in body
+    assert "WorkingArea" in body
+    # Both flip sides are reachable, so left-edge taskbars keep working too.
+    assert "ToolStripDropDownDirection]::Left" in body
+    assert "ToolStripDropDownDirection]::Right" in body
+
+    # Every root-level submenu gets the handler when it is added to the menu:
+    # the ItemAdded hook wires DropDownOpening -> DropDownDirection.
+    item_added = re.search(
+        r"\$menu\.Add_ItemAdded\(\{(.*?)\n    \}\)",
+        script,
+        re.DOTALL,
+    )
+    assert item_added, "Root menu Add_ItemAdded hook is missing"
+    hook = item_added.group(1)
+    assert "Add_DropDownOpening" in hook
+    assert "DropDownDirection = Get-TraySubmenuDropDownDirection" in hook
+
+
+def test_keepawake_constants_live_in_csharp_not_ps_hex_casts() -> None:
+    """PS 5.1 parses 0x80000000 as a negative Int32, so [uint32]0x8... throws.
+
+    The broken form left $script:ES_CONTINUOUS empty at load and every
+    Set-AbsoKeepAwake tick failed with "Specified cast is not valid" (first
+    logged 2026-07-09; keep-awake never actually asserted). The constants
+    must live inside the C# member definition, which parses unsigned hex
+    correctly, and the assert must consume the precomposed ES_AWAKE flag.
+    """
+    for path in (
+        TRAY_SCRIPT, ICONS_SCRIPT, NOTIFICATIONS_SCRIPT, SETTINGS_SCRIPT, QUICK_PANEL_SCRIPT,
+    ):
+        if not path.exists():
+            continue
+        script = path.read_text(encoding="utf-8")
+        assert not re.search(r"\[uint32\]\s*0x[89A-Fa-f]", script), (
+            f"{path.name}: [uint32] cast of a high hex literal is a PS 5.1 "
+            "negative-Int32 pitfall; define the constant in C# instead"
+        )
+
+    tray = TRAY_SCRIPT.read_text(encoding="utf-8")
+    assert "public const uint ES_CONTINUOUS" in tray
+    assert "public const uint ES_AWAKE" in tray
+    assert "[ABSO.PowerState]::SetThreadExecutionState([ABSO.PowerState]::ES_AWAKE)" in tray
+    assert "[ABSO.PowerState]::SetThreadExecutionState([ABSO.PowerState]::ES_CONTINUOUS)" in tray
+    # The rejected-request path is surfaced, not silently swallowed.
+    assert "SetThreadExecutionState rejected the request" in tray
+
+
+def test_launch_sanitizer_stderr_is_deduped_per_session() -> None:
+    """Expected janitor stderr (protected-image refusals) repeats every 10 s
+    sweep tick while a game is alive; each distinct blob must be logged once
+    per game session, and the dedupe table must reset when the game exits."""
+    tray = TRAY_SCRIPT.read_text(encoding="utf-8")
+
+    guard = re.search(
+        r"if \(-not \$script:LaunchSanitizerLoggedStderr\.ContainsKey\(\$stderrKey\)\)"
+        r".*?Write-TrayLog \"LaunchSanitizer stderr: \$stderr\" -Level \"WARN\"",
+        tray,
+        re.DOTALL,
+    )
+    assert guard, "LaunchSanitizer stderr WARN is not deduped per session"
+
+    exit_reset = re.search(
+        r"game exited; resuming idle cadence\"\s*\n"
+        r"\s*\$script:LaunchSanitizerLastSweepStopped = @\{\}\s*\n"
+        r"\s*\$script:LaunchSanitizerLoggedStderr = @\{\}",
+        tray,
+    )
+    assert exit_reset, "LaunchSanitizerLoggedStderr must reset when the game exits"
+
+
+def test_progress_overlay_frame_pipeline_contract() -> None:
+    """The apply-progress animation must stay smooth on high-refresh rigs.
+
+    Measured 2026-07-22 on the live 300Hz machine: the old pipeline detected
+    59Hz via Win32_VideoController (wrong panel; and Get-CimInstance may not
+    autoload under the wscript-hidden PS 5.1 tray host at all), and WM_TIMER
+    plus a full-form Invalidate per tick delivered ~40fps with 16-33ms
+    jitter. The fixed pipeline measured 124.7fps delivered with p95 8.19ms.
+    Pin its load-bearing parts:
+    - refresh detection is raw Win32 EnumDisplaySettingsW (no CIM cmdlet);
+    - the Stopwatch-paced ABSO.FramePump drives frames with BeginInvoke
+      backpressure (FrameDone), with the WinForms Timer only as fallback;
+    - per-frame repaint is region-targeted, never a bare full-form
+      Invalidate; and the 1ms timer-resolution scope is released on close.
+    """
+    script = NOTIFICATIONS_SCRIPT.read_text(encoding="utf-8")
+
+    # Refresh detection: raw Win32, not CIM (hidden-host cmdlet autoload).
+    assert "EnumDisplaySettingsW" in script
+    assert "GetPrimaryDisplayFrequency" in script
+    assert "Get-CimInstance Win32_VideoController" not in script
+
+    # Frame pump with backpressure + fallback timer.
+    assert "class FramePump" in script
+    assert "FrameDone" in script
+    assert re.search(r"\$script:ProgressPump\.Start\(\$form,", script)
+    assert re.search(r"if \(-not \$pumpStarted\)", script)
+
+    # Region-targeted repaints only: the animation frame must invalidate the
+    # spinner/beacon rects, and no bare full-form Invalidate may remain.
+    assert "$script:ProgressForm.Invalidate($script:ProgressSpinnerRect)" in script
+    assert "$script:ProgressForm.Invalidate($script:ProgressBeaconRect)" in script
+    assert not re.search(r"\$script:ProgressForm\.Invalidate\(\)", script)
+
+    # 1ms OS timer resolution is scoped: acquired for the overlay, released
+    # in Close-ProgressOverlay AND in the dead-form self-dispose path.
+    assert script.count("timeBeginPeriod(1)") >= 1
+    assert script.count("timeEndPeriod(1)") >= 2
+    close_body = re.search(
+        r"function Close-ProgressOverlay \{(.*?)\n\}", script, re.DOTALL
+    )
+    assert close_body, "Close-ProgressOverlay not found"
+    assert "ProgressPump.Stop()" in close_body.group(1)
+    assert "timeEndPeriod(1)" in close_body.group(1)

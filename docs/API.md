@@ -177,7 +177,7 @@ applier = ProfileApplier()
 Applies a game optimization profile.
 
 **Parameters:**
-- `profile_name`: Name of the profile (e.g., "slippi-melee", "rivals2-online")
+- `profile_name`: Name of the profile (e.g., "slippi-melee", "rivals2-nosync")
 
 **Returns:** `ApplyResult` dataclass containing:
 - `success`: Boolean indicating overall success
@@ -374,8 +374,8 @@ Generates markdown report of in-game settings.
 | `overwatch2` | `Overwatch2Profile` | Overwatch 2 (No-Sync) |
 | `overwatch2-gsync` | `Overwatch2GSyncProfile` | Overwatch 2 (G-SYNC) |
 | `diablo4` | `Diablo4Profile` | Diablo 4 |
-| `rivals2-offline` | `Rivals2OfflineProfile` | Rivals of Aether 2 |
-| `rivals2-online` | `Rivals2OnlineProfile` | Rivals of Aether 2 |
+| `rivals2-nosync` | `Rivals2NoSyncProfile` | Rivals of Aether 2 |
+| `rivals2-gsync-hdr` | `Rivals2GSyncHDRProfile` | Rivals of Aether 2 |
 
 ---
 
@@ -494,7 +494,7 @@ python -m abso profiles
 
 # Apply a profile
 python -m abso apply slippi-melee
-python -m abso apply rivals2-online --no-backup
+python -m abso apply rivals2-nosync --no-backup
 
 # Restore from backup
 python -m abso restore latest

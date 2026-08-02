@@ -70,9 +70,9 @@ def test_productivity_profile_has_empty_killset(profiles_by_id) -> None:
         # Deadlock strict G-SYNC lanes
         "deadlock-gsync",
         "deadlock-gsync-hdr",
-        # Rivals 2 G-SYNC lanes (offline + online, both fullscreen-only VRR)
+        # Rivals 2 G-SYNC lanes (merged rollback-safe, fullscreen-only VRR)
         "rivals2-gsync",
-        "rivals2-online-gsync",
+        "rivals2-gsync-hdr",
         # Diablo 4 (Reflex + fullscreen-only G-SYNC by default)
         "diablo4",
         "diablo4-sdr",
@@ -109,8 +109,8 @@ def test_strict_overlay_free_profiles_get_full_killset(profile_id, profiles_by_i
         "slippi-melee-universal",
         "ryujinx-ssbu",
         # Rivals 2 no-sync lanes
-        "rivals2-offline",
-        "rivals2-online",
+        "rivals2-nosync",
+        "rivals2-nosync-hdr",
     ],
 )
 def test_non_strict_gaming_profiles_now_get_full_killset(profile_id, profiles_by_id) -> None:
@@ -134,7 +134,6 @@ def test_non_strict_gaming_profiles_now_get_full_killset(profile_id, profiles_by
         "overwatch2-gsync-capture",
         "overwatch2-gsync-hdr-capture",
         "rivals2-gsync-hdr-capture",
-        "rivals2-online-gsync-hdr-capture",
     ],
 )
 def test_capture_safe_profiles_get_filtered_killset(profile_id, profiles_by_id) -> None:
@@ -218,8 +217,6 @@ def test_strict_profiles_advertise_overlay_free_path_in_manifest() -> None:
         "deadlock-gsync-hdr",
         "rivals2-gsync",
         "rivals2-gsync-hdr",
-        "rivals2-online-gsync",
-        "rivals2-online-gsync-hdr",
     }
     for pid in strict_ids:
         assert manifest[pid]["requires_overlay_free_path"] is True, pid

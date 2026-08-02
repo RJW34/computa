@@ -13,6 +13,7 @@ from typing import Any, Literal, get_args
 
 from abso.profiles.base import BaseProfile
 from abso.profiles.counter_strike_2 import (
+    CounterStrike2GSyncHDRCaptureProfile,
     CounterStrike2GSyncHDRProfile,
     CounterStrike2GSyncProfile,
     CounterStrike2HDRProfile,
@@ -46,12 +47,8 @@ from abso.profiles.rivals2_gsync import (
     Rivals2GSyncHDRCaptureProfile,
     Rivals2GSyncHDRProfile,
     Rivals2GSyncProfile,
-    Rivals2OnlineGSyncHDRCaptureProfile,
-    Rivals2OnlineGSyncHDRProfile,
-    Rivals2OnlineGSyncProfile,
 )
-from abso.profiles.rivals2_offline import Rivals2OfflineHDRProfile, Rivals2OfflineProfile
-from abso.profiles.rivals2_online import Rivals2OnlineHDRProfile, Rivals2OnlineProfile
+from abso.profiles.rivals2_nosync import Rivals2NoSyncHDRProfile, Rivals2NoSyncProfile
 from abso.profiles.ryujinx_ssbu import RyujinxSSBUProfile
 from abso.profiles.slippi_melee import (
     SlippiMeleeConsoleParityHDRProfile,
@@ -156,35 +153,20 @@ BUILTIN_TRAY_UI: dict[str, TrayProfileUi] = {
     "productivity-hdr": TrayProfileUi(
         "productivity", "Desktop / Productivity", "HDR", 20
     ),
-    "rivals2-online": TrayProfileUi(
-        "rivals2", "Rivals 2", "Online No Sync (SDR)", 100
-    ),
-    "rivals2-online-hdr": TrayProfileUi(
-        "rivals2", "Rivals 2", "Online No Sync (HDR)", 110
-    ),
-    "rivals2-online-gsync": TrayProfileUi(
-        "rivals2", "Rivals 2", "Online G-SYNC (SDR)", 120
-    ),
-    "rivals2-online-gsync-hdr": TrayProfileUi(
-        "rivals2", "Rivals 2", "Online G-SYNC (HDR)", 130
-    ),
-    "rivals2-online-gsync-hdr-capture": TrayProfileUi(
-        "rivals2", "Rivals 2", "Online Capture-Safe G-SYNC (HDR)", 135
-    ),
-    "rivals2-offline": TrayProfileUi(
-        "rivals2", "Rivals 2", "Offline No Sync (SDR)", 140
-    ),
-    "rivals2-offline-hdr": TrayProfileUi(
-        "rivals2", "Rivals 2", "Offline No Sync (HDR)", 150
-    ),
-    "rivals2-gsync": TrayProfileUi(
-        "rivals2", "Rivals 2", "Offline G-SYNC (SDR)", 160
-    ),
     "rivals2-gsync-hdr": TrayProfileUi(
-        "rivals2", "Rivals 2", "Offline G-SYNC (HDR)", 170
+        "rivals2", "Rivals 2", "G-SYNC (HDR)", 100
     ),
     "rivals2-gsync-hdr-capture": TrayProfileUi(
-        "rivals2", "Rivals 2", "Offline Capture-Safe G-SYNC (HDR)", 175
+        "rivals2", "Rivals 2", "Capture-Safe G-SYNC (HDR)", 110
+    ),
+    "rivals2-gsync": TrayProfileUi(
+        "rivals2", "Rivals 2", "G-SYNC (SDR)", 120
+    ),
+    "rivals2-nosync-hdr": TrayProfileUi(
+        "rivals2", "Rivals 2", "No Sync (HDR)", 130
+    ),
+    "rivals2-nosync": TrayProfileUi(
+        "rivals2", "Rivals 2", "No Sync (SDR)", 140
     ),
     "slippi-melee": TrayProfileUi(
         "slippi-melee", "Super Smash Bros. Melee (Slippi)", "Competitive No Sync (SDR)", 200
@@ -241,6 +223,9 @@ BUILTIN_TRAY_UI: dict[str, TrayProfileUi] = {
     ),
     "counter-strike-2-gsync-hdr": TrayProfileUi(
         "counter-strike-2", "Counter-Strike 2", "G-SYNC (HDR)", 530
+    ),
+    "counter-strike-2-gsync-hdr-capture": TrayProfileUi(
+        "counter-strike-2", "Counter-Strike 2", "Capture-Safe G-SYNC (HDR)", 540
     ),
     "diablo4": TrayProfileUi("diablo4", "Diablo 4", "HDR", 100),
     "diablo4-sdr": TrayProfileUi("diablo4", "Diablo 4", "SDR", 110),
@@ -308,65 +293,51 @@ PROFILE_CATALOG: OrderedDict[str, ProfileCatalogEntry] = OrderedDict(
             ),
             sync_mode="off",
         ),
-        "rivals2-offline": ProfileCatalogEntry(
-            profile_class=Rivals2OfflineProfile,
-            tray_category="Fighting",
-            tray_subtitle="No Sync SDR | LLM ON | Uncapped | Offline Only",
-            tray_description=(
-                "Offline/training Rivals 2 no-sync SDR profile. VSync and VRR off, "
-                "uncapped engine path, exclusive fullscreen."
-            ),
-            sync_mode="off",
-        ),
-        "rivals2-offline-hdr": ProfileCatalogEntry(
-            profile_class=Rivals2OfflineHDRProfile,
-            tray_category="Fighting",
-            tray_subtitle="No Sync HDR | LLM ON | Uncapped | Offline Only",
-            tray_description=(
-                "Offline/training Rivals 2 no-sync profile with Windows HDR composition. "
-                "Rivals 2 currently advertises no native HDR support, so the game stays SDR "
-                "inside the HDR desktop."
-            ),
-            sync_mode="off",
-        ),
-        "rivals2-online": ProfileCatalogEntry(
-            profile_class=Rivals2OnlineProfile,
+        # 2026-07 consolidation: the offline/online lane split collapsed into
+        # single rollback-safe lanes (SnapNet is server-authoritative, so the
+        # aggressive offline-only tuning bought nothing measurable). Retired
+        # IDs redirect via PROFILE_ALIASES below.
+        "rivals2-nosync": ProfileCatalogEntry(
+            profile_class=Rivals2NoSyncProfile,
             tray_category="Fighting",
             tray_subtitle="No Sync SDR | LLM ON | Rollback-Safe",
             tray_description=(
-                "Rollback-safe Rivals 2 online SDR profile. VSync and VRR off, LLM On "
-                "(not Ultra), external frame caps disabled."
+                "Rollback-safe Rivals 2 no-sync SDR lane for online play and "
+                "training. VSync and VRR off, in-game cap on the 60 Hz sim grid "
+                "(300 @ 300 Hz), exclusive fullscreen."
             ),
             sync_mode="off",
         ),
-        "rivals2-online-hdr": ProfileCatalogEntry(
-            profile_class=Rivals2OnlineHDRProfile,
+        "rivals2-nosync-hdr": ProfileCatalogEntry(
+            profile_class=Rivals2NoSyncHDRProfile,
             tray_category="Fighting",
             tray_subtitle="No Sync HDR | LLM ON | Rollback-Safe",
             tray_description=(
-                "Rollback-safe Rivals 2 online profile with Windows HDR composition. "
-                "Same no-sync timing contract as SDR; native game HDR remains off."
+                "Rollback-safe Rivals 2 no-sync lane with Windows HDR composition. "
+                "Same no-sync timing contract as SDR; Rivals 2 currently advertises "
+                "no native HDR support, so the game stays SDR inside the HDR desktop."
             ),
             sync_mode="off",
         ),
         "rivals2-gsync": ProfileCatalogEntry(
             profile_class=Rivals2GSyncProfile,
             tray_category="Fighting",
-            tray_subtitle="Strict SDR G-SYNC | LLM ON | VSync Safety Net | Offline Only",
+            tray_subtitle="Strict SDR G-SYNC | LLM ON | VSync Safety Net | Rollback-Safe",
             tray_description=(
-                "Offline/training Rivals 2 strict fullscreen-only G-SYNC SDR profile. "
-                "Uses refresh - 3 FPS caps and disables driver threaded optimization."
+                "Rollback-safe Rivals 2 strict fullscreen-only G-SYNC SDR lane for "
+                "online play and training. Caps on the 60 Hz sim grid (largest "
+                "multiple of 60 below refresh, e.g. 240 @ 300 Hz)."
             ),
             sync_mode="on",
         ),
         "rivals2-gsync-hdr": ProfileCatalogEntry(
             profile_class=Rivals2GSyncHDRProfile,
             tray_category="Fighting",
-            tray_subtitle="Strict HDR G-SYNC | LLM ON | VSync Safety Net | Offline Only",
+            tray_subtitle="Strict HDR G-SYNC | LLM ON | VSync Safety Net | Rollback-Safe",
             tray_description=(
-                "Offline/training Rivals 2 strict G-SYNC profile with Windows HDR composition. "
-                "Rivals 2 currently advertises no native HDR support, so it stays SDR inside "
-                "the HDR desktop."
+                "Rollback-safe Rivals 2 strict G-SYNC lane with Windows HDR "
+                "composition. Rivals 2 currently advertises no native HDR support, "
+                "so it stays SDR inside the HDR desktop."
             ),
             sync_mode="on",
         ),
@@ -375,43 +346,10 @@ PROFILE_CATALOG: OrderedDict[str, ProfileCatalogEntry] = OrderedDict(
             tray_category="Fighting",
             tray_subtitle="HDR Capture-Safe | Borderless VRR | Keeps OBS/Medal/Overlays",
             tray_description=(
-                "Offline G-SYNC lane with Windows HDR composition on the borderless "
-                "windowed VRR path; keeps OBS, Medal, RTSS, and overlay apps running. "
-                "Rivals 2 currently advertises no native HDR support, so native game "
-                "HDR remains off."
-            ),
-            sync_mode="on",
-        ),
-        "rivals2-online-gsync": ProfileCatalogEntry(
-            profile_class=Rivals2OnlineGSyncProfile,
-            tray_category="Fighting",
-            tray_subtitle="Strict SDR G-SYNC | LLM ON | Rollback-Safe",
-            tray_description=(
-                "Rollback-safe Rivals 2 online strict fullscreen-only G-SYNC SDR profile. "
-                "Threaded optimization off for rollback stability."
-            ),
-            sync_mode="on",
-        ),
-        "rivals2-online-gsync-hdr": ProfileCatalogEntry(
-            profile_class=Rivals2OnlineGSyncHDRProfile,
-            tray_category="Fighting",
-            tray_subtitle="Strict HDR G-SYNC | LLM ON | Rollback-Safe",
-            tray_description=(
-                "Rollback-safe Rivals 2 online strict G-SYNC profile with Windows HDR composition. "
-                "Same VRR stability contract as SDR; Rivals 2 currently advertises no native "
-                "HDR support, so native game HDR remains off."
-            ),
-            sync_mode="on",
-        ),
-        "rivals2-online-gsync-hdr-capture": ProfileCatalogEntry(
-            profile_class=Rivals2OnlineGSyncHDRCaptureProfile,
-            tray_category="Fighting",
-            tray_subtitle="HDR Capture-Safe | Borderless VRR | Rollback-Safe | Keeps OBS/Overlays",
-            tray_description=(
-                "Rollback-safe online G-SYNC lane with Windows HDR composition on the "
-                "borderless windowed VRR path; keeps OBS, Medal, RTSS, and overlay apps "
-                "running. Rivals 2 currently advertises no native HDR support, so native "
-                "game HDR remains off."
+                "Rollback-safe G-SYNC lane with Windows HDR composition on the "
+                "borderless windowed VRR path; keeps OBS, Medal, RTSS, and overlay "
+                "apps running. Rivals 2 currently advertises no native HDR support, "
+                "so native game HDR remains off."
             ),
             sync_mode="on",
         ),
@@ -554,6 +492,18 @@ PROFILE_CATALOG: OrderedDict[str, ProfileCatalogEntry] = OrderedDict(
             ),
             sync_mode="on",
         ),
+        "counter-strike-2-gsync-hdr-capture": ProfileCatalogEntry(
+            profile_class=CounterStrike2GSyncHDRCaptureProfile,
+            tray_category="Shooters",
+            tray_subtitle="HDR Capture-Safe | Borderless VRR | Keeps Medal/OBS/Overlays",
+            tray_description=(
+                "Same HDR G-SYNC contract as the strict Counter-Strike 2 lane, "
+                "on the borderless windowed VRR path, but keeps Medal, OBS, "
+                "RTSS, and overlay apps running at launch instead of stopping "
+                "them."
+            ),
+            sync_mode="on",
+        ),
         "overwatch2": ProfileCatalogEntry(
             profile_class=Overwatch2Profile,
             tray_category="Shooters",
@@ -650,11 +600,21 @@ PROFILE_CATALOG: OrderedDict[str, ProfileCatalogEntry] = OrderedDict(
 )
 
 PROFILE_ALIASES: dict[str, str] = {
-    # Retired generic/no-value Rivals variants map to the evidence-backed
-    # offline no-sync lane instead of lingering as separate menu clutter.
-    "rivals2": "rivals2-offline",
-    "rivals2-300hz-max": "rivals2-offline",
-    "rivals2-tournament-sim-144hz": "rivals2-offline",
+    # Retired generic/no-value Rivals variants map to the merged no-sync
+    # lane instead of lingering as separate menu clutter.
+    "rivals2": "rivals2-nosync",
+    "rivals2-300hz-max": "rivals2-nosync",
+    "rivals2-tournament-sim-144hz": "rivals2-nosync",
+    # 2026-07 offline/online consolidation: the split lanes collapsed into
+    # single rollback-safe lanes; every retired ID redirects to its merged
+    # successor so old tray configs, state files, and history normalize.
+    "rivals2-offline": "rivals2-nosync",
+    "rivals2-offline-hdr": "rivals2-nosync-hdr",
+    "rivals2-online": "rivals2-nosync",
+    "rivals2-online-hdr": "rivals2-nosync-hdr",
+    "rivals2-online-gsync": "rivals2-gsync",
+    "rivals2-online-gsync-hdr": "rivals2-gsync-hdr",
+    "rivals2-online-gsync-hdr-capture": "rivals2-gsync-hdr-capture",
     # Streaming variants consolidated into their base profiles.
     "fortnite-streaming": "fortnite",
     "fortnite-streaming-hdr": "fortnite-hdr",
@@ -662,8 +622,8 @@ PROFILE_ALIASES: dict[str, str] = {
     "overwatch2-gsync-hdr-streaming": "overwatch2-gsync-hdr",
     "pacdeluxe-streaming": "pacdeluxe",
     "ryujinx-ssbu-streaming": "ryujinx-ssbu",
-    "rivals2-streaming": "rivals2-online",
-    "rivals2-streaming-hdr": "rivals2-online-hdr",
+    "rivals2-streaming": "rivals2-nosync",
+    "rivals2-streaming-hdr": "rivals2-nosync-hdr",
     "slippi-melee-streaming": "slippi-melee",
     # Experimental/duplicate Slippi variants.
     "slippi-melee-vrr-lab": "slippi-melee",
@@ -672,6 +632,7 @@ PROFILE_ALIASES: dict[str, str] = {
     "cs2-hdr": "counter-strike-2-hdr",
     "cs2-gsync": "counter-strike-2-gsync",
     "cs2-gsync-hdr": "counter-strike-2-gsync-hdr",
+    "cs2-gsync-hdr-capture": "counter-strike-2-gsync-hdr-capture",
 }
 
 

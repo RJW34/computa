@@ -1,84 +1,68 @@
-"""Rivals of Aether 2 - ONLINE / MATCHMAKING profile.
+"""Rivals of Aether 2 - No Sync profile (merged offline/online lane).
 
-Target: Ranked matchmaking, unranked online play, any rollback-enabled session.
-Rollback netcode behavior is AUTHORITATIVE for this profile.
+Target: Everything — ranked matchmaking, unranked, training, local versus,
+replays. The 2026-07 consolidation collapsed the old offline/online split;
+this lane carries the online-safe tuning everywhere because SnapNet's sim is
+server-authoritative and the aggressive offline-only tuning bought nothing
+measurable.
 
 Per rollback.md canonical spec:
 - Optimization Class: Rollback-Safe Low Latency
 - Priority: Frame pacing stability > raw latency
 
-Goals:
-- Deterministic stability for rollback netcode
-- Prevent timing contention
-- Preserve rollback recovery elasticity
-
-NVCP Settings (per-game for Rivals2.exe):
+NVCP Settings (per-game for Rivals2-Win64-Shipping.exe):
 - V-Sync: OFF (rollback is timing-sensitive, not tear-sensitive)
-- G-SYNC / VRR: OFF (no VRR for online)
+- G-SYNC / VRR: OFF (use the G-SYNC lanes for tear-free)
 - Low Latency Mode: ON (NOT Ultra!)
-- Max Frame Rate: OFF (no external limiters)
-- Threaded Optimization: OFF (rollback/fighting-game stability)
+- Max Frame Rate: OFF (no driver cap; the in-game limiter owns pacing)
+- Threaded Optimization: ON (CPU-bound UE5/DX11; driver worker threads help,
+  and the server-authoritative sim cannot be desynced by them)
 - Power Management: Prefer Maximum Performance
 
-External Tools: RTSS, frame pacing hooks DISABLED.
+In-game frame cap: largest multiple of 60 at/below refresh (300 @ 300 Hz).
+Rivals 2 ticks at a fixed 60 Hz; 60-multiples hold an even frames-per-tick
+cadence, and the bounded render load preserves CPU headroom for rollback
+resimulation bursts.
 
-EXPLICIT PROHIBITIONS (per canonical spec):
-- LLM = Ultra (can cause frame pacing issues, overrides FPS caps)
-- Fast Sync (incompatible with rollback)
-- G-SYNC / VRR (adds ~2-5ms latency overhead)
-- External FPS caps
-- Refresh-minus-X logic
-- Injection tools (RTSS)
+External Tools: RTSS, frame pacing hooks DISABLED (matchmaking-safe lane).
 
 Canonical one-line definition:
-> Exclusive fullscreen + no sync + uncapped FPS + NV LLM ON (not Ultra) + HAGS ON + Ultimate Performance plan + no overlays
+> Exclusive fullscreen + no sync + in-game 60-multiple cap + NV LLM ON (not
+> Ultra) + HAGS ON + Ultimate Performance plan + no overlays
 """
 
 from __future__ import annotations
 
 from typing import Any, Literal
 
+from abso.core.vrr import FIGHTING_60HZ_NOSYNC_CAP_POLICY
 from abso.profiles.profile_bases import Rivals2BaseProfile, merge_settings_map
-from abso.settings.registry import WIN32_PRIORITY_GAMING_ONLINE
 
 
-class Rivals2OnlineProfile(Rivals2BaseProfile):
-    """Optimization profile for Rivals 2 ONLINE / MATCHMAKING play.
+class Rivals2NoSyncProfile(Rivals2BaseProfile):
+    """Rollback-safe no-sync lane for Rivals 2 (online and training).
 
-    Conservative stability-focused profile for:
-    - Ranked matchmaking
-    - Unranked online play
-    - Any rollback-enabled session
-
-    Prioritizes rollback netcode stability over raw latency reduction.
+    Single lane for ranked, unranked, and offline training — the online-safe
+    tuning is carried everywhere. Prioritizes stable rollback pacing while
+    keeping the leanest presentation path (no VRR, no VSync, tearing
+    accepted).
     """
 
     @property
     def profile_id(self) -> str:
-        return "rivals2-online"
+        return "rivals2-nosync"
 
     @property
     def display_name(self) -> str:
-        return "Rivals 2 - Online No Sync"
+        return "Rivals 2 - No Sync"
 
     @property
     def description(self) -> str:
-        return "Stable rollback-safe settings for online play (prioritizes stability)"
+        return "Rollback-safe no-sync lane for online play and training"
 
     @property
     def optimization_target(self) -> str:
         return "stable_online"
-
-    @property
-    def executable_hints(self) -> list[str]:
-        return super().executable_hints
-
-    # === Validation Metadata Overrides ===
-
-    @property
-    def is_online_profile(self) -> bool:
-        """This is explicitly an online rollback profile."""
-        return True
 
     @property
     def is_sdr_only(self) -> bool:
@@ -91,7 +75,7 @@ class Rivals2OnlineProfile(Rivals2BaseProfile):
 
     @property
     def allows_aggressive_settings(self) -> bool:
-        """Online profiles should NOT use aggressive settings."""
+        """Matchmaking-safe lane: no aggressive settings."""
         return False
 
     @property
@@ -99,42 +83,37 @@ class Rivals2OnlineProfile(Rivals2BaseProfile):
         return True
 
     def _settings_overrides(self) -> dict[str, dict[str, Any]]:
-        """Stable, rollback-safe settings for online play."""
+        """Stable, rollback-safe no-sync settings."""
         return {
             "WindowsSettingsHandler": {
                 "max_refresh_rate": True,  # Set display to max refresh rate for current resolution
             },
-            "RegistrySettingsHandler": {
-                # Downgrade from the aggressive WIN32_PRIORITY_GAMING_OFFLINE
-                # (+2 foreground boost) to WIN32_PRIORITY_GAMING_ONLINE (+1
-                # boost). Rollback netcode needs deterministic timing more than
-                # it needs maximum foreground favoritism; starving background
-                # kernel work risks stalls that break resync windows.
-                "win32_priority_separation": WIN32_PRIORITY_GAMING_ONLINE,
-            },
             "NvidiaSettingsHandler": {
-                # ONLINE profile: Conservative settings for rollback stability
-                # Per rollback.md canonical spec - frame pacing stability > raw latency
                 "low_latency_mode": "on",  # ON, NOT Ultra! (Ultra can cause frame pacing issues, overrides FPS caps)
                 "power_management": "prefer_max_performance",
                 "vsync": "off",  # OFF - rollback netcode is timing-sensitive, not tear-sensitive
                 "vsync_tear_control": "disable",  # Explicit tear control off with VSync OFF
-                "vrr_app_override": "force_off",  # OFF for no-sync online path
+                "vrr_app_override": "force_off",  # OFF for the no-sync path
                 "global_vrr_mode": "off",  # Enforce global VRR off for clean no-sync transitions
-                "max_frame_rate": "off",  # Uncapped - no external limiters for online play
+                "max_frame_rate": "off",  # No driver cap - the in-game limiter owns pacing
                 "shader_cache": "unlimited",
-                "threaded_optimization": "off",  # OFF - rollback/fighting-game stability
+                # ON: Rivals 2 is CPU-bound UE5/DX11; driver worker threads
+                # measurably help there. SnapNet's sim is server-authoritative,
+                # so client driver threading cannot desync rollback.
+                "threaded_optimization": "on",
                 "triple_buffering": "off",  # OFF - irrelevant without VSync
-            },
-            "ProcessPriorityHandler": {
-                "cpu_priority": 2,  # Normal-High (not aggressive)
-                "io_priority": 2,
             },
             "Rivals2ConfigHandler": {
                 "fullscreen_mode": 0,  # Exclusive fullscreen no-sync path
                 "vsync": False,  # In-game VSync OFF — driver handles sync
                 "raw_input": True,  # Best input latency
-                "frame_rate_limit": 0,  # 0 = truly uncapped (UE); driver cap is also off
+                # In-game cap on the 60 Hz sim grid: largest multiple of 60
+                # at/below refresh (300 @ 300 Hz). Even frames-per-tick
+                # cadence, and the bounded render load preserves CPU headroom
+                # for rollback resimulation bursts ("stability > raw latency"
+                # made concrete). The driver cap stays off.
+                "auto_vrr_fps_cap": True,
+                "vrr_cap_policy": FIGHTING_60HZ_NOSYNC_CAP_POLICY,
                 "hdr_output": False,
             },
             "NvidiaNotificationHandler": {
@@ -143,25 +122,35 @@ class Rivals2OnlineProfile(Rivals2BaseProfile):
         }
 
     def get_in_game_settings(self) -> list[dict[str, str]]:
-        """Get recommended in-game settings for ONLINE play."""
+        """Get recommended in-game settings for the no-sync lane."""
         return [
             {
-                "category": "=== ONLINE PROFILE ===",
+                "category": "=== NO SYNC PROFILE ===",
                 "setting": "Use Case",
-                "value": "Ranked, Unranked, Rollback Sessions",
-                "reason": "This profile prioritizes STABILITY for rollback netcode.",
+                "value": "Ranked, Unranked, Training, Local VS, Replays",
+                "reason": (
+                    "One rollback-safe lane for everything. Offline training "
+                    "runs identically on the online-safe tuning."
+                ),
             },
             {
                 "category": "=== EXPLICIT PROHIBITIONS ===",
                 "setting": "DO NOT USE",
                 "value": "LLM Ultra, Fast VSync, External FPS Caps, Refresh-3 Logic",
-                "reason": "These can cause rollback timing failures on high-refresh setups. Stability > latency online.",
+                "reason": (
+                    "These can cause rollback timing failures on high-refresh "
+                    "setups, and off-grid caps micro-stutter the 60 Hz sim."
+                ),
             },
             {
                 "category": "NVIDIA Control Panel",
                 "setting": "G-SYNC / VRR",
                 "value": "OFF",
-                "reason": "VRR OFF for online - adds ~2-5ms latency overhead.",
+                "reason": (
+                    "VRR OFF keeps the no-sync scanout path simple and "
+                    "deterministic. Use the G-SYNC HDR lane if you want "
+                    "tear-free VRR."
+                ),
             },
             {
                 "category": "NVIDIA Control Panel",
@@ -172,8 +161,12 @@ class Rivals2OnlineProfile(Rivals2BaseProfile):
             {
                 "category": "NVIDIA Control Panel",
                 "setting": "Threaded Optimization",
-                "value": "OFF",
-                "reason": "OFF - avoids extra driver-side timing variability during rollback.",
+                "value": "On",
+                "reason": (
+                    "Rivals 2 is CPU-bound UE5/DX11; driver worker threads "
+                    "improve frame times. SnapNet's sim is server-authoritative, "
+                    "so driver threading cannot desync rollback."
+                ),
             },
             {
                 "category": "NVIDIA Control Panel",
@@ -185,13 +178,23 @@ class Rivals2OnlineProfile(Rivals2BaseProfile):
                 "category": "NVIDIA Control Panel",
                 "setting": "Max Frame Rate",
                 "value": "DISABLED",
-                "reason": "No external FPS cap — uncapped for online play.",
+                "reason": "No driver-level cap — the in-game limiter owns pacing.",
             },
             {
                 "category": "In-Game Settings",
                 "setting": "V-Sync",
                 "value": "OFF",
                 "reason": "Native engine timing must remain authoritative.",
+            },
+            {
+                "category": "In-Game Settings",
+                "setting": "Frame Rate Cap",
+                "value": "Multiple of 60 at/below refresh (auto-set: 300 @ 300Hz)",
+                "reason": (
+                    "Rivals 2 ticks at a fixed 60 Hz; 60-multiple caps hold an "
+                    "even frames-per-tick cadence, and the bounded render load "
+                    "keeps CPU headroom free for rollback resimulation bursts."
+                ),
             },
             {
                 "category": "External Tools",
@@ -205,6 +208,7 @@ class Rivals2OnlineProfile(Rivals2BaseProfile):
                 "value": "ALLOWED (read-only)",
                 "reason": "Monitoring overlays are fine, but no frame pacing intervention.",
             },
+            *self._rivals2_overlay_guidance(),
             {
                 "category": "Validation",
                 "setting": "Expected Behavior",
@@ -215,25 +219,27 @@ class Rivals2OnlineProfile(Rivals2BaseProfile):
 
     def get_post_apply_notes(self) -> list[str]:
         return [
-            "Rivals 2 manual: disable RTSS/external FPS caps for online rollback; keep in-game V-Sync Off and uncapped."
+            "Rivals 2 manual: disable RTSS/external FPS caps; keep in-game "
+            "V-Sync Off. ABSO sets the in-game cap to the largest multiple of "
+            "60 at your refresh (e.g. 300 @ 300 Hz)."
         ]
 
 
-class Rivals2OnlineHDRProfile(Rivals2OnlineProfile):
-    """Rollback-safe online Rivals 2 profile with Windows HDR composition enabled."""
+class Rivals2NoSyncHDRProfile(Rivals2NoSyncProfile):
+    """No-sync Rivals 2 lane with Windows HDR composition enabled."""
 
     @property
     def profile_id(self) -> str:
-        return "rivals2-online-hdr"
+        return "rivals2-nosync-hdr"
 
     @property
     def display_name(self) -> str:
-        return "Rivals 2 - Online No Sync HDR"
+        return "Rivals 2 - No Sync HDR"
 
     @property
     def description(self) -> str:
         return (
-            "Rollback-safe online Rivals 2 profile with Windows HDR composition. "
+            "Rollback-safe no-sync Rivals 2 lane with Windows HDR composition. "
             "Keeps no-sync rollback stability; Rivals 2 native HDR output stays off."
         )
 
@@ -249,5 +255,3 @@ class Rivals2OnlineHDRProfile(Rivals2OnlineProfile):
 
     def get_in_game_settings(self) -> list[dict[str, str]]:
         return [*self._rivals2_hdr_guidance(), *super().get_in_game_settings()]
-
-

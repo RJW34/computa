@@ -34,7 +34,7 @@ This document encodes that distinction explicitly.
 
 # PROFILE 1: Rivals of Aether 2 — ONLINE (Ranked / Matchmaking)
 
-**Profile ID:** `rivals2-online`  
+**Profile ID:** `rivals2-nosync` (2026-07 merge; the retired `rivals2-online` / `rivals2-offline` IDs alias to it)  
 **Goal:** Lowest possible latency that does NOT cause hitches or rollback instability  
 **Optimization Class:** Rollback-Safe Low Latency  
 **DO NOT reuse offline settings**
@@ -52,7 +52,9 @@ This document encodes that distinction explicitly.
 | Fast Sync / Adaptive Sync | OFF |
 
 **Rationale:**
-Rollback netcode in Rivals 2 is sensitive to timing. VRR adds ~2-5ms latency overhead.
+Rollback netcode in Rivals 2 is sensitive to timing. The no-sync lane keeps
+the scanout path simple and deterministic; the Online GSYNC lane exists for
+players who want tear-free VRR online.
 High-refresh tearing is visually negligible and latency-optimal.
 
 ---
@@ -61,12 +63,15 @@ High-refresh tearing is visually negligible and latency-optimal.
 
 | Setting | Value |
 |----|----|
-| In-Game FPS Cap | Unlimited / Engine Max (ABSO writes 999) |
+| In-Game FPS Cap | Largest multiple of 60 at/below refresh (ABSO auto-writes; 300 @ 300 Hz) |
 | NVCP Frame Rate Limit | OFF |
 | External Limiters (RTSS) | DISABLED |
 
-**Note:** Online no-sync uses one authoritative uncapped engine path and no
-external limiter. Do not add RTSS/NVCP caps to this profile.
+**Note:** Online no-sync uses one authoritative engine limiter and no
+external limiter. Do not add RTSS/NVCP caps to this profile. Rivals 2 ticks
+at a fixed 60 Hz: 60-multiple caps hold an even frames-per-tick cadence, and
+the bounded render load preserves CPU headroom for rollback resimulation
+bursts (this is "frame pacing stability > raw latency" made concrete).
 
 ---
 
@@ -77,8 +82,8 @@ external limiter. Do not add RTSS/NVCP caps to this profile.
 | Vertical Sync | OFF | No sync latency |
 | Low Latency Mode | **ON** | Reduces queue safely |
 | Low Latency Mode = Ultra | **AVOID** | Can cause frame pacing issues in non-GPU-bound scenarios |
-| Max Frame Rate | OFF | Avoid limiter jitter |
-| Threaded Optimization | OFF | OFF (UE5 driver contention) |
+| Max Frame Rate | OFF | Avoid limiter jitter; in-game limiter owns pacing |
+| Threaded Optimization | ON | Rivals 2 is CPU-bound UE5/DX11; worker threads improve frame times. SnapNet's sim is server-authoritative, so driver threading cannot desync rollback |
 | Power Management | Prefer Maximum Performance | Clock stability |
 | Triple Buffering | OFF | Irrelevant without VSync |
 | G-SYNC (per-app) | OFF | No VRR |
@@ -140,7 +145,7 @@ sync/VRR constraints and conservative latency settings elsewhere.
 
 ## Rivals 2 Online – Explicitly Forbidden Optimizations
 
-The optimizer MUST block these when `rivals2-online` is active:
+The optimizer MUST block these when any merged Rivals 2 lane is active:
 
 - LLM = Ultra  
 - Fast Sync  
@@ -153,7 +158,7 @@ The optimizer MUST block these when `rivals2-online` is active:
 
 ### Canonical One-Line Definition (Rivals 2 Online)
 
-> **Exclusive fullscreen + no sync + uncapped engine FPS + NV LLM ON (not Ultra - can cause frame pacing issues) + HAGS ON + Ultimate Performance plan + no overlays**
+> **Exclusive fullscreen + no sync + in-game 60-multiple cap (300 @ 300 Hz) + NV LLM ON (not Ultra - can cause frame pacing issues) + HAGS ON + Ultimate Performance plan + no overlays**
 
 ---
 
@@ -245,16 +250,17 @@ LLM On is recommended. Ultra may work but test for your specific system.
 Do not classify by genre alone.  
 Classify by **rollback coupling**.
 
-## 2. Online vs Offline Profiles Are Mandatory (Rivals 2)
-Offline aggression MUST NOT leak into online play.
+## 2. Online vs Offline Profiles Are Mandatory (Rivals 2) — SUPERSEDED 2026-07
+The 2026-07 consolidation merged the split: every Rivals lane now carries the
+online-safe tuning, so there is no offline aggression left to leak.
 
 ## 3. Injection Detection
 If SK / RTSS / overlays are detected:
-- Block `rivals2-online`
+- Block the Rivals 2 lanes
 - Allow `slippi-melee`
 
 ## 4. Power Plan Guardrails
-- `rivals2-online` → Ultimate Performance standard
+- `rivals2-nosync` → Ultimate Performance standard
 - `slippi-melee` → Ultimate Performance standard
 
 ---
@@ -267,7 +273,7 @@ If SK / RTSS / overlays are detected:
 | VRR | OFF | OFF |
 | LLM | ON | ULTRA |
 | HAGS | ON | ON |
-| FPS Cap | Engine max / uncapped | NONE |
+| FPS Cap | 60-multiple at refresh (300 @ 300 Hz) | NONE |
 | Priority Aggression | LOW | HIGH |
 | Frame Pacing Priority | HIGH | LOW |
 | Raw Latency Priority | MEDIUM | MAX |

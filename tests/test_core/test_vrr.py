@@ -5,12 +5,16 @@ from __future__ import annotations
 import pytest
 
 from abso.core.vrr import (
+    FIGHTING_60HZ_NOSYNC_CAP_POLICY,
+    FIGHTING_60HZ_VRR_CAP_POLICY,
     OW2_REFLEX_GSYNC_CAP_POLICY,
     REFLEX_GSYNC_FPS_CAPS,
     VRR_FPS_CAPS,
     FrameLimiterType,
     GraphicsAPI,
     get_best_ingame_preset,
+    get_fighting_60hz_nosync_cap,
+    get_fighting_60hz_vrr_cap,
     get_fighting_game_config,
     get_high_refresh_benefit,
     get_limiter_recommendation,
@@ -93,6 +97,50 @@ class TestVRRFPSCap:
         assert get_vrr_fps_cap_for_policy(300) == 297
         assert get_vrr_fps_cap_for_policy(300, "refresh_minus_3") == 297
         assert get_vrr_fps_cap_for_policy(300, OW2_REFLEX_GSYNC_CAP_POLICY) == 276
+        assert get_vrr_fps_cap_for_policy(300, FIGHTING_60HZ_VRR_CAP_POLICY) == 240
+        assert get_vrr_fps_cap_for_policy(300, FIGHTING_60HZ_NOSYNC_CAP_POLICY) == 300
+
+
+class TestFighting60HzCaps:
+    """Caps for fixed-60Hz-simulation fighting games (Rivals 2).
+
+    Only render caps that are whole multiples of 60 hold an even
+    frames-per-tick cadence against the 60 Hz sim grid; generic
+    refresh - 3 caps (297/237/141) alternate 4/5 frames per tick.
+    """
+
+    def test_vrr_cap_snaps_to_60_grid_below_refresh_margin(self):
+        assert get_fighting_60hz_vrr_cap(300) == 240
+        assert get_fighting_60hz_vrr_cap(240) == 180
+        assert get_fighting_60hz_vrr_cap(144) == 120
+        assert get_fighting_60hz_vrr_cap(165) == 120
+        assert get_fighting_60hz_vrr_cap(120) == 60
+
+    def test_vrr_cap_falls_back_to_refresh_minus_3_on_60hz_panels(self):
+        """No multiple of 60 fits under 60 - 3; keep the generic VRR margin."""
+        assert get_fighting_60hz_vrr_cap(60) == 57
+
+    def test_vrr_cap_rounds_float_refresh(self):
+        assert get_fighting_60hz_vrr_cap(299.99) == 240
+
+    def test_nosync_cap_is_largest_60_multiple_at_or_below_refresh(self):
+        assert get_fighting_60hz_nosync_cap(300) == 300
+        assert get_fighting_60hz_nosync_cap(240) == 240
+        assert get_fighting_60hz_nosync_cap(144) == 120
+        assert get_fighting_60hz_nosync_cap(165) == 120
+        assert get_fighting_60hz_nosync_cap(60) == 60
+
+    def test_nosync_cap_never_drops_below_sim_rate(self):
+        assert get_fighting_60hz_nosync_cap(50) == 60
+
+    def test_policy_aliases_resolve(self):
+        assert get_vrr_fps_cap_for_policy(300, "fighting_60hz") == 240
+        assert get_vrr_fps_cap_for_policy(300, "fighting-60hz-vrr") == 240
+        assert get_vrr_fps_cap_for_policy(300, "fighting-60hz-nosync") == 300
+
+    def test_unknown_policy_still_raises(self):
+        with pytest.raises(ValueError):
+            get_vrr_fps_cap_for_policy(300, "fighting_120hz")
 
 
 class TestBestInGamePreset:

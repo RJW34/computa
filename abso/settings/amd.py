@@ -134,6 +134,10 @@ class AmdSettingsHandler(SettingsHandler):
     - Enhanced Sync
     """
 
+    # backup() reaches WMI for GPU presence detection; keep it on the main
+    # thread during the concurrent backup scan (see SettingsHandler).
+    backup_requires_main_thread = True
+
     # --- AMD GPU presence detection -------------------------------------------
 
     _amd_present_cached: bool | None = None

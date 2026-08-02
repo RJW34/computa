@@ -152,13 +152,16 @@ NVIDIA_PRESETS: dict[str, dict[str, Any]] = {
         },
         "notes": {
             "fps_cap": (
-                "Use the in-game limiter at refresh_rate - 3 (Blur Busters "
-                "G-SYNC 101): e.g. 297 @ 300Hz, 237 @ 240Hz, 141 @ 144Hz. "
+                "Use the in-game limiter below refresh (Blur Busters G-SYNC 101 "
+                "margin). For fixed-60Hz-logic games, snap to the largest "
+                "multiple of 60 under refresh - 3 (fighting_60hz_vrr policy): "
+                "240 @ 300Hz, 180 @ 240Hz, 120 @ 144Hz. Generic refresh - 3 "
+                "caps (297/237/141) land off the 60 Hz sim grid and micro-stutter. "
                 "In-game limiters have ~0.5-1 frame lower latency than RTSS/NVCP."
             ),
             "fighting_games": (
                 "60Hz-logic games still benefit from high refresh (reduced scanout latency). "
-                "300Hz and 240Hz both divide evenly into 60fps - no cadence judder."
+                "Caps that divide evenly into 60fps avoid cadence judder."
             ),
             "api_support": "Most modern fighting games use DX12/UE5. Driver LLM is less deterministic there than classic DX11 paths; measure per game.",
             "stuttering": (

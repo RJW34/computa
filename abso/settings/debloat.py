@@ -22,6 +22,7 @@ import yaml
 
 from abso.core.models import EvidenceTier, Issue
 from abso.settings.base import SettingsHandler
+from abso.utils.win_services import query_services
 
 logger = logging.getLogger(__name__)
 
@@ -378,6 +379,35 @@ class DebloatHandler(SettingsHandler):
             logger.debug("Appx check for %s failed: %s", package_name, exc)
             return False
 
+    def _list_installed_appx_names(self) -> set[str] | None:
+        """List every installed appx package name in one PowerShell spawn.
+
+        detect() previously spawned one PowerShell per managed package (40
+        packages ~= 4.6 s measured); one full listing answers all membership
+        checks at once. Returns lowercased names, or None on failure so
+        callers fall back to the per-package check.
+        """
+        try:
+            result = subprocess.run(
+                [
+                    "powershell", "-NoProfile", "-Command",
+                    "Get-AppxPackage | Select-Object -ExpandProperty Name",
+                ],
+                capture_output=True,
+                text=True,
+                timeout=30,
+            )
+        except (subprocess.TimeoutExpired, OSError) as exc:
+            logger.debug("Bulk appx listing failed: %s", exc)
+            return None
+
+        if result.returncode != 0:
+            logger.debug("Bulk appx listing returned %s", result.returncode)
+            return None
+
+        names = {line.strip().lower() for line in result.stdout.splitlines() if line.strip()}
+        return names or None
+
     def _remove_appx_package(self, package_name: str) -> bool:
         """Remove an appx package for the current user."""
         try:
@@ -431,9 +461,16 @@ class DebloatHandler(SettingsHandler):
                 "default": tweak.default,
             }
 
-        # Service tweaks — read ALL tiers
+        # Service tweaks — read ALL tiers over one SCM connection, with the
+        # per-service sc reader as fallback for anything unanswered.
+        service_names = [tweak.service for tweak in self._tweaks.services]
+        bulk_services = query_services(service_names) or {}
         for tweak in self._tweaks.services:
-            start_type = self._get_service_start_type(tweak.service)
+            bulk_info = bulk_services.get(tweak.service)
+            if bulk_info is not None:
+                start_type = bulk_info.get("start_type")
+            else:
+                start_type = self._get_service_start_type(tweak.service)
             state["services"][tweak.name] = {
                 "tier": tweak.tier,
                 "service": tweak.service,
@@ -442,9 +479,14 @@ class DebloatHandler(SettingsHandler):
                 "default_start": tweak.default_start,
             }
 
-        # Appx packages — read ALL tiers
+        # Appx packages — read ALL tiers from one full listing, with the
+        # per-package check as fallback when the listing fails.
+        installed_names = self._list_installed_appx_names()
         for tweak in self._tweaks.appx:
-            installed = self._is_appx_installed(tweak.name)
+            if installed_names is not None:
+                installed = tweak.name.lower() in installed_names
+            else:
+                installed = self._is_appx_installed(tweak.name)
             state["appx"][tweak.name] = {
                 "tier": tweak.tier,
                 "display_name": tweak.display_name,

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from abso.profiles.productivity_oled import ProductivityHDRProfile
 from abso.profiles.profile_bases import fso_overrides, merge_settings_map
-from abso.profiles.rivals2_offline import Rivals2OfflineProfile
+from abso.profiles.rivals2_nosync import Rivals2NoSyncProfile
 
 
 def test_merge_settings_map_returns_isolated_nested_values() -> None:
@@ -47,7 +47,7 @@ def test_fso_overrides_preserves_order_and_requested_flag() -> None:
 
 
 def test_shared_profile_settings_are_isolated_between_calls() -> None:
-    profile = Rivals2OfflineProfile()
+    profile = Rivals2NoSyncProfile()
 
     first = profile.get_settings("RegistrySettingsHandler")
     first["game_priority"]["priority"] = 1

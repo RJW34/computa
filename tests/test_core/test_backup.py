@@ -512,3 +512,155 @@ class TestGetLatestBackup:
             result = manager._get_latest_backup()
 
         assert result.name == id2
+
+
+class TestParallelBackupScan:
+    """Tests for the concurrent handler scan inside create_backup."""
+
+    @staticmethod
+    def _mock_handler(name: str, payload=None, side_effect=None, main_thread=False):
+        handler = MagicMock()
+        handler.__class__.__name__ = name
+        # MagicMock auto-attributes are truthy; pin the marker explicitly so
+        # mock handlers exercise the pool path unless a test opts out.
+        handler.backup_requires_main_thread = main_thread
+        if side_effect is not None:
+            handler.backup.side_effect = side_effect
+        else:
+            handler.backup.return_value = payload if payload is not None else {"k": name}
+        return handler
+
+    def test_manifest_preserves_registry_order(self, tmp_path):
+        """Component order must match handler registration order, not completion order."""
+        import time as time_mod
+
+        def slow_backup():
+            time_mod.sleep(0.2)
+            return {"slow": True}
+
+        handlers = [
+            self._mock_handler("SlowHandler", side_effect=slow_backup),
+            self._mock_handler("FastHandler", payload={"fast": True}),
+        ]
+        with patch("abso.core.backup._get_backup_handlers", return_value=handlers):
+            manager = BackupManager(tmp_path)
+            backup_id = manager.create_backup()
+
+        manifest = json.loads((tmp_path / backup_id / "manifest.json").read_text())
+        assert list(manifest["components"]) == ["SlowHandler", "FastHandler"]
+
+    def test_manifest_records_scan_timings(self, tmp_path):
+        """Every component gets duration_ms; the manifest records wall time and workers."""
+        handlers = [self._mock_handler("H1"), self._mock_handler("H2")]
+        with patch("abso.core.backup._get_backup_handlers", return_value=handlers):
+            manager = BackupManager(tmp_path)
+            backup_id = manager.create_backup()
+
+        manifest = json.loads((tmp_path / backup_id / "manifest.json").read_text())
+        assert manifest["scan_workers"] >= 1
+        assert isinstance(manifest["scan_wall_ms"], float | int)
+        for component in manifest["components"].values():
+            assert isinstance(component["duration_ms"], float | int)
+
+    def test_scan_runs_concurrently(self, tmp_path, monkeypatch):
+        """Two 150 ms handlers must overlap, not serialize."""
+        import time as time_mod
+
+        monkeypatch.setenv("ABSO_BACKUP_SCAN_WORKERS", "8")
+
+        def slow_backup():
+            time_mod.sleep(0.15)
+            return {"ok": True}
+
+        handlers = [
+            self._mock_handler(f"Handler{i}", side_effect=slow_backup) for i in range(4)
+        ]
+        with patch("abso.core.backup._get_backup_handlers", return_value=handlers):
+            manager = BackupManager(tmp_path)
+            start = time_mod.perf_counter()
+            manager.create_backup()
+            elapsed = time_mod.perf_counter() - start
+
+        # Sequential would need >= 0.6 s; parallel should finish well under that.
+        assert elapsed < 0.45
+
+    def test_worker_env_override_forces_sequential(self, tmp_path, monkeypatch):
+        """ABSO_BACKUP_SCAN_WORKERS=1 uses the in-thread sequential path."""
+        monkeypatch.setenv("ABSO_BACKUP_SCAN_WORKERS", "1")
+        handlers = [self._mock_handler("H1"), self._mock_handler("H2")]
+        with patch("abso.core.backup._get_backup_handlers", return_value=handlers):
+            manager = BackupManager(tmp_path)
+            backup_id = manager.create_backup()
+
+        manifest = json.loads((tmp_path / backup_id / "manifest.json").read_text())
+        assert manifest["scan_workers"] == 1
+        assert manifest["components"]["H1"]["success"] is True
+
+    def test_error_taxonomy_preserved_under_parallel_scan(self, tmp_path):
+        """Permission/OS/data errors keep their manifest wording and never abort."""
+        handlers = [
+            self._mock_handler("OkHandler", payload={"fine": 1}),
+            self._mock_handler("PermHandler", side_effect=PermissionError("denied")),
+            self._mock_handler("OsHandler", side_effect=OSError("io broke")),
+            self._mock_handler("DataHandler", side_effect=ValueError("bad data")),
+        ]
+        with patch("abso.core.backup._get_backup_handlers", return_value=handlers):
+            manager = BackupManager(tmp_path)
+            backup_id = manager.create_backup()
+
+        manifest = json.loads((tmp_path / backup_id / "manifest.json").read_text())
+        assert manifest["components"]["OkHandler"]["success"] is True
+        assert "Permission denied" in manifest["components"]["PermHandler"]["error"]
+        assert "OS error" in manifest["components"]["OsHandler"]["error"]
+        assert "Data error" in manifest["components"]["DataHandler"]["error"]
+
+    def test_unexpected_exception_aborts_and_cleans_staging(self, tmp_path):
+        """An unexpected exception type still aborts the backup and reaps staging."""
+        handlers = [
+            self._mock_handler("OkHandler"),
+            self._mock_handler("BoomHandler", side_effect=RuntimeError("boom")),
+        ]
+        with patch("abso.core.backup._get_backup_handlers", return_value=handlers):
+            manager = BackupManager(tmp_path)
+            with pytest.raises(RuntimeError, match="boom"):
+                manager.create_backup()
+
+        assert not list(tmp_path.glob("*.partial"))
+        assert not list(tmp_path.glob("*/manifest.json"))
+
+    def test_com_marked_handlers_run_on_main_thread(self, tmp_path, monkeypatch):
+        """backup_requires_main_thread pins a handler to the calling thread."""
+        import threading
+
+        monkeypatch.setenv("ABSO_BACKUP_SCAN_WORKERS", "8")
+        seen: dict[str, int] = {}
+
+        def make(name: str, marked: bool):
+            def record_thread():
+                seen[name] = threading.get_ident()
+                return {"ok": True}
+
+            return self._mock_handler(name, side_effect=record_thread, main_thread=marked)
+
+        handlers = [make("ComHandler", True), make("PlainHandler", False)]
+        with patch("abso.core.backup._get_backup_handlers", return_value=handlers):
+            manager = BackupManager(tmp_path)
+            backup_id = manager.create_backup()
+
+        assert seen["ComHandler"] == threading.get_ident()
+        manifest = json.loads((tmp_path / backup_id / "manifest.json").read_text())
+        assert list(manifest["components"]) == ["ComHandler", "PlainHandler"]
+
+    def test_wmi_backup_handlers_declare_main_thread_marker(self):
+        """Every registered handler whose backup() reaches WMI must be marked."""
+        from abso.settings.amd import AmdSettingsHandler
+        from abso.settings.cpu_affinity import CpuAffinityHandler
+        from abso.settings.interrupt_mode import InterruptModeHandler
+
+        for handler_cls in (AmdSettingsHandler, CpuAffinityHandler, InterruptModeHandler):
+            assert handler_cls.backup_requires_main_thread is True
+
+        # And the default stays opt-in.
+        from abso.settings.base import SettingsHandler
+
+        assert SettingsHandler.backup_requires_main_thread is False

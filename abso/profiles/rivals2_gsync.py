@@ -1,22 +1,28 @@
-"""Rivals of Aether 2 G-SYNC / VRR profiles.
+"""Rivals of Aether 2 G-SYNC / VRR profiles (merged offline/online lanes).
 
-Two variants:
-- Rivals2GSyncProfile: General-purpose G-SYNC (tear-free low latency)
-- Rivals2OnlineGSyncProfile: Rollback-safe G-SYNC (online play with VRR)
+Three variants:
+- Rivals2GSyncProfile: SDR G-SYNC (tear-free, rollback-safe)
+- Rivals2GSyncHDRProfile: + Windows HDR composition
+- Rivals2GSyncHDRCaptureProfile: + borderless capture-safe path (OBS/Medal)
+
+The 2026-07 consolidation collapsed the old offline/online split; every lane
+carries the online-safe tuning (SnapNet's sim is server-authoritative, so the
+aggressive offline-only tuning bought nothing measurable).
 
 Key difference from OW2 G-SYNC: Rivals 2 does NOT have NVIDIA Reflex,
 so we use the ``vrr_fighting_game`` preset (LLM "on") instead of
-``reflex_gsync`` (LLM "off").
+``reflex_gsync`` (LLM "off"). Caps snap to the 60 Hz sim grid via the
+``fighting_60hz_vrr`` policy (240 @ 300 Hz).
 """
 
 from __future__ import annotations
 
 from typing import Any
 
+from abso.core.vrr import FIGHTING_60HZ_VRR_CAP_POLICY
 from abso.profiles.profile_bases import Rivals2BaseProfile, merge_settings_map
-from abso.settings.registry import WIN32_PRIORITY_GAMING_ONLINE
 
-# Shared payload delta for the capture-safe siblings: swap the strict
+# Shared payload delta for the capture-safe sibling: swap the strict
 # exclusive-fullscreen + fullscreen-only VRR contract for the borderless
 # windowed G-SYNC flip path (same mechanism the OW2 capture lanes use).
 # Switching global_vrr_mode off "fullscreen_only" also drops the
@@ -55,10 +61,10 @@ def _capture_display_mode_rows(rows: list[dict[str, str]]) -> list[dict[str, str
 
 
 class Rivals2GSyncProfile(Rivals2BaseProfile):
-    """Low latency VRR profile for Rivals of Aether 2.
+    """Rollback-safe tear-free VRR lane for Rivals 2 (online and training).
 
-    Tear-free output via G-SYNC with VSync as safety net.
-    Uses ``vrr_fighting_game`` preset (LLM on, VSync on, VRR allow).
+    G-SYNC with NVCP VSync as safety net, capped on the 60 Hz sim grid.
+    Uses the ``vrr_fighting_game`` preset (LLM on, VSync on, VRR allow).
     """
 
     @property
@@ -66,7 +72,7 @@ class Rivals2GSyncProfile(Rivals2BaseProfile):
         # Rivals 2 GameUserSettings.ini is known to be rewritten by the game
         # on exit, so ABSO keeps the NVIDIA driver cap as a safety net in
         # addition to the in-game cap. Both resolve to the same
-        # refresh - 3 VRR cap.
+        # 60-multiple VRR cap (fighting_60hz_vrr policy).
         return True
 
     @property
@@ -75,293 +81,15 @@ class Rivals2GSyncProfile(Rivals2BaseProfile):
 
     @property
     def display_name(self) -> str:
-        return "Rivals 2 - Offline GSYNC"
+        return "Rivals 2 - G-SYNC"
 
     @property
     def description(self) -> str:
-        return "Low latency VRR profile (G-SYNC ON, VSync safety net)"
-
-    @property
-    def optimization_target(self) -> str:
-        return "low_latency_vrr"
-
-    @property
-    def is_online_profile(self) -> bool:
-        return False
-
-    @property
-    def is_sdr_only(self) -> bool:
-        return True
-
-    @property
-    def requires_confirmed_vrr_support(self) -> bool:
-        return True
-
-    @property
-    def include_nvidia_notifications(self) -> bool:
-        return True
-
-    @property
-    def mixed_refresh_safe_fallback_profile_id(self) -> str:
-        return "rivals2-offline"
-
-    def _settings_overrides(self) -> dict[str, dict[str, Any]]:
-        return {
-            "WindowsSettingsHandler": {
-                "max_refresh_rate": True,
-            },
-            "NvidiaSettingsHandler": {
-                # vrr_fighting_game: LLM on, VSync on (safety net), threaded
-                # opt on, max perf power, shader cache unlimited. NOTE: this
-                # preset sets no vrr_app_override, so assert it explicitly below.
-                "preset": "vrr_fighting_game",
-                # Auto-detect refresh rate and cap below refresh for G-SYNC headroom
-                "auto_vrr_fps_cap": True,
-                # Enable G-SYNC: global fullscreen-only mode PLUS an explicit
-                # per-app allow so switching from a no-sync Rivals lane (which
-                # sets vrr_app_override=force_off) actually re-enables VRR for
-                # this profile instead of relying on the global flip alone.
-                "global_vrr_mode": "fullscreen_only",
-                "vrr_app_override": "allow",
-                # Keep driver threading consistent with the no-sync Rivals
-                # lanes; the generic fighting-game preset defaults this on.
-                "threaded_optimization": "off",
-            },
-            "Rivals2ConfigHandler": {
-                "fullscreen_mode": 0,  # Exclusive fullscreen for best VRR
-                "vsync": False,  # In-game VSync OFF (NVCP handles sync)
-                "raw_input": True,
-                "auto_vrr_fps_cap": True,
-                "hdr_output": False,
-            },
-            "NvidiaNotificationHandler": {
-                "disable_notifications": True,
-            },
-        }
-
-    def get_in_game_settings(self) -> list[dict[str, str]]:
-        return [
-            {
-                "category": "=== G-SYNC PROFILE ===",
-                "setting": "Overview",
-                "value": "G-SYNC ON, VSync ON (NVCP), refresh - 3 FPS cap",
-                "reason": (
-                    "Tear-free low-latency VRR profile. VSync acts as safety net only - "
-                    "never activates with FPS capped below refresh rate. "
-                    "For 300Hz: cap at 297. For 240Hz: cap at 237. For 144Hz: cap at 141. "
-                    "(Blur Busters G-SYNC 101 convention.)"
-                ),
-            },
-            {
-                "category": "NVIDIA Control Panel",
-                "setting": "Set up G-SYNC",
-                "value": "Enable G-SYNC, G-SYNC Compatible: ON",
-                "reason": "Display > Set up G-SYNC. Check 'Enable G-SYNC' and 'Enable for full screen mode'.",
-            },
-            {
-                "category": "NVIDIA Control Panel",
-                "setting": "Vertical sync",
-                "value": "On",
-                "reason": (
-                    "Manage 3D Settings. Acts as SAFETY NET only with G-SYNC. "
-                    "With FPS capped below refresh, VSync never engages."
-                ),
-            },
-            {
-                "category": "NVIDIA Control Panel",
-                "setting": "Low Latency Mode",
-                "value": "On",
-                "reason": (
-                    "Reduces render queue depth on the published DX11 path. 'On' is correct "
-                    "(not 'Off' - Rivals 2 has no Reflex). If stuttering occurs, try 'Off' or "
-                    "set Pre-Rendered Frames to 2 via Nvidia Profile Inspector."
-                ),
-            },
-            {
-                "category": "NVIDIA Control Panel",
-                "setting": "Max Frame Rate",
-                "value": "refresh - 3 cap (auto-set by ABSO)",
-                "reason": (
-                    "ABSO auto-detects your refresh rate and applies the Blur "
-                    "Busters G-SYNC 101 convention (refresh - 3: e.g. 297 @ "
-                    "300Hz, 237 @ 240Hz, 141 @ 144Hz). Keeps G-SYNC active "
-                    "and V-SYNC from engaging."
-                ),
-            },
-            {
-                "category": "In-Game Video",
-                "setting": "Display Mode",
-                "value": "Exclusive Fullscreen",
-                "reason": "Required for proper G-SYNC behavior. Borderless adds compositor latency.",
-            },
-            {
-                "category": "In-Game Video",
-                "setting": "V-SYNC",
-                "value": "Off",
-                "reason": "ALWAYS disable in-game VSync with G-SYNC. NVCP VSync handles sync.",
-            },
-            {
-                "category": "In-Game Video",
-                "setting": "Frame Rate Cap",
-                "value": "refresh - 3 cap (e.g., 297 for 300Hz)",
-                "reason": (
-                    "Must cap below refresh for G-SYNC to work properly. "
-                    "In-game limiter has lower latency than NVCP/RTSS limiters."
-                ),
-            },
-            {
-                "category": "In-Game Video",
-                "setting": "NVIDIA Reflex",
-                "value": "Not available",
-                "reason": (
-                    "Rivals 2 does not implement NVIDIA Reflex. LLM 'On' is set via NVCP instead. "
-                    "This is different from OW2/Fortnite where Reflex handles queue control."
-                ),
-            },
-        ]
-
-    def get_post_apply_notes(self) -> list[str]:
-        return [
-            "Rivals 2 manual: use exclusive fullscreen, in-game V-Sync Off, and the refresh-minus-3 FPS cap for G-SYNC."
-        ]
-
-
-class Rivals2GSyncHDRProfile(Rivals2GSyncProfile):
-    """Offline G-SYNC Rivals 2 profile with Windows HDR composition enabled."""
-
-    @property
-    def profile_id(self) -> str:
-        return "rivals2-gsync-hdr"
-
-    @property
-    def display_name(self) -> str:
-        return "Rivals 2 - Offline GSYNC HDR"
-
-    @property
-    def description(self) -> str:
-        return (
-            "Offline G-SYNC Rivals 2 profile with Windows HDR composition. "
-            "Keeps the strict VRR path; Rivals 2 native HDR output stays off."
-        )
-
-    @property
-    def is_sdr_only(self) -> bool:
-        return False
-
-    @property
-    def mixed_refresh_safe_fallback_profile_id(self) -> str:
-        return "rivals2-offline-hdr"
-
-    @property
-    def overlay_compatible_fallback_profile_id(self) -> str | None:
-        # Overlay-blocked applies (OBS/Medal running) reroute to the
-        # borderless capture-safe sibling instead of hard-failing.
-        return "rivals2-gsync-hdr-capture"
-
-    def _settings_overrides(self) -> dict[str, dict[str, Any]]:
-        return merge_settings_map(
-            super()._settings_overrides(),
-            self.HDR_WINDOWS_COMPOSITION_OVERRIDES,
-        )
-
-    def get_in_game_settings(self) -> list[dict[str, str]]:
-        return [*self._rivals2_hdr_guidance(), *super().get_in_game_settings()]
-
-
-class Rivals2GSyncHDRCaptureProfile(Rivals2GSyncHDRProfile):
-    """Capture-safe borderless sibling of the offline G-SYNC HDR lane.
-
-    Same VRR + Windows HDR composition contract as
-    :class:`Rivals2GSyncHDRProfile`, but on the borderless windowed G-SYNC
-    flip path with the capture / overlay / peripheral stack (OBS, Medal,
-    RTSS, overlays) kept alive at apply and game launch.
-    """
-
-    @property
-    def is_capture_safe(self) -> bool:
-        return True
-
-    @property
-    def profile_id(self) -> str:
-        return "rivals2-gsync-hdr-capture"
-
-    @property
-    def display_name(self) -> str:
-        return "Rivals 2 - Offline GSYNC HDR Capture-Safe"
-
-    @property
-    def description(self) -> str:
-        return (
-            "Offline G-SYNC Rivals 2 lane with Windows HDR composition on the "
-            "borderless windowed VRR path; keeps OBS/Medal/RTSS and overlays "
-            "alive. Rivals 2 currently advertises no native HDR support, so "
-            "native game HDR remains off."
-        )
-
-    @property
-    def requires_exact_nvidia_binding(self) -> bool:
-        # Windowed VRR drops the exclusive-fullscreen contract, but the
-        # NVIDIA app-binding proof stays mandatory like the strict lane.
-        return True
-
-    @property
-    def overlay_compatible_fallback_profile_id(self) -> str | None:
-        # This lane IS the overlay-compatible path; terminate the chain so
-        # the inherited strict-lane fallback cannot self-reference.
-        return None
-
-    def _settings_overrides(self) -> dict[str, dict[str, Any]]:
-        return merge_settings_map(
-            super()._settings_overrides(),
-            _CAPTURE_WINDOWED_VRR_OVERRIDES,
-        )
-
-    def get_in_game_settings(self) -> list[dict[str, str]]:
-        return _capture_display_mode_rows(super().get_in_game_settings())
-
-    def get_post_apply_notes(self) -> list[str]:
-        return [
-            "Rivals 2 manual: use Borderless / Windowed Fullscreen, in-game "
-            "V-Sync Off, and the refresh-minus-3 cap. OBS/overlays may stay "
-            "running on this lane."
-        ]
-
-
-class Rivals2OnlineGSyncProfile(Rivals2BaseProfile):
-    """Rollback-safe G-SYNC profile for Rivals 2 online play.
-
-    Same G-SYNC setup as the general profile but with stability constraints
-    for SnapNet rollback netcode. Threaded optimization is forced off to avoid
-    extra driver-side timing variability.
-    """
-
-    @property
-    def allow_dual_limiter(self) -> bool:
-        # Same rationale as Rivals2GSyncProfile: the game rewrites
-        # GameUserSettings.ini on exit, so ABSO keeps the driver cap as a
-        # safety net alongside the in-game cap. Both resolve to the same
-        # refresh - 3 VRR cap.
-        return True
-
-    @property
-    def profile_id(self) -> str:
-        return "rivals2-online-gsync"
-
-    @property
-    def display_name(self) -> str:
-        return "Rivals 2 - Online GSYNC"
-
-    @property
-    def description(self) -> str:
-        return "Rollback-safe VRR profile (G-SYNC ON, stability-focused)"
+        return "Rollback-safe tear-free VRR lane (G-SYNC ON, VSync safety net)"
 
     @property
     def optimization_target(self) -> str:
         return "stable_online_vrr"
-
-    @property
-    def is_online_profile(self) -> bool:
-        return True
 
     @property
     def is_sdr_only(self) -> bool:
@@ -381,42 +109,43 @@ class Rivals2OnlineGSyncProfile(Rivals2BaseProfile):
 
     @property
     def mixed_refresh_safe_fallback_profile_id(self) -> str:
-        return "rivals2-online"
+        return "rivals2-nosync"
 
     def _settings_overrides(self) -> dict[str, dict[str, Any]]:
         return {
             "WindowsSettingsHandler": {
                 "max_refresh_rate": True,
             },
-            "RegistrySettingsHandler": {
-                # Match the no-sync online lane (Rivals2OnlineProfile): rollback
-                # netcode wants deterministic scheduler timing over maximum
-                # foreground favoritism, so downgrade Win32PrioritySeparation to
-                # the ONLINE value. The base inherits the OFFLINE value, so the
-                # two online lanes would otherwise ship different scheduler
-                # tuning.
-                "win32_priority_separation": WIN32_PRIORITY_GAMING_ONLINE,
-            },
             "NvidiaSettingsHandler": {
+                # vrr_fighting_game: LLM on, VSync on (safety net), threaded
+                # opt on, max perf power, shader cache unlimited. NOTE: this
+                # preset sets no vrr_app_override, so assert it explicitly below.
                 "preset": "vrr_fighting_game",
+                # Auto-cap on the 60 Hz sim grid: largest multiple of 60 below
+                # refresh - 3 (240 @ 300 Hz). Rivals 2 ticks at a fixed 60 Hz
+                # and community testing shows only 60-multiples render with an
+                # even cadence — the generic refresh - 3 cap (297) alternates
+                # 4/5 rendered frames per tick and reads as micro-stutter.
                 "auto_vrr_fps_cap": True,
+                "vrr_cap_policy": FIGHTING_60HZ_VRR_CAP_POLICY,
+                # Enable G-SYNC: global fullscreen-only mode PLUS an explicit
+                # per-app allow so switching from the no-sync lane (which sets
+                # vrr_app_override=force_off) actually re-enables VRR for this
+                # profile instead of relying on the global flip alone.
                 "global_vrr_mode": "fullscreen_only",
-                # Explicit per-app VRR allow, symmetric with the no-sync lanes'
-                # explicit force_off (vrr_fighting_game sets neither).
                 "vrr_app_override": "allow",
-                # Override preset default - driver timing variability risk with rollback
-                "threaded_optimization": "off",
+                # Keep the preset default explicitly: Rivals 2 is CPU-bound
+                # UE5/DX11 and driver worker threads improve frame times; the
+                # server-authoritative SnapNet sim cannot be desynced by them.
+                "threaded_optimization": "on",
             },
             "Rivals2ConfigHandler": {
-                "fullscreen_mode": 0,
-                "vsync": False,
+                "fullscreen_mode": 0,  # Exclusive fullscreen for best VRR
+                "vsync": False,  # In-game VSync OFF (NVCP handles sync)
                 "raw_input": True,
                 "auto_vrr_fps_cap": True,
+                "vrr_cap_policy": FIGHTING_60HZ_VRR_CAP_POLICY,
                 "hdr_output": False,
-            },
-            "ProcessPriorityHandler": {
-                "cpu_priority": 2,  # Conservative (not aggressive) for online stability
-                "io_priority": 2,
             },
             "NvidiaNotificationHandler": {
                 "disable_notifications": True,
@@ -426,13 +155,17 @@ class Rivals2OnlineGSyncProfile(Rivals2BaseProfile):
     def get_in_game_settings(self) -> list[dict[str, str]]:
         return [
             {
-                "category": "=== ONLINE G-SYNC PROFILE ===",
+                "category": "=== G-SYNC PROFILE ===",
                 "setting": "Overview",
-                "value": "G-SYNC ON, Rollback-Safe, Stability-Focused",
+                "value": "G-SYNC ON, VSync ON (NVCP), 60-multiple FPS cap below refresh",
                 "reason": (
-                    "Tear-free VRR for online play. Stability constraints applied for "
-                    "SnapNet rollback netcode. Threaded optimization OFF to prevent "
-                    "driver-side timing variability during rollback recovery."
+                    "Tear-free rollback-safe VRR lane for online and training. "
+                    "VSync acts as safety net only - never activates with FPS "
+                    "capped below refresh rate. Rivals 2 ticks at a fixed 60 Hz, "
+                    "so the cap snaps to the largest multiple of 60 under "
+                    "refresh - 3 for an even frames-per-tick cadence: 240 @ "
+                    "300Hz, 180 @ 240Hz, 120 @ 144Hz. (Blur Busters G-SYNC 101 "
+                    "margin + 60 Hz sim grid.)"
                 ),
             },
             {
@@ -444,45 +177,77 @@ class Rivals2OnlineGSyncProfile(Rivals2BaseProfile):
             {
                 "category": "NVIDIA Control Panel",
                 "setting": "Vertical sync",
-                "value": "On (safety net)",
-                "reason": "NVCP VSync as safety net only. Never engages with FPS capped below refresh.",
+                "value": "On",
+                "reason": (
+                    "Manage 3D Settings. Acts as SAFETY NET only with G-SYNC. "
+                    "With FPS capped below refresh, VSync never engages."
+                ),
             },
             {
                 "category": "NVIDIA Control Panel",
                 "setting": "Threaded Optimization",
-                "value": "Off",
-                "reason": "OFF - avoids extra driver-side timing variability during rollback.",
+                "value": "On",
+                "reason": (
+                    "Rivals 2 is CPU-bound UE5/DX11; driver worker threads improve "
+                    "frame times. SnapNet's sim is server-authoritative, so driver "
+                    "threading cannot desync rollback."
+                ),
             },
             {
                 "category": "NVIDIA Control Panel",
                 "setting": "Low Latency Mode",
-                "value": "On (NOT Ultra)",
+                "value": "On",
                 "reason": (
-                    "Ultra can cause frame pacing issues and overrides FPS caps. "
-                    "'On' reduces queue depth safely for online play."
+                    "Reduces render queue depth on the published DX11 path. 'On' is correct "
+                    "(not 'Off' - Rivals 2 has no Reflex). If stuttering occurs, try 'Off' or "
+                    "set Pre-Rendered Frames to 2 via Nvidia Profile Inspector."
+                ),
+            },
+            {
+                "category": "NVIDIA Control Panel",
+                "setting": "Max Frame Rate",
+                "value": "60-multiple cap below refresh (auto-set by ABSO)",
+                "reason": (
+                    "ABSO auto-detects your refresh rate and caps at the largest "
+                    "multiple of 60 under refresh - 3 (240 @ 300Hz, 180 @ 240Hz, "
+                    "120 @ 144Hz). Keeps G-SYNC active, V-SYNC from engaging, and "
+                    "the 60 Hz sim cadence even — generic 297-style caps land off "
+                    "the sim grid and micro-stutter."
                 ),
             },
             {
                 "category": "In-Game Video",
                 "setting": "Display Mode",
                 "value": "Exclusive Fullscreen",
-                "reason": "Required for proper G-SYNC behavior.",
+                "reason": "Required for proper G-SYNC behavior. Borderless adds compositor latency.",
             },
             {
                 "category": "In-Game Video",
                 "setting": "V-SYNC",
                 "value": "Off",
-                "reason": "NVCP VSync handles sync. In-game VSync must be off with G-SYNC.",
+                "reason": "ALWAYS disable in-game VSync with G-SYNC. NVCP VSync handles sync.",
             },
             {
                 "category": "In-Game Video",
                 "setting": "Frame Rate Cap",
-                "value": "Refresh-scaled VRR cap",
+                "value": "60-multiple cap below refresh (e.g., 240 for 300Hz)",
                 "reason": (
-                    "Keeps G-SYNC active and below the VSync ceiling. Use the "
-                    "in-game cap for lowest limiter latency."
+                    "Must cap below refresh for G-SYNC to work properly, and on a "
+                    "multiple of 60 so the fixed 60 Hz sim renders an even number "
+                    "of frames per tick. In-game limiter has lower latency than "
+                    "NVCP/RTSS limiters."
                 ),
             },
+            {
+                "category": "In-Game Video",
+                "setting": "NVIDIA Reflex",
+                "value": "Not available",
+                "reason": (
+                    "Rivals 2 does not implement NVIDIA Reflex. LLM 'On' is set via NVCP instead. "
+                    "This is different from OW2/Fortnite where Reflex handles queue control."
+                ),
+            },
+            *self._rivals2_overlay_guidance(),
             {
                 "category": "Validation",
                 "setting": "Expected Behavior",
@@ -493,26 +258,28 @@ class Rivals2OnlineGSyncProfile(Rivals2BaseProfile):
 
     def get_post_apply_notes(self) -> list[str]:
         return [
-            "Rivals 2 manual: keep in-game V-Sync Off and use the refresh-minus-3 cap; disable external caps for online rollback."
+            "Rivals 2 manual: use exclusive fullscreen, in-game V-Sync Off, and "
+            "the 60-multiple VRR cap (e.g. 240 @ 300 Hz) for G-SYNC. Disable "
+            "external caps."
         ]
 
 
-class Rivals2OnlineGSyncHDRProfile(Rivals2OnlineGSyncProfile):
-    """Rollback-safe online G-SYNC Rivals 2 profile with Windows HDR composition."""
+class Rivals2GSyncHDRProfile(Rivals2GSyncProfile):
+    """G-SYNC Rivals 2 lane with Windows HDR composition enabled."""
 
     @property
     def profile_id(self) -> str:
-        return "rivals2-online-gsync-hdr"
+        return "rivals2-gsync-hdr"
 
     @property
     def display_name(self) -> str:
-        return "Rivals 2 - Online GSYNC HDR"
+        return "Rivals 2 - G-SYNC HDR"
 
     @property
     def description(self) -> str:
         return (
-            "Rollback-safe online G-SYNC Rivals 2 profile with Windows HDR composition. "
-            "Keeps the strict VRR stability path; Rivals 2 native HDR output stays off."
+            "Rollback-safe G-SYNC Rivals 2 lane with Windows HDR composition. "
+            "Keeps the strict VRR path; Rivals 2 native HDR output stays off."
         )
 
     @property
@@ -521,13 +288,13 @@ class Rivals2OnlineGSyncHDRProfile(Rivals2OnlineGSyncProfile):
 
     @property
     def mixed_refresh_safe_fallback_profile_id(self) -> str:
-        return "rivals2-online-hdr"
+        return "rivals2-nosync-hdr"
 
     @property
     def overlay_compatible_fallback_profile_id(self) -> str | None:
         # Overlay-blocked applies (OBS/Medal running) reroute to the
         # borderless capture-safe sibling instead of hard-failing.
-        return "rivals2-online-gsync-hdr-capture"
+        return "rivals2-gsync-hdr-capture"
 
     def _settings_overrides(self) -> dict[str, dict[str, Any]]:
         return merge_settings_map(
@@ -539,13 +306,13 @@ class Rivals2OnlineGSyncHDRProfile(Rivals2OnlineGSyncProfile):
         return [*self._rivals2_hdr_guidance(), *super().get_in_game_settings()]
 
 
-class Rivals2OnlineGSyncHDRCaptureProfile(Rivals2OnlineGSyncHDRProfile):
-    """Capture-safe borderless sibling of the online G-SYNC HDR lane.
+class Rivals2GSyncHDRCaptureProfile(Rivals2GSyncHDRProfile):
+    """Capture-safe borderless sibling of the G-SYNC HDR lane.
 
     Same rollback-safe VRR + Windows HDR composition contract as
-    :class:`Rivals2OnlineGSyncHDRProfile`, but on the borderless windowed
-    G-SYNC flip path with the capture / overlay / peripheral stack (OBS,
-    Medal, RTSS, overlays) kept alive at apply and game launch.
+    :class:`Rivals2GSyncHDRProfile`, but on the borderless windowed G-SYNC
+    flip path with the capture / overlay / peripheral stack (OBS, Medal,
+    RTSS, overlays) kept alive at apply and game launch.
     """
 
     @property
@@ -554,19 +321,19 @@ class Rivals2OnlineGSyncHDRCaptureProfile(Rivals2OnlineGSyncHDRProfile):
 
     @property
     def profile_id(self) -> str:
-        return "rivals2-online-gsync-hdr-capture"
+        return "rivals2-gsync-hdr-capture"
 
     @property
     def display_name(self) -> str:
-        return "Rivals 2 - Online GSYNC HDR Capture-Safe"
+        return "Rivals 2 - G-SYNC HDR Capture-Safe"
 
     @property
     def description(self) -> str:
         return (
-            "Rollback-safe online G-SYNC Rivals 2 lane with Windows HDR "
-            "composition on the borderless windowed VRR path; keeps "
-            "OBS/Medal/RTSS and overlays alive. Rivals 2 currently advertises "
-            "no native HDR support, so native game HDR remains off."
+            "Rollback-safe G-SYNC Rivals 2 lane with Windows HDR composition "
+            "on the borderless windowed VRR path; keeps OBS/Medal/RTSS and "
+            "overlays alive. Rivals 2 currently advertises no native HDR "
+            "support, so native game HDR remains off."
         )
 
     @property
@@ -593,8 +360,6 @@ class Rivals2OnlineGSyncHDRCaptureProfile(Rivals2OnlineGSyncHDRProfile):
     def get_post_apply_notes(self) -> list[str]:
         return [
             "Rivals 2 manual: use Borderless / Windowed Fullscreen, in-game "
-            "V-Sync Off, and the refresh-minus-3 cap. OBS/overlays may stay "
-            "running on this lane."
+            "V-Sync Off, and the 60-multiple VRR cap (e.g. 240 @ 300 Hz). "
+            "OBS/overlays may stay running on this lane."
         ]
-
-

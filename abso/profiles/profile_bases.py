@@ -252,7 +252,20 @@ def build_standard_handlers(
 
 
 class Rivals2BaseProfile(BaseProfile):
-    """Shared base for Rivals 2 profiles."""
+    """Shared base for Rivals 2 profiles.
+
+    The 2026-07 consolidation collapsed the old offline/online lane split:
+    every Rivals lane now carries the online-safe tuning (milder scheduler
+    boost, conservative process priority, rollback validation active).
+    SnapNet's sim is server-authoritative, so the aggressive offline-only
+    tuning bought nothing measurable — offline training runs identically
+    on the online-safe values.
+    """
+
+    @property
+    def is_online_profile(self) -> bool:
+        # Every merged Rivals lane is matchmaking-safe by construction.
+        return True
 
     HDR_WINDOWS_COMPOSITION_OVERRIDES: dict[str, dict[str, Any]] = {
         "WindowsSettingsHandler": {
@@ -347,42 +360,44 @@ class Rivals2BaseProfile(BaseProfile):
         """Stable NVIDIA DRS profile identity for Rivals 2 variants.
 
         Rivals 2 does not have a reliable predefined NVIDIA profile like
-        Overwatch 2. We intentionally collapse multiple ABSO variants onto a
-        stable custom profile family so switching between Rivals profiles
-        updates one bound driver profile instead of creating unbound leftovers.
+        Overwatch 2. We intentionally collapse every ABSO variant onto ONE
+        stable custom profile family so switching between Rivals lanes
+        updates one bound driver profile instead of creating unbound
+        leftovers. (The old split kept a separate "Rivals 2 Online" family;
+        it survives in the alias list below so an existing bound profile is
+        reused, not orphaned.)
         """
-        return "Rivals 2 Online" if self.is_online_profile else "Rivals 2"
+        return "Rivals 2"
 
     @property
     def nvidia_profile_aliases(self) -> list[str]:
         """Legacy/custom NVIDIA profile names worth reusing when already bound."""
-        if self.is_online_profile:
-            candidates = [
-                "Rivals 2 - Online No Sync",
-                "Rivals 2 - Online No Sync HDR",
-                "Rivals 2 - Online GSYNC",
-                "Rivals 2 - Online GSYNC HDR",
-                "Rivals 2: Online / Matchmaking",
-                "Rivals 2: Online G-SYNC",
-                "Rivals 2: Online HDR",
-                "Rivals 2: Online G-SYNC HDR",
-                "Rivals 2 (Streaming)",
-            ]
-        else:
-            candidates = [
-                "Rivals2-Win64-Shipping.exe",
-                "Rivals of Aether 2",
-                "Rivals 2 - Offline No Sync",
-                "Rivals 2 - Offline No Sync HDR",
-                "Rivals 2 - Offline GSYNC",
-                "Rivals 2 - Offline GSYNC HDR",
-                "Rivals 2: Offline / Training",
-                "Rivals 2: G-SYNC",
-                "Rivals 2: Offline HDR",
-                "Rivals 2: G-SYNC HDR",
-                "Rivals 2: 300Hz Maximum",
-                "Rivals 2: Tournament Sim (144Hz)",
-            ]
+        candidates = [
+            # Pre-merge online family first: this is the profile most live
+            # machines have bound from the last online-lane apply.
+            "Rivals 2 Online",
+            "Rivals2-Win64-Shipping.exe",
+            "Rivals of Aether 2",
+            "Rivals 2 - Online No Sync",
+            "Rivals 2 - Online No Sync HDR",
+            "Rivals 2 - Online GSYNC",
+            "Rivals 2 - Online GSYNC HDR",
+            "Rivals 2 - Offline No Sync",
+            "Rivals 2 - Offline No Sync HDR",
+            "Rivals 2 - Offline GSYNC",
+            "Rivals 2 - Offline GSYNC HDR",
+            "Rivals 2: Online / Matchmaking",
+            "Rivals 2: Online G-SYNC",
+            "Rivals 2: Online HDR",
+            "Rivals 2: Online G-SYNC HDR",
+            "Rivals 2: Offline / Training",
+            "Rivals 2: G-SYNC",
+            "Rivals 2: Offline HDR",
+            "Rivals 2: G-SYNC HDR",
+            "Rivals 2: 300Hz Maximum",
+            "Rivals 2: Tournament Sim (144Hz)",
+            "Rivals 2 (Streaming)",
+        ]
 
         deduped: list[str] = []
         for name in candidates:
@@ -432,7 +447,11 @@ class Rivals2BaseProfile(BaseProfile):
                 "disable_core_parking": True,
             },
             "RegistrySettingsHandler": {
-                "win32_priority_separation": WIN32_PRIORITY_GAMING_OFFLINE,
+                # Online-safe scheduler tuning for the whole merged family:
+                # +1 foreground boost instead of the aggressive +2. SnapNet
+                # rollback resim wants background kernel/network work never
+                # starved, and the delta is unmeasurable on modern CPUs.
+                "win32_priority_separation": WIN32_PRIORITY_GAMING_ONLINE,
                 "game_priority": {
                     "gpu_priority": 8,
                     "priority": 6,
@@ -453,8 +472,10 @@ class Rivals2BaseProfile(BaseProfile):
                 "disable_global_fso": True,
             },
             "ProcessPriorityHandler": {
-                "cpu_priority": 3,
-                "io_priority": 3,
+                # Conservative (not aggressive) — the merged lanes keep the
+                # online posture everywhere.
+                "cpu_priority": 2,
+                "io_priority": 2,
             },
             "CpuAffinityHandler": {
                 # No affinity pinning by default. Intel officially discourages
@@ -484,6 +505,23 @@ class Rivals2BaseProfile(BaseProfile):
 
     def get_settings(self, handler_name: str) -> dict[str, Any]:
         return merged_handler_settings(self, handler_name)
+
+    def _rivals2_overlay_guidance(self) -> list[dict[str, str]]:
+        """NVIDIA App overlay warning shared by every Rivals 2 lane."""
+        return [
+            {
+                "category": "Overlays",
+                "setting": "NVIDIA App overlay",
+                "value": "Off",
+                "reason": (
+                    "Known Rivals 2 issue: the NVIDIA App in-game overlay can "
+                    "roughly halve frame rate in UE5 titles, and NVIDIA App / "
+                    "driver updates have silently re-enabled it. Keep it "
+                    "disabled on every lane; this is separate from OBS/Medal "
+                    "capture, which follows the lane's own overlay policy."
+                ),
+            },
+        ]
 
     def _rivals2_hdr_guidance(self) -> list[dict[str, str]]:
         return [

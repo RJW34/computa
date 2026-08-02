@@ -243,7 +243,7 @@ def test_capability_reports_amd_gpu_path_as_info() -> None:
     detector = MagicMock()
     detector.detect_monitors.return_value = [{"name": "Primary", "vrr_supported": True}]
     detector.detect_gpu.return_value = {"name": "AMD Radeon RX 7900 XTX"}
-    profile = _make_profile("rivals2-offline")
+    profile = _make_profile("rivals2-nosync")
 
     report = CapabilityEngine(detector).evaluate(profile)
 
@@ -258,7 +258,7 @@ def test_capability_warns_on_gpu_without_vendor_tuning_path() -> None:
     detector = MagicMock()
     detector.detect_monitors.return_value = [{"name": "Primary", "vrr_supported": True}]
     detector.detect_gpu.return_value = {"name": "Intel Arc(TM) B580 Graphics"}
-    profile = _make_profile("rivals2-offline")
+    profile = _make_profile("rivals2-nosync")
 
     report = CapabilityEngine(detector).evaluate(profile)
 
@@ -355,7 +355,7 @@ def test_capability_blocks_fixed_refresh_when_monitor_cannot_support_it() -> Non
     ]
     detector.detect_gpu.return_value = {"name": "NVIDIA GeForce RTX 4090"}
 
-    profile = _make_profile("rivals2-offline")
+    profile = _make_profile("rivals2-nosync")
     profile.get_settings.side_effect = lambda handler_name: (
         {"refresh_rate": 360} if handler_name == "WindowsSettingsHandler" else {}
     )
@@ -379,7 +379,7 @@ def test_capability_allows_fixed_refresh_when_supported() -> None:
     ]
     detector.detect_gpu.return_value = {"name": "NVIDIA GeForce RTX 4090"}
 
-    profile = _make_profile("rivals2-offline")
+    profile = _make_profile("rivals2-nosync")
     profile.get_settings.side_effect = lambda handler_name: (
         {"refresh_rate": 144} if handler_name == "WindowsSettingsHandler" else {}
     )
