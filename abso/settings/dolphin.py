@@ -2,13 +2,23 @@
 
 Manages latency-critical Dolphin settings including:
 - Immediately Present XFB (ImmediateXFBEnable) - skips frame buffer queue
-- Rush Frame Presentation (RushPresentation) - experimental 8-14ms reduction
-- Smooth Frame Presentation (SmoothPresentation) - for VRR displays
+- Rush Frame Presentation (RushPresentation) - mainline-only, see BUILD LINEAGE
+- Smooth Frame Presentation (SmoothPresentation) - VRR pacing aid, costs latency
 - Backend Multithreading (BackendMultithreading) - driver threading overhead
 - GPU Sync (SyncGPU) - adds latency when enabled
 
+BUILD LINEAGE
+-------------
+Slippi Launcher's ``netplay`` Dolphin is historically **Ishiiruka**-based, while
+Rush Frame Presentation shipped in **mainline** Dolphin 2512 (December 2025).
+An Ishiiruka build silently ignores ``RushPresentation``; ``_upsert_value`` will
+still write the key, so its presence in Dolphin.ini proves nothing about whether
+the running build honours it. ``detect()`` reports a best-effort lineage guess
+from Ishiiruka-exclusive GFX.ini keys so callers can gate guidance instead of
+assuming the mainline feature set.
+
 Sources:
-- Dolphin Progress Report December 2025 (Rush Frame Presentation)
+- Dolphin Progress Report December 2025 (Rush/Smooth Frame Presentation)
 - Dolphin Performance Guide
 - melee.tv competitive optimization
 """
@@ -19,11 +29,30 @@ import logging
 import os
 import re
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal, NamedTuple
 
 from abso.settings.base import SettingsHandler
 
 logger = logging.getLogger(__name__)
+
+# GFX.ini keys that only ever exist in Ishiiruka-derived builds. Mainline
+# Dolphin has none of them, so any hit is a reliable lineage signal.
+ISHIIRUKA_GFX_MARKERS: tuple[str, ...] = (
+    "SimBumpEnabled",
+    "ForcePhongShading",
+    "PredictiveFifo",
+    "TextureScalingType",
+    "EnableOpenCL",
+    "TessellationEarlyCulling",
+)
+
+
+class AuditRule(NamedTuple):
+    """Expected value for a managed Dolphin key, plus why it matters."""
+
+    expected: str
+    severity: str
+    reason: str
 
 
 class DolphinConfigHandler(SettingsHandler):
@@ -47,6 +76,9 @@ class DolphinConfigHandler(SettingsHandler):
         "use_deposterize": ("UseDePosterize", "Enhancements"),
         "backend_multithreading": ("BackendMultithreading", "Settings"),
         "vsync": ("VSync", "Hardware"),
+        "efb_access_enable": ("EFBAccessEnable", "Hacks"),
+        "enable_gpu_texture_decoding": ("EnableGPUTextureDecoding", "Hacks"),
+        "borderless_fullscreen": ("BorderlessFullscreen", "Settings"),
     }
 
     DOLPHIN_KEY_MAP: dict[str, tuple[str, str]] = {
@@ -56,56 +88,134 @@ class DolphinConfigHandler(SettingsHandler):
         "smooth_presentation": ("SmoothPresentation", "Core"),
         "sync_gpu": ("SyncGPU", "Core"),
         "timing_variance": ("TimingVariance", "Core"),
+        "time_stretching": ("TimeStretching", "Core"),
+    }
+
+    # Expected values for keys whose correct setting is identical across every
+    # Slippi profile in the catalog. Keys that legitimately differ per profile
+    # must be declared in UNAUDITED_KEYS instead - never left out silently.
+    AUDIT_RULES: dict[str, AuditRule] = {
+        "efb_scale": AuditRule(
+            "1", "medium", "Higher internal resolution adds render latency"
+        ),
+        "texture_scaling_factor": AuditRule(
+            "1", "low", "Texture upscaling adds GPU overhead"
+        ),
+        "use_scaling_filter": AuditRule("False", "low", "Scaling adds GPU overhead"),
+        "use_deposterize": AuditRule(
+            "False", "low", "Post-processing adds GPU overhead"
+        ),
+        "backend_multithreading": AuditRule(
+            "False", "low", "Backend multithreading adds driver overhead"
+        ),
+        "efb_access_enable": AuditRule(
+            "False", "low", "EFB access is slow and unnecessary for Melee"
+        ),
+        "enable_gpu_texture_decoding": AuditRule(
+            "True", "low", "Offloads texture decoding to the GPU"
+        ),
+        "borderless_fullscreen": AuditRule(
+            "False",
+            "medium",
+            "Borderless routes Dolphin through the desktop compositor; "
+            "exclusive fullscreen is the lower-latency scanout path",
+        ),
+        "reduce_timing_dispersion": AuditRule(
+            "True", "medium", "Ishiiruka-specific setting for tighter frame timing"
+        ),
+        "immediate_xfb_enable": AuditRule(
+            "True",
+            "medium",
+            "Immediately Present XFB skips the frame buffer queue for lower latency",
+        ),
+        "smooth_presentation": AuditRule(
+            "False",
+            "medium",
+            "Smooth Frame Presentation deliberately delays presentation ~1-2ms to "
+            "regularise pacing. It is a VRR range-holding aid, not a latency feature, "
+            "and every Slippi profile targets it off",
+        ),
+        "sync_gpu": AuditRule(
+            "False", "medium", "GPU sync adds latency - disable for competitive play"
+        ),
+        "timing_variance": AuditRule(
+            "8", "low", "Ishiiruka-specific frame timing variance target"
+        ),
+        "time_stretching": AuditRule(
+            "False", "low", "Audio time stretching adds processing overhead"
+        ),
+    }
+
+    # Managed keys deliberately excluded from audit, with the reason. Enforced
+    # by tests/test_handlers/test_dolphin.py so a new key map entry cannot be
+    # added without an explicit audit decision.
+    UNAUDITED_KEYS: dict[str, str] = {
+        "vsync": (
+            "Profile-dependent: the competitive no-sync lane targets False while "
+            "slippi-melee-console-parity targets True."
+        ),
+        "rush_presentation": (
+            "Mainline-only (Dolphin 2512) and an explicit A/B setting. Ishiiruka "
+            "netplay builds ignore the key, so a mismatch is not actionable."
+        ),
     }
 
     def detect(self) -> dict[str, Any]:
-        """Detect current Dolphin configuration state."""
-        result = {
+        """Detect current Dolphin configuration state.
+
+        Every key in ``GFX_KEY_MAP`` / ``DOLPHIN_KEY_MAP`` is read, so adding a
+        managed key automatically surfaces it here rather than requiring a
+        parallel hand-written list to be kept in sync.
+        """
+        current: dict[str, str | None] = {}
+        result: dict[str, Any] = {
             "slippi_installed": self.slippi_base.exists(),
             "gfx_ini_exists": self.gfx_ini.exists(),
             "dolphin_ini_exists": self.dolphin_ini.exists(),
-            "current_settings": {},
+            "build_lineage": "unknown",
+            "current_settings": current,
         }
 
+        gfx_content: str | None = None
         if self.gfx_ini.exists():
-            content = self.gfx_ini.read_text(encoding="utf-8")
-            result["current_settings"]["EFBScale"] = self._extract_value(content, "EFBScale")
-            result["current_settings"]["TextureScalingFactor"] = self._extract_value(
-                content, "TextureScalingFactor"
-            )
-            result["current_settings"]["UseScalingFilter"] = self._extract_value(
-                content, "UseScalingFilter"
-            )
-            result["current_settings"]["UseDePosterize"] = self._extract_value(
-                content, "UseDePosterize"
-            )
-            result["current_settings"]["BackendMultithreading"] = self._extract_value(
-                content, "BackendMultithreading"
-            )
-            result["current_settings"]["VSync"] = self._extract_value(content, "VSync")
+            try:
+                gfx_content = self.gfx_ini.read_text(encoding="utf-8")
+            except OSError as e:
+                logger.warning(f"Failed to read GFX.ini: {e}")
+
+        if gfx_content is not None:
+            for ini_key, _section in self.GFX_KEY_MAP.values():
+                current[ini_key] = self._extract_value(gfx_content, ini_key)
+            result["build_lineage"] = self._detect_build_lineage(gfx_content)
 
         if self.dolphin_ini.exists():
-            content = self.dolphin_ini.read_text(encoding="utf-8")
-            result["current_settings"]["ReduceTimingDispersion"] = self._extract_value(
-                content, "ReduceTimingDispersion"
-            )
-            result["current_settings"]["ImmediateXFBEnable"] = self._extract_value(
-                content, "ImmediateXFBEnable"
-            )
-            result["current_settings"]["RushPresentation"] = self._extract_value(
-                content, "RushPresentation"
-            )
-            result["current_settings"]["SmoothPresentation"] = self._extract_value(
-                content, "SmoothPresentation"
-            )
-            result["current_settings"]["SyncGPU"] = self._extract_value(
-                content, "SyncGPU"
-            )
-            result["current_settings"]["TimingVariance"] = self._extract_value(
-                content, "TimingVariance"
-            )
+            try:
+                dolphin_content = self.dolphin_ini.read_text(encoding="utf-8")
+            except OSError as e:
+                logger.warning(f"Failed to read Dolphin.ini: {e}")
+            else:
+                for ini_key, _section in self.DOLPHIN_KEY_MAP.values():
+                    current[ini_key] = self._extract_value(dolphin_content, ini_key)
 
         return result
+
+    def _detect_build_lineage(
+        self, gfx_content: str
+    ) -> Literal["ishiiruka", "mainline", "unknown"]:
+        """Guess whether the netplay build is Ishiiruka- or mainline-derived.
+
+        Ishiiruka-exclusive GFX.ini keys are a positive signal. Their absence is
+        weaker evidence, so a config without them reports ``mainline`` only when
+        it is otherwise populated; an empty/near-empty file stays ``unknown``.
+        """
+        if any(
+            re.search(rf"^{marker}\s*=", gfx_content, re.MULTILINE)
+            for marker in ISHIIRUKA_GFX_MARKERS
+        ):
+            return "ishiiruka"
+        if re.search(r"^EFBScale\s*=", gfx_content, re.MULTILINE):
+            return "mainline"
+        return "unknown"
 
     def _extract_value(self, content: str, key: str) -> str | None:
         """Extract a value from INI content."""
@@ -223,73 +333,35 @@ class DolphinConfigHandler(SettingsHandler):
         }
 
     def audit(self) -> list[dict[str, Any]]:
-        """Audit Dolphin config for latency issues."""
-        issues = []
+        """Audit Dolphin config for latency issues.
+
+        Driven off ``AUDIT_RULES`` so every managed key is either checked or
+        explicitly waived in ``UNAUDITED_KEYS``. The previous hand-written form
+        silently skipped SmoothPresentation, letting a Slippi Launcher rewrite
+        re-enable a ~1-2ms presentation delay without the audit noticing.
+        """
+        issues: list[dict[str, Any]] = []
         detection = self.detect()
 
         if not detection["slippi_installed"]:
             return issues  # No Slippi, no issues to report
 
         current = detection.get("current_settings", {})
+        key_map = {**self.GFX_KEY_MAP, **self.DOLPHIN_KEY_MAP}
 
-        # Check EFBScale
-        if current.get("EFBScale") not in (None, "1"):
+        for input_key, rule in self.AUDIT_RULES.items():
+            ini_key = key_map[input_key][0]
+            value = current.get(ini_key)
+            # None means the key is absent: apply() will insert it, and an
+            # absent key is not evidence of a wrong setting.
+            if value is None or value == rule.expected:
+                continue
             issues.append({
-                "severity": "medium",
-                "setting": "EFBScale",
-                "current": current.get("EFBScale"),
-                "recommended": "1",
-                "reason": "Higher internal resolution adds render latency",
-            })
-
-        # Check TextureScalingFactor
-        if current.get("TextureScalingFactor") not in (None, "1"):
-            issues.append({
-                "severity": "low",
-                "setting": "TextureScalingFactor",
-                "current": current.get("TextureScalingFactor"),
-                "recommended": "1",
-                "reason": "Texture upscaling adds GPU overhead",
-            })
-
-        # Check ReduceTimingDispersion
-        if current.get("ReduceTimingDispersion") == "False":
-            issues.append({
-                "severity": "medium",
-                "setting": "ReduceTimingDispersion",
-                "current": "False",
-                "recommended": "True",
-                "reason": "Ishiiruka-specific setting for tighter frame timing",
-            })
-
-        # Check BackendMultithreading
-        if current.get("BackendMultithreading") == "True":
-            issues.append({
-                "severity": "low",
-                "setting": "BackendMultithreading",
-                "current": "True",
-                "recommended": "False",
-                "reason": "Backend multithreading adds driver overhead",
-            })
-
-        # Check SyncGPU
-        if current.get("SyncGPU") == "True":
-            issues.append({
-                "severity": "medium",
-                "setting": "SyncGPU",
-                "current": "True",
-                "recommended": "False",
-                "reason": "GPU sync adds latency - disable for competitive play",
-            })
-
-        # Check ImmediateXFBEnable (should be True for Melee)
-        if current.get("ImmediateXFBEnable") == "False":
-            issues.append({
-                "severity": "medium",
-                "setting": "ImmediateXFBEnable",
-                "current": "False",
-                "recommended": "True",
-                "reason": "Immediately Present XFB skips frame buffer queue for lower latency",
+                "severity": rule.severity,
+                "setting": ini_key,
+                "current": value,
+                "recommended": rule.expected,
+                "reason": rule.reason,
             })
 
         return issues

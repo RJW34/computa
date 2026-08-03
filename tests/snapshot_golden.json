@@ -6302,9 +6302,9 @@
       },
       {
         "category": "Nvidia Control Panel",
-        "reason": "Melee runs at fixed 60fps, so this no-sync profile disables VRR. High refresh still helps via reduced scanout latency even without VRR.",
+        "reason": "This profile disables VRR so the no-sync presentation path stays a single untouched pipeline. Be clear on why: at ~59.94fps on a high-refresh panel, G-SYNC is latency-NEUTRAL versus VSync-off, not worse. The 'VRR adds lag' result comes from running at or near the refresh ceiling where the driver's VSync-on fallback engages, which fixed-60 content never reaches. What you trade by leaving it off is tearing: 59.94fps against a non-integer-multiple refresh makes the tear line crawl the panel on a slow cycle. If tearing bothers you more than a ~1ms timing difference, enabling G-SYNC costs you essentially nothing here.",
         "setting": "G-SYNC",
-        "value": "Off"
+        "value": "Off (a tearing tradeoff, not a latency one)"
       },
       {
         "category": "Nvidia Control Panel",
@@ -6428,9 +6428,15 @@
       },
       {
         "category": "Dolphin.ini [Core]",
-        "reason": "Rush Frame Presentation can lower latency on some systems, but the gain varies a lot. This profile keeps it off by default so the no-sync path stays deterministic unless you explicitly A/B test it.",
+        "reason": "Rush Frame Presentation shipped in MAINLINE Dolphin 2512 (Dec 2025). Slippi Launcher's netplay Dolphin is historically Ishiiruka-based and does NOT have it. ABSO writes the RushPresentation key regardless, so seeing it in Dolphin.ini proves nothing - confirm the option actually exists under Graphics > Advanced before expecting any effect. Where it IS available it is a real latency win worth A/B testing; this profile keeps it off by default so the no-sync path stays deterministic.",
         "setting": "RushPresentation",
-        "value": "Off by default (manual A/B test)"
+        "value": "Mainline Dolphin only - check your build first"
+      },
+      {
+        "category": "Dolphin.ini [Core]",
+        "reason": "Smooth Frame Presentation deliberately delays presentation by ~1-2ms, using previous frame times to even out pacing. It exists to stop poorly paced games falling out of a VRR window - it is a pacing aid that COSTS latency, not a latency feature. Wrong choice for a no-sync profile. Slippi Launcher has been observed re-enabling this, so ABSO now audits it.",
+        "setting": "SmoothPresentation",
+        "value": "False (enforced)"
       },
       {
         "category": "Dolphin.ini [Core]",
@@ -6488,9 +6494,9 @@
       },
       {
         "category": "Display Info",
-        "reason": "With 60fps on a high refresh display, tears are small and fast-moving. The tradeoff may be acceptable for competitive play if you tolerate tearing.",
+        "reason": "Melee is 59.94fps, not 60. Against a refresh rate that is not an exact integer multiple of it, the tear line drifts a fraction of the screen height per frame and crawls the panel on a repeating cycle - it does not sit still, and it is not 'small and fast-moving'. Most players stop noticing it; if you do not, G-SYNC removes it at no meaningful latency cost.",
         "setting": "Tearing",
-        "value": "May occur but minimal impact"
+        "value": "One slow-crawling tear line"
       },
       {
         "category": "Important",
@@ -6528,13 +6534,17 @@
       },
       "DolphinConfigHandler": {
         "backend_multithreading": "False",
+        "borderless_fullscreen": "False",
+        "efb_access_enable": "False",
         "efb_scale": "1",
+        "enable_gpu_texture_decoding": "True",
         "immediate_xfb_enable": "True",
         "reduce_timing_dispersion": "True",
         "rush_presentation": "False",
         "smooth_presentation": "False",
         "sync_gpu": "False",
         "texture_scaling_factor": "1",
+        "time_stretching": "False",
         "timing_variance": "8",
         "use_deposterize": "False",
         "use_scaling_filter": "False",
@@ -6672,9 +6682,9 @@
       },
       {
         "category": "Display",
-        "reason": "Melee is fixed 60fps. VRR is not required for this parity profile and can alter pacing feel.",
+        "reason": "Deliberate: 60Hz + VSync reproduces console-style cadence, which is the point of this profile. Worth knowing what it costs - 60Hz VSync means ~16.7ms scanout plus up to a frame of sync wait, where G-SYNC at your panel's native refresh would be tear-free at a fraction of that and would not require dropping the whole desktop to 60Hz. If you want tear-free play rather than console parity specifically, the competitive profile plus G-SYNC is the better trade.",
         "setting": "G-SYNC / VRR",
-        "value": "Off"
+        "value": "Off (this profile targets console pacing, not minimum latency)"
       }
     ],
     "include_legacy_tweaks": false,
@@ -6706,13 +6716,17 @@
       },
       "DolphinConfigHandler": {
         "backend_multithreading": "False",
+        "borderless_fullscreen": "False",
+        "efb_access_enable": "False",
         "efb_scale": "1",
+        "enable_gpu_texture_decoding": "True",
         "immediate_xfb_enable": "True",
         "reduce_timing_dispersion": "True",
         "rush_presentation": "False",
         "smooth_presentation": "False",
         "sync_gpu": "False",
         "texture_scaling_factor": "1",
+        "time_stretching": "False",
         "timing_variance": "8",
         "use_deposterize": "False",
         "use_scaling_filter": "False",
@@ -6874,9 +6888,9 @@
       },
       {
         "category": "Display",
-        "reason": "Melee is fixed 60fps. VRR is not required for this parity profile and can alter pacing feel.",
+        "reason": "Deliberate: 60Hz + VSync reproduces console-style cadence, which is the point of this profile. Worth knowing what it costs - 60Hz VSync means ~16.7ms scanout plus up to a frame of sync wait, where G-SYNC at your panel's native refresh would be tear-free at a fraction of that and would not require dropping the whole desktop to 60Hz. If you want tear-free play rather than console parity specifically, the competitive profile plus G-SYNC is the better trade.",
         "setting": "G-SYNC / VRR",
-        "value": "Off"
+        "value": "Off (this profile targets console pacing, not minimum latency)"
       }
     ],
     "include_legacy_tweaks": false,
@@ -6908,13 +6922,17 @@
       },
       "DolphinConfigHandler": {
         "backend_multithreading": "False",
+        "borderless_fullscreen": "False",
+        "efb_access_enable": "False",
         "efb_scale": "1",
+        "enable_gpu_texture_decoding": "True",
         "immediate_xfb_enable": "True",
         "reduce_timing_dispersion": "True",
         "rush_presentation": "False",
         "smooth_presentation": "False",
         "sync_gpu": "False",
         "texture_scaling_factor": "1",
+        "time_stretching": "False",
         "timing_variance": "8",
         "use_deposterize": "False",
         "use_scaling_filter": "False",
@@ -7049,9 +7067,9 @@
       },
       {
         "category": "Nvidia Control Panel",
-        "reason": "Melee runs at fixed 60fps, so this no-sync profile disables VRR. High refresh still helps via reduced scanout latency even without VRR.",
+        "reason": "This profile disables VRR so the no-sync presentation path stays a single untouched pipeline. Be clear on why: at ~59.94fps on a high-refresh panel, G-SYNC is latency-NEUTRAL versus VSync-off, not worse. The 'VRR adds lag' result comes from running at or near the refresh ceiling where the driver's VSync-on fallback engages, which fixed-60 content never reaches. What you trade by leaving it off is tearing: 59.94fps against a non-integer-multiple refresh makes the tear line crawl the panel on a slow cycle. If tearing bothers you more than a ~1ms timing difference, enabling G-SYNC costs you essentially nothing here.",
         "setting": "G-SYNC",
-        "value": "Off"
+        "value": "Off (a tearing tradeoff, not a latency one)"
       },
       {
         "category": "Nvidia Control Panel",
@@ -7175,9 +7193,15 @@
       },
       {
         "category": "Dolphin.ini [Core]",
-        "reason": "Rush Frame Presentation can lower latency on some systems, but the gain varies a lot. This profile keeps it off by default so the no-sync path stays deterministic unless you explicitly A/B test it.",
+        "reason": "Rush Frame Presentation shipped in MAINLINE Dolphin 2512 (Dec 2025). Slippi Launcher's netplay Dolphin is historically Ishiiruka-based and does NOT have it. ABSO writes the RushPresentation key regardless, so seeing it in Dolphin.ini proves nothing - confirm the option actually exists under Graphics > Advanced before expecting any effect. Where it IS available it is a real latency win worth A/B testing; this profile keeps it off by default so the no-sync path stays deterministic.",
         "setting": "RushPresentation",
-        "value": "Off by default (manual A/B test)"
+        "value": "Mainline Dolphin only - check your build first"
+      },
+      {
+        "category": "Dolphin.ini [Core]",
+        "reason": "Smooth Frame Presentation deliberately delays presentation by ~1-2ms, using previous frame times to even out pacing. It exists to stop poorly paced games falling out of a VRR window - it is a pacing aid that COSTS latency, not a latency feature. Wrong choice for a no-sync profile. Slippi Launcher has been observed re-enabling this, so ABSO now audits it.",
+        "setting": "SmoothPresentation",
+        "value": "False (enforced)"
       },
       {
         "category": "Dolphin.ini [Core]",
@@ -7235,9 +7259,9 @@
       },
       {
         "category": "Display Info",
-        "reason": "With 60fps on a high refresh display, tears are small and fast-moving. The tradeoff may be acceptable for competitive play if you tolerate tearing.",
+        "reason": "Melee is 59.94fps, not 60. Against a refresh rate that is not an exact integer multiple of it, the tear line drifts a fraction of the screen height per frame and crawls the panel on a repeating cycle - it does not sit still, and it is not 'small and fast-moving'. Most players stop noticing it; if you do not, G-SYNC removes it at no meaningful latency cost.",
         "setting": "Tearing",
-        "value": "May occur but minimal impact"
+        "value": "One slow-crawling tear line"
       },
       {
         "category": "Important",
@@ -7275,13 +7299,17 @@
       },
       "DolphinConfigHandler": {
         "backend_multithreading": "False",
+        "borderless_fullscreen": "False",
+        "efb_access_enable": "False",
         "efb_scale": "1",
+        "enable_gpu_texture_decoding": "True",
         "immediate_xfb_enable": "True",
         "reduce_timing_dispersion": "True",
         "rush_presentation": "False",
         "smooth_presentation": "False",
         "sync_gpu": "False",
         "texture_scaling_factor": "1",
+        "time_stretching": "False",
         "timing_variance": "8",
         "use_deposterize": "False",
         "use_scaling_filter": "False",
@@ -7392,9 +7420,9 @@
       },
       {
         "category": "Nvidia Control Panel",
-        "reason": "Melee runs at fixed 60fps, so this no-sync profile disables VRR. High refresh still helps via reduced scanout latency even without VRR.",
+        "reason": "This profile disables VRR so the no-sync presentation path stays a single untouched pipeline. Be clear on why: at ~59.94fps on a high-refresh panel, G-SYNC is latency-NEUTRAL versus VSync-off, not worse. The 'VRR adds lag' result comes from running at or near the refresh ceiling where the driver's VSync-on fallback engages, which fixed-60 content never reaches. What you trade by leaving it off is tearing: 59.94fps against a non-integer-multiple refresh makes the tear line crawl the panel on a slow cycle. If tearing bothers you more than a ~1ms timing difference, enabling G-SYNC costs you essentially nothing here.",
         "setting": "G-SYNC",
-        "value": "Off"
+        "value": "Off (a tearing tradeoff, not a latency one)"
       },
       {
         "category": "Nvidia Control Panel",
@@ -7518,9 +7546,15 @@
       },
       {
         "category": "Dolphin.ini [Core]",
-        "reason": "Rush Frame Presentation can lower latency on some systems, but the gain varies a lot. This profile keeps it off by default so the no-sync path stays deterministic unless you explicitly A/B test it.",
+        "reason": "Rush Frame Presentation shipped in MAINLINE Dolphin 2512 (Dec 2025). Slippi Launcher's netplay Dolphin is historically Ishiiruka-based and does NOT have it. ABSO writes the RushPresentation key regardless, so seeing it in Dolphin.ini proves nothing - confirm the option actually exists under Graphics > Advanced before expecting any effect. Where it IS available it is a real latency win worth A/B testing; this profile keeps it off by default so the no-sync path stays deterministic.",
         "setting": "RushPresentation",
-        "value": "Off by default (manual A/B test)"
+        "value": "Mainline Dolphin only - check your build first"
+      },
+      {
+        "category": "Dolphin.ini [Core]",
+        "reason": "Smooth Frame Presentation deliberately delays presentation by ~1-2ms, using previous frame times to even out pacing. It exists to stop poorly paced games falling out of a VRR window - it is a pacing aid that COSTS latency, not a latency feature. Wrong choice for a no-sync profile. Slippi Launcher has been observed re-enabling this, so ABSO now audits it.",
+        "setting": "SmoothPresentation",
+        "value": "False (enforced)"
       },
       {
         "category": "Dolphin.ini [Core]",
@@ -7578,9 +7612,9 @@
       },
       {
         "category": "Display Info",
-        "reason": "With 60fps on a high refresh display, tears are small and fast-moving. The tradeoff may be acceptable for competitive play if you tolerate tearing.",
+        "reason": "Melee is 59.94fps, not 60. Against a refresh rate that is not an exact integer multiple of it, the tear line drifts a fraction of the screen height per frame and crawls the panel on a repeating cycle - it does not sit still, and it is not 'small and fast-moving'. Most players stop noticing it; if you do not, G-SYNC removes it at no meaningful latency cost.",
         "setting": "Tearing",
-        "value": "May occur but minimal impact"
+        "value": "One slow-crawling tear line"
       },
       {
         "category": "Important",
@@ -7618,13 +7652,17 @@
       },
       "DolphinConfigHandler": {
         "backend_multithreading": "False",
+        "borderless_fullscreen": "False",
+        "efb_access_enable": "False",
         "efb_scale": "1",
+        "enable_gpu_texture_decoding": "True",
         "immediate_xfb_enable": "True",
         "reduce_timing_dispersion": "True",
         "rush_presentation": "False",
         "smooth_presentation": "False",
         "sync_gpu": "False",
         "texture_scaling_factor": "1",
+        "time_stretching": "False",
         "timing_variance": "8",
         "use_deposterize": "False",
         "use_scaling_filter": "False",
@@ -7756,9 +7794,9 @@
       },
       {
         "category": "Nvidia Control Panel",
-        "reason": "Melee runs at fixed 60fps, so this no-sync profile disables VRR. High refresh still helps via reduced scanout latency even without VRR.",
+        "reason": "This profile disables VRR so the no-sync presentation path stays a single untouched pipeline. Be clear on why: at ~59.94fps on a high-refresh panel, G-SYNC is latency-NEUTRAL versus VSync-off, not worse. The 'VRR adds lag' result comes from running at or near the refresh ceiling where the driver's VSync-on fallback engages, which fixed-60 content never reaches. What you trade by leaving it off is tearing: 59.94fps against a non-integer-multiple refresh makes the tear line crawl the panel on a slow cycle. If tearing bothers you more than a ~1ms timing difference, enabling G-SYNC costs you essentially nothing here.",
         "setting": "G-SYNC",
-        "value": "Off"
+        "value": "Off (a tearing tradeoff, not a latency one)"
       },
       {
         "category": "Nvidia Control Panel",
@@ -7882,9 +7920,15 @@
       },
       {
         "category": "Dolphin.ini [Core]",
-        "reason": "Rush Frame Presentation can lower latency on some systems, but the gain varies a lot. This profile keeps it off by default so the no-sync path stays deterministic unless you explicitly A/B test it.",
+        "reason": "Rush Frame Presentation shipped in MAINLINE Dolphin 2512 (Dec 2025). Slippi Launcher's netplay Dolphin is historically Ishiiruka-based and does NOT have it. ABSO writes the RushPresentation key regardless, so seeing it in Dolphin.ini proves nothing - confirm the option actually exists under Graphics > Advanced before expecting any effect. Where it IS available it is a real latency win worth A/B testing; this profile keeps it off by default so the no-sync path stays deterministic.",
         "setting": "RushPresentation",
-        "value": "Off by default (manual A/B test)"
+        "value": "Mainline Dolphin only - check your build first"
+      },
+      {
+        "category": "Dolphin.ini [Core]",
+        "reason": "Smooth Frame Presentation deliberately delays presentation by ~1-2ms, using previous frame times to even out pacing. It exists to stop poorly paced games falling out of a VRR window - it is a pacing aid that COSTS latency, not a latency feature. Wrong choice for a no-sync profile. Slippi Launcher has been observed re-enabling this, so ABSO now audits it.",
+        "setting": "SmoothPresentation",
+        "value": "False (enforced)"
       },
       {
         "category": "Dolphin.ini [Core]",
@@ -7942,9 +7986,9 @@
       },
       {
         "category": "Display Info",
-        "reason": "With 60fps on a high refresh display, tears are small and fast-moving. The tradeoff may be acceptable for competitive play if you tolerate tearing.",
+        "reason": "Melee is 59.94fps, not 60. Against a refresh rate that is not an exact integer multiple of it, the tear line drifts a fraction of the screen height per frame and crawls the panel on a repeating cycle - it does not sit still, and it is not 'small and fast-moving'. Most players stop noticing it; if you do not, G-SYNC removes it at no meaningful latency cost.",
         "setting": "Tearing",
-        "value": "May occur but minimal impact"
+        "value": "One slow-crawling tear line"
       },
       {
         "category": "Important",
@@ -7982,13 +8026,17 @@
       },
       "DolphinConfigHandler": {
         "backend_multithreading": "False",
+        "borderless_fullscreen": "False",
+        "efb_access_enable": "False",
         "efb_scale": "1",
+        "enable_gpu_texture_decoding": "True",
         "immediate_xfb_enable": "True",
         "reduce_timing_dispersion": "True",
         "rush_presentation": "False",
         "smooth_presentation": "False",
         "sync_gpu": "False",
         "texture_scaling_factor": "1",
+        "time_stretching": "False",
         "timing_variance": "8",
         "use_deposterize": "False",
         "use_scaling_filter": "False",

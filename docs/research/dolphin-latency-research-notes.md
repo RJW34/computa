@@ -8,7 +8,21 @@ Comprehensive research notes for Dolphin emulator latency optimization, specific
 ## Key Findings Summary
 
 ### Rush Frame Presentation (December 2025)
-A major latency feature added to Dolphin in late 2025, developed in collaboration with Fizzi (Slippi creator).
+A major latency feature added to **mainline** Dolphin in late 2025, developed in collaboration with Fizzi (Slippi creator).
+
+> **BUILD GATE — read before acting on any number below.** Rush Frame
+> Presentation shipped in *mainline* Dolphin 2512. Slippi Launcher's `netplay`
+> Dolphin is historically **Ishiiruka**-based and does not have this option.
+> Fizzi collaborating on the mainline feature does not mean the Slippi netplay
+> build carries it. ABSO's `DolphinConfigHandler` upserts the `RushPresentation`
+> key whether or not the build understands it, so **the key's presence in
+> `Dolphin.ini` is not evidence the feature exists**. Confirm it appears in
+> Graphics > Advanced before expecting any of the gains below.
+>
+> Quick lineage check: if `GFX.ini` contains `SimBumpEnabled`,
+> `ForcePhongShading`, `PredictiveFifo`, `TextureScalingType`, `EnableOpenCL`,
+> or `TessellationEarlyCulling`, the build is Ishiiruka-derived. `abso detect`
+> reports this as `build_lineage`.
 
 **What It Does:**
 - Skips the presentation queue entirely when GPU is ready
@@ -44,10 +58,19 @@ Skips the frame buffer queue and presents frames as soon as they're ready.
 ### Smooth Frame Presentation
 Frame pacing optimization designed for VRR displays.
 
+**Mechanism:** Dolphin deliberately **delays presentation by ~1-2ms**, using
+previous frame times as a heuristic, so frames come out more evenly. It exists
+to stop badly paced games from falling out of a VRR monitor's operating range.
+
+**This is a pacing aid that COSTS latency — it is not a latency feature.**
+
 **When to Use:**
-- Useful when paired with G-SYNC/VRR
-- Improves frame pacing consistency
-- Not recommended for no-sync competitive setups
+- Only when paired with G-SYNC/VRR *and* you are seeing range dropouts or flicker
+- Never for no-sync competitive setups — you are paying 1-2ms for nothing
+
+**Known drift:** Slippi Launcher has been observed with `SmoothPresentation =
+True` against an ABSO target of `False`. Every Slippi profile targets it off and
+`DolphinConfigHandler.audit()` now checks it.
 
 ---
 
@@ -198,16 +221,48 @@ Backend: Experiment (Vulkan often best on NVIDIA/AMD)
 HAGS: ON (with DX12) or OFF (with Vulkan)
 LLM: On (test Ultra, but may cause issues)
 VSync (everywhere): OFF
-G-SYNC: OFF
-Rush Presentation: Optional (test for 8-14ms reduction)
+G-SYNC: OFF (tearing preference — latency-neutral at fixed 60fps, see below)
+Rush Presentation: MAINLINE BUILDS ONLY — verify it exists, then A/B
+Smooth Presentation: OFF (costs ~1-2ms; VRR pacing aid only)
 Immediately Present XFB: Enabled by default
 Internal Resolution: 1x (Native)
 Backend Multithreading: OFF
 ```
 
+### On G-SYNC / VRR at fixed 60fps
+
+The reflexive "VRR adds latency, turn it off" rule does **not** apply at this
+operating point, and the profiles should not claim it does.
+
+- The latency penalty people measure comes from running VRR at or near the
+  **refresh ceiling**, where the driver's VSync-on fallback engages. Fixed-60
+  content on a high-refresh panel runs far below the ceiling, so the fallback
+  never engages.
+- Blur Busters' position: on average G-SYNC has the same latency as VSync off.
+  It will not go *below* VSync off, but it does not add lag either.
+- No-sync at high refresh: the frame flips mid-scan, so content below the tear
+  appears immediately and content above waits up to one scan period. Averaged
+  across the screen that is a small, *randomised* delay.
+- G-SYNC at ~60fps: scanout begins as soon as the frame is presented, and the
+  panel still scans at its maximum rate. Same average, but deterministic.
+
+**Conclusion:** choose on tearing preference, not on latency. Melee is 59.94fps,
+so against a refresh that is not an exact integer multiple the tear line crawls
+the panel on a repeating cycle rather than sitting still.
+
+### The biggest online lever is not on this page
+
+`SlippiOnlineDelay` (Slippi netplay "Delay Frames", default 2) is ~33.4ms of
+deliberate input buffer — larger than every display-path term on this page
+combined. Lowering it to 1 removes ~16.7ms at the cost of more frequent
+rollbacks. It is a connection-quality tradeoff, not a free win, and ABSO does
+not currently manage it.
+
 ### Important Caveats
 - **Results vary by system** - always test configurations
 - **Backend choice matters** - don't assume DX12 is always best
+- **On Ishiiruka builds, D3D12 is the least-maintained backend** - D3D11 and
+  Vulkan are the mature ones. Check lineage before trusting mainline advice.
 - **LLM Ultra is not universally safe** - test for your setup
 - **HAGS benefit is inconsistent** - test both settings
 

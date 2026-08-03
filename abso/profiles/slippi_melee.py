@@ -187,7 +187,13 @@ class SlippiMeleeProfile(EmulatorLatencyBaseProfile):
                 "low_latency_mode": "on",  # ON recommended; Ultra optional (test both)
                 "vsync": "off",  # OFF - removes sync latency entirely
                 "vsync_tear_control": "disable",  # Explicit tear control off with VSync OFF
-                "vrr_app_override": "force_off",  # OFF - fixed 60fps, no VRR benefit
+                # VRR off here is a tearing-visibility choice, NOT a latency one.
+                # At ~59.94fps on a high-refresh panel VRR is latency-neutral vs
+                # no-sync (the VSync-on fallback that costs latency only engages
+                # near the refresh ceiling, which fixed-60 content never reaches).
+                # This lane keeps VRR off so the presentation path stays a single
+                # untouched no-sync pipeline; see the G-SYNC in-game note.
+                "vrr_app_override": "force_off",
                 "global_vrr_mode": "off",  # Enforce global VRR off for clean no-sync transitions
                 "power_management": "prefer_max_performance",
                 "shader_cache": "unlimited",
@@ -213,6 +219,14 @@ class SlippiMeleeProfile(EmulatorLatencyBaseProfile):
                 "rush_presentation": "False",
                 "smooth_presentation": "False",
                 "sync_gpu": "False",
+                "time_stretching": "False",
+                # Previously documented in get_in_game_settings() but never
+                # enforced. Slippi Launcher rewrites these configs, which is the
+                # whole reason this handler exists, so anything we recommend has
+                # to actually be written.
+                "efb_access_enable": "False",
+                "enable_gpu_texture_decoding": "True",
+                "borderless_fullscreen": "False",
             },
         }
 
@@ -275,7 +289,8 @@ class SlippiMeleeProfile(EmulatorLatencyBaseProfile):
         - HAGS: Generally helps with DX12; results vary by system
         - LLM: On recommended; Ultra may work but test for your setup
         - Lower internal resolution reduces GPU work and can reduce render time
-        - G-Sync/VSync disabled - fixed 60fps games don't benefit from VRR
+        - G-Sync/VSync disabled - a tearing-visibility choice; VRR is
+          latency-neutral at fixed 60fps, not a latency regression
         - Results vary by system - always test configurations
         """
         return [
@@ -303,11 +318,18 @@ class SlippiMeleeProfile(EmulatorLatencyBaseProfile):
             {
                 "category": "Nvidia Control Panel",
                 "setting": "G-SYNC",
-                "value": "Off",
+                "value": "Off (a tearing tradeoff, not a latency one)",
                 "reason": (
-                    "Melee runs at fixed 60fps, so this no-sync profile disables VRR. "
-                    "High refresh still helps via "
-                    "reduced scanout latency even without VRR."
+                    "This profile disables VRR so the no-sync presentation path stays a "
+                    "single untouched pipeline. Be clear on why: at ~59.94fps on a "
+                    "high-refresh panel, G-SYNC is latency-NEUTRAL versus VSync-off, not "
+                    "worse. The 'VRR adds lag' result comes from running at or near the "
+                    "refresh ceiling where the driver's VSync-on fallback engages, which "
+                    "fixed-60 content never reaches. What you trade by leaving it off is "
+                    "tearing: 59.94fps against a non-integer-multiple refresh makes the "
+                    "tear line crawl the panel on a slow cycle. If tearing bothers you "
+                    "more than a ~1ms timing difference, enabling G-SYNC costs you "
+                    "essentially nothing here."
                 ),
             },
             {
@@ -454,11 +476,27 @@ class SlippiMeleeProfile(EmulatorLatencyBaseProfile):
             {
                 "category": "Dolphin.ini [Core]",
                 "setting": "RushPresentation",
-                "value": "Off by default (manual A/B test)",
+                "value": "Mainline Dolphin only - check your build first",
                 "reason": (
-                    "Rush Frame Presentation can lower latency on some systems, but the gain varies a lot. "
-                    "This profile keeps it off by default so the no-sync path stays deterministic unless you "
-                    "explicitly A/B test it."
+                    "Rush Frame Presentation shipped in MAINLINE Dolphin 2512 (Dec 2025). "
+                    "Slippi Launcher's netplay Dolphin is historically Ishiiruka-based and "
+                    "does NOT have it. ABSO writes the RushPresentation key regardless, so "
+                    "seeing it in Dolphin.ini proves nothing - confirm the option actually "
+                    "exists under Graphics > Advanced before expecting any effect. Where it "
+                    "IS available it is a real latency win worth A/B testing; this profile "
+                    "keeps it off by default so the no-sync path stays deterministic."
+                ),
+            },
+            {
+                "category": "Dolphin.ini [Core]",
+                "setting": "SmoothPresentation",
+                "value": "False (enforced)",
+                "reason": (
+                    "Smooth Frame Presentation deliberately delays presentation by ~1-2ms, "
+                    "using previous frame times to even out pacing. It exists to stop poorly "
+                    "paced games falling out of a VRR window - it is a pacing aid that COSTS "
+                    "latency, not a latency feature. Wrong choice for a no-sync profile. "
+                    "Slippi Launcher has been observed re-enabling this, so ABSO now audits it."
                 ),
             },
             {
@@ -528,10 +566,13 @@ class SlippiMeleeProfile(EmulatorLatencyBaseProfile):
             {
                 "category": "Display Info",
                 "setting": "Tearing",
-                "value": "May occur but minimal impact",
+                "value": "One slow-crawling tear line",
                 "reason": (
-                    "With 60fps on a high refresh display, tears are small and fast-moving. "
-                    "The tradeoff may be acceptable for competitive play if you tolerate tearing."
+                    "Melee is 59.94fps, not 60. Against a refresh rate that is not an exact "
+                    "integer multiple of it, the tear line drifts a fraction of the screen "
+                    "height per frame and crawls the panel on a repeating cycle - it does not "
+                    "sit still, and it is not 'small and fast-moving'. Most players stop "
+                    "noticing it; if you do not, G-SYNC removes it at no meaningful latency cost."
                 ),
             },
 
@@ -695,6 +736,10 @@ class SlippiMeleeConsoleParityProfile(SlippiMeleeProfile):
                 "sync_gpu": "False",
                 "rush_presentation": "False",
                 "smooth_presentation": "False",
+                "time_stretching": "False",
+                "efb_access_enable": "False",
+                "enable_gpu_texture_decoding": "True",
+                "borderless_fullscreen": "False",
             },
         }
 
@@ -762,9 +807,15 @@ class SlippiMeleeConsoleParityProfile(SlippiMeleeProfile):
             {
                 "category": "Display",
                 "setting": "G-SYNC / VRR",
-                "value": "Off",
+                "value": "Off (this profile targets console pacing, not minimum latency)",
                 "reason": (
-                    "Melee is fixed 60fps. VRR is not required for this parity profile and can alter pacing feel."
+                    "Deliberate: 60Hz + VSync reproduces console-style cadence, which is the "
+                    "point of this profile. Worth knowing what it costs - 60Hz VSync means "
+                    "~16.7ms scanout plus up to a frame of sync wait, where G-SYNC at your "
+                    "panel's native refresh would be tear-free at a fraction of that and "
+                    "would not require dropping the whole desktop to 60Hz. If you want "
+                    "tear-free play rather than console parity specifically, the competitive "
+                    "profile plus G-SYNC is the better trade."
                 ),
             },
         ]
