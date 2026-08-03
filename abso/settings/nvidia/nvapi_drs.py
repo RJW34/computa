@@ -1574,8 +1574,12 @@ class DRSProfileManager:
                         results["app_binding_note"] = (
                             f"Profile '{selected_profile_name}' created with all settings configured. "
                             f"Automatic app binding unavailable on this driver version. "
-                            f"To activate: NVCP > Manage 3D Settings > Program Settings > "
-                            f"Add '{app_executable}' > Select '{selected_profile_name}'"
+                            f"To activate: run Nvidia Profile Inspector as admin > select "
+                            f"'{selected_profile_name}' > 'Application name' section > green + > "
+                            f"add '{app_executable}' > Apply changes. "
+                            f"(NVIDIA Control Panel was retired in driver 610.47; the NVIDIA App's "
+                            f"Graphics > Program Settings has no named-profile picker, so it cannot "
+                            f"complete this binding.)"
                         )
                         results["manual_instructions"] = self.get_manual_binding_instructions(
                             selected_profile_name, app_executable
@@ -1954,8 +1958,12 @@ class DRSProfileManager:
                         results["app_binding_note"] = (
                             f"Profile '{selected_profile_name}' created with all settings configured. "
                             f"Automatic app binding unavailable on this driver version. "
-                            f"To activate: NVCP > Manage 3D Settings > Program Settings > "
-                            f"Add executables to '{selected_profile_name}'."
+                            f"To activate: run Nvidia Profile Inspector as admin > select "
+                            f"'{selected_profile_name}' > 'Application name' section > green + > "
+                            f"add the executables > Apply changes. "
+                            f"(NVIDIA Control Panel was retired in driver 610.47; the NVIDIA App's "
+                            f"Graphics > Program Settings has no named-profile picker, so it cannot "
+                            f"complete this binding.)"
                         )
                         results["manual_instructions"] = self.get_manual_binding_instructions(
                             selected_profile_name, first_failed
@@ -2460,24 +2468,32 @@ NVIDIA Profile Manual Binding Instructions
 Your NVIDIA profile '{profile_name}' has been created with all settings configured.
 However, automatic application binding failed due to driver compatibility.
 
-To complete the setup, please add '{app_executable}' to the profile manually:
+To complete the setup, please add '{app_executable}' to the profile manually.
 
-Option 1: NVIDIA Control Panel
-------------------------------
-1. Right-click desktop > NVIDIA Control Panel
-2. Go to: Manage 3D Settings > Program Settings
-3. Click "Add" and browse to select '{app_executable}'
-4. Under "Use the settings for this program:", select '{profile_name}'
-5. Click "Apply"
-
-Option 2: NVIDIA Profile Inspector (Recommended)
-------------------------------------------------
+Use Nvidia Profile Inspector
+----------------------------
 1. Download NPI from: https://github.com/Orbmu2k/nvidiaProfileInspector
-2. Launch nvidiaProfileInspector.exe
+2. Launch nvidiaProfileInspector.exe AS ADMINISTRATOR
+   (without elevation it cannot write to the driver profile database)
 3. Find '{profile_name}' in the profile dropdown
 4. In the "Application name" section, click the green + button
 5. Enter: {app_executable}
 6. Click "Apply changes"
+
+If NPI warns that '{app_executable}' already belongs to another profile, note the
+name it reports - the executable is bound elsewhere and that binding wins.
+
+Why not the NVIDIA App?
+-----------------------
+The NVIDIA App's Graphics > Program Settings replaced Manage 3D Settings for
+per-program tuning, but it has no equivalent of the old "Use the settings for
+this program:" profile picker. It cannot point an executable at a named driver
+profile, so it cannot finish this particular step.
+
+NVIDIA Control Panel was retired from Game Ready and Studio drivers in version
+610.47. It remains available as an unsupported Microsoft Store download, but it
+receives no further fixes and should not be relied on. NPI talks to the driver
+profile database directly and is unaffected by the retirement.
 
 The profile settings are already configured - you just need to link the executable.
 """
