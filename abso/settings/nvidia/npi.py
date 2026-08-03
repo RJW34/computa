@@ -13,6 +13,7 @@ raise an error if called.
 
 from __future__ import annotations
 
+import contextlib
 import logging
 import os
 import subprocess
@@ -135,11 +136,19 @@ exit $p.ExitCode
             raise RuntimeError(f"NPI import failed: {result.stderr or result.stdout}")
 
     def export_profile(self, output_path: Path) -> None:
-        """Export current Nvidia profile using NPI.
+        """Export the customized Nvidia driver profiles to a .nip file.
 
-        Note: NPI does not support headless export - the -export flag opens the GUI.
-        This method attempts export with a short timeout and kills the process if
-        it spawns a GUI window.
+        Uses NPI's ``-exportCustomized`` flag, which writes a timestamped .nip
+        next to the executable and exits without opening a window. NPI 3.x
+        restored this CLI path; on 2.4.x the flag does not exist and the process
+        falls through to the GUI, which is detected and reported.
+
+        NEVER pass a bare path as an argument. NPI's CLI grammar is
+        ``nvidiaProfileInspector.exe [options] [profile1.nip ...]`` - bare
+        arguments are files to IMPORT. The historical call here was
+        ``-export <path>``, which in 3.x parses as an unknown option plus an
+        import target, i.e. exactly the operation NPI_IMPORTS_DISABLED exists
+        to prevent. It was inert only because the path never existed.
 
         Args:
             output_path: Path to save the exported .nip file.
@@ -152,45 +161,65 @@ exit $p.ExitCode
 
         logger.info(f"Exporting Nvidia profile to: {output_path}")
 
+        # -exportCustomized drops the file beside the executable, so diff the
+        # directory to find what this run produced rather than guessing at the
+        # timestamp format.
+        npi_dir = self.npi_path.parent
+        before = {p.resolve() for p in npi_dir.glob("*.nip")}
+
         process = None
         try:
-            # Hide the window using Windows-specific flags
             startupinfo = subprocess.STARTUPINFO()
             startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
             startupinfo.wShowWindow = 0  # SW_HIDE
 
-            # Use Popen for better process control
             process = subprocess.Popen(
-                [str(self.npi_path), "-export", str(output_path)],
+                [str(self.npi_path), "-exportCustomized"],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,
                 startupinfo=startupinfo,
                 creationflags=subprocess.CREATE_NO_WINDOW,
+                cwd=str(npi_dir),
             )
 
-            # Short timeout - NPI export opens GUI, so it will hang
-            # If it completes quickly, great. If not, assume GUI spawned.
             try:
-                stdout, stderr = process.communicate(timeout=5)
+                stdout, stderr = process.communicate(timeout=60)
             except subprocess.TimeoutExpired:
-                # NPI opened GUI window - kill it
+                # Unsupported flag on older NPI: the UI opened and is waiting.
                 logger.warning("NPI export spawned GUI window, terminating process")
                 self._kill_npi_process(process)
                 raise RuntimeError(
-                    "NPI does not support headless export (GUI was spawned). "
-                    "Use nvidia-smi or manual backup. Nvidia profile backup skipped."
+                    "NPI export spawned a GUI instead of exiting. This build does not "
+                    "support -exportCustomized (requires NPI 3.x). Nvidia profile "
+                    "backup skipped."
                 ) from None
 
-            # NPI may return 0 even if it opened GUI instead of exporting
-            if not output_path.exists():
+            produced = sorted(
+                ({p.resolve() for p in npi_dir.glob("*.nip")} - before),
+                key=lambda p: p.stat().st_mtime,
+            )
+            if not produced:
                 raise RuntimeError(
-                    "NPI export did not create file. Export may require GUI interaction. "
-                    "Run NPI manually and use File > Export to create a backup."
+                    f"NPI export produced no .nip file (exit {process.returncode}): "
+                    f"{stderr or stdout or 'no output'}"
                 )
 
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            if output_path.exists():
+                output_path.unlink()
+            produced[-1].replace(output_path)
+
+            # A single run can only legitimately produce one file; clean up any
+            # extras so they are not mistaken for a later backup.
+            for stale in produced[:-1]:
+                with contextlib.suppress(OSError):
+                    stale.unlink()
+
             if process.returncode != 0:
-                raise RuntimeError(f"NPI export failed: {stderr or stdout}")
+                logger.warning(
+                    f"NPI exited {process.returncode} but produced {output_path.name}"
+                )
 
         except subprocess.TimeoutExpired:
             if process:
@@ -222,11 +251,13 @@ exit $p.ExitCode
     def read_current_settings(self) -> dict[str, Any]:
         """Read current Nvidia 3D settings.
 
-        Note: NPI cannot export headlessly (opens GUI), so this method
-        returns empty dict. Use nvidia-smi for reading current settings instead.
+        Note: headless export now works via ``export_profile`` on NPI 3.x, but
+        parsing the resulting .nip into a settings dict is not implemented -
+        the NVAPI DRS path in ``nvapi_drs.py`` is the authoritative reader.
+        This method remains a stub.
 
         Returns:
-            Empty dictionary (NPI export not supported headlessly).
+            Empty dictionary (.nip parsing not implemented).
         """
         # NPI export opens GUI, so skip entirely to avoid window flash
         logger.debug("Skipping NPI read_current_settings - export opens GUI")
