@@ -56,6 +56,7 @@ def _empty_sweep_payload(
         "profile": canonical,
         "include_opt_in": include_opt_in,
         "dry_run": dry_run,
+        "resolved": [],
         "result": {
             "attempted": [],
             "stopped": [],
@@ -98,6 +99,12 @@ def run_launch_sweep(
         "profile": canonical,
         "include_opt_in": include_opt_in,
         "dry_run": dry_run,
+        # The exact image set this sweep acted on, after per-machine
+        # process_overrides.protect filtering. The tray uses it to decide
+        # whether a later tick has anything to sweep at all, so it must be the
+        # resolved list -- the committed catalog cache is deliberately
+        # machine-independent and still lists protected images.
+        "resolved": list(resolved),
         "result": sweep_result.to_dict(),
         "priority_enforcement": priority_enforcement,
     }

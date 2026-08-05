@@ -161,6 +161,121 @@ def test_launch_sanitizer_sweep_does_not_block_ui_thread() -> None:
     assert "System.Windows.Forms.Timer" in launch_section
 
 
+def test_launch_sanitizer_gates_backend_spawn_on_a_cheap_precheck() -> None:
+    """An active tick must not cold-start the backend unconditionally.
+
+    Every sweep spawn is a frozen-CLI cold start. Spawning one per 10s active
+    tick put multi-second process churn on the machine for the whole gaming
+    session, so the spawn is now gated behind Get-LaunchSweepReason.
+    """
+    script = TRAY_SCRIPT.read_text(encoding="utf-8")
+    tick_section = script.split("function Invoke-LaunchSanitizerTick", 1)[1].split(
+        "function Start-LaunchSanitizerTimer", 1
+    )[0]
+
+    gate = re.search(
+        r"\$sweepReason = Get-LaunchSweepReason -IsFirstDetection \$isFirstDetection"
+        r".*?if \(-not \$sweepReason\)\s*\{.*?return\s*\}"
+        r".*?\$started = Start-LaunchSweepCliProcess",
+        tick_section,
+        re.DOTALL,
+    )
+    assert gate, "Start-LaunchSweepCliProcess is not gated behind Get-LaunchSweepReason"
+
+
+def test_launch_killset_precheck_is_a_single_get_process_call() -> None:
+    """The per-tick pre-check must stay one process-table read."""
+    script = TRAY_SCRIPT.read_text(encoding="utf-8")
+    precheck = script.split("function Test-LaunchKillsetTargetsAlive", 1)[1].split(
+        "function Get-LaunchSweepReason", 1
+    )[0]
+
+    # Count invocations, not the doc comment that explains the single call.
+    assert precheck.count("Get-Process -") == 1
+    assert "Get-Process -Name $baseNames -ErrorAction SilentlyContinue" in precheck
+
+
+def test_launch_killset_precheck_fails_open_when_resolved_set_is_unknown() -> None:
+    """An unknown or stale resolved set must never skip a needed sweep.
+
+    The committed catalog killset is machine-independent and still lists
+    process_overrides.protect images, so the pre-check only trusts the
+    ``resolved`` list the backend reported for the *active* profile.
+    """
+    script = TRAY_SCRIPT.read_text(encoding="utf-8")
+    precheck = script.split("function Test-LaunchKillsetTargetsAlive", 1)[1].split(
+        "function Get-LaunchSweepReason", 1
+    )[0]
+
+    assert re.search(
+        r"if \(\$script:LaunchSanitizerResolvedProfileId -ne \$profileId\) \{ return \$true \}",
+        precheck,
+    )
+    assert re.search(r"if \(\$null -eq \$images\) \{ return \$true \}", precheck)
+
+
+def test_launch_sweep_maintenance_interval_still_reasserts_priority() -> None:
+    """A clean killset must not stop live priority re-assertion forever."""
+    script = TRAY_SCRIPT.read_text(encoding="utf-8")
+
+    assert "$script:LaunchSanitizerMaintenanceIntervalMs = 300000" in script
+    reason = script.split("function Get-LaunchSweepReason", 1)[1].split(
+        "function Test-LaunchSweepInFlight", 1
+    )[0]
+    assert 'return "first-detection"' in reason
+    assert 'return "killset-target-alive"' in reason
+    assert "$script:LaunchSanitizerMaintenanceIntervalMs" in reason
+    assert 'return "maintenance"' in reason
+
+
+def test_launch_sweep_process_runs_below_normal_priority() -> None:
+    """Sweep housekeeping must not compete with the running game for CPU."""
+    script = TRAY_SCRIPT.read_text(encoding="utf-8")
+    launch_section = script.split("function Start-LaunchSweepCliProcess", 1)[1].split(
+        "function Invoke-LaunchSanitizerTick", 1
+    )[0]
+
+    assert re.search(
+        r"\$script:LaunchSanitizerSweepProc\.PriorityClass =\s*\n?\s*"
+        r"\[System\.Diagnostics\.ProcessPriorityClass\]::BelowNormal",
+        launch_section,
+    )
+
+
+def test_launch_sweep_payload_unwraps_the_json_success_envelope() -> None:
+    """The sweep handler must read through {success, data}, not off the envelope.
+
+    Every CLI --json response is wrapped by output_json. Reading
+    ``$Payload.result`` directly always yielded $null, so the handler returned
+    before logging a single stopped image, surfacing a payload warning, or
+    showing the sanitizer toast. Guard the unwrap so it cannot regress.
+    """
+    script = TRAY_SCRIPT.read_text(encoding="utf-8")
+    sanitizer_section = script.split("function Apply-LaunchSweepPayload", 1)[1].split(
+        "function Complete-LaunchSweepIfReady",
+        1,
+    )[0]
+
+    assert "if ($null -ne $Payload.data) { $sweep = $Payload.data }" in sanitizer_section
+    # Past the unwrap, nothing may read sweep fields off the raw envelope.
+    body = sanitizer_section.split("$sweep = $Payload", 1)[1]
+    assert "$Payload.result" not in body
+    assert "$Payload.resolved" not in body
+
+
+def test_launch_sweep_payload_caches_resolved_killset() -> None:
+    """The tray must record the backend's protect-filtered image set."""
+    script = TRAY_SCRIPT.read_text(encoding="utf-8")
+    sanitizer_section = script.split("function Apply-LaunchSweepPayload", 1)[1].split(
+        "function Complete-LaunchSweepIfReady",
+        1,
+    )[0]
+
+    assert "$resolvedImages = $sweep.resolved" in sanitizer_section
+    assert "$script:LaunchSanitizerResolvedImages = @($resolvedImages)" in sanitizer_section
+    assert "$script:LaunchSanitizerResolvedProfileId = $ProfileId" in sanitizer_section
+
+
 def test_launch_sanitizer_toast_uses_triggering_profile_visuals() -> None:
     """Launch sanitizer success toast should identify the protected game profile."""
     script = TRAY_SCRIPT.read_text(encoding="utf-8")

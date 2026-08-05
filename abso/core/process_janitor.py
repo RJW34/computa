@@ -452,6 +452,15 @@ class ProcessJanitor:
         result = ProcessSweepResult()
         seen: set[str] = set()
 
+        # One process-table snapshot for the whole sweep. Killsets run to ~60
+        # images and the launch sanitizer re-sweeps for the life of a gaming
+        # session, so a per-image ``tasklist`` would spawn ~60 short-lived
+        # processes per tick -- process-creation churn (and an AV scan hook
+        # per spawn) that lands directly on frame-time. ``None`` means the
+        # bulk query could not be trusted, and each image falls back to its
+        # own filtered query rather than being silently treated as dead.
+        snapshot = self._snapshot_running_images()
+
         for raw_name in image_names:
             normalized = self._normalize_image_name(raw_name)
             if not normalized:
@@ -468,7 +477,7 @@ class ProcessJanitor:
                 logger.warning(warning)
                 continue
 
-            if not self._is_process_running(normalized):
+            if not self._is_process_running(normalized, snapshot=snapshot):
                 result.not_running.append(normalized)
                 continue
 
@@ -527,9 +536,44 @@ class ProcessJanitor:
             return None
         return image_name.lower() in parse_tasklist_csv_images(completed.stdout or "")
 
-    def _is_process_running(self, image_name: str) -> bool:
+    def _snapshot_running_images(self) -> frozenset[str] | None:
+        """Return every running image name (lowercased), or None if unknown.
+
+        One unfiltered ``tasklist`` call answers the pre-kill gate for an
+        entire killset. Returning ``None`` (rather than an empty set) keeps a
+        failed query distinguishable from "nothing is running", so callers can
+        fall back to per-image queries instead of concluding the machine is
+        idle and skipping every kill.
+        """
+        try:
+            completed = subprocess.run(
+                ["tasklist", "/FO", "CSV", "/NH"],
+                capture_output=True,
+                text=True,
+                timeout=10,
+                creationflags=no_window_creationflags(),
+            )
+        except FileNotFoundError:
+            logger.debug("tasklist unavailable; falling back to per-image queries")
+            return None
+        except Exception as exc:
+            logger.debug("Bulk process snapshot failed: %s", exc)
+            return None
+
+        if completed.returncode != 0:
+            return None
+        return frozenset(parse_tasklist_csv_images(completed.stdout or ""))
+
+    def _is_process_running(
+        self,
+        image_name: str,
+        *,
+        snapshot: frozenset[str] | None = None,
+    ) -> bool:
         # Unknown (tasklist failure) is treated as "not running" for the
         # pre-kill gate: ABSO cannot stop an image it cannot observe.
+        if snapshot is not None:
+            return image_name.lower() in snapshot
         return self._query_process_running(image_name) is True
 
     def _stop_process_image(self, image_name: str) -> bool:

@@ -15,10 +15,10 @@ from abso.core.process_janitor import (
 
 
 @patch.object(ProcessJanitor, "_stop_process_image")
-@patch.object(ProcessJanitor, "_is_process_running")
-def test_janitor_stops_running_images(mock_is_running, mock_stop) -> None:
+@patch.object(ProcessJanitor, "_snapshot_running_images")
+def test_janitor_stops_running_images(mock_snapshot, mock_stop) -> None:
     janitor = ProcessJanitor()
-    mock_is_running.side_effect = lambda name: name in {"Medal.exe", "GameBar.exe"}
+    mock_snapshot.return_value = frozenset({"medal.exe", "gamebar.exe"})
     mock_stop.return_value = True
 
     result = janitor.sweep(["Medal.exe", "GameBar.exe", "NahimicService.exe"])
@@ -30,8 +30,9 @@ def test_janitor_stops_running_images(mock_is_running, mock_stop) -> None:
     assert result.changed is True
 
 
+@patch.object(ProcessJanitor, "_snapshot_running_images", return_value=frozenset())
 @patch.object(ProcessJanitor, "_is_process_running", return_value=False)
-def test_janitor_skips_protected_images(mock_is_running) -> None:
+def test_janitor_skips_protected_images(mock_is_running, mock_snapshot) -> None:
     janitor = ProcessJanitor()
 
     result = janitor.sweep(["EasyAntiCheat.exe", "Steam.exe", "explorer.exe"])
@@ -46,10 +47,10 @@ def test_janitor_skips_protected_images(mock_is_running) -> None:
 
 
 @patch.object(ProcessJanitor, "_stop_process_image")
-@patch.object(ProcessJanitor, "_is_process_running")
-def test_janitor_dry_run_does_not_invoke_taskkill(mock_is_running, mock_stop) -> None:
+@patch.object(ProcessJanitor, "_snapshot_running_images")
+def test_janitor_dry_run_does_not_invoke_taskkill(mock_snapshot, mock_stop) -> None:
     janitor = ProcessJanitor()
-    mock_is_running.return_value = True
+    mock_snapshot.return_value = frozenset({"medal.exe"})
 
     result = janitor.sweep(["Medal.exe"], dry_run=True)
 
@@ -61,17 +62,55 @@ def test_janitor_dry_run_does_not_invoke_taskkill(mock_is_running, mock_stop) ->
 def test_janitor_deduplicates_case_insensitive_input() -> None:
     janitor = ProcessJanitor()
 
-    with patch.object(ProcessJanitor, "_is_process_running", return_value=False):
+    with patch.object(ProcessJanitor, "_snapshot_running_images", return_value=frozenset()):
         result = janitor.sweep(["Medal.exe", "medal.exe", "MEDAL.EXE"])
 
     # Same image, only one attempt.
     assert len(result.attempted) == 1
 
 
+@patch("abso.core.process_janitor.subprocess.run")
+def test_janitor_uses_one_tasklist_call_for_the_whole_killset(mock_run) -> None:
+    """A sweep must not spawn one tasklist per image.
+
+    The launch sanitizer re-sweeps for the life of a gaming session, so
+    per-image probes turn a ~60-image killset into ~60 process spawns per
+    tick. Exactly one snapshot must answer the pre-kill gate for all of them.
+    """
+    mock_run.return_value = MagicMock(returncode=0, stdout="", stderr="")
+    janitor = ProcessJanitor()
+
+    images = [f"Background{index}.exe" for index in range(60)]
+    result = janitor.sweep(images)
+
+    assert mock_run.call_count == 1
+    assert mock_run.call_args.args[0] == ["tasklist", "/FO", "CSV", "/NH"]
+    assert sorted(result.not_running) == sorted(images)
+
+
+@patch.object(ProcessJanitor, "_stop_process_image", return_value=True)
+@patch.object(ProcessJanitor, "_query_process_running", return_value=True)
+@patch.object(ProcessJanitor, "_snapshot_running_images", return_value=None)
+def test_janitor_falls_back_to_per_image_query_when_snapshot_fails(
+    mock_snapshot, mock_query, mock_stop
+) -> None:
+    """An unusable bulk snapshot must not read as 'nothing is running'."""
+    janitor = ProcessJanitor()
+
+    result = janitor.sweep(["Medal.exe"])
+
+    mock_query.assert_called_once_with("Medal.exe")
+    assert result.stopped == ["Medal.exe"]
+    assert result.not_running == []
+
+
 @patch.object(ProcessJanitor, "_stop_process_image", return_value=False)
 @patch.object(ProcessJanitor, "_query_process_running", return_value=True)
+@patch.object(
+    ProcessJanitor, "_snapshot_running_images", return_value=frozenset({"stubbornprocess.exe"})
+)
 def test_janitor_records_failures_when_taskkill_cannot_stop_image(
-    mock_query, mock_stop
+    mock_snapshot, mock_query, mock_stop
 ) -> None:
     janitor = ProcessJanitor()
 
@@ -82,9 +121,12 @@ def test_janitor_records_failures_when_taskkill_cannot_stop_image(
 
 
 @patch.object(ProcessJanitor, "_stop_process_image", return_value=False)
-@patch.object(ProcessJanitor, "_query_process_running", side_effect=[True, None])
+@patch.object(ProcessJanitor, "_query_process_running", return_value=None)
+@patch.object(
+    ProcessJanitor, "_snapshot_running_images", return_value=frozenset({"stubbornprocess.exe"})
+)
 def test_janitor_unverifiable_kill_is_failure_not_success(
-    mock_query, mock_stop
+    mock_snapshot, mock_query, mock_stop
 ) -> None:
     """If tasklist cannot confirm the kill, do not claim a success."""
     janitor = ProcessJanitor()
@@ -96,15 +138,23 @@ def test_janitor_unverifiable_kill_is_failure_not_success(
 
 
 @patch.object(ProcessJanitor, "_stop_process_image", return_value=False)
-@patch.object(ProcessJanitor, "_query_process_running", side_effect=[True, False])
+@patch.object(ProcessJanitor, "_query_process_running", return_value=False)
+@patch.object(
+    ProcessJanitor, "_snapshot_running_images", return_value=frozenset({"racyprocess.exe"})
+)
 def test_janitor_confirmed_gone_after_failed_kill_is_stopped(
-    mock_query, mock_stop
+    mock_snapshot, mock_query, mock_stop
 ) -> None:
-    """A failed taskkill but a positively-confirmed absent image is a stop."""
+    """A failed taskkill but a positively-confirmed absent image is a stop.
+
+    The post-kill re-check stays a live per-image query: the pre-sweep
+    snapshot predates the taskkill and cannot answer whether it landed.
+    """
     janitor = ProcessJanitor()
 
     result = janitor.sweep(["RacyProcess.exe"])
 
+    mock_query.assert_called_once_with("RacyProcess.exe")
     assert result.stopped == ["RacyProcess.exe"]
     assert result.failed == []
 
