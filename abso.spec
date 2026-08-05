@@ -109,19 +109,66 @@ a = Analysis(
 )
 pyz = PYZ(a.pure)
 
+# PyInstaller's ``strip`` option invokes an external GNU/Unix ``strip`` binary.
+# That is not present on normal Windows machines and produces a warning for
+# every collected binary, burying real build issues.
+STRIP = sys.platform != 'win32'
+ICON = ['gui\\src-tauri\\icons\\icon.ico']
+
+# --- Primary output: one-DIR ------------------------------------------------
+# The tray invokes this backend as a short-lived subprocess (launch-sweep,
+# audit, state, apply). A one-FILE build re-extracts the entire ~18 MB archive
+# into %TEMP%\_MEIxxxxxx on *every* invocation, so each call paid a
+# decompress + disk-write + AV-scan cost before Python even started. one-DIR
+# maps the same files off disk directly and drops that per-call overhead.
+#
+# UPX is off for the same reason: compression trades a one-time disk saving
+# for decompression work on every single launch, which is the wrong side of
+# the trade for a binary the tray calls repeatedly during a gaming session.
 exe = EXE(
+    pyz,
+    a.scripts,
+    [],
+    exclude_binaries=True,
+    name='computa',
+    debug=False,
+    bootloader_ignore_signals=False,
+    strip=STRIP,
+    upx=False,
+    console=True,
+    disable_windowed_traceback=False,
+    argv_emulation=False,
+    target_arch=None,
+    codesign_identity=None,
+    entitlements_file=None,
+    icon=ICON,
+)
+
+coll = COLLECT(
+    exe,
+    a.binaries,
+    a.datas,
+    strip=STRIP,
+    upx=False,
+    upx_exclude=[],
+    name='computa',
+)
+
+# --- Secondary output: one-FILE portable build ------------------------------
+# Tauri sidecars must be a single self-contained file, and the release docs
+# offer a portable single-exe download; one build serves both. It is not what
+# the tray or the installed runtime executes, so its slower cold start never
+# lands on a gaming session.
+portable_exe = EXE(
     pyz,
     a.scripts,
     a.binaries,
     a.datas,
     [],
-    name='computa',
+    name='computa-portable',
     debug=False,
     bootloader_ignore_signals=False,
-    # PyInstaller's ``strip`` option invokes an external GNU/Unix ``strip``
-    # binary. That is not present on normal Windows machines and produces a
-    # warning for every collected binary, burying real build issues.
-    strip=sys.platform != 'win32',
+    strip=STRIP,
     upx=True,
     upx_exclude=[],
     runtime_tmpdir=None,
@@ -131,5 +178,5 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon=['gui\\src-tauri\\icons\\icon.ico'],
+    icon=ICON,
 )

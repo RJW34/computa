@@ -3,11 +3,11 @@ r"""Build script for computa (CLI + GUI).
 
 Commands:
     .\.venv\Scripts\python.exe build.py           # Build CLI only (default)
-    .\.venv\Scripts\python.exe build.py cli       # Build CLI only (dist/computa.exe)
+    .\.venv\Scripts\python.exe build.py cli       # Build CLI only (dist/computa/)
     .\.venv\Scripts\python.exe build.py gui       # Build GUI with Tauri (requires CLI)
     .\.venv\Scripts\python.exe build.py all       # Build both CLI and GUI installer
     .\.venv\Scripts\python.exe build.py deploy    # Build CLI and deploy local runtime assets
-    .\.venv\Scripts\python.exe build.py deploy-existing  # Deploy existing dist/computa.exe
+    .\.venv\Scripts\python.exe build.py deploy-existing  # Deploy existing dist/computa/
     .\.venv\Scripts\python.exe build.py installer # Build dist/computa-setup.exe (Inno Setup)
     .\.venv\Scripts\python.exe build.py dev       # Set up for GUI development
 
@@ -15,9 +15,14 @@ Use a Python interpreter with PyInstaller installed. On this PC that is the
 repo-local .venv interpreter above; other launchers may not have PyInstaller.
 
 Output:
-    dist/computa.exe                                 - Standalone CLI
+    dist/computa/computa.exe                        - CLI (one-dir; needs _internal)
+    dist/computa-portable.exe                       - One-file portable build / Tauri sidecar
     gui/src-tauri/target/release/bundle/msi/*.msi   - Windows installer
     gui/src-tauri/target/release/bundle/nsis/*.exe  - NSIS installer
+
+The CLI is a one-dir build on purpose: the tray runs it as a short-lived
+subprocess repeatedly during a gaming session, and a one-file build would
+re-extract its whole archive to %TEMP% on every single call.
 """
 
 from __future__ import annotations
@@ -39,6 +44,14 @@ GUI_DIR = ROOT_DIR / "gui"
 GUI_BINARIES_DIR = GUI_DIR / "src-tauri" / "binaries"
 APP_DIR_NAME = "AdaptiveBattleStationOptimizer"
 GUI_EXE_NAME = "abso-gui.exe"
+# PyInstaller one-dir payload: dist/computa/computa.exe + dist/computa/_internal.
+# The tray runs this backend as a short-lived subprocess many times per session,
+# and one-dir avoids re-extracting the whole archive to %TEMP% on every call.
+CLI_DIR_NAME = "computa"
+CLI_EXE_NAME = "computa.exe"
+# One-file build: the Tauri sidecar (which must be a single file) and the
+# portable download the release docs point users at.
+PORTABLE_EXE_NAME = "computa-portable.exe"
 TRAY_RUNTIME_EXTENSIONS = frozenset({".ico", ".json", ".mp3", ".ps1", ".vbs", ".wav"})
 TRAY_DEPLOY_EXCLUDE_FILENAMES = frozenset({
     # Deprecated ad-hoc diagnostics used broad process killing and should not
@@ -48,6 +61,13 @@ TRAY_DEPLOY_EXCLUDE_FILENAMES = frozenset({
     # User tray settings are stored in %APPDATA%\ABSO\tray-config.json.
     "tray-config.json",
 })
+# Nvidia Profile Inspector is a third-party binary the user supplies under
+# tools/npi. It is mirrored into the install root (not the public installer,
+# which must not redistribute it) so the installed backend can find it: NPI
+# discovery is anchored to the program's own directory, and without this the
+# tray -- whose working directory is the install root -- silently skips every
+# NVIDIA setting. The archive and the disabled build are local clutter.
+NPI_RUNTIME_EXCLUDE_SUFFIXES = frozenset({".zip", ".disabled"})
 TRAY_OBSOLETE_SIDECAR_FILENAMES = frozenset({
     "__init__.py",
     *TRAY_DEPLOY_EXCLUDE_FILENAMES,
@@ -64,6 +84,21 @@ TRAY_OBSOLETE_SIDECAR_FILENAMES = frozenset({
     "oot_navi_hey1.mp3",
     "pokemon-redblueyellow-item-found-sound-effect.mp3",
 })
+
+
+def cli_dist_dir() -> Path:
+    """Return the built one-dir backend payload directory."""
+    return DIST_DIR / CLI_DIR_NAME
+
+
+def cli_exe_path() -> Path:
+    """Return the built backend launcher inside the one-dir payload."""
+    return cli_dist_dir() / CLI_EXE_NAME
+
+
+def portable_exe_path() -> Path:
+    """Return the one-file build used as the portable download and GUI sidecar."""
+    return DIST_DIR / PORTABLE_EXE_NAME
 
 
 def _rmtree_tolerant(path: Path) -> list[str]:
@@ -162,27 +197,38 @@ def check_build_prerequisites() -> bool:
 
 def verify_output() -> bool:
     """Verify the output executable was created."""
-    exe_path = DIST_DIR / "computa.exe"
+    exe_path = cli_exe_path()
 
     if not exe_path.exists():
         print(f"ERROR: Executable not found: {exe_path}")
         return False
 
-    size_mb = exe_path.stat().st_size / (1024 * 1024)
+    payload_bytes = sum(
+        path.stat().st_size for path in cli_dist_dir().rglob("*") if path.is_file()
+    )
     print("\nBuild successful!")
     print(f"  Executable: {exe_path}")
-    print(f"  Size: {size_mb:.1f} MB")
+    print(f"  Payload: {cli_dist_dir()} ({payload_bytes / (1024 * 1024):.1f} MB total)")
+
+    portable = portable_exe_path()
+    if portable.exists():
+        print(
+            f"  Portable/sidecar one-file: {portable} "
+            f"({portable.stat().st_size / (1024 * 1024):.1f} MB)"
+        )
 
     return True
 
 
 def copy_cli_to_gui() -> bool:
-    """Copy the built CLI to the GUI binaries directory."""
+    """Copy the one-file CLI build to the GUI binaries directory."""
     print("\nCopying CLI to GUI binaries...")
 
-    cli_exe = DIST_DIR / "computa.exe"
+    # Tauri sidecars must be a single self-contained file, so the GUI gets the
+    # one-file build rather than the one-dir payload the tray runs.
+    cli_exe = portable_exe_path()
     if not cli_exe.exists():
-        print(f"ERROR: CLI not found at {cli_exe}")
+        print(f"ERROR: CLI sidecar not found at {cli_exe}")
         return False
 
     # Create binaries directory
@@ -381,6 +427,66 @@ def _sync_file_with_backup(
     return result
 
 
+def _sync_backend_payload(
+    *,
+    source_dir: Path,
+    install_root: Path,
+    backup_dir: Path,
+    stamp: str,
+) -> dict[str, object]:
+    """Mirror the one-dir backend payload into the install root.
+
+    Ordering is deliberate: every support file lands (and every stale one is
+    pruned) *before* the launcher is replaced, so an interrupted deploy never
+    leaves a new ``computa.exe`` pointing at a half-written ``_internal``.
+
+    Pruning is scoped to the top-level directories the payload owns — the
+    install root also holds tray assets, backups, config, and the GUI, none of
+    which this function may touch.
+    """
+    launcher_relative = Path(CLI_EXE_NAME)
+    payload_files = [path for path in source_dir.rglob("*") if path.is_file()]
+    support_files = [
+        path for path in payload_files if path.relative_to(source_dir) != launcher_relative
+    ]
+
+    copied = 0
+    for path in sorted(support_files, key=lambda item: str(item).lower()):
+        relative = path.relative_to(source_dir)
+        if _copy_file_if_changed(path, install_root / relative):
+            copied += 1
+
+    expected = {path.relative_to(source_dir) for path in support_files}
+    managed_dirs = {
+        relative.parts[0] for relative in expected if len(relative.parts) > 1
+    }
+    removed = 0
+    for dir_name in sorted(managed_dirs):
+        target_dir = install_root / dir_name
+        if not target_dir.exists():
+            continue
+        # Deepest-first so directories are empty by the time they are visited.
+        for path in sorted(target_dir.rglob("*"), key=lambda item: str(item).lower(), reverse=True):
+            if path.is_file():
+                if path.relative_to(install_root) not in expected:
+                    path.unlink()
+                    removed += 1
+            elif path.is_dir() and not any(path.iterdir()):
+                path.rmdir()
+
+    launcher_result = _sync_file_with_backup(
+        source=source_dir / CLI_EXE_NAME,
+        target=install_root / CLI_EXE_NAME,
+        backup_dir=backup_dir,
+        backup_name=CLI_EXE_NAME,
+        stamp=stamp,
+    )
+    launcher_result["support_copied"] = copied
+    launcher_result["support_removed"] = removed
+    launcher_result["payload_length"] = sum(path.stat().st_size for path in payload_files)
+    return launcher_result
+
+
 def _sync_gui_executable(
     *,
     install_root: Path,
@@ -401,7 +507,7 @@ def _sync_gui_executable(
 
 def deploy_local_runtime(install_dir: Path | None = None) -> dict[str, object]:
     """Deploy the built backend and runtime assets to LocalAppData."""
-    cli_exe = DIST_DIR / "computa.exe"
+    cli_exe = cli_exe_path()
     if not cli_exe.exists():
         raise FileNotFoundError(f"CLI not found at {cli_exe}")
 
@@ -412,12 +518,11 @@ def deploy_local_runtime(install_dir: Path | None = None) -> dict[str, object]:
     backup_dir.mkdir(parents=True, exist_ok=True)
     stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
 
-    installed_exe = install_root / "computa.exe"
-    backend_result = _sync_file_with_backup(
-        source=cli_exe,
-        target=installed_exe,
+    installed_exe = install_root / CLI_EXE_NAME
+    backend_result = _sync_backend_payload(
+        source_dir=cli_dist_dir(),
+        install_root=install_root,
         backup_dir=backup_dir,
-        backup_name="computa.exe",
         stamp=stamp,
     )
 
@@ -461,6 +566,20 @@ def deploy_local_runtime(install_dir: Path | None = None) -> dict[str, object]:
                 tray_updated_files += 1
     tray_removed_files = _remove_obsolete_tray_sidecars(tray_target)
 
+    npi_source = ROOT_DIR / "tools" / "npi"
+    npi_files = 0
+    npi_updated = 0
+    if npi_source.exists():
+        for path in sorted(npi_source.rglob("*"), key=lambda item: str(item).lower()):
+            if not path.is_file():
+                continue
+            if path.suffix.lower() in NPI_RUNTIME_EXCLUDE_SUFFIXES:
+                continue
+            npi_files += 1
+            target = install_root / "tools" / "npi" / path.relative_to(npi_source)
+            if _copy_file_if_changed(path, target):
+                npi_updated += 1
+
     config_source = ROOT_DIR / "abso.yaml"
     config_target: Path | None = None
     config_copied = False
@@ -473,6 +592,7 @@ def deploy_local_runtime(install_dir: Path | None = None) -> dict[str, object]:
     return {
         "installed_exe": str(installed_exe),
         "installed_length": installed_exe.stat().st_size,
+        "installed_payload_length": backend_result.get("payload_length"),
         "backend": backend_result,
         "backup": backend_result.get("backup"),
         "gui": gui_result,
@@ -481,6 +601,8 @@ def deploy_local_runtime(install_dir: Path | None = None) -> dict[str, object]:
         "tray_updated_count": tray_updated_files,
         "tray_removed_count": len(tray_removed_files),
         "tray_removed_files": tray_removed_files,
+        "npi_file_count": npi_files,
+        "npi_updated_count": npi_updated,
         "config": str(config_target) if config_target else None,
         "config_copied": config_copied,
         "migrated_backups": migrated_backups,
@@ -499,6 +621,12 @@ def print_deploy_result(result: dict[str, object]) -> None:
         f"  Backend: {result['installed_exe']} "
         f"({result['installed_length']} bytes{backend_status})"
     )
+    if isinstance(backend_result, dict) and "support_copied" in backend_result:
+        payload_mb = (backend_result.get("payload_length") or 0) / (1024 * 1024)
+        support_summary = f"{backend_result['support_copied']} updated"
+        if backend_result.get("support_removed"):
+            support_summary += f", {backend_result['support_removed']} stale removed"
+        print(f"  Backend payload: {payload_mb:.1f} MB ({support_summary})")
     if result.get("backup"):
         print(f"  Previous backend backup: {result['backup']}")
     gui_result = result.get("gui")
@@ -513,6 +641,11 @@ def print_deploy_result(result: dict[str, object]) -> None:
     if result.get("tray_removed_count"):
         tray_summary += f", {result['tray_removed_count']} stale removed"
     print(f"  Tray assets: {result['tray_target']} ({tray_summary})")
+    if result.get("npi_file_count"):
+        print(
+            f"  Nvidia Profile Inspector: {result['npi_file_count']} files, "
+            f"{result['npi_updated_count']} updated"
+        )
     if result.get("config"):
         config_status = "copied" if result.get("config_copied") else "already current"
         print(f"  Config: {result['config']} ({config_status})")
@@ -692,9 +825,9 @@ def build_installer() -> bool:
     """Build dist/computa-setup.exe with Inno Setup."""
     print("\nBuilding computa-setup.exe (Inno Setup)...")
 
-    exe = DIST_DIR / "computa.exe"
+    exe = cli_exe_path()
     if not exe.exists():
-        print(f"  dist\\computa.exe not found ({exe}).")
+        print(f"  dist\\{CLI_DIR_NAME}\\{CLI_EXE_NAME} not found ({exe}).")
         print("  Build it first:  build.py cli")
         return False
 
@@ -709,7 +842,16 @@ def build_installer() -> bool:
     if payload.exists():
         shutil.rmtree(payload)
     (payload / "abso" / "tray").mkdir(parents=True)
-    shutil.copy2(exe, payload / "computa.exe")
+
+    # Ship the whole one-dir payload: computa.exe plus its _internal tree.
+    backend_files = 0
+    for source in sorted(cli_dist_dir().rglob("*"), key=lambda item: str(item).lower()):
+        if not source.is_file():
+            continue
+        dest = payload / source.relative_to(cli_dist_dir())
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source, dest)
+        backend_files += 1
 
     tray_source = ROOT_DIR / "abso" / "tray"
     count = 0
@@ -718,7 +860,10 @@ def build_installer() -> bool:
         dest.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(source, dest)
         count += 1
-    print(f"  Payload: computa.exe + {count} tray files (themes: default only)")
+    print(
+        f"  Payload: {backend_files} backend files + {count} tray files "
+        f"(themes: default only)"
+    )
 
     version_ns: dict = {}
     exec((ROOT_DIR / "abso" / "__version__.py").read_text(encoding="utf-8"), version_ns)

@@ -46,7 +46,10 @@ Compression=lzma2
 Name: "addpath"; Description: "Let me run 'computa' from the command line (adds the install folder to PATH)"; Flags: unchecked
 
 [Files]
+; computa.exe is a PyInstaller one-dir launcher: it will not start without the
+; _internal tree beside it. Both entries are required.
 Source: "{#PayloadDir}\computa.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{#PayloadDir}\_internal\*"; DestDir: "{app}\_internal"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "{#PayloadDir}\abso\tray\*"; DestDir: "{app}\abso\tray"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]

@@ -17,10 +17,38 @@ import contextlib
 import logging
 import os
 import subprocess
+import sys
 from pathlib import Path
 from typing import Any
 
 logger = logging.getLogger(__name__)
+
+
+def _app_roots() -> list[Path]:
+    """Return directories that may hold a bundled ``tools/npi`` alongside ABSO.
+
+    NPI discovery used to be purely CWD-relative. The tray launches the backend
+    with its working directory set to the install root, which has no ``tools``
+    tree, so every tray-driven apply silently skipped NVIDIA settings while a
+    developer running the same command from the repo saw it work. Anchor the
+    search to the running program instead of the caller's CWD.
+    """
+    roots: list[Path] = []
+
+    # Frozen build: <install root>\computa.exe -> <install root>.
+    if getattr(sys, "frozen", False):
+        with contextlib.suppress(Exception):
+            roots.append(Path(sys.executable).resolve().parent)
+
+    # Source checkout: .../abso/settings/nvidia/npi.py -> repo root.
+    with contextlib.suppress(Exception):
+        roots.append(Path(__file__).resolve().parents[3])
+
+    unique: list[Path] = []
+    for root in roots:
+        if root not in unique:
+            unique.append(root)
+    return unique
 
 # SAFETY FLAG: Set to True to completely disable NPI imports
 NPI_IMPORTS_DISABLED = True
@@ -306,7 +334,18 @@ exit $p.ExitCode
 
     def _find_npi(self) -> None:
         """Try to find Nvidia Profile Inspector in common locations."""
-        common_paths = [
+        common_paths: list[Path] = []
+
+        # Anchored to the running program, so the installed tray (whose CWD is
+        # the install root) resolves the same bundled copy a repo run does.
+        for root in _app_roots():
+            common_paths.extend([
+                root / "tools" / "npi" / "nvidiaProfileInspector.exe",
+                root / "tools" / "nvidiaProfileInspector.exe",
+                root / "nvidiaProfileInspector.exe",
+            ])
+
+        common_paths += [
             # Current directory
             Path("nvidiaProfileInspector.exe"),
             Path("tools/nvidiaProfileInspector.exe"),

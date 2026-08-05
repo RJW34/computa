@@ -116,7 +116,9 @@ def test_build_ships_theme_packs_and_purges_legacy_root_media(tmp_path, monkeypa
     theme_dir.mkdir(parents=True)
     installed_tray.mkdir(parents=True)
 
-    (dist / "computa.exe").write_bytes(b"backend")
+    (dist / "computa").mkdir(parents=True)
+    (dist / "computa" / "computa.exe").write_bytes(b"backend")
+    (dist / "computa-portable.exe").write_bytes(b"backend")
     (tray / "ABSO-Tray.ps1").write_text("# tray", encoding="utf-8")
     (theme_dir / "theme.json").write_text('{"name": "Custom"}', encoding="utf-8")
     (theme_dir / "active.ico").write_bytes(b"icon")

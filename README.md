@@ -34,8 +34,8 @@ together — with automatic backups and one-command rollback.
   profiles, Low Latency Mode, VRR overrides); AMD Radeon gets vendor-specific
   registry tuning (Anti-Lag, Enhanced Sync, ULPS); other GPUs still get all
   OS/power/input/display optimizations
-- Python 3.11+ **only for source installs** — the released `computa.exe` is
-  self-contained
+- Python 3.11+ **only for source installs** — the released
+  `computa-portable.exe` is self-contained
 
 ### Optional: NVIDIA Profile Inspector
 
@@ -67,9 +67,10 @@ streaming — so the tray menu only shows profiles you'd actually use.
 Neither installing nor setup changes your Windows or game settings — you
 pick a game profile later, from the tray.
 
-Portable/power-user path: download `computa.exe` + `install.ps1` and run
-`powershell -ExecutionPolicy Bypass -File .\install.ps1` (console), or put
-`computa.exe` anywhere and run `computa setup` from an elevated terminal.
+Portable/power-user path: download `computa-portable.exe` + `install.ps1` and
+run `powershell -ExecutionPolicy Bypass -File .\install.ps1` (console), or put
+`computa-portable.exe` anywhere and run `computa-portable setup` from an
+elevated terminal.
 
 `computa update-check` reports when a newer release is available; updating is a
 manual re-download (no auto-update). Maintainers: see

@@ -63,7 +63,11 @@ def test_deploy_local_runtime_copies_runtime_assets(tmp_path, monkeypatch):
     gui_bins.mkdir(parents=True)
     gui_release.mkdir(parents=True)
 
-    (dist / "computa.exe").write_bytes(b"new backend")
+    (dist / "computa").mkdir(parents=True)
+    (dist / "computa" / "computa.exe").write_bytes(b"new backend")
+    (dist / "computa" / "_internal").mkdir()
+    (dist / "computa" / "_internal" / "python311.dll").write_bytes(b"runtime")
+    (dist / "computa-portable.exe").write_bytes(b"new backend")
     (gui_release / "abso-gui.exe").write_bytes(b"new gui")
     (tray / "ABSO-Tray.ps1").write_text("# tray", encoding="utf-8")
     (tray / "Install-Startup.ps1").write_text("# installer", encoding="utf-8")
@@ -117,7 +121,9 @@ def test_deploy_local_runtime_copies_profile_cache_and_removes_legacy_sidecar_co
     tray.mkdir(parents=True)
     installed_tray.mkdir(parents=True)
 
-    (dist / "computa.exe").write_bytes(b"backend")
+    (dist / "computa").mkdir(parents=True)
+    (dist / "computa" / "computa.exe").write_bytes(b"backend")
+    (dist / "computa-portable.exe").write_bytes(b"backend")
     (tray / "profile-catalog-cache.json").write_text('{"profiles":[]}', encoding="utf-8")
     (tray / "_restart-tray.ps1").write_text("# deprecated", encoding="utf-8")
     (tray / "tray-config.json").write_text('{"stale":true}', encoding="utf-8")
@@ -153,7 +159,9 @@ def test_deploy_local_runtime_skips_identical_backend_executable(tmp_path, monke
 
     dist.mkdir(parents=True)
     install.mkdir(parents=True)
-    (dist / "computa.exe").write_bytes(b"same backend")
+    (dist / "computa").mkdir(parents=True)
+    (dist / "computa" / "computa.exe").write_bytes(b"same backend")
+    (dist / "computa-portable.exe").write_bytes(b"same backend")
     (install / "computa.exe").write_bytes(b"same backend")
 
     monkeypatch.setattr(build, "ROOT_DIR", root)
@@ -239,7 +247,9 @@ def test_copy_cli_to_gui_skips_identical_sidecar_writes(tmp_path, monkeypatch):
 
     dist.mkdir(parents=True)
     gui_bins.mkdir(parents=True)
-    (dist / "computa.exe").write_bytes(b"same backend")
+    (dist / "computa").mkdir(parents=True)
+    (dist / "computa" / "computa.exe").write_bytes(b"same backend")
+    (dist / "computa-portable.exe").write_bytes(b"same backend")
     for name in sidecar_names:
         sidecar = gui_bins / name
         sidecar.write_bytes(b"same backend")
@@ -269,7 +279,9 @@ def test_deploy_local_runtime_skips_identical_tray_assets_and_config(tmp_path, m
     installed_tray.mkdir(parents=True)
     install.mkdir(parents=True, exist_ok=True)
 
-    (dist / "computa.exe").write_bytes(b"same backend")
+    (dist / "computa").mkdir(parents=True)
+    (dist / "computa" / "computa.exe").write_bytes(b"same backend")
+    (dist / "computa-portable.exe").write_bytes(b"same backend")
     (install / "computa.exe").write_bytes(b"same backend")
     (tray / "ABSO-Tray.ps1").write_text("# tray", encoding="utf-8")
     (tray / "Install-Startup.ps1").write_text("# installer", encoding="utf-8")
@@ -313,7 +325,9 @@ def test_deploy_local_runtime_does_not_overwrite_existing_backup_dirs(tmp_path, 
     dist.mkdir(parents=True)
     source_backup.mkdir(parents=True)
     existing_backup.mkdir(parents=True)
-    (dist / "computa.exe").write_bytes(b"backend")
+    (dist / "computa").mkdir(parents=True)
+    (dist / "computa" / "computa.exe").write_bytes(b"backend")
+    (dist / "computa-portable.exe").write_bytes(b"backend")
     (source_backup / "metadata.json").write_text('{"source": true}', encoding="utf-8")
     (existing_backup / "metadata.json").write_text('{"installed": true}', encoding="utf-8")
 
@@ -341,7 +355,9 @@ def test_deploy_local_runtime_skips_identical_gui_executable(tmp_path, monkeypat
     dist.mkdir(parents=True)
     gui_release.mkdir(parents=True)
     install.mkdir(parents=True)
-    (dist / "computa.exe").write_bytes(b"backend")
+    (dist / "computa").mkdir(parents=True)
+    (dist / "computa" / "computa.exe").write_bytes(b"backend")
+    (dist / "computa-portable.exe").write_bytes(b"backend")
     (gui_release / "abso-gui.exe").write_bytes(b"same gui")
     (install / "abso-gui.exe").write_bytes(b"same gui")
 
@@ -502,3 +518,163 @@ def test_build_gui_installs_dependencies_without_shell(tmp_path, monkeypatch):
         (["npm.cmd", "run", "tauri", "build"], {"cwd": gui, "env": {"PATH": "test-path"}, "check": False}),
     ]
     assert all("shell" not in kwargs for _args, kwargs in calls)
+
+
+def test_deploy_local_runtime_mirrors_one_dir_backend_payload(tmp_path, monkeypatch):
+    """The one-dir _internal tree must land beside the installed launcher.
+
+    computa.exe is a PyInstaller one-dir launcher and will not start without
+    its _internal payload, so a deploy that ships only the exe is broken.
+    """
+    root = tmp_path / "repo"
+    dist = root / "dist"
+    payload = dist / "computa"
+    install = tmp_path / "install"
+
+    (payload / "_internal" / "abso" / "data").mkdir(parents=True)
+    install.mkdir(parents=True)
+    (payload / "computa.exe").write_bytes(b"launcher")
+    (payload / "_internal" / "python311.dll").write_bytes(b"runtime")
+    (payload / "_internal" / "abso" / "data" / "monitor_osd.yaml").write_bytes(b"x: 1\n")
+
+    monkeypatch.setattr(build, "ROOT_DIR", root)
+    monkeypatch.setattr(build, "DIST_DIR", dist)
+    monkeypatch.setattr(build, "GUI_DIR", root / "gui")
+    monkeypatch.setattr(build, "GUI_BINARIES_DIR", root / "gui" / "src-tauri" / "binaries")
+
+    result = build.deploy_local_runtime(install_dir=install)
+
+    assert (install / "computa.exe").read_bytes() == b"launcher"
+    assert (install / "_internal" / "python311.dll").read_bytes() == b"runtime"
+    assert (install / "_internal" / "abso" / "data" / "monitor_osd.yaml").exists()
+    assert result["backend"]["support_copied"] == 2
+    assert result["installed_payload_length"] == len(b"launcher") + len(b"runtime") + len("x: 1\n")
+
+
+def test_deploy_local_runtime_prunes_stale_internal_files(tmp_path, monkeypatch):
+    """A dropped dependency must not linger in the installed _internal tree."""
+    root = tmp_path / "repo"
+    dist = root / "dist"
+    payload = dist / "computa"
+    install = tmp_path / "install"
+
+    (payload / "_internal").mkdir(parents=True)
+    (install / "_internal" / "removed_pkg").mkdir(parents=True)
+    (payload / "computa.exe").write_bytes(b"launcher")
+    (payload / "_internal" / "python311.dll").write_bytes(b"runtime")
+    (install / "_internal" / "python311.dll").write_bytes(b"runtime")
+    (install / "_internal" / "orphan.pyd").write_bytes(b"stale")
+    (install / "_internal" / "removed_pkg" / "old.dll").write_bytes(b"stale")
+
+    monkeypatch.setattr(build, "ROOT_DIR", root)
+    monkeypatch.setattr(build, "DIST_DIR", dist)
+    monkeypatch.setattr(build, "GUI_DIR", root / "gui")
+    monkeypatch.setattr(build, "GUI_BINARIES_DIR", root / "gui" / "src-tauri" / "binaries")
+
+    result = build.deploy_local_runtime(install_dir=install)
+
+    assert not (install / "_internal" / "orphan.pyd").exists()
+    assert not (install / "_internal" / "removed_pkg").exists()
+    assert (install / "_internal" / "python311.dll").read_bytes() == b"runtime"
+    assert result["backend"]["support_removed"] == 2
+
+
+def test_deploy_local_runtime_pruning_leaves_non_backend_content_alone(tmp_path, monkeypatch):
+    """Payload pruning must never reach tray assets, backups, config, or the GUI."""
+    root = tmp_path / "repo"
+    dist = root / "dist"
+    payload = dist / "computa"
+    install = tmp_path / "install"
+
+    (payload / "_internal").mkdir(parents=True)
+    (install / "abso" / "tray").mkdir(parents=True)
+    (install / "backups" / "2026-05-26_010101").mkdir(parents=True)
+    (payload / "computa.exe").write_bytes(b"launcher")
+    (payload / "_internal" / "python311.dll").write_bytes(b"runtime")
+    (install / "abso" / "tray" / "ABSO-Tray.ps1").write_text("# installed tray")
+    (install / "backups" / "2026-05-26_010101" / "manifest.json").write_text("{}")
+    (install / "abso-gui.exe").write_bytes(b"gui")
+    (install / "abso.yaml").write_text("backup_dir: backups\n")
+    (install / ".abso_state.json").write_text("{}")
+
+    monkeypatch.setattr(build, "ROOT_DIR", root)
+    monkeypatch.setattr(build, "DIST_DIR", dist)
+    monkeypatch.setattr(build, "GUI_DIR", root / "gui")
+    monkeypatch.setattr(build, "GUI_BINARIES_DIR", root / "gui" / "src-tauri" / "binaries")
+
+    build.deploy_local_runtime(install_dir=install)
+
+    assert (install / "abso" / "tray" / "ABSO-Tray.ps1").exists()
+    assert (install / "backups" / "2026-05-26_010101" / "manifest.json").exists()
+    assert (install / "abso-gui.exe").exists()
+    assert (install / "abso.yaml").exists()
+    assert (install / ".abso_state.json").exists()
+
+
+def test_copy_cli_to_gui_uses_the_one_file_sidecar_build(tmp_path, monkeypatch):
+    """Tauri sidecars must be single files, not the one-dir launcher stub."""
+    root = tmp_path / "repo"
+    dist = root / "dist"
+    payload = dist / "computa"
+    gui_bins = root / "gui" / "src-tauri" / "binaries"
+
+    payload.mkdir(parents=True)
+    gui_bins.mkdir(parents=True)
+    (payload / "computa.exe").write_bytes(b"one-dir launcher stub")
+    (dist / "computa-portable.exe").write_bytes(b"self-contained sidecar")
+
+    monkeypatch.setattr(build, "DIST_DIR", dist)
+    monkeypatch.setattr(build, "GUI_BINARIES_DIR", gui_bins)
+
+    assert build.copy_cli_to_gui() is True
+
+    assert (gui_bins / "abso.exe").read_bytes() == b"self-contained sidecar"
+    assert (gui_bins / "abso-x86_64-pc-windows-msvc.exe").read_bytes() == b"self-contained sidecar"
+
+
+def test_deploy_local_runtime_ships_npi_into_install_root(tmp_path, monkeypatch):
+    """The installed backend must find NPI without depending on the caller's CWD.
+
+    NPI discovery is anchored to the program's own directory, so the binary has
+    to exist under the install root. Without it the tray -- whose working
+    directory is the install root -- silently skips every NVIDIA setting.
+    """
+    root = tmp_path / "repo"
+    dist = root / "dist"
+    payload = dist / "computa"
+    npi = root / "tools" / "npi"
+    install = tmp_path / "install"
+
+    payload.mkdir(parents=True)
+    npi.mkdir(parents=True)
+    install.mkdir(parents=True)
+    (payload / "computa.exe").write_bytes(b"launcher")
+    (npi / "nvidiaProfileInspector.exe").write_bytes(b"npi")
+    (npi / "nvidiaProfileInspector.exe.config").write_bytes(b"<config/>")
+    (npi / "Reference.xml").write_bytes(b"<ref/>")
+    # Local clutter that must not be mirrored.
+    (npi / "nvidiaProfileInspector.zip").write_bytes(b"archive")
+    (npi / "nvidiaProfileInspector.exe.DISABLED").write_bytes(b"old build")
+
+    monkeypatch.setattr(build, "ROOT_DIR", root)
+    monkeypatch.setattr(build, "DIST_DIR", dist)
+    monkeypatch.setattr(build, "GUI_DIR", root / "gui")
+    monkeypatch.setattr(build, "GUI_BINARIES_DIR", root / "gui" / "src-tauri" / "binaries")
+
+    result = build.deploy_local_runtime(install_dir=install)
+
+    installed_npi = install / "tools" / "npi"
+    assert (installed_npi / "nvidiaProfileInspector.exe").read_bytes() == b"npi"
+    assert (installed_npi / "nvidiaProfileInspector.exe.config").exists()
+    assert (installed_npi / "Reference.xml").exists()
+    assert not (installed_npi / "nvidiaProfileInspector.zip").exists()
+    assert not (installed_npi / "nvidiaProfileInspector.exe.DISABLED").exists()
+    assert result["npi_file_count"] == 3
+
+
+def test_installer_payload_does_not_redistribute_npi() -> None:
+    """The public installer must not ship the third-party NPI binary."""
+    iss = (build.ROOT_DIR / "scripts" / "installer.iss").read_text(encoding="utf-8")
+
+    assert "nvidiaProfileInspector" not in iss
+    assert "tools\npi" not in iss
