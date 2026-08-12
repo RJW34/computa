@@ -234,14 +234,21 @@ class TestProfileLoading:
             assert settings["global_vrr_mode"] == "off", profile_cls.__name__
 
     def test_deadlock_gsync_nvidia_settings(self):
-        """Deadlock G-SYNC variants should run reflex_gsync on the strict VRR path."""
+        """Deadlock G-SYNC variants run reflex_gsync on the windowed/flip path.
+
+        Source 2 has no exclusive-fullscreen mode, so ``fullscreen_only`` would
+        restrict VRR to a mode the game never enters. See
+        tests/test_source2_windowed_vrr.py.
+        """
         for profile_cls in (DeadlockGSyncProfile, DeadlockGSyncHDRProfile):
             profile = profile_cls()
             settings = profile.get_settings("NvidiaSettingsHandler")
             assert settings["preset"] == "reflex_gsync", profile_cls.__name__
             assert settings["profile_name"] == "Deadlock", profile_cls.__name__
             assert settings["auto_vrr_fps_cap"] is True, profile_cls.__name__
-            assert settings["global_vrr_mode"] == "fullscreen_only", profile_cls.__name__
+            assert settings["global_vrr_mode"] == "fullscreen_and_windowed", (
+                profile_cls.__name__
+            )
 
     def test_deadlock_hdr_variants_enable_hdr_and_disable_auto_hdr(self):
         """Both HDR variants should enable native HDR with Auto HDR off and ACM disabled."""
@@ -266,13 +273,17 @@ class TestProfileLoading:
             assert win["auto_hdr"] is False, profile_cls.__name__
             assert color["icc_profile"] == "srgb", profile_cls.__name__
 
-    def test_deadlock_variants_disable_fso_for_both_binaries(self):
-        """Every Deadlock variant runs exclusive fullscreen; FSO must be disabled per-exe."""
+    def test_deadlock_no_sync_variants_disable_fso_for_both_binaries(self):
+        """The no-sync Deadlock lanes keep the per-exe FSO-disable entries.
+
+        The VRR lanes deliberately clear them: Source 2 has no
+        exclusive-fullscreen path for FSO-disable to buy, and the entries cost
+        the flip path windowed G-SYNC rides on (see
+        tests/test_source2_windowed_vrr.py).
+        """
         for profile_cls in (
             DeadlockProfile,
             DeadlockHDRProfile,
-            DeadlockGSyncProfile,
-            DeadlockGSyncHDRProfile,
         ):
             profile = profile_cls()
             flags = profile.fullscreen_optimizations_per_exe
@@ -282,11 +293,16 @@ class TestProfileLoading:
             assert registry_settings["fullscreen_optimizations"]["project8.exe"] is True
             assert registry_settings["fullscreen_optimizations"]["deadlock.exe"] is True
 
-    def test_deadlock_gsync_variants_inherit_strict_display_path_contract(self):
-        """G-SYNC Deadlock variants should match strict fullscreen VRR contract."""
+    def test_deadlock_gsync_variants_keep_the_overlay_strict_contract(self):
+        """The G-SYNC Deadlock lanes stay strict on overlays and NVIDIA binding.
+
+        Moving off ``fullscreen_only`` changes the display path only; the
+        overlay-free gate and exact-binding requirement are declared
+        explicitly on these lanes.
+        """
         for profile_cls in (DeadlockGSyncProfile, DeadlockGSyncHDRProfile):
             profile = profile_cls()
-            assert profile.uses_fullscreen_only_vrr_path is True, profile_cls.__name__
+            assert profile.uses_fullscreen_only_vrr_path is False, profile_cls.__name__
             assert profile.display_path_requirements.require_overlay_free_path is True
             assert profile.requires_exact_nvidia_binding is True, profile_cls.__name__
             assert profile.auto_disable_blocking_overlays is True, profile_cls.__name__
@@ -436,14 +452,21 @@ class TestProfileLoading:
             assert settings["global_vrr_mode"] == "off", profile_cls.__name__
 
     def test_cs2_gsync_nvidia_settings(self):
-        """CS2 G-SYNC variants should run reflex_gsync on the strict VRR path."""
+        """CS2 G-SYNC variants run reflex_gsync on the windowed/flip VRR path.
+
+        CS2 has no exclusive-fullscreen mode (Source 2 presents through DXGI
+        flip), so ``fullscreen_only`` would restrict VRR to a mode the game
+        never enters. See tests/test_cs2_windowed_vrr.py.
+        """
         for profile_cls in (CounterStrike2GSyncProfile, CounterStrike2GSyncHDRProfile):
             profile = profile_cls()
             settings = profile.get_settings("NvidiaSettingsHandler")
             assert settings["preset"] == "reflex_gsync", profile_cls.__name__
             assert settings["profile_name"] == "Counter-Strike 2", profile_cls.__name__
             assert settings["auto_vrr_fps_cap"] is True, profile_cls.__name__
-            assert settings["global_vrr_mode"] == "fullscreen_only", profile_cls.__name__
+            assert settings["global_vrr_mode"] == "fullscreen_and_windowed", (
+                profile_cls.__name__
+            )
 
     def test_cs2_hdr_variants_enable_windows_hdr_and_disable_auto_hdr(self):
         """Both HDR variants use Windows HDR composition with Auto HDR off and ACM disabled."""
@@ -472,18 +495,16 @@ class TestProfileLoading:
             assert win["auto_hdr"] is False, profile_cls.__name__
             assert color["icc_profile"] == "srgb", profile_cls.__name__
 
-    def test_cs2_variants_disable_fso_for_the_binary(self):
-        """Every exclusive-fullscreen CS2 variant must disable FSO per-exe.
+    def test_cs2_no_sync_variants_disable_fso_for_the_binary(self):
+        """The no-sync CS2 lanes keep the per-exe FSO-disable entry.
 
-        The capture lane is deliberately excluded - it runs borderless and
-        clears the flag instead (see
-        test_cs2_capture_lane_uses_borderless_windowed_vrr_path).
+        The VRR lanes deliberately clear it: CS2 has no exclusive-fullscreen
+        path for FSO-disable to buy, and the entry costs the flip path that
+        windowed G-SYNC rides on (see tests/test_cs2_windowed_vrr.py).
         """
         for profile_cls in (
             CounterStrike2Profile,
             CounterStrike2HDRProfile,
-            CounterStrike2GSyncProfile,
-            CounterStrike2GSyncHDRProfile,
         ):
             profile = profile_cls()
             flags = profile.fullscreen_optimizations_per_exe
@@ -491,14 +512,21 @@ class TestProfileLoading:
             registry_settings = profile.get_settings("RegistrySettingsHandler")
             assert registry_settings["fullscreen_optimizations"]["cs2.exe"] is True
 
-    def test_cs2_gsync_variants_inherit_strict_display_path_contract(self):
-        """G-SYNC CS2 variants should match the strict fullscreen VRR contract."""
+    def test_cs2_gsync_variants_keep_the_overlay_strict_contract(self):
+        """The strict G-SYNC lanes stay strict on overlays and NVIDIA binding.
+
+        Moving off ``fullscreen_only`` changes the *display path* only. The
+        overlay-free gate, the exact-binding requirement, and the automatic
+        overlay shutdown are declared explicitly on these lanes so they no
+        longer ride on the fullscreen-only derivation in BaseProfile.
+        """
         for profile_cls in (CounterStrike2GSyncProfile, CounterStrike2GSyncHDRProfile):
             profile = profile_cls()
-            assert profile.uses_fullscreen_only_vrr_path is True, profile_cls.__name__
+            assert profile.uses_fullscreen_only_vrr_path is False, profile_cls.__name__
             assert profile.display_path_requirements.require_overlay_free_path is True
             assert profile.requires_exact_nvidia_binding is True, profile_cls.__name__
             assert profile.auto_disable_blocking_overlays is True, profile_cls.__name__
+            assert profile.is_capture_safe is False, profile_cls.__name__
 
     def test_cs2_is_system_only_until_native_config_handler_lands(self):
         """ABSO does not write CS2's Source 2 config; scope should reflect that."""

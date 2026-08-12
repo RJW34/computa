@@ -9,8 +9,12 @@ Reflex/VRR settings themselves.
 The variant matrix mirrors Overwatch 2's core four:
   - ``deadlock``            -> No-sync SDR (latency-focused lane)
   - ``deadlock-hdr``        -> No-sync HDR (OLED / Mini-LED)
-  - ``deadlock-gsync``      -> Strict fullscreen-only G-SYNC SDR
-  - ``deadlock-gsync-hdr``  -> Strict fullscreen-only G-SYNC HDR
+  - ``deadlock-gsync``      -> G-SYNC SDR (overlay-strict, flip path)
+  - ``deadlock-gsync-hdr``  -> G-SYNC HDR (overlay-strict, flip path)
+
+The G-SYNC lanes are strict on overlays, not on display path: like the CS2
+family they run the borderless/windowed G-SYNC contract, because Source 2 has
+no exclusive-fullscreen mode. See ``_DEADLOCK_WINDOWED_VRR_OVERRIDES``.
 """
 
 from __future__ import annotations
@@ -33,6 +37,30 @@ if TYPE_CHECKING:
 # keeps process detection, NVIDIA binding, and FSO overrides correct across
 # the rename without forcing a profile bump on launch day.
 _DEADLOCK_EXECUTABLES: list[str] = ["project8.exe", "deadlock.exe"]
+
+
+# Deadlock is Source 2, so it inherits the same presentation reality as CS2:
+# no true exclusive fullscreen, everything presents through DXGI flip. The
+# strict exclusive-fullscreen VRR contract is therefore unsatisfiable and
+# fails silently — ``fullscreen_only`` restricts driver VRR to a mode the game
+# never enters, while the same lane turns off the enablers the flip path needs.
+# See ``_CS2_WINDOWED_VRR_OVERRIDES`` in counter_strike_2.py for the full
+# write-up; this is the identical contract.
+_DEADLOCK_WINDOWED_VRR_OVERRIDES: dict[str, dict[str, Any]] = {
+    "WindowsSettingsHandler": {
+        "windowed_optimizations": True,
+        "vrr_optimize": True,
+    },
+    "GraphicsSettingsHandler": {
+        "disable_global_fso": False,
+    },
+    "NvidiaSettingsHandler": {
+        "global_vrr_mode": "fullscreen_and_windowed",
+        # Assert the per-app allow so switching in from a Deadlock no-sync
+        # lane (vrr_app_override=force_off) re-enables VRR deterministically.
+        "vrr_app_override": "allow",
+    },
+}
 
 
 class _DeadlockBaseProfile(ReflexShooterBaseProfile):
@@ -148,10 +176,13 @@ class _DeadlockBaseProfile(ReflexShooterBaseProfile):
             {
                 "category": "Display",
                 "setting": "Display Mode",
-                "value": "Fullscreen (Exclusive)",
+                "value": "Fullscreen Windowed (borderless)",
                 "reason": (
-                    "This profile is tuned for fullscreen-only G-SYNC. "
-                    "Do not switch to borderless/windowed mode after launch."
+                    "Source 2 has no true exclusive fullscreen — every display "
+                    "mode presents through DXGI hardware independent flip. ABSO "
+                    "therefore runs the borderless G-SYNC path (windowed "
+                    "optimizations + VRR optimize + driver VRR in fullscreen AND "
+                    "windowed). Plain Fullscreen also keeps VRR on this path."
                 ),
             },
             {
@@ -362,7 +393,11 @@ class DeadlockHDRProfile(_DeadlockBaseProfile):
 
 
 class DeadlockGSyncProfile(_DeadlockBaseProfile):
-    """Deadlock G-SYNC SDR profile (strict fullscreen-only VRR)."""
+    """Deadlock G-SYNC SDR profile (overlay-strict, flip-path VRR).
+
+    "Strict" is an overlay policy here, not a display path: VRR runs on the
+    borderless contract in :data:`_DEADLOCK_WINDOWED_VRR_OVERRIDES`.
+    """
 
     @property
     def profile_id(self) -> str:
@@ -399,26 +434,33 @@ class DeadlockGSyncProfile(_DeadlockBaseProfile):
     def mixed_refresh_safe_fallback_profile_id(self) -> str:
         return "deadlock"
 
+    @property
+    def fullscreen_optimizations_per_exe(self) -> dict[str, bool]:
+        # No exclusive-fullscreen path exists to force on Source 2, and the
+        # FSO-disable entry costs the flip path windowed VRR rides on.
+        return fso_overrides(_DEADLOCK_EXECUTABLES, disabled=False)
+
     def _variant_overrides(self) -> dict[str, dict[str, Any]]:
-        return {
-            "NvidiaSettingsHandler": {
-                "preset": "reflex_gsync",
-                "profile_name": "Deadlock",
-                # Enforce VRR-safe cap automatically (refresh-3) so NVCP
-                # VSync stays a safety net and never engages.
-                "auto_vrr_fps_cap": True,
-                # Fullscreen-only VRR matches the strict exclusive lane.
-                "global_vrr_mode": "fullscreen_only",
+        return merge_settings_map(
+            {
+                "NvidiaSettingsHandler": {
+                    "preset": "reflex_gsync",
+                    "profile_name": "Deadlock",
+                    # Enforce VRR-safe cap automatically (refresh-3) so NVCP
+                    # VSync stays a safety net and never engages.
+                    "auto_vrr_fps_cap": True,
+                },
+                "ColorProfileSettingsHandler": {
+                    "icc_profile": "srgb",
+                    # Slightly below neutral to compensate for DCI-P3
+                    # oversaturation in SDR.
+                    "digital_vibrance": 45,
+                    "show_osd_guidance": True,
+                    "game_type": "competitive_fps",
+                },
             },
-            "ColorProfileSettingsHandler": {
-                "icc_profile": "srgb",
-                # Slightly below neutral to compensate for DCI-P3
-                # oversaturation in SDR.
-                "digital_vibrance": 45,
-                "show_osd_guidance": True,
-                "game_type": "competitive_fps",
-            },
-        }
+            _DEADLOCK_WINDOWED_VRR_OVERRIDES,
+        )
 
     def get_in_game_settings(self) -> list[dict[str, str]]:
         return [
@@ -428,12 +470,15 @@ class DeadlockGSyncProfile(_DeadlockBaseProfile):
 
 
 class DeadlockGSyncHDRProfile(_DeadlockBaseProfile):
-    """Deadlock G-SYNC profile with Windows HDR on (strict fullscreen-only VRR).
+    """Deadlock G-SYNC profile with Windows HDR on (overlay-strict).
 
     NOTE: Same caveat as DeadlockHDRProfile - Deadlock has not shipped native
     HDR in the playtest. Windows HDR is on for OLED desktop comfort, the game
     itself renders SDR composited inside HDR. Switch back to deadlock-gsync
     for the pure SDR lane if you don't want OS HDR on.
+
+    Display path is the borderless VRR contract shared by every Source 2 lane
+    (see :data:`_DEADLOCK_WINDOWED_VRR_OVERRIDES`).
     """
 
     @property
@@ -473,30 +518,37 @@ class DeadlockGSyncHDRProfile(_DeadlockBaseProfile):
     def mixed_refresh_safe_fallback_profile_id(self) -> str:
         return "deadlock-hdr"
 
+    @property
+    def fullscreen_optimizations_per_exe(self) -> dict[str, bool]:
+        # See the SDR G-SYNC sibling.
+        return fso_overrides(_DEADLOCK_EXECUTABLES, disabled=False)
+
     def _variant_overrides(self) -> dict[str, dict[str, Any]]:
-        return {
-            "WindowsSettingsHandler": {
-                "hdr": True,
-                "advanced_color": True,
-                "auto_hdr": False,
-                "sdr_white_level_nits": 200,
+        return merge_settings_map(
+            {
+                "WindowsSettingsHandler": {
+                    "hdr": True,
+                    "advanced_color": True,
+                    "auto_hdr": False,
+                    "sdr_white_level_nits": 200,
+                },
+                "GraphicsSettingsHandler": {
+                    "disable_auto_color_management": True,
+                },
+                "NvidiaSettingsHandler": {
+                    "preset": "reflex_gsync",
+                    "profile_name": "Deadlock",
+                    "auto_vrr_fps_cap": True,
+                },
+                "ColorProfileSettingsHandler": {
+                    "icc_profile": "native",
+                    "digital_vibrance": 50,
+                    "show_osd_guidance": True,
+                    "game_type": "competitive_fps",
+                },
             },
-            "GraphicsSettingsHandler": {
-                "disable_auto_color_management": True,
-            },
-            "NvidiaSettingsHandler": {
-                "preset": "reflex_gsync",
-                "profile_name": "Deadlock",
-                "auto_vrr_fps_cap": True,
-                "global_vrr_mode": "fullscreen_only",
-            },
-            "ColorProfileSettingsHandler": {
-                "icc_profile": "native",
-                "digital_vibrance": 50,
-                "show_osd_guidance": True,
-                "game_type": "competitive_fps",
-            },
-        }
+            _DEADLOCK_WINDOWED_VRR_OVERRIDES,
+        )
 
     def get_in_game_settings(self) -> list[dict[str, str]]:
         return [

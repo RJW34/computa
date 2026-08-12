@@ -10,11 +10,16 @@ posture as the Deadlock family.
 The variant matrix mirrors Deadlock's core four, plus a capture-safe sibling:
   - ``counter-strike-2``            -> No-sync SDR (latency-focused lane)
   - ``counter-strike-2-hdr``        -> No-sync HDR (OLED / Mini-LED)
-  - ``counter-strike-2-gsync``      -> Strict fullscreen-only G-SYNC SDR
-  - ``counter-strike-2-gsync-hdr``  -> Strict fullscreen-only G-SYNC HDR
-  - ``counter-strike-2-gsync-hdr-capture`` -> Borderless G-SYNC HDR that keeps
+  - ``counter-strike-2-gsync``      -> G-SYNC SDR (overlay-free, flip path)
+  - ``counter-strike-2-gsync-hdr``  -> G-SYNC HDR (overlay-free, flip path)
+  - ``counter-strike-2-gsync-hdr-capture`` -> G-SYNC HDR that keeps
     Medal / OBS / RTSS / overlays alive (same contract as the OW2 and Rivals 2
     capture lanes)
+
+The G-SYNC lanes differ from each other by overlay policy, not by display
+path: every CS2 VRR lane runs the borderless/windowed G-SYNC contract. See
+``_CS2_WINDOWED_VRR_OVERRIDES`` for why CS2 cannot use the strict
+exclusive-fullscreen VRR path at all.
 """
 
 from __future__ import annotations
@@ -36,6 +41,49 @@ if TYPE_CHECKING:
 # in-process module, so unlike Fortnite there is no anti-cheat bootstrapper
 # alias to track.
 _CS2_EXECUTABLES: list[str] = ["cs2.exe"]
+
+
+# Counter-Strike 2 has NO true exclusive-fullscreen path. Source 2 presents
+# through DXGI flip, so CS2's "Fullscreen" and "Fullscreen Windowed" both
+# resolve to hardware independent flip — there is no legacy exclusive mode for
+# the driver to detect.
+#
+# That makes the strict exclusive-fullscreen VRR contract unsatisfiable here,
+# and it fails silently: ``global_vrr_mode = fullscreen_only`` tells the driver
+# to engage VRR only in a mode CS2 never enters, while the same lane switches
+# off the three enablers the flip path actually depends on (Windows windowed
+# optimizations, Windows VRR optimize, and FSO). Net effect on the CS2 G-SYNC
+# lanes: G-SYNC never engages, with no error anywhere in the apply. This is the
+# same failure mode documented in docs/CODEX_HANDOFF_OW2_150FPS.md — lose
+# independent flip and windowed G-SYNC cannot engage.
+#
+# Every CS2 VRR lane therefore runs the borderless/windowed G-SYNC path, the
+# contract the Overwatch 2 G-SYNC lanes already moved to. All three enablers
+# have to be declared together or VRR stays dark:
+#   1. Windows "optimizations for windowed games" (SwapEffectUpgradeEnable)
+#   2. Windows "variable refresh rate"            (VRROptimizeEnable)
+#   3. NVIDIA global VRR mode ``fullscreen_and_windowed``
+# The strict lanes remain strict on *overlays* (killset + overlay-free display
+# path gate); only the display path is shared with the capture sibling.
+_CS2_WINDOWED_VRR_OVERRIDES: dict[str, dict[str, Any]] = {
+    "WindowsSettingsHandler": {
+        "windowed_optimizations": True,
+        "vrr_optimize": True,
+    },
+    "GraphicsSettingsHandler": {
+        # Independent flip rides the optimized composited path; the global FSO
+        # kill switch is exactly what removes it.
+        "disable_global_fso": False,
+    },
+    "NvidiaSettingsHandler": {
+        "global_vrr_mode": "fullscreen_and_windowed",
+        # reflex_gsync already sets vrr_app_override=allow, but assert it
+        # explicitly so switching in from a CS2 no-sync lane (which sets
+        # force_off) re-enables VRR deterministically instead of relying on the
+        # global flip alone — symmetric with the Fortnite / Rivals 2 lanes.
+        "vrr_app_override": "allow",
+    },
+}
 
 
 class _CounterStrike2BaseProfile(ReflexShooterBaseProfile):
@@ -132,10 +180,15 @@ class _CounterStrike2BaseProfile(ReflexShooterBaseProfile):
             {
                 "category": "Video",
                 "setting": "Display Mode",
-                "value": "Fullscreen",
+                "value": "Fullscreen Windowed (borderless)",
                 "reason": (
-                    "This profile is tuned for fullscreen-only G-SYNC. "
-                    "Do not switch to windowed modes after launch."
+                    "Source 2 has no true exclusive fullscreen — CS2's "
+                    "'Fullscreen' and 'Fullscreen Windowed' both present through "
+                    "DXGI hardware independent flip. ABSO therefore runs the "
+                    "borderless G-SYNC path (windowed optimizations + VRR "
+                    "optimize + driver VRR in fullscreen AND windowed). "
+                    "Fullscreen Windowed is the measured-more-responsive of the "
+                    "two on this path; plain Fullscreen also keeps VRR."
                 ),
             },
             {
@@ -353,7 +406,13 @@ class CounterStrike2HDRProfile(_CounterStrike2BaseProfile):
 
 
 class CounterStrike2GSyncProfile(_CounterStrike2BaseProfile):
-    """Counter-Strike 2 G-SYNC SDR profile (strict fullscreen-only VRR)."""
+    """Counter-Strike 2 G-SYNC SDR profile (overlay-strict, flip-path VRR).
+
+    "Strict" here means the overlay/capture stack is stopped for frame-time
+    headroom and apply gates on an overlay-free display path. The *display*
+    path is the borderless/windowed G-SYNC contract shared with every CS2 VRR
+    lane — see :data:`_CS2_WINDOWED_VRR_OVERRIDES`.
+    """
 
     @property
     def profile_id(self) -> str:
@@ -391,26 +450,35 @@ class CounterStrike2GSyncProfile(_CounterStrike2BaseProfile):
     def mixed_refresh_safe_fallback_profile_id(self) -> str:
         return "counter-strike-2"
 
+    @property
+    def fullscreen_optimizations_per_exe(self) -> dict[str, bool]:
+        # CS2 has no exclusive-fullscreen path to force, so the base class's
+        # FSO-disable entry buys nothing here and actively costs the flip
+        # path VRR needs. Clear any stale DISABLEDXMAXIMIZEDWINDOWEDMODE entry
+        # left by an older strict CS2 apply.
+        return fso_overrides(_CS2_EXECUTABLES, disabled=False)
+
     def _variant_overrides(self) -> dict[str, dict[str, Any]]:
-        return {
-            "NvidiaSettingsHandler": {
-                "preset": "reflex_gsync",
-                "profile_name": "Counter-Strike 2",
-                # Enforce VRR-safe cap automatically (refresh-3) so NVCP
-                # VSync stays a safety net and never engages.
-                "auto_vrr_fps_cap": True,
-                # Fullscreen-only VRR matches the strict exclusive lane.
-                "global_vrr_mode": "fullscreen_only",
+        return merge_settings_map(
+            {
+                "NvidiaSettingsHandler": {
+                    "preset": "reflex_gsync",
+                    "profile_name": "Counter-Strike 2",
+                    # Enforce VRR-safe cap automatically (refresh-3) so NVCP
+                    # VSync stays a safety net and never engages.
+                    "auto_vrr_fps_cap": True,
+                },
+                "ColorProfileSettingsHandler": {
+                    "icc_profile": "srgb",
+                    # Slightly below neutral to compensate for DCI-P3
+                    # oversaturation in SDR.
+                    "digital_vibrance": 45,
+                    "show_osd_guidance": True,
+                    "game_type": "competitive_fps",
+                },
             },
-            "ColorProfileSettingsHandler": {
-                "icc_profile": "srgb",
-                # Slightly below neutral to compensate for DCI-P3
-                # oversaturation in SDR.
-                "digital_vibrance": 45,
-                "show_osd_guidance": True,
-                "game_type": "competitive_fps",
-            },
-        }
+            _CS2_WINDOWED_VRR_OVERRIDES,
+        )
 
     def get_in_game_settings(self) -> list[dict[str, str]]:
         return [
@@ -418,14 +486,28 @@ class CounterStrike2GSyncProfile(_CounterStrike2BaseProfile):
             *self._gsync_in_game_settings(),
         ]
 
+    def get_post_apply_notes(self) -> list[str]:
+        return [
+            (
+                "Counter-Strike 2 manual: set Display Mode to Fullscreen "
+                "Windowed, NVIDIA Reflex to Enabled + Boost, and keep 'Wait "
+                "for Vertical Sync' Disabled."
+            )
+        ]
+
 
 class CounterStrike2GSyncHDRProfile(_CounterStrike2BaseProfile):
-    """Counter-Strike 2 G-SYNC profile with Windows HDR on (strict fullscreen-only VRR).
+    """Counter-Strike 2 G-SYNC profile with Windows HDR on (overlay-strict).
 
     NOTE: Same caveat as CounterStrike2HDRProfile - CS2 has no native HDR
     toggle. Windows HDR is on for OLED desktop comfort, the game itself
     renders SDR composited inside HDR. Switch back to counter-strike-2-gsync
     for the pure SDR lane if you don't want OS HDR on.
+
+    Like the SDR G-SYNC sibling, "strict" is an overlay policy, not a display
+    path: VRR runs on the borderless/windowed contract in
+    :data:`_CS2_WINDOWED_VRR_OVERRIDES` because CS2 has no exclusive
+    fullscreen mode to give the driver.
     """
 
     @property
@@ -471,30 +553,38 @@ class CounterStrike2GSyncHDRProfile(_CounterStrike2BaseProfile):
         # capture-safe sibling instead of hard-failing or killing the recorder.
         return "counter-strike-2-gsync-hdr-capture"
 
+    @property
+    def fullscreen_optimizations_per_exe(self) -> dict[str, bool]:
+        # See the SDR G-SYNC sibling: no exclusive-fullscreen path exists to
+        # force, and the FSO-disable entry costs the flip path VRR rides on.
+        return fso_overrides(_CS2_EXECUTABLES, disabled=False)
+
     def _variant_overrides(self) -> dict[str, dict[str, Any]]:
-        return {
-            "WindowsSettingsHandler": {
-                "hdr": True,
-                "advanced_color": True,
-                "auto_hdr": False,
-                "sdr_white_level_nits": 200,
+        return merge_settings_map(
+            {
+                "WindowsSettingsHandler": {
+                    "hdr": True,
+                    "advanced_color": True,
+                    "auto_hdr": False,
+                    "sdr_white_level_nits": 200,
+                },
+                "GraphicsSettingsHandler": {
+                    "disable_auto_color_management": True,
+                },
+                "NvidiaSettingsHandler": {
+                    "preset": "reflex_gsync",
+                    "profile_name": "Counter-Strike 2",
+                    "auto_vrr_fps_cap": True,
+                },
+                "ColorProfileSettingsHandler": {
+                    "icc_profile": "native",
+                    "digital_vibrance": 50,
+                    "show_osd_guidance": True,
+                    "game_type": "competitive_fps",
+                },
             },
-            "GraphicsSettingsHandler": {
-                "disable_auto_color_management": True,
-            },
-            "NvidiaSettingsHandler": {
-                "preset": "reflex_gsync",
-                "profile_name": "Counter-Strike 2",
-                "auto_vrr_fps_cap": True,
-                "global_vrr_mode": "fullscreen_only",
-            },
-            "ColorProfileSettingsHandler": {
-                "icc_profile": "native",
-                "digital_vibrance": 50,
-                "show_osd_guidance": True,
-                "game_type": "competitive_fps",
-            },
-        }
+            _CS2_WINDOWED_VRR_OVERRIDES,
+        )
 
     def get_in_game_settings(self) -> list[dict[str, str]]:
         return [
@@ -507,19 +597,20 @@ class CounterStrike2GSyncHDRCaptureProfile(CounterStrike2GSyncHDRProfile):
     """Capture-safe borderless sibling of the CS2 G-SYNC HDR lane.
 
     Same VRR + Windows HDR composition contract as
-    :class:`CounterStrike2GSyncHDRProfile`, with two deliberate differences:
+    :class:`CounterStrike2GSyncHDRProfile`. The one deliberate difference is
+    overlay policy: the launch-time janitor keeps the capture / overlay /
+    peripheral stack alive (Medal, OBS, RTSS, Discord overlay, NVIDIA Share,
+    G HUB, iCUE) instead of stopping it for frame-time headroom, and the
+    overlay-free display-path gate is dropped so apply does not fail while a
+    recorder is running.
 
-    - The launch-time janitor keeps the capture / overlay / peripheral stack
-      alive (Medal, OBS, RTSS, Discord overlay, NVIDIA Share, G HUB, iCUE)
-      instead of stopping it for frame-time headroom.
-    - VRR runs on the Win11 borderless windowed flip path
-      (``fullscreen_and_windowed`` + windowed optimizations) rather than the
-      strict fullscreen-only path, because the overlay-free display-path gate
-      is what would otherwise block apply while a recorder is running.
+    The display path itself is shared with the strict lane — every CS2 VRR
+    lane runs the borderless flip contract, because CS2 has no exclusive
+    fullscreen mode (see :data:`_CS2_WINDOWED_VRR_OVERRIDES`).
 
-    Cost of this lane vs the strict one: the recorder's encode work and the
-    composited borderless present path both take a small slice of frame-time
-    budget. That is the trade being bought - a clip you actually keep.
+    Cost of this lane vs the strict one: the recorder's encode work takes a
+    small slice of frame-time budget. That is the trade being bought - a clip
+    you actually keep.
     """
 
     @property
@@ -555,57 +646,17 @@ class CounterStrike2GSyncHDRCaptureProfile(CounterStrike2GSyncHDRProfile):
         # cannot self-reference this profile.
         return None
 
-    @property
-    def fullscreen_optimizations_per_exe(self) -> dict[str, bool]:
-        # Borderless capture lane: clear any stale FSO-disable entry left by a
-        # prior strict CS2 apply so the composited flip path can engage
-        # instead of fighting an OS-level exclusive-fullscreen lock.
-        return fso_overrides(_CS2_EXECUTABLES, disabled=False)
-
-    def _variant_overrides(self) -> dict[str, dict[str, Any]]:
-        return merge_settings_map(
-            super()._variant_overrides(),
-            {
-                "WindowsSettingsHandler": {
-                    # Win11 borderless flip path: required for VRR to engage
-                    # in windowed fullscreen.
-                    "windowed_optimizations": True,
-                    "vrr_optimize": True,
-                },
-                "GraphicsSettingsHandler": {
-                    # Leave the global FSO policy alone; the borderless lane
-                    # depends on the optimized composited path the strict lane
-                    # deliberately disables.
-                    "disable_global_fso": False,
-                },
-                "NvidiaSettingsHandler": {
-                    "global_vrr_mode": "fullscreen_and_windowed",
-                },
-            },
-        )
+    # NOTE: the borderless-VRR display contract (windowed optimizations, VRR
+    # optimize, fullscreen_and_windowed, FSO left enabled) is no longer
+    # re-declared here — it is inherited from the strict HDR lane, which now
+    # carries it for every CS2 VRR lane. This class differs by overlay policy
+    # only.
 
     def get_in_game_settings(self) -> list[dict[str, str]]:
-        rows = [
+        return [
             *self._hdr_in_game_settings(),
             *self._gsync_in_game_settings(),
         ]
-        patched: list[dict[str, str]] = []
-        for row in rows:
-            if row.get("setting") == "Display Mode":
-                row = {
-                    **row,
-                    "value": "Fullscreen Windowed (borderless)",
-                    "reason": (
-                        "Capture-safe lane: runs the Win11 borderless windowed "
-                        "G-SYNC path so Medal/OBS/overlays coexist with VRR. "
-                        "ABSO enables windowed VRR and windowed optimizations "
-                        "to keep the flip path fast. Use the strict "
-                        "counter-strike-2-gsync-hdr lane for exclusive "
-                        "Fullscreen when nothing is recording."
-                    ),
-                }
-            patched.append(row)
-        return patched
 
     def get_post_apply_notes(self) -> list[str]:
         return [
