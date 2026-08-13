@@ -221,6 +221,47 @@ class TestApplyProfile:
         finally:
             del ProfileApplier.PROFILES["canonical-profile"]
 
+    def test_apply_profile_rejects_vbs_config_override_before_handler_apply(self):
+        """Config overrides cannot bypass the explicit HVCI acknowledgement gate."""
+        from abso.core.config import ProfileOverrides
+        from abso.settings.windows import WindowsSettingsHandler
+
+        handler = WindowsSettingsHandler()
+        mock_profile = MagicMock()
+        mock_profile.get_handlers.return_value = [handler]
+        mock_profile.get_settings.return_value = {"game_mode": True}
+        mock_profile.has_in_game_settings.return_value = False
+        mock_profile.validate_settings.return_value = []
+
+        applier = ProfileApplier(
+            skip_linting=True,
+            skip_rollback_guard=True,
+            skip_stability_gate=True,
+            skip_network_scope=True,
+            skip_multimon_detection=True,
+            skip_capability_checks=True,
+        )
+        applier._profiles["test-vbs-override"] = mock_profile
+        ProfileApplier.PROFILES["test-vbs-override"] = type(mock_profile)
+
+        try:
+            with (
+                patch.object(handler, "apply") as mock_apply,
+                patch("abso.core.applier.ConfigManager") as mock_config_cls,
+            ):
+                mock_config = mock_config_cls.return_value
+                mock_config.get_profile_overrides.return_value = ProfileOverrides(
+                    windows={"vbs": False}
+                )
+
+                result = applier.apply_profile("test-vbs-override")
+
+            assert result.success is False
+            assert "VBSOptInHandler" in (result.error or "")
+            mock_apply.assert_not_called()
+        finally:
+            del ProfileApplier.PROFILES["test-vbs-override"]
+
     def test_apply_profile_partial_failure(self):
         """Test profile application with some handlers failing."""
         handler1 = MagicMock()

@@ -158,7 +158,8 @@ Exact settings vary per profile; this is what built-in profiles touch today.
   only as an opt-in preset
 - Services: no telemetry/search/Xbox service disabling — brittle, no measured
   win on modern Windows 11
-- VBS / Memory Integrity: never silently disabled; explicit opt-in flow only
+- VBS / Memory Integrity: normal profiles and restores treat it as read-only;
+  security-state changes require the explicit acknowledgement-gated opt-in flow
 - Legacy registry tweaks (`SystemResponsiveness`, `LargeSystemCache`, network
   throttling index) sit behind an opt-in legacy flag
 
@@ -173,6 +174,12 @@ computa's startup registration.
 Some settings need one reboot the **first** time they change (HAGS, MPO,
 opt-in VBS/memory settings); profile switches after that are instant. `state
 --json --verify` distinguishes "not applied" from "applied, reboot pending".
+
+Ordinary Windows-settings backups intentionally exclude Memory Integrity.
+Legacy backups that contain the old `vbs` field are still readable, but restore
+ignores that field so a profile switch, rollback, or uninstall cannot replay a
+stale HVCI setting. Only the explicit VBS opt-in handler owns those changes and
+its corresponding security-state restore.
 
 ## Troubleshooting
 

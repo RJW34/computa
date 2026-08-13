@@ -66,6 +66,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   banners; `docs/AGENT_PROTOCOL.md` is the current entry point.
 
 ### Fixed
+- Ordinary profile application, switching, rollback, and uninstall restore no
+  longer write Memory Integrity from `WindowsSettingsHandler`. New backups omit
+  the legacy `vbs` field, old backups ignore it during restore, and direct or
+  configured generic HVCI targets fail closed in favor of the explicit
+  acknowledgement-gated VBS opt-in handler.
 - Em-dash / en-dash in user-visible CLI strings (cp1252 mojibake in
   `abso bios` and `abso audit` output). `bios_detector.py` and
   `multimon_detector.py` strings replaced with hyphens.

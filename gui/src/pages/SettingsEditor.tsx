@@ -55,12 +55,6 @@ const ADVANCED_SETTINGS = [
         default: false,
       },
       {
-        id: 'vbs',
-        label: 'VBS / Memory Integrity',
-        description: 'Security feature; ~1-7% gaming cost on modern hardware',
-        default: false,
-      },
-      {
         id: 'fso',
         label: 'Fullscreen Optimizations',
         description: 'Windows compositor in fullscreen (adds latency)',

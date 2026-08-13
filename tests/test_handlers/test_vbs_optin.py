@@ -76,6 +76,20 @@ def test_no_built_in_profile_uses_vbs_opt_in_handler() -> None:
     )
 
 
+def test_no_built_in_profile_targets_vbs_through_windows_handler() -> None:
+    """Built-ins must not bypass the acknowledgement-gated security owner."""
+    offenders: list[str] = []
+    for profile in get_all_profiles().values():
+        settings = profile.get_settings("WindowsSettingsHandler") or {}
+        if "vbs" in settings:
+            offenders.append(profile.profile_id)
+
+    assert not offenders, (
+        "Built-in profiles must treat WindowsSettingsHandler.vbs as read-only; "
+        "offenders: " + ", ".join(offenders)
+    )
+
+
 def test_restore_writes_back_full_state() -> None:
     """Restore re-applies every captured flag verbatim."""
     handler = VBSOptInHandler()

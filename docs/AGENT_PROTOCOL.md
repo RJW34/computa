@@ -412,6 +412,21 @@ When auditing Overwatch 2 on this PC:
   cap is not the active mismatch; inspect handler detail for compositor/MPO,
   NVIDIA binding, or process-policy issues instead.
 
+### 5.10 Security-owned settings stay out of generic restore
+
+`WindowsSettingsHandler` may detect and audit Memory Integrity, but it must
+never apply or restore the legacy `vbs` field. New ordinary backups omit that
+field, and legacy backup payloads discard it during restore. This prevents a
+profile switch, automatic rollback, manual restore, or uninstall from replaying
+stale HVCI state captured before the user changed their Windows security
+configuration.
+
+All Memory Integrity mutations belong to `VBSOptInHandler`, which requires the
+literal `acknowledge_security_tradeoff=True` gate. Keep both the generic
+handler's `preflight()` rejection and its direct `apply()` fail-closed guard:
+config overrides are merged after static profile linting, and direct callers
+must not bypass the same ownership boundary.
+
 ---
 
 ## 6. Backlog: what's actually open right now
