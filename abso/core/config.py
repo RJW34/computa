@@ -259,8 +259,18 @@ PROFILE_OVERRIDE_HANDLER_ATTRS: dict[str, str] = {
 }
 
 
+def profile_override_section_names() -> list[str]:
+    """Return every declared ``profile_overrides`` section name, sorted.
+
+    Callers that render or iterate override sections must use this rather
+    than a hand-maintained list -- ``config --show`` drifted and silently
+    hid six of them.
+    """
+    return sorted(_PROFILE_OVERRIDE_SECTION_NAMES)
+
+
 def _format_known_profile_override_sections() -> str:
-    return ", ".join(sorted(_PROFILE_OVERRIDE_SECTION_NAMES))
+    return ", ".join(profile_override_section_names())
 
 
 def _coerce_profile_overrides(

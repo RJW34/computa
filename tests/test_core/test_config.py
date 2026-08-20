@@ -682,3 +682,19 @@ def test_cpu_affinity_is_an_override_surface() -> None:
         {"strategy": None}, "CpuAffinityHandler", overrides
     )
     assert merged["strategy"] == "p_cores_only"
+
+
+def test_profile_override_section_names_covers_every_declared_section() -> None:
+    """The rendered section list must come from the schema, never a literal.
+
+    Regression: `config --show` iterated a hardcoded list that omitted
+    registry, cpu_affinity, and all five per-game config sections, so those
+    overrides were silently invisible in the CLI.
+    """
+    import dataclasses
+
+    from abso.core.config import ProfileOverrides, profile_override_section_names
+
+    declared = {f.name for f in dataclasses.fields(ProfileOverrides)}
+    assert set(profile_override_section_names()) == declared
+    assert "cpu_affinity" in profile_override_section_names()
