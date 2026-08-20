@@ -678,3 +678,54 @@ def test_installer_payload_does_not_redistribute_npi() -> None:
 
     assert "nvidiaProfileInspector" not in iss
     assert "tools\npi" not in iss
+
+
+def _write_warn_file(tmp_path: Path, content: str) -> None:
+    warn_dir = tmp_path / "build" / "abso"
+    warn_dir.mkdir(parents=True, exist_ok=True)
+    (warn_dir / "warn-abso.txt").write_text(content, encoding="utf-8")
+
+
+def test_check_frozen_module_warnings_fails_on_missing_critical_module(
+    tmp_path, monkeypatch, capsys
+):
+    """A build whose environment lacks wmi must fail loudly, not ship degraded."""
+    spec = tmp_path / "abso.spec"
+    spec.write_text("# spec", encoding="utf-8")
+    _write_warn_file(
+        tmp_path,
+        "missing module named wmi - imported by abso.settings.interrupt_mode "
+        "(delayed, optional)\n"
+        "missing module named readline - imported by cmd (delayed, optional)\n",
+    )
+    monkeypatch.setattr(build, "BUILD_DIR", tmp_path / "build")
+    monkeypatch.setattr(build, "SPEC_FILE", spec)
+
+    assert build.check_frozen_module_warnings() is False
+    assert "wmi" in capsys.readouterr().out
+
+
+def test_check_frozen_module_warnings_passes_on_benign_warnings(tmp_path, monkeypatch):
+    """Ordinary stdlib misses (readline etc.) must not fail the build."""
+    spec = tmp_path / "abso.spec"
+    spec.write_text("# spec", encoding="utf-8")
+    _write_warn_file(
+        tmp_path,
+        "missing module named readline - imported by cmd (delayed, optional)\n"
+        "missing module named 'org.python' - imported by pickle (optional)\n",
+    )
+    monkeypatch.setattr(build, "BUILD_DIR", tmp_path / "build")
+    monkeypatch.setattr(build, "SPEC_FILE", spec)
+
+    assert build.check_frozen_module_warnings() is True
+
+
+def test_check_frozen_module_warnings_fails_without_warn_file(tmp_path, monkeypatch, capsys):
+    """No warn file means bundling cannot be proven; fail closed."""
+    spec = tmp_path / "abso.spec"
+    spec.write_text("# spec", encoding="utf-8")
+    monkeypatch.setattr(build, "BUILD_DIR", tmp_path / "build")
+    monkeypatch.setattr(build, "SPEC_FILE", spec)
+
+    assert build.check_frozen_module_warnings() is False
+    assert "warn file not found" in capsys.readouterr().out

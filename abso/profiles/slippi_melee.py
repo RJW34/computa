@@ -132,6 +132,13 @@ class SlippiMeleeProfile(EmulatorLatencyBaseProfile):
         return "minimum_latency"
 
     @property
+    def is_online_profile(self) -> bool:
+        # The competitive and universal descendants are Slippi netplay lanes;
+        # RollbackGuard should validate them. Console-parity overrides this for
+        # its explicitly offline practice contract.
+        return True
+
+    @property
     def executable_hints(self) -> list[str]:
         return ["Slippi Dolphin.exe", "Dolphin.exe"]
 
@@ -167,7 +174,7 @@ class SlippiMeleeProfile(EmulatorLatencyBaseProfile):
 
     @property
     def graphics_api(self) -> Literal["dx11", "dx12", "vulkan", "opengl", "unknown"]:
-        """Backend is user's choice - Vulkan or DX12 both work well."""
+        """Backend is intentionally user-selected and not owned by ABSO."""
         return "unknown"
 
     def _additional_handlers(self) -> list[SettingsHandler]:
@@ -200,15 +207,17 @@ class SlippiMeleeProfile(EmulatorLatencyBaseProfile):
                 "threaded_optimization": "off",  # OFF - emulator stability (per canonical spec)
                 "max_frame_rate": "off",  # OFF - no artificial limiting
                 "triple_buffering": "off",  # OFF - only works with VSync
-                # Backend: Experiment with Vulkan and DX12 - both work well.
-                # Vulkan often best on NVIDIA/AMD. DX12 + HAGS can also achieve low latency.
+                # Renderer ownership stays with the user. This Slippi build's
+                # Windows backend order starts with D3D11; Vulkan and D3D12 are
+                # A/B candidates only when supported by local frame-time data.
                 # High refresh still helps via reduced scanout latency even without VRR.
             },
             "DolphinConfigHandler": {
                 # Fix Slippi Dolphin configs that get overwritten by Slippi Launcher
                 # These are applied every time the profile is activated
                 "efb_scale": "1",  # Native resolution keeps GPU work low.
-                "texture_scaling_factor": "1",  # No texture upscaling
+                "texture_scaling_type": "0",  # Scaling off (the real switch)
+                "texture_scaling_factor": "2",  # Inert at type 0; 2 is the valid floor
                 "use_scaling_filter": "False",  # No scaling filter
                 "use_deposterize": "False",  # No post-processing
                 "backend_multithreading": "False",
@@ -231,17 +240,30 @@ class SlippiMeleeProfile(EmulatorLatencyBaseProfile):
         }
 
     def _detect_dolphin_backend(self) -> Literal["dx11", "dx12", "vulkan", "opengl"] | None:
-        """Best-effort detection of active Dolphin backend from GFX.ini."""
+        """Best-effort detection of the active Slippi/Ishiiruka backend.
+
+        Slippi's Ishiiruka-derived netplay build persists ``GFXBackend`` in
+        ``Dolphin.ini``'s ``[Core]`` section.  Reading ``GFX.ini`` here made
+        backend detection silently return ``None`` on real installs, so HAGS
+        and NVIDIA LLM never followed the renderer the user actually chose.
+        """
         appdata = os.environ.get("APPDATA")
         if not appdata:
             return None
 
-        gfx_ini = Path(appdata) / "Slippi Launcher" / "netplay" / "User" / "Config" / "GFX.ini"
-        if not gfx_ini.exists():
+        dolphin_ini = (
+            Path(appdata)
+            / "Slippi Launcher"
+            / "netplay"
+            / "User"
+            / "Config"
+            / "Dolphin.ini"
+        )
+        if not dolphin_ini.exists():
             return None
 
         try:
-            content = gfx_ini.read_text(encoding="utf-8")
+            content = dolphin_ini.read_text(encoding="utf-8")
         except OSError:
             return None
 
@@ -260,9 +282,13 @@ class SlippiMeleeProfile(EmulatorLatencyBaseProfile):
             return "opengl"
         return None
 
-    def get_settings(self, handler_name: str) -> dict[str, Any]:
-        """Get handler settings with backend-aware adaptive overrides."""
-        settings = super().get_settings(handler_name).copy()
+    def resolve_runtime_settings(
+        self,
+        handler_name: str,
+        settings: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Resolve backend-aware settings without making the catalog machine-local."""
+        settings = super().resolve_runtime_settings(handler_name, settings).copy()
         backend = self._detect_dolphin_backend()
 
         if handler_name == "NvidiaSettingsHandler" and backend in {"vulkan", "opengl"}:
@@ -285,8 +311,9 @@ class SlippiMeleeProfile(EmulatorLatencyBaseProfile):
 
         Latency-focused no-sync settings for competitive Melee.
         Key notes:
-        - Backend: Experiment with Vulkan and DX12 (Vulkan often best on NVIDIA/AMD)
-        - HAGS: Generally helps with DX12; results vary by system
+        - Backend: preserve the user's choice; D3D11 is the compatibility baseline
+          for the shipped Ishiiruka build, while Vulkan/D3D12 require local A/B data
+        - HAGS: backend-aware heuristic; results vary by system
         - LLM: On recommended; Ultra may work but test for your setup
         - Lower internal resolution reduces GPU work and can reduce render time
         - G-Sync/VSync disabled - a tearing-visibility choice; VRR is
@@ -373,11 +400,12 @@ class SlippiMeleeProfile(EmulatorLatencyBaseProfile):
             {
                 "category": "Graphics",
                 "setting": "Backend",
-                "value": "Vulkan first, then test DX12",
+                "value": "Preserve your choice (D3D11 compatibility baseline)",
                 "reason": (
-                    "Official Dolphin guidance still points most NVIDIA/AMD users to Vulkan first. "
-                    "DX12 is still worth A/B testing if Vulkan misbehaves or if HAGS + DX12 performs "
-                    "better on your exact system."
+                    "This Slippi release uses an older Ishiiruka-derived backend stack whose "
+                    "Windows default order starts with D3D11. ABSO does not own this setting: "
+                    "keep the renderer that is stable on your machine, and only prefer Vulkan "
+                    "or D3D12 after a repeatable frame-time A/B test."
                 ),
             },
             {
@@ -433,9 +461,23 @@ class SlippiMeleeProfile(EmulatorLatencyBaseProfile):
             },
             {
                 "category": "GFX.ini [Enhancements]",
+                "setting": "TextureScalingType",
+                "value": "0 (off)",
+                "reason": (
+                    "This is the switch that actually enables xBRZ-style texture "
+                    "upscaling. With it at 0 no scaling runs and the factor below "
+                    "is inert."
+                ),
+            },
+            {
+                "category": "GFX.ini [Enhancements]",
                 "setting": "TextureScalingFactor",
-                "value": "1",
-                "reason": "Texture upscaling adds GPU overhead.",
+                "value": "2",
+                "reason": (
+                    "Texture upscaling adds GPU overhead. Ishiiruka's valid range "
+                    "is 2-5, so 2 is the floor - writing 1 is out of range and "
+                    "Dolphin clamps it back on every launch."
+                ),
             },
             {
                 "category": "GFX.ini [Hacks]",
@@ -593,7 +635,8 @@ class SlippiMeleeProfile(EmulatorLatencyBaseProfile):
         return [
             (
                 "Slippi manual: confirm Dolphin backend and controller adapter; "
-                "try Vulkan first, D3D12 if Vulkan stutters, VSync Off for no-sync."
+                "preserve your renderer (D3D11 is the compatibility baseline; A/B Vulkan/D3D12), "
+                "VSync Off for no-sync."
             )
         ]
 
@@ -630,14 +673,18 @@ class SlippiMeleeUniversalProfile(SlippiMeleeProfile):
     def optimization_target(self) -> str:
         return "minimum_latency"
 
-    def get_settings(self, handler_name: str) -> dict[str, Any]:
-        """Get handler settings with fixed HAGS, no MPO toggle, and backend-aware LLM.
+    def resolve_runtime_settings(
+        self,
+        handler_name: str,
+        settings: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Resolve fixed HAGS, no MPO toggle, and backend-aware LLM.
 
         HAGS is always True and MPO is never toggled, so applying this
         profile never triggers a reboot requirement. LLM is still adapted
         per-backend since it is a runtime driver setting.
         """
-        settings = super().get_settings(handler_name).copy()
+        settings = super().resolve_runtime_settings(handler_name, settings).copy()
 
         if handler_name == "WindowsSettingsHandler":
             # Fixed HAGS=True - no backend-dependent toggling.
@@ -700,6 +747,10 @@ class SlippiMeleeConsoleParityProfile(SlippiMeleeProfile):
     def optimization_target(self) -> str:
         return "balanced"
 
+    @property
+    def is_online_profile(self) -> bool:
+        return False
+
     def _settings_overrides(self) -> dict[str, dict[str, Any]]:
         return {
             "WindowsSettingsHandler": {
@@ -725,7 +776,8 @@ class SlippiMeleeConsoleParityProfile(SlippiMeleeProfile):
             "DolphinConfigHandler": {
                 # Keep visual overhead minimal but avoid aggressive presentation shortcuts.
                 "efb_scale": "1",
-                "texture_scaling_factor": "1",
+                "texture_scaling_type": "0",
+                "texture_scaling_factor": "2",
                 "use_scaling_filter": "False",
                 "use_deposterize": "False",
                 "backend_multithreading": "False",

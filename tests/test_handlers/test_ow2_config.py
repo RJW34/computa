@@ -36,7 +36,7 @@ MasterVolume = "50"
 
 def _write_settings_ini(path: Path, content: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(content, encoding="utf-8")
+    path.write_bytes(content.encode("utf-8"))
 
 
 def test_apply_rejects_unsupported_keys() -> None:
@@ -323,10 +323,12 @@ def test_backup_restore_round_trip(tmp_path: Path) -> None:
 
 
 def test_restore_preserves_current_keybinds_from_stale_backup(tmp_path: Path) -> None:
-    """Baseline restores must not revert user keybinds from an older backup."""
+    """Baseline restores must not revert any unmanaged OW2 choice."""
     backup_ini = """\
 [Render.13]
 WindowMode = "0"
+GraphicsAPI = "Dx12"
+ReflexMode = "0"
 KeyBinds = "old-bindings"
 KeyBindsV2 = "old-bindings-v2"
 MouseSensitivity = "10.00"
@@ -337,6 +339,9 @@ MasterVolume = "40"
     current_ini = """\
 [Render.13]
 WindowMode = "1"
+LimitToRefresh = "1"
+GraphicsAPI = "Dx11"
+ReflexMode = "2"
 KeyBinds = "current-bindings"
 KeyBindsV2 = "current-bindings-v2"
 MouseSensitivity = "7.50"
@@ -358,7 +363,10 @@ MasterVolume = "20"
     assert ok is True
     restored = ini_path.read_text(encoding="utf-8")
     assert 'WindowMode = "0"' in restored  # backup restore still restores render baseline
-    assert 'MasterVolume = "40"' in restored
+    assert "LimitToRefresh" not in restored
+    assert 'MasterVolume = "20"' in restored
+    assert 'GraphicsAPI = "Dx11"' in restored
+    assert 'ReflexMode = "2"' in restored
     assert 'KeyBinds = "current-bindings"' in restored
     assert 'KeyBindsV2 = "current-bindings-v2"' in restored
     assert 'MouseSensitivity = "7.50"' in restored
@@ -398,6 +406,22 @@ MasterVolume = "20"
     restored = ini_path.read_text(encoding="utf-8")
     assert 'WindowMode = "0"' in restored
     assert 'KeyBindsV2 = "current-new-format"' in restored
+
+
+def test_restore_does_not_recreate_missing_ow2_config(tmp_path: Path) -> None:
+    stale_path = tmp_path / "Settings_v0.ini"
+
+    with patch("abso.settings.ow2_config._get_ow2_settings_path", return_value=None):
+        restored = OW2ConfigHandler().restore(
+            {
+                "config_found": True,
+                "config_path": str(stale_path),
+                "file_content": '[Render.13]\nWindowMode = "0"\n',
+            }
+        )
+
+    assert restored is True
+    assert not stale_path.exists()
 
 
 def test_apply_idempotent(tmp_path: Path) -> None:

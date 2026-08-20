@@ -344,8 +344,10 @@ class Rivals2BaseProfile(BaseProfile):
 
     @property
     def graphics_api(self) -> Literal["dx11", "dx12", "vulkan", "opengl", "unknown"]:
-        # Steam's published PC requirements list DirectX 11 for Rivals 2.
-        return "dx11"
+        # Current Rivals 2 builds select D3D12RHI by default on Windows. Steam's
+        # DirectX 11 system-requirement line describes the minimum feature
+        # requirement, not the renderer selected by the shipping build.
+        return "dx12"
 
     @property
     def include_nvidia_notifications(self) -> bool:
@@ -480,7 +482,10 @@ class Rivals2BaseProfile(BaseProfile):
             "CpuAffinityHandler": {
                 # No affinity pinning by default. Intel officially discourages
                 # hard affinity on hybrid CPUs (prevents Thread Director from
-                # optimizing). Users can opt in via abso.yaml profile_overrides.
+                # optimizing). Opt in per profile via abso.yaml
+                # ``profile_overrides.<profile-id>.cpu_affinity.strategy:
+                # p_cores_only`` when a low-thread latency-bound title is
+                # getting demoted to E-cores under background load.
                 "strategy": None,
             },
             "ColorProfileSettingsHandler": {
@@ -683,7 +688,10 @@ class EmulatorLatencyBaseProfile(BaseProfile):
             "CpuAffinityHandler": {
                 # No affinity pinning by default. Intel officially discourages
                 # hard affinity on hybrid CPUs (prevents Thread Director from
-                # optimizing). Users can opt in via abso.yaml profile_overrides.
+                # optimizing). Opt in per profile via abso.yaml
+                # ``profile_overrides.<profile-id>.cpu_affinity.strategy:
+                # p_cores_only`` when a low-thread latency-bound title is
+                # getting demoted to E-cores under background load.
                 "strategy": None,
             },
             "ColorProfileSettingsHandler": {
@@ -848,8 +856,10 @@ class ReflexShooterBaseProfile(BaseProfile):
             "InterruptModeHandler": {"enable_msi": True},
             # Disable the Windows audio enhancement (APO) DPC chain.
             "AudioEngineHandler": {"disable_enhancements": True},
-            # NIC driver tuning for competitive online play (per-NIC; restorable).
-            "NicDriverHandler": {"nic_tuning": True},
+            # Driver advanced-property spellings and link-reset behavior vary
+            # by adapter. Keep this genuinely opt-in through profile_overrides
+            # instead of mutating a live NIC during every shooter apply.
+            "NicDriverHandler": {"nic_tuning": False},
             "WindowsSettingsHandler": {
                 "game_mode": True,
                 "game_bar": False,
@@ -909,7 +919,10 @@ class ReflexShooterBaseProfile(BaseProfile):
             "CpuAffinityHandler": {
                 # No affinity pinning by default. Intel officially discourages
                 # hard affinity on hybrid CPUs (prevents Thread Director from
-                # optimizing). Users can opt in via abso.yaml profile_overrides.
+                # optimizing). Opt in per profile via abso.yaml
+                # ``profile_overrides.<profile-id>.cpu_affinity.strategy:
+                # p_cores_only`` when a low-thread latency-bound title is
+                # getting demoted to E-cores under background load.
                 "strategy": None,
             },
             "ColorProfileSettingsHandler": {

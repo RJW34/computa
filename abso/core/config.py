@@ -219,6 +219,11 @@ class ProfileOverrides:
     mouse: dict[str, Any] = field(default_factory=dict)
     color: dict[str, Any] = field(default_factory=dict)
     display_color_range: dict[str, Any] = field(default_factory=dict)
+    # Hybrid-CPU scheduling. Off by default (Intel discourages hard affinity
+    # on P/E-core parts), but low-thread latency-bound workloads such as
+    # Dolphin/Slippi can get demoted to E-cores under background load, so the
+    # opt-in has to actually exist for the profiles that document it.
+    cpu_affinity: dict[str, Any] = field(default_factory=dict)
     # Per-game config-file handlers — exposed individually so users can
     # disable a profile's auto_vrr_fps_cap, pin a specific frame_rate_cap,
     # or otherwise tune the in-game settings file without modifying source.
@@ -245,6 +250,7 @@ PROFILE_OVERRIDE_HANDLER_ATTRS: dict[str, str] = {
     "MouseSettingsHandler": "mouse",
     "ColorProfileSettingsHandler": "color",
     "DisplayColorRangeHandler": "display_color_range",
+    "CpuAffinityHandler": "cpu_affinity",
     "OW2ConfigHandler": "ow2_config",
     "Diablo4ConfigHandler": "diablo4_config",
     "Rivals2ConfigHandler": "rivals2_config",
@@ -609,6 +615,8 @@ confirm_destructive: true
 #       disable_mpo: true
 #     timer:
 #       resolution_ms: 0.5
+#     cpu_affinity:
+#       strategy: p_cores_only
 
 # Custom profiles (advanced) — see also ~/.abso/profiles/ for YAML profiles
 # custom_profiles:

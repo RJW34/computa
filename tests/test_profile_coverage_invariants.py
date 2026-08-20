@@ -337,8 +337,8 @@ def test_handler_class_names_match_imported_classes(profiles_by_id) -> None:
 # Profile-pair consistency: compositor flags must match the declared profile path
 # ---------------------------------------------------------------------------
 
-def test_strict_gaming_profiles_do_not_force_windowed_compositor_flags(profiles_by_id) -> None:
-    """Non-borderless gaming profiles must not silently opt into compositor flags."""
+def test_gaming_profiles_keep_compositor_and_fso_paths_coherent(profiles_by_id) -> None:
+    """Windowed compositor flags require an explicit, FSO-compatible flip path."""
     keys = ("windowed_optimizations", "vrr_optimize")
     failures: list[str] = []
     for profile_id, profile in profiles_by_id.items():
@@ -364,17 +364,23 @@ def test_strict_gaming_profiles_do_not_force_windowed_compositor_flags(profiles_
             and str(nvidia_settings.get("global_vrr_mode") or "").strip().lower()
             == "fullscreen_and_windowed"
         )
+        graphics_settings = profile.get_settings("GraphicsSettingsHandler") or {}
+        per_exe_fso = getattr(profile, "fullscreen_optimizations_per_exe", {}) or {}
+        explicit_windowed_flip_path = (
+            not getattr(profile, "uses_fullscreen_only_vrr_path", False)
+            and graphics_settings.get("disable_global_fso") is False
+            and not any(per_exe_fso.values())
+        )
         for key in keys:
             if key not in windows_settings:
                 continue
-            if explicit_overlay_free_windowed_vrr:
+            if explicit_overlay_free_windowed_vrr or explicit_windowed_flip_path:
                 continue
             if windows_settings.get(key) is not False:
                 failures.append(
                     f"{profile_id}: WindowsSettingsHandler.{key} is "
-                    f"{windows_settings.get(key)!r} (strict profiles should "
-                    f"leave the windowed compositor path off unless an "
-                    f"explicit borderless/capture variant opts in)"
+                    f"{windows_settings.get(key)!r} (windowed compositor flags "
+                    f"require global/per-exe FSO disables to be cleared)"
                 )
     assert not failures, (
         "Profiles forcing Win11 windowed compositor flags without a matching path:\n  "
@@ -399,6 +405,38 @@ def test_capture_safe_profiles_enable_windowed_compositor_flags(profiles_by_id) 
                 )
     assert not failures, (
         "Capture-safe profiles missing Win11 windowed compositor flags:\n  "
+        + "\n  ".join(failures)
+    )
+
+
+def test_non_opengl_profiles_do_not_force_opengl_thread_control(profiles_by_id) -> None:
+    """Known DirectX/Vulkan profiles must leave OGL_THREAD_CONTROL automatic."""
+    failures: list[str] = []
+    for profile_id, profile in profiles_by_id.items():
+        if profile.graphics_api not in {"dx11", "dx12", "vulkan"}:
+            continue
+        nvidia_settings = profile.get_settings("NvidiaSettingsHandler") or {}
+        if str(nvidia_settings.get("threaded_optimization") or "").lower() == "on":
+            failures.append(
+                f"{profile_id}: graphics_api={profile.graphics_api} forces the "
+                "OpenGL-only Threaded Optimization control On"
+            )
+    assert not failures, "API-inapplicable NVIDIA controls:\n  " + "\n  ".join(failures)
+
+
+def test_online_profiles_do_not_mutate_nic_advanced_properties_by_default(
+    profiles_by_id,
+) -> None:
+    """Connected-play profiles keep adapter-specific NIC tuning opt-in."""
+    failures: list[str] = []
+    for profile_id, profile in profiles_by_id.items():
+        if not profile.is_online_profile:
+            continue
+        nic_settings = profile.get_settings("NicDriverHandler") or {}
+        if nic_settings.get("nic_tuning") is True:
+            failures.append(profile_id)
+    assert not failures, (
+        "Online profiles enabling link-resetting NIC tuning by default:\n  "
         + "\n  ".join(failures)
     )
 

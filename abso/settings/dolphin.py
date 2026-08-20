@@ -31,6 +31,11 @@ import re
 from pathlib import Path
 from typing import Any, Literal, NamedTuple
 
+from abso.core.config_safety import (
+    read_config_text,
+    restore_managed_key_lines,
+    write_config_text,
+)
 from abso.settings.base import SettingsHandler
 
 logger = logging.getLogger(__name__)
@@ -71,6 +76,7 @@ class DolphinConfigHandler(SettingsHandler):
 
     GFX_KEY_MAP: dict[str, tuple[str, str]] = {
         "efb_scale": ("EFBScale", "Settings"),
+        "texture_scaling_type": ("TextureScalingType", "Enhancements"),
         "texture_scaling_factor": ("TextureScalingFactor", "Enhancements"),
         "use_scaling_filter": ("UseScalingFilter", "Enhancements"),
         "use_deposterize": ("UseDePosterize", "Enhancements"),
@@ -98,8 +104,21 @@ class DolphinConfigHandler(SettingsHandler):
         "efb_scale": AuditRule(
             "1", "medium", "Higher internal resolution adds render latency"
         ),
+        "texture_scaling_type": AuditRule(
+            "0",
+            "low",
+            "TextureScalingType is the switch that actually enables xBRZ-style "
+            "texture upscaling; 0 disables it. TextureScalingFactor is inert "
+            "while this is 0",
+        ),
         "texture_scaling_factor": AuditRule(
-            "1", "low", "Texture upscaling adds GPU overhead"
+            "2",
+            "low",
+            "Texture upscaling adds GPU overhead. NOTE: Ishiiruka's factor range "
+            "is 2-5, so a target of 1 is out of range - Dolphin silently clamps "
+            "it back to 2 on every run, which made this audit report a permanent "
+            "false mismatch and made the handler look like it was not sticking. "
+            "2 is the valid floor; TextureScalingType = 0 does the real work",
         ),
         "use_scaling_filter": AuditRule("False", "low", "Scaling adds GPU overhead"),
         "use_deposterize": AuditRule(
@@ -376,31 +395,69 @@ class DolphinConfigHandler(SettingsHandler):
 
         try:
             if self.gfx_ini.exists():
-                data["gfx_ini"] = self.gfx_ini.read_text(encoding="utf-8")
+                data["gfx_ini"] = read_config_text(self.gfx_ini)
         except OSError as e:
             logger.warning(f"Failed to backup GFX.ini: {e}")
 
         try:
             if self.dolphin_ini.exists():
-                data["dolphin_ini"] = self.dolphin_ini.read_text(encoding="utf-8")
+                data["dolphin_ini"] = read_config_text(self.dolphin_ini)
         except OSError as e:
             logger.warning(f"Failed to backup Dolphin.ini: {e}")
 
         return data
 
     def restore(self, data: dict[str, Any]) -> bool:
-        """Restore Dolphin configuration files from backup."""
+        """Restore only the Dolphin keys managed by ABSO.
+
+        Slippi keeps the renderer, ISO paths, controller choices, audio, and
+        many other user-owned values in these same files.  Those live values
+        must survive baseline restore and unrelated profile switches.
+        """
         if not data.get("slippi_installed"):
             return True  # Nothing to restore if Slippi wasn't installed
 
         try:
-            if data.get("gfx_ini") is not None and self.gfx_ini.parent.exists():
-                self.gfx_ini.write_text(data["gfx_ini"], encoding="utf-8")
-
-            if data.get("dolphin_ini") is not None and self.dolphin_ini.parent.exists():
-                self.dolphin_ini.write_text(data["dolphin_ini"], encoding="utf-8")
+            self._restore_managed_file(
+                path=self.gfx_ini,
+                backup_content=data.get("gfx_ini"),
+                key_map=self.GFX_KEY_MAP,
+            )
+            self._restore_managed_file(
+                path=self.dolphin_ini,
+                backup_content=data.get("dolphin_ini"),
+                key_map=self.DOLPHIN_KEY_MAP,
+            )
 
             return True
         except OSError as e:
             logger.error(f"Failed to restore Dolphin config: {e}")
             return False
+
+    def _restore_managed_file(
+        self,
+        *,
+        path: Path,
+        backup_content: str | None,
+        key_map: dict[str, tuple[str, str]],
+    ) -> None:
+        """Merge backed-up managed keys into one existing Dolphin INI."""
+        if backup_content is None or not path.is_file():
+            return
+
+        current_content = read_config_text(path)
+        restored_content = current_content
+        keys_by_section: dict[str, set[str]] = {}
+        for ini_key, section in key_map.values():
+            keys_by_section.setdefault(section, set()).add(ini_key)
+
+        for section, managed_keys in keys_by_section.items():
+            restored_content = restore_managed_key_lines(
+                current_content=restored_content,
+                backup_content=backup_content,
+                managed_keys=managed_keys,
+                section_name=section,
+            )
+
+        if restored_content != current_content:
+            write_config_text(path, restored_content)

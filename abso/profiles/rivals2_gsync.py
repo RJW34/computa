@@ -35,6 +35,11 @@ _CAPTURE_WINDOWED_VRR_OVERRIDES: dict[str, dict[str, Any]] = {
     "NvidiaSettingsHandler": {
         "global_vrr_mode": "fullscreen_and_windowed",
     },
+    "GraphicsSettingsHandler": {
+        # Windowed independent flip requires the optimized FSO path. The
+        # Rivals family base disables it for its strict fullscreen lanes.
+        "disable_global_fso": False,
+    },
     "Rivals2ConfigHandler": {
         "fullscreen_mode": 1,  # UE windowed-fullscreen (borderless)
     },
@@ -117,8 +122,8 @@ class Rivals2GSyncProfile(Rivals2BaseProfile):
                 "max_refresh_rate": True,
             },
             "NvidiaSettingsHandler": {
-                # vrr_fighting_game: LLM on, VSync on (safety net), threaded
-                # opt on, max perf power, shader cache unlimited. NOTE: this
+                # vrr_fighting_game: LLM on, VSync on (safety net), max perf
+                # power, shader cache unlimited. NOTE: this
                 # preset sets no vrr_app_override, so assert it explicitly below.
                 "preset": "vrr_fighting_game",
                 # Auto-cap on the 60 Hz sim grid: largest multiple of 60 below
@@ -134,10 +139,9 @@ class Rivals2GSyncProfile(Rivals2BaseProfile):
                 # profile instead of relying on the global flip alone.
                 "global_vrr_mode": "fullscreen_only",
                 "vrr_app_override": "allow",
-                # Keep the preset default explicitly: Rivals 2 is CPU-bound
-                # UE5/DX11 and driver worker threads improve frame times; the
-                # server-authoritative SnapNet sim cannot be desynced by them.
-                "threaded_optimization": "on",
+                # NVIDIA exposes this as OGL_THREAD_CONTROL; leave it Auto for
+                # Rivals 2's D3D12 renderer.
+                "threaded_optimization": "auto",
             },
             "Rivals2ConfigHandler": {
                 "fullscreen_mode": 0,  # Exclusive fullscreen for best VRR
@@ -186,11 +190,10 @@ class Rivals2GSyncProfile(Rivals2BaseProfile):
             {
                 "category": "NVIDIA Control Panel",
                 "setting": "Threaded Optimization",
-                "value": "On",
+                "value": "Auto",
                 "reason": (
-                    "Rivals 2 is CPU-bound UE5/DX11; driver worker threads improve "
-                    "frame times. SnapNet's sim is server-authoritative, so driver "
-                    "threading cannot desync rollback."
+                    "NVIDIA exposes this as an OpenGL driver control. Rivals 2 uses "
+                    "D3D12, so forcing it On is not a D3D12 optimization."
                 ),
             },
             {
@@ -198,9 +201,8 @@ class Rivals2GSyncProfile(Rivals2BaseProfile):
                 "setting": "Low Latency Mode",
                 "value": "On",
                 "reason": (
-                    "Reduces render queue depth on the published DX11 path. 'On' is correct "
-                    "(not 'Off' - Rivals 2 has no Reflex). If stuttering occurs, try 'Off' or "
-                    "set Pre-Rendered Frames to 2 via Nvidia Profile Inspector."
+                    "Rivals 2 has no Reflex. LLM On remains a heuristic starting point on "
+                    "the D3D12 path; A/B Off if frame pacing worsens."
                 ),
             },
             {
@@ -341,6 +343,11 @@ class Rivals2GSyncHDRCaptureProfile(Rivals2GSyncHDRProfile):
         # Windowed VRR drops the exclusive-fullscreen contract, but the
         # NVIDIA app-binding proof stays mandatory like the strict lane.
         return True
+
+    @property
+    def fullscreen_optimizations_per_exe(self) -> dict[str, bool]:
+        """Clear the strict lanes' per-executable FSO disable."""
+        return dict.fromkeys(("Rivals2-Win64-Shipping.exe", "RivalsofAether2.exe", "Rivals2.exe"), False)
 
     @property
     def overlay_compatible_fallback_profile_id(self) -> str | None:

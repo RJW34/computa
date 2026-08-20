@@ -64,7 +64,9 @@ class RyujinxSSBUProfile(EmulatorLatencyBaseProfile):
                 "vrr_app_override": "force_off",  # Fixed 60fps, no VRR benefit
                 "global_vrr_mode": "off",  # Enforce global VRR off for clean no-sync transitions
                 "shader_cache": "unlimited",  # Critical for emulators
-                "threaded_optimization": "on",  # Ryujinx benefits from driver threading
+                # NVIDIA exposes this as OGL_THREAD_CONTROL. It is not a Vulkan
+                # shader-compilation control, so leave it at the driver default.
+                "threaded_optimization": "auto",
                 "triple_buffering": "off",
             },
         }
@@ -145,8 +147,8 @@ class RyujinxSSBUProfile(EmulatorLatencyBaseProfile):
             {
                 "category": "NVCP",
                 "setting": "Threaded Optimization",
-                "value": "On",
-                "reason": "Ryujinx benefits from driver threading for shader compilation.",
+                "value": "Auto",
+                "reason": "This NVIDIA control is OpenGL-specific and does not accelerate Vulkan shader compilation.",
             },
 
             # === RYUJINX SETTINGS ===

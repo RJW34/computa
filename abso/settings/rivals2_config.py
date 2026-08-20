@@ -13,7 +13,10 @@ from typing import Any
 from abso.core.config_safety import (
     apply_ini_key_patch,
     parse_ini_assignments,
+    read_config_text,
+    restore_managed_key_lines,
     validate_allowed_keys,
+    write_config_text,
 )
 from abso.core.models import Issue
 from abso.settings.base import SettingsHandler
@@ -343,7 +346,7 @@ class Rivals2ConfigHandler(SettingsHandler):
         return results
 
     def backup(self) -> dict[str, Any]:
-        """Back up the full Rivals 2 config file for lossless restore."""
+        """Capture full Rivals 2 config context for selective managed-key restore."""
         ini_path = self._get_config_path()
         if not ini_path:
             return {"config_found": False}
@@ -352,19 +355,18 @@ class Rivals2ConfigHandler(SettingsHandler):
             return {
                 "config_found": True,
                 "config_path": str(ini_path),
-                "file_content": ini_path.read_text(encoding="utf-8", errors="replace"),
+                "file_content": read_config_text(ini_path),
             }
         except Exception as e:
             logger.error("Failed to back up Rivals 2 config %s: %s", ini_path, e)
             return {"config_found": False}
 
     def restore(self, data: dict[str, Any]) -> bool:
-        """Restore Rivals 2 config from a backup payload.
+        """Restore ABSO-owned Rivals 2 keys from a backup payload.
 
         New backups store the full INI under ``file_content``. Older backups
         (taken before the full-file format) only persisted detected values,
-        so we fall back to re-applying those detected fields rather than
-        failing the baseline restore.
+        so they are converted to the same selective-merge operation.
         """
         if not data.get("config_found"):
             return True  # Nothing to restore
@@ -373,21 +375,20 @@ class Rivals2ConfigHandler(SettingsHandler):
         if file_content is None:
             return self._restore_from_legacy_payload(data)
 
-        config_path = data.get("config_path")
-        if not config_path:
-            return False
+        # Do not recreate a config that is no longer present at its live path.
+        ini_path = self._get_config_path()
+        if ini_path is None:
+            return True
 
         try:
-            ini_path = Path(config_path)
-            ini_path.parent.mkdir(parents=True, exist_ok=True)
-            ini_path.write_text(file_content, encoding="utf-8")
+            self._restore_managed_content(ini_path, file_content)
             return True
         except OSError as e:
-            logger.error("Failed to restore Rivals 2 config %s: %s", config_path, e)
+            logger.error("Failed to restore Rivals 2 config %s: %s", ini_path, e)
             return False
 
     def _restore_from_legacy_payload(self, data: dict[str, Any]) -> bool:
-        """Re-apply detected fields from a pre-full-file backup payload."""
+        """Selectively restore detected fields from a legacy backup payload."""
         legacy_keys = (
             "fullscreen_mode",
             "vsync",
@@ -400,11 +401,56 @@ class Rivals2ConfigHandler(SettingsHandler):
         if not settings:
             return True
 
-        if self._get_config_path() is None:
+        ini_path = self._get_config_path()
+        if ini_path is None:
             return True
 
-        result = self.apply(settings)
-        return bool(result.get("success", False))
+        replacements, errors = self._build_replacements(settings)
+        if errors:
+            logger.error(
+                "Failed to restore legacy Rivals 2 config payload: %s",
+                "; ".join(errors),
+            )
+            return False
+
+        # Legacy payloads contain detected values instead of file text.  An
+        # unsectioned synthetic backup is accepted as the target section while
+        # the merge remains strict against the sectioned live file.
+        backup_content = "\n".join(
+            f"{key}={value}" for key, value in replacements.items()
+        )
+        try:
+            self._restore_managed_content(
+                ini_path,
+                backup_content,
+                managed_keys=set(replacements),
+            )
+            return True
+        except OSError as e:
+            logger.error("Failed to restore legacy Rivals 2 config %s: %s", ini_path, e)
+            return False
+
+    def _restore_managed_content(
+        self,
+        ini_path: Path,
+        backup_content: str,
+        *,
+        managed_keys: set[str] | None = None,
+    ) -> None:
+        """Merge a backed-up Rivals settings section into the current file."""
+        current_content = read_config_text(ini_path)
+        if managed_keys is None:
+            managed_keys = set(self.MUTABLE_SETTINGS_TO_INI.values()) | {
+                "LastConfirmedFullscreenMode"
+            }
+        restored_content = restore_managed_key_lines(
+            current_content=current_content,
+            backup_content=backup_content,
+            managed_keys=managed_keys,
+            section_name=self.TARGET_SECTION_NAME,
+        )
+        if restored_content != current_content:
+            write_config_text(ini_path, restored_content)
 
     def _build_replacements(self, settings: dict[str, Any]) -> tuple[dict[str, str], list[str]]:
         """Build INI replacements and collect conversion errors."""

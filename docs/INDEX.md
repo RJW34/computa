@@ -41,6 +41,7 @@ actively working on that area.
 
 ## Research Notes
 
+- [Installed Profile Optimization Audit (2026-08-12)](./research/profile-optimization-audit-2026-08-12.md)
 - [VRR Latency Research Notes](./research/vrr-latency-research-notes.md)
 - [Dolphin Latency Research Notes](./research/dolphin-latency-research-notes.md)
 

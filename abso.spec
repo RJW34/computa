@@ -83,6 +83,14 @@ a = Analysis(
     ] + TRAY_DATA_FILES + TRAY_THEME_DATA_FILES,
     hiddenimports=[
         'win32gui', 'win32process', 'win32security', 'pynvml', 'abso.core.vrr',
+        # Every ``import wmi`` in the codebase is lazy and exception-isolated
+        # (detector, bios_detector, kb_checker, gpu_vendor, cpu_affinity,
+        # interrupt_mode, amd), so a build whose environment lacks the package
+        # still freezes successfully and the installed runtime silently loses
+        # all WMI-backed detection (2026-08-12 deploy shipped exactly that).
+        # Listed explicitly so the module is always collected; build.py
+        # additionally fails the build if PyInstaller reports it missing.
+        'wmi',
         # Process Lasso-class session-runtime modules. These are imported
         # lazily inside cpu_balancer (so the daemon can host them), which
         # PyInstaller's static analysis may not follow; list them explicitly so

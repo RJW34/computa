@@ -341,7 +341,7 @@ class Overwatch2Profile(_Overwatch2BaseProfile):
 
     @property
     def description(self) -> str:
-        return "Latency-focused no-sync SDR profile (Reflex OFF, VSync OFF, VRR OFF)"
+        return "Latency-focused no-sync SDR profile (Reflex ON + Boost, VSync OFF, VRR OFF)"
 
     @property
     def is_sdr_only(self) -> bool:
@@ -469,7 +469,7 @@ class Overwatch2NoSyncHDRProfile(Overwatch2Profile):
     @property
     def description(self) -> str:
         return (
-            "Latency-focused no-sync HDR profile (Reflex OFF, VSync OFF, VRR OFF). "
+            "Latency-focused no-sync HDR profile (Reflex ON + Boost, VSync OFF, VRR OFF). "
             "Native HDR for OLED / Mini-LED displays."
         )
 

@@ -66,6 +66,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   banners; `docs/AGENT_PROTOCOL.md` is the current entry point.
 
 ### Fixed
+- Profile switches now restore only native game-config keys owned by each
+  handler instead of replacing whole stale files. This preserves Slippi's
+  user-selected renderer and unmanaged controls, audio, quality, and future
+  game settings across unrelated profile switches.
+- Slippi backend detection reads `GFXBackend` from the Ishiiruka build's real
+  `Dolphin.ini` location. Guidance now preserves the user's renderer and uses
+  D3D11 only as the documented compatibility baseline, not a forced target.
+- Corrected profile contract drift found by the installed-catalog audit:
+  Rivals 2 reports its observed D3D12 renderer and its capture lane keeps the
+  windowed flip path enabled; Diablo IV uses fullscreen-windowed G-SYNC;
+  Source 2 profiles no longer claim legacy exclusive presentation; and
+  productivity explicitly restores windowed G-SYNC after no-sync profiles.
+- Stateful peripheral daemons are no longer default launch-kill targets, and
+  vendor-specific NIC advanced-property changes are opt-in instead of running
+  on every Reflex-shooter profile.
 - Ordinary profile application, switching, rollback, and uninstall restore no
   longer write Memory Integrity from `WindowsSettingsHandler`. New backups omit
   the legacy `vbs` field, old backups ignore it during restore, and direct or

@@ -39,6 +39,7 @@ from abso.profiles.pokemon_auto_chess import PokemonAutoChessProfile
 from abso.profiles.productivity_oled import ProductivityHDRProfile, ProductivityProfile
 from abso.profiles.rivals2 import Rivals2Profile
 from abso.profiles.rivals2_gsync import (
+    Rivals2GSyncHDRCaptureProfile,
     Rivals2GSyncHDRProfile,
     Rivals2GSyncProfile,
 )
@@ -273,25 +274,20 @@ class TestProfileLoading:
             assert win["auto_hdr"] is False, profile_cls.__name__
             assert color["icc_profile"] == "srgb", profile_cls.__name__
 
-    def test_deadlock_no_sync_variants_disable_fso_for_both_binaries(self):
-        """The no-sync Deadlock lanes keep the per-exe FSO-disable entries.
-
-        The VRR lanes deliberately clear them: Source 2 has no
-        exclusive-fullscreen path for FSO-disable to buy, and the entries cost
-        the flip path windowed G-SYNC rides on (see
-        tests/test_source2_windowed_vrr.py).
-        """
+    def test_deadlock_no_sync_variants_keep_source2_flip_path(self):
+        """No-sync does not create an exclusive path that Source 2 lacks."""
         for profile_cls in (
             DeadlockProfile,
             DeadlockHDRProfile,
         ):
             profile = profile_cls()
             flags = profile.fullscreen_optimizations_per_exe
-            assert flags.get("project8.exe") is True, profile_cls.__name__
-            assert flags.get("deadlock.exe") is True, profile_cls.__name__
+            assert flags.get("project8.exe") is False, profile_cls.__name__
+            assert flags.get("deadlock.exe") is False, profile_cls.__name__
             registry_settings = profile.get_settings("RegistrySettingsHandler")
-            assert registry_settings["fullscreen_optimizations"]["project8.exe"] is True
-            assert registry_settings["fullscreen_optimizations"]["deadlock.exe"] is True
+            assert registry_settings["fullscreen_optimizations"]["project8.exe"] is False
+            assert registry_settings["fullscreen_optimizations"]["deadlock.exe"] is False
+            assert profile.get_settings("GraphicsSettingsHandler")["disable_global_fso"] is False
 
     def test_deadlock_gsync_variants_keep_the_overlay_strict_contract(self):
         """The G-SYNC Deadlock lanes stay strict on overlays and NVIDIA binding.
@@ -495,22 +491,18 @@ class TestProfileLoading:
             assert win["auto_hdr"] is False, profile_cls.__name__
             assert color["icc_profile"] == "srgb", profile_cls.__name__
 
-    def test_cs2_no_sync_variants_disable_fso_for_the_binary(self):
-        """The no-sync CS2 lanes keep the per-exe FSO-disable entry.
-
-        The VRR lanes deliberately clear it: CS2 has no exclusive-fullscreen
-        path for FSO-disable to buy, and the entry costs the flip path that
-        windowed G-SYNC rides on (see tests/test_cs2_windowed_vrr.py).
-        """
+    def test_cs2_no_sync_variants_keep_source2_flip_path(self):
+        """No-sync does not create an exclusive path that Source 2 lacks."""
         for profile_cls in (
             CounterStrike2Profile,
             CounterStrike2HDRProfile,
         ):
             profile = profile_cls()
             flags = profile.fullscreen_optimizations_per_exe
-            assert flags.get("cs2.exe") is True, profile_cls.__name__
+            assert flags.get("cs2.exe") is False, profile_cls.__name__
             registry_settings = profile.get_settings("RegistrySettingsHandler")
-            assert registry_settings["fullscreen_optimizations"]["cs2.exe"] is True
+            assert registry_settings["fullscreen_optimizations"]["cs2.exe"] is False
+            assert profile.get_settings("GraphicsSettingsHandler")["disable_global_fso"] is False
 
     def test_cs2_gsync_variants_keep_the_overlay_strict_contract(self):
         """The strict G-SYNC lanes stay strict on overlays and NVIDIA binding.
@@ -569,7 +561,7 @@ class TestProfileLoading:
         assert gsync.mixed_refresh_safe_fallback_profile_id == "rivals2-nosync"
         assert gsync_hdr.mixed_refresh_safe_fallback_profile_id == "rivals2-nosync-hdr"
         for profile in (nosync, nosync_hdr, gsync, gsync_hdr):
-            assert profile.graphics_api == "dx11", profile.profile_id
+            assert profile.graphics_api == "dx12", profile.profile_id
             # 2026-07 consolidation: every merged lane is matchmaking-safe.
             assert profile.is_online_profile is True, profile.profile_id
             assert profile.allows_aggressive_settings is False, profile.profile_id
@@ -657,6 +649,71 @@ class TestProfileHandlers:
 class TestProfileSettings:
     """Test profile settings retrieval."""
 
+    @pytest.mark.parametrize(
+        ("stored_backend", "detected_backend"),
+        [
+            ("DX11", "dx11"),
+            ("D3D12", "dx12"),
+            ("Vulkan", "vulkan"),
+            ("OGL", "opengl"),
+        ],
+    )
+    def test_slippi_backend_detection_reads_dolphin_ini(
+        self, tmp_path, monkeypatch, stored_backend, detected_backend
+    ):
+        """Slippi v3.6.4 stores GFXBackend in Dolphin.ini, not GFX.ini."""
+        config_dir = (
+            tmp_path / "Slippi Launcher" / "netplay" / "User" / "Config"
+        )
+        config_dir.mkdir(parents=True)
+        (config_dir / "Dolphin.ini").write_text(
+            f"[Core]\nGFXBackend = {stored_backend}\n",
+            encoding="utf-8",
+        )
+        # A conflicting/legacy key in GFX.ini must not win.
+        (config_dir / "GFX.ini").write_text(
+            "[Settings]\nGFXBackend = D3D12\n",
+            encoding="utf-8",
+        )
+        monkeypatch.setenv("APPDATA", str(tmp_path))
+
+        profile = SlippiMeleeProfile()
+
+        assert profile._detect_dolphin_backend() == detected_backend
+
+    def test_slippi_real_dx11_layout_drives_backend_aware_settings(
+        self, tmp_path, monkeypatch
+    ):
+        """The live Slippi layout must actually select the DX11 HAGS policy."""
+        config_dir = (
+            tmp_path / "Slippi Launcher" / "netplay" / "User" / "Config"
+        )
+        config_dir.mkdir(parents=True)
+        (config_dir / "Dolphin.ini").write_text(
+            "[Core]\nGFXBackend = DX11\n",
+            encoding="utf-8",
+        )
+        monkeypatch.setenv("APPDATA", str(tmp_path))
+
+        profile = SlippiMeleeProfile()
+        windows = profile.get_settings("WindowsSettingsHandler")
+        nvidia = profile.get_settings("NvidiaSettingsHandler")
+
+        # Catalog generation stays deterministic; live backend adaptation is
+        # resolved only at apply/verify time.
+        assert windows["hags"] is True
+        assert profile.resolve_runtime_settings("WindowsSettingsHandler", windows)["hags"] is False
+        assert profile.resolve_runtime_settings("NvidiaSettingsHandler", nvidia)["low_latency_mode"] == "on"
+
+    def test_slippi_netplay_lanes_enable_rollback_guard(self):
+        """Competitive/universal are netplay; console parity is offline practice."""
+        assert SlippiMeleeProfile().is_online_profile is True
+        assert SlippiMeleeUniversalProfile().is_online_profile is True
+        assert SlippiMeleeHDRProfile().is_online_profile is True
+        assert SlippiMeleeUniversalHDRProfile().is_online_profile is True
+        assert SlippiMeleeConsoleParityProfile().is_online_profile is False
+        assert SlippiMeleeConsoleParityHDRProfile().is_online_profile is False
+
     def test_slippi_windows_settings(self):
         """Test SlippiMeleeProfile returns Windows settings."""
         profile = SlippiMeleeProfile()
@@ -673,7 +730,10 @@ class TestProfileSettings:
         """
         profile = SlippiMeleeProfile()
         with patch.object(profile, "_detect_dolphin_backend", return_value="dx11"):
-            settings = profile.get_settings("NvidiaSettingsHandler")
+            settings = profile.resolve_runtime_settings(
+                "NvidiaSettingsHandler",
+                profile.get_settings("NvidiaSettingsHandler"),
+            )
 
         # Minimum latency settings per rollback.md canonical spec
         assert settings["low_latency_mode"] == "on"  # On recommended; Ultra optional
@@ -685,28 +745,40 @@ class TestProfileSettings:
         """Vulkan backend should disable driver LLM."""
         profile = SlippiMeleeProfile()
         with patch.object(profile, "_detect_dolphin_backend", return_value="vulkan"):
-            settings = profile.get_settings("NvidiaSettingsHandler")
+            settings = profile.resolve_runtime_settings(
+                "NvidiaSettingsHandler",
+                profile.get_settings("NvidiaSettingsHandler"),
+            )
         assert settings["low_latency_mode"] == "off"
 
     def test_slippi_nvidia_settings_dx12_keeps_llm_on(self):
         """DX12 backend should keep LLM enabled on current NVIDIA drivers."""
         profile = SlippiMeleeProfile()
         with patch.object(profile, "_detect_dolphin_backend", return_value="dx12"):
-            settings = profile.get_settings("NvidiaSettingsHandler")
+            settings = profile.resolve_runtime_settings(
+                "NvidiaSettingsHandler",
+                profile.get_settings("NvidiaSettingsHandler"),
+            )
         assert settings["low_latency_mode"] == "on"
 
     def test_slippi_windows_settings_dx11_disables_hags(self):
         """DX11 backend should disable HAGS for stability."""
         profile = SlippiMeleeProfile()
         with patch.object(profile, "_detect_dolphin_backend", return_value="dx11"):
-            settings = profile.get_settings("WindowsSettingsHandler")
+            settings = profile.resolve_runtime_settings(
+                "WindowsSettingsHandler",
+                profile.get_settings("WindowsSettingsHandler"),
+            )
         assert settings["hags"] is False
 
     def test_slippi_universal_windows_settings_keep_hags_on(self):
         """Universal Slippi profile should keep HAGS on for no-reboot reapply."""
         profile = SlippiMeleeUniversalProfile()
         with patch.object(profile, "_detect_dolphin_backend", return_value="dx11"):
-            settings = profile.get_settings("WindowsSettingsHandler")
+            settings = profile.resolve_runtime_settings(
+                "WindowsSettingsHandler",
+                profile.get_settings("WindowsSettingsHandler"),
+            )
         assert settings["hags"] is True
 
     def test_slippi_competitive_dolphin_settings_clear_vrr_presentation_flags(self):
@@ -1200,9 +1272,8 @@ class TestProfileSettings:
 
         assert settings["profile_name"] == "Rivals 2"
         assert settings["preset"] == "vrr_fighting_game"
-        # CPU-bound UE5/DX11: driver worker threads stay on (preset default,
-        # asserted explicitly so a preset change can't silently regress it).
-        assert settings["threaded_optimization"] == "on"
+        # NVIDIA's OGL_THREAD_CONTROL is not a D3D12 optimization.
+        assert settings["threaded_optimization"] == "auto"
         # 60 Hz sim grid: cap snaps to the largest multiple of 60 below
         # refresh - 3 instead of the generic off-grid refresh - 3 value.
         assert settings["vrr_cap_policy"] == "fighting_60hz_vrr"
@@ -1277,6 +1348,37 @@ class TestProfileSettings:
         assert config["vrr_cap_policy"] == "fighting_60hz_vrr"
         assert config["hdr_output"] is False
 
+    def test_rivals2_capture_lane_has_complete_windowed_vrr_contract(self):
+        """Capture-safe borderless must clear both global and per-exe FSO kills."""
+        profile = Rivals2GSyncHDRCaptureProfile()
+        windows = profile.get_settings("WindowsSettingsHandler")
+        graphics = profile.get_settings("GraphicsSettingsHandler")
+        nvidia = profile.get_settings("NvidiaSettingsHandler")
+        config = profile.get_settings("Rivals2ConfigHandler")
+
+        assert windows["windowed_optimizations"] is True
+        assert windows["vrr_optimize"] is True
+        assert graphics["disable_global_fso"] is False
+        assert nvidia["global_vrr_mode"] == "fullscreen_and_windowed"
+        assert config["fullscreen_mode"] == 1
+        assert all(value is False for value in profile.fullscreen_optimizations_per_exe.values())
+
+    def test_productivity_restores_global_windowed_vrr_contract(self):
+        """A prior no-sync profile must not leave desktop VRR globally off."""
+        for profile in (ProductivityProfile(), ProductivityHDRProfile()):
+            windows = profile.get_settings("WindowsSettingsHandler")
+            nvidia = profile.get_settings("NvidiaSettingsHandler")
+            assert windows["windowed_optimizations"] is True
+            assert windows["vrr_optimize"] is True
+            assert nvidia["global_vrr_mode"] == "fullscreen_and_windowed"
+            assert nvidia["vrr_app_override"] == "allow"
+            assert nvidia["vsync"] == "on"
+
+    def test_reflex_shooter_nic_tuning_is_opt_in(self):
+        """Profiles must not reset a live network link without machine opt-in."""
+        for profile in (FortniteProfile(), MarvelRivalsSDRProfile(), Overwatch2Profile()):
+            assert profile.get_settings("NicDriverHandler")["nic_tuning"] is False
+
     def test_rivals2_no_sync_lane_uses_sim_grid_frame_cap(self):
         """The merged no-sync lane caps at the largest multiple of 60 at/below refresh."""
         nosync_config = Rivals2NoSyncProfile().get_settings("Rivals2ConfigHandler")
@@ -1285,8 +1387,8 @@ class TestProfileSettings:
         assert nosync_config["vrr_cap_policy"] == "fighting_60hz_nosync"
         assert "frame_rate_limit" not in nosync_config
 
-    def test_rivals2_lanes_keep_threaded_optimization_on(self):
-        """CPU-bound UE5/DX11: no Rivals lane forces threaded optimization off."""
+    def test_rivals2_lanes_leave_opengl_thread_control_automatic(self):
+        """Rivals 2 uses D3D12, so the OpenGL-only driver knob stays Auto."""
         for profile in (
             Rivals2NoSyncProfile(),
             Rivals2NoSyncHDRProfile(),
@@ -1294,7 +1396,7 @@ class TestProfileSettings:
             Rivals2GSyncHDRProfile(),
         ):
             nvidia = profile.get_settings("NvidiaSettingsHandler")
-            assert nvidia["threaded_optimization"] == "on", profile.profile_id
+            assert nvidia["threaded_optimization"] == "auto", profile.profile_id
 
     def test_unknown_handler_returns_empty(self):
         """Test that unknown handler name returns empty dict."""
@@ -1535,7 +1637,7 @@ class TestFullscreenOptimizationsPerExe:
             assert flags.get("Marvel-Win64-Shipping.exe") is True
 
     def test_rivals2_family_disables_fso(self):
-        """Every Rivals 2 variant ships fullscreen_mode=0 and wants true exclusive."""
+        """Strict Rivals 2 variants ship fullscreen_mode=0 and disable FSO."""
         for profile_cls in (
             Rivals2Profile,
             Rivals2NoSyncProfile,
@@ -1562,12 +1664,15 @@ class TestFullscreenOptimizationsPerExe:
             assert flags.get("Slippi Dolphin.exe") is True
             assert flags.get("Dolphin.exe") is True
 
-    def test_diablo4_variants_disable_fso(self):
-        """Diablo 4 HDR and SDR lanes both want the true exclusive path for native HDR."""
+    def test_diablo4_variants_keep_fullscreen_windowed_flip_path(self):
+        """Retail Diablo IV mode 1 requires FSO and windowed G-SYNC."""
         for profile_cls in (Diablo4Profile, Diablo4SDRProfile):
             profile = profile_cls()
             flags = profile.fullscreen_optimizations_per_exe
-            assert flags.get("Diablo IV.exe") is True
+            assert flags.get("Diablo IV.exe") is False
+            assert profile.get_settings("WindowsSettingsHandler")["windowed_optimizations"] is True
+            assert profile.get_settings("WindowsSettingsHandler")["vrr_optimize"] is True
+            assert profile.get_settings("NvidiaSettingsHandler")["global_vrr_mode"] == "fullscreen_and_windowed"
 
 
 class TestSingleLimiterPolicy:
@@ -1680,7 +1785,7 @@ class TestReflexContract:
             "abso applies reflex",
         )
         # Explicit "Reflex is OFF" entries are honest non-enforcement statements
-        # (e.g., OW2 no-sync is tuned around LLM-on with Reflex OFF). They should
+        # (e.g., the OW2 driver-ULL G-SYNC lanes require Reflex OFF). They should
         # not be forced to include "manually" — they are not claiming enforcement.
         reflex_off_markers = ("off", "disabled", "do not enable")
 

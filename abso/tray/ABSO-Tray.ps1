@@ -2496,15 +2496,15 @@ $script:FallbackProfiles = [ordered]@{
     }
     "overwatch2"        = @{
         Name     = "Overwatch 2 - No Sync SDR"
-        Sub      = "No Sync SDR | Reflex OFF | VSync OFF | G-SYNC OFF"
+        Sub      = "No Sync SDR | Reflex ON + Boost | VSync OFF | G-SYNC OFF"
         Cat      = "Shooters"
-        Desc     = "Latency-focused no-sync SDR profile (Reflex OFF, VSync OFF, VRR OFF)"
+        Desc     = "Latency-focused no-sync SDR profile (Reflex ON + Boost, VSync OFF, VRR OFF)"
         Exes     = @("Overwatch.exe")
         SyncMode = "off"
     }
     "overwatch2-hdr"    = @{
         Name     = "Overwatch 2 - No Sync HDR"
-        Sub      = "No Sync HDR | Reflex OFF | VSync OFF | G-SYNC OFF"
+        Sub      = "No Sync HDR | Reflex ON + Boost | VSync OFF | G-SYNC OFF"
         Cat      = "Shooters"
         Desc     = "Latency-focused no-sync HDR profile. Native HDR for OLED / Mini-LED displays; same sync/VRR contract as the SDR variant."
         Exes     = @("Overwatch.exe")

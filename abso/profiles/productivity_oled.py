@@ -126,17 +126,20 @@ class _ProductivityBaseProfile(BaseProfile):
                 },
             },
             "NvidiaSettingsHandler": {
-                # Balanced — smooth visuals with adaptive vsync. No Low Latency
+                # Balanced — smooth visuals with the windowed VRR safety net. No Low Latency
                 # Mode and no Prefer Max Performance: productivity wants lower
                 # heat/noise and default driver pacing, not latency-favoring
                 # clocks.
                 "low_latency_mode": "off",
                 "power_management": "adaptive",
-                "vsync": "adaptive",
+                "vsync": "on",
                 "max_frame_rate": "off",
                 "shader_cache": "unlimited",
                 "threaded_optimization": "auto",
                 "vrr_app_override": "allow",
+                # No-sync game profiles turn global VRR off; productivity must
+                # restore the windowed+fullscreen mode it advertises.
+                "global_vrr_mode": "fullscreen_and_windowed",
             },
             "GraphicsSettingsHandler": {
                 # Keep FSO enabled — works well with modern apps.

@@ -79,10 +79,9 @@ class _DeadlockBaseProfile(ReflexShooterBaseProfile):
 
     @property
     def fullscreen_optimizations_per_exe(self) -> dict[str, bool]:
-        # Every Deadlock lane runs exclusive fullscreen. Disable FSO per-exe
-        # for both playtest/final binary names so Windows cannot silently shunt
-        # the game into the composited borderless shim.
-        return fso_overrides(_DEADLOCK_EXECUTABLES)
+        # Source 2 has no legacy exclusive path. Keep the DXGI flip path and
+        # Windows fullscreen optimizations available on every lane.
+        return fso_overrides(_DEADLOCK_EXECUTABLES, disabled=False)
 
     @property
     def nvidia_profile_name(self) -> str | None:
@@ -116,6 +115,10 @@ class _DeadlockBaseProfile(ReflexShooterBaseProfile):
             "WindowsSettingsHandler": {
                 "hdr": False,
                 "auto_hdr": False,
+                "windowed_optimizations": True,
+            },
+            "GraphicsSettingsHandler": {
+                "disable_global_fso": False,
             },
         }
 
@@ -130,8 +133,8 @@ class _DeadlockBaseProfile(ReflexShooterBaseProfile):
             {
                 "category": "Display",
                 "setting": "Display Mode",
-                "value": "Fullscreen (Exclusive)",
-                "reason": "No-sync lane: exclusive fullscreen avoids the DWM compositor tax and keeps the Source 2 present path deterministic.",
+                "value": "Fullscreen or Fullscreen Windowed (DXGI flip)",
+                "reason": "Source 2 has no legacy exclusive path; both modes use the modern DXGI flip presentation model.",
             },
             {
                 "category": "Display",
@@ -272,7 +275,7 @@ class _DeadlockBaseProfile(ReflexShooterBaseProfile):
         return [
             (
                 "Deadlock manual: set NVIDIA Reflex to On + Boost; keep in-game "
-                "VSync Off and fullscreen exclusive."
+                "VSync Off and use the Source 2 DXGI flip display path."
             )
         ]
 

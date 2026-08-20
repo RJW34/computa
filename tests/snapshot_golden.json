@@ -37,9 +37,9 @@
       },
       {
         "category": "Video",
-        "reason": "No-sync lane: Fullscreen avoids the DWM compositor tax and keeps the Source 2 present path deterministic.",
+        "reason": "Source 2 has no legacy exclusive path; both modes use the modern DXGI flip presentation model.",
         "setting": "Display Mode",
-        "value": "Fullscreen"
+        "value": "Fullscreen or Fullscreen Windowed (DXGI flip)"
       },
       {
         "category": "Video",
@@ -112,7 +112,7 @@
         "hard_disable": true
       },
       "GraphicsSettingsHandler": {
-        "disable_global_fso": true
+        "disable_global_fso": false
       },
       "InterruptModeHandler": {
         "enable_msi": true
@@ -127,7 +127,7 @@
         "preset": "default"
       },
       "NicDriverHandler": {
-        "nic_tuning": true
+        "nic_tuning": false
       },
       "NvidiaSettingsHandler": {
         "global_vrr_mode": "off",
@@ -155,7 +155,7 @@
       },
       "RegistrySettingsHandler": {
         "fullscreen_optimizations": {
-          "cs2.exe": true
+          "cs2.exe": false
         },
         "game_priority": {
           "gpu_priority": 8,
@@ -173,7 +173,7 @@
         "hdr": false,
         "max_refresh_rate": true,
         "vrr_optimize": false,
-        "windowed_optimizations": false
+        "windowed_optimizations": true
       }
     }
   },
@@ -305,7 +305,7 @@
         "preset": "default"
       },
       "NicDriverHandler": {
-        "nic_tuning": true
+        "nic_tuning": false
       },
       "NvidiaSettingsHandler": {
         "auto_vrr_fps_cap": true,
@@ -486,7 +486,7 @@
         "preset": "default"
       },
       "NicDriverHandler": {
-        "nic_tuning": true
+        "nic_tuning": false
       },
       "NvidiaSettingsHandler": {
         "auto_vrr_fps_cap": true,
@@ -669,7 +669,7 @@
         "preset": "default"
       },
       "NicDriverHandler": {
-        "nic_tuning": true
+        "nic_tuning": false
       },
       "NvidiaSettingsHandler": {
         "auto_vrr_fps_cap": true,
@@ -761,9 +761,9 @@
       },
       {
         "category": "Video",
-        "reason": "No-sync lane: Fullscreen avoids the DWM compositor tax and keeps the Source 2 present path deterministic.",
+        "reason": "Source 2 has no legacy exclusive path; both modes use the modern DXGI flip presentation model.",
         "setting": "Display Mode",
-        "value": "Fullscreen"
+        "value": "Fullscreen or Fullscreen Windowed (DXGI flip)"
       },
       {
         "category": "Video",
@@ -837,7 +837,7 @@
       },
       "GraphicsSettingsHandler": {
         "disable_auto_color_management": true,
-        "disable_global_fso": true
+        "disable_global_fso": false
       },
       "InterruptModeHandler": {
         "enable_msi": true
@@ -852,7 +852,7 @@
         "preset": "default"
       },
       "NicDriverHandler": {
-        "nic_tuning": true
+        "nic_tuning": false
       },
       "NvidiaSettingsHandler": {
         "global_vrr_mode": "off",
@@ -880,7 +880,7 @@
       },
       "RegistrySettingsHandler": {
         "fullscreen_optimizations": {
-          "cs2.exe": true
+          "cs2.exe": false
         },
         "game_priority": {
           "gpu_priority": 8,
@@ -900,7 +900,7 @@
         "max_refresh_rate": true,
         "sdr_white_level_nits": 200,
         "vrr_optimize": false,
-        "windowed_optimizations": false
+        "windowed_optimizations": true
       }
     }
   },
@@ -942,9 +942,9 @@
       },
       {
         "category": "Display",
-        "reason": "No-sync lane: exclusive fullscreen avoids the DWM compositor tax and keeps the Source 2 present path deterministic.",
+        "reason": "Source 2 has no legacy exclusive path; both modes use the modern DXGI flip presentation model.",
         "setting": "Display Mode",
-        "value": "Fullscreen (Exclusive)"
+        "value": "Fullscreen or Fullscreen Windowed (DXGI flip)"
       },
       {
         "category": "Display",
@@ -1017,7 +1017,7 @@
         "hard_disable": true
       },
       "GraphicsSettingsHandler": {
-        "disable_global_fso": true
+        "disable_global_fso": false
       },
       "InterruptModeHandler": {
         "enable_msi": true
@@ -1032,7 +1032,7 @@
         "preset": "default"
       },
       "NicDriverHandler": {
-        "nic_tuning": true
+        "nic_tuning": false
       },
       "NvidiaSettingsHandler": {
         "global_vrr_mode": "off",
@@ -1059,8 +1059,8 @@
       },
       "RegistrySettingsHandler": {
         "fullscreen_optimizations": {
-          "deadlock.exe": true,
-          "project8.exe": true
+          "deadlock.exe": false,
+          "project8.exe": false
         },
         "game_priority": {
           "gpu_priority": 8,
@@ -1078,7 +1078,7 @@
         "hdr": false,
         "max_refresh_rate": true,
         "vrr_optimize": false,
-        "windowed_optimizations": false
+        "windowed_optimizations": true
       }
     }
   },
@@ -1210,7 +1210,7 @@
         "preset": "default"
       },
       "NicDriverHandler": {
-        "nic_tuning": true
+        "nic_tuning": false
       },
       "NvidiaSettingsHandler": {
         "auto_vrr_fps_cap": true,
@@ -1391,7 +1391,7 @@
         "preset": "default"
       },
       "NicDriverHandler": {
-        "nic_tuning": true
+        "nic_tuning": false
       },
       "NvidiaSettingsHandler": {
         "auto_vrr_fps_cap": true,
@@ -1483,9 +1483,9 @@
       },
       {
         "category": "Display",
-        "reason": "No-sync lane: exclusive fullscreen avoids the DWM compositor tax and keeps the Source 2 present path deterministic.",
+        "reason": "Source 2 has no legacy exclusive path; both modes use the modern DXGI flip presentation model.",
         "setting": "Display Mode",
-        "value": "Fullscreen (Exclusive)"
+        "value": "Fullscreen or Fullscreen Windowed (DXGI flip)"
       },
       {
         "category": "Display",
@@ -1559,7 +1559,7 @@
       },
       "GraphicsSettingsHandler": {
         "disable_auto_color_management": true,
-        "disable_global_fso": true
+        "disable_global_fso": false
       },
       "InterruptModeHandler": {
         "enable_msi": true
@@ -1574,7 +1574,7 @@
         "preset": "default"
       },
       "NicDriverHandler": {
-        "nic_tuning": true
+        "nic_tuning": false
       },
       "NvidiaSettingsHandler": {
         "global_vrr_mode": "off",
@@ -1601,8 +1601,8 @@
       },
       "RegistrySettingsHandler": {
         "fullscreen_optimizations": {
-          "deadlock.exe": true,
-          "project8.exe": true
+          "deadlock.exe": false,
+          "project8.exe": false
         },
         "game_priority": {
           "gpu_priority": 8,
@@ -1622,7 +1622,7 @@
         "max_refresh_rate": true,
         "sdr_white_level_nits": 200,
         "vrr_optimize": false,
-        "windowed_optimizations": false
+        "windowed_optimizations": true
       }
     }
   },
@@ -1660,9 +1660,9 @@
       },
       {
         "category": "Display",
-        "reason": "Matches the fullscreen VRR path this profile applies.",
+        "reason": "Matches Diablo IV's retail fullscreen-windowed DXGI flip path and windowed G-SYNC scope.",
         "setting": "Display Mode",
-        "value": "Fullscreen"
+        "value": "Fullscreen Windowed"
       },
       {
         "category": "Display",
@@ -1753,7 +1753,7 @@
       },
       "NvidiaSettingsHandler": {
         "auto_vrr_fps_cap": false,
-        "global_vrr_mode": "fullscreen_only",
+        "global_vrr_mode": "fullscreen_and_windowed",
         "preset": "vrr_diablo4",
         "profile_name": "Diablo IV",
         "vsync": "on"
@@ -1773,7 +1773,7 @@
       },
       "RegistrySettingsHandler": {
         "fullscreen_optimizations": {
-          "Diablo IV.exe": true
+          "Diablo IV.exe": false
         },
         "game_priority": {
           "gpu_priority": 8,
@@ -1792,8 +1792,8 @@
         "hdr": true,
         "max_refresh_rate": true,
         "sdr_white_level_nits": 250,
-        "vrr_optimize": false,
-        "windowed_optimizations": false
+        "vrr_optimize": true,
+        "windowed_optimizations": true
       }
     }
   },
@@ -1825,9 +1825,9 @@
       },
       {
         "category": "Display",
-        "reason": "Matches the fullscreen VRR path this profile applies.",
+        "reason": "Matches Diablo IV's retail fullscreen-windowed DXGI flip path and windowed G-SYNC scope.",
         "setting": "Display Mode",
-        "value": "Fullscreen"
+        "value": "Fullscreen Windowed"
       },
       {
         "category": "Display",
@@ -1914,7 +1914,7 @@
       },
       "NvidiaSettingsHandler": {
         "auto_vrr_fps_cap": false,
-        "global_vrr_mode": "fullscreen_only",
+        "global_vrr_mode": "fullscreen_and_windowed",
         "preset": "vrr_diablo4",
         "profile_name": "Diablo IV",
         "vsync": "on"
@@ -1934,7 +1934,7 @@
       },
       "RegistrySettingsHandler": {
         "fullscreen_optimizations": {
-          "Diablo IV.exe": true
+          "Diablo IV.exe": false
         },
         "game_priority": {
           "gpu_priority": 8,
@@ -1951,8 +1951,8 @@
         "hags": true,
         "hdr": false,
         "max_refresh_rate": true,
-        "vrr_optimize": false,
-        "windowed_optimizations": false
+        "vrr_optimize": true,
+        "windowed_optimizations": true
       }
     }
   },
@@ -2103,7 +2103,7 @@
         "preset": "default"
       },
       "NicDriverHandler": {
-        "nic_tuning": true
+        "nic_tuning": false
       },
       "NvidiaSettingsHandler": {
         "preset": "reflex_no_sync",
@@ -2309,7 +2309,7 @@
         "preset": "default"
       },
       "NicDriverHandler": {
-        "nic_tuning": true
+        "nic_tuning": false
       },
       "NvidiaSettingsHandler": {
         "auto_vrr_fps_cap": true,
@@ -2520,7 +2520,7 @@
         "preset": "default"
       },
       "NicDriverHandler": {
-        "nic_tuning": true
+        "nic_tuning": false
       },
       "NvidiaSettingsHandler": {
         "preset": "reflex_no_sync",
@@ -2733,7 +2733,7 @@
         "preset": "default"
       },
       "NicDriverHandler": {
-        "nic_tuning": true
+        "nic_tuning": false
       },
       "NvidiaSettingsHandler": {
         "auto_vrr_fps_cap": true,
@@ -2939,7 +2939,7 @@
         "preset": "default"
       },
       "NicDriverHandler": {
-        "nic_tuning": true
+        "nic_tuning": false
       },
       "NvidiaSettingsHandler": {
         "auto_vrr_fps_cap": true,
@@ -3108,7 +3108,7 @@
         "preset": "default"
       },
       "NicDriverHandler": {
-        "nic_tuning": true
+        "nic_tuning": false
       },
       "NvidiaSettingsHandler": {
         "global_vrr_mode": "off",
@@ -3300,7 +3300,7 @@
         "preset": "default"
       },
       "NicDriverHandler": {
-        "nic_tuning": true
+        "nic_tuning": false
       },
       "NvidiaSettingsHandler": {
         "auto_vrr_fps_cap": true,
@@ -3495,7 +3495,7 @@
         "preset": "default"
       },
       "NicDriverHandler": {
-        "nic_tuning": true
+        "nic_tuning": false
       },
       "NvidiaSettingsHandler": {
         "auto_vrr_fps_cap": true,
@@ -3714,7 +3714,7 @@
         "preset": "default"
       },
       "NicDriverHandler": {
-        "nic_tuning": true
+        "nic_tuning": false
       },
       "NvidiaSettingsHandler": {
         "auto_vrr_fps_cap": true,
@@ -3929,7 +3929,7 @@
         "preset": "default"
       },
       "NicDriverHandler": {
-        "nic_tuning": true
+        "nic_tuning": false
       },
       "NvidiaSettingsHandler": {
         "auto_vrr_fps_cap": true,
@@ -4149,7 +4149,7 @@
         "preset": "default"
       },
       "NicDriverHandler": {
-        "nic_tuning": true
+        "nic_tuning": false
       },
       "NvidiaSettingsHandler": {
         "global_vrr_mode": "off",
@@ -4614,6 +4614,7 @@
         "disable_global_fso": false
       },
       "NvidiaSettingsHandler": {
+        "global_vrr_mode": "fullscreen_and_windowed",
         "low_latency_mode": "off",
         "max_frame_rate": "off",
         "power_management": "adaptive",
@@ -4621,7 +4622,7 @@
         "shader_cache": "unlimited",
         "threaded_optimization": "auto",
         "vrr_app_override": "allow",
-        "vsync": "adaptive"
+        "vsync": "on"
       },
       "PowerSettingsHandler": {
         "processor_max_performance": true,
@@ -4739,6 +4740,7 @@
         "disable_global_fso": false
       },
       "NvidiaSettingsHandler": {
+        "global_vrr_mode": "fullscreen_and_windowed",
         "low_latency_mode": "off",
         "max_frame_rate": "off",
         "power_management": "adaptive",
@@ -4746,7 +4748,7 @@
         "shader_cache": "unlimited",
         "threaded_optimization": "auto",
         "vrr_app_override": "allow",
-        "vsync": "adaptive"
+        "vsync": "on"
       },
       "PowerSettingsHandler": {
         "processor_max_performance": true,
@@ -4778,7 +4780,7 @@
     "allows_aggressive_settings": false,
     "application_scope": "system_plus_native_config",
     "display_name": "Rivals 2 - G-SYNC",
-    "graphics_api": "dx11",
+    "graphics_api": "dx12",
     "handlers": [
       "WindowsSettingsHandler",
       "PowerSettingsHandler",
@@ -4816,13 +4818,13 @@
       },
       {
         "category": "NVIDIA Control Panel",
-        "reason": "Rivals 2 is CPU-bound UE5/DX11; driver worker threads improve frame times. SnapNet's sim is server-authoritative, so driver threading cannot desync rollback.",
+        "reason": "NVIDIA exposes this as an OpenGL driver control. Rivals 2 uses D3D12, so forcing it On is not a D3D12 optimization.",
         "setting": "Threaded Optimization",
-        "value": "On"
+        "value": "Auto"
       },
       {
         "category": "NVIDIA Control Panel",
-        "reason": "Reduces render queue depth on the published DX11 path. 'On' is correct (not 'Off' - Rivals 2 has no Reflex). If stuttering occurs, try 'Off' or set Pre-Rendered Frames to 2 via Nvidia Profile Inspector.",
+        "reason": "Rivals 2 has no Reflex. LLM On remains a heuristic starting point on the D3D12 path; A/B Off if frame pacing worsens.",
         "setting": "Low Latency Mode",
         "value": "On"
       },
@@ -4940,7 +4942,7 @@
           "Rivals 2 (Streaming)"
         ],
         "profile_name": "Rivals 2",
-        "threaded_optimization": "on",
+        "threaded_optimization": "auto",
         "vrr_app_override": "allow",
         "vrr_cap_policy": "fighting_60hz_vrr"
       },
@@ -4995,7 +4997,7 @@
     "allows_aggressive_settings": false,
     "application_scope": "system_plus_native_config",
     "display_name": "Rivals 2 - G-SYNC HDR",
-    "graphics_api": "dx11",
+    "graphics_api": "dx12",
     "handlers": [
       "WindowsSettingsHandler",
       "PowerSettingsHandler",
@@ -5063,13 +5065,13 @@
       },
       {
         "category": "NVIDIA Control Panel",
-        "reason": "Rivals 2 is CPU-bound UE5/DX11; driver worker threads improve frame times. SnapNet's sim is server-authoritative, so driver threading cannot desync rollback.",
+        "reason": "NVIDIA exposes this as an OpenGL driver control. Rivals 2 uses D3D12, so forcing it On is not a D3D12 optimization.",
         "setting": "Threaded Optimization",
-        "value": "On"
+        "value": "Auto"
       },
       {
         "category": "NVIDIA Control Panel",
-        "reason": "Reduces render queue depth on the published DX11 path. 'On' is correct (not 'Off' - Rivals 2 has no Reflex). If stuttering occurs, try 'Off' or set Pre-Rendered Frames to 2 via Nvidia Profile Inspector.",
+        "reason": "Rivals 2 has no Reflex. LLM On remains a heuristic starting point on the D3D12 path; A/B Off if frame pacing worsens.",
         "setting": "Low Latency Mode",
         "value": "On"
       },
@@ -5188,7 +5190,7 @@
           "Rivals 2 (Streaming)"
         ],
         "profile_name": "Rivals 2",
-        "threaded_optimization": "on",
+        "threaded_optimization": "auto",
         "vrr_app_override": "allow",
         "vrr_cap_policy": "fighting_60hz_vrr"
       },
@@ -5245,7 +5247,7 @@
     "allows_aggressive_settings": false,
     "application_scope": "system_plus_native_config",
     "display_name": "Rivals 2 - G-SYNC HDR Capture-Safe",
-    "graphics_api": "dx11",
+    "graphics_api": "dx12",
     "handlers": [
       "WindowsSettingsHandler",
       "PowerSettingsHandler",
@@ -5313,13 +5315,13 @@
       },
       {
         "category": "NVIDIA Control Panel",
-        "reason": "Rivals 2 is CPU-bound UE5/DX11; driver worker threads improve frame times. SnapNet's sim is server-authoritative, so driver threading cannot desync rollback.",
+        "reason": "NVIDIA exposes this as an OpenGL driver control. Rivals 2 uses D3D12, so forcing it On is not a D3D12 optimization.",
         "setting": "Threaded Optimization",
-        "value": "On"
+        "value": "Auto"
       },
       {
         "category": "NVIDIA Control Panel",
-        "reason": "Reduces render queue depth on the published DX11 path. 'On' is correct (not 'Off' - Rivals 2 has no Reflex). If stuttering occurs, try 'Off' or set Pre-Rendered Frames to 2 via Nvidia Profile Inspector.",
+        "reason": "Rivals 2 has no Reflex. LLM On remains a heuristic starting point on the D3D12 path; A/B Off if frame pacing worsens.",
         "setting": "Low Latency Mode",
         "value": "On"
       },
@@ -5395,7 +5397,7 @@
       },
       "GraphicsSettingsHandler": {
         "disable_auto_color_management": true,
-        "disable_global_fso": true
+        "disable_global_fso": false
       },
       "MouseSettingsHandler": {
         "disable_acceleration": true,
@@ -5438,7 +5440,7 @@
           "Rivals 2 (Streaming)"
         ],
         "profile_name": "Rivals 2",
-        "threaded_optimization": "on",
+        "threaded_optimization": "auto",
         "vrr_app_override": "allow",
         "vrr_cap_policy": "fighting_60hz_vrr"
       },
@@ -5457,9 +5459,9 @@
       },
       "RegistrySettingsHandler": {
         "fullscreen_optimizations": {
-          "Rivals2-Win64-Shipping.exe": true,
-          "Rivals2.exe": true,
-          "RivalsofAether2.exe": true
+          "Rivals2-Win64-Shipping.exe": false,
+          "Rivals2.exe": false,
+          "RivalsofAether2.exe": false
         },
         "game_priority": {
           "gpu_priority": 8,
@@ -5495,7 +5497,7 @@
     "allows_aggressive_settings": false,
     "application_scope": "system_plus_native_config",
     "display_name": "Rivals 2 - No Sync",
-    "graphics_api": "dx11",
+    "graphics_api": "dx12",
     "handlers": [
       "WindowsSettingsHandler",
       "PowerSettingsHandler",
@@ -5539,9 +5541,9 @@
       },
       {
         "category": "NVIDIA Control Panel",
-        "reason": "Rivals 2 is CPU-bound UE5/DX11; driver worker threads improve frame times. SnapNet's sim is server-authoritative, so driver threading cannot desync rollback.",
+        "reason": "NVIDIA exposes this as an OpenGL driver control. Rivals 2 uses D3D12, so forcing it On is not a D3D12 optimization.",
         "setting": "Threaded Optimization",
-        "value": "On"
+        "value": "Auto"
       },
       {
         "category": "NVIDIA Control Panel",
@@ -5665,7 +5667,7 @@
         ],
         "profile_name": "Rivals 2",
         "shader_cache": "unlimited",
-        "threaded_optimization": "on",
+        "threaded_optimization": "auto",
         "triple_buffering": "off",
         "vrr_app_override": "force_off",
         "vsync": "off",
@@ -5722,7 +5724,7 @@
     "allows_aggressive_settings": false,
     "application_scope": "system_plus_native_config",
     "display_name": "Rivals 2 - No Sync HDR",
-    "graphics_api": "dx11",
+    "graphics_api": "dx12",
     "handlers": [
       "WindowsSettingsHandler",
       "PowerSettingsHandler",
@@ -5796,9 +5798,9 @@
       },
       {
         "category": "NVIDIA Control Panel",
-        "reason": "Rivals 2 is CPU-bound UE5/DX11; driver worker threads improve frame times. SnapNet's sim is server-authoritative, so driver threading cannot desync rollback.",
+        "reason": "NVIDIA exposes this as an OpenGL driver control. Rivals 2 uses D3D12, so forcing it On is not a D3D12 optimization.",
         "setting": "Threaded Optimization",
-        "value": "On"
+        "value": "Auto"
       },
       {
         "category": "NVIDIA Control Panel",
@@ -5923,7 +5925,7 @@
         ],
         "profile_name": "Rivals 2",
         "shader_cache": "unlimited",
-        "threaded_optimization": "on",
+        "threaded_optimization": "auto",
         "triple_buffering": "off",
         "vrr_app_override": "force_off",
         "vsync": "off",
@@ -6048,9 +6050,9 @@
       },
       {
         "category": "NVCP",
-        "reason": "Ryujinx benefits from driver threading for shader compilation.",
+        "reason": "This NVIDIA control is OpenGL-specific and does not accelerate Vulkan shader compilation.",
         "setting": "Threaded Optimization",
-        "value": "On"
+        "value": "Auto"
       },
       {
         "category": "=== RYUJINX SETTINGS ===",
@@ -6233,7 +6235,7 @@
         ],
         "profile_name": "SSBU / HewDraw Remix (Ryujinx)",
         "shader_cache": "unlimited",
-        "threaded_optimization": "on",
+        "threaded_optimization": "auto",
         "triple_buffering": "off",
         "vrr_app_override": "force_off",
         "vsync": "off",
@@ -6343,9 +6345,9 @@
       },
       {
         "category": "Graphics",
-        "reason": "Official Dolphin guidance still points most NVIDIA/AMD users to Vulkan first. DX12 is still worth A/B testing if Vulkan misbehaves or if HAGS + DX12 performs better on your exact system.",
+        "reason": "This Slippi release uses an older Ishiiruka-derived backend stack whose Windows default order starts with D3D11. ABSO does not own this setting: keep the renderer that is stable on your machine, and only prefer Vulkan or D3D12 after a repeatable frame-time A/B test.",
         "setting": "Backend",
-        "value": "Vulkan first, then test DX12"
+        "value": "Preserve your choice (D3D11 compatibility baseline)"
       },
       {
         "category": "Graphics",
@@ -6391,9 +6393,15 @@
       },
       {
         "category": "GFX.ini [Enhancements]",
-        "reason": "Texture upscaling adds GPU overhead.",
+        "reason": "This is the switch that actually enables xBRZ-style texture upscaling. With it at 0 no scaling runs and the factor below is inert.",
+        "setting": "TextureScalingType",
+        "value": "0 (off)"
+      },
+      {
+        "category": "GFX.ini [Enhancements]",
+        "reason": "Texture upscaling adds GPU overhead. Ishiiruka's valid range is 2-5, so 2 is the floor - writing 1 is out of range and Dolphin clamps it back on every launch.",
         "setting": "TextureScalingFactor",
-        "value": "1"
+        "value": "2"
       },
       {
         "category": "GFX.ini [Hacks]",
@@ -6512,7 +6520,7 @@
     ],
     "include_legacy_tweaks": false,
     "is_emulator_profile": true,
-    "is_online_profile": false,
+    "is_online_profile": true,
     "is_sdr_only": true,
     "network_scope": "none",
     "optimization_target": "minimum_latency",
@@ -6548,7 +6556,8 @@
         "rush_presentation": "False",
         "smooth_presentation": "False",
         "sync_gpu": "False",
-        "texture_scaling_factor": "1",
+        "texture_scaling_factor": "2",
+        "texture_scaling_type": "0",
         "time_stretching": "False",
         "timing_variance": "8",
         "use_deposterize": "False",
@@ -6730,7 +6739,8 @@
         "rush_presentation": "False",
         "smooth_presentation": "False",
         "sync_gpu": "False",
-        "texture_scaling_factor": "1",
+        "texture_scaling_factor": "2",
+        "texture_scaling_type": "0",
         "time_stretching": "False",
         "timing_variance": "8",
         "use_deposterize": "False",
@@ -6936,7 +6946,8 @@
         "rush_presentation": "False",
         "smooth_presentation": "False",
         "sync_gpu": "False",
-        "texture_scaling_factor": "1",
+        "texture_scaling_factor": "2",
+        "texture_scaling_type": "0",
         "time_stretching": "False",
         "timing_variance": "8",
         "use_deposterize": "False",
@@ -7108,9 +7119,9 @@
       },
       {
         "category": "Graphics",
-        "reason": "Official Dolphin guidance still points most NVIDIA/AMD users to Vulkan first. DX12 is still worth A/B testing if Vulkan misbehaves or if HAGS + DX12 performs better on your exact system.",
+        "reason": "This Slippi release uses an older Ishiiruka-derived backend stack whose Windows default order starts with D3D11. ABSO does not own this setting: keep the renderer that is stable on your machine, and only prefer Vulkan or D3D12 after a repeatable frame-time A/B test.",
         "setting": "Backend",
-        "value": "Vulkan first, then test DX12"
+        "value": "Preserve your choice (D3D11 compatibility baseline)"
       },
       {
         "category": "Graphics",
@@ -7156,9 +7167,15 @@
       },
       {
         "category": "GFX.ini [Enhancements]",
-        "reason": "Texture upscaling adds GPU overhead.",
+        "reason": "This is the switch that actually enables xBRZ-style texture upscaling. With it at 0 no scaling runs and the factor below is inert.",
+        "setting": "TextureScalingType",
+        "value": "0 (off)"
+      },
+      {
+        "category": "GFX.ini [Enhancements]",
+        "reason": "Texture upscaling adds GPU overhead. Ishiiruka's valid range is 2-5, so 2 is the floor - writing 1 is out of range and Dolphin clamps it back on every launch.",
         "setting": "TextureScalingFactor",
-        "value": "1"
+        "value": "2"
       },
       {
         "category": "GFX.ini [Hacks]",
@@ -7277,7 +7294,7 @@
     ],
     "include_legacy_tweaks": false,
     "is_emulator_profile": true,
-    "is_online_profile": false,
+    "is_online_profile": true,
     "is_sdr_only": false,
     "network_scope": "none",
     "optimization_target": "minimum_latency",
@@ -7313,7 +7330,8 @@
         "rush_presentation": "False",
         "smooth_presentation": "False",
         "sync_gpu": "False",
-        "texture_scaling_factor": "1",
+        "texture_scaling_factor": "2",
+        "texture_scaling_type": "0",
         "time_stretching": "False",
         "timing_variance": "8",
         "use_deposterize": "False",
@@ -7461,9 +7479,9 @@
       },
       {
         "category": "Graphics",
-        "reason": "Official Dolphin guidance still points most NVIDIA/AMD users to Vulkan first. DX12 is still worth A/B testing if Vulkan misbehaves or if HAGS + DX12 performs better on your exact system.",
+        "reason": "This Slippi release uses an older Ishiiruka-derived backend stack whose Windows default order starts with D3D11. ABSO does not own this setting: keep the renderer that is stable on your machine, and only prefer Vulkan or D3D12 after a repeatable frame-time A/B test.",
         "setting": "Backend",
-        "value": "Vulkan first, then test DX12"
+        "value": "Preserve your choice (D3D11 compatibility baseline)"
       },
       {
         "category": "Graphics",
@@ -7509,9 +7527,15 @@
       },
       {
         "category": "GFX.ini [Enhancements]",
-        "reason": "Texture upscaling adds GPU overhead.",
+        "reason": "This is the switch that actually enables xBRZ-style texture upscaling. With it at 0 no scaling runs and the factor below is inert.",
+        "setting": "TextureScalingType",
+        "value": "0 (off)"
+      },
+      {
+        "category": "GFX.ini [Enhancements]",
+        "reason": "Texture upscaling adds GPU overhead. Ishiiruka's valid range is 2-5, so 2 is the floor - writing 1 is out of range and Dolphin clamps it back on every launch.",
         "setting": "TextureScalingFactor",
-        "value": "1"
+        "value": "2"
       },
       {
         "category": "GFX.ini [Hacks]",
@@ -7630,7 +7654,7 @@
     ],
     "include_legacy_tweaks": false,
     "is_emulator_profile": true,
-    "is_online_profile": false,
+    "is_online_profile": true,
     "is_sdr_only": true,
     "network_scope": "none",
     "optimization_target": "minimum_latency",
@@ -7666,7 +7690,8 @@
         "rush_presentation": "False",
         "smooth_presentation": "False",
         "sync_gpu": "False",
-        "texture_scaling_factor": "1",
+        "texture_scaling_factor": "2",
+        "texture_scaling_type": "0",
         "time_stretching": "False",
         "timing_variance": "8",
         "use_deposterize": "False",
@@ -7835,9 +7860,9 @@
       },
       {
         "category": "Graphics",
-        "reason": "Official Dolphin guidance still points most NVIDIA/AMD users to Vulkan first. DX12 is still worth A/B testing if Vulkan misbehaves or if HAGS + DX12 performs better on your exact system.",
+        "reason": "This Slippi release uses an older Ishiiruka-derived backend stack whose Windows default order starts with D3D11. ABSO does not own this setting: keep the renderer that is stable on your machine, and only prefer Vulkan or D3D12 after a repeatable frame-time A/B test.",
         "setting": "Backend",
-        "value": "Vulkan first, then test DX12"
+        "value": "Preserve your choice (D3D11 compatibility baseline)"
       },
       {
         "category": "Graphics",
@@ -7883,9 +7908,15 @@
       },
       {
         "category": "GFX.ini [Enhancements]",
-        "reason": "Texture upscaling adds GPU overhead.",
+        "reason": "This is the switch that actually enables xBRZ-style texture upscaling. With it at 0 no scaling runs and the factor below is inert.",
+        "setting": "TextureScalingType",
+        "value": "0 (off)"
+      },
+      {
+        "category": "GFX.ini [Enhancements]",
+        "reason": "Texture upscaling adds GPU overhead. Ishiiruka's valid range is 2-5, so 2 is the floor - writing 1 is out of range and Dolphin clamps it back on every launch.",
         "setting": "TextureScalingFactor",
-        "value": "1"
+        "value": "2"
       },
       {
         "category": "GFX.ini [Hacks]",
@@ -8004,7 +8035,7 @@
     ],
     "include_legacy_tweaks": false,
     "is_emulator_profile": true,
-    "is_online_profile": false,
+    "is_online_profile": true,
     "is_sdr_only": false,
     "network_scope": "none",
     "optimization_target": "minimum_latency",
@@ -8040,7 +8071,8 @@
         "rush_presentation": "False",
         "smooth_presentation": "False",
         "sync_gpu": "False",
-        "texture_scaling_factor": "1",
+        "texture_scaling_factor": "2",
+        "texture_scaling_type": "0",
         "time_stretching": "False",
         "timing_variance": "8",
         "use_deposterize": "False",

@@ -76,38 +76,30 @@ True` against an ABSO target of `False`. Every Slippi profile targets it off and
 
 ## Graphics Backend Comparison
 
-### Vulkan
-**Best for:** NVIDIA (Turing+), AMD (RDNA+)
+Backend advice must be scoped to the emulator build. Current mainline Dolphin
+guidance is not proof for Slippi Launcher's older Ishiiruka-derived netplay
+build. In Slippi Ishiiruka v3.6.4, the Windows backend list/default order is
+**D3D11, D3D12, D3D9, OpenGL, Vulkan**. That is compatibility evidence, not a
+benchmark ranking, but it makes D3D11 the honest baseline for this exact build.
 
-| Aspect | Rating | Notes |
-|--------|--------|-------|
-| Latency | Excellent | Native low-latency path |
-| Stability | Very Good | Mature implementation |
-| HAGS Compatibility | Good | Works but HAGS benefit varies |
-| Recommendation | **Often Best** | Test against DX12 on your system |
+| Backend | Slippi v3.6.4 posture | Evidence class |
+| --- | --- | --- |
+| D3D11 | Compatibility baseline and first Windows backend | documented |
+| D3D12 | Supported, but its fork backend has little recent maintenance | compatibility / heuristic |
+| Vulkan | Supported; test locally if D3D11 has issues | heuristic |
+| OpenGL | Supported troubleshooting alternative | compatibility |
 
-### DirectX 12
-**Best for:** NVIDIA with HAGS enabled
+ABSO therefore preserves the user's renderer. It does not write
+``GFXBackend``. Prefer D3D11 as the initial stability baseline on this Slippi
+build, then move to Vulkan or D3D12 only when repeatable frame-time captures on
+the same machine show a benefit. The earlier ``0-2ms`` backend-difference claim
+had no benchmark artifact in this repository and has been removed.
 
-| Aspect | Rating | Notes |
-|--------|--------|-------|
-| Latency | Excellent | Especially with HAGS |
-| Stability | Good | Some edge case issues |
-| HAGS Compatibility | **Excellent** | HAGS designed for DX12 |
-| Recommendation | **Good Alternative** | Best if HAGS works well on your system |
+Primary implementation sources:
 
-### OpenGL
-**Best for:** Legacy systems, troubleshooting
-
-| Aspect | Rating | Notes |
-|--------|--------|-------|
-| Latency | Good | Higher driver overhead |
-| Stability | Excellent | Most mature backend |
-| HAGS Compatibility | Poor | HAGS doesn't help OpenGL |
-| Recommendation | **Fallback Only** | Use if Vulkan/DX12 have issues |
-
-### Backend Recommendation
-**Test both Vulkan and DX12 on your specific system.** Vulkan is often best on modern NVIDIA/AMD, but DX12 + HAGS can achieve similar results. The difference is typically 0-2ms between the two.
+- [Slippi Ishiiruka v3.6.4 backend order](https://github.com/project-slippi/Ishiiruka/blob/v3.6.4/Source/Core/VideoCommon/VideoBackendBase.cpp#L70-L116)
+- [Slippi stores GFXBackend in Dolphin.ini](https://github.com/project-slippi/Ishiiruka/blob/v3.6.4/Source/Core/Core/ConfigManager.cpp#L690-L696)
+- [Current mainline Dolphin graphics guide](https://dolphin-emu.org/docs/guides/settings/)
 
 ---
 
@@ -138,13 +130,13 @@ HAGS results are highly system-dependent:
 
 | System Type | HAGS Effect | Notes |
 |-------------|-------------|-------|
-| DX12 + NVIDIA Turing+ | Often beneficial | 0-2ms improvement possible |
-| DX12 + AMD RDNA+ | Mixed results | Test both settings |
+| DX12 + NVIDIA Turing+ | Unmeasured here | Test both settings |
+| DX12 + AMD RDNA+ | Unmeasured here | Test both settings |
 | Vulkan (any GPU) | Minimal effect | Vulkan has own scheduling |
 | DX11 | Avoid | Can cause micro-stutters |
 
 **Recommendation:**
-- Enable HAGS if using DX12 backend
+- Treat HAGS-on for DX12 as a heuristic, not a measured universal win
 - Test both ON and OFF for your specific system
 - Monitor for micro-stutters if issues occur
 

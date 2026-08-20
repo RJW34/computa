@@ -660,3 +660,25 @@ profile_overrides:
             manager.load()
 
         assert "profile_overrides.slippi-melee.graphics" in str(exc_info.value)
+
+
+def test_cpu_affinity_is_an_override_surface() -> None:
+    """CpuAffinityHandler must be reachable from abso.yaml profile_overrides.
+
+    Regression: three profile bases documented "opt in via abso.yaml
+    profile_overrides" for CPU affinity, but no ``cpu_affinity`` section
+    existed, so the documented YAML raised ConfigValidationError on load.
+    """
+    from abso.core.config import (
+        PROFILE_OVERRIDE_HANDLER_ATTRS,
+        ProfileOverrides,
+        merge_profile_override_settings,
+    )
+
+    assert PROFILE_OVERRIDE_HANDLER_ATTRS["CpuAffinityHandler"] == "cpu_affinity"
+
+    overrides = ProfileOverrides(cpu_affinity={"strategy": "p_cores_only"})
+    merged = merge_profile_override_settings(
+        {"strategy": None}, "CpuAffinityHandler", overrides
+    )
+    assert merged["strategy"] == "p_cores_only"

@@ -102,13 +102,8 @@
           "DropboxUpdate.exe",
           "GoogleDriveFS.exe",
           "googledrivesync.exe",
-          "lghub.exe",
-          "lghub_agent.exe",
           "lghub_updater.exe",
-          "LogiAiPromptBuilder.exe",
-          "iCUE.exe",
-          "LCore.exe",
-          "CorsairService.exe"
+          "LogiAiPromptBuilder.exe"
         ],
         "opt_in": [
           "GeForce Experience.exe",
@@ -136,7 +131,7 @@
       },
       "requires_overlay_free_path": false,
       "keep_awake_while_gaming": true,
-      "is_online_profile": false
+      "is_online_profile": true
     },
     {
       "id": "slippi-melee-hdr",
@@ -240,13 +235,8 @@
           "DropboxUpdate.exe",
           "GoogleDriveFS.exe",
           "googledrivesync.exe",
-          "lghub.exe",
-          "lghub_agent.exe",
           "lghub_updater.exe",
-          "LogiAiPromptBuilder.exe",
-          "iCUE.exe",
-          "LCore.exe",
-          "CorsairService.exe"
+          "LogiAiPromptBuilder.exe"
         ],
         "opt_in": [
           "GeForce Experience.exe",
@@ -274,7 +264,7 @@
       },
       "requires_overlay_free_path": false,
       "keep_awake_while_gaming": true,
-      "is_online_profile": false
+      "is_online_profile": true
     },
     {
       "id": "slippi-melee-console-parity",
@@ -378,13 +368,8 @@
           "DropboxUpdate.exe",
           "GoogleDriveFS.exe",
           "googledrivesync.exe",
-          "lghub.exe",
-          "lghub_agent.exe",
           "lghub_updater.exe",
-          "LogiAiPromptBuilder.exe",
-          "iCUE.exe",
-          "LCore.exe",
-          "CorsairService.exe"
+          "LogiAiPromptBuilder.exe"
         ],
         "opt_in": [
           "GeForce Experience.exe",
@@ -516,13 +501,8 @@
           "DropboxUpdate.exe",
           "GoogleDriveFS.exe",
           "googledrivesync.exe",
-          "lghub.exe",
-          "lghub_agent.exe",
           "lghub_updater.exe",
-          "LogiAiPromptBuilder.exe",
-          "iCUE.exe",
-          "LCore.exe",
-          "CorsairService.exe"
+          "LogiAiPromptBuilder.exe"
         ],
         "opt_in": [
           "GeForce Experience.exe",
@@ -654,13 +634,8 @@
           "DropboxUpdate.exe",
           "GoogleDriveFS.exe",
           "googledrivesync.exe",
-          "lghub.exe",
-          "lghub_agent.exe",
           "lghub_updater.exe",
-          "LogiAiPromptBuilder.exe",
-          "iCUE.exe",
-          "LCore.exe",
-          "CorsairService.exe"
+          "LogiAiPromptBuilder.exe"
         ],
         "opt_in": [
           "GeForce Experience.exe",
@@ -688,7 +663,7 @@
       },
       "requires_overlay_free_path": false,
       "keep_awake_while_gaming": true,
-      "is_online_profile": false
+      "is_online_profile": true
     },
     {
       "id": "slippi-melee-universal-hdr",
@@ -792,13 +767,8 @@
           "DropboxUpdate.exe",
           "GoogleDriveFS.exe",
           "googledrivesync.exe",
-          "lghub.exe",
-          "lghub_agent.exe",
           "lghub_updater.exe",
-          "LogiAiPromptBuilder.exe",
-          "iCUE.exe",
-          "LCore.exe",
-          "CorsairService.exe"
+          "LogiAiPromptBuilder.exe"
         ],
         "opt_in": [
           "GeForce Experience.exe",
@@ -826,7 +796,7 @@
       },
       "requires_overlay_free_path": false,
       "keep_awake_while_gaming": true,
-      "is_online_profile": false
+      "is_online_profile": true
     },
     {
       "id": "rivals2-nosync",
@@ -932,13 +902,8 @@
           "DropboxUpdate.exe",
           "GoogleDriveFS.exe",
           "googledrivesync.exe",
-          "lghub.exe",
-          "lghub_agent.exe",
           "lghub_updater.exe",
-          "LogiAiPromptBuilder.exe",
-          "iCUE.exe",
-          "LCore.exe",
-          "CorsairService.exe"
+          "LogiAiPromptBuilder.exe"
         ],
         "opt_in": [
           "GeForce Experience.exe",
@@ -1072,13 +1037,8 @@
           "DropboxUpdate.exe",
           "GoogleDriveFS.exe",
           "googledrivesync.exe",
-          "lghub.exe",
-          "lghub_agent.exe",
           "lghub_updater.exe",
-          "LogiAiPromptBuilder.exe",
-          "iCUE.exe",
-          "LCore.exe",
-          "CorsairService.exe"
+          "LogiAiPromptBuilder.exe"
         ],
         "opt_in": [
           "GeForce Experience.exe",
@@ -1212,13 +1172,8 @@
           "DropboxUpdate.exe",
           "GoogleDriveFS.exe",
           "googledrivesync.exe",
-          "lghub.exe",
-          "lghub_agent.exe",
           "lghub_updater.exe",
-          "LogiAiPromptBuilder.exe",
-          "iCUE.exe",
-          "LCore.exe",
-          "CorsairService.exe"
+          "LogiAiPromptBuilder.exe"
         ],
         "opt_in": [
           "GeForce Experience.exe",
@@ -1352,13 +1307,8 @@
           "DropboxUpdate.exe",
           "GoogleDriveFS.exe",
           "googledrivesync.exe",
-          "lghub.exe",
-          "lghub_agent.exe",
           "lghub_updater.exe",
-          "LogiAiPromptBuilder.exe",
-          "iCUE.exe",
-          "LCore.exe",
-          "CorsairService.exe"
+          "LogiAiPromptBuilder.exe"
         ],
         "opt_in": [
           "GeForce Experience.exe",
@@ -1607,13 +1557,8 @@
           "DropboxUpdate.exe",
           "GoogleDriveFS.exe",
           "googledrivesync.exe",
-          "lghub.exe",
-          "lghub_agent.exe",
           "lghub_updater.exe",
-          "LogiAiPromptBuilder.exe",
-          "iCUE.exe",
-          "LCore.exe",
-          "CorsairService.exe"
+          "LogiAiPromptBuilder.exe"
         ],
         "opt_in": [
           "GeForce Experience.exe",
@@ -1639,7 +1584,7 @@
           "mullvad-daemon.exe"
         ]
       },
-      "requires_overlay_free_path": true,
+      "requires_overlay_free_path": false,
       "keep_awake_while_gaming": false,
       "is_online_profile": false
     },
@@ -1743,13 +1688,8 @@
           "DropboxUpdate.exe",
           "GoogleDriveFS.exe",
           "googledrivesync.exe",
-          "lghub.exe",
-          "lghub_agent.exe",
           "lghub_updater.exe",
-          "LogiAiPromptBuilder.exe",
-          "iCUE.exe",
-          "LCore.exe",
-          "CorsairService.exe"
+          "LogiAiPromptBuilder.exe"
         ],
         "opt_in": [
           "GeForce Experience.exe",
@@ -1775,7 +1715,7 @@
           "mullvad-daemon.exe"
         ]
       },
-      "requires_overlay_free_path": true,
+      "requires_overlay_free_path": false,
       "keep_awake_while_gaming": false,
       "is_online_profile": false
     },
@@ -1887,13 +1827,8 @@
           "DropboxUpdate.exe",
           "GoogleDriveFS.exe",
           "googledrivesync.exe",
-          "lghub.exe",
-          "lghub_agent.exe",
           "lghub_updater.exe",
-          "LogiAiPromptBuilder.exe",
-          "iCUE.exe",
-          "LCore.exe",
-          "CorsairService.exe"
+          "LogiAiPromptBuilder.exe"
         ],
         "opt_in": [
           "GeForce Experience.exe",
@@ -2031,13 +1966,8 @@
           "DropboxUpdate.exe",
           "GoogleDriveFS.exe",
           "googledrivesync.exe",
-          "lghub.exe",
-          "lghub_agent.exe",
           "lghub_updater.exe",
-          "LogiAiPromptBuilder.exe",
-          "iCUE.exe",
-          "LCore.exe",
-          "CorsairService.exe"
+          "LogiAiPromptBuilder.exe"
         ],
         "opt_in": [
           "GeForce Experience.exe",
@@ -2175,13 +2105,8 @@
           "DropboxUpdate.exe",
           "GoogleDriveFS.exe",
           "googledrivesync.exe",
-          "lghub.exe",
-          "lghub_agent.exe",
           "lghub_updater.exe",
-          "LogiAiPromptBuilder.exe",
-          "iCUE.exe",
-          "LCore.exe",
-          "CorsairService.exe"
+          "LogiAiPromptBuilder.exe"
         ],
         "opt_in": [
           "GeForce Experience.exe",
@@ -2317,13 +2242,8 @@
           "DropboxUpdate.exe",
           "GoogleDriveFS.exe",
           "googledrivesync.exe",
-          "lghub.exe",
-          "lghub_agent.exe",
           "lghub_updater.exe",
-          "LogiAiPromptBuilder.exe",
-          "iCUE.exe",
-          "LCore.exe",
-          "CorsairService.exe"
+          "LogiAiPromptBuilder.exe"
         ],
         "opt_in": [
           "GeForce Experience.exe",
@@ -2459,13 +2379,8 @@
           "DropboxUpdate.exe",
           "GoogleDriveFS.exe",
           "googledrivesync.exe",
-          "lghub.exe",
-          "lghub_agent.exe",
           "lghub_updater.exe",
-          "LogiAiPromptBuilder.exe",
-          "iCUE.exe",
-          "LCore.exe",
-          "CorsairService.exe"
+          "LogiAiPromptBuilder.exe"
         ],
         "opt_in": [
           "GeForce Experience.exe",
@@ -2600,13 +2515,8 @@
           "DropboxUpdate.exe",
           "GoogleDriveFS.exe",
           "googledrivesync.exe",
-          "lghub.exe",
-          "lghub_agent.exe",
           "lghub_updater.exe",
-          "LogiAiPromptBuilder.exe",
-          "iCUE.exe",
-          "LCore.exe",
-          "CorsairService.exe"
+          "LogiAiPromptBuilder.exe"
         ],
         "opt_in": [
           "GeForce Experience.exe",
@@ -2741,13 +2651,8 @@
           "DropboxUpdate.exe",
           "GoogleDriveFS.exe",
           "googledrivesync.exe",
-          "lghub.exe",
-          "lghub_agent.exe",
           "lghub_updater.exe",
-          "LogiAiPromptBuilder.exe",
-          "iCUE.exe",
-          "LCore.exe",
-          "CorsairService.exe"
+          "LogiAiPromptBuilder.exe"
         ],
         "opt_in": [
           "GeForce Experience.exe",
@@ -2807,8 +2712,8 @@
       ],
       "has_in_game_settings": true,
       "tray_category": "Shooters",
-      "tray_subtitle": "Strict SDR Exclusive | Reflex (set in-game) | G-SYNC ON",
-      "tray_description": "Tear-free low-latency VRR Deadlock profile on the strict fullscreen-only G-SYNC path. Enable Reflex On + Boost manually in-game.",
+      "tray_subtitle": "Overlay-Free SDR Flip Path | Reflex (set in-game) | G-SYNC ON",
+      "tray_description": "Tear-free low-latency VRR Deadlock profile on the windowed DXGI flip G-SYNC path. Enable Reflex On + Boost manually in-game.",
       "tray_group": "deadlock",
       "tray_group_name": "Deadlock",
       "tray_variant": "G-SYNC (SDR)",
@@ -2882,13 +2787,8 @@
           "DropboxUpdate.exe",
           "GoogleDriveFS.exe",
           "googledrivesync.exe",
-          "lghub.exe",
-          "lghub_agent.exe",
           "lghub_updater.exe",
-          "LogiAiPromptBuilder.exe",
-          "iCUE.exe",
-          "LCore.exe",
-          "CorsairService.exe"
+          "LogiAiPromptBuilder.exe"
         ],
         "opt_in": [
           "GeForce Experience.exe",
@@ -2948,7 +2848,7 @@
       ],
       "has_in_game_settings": true,
       "tray_category": "Shooters",
-      "tray_subtitle": "Strict HDR Exclusive | Reflex (set in-game) | G-SYNC ON",
+      "tray_subtitle": "Overlay-Free HDR Flip Path | Reflex (set in-game) | G-SYNC ON",
       "tray_description": "Tear-free low-latency VRR Deadlock with Windows HDR on for OLED / Mini-LED. Deadlock currently renders SDR through the HDR composition path.",
       "tray_group": "deadlock",
       "tray_group_name": "Deadlock",
@@ -3023,13 +2923,8 @@
           "DropboxUpdate.exe",
           "GoogleDriveFS.exe",
           "googledrivesync.exe",
-          "lghub.exe",
-          "lghub_agent.exe",
           "lghub_updater.exe",
-          "LogiAiPromptBuilder.exe",
-          "iCUE.exe",
-          "LCore.exe",
-          "CorsairService.exe"
+          "LogiAiPromptBuilder.exe"
         ],
         "opt_in": [
           "GeForce Experience.exe",
@@ -3163,13 +3058,8 @@
           "DropboxUpdate.exe",
           "GoogleDriveFS.exe",
           "googledrivesync.exe",
-          "lghub.exe",
-          "lghub_agent.exe",
           "lghub_updater.exe",
-          "LogiAiPromptBuilder.exe",
-          "iCUE.exe",
-          "LCore.exe",
-          "CorsairService.exe"
+          "LogiAiPromptBuilder.exe"
         ],
         "opt_in": [
           "GeForce Experience.exe",
@@ -3303,13 +3193,8 @@
           "DropboxUpdate.exe",
           "GoogleDriveFS.exe",
           "googledrivesync.exe",
-          "lghub.exe",
-          "lghub_agent.exe",
           "lghub_updater.exe",
-          "LogiAiPromptBuilder.exe",
-          "iCUE.exe",
-          "LCore.exe",
-          "CorsairService.exe"
+          "LogiAiPromptBuilder.exe"
         ],
         "opt_in": [
           "GeForce Experience.exe",
@@ -3368,8 +3253,8 @@
       ],
       "has_in_game_settings": true,
       "tray_category": "Shooters",
-      "tray_subtitle": "Strict SDR Exclusive | Reflex (set in-game) | G-SYNC ON",
-      "tray_description": "Tear-free low-latency VRR Counter-Strike 2 profile on the strict fullscreen-only G-SYNC path. Enable Reflex Enabled + Boost manually in-game.",
+      "tray_subtitle": "Overlay-Free SDR Flip Path | Reflex (set in-game) | G-SYNC ON",
+      "tray_description": "Tear-free low-latency VRR Counter-Strike 2 profile on the windowed DXGI flip G-SYNC path. Enable Reflex Enabled + Boost manually in-game.",
       "tray_group": "counter-strike-2",
       "tray_group_name": "Counter-Strike 2",
       "tray_variant": "G-SYNC (SDR)",
@@ -3443,13 +3328,8 @@
           "DropboxUpdate.exe",
           "GoogleDriveFS.exe",
           "googledrivesync.exe",
-          "lghub.exe",
-          "lghub_agent.exe",
           "lghub_updater.exe",
-          "LogiAiPromptBuilder.exe",
-          "iCUE.exe",
-          "LCore.exe",
-          "CorsairService.exe"
+          "LogiAiPromptBuilder.exe"
         ],
         "opt_in": [
           "GeForce Experience.exe",
@@ -3508,7 +3388,7 @@
       ],
       "has_in_game_settings": true,
       "tray_category": "Shooters",
-      "tray_subtitle": "Strict HDR Exclusive | Reflex (set in-game) | G-SYNC ON",
+      "tray_subtitle": "Overlay-Free HDR Flip Path | Reflex (set in-game) | G-SYNC ON",
       "tray_description": "Tear-free low-latency VRR Counter-Strike 2 with Windows HDR on for OLED / Mini-LED. CS2 currently renders SDR through the HDR composition path.",
       "tray_group": "counter-strike-2",
       "tray_group_name": "Counter-Strike 2",
@@ -3583,13 +3463,8 @@
           "DropboxUpdate.exe",
           "GoogleDriveFS.exe",
           "googledrivesync.exe",
-          "lghub.exe",
-          "lghub_agent.exe",
           "lghub_updater.exe",
-          "LogiAiPromptBuilder.exe",
-          "iCUE.exe",
-          "LCore.exe",
-          "CorsairService.exe"
+          "LogiAiPromptBuilder.exe"
         ],
         "opt_in": [
           "GeForce Experience.exe",
@@ -3741,7 +3616,7 @@
     {
       "id": "overwatch2",
       "display_name": "Overwatch 2 - No Sync SDR",
-      "description": "Latency-focused no-sync SDR profile (Reflex OFF, VSync OFF, VRR OFF)",
+      "description": "Latency-focused no-sync SDR profile (Reflex ON + Boost, VSync OFF, VRR OFF)",
       "optimization_target": "low_latency_high_fps",
       "application_scope": "system_plus_native_config",
       "executables": [
@@ -3769,7 +3644,7 @@
       "has_in_game_settings": true,
       "tray_category": "Shooters",
       "tray_subtitle": "No Sync SDR | Reflex ON+Boost (set in-game) | VSync OFF | G-SYNC OFF",
-      "tray_description": "Latency-focused no-sync SDR profile (Reflex OFF, VSync OFF, VRR OFF)",
+      "tray_description": "Latency-focused no-sync SDR profile (Reflex ON + Boost, VSync OFF, VRR OFF)",
       "tray_group": "overwatch2",
       "tray_group_name": "Overwatch 2",
       "tray_variant": "No Sync (SDR)",
@@ -3843,13 +3718,8 @@
           "DropboxUpdate.exe",
           "GoogleDriveFS.exe",
           "googledrivesync.exe",
-          "lghub.exe",
-          "lghub_agent.exe",
           "lghub_updater.exe",
-          "LogiAiPromptBuilder.exe",
-          "iCUE.exe",
-          "LCore.exe",
-          "CorsairService.exe"
+          "LogiAiPromptBuilder.exe"
         ],
         "opt_in": [
           "GeForce Experience.exe",
@@ -3882,7 +3752,7 @@
     {
       "id": "overwatch2-hdr",
       "display_name": "Overwatch 2 - No Sync HDR",
-      "description": "Latency-focused no-sync HDR profile (Reflex OFF, VSync OFF, VRR OFF). Native HDR for OLED / Mini-LED displays.",
+      "description": "Latency-focused no-sync HDR profile (Reflex ON + Boost, VSync OFF, VRR OFF). Native HDR for OLED / Mini-LED displays.",
       "optimization_target": "low_latency_high_fps",
       "application_scope": "system_plus_native_config",
       "executables": [
@@ -3984,13 +3854,8 @@
           "DropboxUpdate.exe",
           "GoogleDriveFS.exe",
           "googledrivesync.exe",
-          "lghub.exe",
-          "lghub_agent.exe",
           "lghub_updater.exe",
-          "LogiAiPromptBuilder.exe",
-          "iCUE.exe",
-          "LCore.exe",
-          "CorsairService.exe"
+          "LogiAiPromptBuilder.exe"
         ],
         "opt_in": [
           "GeForce Experience.exe",
@@ -4125,13 +3990,8 @@
           "DropboxUpdate.exe",
           "GoogleDriveFS.exe",
           "googledrivesync.exe",
-          "lghub.exe",
-          "lghub_agent.exe",
           "lghub_updater.exe",
-          "LogiAiPromptBuilder.exe",
-          "iCUE.exe",
-          "LCore.exe",
-          "CorsairService.exe"
+          "LogiAiPromptBuilder.exe"
         ],
         "opt_in": [
           "GeForce Experience.exe",
@@ -4266,13 +4126,8 @@
           "DropboxUpdate.exe",
           "GoogleDriveFS.exe",
           "googledrivesync.exe",
-          "lghub.exe",
-          "lghub_agent.exe",
           "lghub_updater.exe",
-          "LogiAiPromptBuilder.exe",
-          "iCUE.exe",
-          "LCore.exe",
-          "CorsairService.exe"
+          "LogiAiPromptBuilder.exe"
         ],
         "opt_in": [
           "GeForce Experience.exe",
@@ -4643,13 +4498,8 @@
           "DropboxUpdate.exe",
           "GoogleDriveFS.exe",
           "googledrivesync.exe",
-          "lghub.exe",
-          "lghub_agent.exe",
           "lghub_updater.exe",
-          "LogiAiPromptBuilder.exe",
-          "iCUE.exe",
-          "LCore.exe",
-          "CorsairService.exe"
+          "LogiAiPromptBuilder.exe"
         ],
         "opt_in": [
           "GeForce Experience.exe",
@@ -4778,13 +4628,8 @@
           "DropboxUpdate.exe",
           "GoogleDriveFS.exe",
           "googledrivesync.exe",
-          "lghub.exe",
-          "lghub_agent.exe",
           "lghub_updater.exe",
-          "LogiAiPromptBuilder.exe",
-          "iCUE.exe",
-          "LCore.exe",
-          "CorsairService.exe"
+          "LogiAiPromptBuilder.exe"
         ],
         "opt_in": [
           "GeForce Experience.exe",
@@ -5003,13 +4848,8 @@
           "DropboxUpdate.exe",
           "GoogleDriveFS.exe",
           "googledrivesync.exe",
-          "lghub.exe",
-          "lghub_agent.exe",
           "lghub_updater.exe",
-          "LogiAiPromptBuilder.exe",
-          "iCUE.exe",
-          "LCore.exe",
-          "CorsairService.exe"
+          "LogiAiPromptBuilder.exe"
         ],
         "opt_in": [
           "GeForce Experience.exe",

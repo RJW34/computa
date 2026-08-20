@@ -99,10 +99,9 @@ class _CounterStrike2BaseProfile(ReflexShooterBaseProfile):
 
     @property
     def fullscreen_optimizations_per_exe(self) -> dict[str, bool]:
-        # Every CS2 lane runs exclusive-style Fullscreen. Disable FSO per-exe
-        # so Windows cannot silently shunt the game into the composited
-        # borderless shim.
-        return fso_overrides(_CS2_EXECUTABLES)
+        # Source 2 has no legacy exclusive path. Keep the DXGI flip path and
+        # Windows fullscreen optimizations available on every lane.
+        return fso_overrides(_CS2_EXECUTABLES, disabled=False)
 
     @property
     def nvidia_profile_name(self) -> str | None:
@@ -137,6 +136,10 @@ class _CounterStrike2BaseProfile(ReflexShooterBaseProfile):
             "WindowsSettingsHandler": {
                 "hdr": False,
                 "auto_hdr": False,
+                "windowed_optimizations": True,
+            },
+            "GraphicsSettingsHandler": {
+                "disable_global_fso": False,
             },
         }
 
@@ -151,8 +154,8 @@ class _CounterStrike2BaseProfile(ReflexShooterBaseProfile):
             {
                 "category": "Video",
                 "setting": "Display Mode",
-                "value": "Fullscreen",
-                "reason": "No-sync lane: Fullscreen avoids the DWM compositor tax and keeps the Source 2 present path deterministic.",
+                "value": "Fullscreen or Fullscreen Windowed (DXGI flip)",
+                "reason": "Source 2 has no legacy exclusive path; both modes use the modern DXGI flip presentation model.",
             },
             {
                 "category": "Video",

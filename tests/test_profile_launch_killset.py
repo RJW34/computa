@@ -242,14 +242,6 @@ def test_strict_profiles_advertise_overlay_free_path_in_manifest() -> None:
         "OneDrive.exe",
         "Dropbox.exe",
         "GoogleDriveFS.exe",
-        # Peripheral daemons. Declared killable by default for the frame-time
-        # win; machines whose peripherals rely on G HUB *software* profiles
-        # (rather than onboard memory) protect them via abso.yaml
-        # process_overrides.protect - see the protect-filter tests below.
-        "lghub.exe",
-        "lghub_agent.exe",
-        "iCUE.exe",
-        "LCore.exe",
         # VPN UI/CLI/tray (user explicitly called out Tailscale). Route-holding
         # daemons live in OPT_IN to avoid kill-switch traffic blackholes.
         "tailscale-ipn.exe",
@@ -272,6 +264,18 @@ def test_aggressive_targets_are_in_always_safe(image: str) -> None:
     """User explicitly requested these die at game time on every Reflex profile."""
     images_lower = {name.lower() for name in ALWAYS_SAFE_LAUNCH_KILLSET}
     assert image.lower() in images_lower, f"{image} should be in ALWAYS_SAFE_LAUNCH_KILLSET"
+
+
+@pytest.mark.parametrize(
+    "image",
+    ["lghub.exe", "lghub_agent.exe", "iCUE.exe", "LCore.exe", "CorsairService.exe"],
+)
+def test_stateful_peripheral_daemons_are_never_killed(image: str) -> None:
+    """Software mappings, macros, RGB, and cooling must survive a sweep."""
+    from abso.core.process_janitor import NEVER_KILL_IMAGES
+
+    assert image.lower() in NEVER_KILL_IMAGES
+    assert image.lower() not in {name.lower() for name in ALWAYS_SAFE_LAUNCH_KILLSET}
 
 
 @pytest.mark.parametrize(
@@ -464,7 +468,7 @@ def test_user_protect_override_does_not_change_the_serialized_killset() -> None:
         }
 
     assert with_protect == baseline
-    assert "lghub.exe" in baseline["overwatch2-gsync-hdr"]["always_safe"]
+    assert "lghub.exe" not in baseline["overwatch2-gsync-hdr"]["always_safe"]
 
 
 def test_user_kill_override_appends_to_profile_killset() -> None:

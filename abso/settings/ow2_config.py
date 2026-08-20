@@ -20,7 +20,12 @@ import re
 from pathlib import Path
 from typing import Any
 
-from abso.core.config_safety import validate_allowed_keys
+from abso.core.config_safety import (
+    read_config_text,
+    restore_managed_key_lines,
+    validate_allowed_keys,
+    write_config_text,
+)
 from abso.core.models import Issue
 from abso.settings.base import SettingsHandler
 
@@ -135,7 +140,7 @@ class OW2ConfigHandler(SettingsHandler):
         result: dict[str, Any] = {"config_found": True, "config_path": str(ini_path)}
 
         try:
-            content = ini_path.read_text(encoding="utf-8", errors="replace")
+            content = read_config_text(ini_path)
             lines = content.splitlines()
             render_values = self._parse_render_section(lines)
 
@@ -366,13 +371,13 @@ class OW2ConfigHandler(SettingsHandler):
             return settings, None
 
     def backup(self) -> dict[str, Any]:
-        """Backup the entire Settings_v0.ini for lossless restore."""
+        """Capture full Settings_v0.ini context for selective managed-key restore."""
         ini_path = _get_ow2_settings_path()
         if not ini_path:
             return {"config_found": False}
 
         try:
-            content = ini_path.read_text(encoding="utf-8", errors="replace")
+            content = read_config_text(ini_path)
             return {
                 "config_found": True,
                 "config_path": str(ini_path),
@@ -383,13 +388,7 @@ class OW2ConfigHandler(SettingsHandler):
             return {"config_found": False}
 
     def restore(self, data: dict[str, Any]) -> bool:
-        """Restore Settings_v0.ini from backup while preserving user controls.
-
-        Profile-switch baseline restores can use an older full-file backup.
-        Restoring that byte-for-byte would also restore stale keybinds,
-        sensitivity, and crosshair values. Keep those protected values from
-        the current live file and only let the backup restore the rest.
-        """
+        """Restore only ABSO-owned keys in the current render section."""
         if not data.get("config_found"):
             return True  # Nothing to restore
 
@@ -399,23 +398,21 @@ class OW2ConfigHandler(SettingsHandler):
 
         ini_path = _get_ow2_settings_path()
         if not ini_path:
-            # Try to use the original path from backup
-            config_path = data.get("config_path")
-            if config_path:
-                ini_path = Path(config_path)
-            else:
-                logger.warning("Cannot restore OW2 config: no path available")
-                return False
+            # A removed/moved live config must not be recreated from a stale
+            # path embedded in the backup.
+            return True
 
         try:
-            ini_path.parent.mkdir(parents=True, exist_ok=True)
-            if ini_path.exists():
-                current_content = ini_path.read_text(encoding="utf-8", errors="replace")
-                file_content = self._merge_protected_values(
-                    backup_content=file_content,
-                    current_content=current_content,
-                )
-            ini_path.write_text(file_content, encoding="utf-8")
+            current_content = read_config_text(ini_path)
+            restored_content = restore_managed_key_lines(
+                current_content=current_content,
+                backup_content=file_content,
+                managed_keys=set(self.MUTABLE_SETTINGS.values()),
+                assignment_pattern=self._KV_RE,
+                section_pattern=self.RENDER_SECTION_RE,
+            )
+            if restored_content != current_content:
+                write_config_text(ini_path, restored_content)
             return True
         except OSError as e:
             logger.error("Failed to restore OW2 config: %s", e)
@@ -574,46 +571,6 @@ class OW2ConfigHandler(SettingsHandler):
             else:
                 snapshot[key] = None
         return snapshot
-
-    def _merge_protected_values(
-        self,
-        backup_content: str,
-        current_content: str,
-    ) -> str:
-        """Return backup content with protected user-control values preserved."""
-        backup_lines = backup_content.splitlines()
-        current_lines = current_content.splitlines()
-        current_protected = self._snapshot_protected(current_lines)
-
-        for key, current_value in current_protected.items():
-            if current_value is None:
-                continue
-            backup_lines = self._replace_or_append_protected_value(
-                backup_lines, key, current_value,
-            )
-
-        trailing_newline = "\n" if backup_content.endswith("\n") else ""
-        return "\n".join(backup_lines) + trailing_newline
-
-    def _replace_or_append_protected_value(
-        self,
-        lines: list[str],
-        key: str,
-        value: str,
-    ) -> list[str]:
-        """Replace a protected key in backup lines, or append near current section."""
-        for i, line in enumerate(lines):
-            if self._extract_value(line, key) is not None:
-                lines[i] = f'{key} = "{value}"'
-                return lines
-
-        # Missing from the backup but present live: append to the render
-        # section when possible so user controls survive stale baseline
-        # restores even after OW2 adds new keybind storage keys.
-        bounds = self._find_render_section(lines)
-        insert_at = bounds[1] if bounds else len(lines)
-        lines.insert(insert_at, f'{key} = "{value}"')
-        return lines
 
     def _build_replacements(self, settings: dict[str, Any]) -> dict[str, str]:
         """Convert profile settings dict to ``{INI_key: quoted_value_str}``."""

@@ -171,6 +171,41 @@ def run_pyinstaller() -> bool:
     return True
 
 
+# Modules whose imports are all lazy/exception-isolated in the codebase: a
+# build environment missing them still freezes successfully, and the installed
+# runtime silently degrades instead of crashing (the 2026-08-12 deploy shipped
+# without ``wmi``, so every WMI-backed handler quietly detected nothing).
+CRITICAL_FROZEN_MODULES = frozenset({"wmi", "pynvml"})
+
+
+def check_frozen_module_warnings() -> bool:
+    """Fail the build when PyInstaller reports a critical module as missing."""
+    warn_file = BUILD_DIR / SPEC_FILE.stem / f"warn-{SPEC_FILE.stem}.txt"
+    if not warn_file.exists():
+        print(f"ERROR: PyInstaller warn file not found: {warn_file}")
+        print("  Cannot prove the critical runtime modules were bundled.")
+        return False
+
+    missing: list[str] = []
+    for line in warn_file.read_text(encoding="utf-8", errors="replace").splitlines():
+        stripped = line.strip()
+        if not stripped.startswith("missing module named "):
+            continue
+        module = stripped.removeprefix("missing module named ").split(" ", 1)[0]
+        if module in CRITICAL_FROZEN_MODULES:
+            missing.append(module)
+
+    if missing:
+        print("ERROR: Build is missing critical runtime module(s): " + ", ".join(sorted(missing)))
+        print("  These imports are lazy/optional in the code, so the frozen exe")
+        print("  would run but silently lose the features that need them.")
+        print(f"  Install them into this interpreter: {sys.executable}")
+        print("  (pip install -r requirements-dev.txt)")
+        return False
+
+    return True
+
+
 def check_build_prerequisites() -> bool:
     """Validate build inputs before removing existing artifacts."""
     if not SPEC_FILE.exists():
@@ -739,6 +774,9 @@ def build_cli() -> bool:
     clean_build()
 
     if not run_pyinstaller():
+        return False
+
+    if not check_frozen_module_warnings():
         return False
 
     return verify_output()

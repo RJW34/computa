@@ -228,3 +228,47 @@ def test_detect_and_verify_active_read_current_values(tmp_path: Path) -> None:
     assert detected["fsr_frame_generation"] is False
     assert detected["xe_frame_generation"] is False
     assert verify["all_active"] is True
+
+
+def test_restore_preserves_current_unmanaged_marvel_settings(tmp_path: Path) -> None:
+    config_dir = tmp_path / "Marvel" / "Saved" / "Config" / "Windows"
+    ini_path = config_dir / "GameUserSettings.ini"
+    backup = (
+        "[ScalabilityGroups]\n"
+        "sg.TextureQuality=1\n"
+        "[/Script/Marvel.MarvelGameUserSettings]\n"
+        "FullscreenMode=0\n"
+        "LastConfirmedFullscreenMode=0\n"
+        "PreferredFullscreenMode=0\n"
+        "bNvidiaReflex=True\n"
+        "UserAimSetting=old\n"
+    )
+    current = (
+        "[ScalabilityGroups]\n"
+        "sg.TextureQuality=3\n"
+        "[/Script/Marvel.MarvelGameUserSettings]\n"
+        "FullscreenMode=1\n"
+        "LastConfirmedFullscreenMode=1\n"
+        "PreferredFullscreenMode=1\n"
+        "bNvidiaReflex=False\n"
+        "bDlssFrameGeneration=True\n"
+        "UserAimSetting=current\n"
+    )
+    _write_game_user_settings(ini_path, current)
+
+    with patch.object(MarvelRivalsConfigHandler, "_get_config_dir", return_value=config_dir):
+        restored = MarvelRivalsConfigHandler().restore(
+            {
+                "config_found": True,
+                "config_path": str(ini_path),
+                "file_content": backup,
+            }
+        )
+
+    assert restored is True
+    content = ini_path.read_text(encoding="utf-8")
+    assert "FullscreenMode=0" in content
+    assert "bNvidiaReflex=True" in content
+    assert "bDlssFrameGeneration" not in content
+    assert "sg.TextureQuality=3" in content
+    assert "UserAimSetting=current" in content

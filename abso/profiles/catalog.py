@@ -431,9 +431,9 @@ PROFILE_CATALOG: OrderedDict[str, ProfileCatalogEntry] = OrderedDict(
         "deadlock-gsync": ProfileCatalogEntry(
             profile_class=DeadlockGSyncProfile,
             tray_category="Shooters",
-            tray_subtitle="Strict SDR Exclusive | Reflex (set in-game) | G-SYNC ON",
+            tray_subtitle="Overlay-Free SDR Flip Path | Reflex (set in-game) | G-SYNC ON",
             tray_description=(
-                "Tear-free low-latency VRR Deadlock profile on the strict fullscreen-only "
+                "Tear-free low-latency VRR Deadlock profile on the windowed DXGI flip "
                 "G-SYNC path. Enable Reflex On + Boost manually in-game."
             ),
             sync_mode="on",
@@ -441,7 +441,7 @@ PROFILE_CATALOG: OrderedDict[str, ProfileCatalogEntry] = OrderedDict(
         "deadlock-gsync-hdr": ProfileCatalogEntry(
             profile_class=DeadlockGSyncHDRProfile,
             tray_category="Shooters",
-            tray_subtitle="Strict HDR Exclusive | Reflex (set in-game) | G-SYNC ON",
+            tray_subtitle="Overlay-Free HDR Flip Path | Reflex (set in-game) | G-SYNC ON",
             tray_description=(
                 "Tear-free low-latency VRR Deadlock with Windows HDR on for OLED / Mini-LED. "
                 "Deadlock currently renders SDR through the HDR composition path."
@@ -473,10 +473,10 @@ PROFILE_CATALOG: OrderedDict[str, ProfileCatalogEntry] = OrderedDict(
         "counter-strike-2-gsync": ProfileCatalogEntry(
             profile_class=CounterStrike2GSyncProfile,
             tray_category="Shooters",
-            tray_subtitle="Strict SDR Exclusive | Reflex (set in-game) | G-SYNC ON",
+            tray_subtitle="Overlay-Free SDR Flip Path | Reflex (set in-game) | G-SYNC ON",
             tray_description=(
-                "Tear-free low-latency VRR Counter-Strike 2 profile on the strict "
-                "fullscreen-only G-SYNC path. Enable Reflex Enabled + Boost "
+                "Tear-free low-latency VRR Counter-Strike 2 profile on the windowed "
+                "DXGI flip G-SYNC path. Enable Reflex Enabled + Boost "
                 "manually in-game."
             ),
             sync_mode="on",
@@ -484,7 +484,7 @@ PROFILE_CATALOG: OrderedDict[str, ProfileCatalogEntry] = OrderedDict(
         "counter-strike-2-gsync-hdr": ProfileCatalogEntry(
             profile_class=CounterStrike2GSyncHDRProfile,
             tray_category="Shooters",
-            tray_subtitle="Strict HDR Exclusive | Reflex (set in-game) | G-SYNC ON",
+            tray_subtitle="Overlay-Free HDR Flip Path | Reflex (set in-game) | G-SYNC ON",
             tray_description=(
                 "Tear-free low-latency VRR Counter-Strike 2 with Windows HDR on "
                 "for OLED / Mini-LED. CS2 currently renders SDR through the HDR "

@@ -165,8 +165,7 @@ ALWAYS_SAFE_LAUNCH_KILLSET: tuple[str, ...] = (
     "DropboxUpdate.exe",
     "GoogleDriveFS.exe",
     "googledrivesync.exe",
-    # --- Peripheral vendor daemons (kill only when the device is programmed
-    #     onboard - see the caveat below) ---
+    # --- Peripheral vendor helpers that do not own live mappings ---
     # CAUTION (corrected 2026-08-02): the earlier note here claimed a G502
     # "stores DPI/buttons in onboard memory after first save", so G HUB was
     # only needed for LIGHTSYNC. That is wrong and it caused a real bug.
@@ -181,19 +180,10 @@ ALWAYS_SAFE_LAUNCH_KILLSET: tuple[str, ...] = (
     #   - Onboard Memory Mode: assignments live in device firmware and do
     #     survive the agent dying (and skip the agent's input round trip).
     #
-    # So these stay in the always-safe tier because the frame-time win is
-    # real, but a machine whose peripherals rely on SOFTWARE profiles must
-    # list them in abso.yaml ``process_overrides.protect``. The reference
-    # machine does exactly that.
-    "lghub.exe",
-    "lghub_agent.exe",
+    # Stateful mapping/control daemons are NEVER_KILL below. Updaters and the
+    # optional AI helper do not own DPI, buttons, macros, fan curves, or RGB.
     "lghub_updater.exe",
     "LogiAiPromptBuilder.exe",
-    # Corsair K70 Lux RGB: HID typing always works without iCUE; RGB reverts
-    # to last hardware profile.
-    "iCUE.exe",
-    "LCore.exe",
-    "CorsairService.exe",
 )
 
 
@@ -334,6 +324,16 @@ NEVER_KILL_IMAGES: frozenset[str] = frozenset(
         "smss.exe",
         "wininit.exe",
         "audiodg.exe",
+        # --- Stateful peripheral control / software-profile owners ---
+        # Killing these can change DPI/button mappings, macros, RGB, cooling,
+        # or device profiles in the middle of a game. They are never a safe
+        # default optimization; users with verified onboard-only setups can
+        # close them manually before launch.
+        "lghub.exe",
+        "lghub_agent.exe",
+        "iCUE.exe",
+        "LCore.exe",
+        "CorsairService.exe",
         # --- Code editors / IDEs (agentic work in progress) ---
         # VS Code family
         "Code.exe",

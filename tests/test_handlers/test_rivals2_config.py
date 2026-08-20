@@ -292,6 +292,51 @@ def test_backup_restore_round_trip_preserves_unknown_control_keys(tmp_path: Path
     assert ini_path.read_text(encoding="utf-8") == original
 
 
+def test_restore_preserves_current_unmanaged_rivals_values(tmp_path: Path) -> None:
+    config_dir = tmp_path / "Rivals2" / "Saved" / "Config" / "Windows"
+    ini_path = config_dir / "GameUserSettings.ini"
+    backup = (
+        "[ScalabilityGroups]\n"
+        "sg.TextureQuality=1\n"
+        "[/Script/Engine.GameUserSettings]\n"
+        "FullscreenMode=0\n"
+        "LastConfirmedFullscreenMode=0\n"
+        "bUseVSync=False\n"
+        "PlayerPreference=old\n"
+    )
+    current = (
+        "[ScalabilityGroups]\n"
+        "sg.TextureQuality=3\n"
+        "[/Script/Engine.GameUserSettings]\n"
+        "FullscreenMode=1\n"
+        "LastConfirmedFullscreenMode=1\n"
+        "bUseVSync=True\n"
+        "FrameRateLimit=240\n"
+        "PlayerPreference=current\n"
+    )
+    _write_game_user_settings(ini_path, current)
+
+    with patch(
+        "abso.settings.rivals2_config._get_rivals2_config_dir",
+        return_value=config_dir,
+    ):
+        restored = Rivals2ConfigHandler().restore(
+            {
+                "config_found": True,
+                "config_path": str(ini_path),
+                "file_content": backup,
+            }
+        )
+
+    assert restored is True
+    content = ini_path.read_text(encoding="utf-8")
+    assert "FullscreenMode=0" in content
+    assert "bUseVSync=False" in content
+    assert "FrameRateLimit" not in content
+    assert "sg.TextureQuality=3" in content
+    assert "PlayerPreference=current" in content
+
+
 def test_restore_falls_back_to_legacy_detect_payload(tmp_path: Path) -> None:
     """Older baseline backups stored detected fields without ``file_content``.
 
@@ -359,3 +404,71 @@ def test_restore_legacy_payload_when_game_uninstalled_is_noop(tmp_path: Path) ->
         restored = handler.restore(legacy_payload)
 
     assert restored is True
+
+
+def test_restore_partial_legacy_payload_preserves_unrecorded_managed_keys(
+    tmp_path: Path,
+) -> None:
+    """Old sparse payloads own only the keys they actually recorded."""
+    config_dir = tmp_path / "Rivals2" / "Saved" / "Config" / "Windows"
+    ini_path = config_dir / "GameUserSettings.ini"
+    _write_game_user_settings(
+        ini_path,
+        "\n".join(
+            [
+                "[/Script/Engine.GameUserSettings]",
+                "FullscreenMode=1",
+                "LastConfirmedFullscreenMode=1",
+                "bUseVSync=True",
+                "bUseRawInput=True",
+                "FrameRateLimit=240.000000",
+                "bUseHDRDisplayOutput=True",
+                "HDRDisplayOutputNits=800",
+                "UnmanagedFutureSetting=keep",
+            ]
+        )
+        + "\n",
+    )
+    legacy_payload = {
+        "config_found": True,
+        "config_path": str(ini_path),
+        "fullscreen_mode": 0,
+        "vsync": False,
+    }
+
+    with patch(
+        "abso.settings.rivals2_config._get_rivals2_config_dir",
+        return_value=config_dir,
+    ):
+        restored = Rivals2ConfigHandler().restore(legacy_payload)
+
+    assert restored is True
+    content = ini_path.read_text(encoding="utf-8")
+    assert "FullscreenMode=0" in content
+    assert "LastConfirmedFullscreenMode=0" in content
+    assert "bUseVSync=False" in content
+    assert "bUseRawInput=True" in content
+    assert "FrameRateLimit=240.000000" in content
+    assert "bUseHDRDisplayOutput=True" in content
+    assert "HDRDisplayOutputNits=800" in content
+    assert "UnmanagedFutureSetting=keep" in content
+
+
+def test_restore_full_backup_when_game_uninstalled_is_noop(tmp_path: Path) -> None:
+    stale_path = tmp_path / "missing" / "GameUserSettings.ini"
+    payload = {
+        "config_found": True,
+        "config_path": str(stale_path),
+        "file_content": (
+            "[/Script/Engine.GameUserSettings]\nFullscreenMode=0\n"
+        ),
+    }
+
+    with patch(
+        "abso.settings.rivals2_config._get_rivals2_config_dir",
+        return_value=None,
+    ):
+        restored = Rivals2ConfigHandler().restore(payload)
+
+    assert restored is True
+    assert not stale_path.exists()

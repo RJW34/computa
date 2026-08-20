@@ -48,10 +48,10 @@ class _Diablo4BaseProfile(BaseProfile):
 
     @property
     def fullscreen_optimizations_per_exe(self) -> dict[str, bool]:
-        # D4's native HDR VRR lane wants the true exclusive path so the HDR
-        # tone map runs in the game, not in DWM. Disable FSO per-exe to keep
-        # the GPU off the compositor's borderless HDR shim.
-        return fso_overrides(self.executable_hints)
+        # Retail Diablo IV exposes a fullscreen-windowed presentation path,
+        # not legacy exclusive fullscreen. Keep FSO enabled so DXGI flip and
+        # windowed G-SYNC remain available.
+        return fso_overrides(self.executable_hints, disabled=False)
 
     @property
     def nvidia_profile_name(self) -> str | None:
@@ -84,11 +84,9 @@ class _Diablo4BaseProfile(BaseProfile):
                 "game_bar": False,
                 "game_dvr": False,
                 "hags": True,
-                # Diablo 4 profile targets fullscreen-only VRR. Do not force
-                # the Win11 windowed compositor path unless a future borderless
-                # variant opts in explicitly.
-                "windowed_optimizations": False,
-                "vrr_optimize": False,
+                # DisplayModeWindowMode=1 is fullscreen-windowed in retail D4.
+                "windowed_optimizations": True,
+                "vrr_optimize": True,
                 "max_refresh_rate": True,
             },
             "PowerSettingsHandler": {
@@ -132,7 +130,7 @@ class _Diablo4BaseProfile(BaseProfile):
                 # limiter (written by Diablo4ConfigHandler.auto_vrr_fps_cap) is the
                 # single authoritative limiter per Blur Busters G-SYNC 101.
                 "auto_vrr_fps_cap": False,
-                "global_vrr_mode": "fullscreen_only",
+                "global_vrr_mode": "fullscreen_and_windowed",
             },
             "NetworkSettingsHandler": {
                 "disable_nagle": False,
@@ -179,8 +177,8 @@ class _Diablo4BaseProfile(BaseProfile):
             {
                 "category": "Display",
                 "setting": "Display Mode",
-                "value": "Fullscreen",
-                "reason": "Matches the fullscreen VRR path this profile applies.",
+                "value": "Fullscreen Windowed",
+                "reason": "Matches Diablo IV's retail fullscreen-windowed DXGI flip path and windowed G-SYNC scope.",
             },
             {
                 "category": "Display",

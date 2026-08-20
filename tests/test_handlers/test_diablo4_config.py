@@ -221,18 +221,55 @@ def test_apply_auto_vrr_fps_cap_without_local_prefs_emits_fallback_notice(
     assert any("driver cap" in notice.lower() for notice in result["notices"])
 
 
-def test_restore_rewrites_backed_up_file(tmp_path: Path) -> None:
+def test_restore_only_rewrites_managed_preferences(tmp_path: Path) -> None:
     prefs_path = tmp_path / "Documents" / "Diablo IV" / "LocalPrefs.txt"
-    _write_local_prefs(prefs_path, 'DisplayModeWindowMode "1"\n')
-
-    handler = Diablo4ConfigHandler()
-    restored = handler.restore(
-        {
-            "config_found": True,
-            "config_path": str(prefs_path),
-            "file_content": 'DisplayModeWindowMode "0"\n',
-        }
+    _write_local_prefs(
+        prefs_path,
+        'DisplayModeWindowMode "1"\n'
+        'Vsync "1"\n'
+        'MaxForegroundFPS "297"\n'
+        'MasterVolume "0.800000"\n',
     )
 
+    handler = Diablo4ConfigHandler()
+    with patch(
+        "abso.settings.diablo4_config._get_diablo4_local_prefs_path",
+        return_value=prefs_path,
+    ):
+        restored = handler.restore(
+            {
+                "config_found": True,
+                "config_path": str(prefs_path),
+                "file_content": (
+                    'DisplayModeWindowMode "0"\n'
+                    'Vsync "0"\n'
+                    'MasterVolume "0.200000"\n'
+                ),
+            }
+        )
+
     assert restored is True
-    assert prefs_path.read_text(encoding="utf-8") == 'DisplayModeWindowMode "0"\n'
+    assert prefs_path.read_text(encoding="utf-8") == (
+        'DisplayModeWindowMode "0"\n'
+        'Vsync "0"\n'
+        'MasterVolume "0.800000"\n'
+    )
+
+
+def test_restore_does_not_recreate_missing_diablo_config(tmp_path: Path) -> None:
+    stale_path = tmp_path / "Documents" / "Diablo IV" / "LocalPrefs.txt"
+
+    with patch(
+        "abso.settings.diablo4_config._get_diablo4_local_prefs_path",
+        return_value=None,
+    ):
+        restored = Diablo4ConfigHandler().restore(
+            {
+                "config_found": True,
+                "config_path": str(stale_path),
+                "file_content": 'DisplayModeWindowMode "0"\n',
+            }
+        )
+
+    assert restored is True
+    assert not stale_path.exists()

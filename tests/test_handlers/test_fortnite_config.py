@@ -10,7 +10,7 @@ from abso.settings.fortnite_config import FortniteConfigHandler
 
 def _write_game_user_settings(path: Path, content: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(content, encoding="utf-8")
+    path.write_bytes(content.encode("utf-8"))
 
 
 def test_apply_updates_allowed_keys(tmp_path: Path) -> None:
@@ -201,3 +201,92 @@ def test_backup_restore_round_trip(tmp_path: Path) -> None:
 
     assert restored is True
     assert ini_path.read_text(encoding="utf-8") == original
+
+
+def test_restore_preserves_current_renderer_and_unmanaged_fortnite_values(
+    tmp_path: Path,
+) -> None:
+    config_dir = tmp_path / "FortniteGame" / "Saved" / "Config" / "WindowsClient"
+    ini_path = config_dir / "GameUserSettings.ini"
+    backup = (
+        "[/Script/FortniteGame.FortGameUserSettings]\r\n"
+        "PreferredFullscreenMode=0\r\n"
+        "LastConfirmedFullscreenMode=0\r\n"
+        "bUseVSync=False\r\n"
+        "UserQuality=old\r\n"
+        "\r\n"
+        "[D3DRHIPreference]\r\n"
+        "PreferredRHI=dx11\r\n"
+    )
+    current = (
+        "[/Script/FortniteGame.FortGameUserSettings]\r\n"
+        "PreferredFullscreenMode=1\r\n"
+        "LastConfirmedFullscreenMode=1\r\n"
+        "bUseVSync=True\r\n"
+        "FrameRateLimit=297\r\n"
+        "UserQuality=current\r\n"
+        "\r\n"
+        "[D3DRHIPreference]\r\n"
+        "PreferredRHI=dx12\r\n"
+    )
+    _write_game_user_settings(ini_path, current)
+
+    with patch.object(FortniteConfigHandler, "_get_config_dir", return_value=config_dir):
+        restored = FortniteConfigHandler().restore(
+            {
+                "config_found": True,
+                "config_path": str(ini_path),
+                "file_content": backup,
+            }
+        )
+
+    assert restored is True
+    content = ini_path.read_bytes().decode("utf-8")
+    assert "PreferredFullscreenMode=0\r\n" in content
+    assert "bUseVSync=False\r\n" in content
+    assert "FrameRateLimit" not in content
+    assert "UserQuality=current\r\n" in content
+    assert "PreferredRHI=dx12\r\n" in content
+
+
+def test_restore_does_not_touch_same_key_in_wrong_fortnite_section(
+    tmp_path: Path,
+) -> None:
+    config_dir = tmp_path / "FortniteGame" / "Saved" / "Config" / "WindowsClient"
+    ini_path = config_dir / "GameUserSettings.ini"
+    current = "[Other]\nPreferredFullscreenMode=2\n"
+    _write_game_user_settings(ini_path, current)
+
+    with patch.object(FortniteConfigHandler, "_get_config_dir", return_value=config_dir):
+        restored = FortniteConfigHandler().restore(
+            {
+                "config_found": True,
+                "config_path": str(ini_path),
+                "file_content": (
+                    "[/Script/FortniteGame.FortGameUserSettings]\n"
+                    "PreferredFullscreenMode=0\n"
+                ),
+            }
+        )
+
+    assert restored is True
+    assert ini_path.read_text(encoding="utf-8") == current
+
+
+def test_restore_does_not_recreate_missing_fortnite_config(tmp_path: Path) -> None:
+    stale_path = tmp_path / "missing" / "GameUserSettings.ini"
+
+    with patch.object(FortniteConfigHandler, "_get_config_dir", return_value=None):
+        restored = FortniteConfigHandler().restore(
+            {
+                "config_found": True,
+                "config_path": str(stale_path),
+                "file_content": (
+                    "[/Script/FortniteGame.FortGameUserSettings]\n"
+                    "PreferredFullscreenMode=0\n"
+                ),
+            }
+        )
+
+    assert restored is True
+    assert not stale_path.exists()

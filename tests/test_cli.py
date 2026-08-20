@@ -518,7 +518,8 @@ class TestCLIApply:
         assert payload["data"]["post_apply_notes"] == [
             (
                 "Slippi manual: confirm Dolphin backend and controller adapter; "
-                "try Vulkan first, D3D12 if Vulkan stutters, VSync Off for no-sync."
+                "preserve your renderer (D3D11 is the compatibility baseline; "
+                "A/B Vulkan/D3D12), VSync Off for no-sync."
             )
         ]
         assert payload["data"]["summary_level"] == "warning"

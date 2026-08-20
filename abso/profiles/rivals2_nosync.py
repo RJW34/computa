@@ -15,8 +15,8 @@ NVCP Settings (per-game for Rivals2-Win64-Shipping.exe):
 - G-SYNC / VRR: OFF (use the G-SYNC lanes for tear-free)
 - Low Latency Mode: ON (NOT Ultra!)
 - Max Frame Rate: OFF (no driver cap; the in-game limiter owns pacing)
-- Threaded Optimization: ON (CPU-bound UE5/DX11; driver worker threads help,
-  and the server-authoritative sim cannot be desynced by them)
+- Threaded Optimization: AUTO (the NVAPI control is OpenGL-specific; Rivals 2
+  uses D3D12, so ABSO does not present it as a DX renderer optimization)
 - Power Management: Prefer Maximum Performance
 
 In-game frame cap: largest multiple of 60 at/below refresh (300 @ 300 Hz).
@@ -70,8 +70,8 @@ class Rivals2NoSyncProfile(Rivals2BaseProfile):
 
     @property
     def graphics_api(self) -> Literal["dx11", "dx12", "vulkan", "opengl", "unknown"]:
-        """Steam's published PC requirements list DirectX 11 for Rivals 2."""
-        return "dx11"
+        """Current Windows builds select D3D12RHI by default."""
+        return "dx12"
 
     @property
     def allows_aggressive_settings(self) -> bool:
@@ -97,10 +97,9 @@ class Rivals2NoSyncProfile(Rivals2BaseProfile):
                 "global_vrr_mode": "off",  # Enforce global VRR off for clean no-sync transitions
                 "max_frame_rate": "off",  # No driver cap - the in-game limiter owns pacing
                 "shader_cache": "unlimited",
-                # ON: Rivals 2 is CPU-bound UE5/DX11; driver worker threads
-                # measurably help there. SnapNet's sim is server-authoritative,
-                # so client driver threading cannot desync rollback.
-                "threaded_optimization": "on",
+                # NVIDIA exposes this as OGL_THREAD_CONTROL. Rivals 2's D3D12
+                # renderer does not benefit from forcing the OpenGL knob.
+                "threaded_optimization": "auto",
                 "triple_buffering": "off",  # OFF - irrelevant without VSync
             },
             "Rivals2ConfigHandler": {
@@ -161,11 +160,10 @@ class Rivals2NoSyncProfile(Rivals2BaseProfile):
             {
                 "category": "NVIDIA Control Panel",
                 "setting": "Threaded Optimization",
-                "value": "On",
+                "value": "Auto",
                 "reason": (
-                    "Rivals 2 is CPU-bound UE5/DX11; driver worker threads "
-                    "improve frame times. SnapNet's sim is server-authoritative, "
-                    "so driver threading cannot desync rollback."
+                    "NVIDIA exposes this as an OpenGL driver control. Rivals 2 uses "
+                    "D3D12, so forcing it On is not a D3D12 optimization."
                 ),
             },
             {

@@ -7,9 +7,12 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from abso.core.applier import ApplyResult, ProfileApplier
+from abso.core.config import ProfileOverrides
 from abso.core.exceptions import ProfileNotFoundError
 from abso.core.multimon_detector import DisplayEnvironment, MultiMonitorResult
+from abso.core.stability_gate import StabilityGateResult
 from abso.profiles.overwatch2 import Overwatch2Profile
+from abso.profiles.slippi_melee import SlippiMeleeProfile, SlippiMeleeUniversalProfile
 
 
 class TestApplyResultDataclass:
@@ -531,7 +534,7 @@ class TestApplyProfile:
         assert final["NvidiaSettingsHandler"]["profile_name"] == "User Override"
         assert final["NvidiaSettingsHandler"]["profile_aliases"] == ["User Alias"]
 
-    def test_finalize_expands_overwatch_fso_paths_at_runtime_only(self):
+    def test_runtime_resolution_expands_overwatch_fso_paths_before_finalize(self):
         """OW2 snapshots stay deterministic while apply/verify gets full FSO paths."""
         profile = Overwatch2Profile()
         settings = profile.get_settings("RegistrySettingsHandler")
@@ -541,16 +544,79 @@ class TestApplyProfile:
         applier = ProfileApplier()
         local_path = r"C:\Games\Overwatch\_retail_\Overwatch.exe"
         with patch.object(profile, "_overwatch_install_paths", return_value=[local_path]):
+            runtime_settings = applier._resolve_runtime_settings_map(
+                profile,
+                {"RegistrySettingsHandler": settings},
+            )
             final = applier._finalize_handler_settings(
                 profile,
                 profile.profile_id,
-                {"RegistrySettingsHandler": settings},
+                runtime_settings,
                 None,
             )
 
         fso = final["RegistrySettingsHandler"]["fullscreen_optimizations"]
         assert fso["Overwatch.exe"] is True
         assert fso[local_path] is True
+
+    @pytest.mark.parametrize(
+        "profile",
+        [SlippiMeleeProfile(), SlippiMeleeUniversalProfile()],
+        ids=["adaptive", "universal"],
+    )
+    def test_runtime_hags_resolution_cannot_undo_stability_gate(self, profile):
+        """A recorded HAGS failure must remain safe after runtime discovery."""
+        applier = ProfileApplier(skip_linting=True, skip_network_scope=True)
+
+        def block_hags(profile_arg, settings_map, lint_result):
+            assert profile_arg is profile
+            assert lint_result is None
+            assert settings_map["WindowsSettingsHandler"]["hags"] is True
+            gated = {name: values.copy() for name, values in settings_map.items()}
+            gated["WindowsSettingsHandler"]["hags"] = False
+            return gated, StabilityGateResult(profile_id=profile.profile_id, blocked_count=1)
+
+        applier._stability_gate.process = MagicMock(side_effect=block_hags)
+        with patch.object(profile, "_detect_dolphin_backend", return_value="dx12"):
+            final, _, gate_result, _ = applier._build_effective_settings_map(
+                profile.profile_id,
+                profile,
+                None,
+            )
+
+        assert gate_result is not None
+        assert gate_result.blocked_count == 1
+        assert final["WindowsSettingsHandler"]["hags"] is False
+
+    @pytest.mark.parametrize(
+        ("profile", "override_value"),
+        [
+            (SlippiMeleeProfile(), True),
+            (SlippiMeleeUniversalProfile(), False),
+        ],
+        ids=["adaptive-dx11-user-on", "universal-user-off"],
+    )
+    def test_slippi_runtime_resolution_precedes_explicit_user_override(
+        self,
+        profile,
+        override_value,
+    ):
+        """Machine-local profile overrides retain documented final precedence."""
+        applier = ProfileApplier(
+            skip_linting=True,
+            skip_stability_gate=True,
+            skip_network_scope=True,
+        )
+        overrides = ProfileOverrides(windows={"hags": override_value})
+
+        with patch.object(profile, "_detect_dolphin_backend", return_value="dx11"):
+            final, _, _, _ = applier._build_effective_settings_map(
+                profile.profile_id,
+                profile,
+                overrides,
+            )
+
+        assert final["WindowsSettingsHandler"]["hags"] is override_value
 
     def test_apply_profile_blocks_on_profile_contract_violation(self):
         """Profile-specific validation must abort before handlers run."""
