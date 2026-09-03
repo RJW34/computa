@@ -1,0 +1,20 @@
+[
+  {
+    "resource_id": "fill-me-from-user-history-or-discussion",
+    "title": "Replace this placeholder with the first real user-shared resource",
+    "source_type": "other",
+    "url": "",
+    "status": "unreviewed",
+    "claimed_value": "Describe the concrete optimization claim or capability this resource suggests.",
+    "candidate_surfaces": [],
+    "current_overlap": "unknown",
+    "evidence_needed": [
+      "Proof that the idea maps to a real computa surface",
+      "Proof that the benefit is measurable or the safety/rollback story improves"
+    ],
+    "risk_notes": [
+      "Do not preserve this placeholder once a real resource is added"
+    ],
+    "next_action": "Replace this row with a real candidate from prior discussion or new intake."
+  }
+]

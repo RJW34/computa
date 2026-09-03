@@ -1,0 +1,28 @@
+[
+  {
+    "resource_id": "process-lasso-class-features",
+    "name": "Process Lasso",
+    "source_type": "commercial-tool-analogue",
+    "url": "https://bitsum.com/",
+    "status": "documented-noop",
+    "proof_in_repo": [
+      "docs/PROCESS_LASSO_FEATURES.md"
+    ],
+    "current_surface": "computa documents in-house equivalents for selected CPU/process/power session tuning features.",
+    "notes": "This is a documented analogue, not a bundled dependency or a claim of full feature parity."
+  },
+  {
+    "resource_id": "nvidia-profile-inspector",
+    "name": "NVIDIA Profile Inspector",
+    "source_type": "external-tool",
+    "url": "https://github.com/Orbmu2k/nvidiaProfileInspector/releases",
+    "status": "absorbed",
+    "proof_in_repo": [
+      "README.md",
+      "docs/NVAPI_INTEGRATION_PLAN.md",
+      "abso/settings/nvidia/npi.py"
+    ],
+    "current_surface": "Optional deep NVIDIA driver control path used by computa when present.",
+    "notes": "Explicit integration surface already referenced in current docs and code."
+  }
+]
