@@ -4,14 +4,14 @@
     "title": "Chris Titus Tech WinUtil",
     "source_type": "repo",
     "url": "https://github.com/ChrisTitusTech/winutil",
-    "status": "reviewing",
+    "status": "absorbed",
     "claimed_value": "Broad Windows utility covering tweaks, fixes, updates, and debloat that could surface safe missing deltas for computa's Windows tuning catalog.",
     "candidate_surfaces": [
       "abso/settings/debloat.py",
       "abso/data/debloat_tweaks.yaml",
       "docs/TROUBLESHOOTING.md"
     ],
-    "current_overlap": "partial — computa already has tiered registry/service/appx debloat with restore awareness, but no audited WinUtil-to-computa parity map.",
+    "current_overlap": "audited 2026-09-03: all 67 tweaks payload-mapped; 8 absorbed, 13 documented-noop, ~40 rejected, 3 watchlist \u2014 see parity/winutil-parity-table.md",
     "repo_evidence_paths": [
       "abso/settings/debloat.py",
       "abso/data/debloat_tweaks.yaml"
@@ -27,7 +27,7 @@
       "Avoid bundling one-click tweak packs without per-setting evidence"
     ],
     "proposed_shape": "Add only missing reversible debloat/privacy/service entries as explicit computa tweaks; keep package-management and general Windows toolbox scope out.",
-    "next_action": "Build a WinUtil-to-computa parity matrix, then propose the smallest reversible missing set as follow-on PR slices."
+    "next_action": "Done. Re-audit only on major WinUtil catalog changes; SvcHostSplitThresholdInKB stays on the watchlist pending a RAM-aware handler feature."
   },
   {
     "resource_id": "atlasos-reversible-delta-extraction",
@@ -42,7 +42,7 @@
       "abso/profiles",
       "docs/research/"
     ],
-    "current_overlap": "partial — computa already has game-specific profiles, power tuning, and debloat, but not a whole-OS image-style optimization lane.",
+    "current_overlap": "partial \u2014 computa already has game-specific profiles, power tuning, and debloat, but not a whole-OS image-style optimization lane.",
     "repo_evidence_paths": [
       "abso/settings/debloat.py",
       "abso/settings/power.py",
@@ -74,7 +74,7 @@
       "abso/data/debloat_tweaks.yaml",
       "docs/TROUBLESHOOTING.md"
     ],
-    "current_overlap": "partial — computa already ships privacy and telemetry tweaks plus service controls, but no explicit ShutUp10 parity or rationale doc.",
+    "current_overlap": "partial \u2014 computa already ships privacy and telemetry tweaks plus service controls, but no explicit ShutUp10 parity or rationale doc.",
     "repo_evidence_paths": [
       "abso/settings/debloat.py",
       "abso/data/debloat_tweaks.yaml"
@@ -104,7 +104,7 @@
       "docs/NVAPI_INTEGRATION_PLAN.md",
       "abso/settings/nvidia/"
     ],
-    "current_overlap": "adjacent but absent — computa already has NPI and planned NVAPI read/merge work, but it does not currently mediate driver installation.",
+    "current_overlap": "adjacent but absent \u2014 computa already has NPI and planned NVAPI read/merge work, but it does not currently mediate driver installation.",
     "repo_evidence_paths": [
       "README.md",
       "docs/NVAPI_INTEGRATION_PLAN.md",
@@ -135,7 +135,7 @@
       "abso/profiles",
       "docs/TROUBLESHOOTING.md"
     ],
-    "current_overlap": "partial — computa already handles many targeted Windows changes, but it does not yet document which Winaero-class tweaks are intentionally excluded.",
+    "current_overlap": "partial \u2014 computa already handles many targeted Windows changes, but it does not yet document which Winaero-class tweaks are intentionally excluded.",
     "repo_evidence_paths": [
       "abso/settings/debloat.py",
       "docs/REMEDIATION_ROADMAP.md",
@@ -153,5 +153,29 @@
     ],
     "proposed_shape": "Harvest only a tiny number of measured, reversible settings and document the rest as intentionally out of scope.",
     "next_action": "Split Winaero-class tweaks into performance-relevant, UX-only, and reject buckets before any code proposal."
+  },
+  {
+    "resource_id": "cpu-core-partitioning-family",
+    "title": "CPU core-partitioning tools (charlie754 Game-Optimizer, CPUSetSetter)",
+    "source_type": "repo",
+    "url": "https://github.com/charlie754/Game-Optimizer-CPUs-Threads-Optimizer",
+    "status": "absorbed",
+    "claimed_value": "Two-sided core partitioning while a game runs: game to fast cores (P-cores / V-Cache CCD), background apps to the rest, with heavy-app auto-detection.",
+    "candidate_surfaces": [
+      "abso/core/cpu_sets.py",
+      "abso/core/partition_steer.py",
+      "abso/core/cpu_balancer.py",
+      "abso/profiles/base.py",
+      "abso/tray/ABSO-Tray.ps1"
+    ],
+    "current_overlap": "absorbed 2026-08-31 and deployed: LLC-based X3D classification, game-descendant steering, full-clock background steering, sustained-CPU auto-steer, per-profile policies, tray automation. Corroborating repos (x3d-ccd-optimizer, saturn_affinity_python) reviewed; no unique mechanisms left to import.",
+    "evidence_needed": [
+      "Done: 2,665-test hermetic suite green; live deploy verified (tray PID 3792, health ok)"
+    ],
+    "risk_notes": [
+      "Soft CPU Sets only (no hard affinity, no injection) \u2014 anti-cheat-benign by design",
+      "X3D + Windows Game Mode CCD-parking conflict encoded as warning + config veto"
+    ],
+    "next_action": "Watch first live game session's tray 'Core partition' status line; QuickPanel surfacing is the follow-up once a LOOK-FIRST rendering pass is possible."
   }
 ]

@@ -2,18 +2,31 @@
 
 This is the concrete handoff for a stronger model or future agent.
 
+## Completed (2026-09-03)
+
+- **WinUtil parity audit — DONE (absorbed).** All 67 tweaks payload-mapped;
+  8 reversible deltas imported into `debloat_tweaks.yaml` with tests; full
+  disposition table at `parity/winutil-parity-table.md`; decision note at
+  `decisions/winutil-parity-audit.md`.
+- **CPU core-partitioning family — DONE (absorbed, deployed).** Backfilled from
+  the 2026-08-31 work; decision note at
+  `decisions/core-partitioning-absorption.md`.
+
 ## Immediate next pass
 
-1. Start with `INITIAL_PROPOSALS.md` and the seeded rows in
-   `incoming-candidates.json`.
-2. Do the `Chris Titus Tech WinUtil` parity audit first because computa already
-   has a direct target surface in `debloat_tweaks.yaml`.
-3. For each seeded resource, map it to a real computa surface before proposing
-   code.
-4. Check whether the capability is already present, partially present, or
-   intentionally excluded.
-5. Write or update one decision note per resource family that matters.
-6. Only then start code changes.
+1. **ShutUp10 privacy-toggle mapping** (`oo-shutup10-privacy-toggle-mapping`):
+   no public machine-readable catalog, so map at category level against the
+   now-expanded tier-1/tier-2 rows; expect heavy documented-noop overlap after
+   the WinUtil import.
+2. **Winaero registry audit** (`winaero-tweaker-registry-audit`): bucket into
+   performance-relevant / UX-only / reject before any code proposal.
+3. **AtlasOS delta extraction** stays watchlist per
+   `decisions/atlasos-wholesale-import.md`.
+4. **NVCleanstall scope note** stays watchlist: write the boundary doc keeping
+   driver-package installation out of computa scope.
+5. Watchlist item worth a real feature slice: `SvcHostSplitThresholdInKB`
+   (RAM-aware computed value, reboot-gated, with verify) — see the WinUtil
+   parity table.
 
 ## Good first implementation slices
 
