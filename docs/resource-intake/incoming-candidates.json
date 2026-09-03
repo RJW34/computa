@@ -1,20 +1,157 @@
 [
   {
-    "resource_id": "fill-me-from-user-history-or-discussion",
-    "title": "Replace this placeholder with the first real user-shared resource",
-    "source_type": "other",
-    "url": "",
-    "status": "unreviewed",
-    "claimed_value": "Describe the concrete optimization claim or capability this resource suggests.",
-    "candidate_surfaces": [],
-    "current_overlap": "unknown",
+    "resource_id": "chris-titus-winutil-parity-audit",
+    "title": "Chris Titus Tech WinUtil",
+    "source_type": "repo",
+    "url": "https://github.com/ChrisTitusTech/winutil",
+    "status": "reviewing",
+    "claimed_value": "Broad Windows utility covering tweaks, fixes, updates, and debloat that could surface safe missing deltas for computa's Windows tuning catalog.",
+    "candidate_surfaces": [
+      "abso/settings/debloat.py",
+      "abso/data/debloat_tweaks.yaml",
+      "docs/TROUBLESHOOTING.md"
+    ],
+    "current_overlap": "partial — computa already has tiered registry/service/appx debloat with restore awareness, but no audited WinUtil-to-computa parity map.",
+    "repo_evidence_paths": [
+      "abso/settings/debloat.py",
+      "abso/data/debloat_tweaks.yaml"
+    ],
     "evidence_needed": [
-      "Proof that the idea maps to a real computa surface",
-      "Proof that the benefit is measurable or the safety/rollback story improves"
+      "Field-by-field diff between WinUtil tweak catalog and computa debloat_tweaks.yaml",
+      "Proof that any imported deltas are reversible and honestly verifiable",
+      "Evidence that the imported changes help performance, privacy, or maintenance without scope creep"
     ],
     "risk_notes": [
-      "Do not preserve this placeholder once a real resource is added"
+      "WinUtil is broader than computa and includes non-gaming maintenance scope",
+      "Do not import app install/update orchestration unless product scope expands deliberately",
+      "Avoid bundling one-click tweak packs without per-setting evidence"
     ],
-    "next_action": "Replace this row with a real candidate from prior discussion or new intake."
+    "proposed_shape": "Add only missing reversible debloat/privacy/service entries as explicit computa tweaks; keep package-management and general Windows toolbox scope out.",
+    "next_action": "Build a WinUtil-to-computa parity matrix, then propose the smallest reversible missing set as follow-on PR slices."
+  },
+  {
+    "resource_id": "atlasos-reversible-delta-extraction",
+    "title": "AtlasOS",
+    "source_type": "repo",
+    "url": "https://github.com/Atlas-OS/Atlas",
+    "status": "watchlist",
+    "claimed_value": "Aggressive Windows optimization and privacy project that may contain reversible per-setting ideas worth benchmarking for gaming profiles.",
+    "candidate_surfaces": [
+      "abso/settings/debloat.py",
+      "abso/settings/power.py",
+      "abso/profiles",
+      "docs/research/"
+    ],
+    "current_overlap": "partial — computa already has game-specific profiles, power tuning, and debloat, but not a whole-OS image-style optimization lane.",
+    "repo_evidence_paths": [
+      "abso/settings/debloat.py",
+      "abso/settings/power.py",
+      "docs/MULTIMON_GAMING_IDEA.md",
+      "docs/REMEDIATION_ROADMAP.md"
+    ],
+    "evidence_needed": [
+      "Separation of reversible per-setting deltas from image/install-time modifications",
+      "Benchmark proof on computa target games and display paths",
+      "Rollback-safe implementation path for every kept delta"
+    ],
+    "risk_notes": [
+      "Direct wholesale import conflicts with computa's reversible transaction model",
+      "Atlas-style system-wide image assumptions are a meaningful scope expansion",
+      "Many claims in this category are anecdotal until measured on target hardware"
+    ],
+    "proposed_shape": "Treat AtlasOS as a source of candidate deltas only; reject wholesale preset or image-style adoption.",
+    "next_action": "Extract a shortlist of reversible AtlasOS deltas and tag every non-reversible or image-only change as out of scope."
+  },
+  {
+    "resource_id": "oo-shutup10-privacy-toggle-mapping",
+    "title": "O&O ShutUp10++",
+    "source_type": "vendor-tool",
+    "url": "https://www.oo-software.com/en/shutup10",
+    "status": "reviewing",
+    "claimed_value": "Large privacy and telemetry toggle catalog that can be compared against computa's existing tier-1 and tier-2 debloat coverage.",
+    "candidate_surfaces": [
+      "abso/settings/debloat.py",
+      "abso/data/debloat_tweaks.yaml",
+      "docs/TROUBLESHOOTING.md"
+    ],
+    "current_overlap": "partial — computa already ships privacy and telemetry tweaks plus service controls, but no explicit ShutUp10 parity or rationale doc.",
+    "repo_evidence_paths": [
+      "abso/settings/debloat.py",
+      "abso/data/debloat_tweaks.yaml"
+    ],
+    "evidence_needed": [
+      "Mapping of ShutUp10 toggles to existing or missing computa settings",
+      "Verification that any missing toggles fit computa's restore and safety guarantees",
+      "Clear explanation of which privacy tweaks are placebo, harmful, or out of scope"
+    ],
+    "risk_notes": [
+      "Privacy toggle suites often mix safe telemetry reductions with feature-breaking options",
+      "A big matrix without guidance becomes cargo-cult tweaking",
+      "Some settings may be organization-policy or edition-dependent"
+    ],
+    "proposed_shape": "Create an explicit privacy-toggle mapping doc and import only the deltas that fit computa's evidence and rollback bar.",
+    "next_action": "Draft a ShutUp10 parity table against debloat_tweaks.yaml and mark each row as covered, missing, rejected, or watchlist."
+  },
+  {
+    "resource_id": "nvcleanstall-scope-boundary",
+    "title": "NVCleanstall",
+    "source_type": "vendor-tool",
+    "url": "https://www.techpowerup.com/nvcleanstall/",
+    "status": "watchlist",
+    "claimed_value": "Lean NVIDIA driver installation path that could reduce driver bloat around gaming setups.",
+    "candidate_surfaces": [
+      "README.md",
+      "docs/NVAPI_INTEGRATION_PLAN.md",
+      "abso/settings/nvidia/"
+    ],
+    "current_overlap": "adjacent but absent — computa already has NPI and planned NVAPI read/merge work, but it does not currently mediate driver installation.",
+    "repo_evidence_paths": [
+      "README.md",
+      "docs/NVAPI_INTEGRATION_PLAN.md",
+      "abso/settings/nvidia/npi.py"
+    ],
+    "evidence_needed": [
+      "Explicit product-scope decision on whether driver installation belongs inside computa",
+      "Rollback and recovery story for any driver-package mutation path",
+      "Proof that the benefit is meaningful beyond what current NPI/NVAPI surfaces already cover"
+    ],
+    "risk_notes": [
+      "Driver install mediation is much higher risk than profile tuning",
+      "Bad rollback here can strand the machine rather than just revert a profile",
+      "This can easily become an installer/distribution project instead of a tuning project"
+    ],
+    "proposed_shape": "Do not build install automation first; decide the scope boundary and document it before any implementation work.",
+    "next_action": "Write a scope decision note: either keep NVCleanstall out of computa or define a narrowly optional offline-safe preparation lane."
+  },
+  {
+    "resource_id": "winaero-tweaker-registry-audit",
+    "title": "Winaero Tweaker",
+    "source_type": "vendor-tool",
+    "url": "https://winaero.com/winaero-tweaker/",
+    "status": "reviewing",
+    "claimed_value": "Broad catalog of Windows registry and shell tweaks that may surface a few reversible quality-of-life or gaming-adjacent settings.",
+    "candidate_surfaces": [
+      "abso/settings/debloat.py",
+      "abso/profiles",
+      "docs/TROUBLESHOOTING.md"
+    ],
+    "current_overlap": "partial — computa already handles many targeted Windows changes, but it does not yet document which Winaero-class tweaks are intentionally excluded.",
+    "repo_evidence_paths": [
+      "abso/settings/debloat.py",
+      "docs/REMEDIATION_ROADMAP.md",
+      "docs/TROUBLESHOOTING.md"
+    ],
+    "evidence_needed": [
+      "Identification of any gaming-relevant reversible deltas",
+      "Proof that a kept tweak changes user outcomes rather than just surface preferences",
+      "Explicit rejection reasons for cosmetic or non-verifiable registry tweaks"
+    ],
+    "risk_notes": [
+      "This tool's breadth makes scope drift likely",
+      "Many tweaks here are cosmetic or folklore-driven rather than performance-backed",
+      "User-facing polish tweaks should not be confused with gaming optimization"
+    ],
+    "proposed_shape": "Harvest only a tiny number of measured, reversible settings and document the rest as intentionally out of scope.",
+    "next_action": "Split Winaero-class tweaks into performance-relevant, UX-only, and reject buckets before any code proposal."
   }
 ]

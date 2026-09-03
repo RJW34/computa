@@ -12,6 +12,10 @@
     "docs/TROUBLESHOOTING.md"
   ],
   "current_overlap": "unknown",
+  "repo_evidence_paths": [
+    "abso/settings/...",
+    "docs/..."
+  ],
   "evidence_needed": [
     "Measured benchmark on relevant hardware",
     "Rollback-safe implementation path",
@@ -20,5 +24,6 @@
   "risk_notes": [
     "Any safety, maintenance, anti-cheat, placebo-tweak, or scope concerns"
   ],
+  "proposed_shape": "What the follow-on implementation should probably look like if this resource is worth absorbing.",
   "next_action": "One concrete next step"
 }

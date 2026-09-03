@@ -4,13 +4,16 @@ This is the concrete handoff for a stronger model or future agent.
 
 ## Immediate next pass
 
-1. Replace the placeholder row in `incoming-candidates.json` with real resources
-   from prior user discussion, tweets, repo links, or archived notes.
-2. For each resource, map it to a real computa surface before proposing code.
-3. Check whether the capability is already present, partially present, or
+1. Start with `INITIAL_PROPOSALS.md` and the seeded rows in
+   `incoming-candidates.json`.
+2. Do the `Chris Titus Tech WinUtil` parity audit first because computa already
+   has a direct target surface in `debloat_tweaks.yaml`.
+3. For each seeded resource, map it to a real computa surface before proposing
+   code.
+4. Check whether the capability is already present, partially present, or
    intentionally excluded.
-4. Write one `decision-template.md` copy per resource family that matters.
-5. Only then start code changes.
+5. Write or update one decision note per resource family that matters.
+6. Only then start code changes.
 
 ## Good first implementation slices
 

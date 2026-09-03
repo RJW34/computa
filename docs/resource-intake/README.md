@@ -14,6 +14,11 @@ This directory is the handoff surface for external-resource work.
   - short decision write-up template after review
 - `implementation-backlog.md`
   - concrete follow-on build steps for a stronger model or future agent
+- `INITIAL_PROPOSALS.md`
+  - seeded proposal slices so the branch contains concrete starting work, not
+    just intake process
+- `decisions/`
+  - durable resource-specific decisions once a family has enough evidence
 
 ## Status meanings
 
