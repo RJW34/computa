@@ -171,6 +171,61 @@ registry_tweaks:
     desired: 0
     default: 1
 
+  # --- WinUtil parity imports (2026-09-03 resource-intake audit) -------------
+  # Source: ChrisTitusTech/winutil config/tweaks.json. Only reversible
+  # registry/service deltas that computa did not already cover were imported;
+  # see docs/resource-intake/ for the full parity table and reject rationale.
+
+  - name: "Disable User Activity Publishing"
+    tier: 1
+    description: "Stops Windows from publishing user activities to the activity feed (completes the Activity History family)"
+    hive: HKLM
+    key: "SOFTWARE\\Policies\\Microsoft\\Windows\\System"
+    value: "PublishUserActivities"
+    type: DWORD
+    desired: 0
+    default: 1
+
+  - name: "Disable Implicit Ink Data Collection"
+    tier: 1
+    description: "Prevents Windows from collecting handwriting/ink samples for personalization"
+    hive: HKCU
+    key: "Software\\Microsoft\\InputPersonalization"
+    value: "RestrictImplicitInkCollection"
+    type: DWORD
+    desired: 1
+    default: 0
+
+  - name: "Disable Implicit Text Data Collection"
+    tier: 1
+    description: "Prevents Windows from collecting typed text samples for personalization"
+    hive: HKCU
+    key: "Software\\Microsoft\\InputPersonalization"
+    value: "RestrictImplicitTextCollection"
+    type: DWORD
+    desired: 1
+    default: 0
+
+  - name: "Disable Contact Harvesting"
+    tier: 1
+    description: "Stops the input personalization store from harvesting contact data"
+    hive: HKCU
+    key: "Software\\Microsoft\\InputPersonalization\\TrainedDataStore"
+    value: "HarvestContacts"
+    type: DWORD
+    desired: 0
+    default: 1
+
+  - name: "Disable Personalization Data Consent"
+    tier: 1
+    description: "Withdraws the input personalization privacy-policy consent flag"
+    hive: HKCU
+    key: "Software\\Microsoft\\Personalization\\Settings"
+    value: "AcceptedPrivacyPolicy"
+    type: DWORD
+    desired: 0
+    default: 1
+
   # ---------------------------------------------------------------------------
   # TIER 2: Moderate — disables features some users may rely on
   # ---------------------------------------------------------------------------
@@ -265,6 +320,26 @@ registry_tweaks:
     desired: 1
     default: 0
 
+  - name: "Prevent Device Metadata Download"
+    tier: 2
+    description: "Stops Windows from auto-downloading vendor device metadata/companion software when hardware is plugged in (device icons/names stop updating)"
+    hive: HKLM
+    key: "SOFTWARE\\Policies\\Microsoft\\Windows\\Device Metadata"
+    value: "PreventDeviceMetadataFromNetwork"
+    type: DWORD
+    desired: 1
+    default: 0
+
+  - name: "Disable WPBT Vendor Software Execution"
+    tier: 2
+    description: "Blocks the Windows Platform Binary Table from letting firmware vendors auto-install software at boot (OEM crapware/persistence vector); takes effect next boot"
+    hive: HKLM
+    key: "SYSTEM\\CurrentControlSet\\Control\\Session Manager"
+    value: "DisableWpbtExecution"
+    type: DWORD
+    desired: 1
+    default: 0
+
 service_tweaks:
   # ---------------------------------------------------------------------------
   # TIER 1: Safe — telemetry services that provide no user-facing functionality
@@ -301,6 +376,13 @@ service_tweaks:
     service: "CDPUserSvc"
     desired_start: 4  # Disabled
     default_start: 2  # Automatic
+
+  - name: "MapsBroker to Manual"
+    tier: 2
+    description: "Downloaded Maps Manager — auto-starts to update offline maps; no value on a gaming desktop (WinUtil parity)"
+    service: "MapsBroker"
+    desired_start: 3  # Manual
+    default_start: 2  # Automatic (Delayed)
 
 appx_packages:
   # ---------------------------------------------------------------------------
