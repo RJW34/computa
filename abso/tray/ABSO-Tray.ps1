@@ -883,7 +883,7 @@ function Get-TrayProfileGameGroup {
         "-online-gsync-hdr-capture", "-online-gsync-hdr",
         "-gsync-hdr-capture", "-gsync-capture",
         "-online-gsync", "-offline-gsync-hdr",
-        "-offline-hdr", "-online-hdr", "-console-parity-hdr",
+        "-offline-hdr", "-online-hdr", "-console-parity-hdr", "-hdr-capture",
         "-universal-hdr", "-gsync-hdr", "-tournament-sim-144hz",
         "-console-parity", "-300hz-max", "-streaming-hdr", "-streaming",
         "-offline", "-online", "-vrr-lab", "-gsync", "-hdr", "-sdr",
@@ -2380,6 +2380,14 @@ $script:FallbackProfiles = [ordered]@{
         Exes     = @("Rivals2-Win64-Shipping.exe", "RivalsofAether2.exe", "Rivals2.exe")
         SyncMode = "on"
     }
+    "rivals2-gsync-capture" = @{
+        Name     = "Rivals 2 - G-SYNC Streaming"
+        Sub      = "SDR Streaming | Borderless VRR | Keeps OBS/Overlays"
+        Cat      = "Fighting"
+        Desc     = "Rollback-safe borderless VRR lane that keeps OBS/Medal/overlays alive"
+        Exes     = @("Rivals2-Win64-Shipping.exe", "RivalsofAether2.exe", "Rivals2.exe")
+        SyncMode = "on"
+    }
     "rivals2-gsync-hdr" = @{
         Name     = "Rivals 2 - G-SYNC HDR"
         Sub      = "G-SYNC HDR | LLM ON | VSync Safety Net | Rollback-Safe"
@@ -2389,8 +2397,8 @@ $script:FallbackProfiles = [ordered]@{
         SyncMode = "on"
     }
     "rivals2-gsync-hdr-capture" = @{
-        Name     = "Rivals 2 - G-SYNC HDR Capture-Safe"
-        Sub      = "HDR Capture-Safe | Borderless VRR | Keeps OBS/Overlays"
+        Name     = "Rivals 2 - G-SYNC HDR Streaming"
+        Sub      = "HDR Streaming | Borderless VRR | Keeps OBS/Overlays"
         Cat      = "Fighting"
         Desc     = "Rollback-safe borderless VRR lane that keeps OBS/Medal/overlays alive"
         Exes     = @("Rivals2-Win64-Shipping.exe", "RivalsofAether2.exe", "Rivals2.exe")
@@ -2403,6 +2411,22 @@ $script:FallbackProfiles = [ordered]@{
         Sub      = "Competitive | No Sync | Backend-Aware"
         Cat      = "Fighting"
         Desc     = "Latency-focused no-sync profile for competitive Melee"
+        Exes     = @("Slippi Dolphin.exe", "Dolphin.exe")
+        SyncMode = "off"
+    }
+    "slippi-melee-capture" = @{
+        Name     = "Super Smash Bros. Melee (Slippi SDR Streaming)"
+        Sub      = "SDR Streaming | Borderless | Keeps OBS/Overlays"
+        Cat      = "Fighting"
+        Desc     = "Competitive no-sync Slippi lane that keeps OBS, Medal, RTSS, and overlays alive"
+        Exes     = @("Slippi Dolphin.exe", "Dolphin.exe")
+        SyncMode = "off"
+    }
+    "slippi-melee-hdr-capture" = @{
+        Name     = "Super Smash Bros. Melee (Slippi HDR Streaming)"
+        Sub      = "HDR Streaming | Borderless | Keeps OBS/Overlays"
+        Cat      = "Fighting"
+        Desc     = "Competitive SDR-in-HDR Slippi lane that keeps OBS, Medal, RTSS, and overlays alive"
         Exes     = @("Slippi Dolphin.exe", "Dolphin.exe")
         SyncMode = "off"
     }
@@ -2478,6 +2502,32 @@ $script:FallbackProfiles = [ordered]@{
         )
         SyncMode = "off"
     }
+    "fortnite-gsync-capture" = @{
+        Name     = "Fortnite - GSYNC SDR Streaming"
+        Sub      = "SDR Streaming | Borderless VRR | Keeps OBS/Overlays"
+        Cat      = "Shooters"
+        Desc     = "Capped SDR G-SYNC lane that keeps OBS, Medal, RTSS, and overlays alive"
+        Exes     = @(
+            "FortniteClient-Win64-Shipping.exe",
+            "FortniteClient-Win64-Shipping_EAC.exe",
+            "FortniteClient-Win64-Shipping_BE.exe",
+            "FortniteClient-Win64-Shipping_EAC_EOS.exe"
+        )
+        SyncMode = "on"
+    }
+    "fortnite-gsync-hdr-capture" = @{
+        Name     = "Fortnite - GSYNC HDR Streaming"
+        Sub      = "HDR Streaming | Borderless VRR | Keeps OBS/Overlays"
+        Cat      = "Shooters"
+        Desc     = "Native-HDR capped G-SYNC lane that keeps OBS, Medal, RTSS, and overlays alive"
+        Exes     = @(
+            "FortniteClient-Win64-Shipping.exe",
+            "FortniteClient-Win64-Shipping_EAC.exe",
+            "FortniteClient-Win64-Shipping_BE.exe",
+            "FortniteClient-Win64-Shipping_EAC_EOS.exe"
+        )
+        SyncMode = "on"
+    }
     "marvel-rivals-sdr" = @{
         Name     = "Marvel Rivals - SDR"
         Sub      = "SDR | Reflex ON+Boost | G-SYNC ON"
@@ -2524,6 +2574,38 @@ $script:FallbackProfiles = [ordered]@{
         Cat      = "Shooters"
         Desc     = "Low-latency native-HDR Overwatch 2 G-SYNC on the optimized borderless VRR path, while stopping capture and overlay processes."
         Exes     = @("Overwatch.exe")
+        SyncMode = "on"
+    }
+    "overwatch2-gsync-capture" = @{
+        Name     = "Overwatch 2 - GSYNC SDR Streaming"
+        Sub      = "SDR Streaming | Borderless VRR | Keeps OBS/Overlays"
+        Cat      = "Shooters"
+        Desc     = "Borderless SDR G-SYNC lane that keeps OBS, Medal, RTSS, and overlays alive"
+        Exes     = @("Overwatch.exe")
+        SyncMode = "on"
+    }
+    "overwatch2-gsync-hdr-capture" = @{
+        Name     = "Overwatch 2 - GSYNC HDR Streaming"
+        Sub      = "HDR Streaming | Borderless VRR | Keeps OBS/Overlays"
+        Cat      = "Shooters"
+        Desc     = "Borderless native-HDR G-SYNC lane that keeps OBS, Medal, RTSS, and overlays alive"
+        Exes     = @("Overwatch.exe")
+        SyncMode = "on"
+    }
+    "counter-strike-2-gsync-capture" = @{
+        Name     = "Counter-Strike 2 - GSYNC SDR Streaming"
+        Sub      = "SDR Streaming | Borderless VRR | Keeps OBS/Overlays"
+        Cat      = "Shooters"
+        Desc     = "Borderless SDR G-SYNC lane that keeps OBS, Medal, RTSS, and overlays alive"
+        Exes     = @("cs2.exe")
+        SyncMode = "on"
+    }
+    "counter-strike-2-gsync-hdr-capture" = @{
+        Name     = "Counter-Strike 2 - GSYNC HDR Streaming"
+        Sub      = "HDR Streaming | Borderless VRR | Keeps OBS/Overlays"
+        Cat      = "Shooters"
+        Desc     = "Borderless Windows HDR G-SYNC lane that keeps OBS, Medal, RTSS, and overlays alive"
+        Exes     = @("cs2.exe")
         SyncMode = "on"
     }
 
@@ -2765,6 +2847,19 @@ function Convert-CatalogEntriesToProfileMap {
             try { $isOnlineProfile = [bool]$entry.is_online_profile } catch {}
         }
 
+        # Session core-partition policy (off / game_only / full). Older cache
+        # entries lack the field; default to 'off' so the governor is not
+        # started for a profile whose declaration is unknown.
+        $cpuPartitionPolicy = 'off'
+        if ($null -ne $entry.cpu_partition_policy) {
+            try {
+                $policyValue = "$($entry.cpu_partition_policy)".ToLowerInvariant()
+                if ($policyValue -in @('off', 'game_only', 'full')) {
+                    $cpuPartitionPolicy = $policyValue
+                }
+            } catch {}
+        }
+
         $profiles[$id] = @{
             Name                  = $name
             Sub                   = $sub
@@ -2783,6 +2878,7 @@ function Convert-CatalogEntriesToProfileMap {
             RequiresOverlayFree   = $requiresOverlayFree
             KeepAwakeWhileGaming  = $keepAwakeWhileGaming
             IsOnline              = $isOnlineProfile
+            CpuPartitionPolicy    = $cpuPartitionPolicy
         }
     }
 
@@ -4551,6 +4647,7 @@ $script:TrayMenuPulseFrame = 0
 $script:StartupIconHealTimer = $null
 $script:StartupIconHealAttempts = 0
 $script:ProcessGuardTimer = $null
+$script:MutatingOperationInProgress = $false
 $script:MenuStateInitialized = $false
 $script:LastRenderedActiveProfile = $null
 $script:AboutForm = $null
@@ -4880,8 +4977,65 @@ function Play-ApplySuccessIconAnimation {
 # APPLY / RESTORE
 # ============================================================================
 
+function Test-TrayMutationInProgress {
+    param([string]$RequestedAction)
+
+    if (-not $script:MutatingOperationInProgress) { return $false }
+
+    $requestedLabel = if ([string]::IsNullOrWhiteSpace($RequestedAction)) {
+        "starting another settings change"
+    }
+    else {
+        $RequestedAction
+    }
+    Write-TrayLog "Blocked $requestedLabel because another mutating operation is still running safely" -Level "WARN"
+    Show-Notification `
+        -Title "computa" `
+        -Message "Another settings change is still running safely. Wait for it to finish before $requestedLabel." `
+        -Type "Info" `
+        -ActionName "Busy" `
+        -ActionColor $script:Colors.AccentAmber
+    Set-TrayLastAction -Message "Blocked ${requestedLabel}: another settings change is still running"
+    Update-MenuState
+    return $true
+}
+
+function Complete-TrayMutatingChildProcess {
+    param(
+        [System.Diagnostics.Process]$Process,
+        [string]$OperationName
+    )
+
+    if (-not $Process) { return $true }
+
+    try {
+        while (-not $Process.HasExited) {
+            # A failure to repaint the tray must never escape this safety wait.
+            try { [System.Windows.Forms.Application]::DoEvents() } catch {}
+            Start-Sleep -Milliseconds 100
+        }
+        # Parameterless WaitForExit drains redirected stdout/stderr after the
+        # process handle signals. Do not dispose or delete its files first.
+        $Process.WaitForExit()
+        return $true
+    }
+    catch {
+        try { Write-TrayLog "$OperationName child completion check failed; falling back to a natural blocking wait: $($_.Exception.Message)" -Level "WARN" } catch {}
+        try {
+            $Process.WaitForExit()
+            return $true
+        }
+        catch {
+            try { Write-TrayLog "$OperationName child could not be confirmed stopped; mutation guard remains active: $($_.Exception.Message)" -Level "ERROR" } catch {}
+            return $false
+        }
+    }
+}
+
 function Apply-Profile {
     param([string]$ProfileId)
+
+    if (Test-TrayMutationInProgress -RequestedAction "applying another profile") { return }
 
     Write-TrayLog "Apply-Profile called with: $ProfileId"
     $resolvedId = Resolve-ProfileAlias $ProfileId
@@ -4914,15 +5068,19 @@ function Apply-Profile {
     }
     $profileTitle = Get-TrayProfileObjectDisplayName -Profile $profile -Fallback $ProfileId
 
-    # Show applying state
-    Set-IconState -State "Applying"
-    Set-TrayOperationTooltipText -Text "computa - Applying..."
-
-    # Show progress overlay
-    $progressVisual = Get-TrayProfileToastVisualArgs -ProfileId $ProfileId -Profile $profile
-    Show-ProgressOverlay @progressVisual -Title "Applying $profileTitle" -StepText "Initializing..."
-
+    $tempFile = $null
+    $errFile = $null
+    $proc = $null
+    $script:MutatingOperationInProgress = $true
     try {
+        # Show applying state
+        Set-IconState -State "Applying"
+        Set-TrayOperationTooltipText -Text "computa - Applying..."
+
+        # Show progress overlay
+        $progressVisual = Get-TrayProfileToastVisualArgs -ProfileId $ProfileId -Profile $profile
+        Show-ProgressOverlay @progressVisual -Title "Applying $profileTitle" -StepText "Initializing..."
+
         $tempFile = [System.IO.Path]::GetTempFileName()
         $errFile = "$tempFile.err"
 
@@ -4943,35 +5101,33 @@ function Apply-Profile {
         # PS 5.1: cache the handle now or .ExitCode reads $null after exit.
         if ($proc) { $null = $proc.Handle }
 
-        # Poll instead of -Wait so the UI thread message pump stays alive
-        $timeout = (Get-Date).AddSeconds(120)
-        while (-not $proc.HasExited -and (Get-Date) -lt $timeout) {
-            [System.Windows.Forms.Application]::DoEvents()
+        # Poll instead of -Wait so the UI thread message pump stays alive. A
+        # slow apply must be allowed to reach its own commit/rollback boundary;
+        # interrupting the backend on a tray-side wall-clock deadline can leave
+        # the transaction unfinished. After 120 seconds, tell the user it is
+        # still progressing and continue waiting for the natural exit.
+        $slowApplyNoticeAt = (Get-Date).AddSeconds(120)
+        $slowApplyNoticeShown = $false
+        while (-not $proc.HasExited) {
+            try { [System.Windows.Forms.Application]::DoEvents() } catch {}
+            if (-not $slowApplyNoticeShown -and (Get-Date) -ge $slowApplyNoticeAt) {
+                $slowApplyNoticeShown = $true
+                Write-TrayLog "Apply-Profile is still running after 120s; waiting for the backend transaction to finish safely" -Level "WARN"
+                try {
+                    Update-ProgressOverlay -StepText "Still applying safely..."
+                    Set-TrayOperationTooltipText -Text "computa - Applying (still running safely)..."
+                }
+                catch {
+                    try { Write-TrayLog "Apply-Profile slow-operation UI update failed: $($_.Exception.Message)" -Level "WARN" } catch {}
+                }
+            }
             Start-Sleep -Milliseconds 100
         }
-        if (-not $proc.HasExited) {
-            Write-TrayLog "Apply-Profile timed out after 120s, killing process" -Level "ERROR"
-            $proc.Kill()
-            $proc.Dispose()
-            Close-ProgressOverlay
-            Play-FailSound
-            Set-IconState -State "Error"
-            $timeoutVisual = Get-TrayProfileToastVisualArgs -ProfileId $ProfileId -Profile $profile
-            $timeoutTitle = $profileTitle
-            Show-Notification @timeoutVisual -Title $timeoutTitle -Message "Apply timed out after 120s" -Type "Error" -MetaText $ProfileId
-            Set-TrayLastAction -Message "Apply timed out after 120s"
-            Update-MenuState
-            Remove-Item $tempFile -Force -ErrorAction SilentlyContinue
-            Remove-Item $errFile -Force -ErrorAction SilentlyContinue
-            return
-        }
+        $proc.WaitForExit()
         $exitCode = $proc.ExitCode
-        $proc.Dispose()
 
         $rawOutput = Get-Content $tempFile -Raw -ErrorAction SilentlyContinue
         $errOutput = Get-Content $errFile -Raw -ErrorAction SilentlyContinue
-        Remove-Item $tempFile -Force -ErrorAction SilentlyContinue
-        Remove-Item $errFile -Force -ErrorAction SilentlyContinue
 
         Write-TrayLog "CLI output: $rawOutput"
         if ($errOutput) { Write-TrayLog "CLI stderr: $errOutput" -Level "WARN" }
@@ -4990,9 +5146,9 @@ function Apply-Profile {
             }
         }
 
-        $exitCodeOk = ($null -eq $exitCode -or $exitCode -eq 0)
+        $exitCodeOk = ($null -ne $exitCode -and $exitCode -eq 0)
         if ($null -eq $exitCode) {
-            Write-TrayLog "Apply CLI exit code was unavailable; falling back to JSON payload validation" -Level "WARN"
+            Write-TrayLog "Apply CLI exit code was unavailable; treating the transaction result as failed" -Level "ERROR"
         }
 
         $applySucceeded = (
@@ -5291,10 +5447,21 @@ function Apply-Profile {
         $script:LastActionTime = Get-Date
         Update-MenuState
     }
+    finally {
+        $childCompleted = Complete-TrayMutatingChildProcess -Process $proc -OperationName "Apply-Profile"
+        if ($childCompleted) {
+            if ($proc) { try { $proc.Dispose() } catch {} }
+            if ($tempFile) { Remove-Item $tempFile -Force -ErrorAction SilentlyContinue }
+            if ($errFile) { Remove-Item $errFile -Force -ErrorAction SilentlyContinue }
+            $script:MutatingOperationInProgress = $false
+        }
+    }
 }
 
 function Apply-PendingProfileFixes {
     param([switch]$Force)
+
+    if (Test-TrayMutationInProgress -RequestedAction "applying pending profile fixes") { return }
 
     if ([string]::IsNullOrWhiteSpace([string]$script:activeProfile)) {
         Show-Notification -Title "computa" -Message "No active profile to repair" -Type "Info" -ActionName "Apply" -ActionColor $script:Colors.AccentAmber
@@ -5328,18 +5495,22 @@ function Apply-PendingProfileFixes {
         $pendingText = "profile verification"
     }
 
-    Write-TrayLog "Apply-PendingProfileFixes called for '$script:activeProfile' ($pendingText)"
-    Set-IconState -State "Applying"
-    Set-TrayOperationTooltipText -Text "computa - Applying pending profile fixes..."
-    $pendingProgressVisual = Get-TrayProfileToastVisualArgs `
-        -ProfileId $script:activeProfile `
-        -Profile $activeRecord.Profile `
-        -ActiveBadge
-    Show-ProgressOverlay @pendingProgressVisual -Title "Applying pending profile fixes" -StepText $pendingText
-
-    $tempFile = [System.IO.Path]::GetTempFileName()
-    $errFile = "$tempFile.err"
+    $tempFile = $null
+    $errFile = $null
+    $proc = $null
+    $script:MutatingOperationInProgress = $true
     try {
+        Write-TrayLog "Apply-PendingProfileFixes called for '$script:activeProfile' ($pendingText)"
+        Set-IconState -State "Applying"
+        Set-TrayOperationTooltipText -Text "computa - Applying pending profile fixes..."
+        $pendingProgressVisual = Get-TrayProfileToastVisualArgs `
+            -ProfileId $script:activeProfile `
+            -Profile $activeRecord.Profile `
+            -ActiveBadge
+        Show-ProgressOverlay @pendingProgressVisual -Title "Applying pending profile fixes" -StepText $pendingText
+
+        $tempFile = [System.IO.Path]::GetTempFileName()
+        $errFile = "$tempFile.err"
         $args = Get-AbsoBackendArgs -CommandArgs @("apply-pending", $script:activeProfile, "--json")
         Write-TrayLog "Running: $($script:PythonExe) $($args -join ' ')"
         $proc = Start-Process -FilePath $script:PythonExe -ArgumentList $args `
@@ -5348,18 +5519,26 @@ function Apply-PendingProfileFixes {
         # PS 5.1: cache the handle now or .ExitCode reads $null after exit.
         if ($proc) { $null = $proc.Handle }
 
-        $timeout = (Get-Date).AddSeconds(45)
-        while (-not $proc.HasExited -and (Get-Date) -lt $timeout) {
-            [System.Windows.Forms.Application]::DoEvents()
+        $slowPendingNoticeAt = (Get-Date).AddSeconds(45)
+        $slowPendingNoticeShown = $false
+        while (-not $proc.HasExited) {
+            try { [System.Windows.Forms.Application]::DoEvents() } catch {}
+            if (-not $slowPendingNoticeShown -and (Get-Date) -ge $slowPendingNoticeAt) {
+                $slowPendingNoticeShown = $true
+                Write-TrayLog "Apply-PendingProfileFixes is still running after 45s; waiting for the backend transaction to finish safely" -Level "WARN"
+                try {
+                    Update-ProgressOverlay -StepText "Still applying pending fixes safely..."
+                    Set-TrayOperationTooltipText -Text "computa - Pending profile fixes still running safely..."
+                }
+                catch {
+                    try { Write-TrayLog "Apply-PendingProfileFixes slow-operation UI update failed: $($_.Exception.Message)" -Level "WARN" } catch {}
+                }
+            }
             Start-Sleep -Milliseconds 100
         }
-        if (-not $proc.HasExited) {
-            try { $proc.Kill() } catch {}
-            throw "apply-pending timed out after 45s"
-        }
 
+        $proc.WaitForExit()
         $exitCode = $proc.ExitCode
-        $proc.Dispose()
         $rawOutput = Get-Content $tempFile -Raw -ErrorAction SilentlyContinue
         $errOutput = Get-Content $errFile -Raw -ErrorAction SilentlyContinue
         if ($errOutput) { Write-TrayLog "apply-pending stderr: $errOutput" -Level "WARN" }
@@ -5367,9 +5546,9 @@ function Apply-PendingProfileFixes {
 
         $json = Invoke-JsonSafe -Text $rawOutput -Source 'ApplyPending'
         if ($null -eq $json) { throw "apply-pending returned malformed JSON" }
-        $exitCodeOk = ($null -eq $exitCode -or $exitCode -eq 0)
+        $exitCodeOk = ($null -ne $exitCode -and $exitCode -eq 0)
         if ($null -eq $exitCode) {
-            Write-TrayLog "apply-pending exit code was unavailable; falling back to JSON payload validation" -Level "WARN"
+            Write-TrayLog "apply-pending exit code was unavailable; treating the transaction result as failed" -Level "ERROR"
         }
         if (-not $exitCodeOk -or -not $json.success -or -not $json.data -or -not $json.data.success) {
             $err = if ($json.data -and $json.data.error) { $json.data.error } elseif ($json.error) { $json.error } else { "reason not reported" }
@@ -5424,8 +5603,13 @@ function Apply-PendingProfileFixes {
         Update-MenuState
     }
     finally {
-        Remove-Item $tempFile -Force -ErrorAction SilentlyContinue
-        Remove-Item $errFile -Force -ErrorAction SilentlyContinue
+        $childCompleted = Complete-TrayMutatingChildProcess -Process $proc -OperationName "Apply-PendingProfileFixes"
+        if ($childCompleted) {
+            if ($proc) { try { $proc.Dispose() } catch {} }
+            if ($tempFile) { Remove-Item $tempFile -Force -ErrorAction SilentlyContinue }
+            if ($errFile) { Remove-Item $errFile -Force -ErrorAction SilentlyContinue }
+            $script:MutatingOperationInProgress = $false
+        }
     }
 }
 
@@ -5477,15 +5661,21 @@ function Invoke-TrayCommandFile {
 }
 
 function Restore-Settings {
-    Set-IconState -State "Applying"
-    Set-TrayOperationTooltipText -Text "computa - Restoring..."
-    Show-ProgressOverlay `
-        -Title "Restoring Settings" `
-        -StepText "Restoring previous configuration..." `
-        -ActionName "Restore" `
-        -ActionColor $script:Colors.AccentPurple
+    if (Test-TrayMutationInProgress -RequestedAction "restoring settings") { return }
 
+    $tempFile = $null
+    $errFile = $null
+    $proc = $null
+    $script:MutatingOperationInProgress = $true
     try {
+        Set-IconState -State "Applying"
+        Set-TrayOperationTooltipText -Text "computa - Restoring..."
+        Show-ProgressOverlay `
+            -Title "Restoring Settings" `
+            -StepText "Restoring previous configuration..." `
+            -ActionName "Restore" `
+            -ActionColor $script:Colors.AccentPurple
+
         $tempFile = [System.IO.Path]::GetTempFileName()
         $errFile = "$tempFile.err"
 
@@ -5495,30 +5685,27 @@ function Restore-Settings {
         # PS 5.1: cache the handle now or .ExitCode reads $null after exit.
         if ($proc) { $null = $proc.Handle }
 
-        $timeout = (Get-Date).AddSeconds(120)
-        while (-not $proc.HasExited -and (Get-Date) -lt $timeout) {
-            [System.Windows.Forms.Application]::DoEvents()
+        $slowRestoreNoticeAt = (Get-Date).AddSeconds(120)
+        $slowRestoreNoticeShown = $false
+        while (-not $proc.HasExited) {
+            try { [System.Windows.Forms.Application]::DoEvents() } catch {}
+            if (-not $slowRestoreNoticeShown -and (Get-Date) -ge $slowRestoreNoticeAt) {
+                $slowRestoreNoticeShown = $true
+                Write-TrayLog "Restore-Settings is still running after 120s; waiting for the backend transaction to finish safely" -Level "WARN"
+                try {
+                    Update-ProgressOverlay -StepText "Still restoring safely..."
+                    Set-TrayOperationTooltipText -Text "computa - Restoring (still running safely)..."
+                }
+                catch {
+                    try { Write-TrayLog "Restore-Settings slow-operation UI update failed: $($_.Exception.Message)" -Level "WARN" } catch {}
+                }
+            }
             Start-Sleep -Milliseconds 100
         }
-        if (-not $proc.HasExited) {
-            Write-TrayLog "Restore-Settings timed out after 120s, killing process" -Level "ERROR"
-            $proc.Kill()
-            $proc.Dispose()
-            Close-ProgressOverlay
-            Show-Notification -Title "computa" -Message "Restore timed out after 120s" -Type "Error" -ActionName "Restore" -ActionColor $script:Colors.AccentAmber
-            Set-IconState -State "Error"
-            Set-TrayLastAction -Message "Restore timed out after 120s"
-            Update-MenuState
-            Remove-Item $tempFile -Force -ErrorAction SilentlyContinue
-            Remove-Item $errFile -Force -ErrorAction SilentlyContinue
-            return
-        }
+        $proc.WaitForExit()
         $exitCode = $proc.ExitCode
-        $proc.Dispose()
         $rawOutput = Get-Content $tempFile -Raw -ErrorAction SilentlyContinue
         $errOutput = Get-Content $errFile -Raw -ErrorAction SilentlyContinue
-        Remove-Item $tempFile -Force -ErrorAction SilentlyContinue
-        Remove-Item $errFile -Force -ErrorAction SilentlyContinue
         if ($errOutput) { Write-TrayLog "Restore CLI stderr: $errOutput" -Level "WARN" }
 
         if (-not $rawOutput) { throw "runtime returned no restore status" }
@@ -5526,9 +5713,9 @@ function Restore-Settings {
         $json = Invoke-JsonSafe -Text $rawOutput -Source 'Restore'
         if ($null -eq $json) { throw "Restore CLI returned malformed JSON (see tray log for payload preview)" }
 
-        $exitCodeOk = ($null -eq $exitCode -or $exitCode -eq 0)
+        $exitCodeOk = ($null -ne $exitCode -and $exitCode -eq 0)
         if ($null -eq $exitCode) {
-            Write-TrayLog "Restore CLI exit code was unavailable; falling back to JSON payload validation" -Level "WARN"
+            Write-TrayLog "Restore CLI exit code was unavailable; treating the transaction result as failed" -Level "ERROR"
         }
 
         if ($exitCodeOk -and $json.success -and $json.data -and $json.data.success) {
@@ -5565,7 +5752,16 @@ function Restore-Settings {
         Set-TrayLastAction -Message "Restore failed: $($_.Exception.Message)"
         Update-MenuState
     }
-    Restore-TrayTooltipFromState
+    finally {
+        $childCompleted = Complete-TrayMutatingChildProcess -Process $proc -OperationName "Restore-Settings"
+        if ($childCompleted) {
+            if ($proc) { try { $proc.Dispose() } catch {} }
+            if ($tempFile) { Remove-Item $tempFile -Force -ErrorAction SilentlyContinue }
+            if ($errFile) { Remove-Item $errFile -Force -ErrorAction SilentlyContinue }
+            $script:MutatingOperationInProgress = $false
+            Restore-TrayTooltipFromState
+        }
+    }
 }
 
 # ============================================================================
@@ -7903,18 +8099,24 @@ function Clear-AbsoKeepAwake {
     $script:KeepAwakeAsserted = $false
 }
 
-# --- ProBalance governor (background CPU-contention restraint) --------------
+# --- Session governor (core-partition steering + ProBalance restraint) ------
 # Runs the backend `cpu-balance --pid <game> --stop-file <f>` daemon for the
-# session. It demotes only background CPU spikers (never the game, foreground,
-# anti-cheat, launchers, audio, or process_overrides.protect images) and
-# auto-restores them. Gated on the tray-config `cpuBalancer` flag (default OFF;
-# opt in per machine). Stopped via the stop-file sentinel so the daemon's
-# cleanup restores every demoted priority — never a hard kill except as a last
-# resort.
+# session. Steering side (automatic when the profile's catalog-declared
+# cpu_partition_policy is not 'off'): the game and its descendants are
+# soft-steered toward the fast core partition and the profile's background
+# images (plus auto-detected heavy apps) toward the remaining cores via CPU
+# Sets — placement only, never priority or clock changes. Restraint side
+# (gated on the tray-config `cpuBalancer` flag, default OFF): demotes only
+# background CPU spikers (never the game, foreground, anti-cheat, launchers,
+# audio, or process_overrides.protect images) and auto-restores them; without
+# the opt-in the daemon runs `--no-restraint`. Stopped via the stop-file
+# sentinel so the daemon's cleanup restores every demoted priority and clears
+# every steered CPU set — never a hard kill except as a last resort.
 $script:CpuBalancerProc      = $null
 $script:CpuBalancerStopFile  = $null
 $script:CpuBalancerProfileId = $null
 $script:CpuBalancerGamePid   = $null
+$script:CpuBalancerStatusLogged = $false
 
 function Test-CpuBalancerRunning {
     if (-not $script:CpuBalancerProc) { return $false }
@@ -7969,6 +8171,15 @@ function Start-CpuBalancerForGame {
         Remove-Item $script:CpuBalancerStopFile -Force -ErrorAction SilentlyContinue
 
         $cmdArgs = @("cpu-balance", "--pid", "$GamePid", "--stop-file", $script:CpuBalancerStopFile)
+        # Profile id lets the daemon resolve the catalog-declared core
+        # partition policy (game -> fast cores, background list -> the rest).
+        $cmdArgs += @("--profile", $ProfileId)
+        # ProBalance priority restraint stays an explicit per-machine opt-in
+        # (tray-config cpuBalancer). When the governor is running only for the
+        # profile-declared partition steering, disable restraint.
+        if (-not ($script:TrayConfig -and [bool]$script:TrayConfig.cpuBalancer)) {
+            $cmdArgs += "--no-restraint"
+        }
         # Tier B opt-ins (default OFF), passed through as CLI flags so the daemon
         # also performs P-core steering / EcoQoS herding / watchdog rules.
         if ($script:TrayConfig -and [bool]$script:TrayConfig.cpuSets) { $cmdArgs += "--cpu-sets" }
@@ -7985,13 +8196,59 @@ function Start-CpuBalancerForGame {
             -NoNewWindow -PassThru -WorkingDirectory $script:ProjectRoot
         $script:CpuBalancerProfileId = $ProfileId
         $script:CpuBalancerGamePid = $GamePid
-        Write-TrayLog "CpuBalancer: started for '$ProfileId' (game pid $GamePid)"
+        $policy = 'off'
+        $policyProfile = $script:Profiles[$ProfileId]
+        if ($policyProfile -and $policyProfile.CpuPartitionPolicy) {
+            $policy = $policyProfile.CpuPartitionPolicy
+        }
+        $mode = if ($cmdArgs -contains "--no-restraint") { "steer-only" } else { "restraint+steer" }
+        Write-TrayLog "CpuBalancer: started for '$ProfileId' (game pid $GamePid, partition policy '$policy', $mode)"
         return $true
     }
     catch {
         Write-TrayLog "CpuBalancer: failed to start: $($_.Exception.Message)" -Level "WARN"
         Stop-CpuBalancerForGame
         return $false
+    }
+}
+
+function Write-PartitionSteerStatusOnce {
+    <#
+    .SYNOPSIS
+    Log the live core-partition status once per game session. The governor
+    daemon writes partition-steer.journal (partition kind, CPU-set counts,
+    steered pid->image maps) into the installed app root; surfacing it in the
+    tray log is what lets the user confirm — without any extra tooling — that
+    the game landed on the fast cores and which background apps were moved.
+    #>
+    if ($script:CpuBalancerStatusLogged) { return }
+    if (-not (Test-CpuBalancerRunning)) { return }
+    try {
+        $journalPath = Join-Path (Get-InstalledAppRoot) "partition-steer.journal"
+        if (-not (Test-Path $journalPath)) { return }
+        $data = Get-Content $journalPath -Raw -ErrorAction Stop | ConvertFrom-Json
+        if (-not $data -or -not $data.kind) { return }
+        # A stale journal from a crashed prior session (daemon recovery deletes
+        # it moments after spawn) must not be reported as this session's state.
+        if ($script:CpuBalancerGamePid -and $data.game_pid -and
+            [int]$data.game_pid -ne [int]$script:CpuBalancerGamePid) { return }
+        $gameCount = 0
+        $bgImages = @()
+        if ($data.game) { $gameCount = @($data.game.PSObject.Properties).Count }
+        if ($data.background) {
+            $bgImages = @($data.background.PSObject.Properties |
+                ForEach-Object { "$($_.Value)" } |
+                Where-Object { $_ } | Sort-Object -Unique)
+        }
+        $summary = "Core partition '$($data.kind)': $($data.game_sets) game-side / $($data.background_sets) background-side CPU set(s); $gameCount game process(es) steered"
+        if ($bgImages.Count -gt 0) {
+            $summary += "; background: $($bgImages -join ', ')"
+        }
+        Write-TrayLog $summary
+        $script:CpuBalancerStatusLogged = $true
+    }
+    catch {
+        # Status logging is best-effort; never disturb the session loop.
     }
 }
 
@@ -8027,6 +8284,7 @@ function Stop-CpuBalancerForGame {
     }
     $script:CpuBalancerProfileId = $null
     $script:CpuBalancerGamePid = $null
+    $script:CpuBalancerStatusLogged = $false
 }
 
 function Get-ActiveProfileKillsetSummary {
@@ -8375,19 +8633,39 @@ function Invoke-LaunchSanitizerTick {
             Clear-AbsoKeepAwake
         }
 
-        # ProBalance governor: spawn the background-restraint daemon for the
-        # session. Gated on the tray-config flag (default OFF — opt in per
-        # machine). Self-exits when the game dies; also stopped on exit below.
+        # Session governor: spawn the cpu-balance daemon for the session when
+        # anything needs it — ProBalance restraint (tray-config cpuBalancer,
+        # default OFF), any Tier B tray flag, or the profile's own
+        # catalog-declared core-partition policy (game -> fast cores,
+        # background apps -> the rest; automatic on gaming lanes). Without the
+        # cpuBalancer opt-in the daemon runs steer-only (--no-restraint).
+        # Self-exits when the game dies; also stopped on exit below.
         $cpuBalancerAllowed = $false
         if ($script:TrayConfig -and $null -ne $script:TrayConfig.cpuBalancer) {
             $cpuBalancerAllowed = [bool]$script:TrayConfig.cpuBalancer
         }
-        if ($cpuBalancerAllowed) {
+        $governorNeeded = $cpuBalancerAllowed
+        if (-not $governorNeeded -and $script:TrayConfig) {
+            if ([bool]$script:TrayConfig.cpuSets) { $governorNeeded = $true }
+            elseif ([bool]$script:TrayConfig.ecoMode) { $governorNeeded = $true }
+            elseif ([bool]$script:TrayConfig.watchdog) { $governorNeeded = $true }
+        }
+        if (-not $governorNeeded -and $profile -and $profile.CpuPartitionPolicy -and
+            $profile.CpuPartitionPolicy -ne 'off') {
+            $governorNeeded = $true
+        }
+        if ($governorNeeded) {
             if (-not (Test-CpuBalancerRunning)) {
                 $gameProcId = Get-ActiveProfileGamePid
                 if ($gameProcId) {
                     Start-CpuBalancerForGame -ProfileId $profileId -GamePid $gameProcId | Out-Null
                 }
+            }
+            else {
+                # Once per session, surface what the partition actually did
+                # (kind, set counts, steered background images) from the
+                # daemon's journal on the next 10 s tick after startup.
+                Write-PartitionSteerStatusOnce
             }
         }
         elseif (Test-CpuBalancerRunning) {
@@ -9197,7 +9475,7 @@ public class HotkeyMessageWindow : NativeWindow {
         "-online-gsync-hdr-capture", "-online-gsync-hdr",
         "-gsync-hdr-capture", "-gsync-capture",
         "-online-gsync", "-offline-gsync-hdr",
-        "-offline-hdr", "-online-hdr", "-console-parity-hdr",
+        "-offline-hdr", "-online-hdr", "-console-parity-hdr", "-hdr-capture",
         "-universal-hdr", "-gsync-hdr", "-tournament-sim-144hz",
         "-console-parity", "-300hz-max", "-streaming-hdr", "-streaming",
         "-offline", "-online", "-vrr-lab", "-gsync", "-hdr", "-sdr",
@@ -10007,22 +10285,28 @@ public class HotkeyMessageWindow : NativeWindow {
     $resetDisplayItem.ToolTipText = "Advanced recovery: sends Ctrl+Win+Shift+B x2 and may blank monitors for a few seconds."
     Set-TrayCommandItemVisualState -Item $resetDisplayItem -ChipText "RESET"
     $resetDisplayItem.Add_Click({
-        Write-TrayLog "User invoked Reset Display Pipeline from tray menu"
-        $confirm = [System.Windows.Forms.MessageBox]::Show(
-            "This sends Ctrl+Win+Shift+B twice and can blank or disconnect monitors for a few seconds.`n`nUse only for explicit live display recovery, not routine profile verification.`n`nContinue?",
-            "computa Display Pipeline Reset",
-            [System.Windows.Forms.MessageBoxButtons]::YesNo,
-            [System.Windows.Forms.MessageBoxIcon]::Warning,
-            [System.Windows.Forms.MessageBoxDefaultButton]::Button2
-        )
-        if ($confirm -ne [System.Windows.Forms.DialogResult]::Yes) {
-            Write-TrayLog "User cancelled Reset Display Pipeline from confirmation dialog"
-            return
-        }
+        if (Test-TrayMutationInProgress -RequestedAction "resetting the display pipeline") { return }
+
+        $tf = $null
+        $errFile = $null
+        $proc = $null
+        $script:MutatingOperationInProgress = $true
         try {
+            Write-TrayLog "User invoked Reset Display Pipeline from tray menu"
+            $confirm = [System.Windows.Forms.MessageBox]::Show(
+                "This sends Ctrl+Win+Shift+B twice and can blank or disconnect monitors for a few seconds.`n`nUse only for explicit live display recovery, not routine profile verification.`n`nContinue?",
+                "computa Display Pipeline Reset",
+                [System.Windows.Forms.MessageBoxButtons]::YesNo,
+                [System.Windows.Forms.MessageBoxIcon]::Warning,
+                [System.Windows.Forms.MessageBoxDefaultButton]::Button2
+            )
+            if ($confirm -ne [System.Windows.Forms.DialogResult]::Yes) {
+                Write-TrayLog "User cancelled Reset Display Pipeline from confirmation dialog"
+                return
+            }
+
             $tf = [System.IO.Path]::GetTempFileName()
             $errFile = "$tf.err"
-            $proc = $null
             $proc = Start-Process -FilePath $script:PythonExe `
                 -ArgumentList (Get-AbsoBackendArgs -CommandArgs @("reset-display", "--method", "driver-hotkey", "--json")) `
                 -NoNewWindow -PassThru -WorkingDirectory $script:ProjectRoot `
@@ -10030,23 +10314,20 @@ public class HotkeyMessageWindow : NativeWindow {
             # PS 5.1: cache the handle now or .ExitCode reads $null after exit.
             if ($proc) { $null = $proc.Handle }
 
-            $completed = $proc.WaitForExit(30000)
-            if (-not $completed) {
-                try { $proc.Kill() } catch {}
-                try { $proc.Dispose() } catch {}
-                $proc = $null
-                Write-TrayLog "Reset Display timed out after 30s" -Level "ERROR"
-                Show-Notification -Title "computa" `
-                    -Message "Display reset timed out after 30s" -Type "Error" `
-                    -ActionName "Reset" -ActionColor $script:Colors.AccentAmber
-                Set-TrayLastAction -Message "Display reset timed out after 30s"
-                Update-MenuState
-                return
+            $slowResetNoticeAt = (Get-Date).AddSeconds(30)
+            $slowResetNoticeShown = $false
+            while (-not $proc.HasExited) {
+                try { [System.Windows.Forms.Application]::DoEvents() } catch {}
+                if (-not $slowResetNoticeShown -and (Get-Date) -ge $slowResetNoticeAt) {
+                    $slowResetNoticeShown = $true
+                    Write-TrayLog "Reset Display is still running after 30s; waiting for the backend operation to finish safely" -Level "WARN"
+                    try { Set-TrayOperationTooltipText -Text "computa - Resetting display (still running safely)..." } catch {}
+                }
+                Start-Sleep -Milliseconds 100
             }
 
+            $proc.WaitForExit()
             $exitCode = $proc.ExitCode
-            try { $proc.Dispose() } catch {}
-            $proc = $null
             $out = Get-Content $tf -Raw -ErrorAction SilentlyContinue
             $errOutput = Get-Content $errFile -Raw -ErrorAction SilentlyContinue
             if ($errOutput) { Write-TrayLog "Reset Display CLI stderr: $errOutput" -Level "WARN" }
@@ -10059,7 +10340,7 @@ public class HotkeyMessageWindow : NativeWindow {
                 elseif ($null -ne $j -and $j.result) {
                     $result = $j.result
                 }
-                $exitCodeOk = ($null -eq $exitCode -or $exitCode -eq 0)
+                $exitCodeOk = ($null -ne $exitCode -and $exitCode -eq 0)
                 if ($exitCodeOk -and $null -ne $j -and $j.success -and $j.data -and $j.data.success -and $null -ne $result) {
                     $count = $result.sent_count
                     if (-not $count) { $count = 0 }
@@ -10105,12 +10386,14 @@ public class HotkeyMessageWindow : NativeWindow {
             Update-MenuState
         }
         finally {
-            if ($proc) {
-                try { if (-not $proc.HasExited) { $proc.Kill() } } catch {}
-                try { $proc.Dispose() } catch {}
+            $childCompleted = Complete-TrayMutatingChildProcess -Process $proc -OperationName "Reset Display"
+            if ($childCompleted) {
+                if ($proc) { try { $proc.Dispose() } catch {} }
+                if ($tf) { Remove-Item $tf -Force -ErrorAction SilentlyContinue }
+                if ($errFile) { Remove-Item $errFile -Force -ErrorAction SilentlyContinue }
+                $script:MutatingOperationInProgress = $false
+                Restore-TrayTooltipFromState
             }
-            if ($tf) { Remove-Item $tf -Force -ErrorAction SilentlyContinue }
-            if ($errFile) { Remove-Item $errFile -Force -ErrorAction SilentlyContinue }
         }
     })
     $actionsMenu.DropDownItems.Add($resetDisplayItem) | Out-Null
@@ -10212,85 +10495,103 @@ public class HotkeyMessageWindow : NativeWindow {
         $capturedLabel = $backup.Label
         $capturedProfileId = $backupProfileId
         $bItem.Add_Click({
-            Set-TrayOperationTooltipText -Text "computa - Restoring..."
-            $restoreProfile = $null
-            if (
-                -not [string]::IsNullOrWhiteSpace($capturedProfileId) -and
-                $script:Profiles -and
-                $script:Profiles.Contains($capturedProfileId)
-            ) {
-                $restoreProfile = $script:Profiles[$capturedProfileId]
-            }
-            $restoreVisual = Get-TrayProfileToastVisualArgs -ProfileId $capturedProfileId -Profile $restoreProfile
-            $restoreTitle = if (-not [string]::IsNullOrWhiteSpace($capturedProfileId)) { Get-TrayProfileDisplayName -ProfileId $capturedProfileId } else { "computa" }
-            $restoreMetaText = if (-not [string]::IsNullOrWhiteSpace($capturedProfileId)) { $capturedProfileId } else { $capturedName }
+            if (Test-TrayMutationInProgress -RequestedAction "restoring a backup") { return }
+
+            $tf = $null
+            $errFile = $null
+            $proc = $null
+            $script:MutatingOperationInProgress = $true
             try {
-                $tf = [System.IO.Path]::GetTempFileName()
-                $errFile = "$tf.err"
-                $proc = Start-Process -FilePath $script:PythonExe -ArgumentList (Get-AbsoBackendArgs -CommandArgs @("restore", $capturedName, "--json")) `
-                    -NoNewWindow -PassThru -WorkingDirectory $script:ProjectRoot `
-                    -RedirectStandardOutput $tf -RedirectStandardError $errFile
-                # PS 5.1: cache the handle now or .ExitCode reads $null after exit.
-                if ($proc) { $null = $proc.Handle }
-                $completed = $proc.WaitForExit(120000)
-                if (-not $completed -or -not $proc.HasExited) {
-                    try { $proc.Kill() } catch {}
-                    try { $proc.Dispose() } catch {}
-                    Remove-Item $tf -Force -ErrorAction SilentlyContinue
-                    Remove-Item $errFile -Force -ErrorAction SilentlyContinue
-                    Write-TrayLog "Restore '$capturedName' timed out after 120s" -Level "ERROR"
-                    Show-Notification @restoreVisual -Title $restoreTitle -Message "Restore timed out: $capturedLabel" -Type "Error" -MetaText $restoreMetaText
-                    Set-TrayLastAction -Message "Restore timed out: $capturedLabel"
-                    Update-MenuState
-                    return
+                Set-TrayOperationTooltipText -Text "computa - Restoring..."
+                $restoreProfile = $null
+                if (
+                    -not [string]::IsNullOrWhiteSpace($capturedProfileId) -and
+                    $script:Profiles -and
+                    $script:Profiles.Contains($capturedProfileId)
+                ) {
+                    $restoreProfile = $script:Profiles[$capturedProfileId]
                 }
-                $exitCode = $proc.ExitCode
-                $proc.Dispose()
-                $out = Get-Content $tf -Raw -ErrorAction SilentlyContinue
-                $errOutput = Get-Content $errFile -Raw -ErrorAction SilentlyContinue
-                if ($errOutput) { Write-TrayLog "Restore '$capturedName' stderr: $errOutput" -Level "WARN" }
-                Remove-Item $tf -Force -ErrorAction SilentlyContinue
-                Remove-Item $errFile -Force -ErrorAction SilentlyContinue
-                if ($out) {
-                    $j = Invoke-JsonSafe -Text $out -Source 'RestoreBackup'
-                    $exitCodeOk = ($null -eq $exitCode -or $exitCode -eq 0)
-                    if ($exitCodeOk -and $null -ne $j -and $j.success -and $j.data -and $j.data.success) {
-                        Show-Notification @restoreVisual -Title $restoreTitle -Message "Restored from: $capturedLabel" -Type "Success" -MetaText $restoreMetaText
-                        $script:activeProfile = $null
-                        Reset-ActiveProfileVerificationState
-                        Set-TrayLastAction -Message "Restored backup: $capturedLabel"
-                        $script:TrayConfig = Set-LastProfileState -Config $script:TrayConfig -Status "restored" -Source "tray_restore_backup"
-                        Set-IconState -State "Idle"
+                $restoreVisual = Get-TrayProfileToastVisualArgs -ProfileId $capturedProfileId -Profile $restoreProfile
+                $restoreTitle = if (-not [string]::IsNullOrWhiteSpace($capturedProfileId)) { Get-TrayProfileDisplayName -ProfileId $capturedProfileId } else { "computa" }
+                $restoreMetaText = if (-not [string]::IsNullOrWhiteSpace($capturedProfileId)) { $capturedProfileId } else { $capturedName }
+                try {
+                    $tf = [System.IO.Path]::GetTempFileName()
+                    $errFile = "$tf.err"
+                    $proc = Start-Process -FilePath $script:PythonExe -ArgumentList (Get-AbsoBackendArgs -CommandArgs @("restore", $capturedName, "--json")) `
+                        -NoNewWindow -PassThru -WorkingDirectory $script:ProjectRoot `
+                        -RedirectStandardOutput $tf -RedirectStandardError $errFile
+                    # PS 5.1: cache the handle now or .ExitCode reads $null after exit.
+                    if ($proc) { $null = $proc.Handle }
+                    $slowBackupRestoreNoticeAt = (Get-Date).AddSeconds(120)
+                    $slowBackupRestoreNoticeShown = $false
+                    while (-not $proc.HasExited) {
+                        try { [System.Windows.Forms.Application]::DoEvents() } catch {}
+                        if (-not $slowBackupRestoreNoticeShown -and (Get-Date) -ge $slowBackupRestoreNoticeAt) {
+                            $slowBackupRestoreNoticeShown = $true
+                            Write-TrayLog "Restore '$capturedName' is still running after 120s; waiting for the backend transaction to finish safely" -Level "WARN"
+                            try {
+                                Set-TrayOperationTooltipText -Text "computa - Restoring backup (still running safely)..."
+                            }
+                            catch {
+                                try { Write-TrayLog "Restore '$capturedName' slow-operation UI update failed: $($_.Exception.Message)" -Level "WARN" } catch {}
+                            }
+                        }
+                        Start-Sleep -Milliseconds 100
+                    }
+                    $proc.WaitForExit()
+                    $exitCode = $proc.ExitCode
+                    $out = Get-Content $tf -Raw -ErrorAction SilentlyContinue
+                    $errOutput = Get-Content $errFile -Raw -ErrorAction SilentlyContinue
+                    if ($errOutput) { Write-TrayLog "Restore '$capturedName' stderr: $errOutput" -Level "WARN" }
+                    if ($out) {
+                        $j = Invoke-JsonSafe -Text $out -Source 'RestoreBackup'
+                        $exitCodeOk = ($null -ne $exitCode -and $exitCode -eq 0)
+                        if ($null -eq $exitCode) {
+                            Write-TrayLog "Restore '$capturedName' exit code was unavailable; treating the transaction result as failed" -Level "ERROR"
+                        }
+                        if ($exitCodeOk -and $null -ne $j -and $j.success -and $j.data -and $j.data.success) {
+                            Show-Notification @restoreVisual -Title $restoreTitle -Message "Restored from: $capturedLabel" -Type "Success" -MetaText $restoreMetaText
+                            $script:activeProfile = $null
+                            Reset-ActiveProfileVerificationState
+                            Set-TrayLastAction -Message "Restored backup: $capturedLabel"
+                            $script:TrayConfig = Set-LastProfileState -Config $script:TrayConfig -Status "restored" -Source "tray_restore_backup"
+                            Set-IconState -State "Idle"
+                            Update-MenuState
+                        }
+                        elseif ($null -eq $j) {
+                            Write-TrayLog "Restore '$capturedName': CLI produced unparseable JSON" -Level "ERROR"
+                            Show-Notification @restoreVisual -Title $restoreTitle -Message "Restore failed: runtime status unreadable. See tray log." -Type "Error" -MetaText $restoreMetaText
+                            Set-TrayLastAction -Message "Restore failed: runtime status unreadable"
+                            Update-MenuState
+                        }
+                        else {
+                            $restoreErr = if ($j.error) { $j.error } elseif ($j.data -and $j.data.error) { $j.data.error } elseif ($j.data -and $j.data.message) { $j.data.message } elseif ($null -ne $exitCode -and $exitCode -ne 0) { "runtime exit code $exitCode" } else { "runtime error not reported" }
+                            Write-TrayLog "Restore '$capturedName' reported failure: $restoreErr" -Level "ERROR"
+                            Show-Notification @restoreVisual -Title $restoreTitle -Message "Restore failed: $restoreErr" -Type "Error" -MetaText $restoreMetaText
+                            Set-TrayLastAction -Message "Restore failed: $restoreErr"
+                            Update-MenuState
+                        }
+                    } else {
+                        Write-TrayLog "Restore '$capturedName': CLI produced no output" -Level "ERROR"
+                        Show-Notification @restoreVisual -Title $restoreTitle -Message "Restore failed: runtime returned no status" -Type "Error" -MetaText $restoreMetaText
+                        Set-TrayLastAction -Message "Restore failed: runtime returned no status"
                         Update-MenuState
                     }
-                    elseif ($null -eq $j) {
-                        Write-TrayLog "Restore '$capturedName': CLI produced unparseable JSON" -Level "ERROR"
-                        Show-Notification @restoreVisual -Title $restoreTitle -Message "Restore failed: runtime status unreadable. See tray log." -Type "Error" -MetaText $restoreMetaText
-                        Set-TrayLastAction -Message "Restore failed: runtime status unreadable"
-                        Update-MenuState
-                    }
-                    else {
-                        $restoreErr = if ($j.error) { $j.error } elseif ($j.data -and $j.data.error) { $j.data.error } elseif ($j.data -and $j.data.message) { $j.data.message } elseif ($null -ne $exitCode -and $exitCode -ne 0) { "runtime exit code $exitCode" } else { "runtime error not reported" }
-                        Write-TrayLog "Restore '$capturedName' reported failure: $restoreErr" -Level "ERROR"
-                        Show-Notification @restoreVisual -Title $restoreTitle -Message "Restore failed: $restoreErr" -Type "Error" -MetaText $restoreMetaText
-                        Set-TrayLastAction -Message "Restore failed: $restoreErr"
-                        Update-MenuState
-                    }
-                } else {
-                    Write-TrayLog "Restore '$capturedName': CLI produced no output" -Level "ERROR"
-                    Show-Notification @restoreVisual -Title $restoreTitle -Message "Restore failed: runtime returned no status" -Type "Error" -MetaText $restoreMetaText
-                    Set-TrayLastAction -Message "Restore failed: runtime returned no status"
+                } catch {
+                    Write-TrayLog "Restore '$capturedName' threw: $($_.Exception.Message)" -Level "ERROR"
+                    Show-Notification @restoreVisual -Title $restoreTitle -Message "Restore failed: $($_.Exception.Message)" -Type "Error" -MetaText $restoreMetaText
+                    Set-TrayLastAction -Message "Restore failed: $($_.Exception.Message)"
                     Update-MenuState
                 }
-            } catch {
-                Write-TrayLog "Restore '$capturedName' threw: $($_.Exception.Message)" -Level "ERROR"
-                Show-Notification @restoreVisual -Title $restoreTitle -Message "Restore failed: $($_.Exception.Message)" -Type "Error" -MetaText $restoreMetaText
-                Set-TrayLastAction -Message "Restore failed: $($_.Exception.Message)"
-                Update-MenuState
             } finally {
-                if ($tf) { Remove-Item $tf -Force -ErrorAction SilentlyContinue }
-                if ($errFile) { Remove-Item $errFile -Force -ErrorAction SilentlyContinue }
-                Restore-TrayTooltipFromState
+                $childCompleted = Complete-TrayMutatingChildProcess -Process $proc -OperationName "Restore backup '$capturedName'"
+                if ($childCompleted) {
+                    if ($proc) { try { $proc.Dispose() } catch {} }
+                    if ($tf) { Remove-Item $tf -Force -ErrorAction SilentlyContinue }
+                    if ($errFile) { Remove-Item $errFile -Force -ErrorAction SilentlyContinue }
+                    $script:MutatingOperationInProgress = $false
+                    Restore-TrayTooltipFromState
+                }
             }
         }.GetNewClosure())
         $backupsItem.DropDownItems.Add($bItem) | Out-Null
@@ -10631,6 +10932,8 @@ public class HotkeyMessageWindow : NativeWindow {
     $restartItem.Font = $script:FontMenuRow
     $restartItem.Image = New-ActionBitmap -Action "Refresh" -Color $script:Colors.TextDim
     $restartItem.Add_Click({
+        if (Test-TrayMutationInProgress -RequestedAction "restarting the tray") { return }
+
         $restartToken = [guid]::NewGuid().ToString("N")
         try {
             Set-RestartSuccessSoundMarker -RestartToken $restartToken
@@ -10685,6 +10988,8 @@ public class HotkeyMessageWindow : NativeWindow {
     $exitItem.Font = $script:FontMenuRow
     $exitItem.Image = New-ActionBitmap -Action "Exit" -Color $script:Colors.TextDim
     $exitItem.Add_Click({
+        if (Test-TrayMutationInProgress -RequestedAction "exiting the tray") { return }
+
         if ($script:HotkeyWindow) { Unregister-GlobalHotkeys -WindowHandle $script:HotkeyWindow.Handle }
         Close-QuickPanel
         Close-ProgressOverlay

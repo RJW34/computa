@@ -789,6 +789,7 @@ function Resolve-GameVisualIdentityGroup {
         "-gsync-hdr-capture", "-gsync-capture",
         "-online-gsync", "-offline-gsync-hdr",
         "-offline-hdr", "-online-hdr", "-nosync-hdr", "-console-parity-hdr",
+        "-hdr-capture",
         "-universal-hdr", "-gsync-hdr", "-tournament-sim-144hz",
         "-console-parity", "-300hz-max", "-streaming-hdr", "-streaming",
         "-offline", "-online", "-nosync", "-vrr-lab", "-gsync", "-hdr", "-sdr",

@@ -6,7 +6,9 @@ mocked so no real Get/Set-NetAdapterAdvancedProperty cmdlet ever runs.
 
 from __future__ import annotations
 
+import base64
 import json
+import re
 import subprocess
 from unittest.mock import MagicMock, patch
 
@@ -31,6 +33,25 @@ def _props_json(props: list[dict]) -> str:
     """
     payload = props[0] if len(props) == 1 else props
     return json.dumps(payload)
+
+
+def _batch_results(
+    *results: tuple[str, bool, str | None],
+) -> str:
+    """Build the JSON emitted by the batched property writer."""
+    rows = [
+        {"Keyword": keyword, "Success": success, "Error": error}
+        for keyword, success, error in results
+    ]
+    payload = rows[0] if len(rows) == 1 else rows
+    return json.dumps(payload)
+
+
+def _batch_payload(script: str) -> dict:
+    """Decode the safely embedded JSON payload from a batch script."""
+    match = re.search(r"FromBase64String\('([^']+)'\)", script)
+    assert match is not None
+    return json.loads(base64.b64decode(match.group(1)).decode("utf-8"))
 
 
 _FULL_PROPS = [
@@ -152,15 +173,19 @@ class TestAudit:
 
 class TestApply:
     @patch.object(NicDriverHandler, "_run_ps")
-    def test_apply_sets_present_keywords(self, mock_run):
-        # detect: adapter + props, then four Set calls succeed.
+    def test_apply_batches_all_mismatched_keywords(self, mock_run):
+        # Detect uses two queries; every write is then made by one batch process.
         mock_run.side_effect = [
             _completed(_adapter_json("Ethernet")),
             _completed(_props_json(_FULL_PROPS)),
-            _completed(),
-            _completed(),
-            _completed(),
-            _completed(),
+            _completed(
+                _batch_results(
+                    ("*InterruptModeration", True, None),
+                    ("*RSS", True, None),
+                    ("*FlowControl", True, None),
+                    ("*EEE", True, None),
+                )
+            ),
         ]
         result = NicDriverHandler().apply({"nic_tuning": True})
 
@@ -173,12 +198,65 @@ class TestApply:
             "*FlowControl",
             "*EEE",
         }
-        # Verify the optimal RegistryValues were passed to Set-...
-        set_scripts = [c.args[0] for c in mock_run.call_args_list if "Set-Net" in c.args[0]]
-        assert any("*RSS" in s and "-RegistryValue '1'" in s for s in set_scripts)
-        assert any(
-            "*InterruptModeration" in s and "-RegistryValue '0'" in s for s in set_scripts
+        assert mock_run.call_count == 3
+        batch_script = mock_run.call_args_list[-1].args[0]
+        assert batch_script.count("Set-NetAdapterAdvancedProperty") == 1
+        payload = _batch_payload(batch_script)
+        assert payload == {
+            "Adapter": "Ethernet",
+            "Properties": [
+                {"Keyword": "*InterruptModeration", "Value": "0"},
+                {"Keyword": "*RSS", "Value": "1"},
+                {"Keyword": "*FlowControl", "Value": "0"},
+                {"Keyword": "*EEE", "Value": "0"},
+            ],
+        }
+
+    @patch.object(NicDriverHandler, "_run_ps")
+    def test_apply_all_matching_is_noop(self, mock_run):
+        mock_run.side_effect = [
+            _completed(_adapter_json("Ethernet")),
+            _completed(_props_json(_OPTIMAL_PROPS)),
+        ]
+
+        result = NicDriverHandler().apply({"nic_tuning": True})
+
+        assert result["success"] is True
+        assert result["changed"] is False
+        assert result["changed_keys"] == []
+        assert result["warnings"] == []
+        assert mock_run.call_count == 2
+        assert not any(
+            "Set-NetAdapterAdvancedProperty" in call.args[0] for call in mock_run.call_args_list
         )
+
+    @patch.object(NicDriverHandler, "_run_ps")
+    def test_apply_mixed_values_batches_only_mismatches(self, mock_run):
+        mixed = [
+            _FULL_PROPS[0],  # Interrupt Moderation needs 0.
+            _OPTIMAL_PROPS[1],  # RSS already 1.
+            _FULL_PROPS[2],  # Flow Control needs 0.
+            _OPTIMAL_PROPS[3],  # EEE already 0.
+        ]
+        mock_run.side_effect = [
+            _completed(_adapter_json("Ethernet")),
+            _completed(_props_json(mixed)),
+            _completed(
+                _batch_results(
+                    ("*InterruptModeration", True, None),
+                    ("*FlowControl", True, None),
+                )
+            ),
+        ]
+
+        result = NicDriverHandler().apply({"nic_tuning": True})
+
+        assert result["changed_keys"] == ["*InterruptModeration", "*FlowControl"]
+        payload = _batch_payload(mock_run.call_args_list[-1].args[0])
+        assert payload["Properties"] == [
+            {"Keyword": "*InterruptModeration", "Value": "0"},
+            {"Keyword": "*FlowControl", "Value": "0"},
+        ]
 
     def test_apply_noop_when_not_requested(self):
         # Should not even touch PowerShell.
@@ -195,33 +273,56 @@ class TestApply:
 
         assert result["success"] is True
         assert result["changed"] is False
-        assert "skipped" in result["note"].lower()
+        assert "unverifiable" in result["note"].lower()
+        assert result["warnings"]
+
+    @patch.object(NicDriverHandler, "_run_ps")
+    def test_apply_empty_property_detection_warns_and_writes_nothing(self, mock_run):
+        mock_run.side_effect = [
+            _completed(_adapter_json("Ethernet")),
+            _completed(""),
+        ]
+
+        result = NicDriverHandler().apply({"nic_tuning": True})
+
+        assert result["success"] is True
+        assert result["changed"] is False
+        assert result["warnings"]
+        assert "unverifiable" in result["note"].lower()
+        assert mock_run.call_count == 2
 
     @patch.object(NicDriverHandler, "_run_ps")
     def test_apply_skips_absent_keywords(self, mock_run):
         mock_run.side_effect = [
             _completed(_adapter_json("Ethernet")),
             _completed(_props_json([_FULL_PROPS[1]])),  # only *RSS exposed
-            _completed(),
+            _completed(_batch_results(("*RSS", True, None))),
         ]
         result = NicDriverHandler().apply({"nic_tuning": True})
 
         assert result["changed_keys"] == ["*RSS"]
 
     @patch.object(NicDriverHandler, "_run_ps")
-    def test_apply_set_failure_is_best_effort_warning(self, mock_run):
-        # Opt-in per-NIC add-on: a driver rejecting a keyword warns, it does not
-        # fail (and roll back) the whole profile apply.
+    def test_apply_reports_each_property_failure_from_batch(self, mock_run):
+        # A rejected property warns without hiding a successful sibling.
         mock_run.side_effect = [
             _completed(_adapter_json("Ethernet")),
-            _completed(_props_json([_FULL_PROPS[0]])),  # only *InterruptModeration
-            _completed(returncode=1, stderr="Access denied"),
+            _completed(_props_json([_FULL_PROPS[0], _FULL_PROPS[2]])),
+            _completed(
+                _batch_results(
+                    ("*InterruptModeration", True, None),
+                    ("*FlowControl", False, "Access denied"),
+                )
+            ),
         ]
         result = NicDriverHandler().apply({"nic_tuning": True})
 
         assert result["success"] is True
-        assert result["changed"] is False
-        assert result["warnings"]
+        assert result["changed"] is True
+        assert result["changed_keys"] == ["*InterruptModeration"]
+        assert len(result["warnings"]) == 1
+        assert "*FlowControl" in result["warnings"][0]
+        assert "Access denied" in result["warnings"][0]
 
 
 class TestBackupRestore:
@@ -232,17 +333,94 @@ class TestBackupRestore:
         assert NicDriverHandler().backup() == expected
 
     @patch.object(NicDriverHandler, "_run_ps")
-    def test_restore_writes_originals(self, mock_run):
-        mock_run.return_value = _completed()
+    def test_restore_batches_only_values_not_already_restored(self, mock_run):
+        mock_run.side_effect = [
+            _completed(
+                _props_json(
+                    [
+                        {
+                            "RegistryKeyword": "*InterruptModeration",
+                            "RegistryValue": "0",
+                        },
+                        {"RegistryKeyword": "*FlowControl", "RegistryValue": "3"},
+                    ]
+                )
+            ),
+            _completed(_batch_results(("*InterruptModeration", True, None))),
+        ]
         data = {
             "adapter": "Ethernet",
             "properties": {"*InterruptModeration": "1", "*FlowControl": "3"},
         }
         assert NicDriverHandler().restore(data) is True
 
-        set_scripts = [c.args[0] for c in mock_run.call_args_list]
-        assert any("-RegistryValue '1'" in s for s in set_scripts)
-        assert any("-RegistryValue '3'" in s for s in set_scripts)
+        assert mock_run.call_count == 2
+        payload = _batch_payload(mock_run.call_args_list[-1].args[0])
+        assert payload["Properties"] == [{"Keyword": "*InterruptModeration", "Value": "1"}]
+
+    @patch.object(NicDriverHandler, "_run_ps")
+    def test_restore_all_matching_is_idempotent(self, mock_run):
+        mock_run.return_value = _completed(
+            _props_json(
+                [
+                    {"RegistryKeyword": "*InterruptModeration", "RegistryValue": "1"},
+                    {"RegistryKeyword": "*FlowControl", "RegistryValue": "3"},
+                ]
+            )
+        )
+        data = {
+            "adapter": "Ethernet",
+            "properties": {"*InterruptModeration": "1", "*FlowControl": "3"},
+        }
+
+        assert NicDriverHandler().restore(data) is True
+
+        mock_run.assert_called_once()
+        assert "Set-NetAdapterAdvancedProperty" not in mock_run.call_args.args[0]
+
+    @patch.object(NicDriverHandler, "_run_ps")
+    def test_restore_empty_detection_attempts_batch_and_warns(self, mock_run, caplog):
+        mock_run.side_effect = [
+            _completed(""),
+            _completed(_batch_results(("*FlowControl", True, None))),
+        ]
+        data = {"adapter": "Ethernet", "properties": {"*FlowControl": "3"}}
+
+        assert NicDriverHandler().restore(data) is True
+
+        assert mock_run.call_count == 2
+        assert "Could not verify current NIC properties" in caplog.text
+        payload = _batch_payload(mock_run.call_args_list[-1].args[0])
+        assert payload["Properties"] == [{"Keyword": "*FlowControl", "Value": "3"}]
+
+    @patch.object(NicDriverHandler, "_run_ps")
+    def test_restore_logs_only_failed_property_from_batch(self, mock_run, caplog):
+        mock_run.side_effect = [
+            _completed(
+                _props_json(
+                    [
+                        {"RegistryKeyword": "*InterruptModeration", "RegistryValue": "0"},
+                        {"RegistryKeyword": "*FlowControl", "RegistryValue": "0"},
+                    ]
+                )
+            ),
+            _completed(
+                _batch_results(
+                    ("*InterruptModeration", True, None),
+                    ("*FlowControl", False, "Driver rejected value"),
+                )
+            ),
+        ]
+        data = {
+            "adapter": "Ethernet",
+            "properties": {"*InterruptModeration": "1", "*FlowControl": "3"},
+        }
+
+        assert NicDriverHandler().restore(data) is True
+
+        assert "Failed to restore NIC driver property *FlowControl" in caplog.text
+        assert "Driver rejected value" in caplog.text
+        assert "Failed to restore NIC driver property *InterruptModeration" not in caplog.text
 
     def test_restore_empty_backup_is_noop_success(self):
         with patch.object(NicDriverHandler, "_run_ps") as mock_run:
@@ -291,6 +469,24 @@ class TestVerifyActive:
         assert result["all_active"] is False
         assert result["settings"]["*InterruptModeration"]["active"] is False
 
+    @patch.object(NicDriverHandler, "detect")
+    def test_verify_empty_detection_fails_closed(self, mock_detect):
+        mock_detect.return_value = {"adapter": "Ethernet", "properties": {}}
+
+        result = NicDriverHandler().verify_active({"nic_tuning": True})
+
+        assert result["all_active"] is False
+        assert result["settings"]["detection"]["active"] is False
+
+    @patch.object(NicDriverHandler, "detect")
+    def test_verify_missing_adapter_fails_closed(self, mock_detect):
+        mock_detect.return_value = {"adapter": None, "properties": {}}
+
+        result = NicDriverHandler().verify_active({"nic_tuning": True})
+
+        assert result["all_active"] is False
+        assert result["settings"]["detection"]["current"] == "unavailable"
+
 
 class TestContract:
     def test_critical_verify_and_restore_guarantee(self):
@@ -307,3 +503,22 @@ class TestContract:
         assert target is not None
         assert target[1] == "0"
         assert NicDriverHandler._target_for("*JumboPacket") is None
+
+    @patch.object(NicDriverHandler, "_run_ps")
+    def test_batch_inputs_are_encoded_not_executable(self, mock_run):
+        adapter = "Ether'net; Write-Host adapter-injection"
+        keyword = "*RSS'; Write-Host keyword-injection; #"
+        value = "1'; Write-Host value-injection; #"
+        mock_run.return_value = _completed(_batch_results((keyword, True, None)))
+
+        result = NicDriverHandler()._set_properties(adapter, {keyword: value})
+
+        assert result[keyword]["success"] is True
+        script = mock_run.call_args.args[0]
+        assert adapter not in script
+        assert keyword not in script
+        assert value not in script
+        assert _batch_payload(script) == {
+            "Adapter": adapter,
+            "Properties": [{"Keyword": keyword, "Value": value}],
+        }

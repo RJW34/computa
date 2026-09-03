@@ -58,6 +58,23 @@ _HDR_OVERRIDES: dict[str, dict[str, Any]] = {
     },
 }
 
+_STREAMING_OVERRIDES: dict[str, dict[str, Any]] = {
+    "WindowsSettingsHandler": {
+        "windowed_optimizations": True,
+        "vrr_optimize": False,
+    },
+    "GraphicsSettingsHandler": {
+        "disable_global_fso": False,
+    },
+    "DolphinConfigHandler": {
+        "borderless_fullscreen": "True",
+    },
+    "ProcessPriorityHandler": {
+        "cpu_priority": 2,
+        "io_priority": 2,
+    },
+}
+
 
 def _hdr_in_game_guidance() -> list[dict[str, str]]:
     """Manual setup notes specific to running Dolphin/Slippi as SDR-in-HDR."""
@@ -107,6 +124,37 @@ def _hdr_in_game_guidance() -> list[dict[str, str]]:
             ),
         },
     ]
+
+
+def _streaming_display_mode_rows(
+    rows: list[dict[str, str]],
+) -> list[dict[str, str]]:
+    """Patch strict Slippi presentation guidance for the streaming lanes."""
+    patched: list[dict[str, str]] = []
+    for row in rows:
+        if row.get("setting") == "Fullscreen Mode":
+            row = {
+                **row,
+                "value": "Borderless Fullscreen",
+                "reason": (
+                    "Streaming lane: uses Dolphin's borderless fullscreen mode "
+                    "and Windows windowed optimizations so OBS and overlays can "
+                    "stay running."
+                ),
+            }
+        elif row.get("setting") == "Exclusive Fullscreen vs SDR-in-HDR latency":
+            row = {
+                **row,
+                "setting": "Borderless Streaming vs SDR-in-HDR latency",
+                "value": "Use Borderless Fullscreen",
+                "reason": (
+                    "Dolphin renders SDR through Windows HDR on this lane. The "
+                    "presentation cost varies by OS, driver, and display and is "
+                    "not measured by ABSO."
+                ),
+            }
+        patched.append(row)
+    return patched
 
 
 class SlippiMeleeProfile(EmulatorLatencyBaseProfile):
@@ -313,7 +361,6 @@ class SlippiMeleeProfile(EmulatorLatencyBaseProfile):
                     "Disabling may reduce latency for fixed-framerate emulators."
                 ),
             },
-
             # === NVIDIA CONTROL PANEL SETTINGS ===
             {
                 "category": "Nvidia Control Panel",
@@ -368,16 +415,17 @@ class SlippiMeleeProfile(EmulatorLatencyBaseProfile):
                 "value": "Off",
                 "reason": "No artificial frame limiting.",
             },
-
             # === DOLPHIN GRAPHICS SETTINGS ===
             {
                 "category": "Graphics",
                 "setting": "Backend",
-                "value": "Vulkan first, then test DX12",
+                "value": "Keep your current backend (D3D11 baseline on Ishiiruka builds)",
                 "reason": (
-                    "Official Dolphin guidance still points most NVIDIA/AMD users to Vulkan first. "
-                    "DX12 is still worth A/B testing if Vulkan misbehaves or if HAGS + DX12 performs "
-                    "better on your exact system."
+                    "The Slippi netplay build is Ishiiruka-derived and its Windows backend "
+                    "order starts with D3D11 — the compatibility baseline (2026-08-12 audit). "
+                    "Mainline Dolphin's Vulkan-first advice does not transfer to the older "
+                    "fork backends; Vulkan/D3D12 are A/B benchmark candidates, not automatic "
+                    "upgrades. computa preserves whatever backend you have configured."
                 ),
             },
             {
@@ -402,7 +450,6 @@ class SlippiMeleeProfile(EmulatorLatencyBaseProfile):
                     "latency-focused default."
                 ),
             },
-
             # === DOLPHIN CONFIG FILES (Ishiiruka/Stable) ===
             # These settings are in GFX.ini and Dolphin.ini
             {
@@ -523,7 +570,6 @@ class SlippiMeleeProfile(EmulatorLatencyBaseProfile):
                 "value": "False",
                 "reason": "Floating point result flags add CPU overhead - not needed for Melee.",
             },
-
             # === AUDIO SETTINGS ===
             {
                 "category": "Audio",
@@ -537,7 +583,6 @@ class SlippiMeleeProfile(EmulatorLatencyBaseProfile):
                 "value": "Lowest stable setting",
                 "reason": "Lower is better, but too low causes crackling.",
             },
-
             # === CONTROLLER SETTINGS ===
             {
                 "category": "Controller",
@@ -551,7 +596,6 @@ class SlippiMeleeProfile(EmulatorLatencyBaseProfile):
                 "value": "On",
                 "reason": "Allows input when alt-tabbed.",
             },
-
             # === WHY HIGH REFRESH HELPS WITHOUT VRR ===
             {
                 "category": "Display Info",
@@ -575,7 +619,6 @@ class SlippiMeleeProfile(EmulatorLatencyBaseProfile):
                     "noticing it; if you do not, G-SYNC removes it at no meaningful latency cost."
                 ),
             },
-
             # === IMPORTANT DISCLAIMER ===
             {
                 "category": "Important",
@@ -593,7 +636,8 @@ class SlippiMeleeProfile(EmulatorLatencyBaseProfile):
         return [
             (
                 "Slippi manual: confirm Dolphin backend and controller adapter; "
-                "try Vulkan first, D3D12 if Vulkan stutters, VSync Off for no-sync."
+                "keep your current backend (D3D11 baseline on Ishiiruka builds; "
+                "Vulkan/D3D12 are A/B candidates), VSync Off for no-sync."
             )
         ]
 
@@ -653,17 +697,19 @@ class SlippiMeleeUniversalProfile(SlippiMeleeProfile):
         updated = []
         for entry in base:
             if entry.get("setting") == "Hardware Accelerated GPU Scheduling (HAGS)":
-                updated.append({
-                    "category": "Windows Settings",
-                    "setting": "Hardware Accelerated GPU Scheduling (HAGS)",
-                    "value": "On (always - no reboot on re-apply)",
-                    "reason": (
-                        "HAGS is fixed to True regardless of Dolphin backend. This avoids "
-                        "reboot requirements when switching backends or re-applying the profile. "
-                        "Dolphin's own latency features (ImmediateXFB, RushPresentation) provide "
-                        "far more latency reduction than HAGS state changes."
-                    ),
-                })
+                updated.append(
+                    {
+                        "category": "Windows Settings",
+                        "setting": "Hardware Accelerated GPU Scheduling (HAGS)",
+                        "value": "On (always - no reboot on re-apply)",
+                        "reason": (
+                            "HAGS is fixed to True regardless of Dolphin backend. This avoids "
+                            "reboot requirements when switching backends or re-applying the profile. "
+                            "Dolphin's own latency features (ImmediateXFB, RushPresentation) provide "
+                            "far more latency reduction than HAGS state changes."
+                        ),
+                    }
+                )
             else:
                 updated.append(entry)
         return updated
@@ -864,6 +910,87 @@ class SlippiMeleeHDRProfile(SlippiMeleeProfile):
 
     def get_in_game_settings(self) -> list[dict[str, str]]:
         return [*_hdr_in_game_guidance(), *super().get_in_game_settings()]
+
+
+class _SlippiMeleeStreamingMixin:
+    """Shared process and presentation policy for Slippi streaming lanes."""
+
+    @property
+    def is_capture_safe(self) -> bool:
+        return True
+
+    @property
+    def fullscreen_optimizations_per_exe(self) -> dict[str, bool]:
+        return fso_overrides(self.executable_hints, disabled=False)
+
+    def _settings_overrides(self) -> dict[str, dict[str, Any]]:
+        return merge_settings_map(
+            super()._settings_overrides(),  # type: ignore[misc]
+            _STREAMING_OVERRIDES,
+        )
+
+    def get_in_game_settings(self) -> list[dict[str, str]]:
+        return _streaming_display_mode_rows(
+            super().get_in_game_settings()  # type: ignore[misc]
+        )
+
+    def get_post_apply_notes(self) -> list[str]:
+        return [
+            "Slippi streaming manual: use Borderless Fullscreen and keep "
+            "Dolphin VSync Off for this no-sync lane. OBS and overlay processes "
+            "remain available."
+        ]
+
+
+class SlippiMeleeCaptureProfile(_SlippiMeleeStreamingMixin, SlippiMeleeProfile):
+    """Competitive Slippi SDR lane that preserves streaming processes."""
+
+    @property
+    def profile_id(self) -> str:
+        return "slippi-melee-capture"
+
+    @property
+    def display_name(self) -> str:
+        return "Super Smash Bros. Melee (Slippi SDR Streaming)"
+
+    @property
+    def description(self) -> str:
+        return (
+            "Competitive Slippi SDR lane on the borderless windowed path; "
+            "preserves OBS, Medal, RTSS, and overlays and keeps game CPU/I/O "
+            "priority at Normal so capture is not starved."
+        )
+
+
+class SlippiMeleeHDRCaptureProfile(
+    _SlippiMeleeStreamingMixin,
+    SlippiMeleeHDRProfile,
+):
+    """Competitive Slippi SDR-in-HDR lane that preserves streaming processes."""
+
+    @property
+    def profile_id(self) -> str:
+        return "slippi-melee-hdr-capture"
+
+    @property
+    def display_name(self) -> str:
+        return "Super Smash Bros. Melee (Slippi HDR Streaming)"
+
+    @property
+    def description(self) -> str:
+        return (
+            "Competitive Slippi SDR-in-HDR lane on the borderless windowed "
+            "path; preserves OBS, Medal, RTSS, and overlays and keeps game "
+            "CPU/I/O priority at Normal so capture is not starved."
+        )
+
+    def get_post_apply_notes(self) -> list[str]:
+        return [
+            *super().get_post_apply_notes(),
+            "Streaming color: default to SDR Streaming for an SDR destination. "
+            "Use HDR Streaming only when OBS/output color space or tone mapping "
+            "is already intentionally configured; ABSO does not change OBS settings.",
+        ]
 
 
 class SlippiMeleeUniversalHDRProfile(SlippiMeleeUniversalProfile):

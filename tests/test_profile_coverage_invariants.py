@@ -26,6 +26,7 @@ Today, May 2026, all 30 built-in profiles pass cleanly. These tests
 freeze that contract: any future profile addition or refactor that
 re-opens one of these gaps fails CI immediately.
 """
+
 from __future__ import annotations
 
 import inspect
@@ -47,35 +48,37 @@ from abso.settings.nvidia.presets import NVIDIA_PRESETS
 # Keys consumed by the NVIDIA handler via preset expansion or the
 # DRSProfileManager dispatch, which the heuristic source scanner can't
 # trace through. Updating this set must remain a deliberate review step.
-_NVIDIA_KNOWN_KEYS: frozenset[str] = frozenset({
-    "preset",
-    "low_latency_mode",
-    "power_management",
-    "vsync",
-    "max_frame_rate",
-    "shader_cache",
-    "threaded_optimization",
-    "triple_buffering",
-    "vrr_app_override",
-    "vsync_tear_control",
-    "vsync_vrr_control",
-    "global_vrr_mode",
-    "global_gsync_mode",
-    "global_gsync",
-    "vrr_mode",
-    "vrr_request_state",
-    "auto_vrr_fps_cap",
-    "vrr_cap_policy",
-    "vrr_refresh_rate_hz",
-    "profile_name",
-    "profile_aliases",
-    "executables",
-    "game_name",
-    "texture_filtering",
-    "anisotropic_filtering",
-    "low_latency_boost",
-    "rebar_override",
-})
+_NVIDIA_KNOWN_KEYS: frozenset[str] = frozenset(
+    {
+        "preset",
+        "low_latency_mode",
+        "power_management",
+        "vsync",
+        "max_frame_rate",
+        "shader_cache",
+        "threaded_optimization",
+        "triple_buffering",
+        "vrr_app_override",
+        "vsync_tear_control",
+        "vsync_vrr_control",
+        "global_vrr_mode",
+        "global_gsync_mode",
+        "global_gsync",
+        "vrr_mode",
+        "vrr_request_state",
+        "auto_vrr_fps_cap",
+        "vrr_cap_policy",
+        "vrr_refresh_rate_hz",
+        "profile_name",
+        "profile_aliases",
+        "executables",
+        "game_name",
+        "texture_filtering",
+        "anisotropic_filtering",
+        "low_latency_boost",
+        "rebar_override",
+    }
+)
 
 
 def _handler_known_keys(handler_obj: Any) -> set[str]:
@@ -121,9 +124,7 @@ def _handler_known_keys(handler_obj: Any) -> set[str]:
                 keys.add(m.group(1))
             for m in re.finditer(r"""settings\[\s*["']([^"']+)["']\s*\]""", src):
                 keys.add(m.group(1))
-            for m in re.finditer(
-                r"""["']([a-zA-Z_][a-zA-Z0-9_]*)["']\s+in\s+settings""", src
-            ):
+            for m in re.finditer(r"""["']([a-zA-Z_][a-zA-Z0-9_]*)["']\s+in\s+settings""", src):
                 keys.add(m.group(1))
             for m in re.finditer(r"""\w+_settings\.get\(\s*["']([^"']+)["']""", src):
                 keys.add(m.group(1))
@@ -131,9 +132,7 @@ def _handler_known_keys(handler_obj: Any) -> set[str]:
                 keys.add(m.group(1))
             for m in re.finditer(r"""\w+_settings\[\s*["']([^"']+)["']\s*\]""", src):
                 keys.add(m.group(1))
-            for m in re.finditer(
-                r"""settings\.(?:get|pop)\(\s*self\.([A-Z_][A-Z0-9_]*)""", src
-            ):
+            for m in re.finditer(r"""settings\.(?:get|pop)\(\s*self\.([A-Z_][A-Z0-9_]*)""", src):
                 const_val = getattr(c, m.group(1), None)
                 if isinstance(const_val, str):
                     keys.add(const_val)
@@ -253,9 +252,7 @@ def test_no_unknown_setting_keys(profiles_by_id) -> None:
     """
     failures: list[str] = []
     for profile_id, profile in profiles_by_id.items():
-        declared_handlers = {
-            h.__class__.__name__: h for h in profile.get_handlers()
-        }
+        declared_handlers = {h.__class__.__name__: h for h in profile.get_handlers()}
         for name, handler in declared_handlers.items():
             settings = profile.get_settings(name) or {}
             if not settings:
@@ -294,9 +291,7 @@ def test_hdr_enabled_profiles_set_all_required_windows_keys(profiles_by_id) -> N
             continue
         for key in required:
             if key not in windows_settings:
-                failures.append(
-                    f"{profile_id}: sets hdr=True but is missing Windows key {key!r}"
-                )
+                failures.append(f"{profile_id}: sets hdr=True but is missing Windows key {key!r}")
     assert not failures, "HDR profiles missing required keys:\n  " + "\n  ".join(failures)
 
 
@@ -336,6 +331,7 @@ def test_handler_class_names_match_imported_classes(profiles_by_id) -> None:
 # ---------------------------------------------------------------------------
 # Profile-pair consistency: compositor flags must match the declared profile path
 # ---------------------------------------------------------------------------
+
 
 def test_strict_gaming_profiles_do_not_force_windowed_compositor_flags(profiles_by_id) -> None:
     """Non-borderless gaming profiles must not silently opt into compositor flags."""
@@ -383,24 +379,109 @@ def test_strict_gaming_profiles_do_not_force_windowed_compositor_flags(profiles_
 
 
 def test_capture_safe_profiles_enable_windowed_compositor_flags(profiles_by_id) -> None:
-    """Capture-safe profiles must configure the borderless/windowed VRR path explicitly."""
-    keys = ("windowed_optimizations", "vrr_optimize")
+    """Capture-safe profiles must configure one coherent borderless/windowed path."""
     failures: list[str] = []
     for profile_id, profile in profiles_by_id.items():
         if not getattr(profile, "is_capture_safe", False):
             continue
         windows_settings = profile.get_settings("WindowsSettingsHandler") or {}
-        for key in keys:
-            if windows_settings.get(key) is not True:
-                failures.append(
-                    f"{profile_id}: WindowsSettingsHandler.{key} is "
-                    f"{windows_settings.get(key)!r} (capture-safe profiles "
-                    f"need the windowed compositor path enabled)"
-                )
+        graphics_settings = profile.get_settings("GraphicsSettingsHandler") or {}
+        nvidia_settings = profile.get_settings("NvidiaSettingsHandler") or {}
+        if windows_settings.get("windowed_optimizations") is not True:
+            failures.append(
+                f"{profile_id}: WindowsSettingsHandler.windowed_optimizations is "
+                f"{windows_settings.get('windowed_optimizations')!r} (capture-safe "
+                "profiles need the windowed presentation path enabled)"
+            )
+        vrr_is_disabled = (
+            nvidia_settings.get("global_vrr_mode") == "off"
+            or nvidia_settings.get("vrr_app_override") == "force_off"
+        )
+        expected_vrr_optimize = not vrr_is_disabled
+        if windows_settings.get("vrr_optimize") is not expected_vrr_optimize:
+            failures.append(
+                f"{profile_id}: WindowsSettingsHandler.vrr_optimize is "
+                f"{windows_settings.get('vrr_optimize')!r}, expected "
+                f"{expected_vrr_optimize!r} for NVIDIA VRR mode "
+                f"{nvidia_settings.get('global_vrr_mode')!r}"
+            )
+        if graphics_settings.get("disable_global_fso") is not False:
+            failures.append(
+                f"{profile_id}: GraphicsSettingsHandler.disable_global_fso is "
+                f"{graphics_settings.get('disable_global_fso')!r} (capture-safe "
+                "profiles must leave the global windowed/FSO path enabled)"
+            )
+        stale_fso = {
+            exe: disabled
+            for exe, disabled in profile.fullscreen_optimizations_per_exe.items()
+            if disabled is not False
+        }
+        if stale_fso:
+            failures.append(
+                f"{profile_id}: per-exe FSO overrides still disable the "
+                f"windowed path: {stale_fso!r}"
+            )
     assert not failures, (
-        "Capture-safe profiles missing Win11 windowed compositor flags:\n  "
-        + "\n  ".join(failures)
+        "Capture-safe profiles missing Win11 windowed compositor flags:\n  " + "\n  ".join(failures)
     )
+
+
+def test_capture_safe_profiles_do_not_mutate_obs_configuration(profiles_by_id) -> None:
+    """Streaming game switches preserve the user's OBS encoder/output settings."""
+    failures: list[str] = []
+    for profile_id, profile in profiles_by_id.items():
+        if not getattr(profile, "is_capture_safe", False):
+            continue
+        handler_names = {handler.__class__.__name__ for handler in profile.get_handlers()}
+        if "OBSSettingsHandler" in handler_names:
+            failures.append(profile_id)
+
+    assert not failures, "Capture-safe profiles must not include OBSSettingsHandler: " + ", ".join(
+        failures
+    )
+
+
+def test_requested_streaming_profiles_keep_game_priority_normal(profiles_by_id) -> None:
+    """Persistent High game priority can starve OBS; streaming lanes use Normal."""
+    requested_streaming_ids = {
+        "slippi-melee-capture",
+        "slippi-melee-hdr-capture",
+        "rivals2-gsync-capture",
+        "rivals2-gsync-hdr-capture",
+        "fortnite-gsync-capture",
+        "fortnite-gsync-hdr-capture",
+        "overwatch2-gsync-capture",
+        "overwatch2-gsync-hdr-capture",
+        "counter-strike-2-gsync-capture",
+        "counter-strike-2-gsync-hdr-capture",
+    }
+    assert requested_streaming_ids <= profiles_by_id.keys()
+    for profile_id in requested_streaming_ids:
+        settings = profiles_by_id[profile_id].get_settings("ProcessPriorityHandler")
+        assert settings["cpu_priority"] == 2, profile_id
+        assert settings["io_priority"] == 2, profile_id
+
+
+def test_requested_streaming_profiles_never_fallback_to_obs_killing_lanes(
+    profiles_by_id,
+) -> None:
+    """The streaming lane is already mixed-refresh safe; fallback must terminate."""
+    requested_streaming_ids = {
+        "slippi-melee-capture",
+        "slippi-melee-hdr-capture",
+        "rivals2-gsync-capture",
+        "rivals2-gsync-hdr-capture",
+        "fortnite-gsync-capture",
+        "fortnite-gsync-hdr-capture",
+        "overwatch2-gsync-capture",
+        "overwatch2-gsync-hdr-capture",
+        "counter-strike-2-gsync-capture",
+        "counter-strike-2-gsync-hdr-capture",
+    }
+    assert requested_streaming_ids <= profiles_by_id.keys()
+    for profile_id in requested_streaming_ids:
+        profile = profiles_by_id[profile_id]
+        assert profile.mixed_refresh_safe_fallback_profile_id is None, profile_id
 
 
 def test_capture_safe_profiles_actually_preserve_capture_stack(profiles_by_id) -> None:
@@ -437,8 +518,7 @@ def test_capture_safe_profiles_actually_preserve_capture_stack(profiles_by_id) -
         "profile uses it. This test would silently pass forever."
     )
     assert not failures, (
-        "Capture-safe profiles still killing their own promised stack:\n  "
-        + "\n  ".join(failures)
+        "Capture-safe profiles still killing their own promised stack:\n  " + "\n  ".join(failures)
     )
 
 
@@ -466,7 +546,9 @@ def test_non_capture_profiles_still_kill_capture_stack(profiles_by_id) -> None:
         # We pick a representative trio that should always be in the
         # full killset: Medal, the Discord overlay helper, and RTSS.
         canonical_capture_targets = {
-            "medal.exe", "discordhookhelper64.exe", "rtss.exe",
+            "medal.exe",
+            "discordhookhelper64.exe",
+            "rtss.exe",
         }
         present = all_images & canonical_capture_targets
         if not present:
@@ -475,4 +557,76 @@ def test_non_capture_profiles_still_kill_capture_stack(profiles_by_id) -> None:
                 f"of {sorted(canonical_capture_targets)} - is the filter "
                 f"leaking outside is_capture_safe=True?"
             )
-    assert not failures, "Non-capture profiles missing capture-stack kills:\n  " + "\n  ".join(failures)
+    assert not failures, "Non-capture profiles missing capture-stack kills:\n  " + "\n  ".join(
+        failures
+    )
+
+
+def test_cpu_partition_policy_is_valid_everywhere(profiles_by_id) -> None:
+    """Every profile declares a recognized session core-partition policy."""
+    from abso.profiles.base import VALID_CPU_PARTITION_POLICIES
+
+    for profile_id, profile in profiles_by_id.items():
+        assert profile.cpu_partition_policy in VALID_CPU_PARTITION_POLICIES, (
+            f"{profile_id}: invalid cpu_partition_policy "
+            f"{profile.cpu_partition_policy!r}"
+        )
+
+
+def test_productivity_profiles_never_partition(profiles_by_id) -> None:
+    """Desktop/productivity lanes must not steer anything (the user's apps
+    ARE the workload)."""
+    for profile_id, profile in profiles_by_id.items():
+        if (profile.optimization_target or "").lower() == "productivity":
+            assert profile.cpu_partition_policy == "off", profile_id
+            assert profile.background_steer_images == (), profile_id
+
+
+def test_gaming_profiles_partition_fully_by_default(profiles_by_id) -> None:
+    """Every non-productivity lane ships the automatic full partition."""
+    for profile_id, profile in profiles_by_id.items():
+        if (profile.optimization_target or "").lower() == "productivity":
+            continue
+        assert profile.cpu_partition_policy == "full", (
+            f"{profile_id}: gaming lane expected 'full' partition policy, "
+            f"got {profile.cpu_partition_policy!r}"
+        )
+
+
+def test_capture_safe_lanes_steer_their_encoders(profiles_by_id) -> None:
+    """Capture lanes keep OBS alive, so they must also steer it off the fast
+    cores; ordinary lanes kill OBS and must not list it."""
+    for profile_id, profile in profiles_by_id.items():
+        if profile.cpu_partition_policy != "full":
+            continue
+        images = {i.lower() for i in profile.background_steer_images}
+        if profile.is_capture_safe:
+            assert "obs64.exe" in images, (
+                f"{profile_id}: capture-safe lane missing obs64.exe in "
+                "background_steer_images"
+            )
+        else:
+            assert "obs64.exe" not in images, (
+                f"{profile_id}: non-capture lane lists obs64.exe (killset "
+                "kills it; steering it is dead weight)"
+            )
+
+
+def test_background_steer_never_lists_own_executables(profiles_by_id) -> None:
+    """A profile must never steer its own game images to background cores
+    (browser-game lanes: the 'game' can be chrome.exe)."""
+    for profile_id, profile in profiles_by_id.items():
+        hints = {h.lower() for h in profile.executable_hints}
+        images = {i.lower() for i in profile.background_steer_images}
+        overlap = hints & images
+        assert not overlap, f"{profile_id}: steers its own game images {sorted(overlap)}"
+
+
+def test_background_steer_never_lists_critical_images(profiles_by_id) -> None:
+    """The steer lists must stay clear of the hard never-steer floor."""
+    from abso.core.partition_steer import NEVER_STEER_IMAGES
+
+    for profile_id, profile in profiles_by_id.items():
+        images = {i.lower() for i in profile.background_steer_images}
+        overlap = images & NEVER_STEER_IMAGES
+        assert not overlap, f"{profile_id}: steer list hits never-steer {sorted(overlap)}"

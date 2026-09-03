@@ -10,6 +10,26 @@ from abso.profiles.profile_bases import (
     merge_settings_map,
 )
 
+_STREAMING_WINDOWED_VRR_OVERRIDES: dict[str, dict[str, Any]] = {
+    "WindowsSettingsHandler": {
+        "windowed_optimizations": True,
+        "vrr_optimize": True,
+    },
+    "GraphicsSettingsHandler": {
+        "disable_global_fso": False,
+    },
+    "NvidiaSettingsHandler": {
+        "global_vrr_mode": "fullscreen_and_windowed",
+    },
+    "FortniteConfigHandler": {
+        "fullscreen_mode": 1,
+    },
+    "ProcessPriorityHandler": {
+        "cpu_priority": 2,
+        "io_priority": 2,
+    },
+}
+
 
 class _FortniteBaseProfile(ReflexShooterBaseProfile):
     """Shared Fortnite profile defaults."""
@@ -319,11 +339,13 @@ class FortniteGSyncHDRProfile(_FortniteBaseProfile):
 
     @property
     def mixed_refresh_safe_fallback_profile_id(self) -> str:
-        # No overlay/capture borderless sibling exists for Fortnite, so on a
-        # mixed-refresh desktop where strict fullscreen VRR risks a secondary
-        # black flash, fall back to the no-sync HDR lane instead of the strict
-        # G-SYNC path.
+        # Mixed-refresh fallback remains the no-sync HDR lane; overlay-blocked
+        # applies use the dedicated streaming sibling below.
         return "fortnite-hdr"
+
+    @property
+    def overlay_compatible_fallback_profile_id(self) -> str | None:
+        return "fortnite-gsync-hdr-capture"
 
     @property
     def allow_dual_limiter(self) -> bool:
@@ -460,4 +482,140 @@ class FortniteGSyncHDRProfile(_FortniteBaseProfile):
                 "value": "Off",
                 "reason": "Avoids streaming hitches and unnecessary VRAM churn.",
             },
+        ]
+
+
+class _FortniteGSyncCaptureBase(FortniteGSyncHDRProfile):
+    """Shared capture-compatible Fortnite G-SYNC presentation contract."""
+
+    @property
+    def is_capture_safe(self) -> bool:
+        return True
+
+    @property
+    def requires_exact_nvidia_binding(self) -> bool:
+        return True
+
+    @property
+    def overlay_compatible_fallback_profile_id(self) -> str | None:
+        return None
+
+    @property
+    def mixed_refresh_safe_fallback_profile_id(self) -> None:
+        return None
+
+    @property
+    def fullscreen_optimizations_per_exe(self) -> dict[str, bool]:
+        return fso_overrides(self.executable_hints, disabled=False)
+
+    def _shared_overrides(self) -> dict[str, dict[str, Any]]:
+        return merge_settings_map(
+            super()._shared_overrides(),
+            _STREAMING_WINDOWED_VRR_OVERRIDES,
+        )
+
+    def get_in_game_settings(self) -> list[dict[str, str]]:
+        patched: list[dict[str, str]] = []
+        for row in super().get_in_game_settings():
+            if row.get("setting") == "Display Mode":
+                row = {
+                    **row,
+                    "value": "Windowed Fullscreen (borderless)",
+                    "reason": (
+                        "Streaming lane: uses Fortnite's borderless mode and "
+                        "the Windows windowed G-SYNC path so OBS, Medal, RTSS, "
+                        "and overlays can stay running."
+                    ),
+                }
+            patched.append(row)
+        return patched
+
+    def get_post_apply_notes(self) -> list[str]:
+        return [
+            "Fortnite streaming manual: use Windowed Fullscreen, keep in-game "
+            "VSync Off, and set NVIDIA Reflex Low Latency to On + Boost. OBS "
+            "and overlay processes remain available."
+        ]
+
+
+class FortniteGSyncCaptureProfile(_FortniteGSyncCaptureBase):
+    """Fortnite SDR streaming lane with borderless G-SYNC."""
+
+    @property
+    def profile_id(self) -> str:
+        return "fortnite-gsync-capture"
+
+    @property
+    def display_name(self) -> str:
+        return "Fortnite - GSYNC SDR Streaming"
+
+    @property
+    def description(self) -> str:
+        return (
+            "SDR capped G-SYNC lane on Fortnite's borderless path; preserves "
+            "OBS, Medal, RTSS, and overlays and keeps game CPU/I/O priority at "
+            "Normal so capture is not starved."
+        )
+
+    @property
+    def is_sdr_only(self) -> bool:
+        return True
+
+    def _variant_overrides(self) -> dict[str, dict[str, Any]]:
+        return {
+            "WindowsSettingsHandler": {
+                "hdr": False,
+                "auto_hdr": False,
+            },
+            "ColorProfileSettingsHandler": {
+                "icc_profile": "srgb",
+                "digital_vibrance": 45,
+                "show_osd_guidance": True,
+                "game_type": "competitive_fps",
+            },
+            "FortniteConfigHandler": {
+                "hdr_output": False,
+            },
+        }
+
+    def get_in_game_settings(self) -> list[dict[str, str]]:
+        patched: list[dict[str, str]] = []
+        for row in super().get_in_game_settings():
+            if row.get("setting") == "HDR Peak Brightness / Nits":
+                continue
+            if row.get("setting") == "HDR":
+                row = {
+                    **row,
+                    "value": "Off",
+                    "reason": "This streaming variant intentionally stays on the SDR path.",
+                }
+            patched.append(row)
+        return patched
+
+
+class FortniteGSyncHDRCaptureProfile(_FortniteGSyncCaptureBase):
+    """Fortnite native-HDR streaming lane with borderless G-SYNC."""
+
+    @property
+    def profile_id(self) -> str:
+        return "fortnite-gsync-hdr-capture"
+
+    @property
+    def display_name(self) -> str:
+        return "Fortnite - GSYNC HDR Streaming"
+
+    @property
+    def description(self) -> str:
+        return (
+            "Native-HDR capped G-SYNC lane on Fortnite's borderless path; "
+            "preserves OBS, Medal, RTSS, and overlays and keeps game CPU/I/O "
+            "priority at Normal so capture is not starved."
+        )
+
+    def get_post_apply_notes(self) -> list[str]:
+        return [
+            *super().get_post_apply_notes(),
+            "Streaming color: default to SDR Streaming for an SDR destination. "
+            "Use HDR Streaming only when OBS/output color space or tone mapping "
+            "is already intentionally configured; ABSO does not change OBS settings.",
         ]

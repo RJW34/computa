@@ -65,6 +65,7 @@ class TestABSOConfig:
                     "nvidia": {"preset": "minimum_latency"},
                     "registry": {"game_priority": {"priority": 6}},
                     "timer": {"resolution_ms": 0.5},
+                    "cpu_affinity": {"strategy": "p_cores_only"},
                 }
             }
         )
@@ -75,6 +76,7 @@ class TestABSOConfig:
         assert override.nvidia == {"preset": "minimum_latency"}
         assert override.registry == {"game_priority": {"priority": 6}}
         assert override.timer == {"resolution_ms": 0.5}
+        assert override.cpu_affinity == {"strategy": "p_cores_only"}
         assert override.graphics == {}
 
 
@@ -93,6 +95,7 @@ class TestProfileOverrides:
         assert overrides.power == {}
         assert overrides.timer == {}
         assert overrides.mouse == {}
+        assert overrides.cpu_affinity == {}
 
     def test_custom_values(self):
         """Test with custom override values."""
@@ -118,12 +121,40 @@ class TestProfileOverrides:
     def test_get_handler_profile_overrides_routes_known_handlers(self):
         overrides = ProfileOverrides(
             registry={"game_priority": {"priority": 6}},
+            cpu_affinity={"strategy": "p_cores_only"},
         )
 
         routed = get_handler_profile_overrides(overrides, "RegistrySettingsHandler")
 
         assert routed == {"game_priority": {"priority": 6}}
+        assert get_handler_profile_overrides(
+            overrides, "CpuAffinityHandler"
+        ) == {"strategy": "p_cores_only"}
         assert get_handler_profile_overrides(overrides, "UnknownHandler") == {}
+
+    def test_merge_profile_override_settings_routes_cpu_affinity(self):
+        settings = {
+            "strategy": None,
+            "executables": ["Slippi Dolphin.exe"],
+        }
+        overrides = ProfileOverrides(
+            cpu_affinity={"strategy": "p_cores_only"},
+        )
+
+        merged = merge_profile_override_settings(
+            settings,
+            "CpuAffinityHandler",
+            overrides,
+        )
+
+        assert merged == {
+            "strategy": "p_cores_only",
+            "executables": ["Slippi Dolphin.exe"],
+        }
+        assert settings == {
+            "strategy": None,
+            "executables": ["Slippi Dolphin.exe"],
+        }
 
     def test_merge_profile_override_settings_deep_merges_without_shared_state(self):
         settings = {
@@ -660,3 +691,45 @@ profile_overrides:
             manager.load()
 
         assert "profile_overrides.slippi-melee.graphics" in str(exc_info.value)
+
+
+class TestCpuSetsPartitionConfig:
+    """Core-partitioning knobs on the cpu_sets section."""
+
+    def test_defaults(self, tmp_path):
+        from abso.core.config import ConfigManager
+
+        config = ConfigManager(tmp_path / "none.yaml").load()
+        cs = config.cpu_sets
+        assert cs.enabled is False
+        assert cs.background_steer is True
+        assert cs.background_images == []
+        assert cs.auto_steer is True
+        assert cs.auto_steer_process_threshold == 4
+        assert cs.auto_steer_sustain_ms == 5000
+        assert cs.smt_avoid is False
+        assert cs.x3d_partition is True
+
+    def test_yaml_round_trip(self, tmp_path):
+        from abso.core.config import ConfigManager
+
+        config_path = tmp_path / "config.yaml"
+        config_path.write_text(
+            "cpu_sets:\n"
+            "  background_steer: false\n"
+            "  background_images:\n"
+            "    - krita.exe\n"
+            "  auto_steer: false\n"
+            "  auto_steer_process_threshold: 7\n"
+            "  auto_steer_sustain_ms: 9000\n"
+            "  smt_avoid: true\n"
+            "  x3d_partition: false\n"
+        )
+        cs = ConfigManager(config_path).load().cpu_sets
+        assert cs.background_steer is False
+        assert cs.background_images == ["krita.exe"]
+        assert cs.auto_steer is False
+        assert cs.auto_steer_process_threshold == 7
+        assert cs.auto_steer_sustain_ms == 9000
+        assert cs.smt_avoid is True
+        assert cs.x3d_partition is False

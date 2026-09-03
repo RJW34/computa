@@ -12,6 +12,7 @@ This guide helps diagnose and resolve common issues with computa
 - [Reboot Requirements When Switching Profiles](#reboot-requirements-when-switching-profiles)
 - [Secondary Monitor Black Flashes](#secondary-monitor-black-flashes)
 - [Overwatch Reflex and VRR FPS Caps](#overwatch-reflex-and-vrr-fps-caps)
+- [Streaming and OBS Profiles](#streaming-and-obs-profiles)
 - [Profile Application Failures](#profile-application-failures)
 - [Backup and Restore Issues](#backup-and-restore-issues)
 - [Performance Issues](#performance-issues)
@@ -400,6 +401,55 @@ exclusive fullscreen.
 
 ---
 
+## Streaming and OBS Profiles
+
+### OBS closes when a game profile becomes active
+
+**Cause:** The ordinary competitive lanes are intentionally overlay-free.
+Their launch janitor stops OBS and other capture/overlay helpers to reduce
+frame-time interference.
+
+**Solution:** Select the profile variant labeled **Streaming**. The supported
+legacy command aliases are:
+
+| Game | SDR alias | HDR alias |
+|------|-----------|-----------|
+| Slippi Melee / SSBM | `slippi-melee-streaming` | `slippi-melee-streaming-hdr` |
+| Rivals 2 / ROA2 | `rivals2-streaming` or `roa2-streaming` | `rivals2-streaming-hdr` or `roa2-streaming-hdr` |
+| Counter-Strike 2 | `cs2-streaming` | `cs2-streaming-hdr` |
+| Fortnite | `fortnite-streaming` | `fortnite-streaming-hdr` |
+| Overwatch 2 | `overwatch2-streaming` or `overwatch2-gsync-streaming` | `overwatch2-streaming-hdr` or `overwatch2-gsync-hdr-streaming` |
+
+The aliases resolve to canonical `*-capture` profiles for compatibility with
+existing state files and backups. Every one of those profiles keeps
+`obs64.exe` and `obs32.exe` out of both launch-killset tiers. Confirm a lane's
+policy without changing the PC:
+
+```powershell
+python -m abso launch-killset fortnite-streaming-hdr --json
+```
+
+The Streaming label means computa preserves the capture stack and selects the
+capture-compatible game/display path. It also leaves the game's persistent
+CPU and I/O priority at Windows Normal instead of forcing High, preserving
+scheduler room for capture. It does **not** replace the active OBS profile or
+rewrite encoder, bitrate, canvas, output-resolution, or recording settings.
+For an ordinary SDR stream destination, select the SDR Streaming lane. Use an
+HDR Streaming lane only when OBS and the destination color path are already
+configured for HDR output or intentional tone mapping; otherwise the captured
+colors may not match the game display.
+
+### OBS reports rendering or encoding lag
+
+First confirm that the Streaming game profile is active and that OBS survived
+the launch sweep. Then use OBS's own Stats window to distinguish rendering lag
+from encoding lag. Encoder choice, scene complexity, output resolution, and a
+game-side FPS limit are hardware- and service-specific; computa does not guess
+those values or overwrite a working OBS configuration during a game-profile
+switch.
+
+---
+
 ## Profile Application Failures
 
 ### "Unknown profile" Error
@@ -533,6 +583,35 @@ print(f"Failed: {result.failed_settings}")
 **Cause:** WMI queries are CPU-intensive
 
 **Solution:** This is normal and temporary. Detection caches results.
+
+### Core Partitioning (Automatic CPU Steering) Concerns
+
+**Symptom:** You want to confirm, tune, or disable the automatic game/background
+core split that runs while a game is up.
+
+**How it works:** gaming profiles declare `cpu_partition_policy: full`, so the
+tray's session governor soft-steers the game (and its children) to the fast
+cores and the profile's background apps (OBS on capture lanes, browsers,
+Discord, Spotify, auto-detected heavy processes) to the remaining cores via
+the Windows CPU Sets API. No hard affinity, no priority changes, everything
+reverts on game exit. Single-domain CPUs and symmetric dual-CCD parts no-op.
+
+**Solutions:**
+1. Confirm it ran: the tray log shows
+   `Core partition 'hybrid': N game-side / M background-side set(s)` when the
+   governor starts for a game.
+2. Keep only the game-side steering (no background moves):
+   set `cpu_sets.background_steer: false` in `abso.yaml`.
+3. Disable auto-detection only: `cpu_sets.auto_steer: false`.
+4. **AMD X3D (7950X3D/9950X3D class):** if a game regresses with the
+   `x3d_cache` partition active, disable Windows Game Mode — its own CCD
+   parking can fight manual steering — or set
+   `cpu_sets.x3d_partition: false` to turn the split off entirely.
+5. A background app you want left alone: it is only steered if it is on the
+   profile's `background_steer_images` list, `cpu_sets.background_images`, or
+   auto-detected as sustained-heavy; auto-steer already skips anything in
+   `process_overrides.protect`, anti-cheat, the game's own process tree, and
+   the app you are actively focused on.
 
 ---
 

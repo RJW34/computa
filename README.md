@@ -21,6 +21,13 @@ together — with automatic backups and one-command rollback.
 - **Safe by default** — timestamped backup of every setting before any change,
   one-command restore, and a baseline captured at setup so you can always get
   back to where you started
+- **Automatic CPU core partitioning** — while a game runs, the game and its
+  child processes are soft-steered to the fast cores (P-cores on Intel hybrid,
+  the V-Cache CCD on AMD X3D) and background apps — OBS on capture lanes,
+  browsers, Discord, Spotify, plus anything auto-detected as sustained-heavy —
+  to the remaining cores at full speed, via the anti-cheat-benign Windows CPU
+  Sets API (no hard affinity, no injection; everything reverts on game exit).
+  See [docs/PROCESS_LASSO_FEATURES.md](docs/PROCESS_LASSO_FEATURES.md)
 - **System tray app** — one-click profile switching, game detection, and
   status, with selectable icon/sound themes
 - **Live verification** — `state --json --verify` and `health --json` prove
@@ -123,6 +130,34 @@ profile, watches for game launches, and supports icon/sound theme packs — see
 ## What profiles change
 
 Exact settings vary per profile; this is what built-in profiles touch today.
+
+### Streaming and OBS lanes
+
+Profiles labeled **Streaming** are the lanes to use while OBS, Medal, RTSS,
+or another capture/overlay tool is running. They deliberately keep the
+capture stack alive during the apply-time display-path check and the recurring
+launch janitor sweep. Where the game supports it, they use a capture-compatible
+borderless/windowed VRR path so capture hooks can coexist with G-SYNC. They
+also leave the game's persistent CPU and I/O priority at Windows Normal rather
+than forcing High, preserving scheduler room for the recorder and encoder.
+
+Streaming lanes are available for Slippi Melee, Rivals 2, Counter-Strike 2,
+Fortnite, and Overwatch 2 in SDR/HDR variants where the game family supports
+both. For these five families, legacy `*-streaming` command names remain
+aliases to the matching capture-safe lane; they never resolve to an
+overlay-free profile that stops OBS. Use the read-only command below to
+inspect the exact process policy:
+
+```powershell
+computa launch-killset fortnite-streaming-hdr --json
+```
+
+These lanes do not rewrite OBS encoder, bitrate, service, canvas, or recording
+settings. Those choices depend on the streaming service, scene complexity,
+encoder, and desired output, so computa preserves the user's OBS configuration
+instead of imposing a generic preset. Use an SDR Streaming lane for a normal
+SDR stream destination. Choose an HDR Streaming lane only when OBS and the
+destination color path are already configured for HDR output or tone mapping.
 
 ### Windows
 - Game Mode on; Game Bar / Game DVR capture off (per-user registry)

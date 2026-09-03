@@ -127,21 +127,65 @@ class TestSessionExtras:
         assert bal._eco_herder is None
         bal._stop_session_extras()  # must not raise
 
-    def test_cpu_sets_steer_on_start(self, monkeypatch) -> None:
+    def test_cpu_sets_steer_on_start(self, monkeypatch, tmp_path) -> None:
         import abso.core.cpu_sets as cs
+        from abso.core.cpu_sets import CorePartition
 
-        calls: dict = {}
+        calls: list = []
 
         def fake_steer(pid, ids):
-            calls["steer"] = (pid, ids)
+            calls.append((pid, tuple(ids)))
             return True
 
-        monkeypatch.setattr(cs, "get_pcore_cpu_set_ids", lambda: [256, 257])
-        monkeypatch.setattr(cs, "steer_process_to_pcores", fake_steer)
+        partition = CorePartition(
+            kind="hybrid", game_ids=(256, 257), background_ids=(300,)
+        )
+        monkeypatch.setattr(cs, "get_partition", lambda **kw: partition)
+        monkeypatch.setattr(cs, "steer_process_to_sets", fake_steer)
 
-        bal = CpuBalancer(game_pid=4242, config=CpuBalancerConfig(), enable_cpu_sets=True)
+        bal = CpuBalancer(
+            game_pid=4242,
+            config=CpuBalancerConfig(),
+            enable_cpu_sets=True,
+            steer_journal_path=tmp_path / "steer.journal",
+        )
+        monkeypatch.setattr(
+            bal, "_enumerate_processes", lambda: [(4242, "game.exe", 1)]
+        )
         bal._start_session_extras()
-        assert calls["steer"] == (4242, [256, 257])
+        assert (4242, (256, 257)) in calls
+        assert bal._steerer is not None
+
+    def test_cpu_sets_steer_covers_game_descendants(self, monkeypatch, tmp_path) -> None:
+        import abso.core.cpu_sets as cs
+        from abso.core.cpu_sets import CorePartition
+
+        steered: list = []
+        partition = CorePartition(kind="hybrid", game_ids=(1, 2), background_ids=(9,))
+        monkeypatch.setattr(cs, "get_partition", lambda **kw: partition)
+        monkeypatch.setattr(
+            cs, "steer_process_to_sets", lambda pid, ids: steered.append(pid) or True
+        )
+
+        bal = CpuBalancer(
+            game_pid=100,
+            config=CpuBalancerConfig(),
+            enable_cpu_sets=True,
+            steer_journal_path=tmp_path / "steer.journal",
+        )
+        # 100 -> 101 -> 102 chain plus an unrelated process.
+        monkeypatch.setattr(
+            bal,
+            "_enumerate_processes",
+            lambda: [
+                (100, "game.exe", 1),
+                (101, "eac_child.exe", 100),
+                (102, "shader_worker.exe", 101),
+                (500, "chrome.exe", 1),
+            ],
+        )
+        bal._start_session_extras()
+        assert set(steered) == {100, 101, 102}
 
     def test_cpu_sets_clear_on_stop(self, monkeypatch) -> None:
         import abso.core.cpu_sets as cs
@@ -166,15 +210,21 @@ class TestSessionExtras:
         bal._stop_session_extras()
         assert bal._eco_herder is None
 
-    def test_extras_failure_is_isolated(self, monkeypatch) -> None:
+    def test_extras_failure_is_isolated(self, monkeypatch, tmp_path) -> None:
         import abso.core.cpu_sets as cs
 
-        def boom():
+        def boom(**kw):
             raise RuntimeError("topology query exploded")
 
-        monkeypatch.setattr(cs, "get_pcore_cpu_set_ids", boom)
-        bal = CpuBalancer(game_pid=4242, config=CpuBalancerConfig(), enable_cpu_sets=True)
+        monkeypatch.setattr(cs, "get_partition", boom)
+        bal = CpuBalancer(
+            game_pid=4242,
+            config=CpuBalancerConfig(),
+            enable_cpu_sets=True,
+            steer_journal_path=tmp_path / "steer.journal",
+        )
         bal._start_session_extras()  # exception swallowed -> core loop safe
+        assert bal._steerer is None
 
 
 class TestResolveSessionExtras:
@@ -298,3 +348,215 @@ class TestResolveWatchdog:
         assert enable is True
         assert len(rules) == 1
         assert keep == 6
+
+
+class TestRestraintGate:
+    def test_no_restraint_skips_priority_logic(self, monkeypatch) -> None:
+        bal = _make_balancer(enable_restraint=False)
+
+        def boom():
+            raise AssertionError("restraint path must not run")
+
+        monkeypatch.setattr(bal, "_get_system_cpu", boom)
+        monkeypatch.setattr(bal, "_find_and_restrain_offenders", boom)
+        bal._poll_once()  # no steerer/watchdog -> nothing else runs either
+
+    def test_restraint_on_by_default(self) -> None:
+        bal = _make_balancer()
+        assert bal._enable_restraint is True
+
+
+class TestAutoSteer:
+    def _hybrid_steerer(self, tmp_path):
+        from abso.core.cpu_sets import CorePartition
+        from abso.core.partition_steer import PartitionSteerer
+
+        steered: list = []
+        steerer = PartitionSteerer(
+            4242,
+            CorePartition(kind="hybrid", game_ids=(1,), background_ids=(9,)),
+            (),
+            steer=lambda pid, ids: steered.append((pid, tuple(ids))) or True,
+            clear=lambda pid: True,
+            journal_path=tmp_path / "steer.journal",
+        )
+        return steerer, steered
+
+    def _auto_balancer(self, tmp_path, **kw):
+        bal = _make_balancer(
+            enable_auto_steer=True,
+            auto_steer_process_threshold=4,
+            auto_steer_sustain_ms=1000,
+            steer_journal_path=tmp_path / "steer.journal",
+            **kw,
+        )
+        steerer, steered = self._hybrid_steerer(tmp_path)
+        bal._steerer = steerer
+        return bal, steered
+
+    def test_sustained_heavy_process_is_steered(self, monkeypatch, tmp_path) -> None:
+        bal, steered = self._auto_balancer(tmp_path)
+        monkeypatch.setattr(bal, "_get_foreground_pid", lambda: None)
+        monkeypatch.setattr(
+            bal, "_get_process_cpu", lambda pid, times_store=None: 12.0
+        )
+        procs = [(7000, "encoder.exe", 1)]
+        bal._auto_steer_offenders(procs, now=100.0)  # first sighting
+        assert steered == []
+        bal._auto_steer_offenders(procs, now=101.5)  # sustained past 1000ms
+        assert (7000, (9,)) in steered
+
+    def test_calm_process_resets_sustain(self, monkeypatch, tmp_path) -> None:
+        bal, steered = self._auto_balancer(tmp_path)
+        monkeypatch.setattr(bal, "_get_foreground_pid", lambda: None)
+        cpu_values = iter([12.0, 1.0, 12.0, 12.0])
+        monkeypatch.setattr(
+            bal, "_get_process_cpu", lambda pid, times_store=None: next(cpu_values)
+        )
+        procs = [(7000, "encoder.exe", 1)]
+        bal._auto_steer_offenders(procs, now=100.0)  # high
+        bal._auto_steer_offenders(procs, now=101.5)  # calm -> reset
+        bal._auto_steer_offenders(procs, now=102.0)  # high again (restart clock)
+        bal._auto_steer_offenders(procs, now=102.5)  # only 500ms sustained
+        assert steered == []
+
+    def test_excluded_images_never_auto_steered(self, monkeypatch, tmp_path) -> None:
+        bal, steered = self._auto_balancer(tmp_path)
+        monkeypatch.setattr(bal, "_get_foreground_pid", lambda: None)
+        monkeypatch.setattr(
+            bal, "_get_process_cpu", lambda pid, times_store=None: 50.0
+        )
+        procs = [(900, "dwm.exe", 1)]
+        bal._auto_steer_offenders(procs, now=100.0)
+        bal._auto_steer_offenders(procs, now=200.0)
+        assert steered == []
+
+    def test_game_descendants_never_auto_steered(self, monkeypatch, tmp_path) -> None:
+        bal, steered = self._auto_balancer(tmp_path)
+        monkeypatch.setattr(bal, "_get_foreground_pid", lambda: None)
+        monkeypatch.setattr(
+            bal, "_get_process_cpu", lambda pid, times_store=None: 50.0
+        )
+        procs = [(5000, "shaderworker.exe", 4242)]
+        bal._auto_steer_offenders(procs, now=100.0)
+        bal._auto_steer_offenders(procs, now=200.0)
+        assert steered == []
+
+    def test_uses_isolated_cpu_time_store(self, tmp_path) -> None:
+        bal, _ = self._auto_balancer(tmp_path)
+        assert bal._auto_steer_cpu_times is not bal._last_process_times
+        assert bal._auto_steer_cpu_times is not bal._watchdog_cpu_times
+
+
+class TestResolvePartition:
+    def _cpu_sets_cfg(self, **kw):
+        class _Sets:
+            background_steer = kw.get("background_steer", True)
+            background_images = kw.get("background_images", [])
+            auto_steer = kw.get("auto_steer", True)
+            auto_steer_process_threshold = kw.get("threshold", 4)
+            auto_steer_sustain_ms = kw.get("sustain", 5000)
+            smt_avoid = kw.get("smt_avoid", False)
+            x3d_partition = kw.get("x3d", True)
+
+        class _Cfg:
+            cpu_sets = _Sets()
+
+        return _Cfg()
+
+    def _patch(self, monkeypatch, *, policy, images=(), cfg=None):
+        import abso.core.config as config_mod
+        import abso.profiles.catalog as catalog_mod
+
+        monkeypatch.setattr(
+            catalog_mod, "get_profile_partition", lambda pid: (policy, tuple(images))
+        )
+        monkeypatch.setattr(
+            config_mod, "get_config", lambda: cfg or self._cpu_sets_cfg()
+        )
+
+    def test_full_policy_enables_everything(self, monkeypatch) -> None:
+        self._patch(monkeypatch, policy="full", images=("obs64.exe", "chrome.exe"))
+        kw = cb._resolve_partition(steer_flag=False, profile_id="overwatch2-gsync-hdr")
+        assert kw["enable_cpu_sets"] is True
+        assert kw["steer_background_images"] == ["obs64.exe", "chrome.exe"]
+        assert kw["enable_auto_steer"] is True
+
+    def test_game_only_policy_has_no_background(self, monkeypatch) -> None:
+        self._patch(monkeypatch, policy="game_only", images=())
+        kw = cb._resolve_partition(steer_flag=False, profile_id="x")
+        assert kw["enable_cpu_sets"] is True
+        assert kw["steer_background_images"] == []
+        assert kw["enable_auto_steer"] is False
+
+    def test_off_policy_is_fully_off(self, monkeypatch) -> None:
+        self._patch(monkeypatch, policy="off")
+        kw = cb._resolve_partition(steer_flag=False, profile_id="desktop")
+        assert kw["enable_cpu_sets"] is False
+        assert kw["steer_background_images"] == []
+        assert kw["enable_auto_steer"] is False
+
+    def test_steer_flag_forces_background_with_defaults(self, monkeypatch) -> None:
+        from abso.core.partition_steer import DEFAULT_BACKGROUND_STEER_IMAGES
+
+        self._patch(monkeypatch, policy="off")
+        kw = cb._resolve_partition(steer_flag=True, profile_id="desktop")
+        assert kw["steer_background_images"] == list(DEFAULT_BACKGROUND_STEER_IMAGES)
+
+    def test_config_background_veto(self, monkeypatch) -> None:
+        self._patch(
+            monkeypatch,
+            policy="full",
+            images=("obs64.exe",),
+            cfg=self._cpu_sets_cfg(background_steer=False),
+        )
+        kw = cb._resolve_partition(steer_flag=False, profile_id="x")
+        assert kw["steer_background_images"] == []
+        assert kw["enable_auto_steer"] is False
+        assert kw["enable_cpu_sets"] is True  # game side unaffected
+
+    def test_config_extra_images_deduped(self, monkeypatch) -> None:
+        self._patch(
+            monkeypatch,
+            policy="full",
+            images=("obs64.exe",),
+            cfg=self._cpu_sets_cfg(background_images=["OBS64.EXE", "krita.exe"]),
+        )
+        kw = cb._resolve_partition(steer_flag=False, profile_id="x")
+        assert kw["steer_background_images"] == ["obs64.exe", "krita.exe"]
+
+    def test_auto_steer_config_veto(self, monkeypatch) -> None:
+        self._patch(
+            monkeypatch,
+            policy="full",
+            images=("obs64.exe",),
+            cfg=self._cpu_sets_cfg(auto_steer=False),
+        )
+        kw = cb._resolve_partition(steer_flag=False, profile_id="x")
+        assert kw["enable_auto_steer"] is False
+
+    def test_tuning_knobs_pass_through(self, monkeypatch) -> None:
+        self._patch(
+            monkeypatch,
+            policy="full",
+            images=("a.exe",),
+            cfg=self._cpu_sets_cfg(threshold=7, sustain=9000, smt_avoid=True, x3d=False),
+        )
+        kw = cb._resolve_partition(steer_flag=False, profile_id="x")
+        assert kw["auto_steer_process_threshold"] == 7
+        assert kw["auto_steer_sustain_ms"] == 9000
+        assert kw["smt_avoid"] is True
+        assert kw["allow_x3d"] is False
+
+    def test_resolver_failure_is_safe(self, monkeypatch) -> None:
+        import abso.core.config as config_mod
+        import abso.profiles.catalog as catalog_mod
+
+        def boom(*a, **kw):
+            raise RuntimeError("no catalog")
+
+        monkeypatch.setattr(catalog_mod, "get_profile_partition", boom)
+        monkeypatch.setattr(config_mod, "get_config", boom)
+        kw = cb._resolve_partition(steer_flag=False, profile_id="x")
+        assert kw["enable_cpu_sets"] is False
+        assert kw["steer_background_images"] == []

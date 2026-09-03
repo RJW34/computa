@@ -182,6 +182,14 @@ class CpuBalancer:
         watchdog_rules: Any = None,
         is_online: bool = False,
         watchdog_keep_cores: int = 4,
+        enable_restraint: bool = True,
+        steer_background_images: Iterable[str] | None = None,
+        enable_auto_steer: bool = False,
+        auto_steer_process_threshold: int = 4,
+        auto_steer_sustain_ms: int = 5000,
+        smt_avoid: bool = False,
+        allow_x3d: bool = True,
+        steer_journal_path: os.PathLike[str] | str | None = None,
     ) -> None:
         self._game_pid = game_pid
         self._config = config or CpuBalancerConfig()
@@ -199,6 +207,23 @@ class CpuBalancer:
         # Separate CPU-time store so the watchdog's cpu metric never double-
         # samples (and corrupts) the restraint loop's per-process deltas.
         self._watchdog_cpu_times: dict[int, tuple[int, int]] = {}
+
+        # ProBalance restraint can be disabled (steer-only sessions) while the
+        # governor still hosts the partition steerer / eco herder / watchdog.
+        self._enable_restraint = bool(enable_restraint)
+        # Core-partition steering (game -> fast cores, background -> the rest).
+        self._steer_background_images = list(steer_background_images or [])
+        self._enable_auto_steer = bool(enable_auto_steer)
+        self._auto_steer_threshold = int(auto_steer_process_threshold)
+        self._auto_steer_sustain_ms = int(auto_steer_sustain_ms)
+        self._smt_avoid = bool(smt_avoid)
+        self._allow_x3d = bool(allow_x3d)
+        self._steer_journal_path = steer_journal_path
+        self._steerer: Any = None
+        # Auto-steer keeps its own CPU-time store (see watchdog note above)
+        # plus first-seen-high timestamps for the sustain qualification.
+        self._auto_steer_cpu_times: dict[int, tuple[int, int]] = {}
+        self._auto_steer_high_since: dict[int, float] = {}
         self._restrained: dict[int, RestrainedProcess] = {}
         self._events: list[BalancerEvent] = []
         self._stop_event = threading.Event()
@@ -276,24 +301,48 @@ class CpuBalancer:
 
     def _poll_once(self) -> None:
         """Single poll iteration."""
-        system_cpu = self._get_system_cpu()
-        if system_cpu is None:
-            return
-
         now = time.monotonic()
 
-        # Check if system CPU is above threshold
-        if system_cpu >= self._config.system_cpu_threshold:
-            if self._high_cpu_since is None:
-                self._high_cpu_since = now
-            elif (now - self._high_cpu_since) * 1000 >= self._config.trigger_delay_ms:
-                # Sustained high CPU -- find offenders
-                self._find_and_restrain_offenders()
-        else:
-            self._high_cpu_since = None
+        if self._enable_restraint:
+            system_cpu = self._get_system_cpu()
+            if system_cpu is not None:
+                # Check if system CPU is above threshold
+                if system_cpu >= self._config.system_cpu_threshold:
+                    if self._high_cpu_since is None:
+                        self._high_cpu_since = now
+                    elif (now - self._high_cpu_since) * 1000 >= self._config.trigger_delay_ms:
+                        # Sustained high CPU -- find offenders
+                        self._find_and_restrain_offenders()
+                else:
+                    self._high_cpu_since = None
 
-        # Check if restrained processes can be released
-        self._check_releases(now)
+                # Check if restrained processes can be released
+                self._check_releases(now)
+
+        # One toolhelp snapshot per poll shared by the steerer, auto-steer,
+        # and watchdog (each keeps its own CPU-time store where relevant).
+        processes: list[tuple[int, str, int]] | None = None
+        if self._steerer is not None or self._watchdog_engine is not None:
+            processes = self._enumerate_processes()
+
+        # Core-partition steering: re-sweep every poll -- CPU Sets are not
+        # inherited, so late-spawned game children and background apps are
+        # picked up within one poll period.
+        if self._steerer is not None and processes is not None:
+            try:
+                newly_game, newly_bg = self._steerer.sweep(processes)
+                if newly_game or newly_bg:
+                    logger.info(
+                        "Partition steer: +%d game-side, +%d background-side process(es)",
+                        newly_game, newly_bg,
+                    )
+            except Exception as exc:
+                logger.debug("Partition sweep failed: %s", exc)
+            if self._enable_auto_steer:
+                try:
+                    self._auto_steer_offenders(processes, now)
+                except Exception as exc:
+                    logger.debug("Auto-steer failed: %s", exc)
 
         # Tier B: herd busy background images onto E-cores (idempotent; skips
         # already-throttled, the game, foreground, and never-eco images).
@@ -304,11 +353,49 @@ class CpuBalancer:
                 logger.debug("EcoQoS herd failed: %s", exc)
 
         # Tier B: evaluate declarative watchdog rules against live processes.
-        if self._watchdog_engine is not None:
+        if self._watchdog_engine is not None and processes is not None:
             try:
-                self._watchdog_engine.tick(self._enumerate_processes())
+                self._watchdog_engine.tick(processes)
             except Exception as exc:
                 logger.debug("Watchdog tick failed: %s", exc)
+
+    def _auto_steer_offenders(
+        self, processes: list[tuple[int, str, int]], now: float
+    ) -> None:
+        """Steer sustained-heavy background processes to the background side.
+
+        The charlie754-style auto-detect: any process (outside the exclusion
+        set, the game subtree, and the foreground app) that stays above the
+        per-process CPU threshold for the sustain window is moved to the
+        background partition for the rest of the session. Placement only --
+        priorities and clocks are untouched.
+        """
+        if self._steerer is None or not self._steerer.partition.has_background_side:
+            return
+        parent_map = {pid: ppid for pid, _name, ppid in processes}
+        game_descendants = self._compute_game_descendants(parent_map)
+        already = self._steerer.steered_background_pids
+        for pid, name, _ppid in processes:
+            if pid in already:
+                continue
+            if self._is_excluded(name, pid, game_descendants):
+                self._auto_steer_high_since.pop(pid, None)
+                continue
+            cpu = self._get_process_cpu(pid, times_store=self._auto_steer_cpu_times)
+            if cpu is None:
+                self._auto_steer_high_since.pop(pid, None)
+                continue
+            if cpu >= self._auto_steer_threshold:
+                first = self._auto_steer_high_since.setdefault(pid, now)
+                if (now - first) * 1000 >= self._auto_steer_sustain_ms:
+                    if self._steerer.steer_extra(pid, name):
+                        logger.info(
+                            "Auto-steered %s (PID %d) to background cores (%.1f%% CPU sustained)",
+                            name, pid, cpu,
+                        )
+                    self._auto_steer_high_since.pop(pid, None)
+            else:
+                self._auto_steer_high_since.pop(pid, None)
 
     # ------------------------------------------------------------------
     # System-wide CPU measurement
@@ -580,18 +667,46 @@ class CpuBalancer:
         A failure here must never break the core restraint loop, so every step
         is exception-isolated. No-ops entirely when the flags are off.
         """
-        if self._enable_cpu_sets:
+        if self._enable_cpu_sets or self._steer_background_images:
             try:
-                from abso.core import cpu_sets
+                from abso.core import cpu_sets, partition_steer
 
-                ids = cpu_sets.get_pcore_cpu_set_ids()
-                if ids and cpu_sets.steer_process_to_pcores(self._game_pid, ids):
-                    logger.info(
-                        "CPU Sets: steered game PID %d toward %d P-core set(s)",
-                        self._game_pid, len(ids),
-                    )
+                journal = (
+                    Path(self._steer_journal_path)
+                    if self._steer_journal_path
+                    else partition_steer.default_journal_path()
+                )
+                try:
+                    partition_steer.PartitionSteerer.recover_stale_journal(journal)
+                except Exception as exc:
+                    logger.debug("Stale steer-journal recovery failed: %s", exc)
+
+                partition = cpu_sets.get_partition(
+                    smt_avoid=self._smt_avoid, allow_x3d=self._allow_x3d
+                )
+                images = self._steer_background_images
+                # Steering wins over EcoQoS for overlapping images: placement
+                # at full clocks, not execution-speed throttling.
+                if images and self._eco_images:
+                    steered = {i.lower() for i in images}
+                    self._eco_images = [
+                        i for i in self._eco_images if i.lower() not in steered
+                    ]
+                self._steerer = partition_steer.PartitionSteerer(
+                    self._game_pid, partition, images, journal_path=journal
+                )
+                self._steerer.sweep(self._enumerate_processes())
+                logger.info(
+                    "Core partition '%s': %d game-side / %d background-side "
+                    "set(s); %d background image(s)%s",
+                    partition.kind,
+                    len(partition.game_ids),
+                    len(partition.background_ids),
+                    len(images),
+                    ", auto-steer on" if self._enable_auto_steer else "",
+                )
             except Exception as exc:
-                logger.debug("CPU Sets steer failed: %s", exc)
+                logger.debug("Partition steer init failed: %s", exc)
 
         if self._enable_eco:
             try:
@@ -630,7 +745,14 @@ class CpuBalancer:
 
     def _stop_session_extras(self) -> None:
         """Revert Tier B session behaviors at daemon stop."""
-        if self._enable_cpu_sets:
+        if self._steerer is not None:
+            try:
+                self._steerer.release_all()
+            except Exception as exc:
+                logger.debug("Partition steer release failed: %s", exc)
+            self._steerer = None
+        elif self._enable_cpu_sets:
+            # Steerer creation failed -- fall back to clearing the game PID.
             try:
                 from abso.core import cpu_sets
 
@@ -749,6 +871,83 @@ def _resolve_session_extras(
     return enable_cpu_sets, enable_eco, eco_images
 
 
+def _resolve_partition(*, steer_flag: bool, profile_id: str | None) -> dict[str, Any]:
+    """Resolve profile-driven core partitioning for this session.
+
+    The active profile's ``cpu_partition_policy`` decides the defaults
+    (``off`` / ``game_only`` / ``full``); ``abso.yaml`` ``cpu_sets`` tunes or
+    vetoes the background half; ``--steer-background`` forces the background
+    half on. Returns kwargs for :class:`CpuBalancer`.
+    """
+    policy = ""
+    images: list[str] = []
+    resolved_profile = profile_id
+    try:
+        if not resolved_profile:
+            from abso.core.app_paths import app_state_file
+            from abso.core.state_store import read_state_file
+
+            state = read_state_file(app_state_file()) or {}
+            resolved_profile = state.get("current_profile")
+        if resolved_profile:
+            from abso.profiles.catalog import get_profile_partition
+
+            policy, profile_images = get_profile_partition(resolved_profile)
+            images = list(profile_images)
+    except Exception as exc:
+        logger.debug("Could not resolve profile partition policy: %s", exc)
+
+    enable_game_side = policy in ("game_only", "full")
+    background_allowed = policy == "full" or bool(steer_flag)
+
+    auto_steer_default = True
+    threshold = 4
+    sustain_ms = 5000
+    smt_avoid = False
+    allow_x3d = True
+    try:
+        from abso.core.config import get_config
+
+        cs = get_config().cpu_sets
+        if not bool(cs.background_steer) and not steer_flag:
+            background_allowed = False
+        for extra in cs.background_images:
+            cleaned = str(extra).strip()
+            if cleaned:
+                images.append(cleaned)
+        auto_steer_default = bool(cs.auto_steer)
+        threshold = int(cs.auto_steer_process_threshold)
+        sustain_ms = int(cs.auto_steer_sustain_ms)
+        smt_avoid = bool(cs.smt_avoid)
+        allow_x3d = bool(cs.x3d_partition)
+    except Exception as exc:
+        logger.debug("Could not load cpu_sets partition config: %s", exc)
+
+    if background_allowed and not images:
+        from abso.core.partition_steer import DEFAULT_BACKGROUND_STEER_IMAGES
+
+        images = list(DEFAULT_BACKGROUND_STEER_IMAGES)
+
+    # Case-insensitive order-preserving dedupe.
+    seen: set[str] = set()
+    deduped: list[str] = []
+    for image in images:
+        key = image.lower()
+        if key not in seen:
+            seen.add(key)
+            deduped.append(image)
+
+    return {
+        "enable_cpu_sets": enable_game_side,
+        "steer_background_images": deduped if background_allowed else [],
+        "enable_auto_steer": background_allowed and auto_steer_default,
+        "auto_steer_process_threshold": threshold,
+        "auto_steer_sustain_ms": sustain_ms,
+        "smt_avoid": smt_avoid,
+        "allow_x3d": allow_x3d,
+    }
+
+
 def _resolve_watchdog(*, watchdog_flag: bool) -> tuple[bool, list, int]:
     """Resolve the watchdog: enabled if ``--watchdog`` OR ``watchdog.enabled``.
 
@@ -800,6 +999,24 @@ def main() -> None:
         help="Tier B: soft-steer the game toward P-cores (CPU Sets).",
     )
     parser.add_argument(
+        "--profile",
+        type=str,
+        default=None,
+        help="Active profile id for partition-policy resolution (defaults to "
+        "the recorded active profile).",
+    )
+    parser.add_argument(
+        "--steer-background",
+        action="store_true",
+        help="Force background-app steering to the background core partition "
+        "even when the profile policy does not request it.",
+    )
+    parser.add_argument(
+        "--no-restraint",
+        action="store_true",
+        help="Disable ProBalance priority restraint (steer-only session).",
+    )
+    parser.add_argument(
         "--eco",
         action="store_true",
         help="Tier B: herd busy background images onto E-cores (EcoQoS).",
@@ -838,18 +1055,25 @@ def main() -> None:
     enable_watchdog, watchdog_rules, watchdog_keep_cores = _resolve_watchdog(
         watchdog_flag=args.watchdog
     )
+    partition_kwargs = _resolve_partition(
+        steer_flag=args.steer_background, profile_id=args.profile
+    )
+    partition_kwargs["enable_cpu_sets"] = (
+        enable_cpu_sets or partition_kwargs["enable_cpu_sets"]
+    )
     balancer = CpuBalancer(
         args.pid,
         config,
         extra_excluded=_gather_extra_excluded(),
         stop_file=args.stop_file,
-        enable_cpu_sets=enable_cpu_sets,
         enable_eco=enable_eco,
         eco_images=eco_images,
         enable_watchdog=enable_watchdog,
         watchdog_rules=watchdog_rules,
         is_online=args.online,
         watchdog_keep_cores=watchdog_keep_cores,
+        enable_restraint=not args.no_restraint,
+        **partition_kwargs,
     )
 
     def _shutdown(signum: int, frame: Any) -> None:

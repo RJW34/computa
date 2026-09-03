@@ -8,6 +8,7 @@ import pytest
 
 from abso.profiles import get_all_profiles
 from abso.profiles.counter_strike_2 import (
+    CounterStrike2GSyncCaptureProfile,
     CounterStrike2GSyncHDRCaptureProfile,
     CounterStrike2GSyncHDRProfile,
     CounterStrike2GSyncProfile,
@@ -22,6 +23,8 @@ from abso.profiles.deadlock import (
 )
 from abso.profiles.diablo4 import Diablo4Profile, Diablo4SDRProfile
 from abso.profiles.fortnite import (
+    FortniteGSyncCaptureProfile,
+    FortniteGSyncHDRCaptureProfile,
     FortniteGSyncHDRProfile,
     FortniteHDRProfile,
     FortniteProfile,
@@ -39,13 +42,17 @@ from abso.profiles.pokemon_auto_chess import PokemonAutoChessProfile
 from abso.profiles.productivity_oled import ProductivityHDRProfile, ProductivityProfile
 from abso.profiles.rivals2 import Rivals2Profile
 from abso.profiles.rivals2_gsync import (
+    Rivals2GSyncCaptureProfile,
+    Rivals2GSyncHDRCaptureProfile,
     Rivals2GSyncHDRProfile,
     Rivals2GSyncProfile,
 )
 from abso.profiles.rivals2_nosync import Rivals2NoSyncHDRProfile, Rivals2NoSyncProfile
 from abso.profiles.slippi_melee import (
+    SlippiMeleeCaptureProfile,
     SlippiMeleeConsoleParityHDRProfile,
     SlippiMeleeConsoleParityProfile,
+    SlippiMeleeHDRCaptureProfile,
     SlippiMeleeHDRProfile,
     SlippiMeleeProfile,
     SlippiMeleeUniversalHDRProfile,
@@ -96,6 +103,18 @@ class TestProfileLoading:
         assert "Console-Parity HDR" in parity_hdr.display_name
         assert parity_hdr.is_sdr_only is False
 
+    def test_slippi_streaming_profiles_load(self):
+        """Slippi should expose explicit SDR and HDR streaming lanes."""
+        sdr = SlippiMeleeCaptureProfile()
+        hdr = SlippiMeleeHDRCaptureProfile()
+
+        assert sdr.profile_id == "slippi-melee-capture"
+        assert sdr.display_name == "Super Smash Bros. Melee (Slippi SDR Streaming)"
+        assert sdr.is_sdr_only is True
+        assert hdr.profile_id == "slippi-melee-hdr-capture"
+        assert hdr.display_name == "Super Smash Bros. Melee (Slippi HDR Streaming)"
+        assert hdr.is_sdr_only is False
+
     def test_diablo4_profile_loads(self):
         """Diablo 4 should expose explicit HDR and SDR variants."""
         hdr = Diablo4Profile()
@@ -109,20 +128,16 @@ class TestProfileLoading:
         """Productivity SDR/HDR siblings should not rely on auto-generated NVIDIA profile names."""
         sdr = ProductivityProfile()
         hdr = ProductivityHDRProfile()
-        assert (
-            sdr.get_settings("NvidiaSettingsHandler")["profile_name"]
-            == "Productivity (SDR)"
-        )
-        assert (
-            hdr.get_settings("NvidiaSettingsHandler")["profile_name"]
-            == "Productivity (HDR)"
-        )
+        assert sdr.get_settings("NvidiaSettingsHandler")["profile_name"] == "Productivity (SDR)"
+        assert hdr.get_settings("NvidiaSettingsHandler")["profile_name"] == "Productivity (HDR)"
 
     def test_fortnite_profiles_load(self):
-        """Fortnite should expose explicit SDR, HDR, and G-SYNC HDR variants."""
+        """Fortnite should expose strict and streaming SDR/HDR choices."""
         sdr = FortniteProfile()
         hdr = FortniteHDRProfile()
         gsync_hdr = FortniteGSyncHDRProfile()
+        streaming_sdr = FortniteGSyncCaptureProfile()
+        streaming_hdr = FortniteGSyncHDRCaptureProfile()
         assert sdr.profile_id == "fortnite"
         assert sdr.display_name == "Fortnite - SDR"
         assert hdr.profile_id == "fortnite-hdr"
@@ -131,9 +146,16 @@ class TestProfileLoading:
         assert gsync_hdr.display_name == "Fortnite - GSYNC HDR"
         assert gsync_hdr.is_sdr_only is False
         assert gsync_hdr.requires_confirmed_vrr_support is True
-        # On this mixed-refresh family there is no borderless/capture sibling,
-        # so the VRR-unsafe fallback is the no-sync HDR lane.
         assert gsync_hdr.mixed_refresh_safe_fallback_profile_id == "fortnite-hdr"
+        assert gsync_hdr.overlay_compatible_fallback_profile_id == "fortnite-gsync-hdr-capture"
+        assert streaming_sdr.profile_id == "fortnite-gsync-capture"
+        assert streaming_sdr.is_sdr_only is True
+        assert streaming_sdr.mixed_refresh_safe_fallback_profile_id is None
+        assert streaming_hdr.profile_id == "fortnite-gsync-hdr-capture"
+        assert streaming_hdr.is_sdr_only is False
+        assert streaming_hdr.mixed_refresh_safe_fallback_profile_id is None
+        assert streaming_sdr.overlay_compatible_fallback_profile_id is None
+        assert streaming_hdr.overlay_compatible_fallback_profile_id is None
 
     def test_pokemon_auto_chess_profile_loads(self):
         """Test PokemonAutoChessProfile can be instantiated."""
@@ -156,10 +178,7 @@ class TestProfileLoading:
         assert no_sync_hdr.display_name == "Overwatch 2 - No Sync HDR"
         assert no_sync_hdr.is_sdr_only is False
         # HDR no-sync reuses the no-sync NVIDIA preset and leaves VRR off.
-        assert (
-            no_sync_hdr.get_settings("NvidiaSettingsHandler")["preset"]
-            == "reflex_no_sync"
-        )
+        assert no_sync_hdr.get_settings("NvidiaSettingsHandler")["preset"] == "reflex_no_sync"
         ow2_hdr = no_sync_hdr.get_settings("OW2ConfigHandler")
         assert ow2_hdr["hdr"] is True
         assert ow2_hdr["window_mode"] == 0
@@ -177,12 +196,31 @@ class TestProfileLoading:
         assert gsync.profile_id == "overwatch2-gsync"
         assert gsync_hdr.profile_id == "overwatch2-gsync-hdr"
         assert gsync_capture.profile_id == "overwatch2-gsync-capture"
+        assert gsync_capture.display_name == "Overwatch 2 - GSYNC SDR Streaming"
         assert gsync_hdr_capture.profile_id == "overwatch2-gsync-hdr-capture"
+        assert gsync_hdr_capture.display_name == "Overwatch 2 - GSYNC HDR Streaming"
         assert gsync.mixed_refresh_safe_fallback_profile_id == "overwatch2-gsync-capture"
-        assert (
-            gsync_hdr.mixed_refresh_safe_fallback_profile_id
-            == "overwatch2-gsync-hdr-capture"
-        )
+        assert gsync_hdr.mixed_refresh_safe_fallback_profile_id == "overwatch2-gsync-hdr-capture"
+
+    @pytest.mark.parametrize(
+        "profile_cls",
+        [
+            SlippiMeleeHDRCaptureProfile,
+            Rivals2GSyncHDRCaptureProfile,
+            FortniteGSyncHDRCaptureProfile,
+            Overwatch2GSyncHDRCaptureProfile,
+            CounterStrike2GSyncHDRCaptureProfile,
+        ],
+    )
+    def test_hdr_streaming_guidance_defaults_to_sdr_for_sdr_destinations(
+        self,
+        profile_cls,
+    ):
+        """HDR lanes must not imply that ABSO configures OBS color output."""
+        notes = " ".join(profile_cls().get_post_apply_notes()).lower()
+        assert "default to sdr streaming for an sdr destination" in notes
+        assert "obs/output color space or tone mapping" in notes
+        assert "abso does not change obs settings" in notes
 
     def test_deadlock_profiles_load(self):
         """Deadlock should expose the full GSYNC x HDR matrix (4 variants)."""
@@ -305,7 +343,7 @@ class TestProfileLoading:
             assert profile.requires_reflex is True, profile_cls.__name__
 
     def test_cs2_profiles_load(self):
-        """Counter-Strike 2 should expose the full GSYNC x HDR matrix (4 variants)."""
+        """Counter-Strike 2 should expose strict and streaming SDR/HDR lanes."""
         no_sync = CounterStrike2Profile()
         no_sync_hdr = CounterStrike2HDRProfile()
         gsync = CounterStrike2GSyncProfile()
@@ -331,40 +369,55 @@ class TestProfileLoading:
         assert gsync.mixed_refresh_safe_fallback_profile_id == "counter-strike-2"
         assert gsync_hdr.mixed_refresh_safe_fallback_profile_id == "counter-strike-2-hdr"
 
+        sdr_capture = CounterStrike2GSyncCaptureProfile()
+        assert sdr_capture.profile_id == "counter-strike-2-gsync-capture"
+        assert sdr_capture.display_name == "Counter-Strike 2 - GSYNC SDR Streaming"
+        assert sdr_capture.is_sdr_only is True
+        assert sdr_capture.requires_confirmed_vrr_support is True
+
         hdr_capture = CounterStrike2GSyncHDRCaptureProfile()
         assert hdr_capture.profile_id == "counter-strike-2-gsync-hdr-capture"
-        assert hdr_capture.display_name == "Counter-Strike 2 - GSYNC HDR Capture-Safe"
+        assert hdr_capture.display_name == "Counter-Strike 2 - GSYNC HDR Streaming"
         assert hdr_capture.is_sdr_only is False
         assert hdr_capture.requires_confirmed_vrr_support is True
 
-    def test_cs2_gsync_hdr_falls_back_to_the_capture_lane_when_overlays_block(self):
-        """Overlay-blocked strict HDR applies should reroute, not kill the recorder."""
+    def test_cs2_gsync_lanes_fall_back_to_matching_streaming_lanes(self):
+        """Overlay-blocked strict applies should keep SDR/HDR topology matched."""
+        gsync = CounterStrike2GSyncProfile()
         gsync_hdr = CounterStrike2GSyncHDRProfile()
-        capture = CounterStrike2GSyncHDRCaptureProfile()
+        hdr_capture = CounterStrike2GSyncHDRCaptureProfile()
 
+        assert gsync.overlay_compatible_fallback_profile_id == "counter-strike-2-gsync-capture"
         assert (
-            gsync_hdr.overlay_compatible_fallback_profile_id
-            == "counter-strike-2-gsync-hdr-capture"
+            gsync_hdr.overlay_compatible_fallback_profile_id == "counter-strike-2-gsync-hdr-capture"
         )
         # The capture lane terminates the chain so it cannot self-reference.
-        assert capture.overlay_compatible_fallback_profile_id is None
-        # Mixed-refresh fallback stays the no-sync HDR lane for both.
-        assert capture.mixed_refresh_safe_fallback_profile_id == "counter-strike-2-hdr"
+        assert CounterStrike2GSyncCaptureProfile().overlay_compatible_fallback_profile_id is None
+        assert hdr_capture.overlay_compatible_fallback_profile_id is None
+        assert CounterStrike2GSyncCaptureProfile().mixed_refresh_safe_fallback_profile_id is None
+        assert hdr_capture.mixed_refresh_safe_fallback_profile_id is None
 
-    def test_cs2_capture_lane_uses_borderless_windowed_vrr_path(self):
-        """Capture-safe CS2 keeps HDR but swaps the strict path for borderless VRR."""
-        capture = CounterStrike2GSyncHDRCaptureProfile()
+    @pytest.mark.parametrize(
+        "profile_cls",
+        [CounterStrike2GSyncCaptureProfile, CounterStrike2GSyncHDRCaptureProfile],
+    )
+    def test_cs2_capture_lane_uses_borderless_windowed_vrr_path(self, profile_cls):
+        """CS2 streaming lanes swap the strict path for borderless VRR."""
+        capture = profile_cls()
 
         win = capture.get_settings("WindowsSettingsHandler")
         nvidia = capture.get_settings("NvidiaSettingsHandler")
         graphics = capture.get_settings("GraphicsSettingsHandler")
 
-        # HDR contract carries over from the strict HDR sibling.
-        assert win["hdr"] is True
-        assert win["advanced_color"] is True
-        assert win["auto_hdr"] is False
-        assert win["sdr_white_level_nits"] == 200
-        assert graphics["disable_auto_color_management"] is True
+        if capture.is_sdr_only:
+            assert win["hdr"] is False
+            assert win["auto_hdr"] is False
+        else:
+            assert win["hdr"] is True
+            assert win["advanced_color"] is True
+            assert win["auto_hdr"] is False
+            assert win["sdr_white_level_nits"] == 200
+            assert graphics["disable_auto_color_management"] is True
 
         # Borderless windowed flip path.
         assert win["windowed_optimizations"] is True
@@ -381,28 +434,33 @@ class TestProfileLoading:
 
         # In-game guidance must point at borderless, not exclusive fullscreen.
         display_mode = next(
-            row
-            for row in capture.get_in_game_settings()
-            if row.get("setting") == "Display Mode"
+            row for row in capture.get_in_game_settings() if row.get("setting") == "Display Mode"
         )
         assert "windowed" in display_mode["value"].lower()
 
     def test_cs2_capture_lane_keeps_the_capture_stack_alive(self):
         """The whole point of this lane: Medal/OBS survive apply and game launch."""
-        capture = CounterStrike2GSyncHDRCaptureProfile()
+        for capture in (
+            CounterStrike2GSyncCaptureProfile(),
+            CounterStrike2GSyncHDRCaptureProfile(),
+        ):
+            assert capture.is_capture_safe is True
+            assert capture.display_path_requirements.require_overlay_free_path is False
+            assert capture.auto_disable_blocking_overlays is False
+            assert capture.requires_exact_nvidia_binding is True
 
-        assert capture.is_capture_safe is True
-        assert capture.display_path_requirements.require_overlay_free_path is False
-        assert capture.auto_disable_blocking_overlays is False
-        # NVIDIA app-binding proof stays mandatory even off the strict path.
-        assert capture.requires_exact_nvidia_binding is True
-
-        killset = capture.launch_process_killset()
-        images = {img.lower() for img in killset.always_safe} | {
-            img.lower() for img in killset.opt_in
-        }
-        for survivor in ("medal.exe", "medalencoder.exe", "obs64.exe", "rtss.exe"):
-            assert survivor not in images, survivor
+            killset = capture.launch_process_killset()
+            images = {img.lower() for img in killset.always_safe} | {
+                img.lower() for img in killset.opt_in
+            }
+            for survivor in (
+                "medal.exe",
+                "medalencoder.exe",
+                "obs64.exe",
+                "obs32.exe",
+                "rtss.exe",
+            ):
+                assert survivor not in images, survivor
 
         # The strict sibling still stops them.
         strict_killset = CounterStrike2GSyncHDRProfile().launch_process_killset()
@@ -417,6 +475,7 @@ class TestProfileLoading:
             CounterStrike2Profile,
             CounterStrike2HDRProfile,
             CounterStrike2GSyncProfile,
+            CounterStrike2GSyncCaptureProfile,
             CounterStrike2GSyncHDRProfile,
             CounterStrike2GSyncHDRCaptureProfile,
         ):
@@ -464,7 +523,11 @@ class TestProfileLoading:
 
     def test_cs2_sdr_variants_disable_hdr(self):
         """SDR variants should keep HDR off and use the sRGB color path."""
-        for profile_cls in (CounterStrike2Profile, CounterStrike2GSyncProfile):
+        for profile_cls in (
+            CounterStrike2Profile,
+            CounterStrike2GSyncProfile,
+            CounterStrike2GSyncCaptureProfile,
+        ):
             profile = profile_cls()
             win = profile.get_settings("WindowsSettingsHandler")
             color = profile.get_settings("ColorProfileSettingsHandler")
@@ -506,6 +569,7 @@ class TestProfileLoading:
             CounterStrike2Profile,
             CounterStrike2HDRProfile,
             CounterStrike2GSyncProfile,
+            CounterStrike2GSyncCaptureProfile,
             CounterStrike2GSyncHDRProfile,
             CounterStrike2GSyncHDRCaptureProfile,
         ):
@@ -524,11 +588,13 @@ class TestProfileLoading:
         assert "Marvel Rivals" in hdr.display_name
 
     def test_rivals2_consolidated_profiles_load(self):
-        """The merged Rivals 2 matrix: 5 rollback-safe lanes, all online-safe."""
+        """The merged Rivals 2 matrix has strict and streaming SDR/HDR lanes."""
         nosync = Rivals2NoSyncProfile()
         nosync_hdr = Rivals2NoSyncHDRProfile()
         gsync = Rivals2GSyncProfile()
         gsync_hdr = Rivals2GSyncHDRProfile()
+        streaming = Rivals2GSyncCaptureProfile()
+        streaming_hdr = Rivals2GSyncHDRCaptureProfile()
 
         assert nosync.profile_id == "rivals2-nosync"
         assert nosync.is_sdr_only is True
@@ -538,9 +604,13 @@ class TestProfileLoading:
         assert gsync.is_sdr_only is True
         assert gsync_hdr.profile_id == "rivals2-gsync-hdr"
         assert gsync_hdr.is_sdr_only is False
+        assert streaming.profile_id == "rivals2-gsync-capture"
+        assert streaming.is_sdr_only is True
+        assert streaming_hdr.profile_id == "rivals2-gsync-hdr-capture"
+        assert streaming_hdr.is_sdr_only is False
         assert gsync.mixed_refresh_safe_fallback_profile_id == "rivals2-nosync"
         assert gsync_hdr.mixed_refresh_safe_fallback_profile_id == "rivals2-nosync-hdr"
-        for profile in (nosync, nosync_hdr, gsync, gsync_hdr):
+        for profile in (nosync, nosync_hdr, gsync, gsync_hdr, streaming, streaming_hdr):
             assert profile.graphics_api == "dx11", profile.profile_id
             # 2026-07 consolidation: every merged lane is matchmaking-safe.
             assert profile.is_online_profile is True, profile.profile_id
@@ -688,6 +758,29 @@ class TestProfileSettings:
         assert settings["rush_presentation"] == "False"
         assert settings["smooth_presentation"] == "False"
 
+    def test_slippi_streaming_lanes_use_borderless_no_sync_path(self):
+        """Slippi streaming is borderless but deliberately remains no-sync."""
+        for profile_cls in (SlippiMeleeCaptureProfile, SlippiMeleeHDRCaptureProfile):
+            profile = profile_cls()
+            windows = profile.get_settings("WindowsSettingsHandler")
+            graphics = profile.get_settings("GraphicsSettingsHandler")
+            nvidia = profile.get_settings("NvidiaSettingsHandler")
+            dolphin = profile.get_settings("DolphinConfigHandler")
+
+            assert windows["windowed_optimizations"] is True
+            assert windows["vrr_optimize"] is False
+            assert graphics["disable_global_fso"] is False
+            assert nvidia["global_vrr_mode"] == "off"
+            assert nvidia["vrr_app_override"] == "force_off"
+            assert dolphin["borderless_fullscreen"] == "True"
+            assert all(
+                disabled is False for disabled in profile.fullscreen_optimizations_per_exe.values()
+            )
+
+            guidance = {row["setting"]: row["value"] for row in profile.get_in_game_settings()}
+            assert guidance["VRR Optimize"] == "Off (critical!)"
+            assert guidance["Fullscreen Mode"] == "Borderless Fullscreen"
+
     def test_slippi_console_parity_nvidia_settings(self):
         """Console-parity Slippi should bias for pacing consistency over minimum latency."""
         profile = SlippiMeleeConsoleParityProfile()
@@ -710,6 +803,7 @@ class TestProfileSettings:
         sRGB clamp looked MORE washed-out on the real LG-OLED + QD-OLED hardware)."""
         for profile_cls in (
             SlippiMeleeHDRProfile,
+            SlippiMeleeHDRCaptureProfile,
             SlippiMeleeUniversalHDRProfile,
             SlippiMeleeConsoleParityHDRProfile,
         ):
@@ -837,8 +931,7 @@ class TestProfileSettings:
         """G-SYNC Overwatch guidance should match the borderless driver path."""
         profile = Overwatch2GSyncProfile()
         display_mode = next(
-            item for item in profile.get_in_game_settings()
-            if item["setting"] == "Display Mode"
+            item for item in profile.get_in_game_settings() if item["setting"] == "Display Mode"
         )
         assert display_mode["value"] == "Borderless / Windowed Fullscreen"
         assert "borderless g-sync path" in display_mode["reason"].lower()
@@ -866,8 +959,7 @@ class TestProfileSettings:
         """G-SYNC HDR guidance should stay aligned with borderless VRR settings."""
         profile = Overwatch2GSyncHDRProfile()
         display_mode = next(
-            item for item in profile.get_in_game_settings()
-            if item["setting"] == "Display Mode"
+            item for item in profile.get_in_game_settings() if item["setting"] == "Display Mode"
         )
         assert display_mode["value"] == "Borderless / Windowed Fullscreen"
         assert "borderless hdr g-sync path" in display_mode["reason"].lower()
@@ -1102,6 +1194,45 @@ class TestProfileSettings:
         assert config["auto_vrr_fps_cap"] is True
         assert "frame_rate_limit" not in config
 
+    @pytest.mark.parametrize(
+        ("profile_cls", "expect_hdr"),
+        [
+            (FortniteGSyncCaptureProfile, False),
+            (FortniteGSyncHDRCaptureProfile, True),
+        ],
+    )
+    def test_fortnite_streaming_lanes_use_borderless_vrr_path(
+        self,
+        profile_cls,
+        expect_hdr,
+    ):
+        """Fortnite streaming lanes preserve capture and match SDR/HDR state."""
+        profile = profile_cls()
+        windows = profile.get_settings("WindowsSettingsHandler")
+        graphics = profile.get_settings("GraphicsSettingsHandler")
+        nvidia = profile.get_settings("NvidiaSettingsHandler")
+        config = profile.get_settings("FortniteConfigHandler")
+
+        assert profile.is_capture_safe is True
+        assert profile.requires_exact_nvidia_binding is True
+        assert windows["windowed_optimizations"] is True
+        assert windows["vrr_optimize"] is True
+        assert graphics["disable_global_fso"] is False
+        assert nvidia["preset"] == "reflex_gsync"
+        assert nvidia["global_vrr_mode"] == "fullscreen_and_windowed"
+        assert nvidia["auto_vrr_fps_cap"] is True
+        assert config["fullscreen_mode"] == 1
+        assert config["hdr_output"] is expect_hdr
+        assert windows["hdr"] is expect_hdr
+        assert all(
+            disabled is False for disabled in profile.fullscreen_optimizations_per_exe.values()
+        )
+
+        display_mode = next(
+            row for row in profile.get_in_game_settings() if row["setting"] == "Display Mode"
+        )
+        assert "windowed" in display_mode["value"].lower()
+
     def test_marvel_rivals_variants_drive_native_game_config(self):
         """Marvel Rivals variants should set native HDR and Reflex in GameUserSettings."""
         sdr = MarvelRivalsSDRProfile()
@@ -1180,11 +1311,46 @@ class TestProfileSettings:
         assert settings["vrr_cap_policy"] == "fighting_60hz_vrr"
         assert "Rivals2-Win64-Shipping.exe" in settings["profile_aliases"]
 
+    def test_rivals2_streaming_lanes_use_matching_borderless_paths(self):
+        """Rivals SDR/HDR streaming lanes must clear strict FSO state."""
+        pairs = (
+            (Rivals2GSyncCaptureProfile(), False),
+            (Rivals2GSyncHDRCaptureProfile(), True),
+        )
+        for profile, expect_hdr in pairs:
+            windows = profile.get_settings("WindowsSettingsHandler")
+            graphics = profile.get_settings("GraphicsSettingsHandler")
+            nvidia = profile.get_settings("NvidiaSettingsHandler")
+            config = profile.get_settings("Rivals2ConfigHandler")
+
+            assert profile.is_capture_safe is True
+            assert profile.requires_exact_nvidia_binding is True
+            assert profile.overlay_compatible_fallback_profile_id is None
+            assert profile.mixed_refresh_safe_fallback_profile_id is None
+            assert windows["windowed_optimizations"] is True
+            assert windows["vrr_optimize"] is True
+            assert graphics["disable_global_fso"] is False
+            assert nvidia["global_vrr_mode"] == "fullscreen_and_windowed"
+            assert config["fullscreen_mode"] == 1
+            assert all(
+                disabled is False for disabled in profile.fullscreen_optimizations_per_exe.values()
+            )
+            assert windows.get("hdr", False) is expect_hdr
+
+        assert (
+            Rivals2GSyncProfile().overlay_compatible_fallback_profile_id == "rivals2-gsync-capture"
+        )
+        assert (
+            Rivals2GSyncHDRProfile().overlay_compatible_fallback_profile_id
+            == "rivals2-gsync-hdr-capture"
+        )
+
     def test_rivals2_hdr_variants_enable_windows_hdr_not_native_hdr(self):
         """Rivals 2 HDR lanes are Windows SDR-in-HDR composition, not native game HDR."""
         for profile_cls in (
             Rivals2NoSyncHDRProfile,
             Rivals2GSyncHDRProfile,
+            Rivals2GSyncHDRCaptureProfile,
         ):
             profile = profile_cls()
             win = profile.get_settings("WindowsSettingsHandler")
@@ -1229,8 +1395,7 @@ class TestProfileSettings:
         guidance = profile.get_in_game_settings()
         settings_named = {entry.get("setting") for entry in guidance}
         combined = " ".join(
-            f"{entry.get('value', '')} {entry.get('reason', '')}"
-            for entry in guidance
+            f"{entry.get('value', '')} {entry.get('reason', '')}" for entry in guidance
         ).lower()
 
         assert "Use HDR (Settings > System > Display)" in settings_named
@@ -1264,6 +1429,8 @@ class TestProfileSettings:
             Rivals2NoSyncHDRProfile(),
             Rivals2GSyncProfile(),
             Rivals2GSyncHDRProfile(),
+            Rivals2GSyncCaptureProfile(),
+            Rivals2GSyncHDRCaptureProfile(),
         ):
             nvidia = profile.get_settings("NvidiaSettingsHandler")
             assert nvidia["threaded_optimization"] == "on", profile.profile_id
@@ -1302,7 +1469,6 @@ class TestProfileInGameSettings:
         assert isinstance(settings, list)
         assert len(settings) > 0
         assert any(s.get("setting") == "V-SYNC (global/per-game)" for s in settings)
-
 
     def test_pokemon_auto_chess_in_game_settings(self):
         """Test PokemonAutoChessProfile returns Chrome-specific settings."""
@@ -1493,11 +1659,18 @@ class TestFullscreenOptimizationsPerExe:
 
     def test_fortnite_variants_disable_fso_for_all_shipping_binaries(self):
         """Fortnite's competitive lane is exclusive-fullscreen; all aliases must be locked."""
-        for profile_cls in (FortniteProfile, FortniteHDRProfile):
+        for profile_cls in (FortniteProfile, FortniteHDRProfile, FortniteGSyncHDRProfile):
             profile = profile_cls()
             flags = profile.fullscreen_optimizations_per_exe
             assert "FortniteClient-Win64-Shipping.exe" in flags
             assert all(v is True for v in flags.values())
+
+    def test_fortnite_streaming_variants_clear_fso_for_all_shipping_binaries(self):
+        """Borderless Fortnite lanes must clear strict per-exe FSO flags."""
+        for profile_cls in (FortniteGSyncCaptureProfile, FortniteGSyncHDRCaptureProfile):
+            flags = profile_cls().fullscreen_optimizations_per_exe
+            assert "FortniteClient-Win64-Shipping.exe" in flags
+            assert all(value is False for value in flags.values())
 
     def test_marvel_rivals_variants_disable_fso(self):
         """Marvel Rivals SDR and HDR variants both run exclusive-fullscreen."""
@@ -1519,6 +1692,13 @@ class TestFullscreenOptimizationsPerExe:
             flags = profile.fullscreen_optimizations_per_exe
             assert flags.get("Rivals2-Win64-Shipping.exe") is True
 
+    def test_rivals2_streaming_family_clears_fso(self):
+        """Borderless Rivals streaming lanes must clear strict per-exe FSO flags."""
+        for profile_cls in (Rivals2GSyncCaptureProfile, Rivals2GSyncHDRCaptureProfile):
+            flags = profile_cls().fullscreen_optimizations_per_exe
+            assert flags
+            assert all(value is False for value in flags.values())
+
     def test_slippi_family_disables_fso(self):
         """All Slippi variants should disable FSO for Slippi Dolphin.exe and Dolphin.exe."""
         for profile_cls in (
@@ -1533,6 +1713,13 @@ class TestFullscreenOptimizationsPerExe:
             flags = profile.fullscreen_optimizations_per_exe
             assert flags.get("Slippi Dolphin.exe") is True
             assert flags.get("Dolphin.exe") is True
+
+    def test_slippi_streaming_family_clears_fso(self):
+        """Borderless Slippi streaming lanes must clear strict per-exe FSO flags."""
+        for profile_cls in (SlippiMeleeCaptureProfile, SlippiMeleeHDRCaptureProfile):
+            flags = profile_cls().fullscreen_optimizations_per_exe
+            assert flags.get("Slippi Dolphin.exe") is False
+            assert flags.get("Dolphin.exe") is False
 
     def test_diablo4_variants_disable_fso(self):
         """Diablo 4 HDR and SDR lanes both want the true exclusive path for native HDR."""
@@ -1582,10 +1769,7 @@ class TestSingleLimiterPolicy:
                     "without allow_dual_limiter override"
                 )
 
-        assert not violations, (
-            "Single-limiter policy violations:\n  "
-            + "\n  ".join(violations)
-        )
+        assert not violations, "Single-limiter policy violations:\n  " + "\n  ".join(violations)
 
     def test_diablo4_uses_single_in_game_limiter(self) -> None:
         """Diablo 4 profiles own a single in-game limiter (driver cap off)."""
@@ -1638,9 +1822,7 @@ class TestReflexContract:
                     f"Reflex = {wrote_reflex}"
                 )
 
-        assert not mismatches, (
-            "Reflex contract mismatches:\n  " + "\n  ".join(mismatches)
-        )
+        assert not mismatches, "Reflex contract mismatches:\n  " + "\n  ".join(mismatches)
 
     def test_reflex_not_claimed_when_not_enforced(self) -> None:
         """Profiles that don't enforce Reflex must not claim it is 'applied'."""
@@ -1678,9 +1860,7 @@ class TestReflexContract:
                 value = entry.get("value", "").lower()
                 reason = entry.get("reason", "").lower()
 
-                explicitly_off = any(
-                    marker in value for marker in reflex_off_markers
-                )
+                explicitly_off = any(marker in value for marker in reflex_off_markers)
                 says_manually = "manually" in value or "manually" in reason
 
                 if not explicitly_off and not says_manually:
@@ -1691,9 +1871,7 @@ class TestReflexContract:
                         f"{entry!r}"
                     )
 
-        assert not violations, (
-            "Reflex honesty violations:\n  " + "\n  ".join(violations)
-        )
+        assert not violations, "Reflex honesty violations:\n  " + "\n  ".join(violations)
 
 
 class TestProfileOptimalityConsistency:
@@ -1739,17 +1917,17 @@ class TestProfileOptimalityConsistency:
             Rivals2GSyncHDRProfile,
         ):
             reg = profile_cls().get_settings("RegistrySettingsHandler")
-            assert (
-                reg["win32_priority_separation"] == WIN32_PRIORITY_GAMING_ONLINE
-            ), profile_cls.__name__
+            assert reg["win32_priority_separation"] == WIN32_PRIORITY_GAMING_ONLINE, (
+                profile_cls.__name__
+            )
 
     def test_diablo4_manages_priority_separation(self) -> None:
         """Diablo 4 must set Win32PrioritySeparation (not leave it unmanaged)."""
         for profile_cls in (Diablo4Profile, Diablo4SDRProfile):
             reg = profile_cls().get_settings("RegistrySettingsHandler")
-            assert (
-                reg["win32_priority_separation"] == WIN32_PRIORITY_GAMING_OFFLINE
-            ), profile_cls.__name__
+            assert reg["win32_priority_separation"] == WIN32_PRIORITY_GAMING_OFFLINE, (
+                profile_cls.__name__
+            )
 
     def test_webgl_lanes_wire_the_windowed_vrr_path(self) -> None:
         """Windowed WebGL/WebView2 lanes deliver the VRR smoothness they advertise."""
