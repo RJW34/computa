@@ -6,6 +6,7 @@
 # (no transparency races).
 
 $script:QuickPanelForm    = $null
+$script:QuickPanelFadeTimer = $null
 $script:QuickPanelVisible = $false
 $script:QuickPanelPulseTimer = $null
 $script:QuickPanelPulseFrame = 0
@@ -134,6 +135,14 @@ function Stop-QuickPanelPulseTimer {
     }
     $script:QuickPanelPulseFrame = 0
     $script:QuickPanelPulseTargets = $null
+}
+
+function Stop-QuickPanelFadeTimer {
+    if ($script:QuickPanelFadeTimer) {
+        try { $script:QuickPanelFadeTimer.Stop() } catch {}
+        try { $script:QuickPanelFadeTimer.Dispose() } catch {}
+        $script:QuickPanelFadeTimer = $null
+    }
 }
 
 function Get-QuickPanelGameGroup {
@@ -1199,22 +1208,31 @@ function Show-QuickPanel {
     } catch {}
 
     # Fade-in (cubic-out feels lighter than linear)
+    # The Tick scriptblock runs in the message-loop scope, not this function's
+    # scope, so function locals ($qpFade/$captured) resolved to $null inside it:
+    # the timer could never stop itself, the panel sat at Opacity 0 forever, and
+    # the tick failed ~70x/s for the life of the tray. Use $this (the timer) and
+    # Tag (the form) exactly like the toast timers in ABSO-Notifications.ps1.
+    Stop-QuickPanelFadeTimer
     $qpFade = New-Object System.Windows.Forms.Timer
     $qpFade.Interval = 14
-    $captured = $form
+    $qpFade.Tag = $form
     $qpFade.Add_Tick({
         try {
-            if ($captured -and -not $captured.IsDisposed) {
-                $op = $captured.Opacity + 0.12
+            $f = $this.Tag
+            if ($f -and -not $f.IsDisposed) {
+                $op = $f.Opacity + 0.12
                 if ($op -ge 0.97) {
-                    $captured.Opacity = 0.97
-                    $qpFade.Stop(); $qpFade.Dispose()
+                    $f.Opacity = 0.97
+                    $this.Stop(); $this.Dispose()
+                    if ([object]::ReferenceEquals($script:QuickPanelFadeTimer, $this)) { $script:QuickPanelFadeTimer = $null }
                 } else {
-                    $captured.Opacity = $op
+                    $f.Opacity = $op
                 }
-            } else { $qpFade.Stop(); $qpFade.Dispose() }
-        } catch { try { $qpFade.Stop(); $qpFade.Dispose() } catch {} }
+            } else { $this.Stop(); $this.Dispose() }
+        } catch { try { $this.Stop(); $this.Dispose() } catch {} }
     })
+    $script:QuickPanelFadeTimer = $qpFade
     $qpFade.Start()
 
     if ($script:QuickPanelPulseTargets -and $script:QuickPanelPulseTargets.Count -gt 0) {
@@ -1222,6 +1240,9 @@ function Show-QuickPanel {
         $pulseTimer.Interval = 80
         $pulseTimer.Add_Tick({
             try {
+                # No point driving GDI+ repaints while the panel cannot be seen.
+                $pf = $script:QuickPanelForm
+                if (-not $pf -or $pf.IsDisposed -or -not $pf.Visible -or $pf.Opacity -le 0) { return }
                 $script:QuickPanelPulseFrame = ($script:QuickPanelPulseFrame + 1) % 60
                 foreach ($target in @($script:QuickPanelPulseTargets)) {
                     if ($target -and -not $target.IsDisposed) {
@@ -1244,6 +1265,7 @@ function Close-QuickPanel {
     Closes the quick panel if it's open.
     #>
     Stop-QuickPanelPulseTimer
+    Stop-QuickPanelFadeTimer
     if ($script:QuickPanelForm -and -not $script:QuickPanelForm.IsDisposed) {
         try {
             Clear-QuickPanelGeneratedImages -Root $script:QuickPanelForm
