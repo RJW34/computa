@@ -2606,6 +2606,30 @@ def test_active_profile_menu_row_has_renderer_driven_pulse() -> None:
     assert "Stop-TrayMenuPulseTimer" in script
 
 
+def test_tray_menu_pulse_runs_only_while_menu_is_open() -> None:
+    """The 90 ms menu pulse must be gated to the menu's open/close, not run for
+    the whole tray lifetime — an always-on pulse cost ~6% of a core at idle
+    (a PowerShell closure + full profile-item interop sweep, 11x/second, for a
+    repaint nobody could see with the menu closed)."""
+    script = TRAY_SCRIPT.read_text(encoding="utf-8")
+
+    # The root context menu starts the pulse on open and stops it on close.
+    opened = script.split("$menu.Add_Opened({", 1)[1].split("})", 1)[0]
+    assert "Start-TrayMenuPulseTimer" in opened, "pulse must start when the menu opens"
+    assert "$menu.Add_Closed({" in script, "menu must stop the pulse on close"
+    closed = script.split("$menu.Add_Closed({", 1)[1].split("})", 1)[0]
+    assert "Stop-TrayMenuPulseTimer" in closed, "pulse must stop when the menu closes"
+
+    # It must NOT be started unconditionally during tray init (the old bug).
+    init = script.split("$script:notifyIcon.ContextMenuStrip = $menu", 1)[1].split(
+        "# ─── LEFT-CLICK SHOWS MENU ───", 1
+    )[0]
+    assert "Start-TrayMenuPulseTimer" not in init, (
+        "pulse timer must not be started at tray init — it runs the whole "
+        "session and burns idle CPU"
+    )
+
+
 def test_tray_row_highlights_are_bounded_to_content() -> None:
     """Hover and active treatments should not paint empty full-width slabs."""
     script = TRAY_SCRIPT.read_text(encoding="utf-8")

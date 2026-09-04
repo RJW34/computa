@@ -9295,7 +9295,15 @@ public class HotkeyMessageWindow : NativeWindow {
                 [DwmHelper]::SetRoundedCorners($menu.Handle, 3)
                 [DwmHelper]::SetDarkMode($menu.Handle)
             }
+            # The pulse animation is only visible while the menu is open, so the
+            # 90 ms timer runs ONLY for that window. Leaving it running at idle
+            # fired ~11 ticks/s (each a PowerShell closure + a full profile-item
+            # interop sweep) for a repaint nobody could see — ~6% of a core.
+            Start-TrayMenuPulseTimer
         } catch {}
+    })
+    $menu.Add_Closed({
+        try { Stop-TrayMenuPulseTimer } catch {}
     })
 
     # Also apply DWM to any submenu dropdowns as they open
@@ -11001,7 +11009,8 @@ public class HotkeyMessageWindow : NativeWindow {
     $script:notifyIcon.ContextMenuStrip = $menu
     Update-MenuState
     Set-IconState -State $(if ($script:activeProfile) { "Active" } else { "Idle" })
-    Start-TrayMenuPulseTimer
+    # Pulse is started by the menu's Add_Opened / stopped by Add_Closed, so it
+    # runs only while the menu is visible — not for the whole tray lifetime.
 
     # ─── LEFT-CLICK SHOWS MENU ───
 
