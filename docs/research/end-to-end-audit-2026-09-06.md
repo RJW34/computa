@@ -8,20 +8,73 @@ found concrete defects, corrected a substantial set in source, and identified
 remaining release and measurement gaps. No gaming performance improvement is
 claimed from the source changes alone.
 
-**Release blocker: the checkout and installed program differ materially.**
+**Initial release blocker (resolved by the deployment below): source/install divergence.**
 The checkout began with 38 profiles; the installed backend exposes 44. Recent
 Fortnite capture/restore, NVIDIA verification, menu timer, and CPU partitioning
 work exists on `feat/core-partitioning-and-optimization-venture`, through
 `794a97e`. Relevant commits include `4702387`, `c20bf5f`, `b1433c1`, and
-`a71a103`. Separately, `perf/gaming-session-overhead` contains conditional sanitizer launch suppression and
-five-minute priority maintenance (`0fbe53b`) and one-directory packaging (`3b9e144`). The fixes here
-do not merge those branches or reproduce the entire installed feature set.
-Deploying this checkout without reconciliation would remove working features.
+`a71a103`. Separately, `perf/gaming-session-overhead` contains conditional
+sanitizer launch suppression and five-minute priority maintenance (`0fbe53b`)
+and one-directory packaging (`3b9e144`). The initial audit checkout did not
+include those changes. The deployment
+below reconciles the installed feature branch; the separate packaging and
+conditional-launch experiments remain deferred.
 
-The six installed profiles missing from source are the two Fortnite G-SYNC
+The six installed profiles initially missing from source were the two Fortnite G-SYNC
 capture lanes, the two Slippi capture lanes, `rivals2-gsync-capture`, and
-`counter-strike-2-gsync-capture`. Installed backend SHA256 starts
+`counter-strike-2-gsync-capture`. The initial installed backend SHA256 starts
 `42800ee1bd9187ac`; the full hashes/catalog difference are in `provenance.json`.
+
+## Deployment follow-up: 2026-09-06
+
+User explicitly requested deployment. Branch `codex/deploy-audit-20260906`
+saves the audit in `0b1e616`, merges the installed feature branch in `349e9e5`,
+and fixes GUI backend discovery in `3501e5e`. All 44 profiles are retained.
+The GUI now finds the deployed `computa.exe` while retaining legacy Tauri
+sidecar compatibility. The separate `perf/gaming-session-overhead` branch
+was not merged; it suppresses some launches and performs periodic priority
+maintenance, rather than providing a resident sanitizer.
+
+Both release executables were rebuilt, then installed with
+`build.py deploy-existing`. The validated idle tray PID 19228 was stopped
+only after confirming no game/backend job was running; startup task
+`ABSO-Tray-Startup` launched PID 20596. Its runtime marker and all loaded
+module hashes match the deployed files. No full profile apply or display reset
+was performed. The active CS2 HDR capture profile and original apply timestamp
+are unchanged, verification is `all_active: true`, and no reboot is pending.
+Backend config and saved profile state are byte-identical; tray preferences
+are unchanged except startup bookkeeping fields.
+
+| Artifact | SHA256 |
+| --- | --- |
+| Backend, 18,389,945 bytes | `c016db68efb61a4ed70913446b439e22308c31575867af720df693eb061c1b82` |
+| GUI, 6,026,240 bytes | `cf4c115c1897f20778895806dd0f11e1a281671562f8465995089e9eca6c3ddf` |
+| Tray script | `2ca224d31cba4506a69130bd2b93137d8c01867b55cc55a9d2d438d525add51b` |
+
+Validation: 2,782 Python tests passed / 13 integration tests deselected;
+Ruff, whitespace checks, 3 GUI state tests, GUI lint, 7 release-mode Rust
+resolver tests, and both release builds passed. The existing unknown pytest
+asyncio option warning remains. Frozen hardware detection succeeded; frozen
+and installed game discovery each found nine games in about 1.1 seconds.
+Installed health reports 9 OK / 1 existing topology warning / 0 errors.
+The secondary monitor remains at 59.95 Hz; no display mode was changed.
+The GUI was compiled and its backend resolver tested, without an interactive
+GUI session. These checks do not establish maximum game performance.
+
+Two post-restart 30-second process samples measured 0.16–0.19% of total
+32-thread CPU (5.2–6.2% of one core), 278–285 MiB working set and
+160–164 MiB private memory. This does not demonstrate lower idle CPU than the
+initial audit sample. The startup log is clean and no backend/game/governor
+child or repeated launch loop was found. `showQuickPanel` remains enabled;
+its 80 ms visible animation is a possible comparison confound, but panel
+visibility was not confirmed through the automation helper. Compare identical
+UI visibility before attributing the CPU or working-set difference to a code
+regression. Private memory was lower than the old sample. Further profiling
+and game benchmarks remain necessary for performance claims.
+
+Previous backend and GUI are in the installed `deploy-backups` directory with
+suffix `.bak-20260906-165959`; pre-deploy tray/config snapshots, hashes, build
+logs and readbacks are under `reports/deployments/2026-09-06-audit/`.
 
 ## Evidence and scope
 
@@ -44,9 +97,9 @@ anchors, are preserved with raw evidence under
 
 Raw reports are local and may be gitignored. This document preserves the
 principal conclusions in tracked documentation. “Fixed” below means source
-and tests; these edits have not been deployed. Existing unrelated untracked
-files were preserved. No live profile apply, restore, display reset, HDR cycle,
-game-config write, tray restart, or process-priority change was performed.
+and tests, now deployed as described above. Existing unrelated untracked
+files were preserved. The audit itself made no live profile apply, restore,
+display reset, HDR cycle, game-config write, tray restart, or priority change.
 One manual backup captured current state without applying changes.
 
 ## This machine, as observed
@@ -107,7 +160,7 @@ metadata remains preferred and discovery is not proof of absence.
 
 | Priority | Finding | Required follow-up |
 | --- | --- | --- |
-| P1 | Source/install/branch divergence | Reconcile the installed 44-profile feature set, and source fixes before deployment. Evaluate the separate sanitizer-launch suppression branch independently. Preserve explicit user cap policy and newer Fortnite ownership fixes during integration. |
+| Resolved | Source/install/branch divergence | Installed 44-profile feature set and audit fixes reconciled and deployed. Separate sanitizer-launch suppression and packaging experiments remain deferred. |
 | P1 | Full Windows restore uses a detect dictionary as apply input | Implement captured per-display state restoration. Aggregate HDR and truthy `max_refresh_rate` can restore different display targets; unknown values must not become false writes. |
 | P1 | Backup creation can return an ID while important components failed or cannot restore | Validate manifest completeness/restorability for intended mutations before transactions proceed. This audit's manual capture explicitly said NVIDIA restore was unavailable. A successful capture is not a full rollback guarantee. |
 | P1 | Some native handlers still restore full old files | Extend ownership-aware restore beyond shared UE to OW2, Rivals, Diablo and Dolphin, with tests for later keybind/graphics/calibration edits. |
@@ -169,13 +222,14 @@ and [HAGS is not a guaranteed visible improvement](https://devblogs.microsoft.co
 defines its metrics; frame presentation intervals must not be presented as
 end-to-end input latency.
 
-Final validation: **2,580 Python tests passed, 13 deselected** (the repository's
+Initial audit validation, before integration: **2,580 Python tests passed, 13 deselected** (the repository's
 configured exclusions); Ruff and diff-whitespace checks passed. The only
 pytest warning was the existing unrecognized `asyncio_default_fixture_loop_scope`
 configuration option. **Three GUI state tests, GUI lint, TypeScript/Vite build,
 and `cargo check` passed.** Cargo's first offline attempt lacked a cached
 dependency; the normal check fetched dependencies and completed. No frozen
-runtime was built or deployed from this divergent checkout.
+runtime was built or deployed during that initial audit; the deployment
+follow-up above records the integrated release.
 
 Read-only detect, BIOS, installed state/health, native-config reads, CPU Sets
 and manual backup capture completed. The full elevated machine audit was
