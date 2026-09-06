@@ -7,13 +7,17 @@ from pathlib import Path
 from typing import Any
 
 from abso.core.config_safety import (
+    INI_ASSIGNMENT_RE,
+    INI_SECTION_RE,
     apply_ini_key_patch,
+    find_ini_section_bounds,
     parse_ini_assignments,
     validate_allowed_keys,
 )
 from abso.core.models import Issue
 from abso.settings.base import SettingsHandler
 from abso.settings.value_parsing import parse_bool_like
+from abso.utils.atomic_io import atomic_write_text
 
 logger = logging.getLogger(__name__)
 
@@ -193,7 +197,7 @@ class UEGameUserSettingsHandler(SettingsHandler):
                 }
 
             if patch_result.changed:
-                ini_path.write_text("\n".join(patch_result.lines) + "\n", encoding="utf-8")
+                atomic_write_text(ini_path, "\n".join(patch_result.lines) + "\n")
                 logger.info(
                     "Updated %s: %s (%s changed, %s appended)",
                     self.CONFIG_FILENAME,
@@ -223,12 +227,12 @@ class UEGameUserSettingsHandler(SettingsHandler):
         current = self.detect()
         results: dict[str, Any] = {"all_active": True, "settings": {}}
 
-        if not current.get("config_found"):
-            return results
-
         applied_settings = dict(settings)
         if applied_settings.pop(self.AUTO_VRR_CAP_KEY, False):
-            self._apply_auto_vrr_cap(applied_settings)
+            notice = self._apply_auto_vrr_cap(applied_settings)
+            if notice:
+                results["all_active"] = False
+                results["error"] = notice
 
         for key, target in applied_settings.items():
             # Skip framework-injected synthetic keys. The applier threads a
@@ -240,7 +244,7 @@ class UEGameUserSettingsHandler(SettingsHandler):
             if key.startswith("_"):
                 continue
             current_value = current.get(key)
-            is_active = current_value == target
+            is_active = bool(current.get("config_found")) and current_value == target
             results["settings"][key] = {
                 "target": target,
                 "current": current_value,
@@ -252,7 +256,7 @@ class UEGameUserSettingsHandler(SettingsHandler):
         return results
 
     def backup(self) -> dict[str, Any]:
-        """Back up the full config file for lossless restore."""
+        """Capture the file; restore rolls back only this handler's managed keys."""
         ini_path = self._get_config_path()
         if not ini_path:
             return {"config_found": False}
@@ -268,7 +272,12 @@ class UEGameUserSettingsHandler(SettingsHandler):
             return {"config_found": False}
 
     def restore(self, data: dict[str, Any]) -> bool:
-        """Restore the original config file contents."""
+        """Restore managed keys, preserving later user-owned game preferences.
+
+        A baseline can outlive many in-game UI changes. Replacing the entire
+        file would erase graphics quality, Reflex, bindings and calibration
+        that ABSO never applied. Legacy full-file backups remain readable.
+        """
         if not data.get("config_found"):
             return True
 
@@ -279,8 +288,46 @@ class UEGameUserSettingsHandler(SettingsHandler):
 
         try:
             ini_path = Path(config_path)
-            ini_path.parent.mkdir(parents=True, exist_ok=True)
-            ini_path.write_text(file_content, encoding="utf-8")
+            if not ini_path.exists():
+                atomic_write_text(ini_path, file_content)
+                return True
+
+            current_content = ini_path.read_text(encoding="utf-8")
+            lines = current_content.splitlines()
+            bounds = find_ini_section_bounds(lines, self.TARGET_SECTION_NAME)
+            if (
+                self.TARGET_SECTION_NAME
+                and bounds is None
+                and any(INI_SECTION_RE.match(line) for line in lines)
+            ):
+                # Never let the section-less legacy fallback rewrite a
+                # similarly named key in a different game's settings section.
+                logger.error("Cannot restore missing UE section %s", self.TARGET_SECTION_NAME)
+                return False
+
+            managed = (
+                set(self.MUTABLE_SETTINGS_TO_INI.values())
+                | set(self.MIRROR_FULLSCREEN_MODE_KEYS)
+            ) - self.PROTECTED_INI_KEYS
+            baseline = parse_ini_assignments(
+                file_content.splitlines(), section_name=self.TARGET_SECTION_NAME
+            )
+            replacements = {key: value for key, value in baseline.items() if key in managed}
+            absent = managed - baseline.keys()
+            start, end = bounds if bounds is not None else (0, len(lines))
+            kept_lines = []
+            for index, line in enumerate(lines):
+                match = INI_ASSIGNMENT_RE.match(line)
+                if start <= index < end and match and match.group(1) in absent:
+                    continue
+                kept_lines.append(line)
+            patch_result = apply_ini_key_patch(
+                kept_lines, replacements, append_missing=True,
+                section_name=self.TARGET_SECTION_NAME,
+            )
+            restored_content = "\n".join(patch_result.lines) + "\n"
+            if restored_content != current_content:
+                atomic_write_text(ini_path, restored_content)
             return True
         except OSError as e:
             logger.error("Failed to restore UE config %s: %s", config_path, e)

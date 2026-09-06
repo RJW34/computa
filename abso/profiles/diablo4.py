@@ -117,10 +117,9 @@ class _Diablo4BaseProfile(BaseProfile):
                 # profiles) instead of the High setting inherited by ReflexShooter
                 # profiles — High can starve OBS / Discord encoder threads during
                 # streamed sessions without delivering measurable latency benefit
-                # on a non-twitch game. ``gpu_priority: 8`` is preserved because
-                # GPU work for D4 still benefits from the elevated bucket.
+                # on a non-twitch game. GPU Priority is omitted: Microsoft
+                # documents that the MMCSS value is not used.
                 "game_priority": {
-                    "gpu_priority": 8,
                     "priority": 6,
                     "scheduling_category": "Medium",
                 },

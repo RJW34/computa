@@ -1,5 +1,5 @@
 # ABSO-Tray.ps1 - System tray for computa with Dark Theme (Modernized)
-# Memory: ~25-35MB | CPU: Near-zero when idle
+# Resource use depends on enabled panels and runtime tasks; measure the live process.
 # Left-click shows profile menu, applies via CLI, monitors game lifecycle
 # Features: Dynamic icons, favorites, search, progress overlay, hotkeys, settings
 
@@ -1377,6 +1377,7 @@ function Refresh-ActiveProfileVerificationState {
     #>
     param([switch]$Silent)
 
+    if (-not (Sync-TrayBackendProfileState)) { return }
     if ([string]::IsNullOrWhiteSpace([string]$script:activeProfile)) {
         Reset-ActiveProfileVerificationState
         Update-MenuState
@@ -1465,6 +1466,11 @@ function Apply-ActiveProfileVerificationJson {
     if ($null -eq $Json -or -not $Json.success -or -not $Json.data) {
         throw "state --verify returned malformed or unsuccessful JSON"
     }
+
+    # Another frontend may have changed state while this verifier was running.
+    # Adopt the current backend file before deciding whether this result belongs
+    # to the selected profile; old asynchronous results remain discardable.
+    if (-not (Sync-TrayBackendProfileState)) { return }
 
     $verification = $Json.data.verification
     if (-not $verification) {
@@ -2236,6 +2242,101 @@ function Get-AbsoBackendCommandLine {
     return "$($script:PythonExe) $((Get-AbsoBackendArgs -CommandArgs $CommandArgs) -join ' ')"
 }
 
+function Read-TrayBackendProfileState {
+    # Match backend state_store: packaged runtime reads LocalAppData only;
+    # source mode chooses the newest applied_at (or mtime) across its mirrors.
+    $installedState = Join-Path (Get-InstalledAppRoot) ".abso_state.json"
+    $paths = @()
+    if ($script:AbsoBackendArgsPrefix -and $script:ProjectRoot) {
+        $paths += Join-Path $script:ProjectRoot ".abso_state.json"
+    }
+    if ($paths -notcontains $installedState) { $paths += $installedState }
+    $records = @()
+    foreach ($path in $paths) {
+        if (-not (Test-Path -LiteralPath $path -ErrorAction Stop)) { continue }
+        $state = Get-Content -LiteralPath $path -Raw -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop
+        if ($state -isnot [pscustomobject] -or -not $state.PSObject.Properties['current_profile'] -or
+            ($null -ne $state.current_profile -and $state.current_profile -isnot [string])) {
+            throw "Backend state is malformed: $path"
+        }
+        $timestamp = ConvertTo-StartupTimestamp -Value $state.applied_at
+        if (-not $timestamp) { $timestamp = (Get-Item -LiteralPath $path -ErrorAction Stop).LastWriteTime }
+        $records += [pscustomobject]@{ State = $state; Timestamp = $timestamp.ToUniversalTime() }
+    }
+    if (-not $records.Count) {
+        return [pscustomobject]@{ current_profile = $null; applied_at = $null; reboot_pending = $false; reboot_reasons = @() }
+    }
+    return ($records | Sort-Object Timestamp -Descending | Select-Object -First 1).State
+}
+
+function Sync-TrayBackendProfileState {
+    # Cheap file read only: no detector, verifier, apply, or state-file repair.
+    # Called before profile-scoped process work and on menu open, so external
+    # CLI/GUI changes cannot leave the old lane's killset active indefinitely.
+    try {
+        $state = Read-TrayBackendProfileState
+        $profileId = if ($state.current_profile) { Resolve-ProfileAlias "$($state.current_profile)" } else { $null }
+        $wasUnavailable = [bool]$script:BackendProfileStateUnavailable
+        $script:BackendProfileStateUnavailable = $false
+        $changed = "$script:activeProfile" -ne "$profileId"
+        $epochChanged = "$script:LastBackendProfileAppliedAt" -ne "$($state.applied_at)"
+        if ($epochChanged) {
+            Reset-ActiveProfileVerificationState
+        }
+        $script:LastBackendProfileAppliedAt = "$($state.applied_at)"
+        if ($changed) {
+            Stop-LaunchSweepRuntime -KillProcess
+            Stop-CpuBalancerForGame
+            Clear-AbsoKeepAwake
+            $script:LaunchSanitizerActiveProfileId = $null
+            $script:LaunchSanitizerGameWasAlive = $false
+            $script:LaunchSanitizerLastSweepStopped = @{}
+            $script:LaunchSanitizerLoggedStderr = @{}
+            $script:activeProfile = $profileId
+            Reset-ActiveProfileVerificationState
+            $name = if ($profileId) { Get-TrayProfileDisplayName -ProfileId $profileId } else { $null }
+            $status = if ($profileId) { "active" } else { "restored" }
+            $script:TrayConfig = Set-LastProfileState -Config $script:TrayConfig -Status $status `
+                -ProfileId $profileId -ProfileName $name -Source "backend_state" `
+                -Timestamp $(if ($state.applied_at) { "$($state.applied_at)" } else { (Get-Date).ToString("o") })
+            $message = if ($profileId) { "Profile state loaded: $name (not verified)" } else { "Backend reports no active profile" }
+            Set-TrayLastAction -Message $message
+            Write-TrayLog $message
+        }
+        $script:ActiveProfileStateRebootPending = [bool]$state.reboot_pending
+        $script:ActiveProfileStateRebootReasons = @($state.reboot_reasons)
+        if ($changed -or $wasUnavailable -or $epochChanged) {
+            Set-IconState -State $(if ($profileId) { "Active" } else { "Idle" })
+            Update-MenuState
+            if ($script:QuickPanelVisible) {
+                $empty = Get-QuickPanelEmptyStatus
+                Update-QuickPanel -Favorites $script:TrayConfig.favorites -Profiles $script:Profiles `
+                    -ActiveProfile $script:activeProfile -ActivePendingApplyText (Get-ActiveProfilePendingApplyText) `
+                    -ActiveWindowsRestartText (Get-ActiveProfileRebootPendingText) `
+                    -ActiveVerificationText (Get-ActiveProfileVerificationInProgressText) `
+                    -EmptyMessage $empty.Message -EmptyProfileId $empty.ProfileId -OnApply { param($id) Apply-Profile $id }
+            }
+        }
+        return $true
+    }
+    catch {
+        # An unreadable/in-progress state must not authorize an old process
+        # policy. Keep the remembered profile visible with an explicit warning.
+        Stop-LaunchSweepRuntime -KillProcess
+        Stop-CpuBalancerForGame
+        Clear-AbsoKeepAwake
+        if (-not $script:BackendProfileStateUnavailable) {
+            Write-TrayLog "Backend profile state unavailable; session actions paused: $($_.Exception.Message)" -Level "WARN"
+        }
+        $script:BackendProfileStateUnavailable = $true
+        Reset-ActiveProfileVerificationState
+        Set-TrayLastAction -Message "Backend state unavailable; session actions paused"
+        Set-IconState -State "Warning"
+        Update-MenuState
+        return $false
+    }
+}
+
 $script:AppVersion = "2.5.0"
 
 Write-TrayLog "ABSO backend resolved: $(Get-AbsoBackendCommandLine -CommandArgs @('--version'))"
@@ -2514,7 +2615,7 @@ $script:FallbackProfiles = [ordered]@{
         Name     = "Overwatch 2 - GSYNC SDR"
         Sub      = "Overlay-Free SDR Borderless | Reflex (set in-game) | G-SYNC ON"
         Cat      = "Shooters"
-        Desc     = "Low-latency Overwatch 2 G-SYNC on the optimized borderless VRR path, while stopping capture and overlay processes."
+        Desc     = "Overwatch 2 G-SYNC using borderless VRR, while stopping capture and overlay processes."
         Exes     = @("Overwatch.exe")
         SyncMode = "on"
     }
@@ -2522,7 +2623,7 @@ $script:FallbackProfiles = [ordered]@{
         Name     = "Overwatch 2 - GSYNC HDR"
         Sub      = "Overlay-Free HDR Borderless | Reflex (set in-game) | G-SYNC ON"
         Cat      = "Shooters"
-        Desc     = "Low-latency native-HDR Overwatch 2 G-SYNC on the optimized borderless VRR path, while stopping capture and overlay processes."
+        Desc     = "Overwatch 2 G-SYNC with HDR using borderless VRR, while stopping capture and overlay processes."
         Exes     = @("Overwatch.exe")
         SyncMode = "on"
     }
@@ -2835,10 +2936,12 @@ function Read-ProfileAliasMapFromCache {
 function Write-ProfileCatalogCache {
     param(
         [object[]]$Entries,
-        [hashtable]$Aliases = $null
+        [hashtable]$Aliases = $null,
+        [switch]$ThrowOnFailure
     )
 
     if (-not $script:ProfileCatalogCacheFile -or -not $Entries -or $Entries.Count -eq 0) {
+        if ($ThrowOnFailure) { throw "Profile catalog cache path or entries unavailable" }
         return $false
     }
 
@@ -2854,6 +2957,7 @@ function Write-ProfileCatalogCache {
         }
     }
 
+    $pendingCachePath = $null
     try {
         if (Test-Path $script:ProfileCatalogCacheFile) {
             $existingEntries = Read-ProfileCatalogCacheEntries
@@ -2888,11 +2992,24 @@ function Write-ProfileCatalogCache {
         }
         # Use .NET WriteAllText to avoid UTF-8 BOM (PowerShell 5.1 Set-Content adds BOM)
         $jsonText = $payload | ConvertTo-Json -Depth 8
-        [System.IO.File]::WriteAllText($script:ProfileCatalogCacheFile, $jsonText, [System.Text.UTF8Encoding]::new($false))
+        # Stage beside the destination, then replace atomically. A failed
+        # write must not truncate the last usable startup catalog.
+        $pendingCachePath = "$($script:ProfileCatalogCacheFile).$([Guid]::NewGuid().ToString('N')).tmp"
+        [System.IO.File]::WriteAllText($pendingCachePath, $jsonText, [System.Text.UTF8Encoding]::new($false))
+        if ([System.IO.File]::Exists($script:ProfileCatalogCacheFile)) {
+            [System.IO.File]::Replace($pendingCachePath, $script:ProfileCatalogCacheFile, $null)
+        }
+        else {
+            [System.IO.File]::Move($pendingCachePath, $script:ProfileCatalogCacheFile)
+        }
         return $true
     }
     catch {
         Write-TrayLog "Profile catalog cache write failed: $($_.Exception.Message)" -Level "WARN"
+        if ($ThrowOnFailure) { throw }
+    }
+    finally {
+        if ($pendingCachePath) { Remove-Item -LiteralPath $pendingCachePath -Force -ErrorAction SilentlyContinue }
     }
     return $false
 }
@@ -3090,7 +3207,7 @@ function Invoke-CliCatalogRefresh {
         # PS 5.1: cache the handle now or .ExitCode reads $null after exit.
         if ($proc) { $null = $proc.Handle }
 
-        $proc.WaitForExit(15000)
+        [void]$proc.WaitForExit(15000)
         if (-not $proc.HasExited) {
             Write-TrayLog "Profile catalog refresh timed out after 15s, killing process" -Level "WARN"
             $proc.Kill()
@@ -3129,70 +3246,127 @@ function Invoke-CliCatalogRefresh {
 }
 
 
+function Stop-BackgroundCatalogProcess {
+    param([switch]$KillProcess)
+
+    if ($script:BackgroundCatalogProc) {
+        try {
+            if ($KillProcess -and -not $script:BackgroundCatalogProc.HasExited) {
+                $script:BackgroundCatalogProc.Kill()
+            }
+        } catch {}
+        try { $script:BackgroundCatalogProc.Dispose() } catch {}
+        $script:BackgroundCatalogProc = $null
+    }
+    foreach ($path in @($script:BackgroundCatalogOutputFile, $script:BackgroundCatalogErrorFile)) {
+        if ($path) { Remove-Item -LiteralPath $path -Force -ErrorAction SilentlyContinue }
+    }
+    $script:BackgroundCatalogOutputFile = $null
+    $script:BackgroundCatalogErrorFile = $null
+    $script:BackgroundCatalogStartedAt = $null
+}
+
+function Stop-BackgroundCatalogRefresh {
+    if ($script:BackgroundCatalogTimer) {
+        try { $script:BackgroundCatalogTimer.Stop(); $script:BackgroundCatalogTimer.Dispose() } catch {}
+        $script:BackgroundCatalogTimer = $null
+    }
+    Stop-BackgroundCatalogProcess -KillProcess
+    $script:BackgroundCatalogStage = $null
+    $script:BackgroundCatalogEntries = @()
+}
+
+function Start-BackgroundCatalogStage {
+    param([ValidateSet("profiles", "profile-aliases")][string]$Command)
+
+    $script:BackgroundCatalogStage = $Command
+    $script:BackgroundCatalogOutputFile = [System.IO.Path]::GetTempFileName()
+    $script:BackgroundCatalogErrorFile = "$($script:BackgroundCatalogOutputFile).err"
+    $script:BackgroundCatalogStartedAt = [DateTime]::UtcNow
+    $script:BackgroundCatalogProc = Start-Process -FilePath $script:PythonExe `
+        -ArgumentList (Get-AbsoBackendArgs -CommandArgs @($Command, "--json")) `
+        -NoNewWindow -PassThru -WorkingDirectory $script:ProjectRoot `
+        -RedirectStandardOutput $script:BackgroundCatalogOutputFile `
+        -RedirectStandardError $script:BackgroundCatalogErrorFile
+    if (-not $script:BackgroundCatalogProc) { throw "Catalog process did not start" }
+    # PS 5.1 requires caching the handle to retain the exit code after exit.
+    $null = $script:BackgroundCatalogProc.Handle
+}
+
+function Complete-BackgroundCatalogIfReady {
+    try {
+        # The initial delayed tick only launches the child. Later ticks read
+        # completed output; neither stage waits on the WinForms UI thread.
+        if (-not $script:BackgroundCatalogProc) {
+            Start-BackgroundCatalogStage -Command "profiles"
+            $script:BackgroundCatalogTimer.Interval = 400
+            return
+        }
+        $proc = $script:BackgroundCatalogProc
+        $limit = if ($script:BackgroundCatalogStage -eq "profiles") { 15 } else { 10 }
+        if (-not $proc.HasExited) {
+            if (([DateTime]::UtcNow - $script:BackgroundCatalogStartedAt).TotalSeconds -ge $limit) {
+                throw "$($script:BackgroundCatalogStage) timed out after ${limit}s"
+            }
+            return
+        }
+        if ($null -eq $proc.ExitCode -or $proc.ExitCode -ne 0) {
+            throw "$($script:BackgroundCatalogStage) failed with exit code $($proc.ExitCode)"
+        }
+        $stderr = Get-Content -LiteralPath $script:BackgroundCatalogErrorFile -Raw -ErrorAction SilentlyContinue
+        if ($stderr) { Write-TrayLog "Background catalog stderr: $stderr" -Level "WARN" }
+        $raw = Get-Content -LiteralPath $script:BackgroundCatalogOutputFile -Raw -ErrorAction Stop
+        $payload = $raw | ConvertFrom-Json -ErrorAction Stop
+        if (-not $payload.success -or $null -eq $payload.data) { throw "Invalid catalog response" }
+        if ($script:BackgroundCatalogStage -eq "profiles") {
+            $script:BackgroundCatalogEntries = @($payload.data)
+            if ($script:BackgroundCatalogEntries.Count -eq 0) { throw "Empty profile catalog" }
+            Stop-BackgroundCatalogProcess
+            Start-BackgroundCatalogStage -Command "profile-aliases"
+            return
+        }
+
+        $aliases = @{}
+        foreach ($property in $payload.data.PSObject.Properties) { $aliases[$property.Name] = "$($property.Value)" }
+        $entries = $script:BackgroundCatalogEntries
+        $wroteCache = [bool](Write-ProfileCatalogCache -Entries $entries -Aliases $aliases -ThrowOnFailure)
+        if ($wroteCache) {
+            Write-TrayLog "Background catalog refresh wrote cache ($($entries.Count) profiles)" -Level "INFO"
+        }
+        else {
+            Write-TrayLog "Background catalog refresh verified cache current ($($entries.Count) profiles)" -Level "INFO"
+        }
+        Stop-BackgroundCatalogRefresh
+    }
+    catch {
+        Write-TrayLog "Background catalog refresh failed; cache unchanged: $($_.Exception.Message)" -Level "WARN"
+        Stop-BackgroundCatalogRefresh
+    }
+}
+
 function Start-BackgroundCatalogRefresh {
     <#
     .SYNOPSIS
-    Deferred (non-blocking-at-startup) refresh of the profile catalog cache.
-
-    Schedules a one-shot WinForms Timer that fires ~3s after startup.
-    The refresh itself uses the same Invoke-CliCatalogRefresh path the
-    cold-start fallback uses, then writes the result to disk so the
-    NEXT tray start picks it up immediately.
-
-    Why a WinForms Timer instead of Start-Job: Start-Job spawns a fresh
-    PowerShell process whose working directory / env vars / admin context
-    don't always inherit cleanly, causing the cache write to silently
-    fail. The Timer runs in this tray's own process, so $script:PythonExe
-    / $script:ProjectRoot / $script:ProfileCatalogCacheFile are all the
-    same values that worked at cold-start fallback. The 1-2s UI-thread
-    block during the CLI call is acceptable because it fires AFTER the
-    user-visible startup is complete and the user is unlikely to be
-    interacting with the menu in the first ~5 seconds.
-
-    Stale-while-revalidate pattern: snappy UX now, freshness guaranteed
-    on subsequent starts.
+    Refresh the disk cache using asynchronous child processes and a short
+    completion poll. The loaded menu continues using its current catalog;
+    a subsequent load adopts the refreshed cache. Failed refreshes retain
+    the previous cache. Repeated requests share the pending refresh.
     #>
     if (-not $script:PythonExe -or -not $script:ProfileCatalogCacheFile) {
         return
     }
     if ($script:BackgroundCatalogTimer) {
-        try { $script:BackgroundCatalogTimer.Stop(); $script:BackgroundCatalogTimer.Dispose() } catch {}
-        $script:BackgroundCatalogTimer = $null
+        return
     }
     try {
         $script:BackgroundCatalogTimer = New-Object System.Windows.Forms.Timer
         $script:BackgroundCatalogTimer.Interval = 3000
-        $script:BackgroundCatalogTimer.Add_Tick({
-            try {
-                $this.Stop()
-                $this.Dispose()
-            } catch {}
-            $script:BackgroundCatalogTimer = $null
-            try {
-                $sw = [System.Diagnostics.Stopwatch]::StartNew()
-                $result = Invoke-CliCatalogRefresh
-                $entries = $result.Entries
-                $aliasMap = $result.AliasMap
-                if ($entries -and $entries.Count -gt 0) {
-                    $wroteCache = [bool](Write-ProfileCatalogCache -Entries $entries -Aliases $aliasMap)
-                    $sw.Stop()
-                    if ($wroteCache) {
-                        Write-TrayLog "Background catalog refresh wrote cache ($($entries.Count) profiles) in $($sw.ElapsedMilliseconds)ms" -Level "INFO"
-                    }
-                    else {
-                        Write-TrayLog "Background catalog refresh verified cache current ($($entries.Count) profiles) in $($sw.ElapsedMilliseconds)ms" -Level "INFO"
-                    }
-                } else {
-                    Write-TrayLog "Background catalog refresh returned empty - cache unchanged" -Level "WARN"
-                }
-            } catch {
-                Write-TrayLog "Background catalog refresh failed: $($_.Exception.Message)" -Level "WARN"
-            }
-        })
+        $script:BackgroundCatalogTimer.Add_Tick({ Complete-BackgroundCatalogIfReady })
         $script:BackgroundCatalogTimer.Start()
     }
     catch {
         Write-TrayLog "Failed to schedule background catalog refresh: $($_.Exception.Message)" -Level "WARN"
+        Stop-BackgroundCatalogRefresh
     }
 }
 
@@ -3201,7 +3375,8 @@ function Initialize-ProfilesFromCliCatalog {
     <#
     .SYNOPSIS
     Loads profile metadata. Cache-first for snappy startup; CLI refresh
-    runs in the background so the UI thread is never blocked.
+    uses nonblocking completion polls after a cache hit. A cold cache still
+    requires the bounded synchronous startup fallback described below.
 
     Order:
       1. Read on-disk cache (~10-50ms). If hit, use immediately and
@@ -4702,15 +4877,17 @@ function Get-TraySubmenuDropDownDirection {
 
 function Invoke-TrayMenuPulseInvalidation {
     try {
+        $invalidatedOwners = New-Object 'System.Collections.Generic.HashSet[System.Windows.Forms.ToolStrip]'
         if ($script:notifyIcon -and $script:notifyIcon.ContextMenuStrip) {
             $menu = $script:notifyIcon.ContextMenuStrip
             if (-not $menu.IsDisposed -and $menu.Visible) {
                 $menu.Invalidate()
+                [void]$invalidatedOwners.Add($menu)
             }
         }
         foreach ($item in @($script:profileMenuItems)) {
             if (-not $item -or -not $item.Owner) { continue }
-            if (-not $item.Owner.IsDisposed -and $item.Owner.Visible) {
+            if (-not $item.Owner.IsDisposed -and $item.Owner.Visible -and $invalidatedOwners.Add($item.Owner)) {
                 $item.Owner.Invalidate()
             }
         }
@@ -4731,10 +4908,17 @@ function Stop-TrayMenuPulseTimer {
 
 function Start-TrayMenuPulseTimer {
     Stop-TrayMenuPulseTimer
+    if (-not $script:notifyIcon -or -not $script:notifyIcon.ContextMenuStrip -or
+        -not $script:notifyIcon.ContextMenuStrip.Visible) { return }
     $script:TrayMenuPulseTimer = New-Object System.Windows.Forms.Timer
     $script:TrayMenuPulseTimer.Interval = 90
     $script:TrayMenuPulseTimer.Add_Tick({
         try {
+            if (-not $script:notifyIcon -or -not $script:notifyIcon.ContextMenuStrip -or
+                -not $script:notifyIcon.ContextMenuStrip.Visible) {
+                Stop-TrayMenuPulseTimer
+                return
+            }
             $script:TrayMenuPulseFrame = ($script:TrayMenuPulseFrame + 1) % 120
             if ("DarkThemeRenderer" -as [type]) {
                 [DarkThemeRenderer]::PulseFrame = $script:TrayMenuPulseFrame
@@ -4884,6 +5068,7 @@ function Apply-Profile {
     param([string]$ProfileId)
 
     Write-TrayLog "Apply-Profile called with: $ProfileId"
+    if (-not (Sync-TrayBackendProfileState)) { return }
     $resolvedId = Resolve-ProfileAlias $ProfileId
     if ($resolvedId -and $resolvedId -ne $ProfileId) {
         Write-TrayLog "Resolved retired profile id '$ProfileId' -> '$resolvedId' via alias map"
@@ -6530,6 +6715,12 @@ function Set-TrayStatusHeroImage {
 function Set-TrayActiveStatusItemFromState {
     if (-not $script:statusItem) { return }
 
+    if ($script:BackendProfileStateUnavailable) {
+        $script:statusItem.Text = "Profile state unavailable|Session actions paused; backend state unreadable"
+        $script:statusItem.ForeColor = $script:Colors.AccentAmber
+        return
+    }
+
     $activeRecord = Get-ActiveTrayProfileRecord
     if (-not $activeRecord.Id) {
         $script:statusItem.Text = "Ready|No profile active"
@@ -7721,7 +7912,8 @@ function Set-TraySearchStatus {
 # PROCESS GUARD — Demote misbehaving background apps from RealTime priority
 # ============================================================================
 
-# Default targets: Discord sets itself to RealTime which starves game threads.
+# Guard elevated Discord priorities when observed; do not assume a priority
+# class merely from the process name.
 # Process names are queried in a single Get-Process call for efficiency.
 $script:ProcessGuardNames = @("Discord", "DiscordPTB", "DiscordCanary")
 $script:ProcessGuardCeiling = [System.Diagnostics.ProcessPriorityClass]::Normal
@@ -7729,6 +7921,22 @@ $script:ProcessGuardDemotedPIDs = @{}  # PID -> $true; suppresses repeat log spa
 $script:ProcessGuardIdleIntervalMs  = 30000  # 30s when no targets found
 $script:ProcessGuardActiveIntervalMs = 5000  # 5s after a demotion (re-escalation window)
 $script:ProcessGuardIntervalMs = $script:ProcessGuardIdleIntervalMs
+
+function Get-TrayProcessPriorityRank {
+    param([System.Diagnostics.ProcessPriorityClass]$Priority)
+
+    # Win32 constants are identifiers, not an ordered scale: BelowNormal
+    # (16384) and Idle (64) are numerically greater than Normal (32).
+    switch ($Priority.ToString()) {
+        "Idle" { return 0 }
+        "BelowNormal" { return 1 }
+        "Normal" { return 2 }
+        "AboveNormal" { return 3 }
+        "High" { return 4 }
+        "RealTime" { return 5 }
+        default { return -1 }
+    }
+}
 
 function Invoke-ProcessGuardTick {
     <#
@@ -7751,8 +7959,8 @@ function Invoke-ProcessGuardTick {
 
     foreach ($proc in @($procs)) {
         try {
-            if ($proc.PriorityClass -gt $script:ProcessGuardCeiling) {
-                $was = $proc.PriorityClass
+            $was = $proc.PriorityClass
+            if ((Get-TrayProcessPriorityRank $was) -gt (Get-TrayProcessPriorityRank $script:ProcessGuardCeiling)) {
                 $proc.PriorityClass = $script:ProcessGuardCeiling
                 $demotedThisTick = $true
 
@@ -8300,6 +8508,7 @@ function Invoke-LaunchSanitizerTick {
     profile's game is not running.
     #>
     try {
+        if (-not (Sync-TrayBackendProfileState)) { return }
         $profileId = $script:activeProfile
         if ([string]::IsNullOrWhiteSpace($profileId)) {
             if (Test-LaunchSweepInFlight) {
@@ -8326,8 +8535,9 @@ function Invoke-LaunchSanitizerTick {
         }
 
         $profile = $script:Profiles[$profileId]
-        if (-not $profile -or -not $profile.KillsetAlwaysSafe -or $profile.KillsetAlwaysSafe.Count -eq 0) {
-            # Profile defines no killset (productivity etc.) - nothing to do.
+        if (-not $profile -or -not $profile.Exes -or $profile.Exes.Count -eq 0) {
+            # Profile defines no game executable (productivity etc.). Session
+            # features depend on game liveness, independently of overlay policy.
             if (Test-LaunchSweepInFlight) {
                 Stop-LaunchSweepRuntime -KillProcess
             }
@@ -8397,6 +8607,15 @@ function Invoke-LaunchSanitizerTick {
         $includeOptIn = $false
         if ($script:TrayConfig -and $script:TrayConfig.aggressiveProcessJanitor) {
             $includeOptIn = [bool]$script:TrayConfig.aggressiveProcessJanitor
+        }
+
+        if (-not $profile.KillsetAlwaysSafe -and -not ($includeOptIn -and $profile.KillsetOptIn)) {
+            $script:LaunchSanitizerActiveProfileId = $profileId
+            $script:LaunchSanitizerGameWasAlive = $true
+            if ($script:LaunchSanitizerTimer) {
+                $script:LaunchSanitizerTimer.Interval = $script:LaunchSanitizerActiveIntervalMs
+            }
+            return
         }
 
         # First detection of game-alive transitions logs a banner so the user
@@ -9011,6 +9230,8 @@ public class HotkeyMessageWindow : NativeWindow {
 
     # Apply DWM rounded corners and dark mode to the context menu popup
     $menu.Add_Opened({
+        [void](Sync-TrayBackendProfileState)
+        Start-TrayMenuPulseTimer
         try {
             Set-TrayDropDownWidthBudget -DropDown $menu
             if ("DwmHelper" -as [type]) {
@@ -9019,6 +9240,7 @@ public class HotkeyMessageWindow : NativeWindow {
             }
         } catch {}
     })
+    $menu.Add_Closed({ Stop-TrayMenuPulseTimer })
 
     # Also apply DWM to any submenu dropdowns as they open
     $menu.Add_ItemAdded({
@@ -10446,6 +10668,7 @@ public class HotkeyMessageWindow : NativeWindow {
                 Update-MenuState
                 return
             }
+            $exitCode = $proc.ExitCode
             $proc.Dispose()
             $raw = Get-Content $tempFile -Raw -ErrorAction SilentlyContinue
             Remove-Item $tempFile -Force -ErrorAction SilentlyContinue
@@ -10456,11 +10679,10 @@ public class HotkeyMessageWindow : NativeWindow {
                 return
             }
             $json = $raw | ConvertFrom-Json
-            if ($json.success -and $json.data) {
-                $freed = $json.data.freed_mb
-                Show-Notification -Title "computa" -Message "Standby list cleared. Freed ~${freed}MB" -Type "Success" -ActionName "Memory" -ActionColor $script:Colors.AccentBlue
-                Write-TrayLog "Standby list cleared: freed ${freed}MB"
-                Set-TrayLastAction -Message "Standby list cleared: ~${freed}MB"
+            if ($exitCode -eq 0 -and $json.success -and $json.data -and $json.data.success) {
+                Show-Notification -Title "computa" -Message "Standby purge completed" -Type "Success" -ActionName "Memory" -ActionColor $script:Colors.AccentBlue
+                Write-TrayLog "Standby purge completed; available-memory delta is not a measurement of reclaimed standby pages"
+                Set-TrayLastAction -Message "Standby purge completed"
                 Update-MenuState
             } else {
                 $clearError = if ($json.error) { "$($json.error)" } elseif ($json.data -and $json.data.error) { "$($json.data.error)" } else { "runtime error not reported" }
@@ -10696,7 +10918,6 @@ public class HotkeyMessageWindow : NativeWindow {
     $script:notifyIcon.ContextMenuStrip = $menu
     Update-MenuState
     Set-IconState -State $(if ($script:activeProfile) { "Active" } else { "Idle" })
-    Start-TrayMenuPulseTimer
 
     # ─── LEFT-CLICK SHOWS MENU ───
 
@@ -10833,11 +11054,7 @@ catch {
     catch {}
 }
 finally {
-    # Reap any pending background catalog refresh timer.
-    if ($script:BackgroundCatalogTimer) {
-        try { $script:BackgroundCatalogTimer.Stop(); $script:BackgroundCatalogTimer.Dispose() } catch {}
-        $script:BackgroundCatalogTimer = $null
-    }
+    Stop-BackgroundCatalogRefresh
     Stop-LaunchSanitizerTimer
     Stop-ProcessGuardTimer
     Stop-AuditRuntime -KillProcess

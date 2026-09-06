@@ -41,9 +41,12 @@ def infer_cpu_topology(cpu_data: dict[str, Any] | None) -> dict[str, int | str] 
     )
 
     if is_hybrid and core_count > 0 and thread_count > 0:
-        e_cores = thread_count - core_count
-        p_cores = core_count - e_cores
-        if p_cores > 0 and e_cores >= 0:
+        # With SMT on P-cores only: C = P + E, T = 2P + E.
+        # Equal counts (SMT disabled, or non-SMT Core Ultra) cannot establish
+        # the split from WMI totals; do not invent an all-P-core topology.
+        p_cores = thread_count - core_count
+        e_cores = core_count - p_cores
+        if "core ultra" not in cpu_name and p_cores > 0 and e_cores >= 0:
             return {"type": "hybrid", "p_cores": p_cores, "e_cores": e_cores}
         return {"type": "hybrid"}
 

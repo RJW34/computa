@@ -188,9 +188,8 @@ class Rivals2GSyncProfile(Rivals2BaseProfile):
                 "setting": "Threaded Optimization",
                 "value": "On",
                 "reason": (
-                    "Rivals 2 is CPU-bound UE5/DX11; driver worker threads improve "
-                    "frame times. SnapNet's sim is server-authoritative, so driver "
-                    "threading cannot desync rollback."
+                    "This NVIDIA setting is exposed as OGL_THREAD_CONTROL. "
+                    "A frame-time benefit on Rivals 2's DX11 path has not been established."
                 ),
             },
             {
@@ -212,7 +211,7 @@ class Rivals2GSyncProfile(Rivals2BaseProfile):
                     "multiple of 60 under refresh - 3 (240 @ 300Hz, 180 @ 240Hz, "
                     "120 @ 144Hz). Keeps G-SYNC active, V-SYNC from engaging, and "
                     "the 60 Hz sim cadence even — generic 297-style caps land off "
-                    "the sim grid and micro-stutter."
+                    "the sim grid; whether snapping improves motion requires measurement."
                 ),
             },
             {

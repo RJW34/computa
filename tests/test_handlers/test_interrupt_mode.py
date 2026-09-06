@@ -135,3 +135,10 @@ class TestVerifyRestore:
         ok = InterruptModeHandler().restore({"gpu_msi": {_GPU: 0, "PCI\\OTHER": None}})
         assert ok is True
         assert mock_restore.call_count == 2
+
+    @patch.object(InterruptModeHandler, "_restore_msi")
+    def test_restore_reports_partial_failure_and_attempts_other_gpu(self, mock_restore):
+        mock_restore.side_effect = [OSError("access denied"), None]
+        ok = InterruptModeHandler().restore({"gpu_msi": {_GPU: 0, "PCI\\OTHER": None}})
+        assert ok is False
+        assert mock_restore.call_count == 2

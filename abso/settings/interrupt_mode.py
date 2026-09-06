@@ -40,8 +40,8 @@ class InterruptModeHandler(SettingsHandler):
 
     @property
     def restore_guarantee(self) -> str:
-        # Best-effort: the Enum\PCI keys can be ACL-restricted, so a failed
-        # revert must not block a profile switch's baseline restore.
+        # The Enum\PCI keys can be ACL-restricted; failed reverts are reported
+        # to the transaction instead of claiming a complete restore.
         return "partial"
 
     def detect(self) -> dict[str, Any]:
@@ -123,12 +123,14 @@ class InterruptModeHandler(SettingsHandler):
 
     def restore(self, data: dict[str, Any]) -> bool:
         """Write back the captured MSISupported values (delete those absent)."""
-        try:
-            for pnp_id, original in (data.get("gpu_msi") or {}).items():
+        success = True
+        for pnp_id, original in (data.get("gpu_msi") or {}).items():
+            try:
                 self._restore_msi(pnp_id, original)
-        except Exception as exc:  # noqa: BLE001 - best-effort, never block a switch
-            logger.error("Failed to restore GPU MSI mode: %s", exc)
-        return True
+            except Exception as exc:  # noqa: BLE001 - attempt remaining captured devices
+                logger.error("Failed to restore GPU MSI mode for %s: %s", pnp_id, exc)
+                success = False
+        return success
 
     def verify_active(self, settings: dict[str, Any]) -> dict[str, Any]:
         """Verify GPU MSI mode, honestly accounting for its reboot gate.

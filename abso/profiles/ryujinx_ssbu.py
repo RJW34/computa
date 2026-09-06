@@ -82,8 +82,9 @@ class RyujinxSSBUProfile(EmulatorLatencyBaseProfile):
                 "setting": "Hardware Accelerated GPU Scheduling (HAGS)",
                 "value": "On",
                 "reason": (
-                    "HAGS works well with Vulkan (Ryujinx's primary backend). "
-                    "Similar to DX12, Vulkan's scheduling model benefits from HAGS."
+                    "The profile keeps HAGS On as a compatibility baseline. "
+                    "A Vulkan performance benefit is not guaranteed; compare "
+                    "frame times on this machine before changing the policy."
                 ),
             },
             {
@@ -132,8 +133,9 @@ class RyujinxSSBUProfile(EmulatorLatencyBaseProfile):
                 "setting": "Shader Cache Size",
                 "value": "Unlimited",
                 "reason": (
-                    "Critical for emulators! Ryujinx compiles shaders on-the-fly. "
-                    "Unlimited cache prevents stutter from shader recompilation."
+                    "A larger driver cache can reduce eviction of cached shaders. "
+                    "It does not prevent first-use compilation or replace the "
+                    "emulator's own shader cache, and it can consume disk space."
                 ),
             },
             {

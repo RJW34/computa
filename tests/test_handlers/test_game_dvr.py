@@ -85,10 +85,9 @@ class TestGameDvrRestore:
         assert mock_restore.call_count == 2
 
     @patch.object(GameDvrHandler, "_restore_value", side_effect=Exception("boom"))
-    def test_restore_exception_is_non_blocking(self, _mock_restore):
-        # Best-effort: a restore failure logs but returns True so it never
-        # blocks a profile-switch baseline restore.
-        assert GameDvrHandler().restore({"game_dvr_enabled": 0}) is True
+    def test_restore_exception_reports_failure(self, _mock_restore):
+        # A failed rollback must remain visible to the transaction.
+        assert GameDvrHandler().restore({"game_dvr_enabled": 0}) is False
 
     def test_restore_guarantee_partial(self):
         assert GameDvrHandler().restore_guarantee == "partial"

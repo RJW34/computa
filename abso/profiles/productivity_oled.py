@@ -120,7 +120,6 @@ class _ProductivityBaseProfile(BaseProfile):
                 # Allow more background tasks — we want indexing, search, etc.
                 "system_responsiveness": 20,
                 "game_priority": {
-                    "gpu_priority": 8,
                     "priority": 2,
                     "scheduling_category": "Medium",
                 },

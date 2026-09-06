@@ -138,8 +138,8 @@ class Rivals2NoSyncProfile(Rivals2BaseProfile):
                 "setting": "DO NOT USE",
                 "value": "LLM Ultra, Fast VSync, External FPS Caps, Refresh-3 Logic",
                 "reason": (
-                    "These can cause rollback timing failures on high-refresh "
-                    "setups, and off-grid caps micro-stutter the 60 Hz sim."
+                    "This lane conservatively avoids competing pacing controls. "
+                    "The 60-multiple cap is a heuristic; netcode or latency improvement is unmeasured."
                 ),
             },
             {
@@ -156,16 +156,15 @@ class Rivals2NoSyncProfile(Rivals2BaseProfile):
                 "category": "NVIDIA Control Panel",
                 "setting": "Vertical Sync",
                 "value": "OFF",
-                "reason": "OFF - rollback netcode is timing-sensitive, high-refresh tearing is negligible.",
+                "reason": "This lane accepts tearing. Visibility of tearing depends on the display, frame rate, and scene.",
             },
             {
                 "category": "NVIDIA Control Panel",
                 "setting": "Threaded Optimization",
                 "value": "On",
                 "reason": (
-                    "Rivals 2 is CPU-bound UE5/DX11; driver worker threads "
-                    "improve frame times. SnapNet's sim is server-authoritative, "
-                    "so driver threading cannot desync rollback."
+                    "This NVIDIA setting is exposed as OGL_THREAD_CONTROL. "
+                    "A frame-time benefit on Rivals 2's DX11 path has not been established."
                 ),
             },
             {
@@ -200,13 +199,13 @@ class Rivals2NoSyncProfile(Rivals2BaseProfile):
                 "category": "External Tools",
                 "setting": "RTSS / Frame Limiters",
                 "value": "DISABLED",
-                "reason": "External limiters cause limiter contention with rollback. Disable all.",
+                "reason": "Avoid adding another cap to the limiter already selected by the profile. This is a pacing policy, not proof that external limiters break netcode.",
             },
             {
                 "category": "Monitoring",
                 "setting": "Overlays",
-                "value": "ALLOWED (read-only)",
-                "reason": "Monitoring overlays are fine, but no frame pacing intervention.",
+                "value": "Stopped by this profile at launch",
+                "reason": "This lane stops capture and overlay tools, including RTSS. Use the capture-safe sibling when those apps must remain running.",
             },
             *self._rivals2_overlay_guidance(),
             {

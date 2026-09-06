@@ -2,9 +2,32 @@
 
 from __future__ import annotations
 
+import ctypes
 from unittest.mock import MagicMock
 
+import pytest
+
+from abso.settings.nvidia import nvapi_drs
 from abso.settings.nvidia.nvapi_drs import NVDRS_GLOBAL_PROFILE_NAME, DRSProfileManager
+
+
+@pytest.mark.parametrize("version,size", [(1, 12296), (2, 16392), (3, 16396), (4, 20492)])
+def test_application_struct_matches_official_nvapi_abi(version, size):
+    """nvapi.h V1-V4 layouts/version words must match the native driver ABI."""
+    structure = getattr(nvapi_drs, f"NVDRS_APPLICATION_V{version}")
+    assert ctypes.sizeof(structure) == size
+    assert getattr(nvapi_drs, f"NVDRS_APPLICATION_VER{version}") == (version << 16) | size
+    assert structure.launcher.offset == 8200
+    if version >= 2:
+        assert structure.fileInFolder.offset == 12296
+    if version >= 3:
+        assert structure.isMetro.offset == structure.isCommandLine.offset == 16392
+        app = structure()
+        app.isMetro = 1
+        app.isCommandLine = 1
+        assert bytes(app)[16392:16396] == b"\x03\x00\x00\x00"
+    if version == 4:
+        assert structure.commandLine.offset == 16396
 
 
 def test_resolve_vsync_on_uses_nvapi_constant():

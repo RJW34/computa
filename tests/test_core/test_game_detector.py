@@ -10,12 +10,39 @@ from abso.core.game_detector import (
     _detect_epic_games,
     _detect_standalone_games,
     _detect_steam_games,
+    _find_game_executables,
     _get_steam_library_folders,
     _parse_steam_library_folders,
     detect_installed_games,
     get_profile_suggestions,
     match_games_to_profiles,
 )
+
+
+def test_executable_scan_finds_ue_and_source2_layouts_but_stops_at_depth(tmp_path):
+    for relative in ("Game/Binaries/Win64/MARVEL.EXE", "game/bin/win64/cs2.exe",
+                     "assets/a/b/c/hidden.exe"):
+        target = tmp_path / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.touch()
+    assert _find_game_executables(tmp_path, ["Marvel.exe", "cs2.exe", "hidden.exe"]) == {
+        "marvel.exe", "cs2.exe"
+    }
+
+
+def test_executable_scan_has_directory_budget(tmp_path):
+    (tmp_path / "child").mkdir()
+    (tmp_path / "child" / "game.exe").touch()
+    assert _find_game_executables(tmp_path, ["game.exe"], max_directories=1) == set()
+
+
+def test_executable_scan_visits_each_directory_once_for_multiple_names(tmp_path):
+    (tmp_path / "child").mkdir()
+    from abso.core import game_detector
+
+    with patch.object(game_detector.os, "scandir", wraps=game_detector.os.scandir) as scan:
+        assert _find_game_executables(tmp_path, ["a.exe", "b.exe", "c.exe"]) == set()
+    assert scan.call_count == 2
 
 
 class TestInstalledGame:

@@ -49,13 +49,13 @@
       },
       {
         "category": "Video",
-        "reason": "ABSO has already configured the driver side: NVIDIA LLM is OFF so the engine owns the render queue (Reflex's correct path). The Source 2 video config is owned by the game and cannot be written from outside; toggle 'NVIDIA Reflex' to 'Enabled + Boost' in CS2's Video settings once to finish setup.",
+        "reason": "Applying this profile requests NVIDIA driver LLM Off for native Reflex queue control. ABSO leaves Source 2 video configuration user-owned; toggle 'NVIDIA Reflex' to 'Enabled + Boost' in CS2's Video settings. Boost may reduce FPS and increase power use; NVIDIA recommends it only when minimizing latency takes priority over FPS.",
         "setting": "NVIDIA Reflex",
-        "value": "Enabled + Boost \u2014 ABSO already set driver LLM off; flip the in-game toggle to finish"
+        "value": "Enabled + Boost \u2014 set the in-game toggle manually; profile requests driver LLM Off"
       },
       {
         "category": "Video",
-        "reason": "No-sync lane: CS2 is CPU-bound at competitive settings and higher uncapped FPS lowers frame time. Cap if heat, noise, or pacing gets worse.",
+        "reason": "No-sync lane: higher uncapped FPS lowers frame time when the machine can sustain it. Cap if heat, noise, or pacing gets worse.",
         "setting": "Maximum FPS in game (fps_max)",
         "value": "0 (uncapped)"
       },
@@ -158,7 +158,6 @@
           "cs2.exe": true
         },
         "game_priority": {
-          "gpu_priority": 8,
           "priority": 6,
           "scheduling_category": "High"
         },
@@ -227,9 +226,9 @@
       },
       {
         "category": "Video",
-        "reason": "ABSO has already configured the driver side: NVIDIA LLM is OFF so the engine owns the render queue (Reflex's correct path). The Source 2 video config is owned by the game and cannot be written from outside; toggle 'NVIDIA Reflex' to 'Enabled + Boost' in CS2's Video settings once to finish setup.",
+        "reason": "Applying this profile requests NVIDIA driver LLM Off for native Reflex queue control. ABSO leaves Source 2 video configuration user-owned; toggle 'NVIDIA Reflex' to 'Enabled + Boost' in CS2's Video settings. Boost may reduce FPS and increase power use; NVIDIA recommends it only when minimizing latency takes priority over FPS.",
         "setting": "NVIDIA Reflex",
-        "value": "Enabled + Boost \u2014 ABSO already set driver LLM off; flip the in-game toggle to finish"
+        "value": "Enabled + Boost \u2014 set the in-game toggle manually; profile requests driver LLM Off"
       },
       {
         "category": "Video",
@@ -337,7 +336,6 @@
           "cs2.exe": true
         },
         "game_priority": {
-          "gpu_priority": 8,
           "priority": 6,
           "scheduling_category": "High"
         },
@@ -406,9 +404,9 @@
       },
       {
         "category": "Video",
-        "reason": "ABSO has already configured the driver side: NVIDIA LLM is OFF so the engine owns the render queue (Reflex's correct path). The Source 2 video config is owned by the game and cannot be written from outside; toggle 'NVIDIA Reflex' to 'Enabled + Boost' in CS2's Video settings once to finish setup.",
+        "reason": "Applying this profile requests NVIDIA driver LLM Off for native Reflex queue control. ABSO leaves Source 2 video configuration user-owned; toggle 'NVIDIA Reflex' to 'Enabled + Boost' in CS2's Video settings. Boost may reduce FPS and increase power use; NVIDIA recommends it only when minimizing latency takes priority over FPS.",
         "setting": "NVIDIA Reflex",
-        "value": "Enabled + Boost \u2014 ABSO already set driver LLM off; flip the in-game toggle to finish"
+        "value": "Enabled + Boost \u2014 set the in-game toggle manually; profile requests driver LLM Off"
       },
       {
         "category": "Video",
@@ -517,7 +515,6 @@
           "cs2.exe": true
         },
         "game_priority": {
-          "gpu_priority": 8,
           "priority": 6,
           "scheduling_category": "High"
         },
@@ -588,9 +585,9 @@
       },
       {
         "category": "Video",
-        "reason": "ABSO has already configured the driver side: NVIDIA LLM is OFF so the engine owns the render queue (Reflex's correct path). The Source 2 video config is owned by the game and cannot be written from outside; toggle 'NVIDIA Reflex' to 'Enabled + Boost' in CS2's Video settings once to finish setup.",
+        "reason": "Applying this profile requests NVIDIA driver LLM Off for native Reflex queue control. ABSO leaves Source 2 video configuration user-owned; toggle 'NVIDIA Reflex' to 'Enabled + Boost' in CS2's Video settings. Boost may reduce FPS and increase power use; NVIDIA recommends it only when minimizing latency takes priority over FPS.",
         "setting": "NVIDIA Reflex",
-        "value": "Enabled + Boost \u2014 ABSO already set driver LLM off; flip the in-game toggle to finish"
+        "value": "Enabled + Boost \u2014 set the in-game toggle manually; profile requests driver LLM Off"
       },
       {
         "category": "Video",
@@ -699,7 +696,6 @@
           "cs2.exe": false
         },
         "game_priority": {
-          "gpu_priority": 8,
           "priority": 6,
           "scheduling_category": "High"
         },
@@ -770,13 +766,13 @@
       },
       {
         "category": "Video",
-        "reason": "ABSO has already configured the driver side: NVIDIA LLM is OFF so the engine owns the render queue (Reflex's correct path). The Source 2 video config is owned by the game and cannot be written from outside; toggle 'NVIDIA Reflex' to 'Enabled + Boost' in CS2's Video settings once to finish setup.",
+        "reason": "Applying this profile requests NVIDIA driver LLM Off for native Reflex queue control. ABSO leaves Source 2 video configuration user-owned; toggle 'NVIDIA Reflex' to 'Enabled + Boost' in CS2's Video settings. Boost may reduce FPS and increase power use; NVIDIA recommends it only when minimizing latency takes priority over FPS.",
         "setting": "NVIDIA Reflex",
-        "value": "Enabled + Boost \u2014 ABSO already set driver LLM off; flip the in-game toggle to finish"
+        "value": "Enabled + Boost \u2014 set the in-game toggle manually; profile requests driver LLM Off"
       },
       {
         "category": "Video",
-        "reason": "No-sync lane: CS2 is CPU-bound at competitive settings and higher uncapped FPS lowers frame time. Cap if heat, noise, or pacing gets worse.",
+        "reason": "No-sync lane: higher uncapped FPS lowers frame time when the machine can sustain it. Cap if heat, noise, or pacing gets worse.",
         "setting": "Maximum FPS in game (fps_max)",
         "value": "0 (uncapped)"
       },
@@ -880,7 +876,6 @@
           "cs2.exe": true
         },
         "game_priority": {
-          "gpu_priority": 8,
           "priority": 6,
           "scheduling_category": "High"
         },
@@ -951,9 +946,9 @@
       },
       {
         "category": "Display",
-        "reason": "ABSO has already configured the driver side: NVIDIA LLM is OFF so the engine owns the render queue (Reflex's correct path). The Source 2 video config is owned by the game and cannot be written from outside; manually toggle 'NVIDIA Reflex Low Latency' to 'On + Boost' in Deadlock's Video settings once to finish setup.",
+        "reason": "Applying this profile requests NVIDIA driver LLM Off for native Reflex queue control. ABSO leaves Source 2 video configuration user-owned; manually toggle 'NVIDIA Reflex Low Latency' to 'On + Boost' in Deadlock's Video settings once to finish setup.",
         "setting": "NVIDIA Reflex Low Latency",
-        "value": "On + Boost \u2014 ABSO already set driver LLM off; flip the in-game toggle to finish"
+        "value": "On + Boost \u2014 set the in-game toggle manually; profile requests driver LLM Off"
       },
       {
         "category": "Display",
@@ -1060,7 +1055,6 @@
           "project8.exe": true
         },
         "game_priority": {
-          "gpu_priority": 8,
           "priority": 6,
           "scheduling_category": "High"
         },
@@ -1129,9 +1123,9 @@
       },
       {
         "category": "Display",
-        "reason": "ABSO has already configured the driver side: NVIDIA LLM is OFF so the engine owns the render queue (Reflex's correct path). The Source 2 video config is owned by the game and cannot be written from outside; manually toggle 'NVIDIA Reflex Low Latency' to 'On + Boost' in Deadlock's Video settings once to finish setup.",
+        "reason": "Applying this profile requests NVIDIA driver LLM Off for native Reflex queue control. ABSO leaves Source 2 video configuration user-owned; manually toggle 'NVIDIA Reflex Low Latency' to 'On + Boost' in Deadlock's Video settings once to finish setup.",
         "setting": "NVIDIA Reflex Low Latency",
-        "value": "On + Boost \u2014 ABSO already set driver LLM off; flip the in-game toggle to finish"
+        "value": "On + Boost \u2014 set the in-game toggle manually; profile requests driver LLM Off"
       },
       {
         "category": "Display",
@@ -1239,7 +1233,6 @@
           "project8.exe": true
         },
         "game_priority": {
-          "gpu_priority": 8,
           "priority": 6,
           "scheduling_category": "High"
         },
@@ -1308,9 +1301,9 @@
       },
       {
         "category": "Display",
-        "reason": "ABSO has already configured the driver side: NVIDIA LLM is OFF so the engine owns the render queue (Reflex's correct path). The Source 2 video config is owned by the game and cannot be written from outside; manually toggle 'NVIDIA Reflex Low Latency' to 'On + Boost' in Deadlock's Video settings once to finish setup.",
+        "reason": "Applying this profile requests NVIDIA driver LLM Off for native Reflex queue control. ABSO leaves Source 2 video configuration user-owned; manually toggle 'NVIDIA Reflex Low Latency' to 'On + Boost' in Deadlock's Video settings once to finish setup.",
         "setting": "NVIDIA Reflex Low Latency",
-        "value": "On + Boost \u2014 ABSO already set driver LLM off; flip the in-game toggle to finish"
+        "value": "On + Boost \u2014 set the in-game toggle manually; profile requests driver LLM Off"
       },
       {
         "category": "Display",
@@ -1419,7 +1412,6 @@
           "project8.exe": true
         },
         "game_priority": {
-          "gpu_priority": 8,
           "priority": 6,
           "scheduling_category": "High"
         },
@@ -1490,9 +1482,9 @@
       },
       {
         "category": "Display",
-        "reason": "ABSO has already configured the driver side: NVIDIA LLM is OFF so the engine owns the render queue (Reflex's correct path). The Source 2 video config is owned by the game and cannot be written from outside; manually toggle 'NVIDIA Reflex Low Latency' to 'On + Boost' in Deadlock's Video settings once to finish setup.",
+        "reason": "Applying this profile requests NVIDIA driver LLM Off for native Reflex queue control. ABSO leaves Source 2 video configuration user-owned; manually toggle 'NVIDIA Reflex Low Latency' to 'On + Boost' in Deadlock's Video settings once to finish setup.",
         "setting": "NVIDIA Reflex Low Latency",
-        "value": "On + Boost \u2014 ABSO already set driver LLM off; flip the in-game toggle to finish"
+        "value": "On + Boost \u2014 set the in-game toggle manually; profile requests driver LLM Off"
       },
       {
         "category": "Display",
@@ -1600,7 +1592,6 @@
           "project8.exe": true
         },
         "game_priority": {
-          "gpu_priority": 8,
           "priority": 6,
           "scheduling_category": "High"
         },
@@ -1771,7 +1762,6 @@
           "Diablo IV.exe": true
         },
         "game_priority": {
-          "gpu_priority": 8,
           "priority": 6,
           "scheduling_category": "Medium"
         },
@@ -1932,7 +1922,6 @@
           "Diablo IV.exe": true
         },
         "game_priority": {
-          "gpu_priority": 8,
           "priority": 6,
           "scheduling_category": "Medium"
         },
@@ -1996,9 +1985,9 @@
       },
       {
         "category": "Display",
-        "reason": "ABSO has already configured the driver side: NVIDIA LLM is OFF so the engine owns the render queue (Reflex's correct path). Fortnite's Reflex toggle lives in Fortnite's settings and there is no stable config key to write it from outside; manually flip 'NVIDIA Reflex Low Latency' to 'On + Boost' in the game once.",
+        "reason": "Applying this profile requests NVIDIA driver LLM Off for native Reflex queue control. Fortnite's Reflex toggle lives in Fortnite's settings and there is no stable config key to write it from outside; manually flip 'NVIDIA Reflex Low Latency' to 'On + Boost' in the game once.",
         "setting": "NVIDIA Reflex Low Latency",
-        "value": "On + Boost \u2014 ABSO already set driver LLM off; flip the in-game toggle to finish"
+        "value": "On + Boost \u2014 set the in-game toggle manually; profile requests driver LLM Off"
       },
       {
         "category": "Display",
@@ -2130,7 +2119,6 @@
           "FortniteClient-Win64-Shipping_EAC_EOS.exe": true
         },
         "game_priority": {
-          "gpu_priority": 8,
           "priority": 6,
           "scheduling_category": "High"
         },
@@ -2188,9 +2176,9 @@
       },
       {
         "category": "Display",
-        "reason": "ABSO has already configured the driver side: NVIDIA LLM is OFF so the engine owns the render queue (Reflex's correct path). Fortnite's Reflex toggle lives in Fortnite's settings and there is no stable config key to write it from outside; manually flip 'NVIDIA Reflex Low Latency' to 'On + Boost' in the game once.",
+        "reason": "Applying this profile requests NVIDIA driver LLM Off for native Reflex queue control. Fortnite's Reflex toggle lives in Fortnite's settings and there is no stable config key to write it from outside; manually flip 'NVIDIA Reflex Low Latency' to 'On + Boost' in the game once.",
         "setting": "NVIDIA Reflex Low Latency",
-        "value": "On + Boost \u2014 ABSO already set driver LLM off; flip the in-game toggle to finish"
+        "value": "On + Boost \u2014 set the in-game toggle manually; profile requests driver LLM Off"
       },
       {
         "category": "Display",
@@ -2339,7 +2327,6 @@
           "FortniteClient-Win64-Shipping_EAC_EOS.exe": true
         },
         "game_priority": {
-          "gpu_priority": 8,
           "priority": 6,
           "scheduling_category": "High"
         },
@@ -2411,9 +2398,9 @@
       },
       {
         "category": "Display",
-        "reason": "ABSO has already configured the driver side: NVIDIA LLM is OFF so the engine owns the render queue (Reflex's correct path). Fortnite's Reflex toggle lives in Fortnite's settings and there is no stable config key to write it from outside; manually flip 'NVIDIA Reflex Low Latency' to 'On + Boost' in the game once.",
+        "reason": "Applying this profile requests NVIDIA driver LLM Off for native Reflex queue control. Fortnite's Reflex toggle lives in Fortnite's settings and there is no stable config key to write it from outside; manually flip 'NVIDIA Reflex Low Latency' to 'On + Boost' in the game once.",
         "setting": "NVIDIA Reflex Low Latency",
-        "value": "On + Boost \u2014 ABSO already set driver LLM off; flip the in-game toggle to finish"
+        "value": "On + Boost \u2014 set the in-game toggle manually; profile requests driver LLM Off"
       },
       {
         "category": "Display",
@@ -2547,7 +2534,6 @@
           "FortniteClient-Win64-Shipping_EAC_EOS.exe": true
         },
         "game_priority": {
-          "gpu_priority": 8,
           "priority": 6,
           "scheduling_category": "High"
         },
@@ -2619,9 +2605,9 @@
       },
       {
         "category": "Display",
-        "reason": "Reflex should own queue control in Marvel Rivals; the profile disables driver LLM to avoid overlap.",
+        "reason": "ABSO writes a boolean Reflex target and requests driver LLM Off. That does not prove Boost is enabled or that the current game consumes this key; confirm the menu setting in-game.",
         "setting": "NVIDIA Reflex Low Latency",
-        "value": "On + Boost"
+        "value": "On; select Boost manually only after comparison"
       },
       {
         "category": "Display",
@@ -2755,7 +2741,6 @@
           "Marvel.exe": true
         },
         "game_priority": {
-          "gpu_priority": 8,
           "priority": 6,
           "scheduling_category": "High"
         },
@@ -2827,9 +2812,9 @@
       },
       {
         "category": "Display",
-        "reason": "Reflex should own queue control in Marvel Rivals; the profile disables driver LLM to avoid overlap.",
+        "reason": "ABSO writes a boolean Reflex target and requests driver LLM Off. That does not prove Boost is enabled or that the current game consumes this key; confirm the menu setting in-game.",
         "setting": "NVIDIA Reflex Low Latency",
-        "value": "On + Boost"
+        "value": "On; select Boost manually only after comparison"
       },
       {
         "category": "Display",
@@ -2961,7 +2946,6 @@
           "Marvel.exe": true
         },
         "game_priority": {
-          "gpu_priority": 8,
           "priority": 6,
           "scheduling_category": "High"
         },
@@ -3019,7 +3003,7 @@
       },
       {
         "category": "Display",
-        "reason": "Uncapped no-sync play goes GPU-bound in team fights - exactly where per-frame OW2 testing shows Reflex removes render-queue backpressure at no measured fps cost; CPU-bound lulls are neutral. Reflex's pacing problems only appear when it fights a reachable frame cap (the G-SYNC lanes' scenario), which never happens on this uncapped lane.",
+        "reason": "Reflex reduces render-queue latency, especially when GPU-bound. Boost keeps GPU clocks elevated and may increase power use or reduce FPS; compare Enabled alone on this machine.",
         "setting": "NVIDIA Reflex Low Latency",
         "value": "Enabled + Boost \u2014 set the in-game toggle manually"
       },
@@ -3031,7 +3015,7 @@
       },
       {
         "category": "Display",
-        "reason": "Redundant while Reflex is Enabled (Reflex supersedes it, per-frame testing shows no difference) but harmless - and it keeps the render queue shallow if Reflex is ever toggled off.",
+        "reason": "Requests the game's lower-buffering path. Its interaction with Reflex should be checked with frame-time and latency measurements.",
         "setting": "Reduce Buffering",
         "value": "On"
       },
@@ -3151,7 +3135,6 @@
           "Overwatch.exe": true
         },
         "game_priority": {
-          "gpu_priority": 8,
           "priority": 6,
           "scheduling_category": "High"
         },
@@ -3209,15 +3192,15 @@
       },
       {
         "category": "Display",
-        "reason": "Per-frame CapFrameX testing (Oct 2025, RTX 4070 + G-SYNC) shows OW2's Reflex limiter fighting a reachable frame cap: identical average fps but 1% lows collapse to ~half the average with 2-10 ms frametime variance. Driver ULL Ultra + the driver v3 cap hold a flat frametime line instead. OW2's Reflex toggle is not safely writable from outside; manually set 'NVIDIA Reflex Low Latency' to 'Off' in Overwatch 2's Video settings once.",
+        "reason": "Enable native Reflex for queue control; the profile requests driver LLM Off. With G-SYNC and VSync active, Reflex may pace below the static cap. ABSO cannot safely write the Reflex toggle; verify it in-game. Boost can cost power or FPS, so compare Enabled alone if needed.",
         "setting": "NVIDIA Reflex Low Latency",
-        "value": "Off \u2014 ABSO already set driver LLM to Ultra; flip the in-game toggle to finish"
+        "value": "Enabled + Boost \u2014 set the in-game toggle manually"
       },
       {
         "category": "Display",
-        "reason": "The NVIDIA driver v3 limiter (276 @ 300 Hz, ~8% under refresh) is the authoritative render pacer; the in-game cap parks at refresh - 3 (297) ABOVE it because OW2's engine cap only steadies simulation cadence. Staggering stops limiter fights \u2014 the failure mode behind Reflex's 1%-low collapse. No-sync OW2 lanes remain uncapped at 600.",
+        "reason": "The native and driver ceilings use refresh - 3. Reflex may lower runtime FPS dynamically; an observed value such as 276 is not a replacement for the saved 297 ceiling at 300 Hz. Compare frame-time and latency measurements before overriding this policy.",
         "setting": "Frame Rate Cap",
-        "value": "Auto staggered caps: driver v3 at 276, in-game at 297 (@300Hz; both scale by refresh)"
+        "value": "Auto static ceiling: refresh - 3 (297 at 300 Hz)"
       },
       {
         "category": "Display",
@@ -3300,9 +3283,9 @@
       "NvidiaSettingsHandler": {
         "auto_vrr_fps_cap": true,
         "global_vrr_mode": "fullscreen_and_windowed",
-        "preset": "ull_gsync",
+        "preset": "reflex_gsync",
         "profile_name": "Overwatch 2",
-        "vrr_cap_policy": "ow2_reflex_gsync"
+        "vrr_cap_policy": "refresh_minus_3"
       },
       "OW2ConfigHandler": {
         "aa_detail": 0,
@@ -3310,7 +3293,7 @@
         "dynamic_render_scale": false,
         "dynamic_render_scale_v2": false,
         "effects_quality": 1,
-        "expected_reflex_mode": 0,
+        "expected_reflex_mode": 2,
         "fullscreen_window": false,
         "fullscreen_window_enabled": false,
         "gfx_preset": 1,
@@ -3346,7 +3329,6 @@
           "Overwatch.exe": false
         },
         "game_priority": {
-          "gpu_priority": 8,
           "priority": 6,
           "scheduling_category": "High"
         },
@@ -3404,15 +3386,15 @@
       },
       {
         "category": "Display",
-        "reason": "Per-frame CapFrameX testing (Oct 2025, RTX 4070 + G-SYNC) shows OW2's Reflex limiter fighting a reachable frame cap: identical average fps but 1% lows collapse to ~half the average with 2-10 ms frametime variance. Driver ULL Ultra + the driver v3 cap hold a flat frametime line instead. OW2's Reflex toggle is not safely writable from outside; manually set 'NVIDIA Reflex Low Latency' to 'Off' in Overwatch 2's Video settings once.",
+        "reason": "Enable native Reflex for queue control; the profile requests driver LLM Off. With G-SYNC and VSync active, Reflex may pace below the static cap. ABSO cannot safely write the Reflex toggle; verify it in-game. Boost can cost power or FPS, so compare Enabled alone if needed.",
         "setting": "NVIDIA Reflex Low Latency",
-        "value": "Off \u2014 ABSO already set driver LLM to Ultra; flip the in-game toggle to finish"
+        "value": "Enabled + Boost \u2014 set the in-game toggle manually"
       },
       {
         "category": "Display",
-        "reason": "The NVIDIA driver v3 limiter (276 @ 300 Hz, ~8% under refresh) is the authoritative render pacer; the in-game cap parks at refresh - 3 (297) ABOVE it because OW2's engine cap only steadies simulation cadence. Staggering stops limiter fights \u2014 the failure mode behind Reflex's 1%-low collapse. No-sync OW2 lanes remain uncapped at 600.",
+        "reason": "The native and driver ceilings use refresh - 3. Reflex may lower runtime FPS dynamically; an observed value such as 276 is not a replacement for the saved 297 ceiling at 300 Hz. Compare frame-time and latency measurements before overriding this policy.",
         "setting": "Frame Rate Cap",
-        "value": "Auto staggered caps: driver v3 at 276, in-game at 297 (@300Hz; both scale by refresh)"
+        "value": "Auto static ceiling: refresh - 3 (297 at 300 Hz)"
       },
       {
         "category": "Display",
@@ -3495,9 +3477,9 @@
       "NvidiaSettingsHandler": {
         "auto_vrr_fps_cap": true,
         "global_vrr_mode": "fullscreen_and_windowed",
-        "preset": "ull_gsync",
+        "preset": "reflex_gsync",
         "profile_name": "Overwatch 2",
-        "vrr_cap_policy": "ow2_reflex_gsync"
+        "vrr_cap_policy": "refresh_minus_3"
       },
       "OW2ConfigHandler": {
         "aa_detail": 0,
@@ -3505,7 +3487,7 @@
         "dynamic_render_scale": false,
         "dynamic_render_scale_v2": false,
         "effects_quality": 1,
-        "expected_reflex_mode": 0,
+        "expected_reflex_mode": 2,
         "fullscreen_window": false,
         "fullscreen_window_enabled": false,
         "gfx_preset": 1,
@@ -3541,7 +3523,6 @@
           "Overwatch.exe": false
         },
         "game_priority": {
-          "gpu_priority": 8,
           "priority": 6,
           "scheduling_category": "High"
         },
@@ -3599,15 +3580,15 @@
       },
       {
         "category": "Display",
-        "reason": "Per-frame CapFrameX testing (Oct 2025, RTX 4070 + G-SYNC) shows OW2's Reflex limiter fighting a reachable frame cap: identical average fps but 1% lows collapse to ~half the average with 2-10 ms frametime variance. Driver ULL Ultra + the driver v3 cap hold a flat frametime line instead. OW2's Reflex toggle is not safely writable from outside; manually set 'NVIDIA Reflex Low Latency' to 'Off' in Overwatch 2's Video settings once.",
+        "reason": "Enable native Reflex for queue control; the profile requests driver LLM Off. With G-SYNC and VSync active, Reflex may pace below the static cap. ABSO cannot safely write the Reflex toggle; verify it in-game. Boost can cost power or FPS, so compare Enabled alone if needed.",
         "setting": "NVIDIA Reflex Low Latency",
-        "value": "Off \u2014 ABSO already set driver LLM to Ultra; flip the in-game toggle to finish"
+        "value": "Enabled + Boost \u2014 set the in-game toggle manually"
       },
       {
         "category": "Display",
-        "reason": "The NVIDIA driver v3 limiter (276 @ 300 Hz, ~8% under refresh) is the authoritative render pacer; the in-game cap parks at refresh - 3 (297) ABOVE it because OW2's engine cap only steadies simulation cadence. Staggering stops limiter fights \u2014 the failure mode behind Reflex's 1%-low collapse. No-sync OW2 lanes remain uncapped at 600.",
+        "reason": "The native and driver ceilings use refresh - 3. Reflex may lower runtime FPS dynamically; an observed value such as 276 is not a replacement for the saved 297 ceiling at 300 Hz. Compare frame-time and latency measurements before overriding this policy.",
         "setting": "Frame Rate Cap",
-        "value": "Auto staggered caps: driver v3 at 276, in-game at 297 (@300Hz; both scale by refresh)"
+        "value": "Auto static ceiling: refresh - 3 (297 at 300 Hz)"
       },
       {
         "category": "Display",
@@ -3714,9 +3695,9 @@
       "NvidiaSettingsHandler": {
         "auto_vrr_fps_cap": true,
         "global_vrr_mode": "fullscreen_and_windowed",
-        "preset": "ull_gsync",
+        "preset": "reflex_gsync",
         "profile_name": "Overwatch 2",
-        "vrr_cap_policy": "ow2_reflex_gsync"
+        "vrr_cap_policy": "refresh_minus_3"
       },
       "OW2ConfigHandler": {
         "aa_detail": 0,
@@ -3724,7 +3705,7 @@
         "dynamic_render_scale": false,
         "dynamic_render_scale_v2": false,
         "effects_quality": 1,
-        "expected_reflex_mode": 0,
+        "expected_reflex_mode": 2,
         "fullscreen_window": false,
         "fullscreen_window_enabled": false,
         "gfx_preset": 1,
@@ -3760,7 +3741,6 @@
           "Overwatch.exe": false
         },
         "game_priority": {
-          "gpu_priority": 8,
           "priority": 6,
           "scheduling_category": "High"
         },
@@ -3820,15 +3800,15 @@
       },
       {
         "category": "Display",
-        "reason": "Per-frame CapFrameX testing (Oct 2025, RTX 4070 + G-SYNC) shows OW2's Reflex limiter fighting a reachable frame cap: identical average fps but 1% lows collapse to ~half the average with 2-10 ms frametime variance. Driver ULL Ultra + the driver v3 cap hold a flat frametime line instead. OW2's Reflex toggle is not safely writable from outside; manually set 'NVIDIA Reflex Low Latency' to 'Off' in Overwatch 2's Video settings once.",
+        "reason": "Enable native Reflex for queue control; the profile requests driver LLM Off. With G-SYNC and VSync active, Reflex may pace below the static cap. ABSO cannot safely write the Reflex toggle; verify it in-game. Boost can cost power or FPS, so compare Enabled alone if needed.",
         "setting": "NVIDIA Reflex Low Latency",
-        "value": "Off \u2014 ABSO already set driver LLM to Ultra; flip the in-game toggle to finish"
+        "value": "Enabled + Boost \u2014 set the in-game toggle manually"
       },
       {
         "category": "Display",
-        "reason": "The NVIDIA driver v3 limiter (276 @ 300 Hz, ~8% under refresh) is the authoritative render pacer; the in-game cap parks at refresh - 3 (297) ABOVE it because OW2's engine cap only steadies simulation cadence. Staggering stops limiter fights \u2014 the failure mode behind Reflex's 1%-low collapse. No-sync OW2 lanes remain uncapped at 600.",
+        "reason": "The native and driver ceilings use refresh - 3. Reflex may lower runtime FPS dynamically; an observed value such as 276 is not a replacement for the saved 297 ceiling at 300 Hz. Compare frame-time and latency measurements before overriding this policy.",
         "setting": "Frame Rate Cap",
-        "value": "Auto staggered caps: driver v3 at 276, in-game at 297 (@300Hz; both scale by refresh)"
+        "value": "Auto static ceiling: refresh - 3 (297 at 300 Hz)"
       },
       {
         "category": "Display",
@@ -3929,9 +3909,9 @@
       "NvidiaSettingsHandler": {
         "auto_vrr_fps_cap": true,
         "global_vrr_mode": "fullscreen_and_windowed",
-        "preset": "ull_gsync",
+        "preset": "reflex_gsync",
         "profile_name": "Overwatch 2",
-        "vrr_cap_policy": "ow2_reflex_gsync"
+        "vrr_cap_policy": "refresh_minus_3"
       },
       "OW2ConfigHandler": {
         "aa_detail": 0,
@@ -3939,7 +3919,7 @@
         "dynamic_render_scale": false,
         "dynamic_render_scale_v2": false,
         "effects_quality": 1,
-        "expected_reflex_mode": 0,
+        "expected_reflex_mode": 2,
         "fullscreen_window": false,
         "fullscreen_window_enabled": false,
         "gfx_preset": 1,
@@ -3975,7 +3955,6 @@
           "Overwatch.exe": false
         },
         "game_priority": {
-          "gpu_priority": 8,
           "priority": 6,
           "scheduling_category": "High"
         },
@@ -4035,7 +4014,7 @@
       },
       {
         "category": "Display",
-        "reason": "Uncapped no-sync play goes GPU-bound in team fights - exactly where per-frame OW2 testing shows Reflex removes render-queue backpressure at no measured fps cost; CPU-bound lulls are neutral. Reflex's pacing problems only appear when it fights a reachable frame cap (the G-SYNC lanes' scenario), which never happens on this uncapped lane.",
+        "reason": "Reflex reduces render-queue latency, especially when GPU-bound. Boost keeps GPU clocks elevated and may increase power use or reduce FPS; compare Enabled alone on this machine.",
         "setting": "NVIDIA Reflex Low Latency",
         "value": "Enabled + Boost \u2014 set the in-game toggle manually"
       },
@@ -4047,7 +4026,7 @@
       },
       {
         "category": "Display",
-        "reason": "Redundant while Reflex is Enabled (Reflex supersedes it, per-frame testing shows no difference) but harmless - and it keeps the render queue shallow if Reflex is ever toggled off.",
+        "reason": "Requests the game's lower-buffering path. Its interaction with Reflex should be checked with frame-time and latency measurements.",
         "setting": "Reduce Buffering",
         "value": "On"
       },
@@ -4192,7 +4171,6 @@
           "Overwatch.exe": true
         },
         "game_priority": {
-          "gpu_priority": 8,
           "priority": 6,
           "scheduling_category": "High"
         },
@@ -4382,7 +4360,6 @@
       },
       "RegistrySettingsHandler": {
         "game_priority": {
-          "gpu_priority": 8,
           "priority": 4,
           "scheduling_category": "Medium"
         },
@@ -4526,7 +4503,6 @@
       },
       "RegistrySettingsHandler": {
         "game_priority": {
-          "gpu_priority": 8,
           "priority": 4,
           "scheduling_category": "Medium"
         },
@@ -4624,7 +4600,6 @@
       },
       "RegistrySettingsHandler": {
         "game_priority": {
-          "gpu_priority": 8,
           "priority": 2,
           "scheduling_category": "Medium"
         },
@@ -4749,7 +4724,6 @@
       },
       "RegistrySettingsHandler": {
         "game_priority": {
-          "gpu_priority": 8,
           "priority": 2,
           "scheduling_category": "Medium"
         },
@@ -4811,7 +4785,7 @@
       },
       {
         "category": "NVIDIA Control Panel",
-        "reason": "Rivals 2 is CPU-bound UE5/DX11; driver worker threads improve frame times. SnapNet's sim is server-authoritative, so driver threading cannot desync rollback.",
+        "reason": "This NVIDIA setting is exposed as OGL_THREAD_CONTROL. A frame-time benefit on Rivals 2's DX11 path has not been established.",
         "setting": "Threaded Optimization",
         "value": "On"
       },
@@ -4823,7 +4797,7 @@
       },
       {
         "category": "NVIDIA Control Panel",
-        "reason": "ABSO auto-detects your refresh rate and caps at the largest multiple of 60 under refresh - 3 (240 @ 300Hz, 180 @ 240Hz, 120 @ 144Hz). Keeps G-SYNC active, V-SYNC from engaging, and the 60 Hz sim cadence even \u2014 generic 297-style caps land off the sim grid and micro-stutter.",
+        "reason": "ABSO auto-detects your refresh rate and caps at the largest multiple of 60 under refresh - 3 (240 @ 300Hz, 180 @ 240Hz, 120 @ 144Hz). Keeps G-SYNC active, V-SYNC from engaging, and the 60 Hz sim cadence even \u2014 generic 297-style caps land off the sim grid; whether snapping improves motion requires measurement.",
         "setting": "Max Frame Rate",
         "value": "60-multiple cap below refresh (auto-set by ABSO)"
       },
@@ -4853,7 +4827,7 @@
       },
       {
         "category": "Overlays",
-        "reason": "Known Rivals 2 issue: the NVIDIA App in-game overlay can roughly halve frame rate in UE5 titles, and NVIDIA App / driver updates have silently re-enabled it. Keep it disabled on every lane; this is separate from OBS/Medal capture, which follows the lane's own overlay policy.",
+        "reason": "Compare frame times with the NVIDIA overlay and filters disabled if performance is poor. Overlay cost varies by game, driver, and enabled features; ABSO has no local measurement supporting a fixed percentage loss. Capture apps follow the lane's separate process policy.",
         "setting": "NVIDIA App overlay",
         "value": "Off"
       },
@@ -4959,7 +4933,6 @@
           "RivalsofAether2.exe": true
         },
         "game_priority": {
-          "gpu_priority": 8,
           "priority": 6,
           "scheduling_category": "High"
         },
@@ -5058,7 +5031,7 @@
       },
       {
         "category": "NVIDIA Control Panel",
-        "reason": "Rivals 2 is CPU-bound UE5/DX11; driver worker threads improve frame times. SnapNet's sim is server-authoritative, so driver threading cannot desync rollback.",
+        "reason": "This NVIDIA setting is exposed as OGL_THREAD_CONTROL. A frame-time benefit on Rivals 2's DX11 path has not been established.",
         "setting": "Threaded Optimization",
         "value": "On"
       },
@@ -5070,7 +5043,7 @@
       },
       {
         "category": "NVIDIA Control Panel",
-        "reason": "ABSO auto-detects your refresh rate and caps at the largest multiple of 60 under refresh - 3 (240 @ 300Hz, 180 @ 240Hz, 120 @ 144Hz). Keeps G-SYNC active, V-SYNC from engaging, and the 60 Hz sim cadence even \u2014 generic 297-style caps land off the sim grid and micro-stutter.",
+        "reason": "ABSO auto-detects your refresh rate and caps at the largest multiple of 60 under refresh - 3 (240 @ 300Hz, 180 @ 240Hz, 120 @ 144Hz). Keeps G-SYNC active, V-SYNC from engaging, and the 60 Hz sim cadence even \u2014 generic 297-style caps land off the sim grid; whether snapping improves motion requires measurement.",
         "setting": "Max Frame Rate",
         "value": "60-multiple cap below refresh (auto-set by ABSO)"
       },
@@ -5100,7 +5073,7 @@
       },
       {
         "category": "Overlays",
-        "reason": "Known Rivals 2 issue: the NVIDIA App in-game overlay can roughly halve frame rate in UE5 titles, and NVIDIA App / driver updates have silently re-enabled it. Keep it disabled on every lane; this is separate from OBS/Medal capture, which follows the lane's own overlay policy.",
+        "reason": "Compare frame times with the NVIDIA overlay and filters disabled if performance is poor. Overlay cost varies by game, driver, and enabled features; ABSO has no local measurement supporting a fixed percentage loss. Capture apps follow the lane's separate process policy.",
         "setting": "NVIDIA App overlay",
         "value": "Off"
       },
@@ -5207,7 +5180,6 @@
           "RivalsofAether2.exe": true
         },
         "game_priority": {
-          "gpu_priority": 8,
           "priority": 6,
           "scheduling_category": "High"
         },
@@ -5308,7 +5280,7 @@
       },
       {
         "category": "NVIDIA Control Panel",
-        "reason": "Rivals 2 is CPU-bound UE5/DX11; driver worker threads improve frame times. SnapNet's sim is server-authoritative, so driver threading cannot desync rollback.",
+        "reason": "This NVIDIA setting is exposed as OGL_THREAD_CONTROL. A frame-time benefit on Rivals 2's DX11 path has not been established.",
         "setting": "Threaded Optimization",
         "value": "On"
       },
@@ -5320,7 +5292,7 @@
       },
       {
         "category": "NVIDIA Control Panel",
-        "reason": "ABSO auto-detects your refresh rate and caps at the largest multiple of 60 under refresh - 3 (240 @ 300Hz, 180 @ 240Hz, 120 @ 144Hz). Keeps G-SYNC active, V-SYNC from engaging, and the 60 Hz sim cadence even \u2014 generic 297-style caps land off the sim grid and micro-stutter.",
+        "reason": "ABSO auto-detects your refresh rate and caps at the largest multiple of 60 under refresh - 3 (240 @ 300Hz, 180 @ 240Hz, 120 @ 144Hz). Keeps G-SYNC active, V-SYNC from engaging, and the 60 Hz sim cadence even \u2014 generic 297-style caps land off the sim grid; whether snapping improves motion requires measurement.",
         "setting": "Max Frame Rate",
         "value": "60-multiple cap below refresh (auto-set by ABSO)"
       },
@@ -5350,7 +5322,7 @@
       },
       {
         "category": "Overlays",
-        "reason": "Known Rivals 2 issue: the NVIDIA App in-game overlay can roughly halve frame rate in UE5 titles, and NVIDIA App / driver updates have silently re-enabled it. Keep it disabled on every lane; this is separate from OBS/Medal capture, which follows the lane's own overlay policy.",
+        "reason": "Compare frame times with the NVIDIA overlay and filters disabled if performance is poor. Overlay cost varies by game, driver, and enabled features; ABSO has no local measurement supporting a fixed percentage loss. Capture apps follow the lane's separate process policy.",
         "setting": "NVIDIA App overlay",
         "value": "Off"
       },
@@ -5457,7 +5429,6 @@
           "RivalsofAether2.exe": true
         },
         "game_priority": {
-          "gpu_priority": 8,
           "priority": 6,
           "scheduling_category": "High"
         },
@@ -5516,7 +5487,7 @@
       },
       {
         "category": "=== EXPLICIT PROHIBITIONS ===",
-        "reason": "These can cause rollback timing failures on high-refresh setups, and off-grid caps micro-stutter the 60 Hz sim.",
+        "reason": "This lane conservatively avoids competing pacing controls. The 60-multiple cap is a heuristic; netcode or latency improvement is unmeasured.",
         "setting": "DO NOT USE",
         "value": "LLM Ultra, Fast VSync, External FPS Caps, Refresh-3 Logic"
       },
@@ -5528,13 +5499,13 @@
       },
       {
         "category": "NVIDIA Control Panel",
-        "reason": "OFF - rollback netcode is timing-sensitive, high-refresh tearing is negligible.",
+        "reason": "This lane accepts tearing. Visibility of tearing depends on the display, frame rate, and scene.",
         "setting": "Vertical Sync",
         "value": "OFF"
       },
       {
         "category": "NVIDIA Control Panel",
-        "reason": "Rivals 2 is CPU-bound UE5/DX11; driver worker threads improve frame times. SnapNet's sim is server-authoritative, so driver threading cannot desync rollback.",
+        "reason": "This NVIDIA setting is exposed as OGL_THREAD_CONTROL. A frame-time benefit on Rivals 2's DX11 path has not been established.",
         "setting": "Threaded Optimization",
         "value": "On"
       },
@@ -5564,19 +5535,19 @@
       },
       {
         "category": "External Tools",
-        "reason": "External limiters cause limiter contention with rollback. Disable all.",
+        "reason": "Avoid adding another cap to the limiter already selected by the profile. This is a pacing policy, not proof that external limiters break netcode.",
         "setting": "RTSS / Frame Limiters",
         "value": "DISABLED"
       },
       {
         "category": "Monitoring",
-        "reason": "Monitoring overlays are fine, but no frame pacing intervention.",
+        "reason": "This lane stops capture and overlay tools, including RTSS. Use the capture-safe sibling when those apps must remain running.",
         "setting": "Overlays",
-        "value": "ALLOWED (read-only)"
+        "value": "Stopped by this profile at launch"
       },
       {
         "category": "Overlays",
-        "reason": "Known Rivals 2 issue: the NVIDIA App in-game overlay can roughly halve frame rate in UE5 titles, and NVIDIA App / driver updates have silently re-enabled it. Keep it disabled on every lane; this is separate from OBS/Medal capture, which follows the lane's own overlay policy.",
+        "reason": "Compare frame times with the NVIDIA overlay and filters disabled if performance is poor. Overlay cost varies by game, driver, and enabled features; ABSO has no local measurement supporting a fixed percentage loss. Capture apps follow the lane's separate process policy.",
         "setting": "NVIDIA App overlay",
         "value": "Off"
       },
@@ -5686,7 +5657,6 @@
           "RivalsofAether2.exe": true
         },
         "game_priority": {
-          "gpu_priority": 8,
           "priority": 6,
           "scheduling_category": "High"
         },
@@ -5773,7 +5743,7 @@
       },
       {
         "category": "=== EXPLICIT PROHIBITIONS ===",
-        "reason": "These can cause rollback timing failures on high-refresh setups, and off-grid caps micro-stutter the 60 Hz sim.",
+        "reason": "This lane conservatively avoids competing pacing controls. The 60-multiple cap is a heuristic; netcode or latency improvement is unmeasured.",
         "setting": "DO NOT USE",
         "value": "LLM Ultra, Fast VSync, External FPS Caps, Refresh-3 Logic"
       },
@@ -5785,13 +5755,13 @@
       },
       {
         "category": "NVIDIA Control Panel",
-        "reason": "OFF - rollback netcode is timing-sensitive, high-refresh tearing is negligible.",
+        "reason": "This lane accepts tearing. Visibility of tearing depends on the display, frame rate, and scene.",
         "setting": "Vertical Sync",
         "value": "OFF"
       },
       {
         "category": "NVIDIA Control Panel",
-        "reason": "Rivals 2 is CPU-bound UE5/DX11; driver worker threads improve frame times. SnapNet's sim is server-authoritative, so driver threading cannot desync rollback.",
+        "reason": "This NVIDIA setting is exposed as OGL_THREAD_CONTROL. A frame-time benefit on Rivals 2's DX11 path has not been established.",
         "setting": "Threaded Optimization",
         "value": "On"
       },
@@ -5821,19 +5791,19 @@
       },
       {
         "category": "External Tools",
-        "reason": "External limiters cause limiter contention with rollback. Disable all.",
+        "reason": "Avoid adding another cap to the limiter already selected by the profile. This is a pacing policy, not proof that external limiters break netcode.",
         "setting": "RTSS / Frame Limiters",
         "value": "DISABLED"
       },
       {
         "category": "Monitoring",
-        "reason": "Monitoring overlays are fine, but no frame pacing intervention.",
+        "reason": "This lane stops capture and overlay tools, including RTSS. Use the capture-safe sibling when those apps must remain running.",
         "setting": "Overlays",
-        "value": "ALLOWED (read-only)"
+        "value": "Stopped by this profile at launch"
       },
       {
         "category": "Overlays",
-        "reason": "Known Rivals 2 issue: the NVIDIA App in-game overlay can roughly halve frame rate in UE5 titles, and NVIDIA App / driver updates have silently re-enabled it. Keep it disabled on every lane; this is separate from OBS/Medal capture, which follows the lane's own overlay policy.",
+        "reason": "Compare frame times with the NVIDIA overlay and filters disabled if performance is poor. Overlay cost varies by game, driver, and enabled features; ABSO has no local measurement supporting a fixed percentage loss. Capture apps follow the lane's separate process policy.",
         "setting": "NVIDIA App overlay",
         "value": "Off"
       },
@@ -5944,7 +5914,6 @@
           "RivalsofAether2.exe": true
         },
         "game_priority": {
-          "gpu_priority": 8,
           "priority": 6,
           "scheduling_category": "High"
         },
@@ -5995,7 +5964,7 @@
     "in_game_settings": [
       {
         "category": "=== WINDOWS SETTINGS ===",
-        "reason": "HAGS works well with Vulkan (Ryujinx's primary backend). Similar to DX12, Vulkan's scheduling model benefits from HAGS.",
+        "reason": "The profile keeps HAGS On as a compatibility baseline. A Vulkan performance benefit is not guaranteed; compare frame times on this machine before changing the policy.",
         "setting": "Hardware Accelerated GPU Scheduling (HAGS)",
         "value": "On"
       },
@@ -6031,7 +6000,7 @@
       },
       {
         "category": "NVCP",
-        "reason": "Critical for emulators! Ryujinx compiles shaders on-the-fly. Unlimited cache prevents stutter from shader recompilation.",
+        "reason": "A larger driver cache can reduce eviction of cached shaders. It does not prevent first-use compilation or replace the emulator's own shader cache, and it can consume disk space.",
         "setting": "Shader Cache Size",
         "value": "Unlimited"
       },
@@ -6249,7 +6218,6 @@
       },
       "RegistrySettingsHandler": {
         "game_priority": {
-          "gpu_priority": 8,
           "priority": 6,
           "scheduling_category": "High"
         },
@@ -6598,7 +6566,6 @@
           "Slippi Dolphin.exe": true
         },
         "game_priority": {
-          "gpu_priority": 8,
           "priority": 6,
           "scheduling_category": "High"
         },
@@ -6780,7 +6747,6 @@
           "Slippi Dolphin.exe": true
         },
         "game_priority": {
-          "gpu_priority": 8,
           "priority": 6,
           "scheduling_category": "High"
         },
@@ -6822,7 +6788,7 @@
     "in_game_settings": [
       {
         "category": "Windows HDR",
-        "reason": "Dolphin/Slippi renders SDR. With Windows HDR on, the OS tone-maps Dolphin's SDR output through the HDR pipeline, which is what gives the lower-strain look. Leave HDR enabled at the OS level before launching Slippi.",
+        "reason": "Dolphin/Slippi renders SDR. With Windows HDR on, the OS tone-maps Dolphin's SDR output through the HDR pipeline, which is what gives the preferred look. Leave HDR enabled at the OS level before launching Slippi.",
         "setting": "Use HDR (Settings > System > Display)",
         "value": "On"
       },
@@ -6840,9 +6806,9 @@
       },
       {
         "category": "Display",
-        "reason": "When Windows is in HDR mode, even 'exclusive fullscreen' SDR apps go through the HDR composition path. The added latency is real but not measured by ABSO \u2014 Windows HDR composition cost varies by OS build, driver, and panel. The HDR variant is for sessions where eye-strain relief matters more than the leanest no-sync path; switch back to the SDR sibling for tournament/practice where latency is the priority.",
+        "reason": "SDR output is displayed within the Windows HDR desktop. ABSO has not measured a latency penalty or benefit on this path. Compare the SDR sibling on the same OS, driver, and display when choosing between visual preference and performance.",
         "setting": "Exclusive Fullscreen vs SDR-in-HDR latency",
-        "value": "Accept a small HDR composition cost"
+        "value": "Compare HDR and SDR frame times on this setup"
       },
       {
         "category": "Profile Goal",
@@ -6987,7 +6953,6 @@
           "Slippi Dolphin.exe": true
         },
         "game_priority": {
-          "gpu_priority": 8,
           "priority": 6,
           "scheduling_category": "High"
         },
@@ -7031,7 +6996,7 @@
     "in_game_settings": [
       {
         "category": "Windows HDR",
-        "reason": "Dolphin/Slippi renders SDR. With Windows HDR on, the OS tone-maps Dolphin's SDR output through the HDR pipeline, which is what gives the lower-strain look. Leave HDR enabled at the OS level before launching Slippi.",
+        "reason": "Dolphin/Slippi renders SDR. With Windows HDR on, the OS tone-maps Dolphin's SDR output through the HDR pipeline, which is what gives the preferred look. Leave HDR enabled at the OS level before launching Slippi.",
         "setting": "Use HDR (Settings > System > Display)",
         "value": "On"
       },
@@ -7049,9 +7014,9 @@
       },
       {
         "category": "Display",
-        "reason": "When Windows is in HDR mode, even 'exclusive fullscreen' SDR apps go through the HDR composition path. The added latency is real but not measured by ABSO \u2014 Windows HDR composition cost varies by OS build, driver, and panel. The HDR variant is for sessions where eye-strain relief matters more than the leanest no-sync path; switch back to the SDR sibling for tournament/practice where latency is the priority.",
+        "reason": "SDR output is displayed within the Windows HDR desktop. ABSO has not measured a latency penalty or benefit on this path. Compare the SDR sibling on the same OS, driver, and display when choosing between visual preference and performance.",
         "setting": "Exclusive Fullscreen vs SDR-in-HDR latency",
-        "value": "Accept a small HDR composition cost"
+        "value": "Compare HDR and SDR frame times on this setup"
       },
       {
         "category": "Windows Settings",
@@ -7364,7 +7329,6 @@
           "Slippi Dolphin.exe": true
         },
         "game_priority": {
-          "gpu_priority": 8,
           "priority": 6,
           "scheduling_category": "High"
         },
@@ -7410,7 +7374,7 @@
         "category": "Windows Settings",
         "reason": "HAGS is fixed to True regardless of Dolphin backend. This avoids reboot requirements when switching backends or re-applying the profile. Dolphin's own latency features (ImmediateXFB, RushPresentation) provide far more latency reduction than HAGS state changes.",
         "setting": "Hardware Accelerated GPU Scheduling (HAGS)",
-        "value": "On (always - no reboot on re-apply)"
+        "value": "On (initial change may require reboot)"
       },
       {
         "category": "Windows Settings",
@@ -7716,7 +7680,6 @@
           "Slippi Dolphin.exe": true
         },
         "game_priority": {
-          "gpu_priority": 8,
           "priority": 6,
           "scheduling_category": "High"
         },
@@ -7758,7 +7721,7 @@
     "in_game_settings": [
       {
         "category": "Windows HDR",
-        "reason": "Dolphin/Slippi renders SDR. With Windows HDR on, the OS tone-maps Dolphin's SDR output through the HDR pipeline, which is what gives the lower-strain look. Leave HDR enabled at the OS level before launching Slippi.",
+        "reason": "Dolphin/Slippi renders SDR. With Windows HDR on, the OS tone-maps Dolphin's SDR output through the HDR pipeline, which is what gives the preferred look. Leave HDR enabled at the OS level before launching Slippi.",
         "setting": "Use HDR (Settings > System > Display)",
         "value": "On"
       },
@@ -7776,15 +7739,15 @@
       },
       {
         "category": "Display",
-        "reason": "When Windows is in HDR mode, even 'exclusive fullscreen' SDR apps go through the HDR composition path. The added latency is real but not measured by ABSO \u2014 Windows HDR composition cost varies by OS build, driver, and panel. The HDR variant is for sessions where eye-strain relief matters more than the leanest no-sync path; switch back to the SDR sibling for tournament/practice where latency is the priority.",
+        "reason": "SDR output is displayed within the Windows HDR desktop. ABSO has not measured a latency penalty or benefit on this path. Compare the SDR sibling on the same OS, driver, and display when choosing between visual preference and performance.",
         "setting": "Exclusive Fullscreen vs SDR-in-HDR latency",
-        "value": "Accept a small HDR composition cost"
+        "value": "Compare HDR and SDR frame times on this setup"
       },
       {
         "category": "Windows Settings",
         "reason": "HAGS is fixed to True regardless of Dolphin backend. This avoids reboot requirements when switching backends or re-applying the profile. Dolphin's own latency features (ImmediateXFB, RushPresentation) provide far more latency reduction than HAGS state changes.",
         "setting": "Hardware Accelerated GPU Scheduling (HAGS)",
-        "value": "On (always - no reboot on re-apply)"
+        "value": "On (initial change may require reboot)"
       },
       {
         "category": "Windows Settings",
@@ -8091,7 +8054,6 @@
           "Slippi Dolphin.exe": true
         },
         "game_priority": {
-          "gpu_priority": 8,
           "priority": 6,
           "scheduling_category": "High"
         },

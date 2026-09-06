@@ -3384,7 +3384,8 @@ def profile_create(
 def memory_clear(json_output: bool) -> None:
     """Purge the Windows standby list (ISLC equivalent).
 
-    Clears cached memory pages that can cause stutters during long gaming sessions.
+    Discards cached memory pages. This is a manual diagnostic action;
+    discarding useful cache is not a demonstrated gaming performance gain.
     Requires admin elevation.
     """
     if not is_admin():
@@ -3415,19 +3416,26 @@ def memory_clear(json_output: bool) -> None:
                     "success": success,
                     "before_available_mb": before["available_mb"],
                     "after_available_mb": after["available_mb"],
+                    "available_delta_mb": after["available_mb"] - before["available_mb"],
+                    # Retained for existing clients; this is available-memory
+                    # change, not a count of standby bytes purged.
                     "freed_mb": after["available_mb"] - before["available_mb"],
-                }
+                },
+                success=success,
+                error=None if success else "Failed to purge standby list",
             )
         elif success:
             freed = after["available_mb"] - before["available_mb"]
             console.print(
-                f"[green]Standby list purged. Freed ~{freed}MB "
+                f"[green]Standby list purge completed. Available memory changed by {freed}MB "
                 f"({after['available_mb']}MB now available)[/green]"
             )
         else:
             console.print(
                 "[red]Failed to purge standby list (privilege escalation may have failed)[/red]"
             )
+        if not success:
+            raise SystemExit(1)
     except Exception as e:
         if json_output:
             json_error(str(e))

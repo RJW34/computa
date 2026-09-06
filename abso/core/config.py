@@ -216,6 +216,7 @@ class ProfileOverrides:
     network: dict[str, Any] = field(default_factory=dict)
     power: dict[str, Any] = field(default_factory=dict)
     timer: dict[str, Any] = field(default_factory=dict)
+    cpu_affinity: dict[str, Any] = field(default_factory=dict)
     mouse: dict[str, Any] = field(default_factory=dict)
     color: dict[str, Any] = field(default_factory=dict)
     display_color_range: dict[str, Any] = field(default_factory=dict)
@@ -242,6 +243,7 @@ PROFILE_OVERRIDE_HANDLER_ATTRS: dict[str, str] = {
     "NetworkSettingsHandler": "network",
     "PowerSettingsHandler": "power",
     "TimerSettingsHandler": "timer",
+    "CpuAffinityHandler": "cpu_affinity",
     "MouseSettingsHandler": "mouse",
     "ColorProfileSettingsHandler": "color",
     "DisplayColorRangeHandler": "display_color_range",

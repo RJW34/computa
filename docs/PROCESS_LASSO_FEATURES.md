@@ -4,12 +4,13 @@ ABSO ships an in-house equivalent of the useful parts of
 [Process Lasso](https://bitsum.com/) — background-process restraint, P-core
 steering, per-process power throttling, a reversible CPU limiter, and a
 declarative watchdog — plus a "Highest Performance" core-parking power plan.
-Everything here targets **frame-time consistency (1% lows), not average FPS**,
-and **nothing runs until you opt in** (see [Enablement](#enablement)).
+The session features are configurable experiments for reducing contention.
+No FPS or frame-time improvement is established by the API readback tests.
+Runtime features are opt-in; gaming profiles separately change power-plan settings.
 
 > Do not confuse these with GPU tuning. Higher graphics quality at a fixed FPS
-> cap is a GPU-headroom problem (DLSS / Frame Gen). These features reduce
-> CPU-side stutter so a capped game *feels* locked.
+> cap can be a GPU-headroom problem. Upscaling, frame generation, and CPU
+> scheduling affect different metrics; compare actual frame times and latency.
 
 ## Feature catalog
 
@@ -18,15 +19,16 @@ and **nothing runs until you opt in** (see [Enablement](#enablement)).
 | **ProBalance governor** | Demotes background CPU spikers to BelowNormal during a game session and auto-restores them. Never touches the game, foreground, anti-cheat, launchers, audio, Discord, editors, or your `process_overrides.protect` images. | `abso/core/cpu_balancer.py` (daemon), spawned by the tray |
 | **"Highest Performance" power plan** | Disables CPU core parking (`CPMINCORES`=100) and holds the processor min-state at 100% during gaming profiles; the desktop profile relaxes the floor to 5 so the CPU still idles cool. | `abso/settings/power.py` (apply pipeline) |
 | **Keep-Awake** | Inhibits system/display sleep while a gamepad-driven game runs (emulators) — `SetThreadExecutionState`. Cleared on game exit. | tray (`ABSO-Tray.ps1`) + profile flag |
-| **CPU Sets (soft P-core steering)** | `SetProcessDefaultCpuSets` biases the game toward P-cores while leaving hard affinity intact (threads still spill to E-cores). Anti-cheat-safe, hybrid-correct. | `abso/core/cpu_sets.py`, hosted in the daemon |
-| **EcoQoS herding** | Throttles busy *background* images onto E-cores via `ProcessPowerThrottling`, freeing P-cores for the game. Releases on exit. Never throttles the game/anti-cheat/capture/Discord. | `abso/core/efficiency_mode.py`, hosted in the daemon |
+| **CPU Sets (soft P-core steering)** | `SetProcessDefaultCpuSets` selects logical processors for threads without their own CPU-set assignment. It does not guarantee spill to E-cores or anti-cheat compatibility. | `abso/core/cpu_sets.py`, hosted in the daemon |
+| **EcoQoS herding** | Requests power-efficient scheduling for configured background images via `ProcessPowerThrottling`; this does not guarantee placement on E-cores. Releases on exit. Never throttles the game/anti-cheat/capture/Discord. | `abso/core/efficiency_mode.py`, hosted in the daemon |
 | **CPU Limiter** | Reversible hard-affinity shrink — the "throttle" watchdog action. Restores the original mask on stop. | `abso/core/cpu_limiter.py` |
 | **Watchdog** | Declarative rules (`match`/`metric`/`threshold`/`sustain`/`action`) with reversible demote/throttle/trim actions. Online profiles are auto-restricted to demote-only. | `abso/core/watchdog.py` (policy) + `watchdog_engine.py` (runtime), hosted in the daemon |
 
 The four runtime features (ProBalance, CPU Sets, EcoQoS, watchdog) are all
 hosted inside the one `cpu-balance` daemon the tray spawns on game launch — not
 separate processes. The daemon stops via a stop-file **sentinel** (not a kill),
-so its cleanup always restores demoted priorities / affinity / EcoQoS / CPU Sets.
+so normal shutdown can restore session state. A forced termination or failed
+Win32 write can prevent cleanup; do not describe it as an unconditional guarantee.
 
 ## Configuration reference
 
@@ -84,9 +86,10 @@ augments the never-touch set for ALL of these, not just the killer.
 
 ## Online-safety model
 
-- **ProBalance / EcoQoS / CPU Sets** are online-positive: they only demote/steer
-  *background* work or apply a soft hint, never mutating the game's timing. They
-  run on online profiles with the hardened exclusion set.
+- **ProBalance / EcoQoS / CPU Sets** use operating-system scheduling APIs.
+  Their effect on game timing and compatibility is workload-dependent.
+  Exclusion lists reduce scope; they do not establish anti-cheat approval.
+  See [Microsoft CPU Sets](https://learn.microsoft.com/en-us/windows/win32/procthread/cpu-sets).
 - **Watchdog** is restricted to **demote-only** on `is_online_profile` profiles
   (the tray passes `--online`). Throttle (affinity mutation) and trim are
   offline-only — mid-match affinity changes are exactly the nondeterminism
@@ -107,7 +110,7 @@ edit `%APPDATA%\ABSO\tray-config.json`:
 then restart the tray and launch a game. For EcoQoS, also set
 `efficiency_mode.background_images` in `abso.yaml`; for the watchdog, add
 `watchdog.rules`. Watch your in-game **1% lows / frame-time graph** — that's the
-metric these move, and anti-cheat behavior is yours to confirm in your titles.
+metric to compare, not an improvement the tool can promise.
 
 ## Verification status
 

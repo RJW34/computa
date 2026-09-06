@@ -132,12 +132,12 @@ broken state.
 As of 2026-05-30, the live PC is on `overwatch2-gsync-hdr-capture` with the
 local mixed-refresh MPO mitigation still reboot-gated. Display diagnostics
 currently show a 2560x1440 300 Hz VRR-capable primary plus a 2560x1440
-59.95 Hz secondary. The expected Overwatch G-SYNC cap now resolves through the
-OW2 Reflex/G-SYNC policy to `276` target/current on this 300 Hz path.
+59.95 Hz secondary. The built-in Overwatch G-SYNC static ceiling is `refresh - 3`: `297`
+on a 300 Hz path. Reflex runtime pacing may be lower and is separate.
 
 The Overwatch 2 G-SYNC HDR profile pair now shares the optimized
-borderless/windowed VRR display path because that path outperformed the former
-exclusive/fullscreen-only lane on this Win11/Reflex setup. The difference is
+borderless/windowed VRR display path as the selected compatibility policy on this Win11/Reflex setup; do not
+claim it outperformed another path without matching frame-capture artifacts. The difference is
 process policy: `overwatch2-gsync-hdr` is overlay-free, while
 `overwatch2-gsync-hdr-capture` keeps capture/overlay processes alive. Do not
 treat OW2 borderless/windowed fullscreen as drift for either G-SYNC HDR lane.
@@ -146,7 +146,7 @@ Current safe handling:
 
 1. Use `display-diagnostics --json`, `state --json --verify`,
    `verify overwatch2-gsync-hdr --json`, or `health --json` for evidence.
-2. Treat `276` as the expected persisted cap for the 300 Hz Overwatch G-SYNC
+2. Treat `297` as the expected persisted cap for the 300 Hz Overwatch G-SYNC
    path. The no-sync OW2 profiles remain separate at the game's `600` FPS cap.
 3. Do not run full profile apply, live display reset, HDR cycle, DWM restart,
    or driver hotkey unless the user explicitly asks.

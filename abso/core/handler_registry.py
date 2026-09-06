@@ -141,28 +141,28 @@ def _all_entries() -> list[HandlerEntry]:
             audit=True,
             backup=True,
             notes="restore_guarantee='partial': opt-in best-effort latency add-on; a "
-            "failed revert never blocks a profile-switch baseline restore.",
+            "failed revert is reported to the profile-switch transaction.",
         ),
         HandlerEntry(
             InterruptModeHandler,
             audit=True,
             backup=True,
             notes="restore_guarantee='partial': GPU MSI mode (reboot-gated); the "
-            "Enum\\PCI key can be ACL-restricted, so revert is best-effort/non-blocking.",
+            "Enum\\PCI key can be ACL-restricted, so failed reverts are reported.",
         ),
         HandlerEntry(
             AudioEngineHandler,
             audit=True,
             backup=True,
             notes="restore_guarantee='partial': opt-in best-effort audio-APO disable; a "
-            "failed revert never blocks a profile-switch baseline restore.",
+            "failed revert is reported to the profile-switch transaction.",
         ),
         HandlerEntry(
             NicDriverHandler,
             audit=True,
             backup=True,
             notes="restore_guarantee='partial': opt-in per-NIC best-effort tuning; a "
-            "driver rejecting a keyword on revert never blocks a profile switch.",
+            "driver rejecting a keyword on revert is reported as a restore failure.",
         ),
         HandlerEntry(
             DefenderExclusionsHandler,

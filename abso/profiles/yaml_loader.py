@@ -192,7 +192,6 @@ class BalancedBaseProfile(BaseProfile):
             "RegistrySettingsHandler": {
                 "win32_priority_separation": WIN32_PRIORITY_GAMING_ONLINE,
                 "game_priority": {
-                    "gpu_priority": 8,
                     "priority": 6,
                     "scheduling_category": "High",
                     # sfio_priority omitted — has no effect per Microsoft docs

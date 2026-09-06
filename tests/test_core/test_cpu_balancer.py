@@ -8,6 +8,10 @@ restrain/release is performed against any real process.
 
 from __future__ import annotations
 
+from unittest.mock import MagicMock
+
+import pytest
+
 from abso.core import cpu_balancer as cb
 from abso.core.cpu_balancer import CpuBalancer, CpuBalancerConfig
 
@@ -298,3 +302,95 @@ class TestResolveWatchdog:
         assert enable is True
         assert len(rules) == 1
         assert keep == 6
+
+
+class TestPriorityIntervention:
+    @pytest.mark.parametrize("priority", [
+        cb.NORMAL_PRIORITY_CLASS, cb.ABOVE_NORMAL_PRIORITY_CLASS, cb.HIGH_PRIORITY_CLASS,
+    ])
+    def test_all_eligible_priority_classes_are_demoted(self, monkeypatch, priority):
+        bal = _make_balancer()
+        bal._kernel32 = MagicMock()
+        bal._kernel32.GetPriorityClass.return_value = priority
+        monkeypatch.setattr(bal, "_read_process_times", lambda handle: (123, 0, 0))
+        bal._restrain(9001, "background.exe", 15)
+        assert bal._restrained[9001].original_priority == priority
+        bal._kernel32.SetPriorityClass.assert_called_once_with(
+            bal._kernel32.OpenProcess.return_value, cb.BELOW_NORMAL_PRIORITY_CLASS
+        )
+
+    @pytest.mark.parametrize("priority", [
+        0, cb.IDLE_PRIORITY_CLASS, cb.BELOW_NORMAL_PRIORITY_CLASS, cb.REALTIME_PRIORITY_CLASS,
+    ])
+    def test_never_promotes_low_priority_or_touches_realtime(self, monkeypatch, priority):
+        bal = _make_balancer()
+        bal._kernel32 = MagicMock()
+        bal._kernel32.GetPriorityClass.return_value = priority
+        monkeypatch.setattr(bal, "_read_process_times", lambda handle: (123, 0, 0))
+        bal._restrain(9001, "background.exe", 15)
+        bal._kernel32.SetPriorityClass.assert_not_called()
+        assert not bal._restrained
+
+    def test_recycled_pid_is_never_restored(self, monkeypatch):
+        bal = _make_balancer()
+        bal._kernel32 = MagicMock()
+        bal._restrained[9001] = cb.RestrainedProcess(9001, "old.exe", 32, 0, 15, 123)
+        monkeypatch.setattr(bal, "_read_process_times", lambda handle: (456, 0, 0))
+        bal._release(9001)
+        bal._kernel32.SetPriorityClass.assert_not_called()
+        assert not bal._restrained
+        assert not bal.get_events()
+
+    def test_restore_failure_is_retained_and_not_reported_as_release(self, monkeypatch):
+        bal = _make_balancer()
+        bal._kernel32 = MagicMock()
+        bal._kernel32.GetPriorityClass.return_value = cb.BELOW_NORMAL_PRIORITY_CLASS
+        bal._kernel32.SetPriorityClass.return_value = False
+        bal._restrained[9001] = cb.RestrainedProcess(9001, "old.exe", 32, 0, 15, 123)
+        monkeypatch.setattr(bal, "_read_process_times", lambda handle: (123, 0, 0))
+        bal._release(9001)
+        assert 9001 in bal._restrained
+        assert not bal.get_events()
+        bal._kernel32.SetPriorityClass.return_value = True
+        bal._release(9001)
+        assert not bal._restrained
+        assert bal.get_events()[0].action == "release"
+
+    def test_later_user_priority_change_is_preserved(self, monkeypatch):
+        bal = _make_balancer()
+        bal._kernel32 = MagicMock()
+        bal._kernel32.GetPriorityClass.return_value = cb.HIGH_PRIORITY_CLASS
+        bal._restrained[9001] = cb.RestrainedProcess(9001, "old.exe", 32, 0, 15, 123)
+        monkeypatch.setattr(bal, "_read_process_times", lambda handle: (123, 0, 0))
+        bal._release(9001)
+        bal._kernel32.SetPriorityClass.assert_not_called()
+        assert not bal._restrained
+
+
+class TestCpuSampling:
+    def test_delayed_scan_uses_elapsed_time_not_poll_interval(self, monkeypatch):
+        bal = _make_balancer()
+        bal._kernel32 = MagicMock()
+        counters = iter([(123, 0, 0), (123, 10_000_000, 0)])
+        stamps = iter([10.0, 20.0])
+        monkeypatch.setattr(bal, "_read_process_times", lambda handle: next(counters))
+        monkeypatch.setattr(cb.time, "monotonic", lambda: next(stamps))
+        monkeypatch.setattr(cb.os, "cpu_count", lambda: 2)
+        assert bal._get_process_cpu(9001) is None
+        # 1 CPU second / 10 wall seconds / 2 CPUs = 5%, previously 50%.
+        assert bal._get_process_cpu(9001) == pytest.approx(5.0)
+
+    def test_pid_reuse_resets_sample(self, monkeypatch):
+        bal = _make_balancer()
+        bal._kernel32 = MagicMock()
+        counters = iter([(123, 100_000_000, 0), (456, 1_000_000, 0)])
+        monkeypatch.setattr(bal, "_read_process_times", lambda handle: next(counters))
+        assert bal._get_process_cpu(9001) is None
+        assert bal._get_process_cpu(9001) is None
+
+    def test_snapshot_invalid_handle_is_pointer_sized(self):
+        bal = _make_balancer()
+        bal._kernel32 = MagicMock()
+        bal._kernel32.CreateToolhelp32Snapshot.return_value = cb.ctypes.c_void_p(-1).value
+        assert bal._enumerate_processes() == []
+        bal._kernel32.Process32FirstW.assert_not_called()

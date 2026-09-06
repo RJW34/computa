@@ -161,14 +161,13 @@ class TestAudioEngineBackupRestore:
     @patch.object(
         AudioEngineHandler, "_restore_fx_flag", side_effect=Exception("boom")
     )
-    def test_restore_exception_is_non_blocking(self, mock_restore):
-        """Best-effort: restore logs but returns True so a profile switch is
-        never blocked by a failed audio-flag revert."""
+    def test_restore_exception_reports_failure(self, mock_restore):
+        """An unsuccessful revert must remain visible to transaction rollback."""
         result = AudioEngineHandler().restore(
             {"device_guid": "{g}", "original_flag": 1}
         )
 
-        assert result is True
+        assert result is False
 
 
 class TestAudioEngineVerify:

@@ -157,50 +157,17 @@ pip install -r requirements.txt
 
 ## Reboot Requirements When Switching Profiles
 
-### Understanding When Reboots Are Actually Needed
+### Use current targets and boot state
 
-computa may report "reboot required" after applying a profile, but **you don't always need to reboot**. Here's when you actually need to:
+A reboot can be needed whenever a reboot-gated target changes, including when
+switching profiles or restoring a baseline. Having used a profile previously
+does not prove its targets are still committed after intervening changes.
 
-**Reboot IS required:**
-- First time applying a profile that includes Memory or MPO settings
-- When `state --json --verify` or `health --json` reports
-  `reboot_pending: true` for a reboot-gated handler whose target is already
-  written
-- After Windows updates that reset registry values
-- When switching FROM a profile that doesn't use certain handlers TO one that does
-
-**Reboot is NOT required:**
-- Re-applying the same profile (values already correct)
-- Switching between profiles that share the same reboot-requiring settings
-- Switching from Diablo 4 → Rivals 2 (if you've applied Rivals 2 before and rebooted)
-
-### Why This Works
-
-Settings like Memory Management (DisablePagingExecutive) and MPO are stored in the registry. Once set and rebooted:
-- The kernel reads the values at boot time
-- Writing the same value again doesn't change kernel behavior
-- No reboot needed because the settings are already active
-
-### Profile Comparison
-
-| Switching From | Switching To | Reboot Needed? |
-|----------------|--------------|----------------|
-| Fresh Windows | Rivals 2 | **Yes** (first time) |
-| Rivals 2 | Diablo 4 | No (Diablo 4 doesn't use Memory/MPO) |
-| Diablo 4 | Rivals 2 | No (if Rivals 2 was applied before) |
-| Rivals 2 | Rivals 2 | No (same settings) |
-| Slippi Melee | Rivals 2 | No (both use similar settings) |
-
-### What If I'm Unsure?
-
-If you're uncertain whether a reboot is needed:
-1. Run `python -m abso state --json --verify`
-2. If it reports pending apply settings, run the targeted
-   `python -m abso apply-pending <profile> --json`
-3. If it reports `reboot_pending: true` with no pending apply settings,
-   reboot normally
-4. After that first reboot, subsequent profile switches usually won't need
-   rebooting
+Use `state --json --verify` to distinguish missing writes from written targets
+awaiting reboot. If only reboot-gated settings are pending, a normal reboot
+is the commit step. Do not repeatedly apply profiles or reset the display to
+try to commit those settings. Some game/driver settings instead need the game
+to restart. Verification checks supported readbacks, not frame performance.
 
 ---
 
@@ -367,36 +334,21 @@ inspect `%TEMP%\abso_tray.log`.
 
 ## Overwatch Reflex and VRR FPS Caps
 
-### Why ABSO writes 276 on a 300 Hz Overwatch G-SYNC profile
+### Saved cap versus Reflex runtime pacing
 
-**Symptom:** Older ABSO notes or a generic VRR guide mention `refresh - 3`
-(`297` at 300 Hz), while the current Overwatch G-SYNC profile verifies `276`.
+The built-in Overwatch G-SYNC profiles use the generic `refresh - 3` static
+ceiling: **297 at 300 Hz**, for both the NVIDIA profile and managed engine cap.
+Driver VSync is the safety backstop; in-game VSync is off, and native Reflex
+On + Boost is the expected in-game setting. Reflex may dynamically pace lower
+(for example, a runtime counter near 276); that observation does not change
+the saved target and is not itself configuration drift.
 
-ABSO now treats Overwatch 2 G-SYNC as an explicit Reflex/G-SYNC exception:
-
-- The default VRR cap policy is still `refresh - 3` for games that use the
-  generic G-SYNC safety boundary.
-- The Overwatch 2 G-SYNC profiles use the OW2 Reflex/G-SYNC cap policy. On a
-  300 Hz primary display that policy resolves to `276`.
-- The no-sync Overwatch profiles are separate and remain at the game's `600`
-  FPS ceiling with VRR/G-SYNC off.
-
-For `overwatch2-gsync`, `overwatch2-gsync-hdr`,
-`overwatch2-gsync-capture`, and `overwatch2-gsync-hdr-capture` on a 300 Hz
-monitor, the expected setup is:
-
-1. Display refresh: `300 Hz`
-2. NVIDIA Control Panel G-SYNC: enabled for the profile path
-3. NVIDIA Control Panel V-SYNC: on as safety net
-4. Overwatch VSync: off
-5. Overwatch NVIDIA Reflex: `Enabled + Boost`
-6. ABSO OW2 Reflex/G-SYNC cap: `276`
-
-If profile verification fails while the cap is already `276`, check the
-reported handler detail. On the current Overwatch G-SYNC HDR path, both the
-overlay-free and capture-safe profiles intentionally expect
-borderless/windowed fullscreen. Do not "fix" those profiles by forcing
-exclusive fullscreen.
+NVIDIA documents automatic below-refresh pacing with G-SYNC, VSync and Reflex
+in its [latency guide](https://www.nvidia.com/en-gb/geforce/guides/system-latency-optimization-guide/).
+The exact dynamic cap depends on the game/driver and is not a measured optimum
+for this PC. No-sync OW2 profiles retain the engine's 600 FPS ceiling.
+The two G-SYNC HDR lanes intentionally use borderless/windowed fullscreen;
+inspect the verifier's setting detail before changing display mode.
 
 ---
 
@@ -524,7 +476,7 @@ print(f"Failed: {result.failed_settings}")
    ```bash
    python -m abso audit --category network
    ```
-2. Disable real-time antivirus scanning temporarily
+2. Collect command timings and scan provenance; keep antivirus protection enabled.
 
 ### High CPU During Detection
 

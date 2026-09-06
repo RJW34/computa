@@ -46,7 +46,7 @@ class AudioEngineHandler(SettingsHandler):
 
     @property
     def restore_guarantee(self) -> str:
-        # Best-effort: a failed flag revert must not block a profile switch.
+        # Device availability/permissions can prevent a complete revert.
         return "partial"
 
     def detect(self) -> dict[str, Any]:
@@ -142,8 +142,9 @@ class AudioEngineHandler(SettingsHandler):
             return True
         try:
             self._restore_fx_flag(str(guid), data.get("original_flag"))
-        except Exception as exc:  # noqa: BLE001 - best-effort, never block a switch
+        except Exception as exc:  # noqa: BLE001 - surface failed rollback to the transaction
             logger.error("Failed to restore audio enhancement flag: %s", exc)
+            return False
         return True
 
     def verify_active(self, settings: dict[str, Any]) -> dict[str, Any]:

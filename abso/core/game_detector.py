@@ -7,6 +7,7 @@ import logging
 import os
 import re
 import winreg
+from collections import deque
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -333,6 +334,42 @@ def _detect_epic_games_from_manifests(
     return games
 
 
+def _find_game_executables(
+    root: Path, executables: list[str], *, max_depth: int = 3, max_directories: int = 2048
+) -> set[str]:
+    """Scan an install once, without traversing unbounded trees or junctions.
+
+    Names are case-insensitive, matching Windows. Depth three covers the
+    usual UE Game/Binaries/Win64 and Source2 game/bin/win64 layouts.
+    This fallback is intentionally bounded; launcher metadata remains preferred.
+    """
+    remaining = {name.lower() for name in executables}
+    found: set[str] = set()
+    pending = deque([(root, 0)])
+    visited = 0
+    while pending and remaining and visited < max_directories:
+        folder, depth = pending.popleft()
+        visited += 1
+        try:
+            with os.scandir(folder) as entries:
+                for entry in entries:
+                    try:
+                        name = entry.name.lower()
+                        if name in remaining and entry.is_file(follow_symlinks=False):
+                            found.add(name)
+                            remaining.remove(name)
+                        elif depth < max_depth and entry.is_dir(follow_symlinks=False):
+                            # Junctions are reparse points but not necessarily symlinks.
+                            attrs = getattr(entry.stat(follow_symlinks=False), "st_file_attributes", 0)
+                            if not attrs & 0x400 and len(pending) < max_directories - visited:
+                                pending.append((Path(entry.path), depth + 1))
+                    except OSError:
+                        continue
+        except OSError as exc:
+            logger.debug("Cannot scan game directory %s: %s", folder, exc)
+    return found
+
+
 def _detect_steam_games() -> list[InstalledGame]:
     """Detect installed Steam games."""
     games: list[InstalledGame] = []
@@ -354,32 +391,21 @@ def _detect_steam_games() -> list[InstalledGame]:
             logger.debug(f"Skipping unreadable Steam library folder '{library_folder}': {e}")
             continue
 
-        for game_name, executables in steam_game_patterns.items():
-            # Look for game folders that might contain these executables
-            for game_folder in game_folders:
-                if not game_folder.is_dir():
-                    continue
-
+        wanted = [exe for names in steam_game_patterns.values() for exe in names]
+        for game_folder in game_folders:
+            if not game_folder.is_dir():
+                continue
+            found = _find_game_executables(game_folder, wanted)
+            for game_name, executables in steam_game_patterns.items():
                 for exe_name in executables:
-                    # Search for executable in game folder (up to 3 levels deep)
-                    try:
-                        matches = list(game_folder.rglob(exe_name))
-                    except OSError as e:
-                        logger.debug(f"Failed to scan '{game_folder}' for '{exe_name}': {e}")
-                        continue
-
-                    for exe_path in matches:
-                        if exe_path.is_file():
-                            games.append(InstalledGame(
-                                name=game_name,
-                                executable=exe_name,
-                                install_path=game_folder,
-                                platform="steam",
-                            ))
-                            break
-                    else:
-                        continue
-                    break
+                    if exe_name.lower() in found:
+                        games.append(InstalledGame(
+                            name=game_name,
+                            executable=exe_name,
+                            install_path=game_folder,
+                            platform="steam",
+                        ))
+                        break
 
     return games
 
@@ -417,26 +443,22 @@ def _detect_epic_games() -> list[InstalledGame]:
             if not game_folder.is_dir():
                 continue
 
+            found = _find_game_executables(
+                game_folder, [exe for names in epic_game_patterns.values() for exe in names]
+            )
             for game_name, executables in epic_game_patterns.items():
                 for exe_name in executables:
-                    try:
-                        matches = list(game_folder.rglob(exe_name))
-                    except OSError as e:
-                        logger.debug(f"Failed to scan '{game_folder}' for '{exe_name}': {e}")
-                        continue
-
-                    for exe_path in matches:
-                        if exe_path.is_file():
-                            _append_unique_game(
-                                games,
-                                InstalledGame(
-                                    name=game_name,
-                                    executable=exe_name,
-                                    install_path=game_folder,
-                                    platform="epic",
-                                ),
-                            )
-                            break
+                    if exe_name.lower() in found:
+                        _append_unique_game(
+                            games,
+                            InstalledGame(
+                                name=game_name,
+                                executable=exe_name,
+                                install_path=game_folder,
+                                platform="epic",
+                            ),
+                        )
+                        break
 
     return games
 
@@ -619,22 +641,15 @@ def _detect_standalone_games() -> list[InstalledGame]:
 
     for slippi_path in slippi_locations:
         if slippi_path.exists():
+            found = _find_game_executables(slippi_path, executables, max_depth=5)
             for exe_name in executables:
-                try:
-                    matches = list(slippi_path.rglob(exe_name))
-                except OSError as e:
-                    logger.debug(f"Failed to scan standalone path '{slippi_path}' for '{exe_name}': {e}")
-                    continue
-
-                for exe_path in matches:
-                    if exe_path.is_file():
-                        games.append(InstalledGame(
-                            name="Slippi Melee",
-                            executable=exe_name,
-                            install_path=slippi_path,
-                            platform="standalone",
-                        ))
-                        break
+                if exe_name.lower() in found:
+                    games.append(InstalledGame(
+                        name="Slippi Melee",
+                        executable=exe_name,
+                        install_path=slippi_path,
+                        platform="standalone",
+                    ))
 
     return games
 

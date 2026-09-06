@@ -40,7 +40,7 @@ import pytest
 # is collected first (the production CLI entry side-steps it by going
 # through main()).
 import abso.main  # noqa: F401
-from abso.profiles.catalog import get_profile_instances
+from abso.profiles.catalog import PROFILE_CATALOG, get_profile_instances
 from abso.profiles.profile_bases import WebGLBaseProfile
 from abso.settings.nvidia.presets import NVIDIA_PRESETS
 
@@ -216,6 +216,50 @@ def test_every_nvidia_preset_name_resolves(profiles_by_id) -> None:
                 f"(silently applies empty preset). Known: {sorted(NVIDIA_PRESETS)}"
             )
     assert not failures, "Unknown NVIDIA preset names:\n  " + "\n  ".join(failures)
+
+
+def test_reflex_profiles_do_not_request_driver_queue_control(profiles_by_id) -> None:
+    """Check effective presets, not just explicit keys, for the Reflex contract."""
+    for profile_id, profile in profiles_by_id.items():
+        if profile_id not in PROFILE_CATALOG or not profile.requires_reflex:
+            continue
+        requested = profile.get_settings("NvidiaSettingsHandler")
+        effective = {**NVIDIA_PRESETS.get(requested.get("preset"), {}), **requested}
+        assert effective.get("low_latency_mode", "off") == "off", profile_id
+
+
+def test_built_in_profiles_omit_unused_mmcss_gpu_priority(profiles_by_id) -> None:
+    """Microsoft documents MMCSS GPU Priority as unused, not a GPU boost."""
+    for profile_id, profile in profiles_by_id.items():
+        if profile_id not in PROFILE_CATALOG:
+            continue
+        mmcss = profile.get_settings("RegistrySettingsHandler").get("game_priority", {})
+        assert "gpu_priority" not in mmcss, profile_id
+
+
+@pytest.mark.parametrize("refresh, expected", [(144, 141), (240, 237), (299.99, 297)])
+def test_ow2_saved_caps_are_static_ceiling_not_reflex_observations(
+    profiles_by_id, refresh, expected,
+) -> None:
+    from abso.core.vrr import get_vrr_fps_cap_for_policy
+
+    for profile_id, profile in profiles_by_id.items():
+        if not profile_id.startswith("overwatch2-gsync"):
+            continue
+        for handler in ("NvidiaSettingsHandler", "OW2ConfigHandler"):
+            settings = profile.get_settings(handler)
+            assert settings["auto_vrr_fps_cap"] is True
+            assert get_vrr_fps_cap_for_policy(refresh, settings["vrr_cap_policy"]) == expected
+        assert profile.get_settings("OW2ConfigHandler")["expected_reflex_mode"] == 2
+
+
+def test_retired_ow2_streaming_aliases_preserve_capture_apps(profiles_by_id) -> None:
+    from abso.profiles.catalog import resolve_profile_id
+
+    for alias in ("overwatch2-gsync-streaming", "overwatch2-gsync-hdr-streaming"):
+        profile = profiles_by_id[resolve_profile_id(alias)]
+        assert profile.is_capture_safe is True
+        assert profile.display_path_requirements.require_overlay_free_path is False
 
 
 def test_no_get_settings_errors(profiles_by_id) -> None:

@@ -104,8 +104,8 @@ class _MarvelRivalsBaseProfile(ReflexShooterBaseProfile):
             {
                 "category": "Display",
                 "setting": "NVIDIA Reflex Low Latency",
-                "value": "On + Boost",
-                "reason": "Reflex should own queue control in Marvel Rivals; the profile disables driver LLM to avoid overlap.",
+                "value": "On; select Boost manually only after comparison",
+                "reason": "ABSO writes a boolean Reflex target and requests driver LLM Off. That does not prove Boost is enabled or that the current game consumes this key; confirm the menu setting in-game.",
             },
             {
                 "category": "Display",

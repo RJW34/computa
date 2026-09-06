@@ -10,8 +10,21 @@ import pytest
 from abso.core.bios_detector import (
     SECURE_BOOT_CERT_EXPIRY_DATE,
     BiosDetector,
+    BiosFirmwareInfo,
     SecureBootCertState,
 )
+from abso.core.models import EvidenceTier
+
+
+def test_security_features_do_not_produce_an_unmeasured_fps_promise():
+    recommendations = BiosDetector().get_recommendations(
+        BiosFirmwareInfo(vbs_status="enabled", memory_integrity="enabled")
+    )
+    recommendation = next(rec for rec in recommendations if "HVCI" in rec.title)
+    assert recommendation.evidence_tier == EvidenceTier.EXPERIMENTAL
+    assert "Keep enabled" in recommendation.recommended_value
+    assert "5-10%" not in recommendation.explanation
+    assert "has not measured" in recommendation.explanation
 
 
 def _patch_reads(detector: BiosDetector, dwords: dict[str, int], values: dict[str, object]):

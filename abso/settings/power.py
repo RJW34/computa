@@ -257,7 +257,10 @@ class PowerSettingsHandler(SettingsHandler):
                 data["active_plan"], data.get("active_plan_name")
             )
         ):
-            success = False
+            # Sub-settings below address SCHEME_CURRENT. If switching to the
+            # captured plan failed, applying them would corrupt a different
+            # plan rather than restoring the backup.
+            return False
 
         # Restore power sub-settings
         setting_map = {

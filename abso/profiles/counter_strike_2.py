@@ -75,7 +75,8 @@ class _CounterStrike2BaseProfile(ReflexShooterBaseProfile):
     @property
     def graphics_api(self) -> Literal["dx11", "dx12", "vulkan", "opengl", "unknown"]:
         # CS2 (Source 2) renders through DX11 on Windows (the Vulkan path is
-        # the Linux build). HAGS / LLM expectations here are aligned to DX11.
+        # also available on Windows via -vulkan). HAGS / LLM expectations
+        # here are aligned to DX11, not runtime API detection.
         return "dx11"
 
     def get_handlers(self) -> list[SettingsHandler]:
@@ -115,14 +116,14 @@ class _CounterStrike2BaseProfile(ReflexShooterBaseProfile):
             {
                 "category": "Video",
                 "setting": "NVIDIA Reflex",
-                "value": "Enabled + Boost — ABSO already set driver LLM off; flip the in-game toggle to finish",
-                "reason": "ABSO has already configured the driver side: NVIDIA LLM is OFF so the engine owns the render queue (Reflex's correct path). The Source 2 video config is owned by the game and cannot be written from outside; toggle 'NVIDIA Reflex' to 'Enabled + Boost' in CS2's Video settings once to finish setup.",
+                "value": "Enabled + Boost — set the in-game toggle manually; profile requests driver LLM Off",
+                "reason": "Applying this profile requests NVIDIA driver LLM Off for native Reflex queue control. ABSO leaves Source 2 video configuration user-owned; toggle 'NVIDIA Reflex' to 'Enabled + Boost' in CS2's Video settings. Boost may reduce FPS and increase power use; NVIDIA recommends it only when minimizing latency takes priority over FPS.",
             },
             {
                 "category": "Video",
                 "setting": "Maximum FPS in game (fps_max)",
                 "value": "0 (uncapped)",
-                "reason": "No-sync lane: CS2 is CPU-bound at competitive settings and higher uncapped FPS lowers frame time. Cap if heat, noise, or pacing gets worse.",
+                "reason": "No-sync lane: higher uncapped FPS lowers frame time when the machine can sustain it. Cap if heat, noise, or pacing gets worse.",
             },
             *self._shared_graphics_in_game_settings(),
         ]
@@ -147,8 +148,8 @@ class _CounterStrike2BaseProfile(ReflexShooterBaseProfile):
             {
                 "category": "Video",
                 "setting": "NVIDIA Reflex",
-                "value": "Enabled + Boost — ABSO already set driver LLM off; flip the in-game toggle to finish",
-                "reason": "ABSO has already configured the driver side: NVIDIA LLM is OFF so the engine owns the render queue (Reflex's correct path). The Source 2 video config is owned by the game and cannot be written from outside; toggle 'NVIDIA Reflex' to 'Enabled + Boost' in CS2's Video settings once to finish setup.",
+                "value": "Enabled + Boost — set the in-game toggle manually; profile requests driver LLM Off",
+                "reason": "Applying this profile requests NVIDIA driver LLM Off for native Reflex queue control. ABSO leaves Source 2 video configuration user-owned; toggle 'NVIDIA Reflex' to 'Enabled + Boost' in CS2's Video settings. Boost may reduce FPS and increase power use; NVIDIA recommends it only when minimizing latency takes priority over FPS.",
             },
             {
                 "category": "Video",

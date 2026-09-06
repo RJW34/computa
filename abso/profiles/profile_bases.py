@@ -16,14 +16,9 @@ if TYPE_CHECKING:
     from abso.settings.base import SettingsHandler
 
 
-# SDR-on-wide-gamut compensation. Modern OLED / QD-OLED / mini-LED panels
-# render wider than sRGB natively; without compensation, sRGB content gets
-# stretched into the panel's wider primaries and reads as oversaturated /
-# "off-color." A small DVC pull-down (-5 from neutral 50) restores the
-# author-intended sRGB perception across the SDR profile lineup.
-#
-# HDR profiles override this back to NEUTRAL_VIBRANCE because Windows HDR
-# composition owns the gamut mapping and DVC compensation would fight it.
+# Optional aesthetic desaturation used by existing SDR lanes. A fixed DVC
+# value is not an sRGB gamut transform and cannot calibrate an unknown panel.
+# Retained for compatibility; HDR variants use the neutral value instead.
 SDR_WIDE_GAMUT_VIBRANCE = 45
 NEUTRAL_VIBRANCE = 50
 
@@ -437,12 +432,10 @@ class Rivals2BaseProfile(BaseProfile):
                 "disable_usb_suspend": True,
                 "disable_pcie_power_saving": True,
                 "processor_max_performance": True,
-                # Bitsum "Highest Performance" equivalent: hold the CPU floor at
-                # base clock and keep every core unparked during play, removing
-                # the DVFS ramp + core-unpark wake latency that degrades 1% lows
-                # under a frame cap. The desktop/productivity profile relaxes the
-                # floor back to 5 so the 14900F still idles cool. EXPERIMENTAL:
-                # a frame-time consistency win, not an average-FPS gain.
+                # Experimental power policy: high minimum processor state and
+                # unparked cores can increase heat/power and may reduce thermal
+                # headroom. No local frame-time benefit is established; compare
+                # against a Balanced baseline before claiming an improvement.
                 "processor_min_state": 100,
                 "disable_core_parking": True,
             },
@@ -453,7 +446,6 @@ class Rivals2BaseProfile(BaseProfile):
                 # starved, and the delta is unmeasurable on modern CPUs.
                 "win32_priority_separation": WIN32_PRIORITY_GAMING_ONLINE,
                 "game_priority": {
-                    "gpu_priority": 8,
                     "priority": 6,
                     "scheduling_category": "High",
                     # sfio_priority omitted — has no effect per Microsoft docs
@@ -514,11 +506,11 @@ class Rivals2BaseProfile(BaseProfile):
                 "setting": "NVIDIA App overlay",
                 "value": "Off",
                 "reason": (
-                    "Known Rivals 2 issue: the NVIDIA App in-game overlay can "
-                    "roughly halve frame rate in UE5 titles, and NVIDIA App / "
-                    "driver updates have silently re-enabled it. Keep it "
-                    "disabled on every lane; this is separate from OBS/Medal "
-                    "capture, which follows the lane's own overlay policy."
+                    "Compare frame times with the NVIDIA overlay and filters "
+                    "disabled if performance is poor. Overlay cost varies by "
+                    "game, driver, and enabled features; ABSO has no local "
+                    "measurement supporting a fixed percentage loss. Capture "
+                    "apps follow the lane's separate process policy."
                 ),
             },
         ]
@@ -643,19 +635,16 @@ class EmulatorLatencyBaseProfile(BaseProfile):
                 "disable_usb_suspend": True,
                 "disable_pcie_power_saving": True,
                 "processor_max_performance": True,
-                # Bitsum "Highest Performance" equivalent: hold the CPU floor at
-                # base clock and keep every core unparked during play, removing
-                # the DVFS ramp + core-unpark wake latency that degrades 1% lows
-                # under a frame cap. The desktop/productivity profile relaxes the
-                # floor back to 5 so the 14900F still idles cool. EXPERIMENTAL:
-                # a frame-time consistency win, not an average-FPS gain.
+                # Experimental power policy: high minimum processor state and
+                # unparked cores can increase heat/power and may reduce thermal
+                # headroom. No local frame-time benefit is established; compare
+                # against a Balanced baseline before claiming an improvement.
                 "processor_min_state": 100,
                 "disable_core_parking": True,
             },
             "RegistrySettingsHandler": {
                 "win32_priority_separation": WIN32_PRIORITY_GAMING_OFFLINE,
                 "game_priority": {
-                    "gpu_priority": 8,
                     "priority": 6,
                     "scheduling_category": "High",
                     # sfio_priority omitted — has no effect per Microsoft docs
@@ -747,7 +736,6 @@ class WebGLBaseProfile(BaseProfile):
             "RegistrySettingsHandler": {
                 "win32_priority_separation": WIN32_PRIORITY_GAMING_ONLINE,
                 "game_priority": {
-                    "gpu_priority": 8,
                     "priority": 4,
                     "scheduling_category": "Medium",
                     # sfio_priority omitted — has no effect per Microsoft docs
@@ -869,19 +857,16 @@ class ReflexShooterBaseProfile(BaseProfile):
                 "disable_usb_suspend": True,
                 "disable_pcie_power_saving": True,
                 "processor_max_performance": True,
-                # Bitsum "Highest Performance" equivalent: hold the CPU floor at
-                # base clock and keep every core unparked during play, removing
-                # the DVFS ramp + core-unpark wake latency that degrades 1% lows
-                # under a frame cap. The desktop/productivity profile relaxes the
-                # floor back to 5 so the 14900F still idles cool. EXPERIMENTAL:
-                # a frame-time consistency win, not an average-FPS gain.
+                # Experimental power policy: high minimum processor state and
+                # unparked cores can increase heat/power and may reduce thermal
+                # headroom. No local frame-time benefit is established; compare
+                # against a Balanced baseline before claiming an improvement.
                 "processor_min_state": 100,
                 "disable_core_parking": True,
             },
             "RegistrySettingsHandler": {
                 "win32_priority_separation": WIN32_PRIORITY_GAMING_OFFLINE,
                 "game_priority": {
-                    "gpu_priority": 8,
                     "priority": 6,
                     "scheduling_category": "High",
                     # sfio_priority omitted — has no effect per Microsoft docs

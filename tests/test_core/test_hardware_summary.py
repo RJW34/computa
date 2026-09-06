@@ -16,7 +16,20 @@ def test_infer_cpu_topology_for_14th_gen_hybrid_cpu():
             "cores": 24,
             "threads": 32,
         }
-    ) == {"type": "hybrid", "p_cores": 16, "e_cores": 8}
+    ) == {"type": "hybrid", "p_cores": 8, "e_cores": 16}
+
+
+def test_infer_cpu_topology_does_not_invent_split_without_smt():
+    for name in ("Intel Core i9-14900F", "Intel Core Ultra 9 285K"):
+        assert infer_cpu_topology(
+            {"name": name, "cores": 24, "threads": 24}
+        ) == {"type": "hybrid"}
+
+
+def test_infer_cpu_topology_rejects_impossible_thread_count():
+    assert infer_cpu_topology(
+        {"name": "Intel Core i9-14900F", "cores": 24, "threads": 64}
+    ) == {"type": "hybrid"}
 
 
 def test_infer_cpu_topology_for_homogeneous_cpu():
@@ -78,7 +91,7 @@ def test_build_detect_payload_handles_optional_sections():
         "system": {"manufacturer": "MSI"},
         "gpu": None,
         "cpu": {"name": "Intel(R) Core(TM) i9-14900F", "cores": 24, "threads": 32},
-        "cpu_topology": {"type": "hybrid", "p_cores": 16, "e_cores": 8},
+        "cpu_topology": {"type": "hybrid", "p_cores": 8, "e_cores": 16},
         "ram_gb": None,
         "monitors": [],
         "is_admin": False,

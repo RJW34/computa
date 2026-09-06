@@ -1,6 +1,6 @@
 # computa
 
-**Per-game Windows optimization, with a backup of everything it touches.**
+**Per-game Windows tuning, with backups and explicit verification.**
 
 computa is a CLI-first Windows 11 gaming tuning tool: it detects your
 hardware, audits your system configuration, and applies game-specific
@@ -12,28 +12,28 @@ together — with automatic backups and one-command rollback.
 - **Hardware detection** — GPU (NVIDIA/AMD/Intel), CPU topology, monitors,
   refresh rates, G-SYNC/FreeSync/VRR capability, HDR support
 - **Configuration audit** — scans 15+ system areas and explains what's
-  suboptimal for gaming and why
+  differs from its configured targets and why
 - **Game profiles** — per-game optimization lanes (no-sync minimum latency,
   G-SYNC/VRR, HDR, capture-safe variants) that tune Windows, power, input,
   GPU driver, and display state together
 - **First-run calibration** — `computa setup` walks hardware detection, audit,
   and profile selection, and adapts what it offers to *your* machine
-- **Safe by default** — timestamped backup of every setting before any change,
-  one-command restore, and a baseline captured at setup so you can always get
-  back to where you started
+- **Recovery support** — timestamped backups before profile transactions and
+  a baseline captured at setup. Restore coverage depends on each handler;
+  runtime process effects and partially restorable settings have limits
 - **System tray app** — one-click profile switching, game detection, and
   status, with selectable icon/sound themes
-- **Live verification** — `state --json --verify` and `health --json` prove
-  whether the active profile is actually in effect instead of assuming it
+- **Live verification** — `state --json --verify` and `health --json` check
+  supported setting readbacks. They do not measure FPS, input latency, or
+  prove that every game/driver has consumed a saved setting
 
 ## Requirements
 
 - Windows 10/11 (64-bit); Windows 11 has the deepest coverage
 - Administrator privileges (system settings require elevation)
 - **GPU:** any. NVIDIA gets the deepest driver tuning (per-app driver
-  profiles, Low Latency Mode, VRR overrides); AMD Radeon gets vendor-specific
-  registry tuning (Anti-Lag, Enhanced Sync, ULPS); other GPUs still get all
-  OS/power/input/display optimizations
+  profiles, Low Latency Mode, VRR overrides); AMD Radeon has experimental
+  registry mappings; other GPUs use applicable OS/power/input/display settings
 - Python 3.11+ **only for source installs** — the released `computa.exe` is
   self-contained
 
@@ -146,8 +146,8 @@ Exact settings vary per profile; this is what built-in profiles touch today.
   Latency Mode, VSync, Power Management, Max Frame Rate, and VRR overrides per
   profile. Native Reflex is preferred over driver LLM whenever the game
   supports it; the Reflex toggle itself must still be enabled in-game
-- **AMD:** vendor registry tuning (Anti-Lag, Enhanced Sync, ULPS) mapped from
-  the same profile intents
+- **AMD:** experimental registry mappings for profile intents; registry
+  readback does not establish per-game driver behavior or performance
 - VRR safety caps scale to *your* panel (default `refresh − 3`), not to any
   hardcoded refresh rate
 
@@ -169,9 +169,13 @@ specific timestamp) rolls back. `computa setup` additionally captures a baseline
 snapshot, and `computa uninstall` returns the system to that baseline and removes
 computa's startup registration.
 
-Some settings need one reboot the **first** time they change (HAGS, MPO,
-opt-in VBS/memory settings); profile switches after that are instant. `state
+Some settings need a reboot whenever their effective target changes (HAGS,
+MPO, opt-in VBS/memory settings); profile switches can require another reboot. `state
 --json --verify` distinguishes "not applied" from "applied, reboot pending".
+
+Profiles are starting points for measurement. No built-in profile is proven
+to deliver the best possible performance on every supported setup. Use
+repeatable per-game frame captures before accepting an optimization claim.
 
 ## Troubleshooting
 
@@ -213,7 +217,7 @@ MIT — see [`LICENSE`](LICENSE).
 
 ## Disclaimer
 
-This tool modifies Windows system settings. It backs up everything it changes
-and can restore those backups, but you should still keep your own restore
+This tool modifies Windows system settings. It backs up supported handler state
+and reports restore limitations; you should still keep your own restore
 points for anything you can't afford to lose. The authors are not responsible
 for issues arising from use of this tool.

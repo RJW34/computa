@@ -59,8 +59,8 @@ class NicDriverHandler(SettingsHandler):
 
     @property
     def restore_guarantee(self) -> str:
-        # Best-effort: a driver rejecting a keyword on restore must not block a
-        # profile switch's baseline restore.
+        # Drivers can reject keywords; failed reverts are reported to the
+        # transaction instead of claiming a complete restore.
         return "partial"
 
     # -- SettingsHandler contract -----------------------------------------
@@ -195,12 +195,16 @@ class NicDriverHandler(SettingsHandler):
             # Nothing was captured (no active adapter / no targeted keys); the
             # original state is already intact.
             return True
-        try:
-            for keyword, value in properties.items():
-                self._set_property(adapter, keyword, str(value))
-        except Exception as exc:  # noqa: BLE001 - best-effort, never block a switch
-            logger.error("Failed to restore NIC driver settings: %s", exc)
-        return True
+        success = True
+        for keyword, value in properties.items():
+            try:
+                if not self._set_property(adapter, keyword, str(value)):
+                    logger.error("Failed to restore NIC driver setting %s", keyword)
+                    success = False
+            except Exception as exc:  # noqa: BLE001 - attempt remaining captured properties
+                logger.error("Failed to restore NIC driver setting %s: %s", keyword, exc)
+                success = False
+        return success
 
     def verify_active(self, settings: dict[str, Any]) -> dict[str, Any]:
         """Confirm each exposed targeted keyword sits at its optimal value."""
@@ -291,7 +295,7 @@ class NicDriverHandler(SettingsHandler):
         script = (
             f"Set-NetAdapterAdvancedProperty -Name '{self._escape(adapter)}' "
             f"-RegistryKeyword '{self._escape(keyword)}' "
-            f"-RegistryValue '{self._escape(registry_value)}' -NoRestart"
+            f"-RegistryValue '{self._escape(registry_value)}' -NoRestart -ErrorAction Stop"
         )
         result = self._run_ps(script)
         if result.returncode != 0:

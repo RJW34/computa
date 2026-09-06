@@ -827,10 +827,10 @@ class TestProfileSettings:
         """G-SYNC Overwatch profile should use the optimized borderless VRR path."""
         profile = Overwatch2GSyncProfile()
         settings = profile.get_settings("NvidiaSettingsHandler")
-        assert settings["preset"] == "ull_gsync"
+        assert settings["preset"] == "reflex_gsync"
         assert settings["profile_name"] == "Overwatch 2"
         assert settings["auto_vrr_fps_cap"] is True
-        assert settings["vrr_cap_policy"] == "ow2_reflex_gsync"
+        assert settings["vrr_cap_policy"] == "refresh_minus_3"
         assert settings["global_vrr_mode"] == "fullscreen_and_windowed"
 
     def test_overwatch2_gsync_in_game_display_mode_matches_windowed_vrr_path(self):
@@ -852,10 +852,10 @@ class TestProfileSettings:
         assert win["auto_hdr"] is False
 
         nvidia = profile.get_settings("NvidiaSettingsHandler")
-        assert nvidia["preset"] == "ull_gsync"
+        assert nvidia["preset"] == "reflex_gsync"
         assert nvidia["profile_name"] == "Overwatch 2"
         assert nvidia["auto_vrr_fps_cap"] is True
-        assert nvidia["vrr_cap_policy"] == "ow2_reflex_gsync"
+        assert nvidia["vrr_cap_policy"] == "refresh_minus_3"
         assert nvidia["global_vrr_mode"] == "fullscreen_and_windowed"
 
         color = profile.get_settings("ColorProfileSettingsHandler")
@@ -890,12 +890,10 @@ class TestProfileSettings:
             assert graphics["disable_global_fso"] is False
             assert graphics["disable_mpo"] is False
             assert nvidia["global_vrr_mode"] == "fullscreen_and_windowed"
-            # Staggered caps: the driver v3 limiter (276 @ 300 Hz) is the
-            # authoritative pacer; the in-game cap parks above it at
-            # refresh - 3 so the limiters never fight (CapFrameX, Oct 2025).
-            assert nvidia["vrr_cap_policy"] == "ow2_reflex_gsync"
+            # Saved ceilings stay distinct from Reflex runtime pacing.
+            assert nvidia["vrr_cap_policy"] == "refresh_minus_3"
             assert ow2["vrr_cap_policy"] == "refresh_minus_3"
-            assert ow2["expected_reflex_mode"] == 0
+            assert ow2["expected_reflex_mode"] == 2
             assert ow2["window_mode"] == 1
             assert ow2["fullscreen_window"] is False
             assert ow2["fullscreen_window_enabled"] is False
@@ -915,9 +913,9 @@ class TestProfileSettings:
         assert graphics["disable_mpo"] is False
         assert nvidia["global_vrr_mode"] == "fullscreen_and_windowed"
         assert nvidia["profile_name"] == "Overwatch 2"
-        assert nvidia["vrr_cap_policy"] == "ow2_reflex_gsync"
+        assert nvidia["vrr_cap_policy"] == "refresh_minus_3"
         assert ow2["vrr_cap_policy"] == "refresh_minus_3"
-        assert ow2["expected_reflex_mode"] == 0
+        assert ow2["expected_reflex_mode"] == 2
         assert ow2["window_mode"] == 1
 
     def test_overwatch2_hdr_capture_profile_uses_windowed_hdr_vrr_path(self):
@@ -934,9 +932,9 @@ class TestProfileSettings:
         assert windows["vrr_optimize"] is True
         assert graphics["disable_mpo"] is False
         assert nvidia["global_vrr_mode"] == "fullscreen_and_windowed"
-        assert nvidia["vrr_cap_policy"] == "ow2_reflex_gsync"
+        assert nvidia["vrr_cap_policy"] == "refresh_minus_3"
         assert ow2["vrr_cap_policy"] == "refresh_minus_3"
-        assert ow2["expected_reflex_mode"] == 0
+        assert ow2["expected_reflex_mode"] == 2
         assert ow2["window_mode"] == 1
 
     def test_overwatch2_capture_profile_allows_overlays(self):

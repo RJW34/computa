@@ -251,7 +251,7 @@ def build_recommended_actions(
             "requires_user_action": True,
             "changes_display_state": True,
             "detail": (
-                "After the pending reboot, review Windows/NVIDIA display settings "
+                "Review Windows/NVIDIA display settings "
                 "and set active displays to their highest stable refresh rates. "
                 "ABSO does not change live display modes automatically."
             ),

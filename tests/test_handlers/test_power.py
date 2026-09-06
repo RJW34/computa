@@ -324,6 +324,14 @@ class TestPowerBackupRestore:
 
         assert result is False
 
+    @patch.object(PowerSettingsHandler, "_set_power_setting")
+    @patch.object(PowerSettingsHandler, "_restore_active_plan", return_value=False)
+    def test_failed_plan_restore_never_writes_other_scheme(self, restore_plan, setter):
+        handler = PowerSettingsHandler()
+        result = handler.restore({"active_plan": "missing-guid", "processor_min_state": 5})
+        assert result is False
+        setter.assert_not_called()
+
     @patch.object(PowerSettingsHandler, "_list_plans")
     @patch.object(PowerSettingsHandler, "_set_active_plan")
     def test_restore_falls_back_to_plan_name_when_guid_gone(self, mock_set_active, mock_list):

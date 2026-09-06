@@ -250,12 +250,23 @@ class TestBackupRestore:
             mock_run.assert_not_called()
 
     @patch.object(NicDriverHandler, "_run_ps")
-    def test_restore_exception_is_non_blocking(self, mock_run):
-        # Best-effort: a failed revert logs but returns True so it never blocks
-        # a profile-switch baseline restore.
+    def test_restore_exception_reports_failure(self, mock_run):
+        # A failed revert must remain visible to transaction rollback.
         mock_run.side_effect = Exception("boom")
         data = {"adapter": "Ethernet", "properties": {"*RSS": "0"}}
-        assert NicDriverHandler().restore(data) is True
+        assert NicDriverHandler().restore(data) is False
+
+    @patch.object(NicDriverHandler, "_set_property")
+    def test_restore_continues_after_one_property_fails(self, setter):
+        setter.side_effect = [OSError("first failed"), True]
+        data = {"adapter": "Ethernet", "properties": {"*RSS": "0", "*EEE": "1"}}
+        assert NicDriverHandler().restore(data) is False
+        assert setter.call_count == 2
+
+    @patch.object(NicDriverHandler, "_set_property", return_value=False)
+    def test_restore_reports_native_setter_failure(self, setter):
+        data = {"adapter": "Ethernet", "properties": {"*RSS": "0"}}
+        assert NicDriverHandler().restore(data) is False
 
 
 class TestVerifyActive:

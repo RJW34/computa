@@ -24,12 +24,12 @@ class SyncMethod(Enum):
 
 
 class FrameLimiterType(Enum):
-    """Frame limiter types ranked by latency (best to worst)."""
+    """Frame limiter types; relative latency depends on the implementation."""
 
     IN_GAME = "in_game"  # Usually preferred when stable
     REFLEX = "reflex"  # Engine-level, auto-adjusts
     RTSS = "rtss"  # Best frametime consistency
-    NVCP = "nvcp"  # Affects power management, avoid
+    NVCP = "nvcp"  # Driver-level limiter fallback
 
 
 class GraphicsAPI(Enum):
@@ -82,7 +82,7 @@ class VRRConfig:
 # Practical implication: the cap is *not* the latency control. NVIDIA
 # Reflex (when engaged in-game) provides dynamic pacing that may bind
 # below this static ceiling; that's expected and desirable. The cap just
-# guarantees the V-SYNC safety net never trips during normal play.
+# provides headroom; limiter precision and the presentation path still matter.
 #
 # Users observing FPS far below the cap should run the empirical isolation
 # test (each Reflex mode in turn, see docs/AGENT_PROTOCOL.md) to identify
@@ -108,13 +108,10 @@ VRR_FPS_CAPS: dict[int, int] = {
 
 OW2_REFLEX_GSYNC_CAP_POLICY = "ow2_reflex_gsync"
 
-# Fixed-60Hz-simulation fighting games (Rivals 2 and similar platform
-# fighters) tick game logic on a hard 60 Hz grid. Community testing on
-# Rivals 2 consistently shows that only render caps that are whole
-# multiples of 60 produce an even sim-to-photon cadence; generic
-# ``refresh - 3`` caps (297 @ 300 Hz, 237 @ 240 Hz, 141 @ 144 Hz) land
-# off-grid, alternating 4/5 rendered frames per sim tick, which reads as
-# low-frequency micro-stutter. These policies snap caps to the sim grid.
+# Optional Rivals 2 render-cap heuristic: snap to a 60 Hz simulation grid.
+# Simulation rate alone does not prove a render cap is optimal; rendering can
+# interpolate between ticks. Retained for compatibility pending controlled
+# comparisons against refresh - 3 on the user's actual display/game build.
 FIGHTING_SIM_RATE_HZ = 60
 FIGHTING_60HZ_VRR_CAP_POLICY = "fighting_60hz_vrr"
 FIGHTING_60HZ_NOSYNC_CAP_POLICY = "fighting_60hz_nosync"
@@ -168,11 +165,12 @@ def get_vrr_fps_cap(
 
 
 def get_reflex_gsync_fps_cap(refresh_rate: int | float) -> int:
-    """Calculate the OW2/NVIDIA Reflex G-SYNC effective cap.
+    """Return the historical heuristic cap, retained for explicit custom policies.
 
-    NVIDIA's Reflex/ULLM G-SYNC path uses a wider frame-time margin than the
+    This is not a documented NVIDIA formula or the built-in OW2 policy.
+    The historical Reflex/ULLM G-SYNC approximation used a wider margin than the
     static ``refresh - 3`` safety cap. Known public examples include roughly
-    157 FPS at 165 Hz and 224 FPS at 240 Hz; the current OW2 300 Hz target is
+    157 FPS at 165 Hz and 224 FPS at 240 Hz; the historical 300 Hz estimate was
     276 FPS. The fallback keeps the same ~0.29 ms frame-time margin for less
     common refresh rates.
     """
@@ -398,18 +396,11 @@ SCANOUT_TIMES_MS: dict[int, float] = {
     360: 2.8,
 }
 
-# Tested display latency for 60 FPS content
-DISPLAY_LATENCY_MS: dict[int, float] = {
-    60: 40.7,
-    120: 16.8,
-    170: 15.5,
-}
-
-
 def get_high_refresh_benefit(base_hz: int, target_hz: int) -> dict[str, Any]:
-    """Calculate latency benefit of higher refresh rate.
+    """Calculate the ideal scanout-interval difference of two refresh rates.
 
-    Even for 60Hz-logic games, higher refresh reduces display latency.
+    This arithmetic is not an end-to-end latency measurement. Actual timing
+    depends on presentation, blanking, panel scanout, and pixel response.
 
     Args:
         base_hz: Lower refresh rate to compare.

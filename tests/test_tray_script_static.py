@@ -3748,14 +3748,15 @@ def test_tray_action_toasts_update_durable_status() -> None:
     assert 'Set-TrayLastAction -Message "Profiles refreshed: $($script:Profiles.Count) loaded"' not in script
     assert 'Set-TrayLastAction -Message "Profile refresh failed"' not in script
     assert 'Set-TrayLastAction -Message "Clearing standby list"' in script
-    assert 'Set-TrayLastAction -Message "Standby list cleared: ~${freed}MB"' in script
+    assert 'Set-TrayLastAction -Message "Standby purge completed"' in script
+    assert 'if ($exitCode -eq 0 -and $json.success -and $json.data -and $json.data.success)' in script
     assert 'Set-TrayLastAction -Message "Standby clear timed out after 15s"' in script
     assert 'Set-TrayLastAction -Message "Standby clear failed: runtime returned no status"' in script
     assert '$clearError = if ($json.error)' in script
     assert 'Set-TrayLastAction -Message "Standby clear failed: $clearError"' in script
     assert 'Set-TrayLastAction -Message "Standby clear failed"' not in script
     assert (
-        'Show-Notification -Title "computa" -Message "Standby list cleared. Freed ~${freed}MB" '
+        'Show-Notification -Title "computa" -Message "Standby purge completed" '
         '-Type "Success" -ActionName "Memory" -ActionColor $script:Colors.AccentBlue'
     ) in script
     assert (

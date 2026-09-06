@@ -418,9 +418,9 @@ class MultiMonitorDetector:
                 code="MULTIMON_MIXED_REFRESH",
                 message=f"Mixed refresh rates detected ({env.min_refresh}Hz - {env.max_refresh}Hz)",
                 recommendation=(
-                    "Mixed refresh can cause compositor overhead. Consider disabling "
-                    "secondary monitors during competitive gaming, or ensure HAGS is ON "
-                    "to mitigate compositor latency."
+                    "Mixed refresh can affect presentation in some configurations. "
+                    "If stutter occurs, compare display layouts in a controlled test. "
+                    "Topology alone does not prove a fault or a benefit from HAGS."
                 ),
             ))
 
@@ -442,7 +442,7 @@ class MultiMonitorDetector:
                     f"below detected capability {monitor.max_refresh_rate:g}Hz"
                 ),
                 recommendation=(
-                    "After the pending reboot, consider setting each active display to its "
+                    "Review each active display's selected refresh rate and consider its "
                     "highest stable refresh rate in Windows/NVIDIA Control Panel. ABSO "
                     "does not change live display modes automatically."
                 ),

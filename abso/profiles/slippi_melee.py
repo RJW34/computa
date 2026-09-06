@@ -18,7 +18,7 @@ if TYPE_CHECKING:
 
 
 # Dolphin/Slippi renders SDR; the HDR variants run the game as SDR-in-HDR via
-# Windows HDR composition for users who get eye-strain relief from HDR
+# Windows HDR composition for users who get the preferred HDR desktop appearance from HDR
 # desktop tone-mapping. The latency cost vs the pure-SDR exclusive lane is
 # small but nonzero, so the HDR siblings inherit every other latency choice
 # from their SDR parents unchanged.
@@ -69,7 +69,7 @@ def _hdr_in_game_guidance() -> list[dict[str, str]]:
             "reason": (
                 "Dolphin/Slippi renders SDR. With Windows HDR on, the OS tone-maps "
                 "Dolphin's SDR output through the HDR pipeline, which is what gives "
-                "the lower-strain look. Leave HDR enabled at the OS level before launching Slippi."
+                "the preferred look. Leave HDR enabled at the OS level before launching Slippi."
             ),
         },
         {
@@ -96,14 +96,12 @@ def _hdr_in_game_guidance() -> list[dict[str, str]]:
         {
             "category": "Display",
             "setting": "Exclusive Fullscreen vs SDR-in-HDR latency",
-            "value": "Accept a small HDR composition cost",
+            "value": "Compare HDR and SDR frame times on this setup",
             "reason": (
-                "When Windows is in HDR mode, even 'exclusive fullscreen' SDR apps go through "
-                "the HDR composition path. The added latency is real but not measured by ABSO — "
-                "Windows HDR composition cost varies by OS build, driver, and panel. The HDR "
-                "variant is for sessions where eye-strain relief matters more than the leanest "
-                "no-sync path; switch back to the SDR sibling for tournament/practice where "
-                "latency is the priority."
+                "SDR output is displayed within the Windows HDR desktop. ABSO "
+                "has not measured a latency penalty or benefit on this path. "
+                "Compare the SDR sibling on the same OS, driver, and display "
+                "when choosing between visual preference and performance."
             ),
         },
     ]
@@ -599,7 +597,7 @@ class SlippiMeleeProfile(EmulatorLatencyBaseProfile):
 
 
 class SlippiMeleeUniversalProfile(SlippiMeleeProfile):
-    """No-sync Slippi profile with fixed HAGS (no reboot required).
+    """No-sync Slippi profile with fixed HAGS (initial change may require reboot).
 
     Unlike the base slippi-melee profile which toggles HAGS based on
     Dolphin backend (DX11/OpenGL: off, DX12/Vulkan: on), this profile
@@ -656,7 +654,7 @@ class SlippiMeleeUniversalProfile(SlippiMeleeProfile):
                 updated.append({
                     "category": "Windows Settings",
                     "setting": "Hardware Accelerated GPU Scheduling (HAGS)",
-                    "value": "On (always - no reboot on re-apply)",
+                    "value": "On (initial change may require reboot)",
                     "reason": (
                         "HAGS is fixed to True regardless of Dolphin backend. This avoids "
                         "reboot requirements when switching backends or re-applying the profile. "
@@ -830,14 +828,14 @@ class SlippiMeleeConsoleParityProfile(SlippiMeleeProfile):
 
 
 class SlippiMeleeHDRProfile(SlippiMeleeProfile):
-    """Competitive Slippi profile with Windows HDR on for eye-strain relief.
+    """Competitive Slippi profile with Windows HDR on for the preferred HDR desktop appearance.
 
     Dolphin/Slippi renders SDR; this variant runs the game as SDR-in-HDR via
     Windows HDR composition. Every latency choice from the base
     SlippiMeleeProfile is preserved (VSync OFF, backend-aware LLM, exclusive
     fullscreen, native EFB). The only difference is that Windows HDR is
     enabled and ACM is disabled, which costs a small amount of composition
-    latency in exchange for the lower-strain HDR desktop look.
+    latency in exchange for the preferred HDR desktop look.
     """
 
     @property
@@ -851,7 +849,7 @@ class SlippiMeleeHDRProfile(SlippiMeleeProfile):
     @property
     def description(self) -> str:
         return (
-            "Eye-strain-friendly HDR variant of the competitive Slippi profile. "
+            "Windows HDR composition variant of the competitive Slippi profile. "
             "Same no-sync latency contract; Dolphin renders SDR through Windows HDR."
         )
 
@@ -872,7 +870,7 @@ class SlippiMeleeUniversalHDRProfile(SlippiMeleeUniversalProfile):
     Mirrors SlippiMeleeUniversalProfile - HAGS stays True regardless of
     Dolphin backend so re-applying never triggers a reboot. HDR is added on
     top via the standard Windows HDR composition path so the day-to-day
-    "flip in and out" workflow keeps eye-strain relief without losing the
+    "flip in and out" workflow keeps the preferred HDR desktop appearance without losing the
     no-reboot ergonomics.
     """
 
@@ -887,8 +885,8 @@ class SlippiMeleeUniversalHDRProfile(SlippiMeleeUniversalProfile):
     @property
     def description(self) -> str:
         return (
-            "HDR variant of the universal Slippi profile. Fixed HAGS on (no reboot), "
-            "no-sync latency contract, Windows HDR for eye-strain relief."
+            "HDR variant of the universal Slippi profile. Fixed HAGS on (initial change may require reboot), "
+            "no-sync latency contract, Windows HDR for the preferred HDR desktop appearance."
         )
 
     @property
@@ -903,12 +901,12 @@ class SlippiMeleeUniversalHDRProfile(SlippiMeleeUniversalProfile):
 
 
 class SlippiMeleeConsoleParityHDRProfile(SlippiMeleeConsoleParityProfile):
-    """Console-parity Slippi profile with Windows HDR on for eye-strain relief.
+    """Console-parity Slippi profile with Windows HDR on for the preferred HDR desktop appearance.
 
     Mirrors SlippiMeleeConsoleParityProfile - 60 Hz refresh, VSync on for
     stable cadence, no aggressive presentation shortcuts. HDR is added on
     top via the standard Windows HDR composition path. Best fit for offline
-    practice sessions where you want console-like feel plus the lower-strain
+    practice sessions where you want console-like feel plus the preferred
     HDR desktop look.
     """
 
@@ -924,7 +922,7 @@ class SlippiMeleeConsoleParityHDRProfile(SlippiMeleeConsoleParityProfile):
     def description(self) -> str:
         return (
             "HDR variant of the console-parity Slippi profile. 60 Hz + VSync on, "
-            "Windows HDR for eye-strain relief on offline practice sessions."
+            "Windows HDR for the preferred HDR desktop appearance on offline practice sessions."
         )
 
     @property

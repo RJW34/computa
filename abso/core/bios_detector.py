@@ -567,8 +567,9 @@ class BiosDetector:
             )
             if has_nvidia_gpu:
                 explanation += (
-                    " NVIDIA requires both ReBAR enabled in BIOS and the "
-                    "'ReBAR' toggle set to ON in the NVIDIA Control Panel."
+                    " On supported NVIDIA systems, enable the required BIOS/firmware "
+                    "support and check Resizable BAR under NVIDIA Control Panel "
+                    "System Information; that page is a readback, not an enable toggle."
                 )
             recommendations.append(BiosRecommendation(
                 title="Enable Resizable BAR (ReBAR) in BIOS",
@@ -589,18 +590,19 @@ class BiosDetector:
                     f"(JEDEC default)."
                 )
             recommendations.append(BiosRecommendation(
-                title="Enable XMP/EXPO memory profile in BIOS",
+                title="Review memory profile and supported speed in BIOS",
                 explanation=(
                     "Your memory appears to be running at JEDEC base speed "
-                    f"instead of its rated XMP/EXPO speed.{speed_detail} Enabling "
-                    "XMP (Intel) or EXPO (AMD) in BIOS is free performance "
-                    "-- typically 5-15% improvement in CPU-bound scenarios "
-                    "and minimum frame times."
+                    f"instead of its reported rated speed.{speed_detail} "
+                    "Check the memory kit and motherboard specifications before "
+                    "changing XMP/EXPO. Performance and stability depend on the "
+                    "workload and memory controller; these readbacks do not "
+                    "establish an FPS gain or a supported overclock."
                 ),
                 impact="high",
-                evidence_tier=EvidenceTier.VERIFIED,
+                evidence_tier=EvidenceTier.EXPERIMENTAL,
                 current_value=f"{info.current_speed_mhz} MHz (JEDEC base)",
-                recommended_value=f"{info.rated_speed_mhz} MHz (XMP/EXPO rated)",
+                recommended_value="A stable configuration supported by the memory kit and motherboard",
             ))
 
         # VBS / Memory Integrity recommendation
@@ -613,20 +615,20 @@ class BiosDetector:
             feature_str = " and ".join(parts)
 
             recommendations.append(BiosRecommendation(
-                title=f"Disable {feature_str} for gaming",
+                title=f"Review {feature_str} performance/security tradeoff",
                 explanation=(
                     f"{feature_str} {'is' if len(parts) == 1 else 'are'} "
-                    "currently enabled. Microsoft's own documentation "
-                    "acknowledges a 5-10% FPS impact from Memory Integrity "
-                    "due to hypervisor-enforced code integrity checks on "
-                    "every kernel driver load. For a dedicated gaming system, "
-                    "disabling these provides measurable frame time "
-                    "improvement. Requires reboot after change."
+                    "currently enabled. These are security protections. "
+                    "Their performance cost depends on hardware and workload; "
+                    "this audit has not measured an FPS or frame-time gain "
+                    "from disabling them. Keep them enabled by default. "
+                    "Any opt-in comparison reduces protection and requires "
+                    "a reboot after changes."
                 ),
-                impact="high",
-                evidence_tier=EvidenceTier.VERIFIED,
+                impact="low",
+                evidence_tier=EvidenceTier.EXPERIMENTAL,
                 current_value=f"{feature_str} enabled",
-                recommended_value=f"{feature_str} disabled",
+                recommended_value="Keep enabled unless an explicit measured tradeoff is accepted",
             ))
 
         # Secure Boot cert rollout (June 2026 expiry)

@@ -45,8 +45,8 @@ class GameDvrHandler(SettingsHandler):
 
     @property
     def restore_guarantee(self) -> str:
-        # Best-effort: restore writes back captured values but never blocks a
-        # profile switch's baseline restore if an individual write fails.
+        # Permissions/policy can prevent reverting captured values. A failed
+        # revert is returned to the transaction instead of claiming success.
         return "partial"
 
     def detect(self) -> dict[str, Any]:
@@ -127,10 +127,9 @@ class GameDvrHandler(SettingsHandler):
         try:
             self._restore_value(*_GAMEDVR_ENABLED, data.get("game_dvr_enabled"))
             self._restore_value(*_ALLOW_GAMEDVR, data.get("allow_game_dvr_policy"))
-        except Exception as exc:  # noqa: BLE001 - best-effort, never block a switch
+        except Exception as exc:  # noqa: BLE001 - surface failed rollback to the transaction
             logger.error("Failed to restore Game DVR settings: %s", exc)
-        # Always non-blocking: an opt-in tweak's restore failure must not abort
-        # a profile-switch baseline restore (the error is logged above).
+            return False
         return True
 
     def verify_active(self, settings: dict[str, Any]) -> dict[str, Any]:

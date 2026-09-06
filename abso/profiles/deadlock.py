@@ -114,8 +114,8 @@ class _DeadlockBaseProfile(ReflexShooterBaseProfile):
             {
                 "category": "Display",
                 "setting": "NVIDIA Reflex Low Latency",
-                "value": "On + Boost — ABSO already set driver LLM off; flip the in-game toggle to finish",
-                "reason": "ABSO has already configured the driver side: NVIDIA LLM is OFF so the engine owns the render queue (Reflex's correct path). The Source 2 video config is owned by the game and cannot be written from outside; manually toggle 'NVIDIA Reflex Low Latency' to 'On + Boost' in Deadlock's Video settings once to finish setup.",
+                "value": "On + Boost — set the in-game toggle manually; profile requests driver LLM Off",
+                "reason": "Applying this profile requests NVIDIA driver LLM Off for native Reflex queue control. ABSO leaves Source 2 video configuration user-owned; manually toggle 'NVIDIA Reflex Low Latency' to 'On + Boost' in Deadlock's Video settings once to finish setup.",
             },
             {
                 "category": "Display",
@@ -163,8 +163,8 @@ class _DeadlockBaseProfile(ReflexShooterBaseProfile):
             {
                 "category": "Display",
                 "setting": "NVIDIA Reflex Low Latency",
-                "value": "On + Boost — ABSO already set driver LLM off; flip the in-game toggle to finish",
-                "reason": "ABSO has already configured the driver side: NVIDIA LLM is OFF so the engine owns the render queue (Reflex's correct path). The Source 2 video config is owned by the game and cannot be written from outside; manually toggle 'NVIDIA Reflex Low Latency' to 'On + Boost' in Deadlock's Video settings once to finish setup.",
+                "value": "On + Boost — set the in-game toggle manually; profile requests driver LLM Off",
+                "reason": "Applying this profile requests NVIDIA driver LLM Off for native Reflex queue control. ABSO leaves Source 2 video configuration user-owned; manually toggle 'NVIDIA Reflex Low Latency' to 'On + Boost' in Deadlock's Video settings once to finish setup.",
             },
             {
                 "category": "Display",

@@ -1,13 +1,11 @@
 """CPU Sets soft P-core steering (Tier B scaffold, default OFF).
 
-The hybrid-correct, anti-cheat-safe alternative to hard affinity. Hard affinity
-(``SetProcessAffinityMask``) is wrong on Intel hybrid CPUs because it blocks the
-Thread Director and can starve a game when its threads spill is forbidden -- so
-ABSO ships every gaming base with ``strategy=None``. CPU Sets
-(``SetProcessDefaultCpuSets``) are a scheduler *preference*: threads are biased
-toward the listed cores but the process's full hard-affinity mask stays intact,
-so under load threads still spill to E-cores instead of starving. Process Lasso
-uses exactly this under EAC/BattlEye without bans.
+CPU Sets (``SetProcessDefaultCpuSets``) assign eligible processors to threads
+without changing the hard-affinity mask. Windows normally schedules an assigned
+thread on one of those sets; an unchanged affinity mask does not guarantee that
+the thread can spill onto E-cores under load. This can help or hurt a game's
+CPU throughput and requires measurement. Use of a documented API does not prove
+compatibility with every anti-cheat implementation.
 
 State is per-process and runtime-only (the OS clears it at process exit), so
 there is nothing to persist -- it maps onto the "ephemeral" restore tier.
@@ -15,9 +13,8 @@ there is nothing to persist -- it maps onto the "ephemeral" restore tier.
 Nothing here runs until the tray wires it on a game-launch edge AND config opts
 in; see ``CpuSetsConfig.enabled``. Default OFF.
 
-Honest framing: on a Thread-Director-competent Raptor Lake this is a frame-time
-*consistency* / 1%-low smoother (catching a stray thread on an E-core), NOT an
-average-FPS gain.
+No local benchmark proves a frame-time, 1%-low, or average-FPS benefit from this
+opt-in behavior. Native scheduling remains the default.
 """
 
 from __future__ import annotations

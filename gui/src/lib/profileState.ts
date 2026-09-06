@@ -111,7 +111,7 @@ export function buildProfileUiState({
   const pendingRestart = getRestartReasons(verification, rebootReasons);
   const clean = verificationIsClean(verification);
 
-  if (verification?.status === 'error') {
+  if (verification?.status === 'error' || verification?.error) {
     return {
       kind: 'error',
       needsAttention: true,
@@ -152,6 +152,15 @@ export function buildProfileUiState({
       needsAttention: true,
       label: 'Profile verification mismatch',
       detail: formatStatusDetail(verification.mismatched_handlers[0] ?? activeProfileName),
+    };
+  }
+
+  if (!clean) {
+    return {
+      kind: 'unknown',
+      needsAttention: true,
+      label: 'Profile verification unavailable',
+      detail: 'A saved profile name does not confirm that its settings are in effect.',
     };
   }
 

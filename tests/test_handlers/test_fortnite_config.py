@@ -201,3 +201,53 @@ def test_backup_restore_round_trip(tmp_path: Path) -> None:
 
     assert restored is True
     assert ini_path.read_text(encoding="utf-8") == original
+
+
+def test_restore_preserves_later_user_settings_and_other_sections(tmp_path):
+    config_dir = tmp_path / "config"
+    ini_path = config_dir / "GameUserSettings.ini"
+    original = (
+        "[/Script/FortniteGame.FortGameUserSettings]\n"
+        "PreferredFullscreenMode=1\n"
+        "FrameRateLimit=240.000000\n"
+        "DLSSQuality=0\n"
+        "bLatencyTweak2=False\n"
+        "[Other]\nFrameRateLimit=60\n"
+    )
+    _write_game_user_settings(ini_path, original)
+    with patch.object(FortniteConfigHandler, "_get_config_dir", return_value=config_dir):
+        handler = FortniteConfigHandler()
+        backup = handler.backup()
+        assert handler.apply({"fullscreen_mode": 0, "frame_rate_limit": 0})["success"]
+        updated = ini_path.read_text().replace("DLSSQuality=0", "DLSSQuality=2")
+        updated = updated.replace("bLatencyTweak2=False", "bLatencyTweak2=True")
+        updated = updated.replace("[Other]", "NewUserPreference=True\n[Other]")
+        ini_path.write_text(updated)
+        assert handler.restore(backup)
+    restored = ini_path.read_text()
+    assert "PreferredFullscreenMode=1" in restored
+    assert "FrameRateLimit=240.000000" in restored
+    assert "LastConfirmedFullscreenMode" not in restored
+    assert "DLSSQuality=2" in restored
+    assert "bLatencyTweak2=True" in restored
+    assert "NewUserPreference=True" in restored
+    assert "[Other]\nFrameRateLimit=60\n" in restored
+
+
+def test_missing_game_config_cannot_verify_requested_settings():
+    with patch.object(FortniteConfigHandler, "_get_config_dir", return_value=None):
+        result = FortniteConfigHandler().verify_active({"vsync": False})
+    assert result["all_active"] is False
+    assert result["settings"]["vsync"]["current"] is None
+
+
+def test_unresolved_auto_cap_cannot_verify_active(tmp_path):
+    config_dir = tmp_path / "config"
+    _write_game_user_settings(config_dir / "GameUserSettings.ini", "FrameRateLimit=0\n")
+    with (
+        patch.object(FortniteConfigHandler, "_get_config_dir", return_value=config_dir),
+        patch.object(FortniteConfigHandler, "_apply_auto_vrr_cap", return_value="No refresh readback"),
+    ):
+        result = FortniteConfigHandler().verify_active({"auto_vrr_fps_cap": True})
+    assert result["all_active"] is False
+    assert "No refresh" in result["error"]

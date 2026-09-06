@@ -508,7 +508,8 @@ class NvidiaSettingsHandler(SettingsHandler):
                         for failure in global_verification_failures:
                             errors.append(f"global verification failed: {failure}")
                 except Exception as ve:
-                    logger.warning(f"NVIDIA global post-apply verification skipped: {ve}")
+                    errors.append(f"global verification failed: readback raised {ve}")
+                    logger.warning(f"NVIDIA global post-apply verification failed: {ve}")
 
                 # Sync monitor OSD Adaptive Sync to match driver VRR mode.
                 # The monitor firmware needs Adaptive Sync enabled for G-SYNC
@@ -663,7 +664,8 @@ class NvidiaSettingsHandler(SettingsHandler):
                         for failure in verification_failures:
                             errors.append(f"verification failed: {failure}")
                 except Exception as ve:
-                    logger.warning(f"NVIDIA post-apply verification skipped: {ve}")
+                    errors.append(f"verification failed: readback raised {ve}")
+                    logger.warning(f"NVIDIA post-apply verification failed: {ve}")
             elif nvidia_settings and not executables:
                 logger.warning(
                     f"No executable specified for {game_name}, per-app NVIDIA settings not applied"
@@ -738,13 +740,19 @@ class NvidiaSettingsHandler(SettingsHandler):
             if str(setting_name).startswith("_"):
                 continue
 
-            resolved = manager._resolve_setting(setting_name, expected_value)
+            try:
+                resolved = manager._resolve_setting(setting_name, expected_value)
+            except (ValueError, TypeError) as exc:
+                failures.append(f"{setting_name}: requested value could not be resolved: {exc}")
+                continue
             if resolved is None:
+                failures.append(f"{setting_name}: requested value could not be resolved for verification")
                 continue
 
             setting_id, resolved_value = resolved
             actual = self._find_verified_setting_value(manager, verify_result, setting_id)
             if actual is None:
+                failures.append(f"{setting_name}: driver readback unavailable")
                 continue
 
             if str(actual) != str(resolved_value):

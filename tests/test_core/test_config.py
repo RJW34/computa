@@ -25,6 +25,20 @@ from abso.core.exceptions import (
 )
 
 
+def test_cpu_affinity_override_loads_and_reaches_handler(tmp_path):
+    config_path = tmp_path / "abso.yaml"
+    config_path.write_text(
+        "profile_overrides:\n  slippi-melee-universal:\n"
+        "    cpu_affinity:\n      strategy: p_cores_only\n",
+        encoding="utf-8",
+    )
+    config = ConfigManager(config_path).load()
+    overrides = config.profile_overrides["slippi-melee-universal"]
+    assert get_handler_profile_overrides(overrides, "CpuAffinityHandler") == {
+        "strategy": "p_cores_only"
+    }
+
+
 class TestABSOConfig:
     """Tests for ABSOConfig dataclass."""
 

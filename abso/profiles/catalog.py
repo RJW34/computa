@@ -249,7 +249,7 @@ PROFILE_CATALOG: OrderedDict[str, ProfileCatalogEntry] = OrderedDict(
         "slippi-melee-hdr": ProfileCatalogEntry(
             profile_class=SlippiMeleeHDRProfile,
             tray_category="Fighting",
-            tray_subtitle="Competitive HDR | No Sync | Eye-Strain Relief",
+            tray_subtitle="Competitive HDR | No Sync | HDR Desktop",
             tray_description=(
                 "Competitive Slippi profile with Windows HDR on. Dolphin renders SDR through "
                 "the HDR composition path; small latency cost in exchange for the lower-strain "
@@ -266,7 +266,7 @@ PROFILE_CATALOG: OrderedDict[str, ProfileCatalogEntry] = OrderedDict(
         "slippi-melee-console-parity-hdr": ProfileCatalogEntry(
             profile_class=SlippiMeleeConsoleParityHDRProfile,
             tray_category="Fighting",
-            tray_subtitle="Console-Parity HDR | 60Hz + VSync | Eye-Strain Relief",
+            tray_subtitle="Console-Parity HDR | 60Hz + VSync | HDR Desktop",
             tray_description=(
                 "Console-parity Slippi profile with Windows HDR on. 60 Hz + VSync cadence "
                 "preserved; Dolphin renders SDR through the HDR composition path."
@@ -278,7 +278,7 @@ PROFILE_CATALOG: OrderedDict[str, ProfileCatalogEntry] = OrderedDict(
             tray_category="Fighting",
             tray_subtitle="No Sync | HAGS ON | Reapply-Friendly",
             tray_description=(
-                "No-sync Slippi profile with HAGS kept on so re-applying does not require "
+                "No-sync Slippi profile with HAGS kept on; an initial HAGS change may require "
                 "a reboot. VSync OFF, G-SYNC/VRR OFF."
             ),
             sync_mode="off",
@@ -286,10 +286,10 @@ PROFILE_CATALOG: OrderedDict[str, ProfileCatalogEntry] = OrderedDict(
         "slippi-melee-universal-hdr": ProfileCatalogEntry(
             profile_class=SlippiMeleeUniversalHDRProfile,
             tray_category="Fighting",
-            tray_subtitle="Universal HDR | HAGS ON | No Sync | Eye-Strain Relief",
+            tray_subtitle="Universal HDR | HAGS ON | No Sync | HDR Desktop",
             tray_description=(
-                "Universal HDR Slippi profile. Fixed HAGS on (no reboot on re-apply), no-sync "
-                "latency contract, Windows HDR for daily eye-strain relief."
+                "Universal HDR Slippi profile. Fixed HAGS on (initial change may require reboot), no-sync "
+                "latency contract, Windows HDR for the preferred desktop appearance."
             ),
             sync_mode="off",
         ),
@@ -391,7 +391,7 @@ PROFILE_CATALOG: OrderedDict[str, ProfileCatalogEntry] = OrderedDict(
         "marvel-rivals-sdr": ProfileCatalogEntry(
             profile_class=MarvelRivalsSDRProfile,
             tray_category="Shooters",
-            tray_subtitle="SDR | Reflex ON+Boost | G-SYNC ON",
+            tray_subtitle="SDR | Reflex ON (verify in-game) | G-SYNC ON",
             tray_description=(
                 "Performance-first SDR Marvel Rivals profile. Uses Reflex + VRR and keeps "
                 "engine-specific options in the native config handler."
@@ -401,7 +401,7 @@ PROFILE_CATALOG: OrderedDict[str, ProfileCatalogEntry] = OrderedDict(
         "marvel-rivals-hdr": ProfileCatalogEntry(
             profile_class=MarvelRivalsHDRProfile,
             tray_category="Shooters",
-            tray_subtitle="HDR ON | Reflex ON+Boost | G-SYNC ON",
+            tray_subtitle="HDR ON | Reflex ON (verify in-game) | G-SYNC ON",
             tray_description=(
                 "Performance-first HDR Marvel Rivals profile. Uses Reflex + VRR and keeps "
                 "engine-specific options in the native config handler."
@@ -523,7 +523,7 @@ PROFILE_CATALOG: OrderedDict[str, ProfileCatalogEntry] = OrderedDict(
         "overwatch2-gsync": ProfileCatalogEntry(
             profile_class=Overwatch2GSyncProfile,
             tray_category="Shooters",
-            tray_subtitle="Overlay-Free SDR Borderless | Reflex OFF + ULL Ultra | G-SYNC ON",
+            tray_subtitle="Overlay-Free SDR Borderless | Reflex (set in-game) + LLM OFF | G-SYNC ON",
             tray_description=(
                 "Low-latency Overwatch 2 G-SYNC on the same optimized borderless VRR "
                 "path as capture-safe, while stopping capture and overlay processes."
@@ -533,7 +533,7 @@ PROFILE_CATALOG: OrderedDict[str, ProfileCatalogEntry] = OrderedDict(
         "overwatch2-gsync-hdr": ProfileCatalogEntry(
             profile_class=Overwatch2GSyncHDRProfile,
             tray_category="Shooters",
-            tray_subtitle="Overlay-Free HDR Borderless | Reflex OFF + ULL Ultra | G-SYNC ON",
+            tray_subtitle="Overlay-Free HDR Borderless | Reflex (set in-game) + LLM OFF | G-SYNC ON",
             tray_description=(
                 "Low-latency native-HDR Overwatch 2 G-SYNC on the optimized borderless "
                 "VRR path, while stopping capture and overlay processes."
@@ -618,8 +618,8 @@ PROFILE_ALIASES: dict[str, str] = {
     # Streaming variants consolidated into their base profiles.
     "fortnite-streaming": "fortnite",
     "fortnite-streaming-hdr": "fortnite-hdr",
-    "overwatch2-gsync-streaming": "overwatch2-gsync",
-    "overwatch2-gsync-hdr-streaming": "overwatch2-gsync-hdr",
+    "overwatch2-gsync-streaming": "overwatch2-gsync-capture",
+    "overwatch2-gsync-hdr-streaming": "overwatch2-gsync-hdr-capture",
     "pacdeluxe-streaming": "pacdeluxe",
     "ryujinx-ssbu-streaming": "ryujinx-ssbu",
     "rivals2-streaming": "rivals2-nosync",

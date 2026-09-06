@@ -259,8 +259,9 @@ class NVDRS_APPLICATION_V4(Structure):
         ("userFriendlyName", NvAPI_UnicodeString),
         ("launcher", NvAPI_UnicodeString),
         ("fileInFolder", NvAPI_UnicodeString),
-        ("isMetro", c_uint32),
-        ("isCommandLine", c_uint32),
+        ("isMetro", c_uint32, 1),
+        ("isCommandLine", c_uint32, 1),
+        ("reserved", c_uint32, 30),
         ("commandLine", NvAPI_UnicodeString),
     ]
 
@@ -278,6 +279,9 @@ class NVDRS_APPLICATION_V3(Structure):
         ("userFriendlyName", NvAPI_UnicodeString),
         ("launcher", NvAPI_UnicodeString),
         ("fileInFolder", NvAPI_UnicodeString),
+        ("isMetro", c_uint32, 1),
+        ("isCommandLine", c_uint32, 1),
+        ("reserved", c_uint32, 30),
     ]
 
 
@@ -292,6 +296,7 @@ class NVDRS_APPLICATION_V2(Structure):
         ("appName", NvAPI_UnicodeString),
         ("userFriendlyName", NvAPI_UnicodeString),
         ("launcher", NvAPI_UnicodeString),
+        ("fileInFolder", NvAPI_UnicodeString),
     ]
 
 
@@ -305,6 +310,7 @@ class NVDRS_APPLICATION_V1(Structure):
         ("isPredefined", c_uint32),
         ("appName", NvAPI_UnicodeString),
         ("userFriendlyName", NvAPI_UnicodeString),
+        ("launcher", NvAPI_UnicodeString),
     ]
 
 

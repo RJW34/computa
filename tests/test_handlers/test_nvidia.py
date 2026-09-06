@@ -4,12 +4,48 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 from abso.settings.nvidia import NvidiaSettingsHandler
 from abso.settings.nvidia.nvapi_drs import DRSProfileManager as RealDRSProfileManager
 from abso.settings.nvidia.parsing import (
     parse_low_latency_value,
 )
 from abso.settings.nvidia.profiles import get_setting_value
+
+
+def _mock_successful_readback(manager):
+    """Model numeric readback; empty reads must no longer imply success."""
+    resolver = RealDRSProfileManager()._resolve_setting
+    manager._resolve_setting.side_effect = resolver
+    manager.SETTING_IDS = RealDRSProfileManager.SETTING_IDS
+
+    def readback(*args, **kwargs):
+        mutation = manager.apply_settings_to_app if args else manager.apply_settings_to_global
+        writes = mutation.return_value.get("settings_applied", {})
+        result = {}
+        for name, value in writes.items():
+            setting_id, numeric = resolver(name, value)
+            alias = next(k for k, v in manager.SETTING_IDS.items() if v == setting_id)
+            result[alias] = numeric
+        return result
+
+    manager.get_app_settings.side_effect = readback
+
+
+def test_missing_driver_readback_is_a_verification_failure():
+    failures = NvidiaSettingsHandler()._collect_verification_failures(
+        RealDRSProfileManager(), {}, {"vsync": "on"}
+    )
+    assert failures == ["vsync: driver readback unavailable"]
+
+
+def test_unsupported_value_cannot_verify_active():
+    failures = NvidiaSettingsHandler()._collect_verification_failures(
+        RealDRSProfileManager(), {}, {"unknown_setting": "on"}
+    )
+    assert len(failures) == 1
+    assert "could not be resolved" in failures[0]
 
 
 class TestNvidiaParsing:
@@ -247,9 +283,17 @@ class TestNvidiaAudit:
 class TestNvidiaApply:
     """Tests for apply() method.
 
-    Note: NPI import is DISABLED because it wipes all existing profiles.
-    Apply now logs settings for manual application instead.
+    Writes and readbacks are simulated; no driver state is changed.
     """
+
+    @pytest.fixture(autouse=True)
+    def isolated_ddci_config(self, monkeypatch):
+        from types import SimpleNamespace
+
+        monkeypatch.setattr(
+            "abso.core.config.get_config",
+            lambda: SimpleNamespace(ddci=SimpleNamespace(enabled=False)),
+        )
 
     @patch("abso.settings.nvidia.nvapi_drs.DRSProfileManager")
     def test_apply_logs_preset_settings(self, mock_manager_cls):
@@ -265,8 +309,7 @@ class TestNvidiaApply:
             "app_bound": True,
             "npi_launched": False,
         }
-        mock_manager.get_app_settings.return_value = {}
-        mock_manager._resolve_setting.return_value = None
+        _mock_successful_readback(mock_manager)
         mock_manager_cls.return_value = mock_manager
 
         handler = NvidiaSettingsHandler()
@@ -296,8 +339,7 @@ class TestNvidiaApply:
             "app_bound": True,
             "npi_launched": False,
         }
-        mock_manager.get_app_settings.return_value = {}
-        mock_manager._resolve_setting.return_value = None
+        _mock_successful_readback(mock_manager)
         mock_manager_cls.return_value = mock_manager
 
         handler = NvidiaSettingsHandler()
@@ -325,8 +367,7 @@ class TestNvidiaApply:
             "app_bound": True,
             "npi_launched": False,
         }
-        mock_manager.get_app_settings.return_value = {}
-        mock_manager._resolve_setting.return_value = None
+        _mock_successful_readback(mock_manager)
         mock_manager_cls.return_value = mock_manager
 
         handler = NvidiaSettingsHandler()
@@ -377,8 +418,7 @@ class TestNvidiaApply:
             "app_bound": True,
             "npi_launched": False,
         }
-        mock_manager.get_app_settings.return_value = {}
-        mock_manager._resolve_setting.return_value = (0x00A879CF, 0x08416747)
+        _mock_successful_readback(mock_manager)
         mock_manager_cls.return_value = mock_manager
 
         handler = NvidiaSettingsHandler()
@@ -412,8 +452,7 @@ class TestNvidiaApply:
             "app_bound": True,
             "npi_launched": False,
         }
-        mock_manager.get_app_settings.return_value = {}
-        mock_manager._resolve_setting.return_value = (0x10835002, 297)
+        _mock_successful_readback(mock_manager)
         mock_manager_cls.return_value = mock_manager
 
         handler = NvidiaSettingsHandler()
@@ -446,8 +485,7 @@ class TestNvidiaApply:
             "app_bound": True,
             "npi_launched": False,
         }
-        mock_manager.get_app_settings.return_value = {}
-        mock_manager._resolve_setting.return_value = (0x10835002, 276)
+        _mock_successful_readback(mock_manager)
         mock_manager_cls.return_value = mock_manager
 
         handler = NvidiaSettingsHandler()

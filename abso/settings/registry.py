@@ -23,8 +23,8 @@ logger = logging.getLogger(__name__)
 # Win32PrioritySeparation named constants (module-level for import-by-name).
 #
 # The PriorityControl\Win32PrioritySeparation DWORD is a 6-bit packed value:
-#   Bits 5-4: Quantum length (0/1=default, 2=short, 3=long)
-#   Bits 3-2: Quantum type   (0/1=default, 2=fixed, 3=variable)
+#   Bits 5-4: Quantum length (0/3=default, 1=long, 2=short)
+#   Bits 3-2: Quantum type   (0/3=default, 1=variable, 2=fixed)
 #   Bits 1-0: Foreground boost (0=none, 1=min, 2=max)
 # Reference: Windows Internals (Russinovich), "Master Your Quantum" (MSDN archive)
 # ---------------------------------------------------------------------------
@@ -32,13 +32,12 @@ logger = logging.getLogger(__name__)
 #: Windows desktop default — short, variable, max foreground boost.
 WIN32_PRIORITY_DESKTOP_DEFAULT = 0x26
 
-#: Online-safe gaming quantum — short variable quantum, +1 foreground boost.
-#: Used by rollback-netcode profiles where deterministic timing matters more
-#: than the extra foreground boost.
+#: Desktop scheduler policy used by online profiles; short variable quantum,
+#: maximum foreground boost. No claim of a separate netcode timing benefit.
 WIN32_PRIORITY_GAMING_ONLINE = 0x26
 
 #: Aggressive gaming quantum — short FIXED quantum, max foreground boost.
-#: Best single-player / offline latency; ABSO's stability gate may downgrade
+#: An experimental offline policy; ABSO's stability gate may downgrade
 #: this to ``WIN32_PRIORITY_GAMING_ONLINE`` for rollback profiles.
 WIN32_PRIORITY_GAMING_OFFLINE = 0x2A
 
@@ -92,7 +91,7 @@ class RegistrySettingsHandler(SettingsHandler):
         issues: list[Issue] = []
         current = self.detect()
 
-        # System Responsiveness — legacy MMCSS setting, undocumented behavior on Win11
+        # Documented MMCSS control; no project benchmark proves a gaming gain.
         responsiveness = current.get("system_responsiveness")
         if responsiveness is not None and responsiveness != 10:
             issues.append(Issue(
@@ -101,9 +100,9 @@ class RegistrySettingsHandler(SettingsHandler):
                 current_value=str(responsiveness),
                 optimal_value="10",
                 explanation=(
-                    "MMCSS scheduling hint for background CPU reservation. "
-                    "Effect on modern Windows 11 is undocumented; MMCSS was redesigned "
-                    "in Win10+. May have no measurable impact on current systems. "
+                    "MMCSS reserves this percentage for low-priority tasks. "
+                    "Microsoft documents its semantics, but ABSO has no benchmark "
+                    "showing that reducing the Windows default improves this game. "
                     "Opt-in via include_legacy_tweaks."
                 ),
                 category="registry",
@@ -137,8 +136,10 @@ class RegistrySettingsHandler(SettingsHandler):
                 current_value=str(game_priority.get("priority", "Unknown")),
                 optimal_value="6",
                 explanation=(
-                    "MMCSS Games task priority. Higher values give game threads "
-                    "more CPU scheduling preference via the multimedia class scheduler."
+                    "This affects threads that explicitly register with the MMCSS "
+                    "Games task, not every game thread. With Scheduling Category "
+                    "High, Windows treats Priority as 2 regardless of this value. "
+                    "A registry difference alone does not establish a gaming gain."
                 ),
                 category="registry",
                 evidence_tier=EvidenceTier.VERIFIED,

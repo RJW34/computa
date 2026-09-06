@@ -472,9 +472,8 @@ class WindowsSettingsHandler(SettingsHandler):
                     optimal_value="Enabled (security tradeoff; opt-in disable available)",
                     explanation=(
                         "VBS/Memory Integrity adds a virtualization layer that can cost "
-                        "gaming performance. Current 2025-2026 testing on Ada/Blackwell "
-                        "and Zen 4/5 hardware shows roughly 1-7% in typical workloads, "
-                        "with higher impact in heavy DX12 ray tracing. Disabling it is "
+                        "gaming performance depending on hardware and workload. "
+                        "This audit has not measured that cost. Disabling it is "
                         "a security tradeoff: VBS protects credentials, kernel memory "
                         "integrity, and hypervisor-protected code integrity. ABSO does "
                         "not silently disable VBS. If you want to trade security for "

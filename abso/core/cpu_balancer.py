@@ -89,6 +89,17 @@ class RestrainedProcess:
     original_priority: int
     restrained_at: float  # time.monotonic()
     cpu_percent: float
+    creation_time: int  # GetProcessTimes identity; PID alone can be recycled.
+
+
+@dataclass(frozen=True)
+class ProcessCpuSample:
+    """CPU counters and the actual time/identity at which they were sampled."""
+
+    creation_time: int
+    kernel_time: int
+    user_time: int
+    sampled_at: float
 
 
 @dataclass
@@ -198,7 +209,7 @@ class CpuBalancer:
         self._watchdog_engine: Any = None
         # Separate CPU-time store so the watchdog's cpu metric never double-
         # samples (and corrupts) the restraint loop's per-process deltas.
-        self._watchdog_cpu_times: dict[int, tuple[int, int]] = {}
+        self._watchdog_cpu_times: dict[int, ProcessCpuSample] = {}
         self._restrained: dict[int, RestrainedProcess] = {}
         self._events: list[BalancerEvent] = []
         self._stop_event = threading.Event()
@@ -222,10 +233,35 @@ class CpuBalancer:
 
         # CPU time tracking
         self._last_system_times: tuple[int, int, int] | None = None  # idle, kernel, user
-        self._last_process_times: dict[int, tuple[int, int]] = {}  # pid -> (kernel, user)
+        self._last_process_times: dict[int, ProcessCpuSample] = {}
 
         self._kernel32 = ctypes.WinDLL("kernel32")
         self._user32 = ctypes.WinDLL("user32")
+        # ctypes defaults to a C int return/argument. Handles and HWNDs are
+        # pointer-sized on Win64, so every native boundary needs a prototype.
+        signatures = {
+            "OpenProcess": (wintypes.HANDLE, [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]),
+            "CloseHandle": (wintypes.BOOL, [wintypes.HANDLE]),
+            "GetPriorityClass": (wintypes.DWORD, [wintypes.HANDLE]),
+            "SetPriorityClass": (wintypes.BOOL, [wintypes.HANDLE, wintypes.DWORD]),
+            "GetSystemTimes": (wintypes.BOOL, [ctypes.POINTER(FILETIME)] * 3),
+            "GetProcessTimes": (
+                wintypes.BOOL, [wintypes.HANDLE] + [ctypes.POINTER(FILETIME)] * 4
+            ),
+            "CreateToolhelp32Snapshot": (wintypes.HANDLE, [wintypes.DWORD, wintypes.DWORD]),
+            "Process32FirstW": (wintypes.BOOL, [wintypes.HANDLE, ctypes.POINTER(PROCESSENTRY32W)]),
+            "Process32NextW": (wintypes.BOOL, [wintypes.HANDLE, ctypes.POINTER(PROCESSENTRY32W)]),
+        }
+        for name, (restype, argtypes) in signatures.items():
+            function = getattr(self._kernel32, name)
+            function.restype = restype
+            function.argtypes = argtypes
+        self._user32.GetForegroundWindow.restype = wintypes.HWND
+        self._user32.GetForegroundWindow.argtypes = []
+        self._user32.GetWindowThreadProcessId.restype = wintypes.DWORD
+        self._user32.GetWindowThreadProcessId.argtypes = [
+            wintypes.HWND, ctypes.POINTER(wintypes.DWORD)
+        ]
 
     # ------------------------------------------------------------------
     # Public interface
@@ -350,7 +386,7 @@ class CpuBalancer:
     # ------------------------------------------------------------------
 
     def _get_process_cpu(
-        self, pid: int, *, times_store: dict[int, tuple[int, int]] | None = None
+        self, pid: int, *, times_store: dict[int, ProcessCpuSample] | None = None
     ) -> float | None:
         """Get per-process CPU usage percentage via ``GetProcessTimes``.
 
@@ -362,43 +398,44 @@ class CpuBalancer:
         store = times_store if times_store is not None else self._last_process_times
         handle = self._kernel32.OpenProcess(PROCESS_QUERY_INFORMATION, False, pid)
         if not handle:
+            store.pop(pid, None)
             return None
         try:
-            creation = FILETIME()
-            exit_t = FILETIME()
-            kernel = FILETIME()
-            user = FILETIME()
-            if not self._kernel32.GetProcessTimes(
-                handle,
-                ctypes.byref(creation),
-                ctypes.byref(exit_t),
-                ctypes.byref(kernel),
-                ctypes.byref(user),
-            ):
+            counters = self._read_process_times(handle)
+            if counters is None:
+                store.pop(pid, None)
                 return None
-
-            kern_val = kernel.to_int()
-            user_val = user.to_int()
+            creation_time, kern_val, user_val = counters
+            sampled_at = time.monotonic()
             prev = store.get(pid)
-            store[pid] = (kern_val, user_val)
+            store[pid] = ProcessCpuSample(creation_time, kern_val, user_val, sampled_at)
 
-            if prev is None:
+            if prev is None or prev.creation_time != creation_time:
                 return None
 
-            prev_kern, prev_user = prev
-            proc_delta = (kern_val - prev_kern) + (user_val - prev_user)
+            proc_delta = (kern_val - prev.kernel_time) + (user_val - prev.user_time)
+            elapsed = sampled_at - prev.sampled_at
+            if elapsed <= 0 or proc_delta < 0:
+                return None
 
-            # Approximate total available CPU time over the poll interval.
-            # FILETIME units are 100-nanosecond intervals; poll_interval_ms
-            # is in milliseconds (1 ms = 10_000 x 100 ns).
+            # Offender scans pause below the system threshold, and restrained
+            # processes are not sampled until the minimum restraint expires.
+            # A configured poll interval is therefore NOT the sample duration.
             num_cpus = os.cpu_count() or 1
-            interval_100ns = self._config.poll_interval_ms * 10_000
-            total_100ns = interval_100ns * num_cpus
-            if total_100ns == 0:
-                return 0.0
-            return 100.0 * proc_delta / total_100ns
+            total_100ns = elapsed * 10_000_000 * num_cpus
+            return min(100.0, 100.0 * proc_delta / total_100ns)
         finally:
             self._kernel32.CloseHandle(handle)
+
+    def _read_process_times(self, handle: int) -> tuple[int, int, int] | None:
+        """Read creation identity and CPU counters from the same open handle."""
+        creation, exit_t, kernel, user = FILETIME(), FILETIME(), FILETIME(), FILETIME()
+        if not self._kernel32.GetProcessTimes(
+            handle, ctypes.byref(creation), ctypes.byref(exit_t),
+            ctypes.byref(kernel), ctypes.byref(user),
+        ):
+            return None
+        return creation.to_int(), kernel.to_int(), user.to_int()
 
     # ------------------------------------------------------------------
     # Foreground / process enumeration helpers
@@ -416,7 +453,7 @@ class CpuBalancer:
     def _enumerate_processes(self) -> list[tuple[int, str, int]]:
         """List running processes as ``(pid, image, parent_pid)`` tuples."""
         snapshot = self._kernel32.CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0)
-        if snapshot == -1:
+        if snapshot in (None, -1, ctypes.c_void_p(-1).value):
             return []
         try:
             entry = PROCESSENTRY32W()
@@ -478,6 +515,9 @@ class CpuBalancer:
     def _find_and_restrain_offenders(self) -> None:
         """Find background processes using too much CPU and lower their priority."""
         processes = self._enumerate_processes()
+        live_pids = {pid for pid, _name, _ppid in processes}
+        for pid in self._last_process_times.keys() - live_pids:
+            del self._last_process_times[pid]
         parent_map = {pid: ppid for pid, _name, ppid in processes}
         game_descendants = self._compute_game_descendants(parent_map)
         for pid, name, _ppid in processes:
@@ -499,9 +539,12 @@ class CpuBalancer:
             return
         try:
             original = self._kernel32.GetPriorityClass(handle)
+            counters = self._read_process_times(handle)
             if (
-                original
-                and original > BELOW_NORMAL_PRIORITY_CLASS
+                # Win32 priority classes are enum constants, not ranks:
+                # NORMAL=0x20, HIGH=0x80, BELOW_NORMAL=0x4000.
+                original in {NORMAL_PRIORITY_CLASS, ABOVE_NORMAL_PRIORITY_CLASS, HIGH_PRIORITY_CLASS}
+                and counters is not None
                 and self._kernel32.SetPriorityClass(handle, BELOW_NORMAL_PRIORITY_CLASS)
             ):
                 self._restrained[pid] = RestrainedProcess(
@@ -510,6 +553,7 @@ class CpuBalancer:
                     original_priority=original,
                     restrained_at=time.monotonic(),
                     cpu_percent=cpu,
+                    creation_time=counters[0],
                 )
                 self._events.append(BalancerEvent(
                     timestamp=time.time(),
@@ -544,19 +588,42 @@ class CpuBalancer:
 
     def _release(self, pid: int) -> None:
         """Restore a process's original priority class."""
-        info = self._restrained.pop(pid, None)
+        info = self._restrained.get(pid)
         if info is None:
             return
-        handle = self._kernel32.OpenProcess(PROCESS_SET_INFORMATION, False, pid)
+        handle = self._kernel32.OpenProcess(
+            PROCESS_SET_INFORMATION | PROCESS_QUERY_INFORMATION, False, pid
+        )
         if handle:
             try:
-                self._kernel32.SetPriorityClass(handle, info.original_priority)
+                counters = self._read_process_times(handle)
+                if counters is None:
+                    return
+                if counters[0] != info.creation_time:
+                    # The original exited and its PID now belongs to another
+                    # process. Never restore our stale priority onto that app.
+                    self._restrained.pop(pid, None)
+                    return
+                current = self._kernel32.GetPriorityClass(handle)
+                if current == 0:
+                    return
+                if current != BELOW_NORMAL_PRIORITY_CLASS:
+                    # Respect a later change made by the user or application.
+                    self._restrained.pop(pid, None)
+                    return
+                if not self._kernel32.SetPriorityClass(handle, info.original_priority):
+                    logger.warning("Failed restoring priority for %s (PID %d)", info.name, pid)
+                    return
                 logger.info(
                     "Released %s (PID %d) back to priority %d",
                     info.name, pid, info.original_priority,
                 )
             finally:
                 self._kernel32.CloseHandle(handle)
+        else:
+            # Access failure is not proof of a successful restore or exit.
+            return
+        self._restrained.pop(pid, None)
         self._events.append(BalancerEvent(
             timestamp=time.time(),
             action="release",

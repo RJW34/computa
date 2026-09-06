@@ -5,18 +5,22 @@ from abso.core.launch_sweep import (
     build_launch_killset_payload,
     run_launch_sweep,
 )
-from abso.core.process_janitor import ProcessSweepResult
+from abso.core.process_janitor import CAPTURE_ALLOWED_IMAGES, ProcessSweepResult
 
 
-def test_build_launch_killset_payload_resolves_profile_aliases():
-    payload = build_launch_killset_payload("overwatch2-gsync-hdr-streaming", include_opt_in=False)
+@pytest.mark.parametrize("include_opt_in", [False, True])
+def test_build_launch_killset_payload_resolves_profile_aliases(include_opt_in):
+    payload = build_launch_killset_payload(
+        "overwatch2-gsync-hdr-streaming", include_opt_in=include_opt_in
+    )
 
-    assert payload["profile"] == "overwatch2-gsync-hdr"
+    assert payload["profile"] == "overwatch2-gsync-hdr-capture"
     assert "Overwatch.exe" in payload["executables"]
     assert payload["killset"]["always_safe"]
     assert payload["killset"]["opt_in"]
-    assert "Medal.exe" in payload["resolved"]
-    assert "SearchIndexer.exe" not in payload["resolved"]
+    assert not {image.lower() for image in payload["resolved"]} & CAPTURE_ALLOWED_IMAGES
+    if not include_opt_in:
+        assert "SearchIndexer.exe" not in payload["resolved"]
 
 
 def test_build_launch_killset_payload_rejects_unknown_profile():

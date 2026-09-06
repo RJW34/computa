@@ -102,8 +102,8 @@ class _FortniteBaseProfile(ReflexShooterBaseProfile):
             {
                 "category": "Display",
                 "setting": "NVIDIA Reflex Low Latency",
-                "value": "On + Boost — ABSO already set driver LLM off; flip the in-game toggle to finish",
-                "reason": "ABSO has already configured the driver side: NVIDIA LLM is OFF so the engine owns the render queue (Reflex's correct path). Fortnite's Reflex toggle lives in Fortnite's settings and there is no stable config key to write it from outside; manually flip 'NVIDIA Reflex Low Latency' to 'On + Boost' in the game once.",
+                "value": "On + Boost — set the in-game toggle manually; profile requests driver LLM Off",
+                "reason": "Applying this profile requests NVIDIA driver LLM Off for native Reflex queue control. Fortnite's Reflex toggle lives in Fortnite's settings and there is no stable config key to write it from outside; manually flip 'NVIDIA Reflex Low Latency' to 'On + Boost' in the game once.",
             },
             {
                 "category": "Display",
@@ -403,8 +403,8 @@ class FortniteGSyncHDRProfile(_FortniteBaseProfile):
             {
                 "category": "Display",
                 "setting": "NVIDIA Reflex Low Latency",
-                "value": "On + Boost — ABSO already set driver LLM off; flip the in-game toggle to finish",
-                "reason": "ABSO has already configured the driver side: NVIDIA LLM is OFF so the engine owns the render queue (Reflex's correct path). Fortnite's Reflex toggle lives in Fortnite's settings and there is no stable config key to write it from outside; manually flip 'NVIDIA Reflex Low Latency' to 'On + Boost' in the game once.",
+                "value": "On + Boost — set the in-game toggle manually; profile requests driver LLM Off",
+                "reason": "Applying this profile requests NVIDIA driver LLM Off for native Reflex queue control. Fortnite's Reflex toggle lives in Fortnite's settings and there is no stable config key to write it from outside; manually flip 'NVIDIA Reflex Low Latency' to 'On + Boost' in the game once.",
             },
             {
                 "category": "Display",
