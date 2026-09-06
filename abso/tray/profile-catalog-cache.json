@@ -2849,7 +2849,7 @@
     {
       "id": "fortnite-gsync-capture",
       "display_name": "Fortnite - GSYNC SDR Streaming",
-      "description": "SDR capped G-SYNC lane on Fortnite's borderless path; preserves OBS, Medal, RTSS, and overlays and keeps game CPU/I/O priority at Normal so capture is not starved.",
+      "description": "SDR capped G-SYNC lane on Fortnite's borderless path; preserves OBS, Medal, RTSS, and overlays and keeps game CPU/I/O priority at Normal. Uses in-game VSync and a driver cap; enable Reflex On + Boost manually.",
       "optimization_target": "low_latency_high_fps",
       "application_scope": "system_plus_native_config",
       "executables": [
@@ -2990,7 +2990,7 @@
     {
       "id": "fortnite-gsync-hdr-capture",
       "display_name": "Fortnite - GSYNC HDR Streaming",
-      "description": "Native-HDR capped G-SYNC lane on Fortnite's borderless path; preserves OBS, Medal, RTSS, and overlays and keeps game CPU/I/O priority at Normal so capture is not starved.",
+      "description": "Windows HDR G-SYNC lane on Fortnite's borderless path; preserves OBS, Medal, RTSS, and overlays and keeps game CPU/I/O priority at Normal. Uses in-game VSync and a driver cap; enable Reflex On + Boost manually. Native game HDR is unverified.",
       "optimization_target": "low_latency_high_fps",
       "application_scope": "system_plus_native_config",
       "executables": [
@@ -3021,7 +3021,7 @@
       "has_in_game_settings": true,
       "tray_category": "Shooters",
       "tray_subtitle": "HDR Streaming | Borderless VRR | Keeps OBS/Medal/Overlays",
-      "tray_description": "Capped native-HDR G-SYNC on Fortnite's borderless path. OBS, Medal, RTSS, and overlays remain available; game CPU/I/O priority stays Normal and OBS encoder/output settings are left untouched.",
+      "tray_description": "Capped Windows-HDR G-SYNC on Fortnite's borderless path. OBS, Medal, RTSS, and overlays remain available; game CPU/I/O priority stays Normal and OBS encoder/output settings are left untouched.",
       "tray_group": "fortnite",
       "tray_group_name": "Fortnite",
       "tray_variant": "Streaming G-SYNC (HDR)",

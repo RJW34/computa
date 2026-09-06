@@ -2355,27 +2355,27 @@
     "in_game_settings": [
       {
         "category": "Display",
-        "reason": "Streaming lane: uses Fortnite's borderless mode and the Windows windowed G-SYNC path so OBS, Medal, RTSS, and overlays can stay running.",
+        "reason": "ABSO sets the windowed G-SYNC path and keeps OBS, Medal, RTSS, and overlays available.",
         "setting": "Display Mode",
         "value": "Windowed Fullscreen (borderless)"
       },
       {
         "category": "Display",
-        "reason": "Leave VSync to NVIDIA Control Panel as the VRR safety net; keep the in-game toggle off so it never adds queueing latency.",
+        "reason": "NVIDIA recommends in-game VSync for windowed G-SYNC with Reflex. The driver FPS cap stays below refresh.",
         "setting": "VSync",
-        "value": "Off (in-game)"
+        "value": "On (in-game)"
       },
       {
         "category": "Display",
-        "reason": "ABSO has already configured the driver side: NVIDIA LLM is OFF so the engine owns the render queue (Reflex's correct path). Fortnite's Reflex toggle lives in Fortnite's settings and there is no stable config key to write it from outside; manually flip 'NVIDIA Reflex Low Latency' to 'On + Boost' in the game once.",
+        "reason": "ABSO leaves driver LLM off. Enable Reflex manually in Fortnite; Reflex may pace below the driver cap.",
         "setting": "NVIDIA Reflex Low Latency",
-        "value": "On + Boost \u2014 ABSO already set driver LLM off; flip the in-game toggle to finish"
+        "value": "On + Boost (set manually)"
       },
       {
         "category": "Display",
-        "reason": "Set by ABSO to refresh - 3 (Blur Busters G-SYNC 101). Keeps G-SYNC active and prevents NVCP V-SYNC from engaging while preserving tear-free output.",
+        "reason": "ABSO clears the engine cap and sets the NVIDIA VRR ceiling from the detected refresh rate, avoiding two matching explicit limiters.",
         "setting": "Frame Rate Limit",
-        "value": "Auto (refresh - 3: e.g. 297 @ 300Hz, 237 @ 240Hz, 141 @ 144Hz)"
+        "value": "Unlimited in-game; driver cap at refresh - 3"
       },
       {
         "category": "Display",
@@ -2385,39 +2385,81 @@
       },
       {
         "category": "Graphics",
-        "reason": "This profile is built around Fortnite's DX12 path for Reflex and modern presentation behavior.",
+        "reason": "Changing rendering mode requires a game restart.",
         "setting": "Rendering Mode",
-        "value": "DirectX 12"
+        "value": "DirectX 12 (set manually)"
       },
       {
         "category": "Graphics",
-        "reason": "Better CPU utilization and more stable frame delivery in stacked endgames.",
-        "setting": "Multithreaded Rendering",
-        "value": "On"
+        "reason": "A clarity/performance starting point for supported RTX GPUs; use the game's supported alternatives on other hardware.",
+        "setting": "Anti-Aliasing & Super Resolution",
+        "value": "NVIDIA DLSS Quality (set manually, when available)"
       },
       {
         "category": "Graphics",
-        "reason": "Keep frame times stable first; use DLSS only when needed to hold the VRR cap.",
-        "setting": "3D Resolution / DLSS",
-        "value": "100% or DLSS Performance if GPU-bound"
+        "reason": "Reduce geometry cost; change from the lobby because this option cannot be changed mid-match.",
+        "setting": "Nanite Virtualized Geometry",
+        "value": "Off (set manually)"
       },
       {
         "category": "Graphics",
-        "reason": "Reduces visual noise and preserves snap-tracking clarity.",
+        "reason": "Disable Lumen lighting for this performance starting point; change from the lobby.",
+        "setting": "Global Illumination",
+        "value": "Off (set manually)"
+      },
+      {
+        "category": "Graphics",
+        "reason": "Disable Lumen and screen-space reflections to reduce rendering work.",
+        "setting": "Reflections",
+        "value": "Off (set manually)"
+      },
+      {
+        "category": "Graphics",
+        "reason": "Changing hardware ray tracing requires a game restart.",
+        "setting": "Hardware Ray Tracing",
+        "value": "Off (set manually)"
+      },
+      {
+        "category": "Graphics",
+        "reason": "Reduce rendering work and visual clutter.",
+        "setting": "Shadows",
+        "value": "Off (set manually)"
+      },
+      {
+        "category": "Graphics",
+        "reason": "Balance scenery detail and performance; reduce to Near if more headroom is needed.",
+        "setting": "View Distance",
+        "value": "Medium (manual starting point)"
+      },
+      {
+        "category": "Graphics",
+        "reason": "Balance image detail and memory use; adjust to the GPU's available memory.",
+        "setting": "Textures",
+        "value": "Medium (manual starting point)"
+      },
+      {
+        "category": "Graphics",
+        "reason": "Reduce effects cost while preserving room for capture.",
+        "setting": "Effects / Post Processing",
+        "value": "Low / Low (set manually)"
+      },
+      {
+        "category": "Graphics",
+        "reason": "Keep the chosen upscaling quality stable instead of chasing a dynamic resolution target.",
+        "setting": "Dynamic 3D Resolution",
+        "value": "Off (set manually)"
+      },
+      {
+        "category": "Graphics",
+        "reason": "Keep the baseline focused on rendered game frames and input responsiveness.",
+        "setting": "Frame Generation",
+        "value": "Off (set manually, if offered)"
+      },
+      {
+        "category": "Graphics",
+        "reason": "Keep camera motion and tracking clear.",
         "setting": "Motion Blur",
-        "value": "Off"
-      },
-      {
-        "category": "Graphics",
-        "reason": "Endgame effects spikes matter more than visual richness in the competitive lane.",
-        "setting": "Shadows / Effects",
-        "value": "Low"
-      },
-      {
-        "category": "Content",
-        "reason": "Avoids streaming hitches and unnecessary VRAM churn.",
-        "setting": "High Resolution Textures",
-        "value": "Off"
+        "value": "Off (set manually)"
       }
     ],
     "include_legacy_tweaks": false,
@@ -2451,10 +2493,11 @@
         "dynamic_range": "full"
       },
       "FortniteConfigHandler": {
-        "auto_vrr_fps_cap": true,
+        "auto_vrr_fps_cap": false,
+        "frame_rate_limit": 0,
         "fullscreen_mode": 1,
         "hdr_output": false,
-        "vsync": false
+        "vsync": true
       },
       "GameDvrHandler": {
         "hard_disable": true
@@ -2767,75 +2810,111 @@
     "in_game_settings": [
       {
         "category": "Display",
-        "reason": "Streaming lane: uses Fortnite's borderless mode and the Windows windowed G-SYNC path so OBS, Medal, RTSS, and overlays can stay running.",
+        "reason": "ABSO sets the windowed G-SYNC path and keeps OBS, Medal, RTSS, and overlays available.",
         "setting": "Display Mode",
         "value": "Windowed Fullscreen (borderless)"
       },
       {
         "category": "Display",
-        "reason": "Leave VSync to NVIDIA Control Panel as the VRR safety net; keep the in-game toggle off so it never adds queueing latency.",
+        "reason": "NVIDIA recommends in-game VSync for windowed G-SYNC with Reflex. The driver FPS cap stays below refresh.",
         "setting": "VSync",
-        "value": "Off (in-game)"
+        "value": "On (in-game)"
       },
       {
         "category": "Display",
-        "reason": "ABSO has already configured the driver side: NVIDIA LLM is OFF so the engine owns the render queue (Reflex's correct path). Fortnite's Reflex toggle lives in Fortnite's settings and there is no stable config key to write it from outside; manually flip 'NVIDIA Reflex Low Latency' to 'On + Boost' in the game once.",
+        "reason": "ABSO leaves driver LLM off. Enable Reflex manually in Fortnite; Reflex may pace below the driver cap.",
         "setting": "NVIDIA Reflex Low Latency",
-        "value": "On + Boost \u2014 ABSO already set driver LLM off; flip the in-game toggle to finish"
+        "value": "On + Boost (set manually)"
       },
       {
         "category": "Display",
-        "reason": "Set by ABSO to refresh - 3 (Blur Busters G-SYNC 101). Keeps G-SYNC active and prevents NVCP V-SYNC from engaging while preserving tear-free output.",
+        "reason": "ABSO clears the engine cap and sets the NVIDIA VRR ceiling from the detected refresh rate, avoiding two matching explicit limiters.",
         "setting": "Frame Rate Limit",
-        "value": "Auto (refresh - 3: e.g. 297 @ 300Hz, 237 @ 240Hz, 141 @ 144Hz)"
+        "value": "Unlimited in-game; driver cap at refresh - 3"
       },
       {
         "category": "Display",
-        "reason": "Use Fortnite's native HDR output path in GameUserSettings.ini when the installed build and display path support HDR.",
+        "reason": "ABSO enables Windows HDR. It leaves the game's HDR output and brightness keys unchanged; those keys alone do not prove native HDR output.",
         "setting": "HDR",
-        "value": "On"
-      },
-      {
-        "category": "Display",
-        "reason": "Keep Windows HDR and Fortnite's native HDR output aligned.",
-        "setting": "HDR Peak Brightness / Nits",
-        "value": "Start at 1000 nits or match your display peak"
+        "value": "Windows HDR On; native game HDR unverified"
       },
       {
         "category": "Graphics",
-        "reason": "This profile is built around Fortnite's DX12 path for Reflex and modern presentation behavior.",
+        "reason": "Changing rendering mode requires a game restart.",
         "setting": "Rendering Mode",
-        "value": "DirectX 12"
+        "value": "DirectX 12 (set manually)"
       },
       {
         "category": "Graphics",
-        "reason": "Better CPU utilization and more stable frame delivery in stacked endgames.",
-        "setting": "Multithreaded Rendering",
-        "value": "On"
+        "reason": "A clarity/performance starting point for supported RTX GPUs; use the game's supported alternatives on other hardware.",
+        "setting": "Anti-Aliasing & Super Resolution",
+        "value": "NVIDIA DLSS Quality (set manually, when available)"
       },
       {
         "category": "Graphics",
-        "reason": "Keep frame times stable first; use DLSS only when needed to hold the VRR cap.",
-        "setting": "3D Resolution / DLSS",
-        "value": "100% or DLSS Performance if GPU-bound"
+        "reason": "Reduce geometry cost; change from the lobby because this option cannot be changed mid-match.",
+        "setting": "Nanite Virtualized Geometry",
+        "value": "Off (set manually)"
       },
       {
         "category": "Graphics",
-        "reason": "Reduces visual noise and preserves snap-tracking clarity.",
+        "reason": "Disable Lumen lighting for this performance starting point; change from the lobby.",
+        "setting": "Global Illumination",
+        "value": "Off (set manually)"
+      },
+      {
+        "category": "Graphics",
+        "reason": "Disable Lumen and screen-space reflections to reduce rendering work.",
+        "setting": "Reflections",
+        "value": "Off (set manually)"
+      },
+      {
+        "category": "Graphics",
+        "reason": "Changing hardware ray tracing requires a game restart.",
+        "setting": "Hardware Ray Tracing",
+        "value": "Off (set manually)"
+      },
+      {
+        "category": "Graphics",
+        "reason": "Reduce rendering work and visual clutter.",
+        "setting": "Shadows",
+        "value": "Off (set manually)"
+      },
+      {
+        "category": "Graphics",
+        "reason": "Balance scenery detail and performance; reduce to Near if more headroom is needed.",
+        "setting": "View Distance",
+        "value": "Medium (manual starting point)"
+      },
+      {
+        "category": "Graphics",
+        "reason": "Balance image detail and memory use; adjust to the GPU's available memory.",
+        "setting": "Textures",
+        "value": "Medium (manual starting point)"
+      },
+      {
+        "category": "Graphics",
+        "reason": "Reduce effects cost while preserving room for capture.",
+        "setting": "Effects / Post Processing",
+        "value": "Low / Low (set manually)"
+      },
+      {
+        "category": "Graphics",
+        "reason": "Keep the chosen upscaling quality stable instead of chasing a dynamic resolution target.",
+        "setting": "Dynamic 3D Resolution",
+        "value": "Off (set manually)"
+      },
+      {
+        "category": "Graphics",
+        "reason": "Keep the baseline focused on rendered game frames and input responsiveness.",
+        "setting": "Frame Generation",
+        "value": "Off (set manually, if offered)"
+      },
+      {
+        "category": "Graphics",
+        "reason": "Keep camera motion and tracking clear.",
         "setting": "Motion Blur",
-        "value": "Off"
-      },
-      {
-        "category": "Graphics",
-        "reason": "Endgame effects spikes matter more than visual richness in the competitive lane.",
-        "setting": "Shadows / Effects",
-        "value": "Low"
-      },
-      {
-        "category": "Content",
-        "reason": "Avoids streaming hitches and unnecessary VRAM churn.",
-        "setting": "High Resolution Textures",
-        "value": "Off"
+        "value": "Off (set manually)"
       }
     ],
     "include_legacy_tweaks": false,
@@ -2869,11 +2948,10 @@
         "dynamic_range": "full"
       },
       "FortniteConfigHandler": {
-        "auto_vrr_fps_cap": true,
+        "auto_vrr_fps_cap": false,
+        "frame_rate_limit": 0,
         "fullscreen_mode": 1,
-        "hdr_nits": 1000,
-        "hdr_output": true,
-        "vsync": false
+        "vsync": true
       },
       "GameDvrHandler": {
         "hard_disable": true

@@ -23,6 +23,12 @@ _STREAMING_WINDOWED_VRR_OVERRIDES: dict[str, dict[str, Any]] = {
     },
     "FortniteConfigHandler": {
         "fullscreen_mode": 1,
+        # NVIDIA's G-SYNC + Reflex guidance calls for in-game VSync on the
+        # windowed path. Keep one explicit FPS limiter: the driver VRR cap.
+        # https://www.nvidia.com/en-us/geforce/guides/system-latency-optimization-guide/
+        "vsync": True,
+        "auto_vrr_fps_cap": False,
+        "frame_rate_limit": 0,
     },
     "ProcessPriorityHandler": {
         "cpu_priority": 2,
@@ -508,6 +514,10 @@ class _FortniteGSyncCaptureBase(FortniteGSyncHDRProfile):
     def fullscreen_optimizations_per_exe(self) -> dict[str, bool]:
         return fso_overrides(self.executable_hints, disabled=False)
 
+    @property
+    def allow_dual_limiter(self) -> bool:
+        return False
+
     def _shared_overrides(self) -> dict[str, dict[str, Any]]:
         return merge_settings_map(
             super()._shared_overrides(),
@@ -515,26 +525,70 @@ class _FortniteGSyncCaptureBase(FortniteGSyncHDRProfile):
         )
 
     def get_in_game_settings(self) -> list[dict[str, str]]:
-        patched: list[dict[str, str]] = []
-        for row in super().get_in_game_settings():
-            if row.get("setting") == "Display Mode":
-                row = {
-                    **row,
-                    "value": "Windowed Fullscreen (borderless)",
-                    "reason": (
-                        "Streaming lane: uses Fortnite's borderless mode and "
-                        "the Windows windowed G-SYNC path so OBS, Medal, RTSS, "
-                        "and overlays can stay running."
-                    ),
-                }
-            patched.append(row)
-        return patched
+        # Graphics and Reflex remain manual: their current UI choices were
+        # observed, but their serialized keys are not a stable write contract.
+        # These starting points do not promise a particular FPS on every PC.
+        return [
+            {
+                "category": "Display",
+                "setting": "Display Mode",
+                "value": "Windowed Fullscreen (borderless)",
+                "reason": "ABSO sets the windowed G-SYNC path and keeps OBS, Medal, RTSS, and overlays available.",
+            },
+            {
+                "category": "Display",
+                "setting": "VSync",
+                "value": "On (in-game)",
+                "reason": "NVIDIA recommends in-game VSync for windowed G-SYNC with Reflex. The driver FPS cap stays below refresh.",
+            },
+            {
+                "category": "Display",
+                "setting": "NVIDIA Reflex Low Latency",
+                "value": "On + Boost (set manually)",
+                "reason": "ABSO leaves driver LLM off. Enable Reflex manually in Fortnite; Reflex may pace below the driver cap.",
+            },
+            {
+                "category": "Display",
+                "setting": "Frame Rate Limit",
+                "value": "Unlimited in-game; driver cap at refresh - 3",
+                "reason": "ABSO clears the engine cap and sets the NVIDIA VRR ceiling from the detected refresh rate, avoiding two matching explicit limiters.",
+            },
+            {
+                "category": "Display",
+                "setting": "HDR",
+                "value": "Windows HDR On; native game HDR unverified",
+                "reason": "ABSO enables Windows HDR. It leaves the game's HDR output and brightness keys unchanged; those keys alone do not prove native HDR output.",
+            },
+            *[
+                {"category": "Graphics", "setting": setting, "value": value, "reason": reason}
+                for setting, value, reason in (
+                    ("Rendering Mode", "DirectX 12 (set manually)", "Changing rendering mode requires a game restart."),
+                    ("Anti-Aliasing & Super Resolution", "NVIDIA DLSS Quality (set manually, when available)", "A clarity/performance starting point for supported RTX GPUs; use the game's supported alternatives on other hardware."),
+                    ("Nanite Virtualized Geometry", "Off (set manually)", "Reduce geometry cost; change from the lobby because this option cannot be changed mid-match."),
+                    ("Global Illumination", "Off (set manually)", "Disable Lumen lighting for this performance starting point; change from the lobby."),
+                    ("Reflections", "Off (set manually)", "Disable Lumen and screen-space reflections to reduce rendering work."),
+                    ("Hardware Ray Tracing", "Off (set manually)", "Changing hardware ray tracing requires a game restart."),
+                    ("Shadows", "Off (set manually)", "Reduce rendering work and visual clutter."),
+                    ("View Distance", "Medium (manual starting point)", "Balance scenery detail and performance; reduce to Near if more headroom is needed."),
+                    ("Textures", "Medium (manual starting point)", "Balance image detail and memory use; adjust to the GPU's available memory."),
+                    ("Effects / Post Processing", "Low / Low (set manually)", "Reduce effects cost while preserving room for capture."),
+                    ("Dynamic 3D Resolution", "Off (set manually)", "Keep the chosen upscaling quality stable instead of chasing a dynamic resolution target."),
+                    ("Frame Generation", "Off (set manually, if offered)", "Keep the baseline focused on rendered game frames and input responsiveness."),
+                    ("Motion Blur", "Off (set manually)", "Keep camera motion and tracking clear."),
+                )
+            ],
+        ]
 
     def get_post_apply_notes(self) -> list[str]:
         return [
-            "Fortnite streaming manual: use Windowed Fullscreen, keep in-game "
-            "VSync Off, and set NVIDIA Reflex Low Latency to On + Boost. OBS "
-            "and overlay processes remain available."
+            "Fortnite streaming: Windowed Fullscreen, in-game VSync On, and "
+            "Unlimited engine FPS with the NVIDIA refresh - 3 cap. Set Reflex "
+            "On + Boost manually. OBS and overlays remain available.",
+            "Graphics remain user-controlled: manually choose DX12, DLSS "
+            "Quality when available, Medium textures/view distance, Low "
+            "effects/post processing, and turn Nanite, lighting/reflections, "
+            "ray tracing, shadows, motion blur, dynamic resolution, and frame "
+            "generation off. Restart after changing renderer or hardware ray tracing.",
         ]
 
 
@@ -554,7 +608,8 @@ class FortniteGSyncCaptureProfile(_FortniteGSyncCaptureBase):
         return (
             "SDR capped G-SYNC lane on Fortnite's borderless path; preserves "
             "OBS, Medal, RTSS, and overlays and keeps game CPU/I/O priority at "
-            "Normal so capture is not starved."
+            "Normal. Uses in-game VSync and a driver cap; enable Reflex "
+            "On + Boost manually."
         )
 
     @property
@@ -594,7 +649,7 @@ class FortniteGSyncCaptureProfile(_FortniteGSyncCaptureBase):
 
 
 class FortniteGSyncHDRCaptureProfile(_FortniteGSyncCaptureBase):
-    """Fortnite native-HDR streaming lane with borderless G-SYNC."""
+    """Fortnite streaming lane with Windows HDR and borderless G-SYNC."""
 
     @property
     def profile_id(self) -> str:
@@ -607,10 +662,19 @@ class FortniteGSyncHDRCaptureProfile(_FortniteGSyncCaptureBase):
     @property
     def description(self) -> str:
         return (
-            "Native-HDR capped G-SYNC lane on Fortnite's borderless path; "
+            "Windows HDR G-SYNC lane on Fortnite's borderless path; "
             "preserves OBS, Medal, RTSS, and overlays and keeps game CPU/I/O "
-            "priority at Normal so capture is not starved."
+            "priority at Normal. Uses in-game VSync and a driver cap; enable "
+            "Reflex On + Boost manually. Native game HDR is unverified."
         )
+
+    def _variant_overrides(self) -> dict[str, dict[str, Any]]:
+        settings = super()._variant_overrides()
+        # An accepted UE INI key does not establish Fortnite native HDR
+        # support. Preserve the user's game HDR/calibration values; this lane
+        # promises only the Windows HDR setting that ABSO can verify.
+        settings.pop("FortniteConfigHandler", None)
+        return settings
 
     def get_post_apply_notes(self) -> list[str]:
         return [

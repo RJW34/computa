@@ -439,7 +439,7 @@ PROFILE_CATALOG: OrderedDict[str, ProfileCatalogEntry] = OrderedDict(
             tray_category="Shooters",
             tray_subtitle="HDR Streaming | Borderless VRR | Keeps OBS/Medal/Overlays",
             tray_description=(
-                "Capped native-HDR G-SYNC on Fortnite's borderless path. OBS, Medal, "
+                "Capped Windows-HDR G-SYNC on Fortnite's borderless path. OBS, Medal, "
                 "RTSS, and overlays remain available; game CPU/I/O priority stays "
                 "Normal and OBS encoder/output settings are left untouched."
             ),

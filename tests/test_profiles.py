@@ -1222,7 +1222,17 @@ class TestProfileSettings:
         assert nvidia["global_vrr_mode"] == "fullscreen_and_windowed"
         assert nvidia["auto_vrr_fps_cap"] is True
         assert config["fullscreen_mode"] == 1
-        assert config["hdr_output"] is expect_hdr
+        assert config["vsync"] is True
+        assert config["frame_rate_limit"] == 0
+        assert config["auto_vrr_fps_cap"] is False
+        assert profile.allow_dual_limiter is False
+        if expect_hdr:
+            # Windows HDR is verified separately; game HDR support/calibration
+            # is not inferred from the presence of inherited Unreal INI keys.
+            assert "hdr_output" not in config
+            assert "hdr_nits" not in config
+        else:
+            assert config["hdr_output"] is False
         assert windows["hdr"] is expect_hdr
         assert all(
             disabled is False for disabled in profile.fullscreen_optimizations_per_exe.values()
@@ -1232,6 +1242,41 @@ class TestProfileSettings:
             row for row in profile.get_in_game_settings() if row["setting"] == "Display Mode"
         )
         assert "windowed" in display_mode["value"].lower()
+
+    @pytest.mark.parametrize(
+        "profile_cls", [FortniteGSyncCaptureProfile, FortniteGSyncHDRCaptureProfile]
+    )
+    def test_fortnite_streaming_guidance_matches_sync_and_manual_graphics(self, profile_cls):
+        profile = profile_cls()
+        rows = {row["setting"]: row for row in profile.get_in_game_settings()}
+
+        assert rows["VSync"]["value"] == "On (in-game)"
+        assert "Unlimited" in rows["Frame Rate Limit"]["value"]
+        assert "driver cap" in rows["Frame Rate Limit"]["value"]
+        assert "On + Boost" in rows["NVIDIA Reflex Low Latency"]["value"]
+        assert "manually" in rows["NVIDIA Reflex Low Latency"]["value"]
+        assert profile.enforces_reflex_in_config is False
+        assert "Quality" in rows["Anti-Aliasing & Super Resolution"]["value"]
+        assert "Medium" in rows["Textures"]["value"]
+        assert "Medium" in rows["View Distance"]["value"]
+        assert "Low / Low" in rows["Effects / Post Processing"]["value"]
+        for setting in (
+            "Nanite Virtualized Geometry", "Global Illumination", "Reflections",
+            "Hardware Ray Tracing", "Shadows", "Motion Blur",
+            "Dynamic 3D Resolution", "Frame Generation",
+        ):
+            assert rows[setting]["value"].startswith("Off")
+            assert "manually" in rows[setting]["value"]
+        for setting in ("Rendering Mode", "Hardware Ray Tracing"):
+            assert "restart" in rows[setting]["reason"].lower()
+
+        assert "HDR Peak Brightness / Nits" not in rows
+        if not profile.is_sdr_only:
+            assert "unverified" in rows["HDR"]["value"].lower()
+            assert "unverified" in profile.description.lower()
+        notes = " ".join(profile.get_post_apply_notes())
+        assert "VSync On" in notes
+        assert "VSync Off" not in notes
 
     def test_marvel_rivals_variants_drive_native_game_config(self):
         """Marvel Rivals variants should set native HDR and Reflex in GameUserSettings."""
