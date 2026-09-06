@@ -10,7 +10,7 @@ use std::fs;
 use std::os::windows::ffi::OsStrExt;
 #[cfg(windows)]
 use std::os::windows::process::CommandExt;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::Mutex;
 use tauri::{
@@ -242,76 +242,144 @@ fn ensure_gui_admin() {
 #[cfg(not(windows))]
 fn ensure_gui_admin() {}
 
-/// Resolve an installed sidecar located beside the GUI executable.
-fn current_exe_sidecar_path() -> Option<PathBuf> {
-    let exe = std::env::current_exe().ok()?;
-    let exe_dir = exe.parent()?;
-    let sidecar = exe_dir.join("abso.exe");
-    sidecar.exists().then_some(sidecar)
+/// Resolve the public CLI name while preserving Tauri's legacy sidecar contract.
+fn resolve_sidecar_path(
+    exe_dir: Option<&Path>,
+    resource_dir: Option<&Path>,
+    is_file: impl Fn(&Path) -> bool,
+) -> Option<PathBuf> {
+    let mut installed_dirs = Vec::new();
+    if let Some(dir) = exe_dir {
+        installed_dirs.push(dir.to_path_buf());
+    }
+    if let Some(dir) = resource_dir {
+        installed_dirs.push(dir.to_path_buf());
+        installed_dirs.push(dir.join("binaries"));
+    }
+
+    // A freshly deployed computa.exe must win over an older bundled abso.exe.
+    // Tauri externalBin still ships the legacy name, so keep it as a fallback.
+    for filename in ["computa.exe", "abso.exe"] {
+        for dir in &installed_dirs {
+            let path = dir.join(filename);
+            if is_file(&path) {
+                return Some(path);
+            }
+        }
+    }
+
+    // Support launches from src-tauri, gui, and the project root. Search every
+    // modern location before considering stale builds under the legacy name.
+    for filename in ["computa.exe", "abso.exe"] {
+        for dir in ["../../dist", "../dist", "dist"] {
+            let path = Path::new(dir).join(filename);
+            if is_file(&path) {
+                return Some(path);
+            }
+        }
+    }
+    None
 }
 
-/// Get the path to the bundled abso.exe sidecar
+fn find_sidecar_path(app_handle: Option<&tauri::AppHandle>) -> Option<PathBuf> {
+    let exe = std::env::current_exe().ok();
+    let resource_dir = app_handle.and_then(|handle| handle.path().resource_dir().ok());
+    resolve_sidecar_path(
+        exe.as_deref().and_then(Path::parent),
+        resource_dir.as_deref(),
+        Path::is_file,
+    )
+}
+
+/// Get the installed or bundled CLI path, with the public command as fallback.
 fn get_sidecar_path(app_handle: Option<&tauri::AppHandle>) -> PathBuf {
-    // In production: use the bundled sidecar
-    if let Some(handle) = app_handle {
-        if let Ok(resource_dir) = handle.path().resource_dir() {
-            let sidecar = resource_dir.join("binaries").join("abso.exe");
-            if sidecar.exists() {
-                return sidecar;
-            }
-        }
-    }
-
-    if let Some(sidecar) = current_exe_sidecar_path() {
-        return sidecar;
-    }
-
-    // Fallback for development: look for dist/abso.exe in project root
-    let dev_paths = [
-        PathBuf::from("../../dist/abso.exe"), // From src-tauri
-        PathBuf::from("../dist/abso.exe"),    // From gui
-        PathBuf::from("dist/abso.exe"),       // From project root
-    ];
-
-    for path in &dev_paths {
-        if path.exists() {
-            return path.clone();
-        }
-    }
-
-    // Ultimate fallback: assume it's in PATH or use python
-    PathBuf::from("abso.exe")
+    find_sidecar_path(app_handle).unwrap_or_else(|| PathBuf::from("computa.exe"))
 }
 
-/// Check if we should use Python (development) or bundled exe (production)
-fn should_use_python() -> bool {
-    // In debug builds, always use Python for consistent data paths
-    #[cfg(debug_assertions)]
-    {
-        return true;
+/// Debug builds keep Python's development data paths; release uses the same
+/// resolver as command execution, including resource-only Tauri sidecars.
+fn should_use_python(app_handle: Option<&tauri::AppHandle>) -> bool {
+    cfg!(debug_assertions) || find_sidecar_path(app_handle).is_none()
+}
+
+#[cfg(test)]
+mod sidecar_tests {
+    use super::*;
+
+    fn resolve_available(files: &[&str]) -> Option<PathBuf> {
+        resolve_sidecar_path(
+            Some(Path::new("installed")),
+            Some(Path::new("resources")),
+            |candidate| files.iter().any(|file| candidate == Path::new(file)),
+        )
     }
 
-    // In release builds, check for bundled sidecar
-    #[cfg(not(debug_assertions))]
-    {
-        if current_exe_sidecar_path().is_some() {
-            return false;
+    #[test]
+    fn installed_public_cli_wins_over_old_bundled_backend() {
+        assert_eq!(
+            resolve_available(&[
+                "installed/computa.exe",
+                "installed/abso.exe",
+                "resources/binaries/abso.exe",
+                "dist/computa.exe",
+            ]),
+            Some(PathBuf::from("installed/computa.exe")),
+        );
+    }
+
+    #[test]
+    fn local_deploy_needs_only_the_renamed_backend() {
+        assert_eq!(
+            resolve_available(&["installed/computa.exe"]),
+            Some(PathBuf::from("installed/computa.exe")),
+        );
+    }
+
+    #[test]
+    fn tauri_legacy_backend_remains_usable_beside_gui_or_in_resources() {
+        for location in [
+            "installed/abso.exe",
+            "resources/abso.exe",
+            "resources/binaries/abso.exe",
+        ] {
+            assert_eq!(resolve_available(&[location]), Some(PathBuf::from(location)));
         }
+    }
 
-        let dev_paths = [
-            PathBuf::from("../../dist/abso.exe"),
-            PathBuf::from("../dist/abso.exe"),
-            PathBuf::from("dist/abso.exe"),
-        ];
+    #[test]
+    fn modern_resource_backend_precedes_legacy_sidecars() {
+        assert_eq!(
+            resolve_available(&["installed/abso.exe", "resources/binaries/computa.exe"]),
+            Some(PathBuf::from("resources/binaries/computa.exe")),
+        );
+    }
 
-        for path in &dev_paths {
-            if path.exists() {
-                return false;
-            }
+    #[test]
+    fn development_public_cli_is_found_from_each_supported_directory() {
+        for location in [
+            "../../dist/computa.exe",
+            "../dist/computa.exe",
+            "dist/computa.exe",
+        ] {
+            assert_eq!(
+                resolve_available(&["../../dist/abso.exe", location]),
+                Some(PathBuf::from(location)),
+            );
         }
+    }
 
-        // No bundled exe found, use Python
-        true
+    #[test]
+    fn legacy_development_build_remains_a_fallback() {
+        assert_eq!(
+            resolve_available(&["dist/abso.exe"]),
+            Some(PathBuf::from("dist/abso.exe")),
+        );
+    }
+
+    #[test]
+    fn missing_backend_is_not_reported_as_a_sidecar() {
+        assert_eq!(resolve_available(&[]), None);
+        assert_eq!(resolve_sidecar_path(None, None, |_| false), None);
     }
 }
 
@@ -335,7 +403,7 @@ async fn run_abso_command(
     command: String,
     args: Vec<String>,
 ) -> Result<String, String> {
-    let output = if should_use_python() {
+    let output = if should_use_python(Some(&app_handle)) {
         // Development mode: use Python
         hidden_command("python")
             .args(["-m", "abso", &command])
@@ -408,7 +476,7 @@ fn is_admin() -> bool {
 /// Get info about the CLI backend being used
 #[tauri::command]
 fn get_backend_info(app_handle: tauri::AppHandle) -> serde_json::Value {
-    let using_python = should_use_python();
+    let using_python = should_use_python(Some(&app_handle));
     let sidecar_path = get_sidecar_path(Some(&app_handle));
 
     serde_json::json!({
@@ -445,7 +513,7 @@ fn apply_profile_sync(
     app_handle: &tauri::AppHandle,
     profile_id: &str,
 ) -> Result<ApplyTrayEvent, String> {
-    let output = if should_use_python() {
+    let output = if should_use_python(Some(app_handle)) {
         hidden_command("python")
             .args(["-m", "abso", "apply", profile_id, "--json", "--no-fallback"])
             .current_dir(get_project_root())
@@ -502,7 +570,7 @@ fn apply_profile_sync(
 }
 
 fn load_backend_active_profile(app_handle: &tauri::AppHandle) -> Option<String> {
-    let output = if should_use_python() {
+    let output = if should_use_python(Some(app_handle)) {
         hidden_command("python")
             .args(["-m", "abso", "state", "--json"])
             .current_dir(get_project_root())
@@ -585,7 +653,7 @@ fn fallback_tray_profiles(app_handle: &tauri::AppHandle) -> Vec<TrayProfile> {
 
 /// Load fresh tray profile menu entries from CLI metadata.
 fn load_tray_profiles_from_cli(app_handle: &tauri::AppHandle) -> Vec<TrayProfile> {
-    let output = if should_use_python() {
+    let output = if should_use_python(Some(app_handle)) {
         hidden_command("python")
             .args(["-m", "abso", "profiles", "--json"])
             .current_dir(get_project_root())
