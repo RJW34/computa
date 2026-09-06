@@ -448,6 +448,38 @@ game-side FPS limit are hardware- and service-specific; computa does not guess
 those values or overwrite a working OBS configuration during a game-profile
 switch.
 
+### Fortnite Streaming stays around 60–70 FPS or tears
+
+The Fortnite Streaming profiles use Windowed Fullscreen, **in-game VSync On**,
+driver G-SYNC/VSync, driver Low Latency Mode Off, and an NVIDIA cap of
+`refresh - 3` (297 at 300 Hz). The in-game Frame Rate Limit is Unlimited.
+Enable **NVIDIA Reflex On + Boost** in Fortnite. Reflex can pace below the
+driver ceiling; the ceiling is not a promised gameplay frame rate.
+[NVIDIA's latency guide](https://www.nvidia.com/en-us/geforce/guides/system-latency-optimization-guide/)
+specifically recommends in-game VSync for windowed G-SYNC with Reflex.
+
+Check the graphics workload separately. A DX12 starting point is DLSS Quality
+on supported RTX GPUs, Medium view distance/textures, Low effects/post
+processing, with Nanite, global illumination, reflections, shadows, hardware
+ray tracing, motion blur, dynamic resolution, and frame generation disabled.
+These are manual starting points; ABSO preserves the game's graphics-quality,
+renderer, resolution, and Reflex keys during both apply and baseline restore.
+Older builds restored the entire saved INI on profile switches, which could
+undo manual graphics changes. Renderer and hardware ray-tracing
+changes can require a game restart; follow Fortnite's prompt.
+[Epic's competitive settings guide](https://store.epicgames.com/news/fortnite-on-pc-best-settings-for-competitive-play-in-2026)
+explains the rendering-cost tradeoffs.
+
+The HDR Streaming lane enables **Windows HDR**. It preserves Fortnite's native
+HDR/calibration keys and does not claim that the game produces native HDR.
+Windows HDR or an INI boolean alone does not prove native HDR output, Auto HDR,
+RTX HDR, or correct capture tone mapping. Verify the intended game/capture
+output path separately; use SDR Streaming for an ordinary SDR destination.
+
+Compare FPS, GPU/CPU frame times, and tearing in a repeatable match scene.
+Lobby FPS is not a gameplay benchmark. The [September 2026 Fortnite audit](research/fortnite-streaming-audit-2026-09-06.md)
+records the original findings, saved settings, and verification fixes.
+
 ---
 
 ## Profile Application Failures

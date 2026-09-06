@@ -43,6 +43,7 @@ actively working on that area.
 
 - [VRR Latency Research Notes](./research/vrr-latency-research-notes.md)
 - [Dolphin Latency Research Notes](./research/dolphin-latency-research-notes.md)
+- [Fortnite Streaming Audit and Corrections](./research/fortnite-streaming-audit-2026-09-06.md)
 
 ## Focused-Scope Notes
 
