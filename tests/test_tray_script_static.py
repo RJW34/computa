@@ -341,29 +341,167 @@ def test_tray_profile_copy_normalizes_gsync_typography() -> None:
     assert 'return "$($profile.Name)"' not in script
 
 
-def test_profile_apply_timeout_toast_keeps_profile_visuals() -> None:
-    """Apply timeout error should identify the profile that was being applied."""
+def test_mutating_tray_operations_are_serialized_and_wait_for_backend_exit() -> None:
+    """Mutations should reject re-entry and never kill a backend transaction for being slow."""
     script = TRAY_SCRIPT.read_text(encoding="utf-8")
+    guard_section = script.split("function Test-TrayMutationInProgress", 1)[1].split(
+        "function Complete-TrayMutatingChildProcess",
+        1,
+    )[0]
+    completion_section = script.split("function Complete-TrayMutatingChildProcess", 1)[1].split(
+        "function Apply-Profile",
+        1,
+    )[0]
     apply_section = script.split("function Apply-Profile", 1)[1].split(
         "function Apply-PendingProfileFixes",
         1,
     )[0]
-    timeout_section = apply_section.split('Write-TrayLog "Apply-Profile timed out after 120s', 1)[1].split(
-        "return",
+    pending_section = script.split("function Apply-PendingProfileFixes", 1)[1].split(
+        "function Get-TrayCommandFilePath",
+        1,
+    )[0]
+    restore_section = script.split("function Restore-Settings", 1)[1].split(
+        "# ============================================================================\n# MENU STATE",
+        1,
+    )[0]
+    backup_section = script.split("$bItem.Add_Click({", 1)[1].split(
+        "}.GetNewClosure())",
+        1,
+    )[0]
+    reset_display_section = script.split("$resetDisplayItem.Add_Click({", 1)[1].split(
+        "$actionsMenu.DropDownItems.Add($resetDisplayItem)",
+        1,
+    )[0]
+    restart_section = script.split("$restartItem.Add_Click({", 1)[1].split(
+        "$menu.Items.Add($restartItem)",
+        1,
+    )[0]
+    exit_section = script.split("$exitItem.Add_Click({", 1)[1].split(
+        "$menu.Items.Add($exitItem)",
+        1,
+    )[0]
+    wait_section = apply_section.split("# Poll instead of -Wait", 1)[1].split(
+        "$exitCode = $proc.ExitCode",
         1,
     )[0]
 
-    assert "$timeoutVisual = Get-TrayProfileToastVisualArgs -ProfileId $ProfileId -Profile $profile" in (
-        timeout_section
-    )
-    assert "$profileTitle = Get-TrayProfileObjectDisplayName -Profile $profile -Fallback $ProfileId" in apply_section
-    assert "$timeoutTitle = $profileTitle" in timeout_section
     assert (
-        'Show-Notification @timeoutVisual -Title $timeoutTitle '
-        '-Message "Apply timed out after 120s" -Type "Error" -MetaText $ProfileId'
-    ) in timeout_section
-    assert 'Show-Notification -Title "computa" -Message "Apply timed out after 120s"' not in timeout_section
-    assert 'Set-TrayLastAction -Message "Apply timed out after 120s"' in timeout_section
+        "$script:ProcessGuardTimer = $null\n$script:MutatingOperationInProgress = $false"
+        in script
+    )
+    assert "if (-not $script:MutatingOperationInProgress) { return $false }" in guard_section
+    assert "another mutating operation is still running safely" in guard_section
+    assert "while (-not $Process.HasExited)" in completion_section
+    assert "$Process.WaitForExit()" in completion_section
+    assert "return $false" in completion_section
+    assert "mutation guard remains active" in completion_section
+    assert 'Test-TrayMutationInProgress -RequestedAction "applying another profile"' in apply_section
+    assert 'Test-TrayMutationInProgress -RequestedAction "applying pending profile fixes"' in pending_section
+    assert 'Test-TrayMutationInProgress -RequestedAction "restoring settings"' in restore_section
+    assert 'Test-TrayMutationInProgress -RequestedAction "restoring a backup"' in backup_section
+    mutation_sections = (apply_section, pending_section, restore_section, backup_section)
+    for mutation_section in mutation_sections:
+        assert "$proc = $null" in mutation_section
+        assert "$script:MutatingOperationInProgress = $true" in mutation_section
+        assert mutation_section.index("$proc = $null") < mutation_section.index(
+            "$script:MutatingOperationInProgress = $true"
+        ) < mutation_section.index("Start-Process")
+        assert "finally {" in mutation_section
+        assert "Complete-TrayMutatingChildProcess -Process $proc" in mutation_section
+        assert "if ($childCompleted) {" in mutation_section
+        assert "$script:MutatingOperationInProgress = $false" in mutation_section
+        assert mutation_section.count("$script:MutatingOperationInProgress = $false") == 1
+        assert ".Kill(" not in mutation_section
+        assert "$exitCodeOk = ($null -ne $exitCode -and $exitCode -eq 0)" in mutation_section
+        assert "$exitCodeOk = ($null -eq $exitCode -or $exitCode -eq 0)" not in mutation_section
+        assert "try { [System.Windows.Forms.Application]::DoEvents() } catch {}" in mutation_section
+        assert "slow-operation UI update failed" in mutation_section
+
+    for mutation_section, output_read in (
+        (apply_section, "$rawOutput = Get-Content $tempFile"),
+        (pending_section, "$rawOutput = Get-Content $tempFile"),
+        (restore_section, "$rawOutput = Get-Content $tempFile"),
+        (backup_section, "$out = Get-Content $tf"),
+    ):
+        loop_index = mutation_section.index("while (-not $proc.HasExited)")
+        drain_index = mutation_section.index("$proc.WaitForExit()", loop_index)
+        exit_code_index = mutation_section.index("$exitCode = $proc.ExitCode", drain_index)
+        output_index = mutation_section.index(output_read, exit_code_index)
+        assert loop_index < drain_index < exit_code_index < output_index
+
+    for mutation_section, cleanup_line in (
+        (apply_section, "if ($tempFile) { Remove-Item $tempFile"),
+        (pending_section, "if ($tempFile) { Remove-Item $tempFile"),
+        (restore_section, "if ($tempFile) { Remove-Item $tempFile"),
+        (backup_section, "if ($tf) { Remove-Item $tf"),
+    ):
+        completion_index = mutation_section.rindex("if ($childCompleted) {")
+        dispose_index = mutation_section.index("$proc.Dispose()", completion_index)
+        cleanup_index = mutation_section.index(cleanup_line, dispose_index)
+        release_index = mutation_section.index(
+            "$script:MutatingOperationInProgress = $false",
+            cleanup_index,
+        )
+        assert completion_index < dispose_index < cleanup_index < release_index
+
+    assert "$slowApplyNoticeAt = (Get-Date).AddSeconds(120)" in wait_section
+    assert "$slowApplyNoticeShown = $false" in wait_section
+    assert "while (-not $proc.HasExited)" in wait_section
+    assert "$slowApplyNoticeShown = $true" in wait_section
+    assert (
+        'Write-TrayLog "Apply-Profile is still running after 120s; waiting for the backend '
+        'transaction to finish safely" -Level "WARN"'
+    ) in wait_section
+    assert 'Update-ProgressOverlay -StepText "Still applying safely..."' in wait_section
+    assert (
+        'Set-TrayOperationTooltipText -Text "computa - Applying (still running safely)..."'
+        in wait_section
+    )
+    assert "try { [System.Windows.Forms.Application]::DoEvents() } catch {}" in wait_section
+    assert "timed out" not in wait_section.lower()
+    assert "return" not in wait_section
+
+    assert "$slowPendingNoticeAt = (Get-Date).AddSeconds(45)" in pending_section
+    assert 'Update-ProgressOverlay -StepText "Still applying pending fixes safely..."' in pending_section
+    assert "$slowRestoreNoticeAt = (Get-Date).AddSeconds(120)" in restore_section
+    assert 'Update-ProgressOverlay -StepText "Still restoring safely..."' in restore_section
+    assert 'Test-TrayMutationInProgress -RequestedAction "resetting the display pipeline"' in reset_display_section
+    assert reset_display_section.index("Test-TrayMutationInProgress") < reset_display_section.index(
+        "User invoked Reset Display Pipeline"
+    )
+    assert "$proc = $null" in reset_display_section
+    assert "$script:MutatingOperationInProgress = $true" in reset_display_section
+    assert reset_display_section.index("$script:MutatingOperationInProgress = $true") < reset_display_section.index(
+        "[System.Windows.Forms.MessageBox]::Show("
+    )
+    assert 'if ($confirm -ne [System.Windows.Forms.DialogResult]::Yes)' in reset_display_section
+    assert "$slowResetNoticeAt = (Get-Date).AddSeconds(30)" in reset_display_section
+    reset_loop_index = reset_display_section.index("while (-not $proc.HasExited)")
+    reset_drain_index = reset_display_section.index("$proc.WaitForExit()", reset_loop_index)
+    reset_exit_code_index = reset_display_section.index("$exitCode = $proc.ExitCode", reset_drain_index)
+    reset_output_index = reset_display_section.index("$out = Get-Content $tf", reset_exit_code_index)
+    assert reset_loop_index < reset_drain_index < reset_exit_code_index < reset_output_index
+    assert "finally {" in reset_display_section
+    assert 'Complete-TrayMutatingChildProcess -Process $proc -OperationName "Reset Display"' in (
+        reset_display_section
+    )
+    reset_completion_index = reset_display_section.rindex("if ($childCompleted) {")
+    reset_dispose_index = reset_display_section.index("$proc.Dispose()", reset_completion_index)
+    reset_cleanup_index = reset_display_section.index("if ($tf) { Remove-Item $tf", reset_dispose_index)
+    reset_release_index = reset_display_section.index(
+        "$script:MutatingOperationInProgress = $false",
+        reset_cleanup_index,
+    )
+    assert reset_completion_index < reset_dispose_index < reset_cleanup_index < reset_release_index
+    assert ".Kill(" not in reset_display_section
+    assert 'Test-TrayMutationInProgress -RequestedAction "restarting the tray"' in restart_section
+    assert restart_section.index("Test-TrayMutationInProgress") < restart_section.index(
+        "$restartToken = [guid]::NewGuid()"
+    )
+    assert 'Test-TrayMutationInProgress -RequestedAction "exiting the tray"' in exit_section
+    assert exit_section.index("Test-TrayMutationInProgress") < exit_section.index(
+        "Unregister-GlobalHotkeys"
+    )
 
 
 def test_profile_apply_failure_names_failed_action() -> None:
@@ -1698,6 +1836,7 @@ def test_tray_game_marks_cover_integration_matrix_variants() -> None:
         "-online-hdr",
         "-nosync-hdr",
         "-console-parity-hdr",
+        "-hdr-capture",
         "-universal-hdr",
         "-gsync-hdr",
         "-tournament-sim-144hz",
@@ -1842,6 +1981,7 @@ def test_game_visual_identity_normalizes_profile_variants_to_base_marks() -> Non
     assert '"-gsync-hdr-capture"' in resolver_section
     assert '"-online-gsync-hdr"' in resolver_section
     assert '"-console-parity-hdr"' in resolver_section
+    assert '"-hdr-capture"' in resolver_section
     assert '"-tournament-sim-144hz"' in resolver_section
     assert '"-300hz-max"' in resolver_section
     assert '"-streaming-hdr"' in resolver_section
@@ -1853,6 +1993,36 @@ def test_game_visual_identity_normalizes_profile_variants_to_base_marks() -> Non
     assert '$gameKey = if ($identity.ContainsKey("Key")' in new_game_section
     assert "switch ($gameKey)" in new_game_section
     assert "switch ($GameGroup)" not in new_game_section
+
+
+def test_compound_hdr_capture_suffix_is_supported_across_tray_fallback_resolvers() -> None:
+    """Canonical ``*-hdr-capture`` ids must reduce to their game group in every surface."""
+    icons = ICONS_SCRIPT.read_text(encoding="utf-8")
+    settings = SETTINGS_SCRIPT.read_text(encoding="utf-8")
+    quick_panel = QUICK_PANEL_SCRIPT.read_text(encoding="utf-8")
+    tray = TRAY_SCRIPT.read_text(encoding="utf-8")
+
+    resolver_sections = [
+        icons.split("function Resolve-GameVisualIdentityGroup", 1)[1].split(
+            "function Get-GameVisualIdentity",
+            1,
+        )[0],
+        settings.split("function Get-SettingsProfileGameGroup", 1)[1].split(
+            "function Get-SelectedDefaultProfileId",
+            1,
+        )[0],
+        quick_panel.split("function Get-QuickPanelGameGroup", 1)[1].split(
+            "function Get-QuickPanelCardChipText",
+            1,
+        )[0],
+        tray.split("function Get-TrayProfileGameGroup", 1)[1].split(
+            "function Get-TrayProfileToastVisualArgs",
+            1,
+        )[0],
+        tray.split("function Start-TrayApp", 1)[1],
+    ]
+
+    assert all('"-hdr-capture"' in section for section in resolver_sections)
 
 
 def test_call_of_duty_detection_mark_is_stylized_not_monogram() -> None:
@@ -2434,6 +2604,28 @@ def test_active_profile_menu_row_has_renderer_driven_pulse() -> None:
     assert "Start-TrayMenuPulseTimer" in script
     assert "function Stop-TrayMenuPulseTimer" in script
     assert "Stop-TrayMenuPulseTimer" in script
+
+
+def test_tray_menu_pulse_runs_only_while_menu_is_open() -> None:
+    """The 90 ms menu pulse must be gated to menu visibility, avoiding repeated
+    hidden repaints. CPU savings require measurement of the deployed runtime."""
+    script = TRAY_SCRIPT.read_text(encoding="utf-8")
+
+    # The root context menu starts the pulse on open and stops it on close.
+    opened = script.split("$menu.Add_Opened({", 1)[1].split("})", 1)[0]
+    assert "Start-TrayMenuPulseTimer" in opened, "pulse must start when the menu opens"
+    assert "$menu.Add_Closed({" in script, "menu must stop the pulse on close"
+    closed = script.split("$menu.Add_Closed({", 1)[1].split("})", 1)[0]
+    assert "Stop-TrayMenuPulseTimer" in closed, "pulse must stop when the menu closes"
+
+    # It must NOT be started unconditionally during tray init (the old bug).
+    init = script.split("$script:notifyIcon.ContextMenuStrip = $menu", 1)[1].split(
+        "# ─── LEFT-CLICK SHOWS MENU ───", 1
+    )[0]
+    assert "Start-TrayMenuPulseTimer" not in init, (
+        "pulse timer must not be started at tray init — it runs the whole "
+        "session and burns idle CPU"
+    )
 
 
 def test_tray_row_highlights_are_bounded_to_content() -> None:
@@ -3209,6 +3401,35 @@ def test_tray_wires_cpu_balancer_governor() -> None:
     assert "is_online_profile" in script
 
 
+def test_tray_wires_profile_driven_core_partitioning() -> None:
+    """The governor must start automatically for partition-declaring profiles.
+
+    The catalog-declared cpu_partition_policy reaches the tray via the profile
+    cache; a non-'off' policy starts the cpu-balance daemon even without the
+    cpuBalancer opt-in, in steer-only mode (--no-restraint), and the daemon
+    resolves the policy itself from --profile.
+    """
+    script = TRAY_SCRIPT.read_text(encoding="utf-8")
+    # Cache field parsed and mapped onto the tray profile entry.
+    assert "cpu_partition_policy" in script
+    assert "CpuPartitionPolicy" in script
+    # Daemon resolves the profile's partition policy itself.
+    assert '"--profile", $ProfileId' in script
+    # Restraint stays an explicit opt-in: steer-only without cpuBalancer.
+    assert '"--no-restraint"' in script
+    # Governor-needed gate consults the profile policy, not just tray flags.
+    assert "$governorNeeded" in script
+    assert "CpuPartitionPolicy -ne 'off'" in script
+    # Session status: the tray reads the daemon's steer journal once per game
+    # session and logs partition kind / set counts / steered background images.
+    assert "function Write-PartitionSteerStatusOnce" in script
+    assert "partition-steer.journal" in script
+    assert "CpuBalancerStatusLogged" in script
+    # Start log names the mode so steer-only vs restraint sessions are visible.
+    assert "steer-only" in script
+    assert "restraint+steer" in script
+
+
 def test_tray_backup_menu_uses_logical_backup_timestamp() -> None:
     """Copied backup folders should be sorted by manifest/ID time, not copy time."""
     script = TRAY_SCRIPT.read_text(encoding="utf-8")
@@ -3321,7 +3542,7 @@ def test_tray_recent_and_backup_menus_use_friendly_time_and_profile_labels() -> 
     assert 'Set-TrayLastAction -Message "Restored backup: $capturedLabel"' in script
     assert 'Set-LastProfileState -Config $script:TrayConfig -Status "restored" -Source "tray_restore_backup"' in script
     assert 'Set-TrayLastAction -Message "Restored backup: $capturedName"' not in script
-    assert 'Set-TrayLastAction -Message "Restore timed out: $capturedLabel"' in script
+    assert 'Set-TrayLastAction -Message "Restore timed out: $capturedLabel"' not in script
     assert '"$($p.Sub) - Last: $($entry.timestamp)"' not in script
     assert '"$($mj.profile_id) - $($timestamp.ToString' not in script
 
@@ -3384,10 +3605,7 @@ def test_tray_backup_restore_toasts_use_manifest_profile_visuals() -> None:
         '$restoreMetaText = if (-not [string]::IsNullOrWhiteSpace($capturedProfileId)) '
         "{ $capturedProfileId } else { $capturedName }"
     ) in restore_backup_section
-    assert (
-        'Show-Notification @restoreVisual -Title $restoreTitle -Message "Restore timed out: $capturedLabel" '
-        '-Type "Error" -MetaText $restoreMetaText'
-    ) in restore_backup_section
+    assert 'Restore timed out: $capturedLabel' not in restore_backup_section
     assert (
         'Show-Notification @restoreVisual -Title $restoreTitle -Message "Restored from: $capturedLabel" '
         '-Type "Success" -MetaText $restoreMetaText'
@@ -3488,8 +3706,8 @@ def test_tray_backups_submenu_has_empty_state_row() -> None:
     assert "$backupsItem.DropDownItems.Add($noBackupsItem) | Out-Null" in backups_section
 
 
-def test_tray_backup_restore_timeout_replaces_restoring_state() -> None:
-    """Backup restore should not leave the tray stuck in Restoring if the CLI hangs."""
+def test_tray_backup_restore_waits_safely_and_restores_ui_state() -> None:
+    """Backup restore should stay responsive and let the backend finish its transaction."""
     script = TRAY_SCRIPT.read_text(encoding="utf-8")
     restore_backup_section = script.split("$bItem.Add_Click({", 1)[1].split(
         "}.GetNewClosure())",
@@ -3498,19 +3716,29 @@ def test_tray_backup_restore_timeout_replaces_restoring_state() -> None:
     assert 'Set-TrayOperationTooltipText -Text "computa - Restoring..."' in restore_backup_section
     assert "-NoNewWindow -PassThru -WorkingDirectory $script:ProjectRoot `" in restore_backup_section
     assert "-RedirectStandardOutput $tf -RedirectStandardError $errFile" in restore_backup_section
-    assert "$completed = $proc.WaitForExit(120000)" in restore_backup_section
+    assert "$slowBackupRestoreNoticeAt = (Get-Date).AddSeconds(120)" in restore_backup_section
+    assert "$slowBackupRestoreNoticeShown = $false" in restore_backup_section
+    assert "while (-not $proc.HasExited)" in restore_backup_section
+    assert "[System.Windows.Forms.Application]::DoEvents()" in restore_backup_section
+    assert "$slowBackupRestoreNoticeShown = $true" in restore_backup_section
+    assert (
+        'Write-TrayLog "Restore \'$capturedName\' is still running after 120s; waiting for the '
+        'backend transaction to finish safely" -Level "WARN"'
+    ) in restore_backup_section
+    assert (
+        'Set-TrayOperationTooltipText -Text "computa - Restoring backup (still running safely)..."'
+        in restore_backup_section
+    )
+    assert "$proc.WaitForExit()" in restore_backup_section
     assert "$exitCode = $proc.ExitCode" in restore_backup_section
-    assert "$exitCodeOk = ($null -eq $exitCode -or $exitCode -eq 0)" in restore_backup_section
+    assert "$exitCodeOk = ($null -ne $exitCode -and $exitCode -eq 0)" in restore_backup_section
     assert 'if ($exitCodeOk -and $null -ne $j -and $j.success -and $j.data -and $j.data.success)' in restore_backup_section
     assert 'if ($null -ne $j -and $j.success)' not in restore_backup_section
     assert 'elseif ($j.data -and $j.data.error) { $j.data.error }' in restore_backup_section
     assert 'elseif ($j.data -and $j.data.message) { $j.data.message }' in restore_backup_section
-    assert 'Write-TrayLog "Restore \'$capturedName\' timed out after 120s" -Level "ERROR"' in restore_backup_section
-    assert (
-        'Show-Notification @restoreVisual -Title $restoreTitle -Message "Restore timed out: $capturedLabel" '
-        '-Type "Error" -MetaText $restoreMetaText'
-    ) in restore_backup_section
-    assert 'Set-TrayLastAction -Message "Restore timed out: $capturedLabel"' in restore_backup_section
+    assert ".Kill(" not in restore_backup_section
+    assert "WaitForExit(120000)" not in restore_backup_section
+    assert "timed out" not in restore_backup_section.lower()
     assert 'if ($tf) { Remove-Item $tf -Force -ErrorAction SilentlyContinue }' in restore_backup_section
     assert 'if ($errFile) { Remove-Item $errFile -Force -ErrorAction SilentlyContinue }' in restore_backup_section
     assert "-NoNewWindow -Wait -WorkingDirectory $script:ProjectRoot `" not in restore_backup_section
@@ -3673,8 +3901,8 @@ def test_tray_has_dedicated_windows_restart_status_glyph() -> None:
     assert "Set-MenuItemImageSafe -Item $script:statusBarItem -NewImage $statusImage" in script
     assert '$script:statusBarItem.Image = New-ActionBitmap -Action "Info" -Color $script:statusBarItem.ForeColor' in script
     assert 'return "Action: $displayTime"' in script
-    assert 'Set-TrayLastAction -Message "Restore timed out after 120s"' in script
-    assert 'Set-TrayLastAction -Message "Restore timed out: $capturedLabel"' in script
+    assert 'Set-TrayLastAction -Message "Restore timed out after 120s"' not in script
+    assert 'Set-TrayLastAction -Message "Restore timed out: $capturedLabel"' not in script
     assert 'Set-TrayLastAction -Message "Restored backup: $capturedLabel"' in script
     assert 'Set-TrayLastAction -Message "Restore failed: $restoreError"' in script
     assert 'Set-TrayLastAction -Message "Restore failed: runtime status unreadable"' in script
@@ -3686,10 +3914,7 @@ def test_tray_has_dedicated_windows_restart_status_glyph() -> None:
         1,
     )[0]
     assert "Restore-TrayTooltipFromState" in restore_settings_section
-    assert (
-        'Show-Notification -Title "computa" -Message "Restore timed out after 120s" '
-        '-Type "Error" -ActionName "Restore" -ActionColor $script:Colors.AccentAmber'
-    ) in restore_settings_section
+    assert 'Restore timed out after 120s' not in restore_settings_section
     assert (
         'Show-Notification -Title "computa" -Message "Settings restored" '
         '-Type "Success" -ActionName "Restore" -ActionColor $script:Colors.AccentGreen'
@@ -3732,7 +3957,7 @@ def test_tray_action_toasts_update_durable_status() -> None:
     assert 'Set-TrayLastAction -Message "Startup update failed: $($_.Exception.Message)"' in script
     assert 'Set-TrayLastAction -Message "Startup update failed"' not in script
     assert 'Set-TrayLastAction -Message "Display reset: $count combo(s) sent"' in script
-    assert 'Set-TrayLastAction -Message "Display reset timed out after 30s"' in script
+    assert 'Set-TrayLastAction -Message "Display reset timed out after 30s"' not in script
     assert 'Set-TrayLastAction -Message "Display reset failed: runtime status unreadable"' in script
     assert 'Set-TrayLastAction -Message "Display reset failed: runtime returned no status"' in script
     assert 'Set-TrayLastAction -Message "Quick Panel opened"' in script
@@ -3937,11 +4162,35 @@ def test_tray_profile_refresh_reports_actual_catalog_source() -> None:
     assert 'Reload profiles from CLI catalog and user profiles' not in tray
 
 
+def test_builtin_tray_fallback_keeps_requested_streaming_matrix_available() -> None:
+    """Cache/backend failure must not hide the five requested Streaming families."""
+    tray = TRAY_SCRIPT.read_text(encoding="utf-8")
+    fallback = tray.split("$script:FallbackProfiles = [ordered]@{", 1)[1].split(
+        "foreach ($fallbackProfile",
+        1,
+    )[0]
+    expected_ids = {
+        "slippi-melee-capture",
+        "slippi-melee-hdr-capture",
+        "rivals2-gsync-capture",
+        "rivals2-gsync-hdr-capture",
+        "fortnite-gsync-capture",
+        "fortnite-gsync-hdr-capture",
+        "overwatch2-gsync-capture",
+        "overwatch2-gsync-hdr-capture",
+        "counter-strike-2-gsync-capture",
+        "counter-strike-2-gsync-hdr-capture",
+    }
+
+    for profile_id in expected_ids:
+        assert f'"{profile_id}"' in fallback
+
+
 def test_tray_noop_notifications_update_durable_status() -> None:
     """No-op/error notifications should also replace stale status-bar action text."""
     script = TRAY_SCRIPT.read_text(encoding="utf-8")
     assert 'Set-TrayLastAction -Message "Profile missing from current list: $missingProfileTitle"' in script
-    assert 'Set-TrayLastAction -Message "Apply timed out after 120s"' in script
+    assert 'Set-TrayLastAction -Message "Apply timed out after 120s"' not in script
     assert (
         'Show-Notification -Title "computa" -Message "No active profile to repair" '
         '-Type "Info" -ActionName "Apply" -ActionColor $script:Colors.AccentAmber'
@@ -4136,14 +4385,18 @@ def test_tray_display_pipeline_reset_requires_warning_confirmation() -> None:
     )[0]
     assert "-PassThru" in reset_section
     assert "-RedirectStandardError $errFile" in reset_section
-    assert "$completed = $proc.WaitForExit(30000)" in reset_section
-    assert (
-        'Show-Notification -Title "computa" `\n'
-        '                    -Message "Display reset timed out after 30s" -Type "Error" `\n'
-        '                    -ActionName "Reset" -ActionColor $script:Colors.AccentAmber'
-    ) in reset_section
-    assert '"Reset timed out after 30s"' not in reset_section
-    assert 'Set-TrayLastAction -Message "Display reset timed out after 30s"' in reset_section
+    assert "$script:MutatingOperationInProgress = $true" in reset_section
+    assert reset_section.index("$script:MutatingOperationInProgress = $true") < reset_section.index(
+        "[System.Windows.Forms.MessageBox]::Show("
+    )
+    assert "$slowResetNoticeAt = (Get-Date).AddSeconds(30)" in reset_section
+    assert "while (-not $proc.HasExited)" in reset_section
+    assert "$proc.WaitForExit()" in reset_section
+    assert 'Complete-TrayMutatingChildProcess -Process $proc -OperationName "Reset Display"' in reset_section
+    assert "if ($childCompleted) {" in reset_section
+    assert "$script:MutatingOperationInProgress = $false" in reset_section
+    assert ".Kill(" not in reset_section
+    assert "timed out" not in reset_section.lower()
     assert "$exitCodeOk -and" in reset_section
     assert "-Wait" not in reset_section
 

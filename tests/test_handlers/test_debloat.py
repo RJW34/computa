@@ -113,3 +113,78 @@ class TestDebloatBulkServices:
 
         assert mock_single.call_count == len(service_names)
         assert all(info["current_start"] == 2 for info in state["services"].values())
+
+
+class TestBundledCatalogIntegrity:
+    """Invariants over the bundled debloat_tweaks.yaml catalog."""
+
+    def _tweaks(self, tmp_path):
+        from abso.settings.debloat import load_debloat_tweaks
+
+        # Point the user-override path at an empty location so the machine's
+        # real ~/.abso/debloat_tweaks.yaml never leaks into the assertions.
+        return load_debloat_tweaks(user_yaml=tmp_path / "none.yaml")
+
+    def test_bundled_catalog_parses_completely(self, tmp_path):
+        tweaks = self._tweaks(tmp_path)
+        assert len(tweaks.registry) >= 30
+        assert len(tweaks.services) >= 5
+        assert len(tweaks.appx) >= 15
+
+    def test_all_rows_have_valid_shape(self, tmp_path):
+        from abso.settings.debloat import HIVE_MAP, REG_TYPE_MAP
+
+        tweaks = self._tweaks(tmp_path)
+        for t in tweaks.registry:
+            assert t.tier in (1, 2, 3), t.name
+            assert t.hive in HIVE_MAP, t.name
+            assert t.reg_type in REG_TYPE_MAP, t.name
+        for s in tweaks.services:
+            assert s.tier in (1, 2, 3), s.name
+            assert s.desired_start in (2, 3, 4), s.name
+            assert s.default_start in (2, 3, 4), s.name
+
+    def test_no_bundled_hklm_tweak_hits_blocked_paths(self, tmp_path):
+        from abso.settings.debloat import _is_blocked_hklm_path
+
+        tweaks = self._tweaks(tmp_path)
+        offenders = [
+            t.name
+            for t in tweaks.registry
+            if t.hive == "HKLM" and _is_blocked_hklm_path(t.key)
+        ]
+        assert offenders == [], f"bundled tweaks hit blocked HKLM paths: {offenders}"
+
+    def test_winutil_parity_imports_present(self, tmp_path):
+        """The 2026-09 WinUtil parity audit imported exactly these deltas."""
+        tweaks = self._tweaks(tmp_path)
+        by_name = {t.name: t for t in tweaks.registry}
+
+        expected_tier1 = {
+            "Disable User Activity Publishing": ("PublishUserActivities", 0),
+            "Disable Implicit Ink Data Collection": ("RestrictImplicitInkCollection", 1),
+            "Disable Implicit Text Data Collection": ("RestrictImplicitTextCollection", 1),
+            "Disable Contact Harvesting": ("HarvestContacts", 0),
+            "Disable Personalization Data Consent": ("AcceptedPrivacyPolicy", 0),
+        }
+        for name, (value, desired) in expected_tier1.items():
+            row = by_name.get(name)
+            assert row is not None, f"missing tier-1 parity row: {name}"
+            assert row.tier == 1 and row.value == value and row.desired == desired, name
+
+        expected_tier2 = {
+            "Prevent Device Metadata Download": ("PreventDeviceMetadataFromNetwork", 1),
+            "Disable WPBT Vendor Software Execution": ("DisableWpbtExecution", 1),
+        }
+        for name, (value, desired) in expected_tier2.items():
+            row = by_name.get(name)
+            assert row is not None, f"missing tier-2 parity row: {name}"
+            assert row.tier == 2 and row.value == value and row.desired == desired, name
+
+        maps = {s.name: s for s in tweaks.services}.get("MapsBroker to Manual")
+        assert maps is not None and maps.tier == 2 and maps.desired_start == 3
+
+    def test_registry_names_are_unique(self, tmp_path):
+        tweaks = self._tweaks(tmp_path)
+        names = [t.name for t in tweaks.registry]
+        assert len(names) == len(set(names)), "duplicate registry tweak names"

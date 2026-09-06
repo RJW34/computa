@@ -89,6 +89,7 @@ a = Analysis(
         # the frozen exe actually contains them (otherwise the daemon's
         # exception-isolated imports would silently no-op the features).
         'abso.core.cpu_sets',
+        'abso.core.partition_steer',
         'abso.core.efficiency_mode',
         'abso.core.cpu_limiter',
         'abso.core.watchdog',

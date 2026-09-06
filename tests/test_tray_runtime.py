@@ -306,7 +306,10 @@ Read-TrayBackendProfileState | ConvertTo-Json -Compress
     assert result["current_profile"] == ("source-newer" if source_mode else "installed")
 
 
-def test_session_features_work_for_game_without_process_killset(tmp_path: Path) -> None:
+@pytest.mark.parametrize("partition_policy,restraint", [("off", True), ("full", False)])
+def test_session_features_work_for_game_without_process_killset(
+    tmp_path: Path, partition_policy: str, restraint: bool,
+) -> None:
     result = _run_functions(
         tmp_path,
         ["Invoke-LaunchSanitizerTick"],
@@ -320,17 +323,32 @@ function Set-AbsoKeepAwake { $script:awake = $true }
 function Start-CpuBalancerForGame { param($ProfileId, $GamePid) $script:governorGame = $GamePid; return $true }
 function Start-LaunchSweepCliProcess { throw 'Empty killset must not launch a backend process' }
 $script:activeProfile = 'mock-game'
-$script:Profiles = @{ 'mock-game' = @{ Exes = @('game.exe'); KillsetAlwaysSafe = @(); KillsetOptIn = @(); KeepAwakeWhileGaming = $true } }
-$script:TrayConfig = @{ cpuBalancer = $true }
+$script:Profiles = @{ 'mock-game' = @{ Exes = @('game.exe'); KillsetAlwaysSafe = @(); KillsetOptIn = @(); KeepAwakeWhileGaming = $true; CpuPartitionPolicy = 'PARTITION_POLICY' } }
+$script:TrayConfig = @{ cpuBalancer = RESTRAINT }
 $script:LaunchSanitizerTimer = [pscustomobject]@{ Interval = 30000 }
 $script:LaunchSanitizerActiveIntervalMs = 10000
 Invoke-LaunchSanitizerTick
 @{ awake = $script:awake; governorGame = $script:governorGame
    gameAlive = $script:LaunchSanitizerGameWasAlive; interval = $script:LaunchSanitizerTimer.Interval
 } | ConvertTo-Json -Compress
-""",
+""".replace("PARTITION_POLICY", partition_policy).replace("RESTRAINT", "$true" if restraint else "$false"),
     )
     assert result == {"awake": True, "governorGame": 123, "gameAlive": True, "interval": 10000}
+
+
+def test_backend_adoption_pauses_during_mutating_transaction(tmp_path: Path) -> None:
+    result = _run_functions(
+        tmp_path,
+        ["Sync-TrayBackendProfileState"],
+        """
+$script:MutatingOperationInProgress = $true
+$script:activeProfile = 'prior-profile'
+function Read-TrayBackendProfileState { throw 'Intermediate state must not be read' }
+function Stop-LaunchSweepRuntime { throw 'Mutation guard must not alter session runtime' }
+@{ paused = -not (Sync-TrayBackendProfileState); profile = $script:activeProfile } | ConvertTo-Json -Compress
+""",
+    )
+    assert result == {"paused": True, "profile": "prior-profile"}
 
 
 def test_menu_animation_hooks_and_catalog_poll_have_no_waits() -> None:

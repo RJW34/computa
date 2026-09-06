@@ -7,11 +7,12 @@ variants are ``system_only`` — they tune OS/driver/display state and surface
 manual in-game guidance for the Reflex/VRR/fps_max settings themselves. Same
 posture as the Deadlock family.
 
-The variant matrix mirrors Deadlock's core four, plus a capture-safe sibling:
+The variant matrix mirrors Deadlock's core four, plus two streaming siblings:
   - ``counter-strike-2``            -> No-sync SDR (latency-focused lane)
   - ``counter-strike-2-hdr``        -> No-sync HDR (OLED / Mini-LED)
   - ``counter-strike-2-gsync``      -> Strict fullscreen-only G-SYNC SDR
   - ``counter-strike-2-gsync-hdr``  -> Strict fullscreen-only G-SYNC HDR
+  - ``counter-strike-2-gsync-capture`` -> Borderless G-SYNC SDR streaming lane
   - ``counter-strike-2-gsync-hdr-capture`` -> Borderless G-SYNC HDR that keeps
     Medal / OBS / RTSS / overlays alive (same contract as the OW2 and Rivals 2
     capture lanes)
@@ -36,6 +37,42 @@ if TYPE_CHECKING:
 # in-process module, so unlike Fortnite there is no anti-cheat bootstrapper
 # alias to track.
 _CS2_EXECUTABLES: list[str] = ["cs2.exe"]
+
+_STREAMING_WINDOWED_VRR_OVERRIDES: dict[str, dict[str, Any]] = {
+    "WindowsSettingsHandler": {
+        "windowed_optimizations": True,
+        "vrr_optimize": True,
+    },
+    "GraphicsSettingsHandler": {
+        "disable_global_fso": False,
+    },
+    "NvidiaSettingsHandler": {
+        "global_vrr_mode": "fullscreen_and_windowed",
+    },
+    "ProcessPriorityHandler": {
+        "cpu_priority": 2,
+        "io_priority": 2,
+    },
+}
+
+
+def _streaming_display_mode_rows(
+    rows: list[dict[str, str]],
+) -> list[dict[str, str]]:
+    """Rewrite strict fullscreen guidance for the streaming-safe path."""
+    patched: list[dict[str, str]] = []
+    for row in rows:
+        if row.get("setting") == "Display Mode":
+            row = {
+                **row,
+                "value": "Fullscreen Windowed (borderless)",
+                "reason": (
+                    "Streaming lane: uses the borderless windowed G-SYNC path "
+                    "so OBS, Medal, RTSS, and overlays can stay running."
+                ),
+            }
+        patched.append(row)
+    return patched
 
 
 class _CounterStrike2BaseProfile(ReflexShooterBaseProfile):
@@ -392,6 +429,10 @@ class CounterStrike2GSyncProfile(_CounterStrike2BaseProfile):
     def mixed_refresh_safe_fallback_profile_id(self) -> str:
         return "counter-strike-2"
 
+    @property
+    def overlay_compatible_fallback_profile_id(self) -> str | None:
+        return "counter-strike-2-gsync-capture"
+
     def _variant_overrides(self) -> dict[str, dict[str, Any]]:
         return {
             "NvidiaSettingsHandler": {
@@ -417,6 +458,63 @@ class CounterStrike2GSyncProfile(_CounterStrike2BaseProfile):
         return [
             *self._sdr_in_game_settings(),
             *self._gsync_in_game_settings(),
+        ]
+
+
+class CounterStrike2GSyncCaptureProfile(CounterStrike2GSyncProfile):
+    """Streaming-safe borderless sibling of the CS2 G-SYNC SDR lane."""
+
+    @property
+    def is_capture_safe(self) -> bool:
+        return True
+
+    @property
+    def profile_id(self) -> str:
+        return "counter-strike-2-gsync-capture"
+
+    @property
+    def display_name(self) -> str:
+        return "Counter-Strike 2 - GSYNC SDR Streaming"
+
+    @property
+    def description(self) -> str:
+        return (
+            "SDR G-SYNC lane on the borderless windowed path; preserves OBS, "
+            "Medal, RTSS, and overlays and keeps game CPU/I/O priority at "
+            "Normal so capture is not starved. Enable Reflex Enabled + Boost "
+            "in-game."
+        )
+
+    @property
+    def display_path_requirements(self) -> DisplayPathRequirements:
+        return DisplayPathRequirements()
+
+    @property
+    def overlay_compatible_fallback_profile_id(self) -> str | None:
+        return None
+
+    @property
+    def mixed_refresh_safe_fallback_profile_id(self) -> None:
+        return None
+
+    @property
+    def fullscreen_optimizations_per_exe(self) -> dict[str, bool]:
+        return fso_overrides(_CS2_EXECUTABLES, disabled=False)
+
+    def _variant_overrides(self) -> dict[str, dict[str, Any]]:
+        return merge_settings_map(
+            super()._variant_overrides(),
+            _STREAMING_WINDOWED_VRR_OVERRIDES,
+        )
+
+    def get_in_game_settings(self) -> list[dict[str, str]]:
+        return _streaming_display_mode_rows(super().get_in_game_settings())
+
+    def get_post_apply_notes(self) -> list[str]:
+        return [
+            "Counter-Strike 2 streaming manual: use Fullscreen Windowed, set "
+            "NVIDIA Reflex to Enabled + Boost, and keep Wait for Vertical Sync "
+            "Disabled. OBS and overlay processes remain available."
         ]
 
 
@@ -505,7 +603,7 @@ class CounterStrike2GSyncHDRProfile(_CounterStrike2BaseProfile):
 
 
 class CounterStrike2GSyncHDRCaptureProfile(CounterStrike2GSyncHDRProfile):
-    """Capture-safe borderless sibling of the CS2 G-SYNC HDR lane.
+    """Streaming-safe borderless sibling of the CS2 G-SYNC HDR lane.
 
     Same VRR + Windows HDR composition contract as
     :class:`CounterStrike2GSyncHDRProfile`, with two deliberate differences:
@@ -518,9 +616,7 @@ class CounterStrike2GSyncHDRCaptureProfile(CounterStrike2GSyncHDRProfile):
       strict fullscreen-only path, because the overlay-free display-path gate
       is what would otherwise block apply while a recorder is running.
 
-    Cost of this lane vs the strict one: the recorder's encode work and the
-    composited borderless present path both take a small slice of frame-time
-    budget. That is the trade being bought - a clip you actually keep.
+    Game CPU and I/O priority stay at Normal so the recorder is not starved.
     """
 
     @property
@@ -533,14 +629,14 @@ class CounterStrike2GSyncHDRCaptureProfile(CounterStrike2GSyncHDRProfile):
 
     @property
     def display_name(self) -> str:
-        return "Counter-Strike 2 - GSYNC HDR Capture-Safe"
+        return "Counter-Strike 2 - GSYNC HDR Streaming"
 
     @property
     def description(self) -> str:
         return (
-            "Same VRR + Windows HDR path as GSYNC HDR, on the borderless "
-            "windowed G-SYNC path, but keeps Medal/OBS/RTSS and overlays "
-            "alive at launch instead of stopping them. Enable Reflex "
+            "Windows HDR G-SYNC lane on the borderless windowed path; "
+            "preserves OBS, Medal, RTSS, and overlays and keeps game CPU/I/O "
+            "priority at Normal so capture is not starved. Enable Reflex "
             "Enabled + Boost in-game."
         )
 
@@ -557,6 +653,10 @@ class CounterStrike2GSyncHDRCaptureProfile(CounterStrike2GSyncHDRProfile):
         return None
 
     @property
+    def mixed_refresh_safe_fallback_profile_id(self) -> None:
+        return None
+
+    @property
     def fullscreen_optimizations_per_exe(self) -> dict[str, bool]:
         # Borderless capture lane: clear any stale FSO-disable entry left by a
         # prior strict CS2 apply so the composited flip path can engage
@@ -566,58 +666,23 @@ class CounterStrike2GSyncHDRCaptureProfile(CounterStrike2GSyncHDRProfile):
     def _variant_overrides(self) -> dict[str, dict[str, Any]]:
         return merge_settings_map(
             super()._variant_overrides(),
-            {
-                "WindowsSettingsHandler": {
-                    # Win11 borderless flip path: required for VRR to engage
-                    # in windowed fullscreen.
-                    "windowed_optimizations": True,
-                    "vrr_optimize": True,
-                },
-                "GraphicsSettingsHandler": {
-                    # Leave the global FSO policy alone; the borderless lane
-                    # depends on the optimized composited path the strict lane
-                    # deliberately disables.
-                    "disable_global_fso": False,
-                },
-                "NvidiaSettingsHandler": {
-                    "global_vrr_mode": "fullscreen_and_windowed",
-                },
-            },
+            _STREAMING_WINDOWED_VRR_OVERRIDES,
         )
 
     def get_in_game_settings(self) -> list[dict[str, str]]:
-        rows = [
-            *self._hdr_in_game_settings(),
-            *self._gsync_in_game_settings(),
-        ]
-        patched: list[dict[str, str]] = []
-        for row in rows:
-            if row.get("setting") == "Display Mode":
-                row = {
-                    **row,
-                    "value": "Fullscreen Windowed (borderless)",
-                    "reason": (
-                        "Capture-safe lane: runs the Win11 borderless windowed "
-                        "G-SYNC path so Medal/OBS/overlays coexist with VRR. "
-                        "ABSO enables windowed VRR and windowed optimizations "
-                        "to keep the flip path fast. Use the strict "
-                        "counter-strike-2-gsync-hdr lane for exclusive "
-                        "Fullscreen when nothing is recording."
-                    ),
-                }
-            patched.append(row)
-        return patched
+        return _streaming_display_mode_rows(super().get_in_game_settings())
 
     def get_post_apply_notes(self) -> list[str]:
         return [
             (
-                "Counter-Strike 2 manual: set Display Mode to Fullscreen "
-                "Windowed, NVIDIA Reflex to Enabled + Boost, and keep 'Wait "
-                "for Vertical Sync' Disabled."
+                "Counter-Strike 2 streaming manual: use Fullscreen Windowed, "
+                "set NVIDIA Reflex to Enabled + Boost, and keep Wait for "
+                "Vertical Sync Disabled. OBS and overlay processes remain "
+                "available."
             ),
             (
-                "Capture-safe lane: Medal, OBS, RTSS, and overlay apps are "
-                "left running at apply and at game launch. Expect slightly "
-                "more frame-time noise than counter-strike-2-gsync-hdr."
+                "Streaming color: default to SDR Streaming for an SDR destination. "
+                "Use HDR Streaming only when OBS/output color space or tone mapping "
+                "is already intentionally configured; ABSO does not change OBS settings."
             ),
         ]

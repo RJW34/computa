@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -74,37 +75,59 @@ class UEGameUserSettingsHandler(SettingsHandler):
         return result
 
     def audit(self) -> list[Issue]:
-        """Audit common latency-sensitive UE settings."""
+        """Compare presentation settings with the active profile's contract.
+
+        Borderless and in-game VSync are intentional in some capture lanes;
+        neither is a universal latency defect when no profile is selected.
+        """
         issues: list[Issue] = []
         current = self.detect()
 
         if not current.get("config_found"):
             return issues
 
-        if current.get("fullscreen_mode") is not None and current["fullscreen_mode"] != 0:
-            mode_names = {0: "Exclusive", 1: "Borderless", 2: "Windowed"}
+        targets = self._get_audit_targets()
+        for key, label in (("fullscreen_mode", "Display mode"), ("vsync", "In-game VSync")):
+            if key not in targets or current.get(key) == targets[key]:
+                continue
             issues.append(Issue(
-                title="Game not in exclusive fullscreen",
+                title=f"{self.__class__.__name__}: {label} differs from active profile",
                 severity="warning",
-                current_value=mode_names.get(current["fullscreen_mode"], f"Unknown ({current['fullscreen_mode']})"),
-                optimal_value="Exclusive Fullscreen (0)",
+                current_value=str(current.get(key, "Unreadable")),
+                optimal_value=str(targets[key]),
                 explanation=(
-                    "Exclusive fullscreen is the lowest-latency presentation path for the strict ABSO profiles."
+                    "Use the active profile's presentation and synchronization settings. "
+                    "Streaming profiles can intentionally require borderless mode and in-game VSync."
                 ),
                 category="game_config",
             ))
 
-        if current.get("vsync") is True:
-            issues.append(Issue(
-                title="In-game VSync enabled",
-                severity="warning",
-                current_value="Enabled",
-                optimal_value="Disabled",
-                explanation="Keep in-game VSync off so the chosen NVIDIA/Windows sync path stays authoritative.",
-                category="game_config",
-            ))
-
         return issues
+
+    def _get_audit_targets(self) -> dict[str, Any]:
+        """Read profile intent without applying settings or changing state."""
+        from abso.core.app_paths import app_state_file
+        from abso.core.config import ConfigManager, merge_profile_override_settings
+        from abso.core.state_reconcile import state_file_write_targets
+        from abso.core.state_store import read_state_snapshot
+        from abso.profiles.catalog import get_profile_instances
+
+        # Match source/installed CLI state reconciliation, including a newer
+        # source state whose LocalAppData mirror could not be written.
+        package_root = Path(__file__).resolve().parents[2]
+        primary = app_state_file() if getattr(sys, "frozen", False) else package_root / ".abso_state.json"
+        targets = state_file_write_targets(primary, package_root=package_root)
+        profile_id = read_state_snapshot(targets).get("current_profile")
+        if not profile_id:
+            return {}
+        profile = get_profile_instances().get(profile_id)
+        handler_name = self.__class__.__name__
+        config = ConfigManager()
+        if not profile or config.is_handler_disabled(handler_name):
+            return {}
+        settings = profile.get_settings(handler_name)
+        overrides = config.get_profile_overrides(profile_id)
+        return merge_profile_override_settings(settings, handler_name, overrides) if overrides else settings
 
     def apply(self, settings: dict[str, Any]) -> dict[str, Any]:
         """Apply validated config settings to GameUserSettings.ini."""
@@ -231,8 +254,20 @@ class UEGameUserSettingsHandler(SettingsHandler):
         if applied_settings.pop(self.AUTO_VRR_CAP_KEY, False):
             notice = self._apply_auto_vrr_cap(applied_settings)
             if notice:
+                # An unresolved target cannot be silently omitted: even a
+                # matching explicit fallback does not prove the auto-cap policy.
                 results["all_active"] = False
                 results["error"] = notice
+                results["settings"][self.AUTO_VRR_CAP_KEY] = {
+                    "target": True,
+                    "current": None,
+                    "active": False,
+                    "status": "unverifiable",
+                    "note": (
+                        "Primary display refresh could not be detected; "
+                        "the requested automatic FPS cap cannot be verified."
+                    ),
+                }
 
         for key, target in applied_settings.items():
             # Skip framework-injected synthetic keys. The applier threads a
@@ -244,7 +279,7 @@ class UEGameUserSettingsHandler(SettingsHandler):
             if key.startswith("_"):
                 continue
             current_value = current.get(key)
-            is_active = bool(current.get("config_found")) and current_value == target
+            is_active = bool(current.get("config_found")) and key in current and current_value == target
             results["settings"][key] = {
                 "target": target,
                 "current": current_value,
@@ -252,11 +287,20 @@ class UEGameUserSettingsHandler(SettingsHandler):
             }
             if not is_active:
                 results["all_active"] = False
+                if not current.get("config_found") or key not in current:
+                    results["settings"][key].update({
+                        "status": "unverifiable",
+                        "note": (
+                            f"{self.CONFIG_FILENAME} not found; launch the game to create its settings."
+                            if not current.get("config_found")
+                            else "The requested setting could not be read from the game config."
+                        ),
+                    })
 
         return results
 
     def backup(self) -> dict[str, Any]:
-        """Capture the file; restore rolls back only this handler's managed keys."""
+        """Capture the full file for managed-key rollback and missing-file recovery."""
         ini_path = self._get_config_path()
         if not ini_path:
             return {"config_found": False}
@@ -272,64 +316,107 @@ class UEGameUserSettingsHandler(SettingsHandler):
             return {"config_found": False}
 
     def restore(self, data: dict[str, Any]) -> bool:
-        """Restore managed keys, preserving later user-owned game preferences.
+        """Restore owned settings while retaining subsequent in-game edits.
 
-        A baseline can outlive many in-game UI changes. Replacing the entire
-        file would erase graphics quality, Reflex, bindings and calibration
-        that ABSO never applied. Legacy full-file backups remain readable.
+        Backups retain the full file for recovery, but an existing file may
+        contain newer graphics, controls, or renderer choices. Only mapped
+        keys and their fullscreen mirrors belong to this handler's rollback.
         """
         if not data.get("config_found"):
             return True
 
         file_content = data.get("file_content")
         config_path = data.get("config_path")
-        if file_content is None or not config_path:
+        if not isinstance(file_content, str) or not config_path:
             return False
 
         try:
             ini_path = Path(config_path)
             if not ini_path.exists():
+                # No current file exists whose newer values could be lost.
                 atomic_write_text(ini_path, file_content)
                 return True
 
-            current_content = ini_path.read_text(encoding="utf-8")
-            lines = current_content.splitlines()
-            bounds = find_ini_section_bounds(lines, self.TARGET_SECTION_NAME)
-            if (
-                self.TARGET_SECTION_NAME
-                and bounds is None
-                and any(INI_SECTION_RE.match(line) for line in lines)
-            ):
-                # Never let the section-less legacy fallback rewrite a
-                # similarly named key in a different game's settings section.
-                logger.error("Cannot restore missing UE section %s", self.TARGET_SECTION_NAME)
-                return False
-
-            managed = (
+            current = ini_path.read_text(encoding="utf-8")
+            original_lines = file_content.splitlines(keepends=True)
+            current_lines = current.splitlines(keepends=True)
+            owned = (
                 set(self.MUTABLE_SETTINGS_TO_INI.values())
                 | set(self.MIRROR_FULLSCREEN_MODE_KEYS)
             ) - self.PROTECTED_INI_KEYS
-            baseline = parse_ini_assignments(
-                file_content.splitlines(), section_name=self.TARGET_SECTION_NAME
-            )
-            replacements = {key: value for key, value in baseline.items() if key in managed}
-            absent = managed - baseline.keys()
-            start, end = bounds if bounds is not None else (0, len(lines))
-            kept_lines = []
-            for index, line in enumerate(lines):
-                match = INI_ASSIGNMENT_RE.match(line)
-                if start <= index < end and match and match.group(1) in absent:
-                    continue
-                kept_lines.append(line)
-            patch_result = apply_ini_key_patch(
-                kept_lines, replacements, append_missing=True,
-                section_name=self.TARGET_SECTION_NAME,
-            )
-            restored_content = "\n".join(patch_result.lines) + "\n"
-            if restored_content != current_content:
+
+            def bounds(lines: list[str]) -> tuple[int, int] | None:
+                # The generic patch helper falls back to the entire file when
+                # a section is absent. Rollback must never use that fallback
+                # on a sectioned file: identical keys elsewhere are unowned.
+                normalized = [line.lstrip("\ufeff") for line in lines]
+                found = find_ini_section_bounds(normalized, self.TARGET_SECTION_NAME)
+                if found is not None:
+                    return found
+                if self.TARGET_SECTION_NAME and any(INI_SECTION_RE.match(line) for line in normalized):
+                    return None
+                return 0, len(lines)
+
+            def owned_key(line: str) -> str | None:
+                match = INI_ASSIGNMENT_RE.match(line.lstrip("\ufeff"))
+                return match.group(1) if match and match.group(1) in owned else None
+
+            def without_owned(lines: list[str], scope: tuple[int, int] | None) -> list[str]:
+                start, end = scope if scope is not None else (0, 0)
+                return [
+                    line for index, line in enumerate(lines)
+                    if not (start <= index < end and owned_key(line))
+                ]
+
+            original_scope = bounds(original_lines)
+            current_scope = bounds(current_lines)
+            if without_owned(original_lines, original_scope) == without_owned(current_lines, current_scope):
+                # No unowned text changed, so preserve the exact backup layout
+                # as well as its values (including keys absent at backup).
+                restored_content = file_content
+            else:
+                start, end = original_scope if original_scope is not None else (0, 0)
+                saved = [
+                    (owned_key(line), line) for line in original_lines[start:end]
+                    if owned_key(line)
+                ]
+                if current_scope is None:
+                    if not saved:
+                        return True
+                    # Recreate only the managed section/keys, never its stale
+                    # unowned graphics or controls from the backup.
+                    prefix = current if not current or current.endswith("\n") else current + "\n"
+                    restored_content = prefix + f"[{self.TARGET_SECTION_NAME}]\n"
+                    restored_content += "".join(line.rstrip("\r\n") + "\n" for _, line in saved)
+                else:
+                    start, end = current_scope
+                    body: list[str] = []
+                    remaining = list(saved)
+                    for line in current_lines[start:end]:
+                        key = owned_key(line)
+                        if key is None:
+                            body.append(line)
+                            continue
+                        match_index = next(
+                            (index for index, (saved_key, _) in enumerate(remaining) if saved_key == key),
+                            None,
+                        )
+                        if match_index is not None:
+                            body.append(remaining.pop(match_index)[1].rstrip("\r\n") + "\n")
+                        # Keys introduced after backup are removed; duplicates
+                        # are restored only as many times as the backup had.
+                    if remaining and body and not body[-1].endswith("\n"):
+                        body[-1] += "\n"
+                    body.extend(line.rstrip("\r\n") + "\n" for _, line in remaining)
+                    prefix_lines = current_lines[:start]
+                    if body and prefix_lines and not prefix_lines[-1].endswith("\n"):
+                        prefix_lines[-1] += "\n"
+                    restored_content = "".join(prefix_lines + body + current_lines[end:])
+
+            if restored_content != current:
                 atomic_write_text(ini_path, restored_content)
             return True
-        except OSError as e:
+        except (OSError, UnicodeError) as e:
             logger.error("Failed to restore UE config %s: %s", config_path, e)
             return False
 

@@ -13,6 +13,7 @@ from typing import Any, Literal, get_args
 
 from abso.profiles.base import BaseProfile
 from abso.profiles.counter_strike_2 import (
+    CounterStrike2GSyncCaptureProfile,
     CounterStrike2GSyncHDRCaptureProfile,
     CounterStrike2GSyncHDRProfile,
     CounterStrike2GSyncProfile,
@@ -27,6 +28,8 @@ from abso.profiles.deadlock import (
 )
 from abso.profiles.diablo4 import Diablo4Profile, Diablo4SDRProfile
 from abso.profiles.fortnite import (
+    FortniteGSyncCaptureProfile,
+    FortniteGSyncHDRCaptureProfile,
     FortniteGSyncHDRProfile,
     FortniteHDRProfile,
     FortniteProfile,
@@ -44,6 +47,7 @@ from abso.profiles.pacdeluxe import PACDeluxeProfile
 from abso.profiles.pokemon_auto_chess import PokemonAutoChessProfile
 from abso.profiles.productivity_oled import ProductivityHDRProfile, ProductivityProfile
 from abso.profiles.rivals2_gsync import (
+    Rivals2GSyncCaptureProfile,
     Rivals2GSyncHDRCaptureProfile,
     Rivals2GSyncHDRProfile,
     Rivals2GSyncProfile,
@@ -51,8 +55,10 @@ from abso.profiles.rivals2_gsync import (
 from abso.profiles.rivals2_nosync import Rivals2NoSyncHDRProfile, Rivals2NoSyncProfile
 from abso.profiles.ryujinx_ssbu import RyujinxSSBUProfile
 from abso.profiles.slippi_melee import (
+    SlippiMeleeCaptureProfile,
     SlippiMeleeConsoleParityHDRProfile,
     SlippiMeleeConsoleParityProfile,
+    SlippiMeleeHDRCaptureProfile,
     SlippiMeleeHDRProfile,
     SlippiMeleeProfile,
     SlippiMeleeUniversalHDRProfile,
@@ -147,44 +153,39 @@ def normalize_tray_category(category: str) -> str:
 
 
 BUILTIN_TRAY_UI: dict[str, TrayProfileUi] = {
-    "productivity": TrayProfileUi(
-        "productivity", "Desktop / Productivity", "SDR", 10
-    ),
-    "productivity-hdr": TrayProfileUi(
-        "productivity", "Desktop / Productivity", "HDR", 20
-    ),
-    "rivals2-gsync-hdr": TrayProfileUi(
-        "rivals2", "Rivals 2", "G-SYNC (HDR)", 100
-    ),
+    "productivity": TrayProfileUi("productivity", "Desktop / Productivity", "SDR", 10),
+    "productivity-hdr": TrayProfileUi("productivity", "Desktop / Productivity", "HDR", 20),
+    "rivals2-gsync-hdr": TrayProfileUi("rivals2", "Rivals 2", "G-SYNC (HDR)", 100),
     "rivals2-gsync-hdr-capture": TrayProfileUi(
-        "rivals2", "Rivals 2", "Capture-Safe G-SYNC (HDR)", 110
+        "rivals2", "Rivals 2", "Streaming G-SYNC (HDR)", 110
     ),
-    "rivals2-gsync": TrayProfileUi(
-        "rivals2", "Rivals 2", "G-SYNC (SDR)", 120
-    ),
-    "rivals2-nosync-hdr": TrayProfileUi(
-        "rivals2", "Rivals 2", "No Sync (HDR)", 130
-    ),
-    "rivals2-nosync": TrayProfileUi(
-        "rivals2", "Rivals 2", "No Sync (SDR)", 140
-    ),
+    "rivals2-gsync": TrayProfileUi("rivals2", "Rivals 2", "G-SYNC (SDR)", 120),
+    "rivals2-gsync-capture": TrayProfileUi("rivals2", "Rivals 2", "Streaming G-SYNC (SDR)", 130),
+    "rivals2-nosync-hdr": TrayProfileUi("rivals2", "Rivals 2", "No Sync (HDR)", 140),
+    "rivals2-nosync": TrayProfileUi("rivals2", "Rivals 2", "No Sync (SDR)", 150),
     "slippi-melee": TrayProfileUi(
         "slippi-melee", "Super Smash Bros. Melee (Slippi)", "Competitive No Sync (SDR)", 200
     ),
     "slippi-melee-hdr": TrayProfileUi(
         "slippi-melee", "Super Smash Bros. Melee (Slippi)", "Competitive No Sync (HDR)", 210
     ),
+    "slippi-melee-capture": TrayProfileUi(
+        "slippi-melee", "Super Smash Bros. Melee (Slippi)", "Streaming No Sync (SDR)", 220
+    ),
+    "slippi-melee-hdr-capture": TrayProfileUi(
+        "slippi-melee", "Super Smash Bros. Melee (Slippi)", "Streaming No Sync (HDR)", 230
+    ),
     "slippi-melee-console-parity": TrayProfileUi(
-        "slippi-melee", "Super Smash Bros. Melee (Slippi)", "Console-Parity 60 Hz (SDR)", 220
+        "slippi-melee", "Super Smash Bros. Melee (Slippi)", "Console-Parity 60 Hz (SDR)", 240
     ),
     "slippi-melee-console-parity-hdr": TrayProfileUi(
-        "slippi-melee", "Super Smash Bros. Melee (Slippi)", "Console-Parity 60 Hz (HDR)", 230
+        "slippi-melee", "Super Smash Bros. Melee (Slippi)", "Console-Parity 60 Hz (HDR)", 250
     ),
     "slippi-melee-universal": TrayProfileUi(
-        "slippi-melee", "Super Smash Bros. Melee (Slippi)", "Universal No Sync (SDR)", 240
+        "slippi-melee", "Super Smash Bros. Melee (Slippi)", "Universal No Sync (SDR)", 260
     ),
     "slippi-melee-universal-hdr": TrayProfileUi(
-        "slippi-melee", "Super Smash Bros. Melee (Slippi)", "Universal No Sync (HDR)", 250
+        "slippi-melee", "Super Smash Bros. Melee (Slippi)", "Universal No Sync (HDR)", 270
     ),
     "ryujinx-ssbu": TrayProfileUi(
         "ryujinx-ssbu", "SSBU / HewDraw Remix (Ryujinx)", "Low-Latency Emulator", 300
@@ -195,26 +196,24 @@ BUILTIN_TRAY_UI: dict[str, TrayProfileUi] = {
     "deadlock-gsync-hdr": TrayProfileUi("deadlock", "Deadlock", "G-SYNC (HDR)", 130),
     "fortnite": TrayProfileUi("fortnite", "Fortnite", "No Sync (SDR)", 200),
     "fortnite-hdr": TrayProfileUi("fortnite", "Fortnite", "No Sync (HDR)", 210),
+    "fortnite-gsync-capture": TrayProfileUi("fortnite", "Fortnite", "Streaming G-SYNC (SDR)", 220),
     "fortnite-gsync-hdr": TrayProfileUi("fortnite", "Fortnite", "G-SYNC (HDR)", 230),
-    "marvel-rivals-sdr": TrayProfileUi(
-        "marvel-rivals", "Marvel Rivals", "G-SYNC (SDR)", 300
+    "fortnite-gsync-hdr-capture": TrayProfileUi(
+        "fortnite", "Fortnite", "Streaming G-SYNC (HDR)", 240
     ),
-    "marvel-rivals-hdr": TrayProfileUi(
-        "marvel-rivals", "Marvel Rivals", "G-SYNC (HDR)", 310
-    ),
+    "marvel-rivals-sdr": TrayProfileUi("marvel-rivals", "Marvel Rivals", "G-SYNC (SDR)", 300),
+    "marvel-rivals-hdr": TrayProfileUi("marvel-rivals", "Marvel Rivals", "G-SYNC (HDR)", 310),
     "overwatch2": TrayProfileUi("overwatch2", "Overwatch 2", "No Sync (SDR)", 400),
     "overwatch2-hdr": TrayProfileUi("overwatch2", "Overwatch 2", "No Sync (HDR)", 410),
     "overwatch2-gsync": TrayProfileUi("overwatch2", "Overwatch 2", "G-SYNC (SDR)", 420),
     "overwatch2-gsync-hdr": TrayProfileUi("overwatch2", "Overwatch 2", "G-SYNC (HDR)", 430),
     "overwatch2-gsync-capture": TrayProfileUi(
-        "overwatch2", "Overwatch 2", "Capture-Safe G-SYNC (SDR)", 440
+        "overwatch2", "Overwatch 2", "Streaming G-SYNC (SDR)", 440
     ),
     "overwatch2-gsync-hdr-capture": TrayProfileUi(
-        "overwatch2", "Overwatch 2", "Capture-Safe G-SYNC (HDR)", 450
+        "overwatch2", "Overwatch 2", "Streaming G-SYNC (HDR)", 450
     ),
-    "counter-strike-2": TrayProfileUi(
-        "counter-strike-2", "Counter-Strike 2", "No Sync (SDR)", 500
-    ),
+    "counter-strike-2": TrayProfileUi("counter-strike-2", "Counter-Strike 2", "No Sync (SDR)", 500),
     "counter-strike-2-hdr": TrayProfileUi(
         "counter-strike-2", "Counter-Strike 2", "No Sync (HDR)", 510
     ),
@@ -222,10 +221,13 @@ BUILTIN_TRAY_UI: dict[str, TrayProfileUi] = {
         "counter-strike-2", "Counter-Strike 2", "G-SYNC (SDR)", 520
     ),
     "counter-strike-2-gsync-hdr": TrayProfileUi(
-        "counter-strike-2", "Counter-Strike 2", "G-SYNC (HDR)", 530
+        "counter-strike-2", "Counter-Strike 2", "G-SYNC (HDR)", 540
+    ),
+    "counter-strike-2-gsync-capture": TrayProfileUi(
+        "counter-strike-2", "Counter-Strike 2", "Streaming G-SYNC (SDR)", 530
     ),
     "counter-strike-2-gsync-hdr-capture": TrayProfileUi(
-        "counter-strike-2", "Counter-Strike 2", "Capture-Safe G-SYNC (HDR)", 540
+        "counter-strike-2", "Counter-Strike 2", "Streaming G-SYNC (HDR)", 550
     ),
     "diablo4": TrayProfileUi("diablo4", "Diablo 4", "HDR", 100),
     "diablo4-sdr": TrayProfileUi("diablo4", "Diablo 4", "SDR", 110),
@@ -254,6 +256,28 @@ PROFILE_CATALOG: OrderedDict[str, ProfileCatalogEntry] = OrderedDict(
                 "Competitive Slippi profile with Windows HDR on. Dolphin renders SDR through "
                 "the HDR composition path; small latency cost in exchange for the lower-strain "
                 "HDR desktop look."
+            ),
+            sync_mode="off",
+        ),
+        "slippi-melee-capture": ProfileCatalogEntry(
+            profile_class=SlippiMeleeCaptureProfile,
+            tray_category="Fighting",
+            tray_subtitle="SDR Streaming | Borderless | Keeps OBS/Medal/Overlays",
+            tray_description=(
+                "Competitive Slippi SDR on Dolphin's borderless path. OBS, Medal, "
+                "RTSS, and overlays remain available; game CPU/I/O priority stays "
+                "Normal and OBS encoder/output settings are left untouched."
+            ),
+            sync_mode="off",
+        ),
+        "slippi-melee-hdr-capture": ProfileCatalogEntry(
+            profile_class=SlippiMeleeHDRCaptureProfile,
+            tray_category="Fighting",
+            tray_subtitle="HDR Streaming | Borderless | Keeps OBS/Medal/Overlays",
+            tray_description=(
+                "Competitive Slippi SDR-in-HDR on Dolphin's borderless path. OBS, "
+                "Medal, RTSS, and overlays remain available; game CPU/I/O priority "
+                "stays Normal and OBS encoder/output settings are left untouched."
             ),
             sync_mode="off",
         ),
@@ -330,6 +354,17 @@ PROFILE_CATALOG: OrderedDict[str, ProfileCatalogEntry] = OrderedDict(
             ),
             sync_mode="on",
         ),
+        "rivals2-gsync-capture": ProfileCatalogEntry(
+            profile_class=Rivals2GSyncCaptureProfile,
+            tray_category="Fighting",
+            tray_subtitle="SDR Streaming | Borderless VRR | Keeps OBS/Medal/Overlays",
+            tray_description=(
+                "Rollback-safe SDR G-SYNC on the borderless windowed VRR path. "
+                "OBS, Medal, RTSS, and overlays remain available; game CPU/I/O "
+                "priority stays Normal and OBS settings are left untouched."
+            ),
+            sync_mode="on",
+        ),
         "rivals2-gsync-hdr": ProfileCatalogEntry(
             profile_class=Rivals2GSyncHDRProfile,
             tray_category="Fighting",
@@ -344,12 +379,12 @@ PROFILE_CATALOG: OrderedDict[str, ProfileCatalogEntry] = OrderedDict(
         "rivals2-gsync-hdr-capture": ProfileCatalogEntry(
             profile_class=Rivals2GSyncHDRCaptureProfile,
             tray_category="Fighting",
-            tray_subtitle="HDR Capture-Safe | Borderless VRR | Keeps OBS/Medal/Overlays",
+            tray_subtitle="HDR Streaming | Borderless VRR | Keeps OBS/Medal/Overlays",
             tray_description=(
                 "Rollback-safe G-SYNC lane with Windows HDR composition on the "
-                "borderless windowed VRR path; keeps OBS, Medal, RTSS, and overlay "
-                "apps running. Rivals 2 currently advertises no native HDR support, "
-                "so native game HDR remains off."
+                "borderless windowed VRR path. OBS, Medal, RTSS, and overlays remain "
+                "available; game CPU/I/O priority stays Normal and OBS settings are "
+                "left untouched. Rivals 2 native HDR remains off."
             ),
             sync_mode="on",
         ),
@@ -385,6 +420,28 @@ PROFILE_CATALOG: OrderedDict[str, ProfileCatalogEntry] = OrderedDict(
                 "Tear-free low-latency VRR Fortnite with native HDR for "
                 "OLED / Mini-LED. G-SYNC ON + NVCP VSync safety net at a "
                 "refresh - 3 cap; enable Reflex On + Boost in-game."
+            ),
+            sync_mode="on",
+        ),
+        "fortnite-gsync-capture": ProfileCatalogEntry(
+            profile_class=FortniteGSyncCaptureProfile,
+            tray_category="Shooters",
+            tray_subtitle="SDR Streaming | Borderless VRR | Keeps OBS/Medal/Overlays",
+            tray_description=(
+                "Capped SDR G-SYNC on Fortnite's borderless path. OBS, Medal, RTSS, "
+                "and overlays remain available; game CPU/I/O priority stays Normal "
+                "and OBS encoder/output settings are left untouched."
+            ),
+            sync_mode="on",
+        ),
+        "fortnite-gsync-hdr-capture": ProfileCatalogEntry(
+            profile_class=FortniteGSyncHDRCaptureProfile,
+            tray_category="Shooters",
+            tray_subtitle="HDR Streaming | Borderless VRR | Keeps OBS/Medal/Overlays",
+            tray_description=(
+                "Capped Windows-HDR G-SYNC on Fortnite's borderless path. OBS, Medal, "
+                "RTSS, and overlays remain available; game CPU/I/O priority stays "
+                "Normal and OBS encoder/output settings are left untouched."
             ),
             sync_mode="on",
         ),
@@ -481,6 +538,17 @@ PROFILE_CATALOG: OrderedDict[str, ProfileCatalogEntry] = OrderedDict(
             ),
             sync_mode="on",
         ),
+        "counter-strike-2-gsync-capture": ProfileCatalogEntry(
+            profile_class=CounterStrike2GSyncCaptureProfile,
+            tray_category="Shooters",
+            tray_subtitle="SDR Streaming | Borderless VRR | Keeps Medal/OBS/Overlays",
+            tray_description=(
+                "SDR G-SYNC on the borderless windowed path. OBS, Medal, RTSS, and "
+                "overlays remain available; game CPU/I/O priority stays Normal and "
+                "OBS encoder/output settings are left untouched."
+            ),
+            sync_mode="on",
+        ),
         "counter-strike-2-gsync-hdr": ProfileCatalogEntry(
             profile_class=CounterStrike2GSyncHDRProfile,
             tray_category="Shooters",
@@ -495,12 +563,11 @@ PROFILE_CATALOG: OrderedDict[str, ProfileCatalogEntry] = OrderedDict(
         "counter-strike-2-gsync-hdr-capture": ProfileCatalogEntry(
             profile_class=CounterStrike2GSyncHDRCaptureProfile,
             tray_category="Shooters",
-            tray_subtitle="HDR Capture-Safe | Borderless VRR | Keeps Medal/OBS/Overlays",
+            tray_subtitle="HDR Streaming | Borderless VRR | Keeps Medal/OBS/Overlays",
             tray_description=(
-                "Same HDR G-SYNC contract as the strict Counter-Strike 2 lane, "
-                "on the borderless windowed VRR path, but keeps Medal, OBS, "
-                "RTSS, and overlay apps running at launch instead of stopping "
-                "them."
+                "Windows HDR G-SYNC on the borderless windowed path. OBS, Medal, "
+                "RTSS, and overlays remain available; game CPU/I/O priority stays "
+                "Normal and OBS encoder/output settings are left untouched."
             ),
             sync_mode="on",
         ),
@@ -525,8 +592,8 @@ PROFILE_CATALOG: OrderedDict[str, ProfileCatalogEntry] = OrderedDict(
             tray_category="Shooters",
             tray_subtitle="Overlay-Free SDR Borderless | Reflex (set in-game) + LLM OFF | G-SYNC ON",
             tray_description=(
-                "Low-latency Overwatch 2 G-SYNC on the same optimized borderless VRR "
-                "path as capture-safe, while stopping capture and overlay processes."
+                "Low-latency Overwatch 2 G-SYNC on the same borderless VRR "
+                "path as the Streaming sibling, while stopping capture and overlay processes."
             ),
             sync_mode="on",
         ),
@@ -543,22 +610,22 @@ PROFILE_CATALOG: OrderedDict[str, ProfileCatalogEntry] = OrderedDict(
         "overwatch2-gsync-capture": ProfileCatalogEntry(
             profile_class=Overwatch2GSyncCaptureProfile,
             tray_category="Shooters",
-            tray_subtitle="SDR Capture-Safe | Borderless VRR | Keeps OBS/Medal/Overlays",
+            tray_subtitle="SDR Streaming | Borderless VRR | Keeps OBS/Medal/Overlays",
             tray_description=(
-                "Same borderless G-SYNC path as the overlay-free lane, but keeps "
-                "OBS, Medal, RTSS, and overlay apps running at launch instead of "
-                "stopping them."
+                "Borderless SDR G-SYNC streaming path. OBS, Medal, RTSS, and "
+                "overlays remain available; game CPU/I/O priority stays Normal and "
+                "OBS encoder/output settings are left untouched."
             ),
             sync_mode="on",
         ),
         "overwatch2-gsync-hdr-capture": ProfileCatalogEntry(
             profile_class=Overwatch2GSyncHDRCaptureProfile,
             tray_category="Shooters",
-            tray_subtitle="HDR Capture-Safe | Borderless VRR | Keeps OBS/Medal/Overlays",
+            tray_subtitle="HDR Streaming | Borderless VRR | Keeps OBS/Medal/Overlays",
             tray_description=(
-                "Same borderless HDR G-SYNC path as the overlay-free lane, but keeps "
-                "OBS, Medal, RTSS, and overlay apps running at launch instead of "
-                "stopping them."
+                "Borderless native-HDR G-SYNC streaming path. OBS, Medal, RTSS, "
+                "and overlays remain available; game CPU/I/O priority stays Normal "
+                "and OBS encoder/output settings are left untouched."
             ),
             sync_mode="on",
         ),
@@ -615,16 +682,38 @@ PROFILE_ALIASES: dict[str, str] = {
     "rivals2-online-gsync": "rivals2-gsync",
     "rivals2-online-gsync-hdr": "rivals2-gsync-hdr",
     "rivals2-online-gsync-hdr-capture": "rivals2-gsync-hdr-capture",
-    # Streaming variants consolidated into their base profiles.
-    "fortnite-streaming": "fortnite",
-    "fortnite-streaming-hdr": "fortnite-hdr",
+    # Requested OBS Streaming aliases resolve directly to capture-safe canonical lanes.
+    "fortnite-streaming": "fortnite-gsync-capture",
+    "fortnite-streaming-hdr": "fortnite-gsync-hdr-capture",
+    "fortnite-gsync-streaming": "fortnite-gsync-capture",
+    "fortnite-gsync-streaming-hdr": "fortnite-gsync-hdr-capture",
+    "fortnite-gsync-hdr-streaming": "fortnite-gsync-hdr-capture",
+    "fortnite-gsync-sdr-capture": "fortnite-gsync-capture",
+    "overwatch2-streaming": "overwatch2-gsync-capture",
+    "overwatch2-streaming-hdr": "overwatch2-gsync-hdr-capture",
     "overwatch2-gsync-streaming": "overwatch2-gsync-capture",
+    "overwatch2-gsync-streaming-hdr": "overwatch2-gsync-hdr-capture",
     "overwatch2-gsync-hdr-streaming": "overwatch2-gsync-hdr-capture",
+    "overwatch2-gsync-sdr-capture": "overwatch2-gsync-capture",
     "pacdeluxe-streaming": "pacdeluxe",
     "ryujinx-ssbu-streaming": "ryujinx-ssbu",
-    "rivals2-streaming": "rivals2-nosync",
-    "rivals2-streaming-hdr": "rivals2-nosync-hdr",
-    "slippi-melee-streaming": "slippi-melee",
+    "rivals2-streaming": "rivals2-gsync-capture",
+    "rivals2-streaming-hdr": "rivals2-gsync-hdr-capture",
+    "rivals2-gsync-streaming": "rivals2-gsync-capture",
+    "rivals2-gsync-streaming-hdr": "rivals2-gsync-hdr-capture",
+    "rivals2-gsync-hdr-streaming": "rivals2-gsync-hdr-capture",
+    "rivals2-gsync-sdr-capture": "rivals2-gsync-capture",
+    "roa2-streaming": "rivals2-gsync-capture",
+    "roa2-streaming-hdr": "rivals2-gsync-hdr-capture",
+    "roa2-gsync-capture": "rivals2-gsync-capture",
+    "roa2-gsync-hdr-capture": "rivals2-gsync-hdr-capture",
+    "slippi-melee-streaming": "slippi-melee-capture",
+    "slippi-melee-streaming-hdr": "slippi-melee-hdr-capture",
+    "slippi-melee-hdr-streaming": "slippi-melee-hdr-capture",
+    "slippi-capture": "slippi-melee-capture",
+    "slippi-hdr-capture": "slippi-melee-hdr-capture",
+    "ssbm-streaming": "slippi-melee-capture",
+    "ssbm-streaming-hdr": "slippi-melee-hdr-capture",
     # Experimental/duplicate Slippi variants.
     "slippi-melee-vrr-lab": "slippi-melee",
     # Short-form Counter-Strike 2 convenience ids (cs2 == counter-strike-2).
@@ -632,7 +721,13 @@ PROFILE_ALIASES: dict[str, str] = {
     "cs2-hdr": "counter-strike-2-hdr",
     "cs2-gsync": "counter-strike-2-gsync",
     "cs2-gsync-hdr": "counter-strike-2-gsync-hdr",
+    "cs2-streaming": "counter-strike-2-gsync-capture",
+    "cs2-streaming-hdr": "counter-strike-2-gsync-hdr-capture",
+    "counter-strike-2-streaming": "counter-strike-2-gsync-capture",
+    "counter-strike-2-streaming-hdr": "counter-strike-2-gsync-hdr-capture",
+    "cs2-gsync-capture": "counter-strike-2-gsync-capture",
     "cs2-gsync-hdr-capture": "counter-strike-2-gsync-hdr-capture",
+    "counter-strike-2-gsync-sdr-capture": "counter-strike-2-gsync-capture",
 }
 
 
@@ -732,11 +827,7 @@ def get_profile_manifest() -> list[dict[str, Any]]:
         profile = entry.profile_class()
         handlers = [handler.__class__.__name__ for handler in profile.get_handlers()]
         built_in_ui = BUILTIN_TRAY_UI.get(profile_id)
-        tray_group = (
-            entry.tray_group
-            or (built_in_ui.group if built_in_ui else None)
-            or profile_id
-        )
+        tray_group = entry.tray_group or (built_in_ui.group if built_in_ui else None) or profile_id
         tray_group_name = (
             entry.tray_group_name
             or (built_in_ui.group_name if built_in_ui else None)
@@ -779,9 +870,29 @@ def get_profile_manifest() -> list[dict[str, Any]]:
                 ),
                 "keep_awake_while_gaming": bool(profile.keep_awake_while_gaming),
                 "is_online_profile": bool(profile.is_online_profile),
+                "cpu_partition_policy": str(profile.cpu_partition_policy),
+                "background_steer_images": list(profile.background_steer_images),
             }
         )
     return manifest
+
+
+def get_profile_partition(profile_id: str | None) -> tuple[str, tuple[str, ...]]:
+    """Resolve a profile's session core-partitioning declaration.
+
+    Returns ``(cpu_partition_policy, background_steer_images)``; unknown or
+    missing profile ids resolve to ``("off", ())`` so callers no-op safely.
+    Used by the cpu-balance governor to decide game-side steering and the
+    background steer list for the session.
+    """
+    canonical = resolve_profile_id(profile_id)
+    if not canonical:
+        return "off", ()
+    entry = _get_full_catalog().get(canonical)
+    if entry is None:
+        return "off", ()
+    profile = entry.profile_class()
+    return str(profile.cpu_partition_policy), tuple(profile.background_steer_images)
 
 
 def get_profile_aliases() -> dict[str, str]:

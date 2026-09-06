@@ -251,7 +251,11 @@ NVDRS_SETTING_VER = MAKE_NVAPI_VERSION(NVDRS_SETTING, 1)
 
 
 class NVDRS_APPLICATION_V4(Structure):
-    """DRS application structure (version 4)."""
+    """DRS application structure (version 4), matching NVIDIA nvapi.h.
+
+    The two flags share one DWORD with the reserved bits. The exact layout
+    matters because the structure size is part of the NVAPI version token.
+    """
     _fields_ = [
         ("version", c_uint32),
         ("isPredefined", c_uint32),
@@ -2169,6 +2173,11 @@ class DRSProfileManager:
                 if profile_name:
                     profile = drs.find_profile_by_name(profile_name)
                     selected_profile_name = profile_name
+                    if not profile:
+                        return {
+                            "_profile": profile_name,
+                            "_error": f"NVIDIA profile '{profile_name}' was not found.",
+                        }
 
                 # Look for profile containing this app
                 # For now, try ABSO profile first when no explicit profile was requested.

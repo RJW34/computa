@@ -1,12 +1,18 @@
 # Process Lasso-Class Features (CPU / process / power session tuning)
 
 ABSO ships an in-house equivalent of the useful parts of
-[Process Lasso](https://bitsum.com/) — background-process restraint, P-core
-steering, per-process power throttling, a reversible CPU limiter, and a
-declarative watchdog — plus a "Highest Performance" core-parking power plan.
-The session features are configurable experiments for reducing contention.
-No FPS or frame-time improvement is established by the API readback tests.
-Runtime features are opt-in; gaming profiles separately change power-plan settings.
+[Process Lasso](https://bitsum.com/) — automatic CPU core partitioning,
+background-process restraint, per-process power throttling, a reversible CPU
+limiter, and a declarative watchdog — plus a "Highest Performance"
+core-parking power plan. These features are configurable experiments for
+reducing contention. API readbacks do not establish an FPS or frame-time gain.
+
+**Core partitioning is automatic**: gaming profiles declare
+`cpu_partition_policy = "full"`. The tray starts the session governor when the
+profile's game runs. On supported topologies, it selects the fast-core group
+for the game and its children, and the remaining group for configured or
+sustained-heavy background apps. ProBalance restraint, EcoQoS, and watchdog
+remain explicit opt-ins (see [Enablement](#enablement)).
 
 > Do not confuse these with GPU tuning. Higher graphics quality at a fixed FPS
 > cap can be a GPU-headroom problem. Upscaling, frame generation, and CPU
@@ -19,7 +25,7 @@ Runtime features are opt-in; gaming profiles separately change power-plan settin
 | **ProBalance governor** | Demotes background CPU spikers to BelowNormal during a game session and auto-restores them. Never touches the game, foreground, anti-cheat, launchers, audio, Discord, editors, or your `process_overrides.protect` images. | `abso/core/cpu_balancer.py` (daemon), spawned by the tray |
 | **"Highest Performance" power plan** | Disables CPU core parking (`CPMINCORES`=100) and holds the processor min-state at 100% during gaming profiles; the desktop profile relaxes the floor to 5 so the CPU still idles cool. | `abso/settings/power.py` (apply pipeline) |
 | **Keep-Awake** | Inhibits system/display sleep while a gamepad-driven game runs (emulators) — `SetThreadExecutionState`. Cleared on game exit. | tray (`ABSO-Tray.ps1`) + profile flag |
-| **CPU Sets (soft P-core steering)** | `SetProcessDefaultCpuSets` selects logical processors for threads without their own CPU-set assignment. It does not guarantee spill to E-cores or anti-cheat compatibility. | `abso/core/cpu_sets.py`, hosted in the daemon |
+| **Core partitioning (automatic)** | Classifies Intel hybrid P/E-core groups or asymmetric AMD cache domains and selects CPU Sets for the game subtree and configured/heavy background apps. Symmetric domains are left alone. It does not set a clock speed, guarantee anti-cheat compatibility, or guarantee E-core spill. Assignments are checked each poll and restored on normal exit, with a crash-recovery journal. | `abso/core/cpu_sets.py`, `abso/core/partition_steer.py`, hosted in the daemon |
 | **EcoQoS herding** | Requests power-efficient scheduling for configured background images via `ProcessPowerThrottling`; this does not guarantee placement on E-cores. Releases on exit. Never throttles the game/anti-cheat/capture/Discord. | `abso/core/efficiency_mode.py`, hosted in the daemon |
 | **CPU Limiter** | Reversible hard-affinity shrink — the "throttle" watchdog action. Restores the original mask on stop. | `abso/core/cpu_limiter.py` |
 | **Watchdog** | Declarative rules (`match`/`metric`/`threshold`/`sustain`/`action`) with reversible demote/throttle/trim actions. Online profiles are auto-restricted to demote-only. | `abso/core/watchdog.py` (policy) + `watchdog_engine.py` (runtime), hosted in the daemon |
@@ -48,8 +54,15 @@ efficiency_mode:            # EcoQoS herding
   enabled: false
   background_images: []     # e.g. ["SomeUpdater.exe", "BackgroundTool.exe"] — what to herd to E-cores
 
-cpu_sets:                   # soft P-core steering
-  enabled: false
+cpu_sets:                   # core partitioning (profile-driven; these tune/override it)
+  enabled: false            # force game->fast-core steering on EVERY profile
+  background_steer: true    # allow the background half when the profile policy is "full"
+  background_images: []     # EXTRA images to steer to background cores (unioned with the profile's list)
+  auto_steer: true          # auto-detect heavy background processes and steer them
+  auto_steer_process_threshold: 4   # per-process CPU % (of total capacity), ~1.3 cores on 32T
+  auto_steer_sustain_ms: 5000       # must stay above threshold this long
+  smt_avoid: false          # experimental: game side = one thread per physical core
+  x3d_partition: true       # allow the AMD X3D cache-CCD split (disable Game Mode if it regresses)
 
 cpu_limiter:                # the watchdog "throttle" action
   enabled: false
@@ -73,16 +86,29 @@ augments the never-touch set for ALL of these, not just the killer.
 
 | Key | Default | Effect |
 |---|---|---|
-| `cpuBalancer` | `false` | Spawn the daemon (ProBalance) for a game session. **Master gate** — the Tier B flags below require it. |
-| `cpuSets` | `false` | Pass `--cpu-sets` (P-core steering). |
+| `cpuBalancer` | `false` | Enable ProBalance **restraint** in the session governor. Without it, a governor started for partition steering runs `--no-restraint` (steer-only). |
+| `cpuSets` | `false` | Pass `--cpu-sets` (force game-side steering on every profile; redundant on gaming lanes, which declare it). |
 | `ecoMode` | `false` | Pass `--eco` (EcoQoS herding; set `efficiency_mode.background_images`). |
 | `watchdog` | `false` | Pass `--watchdog` (rule engine; `--online` is added automatically for online profiles). |
 | `keepAwakeWhileGaming` | `true` | Allow Keep-Awake. The per-profile catalog flag decides which profiles assert it (emulators only). |
+
+The governor daemon starts when **any** of these is enabled **or** the active
+profile's `cpu_partition_policy` is not `off` (all gaming lanes). Each flag —
+and the profile policy — independently justifies the daemon; `cpuBalancer` is
+no longer a master gate.
 
 ### Profile catalog flags (set in profile classes, surfaced in the cache)
 
 - `keep_awake_while_gaming` — `True` only on `EmulatorLatencyBaseProfile`.
 - `is_online_profile` — drives the watchdog `--online` demote-only restriction.
+- `cpu_partition_policy` — `full` on every gaming lane (game + background
+  steering + auto-steer), `off` on productivity. The tray passes
+  `--profile <id>` and the daemon resolves the policy from the catalog.
+- `background_steer_images` — the profile's background steer list: browsers /
+  Discord / Spotify / Wallpaper Engine everywhere; capture lanes add
+  OBS + Medal (CPU placement can affect encoding throughput). Never
+  includes the profile's own executables (browser-game lanes) or overlay /
+  input tools (RTSS, G HUB).
 
 ## Online-safety model
 
@@ -99,23 +125,32 @@ augments the never-touch set for ALL of these, not just the killer.
 
 ## Enablement
 
-Nothing is active out of the box (except Keep-Awake for emulator profiles,
-which only inhibits the idle timer). To turn the rest on **for this machine**,
+**Core partitioning is on by default** for every gaming profile: apply a
+profile, launch the game, and the tray starts the session governor
+automatically (steer-only unless `cpuBalancer` is on). Disable or tune it via
+the `cpu_sets` section of `abso.yaml` (`background_steer: false` keeps only
+the game-side steering; per-profile `cpu_partition_policy` overrides belong in
+a profile subclass). On single-domain CPUs and symmetric dual-CCD parts it
+makes no CPU-set changes. On AMD X3D parts, compare measured frame times
+with the vendor-recommended scheduler configuration before changing Game Mode.
+
+The priority-mutating tiers stay opt-in. To turn them on **for this machine**,
 edit `%APPDATA%\ABSO\tray-config.json`:
 
 ```json
-{ "cpuBalancer": true, "cpuSets": true, "ecoMode": false, "watchdog": false }
+{ "cpuBalancer": true, "ecoMode": false, "watchdog": false }
 ```
 
 then restart the tray and launch a game. For EcoQoS, also set
-`efficiency_mode.background_images` in `abso.yaml`; for the watchdog, add
+`efficiency_mode.background_images` in `abso.yaml` (images already on the
+partition steer list are steered, not eco-throttled); for the watchdog, add
 `watchdog.rules`. Watch your in-game **1% lows / frame-time graph** — that's the
 metric to compare, not an improvement the tool can promise.
 
 ## Verification status
 
-All mechanisms are covered by hermetic tests (Win32 calls are dependency-injected)
-**and** were live-verified on the i9-14900F: CPU Sets topology (16 logical
+Hermetic tests inject Win32 calls. Earlier project verification recorded these
+mechanism checks on the i9-14900F (not a game-performance benchmark): CPU Sets topology (16 logical
 P-core threads identified), CPU limiter affinity round-trip, EcoQoS apply/reset,
 proc_actions priority/trim/working-set, the watchdog demote+restore on a real
 process, and the fully-integrated daemon (`--cpu-sets --eco --watchdog`) with a

@@ -24,9 +24,11 @@ reboot, though setting them may briefly reset the link.
 
 from __future__ import annotations
 
+import base64
 import json
 import logging
 import subprocess
+from collections.abc import Mapping
 from typing import Any
 
 from abso.core.models import Issue
@@ -103,9 +105,7 @@ class NicDriverHandler(SettingsHandler):
                     title="NIC driver latency properties are not tuned",
                     severity="info",
                     current_value=f"{adapter}: " + ", ".join(sorted(suboptimal)),
-                    optimal_value=(
-                        "Interrupt Moderation off, RSS on, Flow Control off, EEE off"
-                    ),
+                    optimal_value=("Interrupt Moderation off, RSS on, Flow Control off, EEE off"),
                     explanation=(
                         "Opt-in, per-NIC tuning: disabling interrupt moderation, flow "
                         "control, and Energy Efficient Ethernet while enabling RSS lowers "
@@ -123,8 +123,8 @@ class NicDriverHandler(SettingsHandler):
         Settings:
             nic_tuning: bool - when True, set each targeted keyword the adapter
                 exposes to its optimal RegistryValue. Absent keywords are
-                skipped. When no active adapter exists, this is a graceful
-                no-op.
+                skipped. An unavailable adapter/property query is surfaced as
+                unverifiable without risking a blind write.
         """
         if not settings.get("nic_tuning"):
             return {
@@ -142,23 +142,39 @@ class NicDriverHandler(SettingsHandler):
                 "error": None,
                 "requires_reboot": False,
                 "changed": False,
-                "note": "No active (Up) physical adapter found; skipped",
+                "changed_keys": [],
+                "warnings": ["NIC tuning: no active physical adapter could be verified"],
+                "note": "NIC tuning state is unverifiable; no writes attempted",
             }
 
         properties = self._targeted_properties(adapter)
+        if not properties:
+            return {
+                "success": True,
+                "error": None,
+                "requires_reboot": False,
+                "changed": False,
+                "changed_keys": [],
+                "warnings": [f"NIC tuning: no targeted properties could be verified on {adapter}"],
+                "note": "NIC tuning state is unverifiable; no writes attempted",
+            }
+
         warnings: list[str] = []
         changed_keys: list[str] = []
-        for keyword in properties:
+        pending: dict[str, str] = {}
+        for keyword, current_value in properties.items():
             target = self._target_for(keyword)
             if target is None:
                 continue
-            try:
-                if self._set_property(adapter, keyword, target[1]):
-                    changed_keys.append(keyword)
-                else:
-                    warnings.append(f"NIC tuning: {keyword} could not be set")
-            except Exception as exc:  # noqa: BLE001 - one keyword must not abort the rest
-                warnings.append(f"NIC tuning: {keyword} ({exc})")
+            if str(current_value) != target[1]:
+                pending[keyword] = target[1]
+
+        for keyword, outcome in self._set_properties(adapter, pending).items():
+            if outcome["success"]:
+                changed_keys.append(keyword)
+            else:
+                detail = outcome.get("error") or "could not be set"
+                warnings.append(f"NIC tuning: {keyword} ({detail})")
 
         # Best-effort: this is an opt-in, per-NIC latency add-on, so a driver
         # rejecting a keyword surfaces as a warning rather than failing (and
@@ -170,7 +186,11 @@ class NicDriverHandler(SettingsHandler):
             "changed": bool(changed_keys),
             "changed_keys": changed_keys,
             "warnings": warnings,
-            "note": "Adapter may briefly reset while properties are applied",
+            "note": (
+                "Adapter may briefly reset while properties are applied"
+                if pending
+                else "NIC properties already at target; no writes needed"
+            ),
         }
 
     def backup(self) -> dict[str, Any]:
@@ -186,25 +206,45 @@ class NicDriverHandler(SettingsHandler):
     def restore(self, data: dict[str, Any]) -> bool:
         """Restore each captured keyword to its original RegistryValue.
 
-        Only keywords present in the backup are touched; anything the adapter
-        did not expose at backup time is left alone.
+        Only keywords present in the backup are considered; matching current
+        values are skipped and remaining writes share one PowerShell process.
+        Anything the adapter did not expose at backup time is left alone.
         """
         adapter = data.get("adapter")
-        properties: dict[str, str] = data.get("properties", {})
-        if not adapter or not properties:
+        raw_properties = data.get("properties", {})
+        if not adapter or not isinstance(raw_properties, Mapping) or not raw_properties:
             # Nothing was captured (no active adapter / no targeted keys); the
             # original state is already intact.
             return True
-        success = True
-        for keyword, value in properties.items():
-            try:
-                if not self._set_property(adapter, keyword, str(value)):
-                    logger.error("Failed to restore NIC driver setting %s", keyword)
-                    success = False
-            except Exception as exc:  # noqa: BLE001 - attempt remaining captured properties
-                logger.error("Failed to restore NIC driver setting %s: %s", keyword, exc)
-                success = False
-        return success
+
+        properties = {str(keyword): str(value) for keyword, value in raw_properties.items()}
+        current = self._targeted_properties(str(adapter))
+        if not current:
+            # Detection failure must not be mistaken for an already-restored
+            # adapter. Attempt the captured writes in one batch so the partial
+            # restore guarantee remains useful, and surface that verification
+            # was unavailable in the log.
+            logger.warning(
+                "Could not verify current NIC properties on %s before restore; "
+                "attempting all captured values",
+                adapter,
+            )
+
+        pending = {
+            keyword: value
+            for keyword, value in properties.items()
+            if keyword not in current or str(current[keyword]) != value
+        }
+        outcomes = self._set_properties(str(adapter), pending)
+        for keyword, outcome in outcomes.items():
+            if not outcome["success"]:
+                logger.error(
+                    "Failed to restore NIC driver property %s on %s: %s",
+                    keyword,
+                    adapter,
+                    outcome.get("error") or "unknown error",
+                )
+        return all(outcome["success"] for outcome in outcomes.values())
 
     def verify_active(self, settings: dict[str, Any]) -> dict[str, Any]:
         """Confirm each exposed targeted keyword sits at its optimal value."""
@@ -213,7 +253,17 @@ class NicDriverHandler(SettingsHandler):
             return results
 
         current = self.detect()
+        adapter = current.get("adapter")
         properties: dict[str, str] = current.get("properties", {})
+        if not adapter or not properties:
+            results["all_active"] = False
+            results["settings"]["detection"] = {
+                "target": "active adapter with exposed NIC tuning properties",
+                "current": "unavailable",
+                "active": False,
+            }
+            return results
+
         for keyword, value in properties.items():
             target = self._target_for(keyword)
             if target is None:
@@ -274,7 +324,8 @@ class NicDriverHandler(SettingsHandler):
         insensitively) are returned, preserving the vendor's exact spelling.
         """
         script = (
-            f"Get-NetAdapterAdvancedProperty -Name '{self._escape(adapter)}' | "
+            f"$adapter = {self._ps_utf8_literal(adapter)}; "
+            "Get-NetAdapterAdvancedProperty -Name $adapter | "
             "Select-Object RegistryKeyword,DisplayValue,RegistryValue | ConvertTo-Json"
         )
         data = self._run_json(script)
@@ -290,18 +341,96 @@ class NicDriverHandler(SettingsHandler):
             properties[str(keyword)] = self._coerce_registry_value(row.get("RegistryValue"))
         return properties
 
-    def _set_property(self, adapter: str, keyword: str, registry_value: str) -> bool:
-        """Set one advanced property by registry keyword. Returns success."""
-        script = (
-            f"Set-NetAdapterAdvancedProperty -Name '{self._escape(adapter)}' "
-            f"-RegistryKeyword '{self._escape(keyword)}' "
-            f"-RegistryValue '{self._escape(registry_value)}' -NoRestart -ErrorAction Stop"
+    def _set_properties(
+        self, adapter: str, properties: Mapping[str, str]
+    ) -> dict[str, dict[str, Any]]:
+        """Set multiple properties in one PowerShell process.
+
+        Inputs are serialized as JSON and base64 encoded before being embedded
+        in the fixed PowerShell program. This prevents adapter names, registry
+        keywords, or values from becoming executable PowerShell syntax. Each
+        cmdlet invocation still has its own terminating-error boundary, so one
+        rejected property does not hide successful siblings.
+
+        Returns:
+            A mapping for every requested keyword containing ``success`` and
+            ``error`` fields. Missing, malformed, timed-out, or process-level
+            output is converted to a failure for each requested property.
+        """
+        requested = {str(keyword): str(value) for keyword, value in properties.items()}
+        if not requested:
+            return {}
+
+        payload = {
+            "Adapter": str(adapter),
+            "Properties": [
+                {"Keyword": keyword, "Value": value} for keyword, value in requested.items()
+            ],
+        }
+        encoded = base64.b64encode(json.dumps(payload, ensure_ascii=False).encode("utf-8")).decode(
+            "ascii"
         )
-        result = self._run_ps(script)
-        if result.returncode != 0:
-            err = (result.stderr or result.stdout or "").strip()
-            logger.debug("Set %s on %s failed: %s", keyword, adapter, err)
-        return result.returncode == 0
+        script = (
+            "$payloadJson = [Text.Encoding]::UTF8.GetString("
+            f"[Convert]::FromBase64String('{encoded}')); "
+            "$payload = $payloadJson | ConvertFrom-Json; "
+            "$results = foreach ($item in @($payload.Properties)) { "
+            "try { "
+            "Set-NetAdapterAdvancedProperty -Name ([string]$payload.Adapter) "
+            "-RegistryKeyword ([string]$item.Keyword) "
+            "-RegistryValue ([string]$item.Value) -NoRestart -ErrorAction Stop; "
+            "[PSCustomObject]@{Keyword=[string]$item.Keyword;Success=$true;Error=$null} "
+            "} catch { "
+            "[PSCustomObject]@{Keyword=[string]$item.Keyword;Success=$false;"
+            "Error=[string]$_.Exception.Message} "
+            "} }; "
+            "$results | ConvertTo-Json -Compress"
+        )
+
+        failure: str | None = None
+        try:
+            result = self._run_ps(script)
+        except subprocess.TimeoutExpired:
+            failure = "PowerShell timed out while setting NIC properties"
+        except Exception as exc:  # noqa: BLE001 - return granular failures
+            failure = f"PowerShell failed while setting NIC properties: {exc}"
+        else:
+            if result.returncode != 0:
+                detail = (result.stderr or result.stdout or "").strip()
+                failure = detail or f"PowerShell exited with code {result.returncode}"
+            else:
+                stdout = (result.stdout or "").strip()
+                try:
+                    data = json.loads(stdout) if stdout else None
+                except (ValueError, TypeError):
+                    data = None
+                rows = self._as_rows(data)
+                outcomes: dict[str, dict[str, Any]] = {}
+                for row in rows:
+                    if not isinstance(row, dict):
+                        continue
+                    keyword = str(row.get("Keyword") or "")
+                    if keyword not in requested or keyword in outcomes:
+                        continue
+                    success = row.get("Success") is True
+                    outcomes[keyword] = {
+                        "success": success,
+                        "error": None
+                        if success
+                        else str(row.get("Error") or "property write failed"),
+                    }
+                for keyword in requested:
+                    outcomes.setdefault(
+                        keyword,
+                        {
+                            "success": False,
+                            "error": "PowerShell returned no result for this property",
+                        },
+                    )
+                return outcomes
+
+        logger.debug("Batched NIC property write failed on %s: %s", adapter, failure)
+        return {keyword: {"success": False, "error": failure} for keyword in requested}
 
     def _run_json(self, script: str) -> Any:
         """Run a script and parse its stdout as JSON, defensively.
@@ -355,6 +484,7 @@ class NicDriverHandler(SettingsHandler):
         return None
 
     @staticmethod
-    def _escape(value: str) -> str:
-        """Escape single quotes for embedding in a single-quoted PS string."""
-        return value.replace("'", "''")
+    def _ps_utf8_literal(value: str) -> str:
+        """Return a non-executable PowerShell expression for a UTF-8 string."""
+        encoded = base64.b64encode(str(value).encode("utf-8")).decode("ascii")
+        return f"([Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('{encoded}')))"

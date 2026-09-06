@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from unittest.mock import patch
 
+from abso.profiles.fortnite import FortniteGSyncHDRCaptureProfile
 from abso.settings.fortnite_config import FortniteConfigHandler
 
 
@@ -251,3 +252,61 @@ def test_unresolved_auto_cap_cannot_verify_active(tmp_path):
         result = FortniteConfigHandler().verify_active({"auto_vrr_fps_cap": True})
     assert result["all_active"] is False
     assert "No refresh" in result["error"]
+
+
+def test_streaming_apply_preserves_user_graphics_and_hdr_and_restores(tmp_path: Path) -> None:
+    """A future sync repair must preserve graphics choices made in Fortnite."""
+    config_dir = tmp_path / "WindowsClient"
+    ini_path = config_dir / "GameUserSettings.ini"
+    user_owned = [
+        "ResolutionSizeX=1920",
+        "ResolutionSizeY=1080",
+        "bUseHDRDisplayOutput=False",
+        "HDRDisplayOutputNits=800",
+        "bUseNanite=False",
+        "bMotionBlur=False",
+        "bUseDynamicResolution=False",
+        "LatencyTweak2=2",
+        "DLSSQuality=2",
+        "bRayTracing=False",
+        "[ScalabilityGroups]",
+        "sg.ViewDistanceQuality=1",
+        "sg.TextureQuality=1",
+        "sg.ShadowQuality=0",
+        "sg.GlobalIlluminationQuality=0",
+        "sg.ReflectionQuality=0",
+        "sg.EffectsQuality=0",
+        "sg.PostProcessQuality=0",
+        "[D3DRHIPreference]",
+        "PreferredRHI=dx12",
+    ]
+    original_lines = [
+        "[/Script/FortniteGame.FortGameUserSettings]",
+        "PreferredFullscreenMode=0",
+        "LastConfirmedFullscreenMode=0",
+        "bUseVSync=False",
+        "FrameRateLimit=60.000000",
+        *user_owned,
+    ]
+    original = "\n".join(original_lines) + "\n"
+    _write_game_user_settings(ini_path, original)
+    settings = FortniteGSyncHDRCaptureProfile().get_settings("FortniteConfigHandler")
+
+    with patch.object(FortniteConfigHandler, "_get_config_dir", return_value=config_dir):
+        handler = FortniteConfigHandler()
+        backup = handler.backup()
+        result = handler.apply(settings)
+        assert result["success"] is True
+        assert ini_path.read_text(encoding="utf-8").splitlines() == [
+            "[/Script/FortniteGame.FortGameUserSettings]",
+            "PreferredFullscreenMode=1",
+            "LastConfirmedFullscreenMode=1",
+            "bUseVSync=True",
+            "FrameRateLimit=0",
+            *user_owned,
+        ]
+        assert handler.verify_active(settings)["all_active"] is True
+        assert handler.apply(settings)["applied"] == []
+        assert handler.restore(backup) is True
+
+    assert ini_path.read_text(encoding="utf-8") == original

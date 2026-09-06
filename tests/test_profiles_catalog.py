@@ -7,6 +7,7 @@ from collections import defaultdict
 from abso.core.applier import ProfileApplier
 from abso.profiles import get_all_profiles
 from abso.profiles.catalog import (
+    PROFILE_ALIASES,
     PROFILE_CATALOG,
     get_profile_instances,
     get_profile_manifest,
@@ -48,6 +49,11 @@ def test_catalog_keys_match_profile_id_property() -> None:
     """Catalog key must match each profile class profile_id."""
     for profile_id, entry in PROFILE_CATALOG.items():
         assert entry.profile_class().profile_id == profile_id
+
+
+def test_profile_aliases_target_canonical_catalog_ids_directly() -> None:
+    """Alias resolution is one-hop, so aliases must never point at aliases."""
+    assert set(PROFILE_ALIASES.values()) <= set(PROFILE_CATALOG)
 
 
 def test_retired_rivals_aliases_resolve_to_nosync_profile() -> None:
@@ -110,35 +116,68 @@ def test_user_profiles_cannot_shadow_retired_aliases(tmp_path, monkeypatch) -> N
     assert resolve_profile_id("rivals2") == "rivals2-nosync"
 
 
-def test_rivals2_hdr_variants_are_registered_and_streaming_aliases_resolve() -> None:
-    """Rivals 2 should expose explicit HDR tray entries while retired streaming ids resolve."""
+def test_streaming_aliases_resolve_directly_to_capture_safe_lanes() -> None:
+    """Every requested game name must route streaming input to a real capture lane."""
     assert "rivals2-nosync-hdr" in PROFILE_CATALOG
     assert "rivals2-gsync-hdr" in PROFILE_CATALOG
     assert "rivals2-tournament-sim-144hz" not in PROFILE_CATALOG
-    assert "fortnite-streaming" not in PROFILE_CATALOG
-    assert "fortnite-streaming-hdr" not in PROFILE_CATALOG
-    assert "overwatch2-gsync-streaming" not in PROFILE_CATALOG
-    assert "overwatch2-gsync-hdr-streaming" not in PROFILE_CATALOG
-    assert "pacdeluxe-streaming" not in PROFILE_CATALOG
-    assert "ryujinx-ssbu-streaming" not in PROFILE_CATALOG
-    assert "rivals2-streaming" not in PROFILE_CATALOG
-    assert "rivals2-streaming-hdr" not in PROFILE_CATALOG
-    assert "slippi-melee-streaming" not in PROFILE_CATALOG
-    assert "slippi-melee-vrr-lab" not in PROFILE_CATALOG
 
-    assert resolve_profile_id("rivals2-nosync-hdr") == "rivals2-nosync-hdr"
-    assert resolve_profile_id("rivals2-gsync-hdr") == "rivals2-gsync-hdr"
+    aliases = {
+        "slippi-melee-streaming": "slippi-melee-capture",
+        "slippi-melee-streaming-hdr": "slippi-melee-hdr-capture",
+        "ssbm-streaming": "slippi-melee-capture",
+        "ssbm-streaming-hdr": "slippi-melee-hdr-capture",
+        "rivals2-streaming": "rivals2-gsync-capture",
+        "rivals2-streaming-hdr": "rivals2-gsync-hdr-capture",
+        "roa2-streaming": "rivals2-gsync-capture",
+        "roa2-streaming-hdr": "rivals2-gsync-hdr-capture",
+        "fortnite-streaming": "fortnite-gsync-capture",
+        "fortnite-streaming-hdr": "fortnite-gsync-hdr-capture",
+        "overwatch2-streaming": "overwatch2-gsync-capture",
+        "overwatch2-streaming-hdr": "overwatch2-gsync-hdr-capture",
+        "overwatch2-gsync-streaming": "overwatch2-gsync-capture",
+        "overwatch2-gsync-hdr-streaming": "overwatch2-gsync-hdr-capture",
+        "cs2-streaming": "counter-strike-2-gsync-capture",
+        "cs2-streaming-hdr": "counter-strike-2-gsync-hdr-capture",
+        "counter-strike-2-streaming": "counter-strike-2-gsync-capture",
+        "counter-strike-2-streaming-hdr": "counter-strike-2-gsync-hdr-capture",
+    }
+    profiles = get_profile_instances()
+    for alias, canonical in aliases.items():
+        assert alias not in PROFILE_CATALOG, alias
+        assert resolve_profile_id(alias) == canonical, alias
+        assert profiles[canonical].is_capture_safe is True, alias
+
     assert resolve_profile_id("rivals2-tournament-sim-144hz") == "rivals2-nosync"
-    assert resolve_profile_id("fortnite-streaming") == "fortnite"
-    assert resolve_profile_id("fortnite-streaming-hdr") == "fortnite-hdr"
-    assert resolve_profile_id("overwatch2-gsync-streaming") == "overwatch2-gsync-capture"
-    assert resolve_profile_id("overwatch2-gsync-hdr-streaming") == "overwatch2-gsync-hdr-capture"
     assert resolve_profile_id("pacdeluxe-streaming") == "pacdeluxe"
     assert resolve_profile_id("ryujinx-ssbu-streaming") == "ryujinx-ssbu"
-    assert resolve_profile_id("rivals2-streaming") == "rivals2-nosync"
-    assert resolve_profile_id("rivals2-streaming-hdr") == "rivals2-nosync-hdr"
-    assert resolve_profile_id("slippi-melee-streaming") == "slippi-melee"
     assert resolve_profile_id("slippi-melee-vrr-lab") == "slippi-melee"
+
+
+def test_requested_families_expose_visible_streaming_lanes() -> None:
+    """Tray metadata should make both SDR and HDR streaming choices explicit."""
+    expected_by_group = {
+        "slippi-melee": {"slippi-melee-capture", "slippi-melee-hdr-capture"},
+        "rivals2": {"rivals2-gsync-capture", "rivals2-gsync-hdr-capture"},
+        "fortnite": {"fortnite-gsync-capture", "fortnite-gsync-hdr-capture"},
+        "overwatch2": {
+            "overwatch2-gsync-capture",
+            "overwatch2-gsync-hdr-capture",
+        },
+        "counter-strike-2": {
+            "counter-strike-2-gsync-capture",
+            "counter-strike-2-gsync-hdr-capture",
+        },
+    }
+    manifest = get_profile_manifest()
+    for group, expected_ids in expected_by_group.items():
+        entries = {
+            row["id"]: row
+            for row in manifest
+            if row["tray_group"] == group and "streaming" in row["tray_variant"].lower()
+        }
+        assert set(entries) == expected_ids, group
+        assert all(row["tray_visible"] is True for row in entries.values()), group
 
 
 def test_future_dated_cod_profiles_are_not_registered() -> None:
@@ -205,12 +244,15 @@ def test_tray_manifest_groups_variants_by_game_once() -> None:
         "rivals2-nosync",
         "rivals2-nosync-hdr",
         "rivals2-gsync",
+        "rivals2-gsync-capture",
         "rivals2-gsync-hdr",
         "rivals2-gsync-hdr-capture",
     }
     assert set(groups["slippi-melee"]) == {
         "slippi-melee",
         "slippi-melee-hdr",
+        "slippi-melee-capture",
+        "slippi-melee-hdr-capture",
         "slippi-melee-console-parity",
         "slippi-melee-console-parity-hdr",
         "slippi-melee-universal",
@@ -224,20 +266,32 @@ def test_tray_manifest_groups_variants_by_game_once() -> None:
         "overwatch2-gsync-capture",
         "overwatch2-gsync-hdr-capture",
     }
+    assert set(groups["fortnite"]) == {
+        "fortnite",
+        "fortnite-hdr",
+        "fortnite-gsync-hdr",
+        "fortnite-gsync-capture",
+        "fortnite-gsync-hdr-capture",
+    }
+    assert set(groups["counter-strike-2"]) == {
+        "counter-strike-2",
+        "counter-strike-2-hdr",
+        "counter-strike-2-gsync",
+        "counter-strike-2-gsync-hdr",
+        "counter-strike-2-gsync-capture",
+        "counter-strike-2-gsync-hdr-capture",
+    }
 
 
 def test_tray_rank_orders_rivals2_variants_for_users() -> None:
-    """Rivals 2 tray variants sort most-used first: G-SYNC HDR, capture, then hidden-tier lanes."""
-    profiles = [
-        profile
-        for profile in get_profile_manifest()
-        if profile["tray_group"] == "rivals2"
-    ]
+    """Rivals 2 tray variants should pair strict and streaming HDR/SDR lanes."""
+    profiles = [profile for profile in get_profile_manifest() if profile["tray_group"] == "rivals2"]
 
     assert [profile["id"] for profile in sorted(profiles, key=lambda item: item["tray_rank"])] == [
         "rivals2-gsync-hdr",
         "rivals2-gsync-hdr-capture",
         "rivals2-gsync",
+        "rivals2-gsync-capture",
         "rivals2-nosync-hdr",
         "rivals2-nosync",
     ]

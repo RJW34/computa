@@ -42,15 +42,21 @@ function Get-DefaultConfig {
         # OFF so the user does not lose mid-session cloud uploads or RGB
         # hotkey control without explicitly opting in.
         aggressiveProcessJanitor = $false
-        # ProBalance governor: spawn the cpu-balance daemon for a game session
-        # to demote background CPU spikers (never the game/anti-cheat/protected
-        # images) and auto-restore them. Default OFF — spawning a background
-        # daemon is an explicit per-machine opt-in.
+        # ProBalance restraint: while the session governor runs, also demote
+        # background CPU spikers (never the game/anti-cheat/protected images)
+        # and auto-restore them. Default OFF — priority mutation is an explicit
+        # per-machine opt-in. NOTE: the governor daemon itself now starts
+        # automatically whenever the active profile declares a core-partition
+        # policy (gaming lanes do); this flag only adds the restraint tier.
         cpuBalancer = $false
-        # Tier B (require cpuBalancer ON; the daemon hosts them). Default OFF.
-        #   cpuSets:  soft-steer the game toward P-cores (CPU Sets, anti-cheat-safe).
-        #   ecoMode:  herd busy background images onto E-cores (EcoQoS); populate
-        #             efficiency_mode.background_images in abso.yaml to pick targets.
+        # Tier B overrides (each independently starts the governor). Default OFF
+        # because the profile-driven partition policy already covers the common
+        # case; these force behavior regardless of the active profile:
+        #   cpuSets:  force game -> fast-core steering on every profile
+        #             (CPU Sets, anti-cheat-safe).
+        #   ecoMode:  herd busy background images onto E-cores (EcoQoS
+        #             throttling); populate efficiency_mode.background_images
+        #             in abso.yaml to pick targets.
         #   watchdog: evaluate declarative watchdog.rules (abso.yaml) with
         #             reversible demote/throttle/trim actions; online profiles are
         #             auto-restricted to demote-only.
@@ -185,7 +191,7 @@ function Get-SettingsProfileGameGroup {
         "-online-gsync-hdr-capture", "-online-gsync-hdr",
         "-gsync-hdr-capture", "-gsync-capture",
         "-online-gsync", "-offline-gsync-hdr",
-        "-offline-hdr", "-online-hdr", "-console-parity-hdr",
+        "-offline-hdr", "-online-hdr", "-console-parity-hdr", "-hdr-capture",
         "-universal-hdr", "-gsync-hdr", "-tournament-sim-144hz",
         "-console-parity", "-300hz-max", "-streaming-hdr", "-streaming",
         "-offline", "-online", "-vrr-lab", "-gsync", "-hdr", "-sdr",

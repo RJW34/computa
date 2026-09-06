@@ -15,6 +15,33 @@
       }
     },
     {
+      "id": "apply-slippi-melee-capture",
+      "profile_id": "slippi-melee-capture",
+      "kind": "apply_profile",
+      "assumptions": [
+        "administrator",
+        "nvidia_gpu"
+      ],
+      "expected": {
+        "transaction_state": "committed",
+        "apply_success": true
+      }
+    },
+    {
+      "id": "apply-slippi-melee-hdr-capture",
+      "profile_id": "slippi-melee-hdr-capture",
+      "kind": "apply_profile",
+      "assumptions": [
+        "administrator",
+        "nvidia_gpu",
+        "hdr_capable"
+      ],
+      "expected": {
+        "transaction_state": "committed",
+        "apply_success": true
+      }
+    },
+    {
       "id": "apply-slippi-melee-console-parity",
       "profile_id": "slippi-melee-console-parity",
       "kind": "apply_profile",
@@ -139,6 +166,20 @@
       }
     },
     {
+      "id": "apply-rivals2-gsync-capture",
+      "profile_id": "rivals2-gsync-capture",
+      "kind": "apply_profile",
+      "assumptions": [
+        "administrator",
+        "nvidia_gpu",
+        "vrr_confirmed"
+      ],
+      "expected": {
+        "transaction_state": "committed",
+        "apply_success": true
+      }
+    },
+    {
       "id": "apply-rivals2-gsync-hdr-capture",
       "profile_id": "rivals2-gsync-hdr-capture",
       "kind": "apply_profile",
@@ -232,6 +273,20 @@
         "nvidia_gpu",
         "vrr_confirmed",
         "hdr_capable"
+      ],
+      "expected": {
+        "transaction_state": "committed",
+        "apply_success": true
+      }
+    },
+    {
+      "id": "apply-counter-strike-2-gsync-capture",
+      "profile_id": "counter-strike-2-gsync-capture",
+      "kind": "apply_profile",
+      "assumptions": [
+        "administrator",
+        "nvidia_gpu",
+        "vrr_confirmed"
       ],
       "expected": {
         "transaction_state": "committed",
@@ -339,6 +394,35 @@
     {
       "id": "apply-fortnite-gsync-hdr",
       "profile_id": "fortnite-gsync-hdr",
+      "kind": "apply_profile",
+      "assumptions": [
+        "administrator",
+        "nvidia_gpu",
+        "vrr_confirmed",
+        "hdr_capable"
+      ],
+      "expected": {
+        "transaction_state": "committed",
+        "apply_success": true
+      }
+    },
+    {
+      "id": "apply-fortnite-gsync-capture",
+      "profile_id": "fortnite-gsync-capture",
+      "kind": "apply_profile",
+      "assumptions": [
+        "administrator",
+        "nvidia_gpu",
+        "vrr_confirmed"
+      ],
+      "expected": {
+        "transaction_state": "committed",
+        "apply_success": true
+      }
+    },
+    {
+      "id": "apply-fortnite-gsync-hdr-capture",
+      "profile_id": "fortnite-gsync-hdr-capture",
       "kind": "apply_profile",
       "assumptions": [
         "administrator",

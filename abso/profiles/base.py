@@ -14,11 +14,15 @@ if TYPE_CHECKING:
 NetworkScope = Literal["full", "limited", "none"]
 GraphicsApi = Literal["dx11", "dx12", "vulkan", "opengl", "unknown"]
 CpuAffinityStrategy = Literal["p_cores_only", "all_cores", "custom"]
+CpuPartitionPolicy = Literal["off", "game_only", "full"]
 
 VALID_NETWORK_SCOPES: frozenset[str] = frozenset(get_args(NetworkScope))
 VALID_GRAPHICS_APIS: frozenset[str] = frozenset(get_args(GraphicsApi))
 VALID_CPU_AFFINITY_STRATEGIES: frozenset[str] = frozenset(
     get_args(CpuAffinityStrategy)
+)
+VALID_CPU_PARTITION_POLICIES: frozenset[str] = frozenset(
+    get_args(CpuPartitionPolicy)
 )
 
 
@@ -553,6 +557,54 @@ class BaseProfile(ABC):
         is overridden True only where it is the non-redundant win (emulators).
         """
         return False
+
+    @property
+    def cpu_partition_policy(self) -> CpuPartitionPolicy:
+        """Session core-partitioning behavior while this profile's game runs.
+
+        * ``"full"`` (gaming default) — the tray's governor soft-steers the
+          game and its descendants toward the fast core partition (P-cores on
+          Intel hybrid, the V-Cache CCD on AMD X3D) and steers
+          :attr:`background_steer_images` plus auto-detected heavy background
+          processes toward the remaining cores, at full clock speed.
+        * ``"game_only"`` — only the game-side steering.
+        * ``"off"`` (productivity default) — no session steering at all.
+
+        All steering is soft ``SetProcessDefaultCpuSets`` placement (hard
+        affinity untouched, anti-cheat-benign, ephemeral — the OS clears it
+        at process exit) and no-ops safely on single-domain CPUs.
+        """
+        if (self.optimization_target or "").lower() == "productivity":
+            return "off"
+        return "full"
+
+    @property
+    def background_steer_images(self) -> tuple[str, ...]:
+        """Background images steered to the slow core partition during play.
+
+        Gaming lanes get the heavy multi-process staples (browsers, Discord,
+        Spotify); capture-safe lanes add the encoders they deliberately keep
+        alive (OBS, Medal) so recording continues at full speed on background
+        cores instead of competing with the game for fast cores.
+        """
+        from abso.core.partition_steer import (
+            CAPTURE_BACKGROUND_STEER_IMAGES,
+            DEFAULT_BACKGROUND_STEER_IMAGES,
+        )
+
+        if self.cpu_partition_policy != "full":
+            return ()
+        images = list(DEFAULT_BACKGROUND_STEER_IMAGES)
+        if self.is_capture_safe:
+            existing = {i.lower() for i in images}
+            images.extend(
+                i for i in CAPTURE_BACKGROUND_STEER_IMAGES if i.lower() not in existing
+            )
+        # A profile whose game IS one of these images (WebGL/browser lanes)
+        # must never list its own executable as background-steerable; the
+        # session steerer also guards this at runtime by live image name.
+        hints = {h.lower() for h in self.executable_hints}
+        return tuple(i for i in images if i.lower() not in hints)
 
     @property
     def application_scope(self) -> Literal["system_only", "system_plus_native_config"]:

@@ -107,15 +107,50 @@ class EfficiencyModeConfig:
 
 @dataclass
 class CpuSetsConfig:
-    """CPU Sets soft P-core steering configuration (Tier B scaffold, default OFF).
+    """CPU Sets core-partition steering configuration.
 
-    When ``enabled`` the tray may apply ``SetProcessDefaultCpuSets`` to bias the
-    game's threads toward P-cores while leaving the hard affinity mask intact
-    (threads still spill to E-cores under load). Anti-cheat-safe and
-    hybrid-correct, unlike hard affinity.
+    Uses ``SetProcessDefaultCpuSets`` without changing hard affinity. Windows
+    can override CPU Set selections in documented cases; selection does not
+    guarantee spillover, a performance gain, or anti-cheat compatibility.
+    Activation is normally
+    profile-driven (``BaseProfile.cpu_partition_policy``); ``enabled`` forces
+    the game-side steering on for every profile, and the remaining knobs tune
+    or veto the background half of the partition.
     """
 
     enabled: bool = False
+    """Force game->fast-core steering on regardless of the profile policy."""
+
+    background_steer: bool = True
+    """Allow background apps to be steered to the background side when the
+    active profile's policy is ``full``. Placement only (full clock speed),
+    never EcoQoS throttling."""
+
+    background_images: list[str] = field(default_factory=list)
+    """Extra image names to steer to the background side, unioned with the
+    profile's own list (e.g. OBS on capture lanes, browsers on gaming lanes)."""
+
+    auto_steer: bool = True
+    """Auto-detect heavy background processes (sustained CPU while the game
+    runs) and steer them to the background side. Anti-cheat, protected images,
+    the game subtree, and the foreground app are never auto-steered."""
+
+    auto_steer_process_threshold: int = 4
+    """Per-process CPU % (normalized to total capacity) that qualifies a
+    background process for auto-steer. ~1.3 saturated cores on 32 threads."""
+
+    auto_steer_sustain_ms: int = 5000
+    """How long the process must stay above the threshold before steering."""
+
+    smt_avoid: bool = False
+    """Restrict the game side to one thread per physical core (experimental;
+    charlie754-style 'no SMT' mask). Off by default."""
+
+    x3d_partition: bool = True
+    """Permit the AMD X3D cache-CCD split (larger-L3 CCD = game side). When
+    False, dual-CCD X3D parts classify as symmetric and steering no-ops.
+    Note: Windows Game Mode's own CCD parking can conflict with manual
+    steering on Ryzen X3D parts."""
 
 
 @dataclass

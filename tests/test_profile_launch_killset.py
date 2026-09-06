@@ -131,9 +131,16 @@ def test_non_strict_gaming_profiles_now_get_full_killset(profile_id, profiles_by
 @pytest.mark.parametrize(
     "profile_id",
     [
+        "slippi-melee-capture",
+        "slippi-melee-hdr-capture",
         "overwatch2-gsync-capture",
         "overwatch2-gsync-hdr-capture",
+        "rivals2-gsync-capture",
         "rivals2-gsync-hdr-capture",
+        "fortnite-gsync-capture",
+        "fortnite-gsync-hdr-capture",
+        "counter-strike-2-gsync-capture",
+        "counter-strike-2-gsync-hdr-capture",
     ],
 )
 def test_capture_safe_profiles_get_filtered_killset(profile_id, profiles_by_id) -> None:
@@ -156,12 +163,10 @@ def test_capture_safe_profiles_get_filtered_killset(profile_id, profiles_by_id) 
     killset = profile.launch_process_killset()
 
     expected_always_safe = tuple(
-        img for img in ALWAYS_SAFE_LAUNCH_KILLSET
-        if img.lower() not in CAPTURE_ALLOWED_IMAGES
+        img for img in ALWAYS_SAFE_LAUNCH_KILLSET if img.lower() not in CAPTURE_ALLOWED_IMAGES
     )
     expected_opt_in = tuple(
-        img for img in OPT_IN_LAUNCH_KILLSET
-        if img.lower() not in CAPTURE_ALLOWED_IMAGES
+        img for img in OPT_IN_LAUNCH_KILLSET if img.lower() not in CAPTURE_ALLOWED_IMAGES
     )
     assert killset.always_safe == expected_always_safe
     assert killset.opt_in == expected_opt_in
@@ -171,6 +176,8 @@ def test_capture_safe_profiles_get_filtered_killset(profile_id, profiles_by_id) 
     assert "medal.exe" not in all_killset_lower
     assert "discordhookhelper64.exe" not in all_killset_lower
     assert "rtss.exe" not in all_killset_lower
+    assert "obs64.exe" not in all_killset_lower
+    assert "obs32.exe" not in all_killset_lower
 
 
 def test_pokemon_auto_chess_browser_profile_gets_full_killset(profiles_by_id) -> None:
@@ -225,6 +232,7 @@ def test_strict_profiles_advertise_overlay_free_path_in_manifest() -> None:
 # ---------------------------------------------------------------------------
 # Aggressive-sweep coverage: confirm the May 2026 expansion landed and stays.
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.parametrize(
     "image",
@@ -368,6 +376,7 @@ def test_janitor_refuses_to_kill_discord_even_when_listed() -> None:
 # ---------------------------------------------------------------------------
 # Per-machine YAML override mechanism (process_overrides.protect / .kill)
 # ---------------------------------------------------------------------------
+
 
 def test_user_protect_override_extends_never_kill() -> None:
     """A user-declared protect entry survives even when passed to the janitor."""

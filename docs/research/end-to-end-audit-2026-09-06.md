@@ -13,8 +13,8 @@ The checkout began with 38 profiles; the installed backend exposes 44. Recent
 Fortnite capture/restore, NVIDIA verification, menu timer, and CPU partitioning
 work exists on `feat/core-partitioning-and-optimization-venture`, through
 `794a97e`. Relevant commits include `4702387`, `c20bf5f`, `b1433c1`, and
-`a71a103`. Separately, `perf/gaming-session-overhead` contains the resident
-sanitizer (`0fbe53b`) and one-directory packaging (`3b9e144`). The fixes here
+`a71a103`. Separately, `perf/gaming-session-overhead` contains conditional sanitizer launch suppression and
+five-minute priority maintenance (`0fbe53b`) and one-directory packaging (`3b9e144`). The fixes here
 do not merge those branches or reproduce the entire installed feature set.
 Deploying this checkout without reconciliation would remove working features.
 
@@ -107,14 +107,14 @@ metadata remains preferred and discovery is not proof of absence.
 
 | Priority | Finding | Required follow-up |
 | --- | --- | --- |
-| P1 | Source/install/branch divergence | Reconcile the installed 44-profile feature set, source fixes, and resident-sanitizer branch before deployment. Preserve explicit user cap policy and newer Fortnite ownership fixes during integration. |
+| P1 | Source/install/branch divergence | Reconcile the installed 44-profile feature set, and source fixes before deployment. Evaluate the separate sanitizer-launch suppression branch independently. Preserve explicit user cap policy and newer Fortnite ownership fixes during integration. |
 | P1 | Full Windows restore uses a detect dictionary as apply input | Implement captured per-display state restoration. Aggregate HDR and truthy `max_refresh_rate` can restore different display targets; unknown values must not become false writes. |
 | P1 | Backup creation can return an ID while important components failed or cannot restore | Validate manifest completeness/restorability for intended mutations before transactions proceed. This audit's manual capture explicitly said NVIDIA restore was unavailable. A successful capture is not a full rollback guarantee. |
 | P1 | Some native handlers still restore full old files | Extend ownership-aware restore beyond shared UE to OW2, Rivals, Diablo and Dolphin, with tests for later keybind/graphics/calibration edits. |
 | P1 | Remaining streaming aliases discard capture intent | Fortnite, Ryujinx and other aliases lacking equivalent source capture lanes must not silently resolve to capture-terminating profiles. Restore/reconcile missing lane contracts first. |
 | P1 | Tray operations permit reentrancy and a cross-process state/start race | One transaction coordinator; backend automatic sweep should check expected active profile before acting. |
 | P2 | Governor stop blocks up to 3 seconds then hard-kills | Asynchronous stop acknowledgement and recovery evidence; forced termination can skip cleanup. |
-| P2 | Session sanitizer starts a frozen backend every 10 seconds | Reconcile resident worker branch; benchmark tray and children together. Do not skip launches solely on kill-target presence because the command also enforces priority. |
+| P2 | Session sanitizer starts a frozen backend every 10 seconds | Evaluate conditional launches and periodic priority maintenance; benchmark tray and children together. Do not skip launches solely on kill-target presence because the command also enforces priority. |
 | P2 | CPU-affinity persistence/readback does not prove scheduling | The existing handler uses AppCompat markers and suppresses live affinity errors. Validate Win32 affinity and launch behavior before claiming the local Slippi override works. |
 | P2 | Audio/NIC selectors can choose the wrong endpoint | First active audio endpoint is not necessarily default; first Up NIC is not necessarily the game's route. Resolve actual default endpoint/route. NIC `-NoRestart` writes also need effective-state semantics. |
 | P2 | Display diagnostics invent capability certainty | `MultiMonitorDetector` hardcodes `is_hdr_capable=False`; installed primary also reports a 48–240 VRR range while running 300 Hz. Preserve unknowns and distinguish capability, enabled state, and engagement. |

@@ -68,8 +68,14 @@ class _Overwatch2BaseProfile(ReflexShooterBaseProfile):
 
         # 1) Uninstall key (canonical): DisplayIcon or InstallLocation
         for hive, sub in (
-            (winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\Overwatch"),
-            (winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\Overwatch"),
+            (
+                winreg.HKEY_LOCAL_MACHINE,
+                r"SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\Overwatch",
+            ),
+            (
+                winreg.HKEY_LOCAL_MACHINE,
+                r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\Overwatch",
+            ),
         ):
             try:
                 with winreg.OpenKey(hive, sub) as key:
@@ -118,6 +124,7 @@ class _Overwatch2BaseProfile(ReflexShooterBaseProfile):
         libs: list[Path] = []
         try:
             import winreg
+
             with winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\Valve\Steam") as key:
                 steam_path = Path(winreg.QueryValueEx(key, "SteamPath")[0])
                 if steam_path.exists():
@@ -358,8 +365,8 @@ class Overwatch2Profile(_Overwatch2BaseProfile):
                 # Uncapped no-sync path (600 = OW2 max).
                 "frame_rate_cap": 600,
                 # Verify confirms the manual in-game Reflex step (On + Boost).
-                # Uncapped play is where Reflex's backpressure removal pays;
-                # its capped-lane pacing problems do not apply here.
+                # Native Reflex handles render-queue backpressure; compare
+                # latency and FPS on this setup when choosing Boost.
                 "expected_reflex_mode": 2,
             },
         }
@@ -530,7 +537,7 @@ class Overwatch2GSyncProfile(_Overwatch2BaseProfile):
     refresh - 3 static caps. Reflex may dynamically pace below the ceiling.
 
     Runs the same borderless windowed flip path as the capture-safe sibling;
-    the difference is overlay handling, not the display path. This lane kills
+    the differences are overlay handling and game process priority. This lane kills
     overlay/capture apps (OBS, Medal, RTSS, Steam/Discord overlays, NVIDIA
     Share) at apply and game launch for frame-time headroom, and requires an
     overlay-free display path at apply time. The Discord app itself is
@@ -616,8 +623,8 @@ class Overwatch2GSyncProfile(_Overwatch2BaseProfile):
                 "setting": "Display Mode",
                 "value": "Borderless / Windowed Fullscreen",
                 "reason": (
-                    "This profile uses the same fast Win11 borderless G-SYNC path as "
-                    "capture-safe, but keeps capture and overlay processes out for lower "
+                    "This profile uses the same Win11 borderless G-SYNC path as the "
+                    "Streaming sibling, but keeps capture and overlay processes out for lower "
                     "frame-time noise."
                 ),
             },
@@ -676,7 +683,7 @@ class Overwatch2GSyncHDRProfile(_Overwatch2BaseProfile):
     since OW2 has native HDR support.
 
     Same borderless windowed flip path as the HDR capture-safe sibling; the
-    difference is overlay handling only. This lane kills overlay/capture apps
+    differences are overlay handling and game process priority. This lane kills overlay/capture apps
     at apply and game launch and requires an overlay-free display path. The
     Discord app itself is never killed, so Discord screen sharing keeps
     working here.
@@ -725,27 +732,29 @@ class Overwatch2GSyncHDRProfile(_Overwatch2BaseProfile):
 
     def _base_overrides(self) -> dict[str, dict[str, Any]]:
         base = super()._base_overrides()
-        base.update({
-            "WindowsSettingsHandler": {
-                "hdr": True,
-                "advanced_color": True,  # Win11 24H2+ WCG pairing
-                "auto_hdr": False,
-                # Paper-white ≈ 200 nits under HDR on OLED / Mini-LED.
-                # Driver installs reset this slider; asserting it here
-                # restores the correct SDR-in-HDR tone-mapping.
-                "sdr_white_level_nits": 200,
-            },
-            "ColorProfileSettingsHandler": {
-                "icc_profile": "native",
-                "digital_vibrance": 50,
-                "show_osd_guidance": True,
-                "game_type": "competitive_fps",
-            },
-            "OW2ConfigHandler": {
-                **base.get("OW2ConfigHandler", {}),
-                "hdr": True,  # Native HDR - OW2 handles tone mapping for OLED/Mini-LED
-            },
-        })
+        base.update(
+            {
+                "WindowsSettingsHandler": {
+                    "hdr": True,
+                    "advanced_color": True,  # Win11 24H2+ WCG pairing
+                    "auto_hdr": False,
+                    # Paper-white ≈ 200 nits under HDR on OLED / Mini-LED.
+                    # Driver installs reset this slider; asserting it here
+                    # restores the correct SDR-in-HDR tone-mapping.
+                    "sdr_white_level_nits": 200,
+                },
+                "ColorProfileSettingsHandler": {
+                    "icc_profile": "native",
+                    "digital_vibrance": 50,
+                    "show_osd_guidance": True,
+                    "game_type": "competitive_fps",
+                },
+                "OW2ConfigHandler": {
+                    **base.get("OW2ConfigHandler", {}),
+                    "hdr": True,  # Native HDR - OW2 handles tone mapping for OLED/Mini-LED
+                },
+            }
+        )
         return base
 
     def _variant_overrides(self) -> dict[str, dict[str, Any]]:
@@ -782,8 +791,8 @@ class Overwatch2GSyncHDRProfile(_Overwatch2BaseProfile):
                 "setting": "Display Mode",
                 "value": "Borderless / Windowed Fullscreen",
                 "reason": (
-                    "This profile uses the same fast Win11 borderless HDR G-SYNC path as "
-                    "capture-safe, but keeps capture and overlay processes out for lower "
+                    "This profile uses the same Win11 borderless HDR G-SYNC path as the "
+                    "Streaming sibling, but keeps capture and overlay processes out for lower "
                     "frame-time noise."
                 ),
             },
@@ -857,9 +866,9 @@ class Overwatch2GSyncHDRProfile(_Overwatch2BaseProfile):
 class Overwatch2GSyncCaptureProfile(_Overwatch2BaseProfile):
     """Capture-safe Overwatch 2 VRR profile.
 
-    Same borderless windowed G-SYNC flip path and settings payload as the
-    strict :class:`Overwatch2GSyncProfile`; the difference is overlay
-    handling. This lane keeps the capture / overlay / peripheral stack
+    Same borderless windowed G-SYNC flip path as the strict
+    :class:`Overwatch2GSyncProfile`, with Normal game CPU/I/O priority and
+    capture retention. This lane keeps the capture / overlay / peripheral stack
     (OBS, Medal, RTSS, Steam/Discord overlays, NVIDIA Share, G HUB, iCUE)
     alive at apply and game launch, and skips the strict lane's
     overlay-free display-path gate. Note: Discord screen sharing works on
@@ -882,13 +891,14 @@ class Overwatch2GSyncCaptureProfile(_Overwatch2BaseProfile):
 
     @property
     def display_name(self) -> str:
-        return "Overwatch 2 - GSYNC SDR Capture-Safe"
+        return "Overwatch 2 - GSYNC SDR Streaming"
 
     @property
     def description(self) -> str:
         return (
-            "Same VRR path as GSYNC SDR, but keeps OBS/Medal/RTSS and "
-            "overlays alive at launch instead of killing them"
+            "Borderless SDR G-SYNC streaming lane that preserves OBS, Medal, "
+            "RTSS, and overlays and keeps game CPU/I/O priority at Normal so "
+            "capture is not starved."
         )
 
     @property
@@ -931,6 +941,10 @@ class Overwatch2GSyncCaptureProfile(_Overwatch2BaseProfile):
                 # Static native ceiling plus a manual Reflex verification step.
                 **self._ow2_gsync_engine_cap_settings(),
             },
+            "ProcessPriorityHandler": {
+                "cpu_priority": 2,
+                "io_priority": 2,
+            },
         }
 
     def get_in_game_settings(self) -> list[dict[str, str]]:
@@ -940,9 +954,8 @@ class Overwatch2GSyncCaptureProfile(_Overwatch2BaseProfile):
                 "setting": "Display Mode",
                 "value": "Borderless / Windowed Fullscreen",
                 "reason": (
-                    "Capture-safe path: uses the same fast Win11 borderless G-SYNC path "
-                    "as the overlay-free profile, while keeping Medal/Discord/OBS "
-                    "overlays compatible."
+                    "Streaming path: uses the borderless G-SYNC presentation "
+                    "path while keeping OBS, Medal, RTSS, and overlays available."
                 ),
             },
             {
@@ -967,7 +980,7 @@ class Overwatch2GSyncCaptureProfile(_Overwatch2BaseProfile):
                 "category": "Display",
                 "setting": "Reduce Buffering",
                 "value": "On",
-                "reason": "Maintains low queue depth without fighting the capture-safe path.",
+                "reason": "Maintains low queue depth on the streaming presentation path.",
             },
             {
                 "category": "Graphics",
@@ -992,8 +1005,8 @@ class Overwatch2GSyncHDRCaptureProfile(_Overwatch2BaseProfile):
     """Capture-safe HDR Overwatch 2 VRR profile.
 
     Same borderless windowed HDR G-SYNC path as the strict
-    :class:`Overwatch2GSyncHDRProfile`; the difference is overlay handling
-    only — see :class:`Overwatch2GSyncCaptureProfile` for the contract.
+    :class:`Overwatch2GSyncHDRProfile`, with Normal game CPU/I/O priority and
+    capture retention — see :class:`Overwatch2GSyncCaptureProfile` for the contract.
     """
 
     @property
@@ -1007,13 +1020,14 @@ class Overwatch2GSyncHDRCaptureProfile(_Overwatch2BaseProfile):
 
     @property
     def display_name(self) -> str:
-        return "Overwatch 2 - GSYNC HDR Capture-Safe"
+        return "Overwatch 2 - GSYNC HDR Streaming"
 
     @property
     def description(self) -> str:
         return (
-            "Same HDR VRR path as GSYNC HDR, but keeps OBS/Medal/RTSS and "
-            "overlays alive at launch instead of killing them"
+            "Borderless HDR G-SYNC streaming lane that preserves OBS, Medal, "
+            "RTSS, and overlays and keeps game CPU/I/O priority at Normal so "
+            "capture is not starved."
         )
 
     @property
@@ -1034,25 +1048,27 @@ class Overwatch2GSyncHDRCaptureProfile(_Overwatch2BaseProfile):
 
     def _base_overrides(self) -> dict[str, dict[str, Any]]:
         base = super()._base_overrides()
-        base.update({
-            "WindowsSettingsHandler": {
-                "hdr": True,
-                "advanced_color": True,  # Win11 24H2+ WCG pairing
-                "auto_hdr": False,
-                # Match the strict-HDR lane's paper-white.
-                "sdr_white_level_nits": 200,
-            },
-            "ColorProfileSettingsHandler": {
-                "icc_profile": "native",
-                "digital_vibrance": 50,
-                "show_osd_guidance": True,
-                "game_type": "competitive_fps",
-            },
-            "OW2ConfigHandler": {
-                **base.get("OW2ConfigHandler", {}),
-                "hdr": True,
-            },
-        })
+        base.update(
+            {
+                "WindowsSettingsHandler": {
+                    "hdr": True,
+                    "advanced_color": True,  # Win11 24H2+ WCG pairing
+                    "auto_hdr": False,
+                    # Match the strict-HDR lane's paper-white.
+                    "sdr_white_level_nits": 200,
+                },
+                "ColorProfileSettingsHandler": {
+                    "icc_profile": "native",
+                    "digital_vibrance": 50,
+                    "show_osd_guidance": True,
+                    "game_type": "competitive_fps",
+                },
+                "OW2ConfigHandler": {
+                    **base.get("OW2ConfigHandler", {}),
+                    "hdr": True,
+                },
+            }
+        )
         return base
 
     def _variant_overrides(self) -> dict[str, dict[str, Any]]:
@@ -1076,6 +1092,10 @@ class Overwatch2GSyncHDRCaptureProfile(_Overwatch2BaseProfile):
                 # Static native ceiling plus a manual Reflex verification step.
                 **self._ow2_gsync_engine_cap_settings(),
             },
+            "ProcessPriorityHandler": {
+                "cpu_priority": 2,
+                "io_priority": 2,
+            },
         }
 
     def get_in_game_settings(self) -> list[dict[str, str]]:
@@ -1085,9 +1105,9 @@ class Overwatch2GSyncHDRCaptureProfile(_Overwatch2BaseProfile):
                 "setting": "Display Mode",
                 "value": "Borderless / Windowed Fullscreen",
                 "reason": (
-                    "Capture-safe HDR path: uses the same fast Win11 borderless HDR "
-                    "G-SYNC path as the overlay-free profile, while keeping "
-                    "Medal/Discord/OBS overlays compatible."
+                    "Streaming HDR path: uses the borderless HDR G-SYNC "
+                    "presentation path while keeping OBS, Medal, RTSS, and "
+                    "overlays available."
                 ),
             },
             {
@@ -1112,13 +1132,13 @@ class Overwatch2GSyncHDRCaptureProfile(_Overwatch2BaseProfile):
                 "category": "Display",
                 "setting": "Reduce Buffering",
                 "value": "On",
-                "reason": "Maintains low queue depth without fighting the capture-safe path.",
+                "reason": "Maintains low queue depth on the streaming presentation path.",
             },
             {
                 "category": "Display",
                 "setting": "HDR Mode",
                 "value": "On",
-                "reason": "Native HDR output for OLED/Mini-LED displays on the capture-safe path.",
+                "reason": "Native HDR output for OLED/Mini-LED displays on the streaming path.",
             },
             {
                 "category": "Display",
@@ -1148,4 +1168,9 @@ class Overwatch2GSyncHDRCaptureProfile(_Overwatch2BaseProfile):
         ]
 
     def get_post_apply_notes(self) -> list[str]:
-        return self._ow2_gsync_post_apply_notes()
+        return [
+            *self._ow2_gsync_post_apply_notes(),
+            "Streaming color: default to SDR Streaming for an SDR destination. "
+            "Use HDR Streaming only when OBS/output color space or tone mapping "
+            "is already intentionally configured; ABSO does not change OBS settings.",
+        ]

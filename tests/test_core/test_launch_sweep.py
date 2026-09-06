@@ -23,6 +23,59 @@ def test_build_launch_killset_payload_resolves_profile_aliases(include_opt_in):
         assert "SearchIndexer.exe" not in payload["resolved"]
 
 
+@pytest.mark.parametrize(
+    ("alias", "canonical", "strict_sibling"),
+    [
+        ("ssbm-streaming", "slippi-melee-capture", "slippi-melee"),
+        ("ssbm-streaming-hdr", "slippi-melee-hdr-capture", "slippi-melee-hdr"),
+        ("roa2-streaming", "rivals2-gsync-capture", "rivals2-gsync"),
+        ("roa2-streaming-hdr", "rivals2-gsync-hdr-capture", "rivals2-gsync-hdr"),
+        ("fortnite-streaming", "fortnite-gsync-capture", "fortnite"),
+        (
+            "fortnite-streaming-hdr",
+            "fortnite-gsync-hdr-capture",
+            "fortnite-gsync-hdr",
+        ),
+        (
+            "overwatch2-streaming",
+            "overwatch2-gsync-capture",
+            "overwatch2-gsync",
+        ),
+        (
+            "overwatch2-streaming-hdr",
+            "overwatch2-gsync-hdr-capture",
+            "overwatch2-gsync-hdr",
+        ),
+        (
+            "cs2-streaming",
+            "counter-strike-2-gsync-capture",
+            "counter-strike-2-gsync",
+        ),
+        (
+            "cs2-streaming-hdr",
+            "counter-strike-2-gsync-hdr-capture",
+            "counter-strike-2-gsync-hdr",
+        ),
+    ],
+)
+def test_streaming_alias_launch_killsets_preserve_obs(
+    alias: str,
+    canonical: str,
+    strict_sibling: str,
+) -> None:
+    payload = build_launch_killset_payload(alias, include_opt_in=True)
+    strict = build_launch_killset_payload(strict_sibling, include_opt_in=True)
+
+    assert payload["profile"] == canonical
+    streaming_images = {image.lower() for image in payload["resolved"]}
+    strict_images = {image.lower() for image in strict["resolved"]}
+    assert "obs64.exe" not in streaming_images
+    assert "obs32.exe" not in streaming_images
+    assert "obs64.exe" in strict_images
+    assert "obs32.exe" in strict_images
+    assert "searchindexer.exe" in streaming_images
+
+
 def test_build_launch_killset_payload_rejects_unknown_profile():
     with pytest.raises(LaunchProfileError, match="Unknown profile"):
         build_launch_killset_payload("missing-profile", include_opt_in=False)

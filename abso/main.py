@@ -3555,7 +3555,28 @@ def debloat(tier: int, dry_run: bool, json_output: bool) -> None:
     is_flag=True,
     default=False,
     help="Tier B: soft-steer the game toward P-cores (CPU Sets). Also enabled "
-    "by cpu_sets.enabled in abso.yaml.",
+    "by cpu_sets.enabled in abso.yaml or the profile's cpu_partition_policy.",
+)
+@click.option(
+    "--profile",
+    "profile_id",
+    type=str,
+    default=None,
+    help="Active profile id for partition-policy resolution (defaults to the "
+    "recorded active profile).",
+)
+@click.option(
+    "--steer-background",
+    is_flag=True,
+    default=False,
+    help="Force background-app steering to the background core partition even "
+    "when the profile policy does not request it.",
+)
+@click.option(
+    "--no-restraint",
+    is_flag=True,
+    default=False,
+    help="Disable ProBalance priority restraint (steer-only session).",
 )
 @click.option(
     "--eco",
@@ -3584,6 +3605,9 @@ def cpu_balance(
     poll_interval: int | None,
     stop_file: str | None,
     cpu_sets: bool,
+    profile_id: str | None,
+    steer_background: bool,
+    no_restraint: bool,
     eco: bool,
     watchdog: bool,
     online: bool,
@@ -3603,6 +3627,7 @@ def cpu_balance(
         CpuBalancerConfig,
         _build_runtime_config_from_user,
         _gather_extra_excluded,
+        _resolve_partition,
         _resolve_session_extras,
         _resolve_watchdog,
     )
@@ -3626,18 +3651,25 @@ def cpu_balance(
     enable_watchdog, watchdog_rules, watchdog_keep_cores = _resolve_watchdog(
         watchdog_flag=watchdog
     )
+    partition_kwargs = _resolve_partition(
+        steer_flag=steer_background, profile_id=profile_id
+    )
+    partition_kwargs["enable_cpu_sets"] = (
+        enable_cpu_sets or partition_kwargs["enable_cpu_sets"]
+    )
     balancer = CpuBalancer(
         pid,
         config,
         extra_excluded=_gather_extra_excluded(),
         stop_file=stop_file,
-        enable_cpu_sets=enable_cpu_sets,
         enable_eco=enable_eco,
         eco_images=eco_images,
         enable_watchdog=enable_watchdog,
         watchdog_rules=watchdog_rules,
         is_online=online,
         watchdog_keep_cores=watchdog_keep_cores,
+        enable_restraint=not no_restraint,
+        **partition_kwargs,
     )
 
     import signal

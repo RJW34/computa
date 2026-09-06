@@ -37,7 +37,7 @@ def test_missing_driver_readback_is_a_verification_failure():
     failures = NvidiaSettingsHandler()._collect_verification_failures(
         RealDRSProfileManager(), {}, {"vsync": "on"}
     )
-    assert failures == ["vsync: driver readback unavailable"]
+    assert failures == ["vsync: driver readback unavailable; expected=on"]
 
 
 def test_unsupported_value_cannot_verify_active():
@@ -887,8 +887,11 @@ class TestNvidiaApply:
         assert verify["all_active"] is False
         assert any("Executable binding mismatch" in item for item in verify["setting_failures"])
 
+    @pytest.mark.parametrize("probe_state", [
+        "predefined_profile_safe", "predefined_profile_trusted", "profile_missing", "confirmed",
+    ])
     @patch("abso.settings.nvidia.nvapi_drs.DRSProfileManager")
-    def test_verify_active_uses_safe_binding_probe_when_exact_owner_is_unresolved(self, mock_manager_cls):
+    def test_verify_active_rejects_probe_flags_without_owner_evidence(self, mock_manager_cls, probe_state):
         """require_exact_binding must not be ignored by live profile verification."""
         mock_manager = MagicMock()
         fake_drs = MagicMock()
@@ -906,7 +909,8 @@ class TestNvidiaApply:
         mock_manager._profile_contains_application.return_value = False
         mock_manager.probe_profile_binding.return_value = {
             "app_binding_safe": True,
-            "app_binding_state": "predefined_profile_safe",
+            "app_binding_exact": True,
+            "app_binding_state": probe_state,
             "app_binding_note": (
                 "NVIDIA predefined profile 'Overwatch 2' already exists and has bound applications."
             ),
@@ -926,10 +930,11 @@ class TestNvidiaApply:
             "require_exact_binding": True,
         })
 
-        assert verify["all_active"] is True
-        assert verify["scope"] == "profile_and_safe_binding_probe"
-        assert verify["binding_owner_profiles"] == {"Overwatch.exe": "Overwatch 2"}
-        assert verify["binding_probe_state"] == "predefined_profile_safe"
+        assert verify["all_active"] is False
+        assert verify["scope"] == "profile_readback_only"
+        assert "binding_owner_profiles" not in verify
+        assert verify["binding_probe_state"] == probe_state
+        assert any("binding could not be proven" in failure for failure in verify["setting_failures"])
 
     @patch("abso.settings.nvidia.nvapi_drs.DRSProfileManager")
     def test_verify_active_fails_required_binding_when_probe_is_not_safe(self, mock_manager_cls):
@@ -969,14 +974,14 @@ class TestNvidiaApply:
         })
 
         assert verify["all_active"] is False
-        assert "Exact NVIDIA executable binding could not be confirmed." in verify["setting_failures"]
+        assert any("binding could not be proven" in failure for failure in verify["setting_failures"])
 
     @patch("abso.settings.nvidia.nvapi_drs.DRSProfileManager")
-    def test_verify_active_reports_manual_binding_step_without_failing_opted_in_profile(
+    def test_verify_active_reports_manual_binding_step_and_fails_unproven_required_binding(
         self,
         mock_manager_cls,
     ):
-        """Manual NVIDIA binding should be advisory for stable opted-in profile families."""
+        """Apply reuse permission does not prove a required executable binding exists."""
         mock_manager = MagicMock()
         fake_drs = MagicMock()
         fake_drs.find_profile_by_name.return_value = object()
@@ -1015,8 +1020,8 @@ class TestNvidiaApply:
             "allow_unverified_existing_profile_reuse": True,
         })
 
-        assert verify["all_active"] is True
-        assert verify["setting_failures"] == []
+        assert verify["all_active"] is False
+        assert any("binding could not be proven" in failure for failure in verify["setting_failures"])
         assert verify["scope"] == "profile_settings_manual_binding_required"
         assert verify["pending_manual_binding"] == {
             "profile_name": "Rivals 2 Online",
