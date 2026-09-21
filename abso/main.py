@@ -55,7 +55,11 @@ from abso.core.launch_sweep import (
 )
 from abso.core.launcher import launch_profile, launch_profile_without_apply
 from abso.core.pending_apply import apply_pending_profile_settings
-from abso.core.profile_status import build_profile_verification_summary
+from abso.core.profile_status import (
+    build_profile_verification_summary,
+    format_manual_step,
+    get_pending_manual_steps,
+)
 from abso.core.transaction import ProfileTransactionManager
 from abso.profiles.catalog import (
     get_profile_aliases,
@@ -374,8 +378,10 @@ def _build_same_profile_apply_noop_payload(
         "warnings": [],
         "notices": [notice],
         "post_apply_notes": [],
-        "manual_steps": [],
-        "manual_actions": [],
+        "manual_steps": _collect_manual_steps_from_verification(verification),
+        "manual_actions": _collect_manual_actions(
+            _collect_manual_steps_from_verification(verification)
+        ),
         "summary_level": "notice",
         "changed": False,
         "changed_settings": [],
@@ -407,7 +413,11 @@ def _collect_post_apply_notes(applier: ProfileApplier, profile_name: str) -> lis
 
 def _collect_manual_steps_from_transaction(tx: Any) -> list[dict[str, Any]]:
     """Return non-blocking manual verification steps from an apply transaction."""
-    verify_result = getattr(tx, "verify_result", None)
+    return _collect_manual_steps_from_verification(getattr(tx, "verify_result", None))
+
+
+def _collect_manual_steps_from_verification(verify_result: Any) -> list[dict[str, Any]]:
+    """Retain manual evidence even when an apply transaction was unnecessary."""
     if not isinstance(verify_result, dict):
         return []
     steps: list[dict[str, Any]] = []
@@ -415,6 +425,14 @@ def _collect_manual_steps_from_transaction(tx: Any) -> list[dict[str, Any]]:
         if isinstance(step, dict):
             steps.append(dict(step))
     return steps
+
+
+def _print_manual_setup_steps(manual_steps: Any) -> None:
+    steps = get_pending_manual_steps(manual_steps)
+    if steps:
+        console.print("[yellow]Manual setup still needed:[/yellow]")
+        for step in steps:
+            console.print(f"  - {format_manual_step(step)}", markup=False)
 
 
 def _collect_manual_actions(manual_steps: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -437,7 +455,7 @@ def _collect_manual_actions(manual_steps: list[dict[str, Any]]) -> list[dict[str
         seen.add(key)
         actions.append(action)
 
-    for step in manual_steps:
+    for step in get_pending_manual_steps(manual_steps):
         if step.get("key") != "nvidia_app_binding":
             continue
 
@@ -474,6 +492,10 @@ def _build_pending_apply_as_apply_payload(
     pending_result: dict[str, Any],
 ) -> dict[str, Any]:
     """Wrap apply-pending output in the apply command's JSON response shape."""
+    verification = pending_result.get("verify_after")
+    if not isinstance(verification, dict):
+        verification = pending_result.get("verify_before")
+    manual_steps = _collect_manual_steps_from_verification(verification)
     handler_results = pending_result.get("handler_results") or {}
     results = []
     for handler_name, handler_result in handler_results.items():
@@ -516,8 +538,8 @@ def _build_pending_apply_as_apply_payload(
         "warnings": warnings,
         "notices": notices,
         "post_apply_notes": _collect_post_apply_notes(ProfileApplier(), profile_name),
-        "manual_steps": [],
-        "manual_actions": [],
+        "manual_steps": manual_steps,
+        "manual_actions": _collect_manual_actions(manual_steps),
         "summary_level": summary_level,
         "changed": bool(pending_result.get("changed")),
         "changed_settings": list(pending_result.get("changed_settings") or []),
@@ -958,6 +980,7 @@ def state(json_output: bool, verify_state: bool) -> None:
                 console.print(f"  - {setting}")
         if verification.get("error"):
             console.print(f"[yellow]Verification error: {verification['error']}[/yellow]")
+        _print_manual_setup_steps(verification.get("manual_steps"))
 
 
 @cli.command("apply-pending")
@@ -1027,6 +1050,10 @@ def apply_pending(profile_name: str | None, dry_run: bool, json_output: bool) ->
         console.print(
             "[yellow]Reboot required before judging the live display compositor path.[/yellow]"
         )
+    verification = result.get("verify_after")
+    if not isinstance(verification, dict):
+        verification = result.get("verify_before")
+    _print_manual_setup_steps(_collect_manual_steps_from_verification(verification))
 
 
 @cli.command()
@@ -1151,6 +1178,7 @@ def apply(
                 console.print("[yellow]Reboot is still required for:[/yellow]")
                 for reason in noop_payload.get("reboot_reasons") or []:
                     console.print(f"  [yellow]- {reason}[/yellow]")
+            _print_manual_setup_steps(noop_payload.get("manual_steps"))
             return
 
         if pending_apply_settings:
@@ -1190,6 +1218,7 @@ def apply(
                 console.print(
                     "[yellow]Reboot required before judging the live display compositor path.[/yellow]"
                 )
+            _print_manual_setup_steps(pending_payload.get("manual_steps"))
             return
 
     if not is_admin():
@@ -1416,6 +1445,7 @@ def apply(
                 console.print(f"[yellow]{warning_prefix}: {warning}[/yellow]")
             for notice in apply_notices:
                 console.print(f"[cyan]Note: {notice}[/cyan]")
+            _print_manual_setup_steps(manual_steps)
 
             # Surface the post-apply launch sweep so users see what got
             # stopped without having to look at tray logs.
@@ -1638,6 +1668,7 @@ def launch(
 
             console.print(Panel(f"Launching With Profile: {profile_name}", style="bold blue"))
             console.print(f"[cyan]Note: {noop_payload['notices'][0]}[/cyan]")
+            _print_manual_setup_steps(noop_payload.get("manual_steps"))
             if launch_result.target:
                 console.print(f"[cyan]Target:[/cyan] {launch_result.target.executable_path}")
             if launch_result.launched:
@@ -1694,6 +1725,7 @@ def launch(
 
             console.print(Panel(f"Launching With Profile: {profile_name}", style="bold blue"))
             console.print("[green]Applied targeted pending profile fix before launch.[/green]")
+            _print_manual_setup_steps(pending_payload.get("manual_steps"))
             if launch_result.target:
                 console.print(f"[cyan]Target:[/cyan] {launch_result.target.executable_path}")
             if launch_result.launched:
@@ -1864,6 +1896,10 @@ def reapply(json_output: bool) -> None:
                         "reboot_pending": reboot_pending,
                         "reboot_reasons": reboot_reasons,
                         "verification": verification,
+                        "manual_steps": _collect_manual_steps_from_verification(verification),
+                        "manual_actions": _collect_manual_actions(
+                            _collect_manual_steps_from_verification(verification)
+                        ),
                         "transaction": None,
                     }
                 )
@@ -1875,6 +1911,7 @@ def reapply(json_output: bool) -> None:
                 console.print("[yellow]Reboot is still required for:[/yellow]")
                 for reason in reboot_reasons:
                     console.print(f"  [yellow]- {reason}[/yellow]")
+            _print_manual_setup_steps(verification.get("manual_steps"))
             return
 
         pending_apply_settings = list(verification.get("pending_apply_settings") or [])
@@ -1910,6 +1947,7 @@ def reapply(json_output: bool) -> None:
                 console.print(
                     "[yellow]Reboot required before judging the live display compositor path.[/yellow]"
                 )
+            _print_manual_setup_steps(pending_payload.get("manual_steps"))
             return
 
     if not is_admin():
@@ -2018,6 +2056,7 @@ def reapply(json_output: bool) -> None:
                 console.print(f"[yellow]{warning_prefix}: {warning}[/yellow]")
             for notice in notices:
                 console.print(f"[cyan]Note: {notice}[/cyan]")
+            _print_manual_setup_steps(manual_steps)
         else:
             error = tx.error or (result.error if result else "Unknown transaction error")
             console.print(f"\n[red]Failed to re-apply profile: {error}[/red]")
@@ -2102,6 +2141,8 @@ def verify(profile_name: str, json_output: bool) -> None:
                     console.print(
                         f"    [dim]Reboot-gated: {setting_info.get('note', 'takes effect after reboot')}[/dim]"
                     )
+
+        _print_manual_setup_steps(result.get("manual_steps"))
 
     except ValueError as e:
         if json_output:

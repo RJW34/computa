@@ -255,6 +255,21 @@ class _Overwatch2BaseProfile(ReflexShooterBaseProfile):
         }
 
     @staticmethod
+    def _ow2_gsync_cap_guidance() -> dict[str, str]:
+        return {
+            "category": "Display",
+            "setting": "Frame Rate Cap",
+            "value": "Auto static ceiling: refresh - 3 (297 at 300 Hz)",
+            "reason": (
+                "The saved native and driver caps are fallback ceilings, not a target FPS. "
+                "With G-SYNC, VSync and Reflex active, runtime FPS may be lower; while it is, "
+                "the higher saved ceilings do not limit it. A reading such as 276 is not "
+                "itself saved-cap drift or a universal Reflex target. An added performance "
+                "benefit from redundant caps has not been established."
+            ),
+        }
+
+    @staticmethod
     def _custom_render_scale_guidance() -> dict[str, str]:
         return {
             "category": "Graphics",
@@ -268,12 +283,56 @@ class _Overwatch2BaseProfile(ReflexShooterBaseProfile):
         }
 
     @staticmethod
+    def _graphics_detail_guidance() -> list[dict[str, str]]:
+        """Separate managed effects quality from manual visual preferences."""
+        return [
+            {
+                "category": "Graphics",
+                "setting": "Effects Detail",
+                "value": "Low",
+                "reason": "ABSO sets the saved effects detail to Low as a performance starting point.",
+            },
+            {
+                "category": "Graphics",
+                "setting": "Shadow Detail",
+                "value": "Off or Low — choose manually",
+                "reason": (
+                    "Choose the shadow detail you prefer. Low is a visual preference, "
+                    "not a demonstrated performance improvement over Off. ABSO preserves this choice."
+                ),
+            },
+            {
+                "category": "Graphics",
+                "setting": "Local Reflections",
+                "value": "Off — set manually",
+                "reason": (
+                    "Optional performance starting point that removes local reflections. "
+                    "ABSO preserves this choice; saved-setting verification does not check it."
+                ),
+            },
+            {
+                "category": "Graphics",
+                "setting": "Damage FX",
+                "value": "Low — set manually",
+                "reason": (
+                    "Manual visual starting point; ABSO does not write or verify this option. "
+                    "No FPS improvement is claimed without measurement."
+                ),
+            },
+        ]
+
+    @staticmethod
     def _ow2_gsync_post_apply_notes() -> list[str]:
         return [
             (
                 "OW2 manual: set NVIDIA Reflex to Enabled + Boost; keep Dynamic Render Scale Off "
                 "and Custom Render Scale 100% unless GPU-bound."
-            )
+            ),
+            (
+                "OW2 saved cap: refresh - 3 (297 at 300 Hz) is a fallback ceiling. "
+                "Reflex may pace runtime FPS below it; a lower reading alone is not saved-cap drift. "
+                "This does not promise 297 FPS or a fixed 276 FPS Reflex target."
+            ),
         ]
 
     def _base_overrides(self) -> dict[str, dict[str, Any]]:
@@ -387,7 +446,7 @@ class Overwatch2Profile(_Overwatch2BaseProfile):
             },
             {
                 "category": "Display",
-                "setting": "NVIDIA Reflex Low Latency",
+                "setting": "NVIDIA Reflex",
                 "value": "Enabled + Boost — set the in-game toggle manually",
                 "reason": (
                     "Reflex reduces render-queue latency, especially when GPU-bound. "
@@ -417,12 +476,7 @@ class Overwatch2Profile(_Overwatch2BaseProfile):
                 "reason": "Avoid frametime variance from dynamic scaling.",
             },
             self._custom_render_scale_guidance(),
-            {
-                "category": "Graphics",
-                "setting": "Shadows / Effects",
-                "value": "Low",
-                "reason": "Improves frame-time consistency in team fights.",
-            },
+            *self._graphics_detail_guidance(),
         ]
 
     def get_post_apply_notes(self) -> list[str]:
@@ -636,16 +690,11 @@ class Overwatch2GSyncProfile(_Overwatch2BaseProfile):
             },
             {
                 "category": "Display",
-                "setting": "NVIDIA Reflex Low Latency",
+                "setting": "NVIDIA Reflex",
                 "value": "Enabled + Boost — set the in-game toggle manually",
                 "reason": "Enable native Reflex for queue control; the profile requests driver LLM Off. With G-SYNC and VSync active, Reflex may pace below the static cap. ABSO cannot safely write the Reflex toggle; verify it in-game. Boost can cost power or FPS, so compare Enabled alone if needed.",
             },
-            {
-                "category": "Display",
-                "setting": "Frame Rate Cap",
-                "value": "Auto static ceiling: refresh - 3 (297 at 300 Hz)",
-                "reason": "The native and driver ceilings use refresh - 3. Reflex may lower runtime FPS dynamically; an observed value such as 276 is not a replacement for the saved 297 ceiling at 300 Hz. Compare frame-time and latency measurements before overriding this policy.",
-            },
+            self._ow2_gsync_cap_guidance(),
             {
                 "category": "Display",
                 "setting": "Reduce Buffering",
@@ -659,12 +708,7 @@ class Overwatch2GSyncProfile(_Overwatch2BaseProfile):
                 "reason": "Avoid large frame pacing oscillations.",
             },
             self._custom_render_scale_guidance(),
-            {
-                "category": "Graphics",
-                "setting": "Shadows / Effects",
-                "value": "Low",
-                "reason": "Reduces frame-time spikes during heavy ability usage.",
-            },
+            *self._graphics_detail_guidance(),
         ]
 
     def get_post_apply_notes(self) -> list[str]:
@@ -804,16 +848,11 @@ class Overwatch2GSyncHDRProfile(_Overwatch2BaseProfile):
             },
             {
                 "category": "Display",
-                "setting": "NVIDIA Reflex Low Latency",
+                "setting": "NVIDIA Reflex",
                 "value": "Enabled + Boost — set the in-game toggle manually",
                 "reason": "Enable native Reflex for queue control; the profile requests driver LLM Off. With G-SYNC and VSync active, Reflex may pace below the static cap. ABSO cannot safely write the Reflex toggle; verify it in-game. Boost can cost power or FPS, so compare Enabled alone if needed.",
             },
-            {
-                "category": "Display",
-                "setting": "Frame Rate Cap",
-                "value": "Auto static ceiling: refresh - 3 (297 at 300 Hz)",
-                "reason": "The native and driver ceilings use refresh - 3. Reflex may lower runtime FPS dynamically; an observed value such as 276 is not a replacement for the saved 297 ceiling at 300 Hz. Compare frame-time and latency measurements before overriding this policy.",
-            },
+            self._ow2_gsync_cap_guidance(),
             {
                 "category": "Display",
                 "setting": "Reduce Buffering",
@@ -851,12 +890,7 @@ class Overwatch2GSyncHDRProfile(_Overwatch2BaseProfile):
                 "reason": "Avoid large frame pacing oscillations.",
             },
             self._custom_render_scale_guidance(),
-            {
-                "category": "Graphics",
-                "setting": "Shadows / Effects",
-                "value": "Low",
-                "reason": "Reduces frame-time spikes during heavy ability usage.",
-            },
+            *self._graphics_detail_guidance(),
         ]
 
     def get_post_apply_notes(self) -> list[str]:
@@ -966,16 +1000,11 @@ class Overwatch2GSyncCaptureProfile(_Overwatch2BaseProfile):
             },
             {
                 "category": "Display",
-                "setting": "NVIDIA Reflex Low Latency",
+                "setting": "NVIDIA Reflex",
                 "value": "Enabled + Boost — set the in-game toggle manually",
                 "reason": "Enable native Reflex for queue control; the profile requests driver LLM Off. With G-SYNC and VSync active, Reflex may pace below the static cap. ABSO cannot safely write the Reflex toggle; verify it in-game. Boost can cost power or FPS, so compare Enabled alone if needed.",
             },
-            {
-                "category": "Display",
-                "setting": "Frame Rate Cap",
-                "value": "Auto static ceiling: refresh - 3 (297 at 300 Hz)",
-                "reason": "The native and driver ceilings use refresh - 3. Reflex may lower runtime FPS dynamically; an observed value such as 276 is not a replacement for the saved 297 ceiling at 300 Hz. Compare frame-time and latency measurements before overriding this policy.",
-            },
+            self._ow2_gsync_cap_guidance(),
             {
                 "category": "Display",
                 "setting": "Reduce Buffering",
@@ -989,12 +1018,7 @@ class Overwatch2GSyncCaptureProfile(_Overwatch2BaseProfile):
                 "reason": "Avoid frame pacing swings while recording/clipping.",
             },
             self._custom_render_scale_guidance(),
-            {
-                "category": "Graphics",
-                "setting": "Shadows / Effects",
-                "value": "Low",
-                "reason": "Reduces frame-time spikes during heavy team fights and capture load.",
-            },
+            *self._graphics_detail_guidance(),
         ]
 
     def get_post_apply_notes(self) -> list[str]:
@@ -1118,16 +1142,11 @@ class Overwatch2GSyncHDRCaptureProfile(_Overwatch2BaseProfile):
             },
             {
                 "category": "Display",
-                "setting": "NVIDIA Reflex Low Latency",
+                "setting": "NVIDIA Reflex",
                 "value": "Enabled + Boost — set the in-game toggle manually",
                 "reason": "Enable native Reflex for queue control; the profile requests driver LLM Off. With G-SYNC and VSync active, Reflex may pace below the static cap. ABSO cannot safely write the Reflex toggle; verify it in-game. Boost can cost power or FPS, so compare Enabled alone if needed.",
             },
-            {
-                "category": "Display",
-                "setting": "Frame Rate Cap",
-                "value": "Auto static ceiling: refresh - 3 (297 at 300 Hz)",
-                "reason": "The native and driver ceilings use refresh - 3. Reflex may lower runtime FPS dynamically; an observed value such as 276 is not a replacement for the saved 297 ceiling at 300 Hz. Compare frame-time and latency measurements before overriding this policy.",
-            },
+            self._ow2_gsync_cap_guidance(),
             {
                 "category": "Display",
                 "setting": "Reduce Buffering",
@@ -1159,12 +1178,7 @@ class Overwatch2GSyncHDRCaptureProfile(_Overwatch2BaseProfile):
                 "reason": "Avoid frame pacing swings while recording/clipping.",
             },
             self._custom_render_scale_guidance(),
-            {
-                "category": "Graphics",
-                "setting": "Shadows / Effects",
-                "value": "Low",
-                "reason": "Reduces frame-time spikes during heavy team fights and capture load.",
-            },
+            *self._graphics_detail_guidance(),
         ]
 
     def get_post_apply_notes(self) -> list[str]:

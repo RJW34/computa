@@ -11,17 +11,20 @@ import {
   Timer,
   Zap,
   AlertTriangle,
+  RefreshCw,
 } from 'lucide-react';
 import { ActionCard } from '@/components/cards/ActionCard';
 import { GameMark, gameArtVars, getGameArt } from '@/components/GameMark';
 import { HardwareSummary } from '@/components/HardwareSummary';
 import { Header } from '@/components/Header';
+import { ManualSetupList } from '@/components/ManualSetupList';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useAppStore } from '@/stores/appStore';
-import { buildProfileUiState } from '@/lib/profileState';
+import { buildProfileUiState, canAcceptProfileReadback } from '@/lib/profileState';
 import { cn, formatRelativeTime } from '@/lib/utils';
 import type { Profile } from '@/lib/types';
+import * as api from '@/lib/api';
 
 const PROFILE_CATEGORY_ORDER: Record<string, number> = {
   Desktop: 0,
@@ -95,9 +98,37 @@ export function Home() {
     loadProfiles,
     setWizardProfile,
     isAdmin,
+    setActiveProfile,
+    setActiveProfileStateError,
   } = useAppStore();
 
   const initialLoadDone = React.useRef(false);
+  const verificationInFlight = React.useRef(false);
+  const [checkingProfile, setCheckingProfile] = React.useState(false);
+
+  const verifyCurrentProfile = async () => {
+    if (verificationInFlight.current) return;
+    const startingState = useAppStore.getState();
+    if (!startingState.activeProfileStateKnown) return;
+    verificationInFlight.current = true;
+    setCheckingProfile(true);
+    const stillCurrent = () => canAcceptProfileReadback(startingState, useAppStore.getState());
+    try {
+      const state = await api.getCurrentState();
+      if (!stillCurrent()) return;
+      setActiveProfile(
+        state.current_profile, state.applied_at ?? undefined, state.verification ?? null,
+        state.reboot_pending, state.reboot_reasons
+      );
+    } catch (error) {
+      if (stillCurrent()) {
+        setActiveProfileStateError(error instanceof Error ? error.message : 'Profile verification failed');
+      }
+    } finally {
+      verificationInFlight.current = false;
+      setCheckingProfile(false);
+    }
+  };
 
   React.useEffect(() => {
     if (initialLoadDone.current) return;
@@ -368,11 +399,23 @@ export function Home() {
                 </p>
               </div>
             </div>
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Zap className="h-4 w-4 text-primary" />
-              {profiles.length} profile variants loaded
+            <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+              <span className="flex items-center gap-2">
+                <Zap className="h-4 w-4 text-primary" />
+                {profiles.length} profile variants loaded
+              </span>
+              <Button variant="outline" size="sm" disabled={checkingProfile || !activeProfileStateKnown}
+                onClick={() => void verifyCurrentProfile()}>
+                <RefreshCw className={cn('mr-2 h-4 w-4', checkingProfile && 'animate-spin')} />
+                {checkingProfile ? 'Checking settings…' : 'Verify profile'}
+              </Button>
             </div>
           </div>
+          {profileUiState.kind === 'needs_manual' && (
+            <div className="relative mt-4 border-t border-border pt-4">
+              <ManualSetupList steps={activeProfileVerification?.manual_steps} />
+            </div>
+          )}
         </section>
       </main>
     </div>

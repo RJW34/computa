@@ -1,4 +1,4 @@
-import type { BackendStateVerification } from './types';
+import type { BackendStateVerification, ManualSetupStep } from './types';
 
 export type ProfileUiStateKind =
   | 'loading'
@@ -6,6 +6,7 @@ export type ProfileUiStateKind =
   | 'none'
   | 'active'
   | 'needs_apply'
+  | 'needs_manual'
   | 'needs_restart'
   | 'mismatch'
   | 'error';
@@ -15,6 +16,26 @@ export interface ProfileUiState {
   needsAttention: boolean;
   label: string;
   detail?: string;
+}
+
+interface ProfileReadbackSnapshot {
+  activeProfile: string | null;
+  activeProfileAppliedAt: string | null;
+  activeProfileVerification: BackendStateVerification | null;
+  activeProfileStateKnown: boolean;
+  activeProfileStateError: string | null;
+}
+
+export function canAcceptProfileReadback(
+  starting: ProfileReadbackSnapshot,
+  current: ProfileReadbackSnapshot
+): boolean {
+  // Same-profile verification can change without a new apply timestamp.
+  return starting.activeProfile === current.activeProfile &&
+    starting.activeProfileAppliedAt === current.activeProfileAppliedAt &&
+    starting.activeProfileVerification === current.activeProfileVerification &&
+    starting.activeProfileStateKnown === current.activeProfileStateKnown &&
+    starting.activeProfileStateError === current.activeProfileStateError;
 }
 
 export function formatStatusDetail(value: string): string {
@@ -46,6 +67,8 @@ export function uniqueStrings(values: Array<string | null | undefined>): string[
 export function verificationIsClean(
   verification?: BackendStateVerification | null
 ): boolean {
+  // Managed-setting verification stays separate from manual setup. A manual
+  // reminder must never imply that applying the profile again can repair it.
   return Boolean(
     verification &&
       verification.all_active &&
@@ -55,6 +78,25 @@ export function verificationIsClean(
       verification.mismatched_handlers.length === 0 &&
       !verification.error
   );
+}
+
+export function getPendingManualSteps(
+  steps?: ManualSetupStep[] | null
+): ManualSetupStep[] {
+  return (steps ?? []).filter(
+    (step) => step && typeof step === 'object' && step.satisfied !== true
+  );
+}
+
+export function formatManualStep(step: ManualSetupStep): string {
+  const scalar = (value: unknown): string | undefined =>
+    typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean'
+      ? String(value)
+      : undefined;
+  const label = step.label?.trim() || 'Manual setting';
+  const current = step.current_label?.trim() || scalar(step.current) || 'Not confirmed';
+  const target = step.expected_label?.trim() || scalar(step.expected);
+  return `${label}: ${current}${target ? `; target: ${target}` : '; check manually'}`;
 }
 
 export function getRestartReasons(
@@ -161,6 +203,16 @@ export function buildProfileUiState({
       needsAttention: true,
       label: 'Profile verification unavailable',
       detail: 'A saved profile name does not confirm that its settings are in effect.',
+    };
+  }
+
+  const pendingManual = getPendingManualSteps(verification?.manual_steps);
+  if (pendingManual.length > 0) {
+    return {
+      kind: 'needs_manual',
+      needsAttention: true,
+      label: 'Manual setup needed',
+      detail: pendingManual.map(formatManualStep).join(' · '),
     };
   }
 

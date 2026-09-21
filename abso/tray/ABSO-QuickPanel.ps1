@@ -179,7 +179,8 @@ function Get-QuickPanelCardChipText {
         [string]$Kind,
         [bool]$PendingApply = $false,
         [bool]$WindowsRestart = $false,
-        [bool]$VerificationInProgress = $false
+        [bool]$VerificationInProgress = $false,
+        [bool]$ManualSteps = $false
     )
 
     if ("$Kind" -eq "active") {
@@ -192,6 +193,7 @@ function Get-QuickPanelCardChipText {
         if ($VerificationInProgress) {
             return "CHECK"
         }
+        if ($ManualSteps) { return "MANUAL" }
         return "ACTIVE"
     }
     if ("$Kind" -eq "empty") {
@@ -247,7 +249,8 @@ function Get-QuickPanelCardTooltipText {
         [bool]$Disabled = $false,
         [string]$ActivePendingApplyText = "",
         [string]$ActiveWindowsRestartText = "",
-        [string]$ActiveVerificationText = ""
+        [string]$ActiveVerificationText = "",
+        [string]$ActiveManualStepText = ""
     )
 
     $name = if ($Profile -and -not [string]::IsNullOrWhiteSpace("$($Profile.Name)")) {
@@ -331,6 +334,10 @@ function Get-QuickPanelCardTooltipText {
         [void]$parts.Add("Click to apply this profile.")
     }
 
+    if ("$Kind" -eq "active" -and -not [string]::IsNullOrWhiteSpace($ActiveManualStepText)) {
+        [void]$parts.Add($ActiveManualStepText)
+        [void]$parts.Add("Follow the setting guidance; clicking checks status without changing manual settings.")
+    }
     return ($parts -join "`n")
 }
 
@@ -517,6 +524,7 @@ function Show-QuickPanel {
         [string]$ActivePendingApplyText = "",
         [string]$ActiveWindowsRestartText = "",
         [string]$ActiveVerificationText = "",
+        [string]$ActiveManualStepText = "",
         [string]$EmptyMessage = "No active profile or favorites to show.",
         [string]$EmptyProfileId = "",
         [scriptblock]$OnApply
@@ -883,7 +891,8 @@ function Show-QuickPanel {
             -Kind $entry.Kind `
             -PendingApply $pendingApplyBadge `
             -WindowsRestart $windowsRestartBadge `
-            -VerificationInProgress $verificationBadge
+            -VerificationInProgress $verificationBadge `
+            -ManualSteps ($isActive -and -not [string]::IsNullOrWhiteSpace($ActiveManualStepText))
         if (
             "$($entry.Kind)" -eq "empty" -and
             -not $emptyBadge -and
@@ -900,7 +909,8 @@ function Show-QuickPanel {
             -Disabled $isDisabled `
             -ActivePendingApplyText $ActivePendingApplyText `
             -ActiveWindowsRestartText $ActiveWindowsRestartText `
-            -ActiveVerificationText $ActiveVerificationText
+            -ActiveVerificationText $ActiveVerificationText `
+            -ActiveManualStepText $ActiveManualStepText
 
         $card = New-Object System.Windows.Forms.Panel
         $card.Tag      = $entry.Id
@@ -1113,7 +1123,10 @@ function Show-QuickPanel {
         $card.Controls.Add($nameLabel)
 
         # Sub-text (Cascadia Code mist) - profile descriptor
-        $subText = if ($entry.Profile -and -not [string]::IsNullOrWhiteSpace("$($entry.Profile.Sub)")) {
+        $subText = if ($isActive -and -not [string]::IsNullOrWhiteSpace($ActiveManualStepText)) {
+            $ActiveManualStepText
+        }
+        elseif ($entry.Profile -and -not [string]::IsNullOrWhiteSpace("$($entry.Profile.Sub)")) {
             Format-QuickPanelDisplayCopy -Text "$($entry.Profile.Sub)"
         }
         elseif ($entry.Profile -and -not [string]::IsNullOrWhiteSpace("$($entry.Profile.Cat)")) {
@@ -1195,6 +1208,9 @@ function Show-QuickPanel {
 
     $script:QuickPanelForm    = $form
     $script:QuickPanelVisible = $true
+    # Every rebuild records the status actually displayed, including explicit
+    # reopen while verification is running. Completion can then clear CHECK.
+    $script:QuickPanelVerificationRenderKey = @("$ActiveProfile", "$ActivePendingApplyText", "$ActiveWindowsRestartText", "$ActiveVerificationText", "$ActiveManualStepText") | ConvertTo-Json -Compress
     $script:QuickPanelEmptyState = $emptyPanel
     $form.Show()
 
@@ -1295,11 +1311,12 @@ function Update-QuickPanel {
         [string]$ActivePendingApplyText = "",
         [string]$ActiveWindowsRestartText = "",
         [string]$ActiveVerificationText = "",
+        [string]$ActiveManualStepText = "",
         [string]$EmptyMessage = "No active profile or favorites to show.",
         [string]$EmptyProfileId = "",
         [scriptblock]$OnApply
     )
     if ($script:QuickPanelVisible) {
-        Show-QuickPanel -Favorites $Favorites -Profiles $Profiles -ActiveProfile $ActiveProfile -ActivePendingApplyText $ActivePendingApplyText -ActiveWindowsRestartText $ActiveWindowsRestartText -ActiveVerificationText $ActiveVerificationText -EmptyMessage $EmptyMessage -EmptyProfileId $EmptyProfileId -OnApply $OnApply
+        Show-QuickPanel -Favorites $Favorites -Profiles $Profiles -ActiveProfile $ActiveProfile -ActivePendingApplyText $ActivePendingApplyText -ActiveWindowsRestartText $ActiveWindowsRestartText -ActiveVerificationText $ActiveVerificationText -ActiveManualStepText $ActiveManualStepText -EmptyMessage $EmptyMessage -EmptyProfileId $EmptyProfileId -OnApply $OnApply
     }
 }

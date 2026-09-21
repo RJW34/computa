@@ -305,6 +305,29 @@ class OW2ConfigHandler(SettingsHandler):
         current = self.detect()
         results: dict[str, Any] = {"all_active": True, "settings": {}}
 
+        # Manual confirmation stays visible even before the game has created
+        # its config. A missing/unreadable value means unknown, not satisfied.
+        if expected_reflex is not None:
+            current_reflex = current.get("reflex_mode")
+            expected_label = self.REFLEX_MODE_LABELS.get(
+                expected_reflex, str(expected_reflex)
+            )
+            results["manual_steps"] = [{
+                "key": "reflex_mode",
+                "label": "NVIDIA Reflex (in-game)",
+                "current": current_reflex,
+                "current_label": self.REFLEX_MODE_LABELS.get(current_reflex, "unknown"),
+                "expected": expected_reflex,
+                "expected_label": expected_label,
+                "satisfied": current_reflex == expected_reflex,
+                "instruction": (
+                    "In Overwatch 2, open Options > Video > General > NVIDIA Reflex: "
+                    f"choose {expected_label}. Save/apply if prompted. "
+                    "Restart only if the game asks. "
+                    "ABSO checks the saved choice but does not change this setting."
+                ),
+            }]
+
         if not current.get("config_found"):
             return results
 
@@ -328,23 +351,6 @@ class OW2ConfigHandler(SettingsHandler):
             if not is_active:
                 results["all_active"] = False
 
-        # Reflex is a manual in-game toggle ABSO cannot safely write. Confirm it
-        # as a NON-blocking manual step so a not-yet-set Reflex never flips the
-        # profile's all_active (which would falsely read as "profile broken").
-        if expected_reflex is not None:
-            current_reflex = current.get("reflex_mode")
-            results.setdefault("manual_steps", []).append({
-                "key": "reflex_mode",
-                "label": "NVIDIA Reflex (in-game)",
-                "current": current_reflex,
-                "current_label": self.REFLEX_MODE_LABELS.get(current_reflex, "unknown"),
-                "expected": expected_reflex,
-                "expected_label": self.REFLEX_MODE_LABELS.get(
-                    expected_reflex, str(expected_reflex)
-                ),
-                "satisfied": current_reflex == expected_reflex,
-            })
-
         return results
 
     def _pop_expected_reflex_mode(
@@ -367,7 +373,7 @@ class OW2ConfigHandler(SettingsHandler):
             return settings, None
 
     def backup(self) -> dict[str, Any]:
-        """Capture Settings_v0.ini; restore preserves current protected choices."""
+        """Capture Settings_v0.ini; restore only owns managed render settings."""
         ini_path = _get_ow2_settings_path()
         if not ini_path:
             return {"config_found": False}
@@ -384,20 +390,20 @@ class OW2ConfigHandler(SettingsHandler):
             return {"config_found": False}
 
     def restore(self, data: dict[str, Any]) -> bool:
-        """Restore Settings_v0.ini from backup while preserving user controls.
+        """Restore managed render values without reverting other live choices.
 
-        Profile-switch baseline restores can use an older full-file backup.
-        Restoring that byte-for-byte would also restore stale keybinds,
-        sensitivity, crosshair values, and the manual-only Reflex choice.
-        Preserve current protected values. Never reintroduce a stale Reflex
-        value when the current file or key is absent.
+        Baselines can predate manual graphics, controls, audio and calibration
+        changes. For an existing file, restore only MUTABLE_SETTINGS, including
+        removal of owned keys absent in the backup. Whole-file recovery is
+        reserved for a missing live file and never resurrects manual Reflex.
         """
         if not data.get("config_found"):
             return True  # Nothing to restore
 
         file_content = data.get("file_content")
-        if file_content is None:
-            return True
+        if not isinstance(file_content, str):
+            logger.error("Cannot restore OW2 config: missing or invalid file content")
+            return False
 
         ini_path = _get_ow2_settings_path()
         if not ini_path:
@@ -410,23 +416,87 @@ class OW2ConfigHandler(SettingsHandler):
                 return False
 
         try:
-            ini_path.parent.mkdir(parents=True, exist_ok=True)
-            current_content = ""
+            # Validate before creating directories or touching the live file.
+            self._validated_owned_render_values(file_content)
+            current_content: str | None = None
             if ini_path.exists():
                 current_content = ini_path.read_text(encoding="utf-8", errors="replace")
-            file_content = self._merge_protected_values(
-                backup_content=file_content,
-                current_content=current_content,
-            )
-            ini_path.write_text(file_content, encoding="utf-8")
+                restored_content = self._restore_owned_render_values(
+                    file_content, current_content,
+                )
+            else:
+                restored_content = self._merge_protected_values(file_content, "")
+            if restored_content != current_content:
+                ini_path.parent.mkdir(parents=True, exist_ok=True)
+                ini_path.write_text(restored_content, encoding="utf-8")
             return True
-        except OSError as e:
+        except (OSError, ValueError) as e:
             logger.error("Failed to restore OW2 config: %s", e)
             return False
 
     # ------------------------------------------------------------------
     # INI parsing helpers (OW2 quoted format)
     # ------------------------------------------------------------------
+
+    def _validated_owned_render_values(self, content: str) -> dict[str, str]:
+        """Reject an unusable baseline instead of interpreting it as key absence."""
+        lines = content.splitlines()
+        bounds = self._find_render_section(lines)
+        if bounds is None:
+            raise ValueError("OW2 backup has no versioned Render section")
+        owned_keys = set(self.MUTABLE_SETTINGS.values())
+        values: dict[str, str] = {}
+        for line in lines[bounds[0] + 1:bounds[1]]:
+            assignment = re.match(r"^\s*([A-Za-z0-9_]+)\s*=", line)
+            if assignment is None or assignment.group(1) not in owned_keys:
+                continue
+            pair = self._KV_RE.match(line)
+            if pair is None or pair.group(1) in values:
+                raise ValueError("OW2 backup has malformed or duplicate managed values")
+            values[pair.group(1)] = pair.group(2)
+        return values
+
+    def _restore_owned_render_values(self, backup_content: str, current_content: str) -> str:
+        """Merge baseline-owned values into live sections, preserving everything else."""
+        baseline = self._validated_owned_render_values(backup_content)
+        owned_keys = set(self.MUTABLE_SETTINGS.values())
+        lines = current_content.splitlines()
+        bounds = self._find_render_section(lines)
+        if bounds is None:
+            if not baseline:
+                return current_content
+            backup_lines = backup_content.splitlines()
+            backup_bounds = self._find_render_section(backup_lines)
+            assert backup_bounds is not None  # Validated above.
+            if lines and lines[-1]:
+                lines.append("")
+            lines.append(backup_lines[backup_bounds[0]])
+            bounds = len(lines) - 1, len(lines)
+
+        start, end = bounds
+        restored_lines = lines[:start + 1]
+        restored_keys: set[str] = set()
+        for line in lines[start + 1:end]:
+            assignment = re.match(r"^\s*([A-Za-z0-9_]+)\s*=", line)
+            key = assignment.group(1) if assignment else None
+            if key not in owned_keys:
+                restored_lines.append(line)
+            elif key in baseline and key not in restored_keys:
+                pair = self._KV_RE.match(line)
+                restored_lines.append(
+                    line if pair and pair.group(2) == baseline[key]
+                    else f'{key} = "{baseline[key]}"'
+                )
+                restored_keys.add(key)
+        for key, value in baseline.items():
+            if key not in restored_keys:
+                restored_lines.append(f'{key} = "{value}"')
+        restored_lines.extend(lines[end:])
+        trailing_newline = "\n" if current_content.endswith("\n") else ""
+        restored = "\n".join(restored_lines) + trailing_newline
+        if self._validated_owned_render_values(restored) != baseline:
+            raise ValueError("OW2 managed restore did not match its baseline")
+        return restored
 
     def _extract_value(self, line: str, key: str) -> str | None:
         """Extract the unquoted value for *key* from a single INI line.

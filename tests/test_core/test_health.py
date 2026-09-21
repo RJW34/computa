@@ -10,6 +10,8 @@ from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 from abso.core.display_diagnostics import (
     ACTION_AVOID_REDUNDANT_PROFILE_APPLY,
     ACTION_REBOOT_TO_COMMIT_GRAPHICS_SETTINGS,
@@ -443,6 +445,35 @@ def test_build_health_report_warns_on_pending_apply_verify(tmp_path: Path) -> No
     assert profile_check["warnings"] == [
         "active profile has pending apply settings: GraphicsSettingsHandler.mpo_disabled"
     ]
+
+
+@pytest.mark.parametrize("satisfied,current", [(True, "Enabled + Boost"), (False, "Off"), (None, "unknown")])
+def test_health_surfaces_manual_setup_without_profile_drift_or_reboot(tmp_path, satisfied, current):
+    state_file = tmp_path / ".abso_state.json"
+    state_file.write_text(json.dumps({"current_profile": "overwatch2", "reboot_pending": False}))
+    step = {
+        "key": "reflex_mode", "label": "NVIDIA Reflex (in-game)",
+        "current_label": current, "expected_label": "Enabled + Boost", "satisfied": satisfied,
+    }
+    report = _build_health_report_with_mocks(
+        tmp_path, state_file, verify_result={"all_active": True, "manual_steps": [step]},
+    )
+    check = report["checks"]["profile_verify"]
+    data = check["data"]
+    assert data["all_active"] is True
+    assert data["verification_status"] == "active"
+    assert data["reboot_pending"] is False
+    assert data["pending_apply_settings"] == data["pending_reboot_gated_settings"] == []
+    assert data["manual_steps"] == [step]
+    if satisfied is True:
+        assert check["status"] == "ok"
+        assert not check.get("warnings")
+    else:
+        assert check["status"] == "warning"
+        assert "manual setup needed: NVIDIA Reflex" in check["warnings"][0]
+        assert "expected Enabled + Boost" in check["warnings"][0]
+        if satisfied is None:
+            assert "not yet verified" in check["warnings"][0]
 
 
 def test_build_health_report_warns_on_display_stability_risk(tmp_path: Path) -> None:

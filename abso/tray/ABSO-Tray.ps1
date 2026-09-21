@@ -1154,6 +1154,7 @@ function Reset-ActiveProfileVerificationState {
     $script:ActiveProfilePendingApplySettings = @()
     $script:ActiveProfilePendingRebootSettings = @()
     $script:ActiveProfileMismatchedHandlers = @()
+    $script:ActiveProfileManualSteps = @()
     $script:ActiveProfileVerificationCheckedAt = $null
     $script:ActiveProfileStateRebootPending = $false
     $script:ActiveProfileStateRebootReasons = @()
@@ -1178,6 +1179,7 @@ function Set-ActiveProfileVerificationSeedFromApplyData {
 
     Reset-ActiveProfileVerificationState
     if ($null -eq $Data) { return }
+    $script:ActiveProfileManualSteps = @($Data.manual_steps | Where-Object { $null -ne $_ })
 
     $pendingApplyAfter = @()
     if ($Data.PSObject.Properties["pending_apply_settings_after"]) {
@@ -1241,6 +1243,69 @@ function Test-ActiveProfileVerificationInFlight {
     catch {
         return $false
     }
+}
+
+function Get-ActiveProfileManualStepText {
+    if ([string]::IsNullOrWhiteSpace([string]$script:activeProfile)) { return $null }
+    $messages = [System.Collections.Generic.List[string]]::new()
+    $onlyGameSettings = $true
+    foreach ($step in @($script:ActiveProfileManualSteps)) {
+        if ($null -eq $step -or ($step.satisfied -is [bool] -and $step.satisfied)) { continue }
+        $label = if ([string]::IsNullOrWhiteSpace("$($step.label)")) { "$($step.key)" } else { "$($step.label)" }
+        if ([string]::IsNullOrWhiteSpace($label)) { continue }
+        if ("$($step.key)" -ne "reflex_mode") { $onlyGameSettings = $false }
+        $currentValue = if ([string]::IsNullOrWhiteSpace("$($step.current_label)")) { "$($step.current)" } else { "$($step.current_label)" }
+        $current = if ([string]::IsNullOrWhiteSpace($currentValue) -or $currentValue -eq "unknown") {
+            "not confirmed"
+        } else { $currentValue }
+        $expected = if ([string]::IsNullOrWhiteSpace("$($step.expected_label)")) { "$($step.expected)" } else { "$($step.expected_label)" }
+        if ([string]::IsNullOrWhiteSpace($expected)) { $expected = "the recommended setting" }
+        $message = "${label}: $current; expected $expected"
+        if (-not [string]::IsNullOrWhiteSpace("$($step.instruction)")) { $message += ". $($step.instruction)" }
+        if (-not $messages.Contains($message)) { [void]$messages.Add($message) }
+    }
+    if (-not $messages.Count) { return $null }
+    $heading = if ($onlyGameSettings) { "Check in-game settings" } else { "Check manual settings" }
+    return "${heading}: $(@($messages) -join '. ')"
+}
+
+function Test-ActiveProfileVerificationStale {
+    param([int]$MaxAgeSeconds = 30)
+    $checkedAt = [DateTimeOffset]::MinValue
+    if (-not [DateTimeOffset]::TryParse("$script:ActiveProfileVerificationCheckedAt", [ref]$checkedAt)) { return $true }
+    $age = ([DateTimeOffset]::UtcNow - $checkedAt.ToUniversalTime()).TotalSeconds
+    return ($age -ge $MaxAgeSeconds -or $age -lt -$MaxAgeSeconds)
+}
+
+function Request-ActiveProfileVerificationIfStale {
+    # On-demand only: opening a menu must not create an idle polling loop.
+    if ($script:MutatingOperationInProgress -or [string]::IsNullOrWhiteSpace([string]$script:activeProfile)) { return $false }
+    if ($script:ActiveProfileVerifyTimer -or (Test-ActiveProfileVerificationInFlight)) { return $false }
+    if (-not (Test-ActiveProfileVerificationStale)) { return $false }
+    if ($script:ActiveProfileVerifyLastRequestProfile -eq $script:activeProfile -and $script:ActiveProfileVerifyLastRequestedAt) {
+        if (([DateTimeOffset]::UtcNow - $script:ActiveProfileVerifyLastRequestedAt).TotalSeconds -lt 30) { return $false }
+    }
+    $script:ActiveProfileVerifyLastRequestProfile = $script:activeProfile
+    $script:ActiveProfileVerifyLastRequestedAt = [DateTimeOffset]::UtcNow
+    Start-ActiveProfileVerificationTimer -DelayMilliseconds 250
+    return $true
+}
+
+function Update-TrayQuickPanelVerificationState {
+    if (-not $script:QuickPanelVisible) { return }
+    $pending = Get-ActiveProfilePendingApplyText
+    $reboot = Get-ActiveProfileRebootPendingText
+    $checking = Get-ActiveProfileVerificationInProgressText
+    $manual = Get-ActiveProfileManualStepText
+    $key = @("$script:activeProfile", "$pending", "$reboot", "$checking", "$manual") | ConvertTo-Json -Compress
+    if ($key -eq $script:QuickPanelVerificationRenderKey) { return }
+    # Set before rebuilding: Show-QuickPanel pumps messages during disposal.
+    $script:QuickPanelVerificationRenderKey = $key
+    $empty = Get-QuickPanelEmptyStatus
+    Update-QuickPanel -Favorites $script:TrayConfig.favorites -Profiles $script:Profiles `
+        -ActiveProfile $script:activeProfile -ActivePendingApplyText $pending -ActiveWindowsRestartText $reboot `
+        -ActiveVerificationText $checking -ActiveManualStepText $manual `
+        -EmptyMessage $empty.Message -EmptyProfileId $empty.ProfileId -OnApply { param($id) Apply-Profile $id }
 }
 
 function Get-ActiveProfilePendingApplyText {
@@ -1320,6 +1385,18 @@ function Complete-SameActiveProfileSelectionIfHandled {
         [object]$Profile
     )
 
+    $sameActiveNoticeVisual = Get-TrayProfileToastVisualArgs -ProfileId $ProfileId -Profile $Profile
+    $profileTitle = Get-TrayProfileObjectDisplayName -Profile $Profile -Fallback $ProfileId
+    # A game can change its own settings without changing our state-file
+    # timestamp. Never use an old mismatch (or old success) to choose writes.
+    if (Test-ActiveProfileVerificationStale) {
+        Show-Notification @sameActiveNoticeVisual -Title $profileTitle -Message "Verifying current profile before reapply." -Type "Info" -MetaText $ProfileId
+        $script:LastAction = "Verifying: $profileTitle"
+        $script:LastActionTime = Get-Date
+        Refresh-ActiveProfileVerificationState -Silent
+        Update-MenuState
+        return $true
+    }
     $pendingApplyText = Get-ActiveProfilePendingApplyText
     if (
         -not [string]::IsNullOrWhiteSpace($pendingApplyText) -and
@@ -1333,8 +1410,7 @@ function Complete-SameActiveProfileSelectionIfHandled {
     $status = if ($script:ActiveProfileVerificationStatus) { "$($script:ActiveProfileVerificationStatus)" } else { "" }
     $rebootText = Get-ActiveProfileRebootPendingText
     $alreadyVerified = $status -in @("active", "pending_reboot")
-    $sameActiveNoticeVisual = Get-TrayProfileToastVisualArgs -ProfileId $ProfileId -Profile $Profile
-    $profileTitle = Get-TrayProfileObjectDisplayName -Profile $Profile -Fallback $ProfileId
+    $manualStepText = Get-ActiveProfileManualStepText
 
     if ($alreadyVerified -or -not [string]::IsNullOrWhiteSpace($rebootText)) {
         Set-IconState -State "Active"
@@ -1342,6 +1418,10 @@ function Complete-SameActiveProfileSelectionIfHandled {
             Write-TrayLog "Profile '$ProfileId' already verifies active; skipping apply. Windows restart required: $rebootText"
             Show-Notification @sameActiveNoticeVisual -Title $profileTitle -Message "Already active. Windows restart required: $rebootText" -Type "Warning" -MetaText $ProfileId
             $script:LastAction = "Windows restart required: $rebootText"
+        }
+        elseif ($manualStepText) {
+            Show-Notification @sameActiveNoticeVisual -Title $profileTitle -Message "Profile settings active. $manualStepText" -Type "Warning" -MetaText $ProfileId
+            $script:LastAction = $manualStepText
         }
         else {
             Write-TrayLog "Profile '$ProfileId' already verifies active; skipping redundant apply"
@@ -1413,6 +1493,8 @@ function Set-ActiveProfileVerificationUnavailableAction {
         $lastActionText.StartsWith("Verifying:") -or
         $lastActionText.StartsWith("Pending profile fix:") -or
         $lastActionText.StartsWith("Profile mismatch:") -or
+        $lastActionText.StartsWith("Check in-game settings:") -or
+        $lastActionText.StartsWith("Check manual settings:") -or
         $lastActionText.StartsWith("Windows restart required:")
         )
     )
@@ -1502,6 +1584,7 @@ function Apply-ActiveProfileVerificationJson {
     $script:ActiveProfilePendingApplySettings = @($verification.pending_apply_settings)
     $script:ActiveProfilePendingRebootSettings = @($verification.pending_reboot_gated_settings)
     $script:ActiveProfileMismatchedHandlers = @($verification.mismatched_handlers)
+    $script:ActiveProfileManualSteps = @($verification.manual_steps | Where-Object { $null -ne $_ })
     $script:ActiveProfileVerificationCheckedAt = if ($verification.checked_at) { "$($verification.checked_at)" } else { (Get-Date).ToString("o") }
     $script:ActiveProfileStateRebootPending = if ($Json.data.PSObject.Properties["reboot_pending"]) { [bool]$Json.data.reboot_pending } else { $false }
     $script:ActiveProfileStateRebootReasons = if ($Json.data.PSObject.Properties["reboot_reasons"]) { @($Json.data.reboot_reasons) } else { @() }
@@ -1532,12 +1615,18 @@ function Apply-ActiveProfileVerificationJson {
         $script:LastAction = "Windows restart required: $rebootText"
         $script:LastActionTime = Get-Date
     }
+    elseif (Get-ActiveProfileManualStepText) {
+        $script:LastAction = Get-ActiveProfileManualStepText
+        $script:LastActionTime = Get-Date
+    }
     elseif ($script:ActiveProfileVerificationStatus -eq "active") {
         $lastActionText = Normalize-TrayLastActionMessage -Message $script:LastAction
         $lastActionWasVerifierPending = (
             -not [string]::IsNullOrWhiteSpace($lastActionText) -and (
             $lastActionText.StartsWith("Pending profile fix:") -or
             $lastActionText.StartsWith("Profile mismatch:") -or
+            $lastActionText.StartsWith("Check in-game settings:") -or
+            $lastActionText.StartsWith("Check manual settings:") -or
             $lastActionText.StartsWith("Windows restart required:")
             )
         )
@@ -1668,6 +1757,7 @@ function Complete-ActiveProfileVerificationIfReady {
     finally {
         Stop-ActiveProfileVerificationRuntime
         Update-MenuState
+        Update-TrayQuickPanelVerificationState
     }
 }
 
@@ -1740,6 +1830,9 @@ function Get-TrayStateTooltipText {
         }
         if (Get-ActiveProfileVerificationInProgressText) {
             return "computa - Checking profile state: $profileName"
+        }
+        if (Get-ActiveProfileManualStepText) {
+            return "computa - Manual setup: $profileName"
         }
     }
     if ($activeRecord.Id -and $activeRecord.InCatalog) {
@@ -2329,7 +2422,7 @@ function Sync-TrayBackendProfileState {
                 Update-QuickPanel -Favorites $script:TrayConfig.favorites -Profiles $script:Profiles `
                     -ActiveProfile $script:activeProfile -ActivePendingApplyText (Get-ActiveProfilePendingApplyText) `
                     -ActiveWindowsRestartText (Get-ActiveProfileRebootPendingText) `
-                    -ActiveVerificationText (Get-ActiveProfileVerificationInProgressText) `
+                    -ActiveVerificationText (Get-ActiveProfileVerificationInProgressText) -ActiveManualStepText (Get-ActiveProfileManualStepText) `
                     -EmptyMessage $empty.Message -EmptyProfileId $empty.ProfileId -OnApply { param($id) Apply-Profile $id }
             }
         }
@@ -2663,15 +2756,15 @@ $script:FallbackProfiles = [ordered]@{
     }
     "overwatch2"        = @{
         Name     = "Overwatch 2 - No Sync SDR"
-        Sub      = "No Sync SDR | Reflex OFF | VSync OFF | G-SYNC OFF"
+        Sub      = "No Sync SDR | Reflex On+Boost | VSync OFF | G-SYNC OFF"
         Cat      = "Shooters"
-        Desc     = "Latency-focused no-sync SDR profile (Reflex OFF, VSync OFF, VRR OFF)"
+        Desc     = "Latency-focused no-sync SDR profile (Reflex On+Boost, VSync OFF, VRR OFF)"
         Exes     = @("Overwatch.exe")
         SyncMode = "off"
     }
     "overwatch2-hdr"    = @{
         Name     = "Overwatch 2 - No Sync HDR"
-        Sub      = "No Sync HDR | Reflex OFF | VSync OFF | G-SYNC OFF"
+        Sub      = "No Sync HDR | Reflex On+Boost | VSync OFF | G-SYNC OFF"
         Cat      = "Shooters"
         Desc     = "Latency-focused no-sync HDR profile. Native HDR for OLED / Mini-LED displays; same sync/VRR contract as the SDR variant."
         Exes     = @("Overwatch.exe")
@@ -5644,7 +5737,7 @@ function Apply-Profile {
             $quickPanelPendingApplyText = Get-ActiveProfilePendingApplyText
             $quickPanelWindowsRestartText = Get-ActiveProfileRebootPendingText
             $quickPanelVerificationText = Get-ActiveProfileVerificationInProgressText
-            Update-QuickPanel -Favorites $script:TrayConfig.favorites -Profiles $script:Profiles -ActiveProfile $script:activeProfile -ActivePendingApplyText $quickPanelPendingApplyText -ActiveWindowsRestartText $quickPanelWindowsRestartText -ActiveVerificationText $quickPanelVerificationText -EmptyMessage $quickPanelEmpty.Message -EmptyProfileId $quickPanelEmpty.ProfileId -OnApply { param($id) Apply-Profile $id }
+            Update-QuickPanel -Favorites $script:TrayConfig.favorites -Profiles $script:Profiles -ActiveProfile $script:activeProfile -ActivePendingApplyText $quickPanelPendingApplyText -ActiveWindowsRestartText $quickPanelWindowsRestartText -ActiveVerificationText $quickPanelVerificationText -ActiveManualStepText (Get-ActiveProfileManualStepText) -EmptyMessage $quickPanelEmpty.Message -EmptyProfileId $quickPanelEmpty.ProfileId -OnApply { param($id) Apply-Profile $id }
             Start-ActiveProfileVerificationTimer -DelayMilliseconds 500
         }
         else {
@@ -6123,6 +6216,8 @@ function Update-MenuState {
         }
         if ($rebootPendingText) { Add-UniqueTrayMessage -Target $statusParts -Message "Windows restart required: $rebootPendingText" }
         if ($verificationProgressText) { Add-UniqueTrayMessage -Target $statusParts -Message "Checking profile state" }
+        $manualStepText = Get-ActiveProfileManualStepText
+        if ($manualStepText) { Add-UniqueTrayMessage -Target $statusParts -Message $manualStepText }
         $lastActionText = Normalize-TrayLastActionMessage -Message $script:LastAction
         $statusBarLastActionText = $lastActionText
         if (
@@ -7016,6 +7111,14 @@ function Set-TrayActiveStatusItemFromState {
         $script:statusItem.Text = "$($activeRecord.DisplayName)|Active profile not in current profile list"
         $script:statusItem.ForeColor = $script:Colors.AccentAmber
         Set-TrayStatusHeroImage -ProfileId $activeRecord.Id -Profile $null -ActiveBadge
+        return
+    }
+
+    $manualStepText = Get-ActiveProfileManualStepText
+    if ($manualStepText) {
+        $script:statusItem.Text = "$profileDisplayName|$manualStepText"
+        $script:statusItem.ForeColor = $script:Colors.AccentAmber
+        Set-TrayStatusHeroImage -ProfileId $activeRecord.Id -Profile $activeRecord.Profile -ActiveBadge
         return
     }
 
@@ -9563,6 +9666,7 @@ public class HotkeyMessageWindow : NativeWindow {
     # Apply DWM rounded corners and dark mode to the context menu popup
     $menu.Add_Opened({
         [void](Sync-TrayBackendProfileState)
+        [void](Request-ActiveProfileVerificationIfStale)
         Start-TrayMenuPulseTimer
         try {
             Set-TrayDropDownWidthBudget -DropDown $menu
@@ -9971,6 +10075,7 @@ public class HotkeyMessageWindow : NativeWindow {
         if (Get-ActiveProfilePendingApplyText) { return "FIX" }
         if (Get-ActiveProfileRebootPendingText) { return "RESTART" }
         if (Get-ActiveProfileVerificationInProgressText) { return "CHECK" }
+        if (Get-ActiveProfileManualStepText) { return "MANUAL" }
         return ""
     }
 
@@ -10909,7 +11014,7 @@ public class HotkeyMessageWindow : NativeWindow {
             $quickPanelPendingApplyText = Get-ActiveProfilePendingApplyText
             $quickPanelWindowsRestartText = Get-ActiveProfileRebootPendingText
             $quickPanelVerificationText = Get-ActiveProfileVerificationInProgressText
-            Show-QuickPanel -Favorites $script:TrayConfig.favorites -Profiles $script:Profiles -ActiveProfile $script:activeProfile -ActivePendingApplyText $quickPanelPendingApplyText -ActiveWindowsRestartText $quickPanelWindowsRestartText -ActiveVerificationText $quickPanelVerificationText -EmptyMessage $quickPanelEmpty.Message -EmptyProfileId $quickPanelEmpty.ProfileId -OnApply { param($id) Apply-Profile $id }
+            Show-QuickPanel -Favorites $script:TrayConfig.favorites -Profiles $script:Profiles -ActiveProfile $script:activeProfile -ActivePendingApplyText $quickPanelPendingApplyText -ActiveWindowsRestartText $quickPanelWindowsRestartText -ActiveVerificationText $quickPanelVerificationText -ActiveManualStepText (Get-ActiveProfileManualStepText) -EmptyMessage $quickPanelEmpty.Message -EmptyProfileId $quickPanelEmpty.ProfileId -OnApply { param($id) Apply-Profile $id }
             $script:TrayConfig.showQuickPanel = [bool]$script:QuickPanelVisible
             if (-not $script:QuickPanelVisible) {
                 if (-not [string]::IsNullOrWhiteSpace($quickPanelEmpty.ProfileId)) {
@@ -11347,7 +11452,7 @@ public class HotkeyMessageWindow : NativeWindow {
         $startupQuickPanelPendingApplyText = Get-ActiveProfilePendingApplyText
         $startupQuickPanelWindowsRestartText = Get-ActiveProfileRebootPendingText
         $startupQuickPanelVerificationText = Get-ActiveProfileVerificationInProgressText
-        Show-QuickPanel -Favorites $script:TrayConfig.favorites -Profiles $script:Profiles -ActiveProfile $script:activeProfile -ActivePendingApplyText $startupQuickPanelPendingApplyText -ActiveWindowsRestartText $startupQuickPanelWindowsRestartText -ActiveVerificationText $startupQuickPanelVerificationText -EmptyMessage $startupQuickPanelEmpty.Message -EmptyProfileId $startupQuickPanelEmpty.ProfileId -OnApply { param($id) Apply-Profile $id }
+        Show-QuickPanel -Favorites $script:TrayConfig.favorites -Profiles $script:Profiles -ActiveProfile $script:activeProfile -ActivePendingApplyText $startupQuickPanelPendingApplyText -ActiveWindowsRestartText $startupQuickPanelWindowsRestartText -ActiveVerificationText $startupQuickPanelVerificationText -ActiveManualStepText (Get-ActiveProfileManualStepText) -EmptyMessage $startupQuickPanelEmpty.Message -EmptyProfileId $startupQuickPanelEmpty.ProfileId -OnApply { param($id) Apply-Profile $id }
         $script:TrayConfig.showQuickPanel = [bool]$script:QuickPanelVisible
     }
 

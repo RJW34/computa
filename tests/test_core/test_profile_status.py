@@ -4,8 +4,12 @@ from __future__ import annotations
 
 from datetime import datetime
 
+import pytest
+
 from abso.core.profile_status import (
     build_profile_verification_summary,
+    format_manual_step,
+    get_pending_manual_steps,
     summarize_profile_verification,
 )
 
@@ -55,6 +59,31 @@ def test_summarize_profile_verification_passes_through_manual_steps() -> None:
     assert summary["status"] == "active"
     assert summary["all_active"] is True
     assert summary["manual_steps"] == [step]
+
+
+@pytest.mark.parametrize("satisfied", [True, False, None])
+def test_manual_setup_is_separate_from_machine_setting_status(satisfied) -> None:
+    step = {"key": "reflex_mode", "satisfied": satisfied}
+    summary = summarize_profile_verification(
+        "overwatch2", {"all_active": True, "manual_steps": [step]},
+    )
+    assert summary["status"] == "active"
+    assert summary["all_active"] is True
+    assert summary["pending_apply_settings"] == []
+    assert summary["pending_reboot_gated_settings"] == []
+    assert get_pending_manual_steps(summary["manual_steps"]) == ([] if satisfied is True else [step])
+
+
+def test_manual_step_description_explains_unknown_and_preserves_generic_instructions() -> None:
+    step = {
+        "label": "NVIDIA profile binding", "current_label": "unknown",
+        "expected_label": "Overwatch 2", "instruction": "Check the executable in NPI.",
+    }
+    assert format_manual_step(step) == (
+        "NVIDIA profile binding: current not yet verified; expected Overwatch 2. "
+        "Check the executable in NPI."
+    )
+    assert get_pending_manual_steps([None, "invalid", step]) == [step]
 
 
 def test_summarize_profile_verification_reports_pending_reboot() -> None:

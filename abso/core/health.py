@@ -21,7 +21,11 @@ from abso.core.display_diagnostics import (
 from abso.core.display_events import collect_recent_display_events
 from abso.core.display_stability import collect_display_stability_snapshot
 from abso.core.fallback_controller import FallbackController
-from abso.core.profile_status import summarize_profile_verification
+from abso.core.profile_status import (
+    format_manual_step,
+    get_pending_manual_steps,
+    summarize_profile_verification,
+)
 from abso.core.state_reconcile import (
     get_system_boot_time,
     reconcile_reboot_pending_after_verified_boot,
@@ -475,6 +479,9 @@ def _build_profile_verify_warnings(
             "active profile has reboot-gated pending settings: " + ", ".join(pending_reboot)
         )
 
+    for step in get_pending_manual_steps(profile_verify_data.get("manual_steps")):
+        warnings.append("manual setup needed: " + format_manual_step(step))
+
     if not profile_ok and not warnings:
         warnings.append("active profile verification is not fully active")
     return warnings
@@ -568,11 +575,13 @@ def build_health_report(
                 and not reboot_pending
                 and not verification_summary.get("pending_apply_settings")
                 and not verification_summary.get("pending_reboot_gated_settings")
+                and not get_pending_manual_steps(verification_summary.get("manual_steps"))
             )
             profile_verify_data = {
                 "profile": current_profile,
                 "all_active": bool(verification_summary.get("all_active")),
                 "verification_status": verification_summary.get("status"),
+                "manual_steps": list(verification_summary.get("manual_steps") or []),
                 "reboot_pending": reboot_pending,
                 "reboot_reasons": (
                     list(state_data.get("reboot_reasons") or []) if state_data else []

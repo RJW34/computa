@@ -1825,6 +1825,51 @@ class TestSingleLimiterPolicy:
             assert profile.allow_dual_limiter is False, profile_cls.__name__
 
 
+@pytest.mark.parametrize("profile_class", [
+    Overwatch2Profile,
+    Overwatch2NoSyncHDRProfile,
+    Overwatch2GSyncProfile,
+    Overwatch2GSyncHDRProfile,
+    Overwatch2GSyncCaptureProfile,
+    Overwatch2GSyncHDRCaptureProfile,
+])
+def test_ow2_graphics_guidance_distinguishes_manual_choices(profile_class) -> None:
+    """A settings checklist must not turn a manual visual choice into claimed tuning."""
+    profile = profile_class()
+    rows = {row["setting"]: row for row in profile.get_in_game_settings()}
+    assert "Shadows / Effects" not in rows
+    assert rows["Effects Detail"]["value"] == "Low"
+    assert profile.get_settings("OW2ConfigHandler")["effects_quality"] == 1
+    assert "Off or Low" in rows["Shadow Detail"]["value"]
+    assert "visual preference" in rows["Shadow Detail"]["reason"]
+    for setting, target in [("Local Reflections", "Off"), ("Damage FX", "Low")]:
+        assert target in rows[setting]["value"]
+        assert "manually" in rows[setting]["value"]
+    assert "does not write or verify" in rows["Damage FX"]["reason"]
+
+
+@pytest.mark.parametrize("profile_class", [
+    Overwatch2GSyncProfile,
+    Overwatch2GSyncHDRProfile,
+    Overwatch2GSyncCaptureProfile,
+    Overwatch2GSyncHDRCaptureProfile,
+])
+def test_ow2_gsync_cap_guidance_distinguishes_saved_ceiling_from_runtime(profile_class) -> None:
+    profile = profile_class()
+    rows = {row["setting"]: row for row in profile.get_in_game_settings()}
+    cap = rows["Frame Rate Cap"]
+    assert "refresh - 3 (297 at 300 Hz)" in cap["value"]
+    assert "fallback ceilings, not a target FPS" in cap["reason"]
+    assert "runtime FPS may be lower" in cap["reason"]
+    assert "universal Reflex target" in cap["reason"]
+    notes = " ".join(profile.get_post_apply_notes())
+    assert "fallback ceiling" in notes
+    assert "lower reading alone is not saved-cap drift" in notes
+    assert "does not promise 297 FPS or a fixed 276 FPS Reflex target" in notes
+    for handler in ("OW2ConfigHandler", "NvidiaSettingsHandler"):
+        assert profile.get_settings(handler)["vrr_cap_policy"] == "refresh_minus_3"
+
+
 class TestReflexContract:
     """Invariant: Reflex-requiring profiles must be honest about enforcement.
 

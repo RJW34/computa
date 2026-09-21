@@ -7,6 +7,37 @@ from datetime import datetime
 from typing import Any
 
 
+def get_pending_manual_steps(manual_steps: Any) -> list[dict[str, Any]]:
+    """Keep unmet or unverified human actions separate from profile drift."""
+    if not isinstance(manual_steps, (list, tuple)):
+        return []
+    return [
+        dict(step) for step in manual_steps
+        if isinstance(step, dict) and step.get("satisfied") is not True
+    ]
+
+
+def format_manual_step(step: dict[str, Any]) -> str:
+    """Describe saved/read-back evidence without claiming live game activation."""
+    label = str(step.get("label") or step.get("key") or "Manual setup")
+    current = step.get("current_label")
+    if current is None or str(current).lower() == "unknown":
+        current = step.get("current")
+    if current is None:
+        current = "not yet verified"
+    expected = step.get("expected_label")
+    if expected is None:
+        expected = step.get("expected")
+    if expected is None:
+        message = f"{label}: {current}; follow the profile's setup instructions."
+    else:
+        message = f"{label}: current {current}; expected {expected}."
+    instruction = step.get("instruction")
+    if isinstance(instruction, str) and instruction.strip():
+        message += " " + instruction.strip()
+    return message
+
+
 def summarize_profile_verification(
     profile_name: str,
     verify_result: dict[str, Any],

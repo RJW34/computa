@@ -13,9 +13,11 @@ TRAY_SCRIPT = Path(__file__).resolve().parents[1] / "abso/tray/ABSO-Tray.ps1"
 pytestmark = pytest.mark.skipif(sys.platform != "win32", reason="PowerShell 5.1 harness")
 
 
-def _run_functions(tmp_path: Path, names: list[str], body: str) -> dict:
+def _run_functions(
+    tmp_path: Path, names: list[str], body: str, *, module: Path = TRAY_SCRIPT,
+) -> dict:
     selected = ", ".join("'" + name + "'" for name in names)
-    script_path = str(TRAY_SCRIPT).replace("'", "''")
+    script_path = str(module).replace("'", "''")
     startup_path = str(TRAY_SCRIPT.with_name("ABSO-StartupState.ps1")).replace("'", "''")
     harness = tmp_path / "tray-functions.ps1"
     harness.write_text(
@@ -525,3 +527,203 @@ def test_menu_animation_hooks_and_catalog_poll_have_no_waits() -> None:
     assert "WaitForExit" not in catalog_poll
     assert "Start-Sleep" not in catalog_poll
     assert "Invoke-CliCatalogRefresh" not in catalog_poll
+
+
+@pytest.mark.parametrize("satisfied,current_label", [(True, "Enabled + Boost"), (False, "Disabled"), (None, "unknown")])
+def test_manual_settings_verification_lifecycle(
+    tmp_path: Path, satisfied: bool | None, current_label: str,
+) -> None:
+    step = {
+        "key": "reflex_mode", "label": "NVIDIA Reflex (in-game)",
+        "current_label": current_label, "expected_label": "Enabled + Boost", "satisfied": satisfied,
+    }
+    result = _run_functions(
+        tmp_path,
+        ["Reset-ActiveProfileVerificationState", "Apply-ActiveProfileVerificationJson",
+         "Get-ActiveProfileManualStepText", "Set-ActiveProfileVerificationSeedFromApplyData",
+         "Set-ActiveProfileVerificationUnavailableAction"],
+        """
+function Sync-TrayBackendProfileState { return $true }
+function Normalize-TrayLastActionMessage { param($Message) return $Message }
+function Get-TrayProfileDisplayName { param($ProfileId) return 'Overwatch 2' }
+function Set-TrayLastAction { param($Message) $script:LastAction = $Message }
+$script:activeProfile = 'overwatch2-gsync-hdr-capture'
+$script:LastAction = ''
+$step = 'STEP_JSON' | ConvertFrom-Json
+$payload = [pscustomobject]@{ success = $true; data = [pscustomobject]@{
+    reboot_pending = $false; verification = [pscustomobject]@{
+        profile = $script:activeProfile; status = 'active'; manual_steps = @($step)
+        checked_at = (Get-Date).ToString('o')
+    }
+} }
+Apply-ActiveProfileVerificationJson -Json $payload -Silent
+$first = @{ text = Get-ActiveProfileManualStepText; status = $script:ActiveProfileVerificationStatus; action = $script:LastAction }
+$payload.data.verification.manual_steps = @()
+Apply-ActiveProfileVerificationJson -Json $payload -Silent
+$cleared = Get-ActiveProfileManualStepText
+$clearedAction = $script:LastAction
+Set-ActiveProfileVerificationSeedFromApplyData -Data ([pscustomobject]@{ manual_steps = @($step) })
+$seeded = Get-ActiveProfileManualStepText
+$script:LastAction = 'Check in-game settings: Old profile instruction'
+$payload.data.verification.profile = 'slippi-melee-universal-hdr'
+$payload.data.verification.manual_steps = @($step)
+Apply-ActiveProfileVerificationJson -Json $payload -Silent
+$crossProfileCleared = $script:ActiveProfileManualSteps.Count -eq 0 -and $null -eq $script:ActiveProfileVerificationStatus
+@{ first = $first; cleared = $cleared; clearedAction = $clearedAction; seeded = $seeded; crossProfileCleared = $crossProfileCleared; crossProfileAction = $script:LastAction } | ConvertTo-Json -Depth 5 -Compress
+""".replace("STEP_JSON", json.dumps(step)),
+    )
+    assert result["first"]["status"] == "active"
+    if satisfied:
+        assert result["first"]["text"] is None
+        assert result["seeded"] is None
+    else:
+        text = result["first"]["text"]
+        assert ("not confirmed" if satisfied is None else "Disabled") in text
+        assert "expected Enabled + Boost" in text
+        assert result["first"]["action"].startswith("Check in-game settings:")
+        assert result["seeded"] == text
+    assert result["cleared"] is None
+    assert result["clearedAction"] == "Verified active: Overwatch 2"
+    assert result["crossProfileCleared"] is True
+    assert result["crossProfileAction"] == "Verification not current: profile changed"
+
+
+@pytest.mark.parametrize("stale", [False, True])
+def test_manual_only_active_selection_never_requests_apply(tmp_path: Path, stale: bool) -> None:
+    result = _run_functions(
+        tmp_path,
+        ["Complete-SameActiveProfileSelectionIfHandled", "Get-ActiveProfileManualStepText",
+         "Get-ActiveProfilePendingApplyText", "Test-ActiveProfileVerificationStale"],
+        """
+$script:activeProfile = 'overwatch2-gsync-hdr-capture'
+$script:ActiveProfileVerificationStatus = 'active'
+$script:ActiveProfileVerificationCheckedAt = [DateTimeOffset]::UtcNow.AddSeconds(AGE).ToString('o')
+$script:ActiveProfileManualSteps = @([pscustomobject]@{ key = 'reflex_mode'; label = 'NVIDIA Reflex'; current_label = 'Disabled'; expected_label = 'Enabled + Boost'; satisfied = $false })
+function Get-TrayProfileToastVisualArgs { param($ProfileId, $Profile) return @{} }
+function Get-TrayProfileObjectDisplayName { param($Profile, $Fallback) return 'Overwatch 2' }
+function Get-ActiveProfileRebootPendingText { return $null }
+function Apply-PendingProfileFixes { throw 'Manual setting must never trigger writes' }
+function Refresh-ActiveProfileVerificationState { param([switch]$Silent) $script:refreshed = $true }
+function Start-ActiveProfileVerificationTimer { param($DelayMilliseconds) $script:scheduled = $true }
+function Show-Notification { param($Title, $Message, $Type, $MetaText) $script:notice = $Message }
+function Set-IconState { param($State) }
+function Update-MenuState {}
+$handled = Complete-SameActiveProfileSelectionIfHandled -ProfileId $script:activeProfile -Profile @{}
+@{ handled = $handled; notice = $script:notice; refreshed = [bool]$script:refreshed; scheduled = [bool]$script:scheduled } | ConvertTo-Json -Compress
+""".replace("AGE", "-120" if stale else "0"),
+    )
+    assert result["handled"] is True  # Apply-Profile returns before reapply.
+    assert result["refreshed"] is stale
+    if stale:
+        assert "Verifying current profile" in result["notice"]
+    else:
+        assert "Check in-game settings" in result["notice"]
+        assert "Disabled; expected Enabled + Boost" in result["notice"]
+
+
+def test_manual_guidance_distinguishes_game_settings_from_app_setup(tmp_path: Path) -> None:
+    result = _run_functions(
+        tmp_path,
+        ["Get-ActiveProfileManualStepText"],
+        """
+$script:activeProfile = 'ow2'
+$game = [pscustomobject]@{ key = 'reflex_mode'; label = 'Reflex'; current = 'Disabled'; expected = 'Enabled + Boost'; satisfied = $false; instruction = 'Open Options > Video > General > NVIDIA Reflex.' }
+$binding = [pscustomobject]@{ key = 'applications'; label = 'NVIDIA app binding'; current = 'missing'; expected = 'Overwatch.exe'; satisfied = $true }
+$script:ActiveProfileManualSteps = @($game, $binding)
+$gameOnly = Get-ActiveProfileManualStepText
+$binding.satisfied = 'true' # A non-boolean value must not hide a manual step.
+$mixed = Get-ActiveProfileManualStepText
+$game.satisfied = $true
+$appOnly = Get-ActiveProfileManualStepText
+@{ gameOnly = $gameOnly; mixed = $mixed; appOnly = $appOnly } | ConvertTo-Json -Compress
+""",
+    )
+    assert result["gameOnly"].startswith("Check in-game settings:")
+    assert "Open Options > Video > General > NVIDIA Reflex." in result["gameOnly"]
+    assert "Disabled; expected Enabled + Boost" in result["gameOnly"]
+    assert result["mixed"].startswith("Check manual settings:")
+    assert "NVIDIA app binding: missing; expected Overwatch.exe" in result["mixed"]
+    assert result["appOnly"] == "Check manual settings: NVIDIA app binding: missing; expected Overwatch.exe"
+
+
+def test_menu_open_verification_is_stale_only_coalesced_and_throttled(tmp_path: Path) -> None:
+    result = _run_functions(
+        tmp_path,
+        ["Request-ActiveProfileVerificationIfStale", "Test-ActiveProfileVerificationStale"],
+        """
+$script:activeProfile = 'ow2'
+$script:starts = 0
+function Test-ActiveProfileVerificationInFlight { return [bool]$script:inFlight }
+function Start-ActiveProfileVerificationTimer { param($DelayMilliseconds) $script:starts++; $script:ActiveProfileVerifyTimer = $true }
+$script:ActiveProfileVerificationCheckedAt = [DateTimeOffset]::UtcNow.ToString('o')
+$fresh = Request-ActiveProfileVerificationIfStale
+$script:ActiveProfileVerificationCheckedAt = [DateTimeOffset]::UtcNow.AddSeconds(-60).ToString('o')
+$old = Request-ActiveProfileVerificationIfStale
+$coalesced = Request-ActiveProfileVerificationIfStale
+$script:ActiveProfileVerifyTimer = $null
+$cooldown = Request-ActiveProfileVerificationIfStale
+$script:ActiveProfileVerifyLastRequestedAt = [DateTimeOffset]::UtcNow.AddSeconds(-31)
+$script:inFlight = $true
+$running = Request-ActiveProfileVerificationIfStale
+$script:inFlight = $false
+$script:MutatingOperationInProgress = $true
+$mutating = Request-ActiveProfileVerificationIfStale
+$script:MutatingOperationInProgress = $false
+$nextOpen = Request-ActiveProfileVerificationIfStale
+@{ fresh = $fresh; old = $old; coalesced = $coalesced; cooldown = $cooldown; running = $running; mutating = $mutating; nextOpen = $nextOpen; starts = $script:starts } | ConvertTo-Json -Compress
+""",
+    )
+    assert result == {
+        "fresh": False, "old": True, "coalesced": False, "cooldown": False,
+        "running": False, "mutating": False, "nextOpen": True, "starts": 2,
+    }
+
+
+def test_quick_panel_verification_refresh_only_renders_changed_visible_state(tmp_path: Path) -> None:
+    result = _run_functions(
+        tmp_path,
+        ["Update-TrayQuickPanelVerificationState"],
+        """
+$script:activeProfile = 'ow2'; $script:TrayConfig = @{}; $script:updates = 0
+$script:manual = 'Reflex: Disabled; expected Enabled + Boost'
+function Get-ActiveProfilePendingApplyText { return $null }
+function Get-ActiveProfileRebootPendingText { return $null }
+function Get-ActiveProfileVerificationInProgressText { return $null }
+function Get-ActiveProfileManualStepText { return $script:manual }
+function Get-QuickPanelEmptyStatus { return @{ Message = ''; ProfileId = '' } }
+function Update-QuickPanel { param($Favorites, $Profiles, $ActiveProfile, $ActivePendingApplyText, $ActiveWindowsRestartText, $ActiveVerificationText, $ActiveManualStepText, $EmptyMessage, $EmptyProfileId, $OnApply) $script:updates++; $script:lastManual = $ActiveManualStepText }
+function Start-ActiveProfileVerificationProcess { throw 'Rendering must not launch verification' }
+Update-TrayQuickPanelVerificationState
+$hiddenUpdates = $script:updates
+$script:QuickPanelVisible = $true
+Update-TrayQuickPanelVerificationState
+Update-TrayQuickPanelVerificationState
+$unchangedUpdates = $script:updates
+$script:manual = $null
+Update-TrayQuickPanelVerificationState
+# An explicit panel reopen displayed CHECK. The next identical clean result
+# must repaint even though it matches the previous verifier completion.
+$script:QuickPanelVerificationRenderKey = @('ow2', '', '', 'Checking profile state', '') | ConvertTo-Json -Compress
+Update-TrayQuickPanelVerificationState
+@{ hiddenUpdates = $hiddenUpdates; unchangedUpdates = $unchangedUpdates; total = $script:updates; lastManual = $script:lastManual } | ConvertTo-Json -Compress
+""",
+    )
+    assert result == {"hiddenUpdates": 0, "unchangedUpdates": 1, "total": 3, "lastManual": None}
+
+
+def test_quick_panel_manual_guidance_is_distinct_from_automatic_fix(tmp_path: Path) -> None:
+    result = _run_functions(
+        tmp_path,
+        ["Get-QuickPanelCardChipText", "Get-QuickPanelCardTooltipText"],
+        """
+function Format-QuickPanelDisplayCopy { param($Text) return $Text }
+function Format-QuickPanelUserFacingText { param($Text) return $Text }
+$text = Get-QuickPanelCardTooltipText -Kind active -ProfileId ow2 -ActiveManualStepText 'Check in-game settings: Reflex: not confirmed; expected Enabled + Boost'
+@{ chip = Get-QuickPanelCardChipText -Kind active -ManualSteps $true; tooltip = $text } | ConvertTo-Json -Compress
+""",
+        module=TRAY_SCRIPT.with_name("ABSO-QuickPanel.ps1"),
+    )
+    assert result["chip"] == "MANUAL"
+    assert "Check in-game settings: Reflex: not confirmed" in result["tooltip"]
+    assert "without changing manual settings" in result["tooltip"]
+    assert "Click applies pending profile fixes" not in result["tooltip"]

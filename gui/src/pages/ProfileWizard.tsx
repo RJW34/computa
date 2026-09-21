@@ -1,5 +1,6 @@
 import * as React from 'react';
 import { Header } from '@/components/Header';
+import { ManualSetupList } from '@/components/ManualSetupList';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
@@ -19,6 +20,7 @@ import { useAppStore } from '@/stores/appStore';
 import { cn } from '@/lib/utils';
 import {
   getRestartReasons,
+  getPendingManualSteps,
   verificationIsClean,
 } from '@/lib/profileState';
 import type { ApplyResult, BackendState, Profile } from '@/lib/types';
@@ -267,6 +269,8 @@ export function ProfileWizard() {
     ? getRestartReasons(postApplyState.verification, postApplyState.reboot_reasons)
     : getRestartReasons(null, applyResult?.reboot_reasons ?? []);
   const postApplyVerificationClean = verificationIsClean(postApplyState?.verification);
+  const postApplyManualSteps = postApplyState?.verification?.manual_steps ?? applyResult?.manual_steps;
+  const postApplyNeedsManualSetup = getPendingManualSteps(postApplyManualSteps).length > 0;
   const postApplyNeedsRestart = postApplyState
     ? !postApplyVerificationClean &&
       (postApplyState.reboot_pending || postApplyRestartReasons.length > 0)
@@ -755,10 +759,10 @@ export function ProfileWizard() {
               <div
                 className={cn(
                   'rounded-full p-4',
-                  committedWithWarnings ? 'bg-warning/10' : 'bg-success/10'
+                  committedWithWarnings || postApplyNeedsManualSetup ? 'bg-warning/10' : 'bg-success/10'
                 )}
               >
-                {committedWithWarnings ? (
+                {committedWithWarnings || postApplyNeedsManualSetup ? (
                   <AlertCircle className="h-12 w-12 text-warning" />
                 ) : (
                   <Check className="h-12 w-12 text-success" />
@@ -778,7 +782,16 @@ export function ProfileWizard() {
             </h2>
             <p className="text-muted-foreground">
               {applyCompletionMessage}
+              {postApplyNeedsManualSetup && ' Manual setup still needs attention below.'}
             </p>
+
+            {postApplyNeedsManualSetup && (
+              <Card className="wizard-panel border-warning/40 bg-warning/5 text-left shadow-none" style={gameArtVars(selectedArt)}>
+                <CardContent className="p-4">
+                  <ManualSetupList steps={postApplyManualSteps} />
+                </CardContent>
+              </Card>
+            )}
 
             <Card className="wizard-panel text-left shadow-none" style={gameArtVars(selectedArt)}>
               <CardContent className="p-4 space-y-2">

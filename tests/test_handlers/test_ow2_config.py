@@ -251,8 +251,8 @@ def test_verify_active_expands_auto_vrr_fps_cap(tmp_path: Path) -> None:
     assert verify["settings"]["use_custom_frame_rates"]["active"] is True
 
 
-def test_verify_active_expands_ow2_reflex_gsync_cap_policy(tmp_path: Path) -> None:
-    """OW2 Reflex/G-SYNC profiles verify the concrete 276 FPS 300 Hz target."""
+def test_verify_active_preserves_legacy_ow2_reflex_gsync_cap_policy(tmp_path: Path) -> None:
+    """Legacy explicit policy retains its old cap; shipped OW2 lanes use refresh_minus_3."""
     ini = SAMPLE_INI.replace('FrameRateCap = "60"', 'FrameRateCap = "276"')
     ini = ini.replace('UseCustomFrameRates = "0"\n', "")
     ini = ini.replace('ShowFPSCounter = "0"', 'UseCustomFrameRates = "1"\nShowFPSCounter = "0"')
@@ -360,7 +360,7 @@ MasterVolume = "20"
     assert ok is True
     restored = ini_path.read_text(encoding="utf-8")
     assert 'WindowMode = "0"' in restored  # backup restore still restores render baseline
-    assert 'MasterVolume = "40"' in restored
+    assert 'MasterVolume = "20"' in restored
     assert 'KeyBinds = "current-bindings"' in restored
     assert 'KeyBindsV2 = "current-bindings-v2"' in restored
     assert 'MouseSensitivity = "7.50"' in restored
@@ -457,6 +457,100 @@ def test_restore_does_not_introduce_reflex_absent_from_live_config(
     assert "ReflexMode" not in restored
     expected_controls = "live-controls" if live_file_exists else "backup-controls"
     assert f'KeyBindsV2 = "{expected_controls}"' in restored
+
+
+def test_restore_preserves_all_unmanaged_graphics_calibration_and_sections(tmp_path: Path) -> None:
+    """Switching profiles must not undo settings the user changed in the game."""
+    baseline = (
+        '[Render.13]\nWindowMode = "0"\nFrameRateCap = "60"\n'
+        'ReflexMode = "0"\nLocalReflections = "1"\nSimpleDirectionalShadows = "1"\n'
+        'MaxTonemapLuminance = "200.0"\nMinTonemapLuminance = "0.0"\n'
+        'ObsoleteGameOption = "old"\n[Sound.1]\nMasterVolume = "40"\n'
+    )
+    current = (
+        '[Input.1]\nHighTickInput = "-1"\n\n'
+        '[Render.14]\nWindowMode = "1"\nFrameRateCap = "297"\n'
+        'ReflexMode = "2"\nLocalReflections = "0"\nSimpleDirectionalShadows = "0"\n'
+        'MaxTonemapLuminance = "388.0"\nMinTonemapLuminance = "0.16"\n'
+        '; Preserve this comment and future settings\nNewGameOption = "live"\n'
+        '[Sound.2]\nMasterVolume = "20"\n'
+    )
+    ini_path = tmp_path / "Settings_v0.ini"
+    _write_settings_ini(ini_path, current)
+    with patch("abso.settings.ow2_config._get_ow2_settings_path", return_value=ini_path):
+        assert OW2ConfigHandler().restore({"config_found": True, "file_content": baseline})
+
+    assert ini_path.read_text(encoding="utf-8") == current.replace(
+        'WindowMode = "1"', 'WindowMode = "0"'
+    ).replace('FrameRateCap = "297"', 'FrameRateCap = "60"')
+
+
+def test_restore_removes_owned_keys_absent_from_baseline_only_in_render(tmp_path: Path) -> None:
+    """An introduced owned key is undone without erasing same-named unrelated data."""
+    baseline = '[Render.13]\nWindowMode = "0"\n'
+    current = (
+        '[Render.13]\nWindowMode = "1"\nFrameRateCap = "297"\n'
+        'UseCustomFrameRates = "1"\nLocalReflections = "0"\n'
+        '[Unrelated.1]\nFrameRateCap = "20"\n'
+    )
+    ini_path = tmp_path / "Settings_v0.ini"
+    _write_settings_ini(ini_path, current)
+    with patch("abso.settings.ow2_config._get_ow2_settings_path", return_value=ini_path):
+        assert OW2ConfigHandler().restore({"config_found": True, "file_content": baseline})
+
+    assert ini_path.read_text(encoding="utf-8") == (
+        '[Render.13]\nWindowMode = "0"\nLocalReflections = "0"\n'
+        '[Unrelated.1]\nFrameRateCap = "20"\n'
+    )
+
+
+def test_restore_adds_missing_managed_values_without_importing_manual_baseline(tmp_path: Path) -> None:
+    baseline = (
+        '[Render.13]\nWindowMode = "0"\nFrameRateCap = "60"\n'
+        'ReflexMode = "2"\nLocalReflections = "1"\n'
+    )
+    current = '[Input.1]\nHighTickInput = "-1"\n[Sound.2]\nMasterVolume = "20"\n'
+    ini_path = tmp_path / "Settings_v0.ini"
+    _write_settings_ini(ini_path, current)
+    with patch("abso.settings.ow2_config._get_ow2_settings_path", return_value=ini_path):
+        assert OW2ConfigHandler().restore({"config_found": True, "file_content": baseline})
+
+    restored = ini_path.read_text(encoding="utf-8")
+    assert restored.startswith(current)
+    assert 'WindowMode = "0"' in restored
+    assert 'FrameRateCap = "60"' in restored
+    assert "ReflexMode" not in restored
+    assert "LocalReflections" not in restored
+
+
+@pytest.mark.parametrize("baseline", [
+    None,
+    "",
+    '[Sound.1]\nMasterVolume = "40"\n',
+    '[Render.13]\nFrameRateCap = 60\n',
+    '[Render.13]\nFrameRateCap = "60"\nFrameRateCap = "120"\n',
+])
+def test_restore_rejects_unusable_baseline_before_writing(tmp_path: Path, baseline: str | None) -> None:
+    ini_path = tmp_path / "Settings_v0.ini"
+    _write_settings_ini(ini_path, SAMPLE_INI)
+    with (
+        patch("abso.settings.ow2_config._get_ow2_settings_path", return_value=ini_path),
+        patch.object(Path, "write_text") as write,
+    ):
+        assert OW2ConfigHandler().restore({"config_found": True, "file_content": baseline}) is False
+        write.assert_not_called()
+    assert ini_path.read_text(encoding="utf-8") == SAMPLE_INI
+
+
+def test_restore_does_not_rewrite_unchanged_file(tmp_path: Path) -> None:
+    ini_path = tmp_path / "Settings_v0.ini"
+    _write_settings_ini(ini_path, SAMPLE_INI)
+    with (
+        patch("abso.settings.ow2_config._get_ow2_settings_path", return_value=ini_path),
+        patch.object(Path, "write_text") as write,
+    ):
+        assert OW2ConfigHandler().restore({"config_found": True, "file_content": SAMPLE_INI})
+        write.assert_not_called()
 
 
 def test_apply_idempotent(tmp_path: Path) -> None:
@@ -593,6 +687,9 @@ def test_verify_reflex_manual_step_satisfied(tmp_path: Path) -> None:
     assert steps[0]["satisfied"] is True
     assert steps[0]["current"] == 2
     assert steps[0]["expected_label"] == "Enabled + Boost"
+    assert "Options > Video > General > NVIDIA Reflex" in steps[0]["instruction"]
+    assert "choose Enabled + Boost" in steps[0]["instruction"]
+    assert "does not change" in steps[0]["instruction"]
 
 
 def test_verify_reflex_manual_step_unsatisfied_is_non_blocking(tmp_path: Path) -> None:
@@ -610,6 +707,26 @@ def test_verify_reflex_manual_step_unsatisfied_is_non_blocking(tmp_path: Path) -
     assert verify["all_active"] is True
     assert verify["manual_steps"][0]["satisfied"] is False
     assert verify["manual_steps"][0]["current_label"] == "Off"
+
+
+@pytest.mark.parametrize("config_state", ["missing_file", "missing_key", "unreadable"])
+def test_verify_reflex_unknown_remains_actionable(tmp_path: Path, config_state: str) -> None:
+    ini_path = tmp_path / "Settings_v0.ini"
+    _write_settings_ini(ini_path, SAMPLE_INI)
+    if config_state == "unreadable":
+        ini_path = tmp_path  # Reading a directory fails, without touching real settings.
+    with patch(
+        "abso.settings.ow2_config._get_ow2_settings_path",
+        return_value=None if config_state == "missing_file" else ini_path,
+    ):
+        verify = OW2ConfigHandler().verify_active({"expected_reflex_mode": 2})
+
+    step = verify["manual_steps"][0]
+    assert step["satisfied"] is False
+    assert step["current"] is None
+    assert step["current_label"] == "unknown"
+    assert "choose Enabled + Boost" in step["instruction"]
+    assert verify["all_active"] is True  # Manual guidance remains non-blocking.
 
 
 def test_apply_reports_no_drift_when_write_holds(tmp_path: Path) -> None:

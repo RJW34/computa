@@ -396,11 +396,16 @@ class ProfileApplier:
                 if handler_result.get("success", False):
                     applied.append(handler_name)
                     changed.extend(self._handler_changed_settings(handler_name, handler_result))
-                    if handler_result.get("requires_reboot", False) or handler_result.get(
-                        "requires_restart", False
-                    ):
+                    if handler_result.get("requires_reboot", False):
                         requires_reboot = True
                         reboot_reasons.append(handler_name)
+                    if handler_result.get("requires_restart", False):
+                        # Application restarts (currently OBS) are not Windows
+                        # reboot gates. Existing notices reach CLI/GUI/tray.
+                        restart_note = handler_result.get("message")
+                        if not isinstance(restart_note, str) or not restart_note.strip():
+                            restart_note = "Restart the affected application to load its saved settings."
+                        self._append_unique(result.notices, restart_note)
                 else:
                     failed.append(f"{handler_name}: {handler_result.get('error', 'Unknown error')}")
 

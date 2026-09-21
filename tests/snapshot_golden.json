@@ -3670,7 +3670,7 @@
       {
         "category": "Display",
         "reason": "Reflex reduces render-queue latency, especially when GPU-bound. Boost keeps GPU clocks elevated and may increase power use or reduce FPS; compare Enabled alone on this machine.",
-        "setting": "NVIDIA Reflex Low Latency",
+        "setting": "NVIDIA Reflex",
         "value": "Enabled + Boost \u2014 set the in-game toggle manually"
       },
       {
@@ -3699,9 +3699,27 @@
       },
       {
         "category": "Graphics",
-        "reason": "Improves frame-time consistency in team fights.",
-        "setting": "Shadows / Effects",
+        "reason": "ABSO sets the saved effects detail to Low as a performance starting point.",
+        "setting": "Effects Detail",
         "value": "Low"
+      },
+      {
+        "category": "Graphics",
+        "reason": "Choose the shadow detail you prefer. Low is a visual preference, not a demonstrated performance improvement over Off. ABSO preserves this choice.",
+        "setting": "Shadow Detail",
+        "value": "Off or Low \u2014 choose manually"
+      },
+      {
+        "category": "Graphics",
+        "reason": "Optional performance starting point that removes local reflections. ABSO preserves this choice; saved-setting verification does not check it.",
+        "setting": "Local Reflections",
+        "value": "Off \u2014 set manually"
+      },
+      {
+        "category": "Graphics",
+        "reason": "Manual visual starting point; ABSO does not write or verify this option. No FPS improvement is claimed without measurement.",
+        "setting": "Damage FX",
+        "value": "Low \u2014 set manually"
       }
     ],
     "include_legacy_tweaks": false,
@@ -3859,12 +3877,12 @@
       {
         "category": "Display",
         "reason": "Enable native Reflex for queue control; the profile requests driver LLM Off. With G-SYNC and VSync active, Reflex may pace below the static cap. ABSO cannot safely write the Reflex toggle; verify it in-game. Boost can cost power or FPS, so compare Enabled alone if needed.",
-        "setting": "NVIDIA Reflex Low Latency",
+        "setting": "NVIDIA Reflex",
         "value": "Enabled + Boost \u2014 set the in-game toggle manually"
       },
       {
         "category": "Display",
-        "reason": "The native and driver ceilings use refresh - 3. Reflex may lower runtime FPS dynamically; an observed value such as 276 is not a replacement for the saved 297 ceiling at 300 Hz. Compare frame-time and latency measurements before overriding this policy.",
+        "reason": "The saved native and driver caps are fallback ceilings, not a target FPS. With G-SYNC, VSync and Reflex active, runtime FPS may be lower; while it is, the higher saved ceilings do not limit it. A reading such as 276 is not itself saved-cap drift or a universal Reflex target. An added performance benefit from redundant caps has not been established.",
         "setting": "Frame Rate Cap",
         "value": "Auto static ceiling: refresh - 3 (297 at 300 Hz)"
       },
@@ -3888,9 +3906,27 @@
       },
       {
         "category": "Graphics",
-        "reason": "Reduces frame-time spikes during heavy ability usage.",
-        "setting": "Shadows / Effects",
+        "reason": "ABSO sets the saved effects detail to Low as a performance starting point.",
+        "setting": "Effects Detail",
         "value": "Low"
+      },
+      {
+        "category": "Graphics",
+        "reason": "Choose the shadow detail you prefer. Low is a visual preference, not a demonstrated performance improvement over Off. ABSO preserves this choice.",
+        "setting": "Shadow Detail",
+        "value": "Off or Low \u2014 choose manually"
+      },
+      {
+        "category": "Graphics",
+        "reason": "Optional performance starting point that removes local reflections. ABSO preserves this choice; saved-setting verification does not check it.",
+        "setting": "Local Reflections",
+        "value": "Off \u2014 set manually"
+      },
+      {
+        "category": "Graphics",
+        "reason": "Manual visual starting point; ABSO does not write or verify this option. No FPS improvement is claimed without measurement.",
+        "setting": "Damage FX",
+        "value": "Low \u2014 set manually"
       }
     ],
     "include_legacy_tweaks": false,
@@ -4053,12 +4089,12 @@
       {
         "category": "Display",
         "reason": "Enable native Reflex for queue control; the profile requests driver LLM Off. With G-SYNC and VSync active, Reflex may pace below the static cap. ABSO cannot safely write the Reflex toggle; verify it in-game. Boost can cost power or FPS, so compare Enabled alone if needed.",
-        "setting": "NVIDIA Reflex Low Latency",
+        "setting": "NVIDIA Reflex",
         "value": "Enabled + Boost \u2014 set the in-game toggle manually"
       },
       {
         "category": "Display",
-        "reason": "The native and driver ceilings use refresh - 3. Reflex may lower runtime FPS dynamically; an observed value such as 276 is not a replacement for the saved 297 ceiling at 300 Hz. Compare frame-time and latency measurements before overriding this policy.",
+        "reason": "The saved native and driver caps are fallback ceilings, not a target FPS. With G-SYNC, VSync and Reflex active, runtime FPS may be lower; while it is, the higher saved ceilings do not limit it. A reading such as 276 is not itself saved-cap drift or a universal Reflex target. An added performance benefit from redundant caps has not been established.",
         "setting": "Frame Rate Cap",
         "value": "Auto static ceiling: refresh - 3 (297 at 300 Hz)"
       },
@@ -4082,9 +4118,27 @@
       },
       {
         "category": "Graphics",
-        "reason": "Reduces frame-time spikes during heavy team fights and capture load.",
-        "setting": "Shadows / Effects",
+        "reason": "ABSO sets the saved effects detail to Low as a performance starting point.",
+        "setting": "Effects Detail",
         "value": "Low"
+      },
+      {
+        "category": "Graphics",
+        "reason": "Choose the shadow detail you prefer. Low is a visual preference, not a demonstrated performance improvement over Off. ABSO preserves this choice.",
+        "setting": "Shadow Detail",
+        "value": "Off or Low \u2014 choose manually"
+      },
+      {
+        "category": "Graphics",
+        "reason": "Optional performance starting point that removes local reflections. ABSO preserves this choice; saved-setting verification does not check it.",
+        "setting": "Local Reflections",
+        "value": "Off \u2014 set manually"
+      },
+      {
+        "category": "Graphics",
+        "reason": "Manual visual starting point; ABSO does not write or verify this option. No FPS improvement is claimed without measurement.",
+        "setting": "Damage FX",
+        "value": "Low \u2014 set manually"
       }
     ],
     "include_legacy_tweaks": false,
@@ -4247,12 +4301,12 @@
       {
         "category": "Display",
         "reason": "Enable native Reflex for queue control; the profile requests driver LLM Off. With G-SYNC and VSync active, Reflex may pace below the static cap. ABSO cannot safely write the Reflex toggle; verify it in-game. Boost can cost power or FPS, so compare Enabled alone if needed.",
-        "setting": "NVIDIA Reflex Low Latency",
+        "setting": "NVIDIA Reflex",
         "value": "Enabled + Boost \u2014 set the in-game toggle manually"
       },
       {
         "category": "Display",
-        "reason": "The native and driver ceilings use refresh - 3. Reflex may lower runtime FPS dynamically; an observed value such as 276 is not a replacement for the saved 297 ceiling at 300 Hz. Compare frame-time and latency measurements before overriding this policy.",
+        "reason": "The saved native and driver caps are fallback ceilings, not a target FPS. With G-SYNC, VSync and Reflex active, runtime FPS may be lower; while it is, the higher saved ceilings do not limit it. A reading such as 276 is not itself saved-cap drift or a universal Reflex target. An added performance benefit from redundant caps has not been established.",
         "setting": "Frame Rate Cap",
         "value": "Auto static ceiling: refresh - 3 (297 at 300 Hz)"
       },
@@ -4300,9 +4354,27 @@
       },
       {
         "category": "Graphics",
-        "reason": "Reduces frame-time spikes during heavy ability usage.",
-        "setting": "Shadows / Effects",
+        "reason": "ABSO sets the saved effects detail to Low as a performance starting point.",
+        "setting": "Effects Detail",
         "value": "Low"
+      },
+      {
+        "category": "Graphics",
+        "reason": "Choose the shadow detail you prefer. Low is a visual preference, not a demonstrated performance improvement over Off. ABSO preserves this choice.",
+        "setting": "Shadow Detail",
+        "value": "Off or Low \u2014 choose manually"
+      },
+      {
+        "category": "Graphics",
+        "reason": "Optional performance starting point that removes local reflections. ABSO preserves this choice; saved-setting verification does not check it.",
+        "setting": "Local Reflections",
+        "value": "Off \u2014 set manually"
+      },
+      {
+        "category": "Graphics",
+        "reason": "Manual visual starting point; ABSO does not write or verify this option. No FPS improvement is claimed without measurement.",
+        "setting": "Damage FX",
+        "value": "Low \u2014 set manually"
       }
     ],
     "include_legacy_tweaks": false,
@@ -4467,12 +4539,12 @@
       {
         "category": "Display",
         "reason": "Enable native Reflex for queue control; the profile requests driver LLM Off. With G-SYNC and VSync active, Reflex may pace below the static cap. ABSO cannot safely write the Reflex toggle; verify it in-game. Boost can cost power or FPS, so compare Enabled alone if needed.",
-        "setting": "NVIDIA Reflex Low Latency",
+        "setting": "NVIDIA Reflex",
         "value": "Enabled + Boost \u2014 set the in-game toggle manually"
       },
       {
         "category": "Display",
-        "reason": "The native and driver ceilings use refresh - 3. Reflex may lower runtime FPS dynamically; an observed value such as 276 is not a replacement for the saved 297 ceiling at 300 Hz. Compare frame-time and latency measurements before overriding this policy.",
+        "reason": "The saved native and driver caps are fallback ceilings, not a target FPS. With G-SYNC, VSync and Reflex active, runtime FPS may be lower; while it is, the higher saved ceilings do not limit it. A reading such as 276 is not itself saved-cap drift or a universal Reflex target. An added performance benefit from redundant caps has not been established.",
         "setting": "Frame Rate Cap",
         "value": "Auto static ceiling: refresh - 3 (297 at 300 Hz)"
       },
@@ -4514,9 +4586,27 @@
       },
       {
         "category": "Graphics",
-        "reason": "Reduces frame-time spikes during heavy team fights and capture load.",
-        "setting": "Shadows / Effects",
+        "reason": "ABSO sets the saved effects detail to Low as a performance starting point.",
+        "setting": "Effects Detail",
         "value": "Low"
+      },
+      {
+        "category": "Graphics",
+        "reason": "Choose the shadow detail you prefer. Low is a visual preference, not a demonstrated performance improvement over Off. ABSO preserves this choice.",
+        "setting": "Shadow Detail",
+        "value": "Off or Low \u2014 choose manually"
+      },
+      {
+        "category": "Graphics",
+        "reason": "Optional performance starting point that removes local reflections. ABSO preserves this choice; saved-setting verification does not check it.",
+        "setting": "Local Reflections",
+        "value": "Off \u2014 set manually"
+      },
+      {
+        "category": "Graphics",
+        "reason": "Manual visual starting point; ABSO does not write or verify this option. No FPS improvement is claimed without measurement.",
+        "setting": "Damage FX",
+        "value": "Low \u2014 set manually"
       }
     ],
     "include_legacy_tweaks": false,
@@ -4681,7 +4771,7 @@
       {
         "category": "Display",
         "reason": "Reflex reduces render-queue latency, especially when GPU-bound. Boost keeps GPU clocks elevated and may increase power use or reduce FPS; compare Enabled alone on this machine.",
-        "setting": "NVIDIA Reflex Low Latency",
+        "setting": "NVIDIA Reflex",
         "value": "Enabled + Boost \u2014 set the in-game toggle manually"
       },
       {
@@ -4710,9 +4800,27 @@
       },
       {
         "category": "Graphics",
-        "reason": "Improves frame-time consistency in team fights.",
-        "setting": "Shadows / Effects",
+        "reason": "ABSO sets the saved effects detail to Low as a performance starting point.",
+        "setting": "Effects Detail",
         "value": "Low"
+      },
+      {
+        "category": "Graphics",
+        "reason": "Choose the shadow detail you prefer. Low is a visual preference, not a demonstrated performance improvement over Off. ABSO preserves this choice.",
+        "setting": "Shadow Detail",
+        "value": "Off or Low \u2014 choose manually"
+      },
+      {
+        "category": "Graphics",
+        "reason": "Optional performance starting point that removes local reflections. ABSO preserves this choice; saved-setting verification does not check it.",
+        "setting": "Local Reflections",
+        "value": "Off \u2014 set manually"
+      },
+      {
+        "category": "Graphics",
+        "reason": "Manual visual starting point; ABSO does not write or verify this option. No FPS improvement is claimed without measurement.",
+        "setting": "Damage FX",
+        "value": "Low \u2014 set manually"
       },
       {
         "category": "Display",

@@ -335,6 +335,31 @@ inspect `%TEMP%\abso_tray.log`.
 
 ## Overwatch Reflex and VRR FPS Caps
 
+### Profile is active but manual setup is still needed
+
+An active profile confirms its managed settings. Some choices, including OW2's
+NVIDIA Reflex toggle, must be made inside the game. The tray, desktop app,
+`state --verify`, `verify`, and `health` now show unmet or unconfirmed manual
+steps separately. Missing readback is not confirmation, and applying the same
+profile again cannot complete a manual step.
+
+For OW2, open **Options > Video > General > NVIDIA Reflex** and select the
+profile's indicated value. Apply if prompted, and restart the game only if OW2
+asks. Use **Verify profile** on the desktop app's home page or the tray's
+verification action to check the saved choice. This does not prove live engine
+activation before a required game restart. Opening the tray menu also schedules
+a read-only check when its cached result is over 30 seconds old; it does not
+continuously poll game settings in the background.
+
+OW2 profile restores preserve unowned live settings, including manual Reflex,
+shadows/reflections, audio, controls, and HDR calibration. Only managed render
+keys return to their backed-up values or absence. If the entire live settings
+file is missing, recovery can recreate the old file, excluding stale Reflex.
+
+Application restart notices are distinct from Windows reboot requirements.
+For example, an OBS setting change can require restarting OBS without requiring
+a Windows restart.
+
 ### Saved cap versus Reflex runtime pacing
 
 The built-in Overwatch G-SYNC profiles use the generic `refresh - 3` static
@@ -343,6 +368,13 @@ Driver VSync is the safety backstop; in-game VSync is off, and native Reflex
 On + Boost is the expected in-game setting. Reflex may dynamically pace lower
 (for example, a runtime counter near 276); that observation does not change
 the saved target and is not itself configuration drift.
+
+The saved ceiling is a fallback if automatic below-refresh pacing is inactive.
+When Reflex paces at 276, a higher 297 ceiling is not the limiting setting and
+does not raise FPS to 297. The redundant ceiling has no demonstrated additional
+performance benefit while Reflex is already pacing lower. Do not replace it
+with an observed frame-counter value or treat either number as a guaranteed
+gameplay frame rate.
 
 NVIDIA documents automatic below-refresh pacing with G-SYNC, VSync and Reflex
 in its [latency guide](https://www.nvidia.com/en-gb/geforce/guides/system-latency-optimization-guide/).

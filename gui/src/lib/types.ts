@@ -103,7 +103,7 @@ export interface NvidiaSettings {
   low_latency_mode: 'off' | 'on' | 'ultra';
   power_management: 'optimal' | 'max_performance';
   vsync: boolean;
-  shader_cache: 'limited' | 'unlimited';
+  shader_cache: 'on' | 'off';
   threaded_optimization: boolean;
 }
 
@@ -166,6 +166,18 @@ export interface ComplianceSummary {
   issues: ComplianceIssue[];
 }
 
+export interface ManualSetupStep {
+  handler?: string;
+  key?: string;
+  label?: string;
+  current?: unknown;
+  current_label?: string;
+  expected?: unknown;
+  expected_label?: string;
+  satisfied?: boolean | null;
+  instruction?: string;
+}
+
 export interface BackendStateVerification {
   checked_at: string;
   profile: string;
@@ -174,6 +186,7 @@ export interface BackendStateVerification {
   pending_apply_settings: string[];
   pending_reboot_gated_settings: string[];
   mismatched_handlers: string[];
+  manual_steps?: ManualSetupStep[];
   error?: string;
 }
 
@@ -216,6 +229,7 @@ export interface ApplyResult {
   changed?: boolean;
   changed_settings?: string[];
   verification?: BackendStateVerification;
+  manual_steps?: ManualSetupStep[];
   results: ApplyHandlerResult[];
   transaction?: TransactionSummary;
   compliance?: ComplianceSummary | null;

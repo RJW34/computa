@@ -150,6 +150,33 @@ class TestApplyProfile:
         assert result.success is False
         assert "Unknown profile" in result.error
 
+    @pytest.mark.parametrize("application_restart,windows_reboot", [(True, False), (False, True), (True, True)])
+    def test_application_restart_does_not_create_windows_reboot_gate(
+        self, monkeypatch, application_restart, windows_reboot,
+    ):
+        handler = MagicMock()
+        handler.__class__.__name__ = "OBSSettingsHandler"
+        handler.apply.return_value = {
+            "success": True, "requires_restart": application_restart, "requires_reboot": windows_reboot,
+            "message": "OBS profile updated. Restart OBS to apply changes.",
+        }
+        profile = MagicMock()
+        profile.requires_confirmed_vrr_support = False
+        profile.get_handlers.return_value = [handler]
+        profile.get_settings.return_value = {}
+        profile.has_in_game_settings.return_value = False
+        profile.validate_settings.return_value = []
+        applier = ProfileApplier()
+        applier._profiles["restart-test"] = profile
+        monkeypatch.setitem(ProfileApplier.PROFILES, "restart-test", type(profile))
+
+        result = applier.apply_profile("restart-test")
+
+        assert result.success is True
+        assert result.requires_reboot is windows_reboot
+        assert result.reboot_reasons == (["OBSSettingsHandler"] if windows_reboot else [])
+        assert ("OBS profile updated. Restart OBS to apply changes." in result.notices) is application_restart
+
     def test_apply_profile_success(self):
         """Test successful profile application."""
         mock_handler = MagicMock()

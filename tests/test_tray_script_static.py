@@ -134,6 +134,21 @@ def test_tray_runs_read_only_state_verification_on_explicit_refresh() -> None:
     assert "$proc.WaitForExit(20000)" not in script
 
 
+def test_manual_setup_is_separate_from_pending_fixes_and_refreshes_on_demand() -> None:
+    script = TRAY_SCRIPT.read_text(encoding="utf-8")
+    opened = script.split("$menu.Add_Opened({", 1)[1].split("})", 1)[0]
+    assert "Request-ActiveProfileVerificationIfStale" in opened
+    completion = script.split("function Complete-ActiveProfileVerificationIfReady", 1)[1].split(
+        "function Start-ActiveProfileVerificationTimer", 1,
+    )[0]
+    assert "Update-TrayQuickPanelVerificationState" in completion
+    assert "Start-ActiveProfileVerificationTimer" not in completion
+    assert '$script:ActiveProfileManualSteps = @($verification.manual_steps' in script
+    assert 'return "MANUAL"' in script
+    assert '$script:QuickPanelVerificationRenderKey = @("$ActiveProfile"' in QUICK_PANEL_SCRIPT.read_text(encoding="utf-8")
+    assert "Reflex OFF" not in script
+
+
 def test_tray_defers_startup_profile_verification() -> None:
     """Tray startup must not spawn display/NVIDIA verifier readback automatically."""
     script = TRAY_SCRIPT.read_text(encoding="utf-8")
@@ -3300,11 +3315,11 @@ def test_tray_quick_panel_toggle_tracks_actual_visibility() -> None:
     assert "-ActivePendingApplyText $startupQuickPanelPendingApplyText" in script
     assert "-ActiveWindowsRestartText $startupQuickPanelWindowsRestartText" in script
     assert "-ActiveVerificationText $startupQuickPanelVerificationText" in script
-    assert "Update-QuickPanel -Favorites $script:TrayConfig.favorites -Profiles $script:Profiles -ActiveProfile $script:activeProfile -ActivePendingApplyText $quickPanelPendingApplyText -ActiveWindowsRestartText $quickPanelWindowsRestartText -ActiveVerificationText $quickPanelVerificationText -EmptyMessage $quickPanelEmpty.Message" in script
+    assert "Update-QuickPanel -Favorites $script:TrayConfig.favorites -Profiles $script:Profiles -ActiveProfile $script:activeProfile -ActivePendingApplyText $quickPanelPendingApplyText -ActiveWindowsRestartText $quickPanelWindowsRestartText -ActiveVerificationText $quickPanelVerificationText -ActiveManualStepText (Get-ActiveProfileManualStepText) -EmptyMessage $quickPanelEmpty.Message" in script
     assert "function Update-QuickPanel" in QUICK_PANEL_SCRIPT.read_text(encoding="utf-8")
     assert '[string]$EmptyMessage = "No active profile or favorites to show."' in QUICK_PANEL_SCRIPT.read_text(encoding="utf-8")
     assert '[string]$EmptyProfileId = ""' in QUICK_PANEL_SCRIPT.read_text(encoding="utf-8")
-    assert "Show-QuickPanel -Favorites $Favorites -Profiles $Profiles -ActiveProfile $ActiveProfile -ActivePendingApplyText $ActivePendingApplyText -ActiveWindowsRestartText $ActiveWindowsRestartText -ActiveVerificationText $ActiveVerificationText -EmptyMessage $EmptyMessage -EmptyProfileId $EmptyProfileId -OnApply $OnApply" in QUICK_PANEL_SCRIPT.read_text(encoding="utf-8")
+    assert "Show-QuickPanel -Favorites $Favorites -Profiles $Profiles -ActiveProfile $ActiveProfile -ActivePendingApplyText $ActivePendingApplyText -ActiveWindowsRestartText $ActiveWindowsRestartText -ActiveVerificationText $ActiveVerificationText -ActiveManualStepText $ActiveManualStepText -EmptyMessage $EmptyMessage -EmptyProfileId $EmptyProfileId -OnApply $OnApply" in QUICK_PANEL_SCRIPT.read_text(encoding="utf-8")
     assert "$quickPanelEmptyVisual = Get-TrayProfileToastVisualArgs -ProfileId $quickPanelEmpty.ProfileId -Profile $null" in script
     assert "$quickPanelEmptyTitle = Get-TrayProfileDisplayName -ProfileId $quickPanelEmpty.ProfileId" in script
     assert "Show-Notification @quickPanelEmptyVisual -Title $quickPanelEmptyTitle -Message $quickPanelEmpty.Message -Type \"Info\" -MetaText $quickPanelEmpty.ProfileId" in script

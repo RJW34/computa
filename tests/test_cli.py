@@ -423,6 +423,96 @@ class TestCLIApply:
             },
         ]
 
+    def test_satisfied_manual_binding_has_no_redundant_action(self):
+        assert abso_main._collect_manual_actions([{
+            "key": "nvidia_app_binding", "profile_name": "Overwatch 2", "satisfied": True,
+        }]) == []
+
+    @pytest.mark.parametrize("satisfied", [True, False, None])
+    @pytest.mark.parametrize("command", ["apply", "reapply", "state", "verify"])
+    @pytest.mark.parametrize("json_output", [True, False])
+    def test_manual_setup_survives_verification_and_noop_without_transaction(
+        self, satisfied, command, json_output,
+    ):
+        profile = "overwatch2-gsync-hdr-capture"
+        step = {
+            "key": "reflex_mode", "label": "NVIDIA Reflex (in-game)",
+            "current_label": "Enabled + Boost" if satisfied is True else "unknown" if satisfied is None else "Off",
+            "expected_label": "Enabled + Boost", "satisfied": satisfied,
+        }
+        verification = {
+            "profile": profile, "status": "active", "all_active": True, "handlers": {},
+            "pending_apply_settings": [], "pending_reboot_gated_settings": [], "manual_steps": [step],
+        }
+        state = {"current_profile": profile, "applied_at": None, "reboot_pending": False, "reboot_reasons": []}
+        args = [command]
+        if command in {"apply", "verify"}:
+            args.append(profile)
+        if command == "state":
+            args.append("--verify")
+        if json_output:
+            args.append("--json")
+        with (
+            patch("abso.main.get_current_profile", return_value=profile),
+            patch("abso.main._read_state_snapshot", return_value=state),
+            patch("abso.main._build_state_verification_summary", return_value=verification),
+            patch("abso.main._reconcile_reboot_pending_after_verified_boot", return_value=state),
+            patch("abso.main.ProfileApplier") as applier,
+            patch("abso.main.ProfileTransactionManager") as transaction,
+            patch("abso.main.run_post_apply_display_reset") as display_reset,
+            patch("abso.main.set_current_profile") as set_profile,
+        ):
+            applier.return_value.verify_profile.return_value = verification
+            result = CliRunner().invoke(cli, args)
+        assert result.exit_code == 0, result.output
+        transaction.assert_not_called()
+        display_reset.assert_not_called()
+        set_profile.assert_not_called()
+        if json_output:
+            data = json.loads(result.output)["data"]
+            summary = data["verification"] if command == "state" else data
+            assert summary["manual_steps"] == [step]
+            if command in {"apply", "reapply"}:
+                assert data["changed"] is False
+                assert data["transaction"] is None
+                assert data["reboot_pending"] is False
+        else:
+            output = " ".join(result.output.split())
+            assert ("Manual setup still needed" in output) is (satisfied is not True)
+            if satisfied is not True:
+                assert "NVIDIA Reflex" in output
+                assert "expected Enabled + Boost" in output
+            if satisfied is None:
+                assert "not yet verified" in output
+
+    @pytest.mark.parametrize("satisfied", [False, True, None])
+    def test_targeted_apply_payload_retains_post_repair_manual_evidence(self, satisfied):
+        step = {
+            "key": "nvidia_app_binding", "label": "NVIDIA profile binding",
+            "profile_name": "Overwatch 2", "executables": ["Overwatch.exe"], "satisfied": satisfied,
+        }
+        with patch("abso.main._collect_post_apply_notes", return_value=[]):
+            payload = abso_main._build_pending_apply_as_apply_payload("overwatch2", {
+                "success": True,
+                "verify_before": {"manual_steps": [{**step, "satisfied": not satisfied}]},
+                "verify_after": {"manual_steps": [step]},
+            })
+        assert payload["manual_steps"] == [step]
+        if satisfied is True:
+            assert payload["manual_actions"] == []
+        else:
+            assert payload["manual_actions"][0]["type"] == "open_nvidia_profile_inspector"
+        assert payload["requires_reboot"] is False
+
+    def test_targeted_apply_empty_fresh_readback_does_not_revive_old_manual_steps(self):
+        with patch("abso.main._collect_post_apply_notes", return_value=[]):
+            payload = abso_main._build_pending_apply_as_apply_payload("overwatch2", {
+                "success": True,
+                "verify_before": {"manual_steps": [{"key": "reflex_mode", "satisfied": False}]},
+                "verify_after": {},
+            })
+        assert payload["manual_steps"] == payload["manual_actions"] == []
+
     def test_apply_invalid_profile(self):
         """Test apply with invalid profile name gives error."""
         runner = CliRunner()
