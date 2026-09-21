@@ -34,10 +34,67 @@ NVIDIA reference: [NvApiDriverSettings.h](https://github.com/NVIDIA/nvapi/blob/m
 
 Machine-local raw evidence is in
 `reports/repairs/2026-09-21-ow2-reapply/`, including before-state, hardware
-detection, focused test results, and the scoped operation script. Deployment,
-backup, apply, and verification results will be recorded here after execution.
+detection, driver probes, test results, deployment log, the scoped operation
+script, backup snapshot, apply results, and verification readbacks.
 
-Reflex was read as Off. It remains a manual in-game setting; neither a profile
-apply nor this report establishes that it is enabled. Profile conformance also
-does not establish best possible game performance without frame-time and
-latency measurements on this machine.
+Code commit `153df96` passed 2,871 tests (13 integration tests deselected), Ruff,
+and diff checks. The existing pytest asyncio configuration warning remains.
+`build.py deploy` installed backend SHA256
+`2bf0237771a4e28c3d1f74275dac86cb0a557f5bd0b3a081295050e92b82cfa1`
+(18,393,679 bytes). GUI, tray assets, and configuration were already current;
+tray PID8436 remained running with matching assets. Frozen profile discovery
+and the FSO dry run passed.
+
+The elevated repair captured manual backup `2026-09-21_004340`, cleared the
+global FSO disable with `apply-pending`, then applied the same OW2 profile with
+fallback disabled. The same-profile path skipped baseline restore. It committed
+at `2026-09-21T00:44:18.773649`; no handler failed. Independent verify and state
+readbacks report `all_active: true`, no mismatched handlers, no pending apply,
+and no pending reboot. Raw NVAPI readback confirms Overwatch 2 shader cache
+enabled=1; the global cache-size setting is unchanged.
+
+Windows windowed optimizations/VRR policy, CPU minimum state, mouse sensitivity,
+CPU/I/O process priority, NIC flow control/interrupt moderation, and global FSO
+now match the selected profile. Native and NVIDIA ceilings remain 297 FPS;
+HDR remains enabled on the 300 Hz primary display. No display reset fired;
+the post-apply process sweep stopped no processes.
+
+Health reports 8 OK, 2 warnings, 0 errors. Remaining warnings concern the
+existing mixed 300/59.95 Hz display topology and earlier power/boot events;
+the profile-mismatch warning is gone.
+
+## Authorized in-game settings follow-up
+
+The user launched OW2 and explicitly requested Computer Use to align its
+settings with the profile, with all gameplay testing reserved for the user.
+Through the game's options UI, the agent changed:
+
+- NVIDIA Reflex: Disabled to Enabled + Boost.
+- Shadow Detail: Off to Low, matching the profile's visual guidance. This is
+  not evidence that Low is faster than Off.
+- Local Reflections: On to Off.
+- Damage FX: Default to Low.
+
+Apply was clicked. The game subsequently restarted outside the agent's input
+sequence. Its new window was rediscovered at the home screen; General, Graphics
+Quality, and HDR were rechecked. All four changes persisted and the restart
+notice was gone. OW2 was returned to its home screen without entering a match,
+practice range, or other gameplay.
+
+Confirmed settings include DirectX 11, borderless windowed mode, native 100%
+rendering, dynamic resolution Off, custom 297 FPS ceiling, in-game VSync and
+triple buffering Off, Reduce Buffering On, low detail settings, anti-aliasing
+Off, ambient occlusion and dynamic reflections Off, and HDR On. Existing
+controls, sensitivity, field of view, audio, and HDR calibration were preserved.
+The user confirmed that high precision mouse input was removed in a recent
+patch; no hidden setting was created or changed.
+
+Installed verify and state readbacks after UI work both succeeded. They report
+all active, no pending apply or reboot, and the manual Reflex step satisfied
+with `ReflexMode=2` (Enabled + Boost). Evidence includes `verify-after-ui.json`,
+`state-after-ui.json`, and `Settings_v0-after-ui.ini` in the evidence folder.
+The calibration remains 388.0 maximum / 0.16 minimum tonemap luminance.
+
+Profile conformance does not establish best possible game performance without
+frame-time and latency measurements on this machine. No gameplay benchmark
+was performed.
