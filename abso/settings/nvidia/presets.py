@@ -16,7 +16,8 @@ class NvidiaSettingIDs:
     POWER_MANAGEMENT = "0x1057EB71"       # PREFERRED_PSTATE_ID
     VSYNC = "0x00A879CF"                  # VSYNCMODE_ID
     MAX_FRAME_RATE = "0x10835002"         # FRL_FPS_ID
-    SHADER_CACHE_SIZE = "0x00198FFF"      # PS_SHADERDISKCACHE_ID
+    SHADER_CACHE = "0x00198FFF"           # PS_SHADERDISKCACHE_ID (off/on)
+    SHADER_CACHE_SIZE = "0x00AC8497"      # PS_SHADERDISKCACHE_MAX_SIZE_ID (MiB)
     THREADED_OPTIMIZATION = "0x20C1221E"  # OGL_THREAD_CONTROL_ID
     TRIPLE_BUFFERING = "0x20FDD1F9"       # OGL_TRIPLE_BUFFER_ID
     TEXTURE_FILTERING_QUALITY = "0x1085B0E"  # Unchanged (not in DRS path)
@@ -38,7 +39,8 @@ class NvidiaSettingDecimalIDs:
     POWER_MANAGEMENT = 0x1057EB71         # PREFERRED_PSTATE_ID
     VSYNC = 0x00A879CF                    # VSYNCMODE_ID
     MAX_FRAME_RATE = 0x10835002           # FRL_FPS_ID
-    SHADER_CACHE_SIZE = 0x00198FFF        # PS_SHADERDISKCACHE_ID
+    SHADER_CACHE = 0x00198FFF             # PS_SHADERDISKCACHE_ID (off/on)
+    SHADER_CACHE_SIZE = 0x00AC8497        # PS_SHADERDISKCACHE_MAX_SIZE_ID (MiB)
     THREADED_OPTIMIZATION = 0x20C1221E    # OGL_THREAD_CONTROL_ID
     TRIPLE_BUFFERING = 0x20FDD1F9         # OGL_TRIPLE_BUFFER_ID
     # VRR / G-Sync settings
@@ -77,8 +79,9 @@ class NvidiaSettingValues:
     # Max Frame Rate
     FRAME_RATE_OFF = 0x00000000
 
-    # Shader Cache Size
-    SHADER_CACHE_DEFAULT = 0x00000000
+    # Separate SDK enums: enabled defaults to ON; size is measured in MiB.
+    SHADER_CACHE_ENABLED_DEFAULT = 0x00000001
+    SHADER_CACHE_DEFAULT = 0x00004000
     SHADER_CACHE_UNLIMITED = 0xFFFFFFFF
 
     # Threaded Optimization
@@ -131,7 +134,7 @@ NVIDIA_PRESETS: dict[str, dict[str, Any]] = {
             "power_management": "prefer_max_performance",
             "vsync": "on",  # Safety net for VRR - adds zero latency with proper FPS cap
             "max_frame_rate": "off",  # Use in-game or RTSS limiter instead
-            "shader_cache": "unlimited",
+            "shader_cache": "on",
             "threaded_optimization": "on",
         },
         "notes": {
@@ -146,7 +149,7 @@ NVIDIA_PRESETS: dict[str, dict[str, Any]] = {
             "power_management": "prefer_max_performance",
             "vsync": "on",  # Safety net - never activates with proper FPS cap
             "max_frame_rate": "off",  # Use in-game limiter (lower latency than NVCP/RTSS)
-            "shader_cache": "unlimited",
+            "shader_cache": "on",
             "threaded_optimization": "on",
             "triple_buffering": "off",  # Reduces latency - not needed with G-SYNC
         },
@@ -182,7 +185,7 @@ NVIDIA_PRESETS: dict[str, dict[str, Any]] = {
             # Max Frame Rate is set by the Diablo 4 profile via auto_vrr_fps_cap.
             # That path calls NvidiaSettingsHandler to compute refresh - 3 at apply time.
             "max_frame_rate": "off",
-            "shader_cache": "unlimited",
+            "shader_cache": "on",
             "threaded_optimization": "off",  # OFF - reduces render latency
             "triple_buffering": "off",  # OFF - reduces latency
         },
@@ -223,7 +226,7 @@ NVIDIA_PRESETS: dict[str, dict[str, Any]] = {
             "power_management": "prefer_max_performance",
             "vsync": "off",  # No sync = no sync latency
             "max_frame_rate": "off",  # Uncapped FPS
-            "shader_cache": "unlimited",
+            "shader_cache": "on",
             "threaded_optimization": "on",  # On for no-sync; VRR profiles override to Off
             "triple_buffering": "off",
             "vrr_app_override": "force_off",  # Disable G-Sync for this profile
@@ -259,7 +262,7 @@ NVIDIA_PRESETS: dict[str, dict[str, Any]] = {
             "power_management": "prefer_max_performance",
             "vsync": "off",
             "max_frame_rate": "off",  # Use in-game limiter only if needed
-            "shader_cache": "unlimited",
+            "shader_cache": "on",
             "threaded_optimization": "on",
             "triple_buffering": "off",
             "vrr_app_override": "force_off",  # Enforce no VRR/G-SYNC for deterministic no-sync
@@ -278,7 +281,7 @@ NVIDIA_PRESETS: dict[str, dict[str, Any]] = {
             "power_management": "prefer_max_performance",
             "vsync": "on",  # NVCP safety net for VRR
             "max_frame_rate": "off",  # Set in-game cap to refresh - 3
-            "shader_cache": "unlimited",
+            "shader_cache": "on",
             "threaded_optimization": "on",
             "triple_buffering": "off",
             "vrr_app_override": "allow",  # Enforce VRR/G-SYNC for this game
@@ -298,7 +301,7 @@ NVIDIA_PRESETS: dict[str, dict[str, Any]] = {
             "power_management": "prefer_max_performance",
             "vsync": "on",  # NVCP safety net for VRR
             "max_frame_rate": "off",  # Profiles layer the driver v3 cap via auto_vrr_fps_cap
-            "shader_cache": "unlimited",
+            "shader_cache": "on",
             "threaded_optimization": "on",
             "triple_buffering": "off",
             "vrr_app_override": "allow",
@@ -328,7 +331,7 @@ NVIDIA_PRESETS: dict[str, dict[str, Any]] = {
             "power_management": "prefer_max_performance",
             "vsync": "off",  # Game/Reflex handles sync
             "max_frame_rate": "off",  # Use in-game limiter
-            "shader_cache": "unlimited",
+            "shader_cache": "on",
             "threaded_optimization": "on",
         },
         "notes": {
@@ -355,7 +358,7 @@ NVIDIA_PRESETS: dict[str, dict[str, Any]] = {
             "power_management": "prefer_max_performance",
             "vsync": "off",
             "max_frame_rate": "off",
-            "shader_cache": "unlimited",
+            "shader_cache": "on",
             "threaded_optimization": "on",
             "vrr_app_override": "force_off",  # Disable G-Sync per-app
         },
@@ -372,7 +375,7 @@ NVIDIA_PRESETS: dict[str, dict[str, Any]] = {
             "power_management": "prefer_max_performance",
             "vsync": "off",
             "max_frame_rate": "off",
-            "shader_cache": "unlimited",
+            "shader_cache": "on",
             "threaded_optimization": "on",
         },
         "notes": {
@@ -386,7 +389,7 @@ NVIDIA_PRESETS: dict[str, dict[str, Any]] = {
             "power_management": "prefer_max_performance",
             "vsync": "adaptive",
             "max_frame_rate": "off",
-            "shader_cache": "unlimited",
+            "shader_cache": "on",
             "threaded_optimization": "auto",
         },
     },

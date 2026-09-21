@@ -144,7 +144,7 @@ class Rivals2GSyncProfile(Rivals2BaseProfile):
             },
             "NvidiaSettingsHandler": {
                 # vrr_fighting_game: LLM on, VSync on (safety net), threaded
-                # opt on, max perf power, shader cache unlimited. NOTE: this
+                # opt on, max perf power, shader cache enabled. NOTE: this
                 # preset sets no vrr_app_override, so assert it explicitly below.
                 "preset": "vrr_fighting_game",
                 # Auto-cap on the 60 Hz sim grid: largest multiple of 60 below

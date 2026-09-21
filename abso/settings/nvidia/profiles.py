@@ -7,7 +7,7 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
-from .presets import NVIDIA_PRESETS, NvidiaSettingDecimalIDs
+from .presets import NVIDIA_PRESETS, NvidiaSettingDecimalIDs, NvidiaSettingValues
 
 logger = logging.getLogger(__name__)
 
@@ -152,7 +152,7 @@ def _build_settings_xml(settings: dict[str, Any]) -> str:
 
     if "shader_cache" in settings:
         value = get_setting_value(settings["shader_cache"], "shader_cache")
-        xml_settings.append(_make_setting_xml(NvidiaSettingDecimalIDs.SHADER_CACHE_SIZE, value))
+        xml_settings.append(_make_setting_xml(NvidiaSettingDecimalIDs.SHADER_CACHE, value))
 
     if "threaded_optimization" in settings:
         value = get_setting_value(settings["threaded_optimization"], "threaded")
@@ -215,16 +215,12 @@ def get_setting_value(value: str, setting_type: str) -> int:
             return 0
 
     elif setting_type == "shader_cache":
-        if value.lower() == "off":
-            return 0
-        elif value.lower() in ("unlimited", "max"):
-            return 4294967295  # 0xFFFFFFFF
-        elif value.lower() == "default":
-            return 0
-        try:
-            return int(value)
-        except ValueError:
-            return 0
+        from .nvapi_drs import DRSProfileManager
+
+        _, enabled = DRSProfileManager()._resolve_setting("shader_cache", value)
+        # A NIP value cannot express deleting an override; use the SDK's
+        # enabled default. Native DRS apply deletes it for "default".
+        return NvidiaSettingValues.SHADER_CACHE_ENABLED_DEFAULT if enabled is None else enabled
 
     elif setting_type == "threaded":
         mapping = {"auto": 0, "on": 1, "off": 2}

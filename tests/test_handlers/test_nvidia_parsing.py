@@ -7,6 +7,7 @@ from abso.settings.nvidia.parsing import (
     parse_low_latency_value,
     parse_nip_file,
     parse_power_management_value,
+    parse_shader_cache_enabled_value,
     parse_shader_cache_value,
     parse_threaded_opt_value,
     parse_vsync_value,
@@ -111,9 +112,15 @@ class TestParseFrameRateValue:
 class TestParseShaderCacheValue:
     """Tests for parse_shader_cache_value function."""
 
-    def test_returns_default_for_zero(self):
-        """Test returns 'default' for value 0."""
-        assert parse_shader_cache_value("0") == "default"
+    def test_returns_off_for_zero(self):
+        """A zero cache-size limit disables caching; it is not the default."""
+        assert parse_shader_cache_value("0") == "off"
+
+    def test_enabled_setting_does_not_parse_sizes(self):
+        assert parse_shader_cache_enabled_value("0") == "off"
+        assert parse_shader_cache_enabled_value("1") == "on"
+        assert parse_shader_cache_enabled_value("2") == "unknown"
+        assert parse_shader_cache_enabled_value("4294967295") == "unknown"
 
     def test_returns_unlimited_for_max_uint(self):
         """Test returns 'unlimited' for 0xFFFFFFFF."""
@@ -239,7 +246,8 @@ class TestParseNipFile:
     <ProfileSetting id="0x1057EB71"><SettingValue>1</SettingValue></ProfileSetting>
     <ProfileSetting id="0x00A879CF"><SettingValue>2</SettingValue></ProfileSetting>
     <ProfileSetting id="0x10835002"><SettingValue>144</SettingValue></ProfileSetting>
-    <ProfileSetting id="0x00198FFF"><SettingValue>4294967295</SettingValue></ProfileSetting>
+    <ProfileSetting id="0x00198FFF"><SettingValue>1</SettingValue></ProfileSetting>
+    <ProfileSetting id="0x00AC8497"><SettingValue>4294967295</SettingValue></ProfileSetting>
     <ProfileSetting id="0x20C1221E"><SettingValue>1</SettingValue></ProfileSetting>
   </Profile>
 </Root>'''
@@ -251,7 +259,8 @@ class TestParseNipFile:
         assert result["power_management"] == "prefer_max_performance"
         assert result["vsync"] == "adaptive"
         assert result["max_frame_rate"] == "144"
-        assert result["shader_cache"] == "unlimited"
+        assert result["shader_cache"] == "on"
+        assert result["shader_cache_size"] == "unlimited"
         assert result["threaded_optimization"] == "on"
 
     def test_ignores_unknown_settings(self, tmp_path):

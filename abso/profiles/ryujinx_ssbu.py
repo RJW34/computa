@@ -63,7 +63,7 @@ class RyujinxSSBUProfile(EmulatorLatencyBaseProfile):
                 "vsync_tear_control": "disable",
                 "vrr_app_override": "force_off",  # Fixed 60fps, no VRR benefit
                 "global_vrr_mode": "off",  # Enforce global VRR off for clean no-sync transitions
-                "shader_cache": "unlimited",  # Critical for emulators
+                "shader_cache": "on",  # Preserve the global cache-size limit
                 "threaded_optimization": "on",  # Ryujinx benefits from driver threading
                 "triple_buffering": "off",
             },
@@ -130,12 +130,12 @@ class RyujinxSSBUProfile(EmulatorLatencyBaseProfile):
             },
             {
                 "category": "NVCP",
-                "setting": "Shader Cache Size",
-                "value": "Unlimited",
+                "setting": "Shader Cache",
+                "value": "On",
                 "reason": (
-                    "A larger driver cache can reduce eviction of cached shaders. "
+                    "Keeps driver shader caching enabled; preserves the global cache-size limit. "
                     "It does not prevent first-use compilation or replace the "
-                    "emulator's own shader cache, and it can consume disk space."
+                    "emulator's own shader cache."
                 ),
             },
             {

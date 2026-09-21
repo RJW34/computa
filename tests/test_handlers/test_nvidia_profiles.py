@@ -1,5 +1,6 @@
 """Tests for nvidia profiles module."""
 
+import pytest
 
 from abso.settings.nvidia.presets import NVIDIA_PRESETS
 from abso.settings.nvidia.profiles import (
@@ -91,25 +92,17 @@ class TestGetSettingValue:
         """Test shader_cache 'off' returns 0."""
         assert get_setting_value("off", "shader_cache") == 0
 
-    def test_shader_cache_unlimited(self):
-        """Test shader_cache 'unlimited' returns max uint32."""
-        assert get_setting_value("unlimited", "shader_cache") == 4294967295
-
-    def test_shader_cache_max(self):
-        """Test shader_cache 'max' returns max uint32."""
-        assert get_setting_value("max", "shader_cache") == 4294967295
+    def test_shader_cache_on(self):
+        assert get_setting_value("on", "shader_cache") == 1
 
     def test_shader_cache_default(self):
-        """Test shader_cache 'default' returns 0."""
-        assert get_setting_value("default", "shader_cache") == 0
+        """NIP defaults to the SDK's enabled value, never disabled size zero."""
+        assert get_setting_value("default", "shader_cache") == 1
 
-    def test_shader_cache_number(self):
-        """Test shader_cache number returns integer."""
-        assert get_setting_value("1024", "shader_cache") == 1024
-
-    def test_shader_cache_invalid_returns_zero(self):
-        """Test shader_cache invalid value returns 0."""
-        assert get_setting_value("invalid", "shader_cache") == 0
+    @pytest.mark.parametrize("value", ["unlimited", "max", "1024", "invalid", "2"])
+    def test_shader_cache_size_is_not_an_enabled_enum(self, value):
+        with pytest.raises(ValueError, match="global settings"):
+            get_setting_value(value, "shader_cache")
 
     def test_threaded_auto(self):
         """Test threaded 'auto' returns 0."""
@@ -193,10 +186,11 @@ class TestGenerateCustomProfile:
 
     def test_includes_shader_cache_setting(self):
         """Test includes shader cache setting."""
-        path = generate_custom_profile({"shader_cache": "unlimited"}, "test")
+        path = generate_custom_profile({"shader_cache": "on"}, "test")
         content = path.read_text(encoding="utf-16")
-        assert "1675263" in content  # SHADER_CACHE_SIZE decimal ID (0x00198FFF)
-        assert "<SettingValue>4294967295</SettingValue>" in content
+        assert "1675263" in content  # PS_SHADERDISKCACHE_ID (0x00198FFF)
+        assert "<SettingValue>1</SettingValue>" in content
+        assert "4294967295" not in content
 
     def test_includes_threaded_optimization_setting(self):
         """Test includes threaded optimization setting."""

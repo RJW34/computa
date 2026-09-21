@@ -4913,9 +4913,9 @@
       },
       {
         "category": "Nvidia Control Panel",
-        "reason": "WebGL generates many shaders - larger cache prevents stutter.",
-        "setting": "Shader Cache Size",
-        "value": "Unlimited"
+        "reason": "Allows compiled shaders to be reused; preserves the global cache-size limit.",
+        "setting": "Shader Cache",
+        "value": "On"
       },
       {
         "category": "Nvidia Control Panel",
@@ -5255,7 +5255,7 @@
         "max_frame_rate": "off",
         "power_management": "adaptive",
         "profile_name": "Productivity (SDR)",
-        "shader_cache": "unlimited",
+        "shader_cache": "on",
         "threaded_optimization": "auto",
         "vrr_app_override": "allow",
         "vsync": "adaptive"
@@ -5379,7 +5379,7 @@
         "max_frame_rate": "off",
         "power_management": "adaptive",
         "profile_name": "Productivity (HDR)",
-        "shader_cache": "unlimited",
+        "shader_cache": "on",
         "threaded_optimization": "auto",
         "vrr_app_override": "allow",
         "vsync": "adaptive"
@@ -6512,7 +6512,7 @@
           "Rivals 2 (Streaming)"
         ],
         "profile_name": "Rivals 2",
-        "shader_cache": "unlimited",
+        "shader_cache": "on",
         "threaded_optimization": "on",
         "triple_buffering": "off",
         "vrr_app_override": "force_off",
@@ -6769,7 +6769,7 @@
           "Rivals 2 (Streaming)"
         ],
         "profile_name": "Rivals 2",
-        "shader_cache": "unlimited",
+        "shader_cache": "on",
         "threaded_optimization": "on",
         "triple_buffering": "off",
         "vrr_app_override": "force_off",
@@ -6882,9 +6882,9 @@
       },
       {
         "category": "NVCP",
-        "reason": "A larger driver cache can reduce eviction of cached shaders. It does not prevent first-use compilation or replace the emulator's own shader cache, and it can consume disk space.",
-        "setting": "Shader Cache Size",
-        "value": "Unlimited"
+        "reason": "Keeps driver shader caching enabled; preserves the global cache-size limit. It does not prevent first-use compilation or replace the emulator's own shader cache.",
+        "setting": "Shader Cache",
+        "value": "On"
       },
       {
         "category": "NVCP",
@@ -7078,7 +7078,7 @@
           "SSBU / HewDraw Remix (Streaming)"
         ],
         "profile_name": "SSBU / HewDraw Remix (Ryujinx)",
-        "shader_cache": "unlimited",
+        "shader_cache": "on",
         "threaded_optimization": "on",
         "triple_buffering": "off",
         "vrr_app_override": "force_off",
@@ -7422,7 +7422,7 @@
           "Super Smash Bros. Melee (Slippi Console-Parity)"
         ],
         "profile_name": "Super Smash Bros. Melee (Slippi)",
-        "shader_cache": "unlimited",
+        "shader_cache": "on",
         "threaded_optimization": "off",
         "triple_buffering": "off",
         "vrr_app_override": "force_off",
@@ -7771,7 +7771,7 @@
           "Super Smash Bros. Melee (Slippi Console-Parity)"
         ],
         "profile_name": "Super Smash Bros. Melee (Slippi)",
-        "shader_cache": "unlimited",
+        "shader_cache": "on",
         "threaded_optimization": "off",
         "triple_buffering": "off",
         "vrr_app_override": "force_off",
@@ -7952,7 +7952,7 @@
           "Super Smash Bros. Melee (Slippi Console-Parity)"
         ],
         "profile_name": "Super Smash Bros. Melee (Slippi)",
-        "shader_cache": "unlimited",
+        "shader_cache": "on",
         "threaded_optimization": "off",
         "triple_buffering": "off",
         "vrr_app_override": "force_off",
@@ -8158,7 +8158,7 @@
           "Super Smash Bros. Melee (Slippi Console-Parity)"
         ],
         "profile_name": "Super Smash Bros. Melee (Slippi)",
-        "shader_cache": "unlimited",
+        "shader_cache": "on",
         "threaded_optimization": "off",
         "triple_buffering": "off",
         "vrr_app_override": "force_off",
@@ -8534,7 +8534,7 @@
           "Super Smash Bros. Melee (Slippi Console-Parity)"
         ],
         "profile_name": "Super Smash Bros. Melee (Slippi)",
-        "shader_cache": "unlimited",
+        "shader_cache": "on",
         "threaded_optimization": "off",
         "triple_buffering": "off",
         "vrr_app_override": "force_off",
@@ -8910,7 +8910,7 @@
           "Super Smash Bros. Melee (Slippi Console-Parity)"
         ],
         "profile_name": "Super Smash Bros. Melee (Slippi)",
-        "shader_cache": "unlimited",
+        "shader_cache": "on",
         "threaded_optimization": "off",
         "triple_buffering": "off",
         "vrr_app_override": "force_off",
@@ -9261,7 +9261,7 @@
           "Super Smash Bros. Melee (Slippi Console-Parity)"
         ],
         "profile_name": "Super Smash Bros. Melee (Slippi)",
-        "shader_cache": "unlimited",
+        "shader_cache": "on",
         "threaded_optimization": "off",
         "triple_buffering": "off",
         "vrr_app_override": "force_off",
@@ -9635,7 +9635,7 @@
           "Super Smash Bros. Melee (Slippi Console-Parity)"
         ],
         "profile_name": "Super Smash Bros. Melee (Slippi)",
-        "shader_cache": "unlimited",
+        "shader_cache": "on",
         "threaded_optimization": "off",
         "triple_buffering": "off",
         "vrr_app_override": "force_off",

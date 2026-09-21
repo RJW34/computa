@@ -1207,9 +1207,10 @@ class DRSProfileManager:
     }
 
     SHADER_CACHE_VALUES = {
+        # PS_SHADERDISKCACHE_ID is a boolean, not the separate global cache
+        # size control (PS_SHADERDISKCACHE_MAX_SIZE_ID, 0x00AC8497).
         "off": 0x00000000,
         "on": 0x00000001,
-        "unlimited": 0x00000002,
     }
 
     TRIPLE_BUFFER_VALUES = {
@@ -2124,6 +2125,18 @@ class DRSProfileManager:
         # Handle "default" or None value
         if value is None or (isinstance(value, str) and value.lower() == "default"):
             return setting_id, None
+
+        if canonical_name == "shader_cache":
+            # Never treat the old, invalid enum 2 (or a size in MiB) as
+            # enabled. Changing a game's profile must not silently change
+            # the global disk budget either.
+            shader_value = value.lower() if isinstance(value, str) else value
+            if shader_value not in ("on", "off", "0", "1", "0x0", "0x1", 0, 1):
+                raise ValueError(
+                    "shader_cache accepts on/off/default, not a cache size. "
+                    "Configure Shader Cache Size separately in NVIDIA's global settings; "
+                    "per-game unlimited is not supported."
+                )
 
         # Convert value to numeric
         if isinstance(value, int):

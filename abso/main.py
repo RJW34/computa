@@ -136,6 +136,27 @@ def set_current_profile(
     _write_state_snapshot(state)
 
 
+def _mark_pending_settings_reboot(
+    _profile_name: str,
+    requires_reboot: bool = False,
+    reboot_reasons: list[str] | None = None,
+) -> None:
+    """Record a narrow write's reboot gate without recording a profile apply."""
+    if not requires_reboot:
+        return
+    state = _read_state_snapshot()
+    reasons = list(state.get("reboot_reasons") or [])
+    for reason in reboot_reasons or []:
+        if reason not in reasons:
+            reasons.append(reason)
+    state["reboot_pending"] = True
+    state["reboot_reasons"] = reasons
+    # Keep applied_at as the full-profile apply time. Reboot reconciliation
+    # must instead use this later write time for the new pending setting.
+    state["reboot_required_at"] = datetime.now().isoformat()
+    _write_state_snapshot(state)
+
+
 def clear_reboot_pending() -> None:
     """Clear the reboot-pending flag from state file."""
     if not any(path.exists() for path in _state_file_targets()):
@@ -144,6 +165,7 @@ def clear_reboot_pending() -> None:
         state = _read_state_snapshot()
         state["reboot_pending"] = False
         state["reboot_reasons"] = []
+        state.pop("reboot_required_at", None)
         _write_state_snapshot(state)
     except (json.JSONDecodeError, OSError):
         pass
@@ -231,13 +253,32 @@ def _build_state_verification_summary(profile_name: str) -> dict[str, Any]:
 
 def _apply_pending_profile_settings(profile_name: str, *, dry_run: bool = False) -> dict[str, Any]:
     """Apply narrowly-supported pending verifier fixes without a full profile transaction."""
-    return apply_pending_profile_settings(
+    result = apply_pending_profile_settings(
         profile_name,
         dry_run=dry_run,
         applier=ProfileApplier(),
         is_admin_func=is_admin,
-        set_current_profile_func=set_current_profile,
+        set_current_profile_func=_mark_pending_settings_reboot,
     )
+    state = _read_state_snapshot()
+    verification = result.get("verify_after") or result.get("verify_before") or {}
+    if not isinstance(verification, dict):
+        verification = {}
+    pending_reboot_settings = verification.get("pending_reboot_gated_settings") or []
+    result["reboot_pending"] = bool(
+        state.get("reboot_pending") or result.get("requires_reboot") or pending_reboot_settings
+    )
+    # requires_reboot describes this write; reboot_pending also includes
+    # earlier writes that an FSO-only remediation does not commit or clear.
+    reasons = list(state.get("reboot_reasons") or []) if state.get("reboot_pending") else []
+    for reason in [
+        *(result.get("reboot_reasons") or []),
+        *sorted(_handler_names_from_settings(pending_reboot_settings)),
+    ]:
+        if reason not in reasons:
+            reasons.append(reason)
+    result["reboot_reasons"] = reasons
+    return result
 
 
 def _handler_names_from_settings(settings: list[Any]) -> set[str]:
@@ -462,7 +503,9 @@ def _build_pending_apply_as_apply_payload(
         "fallback_chain": [],
         "backup_id": None,
         "requires_reboot": bool(pending_result.get("requires_reboot")),
-        "reboot_pending": bool(pending_result.get("requires_reboot")),
+        "reboot_pending": bool(
+            pending_result.get("reboot_pending", pending_result.get("requires_reboot"))
+        ),
         "reboot_reasons": list(pending_result.get("reboot_reasons") or []),
         "in_game_settings": False,
         "error": pending_result.get("error"),

@@ -133,7 +133,7 @@ class _ProductivityBaseProfile(BaseProfile):
                 "power_management": "adaptive",
                 "vsync": "adaptive",
                 "max_frame_rate": "off",
-                "shader_cache": "unlimited",
+                "shader_cache": "on",
                 "threaded_optimization": "auto",
                 "vrr_app_override": "allow",
             },

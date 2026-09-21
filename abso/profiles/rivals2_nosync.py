@@ -96,7 +96,7 @@ class Rivals2NoSyncProfile(Rivals2BaseProfile):
                 "vrr_app_override": "force_off",  # OFF for the no-sync path
                 "global_vrr_mode": "off",  # Enforce global VRR off for clean no-sync transitions
                 "max_frame_rate": "off",  # No driver cap - the in-game limiter owns pacing
-                "shader_cache": "unlimited",
+                "shader_cache": "on",
                 # ON: Rivals 2 is CPU-bound UE5/DX11; driver worker threads
                 # measurably help there. SnapNet's sim is server-authoritative,
                 # so client driver threading cannot desync rollback.

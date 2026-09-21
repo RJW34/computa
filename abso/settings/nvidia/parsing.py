@@ -39,7 +39,8 @@ def parse_nip_file(nip_path: Path) -> dict[str, Any]:
             NvidiaSettingIDs.POWER_MANAGEMENT: ("power_management", parse_power_management_value),
             NvidiaSettingIDs.VSYNC: ("vsync", parse_vsync_value),
             NvidiaSettingIDs.MAX_FRAME_RATE: ("max_frame_rate", parse_frame_rate_value),
-            NvidiaSettingIDs.SHADER_CACHE_SIZE: ("shader_cache", parse_shader_cache_value),
+            NvidiaSettingIDs.SHADER_CACHE: ("shader_cache", parse_shader_cache_enabled_value),
+            NvidiaSettingIDs.SHADER_CACHE_SIZE: ("shader_cache_size", parse_shader_cache_value),
             NvidiaSettingIDs.THREADED_OPTIMIZATION: ("threaded_optimization", parse_threaded_opt_value),
         }
 
@@ -126,12 +127,20 @@ def parse_frame_rate_value(value: str) -> str:
     return "unknown"
 
 
+def parse_shader_cache_enabled_value(value: str) -> str:
+    """Parse PS_SHADERDISKCACHE_ID without interpreting invalid enums as sizes."""
+    try:
+        return {0: "off", 1: "on"}.get(int(value, 0), "unknown")
+    except ValueError:
+        return "unknown"
+
+
 def parse_shader_cache_value(value: str) -> str:
-    """Convert shader cache value to human-readable string."""
+    """Convert PS_SHADERDISKCACHE_MAX_SIZE_ID (MiB) to a readable size."""
     try:
         int_val = int(value, 0)
         if int_val == 0:
-            return "default"
+            return "off"
         elif int_val == 0xFFFFFFFF:
             return "unlimited"
         return f"{int_val}MB"

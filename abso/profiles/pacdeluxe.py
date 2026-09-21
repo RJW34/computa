@@ -137,9 +137,9 @@ class PACDeluxeProfile(WebGLBaseProfile):
             },
             {
                 "category": "Nvidia Control Panel",
-                "setting": "Shader Cache Size",
-                "value": "Unlimited",
-                "reason": "WebGL generates many shaders - larger cache prevents stutter.",
+                "setting": "Shader Cache",
+                "value": "On",
+                "reason": "Allows compiled shaders to be reused; preserves the global cache-size limit.",
             },
             {
                 "category": "Nvidia Control Panel",

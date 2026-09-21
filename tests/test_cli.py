@@ -5,6 +5,7 @@ from datetime import datetime
 from pathlib import Path
 from unittest.mock import ANY, MagicMock, patch
 
+import pytest
 from click.testing import CliRunner
 
 import abso.main as abso_main
@@ -1579,6 +1580,13 @@ class TestCLIApplyPending:
 
     def test_apply_pending_applies_mpo_only_and_marks_reboot(self, tmp_path: Path):
         state_file = tmp_path / ".abso_state.json"
+        original_applied_at = "2026-09-18T00:48:31"
+        state_file.write_text(json.dumps({
+            "current_profile": "overwatch2-gsync-hdr-capture",
+            "applied_at": original_applied_at,
+            "reboot_pending": False,
+            "reboot_reasons": [],
+        }), encoding="utf-8")
         runner = CliRunner()
         pending = {
             "profile": "overwatch2-gsync-hdr-capture",
@@ -1633,8 +1641,132 @@ class TestCLIApplyPending:
 
         saved = json.loads(state_file.read_text(encoding="utf-8"))
         assert saved["current_profile"] == "overwatch2-gsync-hdr-capture"
+        assert saved["applied_at"] == original_applied_at
         assert saved["reboot_pending"] is True
         assert saved["reboot_reasons"] == ["GraphicsSettingsHandler"]
+        assert datetime.fromisoformat(saved["reboot_required_at"]) > datetime.fromisoformat(
+            original_applied_at
+        )
+
+    def test_partial_pending_failure_preserves_profile_identity_and_merges_reboot(self, tmp_path):
+        state_file = tmp_path / ".abso_state.json"
+        original_state = {
+            "current_profile": "overwatch2-gsync-hdr-capture",
+            "applied_at": "2026-09-18T00:48:31",
+            "reboot_pending": True,
+            "reboot_reasons": ["WindowsSettingsHandler", "GraphicsSettingsHandler"],
+        }
+        state_file.write_text(json.dumps(original_state), encoding="utf-8")
+        pending = {
+            "all_active": False,
+            "pending_apply_settings": [
+                "GraphicsSettingsHandler.mpo_disabled",
+                "GraphicsSettingsHandler.disable_global_fso",
+            ],
+            "handlers": {"GraphicsSettingsHandler": {"settings": {
+                "mpo_disabled": {"target": True, "current": False},
+                "global_fso_disabled": {"target": False, "current": True},
+            }}},
+        }
+        with (
+            patch("abso.main._state_file_targets", return_value=[state_file]),
+            patch("abso.main.ProfileApplier") as applier_cls,
+            patch("abso.main.is_admin", return_value=True),
+            patch("abso.settings.graphics.GraphicsSettingsHandler") as graphics_cls,
+        ):
+            applier_cls.return_value.verify_profile.return_value = pending
+            graphics_cls.return_value.apply.return_value = {
+                "success": False, "error": "FSO denied", "changed_keys": ["disable_mpo"],
+                "requires_reboot": True,
+            }
+            result = CliRunner().invoke(
+                cli, ["apply-pending", "slippi-melee-universal-hdr", "--json"]
+            )
+
+        assert result.exit_code == 1
+        data = json.loads(result.output)["data"]
+        assert data["success"] is False
+        assert data["error"] == "FSO denied"
+        assert data["reboot_pending"] is True
+        assert data["reboot_reasons"] == original_state["reboot_reasons"]
+        saved = json.loads(state_file.read_text(encoding="utf-8"))
+        assert saved["current_profile"] == original_state["current_profile"]
+        assert saved["applied_at"] == original_state["applied_at"]
+        assert saved["reboot_reasons"] == original_state["reboot_reasons"]
+        assert saved["reboot_pending"] is True
+        assert saved["reboot_required_at"]
+
+    def test_pending_reboot_does_not_invent_active_profile_when_none_recorded(self, tmp_path):
+        state_file = tmp_path / ".abso_state.json"
+        with patch("abso.main._state_file_targets", return_value=[state_file]):
+            abso_main._mark_pending_settings_reboot(
+                "overwatch2-gsync-hdr-capture", requires_reboot=True,
+                reboot_reasons=["GraphicsSettingsHandler"],
+            )
+        saved = json.loads(state_file.read_text(encoding="utf-8"))
+        assert saved["current_profile"] is None
+        assert saved["applied_at"] is None
+        assert saved["reboot_pending"] is True
+        assert saved["reboot_reasons"] == ["GraphicsSettingsHandler"]
+        assert saved["reboot_required_at"]
+
+    @pytest.mark.parametrize("dry_run", [False, True])
+    def test_fso_only_pending_apply_preserves_existing_reboot_in_both_payloads(self, tmp_path, dry_run):
+        state_file = tmp_path / ".abso_state.json"
+        initial_state = json.dumps({
+            "current_profile": "overwatch2-gsync-hdr-capture",
+            "applied_at": "2026-09-18T00:48:31",
+            "reboot_pending": True,
+            "reboot_reasons": ["GraphicsSettingsHandler", "WindowsSettingsHandler"],
+        })
+        state_file.write_text(initial_state, encoding="utf-8")
+        pending = {
+            "all_active": False,
+            "pending_apply_settings": ["GraphicsSettingsHandler.disable_global_fso"],
+            "pending_reboot_gated_settings": ["GraphicsSettingsHandler.mpo_disabled"],
+            "handlers": {"GraphicsSettingsHandler": {"settings": {
+                "global_fso_disabled": {"target": False, "current": True, "active": False},
+            }}},
+        }
+        after = {
+            "all_active": False,
+            "pending_apply_settings": [],
+            "pending_reboot_gated_settings": ["GraphicsSettingsHandler.mpo_disabled"],
+            "handlers": {"GraphicsSettingsHandler": {"settings": {
+                "global_fso_disabled": {"target": False, "current": False, "active": True},
+            }}},
+        }
+        with (
+            patch("abso.main._state_file_targets", return_value=[state_file]),
+            patch("abso.main.ProfileApplier") as applier_cls,
+            patch("abso.main.is_admin", return_value=True),
+            patch("abso.main._collect_post_apply_notes", return_value=[]),
+            patch("abso.settings.graphics.GraphicsSettingsHandler") as graphics_cls,
+        ):
+            applier_cls.return_value.verify_profile.side_effect = [pending, after]
+            graphics_cls.return_value.apply.return_value = {
+                "success": True, "changed_keys": ["disable_global_fso"], "requires_reboot": False,
+            }
+            args = ["apply-pending", "overwatch2-gsync-hdr-capture", "--json"]
+            if dry_run:
+                args.append("--dry-run")
+            result = CliRunner().invoke(cli, args)
+            assert result.exit_code == 0
+            data = json.loads(result.output)["data"]
+            wrapped = abso_main._build_pending_apply_as_apply_payload(
+                "overwatch2-gsync-hdr-capture", data
+            )
+
+        for payload in (data, wrapped):
+            assert payload["success"] is True
+            assert payload["requires_reboot"] is False  # This action adds no new gate.
+            assert payload["reboot_pending"] is True  # The previous gate remains.
+            assert payload["reboot_reasons"] == ["GraphicsSettingsHandler", "WindowsSettingsHandler"]
+        assert state_file.read_text(encoding="utf-8") == initial_state
+        if dry_run:
+            graphics_cls.assert_not_called()
+        else:
+            graphics_cls.return_value.apply.assert_called_once_with({"disable_global_fso": False})
 
 
 class TestCLILaunch:

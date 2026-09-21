@@ -140,3 +140,25 @@ def test_post_apply_verification_rejects_missing_readback():
     )
 
     assert failures == ["max_frame_rate: driver readback unavailable; expected=297"]
+
+
+@pytest.mark.parametrize("readback", [None, 0, 2, 0xFFFFFFFF])
+def test_shader_cache_enabled_needs_valid_driver_readback(driver_manager, readback):
+    driver_manager.get_app_settings.return_value.update(shader_cache=readback)
+    result = NvidiaSettingsHandler().verify_active(game_settings(shader_cache="on"))
+    assert result["all_active"] is False
+    assert any("shader_cache:" in failure for failure in result["setting_failures"])
+
+
+def test_shader_cache_enabled_readback_passes_without_global_cache_size(driver_manager):
+    driver_manager.get_app_settings.return_value.update(shader_cache=1)
+    result = NvidiaSettingsHandler().verify_active(game_settings(shader_cache="on"))
+    assert result["all_active"] is True
+    assert result["global_failures"] == []
+
+
+def test_legacy_unlimited_never_verifies_as_enabled_or_invalid_enum(driver_manager):
+    driver_manager.get_app_settings.return_value.update(shader_cache=2)
+    result = NvidiaSettingsHandler().verify_active(game_settings(shader_cache="unlimited"))
+    assert result["all_active"] is False
+    assert any("global settings" in failure for failure in result["setting_failures"])

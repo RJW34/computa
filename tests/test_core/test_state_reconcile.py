@@ -94,6 +94,25 @@ class TestReconcile:
 
 
 class TestBootCommitsHelper:
+    def test_targeted_write_after_boot_keeps_reboot_pending(self) -> None:
+        snapshot = _snapshot(reboot_required_at="2026-06-10T12:00:00")
+        result, changed = reconcile_reboot_pending_after_verified_boot(
+            snapshot, MPO_PENDING_VERIFY, boot_time=AFTER_BOOT,
+        )
+        assert changed is False
+        assert result["applied_at"] == APPLIED
+        assert result["reboot_pending"] is True
+
+    def test_boot_after_targeted_write_clears_gate(self) -> None:
+        result, changed = reconcile_reboot_pending_after_verified_boot(
+            _snapshot(reboot_required_at="2026-06-08T12:00:00"),
+            MPO_PENDING_VERIFY, boot_time=AFTER_BOOT,
+        )
+        assert changed is True
+        assert result["applied_at"] == APPLIED
+        assert result["reboot_pending"] is False
+        assert "reboot_required_at" not in result
+
     def test_true_after_boot_no_blockers(self) -> None:
         assert boot_commits_reboot_gated_writes(_snapshot(), MPO_PENDING_VERIFY, boot_time=AFTER_BOOT) is True
 

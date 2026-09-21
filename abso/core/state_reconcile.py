@@ -82,7 +82,8 @@ def boot_commits_reboot_gated_writes(
     """Return True when a post-write boot has committed the reboot-gated writes.
 
     A reboot is exactly what commits reboot-gated registry writes (MPO, HAGS,
-    VBS). Once the machine has booted *after* ``applied_at`` and the targets are
+    VBS). Once the machine has booted after the latest full or targeted write
+    (``applied_at`` / ``reboot_required_at``) and the targets are
     present -- i.e. nothing is still awaiting a live apply and there is no hard
     error -- those settings are committed even though live verification cannot
     directly observe DWM's MPO compositor state. Unrelated handler drift does
@@ -93,11 +94,14 @@ def boot_commits_reboot_gated_writes(
         return False
     if verification.get("pending_apply_settings") or []:
         return False
-    applied_at_ts = parse_state_timestamp(snapshot.get("applied_at"))
+    timestamps = [
+        timestamp for key in ("applied_at", "reboot_required_at")
+        if (timestamp := parse_state_timestamp(snapshot.get(key))) is not None
+    ]
     boot_time = boot_time or get_system_boot_time()
-    if applied_at_ts is None or boot_time is None:
+    if not timestamps or boot_time is None:
         return False
-    return boot_time.timestamp() > applied_at_ts
+    return boot_time.timestamp() > max(timestamps)
 
 
 def reconcile_reboot_pending_after_verified_boot(
@@ -108,7 +112,8 @@ def reconcile_reboot_pending_after_verified_boot(
 ) -> tuple[dict[str, Any], bool]:
     """Return state with stale reboot-pending cleared once a boot has committed it.
 
-    Clears ``reboot_pending`` only when a boot has occurred after ``applied_at``
+    Clears ``reboot_pending`` only when a boot has occurred after the latest
+    full or targeted reboot-gated write
     and the reboot-gated targets are present (see
     :func:`boot_commits_reboot_gated_writes`). A reboot is what commits
     reboot-gated writes (MPO/HAGS/VBS); a clean registry verify *before* a boot
@@ -126,4 +131,5 @@ def reconcile_reboot_pending_after_verified_boot(
     updated = dict(snapshot)
     updated["reboot_pending"] = False
     updated["reboot_reasons"] = []
+    updated.pop("reboot_required_at", None)
     return updated, True

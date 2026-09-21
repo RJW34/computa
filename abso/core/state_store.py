@@ -24,12 +24,15 @@ def default_state_snapshot() -> dict[str, Any]:
 
 def sanitize_state_snapshot(state: dict[str, Any]) -> dict[str, Any]:
     """Return the public active-profile state shape with canonical profile id."""
-    return {
+    snapshot = {
         "current_profile": resolve_profile_id(state.get("current_profile")),
         "applied_at": state.get("applied_at"),
         "reboot_pending": bool(state.get("reboot_pending", False)),
         "reboot_reasons": list(state.get("reboot_reasons") or []),
     }
+    if "reboot_required_at" in state:
+        snapshot["reboot_required_at"] = state["reboot_required_at"]
+    return snapshot
 
 
 def read_state_file(path: Path) -> dict[str, Any] | None:
@@ -50,9 +53,12 @@ def read_state_file(path: Path) -> dict[str, Any] | None:
 
 def state_sort_value(path: Path, state: dict[str, Any]) -> float:
     """Return a comparable freshness value for a state candidate."""
-    applied_at_ts = parse_state_timestamp(state.get("applied_at"))
-    if applied_at_ts is not None:
-        return applied_at_ts
+    timestamps = [
+        timestamp for key in ("applied_at", "reboot_required_at")
+        if (timestamp := parse_state_timestamp(state.get(key))) is not None
+    ]
+    if timestamps:
+        return max(timestamps)
     try:
         return path.stat().st_mtime
     except OSError:

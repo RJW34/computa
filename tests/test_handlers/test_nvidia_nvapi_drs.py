@@ -38,6 +38,60 @@ def test_resolve_vsync_on_uses_nvapi_constant():
     assert value == 0x47814940
 
 
+@pytest.mark.parametrize("value,expected", [("on", 1), ("off", 0), (1, 1), (0, 0)])
+def test_shader_cache_uses_only_sdk_enabled_values(value, expected):
+    manager = DRSProfileManager()
+    assert manager._resolve_setting("shader_cache", value) == (0x00198FFF, expected)
+
+
+@pytest.mark.parametrize("value", ["unlimited", "max", 2, "2", "0x2", 1024, 0xFFFFFFFF])
+def test_shader_cache_invalid_size_is_rejected_before_driver_write(value):
+    manager = DRSProfileManager()
+    drs = MagicMock()
+    with pytest.raises(ValueError, match="global settings"):
+        manager._apply_single_setting(drs, object(), "shader_cache", value)
+    drs.set_setting.assert_not_called()
+    drs.delete_setting.assert_not_called()
+    drs.get_base_profile.assert_not_called()
+
+
+def test_shader_cache_enable_replaces_invalid_legacy_value_without_global_write():
+    manager = DRSProfileManager()
+    drs = MagicMock()
+    profile = object()
+    drs.get_setting.return_value = 2
+    manager._apply_single_setting(drs, profile, "shader_cache", "on")
+    drs.set_setting.assert_called_once_with(profile, 0x00198FFF, 1)
+    drs.get_base_profile.assert_not_called()
+
+
+@pytest.mark.parametrize("value", [None, "default"])
+def test_shader_cache_default_removes_enabled_override(value):
+    manager = DRSProfileManager()
+    drs = MagicMock()
+    profile = object()
+    manager._apply_single_setting(drs, profile, "shader_cache", value)
+    drs.delete_setting.assert_called_once_with(profile, 0x00198FFF)
+    drs.set_setting.assert_not_called()
+
+
+def test_all_builtin_profiles_request_valid_shader_cache_enable_values():
+    from abso.profiles import get_all_profiles
+    from abso.settings.nvidia import NvidiaSettingsHandler
+    from abso.settings.nvidia.presets import NVIDIA_PRESETS
+
+    manager = DRSProfileManager()
+    handler = NvidiaSettingsHandler()
+    configured = [preset["settings"] for preset in NVIDIA_PRESETS.values()]
+    configured.extend(
+        handler._resolve_requested_nvidia_settings(profile.get_settings("NvidiaSettingsHandler"))
+        for profile in get_all_profiles().values()
+    )
+    for settings in configured:
+        if "shader_cache" in settings:
+            assert manager._resolve_setting("shader_cache", settings["shader_cache"]) == (0x00198FFF, 1)
+
+
 def test_resolve_vsync_tear_control_disable_uses_nvapi_constant():
     """Tear control disable must map to NVAPI's VSYNCTEARCONTROL_DISABLE."""
     manager = DRSProfileManager()

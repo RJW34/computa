@@ -120,6 +120,7 @@ class OW2ConfigHandler(SettingsHandler):
         "KeyBindsV2",
         "CrosshairSettings",
         "CrosshairSettingsV2",
+        REFLEX_MODE_INI_KEY,
     }
 
     # ------------------------------------------------------------------
@@ -366,7 +367,7 @@ class OW2ConfigHandler(SettingsHandler):
             return settings, None
 
     def backup(self) -> dict[str, Any]:
-        """Backup the entire Settings_v0.ini for lossless restore."""
+        """Capture Settings_v0.ini; restore preserves current protected choices."""
         ini_path = _get_ow2_settings_path()
         if not ini_path:
             return {"config_found": False}
@@ -387,8 +388,9 @@ class OW2ConfigHandler(SettingsHandler):
 
         Profile-switch baseline restores can use an older full-file backup.
         Restoring that byte-for-byte would also restore stale keybinds,
-        sensitivity, and crosshair values. Keep those protected values from
-        the current live file and only let the backup restore the rest.
+        sensitivity, crosshair values, and the manual-only Reflex choice.
+        Preserve current protected values. Never reintroduce a stale Reflex
+        value when the current file or key is absent.
         """
         if not data.get("config_found"):
             return True  # Nothing to restore
@@ -409,12 +411,13 @@ class OW2ConfigHandler(SettingsHandler):
 
         try:
             ini_path.parent.mkdir(parents=True, exist_ok=True)
+            current_content = ""
             if ini_path.exists():
                 current_content = ini_path.read_text(encoding="utf-8", errors="replace")
-                file_content = self._merge_protected_values(
-                    backup_content=file_content,
-                    current_content=current_content,
-                )
+            file_content = self._merge_protected_values(
+                backup_content=file_content,
+                current_content=current_content,
+            )
             ini_path.write_text(file_content, encoding="utf-8")
             return True
         except OSError as e:
@@ -580,13 +583,21 @@ class OW2ConfigHandler(SettingsHandler):
         backup_content: str,
         current_content: str,
     ) -> str:
-        """Return backup content with protected user-control values preserved."""
+        """Preserve current controls and the manual-only Reflex value or absence."""
         backup_lines = backup_content.splitlines()
         current_lines = current_content.splitlines()
         current_protected = self._snapshot_protected(current_lines)
 
         for key, current_value in current_protected.items():
             if current_value is None:
+                if key == self.REFLEX_MODE_INI_KEY:
+                    # Unlike control recovery, Reflex is advisory-only. An
+                    # older backup must not synthesize a manual setting that
+                    # this installation/user no longer has in the live file.
+                    backup_lines = [
+                        line for line in backup_lines
+                        if self._extract_value(line, key) is None
+                    ]
                 continue
             backup_lines = self._replace_or_append_protected_value(
                 backup_lines, key, current_value,

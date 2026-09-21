@@ -69,6 +69,30 @@ def test_read_state_snapshot_ignores_invalid_json(tmp_path: Path) -> None:
     assert state["reboot_reasons"] == []
 
 
+def test_new_targeted_write_is_not_hidden_by_older_mirror(tmp_path: Path) -> None:
+    primary, mirror = tmp_path / "primary.json", tmp_path / "mirror.json"
+    for path, state in (
+        (primary, {
+            "current_profile": "overwatch2-gsync-hdr-capture",
+            "applied_at": "2026-05-26T01:00:00",
+            "reboot_required_at": "2026-05-26T03:00:00",
+            "reboot_pending": True,
+        }),
+        (mirror, {
+            "current_profile": "deadlock-hdr",
+            "applied_at": "2026-05-26T02:00:00",
+            "reboot_pending": False,
+        }),
+    ):
+        path.write_text(json.dumps(state), encoding="utf-8")
+
+    result = read_state_snapshot([mirror, primary])
+    assert result["current_profile"] == "overwatch2-gsync-hdr-capture"
+    assert result["applied_at"] == "2026-05-26T01:00:00"
+    assert result["reboot_required_at"] == "2026-05-26T03:00:00"
+    assert result["reboot_pending"] is True
+
+
 def test_write_state_snapshot_returns_mirror_warnings(tmp_path: Path) -> None:
     """Primary writes are authoritative while mirror write failures are reported."""
     primary = tmp_path / "repo" / ".abso_state.json"

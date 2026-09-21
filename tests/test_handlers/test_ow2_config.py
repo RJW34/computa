@@ -5,6 +5,8 @@ from __future__ import annotations
 from pathlib import Path
 from unittest.mock import patch
 
+import pytest
+
 from abso.settings.ow2_config import OW2ConfigHandler
 
 # Sample Settings_v0.ini content mimicking OW2's real format
@@ -398,6 +400,63 @@ MasterVolume = "20"
     restored = ini_path.read_text(encoding="utf-8")
     assert 'WindowMode = "0"' in restored
     assert 'KeyBindsV2 = "current-new-format"' in restored
+
+
+@pytest.mark.parametrize("current_mode, backup_mode", [(2, 0), (0, 2), (1, 0), (2, None)])
+def test_restore_preserves_manual_reflex_choice(
+    tmp_path: Path, current_mode: int, backup_mode: int | None,
+) -> None:
+    """A stale baseline must not undo a manual Reflex change in either direction."""
+    backup_ini = '[Render.13]\nWindowMode = "0"\n'
+    if backup_mode is not None:
+        backup_ini += f'ReflexMode = "{backup_mode}"\n'
+    current_ini = f'[Render.13]\nWindowMode = "1"\nReflexMode = "{current_mode}"\n'
+    ini_path = tmp_path / "Settings_v0.ini"
+    _write_settings_ini(ini_path, current_ini)
+
+    with patch("abso.settings.ow2_config._get_ow2_settings_path", return_value=ini_path):
+        assert OW2ConfigHandler().restore({
+            "config_found": True,
+            "config_path": str(ini_path),
+            "file_content": backup_ini,
+        }) is True
+
+    restored = ini_path.read_text(encoding="utf-8")
+    assert 'WindowMode = "0"' in restored  # Managed baseline still restores.
+    assert f'ReflexMode = "{current_mode}"' in restored
+    assert restored.count("ReflexMode") == 1
+
+
+@pytest.mark.parametrize("live_file_exists", [True, False])
+def test_restore_does_not_introduce_reflex_absent_from_live_config(
+    tmp_path: Path, live_file_exists: bool,
+) -> None:
+    """An absent manual setting stays absent, including whole-file recovery."""
+    backup_ini = (
+        '[Render.13]\nWindowMode = "0"\nReflexMode = "2"\n'
+        'KeyBindsV2 = "backup-controls"\n'
+    )
+    ini_path = tmp_path / "Settings_v0.ini"
+    if live_file_exists:
+        _write_settings_ini(
+            ini_path, '[Render.13]\nWindowMode = "1"\nKeyBindsV2 = "live-controls"\n'
+        )
+
+    with patch(
+        "abso.settings.ow2_config._get_ow2_settings_path",
+        return_value=ini_path if live_file_exists else None,
+    ):
+        assert OW2ConfigHandler().restore({
+            "config_found": True,
+            "config_path": str(ini_path),
+            "file_content": backup_ini,
+        }) is True
+
+    restored = ini_path.read_text(encoding="utf-8")
+    assert 'WindowMode = "0"' in restored
+    assert "ReflexMode" not in restored
+    expected_controls = "live-controls" if live_file_exists else "backup-controls"
+    assert f'KeyBindsV2 = "{expected_controls}"' in restored
 
 
 def test_apply_idempotent(tmp_path: Path) -> None:

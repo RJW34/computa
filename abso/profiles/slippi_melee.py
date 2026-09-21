@@ -241,7 +241,7 @@ class SlippiMeleeProfile(EmulatorLatencyBaseProfile):
                 "vrr_app_override": "force_off",
                 "global_vrr_mode": "off",  # Enforce global VRR off for clean no-sync transitions
                 "power_management": "prefer_max_performance",
-                "shader_cache": "unlimited",
+                "shader_cache": "on",
                 "threaded_optimization": "off",  # OFF - emulator stability (per canonical spec)
                 "max_frame_rate": "off",  # OFF - no artificial limiting
                 "triple_buffering": "off",  # OFF - only works with VSync
@@ -757,7 +757,7 @@ class SlippiMeleeConsoleParityProfile(SlippiMeleeProfile):
                 "vrr_app_override": "force_off",
                 "global_vrr_mode": "off",  # Enforce global VRR off for clean no-sync transitions
                 "power_management": "prefer_max_performance",
-                "shader_cache": "unlimited",
+                "shader_cache": "on",
                 "threaded_optimization": "off",
                 "max_frame_rate": "off",
                 "triple_buffering": "off",

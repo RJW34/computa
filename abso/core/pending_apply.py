@@ -8,7 +8,12 @@ from typing import Any
 from abso.profiles.catalog import resolve_profile_id
 from abso.utils.admin import is_admin
 
-SUPPORTED_PENDING_APPLY_SETTINGS = frozenset({"GraphicsSettingsHandler.mpo_disabled"})
+SUPPORTED_PENDING_APPLY_SETTINGS = frozenset(
+    {
+        "GraphicsSettingsHandler.mpo_disabled",
+        "GraphicsSettingsHandler.disable_global_fso",
+    }
+)
 
 
 def build_pending_apply_actions(
@@ -24,8 +29,8 @@ def build_pending_apply_actions(
     ]
 
     actions: list[dict[str, Any]] = []
+    handler_result = (verify_result.get("handlers") or {}).get("GraphicsSettingsHandler") or {}
     if "GraphicsSettingsHandler.mpo_disabled" in pending_apply:
-        handler_result = (verify_result.get("handlers") or {}).get("GraphicsSettingsHandler") or {}
         setting_info = (handler_result.get("settings") or {}).get("mpo_disabled") or {}
         target = setting_info.get("target")
         if not isinstance(target, bool):
@@ -43,6 +48,30 @@ def build_pending_apply_actions(
                 "target": target,
                 "reboot_gated": True,
                 "description": "Write the Windows MPO registry target only",
+            }
+        )
+
+    if "GraphicsSettingsHandler.disable_global_fso" in pending_apply:
+        # The verifier's pending key uses the apply name, but its readback
+        # details use global_fso_disabled. Do not infer or coerce a target.
+        setting_info = (handler_result.get("settings") or {}).get("global_fso_disabled") or {}
+        target = setting_info.get("target")
+        if not isinstance(target, bool):
+            return (
+                [],
+                unsupported,
+                "Verifier did not provide a boolean global FSO target for "
+                "GraphicsSettingsHandler.disable_global_fso",
+            )
+        actions.append(
+            {
+                "profile": profile_name,
+                "pending_setting": "GraphicsSettingsHandler.disable_global_fso",
+                "handler": "GraphicsSettingsHandler",
+                "apply_setting": "disable_global_fso",
+                "target": target,
+                "reboot_gated": False,
+                "description": "Write the Windows global fullscreen optimization registry target only",
             }
         )
 
@@ -123,13 +152,9 @@ def apply_pending_profile_settings(
         graphics_handler_factory = GraphicsSettingsHandler
 
     handler_result = graphics_handler_factory().apply(
-        {"disable_mpo": bool(actions[0]["target"])}
+        {action["apply_setting"]: action["target"] for action in actions}
     )
     result["handler_results"]["GraphicsSettingsHandler"] = handler_result
-
-    if not handler_result.get("success", False):
-        result["error"] = handler_result.get("error") or "GraphicsSettingsHandler failed"
-        return result
 
     changed_keys = list(handler_result.get("changed_keys") or [])
     changed_settings = [f"GraphicsSettingsHandler.{key}" for key in changed_keys]
@@ -139,15 +164,9 @@ def apply_pending_profile_settings(
     result["notices"].extend(str(item) for item in (handler_result.get("notices") or []))
     result["warnings"].extend(str(item) for item in (handler_result.get("warnings") or []))
 
-    verify_after = applier.verify_profile(profile_name)
-    result["verify_after"] = verify_after
-    result["pending_apply_settings_after"] = list(
-        verify_after.get("pending_apply_settings") or []
-    )
-    result["pending_reboot_gated_settings_after"] = list(
-        verify_after.get("pending_reboot_gated_settings") or []
-    )
-
+    # The handler can change MPO and then fail a later FSO write. Preserve
+    # those effects and the reboot requirement even though the action failed.
+    # Persist before readback so verification sees the new reboot gate.
     if result["requires_reboot"]:
         result["reboot_reasons"] = ["GraphicsSettingsHandler"]
         if set_current_profile_func is not None:
@@ -156,6 +175,45 @@ def apply_pending_profile_settings(
                 requires_reboot=True,
                 reboot_reasons=result["reboot_reasons"],
             )
+
+    if not handler_result.get("success", False):
+        result["error"] = handler_result.get("error") or "GraphicsSettingsHandler failed"
+        return result
+
+    try:
+        verify_after = applier.verify_profile(profile_name)
+    except Exception as exc:
+        result["error"] = f"Pending apply verification failed: {exc}"
+        return result
+    result["verify_after"] = verify_after
+    if not isinstance(verify_after, dict):
+        result["error"] = "Pending apply verification returned an invalid result"
+        return result
+    result["pending_apply_settings_after"] = list(
+        verify_after.get("pending_apply_settings") or []
+    )
+    result["pending_reboot_gated_settings_after"] = list(
+        verify_after.get("pending_reboot_gated_settings") or []
+    )
+
+    # Handler success is not proof that its writes took effect. Confirm the
+    # requested pending keys cleared, without requiring unrelated settings,
+    # manual steps, or reboot-gated activation to be resolved here.
+    verification_error = verify_after.get("error")
+    graphics_verification = (verify_after.get("handlers") or {}).get("GraphicsSettingsHandler") or {}
+    if not verification_error:
+        verification_error = graphics_verification.get("error")
+    if verification_error:
+        result["error"] = f"Pending apply verification failed: {verification_error}"
+        return result
+    remaining = [
+        action["pending_setting"]
+        for action in actions
+        if action["pending_setting"] in result["pending_apply_settings_after"]
+    ]
+    if remaining:
+        result["error"] = "Pending apply settings remain after remediation: " + ", ".join(remaining)
+        return result
 
     result["success"] = True
     return result

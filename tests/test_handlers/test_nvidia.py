@@ -106,7 +106,7 @@ class TestNvidiaProfiles:
     def test_get_setting_value_shader_cache(self):
         """Test getting decimal values for shader cache settings."""
         assert get_setting_value("off", "shader_cache") == 0
-        assert get_setting_value("unlimited", "shader_cache") == 4294967295
+        assert get_setting_value("on", "shader_cache") == 1
 
 
 class TestNvidiaPresets:
@@ -249,7 +249,7 @@ class TestNvidiaAudit:
                 "power_management": "adaptive",
                 "low_latency_mode": "off",
                 "vsync": "on",
-                "shader_cache": "1024MB",
+                "shader_cache": "on",
             }
         }):
             issues = handler.audit()
@@ -269,7 +269,7 @@ class TestNvidiaAudit:
                 "power_management": "prefer_max_performance",
                 "low_latency_mode": "on",  # "on" not "ultra" - ultra overrides FPS caps
                 "vsync": "on",  # VRR safety net - doesn't add latency with proper FPS cap
-                "shader_cache": "unlimited"
+                "shader_cache": "on"
             }
         }):
             issues = handler.audit()
