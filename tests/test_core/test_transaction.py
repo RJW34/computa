@@ -5,7 +5,10 @@ from __future__ import annotations
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 from abso.core.applier import ApplyResult
+from abso.core.backup import BackupRestoreSummary
 from abso.core.transaction import ProfileTransactionManager
 
 
@@ -20,28 +23,18 @@ def _make_applier() -> MagicMock:
     return applier
 
 
-def _complete_restore_summary() -> MagicMock:
-    summary = MagicMock()
-    summary.complete = True
-    summary.has_blocking_issues = False
-    summary.skipped_components = []
-    summary.failed_components = []
-    return summary
+def _complete_restore_summary() -> BackupRestoreSummary:
+    return BackupRestoreSummary(backup_id="test-backup")
 
 
-def _incomplete_restore_summary(*, blocking: bool) -> MagicMock:
-    summary = MagicMock()
-    summary.complete = False
-    summary.has_blocking_issues = blocking
-    summary.skipped_components = [
+def _incomplete_restore_summary(*, blocking: bool) -> BackupRestoreSummary:
+    return BackupRestoreSummary(backup_id="test-backup", skipped_components=[
         {
             "handler": "NvidiaSettingsHandler",
             "detail": "restore unavailable",
             "blocking": blocking,
         }
-    ]
-    summary.failed_components = []
-    return summary
+    ])
 
 
 def _non_critical_compliance_report() -> MagicMock:
@@ -394,6 +387,123 @@ def test_transaction_fails_for_blocking_baseline_restore_gaps(tmp_path: Path) ->
         applier.apply_profile.assert_not_called()
         backup_manager.create_backup.assert_not_called()
         assert tx.success is False
+
+
+@pytest.mark.parametrize("failure", ["reported", "exception"])
+def test_failed_baseline_recovers_pre_switch_state_before_returning(tmp_path: Path, failure: str):
+    """A late audio restore error must undo the baseline's earlier mutations."""
+    applier = _make_applier()
+    previous = {"hdr": True, "power_plan": "gaming"}
+    live = dict(previous)
+    rollback_manager = MagicMock()
+    rollback_manager.create_backup.return_value = "pre-switch"
+
+    def recover(backup_id):
+        assert backup_id == "pre-switch"
+        live.update(previous)
+        return BackupRestoreSummary(backup_id, restored_components=["Windows", "Power"])
+
+    rollback_manager.restore_backup.side_effect = recover
+    restore_manager = MagicMock()
+    baseline = tmp_path / "baseline"
+    baseline.mkdir()
+    restore_manager.get_baseline_backup.return_value = baseline
+
+    def fail_after_restoring_display(_backup_id):
+        live.update(hdr=False, power_plan="balanced")
+        if failure == "exception":
+            raise RuntimeError("audio restore crashed")
+        return BackupRestoreSummary("baseline", failed_components=[{
+            "handler": "AudioEngineHandler", "detail": "Access denied", "blocking": True,
+        }])
+
+    restore_manager.restore_backup.side_effect = fail_after_restoring_display
+    with patch("abso.core.transaction.BackupManager", side_effect=[rollback_manager, restore_manager]):
+        tx = ProfileTransactionManager(tmp_path, applier=applier).execute("test-profile")
+
+    assert live == previous
+    applier.apply_profile.assert_not_called()
+    assert tx.success is False
+    assert tx.rollback_attempted is True
+    assert tx.rollback_performed is True
+    assert tx.state == "rolled_back"
+    assert tx.to_dict()["rollback_summary"]["complete"] is True
+    assert "Baseline restore" in tx.error
+    assert [cp.phase for cp in tx.checkpoints][-2:] == ["baseline_restore", "rollback"]
+
+
+@pytest.mark.parametrize("recovery", ["nonblocking_gap", "blocking_failure", "exception"])
+def test_failed_baseline_does_not_claim_incomplete_snapshot_recovery(tmp_path: Path, recovery: str):
+    applier = _make_applier()
+    rollback_manager = MagicMock()
+    rollback_manager.create_backup.return_value = "pre-switch"
+    if recovery == "exception":
+        rollback_manager.restore_backup.side_effect = RuntimeError("snapshot read failed")
+    else:
+        rollback_manager.restore_backup.return_value = _incomplete_restore_summary(
+            blocking=recovery == "blocking_failure"
+        )
+    restore_manager = MagicMock()
+    baseline = tmp_path / "baseline"
+    baseline.mkdir()
+    restore_manager.get_baseline_backup.return_value = baseline
+    restore_manager.restore_backup.return_value = BackupRestoreSummary("baseline", failed_components=[{
+        "handler": "AudioEngineHandler", "detail": "Access denied", "blocking": True,
+    }])
+    with patch("abso.core.transaction.BackupManager", side_effect=[rollback_manager, restore_manager]):
+        tx = ProfileTransactionManager(tmp_path, applier=applier).execute("test-profile")
+
+    rollback_manager.restore_backup.assert_called_once_with("pre-switch")
+    applier.apply_profile.assert_not_called()
+    assert tx.success is False
+    assert tx.rollback_attempted is True
+    assert tx.rollback_performed is False
+    assert tx.state == "failed"
+    assert "AudioEngineHandler" in tx.error
+    if recovery == "exception":
+        assert tx.rollback_summary is None
+        assert tx.rollback_error == "snapshot read failed"
+    else:
+        assert "NvidiaSettingsHandler" in tx.rollback_error
+        assert tx.to_dict()["rollback_summary"]["complete"] is False
+        assert "restored backup automatically" not in tx.error
+
+
+@pytest.mark.parametrize("failure_phase", ["backup", "apply"])
+def test_failure_after_baseline_recovers_even_without_new_handler_changes(tmp_path: Path, failure_phase: str):
+    """Baseline restoration itself is a mutation that needs recovery on failure."""
+    applier = _make_applier()
+    applier.apply_profile.return_value = ApplyResult(success=False, error="preflight failed")
+    applier.verify_profile.return_value = {"all_active": False, "handlers": {}}
+    compliance = MagicMock()
+    compliance.evaluate.return_value = _non_critical_compliance_report()
+    rollback_manager = MagicMock()
+    rollback_manager.create_backup.return_value = "pre-switch"
+    rollback_manager.restore_backup.return_value = _complete_restore_summary()
+    restore_manager = MagicMock()
+    baseline = tmp_path / "baseline"
+    baseline.mkdir()
+    restore_manager.get_baseline_backup.return_value = baseline
+    restore_manager.restore_backup.return_value = _complete_restore_summary()
+    backup_manager = MagicMock()
+    if failure_phase == "backup":
+        backup_manager.create_backup.side_effect = OSError("disk full")
+    else:
+        backup_manager.create_backup.return_value = "pre-apply"
+    with patch("abso.core.transaction.BackupManager", side_effect=[
+        rollback_manager, restore_manager, backup_manager,
+    ]):
+        tx = ProfileTransactionManager(tmp_path, applier=applier, compliance_engine=compliance).execute(
+            "test-profile"
+        )
+
+    rollback_manager.restore_backup.assert_called_once_with("pre-switch")
+    assert tx.rollback_performed is True
+    assert tx.success is False
+    if failure_phase == "backup":
+        applier.apply_profile.assert_not_called()
+    else:
+        assert not tx.apply_result.changed_settings
 
 
 def test_transaction_uses_pre_switch_snapshot_as_rollback_target(tmp_path: Path) -> None:

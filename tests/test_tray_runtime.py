@@ -351,6 +351,166 @@ function Stop-LaunchSweepRuntime { throw 'Mutation guard must not alter session 
     assert result == {"paused": True, "profile": "prior-profile"}
 
 
+@pytest.mark.parametrize("malformed_output", [False, True])
+def test_failed_apply_invalidates_old_verification_and_refreshes_without_retry(
+    tmp_path: Path, malformed_output: bool,
+) -> None:
+    result = _run_functions(
+        tmp_path,
+        [
+            "Apply-Profile", "Refresh-TrayStateAfterFailedApply",
+            "Reset-ActiveProfileVerificationState", "Invoke-JsonSafe",
+        ],
+        r"""
+$script:activeProfile = 'overwatch2-gsync-hdr-capture'
+$script:ActiveProfileVerificationStatus = 'active'
+$script:ActiveProfileVerificationCheckedAt = 'old-check'
+$script:Profiles = @{ 'slippi-melee-universal-hdr' = @{ Name = 'Slippi' } }
+$script:PythonExe = 'mock-backend'
+$script:ProjectRoot = $PSScriptRoot
+$script:Colors = @{}
+$script:backendStarts = 0; $script:verifierStops = 0
+function Test-TrayMutationInProgress { param($RequestedAction) return $false }
+function Sync-TrayBackendProfileState {
+    if ($script:MutatingOperationInProgress) { throw 'Must wait for backend exit' }
+    # Simulate saved-state adoption trying to replace the failure feedback.
+    $script:LastAction = 'Profile state loaded: Overwatch'
+    return $true
+}
+function Resolve-ProfileAlias { param($ProfileId) return $ProfileId }
+function Test-NeedsNoSyncOsdReminder { param($FromProfileId, $ToProfileId) return $false }
+function Get-TrayProfileObjectDisplayName { param($Profile, $Fallback) return 'Slippi' }
+function Stop-ActiveProfileVerificationRuntime { param([switch]$KillProcess) $script:verifierStops++ }
+function Set-IconState { param($State) }
+function Set-TrayOperationTooltipText { param($Text) }
+function Get-TrayProfileToastVisualArgs { param($ProfileId, $Profile) return @{} }
+function Show-ProgressOverlay { param($Title, $StepText) }
+function Update-ProgressOverlay { param($StepText) }
+function Get-AbsoBackendArgs { param($CommandArgs) return $CommandArgs }
+function Start-Process {
+    param($FilePath, $ArgumentList, [switch]$NoNewWindow, [switch]$PassThru,
+          $WorkingDirectory, $RedirectStandardOutput, $RedirectStandardError)
+    $script:backendStarts++
+    $script:cacheAtLaunch = $script:ActiveProfileVerificationStatus
+    if ('MALFORMED' -eq 'yes') {
+        Set-Content -LiteralPath $RedirectStandardOutput -Value 'not-json'
+    } else {
+        Set-Content -LiteralPath $RedirectStandardOutput -Value '{"success":false,"data":{"success":false,"error":"Baseline restore incomplete; recovery incomplete. Verify previous profile.","transaction":{"rollback_attempted":true,"rollback_performed":false}}}'
+    }
+    $mock = [pscustomobject]@{ HasExited = $true; Handle = 1; ExitCode = 1 }
+    $mock | Add-Member ScriptMethod WaitForExit { $script:waited = $true }
+    $mock | Add-Member ScriptMethod Dispose { $script:disposed = $true }
+    return $mock
+}
+function Get-ApplyFailureMessage { param($Json, $FailedHandlers, $ExitCode) return "Not applied. $($Json.data.error)" }
+function Close-ProgressOverlay {}
+function Test-IsVrrPrerequisiteError { param($Message) return $false }
+function Play-FailSound {}
+function Get-ApplyFailureActionButtons { param($Message, $Json) return @() }
+function Show-Notification {
+    param($Title, $Message, $Type, $MetaText, $ActionButtons)
+    $script:toast = $Message; $script:toastTarget = $MetaText
+}
+function Update-MenuState {}
+function Complete-TrayMutatingChildProcess {
+    param($Process, $OperationName)
+    if (-not $script:MutatingOperationInProgress) { throw 'Guard released early' }
+    return $true
+}
+function Start-ActiveProfileVerificationProcess {
+    param([switch]$Silent, [switch]$PreserveLastAction)
+    if ($script:MutatingOperationInProgress) { throw 'Verification overlapped mutation' }
+    $script:verifiedProfile = $script:activeProfile
+    $script:preserveFailure = [bool]$PreserveLastAction
+}
+Apply-Profile -ProfileId 'slippi-melee-universal-hdr'
+@{
+    status = $script:ActiveProfileVerificationStatus
+    checkedAt = $script:ActiveProfileVerificationCheckedAt
+    cacheAtLaunch = $script:cacheAtLaunch
+    lastAction = $script:LastAction; toast = $script:toast; target = $script:toastTarget
+    verifiedProfile = $script:verifiedProfile; preserveFailure = $script:preserveFailure
+    backendStarts = $script:backendStarts; verifierStops = $script:verifierStops
+    guard = $script:MutatingOperationInProgress; disposed = $script:disposed
+} | ConvertTo-Json -Compress
+""".replace("MALFORMED", "yes" if malformed_output else "no"),
+    )
+    assert result["status"] is None
+    assert result["checkedAt"] is None
+    assert result["cacheAtLaunch"] is None
+    assert result["lastAction"] == result["toast"]
+    assert result["target"] == "slippi-melee-universal-hdr"
+    assert result["verifiedProfile"] == "overwatch2-gsync-hdr-capture"
+    assert result["preserveFailure"] is True
+    assert result["backendStarts"] == 1
+    assert result["verifierStops"] == 2
+    assert result["guard"] is False
+    assert result["disposed"] is True
+    assert ("malformed JSON" if malformed_output else "recovery incomplete") in result["toast"]
+
+
+@pytest.mark.parametrize("status", ["active", "mismatch", "pending_apply", "pending_reboot"])
+def test_post_failure_verifier_updates_status_without_replacing_failure(
+    tmp_path: Path, status: str,
+) -> None:
+    result = _run_functions(
+        tmp_path,
+        ["Apply-ActiveProfileVerificationJson"],
+        """
+function Sync-TrayBackendProfileState { return $true }
+$script:activeProfile = 'overwatch2-gsync-hdr-capture'
+$script:LastAction = 'Not applied. Recovery incomplete: NVIDIA unavailable.'
+$script:LastActionTime = 'failure-time'
+$payload = '{"success":true,"data":{"reboot_pending":false,"verification":{"profile":"overwatch2-gsync-hdr-capture","status":"STATUS","mismatched_handlers":["AudioEngineHandler"],"checked_at":"new-check"}}}' | ConvertFrom-Json
+Apply-ActiveProfileVerificationJson -Json $payload -Silent -PreserveLastAction
+@{ status = $script:ActiveProfileVerificationStatus; action = $script:LastAction
+   actionTime = $script:LastActionTime; checkedAt = $script:ActiveProfileVerificationCheckedAt
+   mismatches = $script:ActiveProfileMismatchedHandlers } | ConvertTo-Json -Compress
+""".replace("STATUS", status),
+    )
+    assert result == {
+        "status": status,
+        "action": "Not applied. Recovery incomplete: NVIDIA unavailable.",
+        "actionTime": "failure-time",
+        "checkedAt": "new-check",
+        "mismatches": ["AudioEngineHandler"],
+    }
+
+
+@pytest.mark.parametrize("backend_state", ["unavailable", "no_active_profile"])
+def test_failed_apply_refresh_stays_unverified_when_backend_state_is_unavailable(
+    tmp_path: Path, backend_state: str,
+) -> None:
+    result = _run_functions(
+        tmp_path,
+        ["Refresh-TrayStateAfterFailedApply", "Reset-ActiveProfileVerificationState"],
+        """
+$script:activeProfile = 'previous-profile'
+$script:ActiveProfileVerificationStatus = 'active'
+$script:LastAction = 'Not applied. Restore failed.'
+$script:LastActionTime = 'failure-time'
+function Stop-ActiveProfileVerificationRuntime { param([switch]$KillProcess) }
+function Sync-TrayBackendProfileState {
+    if ('BACKEND_STATE' -eq 'unavailable') { return $false }
+    $script:activeProfile = $null
+    $script:LastAction = 'Backend reports no active profile'
+    return $true
+}
+function Start-ActiveProfileVerificationProcess { throw 'No usable active profile to verify' }
+function Update-MenuState {}
+Refresh-TrayStateAfterFailedApply
+@{ status = $script:ActiveProfileVerificationStatus; action = $script:LastAction
+   actionTime = $script:LastActionTime; profile = $script:activeProfile } | ConvertTo-Json -Compress
+""".replace("BACKEND_STATE", backend_state),
+    )
+    assert result == {
+        "status": None,
+        "action": "Not applied. Restore failed.",
+        "actionTime": "failure-time",
+        "profile": "previous-profile" if backend_state == "unavailable" else None,
+    }
+
+
 def test_menu_animation_hooks_and_catalog_poll_have_no_waits() -> None:
     script = TRAY_SCRIPT.read_text(encoding="utf-8")
     menu_setup = script.split("$menu = New-Object System.Windows.Forms.ContextMenuStrip", 1)[1]

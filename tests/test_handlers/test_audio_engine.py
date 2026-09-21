@@ -5,6 +5,8 @@ All winreg access is mocked; these tests never read or write the real registry.
 
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 from abso.settings.audio_engine import (
     _FX_VALUE_NAME,
     _RENDER_ROOT,
@@ -278,13 +280,19 @@ class TestAudioEngineRegistryHelpers:
     @patch("abso.settings.audio_engine.winreg.CloseKey")
     @patch("abso.settings.audio_engine.winreg.SetValueEx")
     @patch("abso.settings.audio_engine.winreg.CreateKeyEx")
-    def test_write_fx_flag_creates_subkey(self, mock_create, mock_set, mock_close):
+    @patch("abso.settings.audio_engine.winreg.OpenKey")
+    @patch.object(AudioEngineHandler, "_read_fx_flag", return_value=None)
+    def test_write_fx_flag_creates_subkey(
+        self, mock_read, mock_open, mock_create, mock_set, mock_close
+    ):
         """Write uses CreateKeyEx so a missing FxProperties subkey is created."""
         mock_create.return_value = MagicMock()
+        device_key = MagicMock()
+        mock_open.side_effect = [device_key, FileNotFoundError()]
 
         assert AudioEngineHandler._write_fx_flag("{g}", 1) is True
-        # FxProperties path passed to CreateKeyEx.
-        assert "FxProperties" in mock_create.call_args[0][1]
+        # Only FxProperties may be created, beneath an existing endpoint.
+        assert mock_create.call_args[0][:2] == (device_key, "FxProperties")
         mock_set.assert_called_once()
         # REG_DWORD value 1 written under the documented value name.
         args = mock_set.call_args[0]
@@ -294,20 +302,26 @@ class TestAudioEngineRegistryHelpers:
     @patch("abso.settings.audio_engine.winreg.CloseKey")
     @patch("abso.settings.audio_engine.winreg.SetValueEx")
     @patch("abso.settings.audio_engine.winreg.CreateKeyEx")
-    def test_restore_fx_flag_writes_original(self, mock_create, mock_set, mock_close):
-        """Restoring a present original re-writes it via CreateKeyEx."""
-        mock_create.return_value = MagicMock()
+    @patch("abso.settings.audio_engine.winreg.OpenKey")
+    @patch.object(AudioEngineHandler, "_read_fx_flag", return_value=1)
+    def test_restore_fx_flag_writes_original(
+        self, mock_read, mock_open, mock_create, mock_set, mock_close
+    ):
+        """An existing FxProperties key needs set-value access, not creation."""
 
         AudioEngineHandler._restore_fx_flag("{g}", 0)
 
         mock_set.assert_called_once()
         assert mock_set.call_args[0][4] == 0
+        mock_create.assert_not_called()
+        assert mock_open.call_args[0][:2] == (mock_open.return_value, "FxProperties")
 
     @patch("abso.settings.audio_engine.winreg.CloseKey")
     @patch("abso.settings.audio_engine.winreg.DeleteValue")
     @patch("abso.settings.audio_engine.winreg.OpenKey")
+    @patch.object(AudioEngineHandler, "_read_fx_flag", return_value=1)
     def test_restore_fx_flag_deletes_when_absent(
-        self, mock_open, mock_delete, mock_close
+        self, mock_read, mock_open, mock_delete, mock_close
     ):
         """Restoring a None original deletes ABSO's injected value."""
         mock_open.return_value = MagicMock()
@@ -328,3 +342,146 @@ class TestAudioEngineRegistryHelpers:
     def test_render_root_constant(self):
         """The render root constant matches the documented MMDevices path."""
         assert _RENDER_ROOT.endswith(r"MMDevices\Audio\Render")
+
+
+class TestAudioEngineRestoreEndpointChanges:
+    """Restore must tolerate endpoint removal without hiding real failures."""
+
+    @pytest.mark.parametrize("original", [None, 0, 1])
+    def test_removed_endpoint_is_not_recreated(self, original, caplog):
+        # The failed 2026-09-20 switch referenced a removed baseline endpoint.
+        with patch("abso.settings.audio_engine.winreg") as registry:
+            registry.OpenKey.side_effect = FileNotFoundError("Endpoint removed")
+
+            assert AudioEngineHandler().restore(
+                {"device_guid": "{old-device}", "original_flag": original}
+            ) is True
+
+            registry.CreateKeyEx.assert_not_called()
+            registry.SetValueEx.assert_not_called()
+            registry.DeleteValue.assert_not_called()
+            assert "no longer exists" in caplog.text
+
+    @pytest.mark.parametrize("original", [None, 0, 1])
+    def test_matching_flag_needs_only_read_access(self, original):
+        with patch("abso.settings.audio_engine.winreg") as registry:
+            if original is None:
+                registry.QueryValueEx.side_effect = FileNotFoundError("Value absent")
+            else:
+                registry.QueryValueEx.return_value = (original, registry.REG_DWORD)
+            registry.CreateKeyEx.side_effect = PermissionError("Writes forbidden")
+
+            assert AudioEngineHandler().restore(
+                {"device_guid": "{g}", "original_flag": original}
+            ) is True
+
+            assert all(call.args[3] == registry.KEY_READ for call in registry.OpenKey.call_args_list)
+            registry.CreateKeyEx.assert_not_called()
+            registry.SetValueEx.assert_not_called()
+            registry.DeleteValue.assert_not_called()
+
+    @pytest.mark.parametrize("failure_point", ["endpoint", "fx_key", "value"])
+    def test_unreadable_state_does_not_become_absence(self, failure_point):
+        with patch("abso.settings.audio_engine.winreg") as registry:
+            denied = PermissionError("Read access denied")
+            if failure_point == "endpoint":
+                registry.OpenKey.side_effect = denied
+            elif failure_point == "fx_key":
+                registry.OpenKey.side_effect = [MagicMock(), denied]
+            else:
+                registry.QueryValueEx.side_effect = denied
+
+            assert AudioEngineHandler().restore(
+                {"device_guid": "{g}", "original_flag": None}
+            ) is False
+
+            registry.CreateKeyEx.assert_not_called()
+            registry.SetValueEx.assert_not_called()
+            registry.DeleteValue.assert_not_called()
+
+    def test_changed_flag_write_denial_remains_failure(self):
+        with patch("abso.settings.audio_engine.winreg") as registry:
+            registry.QueryValueEx.return_value = (1, registry.REG_DWORD)
+            registry.SetValueEx.side_effect = PermissionError("Write access denied")
+
+            assert AudioEngineHandler().restore(
+                {"device_guid": "{g}", "original_flag": 0}
+            ) is False
+
+    def test_delete_denial_remains_failure(self):
+        with patch("abso.settings.audio_engine.winreg") as registry:
+            registry.QueryValueEx.return_value = (1, registry.REG_DWORD)
+            registry.DeleteValue.side_effect = PermissionError("Delete access denied")
+
+            assert AudioEngineHandler().restore(
+                {"device_guid": "{g}", "original_flag": None}
+            ) is False
+
+    def test_missing_fx_subkey_is_restored_only_beneath_existing_endpoint(self):
+        with patch("abso.settings.audio_engine.winreg") as registry:
+            device_key = MagicMock(name="existing_endpoint")
+            registry.OpenKey.side_effect = [
+                device_key, FileNotFoundError("Fx key absent"), FileNotFoundError("Fx key absent")
+            ]
+
+            assert AudioEngineHandler().restore(
+                {"device_guid": "{g}", "original_flag": 1}
+            ) is True
+
+            registry.CreateKeyEx.assert_called_once_with(
+                device_key, "FxProperties", 0, registry.KEY_SET_VALUE
+            )
+            registry.SetValueEx.assert_called_once_with(
+                registry.CreateKeyEx.return_value, _FX_VALUE_NAME, 0, registry.REG_DWORD, 1
+            )
+
+    def test_incomplete_snapshot_does_not_delete_live_value(self):
+        with patch("abso.settings.audio_engine.winreg") as registry:
+            assert AudioEngineHandler().restore({"device_guid": "{g}"}) is False
+            registry.OpenKey.assert_not_called()
+            registry.DeleteValue.assert_not_called()
+
+    @pytest.mark.parametrize("failure_point", ["fx_key", "value"])
+    def test_backup_propagates_read_failure_instead_of_capturing_absence(self, failure_point):
+        with (
+            patch.object(AudioEngineHandler, "_find_active_device_guid", return_value="{g}"),
+            patch("abso.settings.audio_engine.winreg") as registry,
+        ):
+            if failure_point == "fx_key":
+                registry.OpenKey.side_effect = PermissionError("Cannot capture")
+            else:
+                registry.QueryValueEx.side_effect = PermissionError("Cannot capture")
+
+            with pytest.raises(PermissionError, match="Cannot capture"):
+                AudioEngineHandler().backup()
+
+    def test_apply_matching_flag_avoids_write_and_false_change(self):
+        with (
+            patch.object(AudioEngineHandler, "_find_active_device_guid", return_value="{g}"),
+            patch("abso.settings.audio_engine.winreg") as registry,
+        ):
+            registry.QueryValueEx.return_value = (1, registry.REG_DWORD)
+            registry.CreateKeyEx.side_effect = PermissionError("Writes forbidden")
+
+            result = AudioEngineHandler().apply({"disable_enhancements": True})
+
+            assert result["success"] is True
+            assert result["changed"] is False
+            assert not result["warnings"]
+            registry.CreateKeyEx.assert_not_called()
+            registry.SetValueEx.assert_not_called()
+
+    def test_apply_does_not_recreate_removed_endpoint(self):
+        with (
+            patch.object(AudioEngineHandler, "_find_active_device_guid", return_value="{g}"),
+            patch("abso.settings.audio_engine.winreg") as registry,
+        ):
+            registry.OpenKey.side_effect = FileNotFoundError("Endpoint removed")
+
+            result = AudioEngineHandler().apply({"disable_enhancements": True})
+
+            assert result["success"] is True
+            assert result["changed"] is False
+            assert result["warnings"]
+            registry.CreateKeyEx.assert_not_called()
+            registry.SetValueEx.assert_not_called()

@@ -58,8 +58,10 @@ class TransactionResult:
     backup_id: str | None = None
     rollback_backup_id: str | None = None
     error: str | None = None
+    rollback_attempted: bool = False
     rollback_performed: bool = False
     rollback_error: str | None = None
+    rollback_summary: dict[str, Any] | None = None
     apply_result: ApplyResult | None = None
     verify_result: dict[str, Any] | None = None
     compliance_report: ComplianceReport | None = None
@@ -79,8 +81,10 @@ class TransactionResult:
             "backup_id": self.backup_id,
             "rollback_backup_id": self.rollback_backup_id,
             "error": self.error,
+            "rollback_attempted": self.rollback_attempted,
             "rollback_performed": self.rollback_performed,
             "rollback_error": self.rollback_error,
+            "rollback_summary": self.rollback_summary,
             "compliance": self.compliance_report.to_dict() if self.compliance_report else None,
             "checkpoints": [
                 {
@@ -125,6 +129,41 @@ class ProfileTransactionManager:
         self.compliance_engine = compliance_engine or ComplianceEngine()
         self.auto_rollback_on_critical = auto_rollback_on_critical
         self.auto_rollback_on_partial_apply = auto_rollback_on_partial_apply
+
+    @staticmethod
+    def _rollback_to_snapshot(
+        tx: TransactionResult,
+        manager: BackupManager,
+        backup_id: str,
+        reason: str,
+    ) -> None:
+        """Recover the pre-switch state without claiming unbacked settings restored."""
+        tx.success = False
+        tx.state = "rolling_back"
+        tx.rollback_attempted = True
+        try:
+            summary = manager.restore_backup(backup_id)
+            tx.rollback_summary = summary.to_dict()
+            if summary.complete:
+                tx.rollback_performed = True
+                tx.state = "rolled_back"
+                tx.error = f"{reason}; restored backup automatically."
+                tx.add_checkpoint("rollback", "ok", f"Restored backup {backup_id}")
+            else:
+                # Non-blocking skips permit applying another profile, but do
+                # not prove that an aborted switch restored the previous one.
+                # Keep every gap (including unavailable NVIDIA restore) visible.
+                tx.rollback_error = "Rollback incomplete for handlers: " + _summarize_restore_issues(
+                    summary.skipped_components + summary.failed_components
+                )
+                tx.state = "failed"
+                tx.error = f"{reason}; {tx.rollback_error}. Verify the previous profile before playing."
+                tx.add_checkpoint("rollback", "failed", tx.error)
+        except Exception as exc:
+            tx.rollback_error = str(exc)
+            tx.state = "failed"
+            tx.error = f"{reason}; rollback failed: {exc}"
+            tx.add_checkpoint("rollback", "failed", tx.error)
 
     def execute(
         self,
@@ -255,12 +294,14 @@ class ProfileTransactionManager:
         # can leak through if the new profile doesn't explicitly override them.
         # Restore the latest backup (taken before the previous profile was applied)
         # to return to a clean pre-profile baseline before applying the new one.
+        baseline_restore_started = False
         if create_backup:
             try:
                 self.backup_dir.mkdir(parents=True, exist_ok=True)
                 restore_manager = BackupManager(self.backup_dir)
                 baseline_path = restore_manager.get_baseline_backup()
                 if baseline_path and baseline_path.exists():
+                    baseline_restore_started = True
                     restore_summary = restore_manager.restore_backup(baseline_path.name)
                     if restore_summary.complete:
                         tx.add_checkpoint(
@@ -277,6 +318,10 @@ class ProfileTransactionManager:
                             )
                         )
                         tx.add_checkpoint("baseline_restore", "failed", tx.error)
+                        assert rollback_backup_manager is not None and rollback_backup_id is not None
+                        self._rollback_to_snapshot(
+                            tx, rollback_backup_manager, rollback_backup_id, tx.error
+                        )
                         return tx
                     else:
                         tx.add_checkpoint(
@@ -301,12 +346,22 @@ class ProfileTransactionManager:
                 tx.error = f"Baseline backup corrupted: {e}"
                 logger.error(tx.error)
                 tx.add_checkpoint("baseline_restore", "failed", tx.error)
+                if baseline_restore_started:
+                    assert rollback_backup_manager is not None and rollback_backup_id is not None
+                    self._rollback_to_snapshot(
+                        tx, rollback_backup_manager, rollback_backup_id, tx.error
+                    )
                 return tx
             except Exception as e:
                 tx.state = "failed"
                 tx.error = f"Baseline restore failed: {e}"
                 logger.error(tx.error)
                 tx.add_checkpoint("baseline_restore", "failed", tx.error)
+                if baseline_restore_started:
+                    assert rollback_backup_manager is not None and rollback_backup_id is not None
+                    self._rollback_to_snapshot(
+                        tx, rollback_backup_manager, rollback_backup_id, tx.error
+                    )
                 return tx
 
         backup_manager: BackupManager | None = None
@@ -334,6 +389,11 @@ class ProfileTransactionManager:
                 tx.state = "failed"
                 tx.error = f"Backup failed: {e}"
                 tx.add_checkpoint("backup", "failed", tx.error)
+                if baseline_restore_started:
+                    assert rollback_backup_manager is not None and rollback_backup_id is not None
+                    self._rollback_to_snapshot(
+                        tx, rollback_backup_manager, rollback_backup_id, tx.error
+                    )
                 return tx
         else:
             tx.add_checkpoint("backup", "skipped", "Backup creation skipped")
@@ -404,7 +464,7 @@ class ProfileTransactionManager:
         partial_apply_failure = (
             tx.apply_result is not None
             and not tx.apply_result.success
-            and bool(tx.apply_result.changed_settings)
+            and (baseline_restore_started or bool(tx.apply_result.changed_settings))
         )
 
         should_rollback = bool(
@@ -425,36 +485,11 @@ class ProfileTransactionManager:
             rollback_reason = (
                 "Critical compliance failure"
                 if has_critical
+                else "Partial apply failure after baseline restore"
+                if baseline_restore_started
                 else f"Partial apply failure ({len(tx.apply_result.changed_settings)} setting(s) mutated state before failure)"
             )
-            tx.state = "rolling_back"
-            try:
-                restore_summary = rollback_manager.restore_backup(rollback_target_id)
-                if restore_summary.complete or not restore_summary.has_blocking_issues:
-                    tx.rollback_performed = True
-                    tx.state = "rolled_back"
-                    tx.error = f"{rollback_reason}; restored backup automatically."
-                    tx.add_checkpoint("rollback", "ok", f"Restored backup {rollback_target_id}")
-                else:
-                    tx.rollback_performed = False
-                    tx.rollback_error = (
-                        "Rollback incomplete for handlers: "
-                        + _summarize_restore_issues(
-                            restore_summary.skipped_components + restore_summary.failed_components,
-                            blocking_only=True,
-                        )
-                    )
-                    tx.state = "failed"
-                    tx.error = (
-                        f"{rollback_reason} and rollback was incomplete: " f"{tx.rollback_error}"
-                    )
-                    tx.add_checkpoint("rollback", "failed", tx.error)
-            except Exception as e:
-                tx.rollback_error = str(e)
-                tx.state = "failed"
-                tx.error = f"{rollback_reason} and rollback failed: " f"{tx.rollback_error}"
-                tx.add_checkpoint("rollback", "failed", tx.error)
-            tx.success = False
+            self._rollback_to_snapshot(tx, rollback_manager, rollback_target_id, rollback_reason)
             return tx
 
         if tx.apply_result.success and not has_critical:

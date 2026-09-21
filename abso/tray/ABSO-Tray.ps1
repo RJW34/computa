@@ -1455,12 +1455,14 @@ function Stop-ActiveProfileVerificationRuntime {
     $script:ActiveProfileVerifyErrorFile = $null
     $script:ActiveProfileVerifyStartedAt = $null
     $script:ActiveProfileVerifySilent = $true
+    $script:ActiveProfileVerifyPreserveLastAction = $false
 }
 
 function Apply-ActiveProfileVerificationJson {
     param(
         [object]$Json,
-        [switch]$Silent
+        [switch]$Silent,
+        [switch]$PreserveLastAction
     )
 
     if ($null -eq $Json -or -not $Json.success -or -not $Json.data) {
@@ -1503,6 +1505,14 @@ function Apply-ActiveProfileVerificationJson {
     $script:ActiveProfileVerificationCheckedAt = if ($verification.checked_at) { "$($verification.checked_at)" } else { (Get-Date).ToString("o") }
     $script:ActiveProfileStateRebootPending = if ($Json.data.PSObject.Properties["reboot_pending"]) { [bool]$Json.data.reboot_pending } else { $false }
     $script:ActiveProfileStateRebootReasons = if ($Json.data.PSObject.Properties["reboot_reasons"]) { @($Json.data.reboot_reasons) } else { @() }
+
+    if ($PreserveLastAction) {
+        # A failed switch still owns the action feedback. Update the current
+        # profile's verification fields without replacing that failure with a
+        # background status (including a clean result after rollback).
+        Write-TrayLog "Active profile verification after failed apply: $script:ActiveProfileVerificationStatus"
+        return
+    }
 
     if ($script:ActiveProfileVerificationStatus -eq "pending_apply") {
         $pendingText = Get-ActiveProfilePendingApplyText
@@ -1562,7 +1572,7 @@ function Start-ActiveProfileVerificationProcess {
     .SYNOPSIS
     Starts read-only active-profile verification without blocking the WinForms UI thread.
     #>
-    param([switch]$Silent)
+    param([switch]$Silent, [switch]$PreserveLastAction)
 
     if (Test-ActiveProfileVerificationInFlight) {
         if (-not $Silent) { $script:ActiveProfileVerifySilent = $false }
@@ -1586,6 +1596,7 @@ function Start-ActiveProfileVerificationProcess {
         $script:ActiveProfileVerifyErrorFile = "$($script:ActiveProfileVerifyOutputFile).err"
         $script:ActiveProfileVerifyStartedAt = [DateTime]::UtcNow
         $script:ActiveProfileVerifySilent = [bool]$Silent
+        $script:ActiveProfileVerifyPreserveLastAction = [bool]$PreserveLastAction
         $stateArgs = Get-AbsoBackendArgs -CommandArgs @("state", "--json", "--verify")
 
         Write-TrayLog "Starting read-only state verification: $($script:PythonExe) $($stateArgs -join ' ')"
@@ -1647,7 +1658,8 @@ function Complete-ActiveProfileVerificationIfReady {
         if (-not $rawOutput) { throw "state --verify returned no output" }
 
         $json = Invoke-JsonSafe -Text $rawOutput -Source 'StateVerify'
-        Apply-ActiveProfileVerificationJson -Json $json -Silent:([bool]$script:ActiveProfileVerifySilent)
+        Apply-ActiveProfileVerificationJson -Json $json -Silent:([bool]$script:ActiveProfileVerifySilent) `
+            -PreserveLastAction:([bool]$script:ActiveProfileVerifyPreserveLastAction)
     }
     catch {
         Write-TrayLog "State verification refresh failed: $($_.Exception.Message)" -Level "WARN"
@@ -5220,6 +5232,34 @@ function Complete-TrayMutatingChildProcess {
     }
 }
 
+function Refresh-TrayStateAfterFailedApply {
+    # Baseline restore can have changed settings even when the requested
+    # profile never committed. Its old verification is no longer evidence.
+    # Run only after the backend exits and the mutation guard is released.
+    if ($script:MutatingOperationInProgress) { return }
+    $failureAction = $script:LastAction
+    $failureTime = $script:LastActionTime
+    try {
+        Stop-ActiveProfileVerificationRuntime -KillProcess
+        Reset-ActiveProfileVerificationState
+        if (Sync-TrayBackendProfileState) {
+            if (-not [string]::IsNullOrWhiteSpace([string]$script:activeProfile)) {
+                Start-ActiveProfileVerificationProcess -Silent -PreserveLastAction
+            }
+        }
+    }
+    catch {
+        Write-TrayLog "Failed-apply state refresh could not start: $($_.Exception.Message)" -Level "WARN"
+    }
+    finally {
+        # State-file adoption may update LastAction; retain the failed target
+        # and recovery details while the status fields describe current state.
+        $script:LastAction = $failureAction
+        $script:LastActionTime = $failureTime
+        Update-MenuState
+    }
+}
+
 function Apply-Profile {
     param([string]$ProfileId)
 
@@ -5260,8 +5300,15 @@ function Apply-Profile {
     $tempFile = $null
     $errFile = $null
     $proc = $null
+    $refreshAfterFailedApply = $false
+    $preApplyVerificationStatus = $script:ActiveProfileVerificationStatus
     $script:MutatingOperationInProgress = $true
     try {
+        # Do not let a pre-switch verifier repopulate cached status while
+        # this transaction restores or changes settings.
+        Stop-ActiveProfileVerificationRuntime -KillProcess
+        Reset-ActiveProfileVerificationState
+
         # Show applying state
         Set-IconState -State "Applying"
         Set-TrayOperationTooltipText -Text "computa - Applying..."
@@ -5277,7 +5324,7 @@ function Apply-Profile {
 
         if ($sameActiveProfile) {
             $applyArgs = Get-AbsoBackendArgs -CommandArgs @("reapply", "--json")
-            Write-TrayLog "Profile '$ProfileId' is already active but verification status is '$script:ActiveProfileVerificationStatus'; using reapply instead of full apply"
+            Write-TrayLog "Profile '$ProfileId' is already active but verification status is '$preApplyVerificationStatus'; using reapply instead of full apply"
         }
         else {
             $applyArgs = Get-AbsoBackendArgs -CommandArgs @("apply", $ProfileId, "--json", "--no-fallback")
@@ -5602,6 +5649,7 @@ function Apply-Profile {
         }
         else {
             $err = Get-ApplyFailureMessage -Json $json -FailedHandlers $failedHandlers -ExitCode $exitCode
+            $refreshAfterFailedApply = $true
             Write-TrayLog "Profile apply failed: $err" -Level "ERROR"
             Close-ProgressOverlay
             $isVrrPrereqError = Test-IsVrrPrerequisiteError -Message $err
@@ -5625,6 +5673,7 @@ function Apply-Profile {
         }
     }
     catch {
+        $refreshAfterFailedApply = $true
         Write-TrayLog "Apply-Profile exception: $($_.Exception.Message)" -Level "ERROR"
         Close-ProgressOverlay
         Play-FailSound
@@ -5643,6 +5692,7 @@ function Apply-Profile {
             if ($tempFile) { Remove-Item $tempFile -Force -ErrorAction SilentlyContinue }
             if ($errFile) { Remove-Item $errFile -Force -ErrorAction SilentlyContinue }
             $script:MutatingOperationInProgress = $false
+            if ($refreshAfterFailedApply) { Refresh-TrayStateAfterFailedApply }
         }
     }
 }

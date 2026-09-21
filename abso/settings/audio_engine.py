@@ -131,7 +131,9 @@ class AudioEngineHandler(SettingsHandler):
             value, or None when the value/key was absent at backup time).
         """
         guid = self._find_active_device_guid()
-        original = self._read_fx_flag(guid) if guid is not None else None
+        # An unreadable flag is not proof that it was absent. Let the backup
+        # manager record a failed capture rather than save a deletion target.
+        original = self._read_fx_flag(guid, strict=True) if guid is not None else None
         return {"device_guid": guid, "original_flag": original}
 
     def restore(self, data: dict[str, Any]) -> bool:
@@ -140,6 +142,9 @@ class AudioEngineHandler(SettingsHandler):
         if not guid:
             # Nothing was captured (no active device at backup); nothing to do.
             return True
+        if "original_flag" not in data:
+            logger.error("Audio enhancement backup is missing its captured flag")
+            return False
         try:
             self._restore_fx_flag(str(guid), data.get("original_flag"))
         except Exception as exc:  # noqa: BLE001 - surface failed rollback to the transaction
@@ -208,8 +213,8 @@ class AudioEngineHandler(SettingsHandler):
         return None
 
     @staticmethod
-    def _read_fx_flag(guid: str | None) -> int | None:
-        """Read the DisableAllEnhancements flag for a device GUID (None if absent)."""
+    def _read_fx_flag(guid: str | None, *, strict: bool = False) -> int | None:
+        """Read the flag; strict callers distinguish absent from inaccessible."""
         if not guid:
             return None
         try:
@@ -219,61 +224,88 @@ class AudioEngineHandler(SettingsHandler):
                 0,
                 winreg.KEY_READ,
             )
-        except (FileNotFoundError, PermissionError, OSError):
+        except FileNotFoundError:
+            return None
+        except OSError:
+            if strict:
+                raise
             return None
         try:
             try:
                 return int(winreg.QueryValueEx(fx_key, _FX_VALUE_NAME)[0])
             except FileNotFoundError:
                 return None
+            except OSError:
+                if strict:
+                    raise
+                return None
         finally:
             winreg.CloseKey(fx_key)
 
     @staticmethod
     def _write_fx_flag(guid: str, value: int) -> bool:
-        """Write the DisableAllEnhancements flag, creating FxProperties if absent."""
-        # CreateKeyEx opens the subkey when present and creates it (and any
-        # missing FxProperties parent) when it is not.
-        key = winreg.CreateKeyEx(
+        """Write a changed flag beneath an existing Windows-owned endpoint."""
+        device_key = winreg.OpenKey(
             winreg.HKEY_LOCAL_MACHINE,
-            f"{_RENDER_ROOT}\\{guid}\\FxProperties",
+            f"{_RENDER_ROOT}\\{guid}",
             0,
-            winreg.KEY_SET_VALUE,
+            winreg.KEY_READ,
         )
         try:
-            winreg.SetValueEx(key, _FX_VALUE_NAME, 0, winreg.REG_DWORD, value)
+            if AudioEngineHandler._read_fx_flag(guid, strict=True) == value:
+                return False
+            # Never pass a full endpoint path to CreateKeyEx: a disappeared
+            # endpoint belongs to Windows and must not be recreated by ABSO.
+            try:
+                key = winreg.OpenKey(device_key, "FxProperties", 0, winreg.KEY_SET_VALUE)
+            except FileNotFoundError:
+                key = winreg.CreateKeyEx(device_key, "FxProperties", 0, winreg.KEY_SET_VALUE)
+            try:
+                winreg.SetValueEx(key, _FX_VALUE_NAME, 0, winreg.REG_DWORD, value)
+            finally:
+                winreg.CloseKey(key)
             return True
         finally:
-            winreg.CloseKey(key)
+            winreg.CloseKey(device_key)
 
     @staticmethod
     def _restore_fx_flag(guid: str, original: int | None) -> None:
-        """Write back the captured flag, or delete it if it was absent at backup."""
-        if original is None:
-            # Flag was absent at backup; remove ABSO's write (best-effort).
-            try:
-                key = winreg.OpenKey(
-                    winreg.HKEY_LOCAL_MACHINE,
-                    f"{_RENDER_ROOT}\\{guid}\\FxProperties",
-                    0,
-                    winreg.KEY_SET_VALUE,
-                )
-            except FileNotFoundError:
+        """Restore an existing endpoint without recreating removed hardware."""
+        try:
+            device_key = winreg.OpenKey(
+                winreg.HKEY_LOCAL_MACHINE,
+                f"{_RENDER_ROOT}\\{guid}",
+                0,
+                winreg.KEY_READ,
+            )
+        except FileNotFoundError:
+            logger.warning("Skipping audio enhancement restore: endpoint %s no longer exists", guid)
+            return
+        try:
+            # Read-only access may succeed even when writes are ACL-locked.
+            # Matching values (including confirmed absence) need no mutation.
+            current = AudioEngineHandler._read_fx_flag(guid, strict=True)
+            if current == original:
                 return
+            if original is None:
+                try:
+                    key = winreg.OpenKey(device_key, "FxProperties", 0, winreg.KEY_SET_VALUE)
+                except FileNotFoundError:
+                    return
+                try:
+                    with contextlib.suppress(FileNotFoundError):
+                        winreg.DeleteValue(key, _FX_VALUE_NAME)
+                finally:
+                    winreg.CloseKey(key)
+                return
+
             try:
-                with contextlib.suppress(FileNotFoundError):
-                    winreg.DeleteValue(key, _FX_VALUE_NAME)
+                key = winreg.OpenKey(device_key, "FxProperties", 0, winreg.KEY_SET_VALUE)
+            except FileNotFoundError:
+                key = winreg.CreateKeyEx(device_key, "FxProperties", 0, winreg.KEY_SET_VALUE)
+            try:
+                winreg.SetValueEx(key, _FX_VALUE_NAME, 0, winreg.REG_DWORD, int(original))
             finally:
                 winreg.CloseKey(key)
-            return
-
-        key = winreg.CreateKeyEx(
-            winreg.HKEY_LOCAL_MACHINE,
-            f"{_RENDER_ROOT}\\{guid}\\FxProperties",
-            0,
-            winreg.KEY_SET_VALUE,
-        )
-        try:
-            winreg.SetValueEx(key, _FX_VALUE_NAME, 0, winreg.REG_DWORD, int(original))
         finally:
-            winreg.CloseKey(key)
+            winreg.CloseKey(device_key)
