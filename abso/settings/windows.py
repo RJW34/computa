@@ -2656,7 +2656,9 @@ class WindowsSettingsHandler(SettingsHandler):
                 enum_devmode = DEVMODE()
                 enum_devmode.dmSize = ctypes.sizeof(DEVMODE)
 
-                while mode_num < 500 and user32.EnumDisplaySettingsW(
+                # Drivers can expose hundreds of low-resolution modes before
+                # the current resolution. Keep a bound without truncating those.
+                while mode_num < 4096 and user32.EnumDisplaySettingsW(
                     None, mode_num, ctypes.byref(enum_devmode)
                 ):
                     # Only consider modes at current resolution

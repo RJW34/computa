@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, Literal
 
-from abso.profiles.base import BaseProfile
+from abso.profiles.base import BaseProfile, DisplayPathRequirements
 from abso.profiles.profile_bases import (
     build_standard_handlers,
     fso_overrides,
@@ -48,10 +48,19 @@ class _Diablo4BaseProfile(BaseProfile):
 
     @property
     def fullscreen_optimizations_per_exe(self) -> dict[str, bool]:
-        # D4's native HDR VRR lane wants the true exclusive path so the HDR
-        # tone map runs in the game, not in DWM. Disable FSO per-exe to keep
-        # the GPU off the compositor's borderless HDR shim.
-        return fso_overrides(self.executable_hints)
+        # Retail DisplayModeWindowMode=1 is Windowed (Fullscreen), confirmed
+        # by the game's Prism runtime log. Clear a stale exclusive-path flag.
+        return fso_overrides(self.executable_hints, disabled=False)
+
+    @property
+    def display_path_requirements(self) -> DisplayPathRequirements:
+        # Preserve this lane's existing overlay-free process policy while
+        # correcting the presentation mode to borderless.
+        return DisplayPathRequirements(require_overlay_free_path=True)
+
+    @property
+    def requires_exact_nvidia_binding(self) -> bool:
+        return True
 
     @property
     def nvidia_profile_name(self) -> str | None:
@@ -84,9 +93,9 @@ class _Diablo4BaseProfile(BaseProfile):
                 "game_bar": False,
                 "game_dvr": False,
                 "hags": True,
-                # Diablo 4 profile targets fullscreen-only VRR. Do not force
-                # the Win11 windowed compositor path unless a future borderless
-                # variant opts in explicitly.
+                # D4 already uses DX12 flip presentation. These legacy Windows
+                # compatibility switches are not required to select NVIDIA's
+                # windowed G-SYNC mode, set separately below.
                 "windowed_optimizations": False,
                 "vrr_optimize": False,
                 "max_refresh_rate": True,
@@ -131,7 +140,7 @@ class _Diablo4BaseProfile(BaseProfile):
                 # limiter (written by Diablo4ConfigHandler.auto_vrr_fps_cap) is the
                 # single authoritative limiter per Blur Busters G-SYNC 101.
                 "auto_vrr_fps_cap": False,
-                "global_vrr_mode": "fullscreen_only",
+                "global_vrr_mode": "fullscreen_and_windowed",
             },
             "NetworkSettingsHandler": {
                 "disable_nagle": False,
@@ -151,7 +160,9 @@ class _Diablo4BaseProfile(BaseProfile):
             },
             "Diablo4ConfigHandler": {
                 "window_mode": 1,
-                "vsync": False,
+                # NVIDIA's windowed G-SYNC + Reflex guidance requires native
+                # VSync; driver VSync alone does not establish that path.
+                "vsync": True,
                 "reflex": True,
                 "auto_refresh_rate": True,
                 # In-game foreground cap at refresh - 3 via auto_vrr_fps_cap.
@@ -178,8 +189,8 @@ class _Diablo4BaseProfile(BaseProfile):
             {
                 "category": "Display",
                 "setting": "Display Mode",
-                "value": "Fullscreen",
-                "reason": "Matches the fullscreen VRR path this profile applies.",
+                "value": "Windowed (Fullscreen)",
+                "reason": "DisplayModeWindowMode=1 uses Diablo IV's borderless path; ABSO enables windowed G-SYNC.",
             },
             {
                 "category": "Display",
@@ -190,8 +201,8 @@ class _Diablo4BaseProfile(BaseProfile):
             {
                 "category": "Display",
                 "setting": "VSync (in-game)",
-                "value": "Off",
-                "reason": "Keep synchronization in the driver VRR safety-net path, not in the game.",
+                "value": "On",
+                "reason": "NVIDIA recommends in-game VSync for windowed G-SYNC + Reflex. Saved driver settings alone do not prove live VRR engagement.",
             },
             {
                 "category": "Display",

@@ -182,12 +182,18 @@ class _Overwatch2BaseProfile(ReflexShooterBaseProfile):
 
     @staticmethod
     def _borderless_ow2_settings() -> dict[str, Any]:
-        """OW2 Settings_v0.ini keys for borderless/windowed fullscreen."""
+        """OW2 borderless G-SYNC requires the game's VSync path.
+
+        NVIDIA's latency guide recommends native VSync for windowed G-SYNC
+        with Reflex because the driver override is fullscreen-only:
+        https://www.nvidia.com/en-us/geforce/guides/system-latency-optimization-guide/
+        """
         return {
             "window_mode": 1,
             "fullscreen_window": False,
             "fullscreen_window_enabled": False,
             "windowed_fullscreen": True,
+            "vsync": True,
         }
 
     def resolve_runtime_settings(
@@ -270,6 +276,19 @@ class _Overwatch2BaseProfile(ReflexShooterBaseProfile):
         }
 
     @staticmethod
+    def _ow2_gsync_vsync_guidance() -> dict[str, str]:
+        return {
+            "category": "Display",
+            "setting": "VSync",
+            "value": "On (in-game)",
+            "reason": (
+                "This borderless G-SYNC profile enables native VSync as NVIDIA recommends "
+                "for windowed G-SYNC with Reflex. Driver VSync also stays On; its saved "
+                "override alone does not prove that a windowed game is synchronized."
+            ),
+        }
+
+    @staticmethod
     def _custom_render_scale_guidance() -> dict[str, str]:
         return {
             "category": "Graphics",
@@ -322,8 +341,25 @@ class _Overwatch2BaseProfile(ReflexShooterBaseProfile):
         ]
 
     @staticmethod
+    def _hdr_calibration_guidance() -> dict[str, str]:
+        return {
+            "category": "Display",
+            "setting": "HDR Calibration",
+            "value": "Keep your calibrated values",
+            "reason": (
+                "ABSO preserves the game's HDR calibration. Use the game's calibration "
+                "screens when recalibrating this display; there is no universal peak or "
+                "paper-white value. Windows SDR-content brightness is a separate setting."
+            ),
+        }
+
+    @staticmethod
     def _ow2_gsync_post_apply_notes() -> list[str]:
         return [
+            (
+                "OW2 borderless G-SYNC: keep in-game VSync On. Driver VSync also stays On; "
+                "saved settings are not a measurement of live sync engagement."
+            ),
             (
                 "OW2 manual: set NVIDIA Reflex to Enabled + Boost; keep Dynamic Render Scale Off "
                 "and Custom Render Scale 100% unless GPU-bound."
@@ -407,7 +443,7 @@ class Overwatch2Profile(_Overwatch2BaseProfile):
     def _variant_overrides(self) -> dict[str, dict[str, Any]]:
         return {
             "NvidiaSettingsHandler": {
-                # In-game Reflex ON + Boost: uncapped no-sync goes GPU-bound in
+                # In-game Reflex ON + Boost: no-sync can become GPU-bound in
                 # team fights, where native Reflex can reduce queue latency.
                 # Boost tradeoffs still require comparison on this machine.
                 # Driver preset keeps LLM off so the engine owns the queue,
@@ -421,7 +457,7 @@ class Overwatch2Profile(_Overwatch2BaseProfile):
             "OW2ConfigHandler": {
                 # No-sync: exclusive fullscreen for cleanest presentation path.
                 "window_mode": 0,
-                # Uncapped no-sync path (600 = OW2 max).
+                # No-sync uses a high ceiling, not an unlimited frame rate.
                 "frame_rate_cap": 600,
                 # Verify confirms the manual in-game Reflex step (On + Boost).
                 # Native Reflex handles render-queue backpressure; compare
@@ -457,8 +493,8 @@ class Overwatch2Profile(_Overwatch2BaseProfile):
             {
                 "category": "Display",
                 "setting": "Frame Rate Cap",
-                "value": "Uncapped (600)",
-                "reason": "No-sync profile: uncapped FPS reduces frame time when the game can sustain it.",
+                "value": "600 FPS ceiling",
+                "reason": "No-sync uses a 600 FPS ceiling and accepts tearing; actual FPS depends on the workload.",
             },
             {
                 "category": "Display",
@@ -473,7 +509,7 @@ class Overwatch2Profile(_Overwatch2BaseProfile):
                 "category": "Graphics",
                 "setting": "Dynamic Render Scale",
                 "value": "Off",
-                "reason": "Avoid frametime variance from dynamic scaling.",
+                "reason": "Keeps render resolution fixed; performance depends on the scene and GPU load.",
             },
             self._custom_render_scale_guidance(),
             *self._graphics_detail_guidance(),
@@ -561,24 +597,7 @@ class Overwatch2NoSyncHDRProfile(Overwatch2Profile):
                     "value": "On",
                     "reason": "Native HDR output for OLED / Mini-LED displays.",
                 },
-                {
-                    "category": "Display",
-                    "setting": "HDR Paper White Nits",
-                    "value": "~200 (calibrate to taste)",
-                    "reason": "Controls SDR-content brightness under HDR. ~200 nits is a good OLED starting point.",
-                },
-                {
-                    "category": "Display",
-                    "setting": "HDR Max Display Brightness",
-                    "value": "Match monitor peak (e.g. 1000+ nits OLED)",
-                    "reason": "Set to your display's actual peak brightness for correct tone mapping.",
-                },
-                {
-                    "category": "Display",
-                    "setting": "HDR UI Brightness",
-                    "value": "Adjust to taste",
-                    "reason": "OW2-specific slider for HUD brightness under HDR.",
-                },
+                self._hdr_calibration_guidance(),
             ]
         )
         return entries
@@ -587,7 +606,7 @@ class Overwatch2NoSyncHDRProfile(Overwatch2Profile):
 class Overwatch2GSyncProfile(_Overwatch2BaseProfile):
     """Overwatch 2 G-SYNC profile.
 
-    VRR profile with native Reflex, NVCP VSync as a safety net, and matching
+    VRR profile with native Reflex, in-game and driver VSync, and matching
     refresh - 3 static caps. Reflex may dynamically pace below the ceiling.
 
     Runs the same borderless windowed flip path as the capture-safe sibling;
@@ -621,9 +640,8 @@ class Overwatch2GSyncProfile(_Overwatch2BaseProfile):
 
     @property
     def fullscreen_optimizations_per_exe(self) -> dict[str, bool]:
-        # Overlay-free G-SYNC uses OW2's faster modern borderless flip path on
-        # this Win11/Reflex setup. Clear any stale FSO-disable entry left by
-        # the former exclusive profile so Windows can use the optimized path.
+        # This lane uses OW2's modern borderless flip path. Clear stale
+        # FSO-disable entries left by the former exclusive profile.
         # Full launcher paths are expanded only at apply/verify time.
         return self._fso_dict(disabled=False)
 
@@ -682,30 +700,25 @@ class Overwatch2GSyncProfile(_Overwatch2BaseProfile):
                     "frame-time noise."
                 ),
             },
-            {
-                "category": "Display",
-                "setting": "VSync",
-                "value": "Off (in-game)",
-                "reason": "Use NVCP VSync as safety net; keep in-game VSync off.",
-            },
+            self._ow2_gsync_vsync_guidance(),
             {
                 "category": "Display",
                 "setting": "NVIDIA Reflex",
                 "value": "Enabled + Boost — set the in-game toggle manually",
-                "reason": "Enable native Reflex for queue control; the profile requests driver LLM Off. With G-SYNC and VSync active, Reflex may pace below the static cap. ABSO cannot safely write the Reflex toggle; verify it in-game. Boost can cost power or FPS, so compare Enabled alone if needed.",
+                "reason": "Enable native Reflex for queue control; the profile requests driver LLM Off. With G-SYNC and VSync active, Reflex may pace below the static cap. ABSO leaves Reflex as a manual choice; verify it in-game. Boost can cost power or FPS, so compare Enabled alone if needed.",
             },
             self._ow2_gsync_cap_guidance(),
             {
                 "category": "Display",
                 "setting": "Reduce Buffering",
                 "value": "On",
-                "reason": "Maintains low queue depth in the render pipeline.",
+                "reason": "Requests the game's reduced buffering path; compare frame-time and latency results with Reflex on this setup.",
             },
             {
                 "category": "Graphics",
                 "setting": "Dynamic Render Scale",
                 "value": "Off",
-                "reason": "Avoid large frame pacing oscillations.",
+                "reason": "Keeps render resolution fixed; performance depends on the scene and GPU load.",
             },
             self._custom_render_scale_guidance(),
             *self._graphics_detail_guidance(),
@@ -723,7 +736,7 @@ class Overwatch2GSyncHDRProfile(_Overwatch2BaseProfile):
     instead of sRGB clamp.
 
     OW2's HDR implementation works well on OLED with proper in-game
-    calibration (Paper White Nits, Max Nits). Auto HDR is disabled
+    calibration. Auto HDR is disabled
     since OW2 has native HDR support.
 
     Same borderless windowed flip path as the HDR capture-safe sibling; the
@@ -755,10 +768,8 @@ class Overwatch2GSyncHDRProfile(_Overwatch2BaseProfile):
 
     @property
     def fullscreen_optimizations_per_exe(self) -> dict[str, bool]:
-        # Native HDR on this Win11/Reflex setup is faster on OW2's modern
-        # borderless flip path than on the former exclusive/fullscreen-only
-        # lane. Clear stale FSO-disable entries so the optimized path can
-        # engage after switching away from old strict builds.
+        # Native HDR uses the borderless flip path. Clear stale FSO-disable
+        # entries after switching away from the former exclusive lane.
         # Full launcher paths are expanded only at apply/verify time.
         return self._fso_dict(disabled=False)
 
@@ -840,24 +851,19 @@ class Overwatch2GSyncHDRProfile(_Overwatch2BaseProfile):
                     "frame-time noise."
                 ),
             },
-            {
-                "category": "Display",
-                "setting": "VSync",
-                "value": "Off (in-game)",
-                "reason": "Use NVCP VSync as safety net; keep in-game VSync off.",
-            },
+            self._ow2_gsync_vsync_guidance(),
             {
                 "category": "Display",
                 "setting": "NVIDIA Reflex",
                 "value": "Enabled + Boost — set the in-game toggle manually",
-                "reason": "Enable native Reflex for queue control; the profile requests driver LLM Off. With G-SYNC and VSync active, Reflex may pace below the static cap. ABSO cannot safely write the Reflex toggle; verify it in-game. Boost can cost power or FPS, so compare Enabled alone if needed.",
+                "reason": "Enable native Reflex for queue control; the profile requests driver LLM Off. With G-SYNC and VSync active, Reflex may pace below the static cap. ABSO leaves Reflex as a manual choice; verify it in-game. Boost can cost power or FPS, so compare Enabled alone if needed.",
             },
             self._ow2_gsync_cap_guidance(),
             {
                 "category": "Display",
                 "setting": "Reduce Buffering",
                 "value": "On",
-                "reason": "Maintains low queue depth in the render pipeline.",
+                "reason": "Requests the game's reduced buffering path; compare frame-time and latency results with Reflex on this setup.",
             },
             {
                 "category": "Display",
@@ -865,29 +871,12 @@ class Overwatch2GSyncHDRProfile(_Overwatch2BaseProfile):
                 "value": "On",
                 "reason": "Native HDR output for OLED/Mini-LED displays.",
             },
-            {
-                "category": "Display",
-                "setting": "HDR Paper White Nits",
-                "value": "~200 (calibrate to taste)",
-                "reason": "Controls SDR-content brightness under HDR. ~200 nits is a good OLED starting point.",
-            },
-            {
-                "category": "Display",
-                "setting": "HDR Max Display Brightness",
-                "value": "Match monitor peak (e.g. 1000+ nits OLED)",
-                "reason": "Set to your display's actual peak brightness for correct tone mapping.",
-            },
-            {
-                "category": "Display",
-                "setting": "HDR UI Brightness",
-                "value": "Adjust to taste",
-                "reason": "OW2-specific slider for HUD brightness under HDR.",
-            },
+            self._hdr_calibration_guidance(),
             {
                 "category": "Graphics",
                 "setting": "Dynamic Render Scale",
                 "value": "Off",
-                "reason": "Avoid large frame pacing oscillations.",
+                "reason": "Keeps render resolution fixed; performance depends on the scene and GPU load.",
             },
             self._custom_render_scale_guidance(),
             *self._graphics_detail_guidance(),
@@ -931,8 +920,8 @@ class Overwatch2GSyncCaptureProfile(_Overwatch2BaseProfile):
     def description(self) -> str:
         return (
             "Borderless SDR G-SYNC streaming lane that preserves OBS, Medal, "
-            "RTSS, and overlays and keeps game CPU/I/O priority at Normal so "
-            "capture is not starved."
+            "RTSS, and overlays and keeps game CPU/I/O priority at Normal. "
+            "Capture performance still depends on the workload."
         )
 
     @property
@@ -992,30 +981,25 @@ class Overwatch2GSyncCaptureProfile(_Overwatch2BaseProfile):
                     "path while keeping OBS, Medal, RTSS, and overlays available."
                 ),
             },
-            {
-                "category": "Display",
-                "setting": "VSync",
-                "value": "Off (in-game)",
-                "reason": "Use NVCP VSync as the VRR safety net; keep in-game VSync off.",
-            },
+            self._ow2_gsync_vsync_guidance(),
             {
                 "category": "Display",
                 "setting": "NVIDIA Reflex",
                 "value": "Enabled + Boost — set the in-game toggle manually",
-                "reason": "Enable native Reflex for queue control; the profile requests driver LLM Off. With G-SYNC and VSync active, Reflex may pace below the static cap. ABSO cannot safely write the Reflex toggle; verify it in-game. Boost can cost power or FPS, so compare Enabled alone if needed.",
+                "reason": "Enable native Reflex for queue control; the profile requests driver LLM Off. With G-SYNC and VSync active, Reflex may pace below the static cap. ABSO leaves Reflex as a manual choice; verify it in-game. Boost can cost power or FPS, so compare Enabled alone if needed.",
             },
             self._ow2_gsync_cap_guidance(),
             {
                 "category": "Display",
                 "setting": "Reduce Buffering",
                 "value": "On",
-                "reason": "Maintains low queue depth on the streaming presentation path.",
+                "reason": "Requests the game's reduced buffering path; compare frame-time and latency results with Reflex on this setup.",
             },
             {
                 "category": "Graphics",
                 "setting": "Dynamic Render Scale",
                 "value": "Off",
-                "reason": "Avoid frame pacing swings while recording/clipping.",
+                "reason": "Keeps render resolution fixed; performance depends on the scene and GPU load.",
             },
             self._custom_render_scale_guidance(),
             *self._graphics_detail_guidance(),
@@ -1050,8 +1034,8 @@ class Overwatch2GSyncHDRCaptureProfile(_Overwatch2BaseProfile):
     def description(self) -> str:
         return (
             "Borderless HDR G-SYNC streaming lane that preserves OBS, Medal, "
-            "RTSS, and overlays and keeps game CPU/I/O priority at Normal so "
-            "capture is not starved."
+            "RTSS, and overlays and keeps game CPU/I/O priority at Normal. "
+            "Capture performance still depends on the workload."
         )
 
     @property
@@ -1134,24 +1118,19 @@ class Overwatch2GSyncHDRCaptureProfile(_Overwatch2BaseProfile):
                     "overlays available."
                 ),
             },
-            {
-                "category": "Display",
-                "setting": "VSync",
-                "value": "Off (in-game)",
-                "reason": "Use NVCP VSync as the VRR safety net; keep in-game VSync off.",
-            },
+            self._ow2_gsync_vsync_guidance(),
             {
                 "category": "Display",
                 "setting": "NVIDIA Reflex",
                 "value": "Enabled + Boost — set the in-game toggle manually",
-                "reason": "Enable native Reflex for queue control; the profile requests driver LLM Off. With G-SYNC and VSync active, Reflex may pace below the static cap. ABSO cannot safely write the Reflex toggle; verify it in-game. Boost can cost power or FPS, so compare Enabled alone if needed.",
+                "reason": "Enable native Reflex for queue control; the profile requests driver LLM Off. With G-SYNC and VSync active, Reflex may pace below the static cap. ABSO leaves Reflex as a manual choice; verify it in-game. Boost can cost power or FPS, so compare Enabled alone if needed.",
             },
             self._ow2_gsync_cap_guidance(),
             {
                 "category": "Display",
                 "setting": "Reduce Buffering",
                 "value": "On",
-                "reason": "Maintains low queue depth on the streaming presentation path.",
+                "reason": "Requests the game's reduced buffering path; compare frame-time and latency results with Reflex on this setup.",
             },
             {
                 "category": "Display",
@@ -1159,23 +1138,12 @@ class Overwatch2GSyncHDRCaptureProfile(_Overwatch2BaseProfile):
                 "value": "On",
                 "reason": "Native HDR output for OLED/Mini-LED displays on the streaming path.",
             },
-            {
-                "category": "Display",
-                "setting": "HDR Paper White Nits",
-                "value": "~200 (calibrate to taste)",
-                "reason": "Controls SDR-content brightness under HDR.",
-            },
-            {
-                "category": "Display",
-                "setting": "HDR Max Display Brightness",
-                "value": "Match monitor peak",
-                "reason": "Set to your display's actual peak brightness for correct tone mapping.",
-            },
+            self._hdr_calibration_guidance(),
             {
                 "category": "Graphics",
                 "setting": "Dynamic Render Scale",
                 "value": "Off",
-                "reason": "Avoid frame pacing swings while recording/clipping.",
+                "reason": "Keeps render resolution fixed; performance depends on the scene and GPU load.",
             },
             self._custom_render_scale_guidance(),
             *self._graphics_detail_guidance(),

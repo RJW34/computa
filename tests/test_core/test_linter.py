@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
+import pytest
+
 from abso.core.linter import ProfileLinter
 from abso.profiles.catalog import get_profile_classes
 
@@ -22,6 +24,7 @@ def _make_profile(**kwargs):
     profile.is_sdr_only = kwargs.get("is_sdr_only", False)
     profile.allows_aggressive_settings = kwargs.get("allows_aggressive_settings", True)
     profile.requires_confirmed_vrr_support = kwargs.get("requires_confirmed_vrr_support", False)
+    profile.graphics_api = kwargs.get("graphics_api", "unknown")
 
     handlers = kwargs.get("handlers", [])
     profile.get_handlers.return_value = handlers
@@ -312,3 +315,51 @@ def test_all_shipped_profiles_pass_linter_without_errors():
             failures.append((profile_id, [issue.code for issue in result.errors]))
 
     assert not failures, f"Profiles failed linting: {failures}"
+
+
+@pytest.mark.parametrize("profile_id", ["diablo4", "diablo4-sdr"])
+def test_dx12_diablo_borderless_path_does_not_require_legacy_windows_vrr_switch(profile_id):
+    profile = get_profile_classes()[profile_id]()
+    assert profile.graphics_api == "dx12"
+    assert profile.get_settings("WindowsSettingsHandler")["vrr_optimize"] is False
+    result = ProfileLinter().lint(profile)
+    assert result.passed, result.errors
+
+
+@pytest.mark.parametrize("profile_id", ["diablo4", "diablo4-sdr"])
+def test_dx12_borderless_path_still_rejects_fullscreen_only_driver_vrr(profile_id, monkeypatch):
+    profile = get_profile_classes()[profile_id]()
+    original_settings = profile.get_settings
+
+    def mismatched_settings(handler_name):
+        settings = original_settings(handler_name)
+        if handler_name == "NvidiaSettingsHandler":
+            return {**settings, "global_vrr_mode": "fullscreen_only"}
+        return settings
+
+    monkeypatch.setattr(profile, "get_settings", mismatched_settings)
+    result = ProfileLinter().lint(profile)
+    issue = next(e for e in result.errors if e.code == "VRR_DISPLAY_MODE_GUIDANCE_MISMATCH")
+    assert "global_vrr_mode='fullscreen_and_windowed'" in issue.details
+    assert "vrr_optimize=True" not in issue.details
+
+
+@pytest.mark.parametrize("graphics_api", ["dx11", "unknown"])
+def test_other_windowed_paths_retain_existing_windows_vrr_requirement(graphics_api):
+    nvidia = MagicMock()
+    nvidia.__class__.__name__ = "NvidiaSettingsHandler"
+    windows = MagicMock()
+    windows.__class__.__name__ = "WindowsSettingsHandler"
+    profile = _make_profile(
+        graphics_api=graphics_api,
+        requires_confirmed_vrr_support=True,
+        handlers=[nvidia, windows],
+        settings_map={
+            "NvidiaSettingsHandler": {"global_vrr_mode": "fullscreen_and_windowed"},
+            "WindowsSettingsHandler": {"vrr_optimize": False},
+        },
+        in_game_settings=[{"setting": "Display Mode", "value": "Borderless Windowed"}],
+    )
+    result = ProfileLinter().lint(profile)
+    issue = next(e for e in result.errors if e.code == "VRR_DISPLAY_MODE_GUIDANCE_MISMATCH")
+    assert "vrr_optimize=True" in issue.details

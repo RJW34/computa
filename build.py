@@ -548,14 +548,14 @@ def build_gui() -> bool:
     print("Building ABSO GUI with Tauri...")
     print("=" * 60)
 
-    # Check CLI is available
-    sidecar = GUI_BINARIES_DIR / "abso-x86_64-pc-windows-msvc.exe"
-    if not sidecar.exists():
-        print("CLI not found in GUI binaries. Building CLI first...")
+    # The dist backend is authoritative. An existing sidecar may belong to an
+    # older build; packaging it silently reintroduces old profile behavior.
+    if not (DIST_DIR / "computa.exe").exists():
+        print("CLI not found in dist. Building CLI first...")
         if not build_cli():
             return False
-        if not copy_cli_to_gui():
-            return False
+    if not copy_cli_to_gui():
+        return False
 
     # Get environment with proper PATH
     env = get_gui_build_env()

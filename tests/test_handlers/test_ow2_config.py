@@ -16,7 +16,8 @@ WindowMode = "1"
 FullscreenWindow = "0"
 FullscreenWindowEnabled = "0"
 WindowedFullscreen = "1"
-LimitToRefresh = "1"
+VerticalSyncEnabled = "1"
+LimitToRefresh = "0"
 CpuForceSyncEnabled = "0"
 UseGPUScale = "1"
 FrameRateCap = "60"
@@ -82,7 +83,7 @@ def test_apply_updates_allowed_keys(tmp_path: Path) -> None:
     assert 'FullscreenWindow = "0"' in content
     assert 'FullscreenWindowEnabled = "1"' in content
     assert 'WindowedFullscreen = "0"' in content
-    assert 'LimitToRefresh = "0"' in content
+    assert 'VerticalSyncEnabled = "0"' in content
     assert 'CpuForceSyncEnabled = "1"' in content
     assert 'UseGPUScale = "0"' in content
     assert 'FrameRateCap = "400"' in content
@@ -126,7 +127,7 @@ MasterVolume = "50"
     # Updated existing key
     assert 'WindowMode = "0"' in content
     # Appended missing keys
-    assert 'LimitToRefresh = "0"' in content
+    assert 'VerticalSyncEnabled = "0"' in content
     assert 'ShowFPSCounter = "1"' in content
     # Sound section preserved
     assert "[Sound.1]" in content
@@ -220,6 +221,76 @@ def test_verify_active_all_match(tmp_path: Path) -> None:
 
     # window_mode=1 matches, vsync True -> "1" matches "1"
     assert verify["all_active"] is True
+
+
+@pytest.mark.parametrize("native_vsync", [0, 1])
+def test_vsync_readback_uses_native_key_despite_opposite_legacy_value(
+    tmp_path: Path, native_vsync: int,
+) -> None:
+    ini_path = tmp_path / "Settings_v0.ini"
+    _write_settings_ini(
+        ini_path,
+        '[Render.13]\n'
+        f'VerticalSyncEnabled = "{native_vsync}"\n'
+        f'LimitToRefresh = "{1 - native_vsync}"\n',
+    )
+    with patch("abso.settings.ow2_config._get_ow2_settings_path", return_value=ini_path):
+        handler = OW2ConfigHandler()
+        assert handler.detect()["vsync"] == native_vsync
+        assert handler.verify_active({"vsync": bool(native_vsync)})["all_active"] is True
+        mismatch = handler.verify_active({"vsync": not native_vsync})
+    assert mismatch["all_active"] is False
+    assert mismatch["settings"]["vsync"]["current"] == native_vsync
+
+
+@pytest.mark.parametrize("target", [False, True])
+@pytest.mark.parametrize("file_exists", [False, True])
+def test_missing_native_vsync_never_verifies_from_legacy_key(
+    tmp_path: Path, target: bool, file_exists: bool,
+) -> None:
+    ini_path = tmp_path / "Settings_v0.ini"
+    if file_exists:
+        _write_settings_ini(ini_path, f'[Render.13]\nLimitToRefresh = "{int(target)}"\n')
+    with patch(
+        "abso.settings.ow2_config._get_ow2_settings_path",
+        return_value=ini_path if file_exists else None,
+    ):
+        result = OW2ConfigHandler().verify_active({"vsync": target})
+    assert result["all_active"] is False
+    assert result["settings"]["vsync"] == {
+        "current": None, "target": int(target), "active": False,
+    }
+
+
+@pytest.mark.parametrize("target", [False, True])
+def test_vsync_apply_preserves_unowned_limit_to_refresh(tmp_path: Path, target: bool) -> None:
+    ini_path = tmp_path / "Settings_v0.ini"
+    legacy_value = 1 - int(target)
+    _write_settings_ini(ini_path, f'[Render.13]\nLimitToRefresh = "{legacy_value}"\n')
+    with patch("abso.settings.ow2_config._get_ow2_settings_path", return_value=ini_path):
+        handler = OW2ConfigHandler()
+        result = handler.apply({"vsync": target})
+        assert handler.verify_active({"vsync": target})["all_active"] is True
+    assert result["success"] is True
+    assert result["applied"] == ["VerticalSyncEnabled"]
+    content = ini_path.read_text(encoding="utf-8")
+    assert f'VerticalSyncEnabled = "{int(target)}"' in content
+    assert f'LimitToRefresh = "{legacy_value}"' in content
+
+
+def test_restore_native_vsync_preserves_live_legacy_key(tmp_path: Path) -> None:
+    ini_path = tmp_path / "Settings_v0.ini"
+    _write_settings_ini(
+        ini_path, '[Render.13]\nVerticalSyncEnabled = "1"\nLimitToRefresh = "1"\n',
+    )
+    with patch("abso.settings.ow2_config._get_ow2_settings_path", return_value=ini_path):
+        assert OW2ConfigHandler().restore({
+            "config_found": True,
+            "file_content": '[Render.13]\nVerticalSyncEnabled = "0"\nLimitToRefresh = "0"\n',
+        })
+    assert ini_path.read_text(encoding="utf-8") == (
+        '[Render.13]\nVerticalSyncEnabled = "0"\nLimitToRefresh = "1"\n'
+    )
 
 
 def test_verify_active_expands_auto_vrr_fps_cap(tmp_path: Path) -> None:
@@ -590,7 +661,7 @@ def test_audit_flags_suboptimal_settings(tmp_path: Path) -> None:
 
     # SAMPLE_INI has vsync=1, reduce_buffering=0, triple_buffering=1, dynamic_render_scale=1
     titles = [i.title for i in issues]
-    assert "OW2 VSync enabled in-game" in titles
+    assert "OW2 VSync enabled in-game" not in titles
     assert "OW2 Reduce Buffering disabled" in titles
     assert "OW2 Triple Buffering enabled" in titles
     assert "OW2 Dynamic Render Scale enabled" in titles
@@ -637,7 +708,7 @@ def test_apply_surfaces_post_write_window_mode_drift(tmp_path: Path) -> None:
 REFLEX_INI = """\
 [Render.13]
 WindowMode = "1"
-LimitToRefresh = "0"
+VerticalSyncEnabled = "0"
 ReflexMode = "2"
 
 [Sound.1]
@@ -706,7 +777,7 @@ def test_verify_reflex_manual_step_unsatisfied_is_non_blocking(tmp_path: Path) -
     # window_mode matches, so the profile is still "active"; Reflex is advisory.
     assert verify["all_active"] is True
     assert verify["manual_steps"][0]["satisfied"] is False
-    assert verify["manual_steps"][0]["current_label"] == "Off"
+    assert verify["manual_steps"][0]["current_label"] == "Disabled"
 
 
 @pytest.mark.parametrize("config_state", ["missing_file", "missing_key", "unreadable"])

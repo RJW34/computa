@@ -356,6 +356,12 @@ shadows/reflections, audio, controls, and HDR calibration. Only managed render
 keys return to their backed-up values or absence. If the entire live settings
 file is missing, recovery can recreate the old file, excluding stale Reflex.
 
+Switching to another game's profile preserves native configuration handlers
+that the new profile does not use. For example, selecting CS2 no longer restores
+OW2's native settings from an old baseline. Explicit restore and failed-switch
+recovery still restore their complete selected backup; the exclusion applies
+only to baseline cleanup during profile application.
+
 Application restart notices are distinct from Windows reboot requirements.
 For example, an OBS setting change can require restarting OBS without requiring
 a Windows restart.
@@ -364,8 +370,9 @@ a Windows restart.
 
 The built-in Overwatch G-SYNC profiles use the generic `refresh - 3` static
 ceiling: **297 at 300 Hz**, for both the NVIDIA profile and managed engine cap.
-Driver VSync is the safety backstop; in-game VSync is off, and native Reflex
-On + Boost is the expected in-game setting. Reflex may dynamically pace lower
+The borderless/windowed G-SYNC lanes enable both driver VSync and in-game
+VSync, with native Reflex On + Boost as the expected in-game setting. NVIDIA's
+windowed guidance requires the in-game VSync path. Reflex may dynamically pace lower
 (for example, a runtime counter near 276); that observation does not change
 the saved target and is not itself configuration drift.
 
@@ -380,8 +387,16 @@ NVIDIA documents automatic below-refresh pacing with G-SYNC, VSync and Reflex
 in its [latency guide](https://www.nvidia.com/en-gb/geforce/guides/system-latency-optimization-guide/).
 The exact dynamic cap depends on the game/driver and is not a measured optimum
 for this PC. No-sync OW2 profiles retain the engine's 600 FPS ceiling.
-The two G-SYNC HDR lanes intentionally use borderless/windowed fullscreen;
+All four OW2 G-SYNC lanes intentionally use borderless/windowed fullscreen;
 inspect the verifier's setting detail before changing display mode.
+
+OW2's native VSync toggle is `VerticalSyncEnabled`. The legacy `LimitToRefresh`
+key is not evidence that VSync is on or off, and ABSO leaves it unchanged.
+Verification reports missing managed keys as unconfirmed instead of success.
+After updating source, build and deploy the runtime and restart the tray:
+an already-running tray and an older installed backend retain their old behavior.
+For a complete backend and desktop-app update, run `build.py all` followed by
+`build.py deploy-existing` using the repository's virtual-environment Python.
 
 ---
 

@@ -18,6 +18,7 @@ from abso.core.handler_registry import (
     _all_entries,
     get_audit_handlers,
     get_backup_handlers,
+    get_native_game_config_handler_names,
 )
 from abso.settings.base import SettingsHandler
 
@@ -71,6 +72,19 @@ def test_profile_config_handlers_are_backup_only():
     ):
         assert name in backup_names, f"{name} missing from backup set"
         assert name not in audit_names, f"{name} should be backup-only"
+
+
+def test_native_game_config_scope_is_explicit_and_keeps_complete_backups():
+    """Profile-switch preservation must not accidentally include system handlers."""
+    expected = {
+        "Diablo4ConfigHandler", "DolphinConfigHandler", "FortniteConfigHandler",
+        "MarvelRivalsConfigHandler", "OW2ConfigHandler", "Rivals2ConfigHandler",
+    }
+    assert get_native_game_config_handler_names() == expected
+    for entry in _all_entries():
+        if entry.native_game_config:
+            assert entry.backup is True
+            assert entry.factory.__name__ in expected
 
 
 def test_diagnostics_and_vbs_optin_are_audit_only():

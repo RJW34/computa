@@ -3979,11 +3979,11 @@ def test_tray_action_toasts_update_durable_status() -> None:
     assert 'Set-TrayLastAction -Message "Quick Panel closed"' in script
     assert 'LastAction = "Quick Panel empty"' in script
     assert 'Set-TrayLastAction -Message $quickPanelEmpty.LastAction' in script
-    assert 'Set-TrayLastAction -Message "Profiles refreshed: $profileCount from $catalogSource"' in script
-    assert 'Set-TrayLastAction -Message "Profiles fallback list loaded: $profileCount"' in script
+    assert 'Set-TrayLastAction -Message "Profile refresh requested; checking backend"' in script
+    assert '$message = "Profiles refreshed from backend ($($entries.Count) profiles loaded)"' in script
     assert 'Set-TrayLastAction -Message "Profiles safe list loaded: $profileCount"' not in script
     assert 'Set-TrayLastAction -Message "Profiles fallback loaded: $profileCount"' not in script
-    assert 'Set-TrayLastAction -Message "Profile refresh failed: no profiles loaded"' in script
+    assert 'throw "No profiles loaded from backend"' in script
     assert 'Set-TrayLastAction -Message "Profile refresh failed: $($_.Exception.Message)"' in script
     assert 'Set-TrayLastAction -Message "Profiles refreshed: $($script:Profiles.Count) loaded"' not in script
     assert 'Set-TrayLastAction -Message "Profile refresh failed"' not in script
@@ -4145,36 +4145,38 @@ def test_tray_sound_toggle_copy_is_scope_accurate() -> None:
 
 
 def test_tray_profile_refresh_reports_actual_catalog_source() -> None:
-    """Manual profile refresh should not report generic success when fallback/empty data loaded."""
+    """Manual refresh waits for fresh backend metadata instead of praising stale cache."""
     tray = TRAY_SCRIPT.read_text(encoding="utf-8")
     assert "$script:ProfileCatalogLastSource = $null" in tray
     assert "$script:ProfileCatalogLastCount = 0" in tray
     assert "$script:ProfileCatalogUsedFallback = $false" in tray
     assert '$script:ProfileCatalogLastSource = $source' in tray
     assert '$script:ProfileCatalogLastSource = "built-in fallback"' in tray
-    assert '$catalogSource = if ($script:ProfileCatalogLastSource) { "$($script:ProfileCatalogLastSource)" } else { "source not reported" }' in tray
     assert '"unknown source"' not in tray
     assert '$refreshProfilesItem.ToolTipText = "Reload the profile list and user profiles; no profile is applied."' in tray
     assert 'Reload profile catalog from cache/CLI, then user profiles' not in tray
-    assert 'Profiles loaded from built-in fallback profile list ($profileCount profiles)' in tray
-    assert 'Profiles loaded from built-in safe list ($profileCount profiles)' not in tray
-    assert 'Profiles loaded from built-in fallback ($profileCount profiles)' not in tray
-    assert 'Profiles refreshed from $catalogSource ($profileCount profiles loaded)' in tray
-    assert 'Profile refresh failed: no profiles loaded' in tray
-    assert (
-        'Show-Notification -Title "computa" -Message "Profiles refreshed from $catalogSource ($profileCount profiles loaded)" '
-        '-Type "Success" -ActionName "Refresh" -ActionColor $script:Colors.AccentBlue'
-    ) in tray
-    assert (
-        'Show-Notification -Title "computa" -Message "Profiles loaded from built-in fallback profile list ($profileCount profiles)" '
-        '-Type "Warning" -ActionName "Refresh" -ActionColor $script:Colors.AccentBlue'
-    ) in tray
-    assert (
-        'Show-Notification -Title "computa" -Message "Profile refresh failed: no profiles loaded" '
-        '-Type "Error" -ActionName "Refresh" -ActionColor $script:Colors.AccentBlue'
-    ) in tray
-    assert 'Profiles refreshed ($($script:Profiles.Count) profiles loaded)' not in tray
-    assert 'Reload profiles from CLI catalog and user profiles' not in tray
+    refresh_menu = tray.split("# Refresh Profiles", 1)[1].split("# Open Profiles Folder", 1)[0]
+    assert "Request-TrayCatalogRefresh" in refresh_menu
+    assert "Initialize-ProfilesFromCliCatalog" not in refresh_menu
+    assert "Show-Notification" not in refresh_menu
+    completion = tray.split("function Complete-BackgroundCatalogIfReady", 1)[1].split(
+        "function Start-BackgroundCatalogRefresh", 1,
+    )[0]
+    assert "if ($script:MutatingOperationInProgress) { return }" in completion
+    assert "Set-RefreshedTrayCatalog -Entries $entries -Aliases $aliases" in completion
+    assert completion.index("Set-RefreshedTrayCatalog") < completion.index('Profiles refreshed from backend')
+    assert "Restart tray to rebuild changed menu groups" in completion
+
+
+def test_ow2_gsync_fallback_guidance_matches_native_vsync_contract() -> None:
+    script = TRAY_SCRIPT.read_text(encoding="utf-8")
+    for profile_id in (
+        "overwatch2-gsync", "overwatch2-gsync-hdr",
+        "overwatch2-gsync-capture", "overwatch2-gsync-hdr-capture",
+    ):
+        entry = script.split(f'"{profile_id}"', 1)[1].split("\n    }", 1)[0]
+        assert "In-game VSync ON" in entry
+        assert "in-game VSync ON and Reflex On+Boost" in entry
 
 
 def test_builtin_tray_fallback_keeps_requested_streaming_matrix_available() -> None:

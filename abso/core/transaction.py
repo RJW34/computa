@@ -292,8 +292,9 @@ class ProfileTransactionManager:
         # === PHASE 0: Restore previous baseline ===
         # When switching profiles, stale settings from the previous profile
         # can leak through if the new profile doesn't explicitly override them.
-        # Restore the latest backup (taken before the previous profile was applied)
-        # to return to a clean pre-profile baseline before applying the new one.
+        # Restore shared system state and this game's native config from the
+        # prior baseline. Other games' files are independent: reverting them
+        # here would replace their latest settings with an old snapshot.
         baseline_restore_started = False
         if create_backup:
             try:
@@ -301,8 +302,17 @@ class ProfileTransactionManager:
                 restore_manager = BackupManager(self.backup_dir)
                 baseline_path = restore_manager.get_baseline_backup()
                 if baseline_path and baseline_path.exists():
+                    target_handlers = {
+                        type(handler).__name__
+                        for handler in self.applier._get_profile(
+                            canonical_profile_id
+                        ).get_handlers()
+                    }
                     baseline_restore_started = True
-                    restore_summary = restore_manager.restore_backup(baseline_path.name)
+                    restore_summary = restore_manager.restore_backup(
+                        baseline_path.name,
+                        native_config_handlers=target_handlers,
+                    )
                     if restore_summary.complete:
                         tx.add_checkpoint(
                             "baseline_restore", "ok", f"Restored baseline: {baseline_path.name}"

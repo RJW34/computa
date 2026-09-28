@@ -33,12 +33,15 @@ class HandlerEntry:
         audit: True if :func:`get_audit_handlers` should include it.
         backup: True if :func:`get_backup_handlers` should include it.
         notes: free-text rationale for unusual flags (e.g. audit-only).
+        native_game_config: Owns one game's config, which should be preserved
+            when a profile for another game restores shared system baselines.
     """
 
     factory: Callable[[], SettingsHandler]
     audit: bool
     backup: bool
     notes: str | None = None
+    native_game_config: bool = False
 
 
 def _all_entries() -> list[HandlerEntry]:
@@ -208,12 +211,12 @@ def _all_entries() -> list[HandlerEntry]:
         ),
 
         # --- Profile-specific config handlers (backup-only) ---
-        HandlerEntry(Diablo4ConfigHandler, audit=False, backup=True),
-        HandlerEntry(DolphinConfigHandler, audit=False, backup=True),
-        HandlerEntry(FortniteConfigHandler, audit=False, backup=True),
-        HandlerEntry(MarvelRivalsConfigHandler, audit=False, backup=True),
-        HandlerEntry(OW2ConfigHandler, audit=False, backup=True),
-        HandlerEntry(Rivals2ConfigHandler, audit=False, backup=True),
+        HandlerEntry(Diablo4ConfigHandler, audit=False, backup=True, native_game_config=True),
+        HandlerEntry(DolphinConfigHandler, audit=False, backup=True, native_game_config=True),
+        HandlerEntry(FortniteConfigHandler, audit=False, backup=True, native_game_config=True),
+        HandlerEntry(MarvelRivalsConfigHandler, audit=False, backup=True, native_game_config=True),
+        HandlerEntry(OW2ConfigHandler, audit=False, backup=True, native_game_config=True),
+        HandlerEntry(Rivals2ConfigHandler, audit=False, backup=True, native_game_config=True),
         HandlerEntry(NvidiaNotificationHandler, audit=False, backup=True),
         HandlerEntry(OBSSettingsHandler, audit=False, backup=True),
         HandlerEntry(ProcessPriorityHandler, audit=False, backup=True),
@@ -259,3 +262,10 @@ def get_audit_handlers() -> list[SettingsHandler]:
 def get_backup_handlers() -> list[SettingsHandler]:
     """Construct one handler instance per registry entry tagged ``backup``."""
     return [entry.factory() for entry in _all_entries() if entry.backup]
+
+
+def get_native_game_config_handler_names() -> frozenset[str]:
+    """Identify per-game files explicitly, without inferring scope from names."""
+    return frozenset(
+        entry.factory.__name__ for entry in _all_entries() if entry.native_game_config
+    )

@@ -124,7 +124,7 @@ def test_apply_settings_to_global_applies_all_settings():
             return False
 
     manager._drs = _Ctx()
-    manager._apply_single_setting = MagicMock()
+    manager._apply_single_setting = MagicMock(return_value=[])
 
     result = manager.apply_settings_to_global({
         "vrr_mode": "off",
@@ -189,7 +189,7 @@ def test_apply_settings_to_app_reuses_bound_legacy_alias_when_requested_profile_
             return False
 
     manager._drs = _Ctx()
-    manager._apply_single_setting = MagicMock()
+    manager._apply_single_setting = MagicMock(return_value=[])
 
     result = manager.apply_settings_to_app(
         "Rivals2-Win64-Shipping.exe",
@@ -274,7 +274,7 @@ def test_apply_settings_to_app_reuses_bound_case_variant_before_empty_exact_dupl
             return False
 
     manager._drs = _Ctx()
-    manager._apply_single_setting = MagicMock()
+    manager._apply_single_setting = MagicMock(return_value=[])
 
     result = manager.apply_settings_to_app(
         "cs2.exe",
@@ -312,7 +312,7 @@ def test_apply_settings_to_app_confirms_existing_binding_when_owner_matches_sele
             return False
 
     manager._drs = _Ctx()
-    manager._apply_single_setting = MagicMock()
+    manager._apply_single_setting = MagicMock(return_value=[])
 
     result = manager.apply_settings_to_app(
         "Overwatch.exe",
@@ -348,7 +348,7 @@ def test_apply_settings_to_app_fails_when_executable_is_bound_to_different_profi
             return False
 
     manager._drs = _Ctx()
-    manager._apply_single_setting = MagicMock()
+    manager._apply_single_setting = MagicMock(return_value=[])
 
     result = manager.apply_settings_to_app(
         "Overwatch.exe",
@@ -418,7 +418,7 @@ def test_apply_settings_to_app_trusts_predefined_profile_without_conflicting_own
             return False
 
     manager._drs = _Ctx()
-    manager._apply_single_setting = MagicMock()
+    manager._apply_single_setting = MagicMock(return_value=[])
 
     result = manager.apply_settings_to_app(
         "Overwatch.exe",

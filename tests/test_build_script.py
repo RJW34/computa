@@ -457,6 +457,9 @@ def test_build_gui_runs_npm_without_shell(tmp_path, monkeypatch):
     sidecars.mkdir(parents=True)
     node_modules.mkdir()
     (sidecars / "abso-x86_64-pc-windows-msvc.exe").write_bytes(b"backend")
+    dist = tmp_path / "dist"
+    dist.mkdir()
+    (dist / "computa.exe").write_bytes(b"current backend")
     calls = []
 
     def fake_run(args, **kwargs):
@@ -465,6 +468,7 @@ def test_build_gui_runs_npm_without_shell(tmp_path, monkeypatch):
 
     monkeypatch.setattr(build, "GUI_DIR", gui)
     monkeypatch.setattr(build, "GUI_BINARIES_DIR", sidecars)
+    monkeypatch.setattr(build, "DIST_DIR", dist)
     monkeypatch.setattr(build, "get_gui_build_env", lambda: {"PATH": "test-path"})
     monkeypatch.setattr(build, "resolve_npm_command", lambda env: "npm.cmd")
     monkeypatch.setattr(build.subprocess, "run", fake_run)
@@ -475,6 +479,7 @@ def test_build_gui_runs_npm_without_shell(tmp_path, monkeypatch):
         (["npm.cmd", "run", "tauri", "build"], {"cwd": gui, "env": {"PATH": "test-path"}, "check": False})
     ]
     assert "shell" not in calls[0][1]
+    assert all(path.read_bytes() == b"current backend" for path in sidecars.glob("*.exe"))
 
 
 def test_build_gui_installs_dependencies_without_shell(tmp_path, monkeypatch):
@@ -483,6 +488,9 @@ def test_build_gui_installs_dependencies_without_shell(tmp_path, monkeypatch):
     sidecars = gui / "src-tauri" / "binaries"
     sidecars.mkdir(parents=True)
     (sidecars / "abso-x86_64-pc-windows-msvc.exe").write_bytes(b"backend")
+    dist = tmp_path / "dist"
+    dist.mkdir()
+    (dist / "computa.exe").write_bytes(b"backend")
     calls = []
 
     def fake_run(args, **kwargs):
@@ -491,6 +499,7 @@ def test_build_gui_installs_dependencies_without_shell(tmp_path, monkeypatch):
 
     monkeypatch.setattr(build, "GUI_DIR", gui)
     monkeypatch.setattr(build, "GUI_BINARIES_DIR", sidecars)
+    monkeypatch.setattr(build, "DIST_DIR", dist)
     monkeypatch.setattr(build, "get_gui_build_env", lambda: {"PATH": "test-path"})
     monkeypatch.setattr(build, "resolve_npm_command", lambda env: "npm.cmd")
     monkeypatch.setattr(build.subprocess, "run", fake_run)
@@ -502,3 +511,28 @@ def test_build_gui_installs_dependencies_without_shell(tmp_path, monkeypatch):
         (["npm.cmd", "run", "tauri", "build"], {"cwd": gui, "env": {"PATH": "test-path"}, "check": False}),
     ]
     assert all("shell" not in kwargs for _args, kwargs in calls)
+
+
+def test_build_gui_missing_dist_does_not_trust_old_sidecar(tmp_path, monkeypatch):
+    sidecars = tmp_path / "binaries"
+    sidecars.mkdir()
+    (sidecars / "abso-x86_64-pc-windows-msvc.exe").write_bytes(b"old backend")
+    monkeypatch.setattr(build, "DIST_DIR", tmp_path / "missing-dist")
+    monkeypatch.setattr(build, "GUI_BINARIES_DIR", sidecars)
+    monkeypatch.setattr(build, "build_cli", lambda: False)
+    monkeypatch.setattr(build.subprocess, "run", lambda *a, **k: (_ for _ in ()).throw(
+        AssertionError("must not package stale sidecar after backend build failure")
+    ))
+
+    assert build.build_gui() is False
+
+
+def test_build_gui_stops_when_sidecar_sync_fails(tmp_path, monkeypatch):
+    (tmp_path / "computa.exe").write_bytes(b"backend")
+    monkeypatch.setattr(build, "DIST_DIR", tmp_path)
+    monkeypatch.setattr(build, "copy_cli_to_gui", lambda: False)
+    monkeypatch.setattr(build.subprocess, "run", lambda *a, **k: (_ for _ in ()).throw(
+        AssertionError("must not package stale sidecar after sync failure")
+    ))
+
+    assert build.build_gui() is False

@@ -23,8 +23,16 @@ def _mock_successful_readback(manager):
     def readback(*args, **kwargs):
         mutation = manager.apply_settings_to_app if args else manager.apply_settings_to_global
         writes = mutation.return_value.get("settings_applied", {})
+        if mutation.call_args:
+            writes = {**mutation.call_args.args[1 if args else 0], **writes}
         result = {}
         for name, value in writes.items():
+            if name in RealDRSProfileManager.LOW_LATENCY_ALIASES:
+                result.update(RealDRSProfileManager.low_latency_native_settings(value))
+                continue
+            if name == "vsync" and value in RealDRSProfileManager.VSYNC_COMPANION_TEAR:
+                tear = RealDRSProfileManager.VSYNC_COMPANION_TEAR[value]
+                result["vsync_tear_control"] = RealDRSProfileManager.VSYNC_TEAR_CONTROL_VALUES[tear]
             setting_id, numeric = resolver(name, value)
             alias = next(k for k, v in manager.SETTING_IDS.items() if v == setting_id)
             result[alias] = numeric
@@ -37,7 +45,10 @@ def test_missing_driver_readback_is_a_verification_failure():
     failures = NvidiaSettingsHandler()._collect_verification_failures(
         RealDRSProfileManager(), {}, {"vsync": "on"}
     )
-    assert failures == ["vsync: driver readback unavailable; expected=on"]
+    assert failures == [
+        "vsync: driver readback unavailable; expected=on",
+        "vsync_tear_control: driver readback unavailable; expected=disable",
+    ]
 
 
 def test_unsupported_value_cannot_verify_active():
@@ -99,9 +110,9 @@ class TestNvidiaProfiles:
 
     def test_get_setting_value_vsync(self):
         """Test getting decimal values for vsync settings."""
-        assert get_setting_value("off", "vsync") == 0
-        assert get_setting_value("on", "vsync") == 1
-        assert get_setting_value("adaptive", "vsync") == 2
+        assert get_setting_value("off", "vsync") == 0x08416747
+        assert get_setting_value("on", "vsync") == 0x47814940
+        assert get_setting_value("adaptive", "vsync") == 0x47814940
 
     def test_get_setting_value_shader_cache(self):
         """Test getting decimal values for shader cache settings."""
@@ -547,12 +558,14 @@ class TestNvidiaApply:
         }
         mock_manager.get_app_settings.return_value = {
             "vsync_mode": 0x47814940,
+            "vsync_tear_control": 0x96861077,
             "frame_rate_limiter_v3": 297,
         }
 
         def resolve_side_effect(name, value):
             mapping = {
                 ("vsync", "on"): (0x00A879CF, 0x47814940),
+                ("vsync_tear_control", "disable"): (0x005A375C, 0x96861077),
                 ("max_frame_rate", 297): (0x10835002, 297),
             }
             return mapping[(name, value)]
@@ -781,9 +794,10 @@ class TestNvidiaApply:
 
         assert result["success"] is True
         assert result["warnings"] == []
-        assert result["notices"] == [
+        assert result["notices"][:1] == [
             "'Overwatch.exe' was already associated with NVIDIA profile 'Overwatch 2'."
         ]
+        assert result["manual_steps"][0]["satisfied"] is None
 
     @patch("abso.settings.nvidia.nvapi_drs.DRSProfileManager")
     def test_apply_surfaces_safe_predefined_profile_as_notice(self, mock_manager_cls):

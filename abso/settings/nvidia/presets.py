@@ -12,7 +12,9 @@ class NvidiaSettingIDs:
     Canonical source: DRSProfileManager.SETTING_IDS in nvapi_drs.py.
     """
 
-    LOW_LATENCY_MODE = "0x007BA09E"       # PRERENDERLIMIT_ID
+    LOW_LATENCY_MODE = "0x0005F543"       # Inspector ULL CPL state, not queue depth
+    PRERENDERED_FRAMES = "0x007BA09E"     # PRERENDERLIMIT_ID
+    ULTRA_LOW_LATENCY = "0x10835000"      # Inspector ULL enable
     POWER_MANAGEMENT = "0x1057EB71"       # PREFERRED_PSTATE_ID
     VSYNC = "0x00A879CF"                  # VSYNCMODE_ID
     MAX_FRAME_RATE = "0x10835002"         # FRL_FPS_ID
@@ -35,7 +37,9 @@ class NvidiaSettingDecimalIDs:
     Verified against NVIDIA nvapi/NvApiDriverSettings.h.
     """
 
-    LOW_LATENCY_MODE = 0x007BA09E         # PRERENDERLIMIT_ID
+    LOW_LATENCY_MODE = 0x0005F543         # Inspector ULL CPL state
+    PRERENDERED_FRAMES = 0x007BA09E       # PRERENDERLIMIT_ID
+    ULTRA_LOW_LATENCY = 0x10835000        # Inspector ULL enable
     POWER_MANAGEMENT = 0x1057EB71         # PREFERRED_PSTATE_ID
     VSYNC = 0x00A879CF                    # VSYNCMODE_ID
     MAX_FRAME_RATE = 0x10835002           # FRL_FPS_ID
@@ -53,11 +57,8 @@ class NvidiaSettingDecimalIDs:
 class NvidiaSettingValues:
     """Known values for Nvidia settings as used by NPI (Nvidia Profile Inspector).
 
-    WARNING: These values match NPI's internal representation, NOT the raw
-    NVAPI DRS SDK values. For example, NPI uses sequential integers (0,1,2)
-    for VSync modes, while NVAPI uses hash-like hex values (0x08416747, etc.).
-    The DRS codepath in nvapi_drs.py uses the correct SDK values directly.
-    These values are used ONLY for parsing NPI export files.
+    NIP files store raw driver DWORD values, just like NVAPI DRS. Private
+    Ultra Low Latency IDs come from Inspector's CustomSettingNames.xml.
     """
 
     # Low Latency Mode
@@ -71,10 +72,11 @@ class NvidiaSettingValues:
     POWER_OPTIMAL = 0x00000002
 
     # VSync
-    VSYNC_OFF = 0x00000000
-    VSYNC_ON = 0x00000001
-    VSYNC_ADAPTIVE = 0x00000002
-    VSYNC_ADAPTIVE_HALF = 0x00000003
+    VSYNC_OFF = 0x08416747
+    VSYNC_ON = 0x47814940
+    VSYNC_ADAPTIVE = 0x47814940  # Plus adaptive tear control
+    VSYNC_ADAPTIVE_HALF = 0x32610244
+    VSYNC_FAST = 0x18888888
 
     # Max Frame Rate
     FRAME_RATE_OFF = 0x00000000
@@ -101,9 +103,9 @@ class NvidiaSettingValues:
     VRR_APP_OVERRIDE_ULMB = 0x00000003  # Use ULMB instead
     VRR_APP_OVERRIDE_FIXED_REFRESH = 0x00000004  # Fixed refresh rate
 
-    # VSync Tear Control (NPI values — SDK uses 0x96861077/0x99941284)
-    VSYNC_TEAR_CONTROL_DISABLE = 0x00000000
-    VSYNC_TEAR_CONTROL_ENABLE = 0x00000001
+    # VSync Tear Control (native DWORDs)
+    VSYNC_TEAR_CONTROL_DISABLE = 0x96861077
+    VSYNC_TEAR_CONTROL_ENABLE = 0x99941284
 
 
 # Preset profiles for different optimization targets
@@ -337,15 +339,16 @@ NVIDIA_PRESETS: dict[str, dict[str, Any]] = {
         "notes": {
             "reflex": (
                 "NVIDIA Reflex is more effective than driver Low Latency Mode. "
-                "Enable Reflex 'On + Boost' in-game. Do NOT combine with driver LLM."
+                "Enable Reflex 'On + Boost' in-game. This preset leaves driver "
+                "Low Latency Mode off because Reflex controls the render queue."
             ),
             "games": (
                 "CoD, Apex Legends, Valorant, Fortnite, Overwatch 2, and many others. "
                 "Check in-game settings for 'NVIDIA Reflex Low Latency' option."
             ),
             "conflict_warning": (
-                "Using LLM with Reflex can cause stuttering and actually increase "
-                "latency. Always use Reflex alone when available."
+                "NVIDIA Reflex overrides driver Ultra Low Latency functionality "
+                "when both are enabled; their latency reductions are not additive."
             ),
         },
     },

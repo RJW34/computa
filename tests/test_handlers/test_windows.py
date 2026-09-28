@@ -1072,6 +1072,45 @@ class TestWindowsHdrInfo2Readback:
 class TestWindowsRefreshRate:
     """Tests for refresh rate detection and setting."""
 
+    @pytest.mark.parametrize("current_hz", [60, 300])
+    @pytest.mark.parametrize("endless_modes", [False, True])
+    @patch("abso.settings.windows.ctypes")
+    def test_native_modes_after_500_are_verified_with_bounded_enumeration(
+        self, mock_ctypes, current_hz, endless_modes
+    ):
+        """Late native modes must not produce an unknown or understated maximum."""
+        mock_user32 = mock_ctypes.windll.user32
+        mock_ctypes.sizeof.return_value = 220
+        mock_ctypes.byref.side_effect = lambda value: value
+        enumerated = []
+
+        def enum_mode(device, index, mode):
+            if index == -1:
+                mode.dmPelsWidth, mode.dmPelsHeight = 2560, 1440
+                mode.dmDisplayFrequency = current_hz
+                return True
+            enumerated.append(index)
+            if index >= 617 and not endless_modes:
+                return False
+            if index in (615, 616):
+                mode.dmPelsWidth, mode.dmPelsHeight = 2560, 1440
+                mode.dmDisplayFrequency = 60 if index == 615 else 300
+            else:
+                mode.dmPelsWidth, mode.dmPelsHeight = 640, 480
+                mode.dmDisplayFrequency = 480
+            return True
+
+        mock_user32.EnumDisplaySettingsW.side_effect = enum_mode
+        result = WindowsSettingsHandler().verify_active({"max_refresh_rate": True})
+
+        assert result["settings"]["max_refresh_rate"]["current"] == {
+            "refresh_rate": current_hz,
+            "max_refresh_rate": 300,
+        }
+        assert result["all_active"] is (current_hz == 300)
+        assert enumerated == list(range(4096 if endless_modes else 618))
+        mock_user32.ChangeDisplaySettingsW.assert_not_called()
+
     @patch("abso.settings.windows.ctypes")
     def test_get_refresh_rate_info(self, mock_ctypes):
         """Test getting refresh rate information."""

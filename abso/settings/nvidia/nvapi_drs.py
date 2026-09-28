@@ -398,6 +398,7 @@ class NVAPIDRS:
         self._session: NvDRSSessionHandle | None = None
         self._initialized = False
         self._interface_table: dict[str, Any] = {}
+        self._dirty = False
 
     def _find_nvapi_dll(self) -> Path | None:
         """Find nvapi64.dll location."""
@@ -517,6 +518,7 @@ class NVAPIDRS:
             raise NVAPIError("Failed to create DRS session", status)
 
         self._session = session
+        self._dirty = False
         logger.debug("DRS session created")
 
     def load_settings(self) -> None:
@@ -536,12 +538,15 @@ class NVAPIDRS:
         if status != NvAPIStatus.OK:
             raise NVAPIError("Failed to load DRS settings", status)
 
+        self._dirty = False
         logger.debug("DRS settings loaded")
 
     def save_settings(self) -> None:
         """Save modified settings back to the driver."""
         if not self._session:
             raise NVAPIError("No active DRS session")
+        if not self._dirty:
+            return
 
         # NvAPI_DRS_SaveSettings - interface ID 0xFCBC7E14
         save_settings = self._get_function(
@@ -555,23 +560,29 @@ class NVAPIDRS:
         if status != NvAPIStatus.OK:
             raise NVAPIError("Failed to save DRS settings", status)
 
+        self._dirty = False
         logger.info("DRS settings saved")
 
     def destroy_session(self) -> None:
         """Destroy the DRS session and clean up."""
         if not self._session:
+            self._dirty = False
             return
 
         # NvAPI_DRS_DestroySession - interface ID 0xDAD9CFF8
-        destroy_session = self._get_function(
-            "NvAPI_DRS_DestroySession",
-            0xDAD9CFF8,
-            c_int,
-            [NvDRSSessionHandle]
-        )
-
-        status = destroy_session(self._session)
-        self._session = None
+        try:
+            destroy_session = self._get_function(
+                "NvAPI_DRS_DestroySession",
+                0xDAD9CFF8,
+                c_int,
+                [NvDRSSessionHandle]
+            )
+            status = destroy_session(self._session)
+        finally:
+            # Never reuse an invalid/possibly destroyed handle or carry its
+            # pending writes into the next independent context.
+            self._session = None
+            self._dirty = False
 
         if status != NvAPIStatus.OK:
             logger.warning(f"DRS session destroy returned status {status}")
@@ -832,6 +843,7 @@ class NVAPIDRS:
         status = delete_profile(self._session, profile_handle)
 
         if status == NvAPIStatus.OK:
+            self._dirty = True
             return True
         elif status == NvAPIStatus.PROFILE_NOT_FOUND:
             logger.warning("Profile not found for deletion")
@@ -877,6 +889,7 @@ class NVAPIDRS:
         elif status != NvAPIStatus.OK:
             raise NVAPIError(f"Failed to create profile '{profile_name}'", status)
 
+        self._dirty = True
         logger.info(f"Created profile: {profile_name}")
         return profile_handle
 
@@ -937,6 +950,7 @@ class NVAPIDRS:
             status = create_app(self._session, profile_handle, byref(app_info))
 
             if status == NvAPIStatus.OK:
+                self._dirty = True
                 self._app_binding_statuses[app_name] = "created"
                 logger.info(f"Added application to profile: {app_name} (using V{app_version >> 16})")
                 return
@@ -1033,6 +1047,7 @@ class NVAPIDRS:
         if status != NvAPIStatus.OK:
             raise NVAPIError(f"Failed to set setting 0x{setting_id:08X} = {value}", status)
 
+        self._dirty = True
         logger.debug(f"Set setting 0x{setting_id:08X} = {value}")
 
     def delete_setting(
@@ -1064,6 +1079,7 @@ class NVAPIDRS:
         elif status != NvAPIStatus.OK:
             raise NVAPIError(f"Failed to delete setting 0x{setting_id:08X}", status)
 
+        self._dirty = True
         logger.debug(f"Deleted setting 0x{setting_id:08X}")
 
     def unload(self) -> None:
@@ -1091,20 +1107,35 @@ class NVAPIDRS:
 
     def __enter__(self):
         """Context manager entry."""
-        self.initialize()
-        self.create_session()
-        self.load_settings()
+        try:
+            self.initialize()
+            self.create_session()
+            self.load_settings()
+        except BaseException:
+            # __exit__ is not called when entry fails. Release any session
+            # already created, preserving the original initialization error.
+            try:
+                self.destroy_session()
+            except Exception as e:
+                logger.warning(f"Failed to clean up DRS session: {e}")
+            raise
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         """Context manager exit."""
-        if exc_type is None:
-            # No exception - save settings
+        if exc_type is None and self._dirty:
+            # Reads must never commit the loaded database: verification and
+            # detection share this context with callers that modify settings.
             try:
                 self.save_settings()
             except Exception as e:
                 logger.error(f"Failed to save settings: {e}")
-        self.destroy_session()
+        try:
+            self.destroy_session()
+        except Exception as e:
+            if exc_type is None:
+                raise
+            logger.warning(f"Failed to clean up DRS session: {e}")
         return False
 
 
@@ -1128,9 +1159,12 @@ class DRSProfileManager:
         "frame_rate_limiter": 0x10835002,   # FRL_FPS_ID (v1 and v3 use same ID)
         "frame_rate_limiter_v3": 0x10835002, # FRL_FPS_ID
 
-        # Low Latency Mode / Pre-rendered frames (same underlying setting)
-        "low_latency_mode": 0x007BA09E,     # PRERENDERLIMIT_ID
-        "prerendered_frames": 0x007BA09E,   # PRERENDERLIMIT_ID (alias)
+        # Queue depth is public SDK state. ULL and its control-panel mirror
+        # are private driver controls documented by Profile Inspector's
+        # CustomSettingNames.xml; unavailable reads require manual confirmation.
+        "low_latency_mode": 0x0005F543,     # ULL control-panel state (0/1/2)
+        "prerendered_frames": 0x007BA09E,   # PRERENDERLIMIT_ID (frame count)
+        "ultra_low_latency": 0x10835000,    # ULL scheduling enabled (0/1)
 
         # G-Sync / VRR
         "vrr_app_override": 0x10A879CF,     # VRR_APP_OVERRIDE_ID
@@ -1161,12 +1195,9 @@ class DRSProfileManager:
         "on": 0x47814940,            # VSYNCMODE_FORCEON
         "use_3d_app": 0x60925292,    # VSYNCMODE_PASSIVE
         "passive": 0x60925292,       # VSYNCMODE_PASSIVE
-        "adaptive": 0x18888888,      # VSYNCMODE_VIRTUAL
+        "adaptive": 0x47814940,      # FORCEON plus adaptive tear control
         "adaptive_half": 0x32610244, # VSYNCMODE_FLIPINTERVAL2
-        # Fast Sync is represented by VSYNCTEARCONTROL_ENABLE.
-        # Keep this alias for compatibility; callers should also set
-        # vsync_tear_control=enable for deterministic behavior.
-        "fast": 0x47814940,          # VSYNCMODE_FORCEON
+        "fast": 0x18888888,          # VSYNCMODE_VIRTUAL (Fast Sync in Inspector)
     }
 
     LOW_LATENCY_VALUES = {
@@ -1174,6 +1205,73 @@ class DRSProfileManager:
         "on": 0x00000001,
         "ultra": 0x00000002,
     }
+
+    LOW_LATENCY_ALIASES = frozenset({"low_latency_mode", "llm"})
+
+    VSYNC_COMPANION_TEAR = {"on": "disable", "adaptive": "enable", "adaptive_half": "enable", "fast": "disable"}
+
+    @staticmethod
+    def _settings_in_write_order(settings: dict[str, Any]) -> list[tuple[str, Any]]:
+        """An explicit tear-control value overrides the mode's companion.
+
+        Apply it last so JSON/YAML key order cannot change the final state.
+        """
+        return sorted(settings.items(), key=lambda item: item[0] == "vsync_tear_control")
+
+    @classmethod
+    def low_latency_native_settings(cls, value: Any) -> dict[str, int | None]:
+        """Expand a mode into scheduling state, queue depth, and the UI mirror.
+
+        NVIDIA's PRERENDERLIMIT is a frame count, not an off/on/ultra enum.
+        Inspector's reference defines ULL separately (0x10835000) and advises
+        one pre-rendered frame for Ultra. 0x0005F543 is only the CPL mirror.
+        https://github.com/Orbmu2k/nvidiaProfileInspector/blob/master/nvidiaProfileInspector/CustomSettingNames.xml
+        """
+        if value is None or str(value).lower() == "default":
+            mode = None
+        elif isinstance(value, str) and value.lower() in cls.LOW_LATENCY_VALUES:
+            mode = cls.LOW_LATENCY_VALUES[value.lower()]
+        else:
+            try:
+                mode = int(value, 0) if isinstance(value, str) else int(value)
+            except (TypeError, ValueError) as exc:
+                raise ValueError("Low Latency Mode must be off/on/ultra/default") from exc
+            if mode not in (0, 1, 2) or (not isinstance(value, str) and value != mode):
+                raise ValueError("Low Latency Mode must be off/on/ultra/default")
+        return {
+            "ultra_low_latency": None if mode is None else int(mode == 2),
+            "prerendered_frames": None if mode is None else int(mode != 0),
+            "low_latency_mode": mode,
+        }
+
+    @classmethod
+    def low_latency_manual_step(cls, value: Any) -> dict[str, Any]:
+        mode = cls.low_latency_native_settings(value)["low_latency_mode"]
+        label = {0: "Off", 1: "On", 2: "Ultra", None: "Default"}[mode]
+        return {
+            "key": "low_latency_mode",
+            "label": "NVIDIA driver Low Latency Mode",
+            "current": None,
+            "current_label": "Private driver controls unavailable",
+            "expected": value,
+            "expected_label": label,
+            "satisfied": None,
+            "instruction": (
+                f"Confirm Low Latency Mode is {label} for this game in NVIDIA App "
+                "or NVIDIA Control Panel. Driver queue-depth readback alone "
+                "cannot confirm Ultra Low Latency state."
+            ),
+        }
+
+    def _record_setting_apply(
+        self, drs: NVAPIDRS, profile: NvDRSProfileHandle,
+        setting_name: str, value: Any, results: dict[str, Any],
+    ) -> None:
+        pending = self._apply_single_setting(drs, profile, setting_name, value)
+        if pending:
+            results.setdefault("manual_steps", []).append(self.low_latency_manual_step(value))
+        else:
+            results["settings_applied"][setting_name] = value
 
     VRR_OVERRIDE_VALUES = {
         "allow": 0x00000000,       # Enable G-Sync
@@ -1601,10 +1699,9 @@ class DRSProfileManager:
                     results["app_binding_state"] = "confirmed" if on_selected_profile else "profile_only"
 
                 if results.get("app_binding_state") != "bound_elsewhere":
-                    for setting_name, value in settings.items():
+                    for setting_name, value in self._settings_in_write_order(settings):
                         try:
-                            self._apply_single_setting(drs, profile, setting_name, value)
-                            results["settings_applied"][setting_name] = value
+                            self._record_setting_apply(drs, profile, setting_name, value, results)
                         except Exception as e:
                             results["errors"].append({
                                 "setting": setting_name,
@@ -1985,10 +2082,9 @@ class DRSProfileManager:
                     results["app_binding_state"] = "profile_only"
 
                 if results.get("app_binding_state") != "bound_elsewhere":
-                    for setting_name, value in settings.items():
+                    for setting_name, value in self._settings_in_write_order(settings):
                         try:
-                            self._apply_single_setting(drs, profile, setting_name, value)
-                            results["settings_applied"][setting_name] = value
+                            self._record_setting_apply(drs, profile, setting_name, value, results)
                         except Exception as e:
                             results["errors"].append({
                                 "setting": setting_name,
@@ -2030,10 +2126,9 @@ class DRSProfileManager:
             with self._drs as drs:
                 global_profile = drs.get_base_profile()
 
-                for setting_name, value in settings.items():
+                for setting_name, value in self._settings_in_write_order(settings):
                     try:
-                        self._apply_single_setting(drs, global_profile, setting_name, value)
-                        results["settings_applied"][setting_name] = value
+                        self._record_setting_apply(drs, global_profile, setting_name, value, results)
                     except Exception as e:
                         results["errors"].append({
                             "setting": setting_name,
@@ -2054,8 +2149,33 @@ class DRSProfileManager:
         profile: NvDRSProfileHandle,
         setting_name: str,
         value: Any
-    ) -> None:
-        """Apply a single setting to a profile."""
+    ) -> list[str]:
+        """Apply a setting, returning private controls needing manual setup."""
+        sync_mode = str(value).lower()
+        if setting_name.lower() in ("vsync", "v_sync", "vsync_mode") and sync_mode in self.VSYNC_COMPANION_TEAR:
+            drs.set_setting(profile, self.SETTING_IDS["vsync_mode"], self.VSYNC_VALUES[sync_mode])
+            drs.set_setting(
+                profile, self.SETTING_IDS["vsync_tear_control"],
+                self.VSYNC_TEAR_CONTROL_VALUES[self.VSYNC_COMPANION_TEAR[sync_mode]],
+            )
+            return []
+        if setting_name.lower() in self.LOW_LATENCY_ALIASES:
+            pending = []
+            for name, native_value in self.low_latency_native_settings(value).items():
+                setting_id = self.SETTING_IDS[name]
+                if name != "prerendered_frames":
+                    try:
+                        readable = drs.get_setting(profile, setting_id)
+                    except NVAPIError:
+                        readable = None
+                    if readable is None:
+                        pending.append(name)
+                        continue
+                if native_value is None:
+                    drs.delete_setting(profile, setting_id)
+                else:
+                    drs.set_setting(profile, setting_id, native_value)
+            return pending
         # Map setting name to ID and value
         setting_id, numeric_value = self._resolve_setting(setting_name, value)
 
@@ -2064,6 +2184,7 @@ class DRSProfileManager:
             drs.delete_setting(profile, setting_id)
         else:
             drs.set_setting(profile, setting_id, numeric_value)
+        return []
 
     def _resolve_setting(self, setting_name: str, value: Any) -> tuple[int, int | None]:
         """Resolve a setting name and value to ID and numeric value.
@@ -2078,6 +2199,8 @@ class DRSProfileManager:
         """
         # Normalize setting name
         name_lower = setting_name.lower().replace("-", "_").replace(" ", "_")
+        if name_lower == "nvidia_reflex":
+            raise ValueError("NVIDIA Reflex is an in-game setting; enable it in the game's options, not through driver Low Latency Mode")
 
         # Handle special cases and aliases
         setting_map = {
@@ -2086,7 +2209,6 @@ class DRSProfileManager:
             "vsync_mode": ("vsync_mode", self.VSYNC_VALUES),
             "low_latency_mode": ("low_latency_mode", self.LOW_LATENCY_VALUES),
             "llm": ("low_latency_mode", self.LOW_LATENCY_VALUES),
-            "nvidia_reflex": ("low_latency_mode", self.LOW_LATENCY_VALUES),
             "vrr_app_override": ("vrr_app_override", self.VRR_OVERRIDE_VALUES),
             "vrr_app_override_request_state": ("vrr_app_override_request_state", self.VRR_OVERRIDE_VALUES),
             "gsync": ("vrr_app_override", self.VRR_OVERRIDE_VALUES),

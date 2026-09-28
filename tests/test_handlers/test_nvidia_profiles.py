@@ -56,23 +56,23 @@ class TestGetSettingValue:
 
     def test_vsync_off(self):
         """Test vsync 'off' returns 0."""
-        assert get_setting_value("off", "vsync") == 0
+        assert get_setting_value("off", "vsync") == 0x08416747
 
     def test_vsync_on(self):
         """Test vsync 'on' returns 1."""
-        assert get_setting_value("on", "vsync") == 1
+        assert get_setting_value("on", "vsync") == 0x47814940
 
     def test_vsync_adaptive(self):
         """Test vsync 'adaptive' returns 2."""
-        assert get_setting_value("adaptive", "vsync") == 2
+        assert get_setting_value("adaptive", "vsync") == 0x47814940
 
     def test_vsync_adaptive_half(self):
         """Test vsync 'adaptive_half' returns 3."""
-        assert get_setting_value("adaptive_half", "vsync") == 3
+        assert get_setting_value("adaptive_half", "vsync") == 0x32610244
 
     def test_vsync_unknown_defaults_to_zero(self):
         """Test vsync unknown value defaults to 0."""
-        assert get_setting_value("invalid", "vsync") == 0
+        assert get_setting_value("invalid", "vsync") == 0x08416747
 
     def test_framerate_off(self):
         """Test framerate 'off' returns 0."""
@@ -175,7 +175,8 @@ class TestGenerateCustomProfile:
         path = generate_custom_profile({"vsync": "adaptive"}, "test")
         content = path.read_text(encoding="utf-16")
         assert "11041231" in content  # VSYNC decimal ID (0x00A879CF)
-        assert "<SettingValue>2</SettingValue>" in content
+        assert "<SettingValue>1199655232</SettingValue>" in content
+        assert "<SettingValue>2576618116</SettingValue>" in content
 
     def test_includes_max_frame_rate_setting(self):
         """Test includes max frame rate setting."""

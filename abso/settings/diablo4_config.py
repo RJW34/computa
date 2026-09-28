@@ -98,24 +98,15 @@ class Diablo4ConfigHandler(SettingsHandler):
 
         if current.get("window_mode") not in {1, None}:
             issues.append(Issue(
-                title="Diablo IV is not using the intended fullscreen path",
+                title="Diablo IV is not using Windowed (Fullscreen)",
                 severity="warning",
                 current_value=str(current.get("window_mode")),
-                optimal_value="1 (Fullscreen)",
-                explanation="ABSO expects Diablo IV to stay on the native fullscreen presentation path.",
+                optimal_value="1 (Windowed Fullscreen)",
+                explanation="ABSO's Diablo IV profiles use the game's borderless fullscreen presentation path.",
                 category="game_config",
             ))
 
-        if current.get("vsync") is True:
-            issues.append(Issue(
-                title="Diablo IV VSync enabled in-game",
-                severity="warning",
-                current_value="Enabled",
-                optimal_value="Disabled",
-                explanation="Keep in-game VSync off so the chosen VRR/driver sync path stays authoritative.",
-                category="game_config",
-            ))
-
+        # VSync is profile-dependent; verify_active checks the selected target.
         if current.get("reflex") is not True:
             issues.append(Issue(
                 title="Diablo IV Reflex not enabled",
@@ -261,10 +252,9 @@ class Diablo4ConfigHandler(SettingsHandler):
         current = self.detect()
         results: dict[str, Any] = {"all_active": True, "settings": {}}
 
-        if not current.get("config_found"):
-            return results
-
-        requested = dict(settings)
+        # Framework metadata is not a LocalPrefs setting and must not create
+        # a false mismatch during transaction verification.
+        requested = {key: value for key, value in settings.items() if not key.startswith("_")}
         auto_refresh = requested.pop(self.AUTO_REFRESH_RATE_KEY, False)
         auto_vrr_cap = requested.pop(self.AUTO_VRR_FPS_CAP_KEY, False)
 
@@ -277,6 +267,24 @@ class Diablo4ConfigHandler(SettingsHandler):
             except Exception:
                 pass
 
+        if (auto_refresh or auto_vrr_cap) and not (refresh_hz and refresh_hz > 0):
+            results["all_active"] = False
+            for key, enabled in (
+                (self.AUTO_REFRESH_RATE_KEY, auto_refresh),
+                (self.AUTO_VRR_FPS_CAP_KEY, auto_vrr_cap),
+            ):
+                if enabled:
+                    results["settings"][key] = {
+                        "target": True,
+                        "current": None,
+                        "active": False,
+                        "status": "unverifiable",
+                        "note": (
+                            "Primary display refresh could not be detected; "
+                            "the requested automatic setting cannot be verified."
+                        ),
+                    }
+
         if auto_refresh and refresh_hz and refresh_hz > 0:
             requested["refresh_rate"] = int(round(refresh_hz))
 
@@ -288,7 +296,7 @@ class Diablo4ConfigHandler(SettingsHandler):
 
         for key, target in requested.items():
             current_value = current.get(key)
-            is_active = current_value == target
+            is_active = bool(current.get("config_found")) and key in current and current_value == target
             results["settings"][key] = {
                 "target": target,
                 "current": current_value,
@@ -296,6 +304,15 @@ class Diablo4ConfigHandler(SettingsHandler):
             }
             if not is_active:
                 results["all_active"] = False
+                if not current.get("config_found") or key not in current:
+                    results["settings"][key].update({
+                        "status": "unverifiable",
+                        "note": (
+                            "LocalPrefs.txt not found; launch Diablo IV to create its settings."
+                            if not current.get("config_found")
+                            else "The requested setting could not be read from LocalPrefs.txt."
+                        ),
+                    })
 
         return results
 

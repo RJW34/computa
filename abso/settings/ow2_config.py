@@ -6,7 +6,7 @@ settings before launch.  OW2 uses a quoted INI format inside versioned
 
     [Render.13]
     WindowMode = "1"
-    LimitToRefresh = "0"
+    VerticalSyncEnabled = "1"
 
 This handler uses custom extract/upsert helpers (following the Dolphin
 handler pattern) instead of ``config_safety.apply_ini_key_patch`` because
@@ -60,15 +60,15 @@ class OW2ConfigHandler(SettingsHandler):
     AUTO_VRR_FPS_CAP_KEY = "auto_vrr_fps_cap"
     VRR_CAP_POLICY_KEY = "vrr_cap_policy"
 
-    # ReflexMode is the in-game NVIDIA Reflex toggle. ABSO never *writes* it
-    # (the key is not stable across OW2 patches and is unsafe to author from
-    # outside), but it lives in the same [Render.X] section ABSO already parses,
+    # ReflexMode is the in-game NVIDIA Reflex toggle. ABSO deliberately leaves
+    # this choice to the user in-game, but it lives in the [Render.X] section
+    # ABSO already parses,
     # so it can be read back to confirm the user's manual Reflex step. A profile
     # declares the expected mode via ``expected_reflex_mode`` and verify surfaces
     # a non-blocking manual-step confirmation.
     EXPECTED_REFLEX_MODE_KEY = "expected_reflex_mode"
     REFLEX_MODE_INI_KEY = "ReflexMode"
-    REFLEX_MODE_LABELS = {0: "Off", 1: "Enabled", 2: "Enabled + Boost"}
+    REFLEX_MODE_LABELS = {0: "Disabled", 1: "Enabled", 2: "Enabled + Boost"}
 
     # Matches versioned render section headers like [Render.13]
     RENDER_SECTION_RE = re.compile(r"^\[Render\.\d+\]$")
@@ -82,7 +82,9 @@ class OW2ConfigHandler(SettingsHandler):
         "fullscreen_window": "FullscreenWindow",
         "fullscreen_window_enabled": "FullscreenWindowEnabled",
         "windowed_fullscreen": "WindowedFullscreen",
-        "vsync": "LimitToRefresh",
+        # LimitToRefresh is a different/legacy key, not proof of the VSync
+        # toggle. Preserve it as unowned rather than guessing its meaning.
+        "vsync": "VerticalSyncEnabled",
         "reduce_buffering": "CpuForceSyncEnabled",
         "dynamic_render_scale": "UseGPUScale",
         "dynamic_render_scale_v2": "DynamicRenderScale",
@@ -166,15 +168,8 @@ class OW2ConfigHandler(SettingsHandler):
         if not current.get("config_found"):
             return issues
 
-        if current.get("vsync") == 1:
-            issues.append(Issue(
-                title="OW2 VSync enabled in-game",
-                severity="warning",
-                current_value="On",
-                optimal_value="Off (use NVCP instead)",
-                explanation="In-game VSync adds input latency; sync should be managed by the driver.",
-                category="game_config",
-            ))
+        # VSync is profile-dependent: borderless G-SYNC uses the native toggle,
+        # whereas no-sync lanes disable it. verify_active checks that contract.
 
         if current.get("reduce_buffering") == 0:
             issues.append(Issue(
@@ -182,7 +177,10 @@ class OW2ConfigHandler(SettingsHandler):
                 severity="warning",
                 current_value="Off",
                 optimal_value="On",
-                explanation="Reduce Buffering lowers the render queue depth for lower latency.",
+                explanation=(
+                    "ABSO profiles request reduced buffering. Its interaction with Reflex "
+                    "and the resulting latency depend on the game and workload."
+                ),
                 category="game_config",
             ))
 
@@ -192,7 +190,10 @@ class OW2ConfigHandler(SettingsHandler):
                 severity="warning",
                 current_value="On",
                 optimal_value="Off",
-                explanation="Triple buffering adds a frame of latency.",
+                explanation=(
+                    "ABSO profiles disable this extra buffering option; its latency effect "
+                    "depends on the active synchronization and presentation path."
+                ),
                 category="game_config",
             ))
 
@@ -202,7 +203,10 @@ class OW2ConfigHandler(SettingsHandler):
                 severity="info",
                 current_value="On",
                 optimal_value="Off",
-                explanation="Dynamic scaling causes frametime variance.",
+                explanation=(
+                    "ABSO profiles use fixed render resolution. Dynamic scaling changes "
+                    "resolution in response to load, so compare it separately if needed."
+                ),
                 category="game_config",
             ))
 
@@ -327,9 +331,6 @@ class OW2ConfigHandler(SettingsHandler):
                     "ABSO checks the saved choice but does not change this setting."
                 ),
             }]
-
-        if not current.get("config_found"):
-            return results
 
         settings = self._resolve_auto_vrr_fps_cap(settings)
         replacements = self._build_replacements(settings)

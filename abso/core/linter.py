@@ -502,7 +502,11 @@ class ProfileLinter:
         missing_support: list[str] = []
         if global_vrr_mode != "fullscreen_and_windowed":
             missing_support.append("global_vrr_mode='fullscreen_and_windowed'")
-        if not vrr_optimize:
+        # DX12 already uses native flip presentation; the legacy Windows VRR
+        # compatibility switch is not a prerequisite for that path. Keep the
+        # windowed NVIDIA mode requirement above for every renderer.
+        graphics_api = str(getattr(profile, "graphics_api", "unknown")).strip().lower()
+        if graphics_api != "dx12" and not vrr_optimize:
             missing_support.append("WindowsSettingsHandler.vrr_optimize=True")
 
         if missing_support:

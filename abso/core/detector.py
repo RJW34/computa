@@ -1094,7 +1094,8 @@ class HardwareDetector:
                     max_refresh_any_res = refresh_rate
                     try:
                         mode_index = 0
-                        while mode_index < 500:  # Safety limit
+                        # Native-resolution modes can occur after index 500.
+                        while mode_index < 4096:  # Safety limit
                             try:
                                 mode = win32api.EnumDisplaySettings(adapter.DeviceName, mode_index)
                                 if mode is None:
@@ -1267,7 +1268,8 @@ class HardwareDetector:
                 max_refresh_any_res = float(refresh_rate)
 
                 mode_index = 0
-                while mode_index < 500:
+                # Match the pywin32 path's bound for large driver mode lists.
+                while mode_index < 4096:
                     mode = DEVMODEW()
                     mode.dmSize = ctypes.sizeof(DEVMODEW)
                     if not user32.EnumDisplaySettingsW(adapter.DeviceName, mode_index, ctypes.byref(mode)):

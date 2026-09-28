@@ -85,7 +85,7 @@ $states | ConvertTo-Json -Compress
     }
 
 
-@pytest.mark.parametrize("outcome", ["success", "failure", "timeout", "shutdown"])
+@pytest.mark.parametrize("outcome", ["success", "failure", "invalid", "timeout", "shutdown"])
 def test_catalog_refresh_is_single_flight_and_cleans_up(tmp_path: Path, outcome: str) -> None:
     result = _run_functions(
         tmp_path,
@@ -114,6 +114,7 @@ $script:ProfileCatalogCacheFile = Join-Path $PSScriptRoot 'mock-cache.json'
 $script:children = @()
 $script:tempPaths = @()
 $script:writes = 0
+$script:adoptions = 0
 $script:entries = $null
 $script:aliases = $null
 function Get-AbsoBackendArgs { param($CommandArgs) return $CommandArgs }
@@ -138,6 +139,7 @@ function Write-ProfileCatalogCache {
     $script:aliases = $Aliases
     return $true
 }
+function Set-RefreshedTrayCatalog { param($Entries, $Aliases) $script:adoptions++; return $false }
 Start-BackgroundCatalogRefresh
 Complete-BackgroundCatalogIfReady
 $first = $script:children[0]
@@ -152,15 +154,21 @@ if ('OUTCOME' -eq 'timeout') {
     Stop-BackgroundCatalogRefresh
 } else {
     $first.HasExited = $true
+    if ('OUTCOME' -eq 'invalid') {
+        [System.IO.File]::WriteAllText($script:BackgroundCatalogOutputFile, '{"success":true,"data":[{"id":""}]}')
+    }
     Complete-BackgroundCatalogIfReady
-    $second = $script:children[1]
-    $second.HasExited = $true
-    if ('OUTCOME' -eq 'failure') { $second.ExitCode = 9 }
-    Complete-BackgroundCatalogIfReady
+    if ('OUTCOME' -ne 'invalid') {
+        $second = $script:children[1]
+        $second.HasExited = $true
+        if ('OUTCOME' -eq 'failure') { $second.ExitCode = 9 }
+        Complete-BackgroundCatalogIfReady
+    }
 }
 $remainingPaths = @($script:tempPaths | Where-Object { Test-Path -LiteralPath $_ })
 @{
     coalesced = $coalesced; writes = $script:writes
+    adoptions = $script:adoptions
     entries = @($script:entries); aliases = $script:aliases
     cleaned = $null -eq $script:BackgroundCatalogProc -and $null -eq $script:BackgroundCatalogTimer
     disposed = @($script:children | Where-Object { -not $_.Disposed }).Count -eq 0
@@ -173,10 +181,121 @@ $remainingPaths = @($script:tempPaths | Where-Object { Test-Path -LiteralPath $_
     assert result["disposed"]
     assert result["remainingPaths"] == 0
     assert result["writes"] == (1 if outcome == "success" else 0)
+    assert result["adoptions"] == (1 if outcome == "success" else 0)
     assert result["killed"] == (outcome in {"timeout", "shutdown"})
     if outcome == "success":
         assert result["entries"] == [{"id": "mock-profile"}]
         assert result["aliases"] == {"old-profile": "mock-profile"}
+
+
+@pytest.mark.parametrize("change", ["unchanged", "guidance", "policy", "removed"])
+def test_fresh_catalog_replaces_loaded_metadata_without_applying(tmp_path: Path, change: str) -> None:
+    result = _run_functions(
+        tmp_path,
+        ["Set-RefreshedTrayCatalog", "Get-TrayCatalogSessionPolicy", "Convert-CatalogEntriesToProfileMap"],
+        """
+function Format-TrayDisplayCopy { param($Text) return $Text }
+function Normalize-TrayCategory { param($Category) return $Category }
+function Stop-LaunchSweepRuntime { param([switch]$KillProcess) $script:sweepsStopped++ }
+function Stop-CpuBalancerForGame { $script:governorsStopped++ }
+function Clear-AbsoKeepAwake {}
+function Reset-ActiveProfileVerificationState { $script:verificationResets++ }
+function Update-MenuState { $script:menuUpdates++ }
+function Update-TrayQuickPanelVerificationState { $script:panelUpdates++ }
+function Apply-Profile { throw 'Refreshing metadata must not apply a profile' }
+$entry = '{"id":"ow2","display_name":"OW2","tray_subtitle":"Old guidance","tray_description":"Old guidance","tray_category":"Shooters","tray_group":"ow2","tray_group_name":"Overwatch","executables":["Overwatch.exe"],"cpu_partition_policy":"full","launch_process_killset":{"always_safe":["OldOverlay.exe"]},"settings":{"ow2_config":{"vsync":false}}}' | ConvertFrom-Json
+$script:FallbackProfiles = @{}
+$script:Profiles = Convert-CatalogEntriesToProfileMap -Entries @($entry) -FallbackProfiles @{}
+$script:activeProfile = 'ow2'
+$script:ProfileAliases = @{ old = 'wrong-profile' }
+$script:profileMenuItems = @([pscustomobject]@{ Tag = 'ow2'; Enabled = $true })
+$script:notifyIcon = [pscustomobject]@{ ContextMenuStrip = $true }
+$script:QuickPanelVisible = $true
+$script:sweepsStopped = 0; $script:governorsStopped = 0; $script:verificationResets = 0
+$script:menuUpdates = 0; $script:panelUpdates = 0
+if ('CHANGE' -eq 'guidance') { $entry.tray_subtitle = 'In-game VSync ON' }
+if ('CHANGE' -eq 'policy') { $entry.launch_process_killset.always_safe = @(); $entry.cpu_partition_policy = 'off' }
+if ('CHANGE' -eq 'removed') { $entry.id = 'new-profile' }
+$script:MutatingOperationInProgress = $true
+$blocked = $false
+try { Set-RefreshedTrayCatalog -Entries @($entry) -Aliases @{ old = 'ow2' } } catch { $blocked = $true }
+$unchangedWhileBusy = $script:ProfileAliases.old -eq 'wrong-profile' -and $script:menuUpdates -eq 0
+$script:MutatingOperationInProgress = $false
+$menuChanged = Set-RefreshedTrayCatalog -Entries @($entry) -Aliases @{ old = 'ow2' }
+$loaded = $script:Profiles[$entry.id]
+@{ blocked = $blocked; unchangedWhileBusy = $unchangedWhileBusy; source = $script:ProfileCatalogLastSource
+   active = $script:activeProfile; alias = $script:ProfileAliases.old; subtitle = $loaded.Sub
+   policy = $loaded.CpuPartitionPolicy; killsetCount = $loaded.KillsetAlwaysSafe.Count
+   containsSettingValues = $loaded.ContainsKey('settings'); menuChanged = $menuChanged
+   rowEnabled = $script:profileMenuItems[0].Enabled; resets = $script:verificationResets
+   sweepsStopped = $script:sweepsStopped; governorsStopped = $script:governorsStopped
+   menuUpdates = $script:menuUpdates; panelUpdates = $script:panelUpdates } | ConvertTo-Json -Compress
+""".replace("CHANGE", change),
+    )
+    assert result["blocked"] and result["unchangedWhileBusy"]
+    assert result["source"] == "backend"
+    assert result["active"] == "ow2"
+    assert result["alias"] == "ow2"
+    assert not result["containsSettingValues"]
+    assert result["menuChanged"] is (change == "removed")
+    assert result["rowEnabled"] is (change != "removed")
+    assert result["resets"] == (0 if change == "unchanged" else 1)
+    assert result["panelUpdates"] == (0 if change == "unchanged" else 1)
+    assert result["menuUpdates"] == 1
+    assert result["sweepsStopped"] == result["governorsStopped"] == (1 if change in {"policy", "removed"} else 0)
+    if change == "guidance":
+        assert result["subtitle"] == "In-game VSync ON"
+    if change == "policy":
+        assert result["policy"] == "off"
+        assert result["killsetCount"] == 0
+
+
+def test_manual_catalog_refresh_waits_for_backend_success(tmp_path: Path) -> None:
+    result = _run_functions(
+        tmp_path,
+        ["Request-TrayCatalogRefresh", "Complete-BackgroundCatalogIfReady"],
+        """
+function Test-TrayMutationInProgress { param($RequestedAction) return $false }
+function Start-BackgroundCatalogRefresh { $script:BackgroundCatalogTimer = $true }
+function Stop-BackgroundCatalogRefresh { $script:BackgroundCatalogTimer = $null; $script:BackgroundCatalogProc = $null }
+function Set-TrayLastAction { param($Message) $script:LastAction = $Message }
+function Show-Notification { param($Title, $Message, $Type, $ActionName, $ActionColor) $script:notices += @{ type = $Type; message = $Message } }
+function Update-MenuState {}
+function Write-ProfileCatalogCache { param($Entries,$Aliases,[switch]$ThrowOnFailure) return $false }
+function Set-RefreshedTrayCatalog { param($Entries,$Aliases) $script:adopted = $true; return $true }
+$script:PythonExe = 'mock'; $script:notices = @(); $script:adopted = $false
+Request-TrayCatalogRefresh
+$earlyNotices = $script:notices.Count
+$requestAction = $script:LastAction
+$script:BackgroundCatalogStage = 'profile-aliases'
+$script:BackgroundCatalogProc = [pscustomobject]@{ HasExited = $true; ExitCode = 0 }
+$script:BackgroundCatalogEntries = @(@{ id = 'ow2' })
+$script:BackgroundCatalogOutputFile = Join-Path $PSScriptRoot 'aliases.json'
+$script:BackgroundCatalogErrorFile = Join-Path $PSScriptRoot 'aliases.err'
+Set-Content $script:BackgroundCatalogOutputFile '{"success":true,"data":{}}'
+Set-Content $script:BackgroundCatalogErrorFile ''
+$script:MutatingOperationInProgress = $true
+Complete-BackgroundCatalogIfReady
+$blocked = -not $script:adopted -and $script:notices.Count -eq 0
+$script:MutatingOperationInProgress = $false
+Complete-BackgroundCatalogIfReady
+$successAction = $script:LastAction
+Request-TrayCatalogRefresh
+$script:BackgroundCatalogProc = [pscustomobject]@{ HasExited = $true; ExitCode = 9 }
+Complete-BackgroundCatalogIfReady
+@{ earlyNotices = $earlyNotices; requestAction = $requestAction; blocked = $blocked
+   adopted = $script:adopted; successAction = $successAction; notices = $script:notices
+   pending = $script:ProfileCatalogRefreshRequested } | ConvertTo-Json -Depth 4 -Compress
+""",
+    )
+    assert result["earlyNotices"] == 0
+    assert result["requestAction"] == "Profile refresh requested; checking backend"
+    assert result["blocked"] and result["adopted"]
+    assert "Profiles refreshed from backend" in result["successAction"]
+    assert "Restart tray" in result["successAction"]
+    assert [notice["type"] for notice in result["notices"]] == ["Success", "Error"]
+    assert "exit code 9" in result["notices"][1]["message"]
+    assert not result["pending"]
 
 
 def test_hidden_menu_never_starts_animation_timer(tmp_path: Path) -> None:

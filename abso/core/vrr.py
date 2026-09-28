@@ -55,7 +55,7 @@ class VRRConfig:
 
     gsync_enabled: bool
     vsync_nvcp: bool  # NVCP V-SYNC (safety net)
-    vsync_ingame: bool  # In-game V-SYNC (should be OFF)
+    vsync_ingame: bool  # Depends on presentation path; windowed Reflex can require ON
     low_latency_mode: str  # "off", "on", "ultra"
     fps_cap: int | None  # None = uncapped
     fps_cap_method: FrameLimiterType

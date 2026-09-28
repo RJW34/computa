@@ -25,6 +25,7 @@ from abso.core.models import Issue
 from abso.settings.base import SettingsHandler
 
 from .npi import NPI_IMPORTS_DISABLED, NPIManager
+from .nvapi_drs import DRSProfileManager as _DRSSettingSchema
 from .presets import NVIDIA_PRESETS, NvidiaSettingIDs, NvidiaSettingValues
 from .profiles import generate_custom_profile, generate_game_profile, generate_preset_profile
 
@@ -46,8 +47,9 @@ VERIFICATION_SETTING_IDS = {
     "vsync_tear_control": 0x005A375C,
     "frame_rate_limiter": 0x10835002,
     "frame_rate_limiter_v3": 0x10835002,
-    "low_latency_mode": 0x007BA09E,
+    "low_latency_mode": 0x0005F543,
     "prerendered_frames": 0x007BA09E,
+    "ultra_low_latency": 0x10835000,
     "vrr_app_override": 0x10A879CF,
     "vrr_app_override_request_state": 0x10A879AC,
     "vrr_mode": 0x1194F158,
@@ -376,6 +378,7 @@ class NvidiaSettingsHandler(SettingsHandler):
         # Structured signal so callers (applier / tray) don't have to grep the `applied` lines
         # for the "Monitor Adaptive Sync: ..." string. None means we never touched it.
         monitor_adaptive_sync_state: str | None = None
+        manual_steps: list[dict[str, Any]] = []
 
         executables = list(requested["executables"] or [])
         game_name = str(requested["game_name"] or "Game")
@@ -481,6 +484,7 @@ class NvidiaSettingsHandler(SettingsHandler):
 
             if global_settings:
                 global_result = manager.apply_settings_to_global(global_settings)
+                manual_steps.extend(self._global_manual_steps(global_result.get("manual_steps", [])))
 
                 if global_result.get("settings_applied"):
                     applied.append("NVIDIA global profile configured:")
@@ -498,8 +502,9 @@ class NvidiaSettingsHandler(SettingsHandler):
                     global_verification_failures = self._collect_verification_failures(
                         manager,
                         global_verify_result,
-                        global_result.get("settings_applied", {}),
+                        self._post_apply_targets(global_result, global_settings),
                     )
+                    manual_steps.extend(self._global_manual_steps(self._low_latency_manual_steps(manager, global_verify_result, global_settings)))
                     if global_verification_failures:
                         logger.warning(
                             "NVIDIA global post-apply verification mismatches: %s",
@@ -579,6 +584,7 @@ class NvidiaSettingsHandler(SettingsHandler):
                     )
 
                 effective_profile_name = str(result.get("profile_name") or requested_profile_name)
+                manual_steps.extend(result.get("manual_steps", []))
                 if result.get("profile_selection_note"):
                     selection_note = str(result["profile_selection_note"])
                     applied.append(selection_note)
@@ -657,8 +663,9 @@ class NvidiaSettingsHandler(SettingsHandler):
                     verification_failures = self._collect_verification_failures(
                         manager,
                         verify_result,
-                        result.get("settings_applied", {}),
+                        self._post_apply_targets(result, nvidia_settings),
                     )
+                    manual_steps.extend(self._low_latency_manual_steps(manager, verify_result, nvidia_settings))
                     if verification_failures:
                         logger.warning("NVIDIA post-apply verification mismatches: %s", verification_failures)
                         for failure in verification_failures:
@@ -672,6 +679,9 @@ class NvidiaSettingsHandler(SettingsHandler):
                 )
                 applied.append("No executable specified - per-application NVIDIA settings not applied")
 
+            # Readback can add the same reminder as the apply manager.
+            manual_steps = list({step["key"]: step for step in manual_steps}.values())
+            notices.extend(step["instruction"] for step in manual_steps)
             return {
                 "success": len(errors) == 0,
                 "error": "; ".join(errors) if errors else None,
@@ -679,6 +689,7 @@ class NvidiaSettingsHandler(SettingsHandler):
                 "applied": applied,
                 "warnings": warnings,
                 "notices": notices,
+                "manual_steps": manual_steps,
                 "app_bound": app_bound,
                 "npi_launched": npi_launched,
                 "monitor_adaptive_sync_state": monitor_adaptive_sync_state,
@@ -738,8 +749,36 @@ class NvidiaSettingsHandler(SettingsHandler):
         if verify_result.get("_error"):
             return [str(verify_result["_error"])]
 
+        # Adaptive/Fast Sync are compound modes in Inspector's native schema.
+        requested_settings = dict(requested_settings)
+        sync_mode = str(requested_settings.get("vsync", "")).lower()
+        if sync_mode in _DRSSettingSchema.VSYNC_COMPANION_TEAR:
+            requested_settings.setdefault("vsync_tear_control", _DRSSettingSchema.VSYNC_COMPANION_TEAR[sync_mode])
+
         for setting_name, expected_value in requested_settings.items():
             if str(setting_name).startswith("_"):
+                continue
+
+            if setting_name.lower() in _DRSSettingSchema.LOW_LATENCY_ALIASES:
+                try:
+                    native_settings = _DRSSettingSchema.low_latency_native_settings(expected_value)
+                except ValueError as error:
+                    failures.append(f"{setting_name}: {error}")
+                    continue
+                if native_settings["low_latency_mode"] is None:
+                    # Numeric readback can be inherited. It cannot prove that
+                    # an override was deleted; request manual confirmation.
+                    continue
+                for native_name, target in native_settings.items():
+                    actual = self._find_verified_setting_value(
+                        manager, verify_result, _DRSSettingSchema.SETTING_IDS[native_name],
+                    )
+                    if actual is None and native_name != "prerendered_frames":
+                        # Undocumented controls are not exposed by every driver.
+                        # Unknown becomes manual confirmation, never assumed Off.
+                        continue
+                    if actual is None or str(actual) != str(target):
+                        failures.append(f"{setting_name}.{native_name}: expected={target}, actual={actual}")
                 continue
 
             try:
@@ -763,6 +802,41 @@ class NvidiaSettingsHandler(SettingsHandler):
                 )
 
         return failures
+
+    @staticmethod
+    def _post_apply_targets(applied: dict[str, Any], requested: dict[str, Any]) -> dict[str, Any]:
+        pending_low_latency = any(step.get("key") == "low_latency_mode" for step in applied.get("manual_steps", []))
+        return {
+            **applied.get("settings_applied", {}),
+            **{key: value for key, value in requested.items() if pending_low_latency and key in _DRSSettingSchema.LOW_LATENCY_ALIASES},
+        }
+
+    def _low_latency_manual_steps(
+        self, manager: Any, readback: dict[str, Any], requested: dict[str, Any],
+    ) -> list[dict[str, Any]]:
+        if readback.get("_error"):
+            return []
+        for name, value in requested.items():
+            if name.lower() not in _DRSSettingSchema.LOW_LATENCY_ALIASES:
+                continue
+            if _DRSSettingSchema.low_latency_native_settings(value)["low_latency_mode"] is None or any(
+                self._find_verified_setting_value(manager, readback, _DRSSettingSchema.SETTING_IDS[key]) is None
+                for key in ("low_latency_mode", "ultra_low_latency")
+            ):
+                return [_DRSSettingSchema.low_latency_manual_step(value)]
+        return []
+
+    @staticmethod
+    def _global_manual_steps(steps: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        return [
+            {
+                **step,
+                "key": "global." + step["key"],
+                "label": "Global " + step["label"],
+                "instruction": step["instruction"].replace("for this game", "in global settings"),
+            }
+            for step in steps
+        ]
 
     def _find_verified_setting_value(
         self,
@@ -892,6 +966,7 @@ class NvidiaSettingsHandler(SettingsHandler):
                         global_verify,
                         global_settings,
                     )
+                    result.setdefault("manual_steps", []).extend(self._global_manual_steps(self._low_latency_manual_steps(manager, global_verify, global_settings)))
 
             if nvidia_settings:
                 if executables:
@@ -952,6 +1027,7 @@ class NvidiaSettingsHandler(SettingsHandler):
                             verify_result,
                             nvidia_settings,
                         ))
+                        result.setdefault("manual_steps", []).extend(self._low_latency_manual_steps(manager, verify_result, nvidia_settings))
                         if binding_owner_profiles:
                             result["binding_owner_profiles"] = binding_owner_profiles
 

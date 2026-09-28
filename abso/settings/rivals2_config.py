@@ -296,8 +296,10 @@ class Rivals2ConfigHandler(SettingsHandler):
     def verify_active(self, settings: dict[str, Any]) -> dict[str, Any]:
         """Verify requested Rivals 2 config values are active."""
         settings = dict(settings)
+        results: dict[str, Any] = {"all_active": True, "settings": {}}
         vrr_cap_policy = settings.pop("vrr_cap_policy", None)
         if settings.pop("auto_vrr_fps_cap", False):
+            cap_resolved = False
             try:
                 from abso.core.vrr import get_vrr_fps_cap_for_policy
                 from abso.settings.nvidia import NvidiaSettingsHandler
@@ -307,14 +309,23 @@ class Rivals2ConfigHandler(SettingsHandler):
                     settings["frame_rate_limit"] = get_vrr_fps_cap_for_policy(
                         refresh_hz, vrr_cap_policy
                     )
+                    cap_resolved = True
             except Exception as e:
                 logger.warning("Rivals 2 auto VRR FPS cap verification failed: %s", e)
+            if not cap_resolved:
+                results["all_active"] = False
+                results["settings"]["auto_vrr_fps_cap"] = {
+                    "target": True,
+                    "current": None,
+                    "active": False,
+                    "status": "unverifiable",
+                    "note": (
+                        "The requested automatic FPS cap could not be resolved "
+                        "from the primary display refresh and cap policy."
+                    ),
+                }
 
         current = self.detect()
-        results: dict[str, Any] = {"all_active": True, "settings": {}}
-
-        if not current.get("config_found"):
-            return results
 
         for key in self.MUTABLE_SETTINGS_TO_INI:
             if key not in settings:
@@ -322,9 +333,11 @@ class Rivals2ConfigHandler(SettingsHandler):
 
             target = settings[key]
             current_value = current.get(key)
-            is_active = current_value == target
+            readable = bool(current.get("config_found")) and key in current
+            is_active = readable and current_value == target
             if (
                 not is_active
+                and readable
                 and key == "frame_rate_limit"
                 and self._is_uncapped_frame_rate(target)
                 and self._is_uncapped_frame_rate(current_value)
@@ -339,6 +352,15 @@ class Rivals2ConfigHandler(SettingsHandler):
             }
             if not is_active:
                 results["all_active"] = False
+                if not readable:
+                    results["settings"][key].update({
+                        "status": "unverifiable",
+                        "note": (
+                            "GameUserSettings.ini not found; launch Rivals 2 to create its settings."
+                            if not current.get("config_found")
+                            else "The requested setting could not be read from the game config."
+                        ),
+                    })
 
         return results
 

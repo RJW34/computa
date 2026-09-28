@@ -250,7 +250,7 @@ def test_transaction_restores_baseline_before_apply(tmp_path: Path) -> None:
         manager = ProfileTransactionManager(tmp_path, applier=applier)
         tx = manager.execute("test-profile", create_backup=True)
 
-        restore_manager.restore_backup.assert_called_once_with("old-backup")
+        restore_manager.restore_backup.assert_called_once_with("old-backup", native_config_handlers=set())
         assert any(cp.phase == "baseline_restore" and cp.status == "ok" for cp in tx.checkpoints)
         assert tx.success is True
 
@@ -409,7 +409,8 @@ def test_failed_baseline_recovers_pre_switch_state_before_returning(tmp_path: Pa
     baseline.mkdir()
     restore_manager.get_baseline_backup.return_value = baseline
 
-    def fail_after_restoring_display(_backup_id):
+    def fail_after_restoring_display(_backup_id, *, native_config_handlers):
+        assert native_config_handlers == set()
         live.update(hdr=False, power_plan="balanced")
         if failure == "exception":
             raise RuntimeError("audio restore crashed")
@@ -535,7 +536,7 @@ def test_transaction_uses_pre_switch_snapshot_as_rollback_target(tmp_path: Path)
         manager = ProfileTransactionManager(tmp_path, applier=applier)
         tx = manager.execute("test-profile", create_backup=True)
 
-        restore_manager.restore_backup.assert_called_once_with("baseline-clean")
+        restore_manager.restore_backup.assert_called_once_with("baseline-clean", native_config_handlers=set())
         backup_manager.create_backup.assert_called_once()
         rollback_manager.restore_backup.assert_called_once_with("rollback-live-state")
         assert tx.rollback_backup_id == "rollback-live-state"

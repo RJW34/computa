@@ -57,10 +57,11 @@ class BackupRestoreSummary:
     restored_components: list[str] = field(default_factory=list)
     skipped_components: list[dict[str, str]] = field(default_factory=list)
     failed_components: list[dict[str, str]] = field(default_factory=list)
+    preserved_components: list[str] = field(default_factory=list)
 
     @property
     def complete(self) -> bool:
-        """Whether every backed-up component's restore completed without failure."""
+        """Whether every selected component's restore completed without failure."""
         return not self.skipped_components and not self.failed_components
 
     @property
@@ -78,6 +79,7 @@ class BackupRestoreSummary:
             "restored_components": list(self.restored_components),
             "skipped_components": list(self.skipped_components),
             "failed_components": list(self.failed_components),
+            "preserved_components": list(self.preserved_components),
         }
 
 
@@ -340,11 +342,20 @@ class BackupManager:
         logger.info(f"Backup created: {final_path.name}")
         return final_path.name
 
-    def restore_backup(self, backup_id: str) -> BackupRestoreSummary:
+    def restore_backup(
+        self,
+        backup_id: str,
+        *,
+        native_config_handlers: set[str] | None = None,
+    ) -> BackupRestoreSummary:
         """Restore settings from a backup.
 
         Args:
             backup_id: Backup ID (timestamp) or 'latest'.
+            native_config_handlers: When provided for a profile switch, restore
+                only these native game handlers and preserve other games' files.
+                Shared system handlers are still restored. None retains full
+                restore behavior for explicit restore, uninstall, and rollback.
 
         Raises:
             FileNotFoundError: If backup not found.
@@ -377,9 +388,18 @@ class BackupManager:
         # Create handler lookup
         handler_map = {handler.__class__.__name__: handler for handler in self.handlers}
         restore_summary = BackupRestoreSummary(backup_id=backup_path.name)
+        preserve_native: frozenset[str] | set[str] = set()
+        if native_config_handlers is not None:
+            from abso.core.handler_registry import get_native_game_config_handler_names
+
+            preserve_native = get_native_game_config_handler_names() - native_config_handlers
 
         # Restore each component
         for handler_name, component_info in manifest["components"].items():
+            if handler_name in preserve_native:
+                logger.info("Preserving unrelated native game config: %s", handler_name)
+                restore_summary.preserved_components.append(handler_name)
+                continue
             handler = handler_map.get(handler_name)
             restore_guarantee = self._resolve_restore_guarantee(component_info, handler)
             is_blocking = restore_guarantee not in _NON_BLOCKING_GUARANTEES

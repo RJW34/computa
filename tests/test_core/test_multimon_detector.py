@@ -100,7 +100,14 @@ class TestMultiMonitorDetector:
         assert env.has_mixed_refresh is True
         assert env.monitors[0].name == "Primary Monitor"
         assert env.monitors[1].name == r"\\.\DISPLAY2"
-        assert any(warning.code == "MULTIMON_MPO_GLITCH_RISK" for warning in result.warnings)
+        mpo_warning = next(
+            warning for warning in result.warnings
+            if warning.code == "MULTIMON_MPO_GLITCH_RISK"
+        )
+        assert mpo_warning.message == (
+            "MPO glitch risk: VRR-capable display (current VRR engagement unverified), "
+            "mixed refresh (60Hz - 300Hz)"
+        )
 
     @patch.object(MultiMonitorDetector, "_detect_overlays", return_value=None)
     @patch.object(MultiMonitorDetector, "_enum_desktop_screens", return_value=[])

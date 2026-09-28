@@ -5573,7 +5573,7 @@
     {
       "id": "overwatch2-gsync-capture",
       "display_name": "Overwatch 2 - GSYNC SDR Streaming",
-      "description": "Borderless SDR G-SYNC streaming lane that preserves OBS, Medal, RTSS, and overlays and keeps game CPU/I/O priority at Normal so capture is not starved.",
+      "description": "Borderless SDR G-SYNC streaming lane that preserves OBS, Medal, RTSS, and overlays and keeps game CPU/I/O priority at Normal. Capture performance still depends on the workload.",
       "optimization_target": "low_latency_high_fps",
       "application_scope": "system_plus_native_config",
       "executables": [
@@ -5711,7 +5711,7 @@
     {
       "id": "overwatch2-gsync-hdr-capture",
       "display_name": "Overwatch 2 - GSYNC HDR Streaming",
-      "description": "Borderless HDR G-SYNC streaming lane that preserves OBS, Medal, RTSS, and overlays and keeps game CPU/I/O priority at Normal so capture is not starved.",
+      "description": "Borderless HDR G-SYNC streaming lane that preserves OBS, Medal, RTSS, and overlays and keeps game CPU/I/O priority at Normal. Capture performance still depends on the workload.",
       "optimization_target": "low_latency_high_fps",
       "application_scope": "system_plus_native_config",
       "executables": [

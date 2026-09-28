@@ -398,9 +398,9 @@
       },
       {
         "category": "Video",
-        "reason": "Use NVCP VSync as the VRR safety net; keep the in-game toggle off.",
+        "reason": "NVIDIA recommends in-game VSync for windowed G-SYNC + Reflex; driver VSync alone does not establish this path. Set this manually in CS2's Video settings.",
         "setting": "Wait for Vertical Sync",
-        "value": "Disabled (in-game)"
+        "value": "Enabled (in-game)"
       },
       {
         "category": "Video",
@@ -757,9 +757,9 @@
       },
       {
         "category": "Video",
-        "reason": "Use NVCP VSync as the VRR safety net; keep the in-game toggle off.",
+        "reason": "NVIDIA recommends in-game VSync for windowed G-SYNC + Reflex; driver VSync alone does not establish this path. Set this manually in CS2's Video settings.",
         "setting": "Wait for Vertical Sync",
-        "value": "Disabled (in-game)"
+        "value": "Enabled (in-game)"
       },
       {
         "category": "Video",
@@ -1824,9 +1824,9 @@
       },
       {
         "category": "Display",
-        "reason": "Matches the fullscreen VRR path this profile applies.",
+        "reason": "DisplayModeWindowMode=1 uses Diablo IV's borderless path; ABSO enables windowed G-SYNC.",
         "setting": "Display Mode",
-        "value": "Fullscreen"
+        "value": "Windowed (Fullscreen)"
       },
       {
         "category": "Display",
@@ -1836,9 +1836,9 @@
       },
       {
         "category": "Display",
-        "reason": "Keep synchronization in the driver VRR safety-net path, not in the game.",
+        "reason": "NVIDIA recommends in-game VSync for windowed G-SYNC + Reflex. Saved driver settings alone do not prove live VRR engagement.",
         "setting": "VSync (in-game)",
-        "value": "Off"
+        "value": "On"
       },
       {
         "category": "Display",
@@ -1896,7 +1896,7 @@
         "hdr_white_point": 1000.0,
         "limit_background_fps": true,
         "reflex": true,
-        "vsync": false,
+        "vsync": true,
         "window_mode": 1
       },
       "DisplayColorRangeHandler": {
@@ -1917,7 +1917,7 @@
       },
       "NvidiaSettingsHandler": {
         "auto_vrr_fps_cap": false,
-        "global_vrr_mode": "fullscreen_only",
+        "global_vrr_mode": "fullscreen_and_windowed",
         "preset": "vrr_diablo4",
         "profile_name": "Diablo IV",
         "vsync": "on"
@@ -1937,7 +1937,7 @@
       },
       "RegistrySettingsHandler": {
         "fullscreen_optimizations": {
-          "Diablo IV.exe": true
+          "Diablo IV.exe": false
         },
         "game_priority": {
           "priority": 6,
@@ -1988,9 +1988,9 @@
       },
       {
         "category": "Display",
-        "reason": "Matches the fullscreen VRR path this profile applies.",
+        "reason": "DisplayModeWindowMode=1 uses Diablo IV's borderless path; ABSO enables windowed G-SYNC.",
         "setting": "Display Mode",
-        "value": "Fullscreen"
+        "value": "Windowed (Fullscreen)"
       },
       {
         "category": "Display",
@@ -2000,9 +2000,9 @@
       },
       {
         "category": "Display",
-        "reason": "Keep synchronization in the driver VRR safety-net path, not in the game.",
+        "reason": "NVIDIA recommends in-game VSync for windowed G-SYNC + Reflex. Saved driver settings alone do not prove live VRR engagement.",
         "setting": "VSync (in-game)",
-        "value": "Off"
+        "value": "On"
       },
       {
         "category": "Display",
@@ -2057,7 +2057,7 @@
         "hdr_output": false,
         "limit_background_fps": true,
         "reflex": true,
-        "vsync": false,
+        "vsync": true,
         "window_mode": 1
       },
       "DisplayColorRangeHandler": {
@@ -2077,7 +2077,7 @@
       },
       "NvidiaSettingsHandler": {
         "auto_vrr_fps_cap": false,
-        "global_vrr_mode": "fullscreen_only",
+        "global_vrr_mode": "fullscreen_and_windowed",
         "preset": "vrr_diablo4",
         "profile_name": "Diablo IV",
         "vsync": "on"
@@ -2097,7 +2097,7 @@
       },
       "RegistrySettingsHandler": {
         "fullscreen_optimizations": {
-          "Diablo IV.exe": true
+          "Diablo IV.exe": false
         },
         "game_priority": {
           "priority": 6,
@@ -3675,9 +3675,9 @@
       },
       {
         "category": "Display",
-        "reason": "No-sync profile: uncapped FPS reduces frame time when the game can sustain it.",
+        "reason": "No-sync uses a 600 FPS ceiling and accepts tearing; actual FPS depends on the workload.",
         "setting": "Frame Rate Cap",
-        "value": "Uncapped (600)"
+        "value": "600 FPS ceiling"
       },
       {
         "category": "Display",
@@ -3687,7 +3687,7 @@
       },
       {
         "category": "Graphics",
-        "reason": "Avoid frametime variance from dynamic scaling.",
+        "reason": "Keeps render resolution fixed; performance depends on the scene and GPU load.",
         "setting": "Dynamic Render Scale",
         "value": "Off"
       },
@@ -3870,13 +3870,13 @@
       },
       {
         "category": "Display",
-        "reason": "Use NVCP VSync as safety net; keep in-game VSync off.",
+        "reason": "This borderless G-SYNC profile enables native VSync as NVIDIA recommends for windowed G-SYNC with Reflex. Driver VSync also stays On; its saved override alone does not prove that a windowed game is synchronized.",
         "setting": "VSync",
-        "value": "Off (in-game)"
+        "value": "On (in-game)"
       },
       {
         "category": "Display",
-        "reason": "Enable native Reflex for queue control; the profile requests driver LLM Off. With G-SYNC and VSync active, Reflex may pace below the static cap. ABSO cannot safely write the Reflex toggle; verify it in-game. Boost can cost power or FPS, so compare Enabled alone if needed.",
+        "reason": "Enable native Reflex for queue control; the profile requests driver LLM Off. With G-SYNC and VSync active, Reflex may pace below the static cap. ABSO leaves Reflex as a manual choice; verify it in-game. Boost can cost power or FPS, so compare Enabled alone if needed.",
         "setting": "NVIDIA Reflex",
         "value": "Enabled + Boost \u2014 set the in-game toggle manually"
       },
@@ -3888,13 +3888,13 @@
       },
       {
         "category": "Display",
-        "reason": "Maintains low queue depth in the render pipeline.",
+        "reason": "Requests the game's reduced buffering path; compare frame-time and latency results with Reflex on this setup.",
         "setting": "Reduce Buffering",
         "value": "On"
       },
       {
         "category": "Graphics",
-        "reason": "Avoid large frame pacing oscillations.",
+        "reason": "Keeps render resolution fixed; performance depends on the scene and GPU load.",
         "setting": "Dynamic Render Scale",
         "value": "Off"
       },
@@ -4009,7 +4009,7 @@
         "triple_buffering": false,
         "upscaling": false,
         "vrr_cap_policy": "refresh_minus_3",
-        "vsync": false,
+        "vsync": true,
         "window_mode": 1,
         "windowed_fullscreen": true
       },
@@ -4082,13 +4082,13 @@
       },
       {
         "category": "Display",
-        "reason": "Use NVCP VSync as the VRR safety net; keep in-game VSync off.",
+        "reason": "This borderless G-SYNC profile enables native VSync as NVIDIA recommends for windowed G-SYNC with Reflex. Driver VSync also stays On; its saved override alone does not prove that a windowed game is synchronized.",
         "setting": "VSync",
-        "value": "Off (in-game)"
+        "value": "On (in-game)"
       },
       {
         "category": "Display",
-        "reason": "Enable native Reflex for queue control; the profile requests driver LLM Off. With G-SYNC and VSync active, Reflex may pace below the static cap. ABSO cannot safely write the Reflex toggle; verify it in-game. Boost can cost power or FPS, so compare Enabled alone if needed.",
+        "reason": "Enable native Reflex for queue control; the profile requests driver LLM Off. With G-SYNC and VSync active, Reflex may pace below the static cap. ABSO leaves Reflex as a manual choice; verify it in-game. Boost can cost power or FPS, so compare Enabled alone if needed.",
         "setting": "NVIDIA Reflex",
         "value": "Enabled + Boost \u2014 set the in-game toggle manually"
       },
@@ -4100,13 +4100,13 @@
       },
       {
         "category": "Display",
-        "reason": "Maintains low queue depth on the streaming presentation path.",
+        "reason": "Requests the game's reduced buffering path; compare frame-time and latency results with Reflex on this setup.",
         "setting": "Reduce Buffering",
         "value": "On"
       },
       {
         "category": "Graphics",
-        "reason": "Avoid frame pacing swings while recording/clipping.",
+        "reason": "Keeps render resolution fixed; performance depends on the scene and GPU load.",
         "setting": "Dynamic Render Scale",
         "value": "Off"
       },
@@ -4221,7 +4221,7 @@
         "triple_buffering": false,
         "upscaling": false,
         "vrr_cap_policy": "refresh_minus_3",
-        "vsync": false,
+        "vsync": true,
         "window_mode": 1,
         "windowed_fullscreen": true
       },
@@ -4294,13 +4294,13 @@
       },
       {
         "category": "Display",
-        "reason": "Use NVCP VSync as safety net; keep in-game VSync off.",
+        "reason": "This borderless G-SYNC profile enables native VSync as NVIDIA recommends for windowed G-SYNC with Reflex. Driver VSync also stays On; its saved override alone does not prove that a windowed game is synchronized.",
         "setting": "VSync",
-        "value": "Off (in-game)"
+        "value": "On (in-game)"
       },
       {
         "category": "Display",
-        "reason": "Enable native Reflex for queue control; the profile requests driver LLM Off. With G-SYNC and VSync active, Reflex may pace below the static cap. ABSO cannot safely write the Reflex toggle; verify it in-game. Boost can cost power or FPS, so compare Enabled alone if needed.",
+        "reason": "Enable native Reflex for queue control; the profile requests driver LLM Off. With G-SYNC and VSync active, Reflex may pace below the static cap. ABSO leaves Reflex as a manual choice; verify it in-game. Boost can cost power or FPS, so compare Enabled alone if needed.",
         "setting": "NVIDIA Reflex",
         "value": "Enabled + Boost \u2014 set the in-game toggle manually"
       },
@@ -4312,7 +4312,7 @@
       },
       {
         "category": "Display",
-        "reason": "Maintains low queue depth in the render pipeline.",
+        "reason": "Requests the game's reduced buffering path; compare frame-time and latency results with Reflex on this setup.",
         "setting": "Reduce Buffering",
         "value": "On"
       },
@@ -4324,25 +4324,13 @@
       },
       {
         "category": "Display",
-        "reason": "Controls SDR-content brightness under HDR. ~200 nits is a good OLED starting point.",
-        "setting": "HDR Paper White Nits",
-        "value": "~200 (calibrate to taste)"
-      },
-      {
-        "category": "Display",
-        "reason": "Set to your display's actual peak brightness for correct tone mapping.",
-        "setting": "HDR Max Display Brightness",
-        "value": "Match monitor peak (e.g. 1000+ nits OLED)"
-      },
-      {
-        "category": "Display",
-        "reason": "OW2-specific slider for HUD brightness under HDR.",
-        "setting": "HDR UI Brightness",
-        "value": "Adjust to taste"
+        "reason": "ABSO preserves the game's HDR calibration. Use the game's calibration screens when recalibrating this display; there is no universal peak or paper-white value. Windows SDR-content brightness is a separate setting.",
+        "setting": "HDR Calibration",
+        "value": "Keep your calibrated values"
       },
       {
         "category": "Graphics",
-        "reason": "Avoid large frame pacing oscillations.",
+        "reason": "Keeps render resolution fixed; performance depends on the scene and GPU load.",
         "setting": "Dynamic Render Scale",
         "value": "Off"
       },
@@ -4457,7 +4445,7 @@
         "triple_buffering": false,
         "upscaling": false,
         "vrr_cap_policy": "refresh_minus_3",
-        "vsync": false,
+        "vsync": true,
         "window_mode": 1,
         "windowed_fullscreen": true
       },
@@ -4532,13 +4520,13 @@
       },
       {
         "category": "Display",
-        "reason": "Use NVCP VSync as the VRR safety net; keep in-game VSync off.",
+        "reason": "This borderless G-SYNC profile enables native VSync as NVIDIA recommends for windowed G-SYNC with Reflex. Driver VSync also stays On; its saved override alone does not prove that a windowed game is synchronized.",
         "setting": "VSync",
-        "value": "Off (in-game)"
+        "value": "On (in-game)"
       },
       {
         "category": "Display",
-        "reason": "Enable native Reflex for queue control; the profile requests driver LLM Off. With G-SYNC and VSync active, Reflex may pace below the static cap. ABSO cannot safely write the Reflex toggle; verify it in-game. Boost can cost power or FPS, so compare Enabled alone if needed.",
+        "reason": "Enable native Reflex for queue control; the profile requests driver LLM Off. With G-SYNC and VSync active, Reflex may pace below the static cap. ABSO leaves Reflex as a manual choice; verify it in-game. Boost can cost power or FPS, so compare Enabled alone if needed.",
         "setting": "NVIDIA Reflex",
         "value": "Enabled + Boost \u2014 set the in-game toggle manually"
       },
@@ -4550,7 +4538,7 @@
       },
       {
         "category": "Display",
-        "reason": "Maintains low queue depth on the streaming presentation path.",
+        "reason": "Requests the game's reduced buffering path; compare frame-time and latency results with Reflex on this setup.",
         "setting": "Reduce Buffering",
         "value": "On"
       },
@@ -4562,19 +4550,13 @@
       },
       {
         "category": "Display",
-        "reason": "Controls SDR-content brightness under HDR.",
-        "setting": "HDR Paper White Nits",
-        "value": "~200 (calibrate to taste)"
-      },
-      {
-        "category": "Display",
-        "reason": "Set to your display's actual peak brightness for correct tone mapping.",
-        "setting": "HDR Max Display Brightness",
-        "value": "Match monitor peak"
+        "reason": "ABSO preserves the game's HDR calibration. Use the game's calibration screens when recalibrating this display; there is no universal peak or paper-white value. Windows SDR-content brightness is a separate setting.",
+        "setting": "HDR Calibration",
+        "value": "Keep your calibrated values"
       },
       {
         "category": "Graphics",
-        "reason": "Avoid frame pacing swings while recording/clipping.",
+        "reason": "Keeps render resolution fixed; performance depends on the scene and GPU load.",
         "setting": "Dynamic Render Scale",
         "value": "Off"
       },
@@ -4689,7 +4671,7 @@
         "triple_buffering": false,
         "upscaling": false,
         "vrr_cap_policy": "refresh_minus_3",
-        "vsync": false,
+        "vsync": true,
         "window_mode": 1,
         "windowed_fullscreen": true
       },
@@ -4776,9 +4758,9 @@
       },
       {
         "category": "Display",
-        "reason": "No-sync profile: uncapped FPS reduces frame time when the game can sustain it.",
+        "reason": "No-sync uses a 600 FPS ceiling and accepts tearing; actual FPS depends on the workload.",
         "setting": "Frame Rate Cap",
-        "value": "Uncapped (600)"
+        "value": "600 FPS ceiling"
       },
       {
         "category": "Display",
@@ -4788,7 +4770,7 @@
       },
       {
         "category": "Graphics",
-        "reason": "Avoid frametime variance from dynamic scaling.",
+        "reason": "Keeps render resolution fixed; performance depends on the scene and GPU load.",
         "setting": "Dynamic Render Scale",
         "value": "Off"
       },
@@ -4830,21 +4812,9 @@
       },
       {
         "category": "Display",
-        "reason": "Controls SDR-content brightness under HDR. ~200 nits is a good OLED starting point.",
-        "setting": "HDR Paper White Nits",
-        "value": "~200 (calibrate to taste)"
-      },
-      {
-        "category": "Display",
-        "reason": "Set to your display's actual peak brightness for correct tone mapping.",
-        "setting": "HDR Max Display Brightness",
-        "value": "Match monitor peak (e.g. 1000+ nits OLED)"
-      },
-      {
-        "category": "Display",
-        "reason": "OW2-specific slider for HUD brightness under HDR.",
-        "setting": "HDR UI Brightness",
-        "value": "Adjust to taste"
+        "reason": "ABSO preserves the game's HDR calibration. Use the game's calibration screens when recalibrating this display; there is no universal peak or paper-white value. Windows SDR-content brightness is a separate setting.",
+        "setting": "HDR Calibration",
+        "value": "Keep your calibrated values"
       }
     ],
     "include_legacy_tweaks": false,

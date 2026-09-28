@@ -474,12 +474,13 @@ class MultiMonitorDetector:
             ))
             result.exclusive_fullscreen_safe = False
 
-        # Warning: MPO glitch risk on multi-monitor with VRR or mixed refresh
+        # Capability detection does not establish live VRR engagement.
+        # Warning: MPO glitch risk on multi-monitor with VRR capability or mixed refresh
         vrr_monitors = [m for m in env.monitors if m.is_vrr_capable]
         if env.is_multi_monitor and (vrr_monitors or env.has_mixed_refresh):
             triggers: list[str] = []
             if vrr_monitors:
-                triggers.append("VRR/G-Sync active")
+                triggers.append("VRR-capable display (current VRR engagement unverified)")
             if env.has_mixed_refresh:
                 triggers.append(
                     f"mixed refresh ({env.min_refresh:.0f}Hz - {env.max_refresh:.0f}Hz)"

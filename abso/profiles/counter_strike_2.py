@@ -59,7 +59,7 @@ _STREAMING_WINDOWED_VRR_OVERRIDES: dict[str, dict[str, Any]] = {
 def _streaming_display_mode_rows(
     rows: list[dict[str, str]],
 ) -> list[dict[str, str]]:
-    """Rewrite strict fullscreen guidance for the streaming-safe path."""
+    """Keep display mode and native sync guidance coherent for borderless."""
     patched: list[dict[str, str]] = []
     for row in rows:
         if row.get("setting") == "Display Mode":
@@ -69,6 +69,16 @@ def _streaming_display_mode_rows(
                 "reason": (
                     "Streaming lane: uses the borderless windowed G-SYNC path "
                     "so OBS, Medal, RTSS, and overlays can stay running."
+                ),
+            }
+        elif row.get("setting") == "Wait for Vertical Sync":
+            row = {
+                **row,
+                "value": "Enabled (in-game)",
+                "reason": (
+                    "NVIDIA recommends in-game VSync for windowed G-SYNC + "
+                    "Reflex; driver VSync alone does not establish this path. "
+                    "Set this manually in CS2's Video settings."
                 ),
             }
         patched.append(row)
@@ -514,7 +524,7 @@ class CounterStrike2GSyncCaptureProfile(CounterStrike2GSyncProfile):
         return [
             "Counter-Strike 2 streaming manual: use Fullscreen Windowed, set "
             "NVIDIA Reflex to Enabled + Boost, and keep Wait for Vertical Sync "
-            "Disabled. OBS and overlay processes remain available."
+            "Enabled in-game. OBS and overlay processes remain available."
         ]
 
 
@@ -677,7 +687,7 @@ class CounterStrike2GSyncHDRCaptureProfile(CounterStrike2GSyncHDRProfile):
             (
                 "Counter-Strike 2 streaming manual: use Fullscreen Windowed, "
                 "set NVIDIA Reflex to Enabled + Boost, and keep Wait for "
-                "Vertical Sync Disabled. OBS and overlay processes remain "
+                "Vertical Sync Enabled in-game. OBS and overlay processes remain "
                 "available."
             ),
             (

@@ -67,19 +67,19 @@ class TestParseVsyncValue:
 
     def test_returns_off_for_zero(self):
         """Test returns 'off' for value 0."""
-        assert parse_vsync_value("0") == "off"
+        assert parse_vsync_value("0x08416747") == "off"
 
     def test_returns_on_for_one(self):
         """Test returns 'on' for value 1."""
-        assert parse_vsync_value("1") == "on"
+        assert parse_vsync_value("0x47814940") == "on"
 
     def test_returns_adaptive_for_two(self):
         """Test returns 'adaptive' for value 2."""
-        assert parse_vsync_value("2") == "adaptive"
+        assert parse_vsync_value("0x18888888") == "fast"
 
     def test_returns_adaptive_half_for_three(self):
         """Test returns 'adaptive_half' for value 3."""
-        assert parse_vsync_value("3") == "adaptive_half"
+        assert parse_vsync_value("0x32610244") == "adaptive_half"
 
     def test_returns_unknown_for_invalid(self):
         """Test returns 'unknown' for invalid values."""
@@ -178,7 +178,7 @@ class TestParseNipFile:
       <SettingValue>1</SettingValue>
     </ProfileSetting>
     <ProfileSetting id="0x00A879CF">
-      <SettingValue>0</SettingValue>
+      <SettingValue>0x08416747</SettingValue>
     </ProfileSetting>
   </Profile>
 </Root>'''
@@ -186,7 +186,8 @@ class TestParseNipFile:
         nip_path.write_text(nip_content, encoding="utf-8")
 
         result = parse_nip_file(nip_path)
-        assert result.get("low_latency_mode") == "ultra"
+        assert result.get("prerendered_frames") == "2"
+        assert "low_latency_mode" not in result
         assert result.get("power_management") == "prefer_max_performance"
         assert result.get("vsync") == "off"
 
@@ -204,7 +205,7 @@ class TestParseNipFile:
         nip_path.write_text(nip_content, encoding="utf-8")
 
         result = parse_nip_file(nip_path)
-        assert result.get("low_latency_mode") == "on"
+        assert result.get("prerendered_frames") == "1"
 
     def test_handles_xml_parse_error(self, tmp_path):
         """Test handles invalid XML gracefully."""
@@ -244,7 +245,8 @@ class TestParseNipFile:
   <Profile name="Base Profile">
     <ProfileSetting id="0x007BA09E"><SettingValue>2</SettingValue></ProfileSetting>
     <ProfileSetting id="0x1057EB71"><SettingValue>1</SettingValue></ProfileSetting>
-    <ProfileSetting id="0x00A879CF"><SettingValue>2</SettingValue></ProfileSetting>
+    <ProfileSetting id="0x00A879CF"><SettingValue>0x47814940</SettingValue></ProfileSetting>
+    <ProfileSetting id="0x005A375C"><SettingValue>0x99941284</SettingValue></ProfileSetting>
     <ProfileSetting id="0x10835002"><SettingValue>144</SettingValue></ProfileSetting>
     <ProfileSetting id="0x00198FFF"><SettingValue>1</SettingValue></ProfileSetting>
     <ProfileSetting id="0x00AC8497"><SettingValue>4294967295</SettingValue></ProfileSetting>
@@ -255,7 +257,7 @@ class TestParseNipFile:
         nip_path.write_text(nip_content, encoding="utf-8")
 
         result = parse_nip_file(nip_path)
-        assert result["low_latency_mode"] == "ultra"
+        assert result["prerendered_frames"] == "2"
         assert result["power_management"] == "prefer_max_performance"
         assert result["vsync"] == "adaptive"
         assert result["max_frame_rate"] == "144"

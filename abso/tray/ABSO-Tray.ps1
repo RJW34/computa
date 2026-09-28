@@ -2772,33 +2772,33 @@ $script:FallbackProfiles = [ordered]@{
     }
     "overwatch2-gsync"  = @{
         Name     = "Overwatch 2 - GSYNC SDR"
-        Sub      = "Overlay-Free SDR Borderless | Reflex (set in-game) | G-SYNC ON"
+        Sub      = "Overlay-Free SDR Borderless | In-game VSync ON | G-SYNC ON"
         Cat      = "Shooters"
-        Desc     = "Overwatch 2 G-SYNC using borderless VRR, while stopping capture and overlay processes."
+        Desc     = "Overwatch 2 G-SYNC using borderless VRR with in-game VSync ON and Reflex On+Boost, while stopping capture and overlay processes."
         Exes     = @("Overwatch.exe")
         SyncMode = "on"
     }
     "overwatch2-gsync-hdr" = @{
         Name     = "Overwatch 2 - GSYNC HDR"
-        Sub      = "Overlay-Free HDR Borderless | Reflex (set in-game) | G-SYNC ON"
+        Sub      = "Overlay-Free HDR Borderless | In-game VSync ON | G-SYNC ON"
         Cat      = "Shooters"
-        Desc     = "Overwatch 2 G-SYNC with HDR using borderless VRR, while stopping capture and overlay processes."
+        Desc     = "Overwatch 2 G-SYNC with HDR using borderless VRR with in-game VSync ON and Reflex On+Boost, while stopping capture and overlay processes."
         Exes     = @("Overwatch.exe")
         SyncMode = "on"
     }
     "overwatch2-gsync-capture" = @{
         Name     = "Overwatch 2 - GSYNC SDR Streaming"
-        Sub      = "SDR Streaming | Borderless VRR | Keeps OBS/Overlays"
+        Sub      = "SDR Streaming | In-game VSync ON | Keeps OBS/Overlays"
         Cat      = "Shooters"
-        Desc     = "Borderless SDR G-SYNC lane that keeps OBS, Medal, RTSS, and overlays alive"
+        Desc     = "Borderless SDR G-SYNC with in-game VSync ON and Reflex On+Boost; keeps OBS, Medal, RTSS, and overlays alive"
         Exes     = @("Overwatch.exe")
         SyncMode = "on"
     }
     "overwatch2-gsync-hdr-capture" = @{
         Name     = "Overwatch 2 - GSYNC HDR Streaming"
-        Sub      = "HDR Streaming | Borderless VRR | Keeps OBS/Overlays"
+        Sub      = "HDR Streaming | In-game VSync ON | Keeps OBS/Overlays"
         Cat      = "Shooters"
-        Desc     = "Borderless native-HDR G-SYNC lane that keeps OBS, Medal, RTSS, and overlays alive"
+        Desc     = "Borderless native-HDR G-SYNC with in-game VSync ON and Reflex On+Boost; keeps OBS, Medal, RTSS, and overlays alive"
         Exes     = @("Overwatch.exe")
         SyncMode = "on"
     }
@@ -3498,8 +3498,94 @@ function Start-BackgroundCatalogStage {
     $null = $script:BackgroundCatalogProc.Handle
 }
 
+function Get-TrayCatalogSessionPolicy {
+    param([AllowNull()][object]$Profile)
+    return ([ordered]@{
+        Exes = @($Profile.Exes)
+        KillsetAlwaysSafe = @($Profile.KillsetAlwaysSafe)
+        KillsetOptIn = @($Profile.KillsetOptIn)
+        RequiresOverlayFree = [bool]$Profile.RequiresOverlayFree
+        KeepAwakeWhileGaming = [bool]$Profile.KeepAwakeWhileGaming
+        IsOnline = [bool]$Profile.IsOnline
+        CpuPartitionPolicy = "$($Profile.CpuPartitionPolicy)"
+    } | ConvertTo-Json -Depth 5 -Compress)
+}
+
+function Set-RefreshedTrayCatalog {
+    param([object[]]$Entries, [hashtable]$Aliases)
+
+    if ($script:MutatingOperationInProgress) { throw "Catalog adoption deferred during a profile transaction" }
+    $resolved = Convert-CatalogEntriesToProfileMap -Entries $Entries -FallbackProfiles $script:FallbackProfiles
+    if (-not $resolved -or $resolved.Count -eq 0) { throw "No profiles loaded from backend" }
+
+    $oldProfiles = $script:Profiles
+    $oldActive = if ($oldProfiles -and $script:activeProfile) { $oldProfiles[$script:activeProfile] } else { $null }
+    $newActive = if ($script:activeProfile) { $resolved[$script:activeProfile] } else { $null }
+    if ((Get-TrayCatalogSessionPolicy $oldActive) -ne (Get-TrayCatalogSessionPolicy $newActive)) {
+        # Retire the old lane's session policy before publishing its replacement.
+        # The existing session timer resumes using the new metadata; no apply.
+        Stop-LaunchSweepRuntime -KillProcess
+        Stop-CpuBalancerForGame
+        Clear-AbsoKeepAwake
+        $script:LaunchSanitizerActiveProfileId = $null
+        $script:LaunchSanitizerGameWasAlive = $false
+        $script:LaunchSanitizerLastSweepStopped = @{}
+        $script:LaunchSanitizerLoggedStderr = @{}
+    }
+
+    $menuShape = {
+        param($Profiles)
+        @($Profiles.Keys | ForEach-Object {
+            $p = $Profiles[$_]
+            @("$_", "$($p.Cat)", "$($p.GameGroup)", "$($p.GroupName)", "$($p.Rank)", "$($p.TrayVisible)") -join '|'
+        }) | ConvertTo-Json -Compress
+    }
+    $menuChanged = (& $menuShape $oldProfiles) -ne (& $menuShape $resolved)
+    $metadataChanged = (ConvertTo-Json -InputObject $oldProfiles -Depth 8 -Compress) -ne (ConvertTo-Json -InputObject $resolved -Depth 8 -Compress)
+    $script:Profiles = $resolved
+    $script:ProfileAliases = $Aliases
+    $script:ProfileCatalogLastSource = "backend"
+    $script:ProfileCatalogLastCount = $resolved.Count
+    $script:ProfileCatalogUsedFallback = $false
+    if ($metadataChanged) { Reset-ActiveProfileVerificationState }
+    $script:MenuStateInitialized = $false
+    # Menu structure is created at startup. Refresh existing rows immediately;
+    # a structural change needs a restart, and removed rows must not stay usable.
+    foreach ($item in @($script:profileMenuItems)) {
+        if ($item -and -not $resolved.Contains("$($item.Tag)")) { $item.Enabled = $false }
+    }
+    if ($script:notifyIcon -and $script:notifyIcon.ContextMenuStrip) { Update-MenuState }
+    if ($metadataChanged -and $script:QuickPanelVisible) {
+        $script:QuickPanelVerificationRenderKey = $null
+        Update-TrayQuickPanelVerificationState
+    }
+    Write-TrayLog "Loaded refreshed backend catalog ($($resolved.Count) profiles, $($Aliases.Count) aliases)"
+    return $menuChanged
+}
+
+function Request-TrayCatalogRefresh {
+    if (Test-TrayMutationInProgress -RequestedAction "refreshing profiles") { return }
+    try {
+        if (-not $script:PythonExe) { throw "Backend unavailable" }
+        $script:ProfileCatalogRefreshRequested = $true
+        Start-BackgroundCatalogRefresh
+        if (-not $script:BackgroundCatalogTimer) { throw "Refresh could not start" }
+        Set-TrayLastAction -Message "Profile refresh requested; checking backend"
+        Update-MenuState
+    }
+    catch {
+        $script:ProfileCatalogRefreshRequested = $false
+        Set-TrayLastAction -Message "Profile refresh failed: $($_.Exception.Message)"
+        Show-Notification -Title "computa" -Message $script:LastAction -Type "Error" -ActionName "Refresh" -ActionColor $script:Colors.AccentBlue
+        Update-MenuState
+    }
+}
+
 function Complete-BackgroundCatalogIfReady {
     try {
+        # DoEvents during apply/restore can dispatch this timer. Never replace
+        # aliases, verification, or session policies inside that transaction.
+        if ($script:MutatingOperationInProgress) { return }
         # The initial delayed tick only launches the child. Later ticks read
         # completed output; neither stage waits on the WinForms UI thread.
         if (-not $script:BackgroundCatalogProc) {
@@ -3526,6 +3612,9 @@ function Complete-BackgroundCatalogIfReady {
         if ($script:BackgroundCatalogStage -eq "profiles") {
             $script:BackgroundCatalogEntries = @($payload.data)
             if ($script:BackgroundCatalogEntries.Count -eq 0) { throw "Empty profile catalog" }
+            foreach ($entry in $script:BackgroundCatalogEntries) {
+                if ([string]::IsNullOrWhiteSpace("$($entry.id)")) { throw "Catalog entry has no profile id" }
+            }
             Stop-BackgroundCatalogProcess
             Start-BackgroundCatalogStage -Command "profile-aliases"
             return
@@ -3541,11 +3630,26 @@ function Complete-BackgroundCatalogIfReady {
         else {
             Write-TrayLog "Background catalog refresh verified cache current ($($entries.Count) profiles)" -Level "INFO"
         }
+        $menuChanged = Set-RefreshedTrayCatalog -Entries $entries -Aliases $aliases
         Stop-BackgroundCatalogRefresh
+        if ($script:ProfileCatalogRefreshRequested) {
+            $message = "Profiles refreshed from backend ($($entries.Count) profiles loaded)"
+            if ($menuChanged) { $message += ". Restart tray to rebuild changed menu groups." }
+            Set-TrayLastAction -Message $message
+            Show-Notification -Title "computa" -Message $message -Type "Success" -ActionName "Refresh" -ActionColor $script:Colors.AccentBlue
+            $script:ProfileCatalogRefreshRequested = $false
+            Update-MenuState
+        }
     }
     catch {
-        Write-TrayLog "Background catalog refresh failed; cache unchanged: $($_.Exception.Message)" -Level "WARN"
+        Write-TrayLog "Background catalog refresh failed: $($_.Exception.Message)" -Level "WARN"
         Stop-BackgroundCatalogRefresh
+        if ($script:ProfileCatalogRefreshRequested) {
+            $script:ProfileCatalogRefreshRequested = $false
+            Set-TrayLastAction -Message "Profile refresh failed: $($_.Exception.Message)"
+            Show-Notification -Title "computa" -Message $script:LastAction -Type "Error" -ActionName "Refresh" -ActionColor $script:Colors.AccentBlue
+            Update-MenuState
+        }
     }
 }
 
@@ -3553,9 +3657,9 @@ function Start-BackgroundCatalogRefresh {
     <#
     .SYNOPSIS
     Refresh the disk cache using asynchronous child processes and a short
-    completion poll. The loaded menu continues using its current catalog;
-    a subsequent load adopts the refreshed cache. Failed refreshes retain
-    the previous cache. Repeated requests share the pending refresh.
+    completion poll. Successful results replace the loaded metadata and
+    aliases without applying a profile. Failed refreshes retain the previous
+    catalog. Repeated requests share the pending refresh.
     #>
     if (-not $script:PythonExe -or -not $script:ProfileCatalogCacheFile) {
         return
@@ -3585,8 +3689,8 @@ function Initialize-ProfilesFromCliCatalog {
 
     Order:
       1. Read on-disk cache (~10-50ms). If hit, use immediately and
-         schedule a background CLI refresh that updates the cache for
-         the NEXT tray start.
+         schedule a background CLI refresh that updates the cache and
+         loaded metadata when the backend response is complete.
       2. If cache is empty (first install or corrupt), fall through to a
          blocking CLI call so the user has something to work with this
          session. Result is written to cache for subsequent fast starts.
@@ -11053,33 +11157,7 @@ public class HotkeyMessageWindow : NativeWindow {
     $refreshProfilesItem.ToolTipText = "Reload the profile list and user profiles; no profile is applied."
     Set-TrayCommandItemVisualState -Item $refreshProfilesItem -ChipText "REFRESH"
     $refreshProfilesItem.Add_Click({
-        try {
-            Initialize-ProfilesFromCliCatalog
-            $profileCount = if ($script:Profiles) { $script:Profiles.Count } else { 0 }
-            $catalogSource = if ($script:ProfileCatalogLastSource) { "$($script:ProfileCatalogLastSource)" } else { "source not reported" }
-            if ($profileCount -le 0) {
-                Show-Notification -Title "computa" -Message "Profile refresh failed: no profiles loaded" -Type "Error" -ActionName "Refresh" -ActionColor $script:Colors.AccentBlue
-                Write-TrayLog "Profile refresh via menu loaded zero profiles" -Level "ERROR"
-                Set-TrayLastAction -Message "Profile refresh failed: no profiles loaded"
-            }
-            elseif ($script:ProfileCatalogUsedFallback) {
-                Show-Notification -Title "computa" -Message "Profiles loaded from built-in fallback profile list ($profileCount profiles)" -Type "Warning" -ActionName "Refresh" -ActionColor $script:Colors.AccentBlue
-                Write-TrayLog "Profiles refreshed via menu from built-in fallback ($profileCount profiles)" -Level "WARN"
-                Set-TrayLastAction -Message "Profiles fallback list loaded: $profileCount"
-            }
-            else {
-                Show-Notification -Title "computa" -Message "Profiles refreshed from $catalogSource ($profileCount profiles loaded)" -Type "Success" -ActionName "Refresh" -ActionColor $script:Colors.AccentBlue
-                Write-TrayLog "Profiles refreshed via menu from $catalogSource ($profileCount profiles)"
-                Set-TrayLastAction -Message "Profiles refreshed: $profileCount from $catalogSource"
-            }
-            Update-MenuState
-        }
-        catch {
-            Write-TrayLog "Failed to refresh profiles: $($_.Exception.Message)" -Level "ERROR"
-            Show-Notification -Title "computa" -Message "Profile refresh failed: $($_.Exception.Message)" -Type "Error" -ActionName "Refresh" -ActionColor $script:Colors.AccentBlue
-            Set-TrayLastAction -Message "Profile refresh failed: $($_.Exception.Message)"
-            Update-MenuState
-        }
+        Request-TrayCatalogRefresh
     })
     $actionsMenu.DropDownItems.Add($refreshProfilesItem) | Out-Null
 

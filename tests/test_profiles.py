@@ -438,6 +438,14 @@ class TestProfileLoading:
         )
         assert "windowed" in display_mode["value"].lower()
 
+        guidance = {row["setting"]: row for row in capture.get_in_game_settings()}
+        assert guidance["Wait for Vertical Sync"]["value"] == "Enabled (in-game)"
+        assert "windowed" in guidance["Wait for Vertical Sync"]["reason"].lower()
+        notes = " ".join(capture.get_post_apply_notes())
+        assert "Wait for Vertical Sync Enabled in-game" in notes
+        assert capture.application_scope == "system_only"
+        assert capture.enforces_reflex_in_config is False
+
     def test_cs2_capture_lane_keeps_the_capture_stack_alive(self):
         """The whole point of this lane: Medal/OBS survive apply and game launch."""
         for capture in (
@@ -897,6 +905,28 @@ class TestProfileSettings:
         assert sdr_config["window_mode"] == 1
         assert sdr_config["auto_vrr_fps_cap"] is True
         assert sdr_config["hdr_output"] is False
+
+    @pytest.mark.parametrize("profile_cls", [Diablo4Profile, Diablo4SDRProfile])
+    def test_diablo4_borderless_sync_contract(self, profile_cls):
+        """Native sync, NVIDIA scope, and guidance match D4's windowed mode."""
+        profile = profile_cls()
+        native = profile.get_settings("Diablo4ConfigHandler")
+        nvidia = profile.get_settings("NvidiaSettingsHandler")
+        guidance = {row["setting"]: row["value"] for row in profile.get_in_game_settings()}
+
+        assert native["window_mode"] == 1
+        assert native["vsync"] is True
+        assert native["reflex"] is True
+        assert native["auto_vrr_fps_cap"] is True
+        assert nvidia["global_vrr_mode"] == "fullscreen_and_windowed"
+        assert nvidia["vsync"] == "on"
+        assert nvidia["auto_vrr_fps_cap"] is False
+        assert guidance["Display Mode"] == "Windowed (Fullscreen)"
+        assert guidance["VSync (in-game)"] == "On"
+        assert profile.uses_fullscreen_only_vrr_path is False
+        # Correcting presentation must not drop binding or process safeguards.
+        assert profile.requires_exact_nvidia_binding is True
+        assert profile.display_path_requirements.require_overlay_free_path is True
 
     def test_pokemon_auto_chess_nvidia_settings(self):
         """PokemonAutoChess uses the balanced preset (adaptive VSync) like PACDeluxe."""
@@ -1764,12 +1794,14 @@ class TestFullscreenOptimizationsPerExe:
             assert flags.get("Slippi Dolphin.exe") is False
             assert flags.get("Dolphin.exe") is False
 
-    def test_diablo4_variants_disable_fso(self):
-        """Diablo 4 HDR and SDR lanes both want the true exclusive path for native HDR."""
+    def test_diablo4_variants_clear_stale_fso_disable(self):
+        """Both D4 lanes use a fullscreen window, not legacy exclusive mode."""
         for profile_cls in (Diablo4Profile, Diablo4SDRProfile):
             profile = profile_cls()
             flags = profile.fullscreen_optimizations_per_exe
-            assert flags.get("Diablo IV.exe") is True
+            assert flags.get("Diablo IV.exe") is False
+            registry = profile.get_settings("RegistrySettingsHandler")
+            assert registry["fullscreen_optimizations"]["Diablo IV.exe"] is False
 
 
 class TestSingleLimiterPolicy:
@@ -1868,6 +1900,42 @@ def test_ow2_gsync_cap_guidance_distinguishes_saved_ceiling_from_runtime(profile
     assert "does not promise 297 FPS or a fixed 276 FPS Reflex target" in notes
     for handler in ("OW2ConfigHandler", "NvidiaSettingsHandler"):
         assert profile.get_settings(handler)["vrr_cap_policy"] == "refresh_minus_3"
+
+
+@pytest.mark.parametrize("profile_class, expected_vsync", [
+    (Overwatch2Profile, False),
+    (Overwatch2NoSyncHDRProfile, False),
+    (Overwatch2GSyncProfile, True),
+    (Overwatch2GSyncHDRProfile, True),
+    (Overwatch2GSyncCaptureProfile, True),
+    (Overwatch2GSyncHDRCaptureProfile, True),
+])
+def test_ow2_native_vsync_matches_presentation_path(profile_class, expected_vsync: bool) -> None:
+    profile = profile_class()
+    settings = profile.get_settings("OW2ConfigHandler")
+    assert settings["vsync"] is expected_vsync
+    assert settings["window_mode"] == int(expected_vsync)
+    assert settings["expected_reflex_mode"] == 2
+    rows = {row["setting"]: row for row in profile.get_in_game_settings()}
+    if expected_vsync:
+        assert rows["VSync"]["value"] == "On (in-game)"
+        assert "windowed G-SYNC with Reflex" in rows["VSync"]["reason"]
+        assert "in-game VSync On" in " ".join(profile.get_post_apply_notes())
+    else:
+        assert rows["VSync"]["value"] == "Off"
+
+
+@pytest.mark.parametrize("profile_class", [
+    Overwatch2NoSyncHDRProfile,
+    Overwatch2GSyncHDRProfile,
+    Overwatch2GSyncHDRCaptureProfile,
+])
+def test_ow2_hdr_guidance_preserves_native_calibration(profile_class) -> None:
+    rows = {row["setting"]: row for row in profile_class().get_in_game_settings()}
+    assert rows["HDR Calibration"]["value"] == "Keep your calibrated values"
+    assert "Windows SDR-content brightness is a separate setting" in rows["HDR Calibration"]["reason"]
+    assert "HDR Paper White Nits" not in rows
+    assert "HDR Max Display Brightness" not in rows
 
 
 class TestReflexContract:

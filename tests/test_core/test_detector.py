@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 import subprocess
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
+
+import pytest
 
 from abso.core.detector import HardwareDetector, _parse_edid_for_vrr
 
@@ -215,6 +218,93 @@ class TestDetectRam:
 
 class TestDetectMonitors:
     """Tests for monitor detection."""
+
+    @pytest.mark.parametrize("backend", ["pywin32", "ctypes"])
+    @pytest.mark.parametrize("endless_modes", [False, True])
+    def test_late_native_modes_set_maximum_and_enumeration_remains_bounded(
+        self, backend, endless_modes
+    ):
+        enumerated = []
+
+        def mode_values(index):
+            if index == -1:
+                return 2560, 1440, 60
+            enumerated.append(index)
+            if index >= 617 and not endless_modes:
+                return None
+            if index in (615, 616):
+                return 2560, 1440, 60 if index == 615 else 300
+            return 640, 480, 480
+
+        def device_values(device, index):
+            if device is not None:
+                return {"DeviceName": "TestMonitor", "DeviceString": "Test Monitor", "DeviceID": ""}
+            if index == 0:
+                return {"DeviceName": r"\\.\DISPLAY1", "DeviceString": "Test GPU", "StateFlags": 5}
+            return None
+
+        fake_win32 = MagicMock()
+
+        def enum_device(device, index):
+            values = device_values(device, index)
+            if values is None:
+                raise OSError("No more devices")
+            return SimpleNamespace(**values)
+
+        def enum_mode(device, index):
+            values = mode_values(index)
+            if values is None:
+                raise OSError("No more modes")
+            width, height, refresh = values
+            return SimpleNamespace(PelsWidth=width, PelsHeight=height, DisplayFrequency=refresh)
+
+        fake_win32.EnumDisplayDevices.side_effect = enum_device
+        fake_win32.EnumDisplaySettings.side_effect = enum_mode
+        fake_user32 = MagicMock()
+
+        def enum_device_w(device, index, pointer, flags):
+            values = device_values(device, index)
+            if values is None:
+                return False
+            for key, value in values.items():
+                setattr(pointer._obj, key, value)
+            return True
+
+        def enum_mode_w(device, index, pointer):
+            values = mode_values(index)
+            if values is None:
+                return False
+            mode = pointer._obj
+            mode.dmPelsWidth, mode.dmPelsHeight, mode.dmDisplayFrequency = values
+            return True
+
+        fake_user32.EnumDisplayDevicesW.side_effect = enum_device_w
+        fake_user32.EnumDisplaySettingsW.side_effect = enum_mode_w
+        detector = HardwareDetector()
+        with (
+            patch.dict("sys.modules", {
+                "win32api": fake_win32,
+                "pywintypes": SimpleNamespace(error=OSError),
+            }),
+            patch("abso.core.detector.ctypes.windll.user32", fake_user32),
+            patch("abso.core.detector._get_refresh_rates_ccd", return_value={}),
+            patch("abso.core.detector._detect_gsync_from_nvidia_registry", return_value={}),
+            patch("abso.core.detector._promote_vrr_via_amd_driver"),
+            patch.object(detector, "_derive_vrr_info", return_value={}),
+        ):
+            monitors = (
+                detector.detect_monitors()
+                if backend == "pywin32"
+                else detector._detect_monitors_without_pywin32({})
+            )
+
+        assert len(monitors) == 1
+        assert monitors[0]["refresh_rate"] == 60
+        assert monitors[0]["max_refresh_rate"] == 300
+        assert monitors[0]["max_refresh_capability"] == 480
+        assert enumerated == list(range(4096 if endless_modes else 618))
+        fake_user32.ChangeDisplaySettingsW.assert_not_called()
+        fake_win32.ChangeDisplaySettings.assert_not_called()
 
     @patch.object(HardwareDetector, "_detect_monitors_without_pywin32")
     def test_detect_monitors_import_error_uses_fallback(self, mock_fallback):

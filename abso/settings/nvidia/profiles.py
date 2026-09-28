@@ -132,11 +132,15 @@ def generate_game_profile(
 
 def _build_settings_xml(settings: dict[str, Any]) -> str:
     """Build XML string for settings list."""
+    from .nvapi_drs import DRSProfileManager
+
     xml_settings = []
 
     if "low_latency_mode" in settings:
-        value = get_setting_value(settings["low_latency_mode"], "low_latency")
-        xml_settings.append(_make_setting_xml(NvidiaSettingDecimalIDs.LOW_LATENCY_MODE, value))
+        for name, value in DRSProfileManager.low_latency_native_settings(settings["low_latency_mode"]).items():
+            if value is None:
+                raise ValueError("NIP export cannot remove a Low Latency Mode override")
+            xml_settings.append(_make_setting_xml(DRSProfileManager.SETTING_IDS[name], value))
 
     if "power_management" in settings:
         value = get_setting_value(settings["power_management"], "power")
@@ -145,6 +149,14 @@ def _build_settings_xml(settings: dict[str, Any]) -> str:
     if "vsync" in settings:
         value = get_setting_value(settings["vsync"], "vsync")
         xml_settings.append(_make_setting_xml(NvidiaSettingDecimalIDs.VSYNC, value))
+
+    tear_control = settings.get("vsync_tear_control")
+    sync_mode = str(settings.get("vsync", "")).lower()
+    if sync_mode in DRSProfileManager.VSYNC_COMPANION_TEAR and tear_control is None:
+        tear_control = DRSProfileManager.VSYNC_COMPANION_TEAR[sync_mode]
+    if tear_control is not None:
+        _, value = DRSProfileManager()._resolve_setting("vsync_tear_control", tear_control)
+        xml_settings.append(_make_setting_xml(NvidiaSettingDecimalIDs.VSYNC_TEAR_CONTROL, value))
 
     if "max_frame_rate" in settings:
         value = get_setting_value(settings["max_frame_rate"], "framerate")
@@ -203,8 +215,9 @@ def get_setting_value(value: str, setting_type: str) -> int:
         return mapping.get(value.lower(), 1)
 
     elif setting_type == "vsync":
-        mapping = {"off": 0, "on": 1, "adaptive": 2, "adaptive_half": 3, "fast": 4}
-        return mapping.get(value.lower(), 0)
+        from .nvapi_drs import DRSProfileManager
+
+        return DRSProfileManager.VSYNC_VALUES.get(value.lower(), NvidiaSettingValues.VSYNC_OFF)
 
     elif setting_type == "framerate":
         if value.lower() == "off":

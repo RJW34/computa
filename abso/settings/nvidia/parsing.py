@@ -36,8 +36,11 @@ def parse_nip_file(nip_path: Path) -> dict[str, Any]:
         # Map of setting IDs to human-readable names and value parsers
         setting_map: dict[str, tuple[str, Callable[[str], str]]] = {
             NvidiaSettingIDs.LOW_LATENCY_MODE: ("low_latency_mode", parse_low_latency_value),
+            NvidiaSettingIDs.PRERENDERED_FRAMES: ("prerendered_frames", lambda value: str(int(value, 0))),
+            NvidiaSettingIDs.ULTRA_LOW_LATENCY: ("ultra_low_latency", lambda value: str(int(value, 0))),
             NvidiaSettingIDs.POWER_MANAGEMENT: ("power_management", parse_power_management_value),
             NvidiaSettingIDs.VSYNC: ("vsync", parse_vsync_value),
+            NvidiaSettingIDs.VSYNC_TEAR_CONTROL: ("vsync_tear_control", lambda value: str(int(value, 0))),
             NvidiaSettingIDs.MAX_FRAME_RATE: ("max_frame_rate", parse_frame_rate_value),
             NvidiaSettingIDs.SHADER_CACHE: ("shader_cache", parse_shader_cache_enabled_value),
             NvidiaSettingIDs.SHADER_CACHE_SIZE: ("shader_cache_size", parse_shader_cache_value),
@@ -46,10 +49,14 @@ def parse_nip_file(nip_path: Path) -> dict[str, Any]:
 
         # Find the base profile (global settings)
         for profile in root.findall(".//Profile"):
-            profile_name = profile.get("name", "")
+            profile_name = profile.get("name") or profile.findtext("ProfileName", "")
             if profile_name.lower() in ("base profile", "_global_driver_profile"):
                 for setting in profile.findall(".//ProfileSetting"):
-                    setting_id = setting.get("id", "")
+                    setting_id = setting.get("id") or setting.findtext("SettingID", "")
+                    try:
+                        setting_id = f"0x{int(setting_id, 0):08X}"
+                    except ValueError:
+                        continue
                     if setting_id in setting_map:
                         name, parser = setting_map[setting_id]
                         value_elem = setting.find("SettingValue")
@@ -58,6 +65,8 @@ def parse_nip_file(nip_path: Path) -> dict[str, Any]:
                                 settings[name] = parser(value_elem.text)
                             except ValueError:
                                 logger.debug(f"Failed to parse setting {name}: {value_elem.text}")
+                if settings.get("vsync") == "on" and settings.get("vsync_tear_control") == str(NvidiaSettingValues.VSYNC_TEAR_CONTROL_ENABLE):
+                    settings["vsync"] = "adaptive"
                 break  # Only need the base profile
 
     except ET.ParseError as e:
@@ -106,8 +115,8 @@ def parse_vsync_value(value: str) -> str:
             return "off"
         elif int_val == NvidiaSettingValues.VSYNC_ON:
             return "on"
-        elif int_val == NvidiaSettingValues.VSYNC_ADAPTIVE:
-            return "adaptive"
+        elif int_val == NvidiaSettingValues.VSYNC_FAST:
+            return "fast"
         elif int_val == NvidiaSettingValues.VSYNC_ADAPTIVE_HALF:
             return "adaptive_half"
     except ValueError:
