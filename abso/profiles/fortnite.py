@@ -8,6 +8,7 @@ from abso.profiles.profile_bases import (
     ReflexShooterBaseProfile,
     fso_overrides,
     merge_settings_map,
+    preserve_baseline_system_policy,
 )
 
 _STREAMING_WINDOWED_VRR_OVERRIDES: dict[str, dict[str, Any]] = {
@@ -40,6 +41,14 @@ _STREAMING_WINDOWED_VRR_OVERRIDES: dict[str, dict[str, Any]] = {
 class _FortniteBaseProfile(ReflexShooterBaseProfile):
     """Shared Fortnite profile defaults."""
 
+    def _base_settings(self) -> dict[str, dict[str, Any]]:
+        settings = preserve_baseline_system_policy(super()._base_settings())
+        # Allow the normal Windows presentation path. A fullscreen selection
+        # does not prove exclusive presentation or a benefit from disabling FSO.
+        settings["GraphicsSettingsHandler"]["disable_global_fso"] = False
+        settings["FortniteConfigHandler"] = {"require_reflex": True}
+        return settings
+
     @property
     def executable_hints(self) -> list[str]:
         return [
@@ -51,11 +60,7 @@ class _FortniteBaseProfile(ReflexShooterBaseProfile):
 
     @property
     def fullscreen_optimizations_per_exe(self) -> dict[str, bool]:
-        # Competitive Fortnite runs exclusive-fullscreen (fullscreen_mode=0 in
-        # GameUserSettings.ini). Disable FSO per-exe so Windows doesn't shunt
-        # the shipping binary into the composited borderless path and steal
-        # FPS from the Reflex/DX12 presentation path.
-        return fso_overrides(self.executable_hints)
+        return fso_overrides(self.executable_hints, disabled=False)
 
     @property
     def nvidia_binding_executables(self) -> list[str]:
@@ -116,8 +121,8 @@ class _FortniteBaseProfile(ReflexShooterBaseProfile):
             {
                 "category": "Display",
                 "setting": "Display Mode",
-                "value": "Fullscreen (Exclusive)",
-                "reason": "Matches the competitive no-sync path this profile actually applies.",
+                "value": "Fullscreen",
+                "reason": "Matches the game's fullscreen selection; the saved enum does not prove exclusive scanout or a latency advantage.",
             },
             {
                 "category": "Display",
@@ -128,8 +133,8 @@ class _FortniteBaseProfile(ReflexShooterBaseProfile):
             {
                 "category": "Display",
                 "setting": "NVIDIA Reflex Low Latency",
-                "value": "On + Boost — set the in-game toggle manually; profile requests driver LLM Off",
-                "reason": "Applying this profile requests NVIDIA driver LLM Off for native Reflex queue control. Fortnite's Reflex toggle lives in Fortnite's settings and there is no stable config key to write it from outside; manually flip 'NVIDIA Reflex Low Latency' to 'On + Boost' in the game once.",
+                "value": "On or On + Boost (choose manually)",
+                "reason": "Driver LLM is Off so native Reflex controls the queue. ABSO reads the saved Reflex choice but never writes it. Boost keeps GPU clocks higher at a power cost; compare it with On for this workload.",
             },
             {
                 "category": "Display",
@@ -140,20 +145,20 @@ class _FortniteBaseProfile(ReflexShooterBaseProfile):
             {
                 "category": "Graphics",
                 "setting": "Rendering Mode",
-                "value": "DirectX 12",
-                "reason": "This profile is built around Fortnite's DX12 path for Reflex and modern presentation behavior.",
+                "value": "Compare Performance (DX12) with DirectX 12 manually",
+                "reason": "Epic recommends Performance mode for competitive play. Standard DX12 offers different graphics/upscaling options; compare frame times and image quality, then restart if prompted. ABSO preserves the renderer.",
             },
             {
                 "category": "Graphics",
                 "setting": "Multithreaded Rendering",
                 "value": "On",
-                "reason": "Better CPU utilization and more stable frame delivery in stacked endgames.",
+                "reason": "Use the game's default when this option is available; a local frame-time benefit has not been measured.",
             },
             {
                 "category": "Graphics",
                 "setting": "3D Resolution / DLSS",
-                "value": "100% or DLSS Performance if GPU-bound",
-                "reason": "Keep frame times stable first; use DLSS only when needed to hold target FPS.",
+                "value": "100%; compare DLSS Quality when available and GPU-bound",
+                "reason": "Upscaling trades image detail for rendering cost. Start with Quality on supported RTX hardware, then compare lower presets only if needed; available options depend on the renderer.",
             },
             {
                 "category": "Graphics",
@@ -171,7 +176,7 @@ class _FortniteBaseProfile(ReflexShooterBaseProfile):
                 "category": "Content",
                 "setting": "High Resolution Textures",
                 "value": "Off",
-                "reason": "Avoids streaming hitches and unnecessary VRAM churn.",
+                "reason": "Reduces optional texture storage and memory demand; it does not guarantee removal of streaming hitches.",
             },
         ]
 
@@ -191,7 +196,7 @@ class FortniteProfile(_FortniteBaseProfile):
     def description(self) -> str:
         return (
             "Competitive SDR Fortnite profile with a no-sync latency path. "
-            "Keeps driver LLM off for Reflex; enable Reflex On + Boost in-game."
+            "Keeps driver LLM off for Reflex; choose Reflex On or On + Boost in-game."
         )
 
     @property
@@ -210,14 +215,6 @@ class FortniteProfile(_FortniteBaseProfile):
                 "show_osd_guidance": True,
                 "game_type": "competitive_fps",
             },
-            "FortniteConfigHandler": {
-                # SDR lane: HDR output off. The config handler writes
-                # HDRDisplayOutputNits unconditionally, but Fortnite ignores the
-                # nits value when bUseHDRDisplayOutput is false, so setting it
-                # here would only write an inert INI line (matches the Marvel
-                # Rivals SDR cleanup).
-                "hdr_output": False,
-            },
         }
 
     def get_in_game_settings(self) -> list[dict[str, str]]:
@@ -225,8 +222,8 @@ class FortniteProfile(_FortniteBaseProfile):
             {
                 "category": "Display",
                 "setting": "HDR",
-                "value": "Off",
-                "reason": "This variant intentionally stays on the SDR path.",
+                "value": "Windows HDR Off",
+                "reason": "Windows output stays SDR; Fortnite's saved HDR and calibration values are preserved.",
             },
             *self._common_in_game_settings(),
         ]
@@ -246,8 +243,8 @@ class FortniteHDRProfile(_FortniteBaseProfile):
     @property
     def description(self) -> str:
         return (
-            "Competitive Fortnite HDR profile with a no-sync latency path. "
-            "Keeps driver LLM off for Reflex; enable Reflex On + Boost in-game."
+            "Windows HDR Fortnite profile with a no-sync latency path. "
+            "Keeps driver LLM off for manual Reflex; native game HDR is unverified."
         )
 
     @property
@@ -260,9 +257,8 @@ class FortniteHDRProfile(_FortniteBaseProfile):
                 "hdr": True,
                 "advanced_color": True,  # Win11 24H2+ WCG pairing
                 "auto_hdr": False,
-                # Paper-white ≈ 200 nits under HDR on OLED / Mini-LED.
-                # Driver installs reset this slider; asserting it here
-                # restores the correct SDR-in-HDR tone-mapping.
+                # Windows SDR brightness preference; not proof of native HDR
+                # or a calibrated peak-luminance value for every display.
                 "sdr_white_level_nits": 200,
             },
             "GraphicsSettingsHandler": {
@@ -276,10 +272,6 @@ class FortniteHDRProfile(_FortniteBaseProfile):
                 "show_osd_guidance": True,
                 "game_type": "competitive_fps",
             },
-            "FortniteConfigHandler": {
-                "hdr_output": True,
-                "hdr_nits": 1000,
-            },
         }
 
     def get_in_game_settings(self) -> list[dict[str, str]]:
@@ -287,33 +279,19 @@ class FortniteHDRProfile(_FortniteBaseProfile):
             {
                 "category": "Display",
                 "setting": "HDR",
-                "value": "On",
-                "reason": "Use Fortnite's native HDR output path in GameUserSettings.ini when the installed build and display path support HDR.",
-            },
-            {
-                "category": "Display",
-                "setting": "HDR Peak Brightness / Nits",
-                "value": "Start at 1000 nits or match your display peak",
-                "reason": "Keep Windows HDR and Fortnite's native HDR output aligned.",
+                "value": "Windows HDR On; native game HDR unverified",
+                "reason": "ABSO sets Windows HDR and preserves Fortnite's HDR/calibration values. A saved UE HDR key does not establish native HDR output; Auto HDR and RTX HDR are not enabled by this lane.",
             },
             *self._common_in_game_settings(),
         ]
 
 
 class FortniteGSyncHDRProfile(_FortniteBaseProfile):
-    """Fortnite G-SYNC + native HDR competitive profile.
+    """Fortnite fullscreen-selection G-SYNC lane with Windows HDR.
 
-    Tear-free low-latency VRR path for HDR-capable displays (OLED / Mini-LED).
-    Unlike the no-sync Fortnite lanes, this keeps G-SYNC ON with NVCP VSync as
-    the safety net and an auto refresh - 3 FPS cap (Blur Busters G-SYNC 101).
-    Reflex still owns the render queue (driver LLM stays off); flip Fortnite's
-    in-game NVIDIA Reflex to On + Boost once.
-
-    Runs the same exclusive-fullscreen path as the SDR/HDR no-sync siblings
-    (PreferredFullscreenMode=0); the difference is the sync model, not the
-    presentation path. On a mixed-refresh multi-monitor desktop where strict
-    fullscreen VRR can cause a secondary-monitor black flash, ABSO can fall
-    back to the no-sync HDR lane via ``mixed_refresh_safe_fallback_profile_id``.
+    The driver owns the explicit refresh-minus-three ceiling; the engine uses
+    Unlimited. Native HDR and actual exclusive/VRR presentation need runtime
+    evidence. The existing mixed-refresh compatibility gate remains in place.
     """
 
     @property
@@ -327,10 +305,9 @@ class FortniteGSyncHDRProfile(_FortniteBaseProfile):
     @property
     def description(self) -> str:
         return (
-            "Tear-free low-latency VRR Fortnite profile with native HDR "
-            "(OLED / Mini-LED). G-SYNC ON + NVCP VSync safety net with a "
-            "refresh - 3 cap; keeps driver LLM off for Reflex (enable Reflex "
-            "On + Boost in-game)."
+            "Windows HDR Fortnite G-SYNC lane with driver VSync and a "
+            "refresh - 3 driver cap; native FPS is Unlimited. Choose Reflex "
+            "On or On + Boost in-game. Native game HDR is unverified."
         )
 
     @property
@@ -355,11 +332,7 @@ class FortniteGSyncHDRProfile(_FortniteBaseProfile):
 
     @property
     def allow_dual_limiter(self) -> bool:
-        # Fortnite rewrites GameUserSettings.ini on exit, so ABSO layers the
-        # in-game cap (authoritative, Blur Busters-preferred) with the NVIDIA
-        # driver cap (safety net). Both resolve to refresh - 3, so the
-        # effective cap stays deterministic if the INI drifts.
-        return True
+        return False
 
     def _shared_overrides(self) -> dict[str, dict[str, Any]]:
         # Replace the no-sync base contract (reflex_no_sync / uncapped) with the
@@ -370,7 +343,7 @@ class FortniteGSyncHDRProfile(_FortniteBaseProfile):
                 "preset": "reflex_gsync",
                 # Auto-detect refresh and cap below it for G-SYNC headroom.
                 "auto_vrr_fps_cap": True,
-                # Enable G-SYNC for exclusive fullscreen (PreferredFullscreenMode=0).
+                # Existing fullscreen VRR policy; a saved mode is not runtime proof.
                 "global_vrr_mode": "fullscreen_only",
                 # reflex_gsync already sets vrr_app_override=allow, but assert it
                 # explicitly so a no-sync Fortnite lane (force_off) -> this lane
@@ -381,8 +354,10 @@ class FortniteGSyncHDRProfile(_FortniteBaseProfile):
             "FortniteConfigHandler": {
                 "fullscreen_mode": 0,
                 "vsync": False,
-                # Write the in-game FrameRateLimit to refresh - 3 at apply time.
-                "auto_vrr_fps_cap": True,
+                # Fortnite's UI uses discrete limits. Do not force a custom
+                # native297 merely because it is used by another game.
+                "auto_vrr_fps_cap": False,
+                "frame_rate_limit": 0,
             },
         }
 
@@ -392,9 +367,8 @@ class FortniteGSyncHDRProfile(_FortniteBaseProfile):
                 "hdr": True,
                 "advanced_color": True,  # Win11 24H2+ WCG pairing
                 "auto_hdr": False,
-                # Paper-white ≈ 200 nits under HDR on OLED / Mini-LED.
-                # Driver installs reset this slider; asserting it here
-                # restores the correct SDR-in-HDR tone-mapping.
+                # Windows SDR brightness preference; not proof of native HDR
+                # or a calibrated peak-luminance value for every display.
                 "sdr_white_level_nits": 200,
             },
             "GraphicsSettingsHandler": {
@@ -408,10 +382,6 @@ class FortniteGSyncHDRProfile(_FortniteBaseProfile):
                 "show_osd_guidance": True,
                 "game_type": "competitive_fps",
             },
-            "FortniteConfigHandler": {
-                "hdr_output": True,
-                "hdr_nits": 1000,
-            },
         }
 
     def get_in_game_settings(self) -> list[dict[str, str]]:
@@ -419,56 +389,50 @@ class FortniteGSyncHDRProfile(_FortniteBaseProfile):
             {
                 "category": "Display",
                 "setting": "Display Mode",
-                "value": "Fullscreen (Exclusive)",
-                "reason": "Exclusive fullscreen is the lowest-latency presentation path and the right match for this profile's fullscreen-only G-SYNC mode.",
+                "value": "Fullscreen",
+                "reason": "Matches this lane's fullscreen VRR policy. Confirm actual G-SYNC engagement in-game; the saved mode does not prove exclusive presentation.",
             },
             {
                 "category": "Display",
                 "setting": "VSync",
                 "value": "Off (in-game)",
-                "reason": "Leave VSync to NVIDIA Control Panel as the VRR safety net; keep the in-game toggle off so it never adds queueing latency.",
+                "reason": "This lane uses driver VSync with its fullscreen VRR policy. The borderless Streaming lanes instead enable in-game VSync; runtime engagement still needs checking.",
             },
             {
                 "category": "Display",
                 "setting": "NVIDIA Reflex Low Latency",
-                "value": "On + Boost — set the in-game toggle manually; profile requests driver LLM Off",
-                "reason": "Applying this profile requests NVIDIA driver LLM Off for native Reflex queue control. Fortnite's Reflex toggle lives in Fortnite's settings and there is no stable config key to write it from outside; manually flip 'NVIDIA Reflex Low Latency' to 'On + Boost' in the game once.",
+                "value": "On or On + Boost (choose manually)",
+                "reason": "Driver LLM is Off. ABSO checks the saved Reflex choice without changing it; Boost keeps clocks higher at a power cost and is not proven best for this workload.",
             },
             {
                 "category": "Display",
                 "setting": "Frame Rate Limit",
-                "value": "Auto (refresh - 3: e.g. 297 @ 300Hz, 237 @ 240Hz, 141 @ 144Hz)",
-                "reason": "Set by ABSO to refresh - 3 (Blur Busters G-SYNC 101). Keeps G-SYNC active and prevents NVCP V-SYNC from engaging while preserving tear-free output.",
+                "value": "Unlimited in-game; driver cap at refresh - 3",
+                "reason": "The driver owns the explicit ceiling (297 at 300Hz); Fortnite's engine stays Unlimited. Reflex may pace lower. Neither the saved cap nor this checklist proves runtime VRR engagement.",
             },
             {
                 "category": "Display",
                 "setting": "HDR",
-                "value": "On",
-                "reason": "Use Fortnite's native HDR output path in GameUserSettings.ini when the installed build and display path support HDR.",
-            },
-            {
-                "category": "Display",
-                "setting": "HDR Peak Brightness / Nits",
-                "value": "Start at 1000 nits or match your display peak",
-                "reason": "Keep Windows HDR and Fortnite's native HDR output aligned.",
+                "value": "Windows HDR On; native game HDR unverified",
+                "reason": "ABSO preserves the game's HDR and calibration settings. Windows HDR does not prove Fortnite native HDR; this lane does not enable Auto HDR or RTX HDR.",
             },
             {
                 "category": "Graphics",
                 "setting": "Rendering Mode",
-                "value": "DirectX 12",
-                "reason": "This profile is built around Fortnite's DX12 path for Reflex and modern presentation behavior.",
+                "value": "Compare Performance (DX12) with DirectX 12 manually",
+                "reason": "Epic recommends Performance mode for competitive play; standard DX12 offers different graphics/upscaling choices. Compare frame times and image quality; ABSO preserves the renderer.",
             },
             {
                 "category": "Graphics",
                 "setting": "Multithreaded Rendering",
                 "value": "On",
-                "reason": "Better CPU utilization and more stable frame delivery in stacked endgames.",
+                "reason": "Use the game's default when available; no local frame-time improvement has been established.",
             },
             {
                 "category": "Graphics",
                 "setting": "3D Resolution / DLSS",
-                "value": "100% or DLSS Performance if GPU-bound",
-                "reason": "Keep frame times stable first; use DLSS only when needed to hold the VRR cap.",
+                "value": "100%; compare DLSS Quality when available and GPU-bound",
+                "reason": "Trade image detail for rendering cost only when needed. Supported upscalers depend on the selected renderer.",
             },
             {
                 "category": "Graphics",
@@ -486,7 +450,7 @@ class FortniteGSyncHDRProfile(_FortniteBaseProfile):
                 "category": "Content",
                 "setting": "High Resolution Textures",
                 "value": "Off",
-                "reason": "Avoids streaming hitches and unnecessary VRAM churn.",
+                "reason": "Reduces optional texture storage and memory demand; removing it is not a guaranteed stutter fix.",
             },
         ]
 
@@ -544,8 +508,8 @@ class _FortniteGSyncCaptureBase(FortniteGSyncHDRProfile):
             {
                 "category": "Display",
                 "setting": "NVIDIA Reflex Low Latency",
-                "value": "On + Boost (set manually)",
-                "reason": "ABSO leaves driver LLM off. Enable Reflex manually in Fortnite; Reflex may pace below the driver cap.",
+                "value": "On or On + Boost (choose manually)",
+                "reason": "ABSO leaves driver LLM off and only reads the saved Reflex choice. Reflex may pace below the driver cap; compare Boost's power cost and latency on the actual workload.",
             },
             {
                 "category": "Display",
@@ -562,7 +526,7 @@ class _FortniteGSyncCaptureBase(FortniteGSyncHDRProfile):
             *[
                 {"category": "Graphics", "setting": setting, "value": value, "reason": reason}
                 for setting, value, reason in (
-                    ("Rendering Mode", "DirectX 12 (set manually)", "Changing rendering mode requires a game restart."),
+                    ("Rendering Mode", "DirectX 12; compare Performance (DX12) manually", "Standard DX12 supports the following quality/upscaling starting points. Performance mode reduces rendering features; compare it separately and restart if prompted. ABSO preserves the current renderer."),
                     ("Anti-Aliasing & Super Resolution", "NVIDIA DLSS Quality (set manually, when available)", "A clarity/performance starting point for supported RTX GPUs; use the game's supported alternatives on other hardware."),
                     ("Nanite Virtualized Geometry", "Off (set manually)", "Reduce geometry cost; change from the lobby because this option cannot be changed mid-match."),
                     ("Global Illumination", "Off (set manually)", "Disable Lumen lighting for this performance starting point; change from the lobby."),
@@ -583,12 +547,12 @@ class _FortniteGSyncCaptureBase(FortniteGSyncHDRProfile):
         return [
             "Fortnite streaming: Windowed Fullscreen, in-game VSync On, and "
             "Unlimited engine FPS with the NVIDIA refresh - 3 cap. Set Reflex "
-            "On + Boost manually. OBS and overlays remain available.",
-            "Graphics remain user-controlled: manually choose DX12, DLSS "
-            "Quality when available, Medium textures/view distance, Low "
-            "effects/post processing, and turn Nanite, lighting/reflections, "
-            "ray tracing, shadows, motion blur, dynamic resolution, and frame "
-            "generation off. Restart after changing renderer or hardware ray tracing.",
+            "On or On + Boost manually. OBS and overlays remain available.",
+            "Graphics remain user-controlled: compare standard DX12 with "
+            "Performance (DX12). For standard DX12, DLSS Quality, Medium "
+            "textures/view distance and Low effects are starting points; "
+            "reducing Nanite, lighting, ray tracing and shadows reduces rendering "
+            "work. Restart after renderer or ray-tracing changes if prompted.",
         ]
 
 
@@ -609,7 +573,7 @@ class FortniteGSyncCaptureProfile(_FortniteGSyncCaptureBase):
             "SDR capped G-SYNC lane on Fortnite's borderless path; preserves "
             "OBS, Medal, RTSS, and overlays and keeps game CPU/I/O priority at "
             "Normal. Uses in-game VSync and a driver cap; enable Reflex "
-            "On + Boost manually."
+            "On or On + Boost manually."
         )
 
     @property
@@ -628,9 +592,6 @@ class FortniteGSyncCaptureProfile(_FortniteGSyncCaptureBase):
                 "show_osd_guidance": True,
                 "game_type": "competitive_fps",
             },
-            "FortniteConfigHandler": {
-                "hdr_output": False,
-            },
         }
 
     def get_in_game_settings(self) -> list[dict[str, str]]:
@@ -641,8 +602,8 @@ class FortniteGSyncCaptureProfile(_FortniteGSyncCaptureBase):
             if row.get("setting") == "HDR":
                 row = {
                     **row,
-                    "value": "Off",
-                    "reason": "This streaming variant intentionally stays on the SDR path.",
+                    "value": "Windows HDR Off",
+                    "reason": "Windows output stays SDR; Fortnite's saved HDR and calibration values are preserved.",
                 }
             patched.append(row)
         return patched
@@ -665,7 +626,7 @@ class FortniteGSyncHDRCaptureProfile(_FortniteGSyncCaptureBase):
             "Windows HDR G-SYNC lane on Fortnite's borderless path; "
             "preserves OBS, Medal, RTSS, and overlays and keeps game CPU/I/O "
             "priority at Normal. Uses in-game VSync and a driver cap; enable "
-            "Reflex On + Boost manually. Native game HDR is unverified."
+            "Reflex On or On + Boost manually. Native game HDR is unverified."
         )
 
     def _variant_overrides(self) -> dict[str, dict[str, Any]]:

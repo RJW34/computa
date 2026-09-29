@@ -34,7 +34,9 @@ def find_ini_section_bounds(
     section_start: int | None = None
 
     for index, line in enumerate(lines):
-        match = INI_SECTION_RE.match(line)
+        # UTF-8 readers may retain a BOM before the first section header.
+        # Normalize only for matching; keep the original lines for patching.
+        match = INI_SECTION_RE.match(line.lstrip("\ufeff"))
         if not match:
             continue
 

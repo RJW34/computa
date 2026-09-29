@@ -460,12 +460,41 @@ game-side FPS limit are hardware- and service-specific; computa does not guess
 those values or overwrite a working OBS configuration during a game-profile
 switch.
 
+### Game-specific sync and limiter checks
+
+The defaults differ by game; copying every Overwatch setting into another
+profile is not a reliable tuning method. At a 300 Hz primary display:
+
+| G-SYNC game family | Explicit ceiling | Native VSync | Reflex |
+| --- | --- | --- | --- |
+| Overwatch 2 | Native 297; NVIDIA cap Off | On for the borderless lanes | Enabled; Boost optional |
+| Counter-Strike 2 | NVIDIA 297; manually set `fps_max 0` | On in all G-SYNC lanes | Enabled; Boost optional, manual |
+| Rivals of Aether 2 | Native 297; NVIDIA cap Off | Off for fullscreen; On for capture/borderless | No verified native Reflex integration |
+| Fortnite | NVIDIA 297; native Unlimited | Off for fullscreen; On for capture/borderless | On; Boost optional, manual |
+
+Lower runtime FPS can be expected Reflex pacing or a workload limit. Saved
+ceilings do not prove G-SYNC engagement, stable frame times, or a measured
+performance improvement. CS2 exposes an NVIDIA G-Sync status row in its video
+settings on supported paths; use that to check actual engagement.
+
+These three game families preserve baseline power, scheduler/MMCSS, NIC and
+MSI policy instead of imposing unmeasured defaults. Previously captured
+baselines can already contain older tuning; removing a default is not a claim
+that every historical system change has been reset. Explicit user overrides
+remain possible. Fullscreen optimization is allowed for CS2 and Fortnite;
+disabling it is a troubleshooting comparison, not a universal FPS gain.
+
+Detailed evidence and remaining tradeoffs are documented separately for
+[CS2](research/cs2-settings-sanity-2026-09-29.md),
+[Rivals 2](research/rivals2-settings-sanity-2026-09-29.md), and
+[Fortnite](research/fortnite-settings-sanity-2026-09-29.md).
+
 ### Fortnite Streaming stays around 60–70 FPS or tears
 
 The Fortnite Streaming profiles use Windowed Fullscreen, **in-game VSync On**,
 driver G-SYNC/VSync, driver Low Latency Mode Off, and an NVIDIA cap of
 `refresh - 3` (297 at 300 Hz). The in-game Frame Rate Limit is Unlimited.
-Enable **NVIDIA Reflex On + Boost** in Fortnite. Reflex can pace below the
+Enable **NVIDIA Reflex On** in Fortnite; **On + Boost** is optional. Reflex can pace below the
 driver ceiling; the ceiling is not a promised gameplay frame rate.
 [NVIDIA's latency guide](https://www.nvidia.com/en-us/geforce/guides/system-latency-optimization-guide/)
 specifically recommends in-game VSync for windowed G-SYNC with Reflex.
@@ -482,7 +511,7 @@ changes can require a game restart; follow Fortnite's prompt.
 [Epic's competitive settings guide](https://store.epicgames.com/news/fortnite-on-pc-best-settings-for-competitive-play-in-2026)
 explains the rendering-cost tradeoffs.
 
-The HDR Streaming lane enables **Windows HDR**. It preserves Fortnite's native
+All Fortnite HDR lanes enable **Windows HDR**. They preserve Fortnite's native
 HDR/calibration keys and does not claim that the game produces native HDR.
 Windows HDR or an INI boolean alone does not prove native HDR output, Auto HDR,
 RTX HDR, or correct capture tone mapping. Verify the intended game/capture

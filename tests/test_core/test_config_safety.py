@@ -99,3 +99,36 @@ def test_apply_ini_key_patch_scopes_to_named_section() -> None:
         "bUseVSync": "False",
         "FrameRateLimit": "297",
     }
+
+
+def test_bom_header_scopes_parsing_and_patching_without_rewriting_header() -> None:
+    lines = [
+        "\ufeff[/Script/Engine.GameUserSettings]",
+        "bUseVSync=False",
+        "[Other]",
+        "bUseVSync=True",
+    ]
+    section = "/Script/Engine.GameUserSettings"
+    assert find_ini_section_bounds(lines, section) == (1, 2)
+    assert parse_ini_assignments(lines, section_name=section) == {"bUseVSync": "False"}
+
+    result = apply_ini_key_patch(
+        lines, {"bUseVSync": "False", "FrameRateLimit": "0"},
+        append_missing=True, section_name=section,
+    )
+    assert result.changed_keys == set()
+    assert result.appended_keys == {"FrameRateLimit"}
+    assert result.lines == [
+        "\ufeff[/Script/Engine.GameUserSettings]",
+        "bUseVSync=False",
+        "FrameRateLimit=0",
+        "[Other]",
+        "bUseVSync=True",
+    ]
+    assert lines[0] == "\ufeff[/Script/Engine.GameUserSettings]"
+
+
+def test_bom_normalization_does_not_create_missing_section_bounds() -> None:
+    lines = ["\ufeff[Other]", "bUseVSync=True"]
+    assert find_ini_section_bounds(lines, "/Script/Engine.GameUserSettings") is None
+    assert find_ini_section_bounds(lines, None) is None

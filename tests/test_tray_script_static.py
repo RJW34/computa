@@ -4176,7 +4176,7 @@ def test_ow2_gsync_fallback_guidance_matches_native_vsync_contract() -> None:
     ):
         entry = script.split(f'"{profile_id}"', 1)[1].split("\n    }", 1)[0]
         assert "In-game VSync ON" in entry
-        assert "in-game VSync ON and Reflex On+Boost" in entry
+        assert "in-game VSync ON and Reflex On (Boost optional)" in entry
 
 
 def test_builtin_tray_fallback_keeps_requested_streaming_matrix_available() -> None:

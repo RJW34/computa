@@ -338,9 +338,10 @@ def test_cs2_hdr_catalog_does_not_claim_native_hdr() -> None:
             str(manifest[profile_id].get(key, ""))
             for key in ("description", "tray_subtitle", "tray_description")
         ).lower()
-        assert "native hdr" not in text
+        assert "native hdr" in text
+        assert "not configured" in text or "does not establish" in text
         assert "windows hdr" in text
-        assert "renders sdr" in text
+        assert "composition" in text
 
 
 def test_rivals2_hdr_catalog_reports_windows_hdr_composition() -> None:
@@ -357,8 +358,8 @@ def test_rivals2_hdr_catalog_reports_windows_hdr_composition() -> None:
             for key in ("description", "tray_subtitle", "tray_description")
         ).lower()
         assert "windows hdr composition" in text
-        assert "native hdr" in text
-        assert "no native hdr support" in text or "native game hdr remains off" in text
+        assert "native" in text and "hdr" in text
+        assert "native game hdr stays off" in text or "native hdr remains off" in text
 
 
 def test_productivity_catalog_reports_sdr_hdr_off_lane() -> None:

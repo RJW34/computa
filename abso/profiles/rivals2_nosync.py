@@ -1,34 +1,8 @@
-"""Rivals of Aether 2 - No Sync profile (merged offline/online lane).
+"""Rivals of Aether 2 no-sync profiles for online play and training.
 
-Target: Everything — ranked matchmaking, unranked, training, local versus,
-replays. The 2026-07 consolidation collapsed the old offline/online split;
-this lane carries the online-safe tuning everywhere because SnapNet's sim is
-server-authoritative and the aggressive offline-only tuning bought nothing
-measurable.
-
-Per rollback.md canonical spec:
-- Optimization Class: Rollback-Safe Low Latency
-- Priority: Frame pacing stability > raw latency
-
-NVCP Settings (per-game for Rivals2-Win64-Shipping.exe):
-- V-Sync: OFF (rollback is timing-sensitive, not tear-sensitive)
-- G-SYNC / VRR: OFF (use the G-SYNC lanes for tear-free)
-- Low Latency Mode: ON (NOT Ultra!)
-- Max Frame Rate: OFF (no driver cap; the in-game limiter owns pacing)
-- Threaded Optimization: ON (CPU-bound UE5/DX11; driver worker threads help,
-  and the server-authoritative sim cannot be desynced by them)
-- Power Management: Prefer Maximum Performance
-
-In-game frame cap: largest multiple of 60 at/below refresh (300 @ 300 Hz).
-Rivals 2 ticks at a fixed 60 Hz; 60-multiples hold an even frames-per-tick
-cadence, and the bounded render load preserves CPU headroom for rollback
-resimulation bursts.
-
-External Tools: RTSS, frame pacing hooks DISABLED (matchmaking-safe lane).
-
-Canonical one-line definition:
-> Exclusive fullscreen + no sync + in-game 60-multiple cap + NV LLM ON (not
-> Ultra) + HAGS ON + Ultimate Performance plan + no overlays
+No VRR/VSync; tearing is accepted. A bounded native render cap (300 at
+300 Hz) is retained as a starting policy, not a rollback requirement or
+measured optimum. Driver queue control stays On; Reflex is not assumed.
 """
 
 from __future__ import annotations
@@ -40,13 +14,7 @@ from abso.profiles.profile_bases import Rivals2BaseProfile, merge_settings_map
 
 
 class Rivals2NoSyncProfile(Rivals2BaseProfile):
-    """Rollback-safe no-sync lane for Rivals 2 (online and training).
-
-    Single lane for ranked, unranked, and offline training — the online-safe
-    tuning is carried everywhere. Prioritizes stable rollback pacing while
-    keeping the leanest presentation path (no VRR, no VSync, tearing
-    accepted).
-    """
+    """One no-sync lane for ranked, unranked, and offline training."""
 
     @property
     def profile_id(self) -> str:
@@ -58,7 +26,7 @@ class Rivals2NoSyncProfile(Rivals2BaseProfile):
 
     @property
     def description(self) -> str:
-        return "Rollback-safe no-sync lane for online play and training"
+        return "No-sync lane with a bounded native FPS cap; tearing accepted"
 
     @property
     def optimization_target(self) -> str:
@@ -75,7 +43,7 @@ class Rivals2NoSyncProfile(Rivals2BaseProfile):
 
     @property
     def allows_aggressive_settings(self) -> bool:
-        """Matchmaking-safe lane: no aggressive settings."""
+        """Do not opt into aggressive presets for this lane."""
         return False
 
     @property
@@ -83,35 +51,29 @@ class Rivals2NoSyncProfile(Rivals2BaseProfile):
         return True
 
     def _settings_overrides(self) -> dict[str, dict[str, Any]]:
-        """Stable, rollback-safe no-sync settings."""
+        """No-sync settings; native limiter owns the render cap."""
         return {
             "WindowsSettingsHandler": {
                 "max_refresh_rate": True,  # Set display to max refresh rate for current resolution
             },
             "NvidiaSettingsHandler": {
-                "low_latency_mode": "on",  # ON, NOT Ultra! (Ultra can cause frame pacing issues, overrides FPS caps)
+                "low_latency_mode": "on",  # Starting policy for DX11; compare before tuning.
                 "power_management": "prefer_max_performance",
-                "vsync": "off",  # OFF - rollback netcode is timing-sensitive, not tear-sensitive
+                "vsync": "off",  # This lane accepts tearing.
                 "vsync_tear_control": "disable",  # Explicit tear control off with VSync OFF
                 "vrr_app_override": "force_off",  # OFF for the no-sync path
                 "global_vrr_mode": "off",  # Enforce global VRR off for clean no-sync transitions
                 "max_frame_rate": "off",  # No driver cap - the in-game limiter owns pacing
                 "shader_cache": "on",
-                # ON: Rivals 2 is CPU-bound UE5/DX11; driver worker threads
-                # measurably help there. SnapNet's sim is server-authoritative,
-                # so client driver threading cannot desync rollback.
-                "threaded_optimization": "on",
+                "threaded_optimization": "auto",  # OGL control; no proven DX11 gain.
                 "triple_buffering": "off",  # OFF - irrelevant without VSync
             },
             "Rivals2ConfigHandler": {
-                "fullscreen_mode": 0,  # Exclusive fullscreen no-sync path
-                "vsync": False,  # In-game VSync OFF — driver handles sync
-                "raw_input": True,  # Best input latency
-                # In-game cap on the 60 Hz sim grid: largest multiple of 60
-                # at/below refresh (300 @ 300 Hz). Even frames-per-tick
-                # cadence, and the bounded render load preserves CPU headroom
-                # for rollback resimulation bursts ("stability > raw latency"
-                # made concrete). The driver cap stays off.
+                "fullscreen_mode": 0,  # Request fullscreen; actual presentation is unverified.
+                "vsync": False,  # No synchronization on this lane.
+                # Retain the bounded render-cap policy (300 at 300 Hz).
+                # Multiples of 60 are not required for correct simulation and
+                # no frame-time benefit has been measured for this policy.
                 "auto_vrr_fps_cap": True,
                 "vrr_cap_policy": FIGHTING_60HZ_NOSYNC_CAP_POLICY,
                 "hdr_output": False,
@@ -129,14 +91,14 @@ class Rivals2NoSyncProfile(Rivals2BaseProfile):
                 "setting": "Use Case",
                 "value": "Ranked, Unranked, Training, Local VS, Replays",
                 "reason": (
-                    "One rollback-safe lane for everything. Offline training "
-                    "runs identically on the online-safe tuning."
+                    "One no-sync lane for online play and offline training. "
+                    "Actual latency and frame pacing require measurement."
                 ),
             },
             {
-                "category": "=== EXPLICIT PROHIBITIONS ===",
-                "setting": "DO NOT USE",
-                "value": "LLM Ultra, Fast VSync, External FPS Caps, Refresh-3 Logic",
+                "category": "Pacing policy",
+                "setting": "Limiter selection",
+                "value": "One native cap; no VRR or VSync",
                 "reason": (
                     "This lane conservatively avoids competing pacing controls. "
                     "The 60-multiple cap is a heuristic; netcode or latency improvement is unmeasured."
@@ -147,9 +109,8 @@ class Rivals2NoSyncProfile(Rivals2BaseProfile):
                 "setting": "G-SYNC / VRR",
                 "value": "OFF",
                 "reason": (
-                    "VRR OFF keeps the no-sync scanout path simple and "
-                    "deterministic. Use the G-SYNC HDR lane if you want "
-                    "tear-free VRR."
+                    "This lane disables VRR and accepts tearing. Use a G-SYNC "
+                    "lane if you prefer synchronized variable-refresh presentation."
                 ),
             },
             {
@@ -161,7 +122,7 @@ class Rivals2NoSyncProfile(Rivals2BaseProfile):
             {
                 "category": "NVIDIA Control Panel",
                 "setting": "Threaded Optimization",
-                "value": "On",
+                "value": "Auto",
                 "reason": (
                     "This NVIDIA setting is exposed as OGL_THREAD_CONTROL. "
                     "A frame-time benefit on Rivals 2's DX11 path has not been established."
@@ -171,7 +132,7 @@ class Rivals2NoSyncProfile(Rivals2BaseProfile):
                 "category": "NVIDIA Control Panel",
                 "setting": "Low Latency Mode",
                 "value": "On",
-                "reason": "ON (not Ultra) - Ultra can cause frame pacing issues and overrides FPS caps.",
+                "reason": "Driver queue-control starting point for DX11. Compare frame times and latency; no mode is proven best on this PC.",
             },
             {
                 "category": "NVIDIA Control Panel",
@@ -183,16 +144,16 @@ class Rivals2NoSyncProfile(Rivals2BaseProfile):
                 "category": "In-Game Settings",
                 "setting": "V-Sync",
                 "value": "OFF",
-                "reason": "Native engine timing must remain authoritative.",
+                "reason": "This no-sync lane accepts tearing in exchange for avoiding VSync backpressure.",
             },
             {
                 "category": "In-Game Settings",
                 "setting": "Frame Rate Cap",
                 "value": "Multiple of 60 at/below refresh (auto-set: 300 @ 300Hz)",
                 "reason": (
-                    "Rivals 2 ticks at a fixed 60 Hz; 60-multiple caps hold an "
-                    "even frames-per-tick cadence, and the bounded render load "
-                    "keeps CPU headroom free for rollback resimulation bursts."
+                    "The retained render-budget policy uses multiples of 60, but an "
+                    "integer frames-per-tick cadence is not a simulation requirement. "
+                    "No local latency or rollback benefit has been measured."
                 ),
             },
             {
@@ -211,8 +172,8 @@ class Rivals2NoSyncProfile(Rivals2BaseProfile):
             {
                 "category": "Validation",
                 "setting": "Expected Behavior",
-                "value": "Minor frametime variance OK, no persistent VRR dropouts",
-                "reason": "Rollback resync frames must not cause cascading frame loss.",
+                "value": "Check frame pacing, tearing, and online responsiveness",
+                "reason": "VRR is off in this lane. Saved configuration cannot guarantee online or rendering performance.",
             },
         ]
 
@@ -238,8 +199,8 @@ class Rivals2NoSyncHDRProfile(Rivals2NoSyncProfile):
     @property
     def description(self) -> str:
         return (
-            "Rollback-safe no-sync Rivals 2 lane with Windows HDR composition. "
-            "Keeps no-sync rollback stability; Rivals 2 native HDR output stays off."
+            "No-sync Rivals 2 lane with Windows HDR composition. "
+            "Tearing is accepted; native game HDR output stays off."
         )
 
     @property

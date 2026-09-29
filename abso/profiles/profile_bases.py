@@ -23,6 +23,30 @@ SDR_WIDE_GAMUT_VIBRANCE = 45
 NEUTRAL_VIBRANCE = 50
 
 
+def preserve_baseline_system_policy(
+    settings: dict[str, dict[str, Any]],
+) -> dict[str, dict[str, Any]]:
+    """Remove unmeasured system policies from an opted-in game's defaults.
+
+    Call before merging variant/user overrides so explicit tuning remains
+    possible. This does not write opposite values or infer Windows defaults:
+    normal profile transactions restore the captured baseline. Registered
+    handlers remain available for backup/restore. FSO and opt-in legacy keys
+    are unrelated policies and are preserved.
+    """
+    result = deepcopy(settings)
+    if "PowerSettingsHandler" in result:
+        result["PowerSettingsHandler"] = {}
+    registry = result.get("RegistrySettingsHandler", {})
+    registry.pop("win32_priority_separation", None)
+    registry.pop("game_priority", None)
+    if "InterruptModeHandler" in result:
+        result["InterruptModeHandler"] = {"enable_msi": False}
+    if "NicDriverHandler" in result:
+        result["NicDriverHandler"] = {"nic_tuning": False}
+    return result
+
+
 def fso_overrides(
     executables: Iterable[str],
     *,
@@ -249,17 +273,14 @@ def build_standard_handlers(
 class Rivals2BaseProfile(BaseProfile):
     """Shared base for Rivals 2 profiles.
 
-    The 2026-07 consolidation collapsed the old offline/online lane split:
-    every Rivals lane now carries the online-safe tuning (milder scheduler
-    boost, conservative process priority, rollback validation active).
-    SnapNet's sim is server-authoritative, so the aggressive offline-only
-    tuning bought nothing measurable — offline training runs identically
-    on the online-safe values.
+    One family covers online play and training. System power/scheduler
+    policies stay at the captured baseline. Display and pacing choices are
+    starting policies, not measured latency or rollback guarantees.
     """
 
     @property
     def is_online_profile(self) -> bool:
-        # Every merged Rivals lane is matchmaking-safe by construction.
+        # Keep online compatibility validation for every merged lane.
         return True
 
     HDR_WINDOWS_COMPOSITION_OVERRIDES: dict[str, dict[str, Any]] = {
@@ -267,10 +288,9 @@ class Rivals2BaseProfile(BaseProfile):
             "hdr": True,
             "advanced_color": True,
             "auto_hdr": False,
-            # Rivals 2 currently advertises no native HDR support in Steam's
-            # metadata, so HDR variants run the game as SDR composited into
-            # Windows HDR. 200 nits is the OLED / Mini-LED starting point for
-            # the SDR-in-HDR paper-white slider.
+            # These lanes deliberately keep game output SDR in Windows HDR.
+            # Native HDR support is not established. 200 nits is a brightness
+            # starting point, not calibrated output or a performance target.
             "sdr_white_level_nits": 200,
         },
         "GraphicsSettingsHandler": {
@@ -294,8 +314,7 @@ class Rivals2BaseProfile(BaseProfile):
 
     @property
     def xbox_mode(self) -> Literal["off", "on", "leave"]:
-        # Rivals 2 family ships fullscreen_mode=0; the Xbox Mode shell layer
-        # actively conflicts with the exclusive-fullscreen FSO override.
+        # Retain this family shell preference; no latency gain is assumed.
         return "off"
 
     @property
@@ -309,10 +328,9 @@ class Rivals2BaseProfile(BaseProfile):
 
     @property
     def fullscreen_optimizations_per_exe(self) -> dict[str, bool]:
-        # Every Rivals 2 variant ships fullscreen_mode=0 in its GameUserSettings,
-        # so the whole family wants Windows to keep the real shipping binary on
-        # the true exclusive path. Disable FSO per-exe for the shipping binary
-        # and the legacy detection aliases.
+        # Strict lanes request fullscreen. Capture subclasses override this
+        # for their borderless path. Config/FSO flags do not prove the actual
+        # runtime presentation mode.
         exe_names = (
             "Rivals2-Win64-Shipping.exe",
             "RivalsofAether2.exe",
@@ -426,31 +444,10 @@ class Rivals2BaseProfile(BaseProfile):
                 "windowed_optimizations": False,
                 "vrr_optimize": False,
             },
-            "PowerSettingsHandler": {
-                "ensure_ultimate_performance": True,
-                "active_plan": "ultimate_performance",
-                "disable_usb_suspend": True,
-                "disable_pcie_power_saving": True,
-                "processor_max_performance": True,
-                # Experimental power policy: high minimum processor state and
-                # unparked cores can increase heat/power and may reduce thermal
-                # headroom. No local frame-time benefit is established; compare
-                # against a Balanced baseline before claiming an improvement.
-                "processor_min_state": 100,
-                "disable_core_parking": True,
-            },
-            "RegistrySettingsHandler": {
-                # Online-safe scheduler tuning for the whole merged family:
-                # +1 foreground boost instead of the aggressive +2. SnapNet
-                # rollback resim wants background kernel/network work never
-                # starved, and the delta is unmeasurable on modern CPUs.
-                "win32_priority_separation": WIN32_PRIORITY_GAMING_ONLINE,
-                "game_priority": {
-                    "priority": 6,
-                    "scheduling_category": "High",
-                    # sfio_priority omitted — has no effect per Microsoft docs
-                },
-            },
+            # Keep these handlers available without imposing a new power or
+            # scheduler/MMCSS policy. Explicit user overrides remain possible.
+            "PowerSettingsHandler": {},
+            "RegistrySettingsHandler": {},
             "NetworkSettingsHandler": {
                 "disable_nagle": False,
                 "preset": "default",
@@ -490,7 +487,7 @@ class Rivals2BaseProfile(BaseProfile):
         if self.include_legacy_tweaks:
             add_legacy_system_tweaks(settings)
 
-        return settings
+        return preserve_baseline_system_policy(settings)
 
     def _settings_overrides(self) -> dict[str, dict[str, Any]]:
         return {}
@@ -523,8 +520,8 @@ class Rivals2BaseProfile(BaseProfile):
                 "value": "On",
                 "reason": (
                     "This profile enables Windows HDR + WCG for OLED / Mini-LED "
-                    "comfort. Rivals 2 currently advertises no native HDR support, "
-                    "so the game remains SDR and Windows composites it into the HDR surface."
+                    "comfort. This lane deliberately keeps game output SDR for Windows "
+                    "HDR composition; native game HDR support is not established."
                 ),
             },
             {
@@ -541,8 +538,8 @@ class Rivals2BaseProfile(BaseProfile):
                 "setting": "HDR Output",
                 "value": "Off in GameUserSettings.ini",
                 "reason": (
-                    "Steam metadata reports hdr_support=0 for Rivals 2, so ABSO does not "
-                    "force Unreal's bUseHDRDisplayOutput flag. These HDR lanes are OS-level "
+                    "Native game HDR support is not established, so ABSO keeps "
+                    "Unreal's bUseHDRDisplayOutput flag off. These lanes use OS-level "
                     "SDR-in-HDR composition variants, not native game HDR."
                 ),
             },
@@ -558,10 +555,11 @@ class Rivals2BaseProfile(BaseProfile):
             {
                 "category": "Display",
                 "setting": "Exclusive Fullscreen vs SDR-in-HDR latency",
-                "value": "Accept a small HDR composition cost",
+                "value": "Compare presentation and image quality",
                 "reason": (
-                    "Windows HDR composition can add a small nonzero presentation cost. "
-                    "Use the SDR sibling when the leanest latency path matters more than HDR desktop comfort."
+                    "This lane keeps game output SDR inside the Windows HDR desktop. "
+                    "Presentation cost varies by OS, driver, and path; ABSO has not "
+                    "measured a latency difference from the SDR sibling."
                 ),
             },
         ]

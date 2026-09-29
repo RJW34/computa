@@ -123,8 +123,8 @@ class NvidiaSettingValues:
 # - Or use NPI to set Max Pre-Rendered Frames to 2-3 (more granular control)
 # These settings are hardware-dependent - test and adjust for your system.
 #
-# V-SYNC with G-SYNC: NVCP V-SYNC "On" acts as a safety net, not active latency.
-# With FPS capped at refresh_rate - 3, V-SYNC never engages.
+# V-SYNC with G-SYNC provides tear protection. A below-refresh ceiling reduces
+# ceiling backpressure; limiter precision and the presentation path still matter.
 # See: https://blurbusters.com/gsync/gsync101-input-lag-tests-and-settings/
 
 NVIDIA_PRESETS: dict[str, dict[str, Any]] = {
@@ -134,7 +134,7 @@ NVIDIA_PRESETS: dict[str, dict[str, Any]] = {
         "settings": {
             "low_latency_mode": "on",  # Not Ultra - it overrides manual FPS caps
             "power_management": "prefer_max_performance",
-            "vsync": "on",  # Safety net for VRR - adds zero latency with proper FPS cap
+            "vsync": "on",  # Tear protection; latency depends on actual presentation
             "max_frame_rate": "off",  # Use in-game or RTSS limiter instead
             "shader_cache": "on",
             "threaded_optimization": "on",
@@ -149,24 +149,22 @@ NVIDIA_PRESETS: dict[str, dict[str, Any]] = {
         "settings": {
             "low_latency_mode": "on",  # NOT Ultra - Ultra overrides manual FPS caps
             "power_management": "prefer_max_performance",
-            "vsync": "on",  # Safety net - never activates with proper FPS cap
-            "max_frame_rate": "off",  # Use in-game limiter (lower latency than NVCP/RTSS)
+            "vsync": "on",  # Tear protection; keep a below-refresh ceiling
+            "max_frame_rate": "off",  # Limiter choice belongs to the game profile
             "shader_cache": "on",
             "threaded_optimization": "on",
             "triple_buffering": "off",  # Reduces latency - not needed with G-SYNC
         },
         "notes": {
             "fps_cap": (
-                "Use the in-game limiter below refresh (Blur Busters G-SYNC 101 "
-                "margin). For fixed-60Hz-logic games, snap to the largest "
-                "multiple of 60 under refresh - 3 (fighting_60hz_vrr policy): "
-                "240 @ 300Hz, 180 @ 240Hz, 120 @ 144Hz. Generic refresh - 3 "
-                "caps (297/237/141) land off the 60 Hz sim grid and micro-stutter. "
-                "In-game limiters have ~0.5-1 frame lower latency than RTSS/NVCP."
+                "Use the limiter and below-refresh target chosen by the game profile. "
+                "A 60 Hz simulation does not establish the optimal render cap: "
+                "interpolation and actual frame pacing must be measured. Legacy "
+                "60 Hz-multiple policies remain available for explicit comparisons."
             ),
             "fighting_games": (
-                "60Hz-logic games still benefit from high refresh (reduced scanout latency). "
-                "Caps that divide evenly into 60fps avoid cadence judder."
+                "High refresh can reduce scanout time. Render interpolation and "
+                "simulation rate are separate; no cadence improvement is guaranteed."
             ),
             "api_support": "Most modern fighting games use DX12/UE5. Driver LLM is less deterministic there than classic DX11 paths; measure per game.",
             "stuttering": (
@@ -235,8 +233,8 @@ NVIDIA_PRESETS: dict[str, dict[str, Any]] = {
         },
         "notes": {
             "warning": (
-                "Causes screen tearing. At 300Hz+, tearing is less perceptible "
-                "(tear lines move faster). Use for tournament/LAN settings only."
+                "Accepts screen tearing, including at high refresh rates. Compare "
+                "motion clarity and latency with the game's G-SYNC lane."
             ),
             "fighting_games": (
                 "Avoids sync/VRR queueing and accepts tearing. The exact latency "
@@ -249,9 +247,9 @@ NVIDIA_PRESETS: dict[str, dict[str, Any]] = {
                 "can starve the GPU on some systems. Hardware-dependent - test both."
             ),
             "threaded_opt": (
-                "Threaded Optimization ON is default for this preset. For VRR/G-Sync "
-                "setups (vrr_ue5_fighting_game, vrr_diablo4), it's set to OFF for "
-                "lower render latency. Test both settings for your hardware."
+                "This driver's Threaded Optimization control is an OpenGL setting. "
+                "It does not configure DirectX engine worker threads, so it must not "
+                "be described as a DirectX latency or rollback optimization."
             ),
         },
     },
@@ -272,7 +270,7 @@ NVIDIA_PRESETS: dict[str, dict[str, Any]] = {
         },
         "notes": {
             "usage": "For competitive no-sync play where lower queueing is prioritized over tear-free output.",
-            "reflex": "Set in-game NVIDIA Reflex to On + Boost.",
+            "reflex": "Enable in-game NVIDIA Reflex. Boost is optional; compare latency, FPS and power use.",
             "warning": "Will tear on high-motion scenes; this is expected for no-sync mode.",
         },
     },
@@ -281,7 +279,7 @@ NVIDIA_PRESETS: dict[str, dict[str, Any]] = {
         "settings": {
             "low_latency_mode": "off",  # Reflex replaces driver LLM
             "power_management": "prefer_max_performance",
-            "vsync": "on",  # NVCP safety net for VRR
+            "vsync": "on",  # Driver tear-protection policy for VRR
             "max_frame_rate": "off",  # Set in-game cap to refresh - 3
             "shader_cache": "on",
             "threaded_optimization": "on",
@@ -292,8 +290,8 @@ NVIDIA_PRESETS: dict[str, dict[str, Any]] = {
         },
         "notes": {
             "usage": "For VRR users who want tear-free output without giving up Reflex.",
-            "fps_cap": "Set in-game FPS cap to refresh_rate - 3 to keep VSync as safety net only.",
-            "reflex": "Set in-game NVIDIA Reflex to On + Boost.",
+            "fps_cap": "Follow the game profile's single-limiter policy and below-refresh target. Reflex may pace FPS below that ceiling.",
+            "reflex": "Enable in-game NVIDIA Reflex. Boost is optional; compare latency, FPS and power use.",
         },
     },
     "ull_gsync": {
@@ -301,7 +299,7 @@ NVIDIA_PRESETS: dict[str, dict[str, Any]] = {
         "settings": {
             "low_latency_mode": "ultra",  # Driver owns the queue; in-game Reflex stays OFF
             "power_management": "prefer_max_performance",
-            "vsync": "on",  # NVCP safety net for VRR
+            "vsync": "on",  # Driver tear-protection policy for VRR
             "max_frame_rate": "off",  # Profiles layer the driver v3 cap via auto_vrr_fps_cap
             "shader_cache": "on",
             "threaded_optimization": "on",
@@ -312,17 +310,15 @@ NVIDIA_PRESETS: dict[str, dict[str, Any]] = {
         },
         "notes": {
             "usage": (
-                "For games whose in-engine Reflex limiter measurably degrades frame "
-                "pacing under a reachable cap. OW2 per-frame CapFrameX testing "
-                "(Oct 2025, RTX 4070 + G-SYNC): Reflex ON turned a flat capped "
-                "frametime line into 2-10 ms variance with 1% lows near half the "
-                "average at identical average fps; ULL Ultra + the driver v3 cap "
-                "held the line flat."
+                "Experimental alternative for a controlled comparison against native "
+                "Reflex. No reproducible benchmark artifact establishes this preset "
+                "as better for OW2 or for this machine; built-in Reflex profiles "
+                "continue to prefer native Reflex."
             ),
             "reflex": "Set in-game NVIDIA Reflex to Off; driver ULL Ultra owns pacing.",
             "fps_cap": (
-                "The driver v3 cap (~8% below refresh) is authoritative; park any "
-                "in-game cap ABOVE it so the two limiters never fight."
+                "Follow the explicit profile cap policy. Driver automatic pacing "
+                "can vary; a fixed percentage below refresh is not a universal rule."
             ),
         },
     },
@@ -339,7 +335,7 @@ NVIDIA_PRESETS: dict[str, dict[str, Any]] = {
         "notes": {
             "reflex": (
                 "NVIDIA Reflex is more effective than driver Low Latency Mode. "
-                "Enable Reflex 'On + Boost' in-game. This preset leaves driver "
+                "Enable Reflex in-game; Boost is optional. This preset leaves driver "
                 "Low Latency Mode off because Reflex controls the render queue."
             ),
             "games": (

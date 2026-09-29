@@ -27,6 +27,7 @@ from abso.profiles.profile_bases import (
     ReflexShooterBaseProfile,
     fso_overrides,
     merge_settings_map,
+    preserve_baseline_system_policy,
 )
 
 if TYPE_CHECKING:
@@ -98,10 +99,10 @@ class _CounterStrike2BaseProfile(ReflexShooterBaseProfile):
 
     @property
     def fullscreen_optimizations_per_exe(self) -> dict[str, bool]:
-        # Every CS2 lane runs exclusive-style Fullscreen. Disable FSO per-exe
-        # so Windows cannot silently shunt the game into the composited
-        # borderless shim.
-        return fso_overrides(_CS2_EXECUTABLES)
+        # Allow Windows' optimized presentation path, including Fullscreen.
+        # A Fullscreen menu label alone does not prove exclusive presentation;
+        # no CS2 measurement here justifies disabling FSO.
+        return fso_overrides(_CS2_EXECUTABLES, disabled=False)
 
     @property
     def nvidia_profile_name(self) -> str | None:
@@ -132,11 +133,19 @@ class _CounterStrike2BaseProfile(ReflexShooterBaseProfile):
         # the file lives under a per-account Steam userdata path.
         return super().get_handlers()
 
+    def _base_settings(self) -> dict[str, dict[str, Any]]:
+        # Preserve the captured system policy rather than force unmeasured
+        # power, scheduler/MMCSS, NIC or GPU MSI tweaks for this game.
+        return preserve_baseline_system_policy(super()._base_settings())
+
     def _base_overrides(self) -> dict[str, dict[str, Any]]:
         return {
             "WindowsSettingsHandler": {
                 "hdr": False,
                 "auto_hdr": False,
+            },
+            "GraphicsSettingsHandler": {
+                "disable_global_fso": False,
             },
         }
 
@@ -152,7 +161,7 @@ class _CounterStrike2BaseProfile(ReflexShooterBaseProfile):
                 "category": "Video",
                 "setting": "Display Mode",
                 "value": "Fullscreen",
-                "reason": "No-sync lane: Fullscreen avoids the DWM compositor tax and keeps the Source 2 present path deterministic.",
+                "reason": "Use Fullscreen for this lane. Windows Fullscreen Optimizations remain available; actual presentation and latency need runtime measurement.",
             },
             {
                 "category": "Video",
@@ -163,14 +172,14 @@ class _CounterStrike2BaseProfile(ReflexShooterBaseProfile):
             {
                 "category": "Video",
                 "setting": "NVIDIA Reflex",
-                "value": "Enabled + Boost — set the in-game toggle manually; profile requests driver LLM Off",
-                "reason": "Applying this profile requests NVIDIA driver LLM Off for native Reflex queue control. ABSO leaves Source 2 video configuration user-owned; toggle 'NVIDIA Reflex' to 'Enabled + Boost' in CS2's Video settings. Boost may reduce FPS and increase power use; NVIDIA recommends it only when minimizing latency takes priority over FPS.",
+                "value": "Enabled; Enabled + Boost is optional (set manually)",
+                "reason": "In Settings > Video > Advanced Video, set NVIDIA Reflex Low Latency to Enabled. ABSO requests driver LLM Off and leaves CS2 settings user-owned. NVIDIA describes Boost as a possible latency reduction with extra power use and potentially lower FPS; compare on your setup before preferring it.",
             },
             {
                 "category": "Video",
                 "setting": "Maximum FPS in game (fps_max)",
                 "value": "0 (uncapped)",
-                "reason": "No-sync lane: higher uncapped FPS lowers frame time when the machine can sustain it. Cap if heat, noise, or pacing gets worse.",
+                "reason": "Optional uncapped starting point for the tearing-allowed lane. The driver limiter is Off. A sustainable manual cap may suit heat, noise or frame pacing better; uncapped FPS is not a smoothness guarantee.",
             },
             *self._shared_graphics_in_game_settings(),
         ]
@@ -189,20 +198,26 @@ class _CounterStrike2BaseProfile(ReflexShooterBaseProfile):
             {
                 "category": "Video",
                 "setting": "Wait for Vertical Sync",
-                "value": "Disabled (in-game)",
-                "reason": "Use NVCP VSync as the VRR safety net; keep the in-game toggle off.",
+                "value": "Enabled (in-game)",
+                "reason": "Valve recommends G-SYNC, VSync and NVIDIA Reflex together in CS2. Enable this native toggle manually; ABSO also requests driver VSync On. Check the game's NVIDIA G-Sync status row after launch, rather than assume a driver setting proves engagement.",
             },
             {
                 "category": "Video",
                 "setting": "NVIDIA Reflex",
-                "value": "Enabled + Boost — set the in-game toggle manually; profile requests driver LLM Off",
-                "reason": "Applying this profile requests NVIDIA driver LLM Off for native Reflex queue control. ABSO leaves Source 2 video configuration user-owned; toggle 'NVIDIA Reflex' to 'Enabled + Boost' in CS2's Video settings. Boost may reduce FPS and increase power use; NVIDIA recommends it only when minimizing latency takes priority over FPS.",
+                "value": "Enabled; Enabled + Boost is optional (set manually)",
+                "reason": "In Settings > Video > Advanced Video, set NVIDIA Reflex Low Latency to Enabled. ABSO requests driver LLM Off and leaves CS2 settings user-owned. Boost may reduce latency at the cost of power and FPS; neither choice is a measured optimum on this machine.",
             },
             {
                 "category": "Video",
                 "setting": "Maximum FPS in game (fps_max)",
-                "value": "0 (uncapped in-game; ABSO caps at the driver)",
-                "reason": "ABSO sets the NVCP limiter to refresh - 3 (Blur Busters G-SYNC 101 convention). Keeping fps_max at 0 leaves one deterministic limiter in the path and stops NVCP V-SYNC from engaging.",
+                "value": "0 (manual; driver refresh-minus-three ceiling remains)",
+                "reason": "ABSO retains a managed driver refresh - 3 ceiling (297 at 300 Hz) because it does not write or verify CS2's native limiter. With G-SYNC, VSync and Reflex enabled, Reflex may pace FPS lower. This fallback ceiling does not promise 297 FPS, prove VRR engagement, or establish a benefit from redundant limits.",
+            },
+            {
+                "category": "Video",
+                "setting": "NVIDIA G-Sync status",
+                "value": "Confirm enabled in CS2's Frame Pacing section",
+                "reason": "Valve exposes this status for the current display settings. It may be hidden with Vulkan or a non-NVIDIA GPU. ABSO's configured driver values do not verify live engagement; the profile assumes the Windows DX11 path.",
             },
             *self._shared_graphics_in_game_settings(),
         ]
@@ -213,20 +228,26 @@ class _CounterStrike2BaseProfile(ReflexShooterBaseProfile):
             {
                 "category": "Video",
                 "setting": "Multisampling Anti-Aliasing Mode",
-                "value": "CMAA2, or 2x-4x MSAA with GPU headroom",
-                "reason": "MSAA is CS2's main GPU cost lever; CMAA2 keeps the CPU-bound lane cheap while MSAA is affordable only when the GPU is not the bottleneck.",
+                "value": "CMAA2 starting point; compare 2x-4x MSAA for image quality",
+                "reason": "Anti-aliasing trades edge quality for rendering cost. Compare GPU frame time and visibility at your chosen resolution; no option is proven fastest and clearest for every scene.",
             },
             {
                 "category": "Video",
-                "setting": "Shader / Particle / Effect Detail",
-                "value": "Low",
-                "reason": "Smokes and utility fights are the most common source of frame-time spikes in CS2; competitive-low keeps the frame queue clean.",
+                "setting": "Shader Detail",
+                "value": "Low starting point",
+                "reason": "Valve describes higher shader detail as a visual-quality versus graphics-performance tradeoff. Compare representative scenes; Low does not guarantee fewer frame-time spikes.",
+            },
+            {
+                "category": "Video",
+                "setting": "Particle Detail",
+                "value": "Low starting point",
+                "reason": "Valve describes higher particle detail as more complex effects and particle shadows with possible graphics cost. Preserve a higher setting if its visual benefit is worth the measured cost.",
             },
             {
                 "category": "Video",
                 "setting": "Boost Player Contrast",
-                "value": "Enabled",
-                "reason": "Improves enemy visibility at negligible GPU cost.",
+                "value": "Enabled starting point for visibility",
+                "reason": "Valve says this improves player legibility in low-contrast situations and can degrade graphics performance. It is a visibility preference, not a free FPS improvement.",
             },
         ]
 
@@ -236,14 +257,13 @@ class _CounterStrike2BaseProfile(ReflexShooterBaseProfile):
             {
                 "category": "Display (Windows)",
                 "setting": "HDR",
-                "value": "On (set by this profile for desktop comfort)",
+                "value": "On (Windows policy; game HDR output unverified)",
                 "reason": (
-                    "Counter-Strike 2 has not shipped a native HDR toggle in the "
-                    "builds this profile was authored against. Windows HDR is on "
-                    "to keep the OS composition path consistent for OLED owners; "
-                    "the game itself renders SDR and is composited into the HDR "
-                    "surface. If CS2 ships an in-game HDR toggle later, enable "
-                    "it then - until then this is SDR-in-HDR composition."
+                    "This lane enables Windows HDR and disables Auto HDR. "
+                    "CS2's High Dynamic Range Quality/Performance setting is a "
+                    "rendering-quality choice; its name does not verify HDR "
+                    "display output. ABSO does not detect CS2's live output "
+                    "color space or claim this improves FPS or latency."
                 ),
             },
             {
@@ -252,8 +272,9 @@ class _CounterStrike2BaseProfile(ReflexShooterBaseProfile):
                 "value": "200 nits starting point; tune to taste",
                 "reason": (
                     "Settings > System > Display > HDR > SDR content brightness. "
-                    "This profile sets 200 nits as the OLED baseline. If the "
-                    "desktop reads dim, push it up to 240-280."
+                    "This profile sets a 200-nit preference; it is not panel "
+                    "calibration or a universal OLED target. Adjust to your "
+                    "display and viewing conditions."
                 ),
             },
         ]
@@ -265,22 +286,25 @@ class _CounterStrike2BaseProfile(ReflexShooterBaseProfile):
                 "category": "Display",
                 "setting": "HDR",
                 "value": "Off",
-                "reason": "Use this variant when you want the cleaner SDR path or do not have HDR active.",
+                "reason": "This variant requests Windows HDR Off. It is a display preference, not a measured latency advantage over the HDR lane.",
             },
             {
                 "category": "Display",
                 "setting": "Color Space",
                 "value": "SDR / default gamut",
-                "reason": "Matches the profile's sRGB clamp and avoids wide-gamut oversaturation in SDR.",
+                "reason": "The profile selects its sRGB ICC association and digital vibrance 45 preference. ICC association is not proof that CS2 applies a gamut transform, and vibrance is not an sRGB clamp; use display calibration for color accuracy.",
             },
         ]
 
     def get_post_apply_notes(self) -> list[str]:
+        gsync = self.requires_confirmed_vrr_support
+        vsync = "Enabled" if gsync else "Disabled"
         return [
             (
-                "Counter-Strike 2 manual: set NVIDIA Reflex to Enabled + Boost; "
-                "keep 'Wait for Vertical Sync' Disabled and Display Mode "
-                "Fullscreen."
+                "Counter-Strike 2 manual: set NVIDIA Reflex to Enabled "
+                "(Enabled + Boost is optional); keep 'Wait for Vertical Sync' "
+                f"{vsync} and Display Mode Fullscreen. ABSO does not write or "
+                "verify these native settings."
             )
         ]
 
@@ -300,8 +324,8 @@ class CounterStrike2Profile(_CounterStrike2BaseProfile):
     def description(self) -> str:
         return (
             "Latency-focused no-sync SDR Counter-Strike 2 profile (VSync OFF, "
-            "VRR OFF). Keeps driver LLM off for Reflex; enable Reflex "
-            "Enabled + Boost in-game."
+            "VRR OFF; tearing expected). Requests driver LLM Off; set native "
+            "Reflex Enabled, with Boost optional. Native settings are manual."
         )
 
     @property
@@ -333,15 +357,7 @@ class CounterStrike2Profile(_CounterStrike2BaseProfile):
 
 
 class CounterStrike2HDRProfile(_CounterStrike2BaseProfile):
-    """Counter-Strike 2 no-sync HDR profile (OS-level HDR for OLED / Mini-LED).
-
-    NOTE: CS2 has no native HDR toggle in the builds this profile was authored
-    against. This profile turns Windows HDR ON for desktop comfort while the
-    game itself renders SDR composited inside the HDR surface - same posture
-    as the Deadlock HDR siblings. If Valve ships native HDR later, the in-game
-    guidance points users at the toggle; until then this is functionally
-    SDR-in-HDR composition.
-    """
+    """No-sync profile that enables Windows HDR; game HDR output is unverified."""
 
     @property
     def profile_id(self) -> str:
@@ -355,9 +371,8 @@ class CounterStrike2HDRProfile(_CounterStrike2BaseProfile):
     def description(self) -> str:
         return (
             "Latency-focused no-sync Counter-Strike 2 profile with Windows HDR "
-            "on for OLED desktop comfort (VSync OFF, VRR OFF). CS2 currently "
-            "renders SDR; HDR is for the OS composition path, not the game. "
-            "Enable Reflex Enabled + Boost in-game."
+            "on (VSync OFF, VRR OFF; tearing expected). Game HDR output is "
+            "unverified. Set native Reflex Enabled, with Boost optional."
         )
 
     @property
@@ -370,14 +385,11 @@ class CounterStrike2HDRProfile(_CounterStrike2BaseProfile):
                 "hdr": True,
                 "advanced_color": True,  # Win11 24H2+ WCG pairing
                 "auto_hdr": False,
-                # Paper-white at 200 nits is the OLED / Mini-LED starting
-                # point. Driver installs reset this slider; asserting it
-                # here restores correct SDR-in-HDR tone-mapping.
+                # Existing SDR-white preference, not panel calibration.
                 "sdr_white_level_nits": 200,
             },
             "GraphicsSettingsHandler": {
-                # Keep ACM off so wide-gamut colors are not clamped to sRGB
-                # system-wide by Windows 11 24H2+ Auto Color Management.
+                # Retain this lane's existing color-management policy.
                 "disable_auto_color_management": True,
             },
             "NvidiaSettingsHandler": {
@@ -414,9 +426,9 @@ class CounterStrike2GSyncProfile(_CounterStrike2BaseProfile):
     @property
     def description(self) -> str:
         return (
-            "Tear-free low latency VRR SDR Counter-Strike 2 profile (VSync "
-            "safety net, G-SYNC ON). Keeps driver LLM off for Reflex; enable "
-            "Reflex Enabled + Boost in-game."
+            "Fullscreen G-SYNC SDR Counter-Strike 2 lane. Set native VSync "
+            "On and Reflex Enabled, with Boost optional. Driver refresh-minus-"
+            "three cap is a fallback ceiling; confirm G-SYNC in-game."
         )
 
     @property
@@ -448,16 +460,15 @@ class CounterStrike2GSyncProfile(_CounterStrike2BaseProfile):
             "NvidiaSettingsHandler": {
                 "preset": "reflex_gsync",
                 "profile_name": "Counter-Strike 2",
-                # Enforce VRR-safe cap automatically (refresh-3) so NVCP
-                # VSync stays a safety net and never engages.
+                # Managed fallback ceiling. Reflex can pace FPS lower; this
+                # does not prove runtime presentation or eliminate all stalls.
                 "auto_vrr_fps_cap": True,
-                # Fullscreen-only VRR matches the strict exclusive lane.
+                # Fullscreen-only VRR matches the native Fullscreen guidance.
                 "global_vrr_mode": "fullscreen_only",
             },
             "ColorProfileSettingsHandler": {
                 "icc_profile": "srgb",
-                # Slightly below neutral to compensate for DCI-P3
-                # oversaturation in SDR.
+                # Existing desaturation preference, not a gamut transform.
                 "digital_vibrance": 45,
                 "show_osd_guidance": True,
                 "game_type": "competitive_fps",
@@ -491,8 +502,8 @@ class CounterStrike2GSyncCaptureProfile(CounterStrike2GSyncProfile):
         return (
             "SDR G-SYNC lane on the borderless windowed path; preserves OBS, "
             "Medal, RTSS, and overlays and keeps game CPU/I/O priority at "
-            "Normal so capture is not starved. Enable Reflex Enabled + Boost "
-            "in-game."
+            "Normal. Set native VSync On and Reflex Enabled, with Boost "
+            "optional; capture performance still needs measurement."
         )
 
     @property
@@ -523,19 +534,15 @@ class CounterStrike2GSyncCaptureProfile(CounterStrike2GSyncProfile):
     def get_post_apply_notes(self) -> list[str]:
         return [
             "Counter-Strike 2 streaming manual: use Fullscreen Windowed, set "
-            "NVIDIA Reflex to Enabled + Boost, and keep Wait for Vertical Sync "
-            "Enabled in-game. OBS and overlay processes remain available."
+            "NVIDIA Reflex to Enabled (Enabled + Boost is optional), and keep "
+            "Wait for Vertical Sync Enabled in-game. Confirm G-SYNC in CS2; "
+            "ABSO does not write or verify native settings. OBS and overlay "
+            "processes remain available."
         ]
 
 
 class CounterStrike2GSyncHDRProfile(_CounterStrike2BaseProfile):
-    """Counter-Strike 2 G-SYNC profile with Windows HDR on (strict fullscreen-only VRR).
-
-    NOTE: Same caveat as CounterStrike2HDRProfile - CS2 has no native HDR
-    toggle. Windows HDR is on for OLED desktop comfort, the game itself
-    renders SDR composited inside HDR. Switch back to counter-strike-2-gsync
-    for the pure SDR lane if you don't want OS HDR on.
-    """
+    """Fullscreen G-SYNC with Windows HDR on; game HDR output is unverified."""
 
     @property
     def profile_id(self) -> str:
@@ -548,10 +555,9 @@ class CounterStrike2GSyncHDRProfile(_CounterStrike2BaseProfile):
     @property
     def description(self) -> str:
         return (
-            "Tear-free low latency VRR Counter-Strike 2 profile with Windows "
-            "HDR on for OLED desktop comfort (VSync safety net, G-SYNC ON). "
-            "CS2 currently renders SDR; HDR is for the OS composition path. "
-            "Enable Reflex Enabled + Boost in-game."
+            "Fullscreen G-SYNC Counter-Strike 2 lane with Windows HDR on; "
+            "game HDR output is unverified. Set native VSync On and Reflex "
+            "Enabled, with Boost optional; confirm G-SYNC in-game."
         )
 
     @property
@@ -615,7 +621,7 @@ class CounterStrike2GSyncHDRProfile(_CounterStrike2BaseProfile):
 class CounterStrike2GSyncHDRCaptureProfile(CounterStrike2GSyncHDRProfile):
     """Streaming-safe borderless sibling of the CS2 G-SYNC HDR lane.
 
-    Same VRR + Windows HDR composition contract as
+    Same VRR + Windows HDR policy as
     :class:`CounterStrike2GSyncHDRProfile`, with two deliberate differences:
 
     - The launch-time janitor keeps the capture / overlay / peripheral stack
@@ -626,7 +632,7 @@ class CounterStrike2GSyncHDRCaptureProfile(CounterStrike2GSyncHDRProfile):
       strict fullscreen-only path, because the overlay-free display-path gate
       is what would otherwise block apply while a recorder is running.
 
-    Game CPU and I/O priority stay at Normal so the recorder is not starved.
+    Game CPU and I/O priority stay at Normal. Capture performance is unmeasured.
     """
 
     @property
@@ -646,8 +652,8 @@ class CounterStrike2GSyncHDRCaptureProfile(CounterStrike2GSyncHDRProfile):
         return (
             "Windows HDR G-SYNC lane on the borderless windowed path; "
             "preserves OBS, Medal, RTSS, and overlays and keeps game CPU/I/O "
-            "priority at Normal so capture is not starved. Enable Reflex "
-            "Enabled + Boost in-game."
+            "priority at Normal. Set native VSync On and Reflex Enabled, with "
+            "Boost optional. Game HDR output and capture performance are unverified."
         )
 
     @property
@@ -668,9 +674,7 @@ class CounterStrike2GSyncHDRCaptureProfile(CounterStrike2GSyncHDRProfile):
 
     @property
     def fullscreen_optimizations_per_exe(self) -> dict[str, bool]:
-        # Borderless capture lane: clear any stale FSO-disable entry left by a
-        # prior strict CS2 apply so the composited flip path can engage
-        # instead of fighting an OS-level exclusive-fullscreen lock.
+        # Clear a stale FSO-disable entry left by an earlier CS2 profile.
         return fso_overrides(_CS2_EXECUTABLES, disabled=False)
 
     def _variant_overrides(self) -> dict[str, dict[str, Any]]:
@@ -686,9 +690,10 @@ class CounterStrike2GSyncHDRCaptureProfile(CounterStrike2GSyncHDRProfile):
         return [
             (
                 "Counter-Strike 2 streaming manual: use Fullscreen Windowed, "
-                "set NVIDIA Reflex to Enabled + Boost, and keep Wait for "
-                "Vertical Sync Enabled in-game. OBS and overlay processes remain "
-                "available."
+                "set NVIDIA Reflex to Enabled (Enabled + Boost is optional), "
+                "and keep Wait for Vertical Sync Enabled in-game. Confirm "
+                "G-SYNC in CS2; ABSO does not write or verify native settings. "
+                "OBS and overlay processes remain available."
             ),
             (
                 "Streaming color: default to SDR Streaming for an SDR destination. "

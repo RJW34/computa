@@ -50,11 +50,11 @@ def test_shared_profile_settings_are_isolated_between_calls() -> None:
     profile = Rivals2NoSyncProfile()
 
     first = profile.get_settings("RegistrySettingsHandler")
-    first["game_priority"]["priority"] = 1
+    first["fullscreen_optimizations"]["Rivals2-Win64-Shipping.exe"] = False
 
     second = profile.get_settings("RegistrySettingsHandler")
 
-    assert second["game_priority"]["priority"] == 6
+    assert second["fullscreen_optimizations"]["Rivals2-Win64-Shipping.exe"] is True
 
 
 def test_productivity_profile_settings_are_isolated_between_calls() -> None:

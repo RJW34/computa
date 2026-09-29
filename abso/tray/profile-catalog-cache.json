@@ -1185,7 +1185,7 @@
     {
       "id": "rivals2-nosync",
       "display_name": "Rivals 2 - No Sync",
-      "description": "Rollback-safe no-sync lane for online play and training",
+      "description": "No-sync lane with a bounded native FPS cap; tearing accepted",
       "optimization_target": "stable_online",
       "application_scope": "system_plus_native_config",
       "executables": [
@@ -1211,8 +1211,8 @@
       ],
       "has_in_game_settings": true,
       "tray_category": "Fighting",
-      "tray_subtitle": "No Sync SDR | LLM ON | Rollback-Safe",
-      "tray_description": "Rollback-safe Rivals 2 no-sync SDR lane for online play and training. VSync and VRR off, in-game cap on the 60 Hz sim grid (300 @ 300 Hz), exclusive fullscreen.",
+      "tray_subtitle": "No Sync SDR | LLM ON",
+      "tray_description": "Rivals 2 no-sync SDR lane. VSync and VRR off, with a bounded native cap (300 at 300 Hz) and fullscreen requested. Tearing is expected; this cap is a starting point, not a measured optimum.",
       "tray_group": "rivals2",
       "tray_group_name": "Rivals 2",
       "tray_variant": "No Sync (SDR)",
@@ -1339,7 +1339,7 @@
     {
       "id": "rivals2-nosync-hdr",
       "display_name": "Rivals 2 - No Sync HDR",
-      "description": "Rollback-safe no-sync Rivals 2 lane with Windows HDR composition. Keeps no-sync rollback stability; Rivals 2 native HDR output stays off.",
+      "description": "No-sync Rivals 2 lane with Windows HDR composition. Tearing is accepted; native game HDR output stays off.",
       "optimization_target": "stable_online",
       "application_scope": "system_plus_native_config",
       "executables": [
@@ -1365,8 +1365,8 @@
       ],
       "has_in_game_settings": true,
       "tray_category": "Fighting",
-      "tray_subtitle": "No Sync HDR | LLM ON | Rollback-Safe",
-      "tray_description": "Rollback-safe Rivals 2 no-sync lane with Windows HDR composition. Same no-sync timing contract as SDR; Rivals 2 currently advertises no native HDR support, so the game stays SDR inside the HDR desktop.",
+      "tray_subtitle": "No Sync HDR | LLM ON",
+      "tray_description": "Rivals 2 no-sync lane with Windows HDR composition. Same no-sync contract as SDR; native game HDR stays off. Windows HDR alone does not establish native HDR output.",
       "tray_group": "rivals2",
       "tray_group_name": "Rivals 2",
       "tray_variant": "No Sync (HDR)",
@@ -1493,7 +1493,7 @@
     {
       "id": "rivals2-gsync",
       "display_name": "Rivals 2 - G-SYNC",
-      "description": "Rollback-safe tear-free VRR lane (G-SYNC ON, VSync safety net)",
+      "description": "G-SYNC lane with VSync and a native FPS cap below refresh",
       "optimization_target": "stable_online_vrr",
       "application_scope": "system_plus_native_config",
       "executables": [
@@ -1519,8 +1519,8 @@
       ],
       "has_in_game_settings": true,
       "tray_category": "Fighting",
-      "tray_subtitle": "Strict SDR G-SYNC | LLM ON | VSync Safety Net | Rollback-Safe",
-      "tray_description": "Rollback-safe Rivals 2 strict fullscreen-only G-SYNC SDR lane for online play and training. Caps on the 60 Hz sim grid (largest multiple of 60 below refresh, e.g. 240 @ 300 Hz).",
+      "tray_subtitle": "Strict SDR G-SYNC | LLM ON | VSync Safety Net",
+      "tray_description": "Rivals 2 fullscreen-only G-SYNC SDR lane. Uses one native refresh-minus-three cap (297 at 300 Hz); driver Max Frame Rate is off. Confirm G-SYNC engagement and frame pacing in-game.",
       "tray_group": "rivals2",
       "tray_group_name": "Rivals 2",
       "tray_variant": "G-SYNC (SDR)",
@@ -1647,7 +1647,7 @@
     {
       "id": "rivals2-gsync-capture",
       "display_name": "Rivals 2 - G-SYNC SDR Streaming",
-      "description": "Rollback-safe SDR G-SYNC lane on the borderless windowed VRR path; preserves OBS, Medal, RTSS, and overlay processes and keeps game CPU/I/O priority at Normal so capture is not starved.",
+      "description": "SDR G-SYNC lane on the borderless windowed VRR path; preserves OBS, Medal, RTSS, and overlay processes and keeps game CPU/I/O priority at Normal; capture performance still needs measurement.",
       "optimization_target": "stable_online_vrr",
       "application_scope": "system_plus_native_config",
       "executables": [
@@ -1674,7 +1674,7 @@
       "has_in_game_settings": true,
       "tray_category": "Fighting",
       "tray_subtitle": "SDR Streaming | Borderless VRR | Keeps OBS/Medal/Overlays",
-      "tray_description": "Rollback-safe SDR G-SYNC on the borderless windowed VRR path. OBS, Medal, RTSS, and overlays remain available; game CPU/I/O priority stays Normal and OBS settings are left untouched.",
+      "tray_description": "SDR G-SYNC on the borderless VRR path with native VSync on. OBS, Medal, RTSS, and overlays remain available; game CPU/I/O priority stays Normal and OBS settings are left untouched.",
       "tray_group": "rivals2",
       "tray_group_name": "Rivals 2",
       "tray_variant": "Streaming G-SYNC (SDR)",
@@ -1784,7 +1784,7 @@
     {
       "id": "rivals2-gsync-hdr",
       "display_name": "Rivals 2 - G-SYNC HDR",
-      "description": "Rollback-safe G-SYNC Rivals 2 lane with Windows HDR composition. Keeps the strict VRR path; Rivals 2 native HDR output stays off.",
+      "description": "G-SYNC Rivals 2 lane with Windows HDR composition. Keeps the strict VRR path; Rivals 2 native HDR output stays off.",
       "optimization_target": "stable_online_vrr",
       "application_scope": "system_plus_native_config",
       "executables": [
@@ -1810,8 +1810,8 @@
       ],
       "has_in_game_settings": true,
       "tray_category": "Fighting",
-      "tray_subtitle": "Strict HDR G-SYNC | LLM ON | VSync Safety Net | Rollback-Safe",
-      "tray_description": "Rollback-safe Rivals 2 strict G-SYNC lane with Windows HDR composition. Rivals 2 currently advertises no native HDR support, so it stays SDR inside the HDR desktop.",
+      "tray_subtitle": "Strict HDR G-SYNC | LLM ON | VSync Safety Net",
+      "tray_description": "Rivals 2 fullscreen-only G-SYNC lane with Windows HDR composition and a native refresh-minus-three cap. Native game HDR stays off.",
       "tray_group": "rivals2",
       "tray_group_name": "Rivals 2",
       "tray_variant": "G-SYNC (HDR)",
@@ -1938,7 +1938,7 @@
     {
       "id": "rivals2-gsync-hdr-capture",
       "display_name": "Rivals 2 - G-SYNC HDR Streaming",
-      "description": "Rollback-safe G-SYNC Rivals 2 lane with Windows HDR composition on the borderless windowed VRR path; preserves OBS, Medal, RTSS, and overlay processes and keeps game CPU/I/O priority at Normal. Rivals 2 currently advertises no native HDR support, so native game HDR remains off.",
+      "description": "G-SYNC Rivals 2 lane with Windows HDR composition on the borderless windowed VRR path; preserves OBS, Medal, RTSS, and overlay processes and keeps game CPU/I/O priority at Normal. Native HDR support is not established; native game HDR remains off.",
       "optimization_target": "stable_online_vrr",
       "application_scope": "system_plus_native_config",
       "executables": [
@@ -1965,7 +1965,7 @@
       "has_in_game_settings": true,
       "tray_category": "Fighting",
       "tray_subtitle": "HDR Streaming | Borderless VRR | Keeps OBS/Medal/Overlays",
-      "tray_description": "Rollback-safe G-SYNC lane with Windows HDR composition on the borderless windowed VRR path. OBS, Medal, RTSS, and overlays remain available; game CPU/I/O priority stays Normal and OBS settings are left untouched. Rivals 2 native HDR remains off.",
+      "tray_description": "G-SYNC lane with native VSync on and Windows HDR composition on the borderless windowed VRR path. OBS, Medal, RTSS, and overlays remain available; game CPU/I/O priority stays Normal and OBS settings are left untouched. Rivals 2 native HDR remains off.",
       "tray_group": "rivals2",
       "tray_group_name": "Rivals 2",
       "tray_variant": "Streaming G-SYNC (HDR)",
@@ -2375,7 +2375,7 @@
     {
       "id": "fortnite",
       "display_name": "Fortnite - SDR",
-      "description": "Competitive SDR Fortnite profile with a no-sync latency path. Keeps driver LLM off for Reflex; enable Reflex On + Boost in-game.",
+      "description": "Competitive SDR Fortnite profile with a no-sync latency path. Keeps driver LLM off for Reflex; choose Reflex On or On + Boost in-game.",
       "optimization_target": "low_latency_high_fps",
       "application_scope": "system_plus_native_config",
       "executables": [
@@ -2406,7 +2406,7 @@
       "has_in_game_settings": true,
       "tray_category": "Shooters",
       "tray_subtitle": "SDR | Reflex (set in-game) | No Sync",
-      "tray_description": "Competitive SDR Fortnite profile with a no-sync latency path. Keeps driver LLM off for Reflex; enable Reflex On + Boost in-game.",
+      "tray_description": "Competitive SDR Fortnite profile with a no-sync latency path. Keeps driver LLM off for Reflex; choose Reflex On or On + Boost in-game.",
       "tray_group": "fortnite",
       "tray_group_name": "Fortnite",
       "tray_variant": "No Sync (SDR)",
@@ -2533,7 +2533,7 @@
     {
       "id": "fortnite-hdr",
       "display_name": "Fortnite - HDR",
-      "description": "Competitive Fortnite HDR profile with a no-sync latency path. Keeps driver LLM off for Reflex; enable Reflex On + Boost in-game.",
+      "description": "Windows HDR Fortnite profile with a no-sync latency path. Keeps driver LLM off for manual Reflex; native game HDR is unverified.",
       "optimization_target": "low_latency_high_fps",
       "application_scope": "system_plus_native_config",
       "executables": [
@@ -2563,8 +2563,8 @@
       ],
       "has_in_game_settings": true,
       "tray_category": "Shooters",
-      "tray_subtitle": "HDR ON | Reflex (set in-game) | No Sync",
-      "tray_description": "Competitive Fortnite HDR profile with a no-sync latency path. Keeps driver LLM off for Reflex; enable Reflex On + Boost in-game.",
+      "tray_subtitle": "Windows HDR | Reflex (set in-game) | No Sync",
+      "tray_description": "Windows HDR Fortnite profile with a no-sync latency path. Keeps driver LLM off for manual Reflex; native game HDR is unverified.",
       "tray_group": "fortnite",
       "tray_group_name": "Fortnite",
       "tray_variant": "No Sync (HDR)",
@@ -2691,7 +2691,7 @@
     {
       "id": "fortnite-gsync-hdr",
       "display_name": "Fortnite - GSYNC HDR",
-      "description": "Tear-free low-latency VRR Fortnite profile with native HDR (OLED / Mini-LED). G-SYNC ON + NVCP VSync safety net with a refresh - 3 cap; keeps driver LLM off for Reflex (enable Reflex On + Boost in-game).",
+      "description": "Windows HDR Fortnite G-SYNC lane with driver VSync and a refresh - 3 driver cap; native FPS is Unlimited. Choose Reflex On or On + Boost in-game. Native game HDR is unverified.",
       "optimization_target": "low_latency_high_fps",
       "application_scope": "system_plus_native_config",
       "executables": [
@@ -2721,8 +2721,8 @@
       ],
       "has_in_game_settings": true,
       "tray_category": "Shooters",
-      "tray_subtitle": "HDR ON | Reflex (set in-game) | G-SYNC ON",
-      "tray_description": "Tear-free low-latency VRR Fortnite with native HDR for OLED / Mini-LED. G-SYNC ON + NVCP VSync safety net at a refresh - 3 cap; enable Reflex On + Boost in-game.",
+      "tray_subtitle": "Windows HDR | Reflex (set in-game) | G-SYNC ON",
+      "tray_description": "Fortnite G-SYNC with Windows HDR composition, a driver refresh-minus-three cap, and native FPS limit Unlimited. Enable Reflex in-game; Boost is optional. Native HDR is not configured.",
       "tray_group": "fortnite",
       "tray_group_name": "Fortnite",
       "tray_variant": "G-SYNC (HDR)",
@@ -2849,7 +2849,7 @@
     {
       "id": "fortnite-gsync-capture",
       "display_name": "Fortnite - GSYNC SDR Streaming",
-      "description": "SDR capped G-SYNC lane on Fortnite's borderless path; preserves OBS, Medal, RTSS, and overlays and keeps game CPU/I/O priority at Normal. Uses in-game VSync and a driver cap; enable Reflex On + Boost manually.",
+      "description": "SDR capped G-SYNC lane on Fortnite's borderless path; preserves OBS, Medal, RTSS, and overlays and keeps game CPU/I/O priority at Normal. Uses in-game VSync and a driver cap; enable Reflex On or On + Boost manually.",
       "optimization_target": "low_latency_high_fps",
       "application_scope": "system_plus_native_config",
       "executables": [
@@ -2990,7 +2990,7 @@
     {
       "id": "fortnite-gsync-hdr-capture",
       "display_name": "Fortnite - GSYNC HDR Streaming",
-      "description": "Windows HDR G-SYNC lane on Fortnite's borderless path; preserves OBS, Medal, RTSS, and overlays and keeps game CPU/I/O priority at Normal. Uses in-game VSync and a driver cap; enable Reflex On + Boost manually. Native game HDR is unverified.",
+      "description": "Windows HDR G-SYNC lane on Fortnite's borderless path; preserves OBS, Medal, RTSS, and overlays and keeps game CPU/I/O priority at Normal. Uses in-game VSync and a driver cap; enable Reflex On or On + Boost manually. Native game HDR is unverified.",
       "optimization_target": "low_latency_high_fps",
       "application_scope": "system_plus_native_config",
       "executables": [
@@ -4063,7 +4063,7 @@
     {
       "id": "counter-strike-2",
       "display_name": "Counter-Strike 2 - No Sync SDR",
-      "description": "Latency-focused no-sync SDR Counter-Strike 2 profile (VSync OFF, VRR OFF). Keeps driver LLM off for Reflex; enable Reflex Enabled + Boost in-game.",
+      "description": "Latency-focused no-sync SDR Counter-Strike 2 profile (VSync OFF, VRR OFF; tearing expected). Requests driver LLM Off; set native Reflex Enabled, with Boost optional. Native settings are manual.",
       "optimization_target": "low_latency_high_fps",
       "application_scope": "system_only",
       "executables": [
@@ -4090,7 +4090,7 @@
       "has_in_game_settings": true,
       "tray_category": "Shooters",
       "tray_subtitle": "No Sync SDR | Reflex (set in-game) | VSync OFF | G-SYNC OFF",
-      "tray_description": "Minimum-latency no-sync Counter-Strike 2 profile. ABSO tunes the OS/driver path; enable Reflex Enabled + Boost manually in CS2's video settings.",
+      "tray_description": "No-sync Counter-Strike 2 profile. ABSO tunes the OS/driver path; enable Reflex manually in CS2's video settings. Boost is optional.",
       "tray_group": "counter-strike-2",
       "tray_group_name": "Counter-Strike 2",
       "tray_variant": "No Sync (SDR)",
@@ -4217,7 +4217,7 @@
     {
       "id": "counter-strike-2-hdr",
       "display_name": "Counter-Strike 2 - No Sync HDR",
-      "description": "Latency-focused no-sync Counter-Strike 2 profile with Windows HDR on for OLED desktop comfort (VSync OFF, VRR OFF). CS2 currently renders SDR; HDR is for the OS composition path, not the game. Enable Reflex Enabled + Boost in-game.",
+      "description": "Latency-focused no-sync Counter-Strike 2 profile with Windows HDR on (VSync OFF, VRR OFF; tearing expected). Game HDR output is unverified. Set native Reflex Enabled, with Boost optional.",
       "optimization_target": "low_latency_high_fps",
       "application_scope": "system_only",
       "executables": [
@@ -4244,7 +4244,7 @@
       "has_in_game_settings": true,
       "tray_category": "Shooters",
       "tray_subtitle": "No Sync HDR | Reflex (set in-game) | VSync OFF | G-SYNC OFF",
-      "tray_description": "Minimum-latency no-sync Counter-Strike 2 with Windows HDR on for OLED / Mini-LED. CS2 currently renders SDR through the HDR composition path.",
+      "tray_description": "No-sync Counter-Strike 2 with Windows HDR on for desktop composition. This does not establish native HDR output; the game's HDR Quality option is a separate rendering setting.",
       "tray_group": "counter-strike-2",
       "tray_group_name": "Counter-Strike 2",
       "tray_variant": "No Sync (HDR)",
@@ -4371,7 +4371,7 @@
     {
       "id": "counter-strike-2-gsync",
       "display_name": "Counter-Strike 2 - GSYNC SDR",
-      "description": "Tear-free low latency VRR SDR Counter-Strike 2 profile (VSync safety net, G-SYNC ON). Keeps driver LLM off for Reflex; enable Reflex Enabled + Boost in-game.",
+      "description": "Fullscreen G-SYNC SDR Counter-Strike 2 lane. Set native VSync On and Reflex Enabled, with Boost optional. Driver refresh-minus-three cap is a fallback ceiling; confirm G-SYNC in-game.",
       "optimization_target": "low_latency_high_fps",
       "application_scope": "system_only",
       "executables": [
@@ -4397,8 +4397,8 @@
       ],
       "has_in_game_settings": true,
       "tray_category": "Shooters",
-      "tray_subtitle": "Strict SDR Exclusive | Reflex (set in-game) | G-SYNC ON",
-      "tray_description": "Tear-free low-latency VRR Counter-Strike 2 profile on the strict fullscreen-only G-SYNC path. Enable Reflex Enabled + Boost manually in-game.",
+      "tray_subtitle": "Fullscreen SDR | Reflex (set in-game) | G-SYNC ON",
+      "tray_description": "Tear-free low-latency VRR Counter-Strike 2 profile on the strict fullscreen-only G-SYNC path. Enable native VSync and Reflex in-game; Boost is optional. Uses a driver refresh-minus-three cap.",
       "tray_group": "counter-strike-2",
       "tray_group_name": "Counter-Strike 2",
       "tray_variant": "G-SYNC (SDR)",
@@ -4525,7 +4525,7 @@
     {
       "id": "counter-strike-2-gsync-capture",
       "display_name": "Counter-Strike 2 - GSYNC SDR Streaming",
-      "description": "SDR G-SYNC lane on the borderless windowed path; preserves OBS, Medal, RTSS, and overlays and keeps game CPU/I/O priority at Normal so capture is not starved. Enable Reflex Enabled + Boost in-game.",
+      "description": "SDR G-SYNC lane on the borderless windowed path; preserves OBS, Medal, RTSS, and overlays and keeps game CPU/I/O priority at Normal. Set native VSync On and Reflex Enabled, with Boost optional; capture performance still needs measurement.",
       "optimization_target": "low_latency_high_fps",
       "application_scope": "system_only",
       "executables": [
@@ -4662,7 +4662,7 @@
     {
       "id": "counter-strike-2-gsync-hdr",
       "display_name": "Counter-Strike 2 - GSYNC HDR",
-      "description": "Tear-free low latency VRR Counter-Strike 2 profile with Windows HDR on for OLED desktop comfort (VSync safety net, G-SYNC ON). CS2 currently renders SDR; HDR is for the OS composition path. Enable Reflex Enabled + Boost in-game.",
+      "description": "Fullscreen G-SYNC Counter-Strike 2 lane with Windows HDR on; game HDR output is unverified. Set native VSync On and Reflex Enabled, with Boost optional; confirm G-SYNC in-game.",
       "optimization_target": "low_latency_high_fps",
       "application_scope": "system_only",
       "executables": [
@@ -4688,8 +4688,8 @@
       ],
       "has_in_game_settings": true,
       "tray_category": "Shooters",
-      "tray_subtitle": "Strict HDR Exclusive | Reflex (set in-game) | G-SYNC ON",
-      "tray_description": "Tear-free low-latency VRR Counter-Strike 2 with Windows HDR on for OLED / Mini-LED. CS2 currently renders SDR through the HDR composition path.",
+      "tray_subtitle": "Fullscreen Windows HDR | Reflex (set in-game) | G-SYNC ON",
+      "tray_description": "Tear-free low-latency VRR Counter-Strike 2 with Windows HDR on for desktop composition. Enable native VSync and Reflex in-game; native HDR display output is not configured.",
       "tray_group": "counter-strike-2",
       "tray_group_name": "Counter-Strike 2",
       "tray_variant": "G-SYNC (HDR)",
@@ -4816,7 +4816,7 @@
     {
       "id": "counter-strike-2-gsync-hdr-capture",
       "display_name": "Counter-Strike 2 - GSYNC HDR Streaming",
-      "description": "Windows HDR G-SYNC lane on the borderless windowed path; preserves OBS, Medal, RTSS, and overlays and keeps game CPU/I/O priority at Normal so capture is not starved. Enable Reflex Enabled + Boost in-game.",
+      "description": "Windows HDR G-SYNC lane on the borderless windowed path; preserves OBS, Medal, RTSS, and overlays and keeps game CPU/I/O priority at Normal. Set native VSync On and Reflex Enabled, with Boost optional. Game HDR output and capture performance are unverified.",
       "optimization_target": "low_latency_high_fps",
       "application_scope": "system_only",
       "executables": [

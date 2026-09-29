@@ -185,11 +185,10 @@ def get_reflex_gsync_fps_cap(refresh_rate: int | float) -> int:
 def get_fighting_60hz_vrr_cap(refresh_rate: int | float) -> int:
     """VRR cap for fixed-60Hz-sim games: largest multiple of 60 <= refresh - 3.
 
-    Keeps the cap below refresh so G-SYNC stays engaged and the NVCP V-SYNC
-    safety net never trips, while landing on the 60 Hz sim grid for an even
-    frames-per-tick cadence (240 @ 300 Hz, 180 @ 240 Hz, 120 @ 144 Hz).
-    Falls back to the generic ``refresh - 3`` cap when no multiple of 60
-    fits under the margin (i.e. 60 Hz panels).
+    Legacy heuristic retained for explicit custom policies, not proof of an
+    optimal render cadence. Simulation rate does not determine how an engine
+    interpolates rendered frames. Returns 240 @ 300 Hz, 180 @ 240 Hz and
+    120 @ 144 Hz, with a generic ``refresh - 3`` fallback when none fits.
     """
     rounded = round(float(refresh_rate))
     snapped = ((rounded - 3) // FIGHTING_SIM_RATE_HZ) * FIGHTING_SIM_RATE_HZ
@@ -201,10 +200,9 @@ def get_fighting_60hz_vrr_cap(refresh_rate: int | float) -> int:
 def get_fighting_60hz_nosync_cap(refresh_rate: int | float) -> int:
     """No-sync cap for fixed-60Hz-sim games: largest multiple of 60 <= refresh.
 
-    Without G-SYNC/V-SYNC in the path there is no below-refresh margin to
-    protect; the cap exists to hold the 60 Hz sim-grid cadence and keep
-    render load bounded (preserving CPU headroom for rollback
-    resimulation bursts) instead of rendering unbounded duplicate frames.
+    Legacy bounded-load heuristic. It does not establish better rollback,
+    frame pacing or latency than other caps; those require game-specific
+    measurements. No below-refresh VRR margin is requested by this policy.
     """
     rounded = round(float(refresh_rate))
     snapped = (rounded // FIGHTING_SIM_RATE_HZ) * FIGHTING_SIM_RATE_HZ

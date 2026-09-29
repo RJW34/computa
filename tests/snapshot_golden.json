@@ -25,19 +25,19 @@
     "in_game_settings": [
       {
         "category": "Display",
-        "reason": "Use this variant when you want the cleaner SDR path or do not have HDR active.",
+        "reason": "This variant requests Windows HDR Off. It is a display preference, not a measured latency advantage over the HDR lane.",
         "setting": "HDR",
         "value": "Off"
       },
       {
         "category": "Display",
-        "reason": "Matches the profile's sRGB clamp and avoids wide-gamut oversaturation in SDR.",
+        "reason": "The profile selects its sRGB ICC association and digital vibrance 45 preference. ICC association is not proof that CS2 applies a gamut transform, and vibrance is not an sRGB clamp; use display calibration for color accuracy.",
         "setting": "Color Space",
         "value": "SDR / default gamut"
       },
       {
         "category": "Video",
-        "reason": "No-sync lane: Fullscreen avoids the DWM compositor tax and keeps the Source 2 present path deterministic.",
+        "reason": "Use Fullscreen for this lane. Windows Fullscreen Optimizations remain available; actual presentation and latency need runtime measurement.",
         "setting": "Display Mode",
         "value": "Fullscreen"
       },
@@ -49,33 +49,39 @@
       },
       {
         "category": "Video",
-        "reason": "Applying this profile requests NVIDIA driver LLM Off for native Reflex queue control. ABSO leaves Source 2 video configuration user-owned; toggle 'NVIDIA Reflex' to 'Enabled + Boost' in CS2's Video settings. Boost may reduce FPS and increase power use; NVIDIA recommends it only when minimizing latency takes priority over FPS.",
+        "reason": "In Settings > Video > Advanced Video, set NVIDIA Reflex Low Latency to Enabled. ABSO requests driver LLM Off and leaves CS2 settings user-owned. NVIDIA describes Boost as a possible latency reduction with extra power use and potentially lower FPS; compare on your setup before preferring it.",
         "setting": "NVIDIA Reflex",
-        "value": "Enabled + Boost \u2014 set the in-game toggle manually; profile requests driver LLM Off"
+        "value": "Enabled; Enabled + Boost is optional (set manually)"
       },
       {
         "category": "Video",
-        "reason": "No-sync lane: higher uncapped FPS lowers frame time when the machine can sustain it. Cap if heat, noise, or pacing gets worse.",
+        "reason": "Optional uncapped starting point for the tearing-allowed lane. The driver limiter is Off. A sustainable manual cap may suit heat, noise or frame pacing better; uncapped FPS is not a smoothness guarantee.",
         "setting": "Maximum FPS in game (fps_max)",
         "value": "0 (uncapped)"
       },
       {
         "category": "Video",
-        "reason": "MSAA is CS2's main GPU cost lever; CMAA2 keeps the CPU-bound lane cheap while MSAA is affordable only when the GPU is not the bottleneck.",
+        "reason": "Anti-aliasing trades edge quality for rendering cost. Compare GPU frame time and visibility at your chosen resolution; no option is proven fastest and clearest for every scene.",
         "setting": "Multisampling Anti-Aliasing Mode",
-        "value": "CMAA2, or 2x-4x MSAA with GPU headroom"
+        "value": "CMAA2 starting point; compare 2x-4x MSAA for image quality"
       },
       {
         "category": "Video",
-        "reason": "Smokes and utility fights are the most common source of frame-time spikes in CS2; competitive-low keeps the frame queue clean.",
-        "setting": "Shader / Particle / Effect Detail",
-        "value": "Low"
+        "reason": "Valve describes higher shader detail as a visual-quality versus graphics-performance tradeoff. Compare representative scenes; Low does not guarantee fewer frame-time spikes.",
+        "setting": "Shader Detail",
+        "value": "Low starting point"
       },
       {
         "category": "Video",
-        "reason": "Improves enemy visibility at negligible GPU cost.",
+        "reason": "Valve describes higher particle detail as more complex effects and particle shadows with possible graphics cost. Preserve a higher setting if its visual benefit is worth the measured cost.",
+        "setting": "Particle Detail",
+        "value": "Low starting point"
+      },
+      {
+        "category": "Video",
+        "reason": "Valve says this improves player legibility in low-contrast situations and can degrade graphics performance. It is a visibility preference, not a free FPS improvement.",
         "setting": "Boost Player Contrast",
-        "value": "Enabled"
+        "value": "Enabled starting point for visibility"
       }
     ],
     "include_legacy_tweaks": false,
@@ -112,10 +118,10 @@
         "hard_disable": true
       },
       "GraphicsSettingsHandler": {
-        "disable_global_fso": true
+        "disable_global_fso": false
       },
       "InterruptModeHandler": {
-        "enable_msi": true
+        "enable_msi": false
       },
       "MouseSettingsHandler": {
         "disable_acceleration": true,
@@ -127,7 +133,7 @@
         "preset": "default"
       },
       "NicDriverHandler": {
-        "nic_tuning": true
+        "nic_tuning": false
       },
       "NvidiaSettingsHandler": {
         "global_vrr_mode": "off",
@@ -140,28 +146,15 @@
         ],
         "profile_name": "Counter-Strike 2"
       },
-      "PowerSettingsHandler": {
-        "active_plan": "ultimate_performance",
-        "disable_core_parking": true,
-        "disable_pcie_power_saving": true,
-        "disable_usb_suspend": true,
-        "ensure_ultimate_performance": true,
-        "processor_max_performance": true,
-        "processor_min_state": 100
-      },
+      "PowerSettingsHandler": {},
       "ProcessPriorityHandler": {
         "cpu_priority": 3,
         "io_priority": 3
       },
       "RegistrySettingsHandler": {
         "fullscreen_optimizations": {
-          "cs2.exe": true
-        },
-        "game_priority": {
-          "priority": 6,
-          "scheduling_category": "High"
-        },
-        "win32_priority_separation": 42
+          "cs2.exe": false
+        }
       },
       "WindowsSettingsHandler": {
         "auto_hdr": false,
@@ -202,13 +195,13 @@
     "in_game_settings": [
       {
         "category": "Display",
-        "reason": "Use this variant when you want the cleaner SDR path or do not have HDR active.",
+        "reason": "This variant requests Windows HDR Off. It is a display preference, not a measured latency advantage over the HDR lane.",
         "setting": "HDR",
         "value": "Off"
       },
       {
         "category": "Display",
-        "reason": "Matches the profile's sRGB clamp and avoids wide-gamut oversaturation in SDR.",
+        "reason": "The profile selects its sRGB ICC association and digital vibrance 45 preference. ICC association is not proof that CS2 applies a gamut transform, and vibrance is not an sRGB clamp; use display calibration for color accuracy.",
         "setting": "Color Space",
         "value": "SDR / default gamut"
       },
@@ -220,39 +213,51 @@
       },
       {
         "category": "Video",
-        "reason": "Use NVCP VSync as the VRR safety net; keep the in-game toggle off.",
+        "reason": "Valve recommends G-SYNC, VSync and NVIDIA Reflex together in CS2. Enable this native toggle manually; ABSO also requests driver VSync On. Check the game's NVIDIA G-Sync status row after launch, rather than assume a driver setting proves engagement.",
         "setting": "Wait for Vertical Sync",
-        "value": "Disabled (in-game)"
+        "value": "Enabled (in-game)"
       },
       {
         "category": "Video",
-        "reason": "Applying this profile requests NVIDIA driver LLM Off for native Reflex queue control. ABSO leaves Source 2 video configuration user-owned; toggle 'NVIDIA Reflex' to 'Enabled + Boost' in CS2's Video settings. Boost may reduce FPS and increase power use; NVIDIA recommends it only when minimizing latency takes priority over FPS.",
+        "reason": "In Settings > Video > Advanced Video, set NVIDIA Reflex Low Latency to Enabled. ABSO requests driver LLM Off and leaves CS2 settings user-owned. Boost may reduce latency at the cost of power and FPS; neither choice is a measured optimum on this machine.",
         "setting": "NVIDIA Reflex",
-        "value": "Enabled + Boost \u2014 set the in-game toggle manually; profile requests driver LLM Off"
+        "value": "Enabled; Enabled + Boost is optional (set manually)"
       },
       {
         "category": "Video",
-        "reason": "ABSO sets the NVCP limiter to refresh - 3 (Blur Busters G-SYNC 101 convention). Keeping fps_max at 0 leaves one deterministic limiter in the path and stops NVCP V-SYNC from engaging.",
+        "reason": "ABSO retains a managed driver refresh - 3 ceiling (297 at 300 Hz) because it does not write or verify CS2's native limiter. With G-SYNC, VSync and Reflex enabled, Reflex may pace FPS lower. This fallback ceiling does not promise 297 FPS, prove VRR engagement, or establish a benefit from redundant limits.",
         "setting": "Maximum FPS in game (fps_max)",
-        "value": "0 (uncapped in-game; ABSO caps at the driver)"
+        "value": "0 (manual; driver refresh-minus-three ceiling remains)"
       },
       {
         "category": "Video",
-        "reason": "MSAA is CS2's main GPU cost lever; CMAA2 keeps the CPU-bound lane cheap while MSAA is affordable only when the GPU is not the bottleneck.",
+        "reason": "Valve exposes this status for the current display settings. It may be hidden with Vulkan or a non-NVIDIA GPU. ABSO's configured driver values do not verify live engagement; the profile assumes the Windows DX11 path.",
+        "setting": "NVIDIA G-Sync status",
+        "value": "Confirm enabled in CS2's Frame Pacing section"
+      },
+      {
+        "category": "Video",
+        "reason": "Anti-aliasing trades edge quality for rendering cost. Compare GPU frame time and visibility at your chosen resolution; no option is proven fastest and clearest for every scene.",
         "setting": "Multisampling Anti-Aliasing Mode",
-        "value": "CMAA2, or 2x-4x MSAA with GPU headroom"
+        "value": "CMAA2 starting point; compare 2x-4x MSAA for image quality"
       },
       {
         "category": "Video",
-        "reason": "Smokes and utility fights are the most common source of frame-time spikes in CS2; competitive-low keeps the frame queue clean.",
-        "setting": "Shader / Particle / Effect Detail",
-        "value": "Low"
+        "reason": "Valve describes higher shader detail as a visual-quality versus graphics-performance tradeoff. Compare representative scenes; Low does not guarantee fewer frame-time spikes.",
+        "setting": "Shader Detail",
+        "value": "Low starting point"
       },
       {
         "category": "Video",
-        "reason": "Improves enemy visibility at negligible GPU cost.",
+        "reason": "Valve describes higher particle detail as more complex effects and particle shadows with possible graphics cost. Preserve a higher setting if its visual benefit is worth the measured cost.",
+        "setting": "Particle Detail",
+        "value": "Low starting point"
+      },
+      {
+        "category": "Video",
+        "reason": "Valve says this improves player legibility in low-contrast situations and can degrade graphics performance. It is a visibility preference, not a free FPS improvement.",
         "setting": "Boost Player Contrast",
-        "value": "Enabled"
+        "value": "Enabled starting point for visibility"
       }
     ],
     "include_legacy_tweaks": false,
@@ -289,10 +294,10 @@
         "hard_disable": true
       },
       "GraphicsSettingsHandler": {
-        "disable_global_fso": true
+        "disable_global_fso": false
       },
       "InterruptModeHandler": {
-        "enable_msi": true
+        "enable_msi": false
       },
       "MouseSettingsHandler": {
         "disable_acceleration": true,
@@ -304,7 +309,7 @@
         "preset": "default"
       },
       "NicDriverHandler": {
-        "nic_tuning": true
+        "nic_tuning": false
       },
       "NvidiaSettingsHandler": {
         "auto_vrr_fps_cap": true,
@@ -318,28 +323,15 @@
         ],
         "profile_name": "Counter-Strike 2"
       },
-      "PowerSettingsHandler": {
-        "active_plan": "ultimate_performance",
-        "disable_core_parking": true,
-        "disable_pcie_power_saving": true,
-        "disable_usb_suspend": true,
-        "ensure_ultimate_performance": true,
-        "processor_max_performance": true,
-        "processor_min_state": 100
-      },
+      "PowerSettingsHandler": {},
       "ProcessPriorityHandler": {
         "cpu_priority": 3,
         "io_priority": 3
       },
       "RegistrySettingsHandler": {
         "fullscreen_optimizations": {
-          "cs2.exe": true
-        },
-        "game_priority": {
-          "priority": 6,
-          "scheduling_category": "High"
-        },
-        "win32_priority_separation": 42
+          "cs2.exe": false
+        }
       },
       "WindowsSettingsHandler": {
         "auto_hdr": false,
@@ -380,13 +372,13 @@
     "in_game_settings": [
       {
         "category": "Display",
-        "reason": "Use this variant when you want the cleaner SDR path or do not have HDR active.",
+        "reason": "This variant requests Windows HDR Off. It is a display preference, not a measured latency advantage over the HDR lane.",
         "setting": "HDR",
         "value": "Off"
       },
       {
         "category": "Display",
-        "reason": "Matches the profile's sRGB clamp and avoids wide-gamut oversaturation in SDR.",
+        "reason": "The profile selects its sRGB ICC association and digital vibrance 45 preference. ICC association is not proof that CS2 applies a gamut transform, and vibrance is not an sRGB clamp; use display calibration for color accuracy.",
         "setting": "Color Space",
         "value": "SDR / default gamut"
       },
@@ -404,33 +396,45 @@
       },
       {
         "category": "Video",
-        "reason": "Applying this profile requests NVIDIA driver LLM Off for native Reflex queue control. ABSO leaves Source 2 video configuration user-owned; toggle 'NVIDIA Reflex' to 'Enabled + Boost' in CS2's Video settings. Boost may reduce FPS and increase power use; NVIDIA recommends it only when minimizing latency takes priority over FPS.",
+        "reason": "In Settings > Video > Advanced Video, set NVIDIA Reflex Low Latency to Enabled. ABSO requests driver LLM Off and leaves CS2 settings user-owned. Boost may reduce latency at the cost of power and FPS; neither choice is a measured optimum on this machine.",
         "setting": "NVIDIA Reflex",
-        "value": "Enabled + Boost \u2014 set the in-game toggle manually; profile requests driver LLM Off"
+        "value": "Enabled; Enabled + Boost is optional (set manually)"
       },
       {
         "category": "Video",
-        "reason": "ABSO sets the NVCP limiter to refresh - 3 (Blur Busters G-SYNC 101 convention). Keeping fps_max at 0 leaves one deterministic limiter in the path and stops NVCP V-SYNC from engaging.",
+        "reason": "ABSO retains a managed driver refresh - 3 ceiling (297 at 300 Hz) because it does not write or verify CS2's native limiter. With G-SYNC, VSync and Reflex enabled, Reflex may pace FPS lower. This fallback ceiling does not promise 297 FPS, prove VRR engagement, or establish a benefit from redundant limits.",
         "setting": "Maximum FPS in game (fps_max)",
-        "value": "0 (uncapped in-game; ABSO caps at the driver)"
+        "value": "0 (manual; driver refresh-minus-three ceiling remains)"
       },
       {
         "category": "Video",
-        "reason": "MSAA is CS2's main GPU cost lever; CMAA2 keeps the CPU-bound lane cheap while MSAA is affordable only when the GPU is not the bottleneck.",
+        "reason": "Valve exposes this status for the current display settings. It may be hidden with Vulkan or a non-NVIDIA GPU. ABSO's configured driver values do not verify live engagement; the profile assumes the Windows DX11 path.",
+        "setting": "NVIDIA G-Sync status",
+        "value": "Confirm enabled in CS2's Frame Pacing section"
+      },
+      {
+        "category": "Video",
+        "reason": "Anti-aliasing trades edge quality for rendering cost. Compare GPU frame time and visibility at your chosen resolution; no option is proven fastest and clearest for every scene.",
         "setting": "Multisampling Anti-Aliasing Mode",
-        "value": "CMAA2, or 2x-4x MSAA with GPU headroom"
+        "value": "CMAA2 starting point; compare 2x-4x MSAA for image quality"
       },
       {
         "category": "Video",
-        "reason": "Smokes and utility fights are the most common source of frame-time spikes in CS2; competitive-low keeps the frame queue clean.",
-        "setting": "Shader / Particle / Effect Detail",
-        "value": "Low"
+        "reason": "Valve describes higher shader detail as a visual-quality versus graphics-performance tradeoff. Compare representative scenes; Low does not guarantee fewer frame-time spikes.",
+        "setting": "Shader Detail",
+        "value": "Low starting point"
       },
       {
         "category": "Video",
-        "reason": "Improves enemy visibility at negligible GPU cost.",
+        "reason": "Valve describes higher particle detail as more complex effects and particle shadows with possible graphics cost. Preserve a higher setting if its visual benefit is worth the measured cost.",
+        "setting": "Particle Detail",
+        "value": "Low starting point"
+      },
+      {
+        "category": "Video",
+        "reason": "Valve says this improves player legibility in low-contrast situations and can degrade graphics performance. It is a visibility preference, not a free FPS improvement.",
         "setting": "Boost Player Contrast",
-        "value": "Enabled"
+        "value": "Enabled starting point for visibility"
       }
     ],
     "include_legacy_tweaks": false,
@@ -470,7 +474,7 @@
         "disable_global_fso": false
       },
       "InterruptModeHandler": {
-        "enable_msi": true
+        "enable_msi": false
       },
       "MouseSettingsHandler": {
         "disable_acceleration": true,
@@ -482,7 +486,7 @@
         "preset": "default"
       },
       "NicDriverHandler": {
-        "nic_tuning": true
+        "nic_tuning": false
       },
       "NvidiaSettingsHandler": {
         "auto_vrr_fps_cap": true,
@@ -496,15 +500,7 @@
         ],
         "profile_name": "Counter-Strike 2"
       },
-      "PowerSettingsHandler": {
-        "active_plan": "ultimate_performance",
-        "disable_core_parking": true,
-        "disable_pcie_power_saving": true,
-        "disable_usb_suspend": true,
-        "ensure_ultimate_performance": true,
-        "processor_max_performance": true,
-        "processor_min_state": 100
-      },
+      "PowerSettingsHandler": {},
       "ProcessPriorityHandler": {
         "cpu_priority": 2,
         "io_priority": 2
@@ -512,12 +508,7 @@
       "RegistrySettingsHandler": {
         "fullscreen_optimizations": {
           "cs2.exe": false
-        },
-        "game_priority": {
-          "priority": 6,
-          "scheduling_category": "High"
-        },
-        "win32_priority_separation": 42
+        }
       },
       "WindowsSettingsHandler": {
         "auto_hdr": false,
@@ -558,13 +549,13 @@
     "in_game_settings": [
       {
         "category": "Display (Windows)",
-        "reason": "Counter-Strike 2 has not shipped a native HDR toggle in the builds this profile was authored against. Windows HDR is on to keep the OS composition path consistent for OLED owners; the game itself renders SDR and is composited into the HDR surface. If CS2 ships an in-game HDR toggle later, enable it then - until then this is SDR-in-HDR composition.",
+        "reason": "This lane enables Windows HDR and disables Auto HDR. CS2's High Dynamic Range Quality/Performance setting is a rendering-quality choice; its name does not verify HDR display output. ABSO does not detect CS2's live output color space or claim this improves FPS or latency.",
         "setting": "HDR",
-        "value": "On (set by this profile for desktop comfort)"
+        "value": "On (Windows policy; game HDR output unverified)"
       },
       {
         "category": "Display (Windows)",
-        "reason": "Settings > System > Display > HDR > SDR content brightness. This profile sets 200 nits as the OLED baseline. If the desktop reads dim, push it up to 240-280.",
+        "reason": "Settings > System > Display > HDR > SDR content brightness. This profile sets a 200-nit preference; it is not panel calibration or a universal OLED target. Adjust to your display and viewing conditions.",
         "setting": "SDR content brightness",
         "value": "200 nits starting point; tune to taste"
       },
@@ -576,39 +567,51 @@
       },
       {
         "category": "Video",
-        "reason": "Use NVCP VSync as the VRR safety net; keep the in-game toggle off.",
+        "reason": "Valve recommends G-SYNC, VSync and NVIDIA Reflex together in CS2. Enable this native toggle manually; ABSO also requests driver VSync On. Check the game's NVIDIA G-Sync status row after launch, rather than assume a driver setting proves engagement.",
         "setting": "Wait for Vertical Sync",
-        "value": "Disabled (in-game)"
+        "value": "Enabled (in-game)"
       },
       {
         "category": "Video",
-        "reason": "Applying this profile requests NVIDIA driver LLM Off for native Reflex queue control. ABSO leaves Source 2 video configuration user-owned; toggle 'NVIDIA Reflex' to 'Enabled + Boost' in CS2's Video settings. Boost may reduce FPS and increase power use; NVIDIA recommends it only when minimizing latency takes priority over FPS.",
+        "reason": "In Settings > Video > Advanced Video, set NVIDIA Reflex Low Latency to Enabled. ABSO requests driver LLM Off and leaves CS2 settings user-owned. Boost may reduce latency at the cost of power and FPS; neither choice is a measured optimum on this machine.",
         "setting": "NVIDIA Reflex",
-        "value": "Enabled + Boost \u2014 set the in-game toggle manually; profile requests driver LLM Off"
+        "value": "Enabled; Enabled + Boost is optional (set manually)"
       },
       {
         "category": "Video",
-        "reason": "ABSO sets the NVCP limiter to refresh - 3 (Blur Busters G-SYNC 101 convention). Keeping fps_max at 0 leaves one deterministic limiter in the path and stops NVCP V-SYNC from engaging.",
+        "reason": "ABSO retains a managed driver refresh - 3 ceiling (297 at 300 Hz) because it does not write or verify CS2's native limiter. With G-SYNC, VSync and Reflex enabled, Reflex may pace FPS lower. This fallback ceiling does not promise 297 FPS, prove VRR engagement, or establish a benefit from redundant limits.",
         "setting": "Maximum FPS in game (fps_max)",
-        "value": "0 (uncapped in-game; ABSO caps at the driver)"
+        "value": "0 (manual; driver refresh-minus-three ceiling remains)"
       },
       {
         "category": "Video",
-        "reason": "MSAA is CS2's main GPU cost lever; CMAA2 keeps the CPU-bound lane cheap while MSAA is affordable only when the GPU is not the bottleneck.",
+        "reason": "Valve exposes this status for the current display settings. It may be hidden with Vulkan or a non-NVIDIA GPU. ABSO's configured driver values do not verify live engagement; the profile assumes the Windows DX11 path.",
+        "setting": "NVIDIA G-Sync status",
+        "value": "Confirm enabled in CS2's Frame Pacing section"
+      },
+      {
+        "category": "Video",
+        "reason": "Anti-aliasing trades edge quality for rendering cost. Compare GPU frame time and visibility at your chosen resolution; no option is proven fastest and clearest for every scene.",
         "setting": "Multisampling Anti-Aliasing Mode",
-        "value": "CMAA2, or 2x-4x MSAA with GPU headroom"
+        "value": "CMAA2 starting point; compare 2x-4x MSAA for image quality"
       },
       {
         "category": "Video",
-        "reason": "Smokes and utility fights are the most common source of frame-time spikes in CS2; competitive-low keeps the frame queue clean.",
-        "setting": "Shader / Particle / Effect Detail",
-        "value": "Low"
+        "reason": "Valve describes higher shader detail as a visual-quality versus graphics-performance tradeoff. Compare representative scenes; Low does not guarantee fewer frame-time spikes.",
+        "setting": "Shader Detail",
+        "value": "Low starting point"
       },
       {
         "category": "Video",
-        "reason": "Improves enemy visibility at negligible GPU cost.",
+        "reason": "Valve describes higher particle detail as more complex effects and particle shadows with possible graphics cost. Preserve a higher setting if its visual benefit is worth the measured cost.",
+        "setting": "Particle Detail",
+        "value": "Low starting point"
+      },
+      {
+        "category": "Video",
+        "reason": "Valve says this improves player legibility in low-contrast situations and can degrade graphics performance. It is a visibility preference, not a free FPS improvement.",
         "setting": "Boost Player Contrast",
-        "value": "Enabled"
+        "value": "Enabled starting point for visibility"
       }
     ],
     "include_legacy_tweaks": false,
@@ -646,10 +649,10 @@
       },
       "GraphicsSettingsHandler": {
         "disable_auto_color_management": true,
-        "disable_global_fso": true
+        "disable_global_fso": false
       },
       "InterruptModeHandler": {
-        "enable_msi": true
+        "enable_msi": false
       },
       "MouseSettingsHandler": {
         "disable_acceleration": true,
@@ -661,7 +664,7 @@
         "preset": "default"
       },
       "NicDriverHandler": {
-        "nic_tuning": true
+        "nic_tuning": false
       },
       "NvidiaSettingsHandler": {
         "auto_vrr_fps_cap": true,
@@ -675,28 +678,15 @@
         ],
         "profile_name": "Counter-Strike 2"
       },
-      "PowerSettingsHandler": {
-        "active_plan": "ultimate_performance",
-        "disable_core_parking": true,
-        "disable_pcie_power_saving": true,
-        "disable_usb_suspend": true,
-        "ensure_ultimate_performance": true,
-        "processor_max_performance": true,
-        "processor_min_state": 100
-      },
+      "PowerSettingsHandler": {},
       "ProcessPriorityHandler": {
         "cpu_priority": 3,
         "io_priority": 3
       },
       "RegistrySettingsHandler": {
         "fullscreen_optimizations": {
-          "cs2.exe": true
-        },
-        "game_priority": {
-          "priority": 6,
-          "scheduling_category": "High"
-        },
-        "win32_priority_separation": 42
+          "cs2.exe": false
+        }
       },
       "WindowsSettingsHandler": {
         "advanced_color": true,
@@ -739,13 +729,13 @@
     "in_game_settings": [
       {
         "category": "Display (Windows)",
-        "reason": "Counter-Strike 2 has not shipped a native HDR toggle in the builds this profile was authored against. Windows HDR is on to keep the OS composition path consistent for OLED owners; the game itself renders SDR and is composited into the HDR surface. If CS2 ships an in-game HDR toggle later, enable it then - until then this is SDR-in-HDR composition.",
+        "reason": "This lane enables Windows HDR and disables Auto HDR. CS2's High Dynamic Range Quality/Performance setting is a rendering-quality choice; its name does not verify HDR display output. ABSO does not detect CS2's live output color space or claim this improves FPS or latency.",
         "setting": "HDR",
-        "value": "On (set by this profile for desktop comfort)"
+        "value": "On (Windows policy; game HDR output unverified)"
       },
       {
         "category": "Display (Windows)",
-        "reason": "Settings > System > Display > HDR > SDR content brightness. This profile sets 200 nits as the OLED baseline. If the desktop reads dim, push it up to 240-280.",
+        "reason": "Settings > System > Display > HDR > SDR content brightness. This profile sets a 200-nit preference; it is not panel calibration or a universal OLED target. Adjust to your display and viewing conditions.",
         "setting": "SDR content brightness",
         "value": "200 nits starting point; tune to taste"
       },
@@ -763,33 +753,45 @@
       },
       {
         "category": "Video",
-        "reason": "Applying this profile requests NVIDIA driver LLM Off for native Reflex queue control. ABSO leaves Source 2 video configuration user-owned; toggle 'NVIDIA Reflex' to 'Enabled + Boost' in CS2's Video settings. Boost may reduce FPS and increase power use; NVIDIA recommends it only when minimizing latency takes priority over FPS.",
+        "reason": "In Settings > Video > Advanced Video, set NVIDIA Reflex Low Latency to Enabled. ABSO requests driver LLM Off and leaves CS2 settings user-owned. Boost may reduce latency at the cost of power and FPS; neither choice is a measured optimum on this machine.",
         "setting": "NVIDIA Reflex",
-        "value": "Enabled + Boost \u2014 set the in-game toggle manually; profile requests driver LLM Off"
+        "value": "Enabled; Enabled + Boost is optional (set manually)"
       },
       {
         "category": "Video",
-        "reason": "ABSO sets the NVCP limiter to refresh - 3 (Blur Busters G-SYNC 101 convention). Keeping fps_max at 0 leaves one deterministic limiter in the path and stops NVCP V-SYNC from engaging.",
+        "reason": "ABSO retains a managed driver refresh - 3 ceiling (297 at 300 Hz) because it does not write or verify CS2's native limiter. With G-SYNC, VSync and Reflex enabled, Reflex may pace FPS lower. This fallback ceiling does not promise 297 FPS, prove VRR engagement, or establish a benefit from redundant limits.",
         "setting": "Maximum FPS in game (fps_max)",
-        "value": "0 (uncapped in-game; ABSO caps at the driver)"
+        "value": "0 (manual; driver refresh-minus-three ceiling remains)"
       },
       {
         "category": "Video",
-        "reason": "MSAA is CS2's main GPU cost lever; CMAA2 keeps the CPU-bound lane cheap while MSAA is affordable only when the GPU is not the bottleneck.",
+        "reason": "Valve exposes this status for the current display settings. It may be hidden with Vulkan or a non-NVIDIA GPU. ABSO's configured driver values do not verify live engagement; the profile assumes the Windows DX11 path.",
+        "setting": "NVIDIA G-Sync status",
+        "value": "Confirm enabled in CS2's Frame Pacing section"
+      },
+      {
+        "category": "Video",
+        "reason": "Anti-aliasing trades edge quality for rendering cost. Compare GPU frame time and visibility at your chosen resolution; no option is proven fastest and clearest for every scene.",
         "setting": "Multisampling Anti-Aliasing Mode",
-        "value": "CMAA2, or 2x-4x MSAA with GPU headroom"
+        "value": "CMAA2 starting point; compare 2x-4x MSAA for image quality"
       },
       {
         "category": "Video",
-        "reason": "Smokes and utility fights are the most common source of frame-time spikes in CS2; competitive-low keeps the frame queue clean.",
-        "setting": "Shader / Particle / Effect Detail",
-        "value": "Low"
+        "reason": "Valve describes higher shader detail as a visual-quality versus graphics-performance tradeoff. Compare representative scenes; Low does not guarantee fewer frame-time spikes.",
+        "setting": "Shader Detail",
+        "value": "Low starting point"
       },
       {
         "category": "Video",
-        "reason": "Improves enemy visibility at negligible GPU cost.",
+        "reason": "Valve describes higher particle detail as more complex effects and particle shadows with possible graphics cost. Preserve a higher setting if its visual benefit is worth the measured cost.",
+        "setting": "Particle Detail",
+        "value": "Low starting point"
+      },
+      {
+        "category": "Video",
+        "reason": "Valve says this improves player legibility in low-contrast situations and can degrade graphics performance. It is a visibility preference, not a free FPS improvement.",
         "setting": "Boost Player Contrast",
-        "value": "Enabled"
+        "value": "Enabled starting point for visibility"
       }
     ],
     "include_legacy_tweaks": false,
@@ -830,7 +832,7 @@
         "disable_global_fso": false
       },
       "InterruptModeHandler": {
-        "enable_msi": true
+        "enable_msi": false
       },
       "MouseSettingsHandler": {
         "disable_acceleration": true,
@@ -842,7 +844,7 @@
         "preset": "default"
       },
       "NicDriverHandler": {
-        "nic_tuning": true
+        "nic_tuning": false
       },
       "NvidiaSettingsHandler": {
         "auto_vrr_fps_cap": true,
@@ -856,15 +858,7 @@
         ],
         "profile_name": "Counter-Strike 2"
       },
-      "PowerSettingsHandler": {
-        "active_plan": "ultimate_performance",
-        "disable_core_parking": true,
-        "disable_pcie_power_saving": true,
-        "disable_usb_suspend": true,
-        "ensure_ultimate_performance": true,
-        "processor_max_performance": true,
-        "processor_min_state": 100
-      },
+      "PowerSettingsHandler": {},
       "ProcessPriorityHandler": {
         "cpu_priority": 2,
         "io_priority": 2
@@ -872,12 +866,7 @@
       "RegistrySettingsHandler": {
         "fullscreen_optimizations": {
           "cs2.exe": false
-        },
-        "game_priority": {
-          "priority": 6,
-          "scheduling_category": "High"
-        },
-        "win32_priority_separation": 42
+        }
       },
       "WindowsSettingsHandler": {
         "advanced_color": true,
@@ -920,19 +909,19 @@
     "in_game_settings": [
       {
         "category": "Display (Windows)",
-        "reason": "Counter-Strike 2 has not shipped a native HDR toggle in the builds this profile was authored against. Windows HDR is on to keep the OS composition path consistent for OLED owners; the game itself renders SDR and is composited into the HDR surface. If CS2 ships an in-game HDR toggle later, enable it then - until then this is SDR-in-HDR composition.",
+        "reason": "This lane enables Windows HDR and disables Auto HDR. CS2's High Dynamic Range Quality/Performance setting is a rendering-quality choice; its name does not verify HDR display output. ABSO does not detect CS2's live output color space or claim this improves FPS or latency.",
         "setting": "HDR",
-        "value": "On (set by this profile for desktop comfort)"
+        "value": "On (Windows policy; game HDR output unverified)"
       },
       {
         "category": "Display (Windows)",
-        "reason": "Settings > System > Display > HDR > SDR content brightness. This profile sets 200 nits as the OLED baseline. If the desktop reads dim, push it up to 240-280.",
+        "reason": "Settings > System > Display > HDR > SDR content brightness. This profile sets a 200-nit preference; it is not panel calibration or a universal OLED target. Adjust to your display and viewing conditions.",
         "setting": "SDR content brightness",
         "value": "200 nits starting point; tune to taste"
       },
       {
         "category": "Video",
-        "reason": "No-sync lane: Fullscreen avoids the DWM compositor tax and keeps the Source 2 present path deterministic.",
+        "reason": "Use Fullscreen for this lane. Windows Fullscreen Optimizations remain available; actual presentation and latency need runtime measurement.",
         "setting": "Display Mode",
         "value": "Fullscreen"
       },
@@ -944,33 +933,39 @@
       },
       {
         "category": "Video",
-        "reason": "Applying this profile requests NVIDIA driver LLM Off for native Reflex queue control. ABSO leaves Source 2 video configuration user-owned; toggle 'NVIDIA Reflex' to 'Enabled + Boost' in CS2's Video settings. Boost may reduce FPS and increase power use; NVIDIA recommends it only when minimizing latency takes priority over FPS.",
+        "reason": "In Settings > Video > Advanced Video, set NVIDIA Reflex Low Latency to Enabled. ABSO requests driver LLM Off and leaves CS2 settings user-owned. NVIDIA describes Boost as a possible latency reduction with extra power use and potentially lower FPS; compare on your setup before preferring it.",
         "setting": "NVIDIA Reflex",
-        "value": "Enabled + Boost \u2014 set the in-game toggle manually; profile requests driver LLM Off"
+        "value": "Enabled; Enabled + Boost is optional (set manually)"
       },
       {
         "category": "Video",
-        "reason": "No-sync lane: higher uncapped FPS lowers frame time when the machine can sustain it. Cap if heat, noise, or pacing gets worse.",
+        "reason": "Optional uncapped starting point for the tearing-allowed lane. The driver limiter is Off. A sustainable manual cap may suit heat, noise or frame pacing better; uncapped FPS is not a smoothness guarantee.",
         "setting": "Maximum FPS in game (fps_max)",
         "value": "0 (uncapped)"
       },
       {
         "category": "Video",
-        "reason": "MSAA is CS2's main GPU cost lever; CMAA2 keeps the CPU-bound lane cheap while MSAA is affordable only when the GPU is not the bottleneck.",
+        "reason": "Anti-aliasing trades edge quality for rendering cost. Compare GPU frame time and visibility at your chosen resolution; no option is proven fastest and clearest for every scene.",
         "setting": "Multisampling Anti-Aliasing Mode",
-        "value": "CMAA2, or 2x-4x MSAA with GPU headroom"
+        "value": "CMAA2 starting point; compare 2x-4x MSAA for image quality"
       },
       {
         "category": "Video",
-        "reason": "Smokes and utility fights are the most common source of frame-time spikes in CS2; competitive-low keeps the frame queue clean.",
-        "setting": "Shader / Particle / Effect Detail",
-        "value": "Low"
+        "reason": "Valve describes higher shader detail as a visual-quality versus graphics-performance tradeoff. Compare representative scenes; Low does not guarantee fewer frame-time spikes.",
+        "setting": "Shader Detail",
+        "value": "Low starting point"
       },
       {
         "category": "Video",
-        "reason": "Improves enemy visibility at negligible GPU cost.",
+        "reason": "Valve describes higher particle detail as more complex effects and particle shadows with possible graphics cost. Preserve a higher setting if its visual benefit is worth the measured cost.",
+        "setting": "Particle Detail",
+        "value": "Low starting point"
+      },
+      {
+        "category": "Video",
+        "reason": "Valve says this improves player legibility in low-contrast situations and can degrade graphics performance. It is a visibility preference, not a free FPS improvement.",
         "setting": "Boost Player Contrast",
-        "value": "Enabled"
+        "value": "Enabled starting point for visibility"
       }
     ],
     "include_legacy_tweaks": false,
@@ -1008,10 +1003,10 @@
       },
       "GraphicsSettingsHandler": {
         "disable_auto_color_management": true,
-        "disable_global_fso": true
+        "disable_global_fso": false
       },
       "InterruptModeHandler": {
-        "enable_msi": true
+        "enable_msi": false
       },
       "MouseSettingsHandler": {
         "disable_acceleration": true,
@@ -1023,7 +1018,7 @@
         "preset": "default"
       },
       "NicDriverHandler": {
-        "nic_tuning": true
+        "nic_tuning": false
       },
       "NvidiaSettingsHandler": {
         "global_vrr_mode": "off",
@@ -1036,28 +1031,15 @@
         ],
         "profile_name": "Counter-Strike 2"
       },
-      "PowerSettingsHandler": {
-        "active_plan": "ultimate_performance",
-        "disable_core_parking": true,
-        "disable_pcie_power_saving": true,
-        "disable_usb_suspend": true,
-        "ensure_ultimate_performance": true,
-        "processor_max_performance": true,
-        "processor_min_state": 100
-      },
+      "PowerSettingsHandler": {},
       "ProcessPriorityHandler": {
         "cpu_priority": 3,
         "io_priority": 3
       },
       "RegistrySettingsHandler": {
         "fullscreen_optimizations": {
-          "cs2.exe": true
-        },
-        "game_priority": {
-          "priority": 6,
-          "scheduling_category": "High"
-        },
-        "win32_priority_separation": 42
+          "cs2.exe": false
+        }
       },
       "WindowsSettingsHandler": {
         "advanced_color": true,
@@ -2145,15 +2127,15 @@
     "in_game_settings": [
       {
         "category": "Display",
-        "reason": "This variant intentionally stays on the SDR path.",
+        "reason": "Windows output stays SDR; Fortnite's saved HDR and calibration values are preserved.",
         "setting": "HDR",
-        "value": "Off"
+        "value": "Windows HDR Off"
       },
       {
         "category": "Display",
-        "reason": "Matches the competitive no-sync path this profile actually applies.",
+        "reason": "Matches the game's fullscreen selection; the saved enum does not prove exclusive scanout or a latency advantage.",
         "setting": "Display Mode",
-        "value": "Fullscreen (Exclusive)"
+        "value": "Fullscreen"
       },
       {
         "category": "Display",
@@ -2163,9 +2145,9 @@
       },
       {
         "category": "Display",
-        "reason": "Applying this profile requests NVIDIA driver LLM Off for native Reflex queue control. Fortnite's Reflex toggle lives in Fortnite's settings and there is no stable config key to write it from outside; manually flip 'NVIDIA Reflex Low Latency' to 'On + Boost' in the game once.",
+        "reason": "Driver LLM is Off so native Reflex controls the queue. ABSO reads the saved Reflex choice but never writes it. Boost keeps GPU clocks higher at a power cost; compare it with On for this workload.",
         "setting": "NVIDIA Reflex Low Latency",
-        "value": "On + Boost \u2014 set the in-game toggle manually; profile requests driver LLM Off"
+        "value": "On or On + Boost (choose manually)"
       },
       {
         "category": "Display",
@@ -2175,21 +2157,21 @@
       },
       {
         "category": "Graphics",
-        "reason": "This profile is built around Fortnite's DX12 path for Reflex and modern presentation behavior.",
+        "reason": "Epic recommends Performance mode for competitive play. Standard DX12 offers different graphics/upscaling options; compare frame times and image quality, then restart if prompted. ABSO preserves the renderer.",
         "setting": "Rendering Mode",
-        "value": "DirectX 12"
+        "value": "Compare Performance (DX12) with DirectX 12 manually"
       },
       {
         "category": "Graphics",
-        "reason": "Better CPU utilization and more stable frame delivery in stacked endgames.",
+        "reason": "Use the game's default when this option is available; a local frame-time benefit has not been measured.",
         "setting": "Multithreaded Rendering",
         "value": "On"
       },
       {
         "category": "Graphics",
-        "reason": "Keep frame times stable first; use DLSS only when needed to hold target FPS.",
+        "reason": "Upscaling trades image detail for rendering cost. Start with Quality on supported RTX hardware, then compare lower presets only if needed; available options depend on the renderer.",
         "setting": "3D Resolution / DLSS",
-        "value": "100% or DLSS Performance if GPU-bound"
+        "value": "100%; compare DLSS Quality when available and GPU-bound"
       },
       {
         "category": "Graphics",
@@ -2205,7 +2187,7 @@
       },
       {
         "category": "Content",
-        "reason": "Avoids streaming hitches and unnecessary VRAM churn.",
+        "reason": "Reduces optional texture storage and memory demand; it does not guarantee removal of streaming hitches.",
         "setting": "High Resolution Textures",
         "value": "Off"
       }
@@ -2243,17 +2225,17 @@
       "FortniteConfigHandler": {
         "frame_rate_limit": 0,
         "fullscreen_mode": 0,
-        "hdr_output": false,
+        "require_reflex": true,
         "vsync": false
       },
       "GameDvrHandler": {
         "hard_disable": true
       },
       "GraphicsSettingsHandler": {
-        "disable_global_fso": true
+        "disable_global_fso": false
       },
       "InterruptModeHandler": {
-        "enable_msi": true
+        "enable_msi": false
       },
       "MouseSettingsHandler": {
         "disable_acceleration": true,
@@ -2265,7 +2247,7 @@
         "preset": "default"
       },
       "NicDriverHandler": {
-        "nic_tuning": true
+        "nic_tuning": false
       },
       "NvidiaSettingsHandler": {
         "preset": "reflex_no_sync",
@@ -2276,31 +2258,18 @@
         ],
         "profile_name": "Fortnite"
       },
-      "PowerSettingsHandler": {
-        "active_plan": "ultimate_performance",
-        "disable_core_parking": true,
-        "disable_pcie_power_saving": true,
-        "disable_usb_suspend": true,
-        "ensure_ultimate_performance": true,
-        "processor_max_performance": true,
-        "processor_min_state": 100
-      },
+      "PowerSettingsHandler": {},
       "ProcessPriorityHandler": {
         "cpu_priority": 3,
         "io_priority": 3
       },
       "RegistrySettingsHandler": {
         "fullscreen_optimizations": {
-          "FortniteClient-Win64-Shipping.exe": true,
-          "FortniteClient-Win64-Shipping_BE.exe": true,
-          "FortniteClient-Win64-Shipping_EAC.exe": true,
-          "FortniteClient-Win64-Shipping_EAC_EOS.exe": true
-        },
-        "game_priority": {
-          "priority": 6,
-          "scheduling_category": "High"
-        },
-        "win32_priority_separation": 42
+          "FortniteClient-Win64-Shipping.exe": false,
+          "FortniteClient-Win64-Shipping_BE.exe": false,
+          "FortniteClient-Win64-Shipping_EAC.exe": false,
+          "FortniteClient-Win64-Shipping_EAC_EOS.exe": false
+        }
       },
       "WindowsSettingsHandler": {
         "auto_hdr": false,
@@ -2354,9 +2323,9 @@
       },
       {
         "category": "Display",
-        "reason": "ABSO leaves driver LLM off. Enable Reflex manually in Fortnite; Reflex may pace below the driver cap.",
+        "reason": "ABSO leaves driver LLM off and only reads the saved Reflex choice. Reflex may pace below the driver cap; compare Boost's power cost and latency on the actual workload.",
         "setting": "NVIDIA Reflex Low Latency",
-        "value": "On + Boost (set manually)"
+        "value": "On or On + Boost (choose manually)"
       },
       {
         "category": "Display",
@@ -2366,15 +2335,15 @@
       },
       {
         "category": "Display",
-        "reason": "This streaming variant intentionally stays on the SDR path.",
+        "reason": "Windows output stays SDR; Fortnite's saved HDR and calibration values are preserved.",
         "setting": "HDR",
-        "value": "Off"
+        "value": "Windows HDR Off"
       },
       {
         "category": "Graphics",
-        "reason": "Changing rendering mode requires a game restart.",
+        "reason": "Standard DX12 supports the following quality/upscaling starting points. Performance mode reduces rendering features; compare it separately and restart if prompted. ABSO preserves the current renderer.",
         "setting": "Rendering Mode",
-        "value": "DirectX 12 (set manually)"
+        "value": "DirectX 12; compare Performance (DX12) manually"
       },
       {
         "category": "Graphics",
@@ -2483,7 +2452,7 @@
         "auto_vrr_fps_cap": false,
         "frame_rate_limit": 0,
         "fullscreen_mode": 1,
-        "hdr_output": false,
+        "require_reflex": true,
         "vsync": true
       },
       "GameDvrHandler": {
@@ -2493,7 +2462,7 @@
         "disable_global_fso": false
       },
       "InterruptModeHandler": {
-        "enable_msi": true
+        "enable_msi": false
       },
       "MouseSettingsHandler": {
         "disable_acceleration": true,
@@ -2505,7 +2474,7 @@
         "preset": "default"
       },
       "NicDriverHandler": {
-        "nic_tuning": true
+        "nic_tuning": false
       },
       "NvidiaSettingsHandler": {
         "auto_vrr_fps_cap": true,
@@ -2519,15 +2488,7 @@
         "profile_name": "Fortnite",
         "vrr_app_override": "allow"
       },
-      "PowerSettingsHandler": {
-        "active_plan": "ultimate_performance",
-        "disable_core_parking": true,
-        "disable_pcie_power_saving": true,
-        "disable_usb_suspend": true,
-        "ensure_ultimate_performance": true,
-        "processor_max_performance": true,
-        "processor_min_state": 100
-      },
+      "PowerSettingsHandler": {},
       "ProcessPriorityHandler": {
         "cpu_priority": 2,
         "io_priority": 2
@@ -2538,12 +2499,7 @@
           "FortniteClient-Win64-Shipping_BE.exe": false,
           "FortniteClient-Win64-Shipping_EAC.exe": false,
           "FortniteClient-Win64-Shipping_EAC_EOS.exe": false
-        },
-        "game_priority": {
-          "priority": 6,
-          "scheduling_category": "High"
-        },
-        "win32_priority_separation": 42
+        }
       },
       "WindowsSettingsHandler": {
         "auto_hdr": false,
@@ -2585,57 +2541,51 @@
     "in_game_settings": [
       {
         "category": "Display",
-        "reason": "Exclusive fullscreen is the lowest-latency presentation path and the right match for this profile's fullscreen-only G-SYNC mode.",
+        "reason": "Matches this lane's fullscreen VRR policy. Confirm actual G-SYNC engagement in-game; the saved mode does not prove exclusive presentation.",
         "setting": "Display Mode",
-        "value": "Fullscreen (Exclusive)"
+        "value": "Fullscreen"
       },
       {
         "category": "Display",
-        "reason": "Leave VSync to NVIDIA Control Panel as the VRR safety net; keep the in-game toggle off so it never adds queueing latency.",
+        "reason": "This lane uses driver VSync with its fullscreen VRR policy. The borderless Streaming lanes instead enable in-game VSync; runtime engagement still needs checking.",
         "setting": "VSync",
         "value": "Off (in-game)"
       },
       {
         "category": "Display",
-        "reason": "Applying this profile requests NVIDIA driver LLM Off for native Reflex queue control. Fortnite's Reflex toggle lives in Fortnite's settings and there is no stable config key to write it from outside; manually flip 'NVIDIA Reflex Low Latency' to 'On + Boost' in the game once.",
+        "reason": "Driver LLM is Off. ABSO checks the saved Reflex choice without changing it; Boost keeps clocks higher at a power cost and is not proven best for this workload.",
         "setting": "NVIDIA Reflex Low Latency",
-        "value": "On + Boost \u2014 set the in-game toggle manually; profile requests driver LLM Off"
+        "value": "On or On + Boost (choose manually)"
       },
       {
         "category": "Display",
-        "reason": "Set by ABSO to refresh - 3 (Blur Busters G-SYNC 101). Keeps G-SYNC active and prevents NVCP V-SYNC from engaging while preserving tear-free output.",
+        "reason": "The driver owns the explicit ceiling (297 at 300Hz); Fortnite's engine stays Unlimited. Reflex may pace lower. Neither the saved cap nor this checklist proves runtime VRR engagement.",
         "setting": "Frame Rate Limit",
-        "value": "Auto (refresh - 3: e.g. 297 @ 300Hz, 237 @ 240Hz, 141 @ 144Hz)"
+        "value": "Unlimited in-game; driver cap at refresh - 3"
       },
       {
         "category": "Display",
-        "reason": "Use Fortnite's native HDR output path in GameUserSettings.ini when the installed build and display path support HDR.",
+        "reason": "ABSO preserves the game's HDR and calibration settings. Windows HDR does not prove Fortnite native HDR; this lane does not enable Auto HDR or RTX HDR.",
         "setting": "HDR",
-        "value": "On"
-      },
-      {
-        "category": "Display",
-        "reason": "Keep Windows HDR and Fortnite's native HDR output aligned.",
-        "setting": "HDR Peak Brightness / Nits",
-        "value": "Start at 1000 nits or match your display peak"
+        "value": "Windows HDR On; native game HDR unverified"
       },
       {
         "category": "Graphics",
-        "reason": "This profile is built around Fortnite's DX12 path for Reflex and modern presentation behavior.",
+        "reason": "Epic recommends Performance mode for competitive play; standard DX12 offers different graphics/upscaling choices. Compare frame times and image quality; ABSO preserves the renderer.",
         "setting": "Rendering Mode",
-        "value": "DirectX 12"
+        "value": "Compare Performance (DX12) with DirectX 12 manually"
       },
       {
         "category": "Graphics",
-        "reason": "Better CPU utilization and more stable frame delivery in stacked endgames.",
+        "reason": "Use the game's default when available; no local frame-time improvement has been established.",
         "setting": "Multithreaded Rendering",
         "value": "On"
       },
       {
         "category": "Graphics",
-        "reason": "Keep frame times stable first; use DLSS only when needed to hold the VRR cap.",
+        "reason": "Trade image detail for rendering cost only when needed. Supported upscalers depend on the selected renderer.",
         "setting": "3D Resolution / DLSS",
-        "value": "100% or DLSS Performance if GPU-bound"
+        "value": "100%; compare DLSS Quality when available and GPU-bound"
       },
       {
         "category": "Graphics",
@@ -2651,7 +2601,7 @@
       },
       {
         "category": "Content",
-        "reason": "Avoids streaming hitches and unnecessary VRAM churn.",
+        "reason": "Reduces optional texture storage and memory demand; removing it is not a guaranteed stutter fix.",
         "setting": "High Resolution Textures",
         "value": "Off"
       }
@@ -2687,10 +2637,10 @@
         "dynamic_range": "full"
       },
       "FortniteConfigHandler": {
-        "auto_vrr_fps_cap": true,
+        "auto_vrr_fps_cap": false,
+        "frame_rate_limit": 0,
         "fullscreen_mode": 0,
-        "hdr_nits": 1000,
-        "hdr_output": true,
+        "require_reflex": true,
         "vsync": false
       },
       "GameDvrHandler": {
@@ -2698,10 +2648,10 @@
       },
       "GraphicsSettingsHandler": {
         "disable_auto_color_management": true,
-        "disable_global_fso": true
+        "disable_global_fso": false
       },
       "InterruptModeHandler": {
-        "enable_msi": true
+        "enable_msi": false
       },
       "MouseSettingsHandler": {
         "disable_acceleration": true,
@@ -2713,7 +2663,7 @@
         "preset": "default"
       },
       "NicDriverHandler": {
-        "nic_tuning": true
+        "nic_tuning": false
       },
       "NvidiaSettingsHandler": {
         "auto_vrr_fps_cap": true,
@@ -2727,31 +2677,18 @@
         "profile_name": "Fortnite",
         "vrr_app_override": "allow"
       },
-      "PowerSettingsHandler": {
-        "active_plan": "ultimate_performance",
-        "disable_core_parking": true,
-        "disable_pcie_power_saving": true,
-        "disable_usb_suspend": true,
-        "ensure_ultimate_performance": true,
-        "processor_max_performance": true,
-        "processor_min_state": 100
-      },
+      "PowerSettingsHandler": {},
       "ProcessPriorityHandler": {
         "cpu_priority": 3,
         "io_priority": 3
       },
       "RegistrySettingsHandler": {
         "fullscreen_optimizations": {
-          "FortniteClient-Win64-Shipping.exe": true,
-          "FortniteClient-Win64-Shipping_BE.exe": true,
-          "FortniteClient-Win64-Shipping_EAC.exe": true,
-          "FortniteClient-Win64-Shipping_EAC_EOS.exe": true
-        },
-        "game_priority": {
-          "priority": 6,
-          "scheduling_category": "High"
-        },
-        "win32_priority_separation": 42
+          "FortniteClient-Win64-Shipping.exe": false,
+          "FortniteClient-Win64-Shipping_BE.exe": false,
+          "FortniteClient-Win64-Shipping_EAC.exe": false,
+          "FortniteClient-Win64-Shipping_EAC_EOS.exe": false
+        }
       },
       "WindowsSettingsHandler": {
         "advanced_color": true,
@@ -2807,9 +2744,9 @@
       },
       {
         "category": "Display",
-        "reason": "ABSO leaves driver LLM off. Enable Reflex manually in Fortnite; Reflex may pace below the driver cap.",
+        "reason": "ABSO leaves driver LLM off and only reads the saved Reflex choice. Reflex may pace below the driver cap; compare Boost's power cost and latency on the actual workload.",
         "setting": "NVIDIA Reflex Low Latency",
-        "value": "On + Boost (set manually)"
+        "value": "On or On + Boost (choose manually)"
       },
       {
         "category": "Display",
@@ -2825,9 +2762,9 @@
       },
       {
         "category": "Graphics",
-        "reason": "Changing rendering mode requires a game restart.",
+        "reason": "Standard DX12 supports the following quality/upscaling starting points. Performance mode reduces rendering features; compare it separately and restart if prompted. ABSO preserves the current renderer.",
         "setting": "Rendering Mode",
-        "value": "DirectX 12 (set manually)"
+        "value": "DirectX 12; compare Performance (DX12) manually"
       },
       {
         "category": "Graphics",
@@ -2936,6 +2873,7 @@
         "auto_vrr_fps_cap": false,
         "frame_rate_limit": 0,
         "fullscreen_mode": 1,
+        "require_reflex": true,
         "vsync": true
       },
       "GameDvrHandler": {
@@ -2946,7 +2884,7 @@
         "disable_global_fso": false
       },
       "InterruptModeHandler": {
-        "enable_msi": true
+        "enable_msi": false
       },
       "MouseSettingsHandler": {
         "disable_acceleration": true,
@@ -2958,7 +2896,7 @@
         "preset": "default"
       },
       "NicDriverHandler": {
-        "nic_tuning": true
+        "nic_tuning": false
       },
       "NvidiaSettingsHandler": {
         "auto_vrr_fps_cap": true,
@@ -2972,15 +2910,7 @@
         "profile_name": "Fortnite",
         "vrr_app_override": "allow"
       },
-      "PowerSettingsHandler": {
-        "active_plan": "ultimate_performance",
-        "disable_core_parking": true,
-        "disable_pcie_power_saving": true,
-        "disable_usb_suspend": true,
-        "ensure_ultimate_performance": true,
-        "processor_max_performance": true,
-        "processor_min_state": 100
-      },
+      "PowerSettingsHandler": {},
       "ProcessPriorityHandler": {
         "cpu_priority": 2,
         "io_priority": 2
@@ -2991,12 +2921,7 @@
           "FortniteClient-Win64-Shipping_BE.exe": false,
           "FortniteClient-Win64-Shipping_EAC.exe": false,
           "FortniteClient-Win64-Shipping_EAC_EOS.exe": false
-        },
-        "game_priority": {
-          "priority": 6,
-          "scheduling_category": "High"
-        },
-        "win32_priority_separation": 42
+        }
       },
       "WindowsSettingsHandler": {
         "advanced_color": true,
@@ -3040,21 +2965,15 @@
     "in_game_settings": [
       {
         "category": "Display",
-        "reason": "Use Fortnite's native HDR output path in GameUserSettings.ini when the installed build and display path support HDR.",
+        "reason": "ABSO sets Windows HDR and preserves Fortnite's HDR/calibration values. A saved UE HDR key does not establish native HDR output; Auto HDR and RTX HDR are not enabled by this lane.",
         "setting": "HDR",
-        "value": "On"
+        "value": "Windows HDR On; native game HDR unverified"
       },
       {
         "category": "Display",
-        "reason": "Keep Windows HDR and Fortnite's native HDR output aligned.",
-        "setting": "HDR Peak Brightness / Nits",
-        "value": "Start at 1000 nits or match your display peak"
-      },
-      {
-        "category": "Display",
-        "reason": "Matches the competitive no-sync path this profile actually applies.",
+        "reason": "Matches the game's fullscreen selection; the saved enum does not prove exclusive scanout or a latency advantage.",
         "setting": "Display Mode",
-        "value": "Fullscreen (Exclusive)"
+        "value": "Fullscreen"
       },
       {
         "category": "Display",
@@ -3064,9 +2983,9 @@
       },
       {
         "category": "Display",
-        "reason": "Applying this profile requests NVIDIA driver LLM Off for native Reflex queue control. Fortnite's Reflex toggle lives in Fortnite's settings and there is no stable config key to write it from outside; manually flip 'NVIDIA Reflex Low Latency' to 'On + Boost' in the game once.",
+        "reason": "Driver LLM is Off so native Reflex controls the queue. ABSO reads the saved Reflex choice but never writes it. Boost keeps GPU clocks higher at a power cost; compare it with On for this workload.",
         "setting": "NVIDIA Reflex Low Latency",
-        "value": "On + Boost \u2014 set the in-game toggle manually; profile requests driver LLM Off"
+        "value": "On or On + Boost (choose manually)"
       },
       {
         "category": "Display",
@@ -3076,21 +2995,21 @@
       },
       {
         "category": "Graphics",
-        "reason": "This profile is built around Fortnite's DX12 path for Reflex and modern presentation behavior.",
+        "reason": "Epic recommends Performance mode for competitive play. Standard DX12 offers different graphics/upscaling options; compare frame times and image quality, then restart if prompted. ABSO preserves the renderer.",
         "setting": "Rendering Mode",
-        "value": "DirectX 12"
+        "value": "Compare Performance (DX12) with DirectX 12 manually"
       },
       {
         "category": "Graphics",
-        "reason": "Better CPU utilization and more stable frame delivery in stacked endgames.",
+        "reason": "Use the game's default when this option is available; a local frame-time benefit has not been measured.",
         "setting": "Multithreaded Rendering",
         "value": "On"
       },
       {
         "category": "Graphics",
-        "reason": "Keep frame times stable first; use DLSS only when needed to hold target FPS.",
+        "reason": "Upscaling trades image detail for rendering cost. Start with Quality on supported RTX hardware, then compare lower presets only if needed; available options depend on the renderer.",
         "setting": "3D Resolution / DLSS",
-        "value": "100% or DLSS Performance if GPU-bound"
+        "value": "100%; compare DLSS Quality when available and GPU-bound"
       },
       {
         "category": "Graphics",
@@ -3106,7 +3025,7 @@
       },
       {
         "category": "Content",
-        "reason": "Avoids streaming hitches and unnecessary VRAM churn.",
+        "reason": "Reduces optional texture storage and memory demand; it does not guarantee removal of streaming hitches.",
         "setting": "High Resolution Textures",
         "value": "Off"
       }
@@ -3144,8 +3063,7 @@
       "FortniteConfigHandler": {
         "frame_rate_limit": 0,
         "fullscreen_mode": 0,
-        "hdr_nits": 1000,
-        "hdr_output": true,
+        "require_reflex": true,
         "vsync": false
       },
       "GameDvrHandler": {
@@ -3153,10 +3071,10 @@
       },
       "GraphicsSettingsHandler": {
         "disable_auto_color_management": true,
-        "disable_global_fso": true
+        "disable_global_fso": false
       },
       "InterruptModeHandler": {
-        "enable_msi": true
+        "enable_msi": false
       },
       "MouseSettingsHandler": {
         "disable_acceleration": true,
@@ -3168,7 +3086,7 @@
         "preset": "default"
       },
       "NicDriverHandler": {
-        "nic_tuning": true
+        "nic_tuning": false
       },
       "NvidiaSettingsHandler": {
         "preset": "reflex_no_sync",
@@ -3179,31 +3097,18 @@
         ],
         "profile_name": "Fortnite"
       },
-      "PowerSettingsHandler": {
-        "active_plan": "ultimate_performance",
-        "disable_core_parking": true,
-        "disable_pcie_power_saving": true,
-        "disable_usb_suspend": true,
-        "ensure_ultimate_performance": true,
-        "processor_max_performance": true,
-        "processor_min_state": 100
-      },
+      "PowerSettingsHandler": {},
       "ProcessPriorityHandler": {
         "cpu_priority": 3,
         "io_priority": 3
       },
       "RegistrySettingsHandler": {
         "fullscreen_optimizations": {
-          "FortniteClient-Win64-Shipping.exe": true,
-          "FortniteClient-Win64-Shipping_BE.exe": true,
-          "FortniteClient-Win64-Shipping_EAC.exe": true,
-          "FortniteClient-Win64-Shipping_EAC_EOS.exe": true
-        },
-        "game_priority": {
-          "priority": 6,
-          "scheduling_category": "High"
-        },
-        "win32_priority_separation": 42
+          "FortniteClient-Win64-Shipping.exe": false,
+          "FortniteClient-Win64-Shipping_BE.exe": false,
+          "FortniteClient-Win64-Shipping_EAC.exe": false,
+          "FortniteClient-Win64-Shipping_EAC_EOS.exe": false
+        }
       },
       "WindowsSettingsHandler": {
         "advanced_color": true,
@@ -5460,64 +5365,64 @@
     ],
     "in_game_settings": [
       {
-        "category": "=== G-SYNC PROFILE ===",
-        "reason": "Tear-free rollback-safe VRR lane for online and training. VSync acts as safety net only - never activates with FPS capped below refresh rate. Rivals 2 ticks at a fixed 60 Hz, so the cap snaps to the largest multiple of 60 under refresh - 3 for an even frames-per-tick cadence: 240 @ 300Hz, 180 @ 240Hz, 120 @ 144Hz. (Blur Busters G-SYNC 101 margin + 60 Hz sim grid.)",
+        "category": "G-SYNC profile",
+        "reason": "Uses one native render cap with headroom below display refresh. SnapNet interpolates between simulation ticks; a 60 Hz simulation does not require a render cap in multiples of 60. This is a starting policy, not a measured latency or rollback guarantee.",
         "setting": "Overview",
-        "value": "G-SYNC ON, VSync ON (NVCP), 60-multiple FPS cap below refresh"
+        "value": "G-SYNC On, VSync On, native FPS cap below refresh"
       },
       {
         "category": "NVIDIA Control Panel",
-        "reason": "Display > Set up G-SYNC. Check 'Enable G-SYNC' and 'Enable for full screen mode'.",
+        "reason": "Enable fullscreen G-SYNC for this lane; verify engagement during gameplay.",
         "setting": "Set up G-SYNC",
-        "value": "Enable G-SYNC, G-SYNC Compatible: ON"
+        "value": "Enable G-SYNC / G-SYNC Compatible"
       },
       {
         "category": "NVIDIA Control Panel",
-        "reason": "Manage 3D Settings. Acts as SAFETY NET only with G-SYNC. With FPS capped below refresh, VSync never engages.",
+        "reason": "Provides tear prevention with G-SYNC; the cap reduces refresh-ceiling backpressure.",
         "setting": "Vertical sync",
         "value": "On"
       },
       {
         "category": "NVIDIA Control Panel",
-        "reason": "This NVIDIA setting is exposed as OGL_THREAD_CONTROL. A frame-time benefit on Rivals 2's DX11 path has not been established.",
+        "reason": "Restores automatic policy for this OpenGL control; no DX11 performance gain is claimed.",
         "setting": "Threaded Optimization",
-        "value": "On"
+        "value": "Auto"
       },
       {
         "category": "NVIDIA Control Panel",
-        "reason": "Reduces render queue depth on the published DX11 path. 'On' is correct (not 'Off' - Rivals 2 has no Reflex). If stuttering occurs, try 'Off' or set Pre-Rendered Frames to 2 via Nvidia Profile Inspector.",
+        "reason": "Driver queue-control starting point for the published DX11 path. Compare frame times and latency before choosing another mode; neither On nor Ultra is proven best on this PC.",
         "setting": "Low Latency Mode",
         "value": "On"
       },
       {
         "category": "NVIDIA Control Panel",
-        "reason": "ABSO auto-detects your refresh rate and caps at the largest multiple of 60 under refresh - 3 (240 @ 300Hz, 180 @ 240Hz, 120 @ 144Hz). Keeps G-SYNC active, V-SYNC from engaging, and the 60 Hz sim cadence even \u2014 generic 297-style caps land off the sim grid; whether snapping improves motion requires measurement.",
+        "reason": "The native limiter owns the cap; adding another limiter has no measured benefit here.",
         "setting": "Max Frame Rate",
-        "value": "60-multiple cap below refresh (auto-set by ABSO)"
+        "value": "Off"
       },
       {
         "category": "In-Game Video",
-        "reason": "Required for proper G-SYNC behavior. Borderless adds compositor latency.",
+        "reason": "This lane requests fullscreen and disables FSO. The actual presentation path and latency still require observation; use a capture lane for borderless.",
         "setting": "Display Mode",
-        "value": "Exclusive Fullscreen"
+        "value": "Fullscreen"
       },
       {
         "category": "In-Game Video",
-        "reason": "ALWAYS disable in-game VSync with G-SYNC. NVCP VSync handles sync.",
+        "reason": "This fullscreen lane uses driver VSync; capture lanes use native VSync for windowed presentation.",
         "setting": "V-SYNC",
         "value": "Off"
       },
       {
         "category": "In-Game Video",
-        "reason": "Must cap below refresh for G-SYNC to work properly, and on a multiple of 60 so the fixed 60 Hz sim renders an even number of frames per tick. In-game limiter has lower latency than NVCP/RTSS limiters.",
+        "reason": "ABSO writes the native cap below the detected primary refresh. Confirm the game retained it after launch; saved-file verification does not prove runtime limiter behavior.",
         "setting": "Frame Rate Cap",
-        "value": "60-multiple cap below refresh (e.g., 240 for 300Hz)"
+        "value": "Refresh minus 3 (297 at 300 Hz)"
       },
       {
         "category": "In-Game Video",
-        "reason": "Rivals 2 does not implement NVIDIA Reflex. LLM 'On' is set via NVCP instead. This is different from OW2/Fortnite where Reflex handles queue control.",
+        "reason": "Rivals of Aether 2 is not listed in NVIDIA's checked Reflex game list. ABSO does not enable Reflex through driver settings.",
         "setting": "NVIDIA Reflex",
-        "value": "Not available"
+        "value": "Support not established"
       },
       {
         "category": "Overlays",
@@ -5527,9 +5432,9 @@
       },
       {
         "category": "Validation",
-        "reason": "G-SYNC smooths frame delivery. Conservative priority prevents timing contention.",
+        "reason": "Saved settings cannot establish active VRR, input latency, or absence of rollback corrections.",
         "setting": "Expected Behavior",
-        "value": "Tear-free, stable frametimes, no rollback dropouts"
+        "value": "Check frame pacing, tearing, and online responsiveness"
       }
     ],
     "include_legacy_tweaks": false,
@@ -5575,9 +5480,10 @@
         "disable_notifications": true
       },
       "NvidiaSettingsHandler": {
-        "auto_vrr_fps_cap": true,
         "global_vrr_mode": "fullscreen_only",
-        "preset": "vrr_fighting_game",
+        "low_latency_mode": "on",
+        "max_frame_rate": "off",
+        "power_management": "prefer_max_performance",
         "profile_aliases": [
           "Rivals 2 Online",
           "Rivals2-Win64-Shipping.exe",
@@ -5603,19 +5509,14 @@
           "Rivals 2 (Streaming)"
         ],
         "profile_name": "Rivals 2",
-        "threaded_optimization": "on",
+        "shader_cache": "on",
+        "threaded_optimization": "auto",
+        "triple_buffering": "off",
         "vrr_app_override": "allow",
-        "vrr_cap_policy": "fighting_60hz_vrr"
+        "vsync": "on",
+        "vsync_tear_control": "disable"
       },
-      "PowerSettingsHandler": {
-        "active_plan": "ultimate_performance",
-        "disable_core_parking": true,
-        "disable_pcie_power_saving": true,
-        "disable_usb_suspend": true,
-        "ensure_ultimate_performance": true,
-        "processor_max_performance": true,
-        "processor_min_state": 100
-      },
+      "PowerSettingsHandler": {},
       "ProcessPriorityHandler": {
         "cpu_priority": 2,
         "io_priority": 2
@@ -5625,19 +5526,13 @@
           "Rivals2-Win64-Shipping.exe": true,
           "Rivals2.exe": true,
           "RivalsofAether2.exe": true
-        },
-        "game_priority": {
-          "priority": 6,
-          "scheduling_category": "High"
-        },
-        "win32_priority_separation": 38
+        }
       },
       "Rivals2ConfigHandler": {
         "auto_vrr_fps_cap": true,
         "fullscreen_mode": 0,
         "hdr_output": false,
-        "raw_input": true,
-        "vrr_cap_policy": "fighting_60hz_vrr",
+        "vrr_cap_policy": "refresh_minus_3",
         "vsync": false
       },
       "WindowsSettingsHandler": {
@@ -5676,40 +5571,40 @@
     ],
     "in_game_settings": [
       {
-        "category": "=== G-SYNC PROFILE ===",
-        "reason": "Tear-free rollback-safe VRR lane for online and training. VSync acts as safety net only - never activates with FPS capped below refresh rate. Rivals 2 ticks at a fixed 60 Hz, so the cap snaps to the largest multiple of 60 under refresh - 3 for an even frames-per-tick cadence: 240 @ 300Hz, 180 @ 240Hz, 120 @ 144Hz. (Blur Busters G-SYNC 101 margin + 60 Hz sim grid.)",
+        "category": "G-SYNC profile",
+        "reason": "Uses one native render cap with headroom below display refresh. SnapNet interpolates between simulation ticks; a 60 Hz simulation does not require a render cap in multiples of 60. This is a starting policy, not a measured latency or rollback guarantee.",
         "setting": "Overview",
-        "value": "G-SYNC ON, VSync ON (NVCP), 60-multiple FPS cap below refresh"
+        "value": "G-SYNC On, VSync On, native FPS cap below refresh"
       },
       {
         "category": "NVIDIA Control Panel",
-        "reason": "Display > Set up G-SYNC. Check 'Enable G-SYNC' and 'Enable for full screen mode'.",
+        "reason": "Enable G-SYNC for windowed and fullscreen mode for this borderless lane.",
         "setting": "Set up G-SYNC",
-        "value": "Enable G-SYNC, G-SYNC Compatible: ON"
+        "value": "Enable G-SYNC / G-SYNC Compatible"
       },
       {
         "category": "NVIDIA Control Panel",
-        "reason": "Manage 3D Settings. Acts as SAFETY NET only with G-SYNC. With FPS capped below refresh, VSync never engages.",
+        "reason": "Provides tear prevention with G-SYNC; the cap reduces refresh-ceiling backpressure.",
         "setting": "Vertical sync",
         "value": "On"
       },
       {
         "category": "NVIDIA Control Panel",
-        "reason": "This NVIDIA setting is exposed as OGL_THREAD_CONTROL. A frame-time benefit on Rivals 2's DX11 path has not been established.",
+        "reason": "Restores automatic policy for this OpenGL control; no DX11 performance gain is claimed.",
         "setting": "Threaded Optimization",
-        "value": "On"
+        "value": "Auto"
       },
       {
         "category": "NVIDIA Control Panel",
-        "reason": "Reduces render queue depth on the published DX11 path. 'On' is correct (not 'Off' - Rivals 2 has no Reflex). If stuttering occurs, try 'Off' or set Pre-Rendered Frames to 2 via Nvidia Profile Inspector.",
+        "reason": "Driver queue-control starting point for the published DX11 path. Compare frame times and latency before choosing another mode; neither On nor Ultra is proven best on this PC.",
         "setting": "Low Latency Mode",
         "value": "On"
       },
       {
         "category": "NVIDIA Control Panel",
-        "reason": "ABSO auto-detects your refresh rate and caps at the largest multiple of 60 under refresh - 3 (240 @ 300Hz, 180 @ 240Hz, 120 @ 144Hz). Keeps G-SYNC active, V-SYNC from engaging, and the 60 Hz sim cadence even \u2014 generic 297-style caps land off the sim grid; whether snapping improves motion requires measurement.",
+        "reason": "The native limiter owns the cap; adding another limiter has no measured benefit here.",
         "setting": "Max Frame Rate",
-        "value": "60-multiple cap below refresh (auto-set by ABSO)"
+        "value": "Off"
       },
       {
         "category": "In-Game Video",
@@ -5719,21 +5614,21 @@
       },
       {
         "category": "In-Game Video",
-        "reason": "ALWAYS disable in-game VSync with G-SYNC. NVCP VSync handles sync.",
+        "reason": "Use native VSync for the windowed path; the native FPS cap provides headroom below refresh.",
         "setting": "V-SYNC",
-        "value": "Off"
+        "value": "On"
       },
       {
         "category": "In-Game Video",
-        "reason": "Must cap below refresh for G-SYNC to work properly, and on a multiple of 60 so the fixed 60 Hz sim renders an even number of frames per tick. In-game limiter has lower latency than NVCP/RTSS limiters.",
+        "reason": "ABSO writes the native cap below the detected primary refresh. Confirm the game retained it after launch; saved-file verification does not prove runtime limiter behavior.",
         "setting": "Frame Rate Cap",
-        "value": "60-multiple cap below refresh (e.g., 240 for 300Hz)"
+        "value": "Refresh minus 3 (297 at 300 Hz)"
       },
       {
         "category": "In-Game Video",
-        "reason": "Rivals 2 does not implement NVIDIA Reflex. LLM 'On' is set via NVCP instead. This is different from OW2/Fortnite where Reflex handles queue control.",
+        "reason": "Rivals of Aether 2 is not listed in NVIDIA's checked Reflex game list. ABSO does not enable Reflex through driver settings.",
         "setting": "NVIDIA Reflex",
-        "value": "Not available"
+        "value": "Support not established"
       },
       {
         "category": "Overlays",
@@ -5743,9 +5638,9 @@
       },
       {
         "category": "Validation",
-        "reason": "G-SYNC smooths frame delivery. Conservative priority prevents timing contention.",
+        "reason": "Saved settings cannot establish active VRR, input latency, or absence of rollback corrections.",
         "setting": "Expected Behavior",
-        "value": "Tear-free, stable frametimes, no rollback dropouts"
+        "value": "Check frame pacing, tearing, and online responsiveness"
       }
     ],
     "include_legacy_tweaks": false,
@@ -5791,9 +5686,10 @@
         "disable_notifications": true
       },
       "NvidiaSettingsHandler": {
-        "auto_vrr_fps_cap": true,
         "global_vrr_mode": "fullscreen_and_windowed",
-        "preset": "vrr_fighting_game",
+        "low_latency_mode": "on",
+        "max_frame_rate": "off",
+        "power_management": "prefer_max_performance",
         "profile_aliases": [
           "Rivals 2 Online",
           "Rivals2-Win64-Shipping.exe",
@@ -5819,19 +5715,14 @@
           "Rivals 2 (Streaming)"
         ],
         "profile_name": "Rivals 2",
-        "threaded_optimization": "on",
+        "shader_cache": "on",
+        "threaded_optimization": "auto",
+        "triple_buffering": "off",
         "vrr_app_override": "allow",
-        "vrr_cap_policy": "fighting_60hz_vrr"
+        "vsync": "on",
+        "vsync_tear_control": "disable"
       },
-      "PowerSettingsHandler": {
-        "active_plan": "ultimate_performance",
-        "disable_core_parking": true,
-        "disable_pcie_power_saving": true,
-        "disable_usb_suspend": true,
-        "ensure_ultimate_performance": true,
-        "processor_max_performance": true,
-        "processor_min_state": 100
-      },
+      "PowerSettingsHandler": {},
       "ProcessPriorityHandler": {
         "cpu_priority": 2,
         "io_priority": 2
@@ -5841,20 +5732,14 @@
           "Rivals2-Win64-Shipping.exe": false,
           "Rivals2.exe": false,
           "RivalsofAether2.exe": false
-        },
-        "game_priority": {
-          "priority": 6,
-          "scheduling_category": "High"
-        },
-        "win32_priority_separation": 38
+        }
       },
       "Rivals2ConfigHandler": {
         "auto_vrr_fps_cap": true,
         "fullscreen_mode": 1,
         "hdr_output": false,
-        "raw_input": true,
-        "vrr_cap_policy": "fighting_60hz_vrr",
-        "vsync": false
+        "vrr_cap_policy": "refresh_minus_3",
+        "vsync": true
       },
       "WindowsSettingsHandler": {
         "auto_hdr": false,
@@ -5893,7 +5778,7 @@
     "in_game_settings": [
       {
         "category": "Windows HDR",
-        "reason": "This profile enables Windows HDR + WCG for OLED / Mini-LED comfort. Rivals 2 currently advertises no native HDR support, so the game remains SDR and Windows composites it into the HDR surface.",
+        "reason": "This profile enables Windows HDR + WCG for OLED / Mini-LED comfort. This lane deliberately keeps game output SDR for Windows HDR composition; native game HDR support is not established.",
         "setting": "Use HDR (Settings > System > Display)",
         "value": "On"
       },
@@ -5905,7 +5790,7 @@
       },
       {
         "category": "Rivals 2 Video",
-        "reason": "Steam metadata reports hdr_support=0 for Rivals 2, so ABSO does not force Unreal's bUseHDRDisplayOutput flag. These HDR lanes are OS-level SDR-in-HDR composition variants, not native game HDR.",
+        "reason": "Native game HDR support is not established, so ABSO keeps Unreal's bUseHDRDisplayOutput flag off. These lanes use OS-level SDR-in-HDR composition variants, not native game HDR.",
         "setting": "HDR Output",
         "value": "Off in GameUserSettings.ini"
       },
@@ -5917,69 +5802,69 @@
       },
       {
         "category": "Display",
-        "reason": "Windows HDR composition can add a small nonzero presentation cost. Use the SDR sibling when the leanest latency path matters more than HDR desktop comfort.",
+        "reason": "This lane keeps game output SDR inside the Windows HDR desktop. Presentation cost varies by OS, driver, and path; ABSO has not measured a latency difference from the SDR sibling.",
         "setting": "Exclusive Fullscreen vs SDR-in-HDR latency",
-        "value": "Accept a small HDR composition cost"
+        "value": "Compare presentation and image quality"
       },
       {
-        "category": "=== G-SYNC PROFILE ===",
-        "reason": "Tear-free rollback-safe VRR lane for online and training. VSync acts as safety net only - never activates with FPS capped below refresh rate. Rivals 2 ticks at a fixed 60 Hz, so the cap snaps to the largest multiple of 60 under refresh - 3 for an even frames-per-tick cadence: 240 @ 300Hz, 180 @ 240Hz, 120 @ 144Hz. (Blur Busters G-SYNC 101 margin + 60 Hz sim grid.)",
+        "category": "G-SYNC profile",
+        "reason": "Uses one native render cap with headroom below display refresh. SnapNet interpolates between simulation ticks; a 60 Hz simulation does not require a render cap in multiples of 60. This is a starting policy, not a measured latency or rollback guarantee.",
         "setting": "Overview",
-        "value": "G-SYNC ON, VSync ON (NVCP), 60-multiple FPS cap below refresh"
+        "value": "G-SYNC On, VSync On, native FPS cap below refresh"
       },
       {
         "category": "NVIDIA Control Panel",
-        "reason": "Display > Set up G-SYNC. Check 'Enable G-SYNC' and 'Enable for full screen mode'.",
+        "reason": "Enable fullscreen G-SYNC for this lane; verify engagement during gameplay.",
         "setting": "Set up G-SYNC",
-        "value": "Enable G-SYNC, G-SYNC Compatible: ON"
+        "value": "Enable G-SYNC / G-SYNC Compatible"
       },
       {
         "category": "NVIDIA Control Panel",
-        "reason": "Manage 3D Settings. Acts as SAFETY NET only with G-SYNC. With FPS capped below refresh, VSync never engages.",
+        "reason": "Provides tear prevention with G-SYNC; the cap reduces refresh-ceiling backpressure.",
         "setting": "Vertical sync",
         "value": "On"
       },
       {
         "category": "NVIDIA Control Panel",
-        "reason": "This NVIDIA setting is exposed as OGL_THREAD_CONTROL. A frame-time benefit on Rivals 2's DX11 path has not been established.",
+        "reason": "Restores automatic policy for this OpenGL control; no DX11 performance gain is claimed.",
         "setting": "Threaded Optimization",
-        "value": "On"
+        "value": "Auto"
       },
       {
         "category": "NVIDIA Control Panel",
-        "reason": "Reduces render queue depth on the published DX11 path. 'On' is correct (not 'Off' - Rivals 2 has no Reflex). If stuttering occurs, try 'Off' or set Pre-Rendered Frames to 2 via Nvidia Profile Inspector.",
+        "reason": "Driver queue-control starting point for the published DX11 path. Compare frame times and latency before choosing another mode; neither On nor Ultra is proven best on this PC.",
         "setting": "Low Latency Mode",
         "value": "On"
       },
       {
         "category": "NVIDIA Control Panel",
-        "reason": "ABSO auto-detects your refresh rate and caps at the largest multiple of 60 under refresh - 3 (240 @ 300Hz, 180 @ 240Hz, 120 @ 144Hz). Keeps G-SYNC active, V-SYNC from engaging, and the 60 Hz sim cadence even \u2014 generic 297-style caps land off the sim grid; whether snapping improves motion requires measurement.",
+        "reason": "The native limiter owns the cap; adding another limiter has no measured benefit here.",
         "setting": "Max Frame Rate",
-        "value": "60-multiple cap below refresh (auto-set by ABSO)"
+        "value": "Off"
       },
       {
         "category": "In-Game Video",
-        "reason": "Required for proper G-SYNC behavior. Borderless adds compositor latency.",
+        "reason": "This lane requests fullscreen and disables FSO. The actual presentation path and latency still require observation; use a capture lane for borderless.",
         "setting": "Display Mode",
-        "value": "Exclusive Fullscreen"
+        "value": "Fullscreen"
       },
       {
         "category": "In-Game Video",
-        "reason": "ALWAYS disable in-game VSync with G-SYNC. NVCP VSync handles sync.",
+        "reason": "This fullscreen lane uses driver VSync; capture lanes use native VSync for windowed presentation.",
         "setting": "V-SYNC",
         "value": "Off"
       },
       {
         "category": "In-Game Video",
-        "reason": "Must cap below refresh for G-SYNC to work properly, and on a multiple of 60 so the fixed 60 Hz sim renders an even number of frames per tick. In-game limiter has lower latency than NVCP/RTSS limiters.",
+        "reason": "ABSO writes the native cap below the detected primary refresh. Confirm the game retained it after launch; saved-file verification does not prove runtime limiter behavior.",
         "setting": "Frame Rate Cap",
-        "value": "60-multiple cap below refresh (e.g., 240 for 300Hz)"
+        "value": "Refresh minus 3 (297 at 300 Hz)"
       },
       {
         "category": "In-Game Video",
-        "reason": "Rivals 2 does not implement NVIDIA Reflex. LLM 'On' is set via NVCP instead. This is different from OW2/Fortnite where Reflex handles queue control.",
+        "reason": "Rivals of Aether 2 is not listed in NVIDIA's checked Reflex game list. ABSO does not enable Reflex through driver settings.",
         "setting": "NVIDIA Reflex",
-        "value": "Not available"
+        "value": "Support not established"
       },
       {
         "category": "Overlays",
@@ -5989,9 +5874,9 @@
       },
       {
         "category": "Validation",
-        "reason": "G-SYNC smooths frame delivery. Conservative priority prevents timing contention.",
+        "reason": "Saved settings cannot establish active VRR, input latency, or absence of rollback corrections.",
         "setting": "Expected Behavior",
-        "value": "Tear-free, stable frametimes, no rollback dropouts"
+        "value": "Check frame pacing, tearing, and online responsiveness"
       }
     ],
     "include_legacy_tweaks": false,
@@ -6038,9 +5923,10 @@
         "disable_notifications": true
       },
       "NvidiaSettingsHandler": {
-        "auto_vrr_fps_cap": true,
         "global_vrr_mode": "fullscreen_only",
-        "preset": "vrr_fighting_game",
+        "low_latency_mode": "on",
+        "max_frame_rate": "off",
+        "power_management": "prefer_max_performance",
         "profile_aliases": [
           "Rivals 2 Online",
           "Rivals2-Win64-Shipping.exe",
@@ -6066,19 +5952,14 @@
           "Rivals 2 (Streaming)"
         ],
         "profile_name": "Rivals 2",
-        "threaded_optimization": "on",
+        "shader_cache": "on",
+        "threaded_optimization": "auto",
+        "triple_buffering": "off",
         "vrr_app_override": "allow",
-        "vrr_cap_policy": "fighting_60hz_vrr"
+        "vsync": "on",
+        "vsync_tear_control": "disable"
       },
-      "PowerSettingsHandler": {
-        "active_plan": "ultimate_performance",
-        "disable_core_parking": true,
-        "disable_pcie_power_saving": true,
-        "disable_usb_suspend": true,
-        "ensure_ultimate_performance": true,
-        "processor_max_performance": true,
-        "processor_min_state": 100
-      },
+      "PowerSettingsHandler": {},
       "ProcessPriorityHandler": {
         "cpu_priority": 2,
         "io_priority": 2
@@ -6088,19 +5969,13 @@
           "Rivals2-Win64-Shipping.exe": true,
           "Rivals2.exe": true,
           "RivalsofAether2.exe": true
-        },
-        "game_priority": {
-          "priority": 6,
-          "scheduling_category": "High"
-        },
-        "win32_priority_separation": 38
+        }
       },
       "Rivals2ConfigHandler": {
         "auto_vrr_fps_cap": true,
         "fullscreen_mode": 0,
         "hdr_output": false,
-        "raw_input": true,
-        "vrr_cap_policy": "fighting_60hz_vrr",
+        "vrr_cap_policy": "refresh_minus_3",
         "vsync": false
       },
       "WindowsSettingsHandler": {
@@ -6142,7 +6017,7 @@
     "in_game_settings": [
       {
         "category": "Windows HDR",
-        "reason": "This profile enables Windows HDR + WCG for OLED / Mini-LED comfort. Rivals 2 currently advertises no native HDR support, so the game remains SDR and Windows composites it into the HDR surface.",
+        "reason": "This profile enables Windows HDR + WCG for OLED / Mini-LED comfort. This lane deliberately keeps game output SDR for Windows HDR composition; native game HDR support is not established.",
         "setting": "Use HDR (Settings > System > Display)",
         "value": "On"
       },
@@ -6154,7 +6029,7 @@
       },
       {
         "category": "Rivals 2 Video",
-        "reason": "Steam metadata reports hdr_support=0 for Rivals 2, so ABSO does not force Unreal's bUseHDRDisplayOutput flag. These HDR lanes are OS-level SDR-in-HDR composition variants, not native game HDR.",
+        "reason": "Native game HDR support is not established, so ABSO keeps Unreal's bUseHDRDisplayOutput flag off. These lanes use OS-level SDR-in-HDR composition variants, not native game HDR.",
         "setting": "HDR Output",
         "value": "Off in GameUserSettings.ini"
       },
@@ -6171,40 +6046,40 @@
         "value": "Use Borderless / Windowed Fullscreen"
       },
       {
-        "category": "=== G-SYNC PROFILE ===",
-        "reason": "Tear-free rollback-safe VRR lane for online and training. VSync acts as safety net only - never activates with FPS capped below refresh rate. Rivals 2 ticks at a fixed 60 Hz, so the cap snaps to the largest multiple of 60 under refresh - 3 for an even frames-per-tick cadence: 240 @ 300Hz, 180 @ 240Hz, 120 @ 144Hz. (Blur Busters G-SYNC 101 margin + 60 Hz sim grid.)",
+        "category": "G-SYNC profile",
+        "reason": "Uses one native render cap with headroom below display refresh. SnapNet interpolates between simulation ticks; a 60 Hz simulation does not require a render cap in multiples of 60. This is a starting policy, not a measured latency or rollback guarantee.",
         "setting": "Overview",
-        "value": "G-SYNC ON, VSync ON (NVCP), 60-multiple FPS cap below refresh"
+        "value": "G-SYNC On, VSync On, native FPS cap below refresh"
       },
       {
         "category": "NVIDIA Control Panel",
-        "reason": "Display > Set up G-SYNC. Check 'Enable G-SYNC' and 'Enable for full screen mode'.",
+        "reason": "Enable G-SYNC for windowed and fullscreen mode for this borderless lane.",
         "setting": "Set up G-SYNC",
-        "value": "Enable G-SYNC, G-SYNC Compatible: ON"
+        "value": "Enable G-SYNC / G-SYNC Compatible"
       },
       {
         "category": "NVIDIA Control Panel",
-        "reason": "Manage 3D Settings. Acts as SAFETY NET only with G-SYNC. With FPS capped below refresh, VSync never engages.",
+        "reason": "Provides tear prevention with G-SYNC; the cap reduces refresh-ceiling backpressure.",
         "setting": "Vertical sync",
         "value": "On"
       },
       {
         "category": "NVIDIA Control Panel",
-        "reason": "This NVIDIA setting is exposed as OGL_THREAD_CONTROL. A frame-time benefit on Rivals 2's DX11 path has not been established.",
+        "reason": "Restores automatic policy for this OpenGL control; no DX11 performance gain is claimed.",
         "setting": "Threaded Optimization",
-        "value": "On"
+        "value": "Auto"
       },
       {
         "category": "NVIDIA Control Panel",
-        "reason": "Reduces render queue depth on the published DX11 path. 'On' is correct (not 'Off' - Rivals 2 has no Reflex). If stuttering occurs, try 'Off' or set Pre-Rendered Frames to 2 via Nvidia Profile Inspector.",
+        "reason": "Driver queue-control starting point for the published DX11 path. Compare frame times and latency before choosing another mode; neither On nor Ultra is proven best on this PC.",
         "setting": "Low Latency Mode",
         "value": "On"
       },
       {
         "category": "NVIDIA Control Panel",
-        "reason": "ABSO auto-detects your refresh rate and caps at the largest multiple of 60 under refresh - 3 (240 @ 300Hz, 180 @ 240Hz, 120 @ 144Hz). Keeps G-SYNC active, V-SYNC from engaging, and the 60 Hz sim cadence even \u2014 generic 297-style caps land off the sim grid; whether snapping improves motion requires measurement.",
+        "reason": "The native limiter owns the cap; adding another limiter has no measured benefit here.",
         "setting": "Max Frame Rate",
-        "value": "60-multiple cap below refresh (auto-set by ABSO)"
+        "value": "Off"
       },
       {
         "category": "In-Game Video",
@@ -6214,21 +6089,21 @@
       },
       {
         "category": "In-Game Video",
-        "reason": "ALWAYS disable in-game VSync with G-SYNC. NVCP VSync handles sync.",
+        "reason": "Use native VSync for the windowed path; the native FPS cap provides headroom below refresh.",
         "setting": "V-SYNC",
-        "value": "Off"
+        "value": "On"
       },
       {
         "category": "In-Game Video",
-        "reason": "Must cap below refresh for G-SYNC to work properly, and on a multiple of 60 so the fixed 60 Hz sim renders an even number of frames per tick. In-game limiter has lower latency than NVCP/RTSS limiters.",
+        "reason": "ABSO writes the native cap below the detected primary refresh. Confirm the game retained it after launch; saved-file verification does not prove runtime limiter behavior.",
         "setting": "Frame Rate Cap",
-        "value": "60-multiple cap below refresh (e.g., 240 for 300Hz)"
+        "value": "Refresh minus 3 (297 at 300 Hz)"
       },
       {
         "category": "In-Game Video",
-        "reason": "Rivals 2 does not implement NVIDIA Reflex. LLM 'On' is set via NVCP instead. This is different from OW2/Fortnite where Reflex handles queue control.",
+        "reason": "Rivals of Aether 2 is not listed in NVIDIA's checked Reflex game list. ABSO does not enable Reflex through driver settings.",
         "setting": "NVIDIA Reflex",
-        "value": "Not available"
+        "value": "Support not established"
       },
       {
         "category": "Overlays",
@@ -6238,9 +6113,9 @@
       },
       {
         "category": "Validation",
-        "reason": "G-SYNC smooths frame delivery. Conservative priority prevents timing contention.",
+        "reason": "Saved settings cannot establish active VRR, input latency, or absence of rollback corrections.",
         "setting": "Expected Behavior",
-        "value": "Tear-free, stable frametimes, no rollback dropouts"
+        "value": "Check frame pacing, tearing, and online responsiveness"
       }
     ],
     "include_legacy_tweaks": false,
@@ -6287,9 +6162,10 @@
         "disable_notifications": true
       },
       "NvidiaSettingsHandler": {
-        "auto_vrr_fps_cap": true,
         "global_vrr_mode": "fullscreen_and_windowed",
-        "preset": "vrr_fighting_game",
+        "low_latency_mode": "on",
+        "max_frame_rate": "off",
+        "power_management": "prefer_max_performance",
         "profile_aliases": [
           "Rivals 2 Online",
           "Rivals2-Win64-Shipping.exe",
@@ -6315,19 +6191,14 @@
           "Rivals 2 (Streaming)"
         ],
         "profile_name": "Rivals 2",
-        "threaded_optimization": "on",
+        "shader_cache": "on",
+        "threaded_optimization": "auto",
+        "triple_buffering": "off",
         "vrr_app_override": "allow",
-        "vrr_cap_policy": "fighting_60hz_vrr"
+        "vsync": "on",
+        "vsync_tear_control": "disable"
       },
-      "PowerSettingsHandler": {
-        "active_plan": "ultimate_performance",
-        "disable_core_parking": true,
-        "disable_pcie_power_saving": true,
-        "disable_usb_suspend": true,
-        "ensure_ultimate_performance": true,
-        "processor_max_performance": true,
-        "processor_min_state": 100
-      },
+      "PowerSettingsHandler": {},
       "ProcessPriorityHandler": {
         "cpu_priority": 2,
         "io_priority": 2
@@ -6337,20 +6208,14 @@
           "Rivals2-Win64-Shipping.exe": false,
           "Rivals2.exe": false,
           "RivalsofAether2.exe": false
-        },
-        "game_priority": {
-          "priority": 6,
-          "scheduling_category": "High"
-        },
-        "win32_priority_separation": 38
+        }
       },
       "Rivals2ConfigHandler": {
         "auto_vrr_fps_cap": true,
         "fullscreen_mode": 1,
         "hdr_output": false,
-        "raw_input": true,
-        "vrr_cap_policy": "fighting_60hz_vrr",
-        "vsync": false
+        "vrr_cap_policy": "refresh_minus_3",
+        "vsync": true
       },
       "WindowsSettingsHandler": {
         "advanced_color": true,
@@ -6391,19 +6256,19 @@
     "in_game_settings": [
       {
         "category": "=== NO SYNC PROFILE ===",
-        "reason": "One rollback-safe lane for everything. Offline training runs identically on the online-safe tuning.",
+        "reason": "One no-sync lane for online play and offline training. Actual latency and frame pacing require measurement.",
         "setting": "Use Case",
         "value": "Ranked, Unranked, Training, Local VS, Replays"
       },
       {
-        "category": "=== EXPLICIT PROHIBITIONS ===",
+        "category": "Pacing policy",
         "reason": "This lane conservatively avoids competing pacing controls. The 60-multiple cap is a heuristic; netcode or latency improvement is unmeasured.",
-        "setting": "DO NOT USE",
-        "value": "LLM Ultra, Fast VSync, External FPS Caps, Refresh-3 Logic"
+        "setting": "Limiter selection",
+        "value": "One native cap; no VRR or VSync"
       },
       {
         "category": "NVIDIA Control Panel",
-        "reason": "VRR OFF keeps the no-sync scanout path simple and deterministic. Use the G-SYNC HDR lane if you want tear-free VRR.",
+        "reason": "This lane disables VRR and accepts tearing. Use a G-SYNC lane if you prefer synchronized variable-refresh presentation.",
         "setting": "G-SYNC / VRR",
         "value": "OFF"
       },
@@ -6417,11 +6282,11 @@
         "category": "NVIDIA Control Panel",
         "reason": "This NVIDIA setting is exposed as OGL_THREAD_CONTROL. A frame-time benefit on Rivals 2's DX11 path has not been established.",
         "setting": "Threaded Optimization",
-        "value": "On"
+        "value": "Auto"
       },
       {
         "category": "NVIDIA Control Panel",
-        "reason": "ON (not Ultra) - Ultra can cause frame pacing issues and overrides FPS caps.",
+        "reason": "Driver queue-control starting point for DX11. Compare frame times and latency; no mode is proven best on this PC.",
         "setting": "Low Latency Mode",
         "value": "On"
       },
@@ -6433,13 +6298,13 @@
       },
       {
         "category": "In-Game Settings",
-        "reason": "Native engine timing must remain authoritative.",
+        "reason": "This no-sync lane accepts tearing in exchange for avoiding VSync backpressure.",
         "setting": "V-Sync",
         "value": "OFF"
       },
       {
         "category": "In-Game Settings",
-        "reason": "Rivals 2 ticks at a fixed 60 Hz; 60-multiple caps hold an even frames-per-tick cadence, and the bounded render load keeps CPU headroom free for rollback resimulation bursts.",
+        "reason": "The retained render-budget policy uses multiples of 60, but an integer frames-per-tick cadence is not a simulation requirement. No local latency or rollback benefit has been measured.",
         "setting": "Frame Rate Cap",
         "value": "Multiple of 60 at/below refresh (auto-set: 300 @ 300Hz)"
       },
@@ -6463,9 +6328,9 @@
       },
       {
         "category": "Validation",
-        "reason": "Rollback resync frames must not cause cascading frame loss.",
+        "reason": "VRR is off in this lane. Saved configuration cannot guarantee online or rendering performance.",
         "setting": "Expected Behavior",
-        "value": "Minor frametime variance OK, no persistent VRR dropouts"
+        "value": "Check frame pacing, tearing, and online responsiveness"
       }
     ],
     "include_legacy_tweaks": false,
@@ -6541,21 +6406,13 @@
         ],
         "profile_name": "Rivals 2",
         "shader_cache": "on",
-        "threaded_optimization": "on",
+        "threaded_optimization": "auto",
         "triple_buffering": "off",
         "vrr_app_override": "force_off",
         "vsync": "off",
         "vsync_tear_control": "disable"
       },
-      "PowerSettingsHandler": {
-        "active_plan": "ultimate_performance",
-        "disable_core_parking": true,
-        "disable_pcie_power_saving": true,
-        "disable_usb_suspend": true,
-        "ensure_ultimate_performance": true,
-        "processor_max_performance": true,
-        "processor_min_state": 100
-      },
+      "PowerSettingsHandler": {},
       "ProcessPriorityHandler": {
         "cpu_priority": 2,
         "io_priority": 2
@@ -6565,18 +6422,12 @@
           "Rivals2-Win64-Shipping.exe": true,
           "Rivals2.exe": true,
           "RivalsofAether2.exe": true
-        },
-        "game_priority": {
-          "priority": 6,
-          "scheduling_category": "High"
-        },
-        "win32_priority_separation": 38
+        }
       },
       "Rivals2ConfigHandler": {
         "auto_vrr_fps_cap": true,
         "fullscreen_mode": 0,
         "hdr_output": false,
-        "raw_input": true,
         "vrr_cap_policy": "fighting_60hz_nosync",
         "vsync": false
       },
@@ -6617,7 +6468,7 @@
     "in_game_settings": [
       {
         "category": "Windows HDR",
-        "reason": "This profile enables Windows HDR + WCG for OLED / Mini-LED comfort. Rivals 2 currently advertises no native HDR support, so the game remains SDR and Windows composites it into the HDR surface.",
+        "reason": "This profile enables Windows HDR + WCG for OLED / Mini-LED comfort. This lane deliberately keeps game output SDR for Windows HDR composition; native game HDR support is not established.",
         "setting": "Use HDR (Settings > System > Display)",
         "value": "On"
       },
@@ -6629,7 +6480,7 @@
       },
       {
         "category": "Rivals 2 Video",
-        "reason": "Steam metadata reports hdr_support=0 for Rivals 2, so ABSO does not force Unreal's bUseHDRDisplayOutput flag. These HDR lanes are OS-level SDR-in-HDR composition variants, not native game HDR.",
+        "reason": "Native game HDR support is not established, so ABSO keeps Unreal's bUseHDRDisplayOutput flag off. These lanes use OS-level SDR-in-HDR composition variants, not native game HDR.",
         "setting": "HDR Output",
         "value": "Off in GameUserSettings.ini"
       },
@@ -6641,25 +6492,25 @@
       },
       {
         "category": "Display",
-        "reason": "Windows HDR composition can add a small nonzero presentation cost. Use the SDR sibling when the leanest latency path matters more than HDR desktop comfort.",
+        "reason": "This lane keeps game output SDR inside the Windows HDR desktop. Presentation cost varies by OS, driver, and path; ABSO has not measured a latency difference from the SDR sibling.",
         "setting": "Exclusive Fullscreen vs SDR-in-HDR latency",
-        "value": "Accept a small HDR composition cost"
+        "value": "Compare presentation and image quality"
       },
       {
         "category": "=== NO SYNC PROFILE ===",
-        "reason": "One rollback-safe lane for everything. Offline training runs identically on the online-safe tuning.",
+        "reason": "One no-sync lane for online play and offline training. Actual latency and frame pacing require measurement.",
         "setting": "Use Case",
         "value": "Ranked, Unranked, Training, Local VS, Replays"
       },
       {
-        "category": "=== EXPLICIT PROHIBITIONS ===",
+        "category": "Pacing policy",
         "reason": "This lane conservatively avoids competing pacing controls. The 60-multiple cap is a heuristic; netcode or latency improvement is unmeasured.",
-        "setting": "DO NOT USE",
-        "value": "LLM Ultra, Fast VSync, External FPS Caps, Refresh-3 Logic"
+        "setting": "Limiter selection",
+        "value": "One native cap; no VRR or VSync"
       },
       {
         "category": "NVIDIA Control Panel",
-        "reason": "VRR OFF keeps the no-sync scanout path simple and deterministic. Use the G-SYNC HDR lane if you want tear-free VRR.",
+        "reason": "This lane disables VRR and accepts tearing. Use a G-SYNC lane if you prefer synchronized variable-refresh presentation.",
         "setting": "G-SYNC / VRR",
         "value": "OFF"
       },
@@ -6673,11 +6524,11 @@
         "category": "NVIDIA Control Panel",
         "reason": "This NVIDIA setting is exposed as OGL_THREAD_CONTROL. A frame-time benefit on Rivals 2's DX11 path has not been established.",
         "setting": "Threaded Optimization",
-        "value": "On"
+        "value": "Auto"
       },
       {
         "category": "NVIDIA Control Panel",
-        "reason": "ON (not Ultra) - Ultra can cause frame pacing issues and overrides FPS caps.",
+        "reason": "Driver queue-control starting point for DX11. Compare frame times and latency; no mode is proven best on this PC.",
         "setting": "Low Latency Mode",
         "value": "On"
       },
@@ -6689,13 +6540,13 @@
       },
       {
         "category": "In-Game Settings",
-        "reason": "Native engine timing must remain authoritative.",
+        "reason": "This no-sync lane accepts tearing in exchange for avoiding VSync backpressure.",
         "setting": "V-Sync",
         "value": "OFF"
       },
       {
         "category": "In-Game Settings",
-        "reason": "Rivals 2 ticks at a fixed 60 Hz; 60-multiple caps hold an even frames-per-tick cadence, and the bounded render load keeps CPU headroom free for rollback resimulation bursts.",
+        "reason": "The retained render-budget policy uses multiples of 60, but an integer frames-per-tick cadence is not a simulation requirement. No local latency or rollback benefit has been measured.",
         "setting": "Frame Rate Cap",
         "value": "Multiple of 60 at/below refresh (auto-set: 300 @ 300Hz)"
       },
@@ -6719,9 +6570,9 @@
       },
       {
         "category": "Validation",
-        "reason": "Rollback resync frames must not cause cascading frame loss.",
+        "reason": "VRR is off in this lane. Saved configuration cannot guarantee online or rendering performance.",
         "setting": "Expected Behavior",
-        "value": "Minor frametime variance OK, no persistent VRR dropouts"
+        "value": "Check frame pacing, tearing, and online responsiveness"
       }
     ],
     "include_legacy_tweaks": false,
@@ -6798,21 +6649,13 @@
         ],
         "profile_name": "Rivals 2",
         "shader_cache": "on",
-        "threaded_optimization": "on",
+        "threaded_optimization": "auto",
         "triple_buffering": "off",
         "vrr_app_override": "force_off",
         "vsync": "off",
         "vsync_tear_control": "disable"
       },
-      "PowerSettingsHandler": {
-        "active_plan": "ultimate_performance",
-        "disable_core_parking": true,
-        "disable_pcie_power_saving": true,
-        "disable_usb_suspend": true,
-        "ensure_ultimate_performance": true,
-        "processor_max_performance": true,
-        "processor_min_state": 100
-      },
+      "PowerSettingsHandler": {},
       "ProcessPriorityHandler": {
         "cpu_priority": 2,
         "io_priority": 2
@@ -6822,18 +6665,12 @@
           "Rivals2-Win64-Shipping.exe": true,
           "Rivals2.exe": true,
           "RivalsofAether2.exe": true
-        },
-        "game_priority": {
-          "priority": 6,
-          "scheduling_category": "High"
-        },
-        "win32_priority_separation": 38
+        }
       },
       "Rivals2ConfigHandler": {
         "auto_vrr_fps_cap": true,
         "fullscreen_mode": 0,
         "hdr_output": false,
-        "raw_input": true,
         "vrr_cap_policy": "fighting_60hz_nosync",
         "vsync": false
       },

@@ -1,23 +1,28 @@
 """Rivals of Aether 2 game config handler.
 
 Manages Rivals 2-specific game configuration files to enforce ABSO profile targets
-like exclusive fullscreen mode and raw input.
+such as display mode, VSync, and the native frame-rate limit.
 """
 
 from __future__ import annotations
 
 import logging
+import math
 from pathlib import Path
 from typing import Any
 
 from abso.core.config_safety import (
+    INI_SECTION_RE,
     apply_ini_key_patch,
+    find_ini_section_bounds,
     parse_ini_assignments,
     validate_allowed_keys,
 )
 from abso.core.models import Issue
 from abso.settings.base import SettingsHandler
+from abso.settings.ue_game_user_settings import UEGameUserSettingsHandler
 from abso.settings.value_parsing import parse_bool_like
+from abso.utils.atomic_io import atomic_write_text
 
 logger = logging.getLogger(__name__)
 
@@ -47,9 +52,9 @@ class Rivals2ConfigHandler(SettingsHandler):
     """Enforces Rivals 2 game config settings for ABSO profiles.
 
     Manages the game's GameUserSettings.ini to enforce:
-    - Exclusive fullscreen mode for strict profiles
-    - VSync off (handled by NVCP instead)
-    - Raw input for best input latency
+    - Profile-selected fullscreen or borderless mode
+    - Profile-selected VSync and native FPS cap
+    - Native HDR output intent (saved-file readback, not runtime proof)
     """
 
     is_critical_verify = True
@@ -59,17 +64,13 @@ class Rivals2ConfigHandler(SettingsHandler):
     MUTABLE_SETTINGS_TO_INI: dict[str, str] = {
         "fullscreen_mode": "FullscreenMode",
         "vsync": "bUseVSync",
-        "raw_input": "bUseRawInput",
         "frame_rate_limit": "FrameRateLimit",
         "hdr_output": "bUseHDRDisplayOutput",
         "hdr_nits": "HDRDisplayOutputNits",
     }
 
-    # The game's own settings UI writes ``FrameRateLimit=999`` for its
-    # uncapped option; Unreal also treats ``0`` as no cap. Both mean the
-    # same effective state, so verification must not report drift when the
-    # game rewrites one sentinel over the other.
-    UNCAPPED_FRAME_RATE_SENTINEL = 999
+    # bUseRawInput is not documented by UGameUserSettings. Do not write it,
+    # even for legacy overrides; leave existing input configuration user-owned.
 
     # These keys should never be mutated by profile automation.
     PROTECTED_INI_KEYS: set[str] = {
@@ -103,21 +104,28 @@ class Rivals2ConfigHandler(SettingsHandler):
         result: dict[str, Any] = {"config_found": True, "config_path": str(ini_path)}
 
         try:
-            content = ini_path.read_text(encoding="utf-8", errors="replace")
+            content = ini_path.read_text(encoding="utf-8-sig")
+            if not self._section_available(content.splitlines()):
+                result["config_section_found"] = False
+                return result
             assignments = parse_ini_assignments(
                 content.splitlines(),
                 section_name=self.TARGET_SECTION_NAME,
             )
 
             if "FullscreenMode" in assignments:
-                result["fullscreen_mode"] = int(float(assignments["FullscreenMode"]))
+                mode = float(assignments["FullscreenMode"])
+                if mode in (0, 1, 2):
+                    result["fullscreen_mode"] = int(mode)
             if "bUseVSync" in assignments:
                 result["vsync"] = parse_bool_like(assignments["bUseVSync"])
             if "bUseRawInput" in assignments:
                 result["raw_input"] = parse_bool_like(assignments["bUseRawInput"])
             if "FrameRateLimit" in assignments:
                 try:
-                    result["frame_rate_limit"] = int(float(assignments["FrameRateLimit"]))
+                    cap = float(assignments["FrameRateLimit"])
+                    if math.isfinite(cap) and cap >= 0:
+                        result["frame_rate_limit"] = int(cap) if cap.is_integer() else cap
                 except ValueError:
                     logger.debug("Rivals 2 frame rate limit value was non-numeric")
             if "bUseHDRDisplayOutput" in assignments:
@@ -133,45 +141,28 @@ class Rivals2ConfigHandler(SettingsHandler):
         return result
 
     def audit(self) -> list[Issue]:
-        """Audit Rivals 2 game config."""
-        issues: list[Issue] = []
-        current = self.detect()
+        """verify_active owns lane-specific presentation/sync comparisons.
 
-        if not current.get("config_found"):
-            return issues  # Game not installed, nothing to audit
+        Borderless and native VSync are intentional in the capture lanes.
+        Neither is a universal defect when the selected target is unknown.
+        """
+        return []
 
-        if current.get("fullscreen_mode") is not None and current["fullscreen_mode"] != 0:
-            mode_names = {0: "Exclusive", 1: "Borderless", 2: "Windowed"}
-            issues.append(Issue(
-                title="Rivals 2 not in exclusive fullscreen",
-                severity="warning",
-                current_value=mode_names.get(current["fullscreen_mode"], f"Unknown ({current['fullscreen_mode']})"),
-                optimal_value="Exclusive Fullscreen (0)",
-                explanation=(
-                    "This strict Rivals 2 profile expects exclusive fullscreen. "
-                    "Use a capture/borderless profile if you want the windowed path."
-                ),
-                category="game_config",
-            ))
-
-        if current.get("vsync") is True:
-            issues.append(Issue(
-                title="Rivals 2 VSync enabled in game",
-                severity="warning",
-                current_value="Enabled",
-                optimal_value="Disabled (use NVCP instead)",
-                explanation="In-game VSync should be off; sync is managed by NVIDIA Control Panel.",
-                category="game_config",
-            ))
-
-        return issues
+    @classmethod
+    def _section_available(cls, lines: list[str]) -> bool:
+        if find_ini_section_bounds(lines, cls.TARGET_SECTION_NAME) is not None:
+            return True
+        # Support historical sectionless files, but never edit another section
+        # through the generic INI helper's whole-file fallback.
+        return not any(INI_SECTION_RE.match(line) for line in lines)
 
     def apply(self, settings: dict[str, Any]) -> dict[str, Any]:
         """Apply Rivals 2 game config settings."""
-        settings = dict(settings)
+        settings = {key: value for key, value in settings.items() if not key.startswith("_")}
 
         vrr_cap_policy = settings.pop("vrr_cap_policy", None)
         if settings.pop("auto_vrr_fps_cap", False):
+            cap_resolved = False
             try:
                 from abso.core.vrr import get_vrr_fps_cap_for_policy
                 from abso.settings.nvidia import NvidiaSettingsHandler
@@ -181,6 +172,7 @@ class Rivals2ConfigHandler(SettingsHandler):
                     settings["frame_rate_limit"] = get_vrr_fps_cap_for_policy(
                         refresh_hz, vrr_cap_policy
                     )
+                    cap_resolved = True
                     logger.info(
                         "Rivals 2 auto VRR FPS cap: %d (from %d Hz%s)",
                         settings["frame_rate_limit"],
@@ -189,6 +181,15 @@ class Rivals2ConfigHandler(SettingsHandler):
                     )
             except Exception as e:
                 logger.warning("Rivals 2 auto VRR FPS cap detection failed: %s", e)
+            if not cap_resolved:
+                return {
+                    "success": False,
+                    "error": (
+                        "Rivals 2 automatic FPS cap could not be resolved; no settings were written. "
+                        "Check display refresh and cap policy, or request an explicit frame_rate_limit."
+                    ),
+                    "requires_reboot": False,
+                }
 
         invalid_requested_keys = validate_allowed_keys(
             set(settings.keys()),
@@ -207,15 +208,21 @@ class Rivals2ConfigHandler(SettingsHandler):
         ini_path = self._get_config_path()
         if not ini_path:
             return {
-                "success": True,
-                "error": None,
+                "success": not bool(settings),
+                "error": "Rivals 2 GameUserSettings.ini not found; launch the game once to create it." if settings else None,
                 "requires_reboot": False,
-                "skipped": "Rivals 2 GameUserSettings.ini not found",
+                "applied": [],
             }
 
         try:
-            content = ini_path.read_text(encoding="utf-8", errors="replace")
+            content = ini_path.read_text(encoding="utf-8-sig")
             lines = content.splitlines()
+            if not self._section_available(lines):
+                return {
+                    "success": False,
+                    "error": "Rivals 2 Engine.GameUserSettings section not found; no settings were written.",
+                    "requires_reboot": False,
+                }
             replacements, conversion_errors = self._build_replacements(settings)
             if conversion_errors:
                 return {
@@ -265,7 +272,7 @@ class Rivals2ConfigHandler(SettingsHandler):
                 }
 
             if patch_result.changed:
-                ini_path.write_text("\n".join(patch_result.lines) + "\n", encoding="utf-8")
+                atomic_write_text(ini_path, "\n".join(patch_result.lines) + "\n")
                 logger.info(
                     "Updated Rivals 2 config: %s (%s changed, %s appended)",
                     ini_path,
@@ -286,18 +293,21 @@ class Rivals2ConfigHandler(SettingsHandler):
                 "requires_reboot": False,
             }
 
-    @classmethod
-    def _is_uncapped_frame_rate(cls, value: Any) -> bool:
-        """True when a FrameRateLimit value means "no cap" (0 or >= 999)."""
-        return isinstance(value, int | float) and not isinstance(value, bool) and (
-            value == 0 or value >= cls.UNCAPPED_FRAME_RATE_SENTINEL
-        )
-
     def verify_active(self, settings: dict[str, Any]) -> dict[str, Any]:
         """Verify requested Rivals 2 config values are active."""
-        settings = dict(settings)
+        settings = {key: value for key, value in settings.items() if not key.startswith("_")}
         results: dict[str, Any] = {"all_active": True, "settings": {}}
         vrr_cap_policy = settings.pop("vrr_cap_policy", None)
+        invalid_requested_keys = validate_allowed_keys(
+            set(settings) - {"auto_vrr_fps_cap"}, set(self.MUTABLE_SETTINGS_TO_INI)
+        )
+        for key in invalid_requested_keys:
+            results["all_active"] = False
+            results["settings"][key] = {
+                "target": settings[key], "current": None, "active": False,
+                "status": "unsupported",
+                "note": "This setting is not managed by the Rivals 2 config handler.",
+            }
         if settings.pop("auto_vrr_fps_cap", False):
             cap_resolved = False
             try:
@@ -333,18 +343,9 @@ class Rivals2ConfigHandler(SettingsHandler):
 
             target = settings[key]
             current_value = current.get(key)
+            _, conversion_errors = self._build_replacements({key: target})
             readable = bool(current.get("config_found")) and key in current
-            is_active = readable and current_value == target
-            if (
-                not is_active
-                and readable
-                and key == "frame_rate_limit"
-                and self._is_uncapped_frame_rate(target)
-                and self._is_uncapped_frame_rate(current_value)
-            ):
-                # 0 and 999 are both "uncapped"; a game-side rewrite between
-                # the two sentinels is not real drift.
-                is_active = True
+            is_active = not conversion_errors and readable and current_value == target
             results["settings"][key] = {
                 "target": target,
                 "current": current_value,
@@ -352,7 +353,11 @@ class Rivals2ConfigHandler(SettingsHandler):
             }
             if not is_active:
                 results["all_active"] = False
-                if not readable:
+                if conversion_errors:
+                    results["settings"][key].update({
+                        "status": "invalid", "note": "; ".join(conversion_errors),
+                    })
+                elif not readable:
                     results["settings"][key].update({
                         "status": "unverifiable",
                         "note": (
@@ -365,7 +370,7 @@ class Rivals2ConfigHandler(SettingsHandler):
         return results
 
     def backup(self) -> dict[str, Any]:
-        """Back up the full Rivals 2 config file for lossless restore."""
+        """Retain the full file for recovery; normal restore patches owned keys."""
         ini_path = self._get_config_path()
         if not ini_path:
             return {"config_found": False}
@@ -374,46 +379,34 @@ class Rivals2ConfigHandler(SettingsHandler):
             return {
                 "config_found": True,
                 "config_path": str(ini_path),
-                "file_content": ini_path.read_text(encoding="utf-8", errors="replace"),
+                "file_content": ini_path.read_text(encoding="utf-8"),
             }
         except Exception as e:
             logger.error("Failed to back up Rivals 2 config %s: %s", ini_path, e)
             return {"config_found": False}
 
     def restore(self, data: dict[str, Any]) -> bool:
-        """Restore Rivals 2 config from a backup payload.
+        """Restore managed keys while preserving newer controls and graphics.
 
-        New backups store the full INI under ``file_content``. Older backups
-        (taken before the full-file format) only persisted detected values,
-        so we fall back to re-applying those detected fields rather than
-        failing the baseline restore.
+        Reuse the UE handler's section-aware restore and missing-file recovery.
+        Undocumented raw input remains user-owned during baseline restoration.
         """
         if not data.get("config_found"):
-            return True  # Nothing to restore
-
-        file_content = data.get("file_content")
-        if file_content is None:
-            return self._restore_from_legacy_payload(data)
-
-        config_path = data.get("config_path")
-        if not config_path:
-            return False
-
-        try:
-            ini_path = Path(config_path)
-            ini_path.parent.mkdir(parents=True, exist_ok=True)
-            ini_path.write_text(file_content, encoding="utf-8")
             return True
-        except OSError as e:
-            logger.error("Failed to restore Rivals 2 config %s: %s", config_path, e)
-            return False
+        if data.get("file_content") is None:
+            return self._restore_from_legacy_payload(data)
+        restorer = UEGameUserSettingsHandler()
+        restorer.TARGET_SECTION_NAME = self.TARGET_SECTION_NAME
+        restorer.MUTABLE_SETTINGS_TO_INI = dict(self.MUTABLE_SETTINGS_TO_INI)
+        restorer.MIRROR_FULLSCREEN_MODE_KEYS = ("LastConfirmedFullscreenMode",)
+        restorer.PROTECTED_INI_KEYS = self.PROTECTED_INI_KEYS
+        return restorer.restore(data)
 
     def _restore_from_legacy_payload(self, data: dict[str, Any]) -> bool:
         """Re-apply detected fields from a pre-full-file backup payload."""
         legacy_keys = (
             "fullscreen_mode",
             "vsync",
-            "raw_input",
             "frame_rate_limit",
             "hdr_output",
             "hdr_nits",
@@ -435,11 +428,14 @@ class Rivals2ConfigHandler(SettingsHandler):
 
         if "fullscreen_mode" in settings:
             try:
-                fullscreen_mode = str(int(settings["fullscreen_mode"]))
+                mode = float(settings["fullscreen_mode"])
+                if isinstance(settings["fullscreen_mode"], bool) or mode not in (0, 1, 2):
+                    raise ValueError
+                fullscreen_mode = str(int(mode))
                 replacements["FullscreenMode"] = fullscreen_mode
                 replacements["LastConfirmedFullscreenMode"] = fullscreen_mode
             except (TypeError, ValueError):
-                errors.append("fullscreen_mode must be an integer")
+                errors.append("fullscreen_mode must be 0 (fullscreen), 1 (borderless), or 2 (windowed)")
 
         if "vsync" in settings:
             parsed = parse_bool_like(settings["vsync"])
@@ -448,21 +444,15 @@ class Rivals2ConfigHandler(SettingsHandler):
             else:
                 replacements["bUseVSync"] = "True" if parsed else "False"
 
-        if "raw_input" in settings:
-            parsed = parse_bool_like(settings["raw_input"])
-            if parsed is None:
-                errors.append("raw_input must be a boolean")
-            else:
-                replacements["bUseRawInput"] = "True" if parsed else "False"
-
         if "frame_rate_limit" in settings:
             try:
-                frame_cap = int(float(settings["frame_rate_limit"]))
-                if frame_cap < 0:
+                frame_cap = float(settings["frame_rate_limit"])
+                if (isinstance(settings["frame_rate_limit"], bool) or not math.isfinite(frame_cap)
+                        or frame_cap < 0 or not frame_cap.is_integer()):
                     raise ValueError
-                replacements["FrameRateLimit"] = str(frame_cap)
+                replacements["FrameRateLimit"] = str(int(frame_cap))
             except (TypeError, ValueError):
-                errors.append("frame_rate_limit must be a non-negative number")
+                errors.append("frame_rate_limit must be a finite non-negative integer")
 
         if "hdr_output" in settings:
             parsed = parse_bool_like(settings["hdr_output"])
@@ -477,7 +467,7 @@ class Rivals2ConfigHandler(SettingsHandler):
                 if hdr_nits <= 0:
                     raise ValueError
                 replacements["HDRDisplayOutputNits"] = str(hdr_nits)
-            except (TypeError, ValueError):
+            except (TypeError, ValueError, OverflowError):
                 errors.append("hdr_nits must be a positive number")
 
         return replacements, errors

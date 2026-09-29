@@ -12,6 +12,7 @@ from abso.profiles.profile_bases import (
     ReflexShooterBaseProfile,
     fso_overrides,
     merge_settings_map,
+    preserve_baseline_system_policy,
 )
 
 if TYPE_CHECKING:
@@ -24,19 +25,13 @@ class _Overwatch2BaseProfile(ReflexShooterBaseProfile):
     """Shared Overwatch 2 profile defaults."""
 
     def _base_settings(self) -> dict[str, dict[str, Any]]:
-        settings = super()._base_settings()
+        settings = preserve_baseline_system_policy(super()._base_settings())
         # OW2 has no measured benefit from the shared base's power-plan,
         # CPU-floor, parking, scheduler, MSI, or NIC policies. Leave these
         # at the captured baseline during a normal profile transaction.
         # Replace the power map here: an empty override would merge with and
         # retain the inherited settings. Keep handlers registered for backup
         # and restore, and preserve explicit opt-in legacy registry settings.
-        settings["PowerSettingsHandler"] = {}
-        registry = settings["RegistrySettingsHandler"]
-        registry.pop("win32_priority_separation", None)
-        registry.pop("game_priority", None)
-        settings["InterruptModeHandler"] = {"enable_msi": False}
-        settings["NicDriverHandler"] = {"nic_tuning": False}
         # The native limiter owns the ceiling. Explicit Off clears a driver
         # cap left by an earlier OW2 profile instead of merely omitting it.
         settings["NvidiaSettingsHandler"].update({

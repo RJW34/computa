@@ -2565,28 +2565,28 @@ $script:FallbackProfiles = [ordered]@{
         Rank = 10
     }
 
-    # --- Fighting Games: Rivals 2 (merged rollback-safe lanes) ---
+    # --- Fighting Games: Rivals 2 (online and training lanes) ---
     "rivals2-nosync"    = @{
         Name     = "Rivals 2 - No Sync"
-        Sub      = "No Sync | LLM ON | Rollback-Safe"
+        Sub      = "No Sync | LLM ON"
         Cat      = "Fighting"
-        Desc     = "Rollback-safe no-sync lane for online play and training"
+        Desc     = "No-sync lane with a bounded native FPS cap; tearing accepted"
         Exes     = @("Rivals2-Win64-Shipping.exe", "RivalsofAether2.exe", "Rivals2.exe")
         SyncMode = "off"
     }
     "rivals2-nosync-hdr" = @{
         Name     = "Rivals 2 - No Sync HDR"
-        Sub      = "No Sync HDR | LLM ON | Rollback-Safe"
+        Sub      = "No Sync HDR | LLM ON"
         Cat      = "Fighting"
-        Desc     = "Rollback-safe no-sync lane with Windows HDR composition"
+        Desc     = "No-sync lane with Windows HDR composition; native HDR stays off"
         Exes     = @("Rivals2-Win64-Shipping.exe", "RivalsofAether2.exe", "Rivals2.exe")
         SyncMode = "off"
     }
     "rivals2-gsync" = @{
         Name     = "Rivals 2 - G-SYNC"
-        Sub      = "G-SYNC ON | LLM ON | VSync Safety Net | Rollback-Safe"
+        Sub      = "G-SYNC ON | LLM ON | VSync Safety Net"
         Cat      = "Fighting"
-        Desc     = "Rollback-safe tear-free VRR lane (G-SYNC ON, VSync safety net)"
+        Desc     = "G-SYNC lane with one native refresh-minus-three cap and driver VSync On"
         Exes     = @("Rivals2-Win64-Shipping.exe", "RivalsofAether2.exe", "Rivals2.exe")
         SyncMode = "on"
     }
@@ -2594,15 +2594,15 @@ $script:FallbackProfiles = [ordered]@{
         Name     = "Rivals 2 - G-SYNC Streaming"
         Sub      = "SDR Streaming | Borderless VRR | Keeps OBS/Overlays"
         Cat      = "Fighting"
-        Desc     = "Rollback-safe borderless VRR lane that keeps OBS/Medal/overlays alive"
+        Desc     = "Borderless VRR with native VSync On and one native cap; keeps OBS/Medal/overlays alive"
         Exes     = @("Rivals2-Win64-Shipping.exe", "RivalsofAether2.exe", "Rivals2.exe")
         SyncMode = "on"
     }
     "rivals2-gsync-hdr" = @{
         Name     = "Rivals 2 - G-SYNC HDR"
-        Sub      = "G-SYNC HDR | LLM ON | VSync Safety Net | Rollback-Safe"
+        Sub      = "G-SYNC HDR | LLM ON | VSync Safety Net"
         Cat      = "Fighting"
-        Desc     = "Rollback-safe G-SYNC lane with Windows HDR composition"
+        Desc     = "G-SYNC lane with Windows HDR composition and one native refresh-minus-three cap"
         Exes     = @("Rivals2-Win64-Shipping.exe", "RivalsofAether2.exe", "Rivals2.exe")
         SyncMode = "on"
     }
@@ -2610,7 +2610,7 @@ $script:FallbackProfiles = [ordered]@{
         Name     = "Rivals 2 - G-SYNC HDR Streaming"
         Sub      = "HDR Streaming | Borderless VRR | Keeps OBS/Overlays"
         Cat      = "Fighting"
-        Desc     = "Rollback-safe borderless VRR lane that keeps OBS/Medal/overlays alive"
+        Desc     = "Borderless VRR with native VSync On and one native cap; keeps OBS/Medal/overlays alive"
         Exes     = @("Rivals2-Win64-Shipping.exe", "RivalsofAether2.exe", "Rivals2.exe")
         SyncMode = "on"
     }
@@ -2690,7 +2690,7 @@ $script:FallbackProfiles = [ordered]@{
         Name     = "Fortnite - SDR"
         Sub      = "SDR | Reflex (set in-game) | No Sync"
         Cat      = "Shooters"
-        Desc     = "Competitive SDR Fortnite profile with a no-sync latency path. Keeps driver LLM off for Reflex; enable Reflex On + Boost in-game."
+        Desc     = "Competitive SDR Fortnite profile with a no-sync latency path. Keeps driver LLM off for Reflex; enable Reflex in-game; Boost is optional."
         Exes     = @(
             "FortniteClient-Win64-Shipping.exe",
             "FortniteClient-Win64-Shipping_EAC.exe",
@@ -2703,7 +2703,7 @@ $script:FallbackProfiles = [ordered]@{
         Name     = "Fortnite - HDR"
         Sub      = "HDR ON | Reflex (set in-game) | No Sync"
         Cat      = "Shooters"
-        Desc     = "Competitive Fortnite HDR profile with a no-sync latency path. Keeps driver LLM off for Reflex; enable Reflex On + Boost in-game."
+        Desc     = "Windows HDR Fortnite profile with a no-sync path; native game HDR is unverified. Keeps driver LLM off for Reflex; enable Reflex in-game; Boost is optional."
         Exes     = @(
             "FortniteClient-Win64-Shipping.exe",
             "FortniteClient-Win64-Shipping_EAC.exe",
@@ -2729,7 +2729,7 @@ $script:FallbackProfiles = [ordered]@{
         Name     = "Fortnite - GSYNC HDR Streaming"
         Sub      = "HDR Streaming | Borderless VRR | Keeps OBS/Overlays"
         Cat      = "Shooters"
-        Desc     = "Windows HDR capped G-SYNC lane that keeps OBS, Medal, RTSS, and overlays alive; native game HDR remains user-controlled"
+        Desc     = "Windows HDR capped G-SYNC lane that keeps OBS, Medal, RTSS, and overlays alive; native game HDR is unverified and its saved values are preserved"
         Exes     = @(
             "FortniteClient-Win64-Shipping.exe",
             "FortniteClient-Win64-Shipping_EAC.exe",
@@ -2756,15 +2756,15 @@ $script:FallbackProfiles = [ordered]@{
     }
     "overwatch2"        = @{
         Name     = "Overwatch 2 - No Sync SDR"
-        Sub      = "No Sync SDR | Reflex On+Boost | VSync OFF | G-SYNC OFF"
+        Sub      = "No Sync SDR | Reflex On (Boost optional) | VSync OFF | G-SYNC OFF"
         Cat      = "Shooters"
-        Desc     = "Latency-focused no-sync SDR profile (Reflex On+Boost, VSync OFF, VRR OFF)"
+        Desc     = "Latency-focused no-sync SDR profile (Reflex On (Boost optional), VSync OFF, VRR OFF)"
         Exes     = @("Overwatch.exe")
         SyncMode = "off"
     }
     "overwatch2-hdr"    = @{
         Name     = "Overwatch 2 - No Sync HDR"
-        Sub      = "No Sync HDR | Reflex On+Boost | VSync OFF | G-SYNC OFF"
+        Sub      = "No Sync HDR | Reflex On (Boost optional) | VSync OFF | G-SYNC OFF"
         Cat      = "Shooters"
         Desc     = "Latency-focused no-sync HDR profile. Native HDR for OLED / Mini-LED displays; same sync/VRR contract as the SDR variant."
         Exes     = @("Overwatch.exe")
@@ -2774,7 +2774,7 @@ $script:FallbackProfiles = [ordered]@{
         Name     = "Overwatch 2 - GSYNC SDR"
         Sub      = "Overlay-Free SDR Borderless | In-game VSync ON | G-SYNC ON"
         Cat      = "Shooters"
-        Desc     = "Overwatch 2 G-SYNC using borderless VRR with in-game VSync ON and Reflex On+Boost, while stopping capture and overlay processes."
+        Desc     = "Overwatch 2 G-SYNC using borderless VRR with in-game VSync ON and Reflex On (Boost optional), while stopping capture and overlay processes."
         Exes     = @("Overwatch.exe")
         SyncMode = "on"
     }
@@ -2782,7 +2782,7 @@ $script:FallbackProfiles = [ordered]@{
         Name     = "Overwatch 2 - GSYNC HDR"
         Sub      = "Overlay-Free HDR Borderless | In-game VSync ON | G-SYNC ON"
         Cat      = "Shooters"
-        Desc     = "Overwatch 2 G-SYNC with HDR using borderless VRR with in-game VSync ON and Reflex On+Boost, while stopping capture and overlay processes."
+        Desc     = "Overwatch 2 G-SYNC with HDR using borderless VRR with in-game VSync ON and Reflex On (Boost optional), while stopping capture and overlay processes."
         Exes     = @("Overwatch.exe")
         SyncMode = "on"
     }
@@ -2790,7 +2790,7 @@ $script:FallbackProfiles = [ordered]@{
         Name     = "Overwatch 2 - GSYNC SDR Streaming"
         Sub      = "SDR Streaming | In-game VSync ON | Keeps OBS/Overlays"
         Cat      = "Shooters"
-        Desc     = "Borderless SDR G-SYNC with in-game VSync ON and Reflex On+Boost; keeps OBS, Medal, RTSS, and overlays alive"
+        Desc     = "Borderless SDR G-SYNC with in-game VSync ON and Reflex On (Boost optional); keeps OBS, Medal, RTSS, and overlays alive"
         Exes     = @("Overwatch.exe")
         SyncMode = "on"
     }
@@ -2798,7 +2798,7 @@ $script:FallbackProfiles = [ordered]@{
         Name     = "Overwatch 2 - GSYNC HDR Streaming"
         Sub      = "HDR Streaming | In-game VSync ON | Keeps OBS/Overlays"
         Cat      = "Shooters"
-        Desc     = "Borderless native-HDR G-SYNC with in-game VSync ON and Reflex On+Boost; keeps OBS, Medal, RTSS, and overlays alive"
+        Desc     = "Borderless native-HDR G-SYNC with in-game VSync ON and Reflex On (Boost optional); keeps OBS, Medal, RTSS, and overlays alive"
         Exes     = @("Overwatch.exe")
         SyncMode = "on"
     }
@@ -2806,7 +2806,7 @@ $script:FallbackProfiles = [ordered]@{
         Name     = "Counter-Strike 2 - GSYNC SDR Streaming"
         Sub      = "SDR Streaming | Borderless VRR | Keeps OBS/Overlays"
         Cat      = "Shooters"
-        Desc     = "Borderless SDR G-SYNC lane that keeps OBS, Medal, RTSS, and overlays alive"
+        Desc     = "Borderless SDR G-SYNC; enable native VSync and Reflex manually. Keeps OBS, Medal, RTSS, and overlays alive"
         Exes     = @("cs2.exe")
         SyncMode = "on"
     }
@@ -2814,7 +2814,7 @@ $script:FallbackProfiles = [ordered]@{
         Name     = "Counter-Strike 2 - GSYNC HDR Streaming"
         Sub      = "HDR Streaming | Borderless VRR | Keeps OBS/Overlays"
         Cat      = "Shooters"
-        Desc     = "Borderless Windows HDR G-SYNC lane that keeps OBS, Medal, RTSS, and overlays alive"
+        Desc     = "Borderless Windows HDR G-SYNC; enable native VSync and Reflex manually. Keeps OBS, Medal, RTSS, and overlays alive"
         Exes     = @("cs2.exe")
         SyncMode = "on"
     }

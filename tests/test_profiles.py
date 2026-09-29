@@ -60,7 +60,6 @@ from abso.profiles.slippi_melee import (
 )
 from abso.settings.registry import (
     WIN32_PRIORITY_GAMING_OFFLINE,
-    WIN32_PRIORITY_GAMING_ONLINE,
 )
 
 
@@ -543,13 +542,8 @@ class TestProfileLoading:
             assert win["auto_hdr"] is False, profile_cls.__name__
             assert color["icc_profile"] == "srgb", profile_cls.__name__
 
-    def test_cs2_variants_disable_fso_for_the_binary(self):
-        """Every exclusive-fullscreen CS2 variant must disable FSO per-exe.
-
-        The capture lane is deliberately excluded - it runs borderless and
-        clears the flag instead (see
-        test_cs2_capture_lane_uses_borderless_windowed_vrr_path).
-        """
+    def test_cs2_variants_allow_fso_for_the_binary(self):
+        """CS2 clears stale FSO-disable flags without promising true exclusive mode."""
         for profile_cls in (
             CounterStrike2Profile,
             CounterStrike2HDRProfile,
@@ -558,9 +552,9 @@ class TestProfileLoading:
         ):
             profile = profile_cls()
             flags = profile.fullscreen_optimizations_per_exe
-            assert flags.get("cs2.exe") is True, profile_cls.__name__
+            assert flags.get("cs2.exe") is False, profile_cls.__name__
             registry_settings = profile.get_settings("RegistrySettingsHandler")
-            assert registry_settings["fullscreen_optimizations"]["cs2.exe"] is True
+            assert registry_settings["fullscreen_optimizations"]["cs2.exe"] is False
 
     def test_cs2_gsync_variants_inherit_strict_display_path_contract(self):
         """G-SYNC CS2 variants should match the strict fullscreen VRR contract."""
@@ -1161,7 +1155,7 @@ class TestProfileSettings:
         assert RyujinxSSBUProfile().application_scope == "system_only"
 
     def test_fortnite_sdr_and_hdr_variants_drive_native_game_config(self):
-        """Fortnite variants should enforce the matching SDR/HDR game config path."""
+        """Fortnite variants should manage display/sync while preserving unsupported native HDR."""
         sdr = FortniteProfile()
         hdr = FortniteHDRProfile()
 
@@ -1175,19 +1169,19 @@ class TestProfileSettings:
         assert sdr_windows["hdr"] is False
         assert sdr_windows["auto_hdr"] is False
         assert sdr_color["icc_profile"] == "srgb"
-        assert sdr_config["hdr_output"] is False
+        assert "hdr_output" not in sdr_config
         assert sdr_config["fullscreen_mode"] == 0
         assert sdr_config["frame_rate_limit"] == 0
 
         assert hdr_windows["hdr"] is True
         assert hdr_windows["auto_hdr"] is False
         assert hdr_color["icc_profile"] == "native"
-        assert hdr_config["hdr_output"] is True
+        assert "hdr_output" not in hdr_config
         assert hdr_config["fullscreen_mode"] == 0
         assert hdr_config["frame_rate_limit"] == 0
 
-    def test_fortnite_gsync_hdr_drives_vrr_and_native_hdr(self):
-        """Fortnite G-SYNC HDR should run reflex_gsync VRR with native HDR on."""
+    def test_fortnite_gsync_hdr_drives_vrr_and_windows_hdr(self):
+        """Fortnite G-SYNC HDR uses Windows HDR and one driver cap."""
         profile = FortniteGSyncHDRProfile()
 
         nvidia = profile.get_settings("NvidiaSettingsHandler")
@@ -1204,7 +1198,7 @@ class TestProfileSettings:
         # The shared "Fortnite" NVIDIA identity is still injected.
         assert nvidia["profile_name"] == "Fortnite"
 
-        # Native HDR enabled with all four canonical Windows HDR keys.
+        # Windows HDR enabled; native game HDR is not inferred.
         assert windows["hdr"] is True
         assert windows["advanced_color"] is True
         assert windows["auto_hdr"] is False
@@ -1213,14 +1207,15 @@ class TestProfileSettings:
         assert color["icc_profile"] == "native"
         assert color["digital_vibrance"] == 50
 
-        # In-game config: exclusive fullscreen, in-game VSync off, native HDR out,
-        # and the auto refresh - 3 cap (no leftover uncapped frame_rate_limit=0).
+        # Fullscreen requested, native VSync off, native limiter Unlimited.
+        # The driver supplies the only explicit cap; no native HDR is written.
         assert config["fullscreen_mode"] == 0
         assert config["vsync"] is False
-        assert config["hdr_output"] is True
-        assert config["hdr_nits"] == 1000
-        assert config["auto_vrr_fps_cap"] is True
-        assert "frame_rate_limit" not in config
+        assert "hdr_output" not in config
+        assert "hdr_nits" not in config
+        assert config["auto_vrr_fps_cap"] is False
+        assert config["frame_rate_limit"] == 0
+        assert profile.allow_dual_limiter is False
 
     @pytest.mark.parametrize(
         ("profile_cls", "expect_hdr"),
@@ -1254,13 +1249,9 @@ class TestProfileSettings:
         assert config["frame_rate_limit"] == 0
         assert config["auto_vrr_fps_cap"] is False
         assert profile.allow_dual_limiter is False
-        if expect_hdr:
-            # Windows HDR is verified separately; game HDR support/calibration
-            # is not inferred from the presence of inherited Unreal INI keys.
-            assert "hdr_output" not in config
-            assert "hdr_nits" not in config
-        else:
-            assert config["hdr_output"] is False
+        # Native HDR support is not inferred from inherited Unreal INI keys.
+        assert "hdr_output" not in config
+        assert "hdr_nits" not in config
         assert windows["hdr"] is expect_hdr
         assert all(
             disabled is False for disabled in profile.fullscreen_optimizations_per_exe.values()
@@ -1375,13 +1366,10 @@ class TestProfileSettings:
         settings = profile.get_settings("NvidiaSettingsHandler")
 
         assert settings["profile_name"] == "Rivals 2"
-        assert settings["preset"] == "vrr_fighting_game"
-        # CPU-bound UE5/DX11: driver worker threads stay on (preset default,
-        # asserted explicitly so a preset change can't silently regress it).
-        assert settings["threaded_optimization"] == "on"
-        # 60 Hz sim grid: cap snaps to the largest multiple of 60 below
-        # refresh - 3 instead of the generic off-grid refresh - 3 value.
-        assert settings["vrr_cap_policy"] == "fighting_60hz_vrr"
+        assert settings["threaded_optimization"] == "auto"
+        assert "preset" not in settings
+        assert settings["max_frame_rate"] == "off"
+        assert settings.get("auto_vrr_fps_cap", False) is False
         assert "Rivals2-Win64-Shipping.exe" in settings["profile_aliases"]
 
     def test_rivals2_streaming_lanes_use_matching_borderless_paths(self):
@@ -1474,17 +1462,17 @@ class TestProfileSettings:
         assert "Use HDR (Settings > System > Display)" in settings_named
         assert "SDR content brightness" in settings_named
         assert "HDR Output" in settings_named
-        assert "no native hdr support" in combined
+        assert "native game hdr support is not established" in combined
         assert "not native game hdr" in combined
-        assert "does not force unreal" in combined
+        assert "busehdrdisplayoutput flag off" in combined
 
     def test_rivals2_gsync_profile_sets_in_game_vrr_cap_automatically(self):
-        """VRR Rivals profiles should drive the lower-latency in-game cap, not just NVCP."""
+        """VRR Rivals profiles should use one native below-refresh cap."""
         profile = Rivals2GSyncProfile()
         config = profile.get_settings("Rivals2ConfigHandler")
 
         assert config["auto_vrr_fps_cap"] is True
-        assert config["vrr_cap_policy"] == "fighting_60hz_vrr"
+        assert config["vrr_cap_policy"] == "refresh_minus_3"
         assert config["hdr_output"] is False
 
     def test_rivals2_no_sync_lane_uses_sim_grid_frame_cap(self):
@@ -1495,8 +1483,8 @@ class TestProfileSettings:
         assert nosync_config["vrr_cap_policy"] == "fighting_60hz_nosync"
         assert "frame_rate_limit" not in nosync_config
 
-    def test_rivals2_lanes_keep_threaded_optimization_on(self):
-        """CPU-bound UE5/DX11: no Rivals lane forces threaded optimization off."""
+    def test_rivals2_lanes_do_not_tune_opengl_worker_control(self):
+        """OpenGL driver controls do not configure DirectX engine workers."""
         for profile in (
             Rivals2NoSyncProfile(),
             Rivals2NoSyncHDRProfile(),
@@ -1506,7 +1494,7 @@ class TestProfileSettings:
             Rivals2GSyncHDRCaptureProfile(),
         ):
             nvidia = profile.get_settings("NvidiaSettingsHandler")
-            assert nvidia["threaded_optimization"] == "on", profile.profile_id
+            assert nvidia["threaded_optimization"] == "auto", profile.profile_id
 
     def test_unknown_handler_returns_empty(self):
         """Test that unknown handler name returns empty dict."""
@@ -1730,13 +1718,13 @@ class TestFullscreenOptimizationsPerExe:
             registry_settings = profile.get_settings("RegistrySettingsHandler")
             assert registry_settings["fullscreen_optimizations"] == {"Overwatch.exe": False}
 
-    def test_fortnite_variants_disable_fso_for_all_shipping_binaries(self):
-        """Fortnite's competitive lane is exclusive-fullscreen; all aliases must be locked."""
+    def test_fortnite_variants_allow_fso_for_all_shipping_binaries(self):
+        """Fortnite allows Fullscreen Optimizations for every shipping binary."""
         for profile_cls in (FortniteProfile, FortniteHDRProfile, FortniteGSyncHDRProfile):
             profile = profile_cls()
             flags = profile.fullscreen_optimizations_per_exe
             assert "FortniteClient-Win64-Shipping.exe" in flags
-            assert all(v is True for v in flags.values())
+            assert all(v is False for v in flags.values())
 
     def test_fortnite_streaming_variants_clear_fso_for_all_shipping_binaries(self):
         """Borderless Fortnite lanes must clear strict per-exe FSO flags."""
@@ -2165,8 +2153,8 @@ class TestProfileOptimalityConsistency:
             nvidia = profile_cls().get_settings("NvidiaSettingsHandler")
             assert nvidia.get("vrr_app_override") == "allow", profile_cls.__name__
 
-    def test_rivals2_lanes_share_online_priority_separation(self) -> None:
-        """Every merged Rivals 2 lane uses the ONLINE scheduler value."""
+    def test_rivals2_lanes_preserve_baseline_scheduler_policy(self) -> None:
+        """Rivals lanes do not impose an unmeasured scheduler override."""
         for profile_cls in (
             Rivals2NoSyncProfile,
             Rivals2NoSyncHDRProfile,
@@ -2174,9 +2162,8 @@ class TestProfileOptimalityConsistency:
             Rivals2GSyncHDRProfile,
         ):
             reg = profile_cls().get_settings("RegistrySettingsHandler")
-            assert reg["win32_priority_separation"] == WIN32_PRIORITY_GAMING_ONLINE, (
-                profile_cls.__name__
-            )
+            assert "win32_priority_separation" not in reg, profile_cls.__name__
+            assert "game_priority" not in reg, profile_cls.__name__
 
     def test_diablo4_manages_priority_separation(self) -> None:
         """Diablo 4 must set Win32PrioritySeparation (not leave it unmanaged)."""

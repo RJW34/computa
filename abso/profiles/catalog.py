@@ -317,40 +317,38 @@ PROFILE_CATALOG: OrderedDict[str, ProfileCatalogEntry] = OrderedDict(
             ),
             sync_mode="off",
         ),
-        # 2026-07 consolidation: the offline/online lane split collapsed into
-        # single rollback-safe lanes (SnapNet is server-authoritative, so the
-        # aggressive offline-only tuning bought nothing measurable). Retired
-        # IDs redirect via PROFILE_ALIASES below.
+        # Retired offline/online IDs redirect via PROFILE_ALIASES below.
+        # No rollback performance improvement is established by these settings.
         "rivals2-nosync": ProfileCatalogEntry(
             profile_class=Rivals2NoSyncProfile,
             tray_category="Fighting",
-            tray_subtitle="No Sync SDR | LLM ON | Rollback-Safe",
+            tray_subtitle="No Sync SDR | LLM ON",
             tray_description=(
-                "Rollback-safe Rivals 2 no-sync SDR lane for online play and "
-                "training. VSync and VRR off, in-game cap on the 60 Hz sim grid "
-                "(300 @ 300 Hz), exclusive fullscreen."
+                "Rivals 2 no-sync SDR lane. VSync and VRR off, with a bounded "
+                "native cap (300 at 300 Hz) and fullscreen requested. Tearing is "
+                "expected; this cap is a starting point, not a measured optimum."
             ),
             sync_mode="off",
         ),
         "rivals2-nosync-hdr": ProfileCatalogEntry(
             profile_class=Rivals2NoSyncHDRProfile,
             tray_category="Fighting",
-            tray_subtitle="No Sync HDR | LLM ON | Rollback-Safe",
+            tray_subtitle="No Sync HDR | LLM ON",
             tray_description=(
-                "Rollback-safe Rivals 2 no-sync lane with Windows HDR composition. "
-                "Same no-sync timing contract as SDR; Rivals 2 currently advertises "
-                "no native HDR support, so the game stays SDR inside the HDR desktop."
+                "Rivals 2 no-sync lane with Windows HDR composition. Same no-sync "
+                "contract as SDR; native game HDR stays off. Windows HDR alone "
+                "does not establish native HDR output."
             ),
             sync_mode="off",
         ),
         "rivals2-gsync": ProfileCatalogEntry(
             profile_class=Rivals2GSyncProfile,
             tray_category="Fighting",
-            tray_subtitle="Strict SDR G-SYNC | LLM ON | VSync Safety Net | Rollback-Safe",
+            tray_subtitle="Strict SDR G-SYNC | LLM ON | VSync Safety Net",
             tray_description=(
-                "Rollback-safe Rivals 2 strict fullscreen-only G-SYNC SDR lane for "
-                "online play and training. Caps on the 60 Hz sim grid (largest "
-                "multiple of 60 below refresh, e.g. 240 @ 300 Hz)."
+                "Rivals 2 fullscreen-only G-SYNC SDR lane. Uses one native "
+                "refresh-minus-three cap (297 at 300 Hz); driver Max Frame Rate "
+                "is off. Confirm G-SYNC engagement and frame pacing in-game."
             ),
             sync_mode="on",
         ),
@@ -359,7 +357,7 @@ PROFILE_CATALOG: OrderedDict[str, ProfileCatalogEntry] = OrderedDict(
             tray_category="Fighting",
             tray_subtitle="SDR Streaming | Borderless VRR | Keeps OBS/Medal/Overlays",
             tray_description=(
-                "Rollback-safe SDR G-SYNC on the borderless windowed VRR path. "
+                "SDR G-SYNC on the borderless VRR path with native VSync on. "
                 "OBS, Medal, RTSS, and overlays remain available; game CPU/I/O "
                 "priority stays Normal and OBS settings are left untouched."
             ),
@@ -368,11 +366,10 @@ PROFILE_CATALOG: OrderedDict[str, ProfileCatalogEntry] = OrderedDict(
         "rivals2-gsync-hdr": ProfileCatalogEntry(
             profile_class=Rivals2GSyncHDRProfile,
             tray_category="Fighting",
-            tray_subtitle="Strict HDR G-SYNC | LLM ON | VSync Safety Net | Rollback-Safe",
+            tray_subtitle="Strict HDR G-SYNC | LLM ON | VSync Safety Net",
             tray_description=(
-                "Rollback-safe Rivals 2 strict G-SYNC lane with Windows HDR "
-                "composition. Rivals 2 currently advertises no native HDR support, "
-                "so it stays SDR inside the HDR desktop."
+                "Rivals 2 fullscreen-only G-SYNC lane with Windows HDR composition "
+                "and a native refresh-minus-three cap. Native game HDR stays off."
             ),
             sync_mode="on",
         ),
@@ -381,7 +378,7 @@ PROFILE_CATALOG: OrderedDict[str, ProfileCatalogEntry] = OrderedDict(
             tray_category="Fighting",
             tray_subtitle="HDR Streaming | Borderless VRR | Keeps OBS/Medal/Overlays",
             tray_description=(
-                "Rollback-safe G-SYNC lane with Windows HDR composition on the "
+                "G-SYNC lane with native VSync on and Windows HDR composition on the "
                 "borderless windowed VRR path. OBS, Medal, RTSS, and overlays remain "
                 "available; game CPU/I/O priority stays Normal and OBS settings are "
                 "left untouched. Rivals 2 native HDR remains off."
@@ -409,17 +406,17 @@ PROFILE_CATALOG: OrderedDict[str, ProfileCatalogEntry] = OrderedDict(
         "fortnite-hdr": ProfileCatalogEntry(
             profile_class=FortniteHDRProfile,
             tray_category="Shooters",
-            tray_subtitle="HDR ON | Reflex (set in-game) | No Sync",
+            tray_subtitle="Windows HDR | Reflex (set in-game) | No Sync",
             sync_mode="off",
         ),
         "fortnite-gsync-hdr": ProfileCatalogEntry(
             profile_class=FortniteGSyncHDRProfile,
             tray_category="Shooters",
-            tray_subtitle="HDR ON | Reflex (set in-game) | G-SYNC ON",
+            tray_subtitle="Windows HDR | Reflex (set in-game) | G-SYNC ON",
             tray_description=(
-                "Tear-free low-latency VRR Fortnite with native HDR for "
-                "OLED / Mini-LED. G-SYNC ON + NVCP VSync safety net at a "
-                "refresh - 3 cap; enable Reflex On + Boost in-game."
+                "Fortnite G-SYNC with Windows HDR composition, a driver "
+                "refresh-minus-three cap, and native FPS limit Unlimited. Enable "
+                "Reflex in-game; Boost is optional. Native HDR is not configured."
             ),
             sync_mode="on",
         ),
@@ -510,9 +507,9 @@ PROFILE_CATALOG: OrderedDict[str, ProfileCatalogEntry] = OrderedDict(
             tray_category="Shooters",
             tray_subtitle="No Sync SDR | Reflex (set in-game) | VSync OFF | G-SYNC OFF",
             tray_description=(
-                "Minimum-latency no-sync Counter-Strike 2 profile. ABSO tunes the "
-                "OS/driver path; enable Reflex Enabled + Boost manually in CS2's "
-                "video settings."
+                "No-sync Counter-Strike 2 profile. ABSO tunes the "
+                "OS/driver path; enable Reflex manually in CS2's video settings. "
+                "Boost is optional."
             ),
             sync_mode="off",
         ),
@@ -521,20 +518,20 @@ PROFILE_CATALOG: OrderedDict[str, ProfileCatalogEntry] = OrderedDict(
             tray_category="Shooters",
             tray_subtitle="No Sync HDR | Reflex (set in-game) | VSync OFF | G-SYNC OFF",
             tray_description=(
-                "Minimum-latency no-sync Counter-Strike 2 with Windows HDR on for "
-                "OLED / Mini-LED. CS2 currently renders SDR through the HDR "
-                "composition path."
+                "No-sync Counter-Strike 2 with Windows HDR on for "
+                "desktop composition. This does not establish native HDR output; "
+                "the game's HDR Quality option is a separate rendering setting."
             ),
             sync_mode="off",
         ),
         "counter-strike-2-gsync": ProfileCatalogEntry(
             profile_class=CounterStrike2GSyncProfile,
             tray_category="Shooters",
-            tray_subtitle="Strict SDR Exclusive | Reflex (set in-game) | G-SYNC ON",
+            tray_subtitle="Fullscreen SDR | Reflex (set in-game) | G-SYNC ON",
             tray_description=(
                 "Tear-free low-latency VRR Counter-Strike 2 profile on the strict "
-                "fullscreen-only G-SYNC path. Enable Reflex Enabled + Boost "
-                "manually in-game."
+                "fullscreen-only G-SYNC path. Enable native VSync and Reflex "
+                "in-game; Boost is optional. Uses a driver refresh-minus-three cap."
             ),
             sync_mode="on",
         ),
@@ -552,11 +549,11 @@ PROFILE_CATALOG: OrderedDict[str, ProfileCatalogEntry] = OrderedDict(
         "counter-strike-2-gsync-hdr": ProfileCatalogEntry(
             profile_class=CounterStrike2GSyncHDRProfile,
             tray_category="Shooters",
-            tray_subtitle="Strict HDR Exclusive | Reflex (set in-game) | G-SYNC ON",
+            tray_subtitle="Fullscreen Windows HDR | Reflex (set in-game) | G-SYNC ON",
             tray_description=(
                 "Tear-free low-latency VRR Counter-Strike 2 with Windows HDR on "
-                "for OLED / Mini-LED. CS2 currently renders SDR through the HDR "
-                "composition path."
+                "for desktop composition. Enable native VSync and Reflex in-game; "
+                "native HDR display output is not configured."
             ),
             sync_mode="on",
         ),
