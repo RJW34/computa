@@ -574,13 +574,13 @@ PROFILE_CATALOG: OrderedDict[str, ProfileCatalogEntry] = OrderedDict(
         "overwatch2": ProfileCatalogEntry(
             profile_class=Overwatch2Profile,
             tray_category="Shooters",
-            tray_subtitle="No Sync SDR | Reflex ON+Boost (set in-game) | VSync OFF | G-SYNC OFF",
+            tray_subtitle="No Sync SDR | Reflex ON (Boost optional) | VSync OFF | G-SYNC OFF",
             sync_mode="off",
         ),
         "overwatch2-hdr": ProfileCatalogEntry(
             profile_class=Overwatch2NoSyncHDRProfile,
             tray_category="Shooters",
-            tray_subtitle="No Sync HDR | Reflex ON+Boost (set in-game) | VSync OFF | G-SYNC OFF",
+            tray_subtitle="No Sync HDR | Reflex ON (Boost optional) | VSync OFF | G-SYNC OFF",
             tray_description=(
                 "Minimum-latency no-sync Overwatch 2 with native HDR for "
                 "OLED / Mini-LED. Same sync/VRR contract as the SDR variant."

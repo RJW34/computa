@@ -396,21 +396,26 @@ profile apply logic for a single pending reboot-gated graphics setting.
 ABSO's default manual VRR cap policy is `refresh - 3`. The value is a static
 V-SYNC safety boundary for generic VRR profiles.
 
-Overwatch 2 G-SYNC profiles are an explicit exception. They declare the OW2
-Reflex/G-SYNC cap policy for both the NVIDIA profile and OW2 Settings_v0.ini;
-on the 300 Hz reference path that policy resolves to `276`. The no-sync OW2
-profiles keep VRR/G-SYNC off and use the game's `600` FPS ceiling.
+Overwatch 2 G-SYNC profiles use the same static `refresh - 3` policy
+(`vrr_cap_policy: "refresh_minus_3"` in `abso/profiles/overwatch2.py`) for
+OW2 Settings_v0.ini, with the duplicate NVIDIA driver limiter explicitly Off;
+on the 300 Hz reference path
+that resolves to `297`. The older `276` figure is the historical Reflex/ULLM
+heuristic kept only in `abso/core/vrr.py::get_reflex_gsync_fps_cap` for
+explicit custom policies; it is not the built-in OW2 policy any more (changed
+in the 2026-09-06 audit, commit `0b1e616`). The no-sync OW2 profiles keep
+VRR/G-SYNC off and use the game's `600` FPS ceiling.
 
 When auditing Overwatch 2 on this PC:
 
 - Verify the active monitor path first. The current reference setup is
-  2560x1440 at 300 Hz, so the expected OW2 G-SYNC cap is `276`.
-- If verification reports `frame_rate_cap` target/current `276`, the cap is
-  not the active mismatch.
+  2560x1440 at 300 Hz, so the expected persisted OW2 G-SYNC cap is `297`.
+- If verification reports `frame_rate_cap` target/current `297`, the cap is
+  not the active mismatch. An observed runtime FPS near `276` is NVIDIA Reflex
+  pacing below the ceiling, not drift; do not persist it.
 - OW2 G-SYNC profiles intentionally expect borderless/windowed fullscreen on
-  this PC. If verification reports `frame_rate_cap` target/current `276`, the
-  cap is not the active mismatch; inspect handler detail for compositor/MPO,
-  NVIDIA binding, or process-policy issues instead.
+  this PC. Inspect handler detail for compositor/MPO, NVIDIA binding, or
+  process-policy issues before touching the cap.
 
 ---
 
@@ -461,6 +466,13 @@ must stay out of both the installed tray tree and the PyInstaller tray data
 bundle.
 
 ### 6.1 OW2 / Reflex latency-stack closure (audit 2026-05-21)
+
+**Historical proposals, not current OW2 defaults:** the 2026-09-29 evidence
+review removed forced power-plan, scheduler/MMCSS, NIC and GPU MSI policies
+from the OW2 family. No local benchmark establishes their benefit. Do not use
+the impact labels or aggressive-default proposal below as authorization or
+evidence to reintroduce these settings. New tuning needs a source-supported
+hypothesis and repeatable measurement on the target machine.
 
 Standing audit against `overwatch2-gsync-hdr` after the launch-time
 process janitor landed. These are the knobs ABSO still does not tune

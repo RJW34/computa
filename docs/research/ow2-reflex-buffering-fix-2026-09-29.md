@@ -1,5 +1,9 @@
 # OW2 native sync and Reflex buffering correction — 2026-09-29
 
+This records the initial buffering repair. The subsequent
+[evidence-based defaults review](ow2-evidence-based-defaults-2026-09-29.md)
+supersedes its Boost-only guidance and duplicate-cap policy.
+
 Applying the installed OW2 HDR Streaming profile restored an old native config
 before launch: transaction backups show `VerticalSyncEnabled` changing from 1
 to 0 and `CpuForceSyncEnabled` from 0 to 1. The old verifier checked the unrelated

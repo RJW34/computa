@@ -3671,7 +3671,7 @@
         "category": "Display",
         "reason": "Reflex reduces render-queue latency, especially when GPU-bound. Boost keeps GPU clocks elevated and may increase power use or reduce FPS; compare Enabled alone on this machine.",
         "setting": "NVIDIA Reflex",
-        "value": "Enabled + Boost \u2014 set the in-game toggle manually"
+        "value": "Enabled or Enabled + Boost \u2014 choose manually"
       },
       {
         "category": "Display",
@@ -3681,7 +3681,7 @@
       },
       {
         "category": "Display",
-        "reason": "This profile delegates pacing to Reflex On + Boost. Reduce Buffering Off is a profile policy, not a measured FPS improvement or proof that On is harmful.",
+        "reason": "This profile delegates pacing to Reflex Enabled or Enabled + Boost. Reduce Buffering Off is a profile policy, not a measured FPS improvement or proof that On is harmful. Reassess buffering if you disable Reflex.",
         "setting": "Reduce Buffering",
         "value": "Off"
       },
@@ -3759,7 +3759,7 @@
         "disable_global_fso": true
       },
       "InterruptModeHandler": {
-        "enable_msi": true
+        "enable_msi": false
       },
       "MouseSettingsHandler": {
         "disable_acceleration": true,
@@ -3771,19 +3771,25 @@
         "preset": "default"
       },
       "NicDriverHandler": {
-        "nic_tuning": true
+        "nic_tuning": false
       },
       "NvidiaSettingsHandler": {
+        "auto_vrr_fps_cap": false,
         "global_vrr_mode": "off",
+        "max_frame_rate": "off",
         "preset": "reflex_no_sync",
         "profile_name": "Overwatch 2"
       },
       "OW2ConfigHandler": {
         "aa_detail": 0,
+        "accepted_reflex_modes": [
+          1,
+          2
+        ],
         "dynamic_render_scale": false,
         "dynamic_render_scale_v2": false,
         "effects_quality": 1,
-        "expected_reflex_mode": 2,
+        "expected_reflex_mode": 1,
         "frame_rate_cap": 600,
         "fullscreen_window": false,
         "fullscreen_window_enabled": true,
@@ -3801,15 +3807,7 @@
         "window_mode": 0,
         "windowed_fullscreen": false
       },
-      "PowerSettingsHandler": {
-        "active_plan": "ultimate_performance",
-        "disable_core_parking": true,
-        "disable_pcie_power_saving": true,
-        "disable_usb_suspend": true,
-        "ensure_ultimate_performance": true,
-        "processor_max_performance": true,
-        "processor_min_state": 100
-      },
+      "PowerSettingsHandler": {},
       "ProcessPriorityHandler": {
         "cpu_priority": 3,
         "io_priority": 3
@@ -3817,12 +3815,7 @@
       "RegistrySettingsHandler": {
         "fullscreen_optimizations": {
           "Overwatch.exe": true
-        },
-        "game_priority": {
-          "priority": 6,
-          "scheduling_category": "High"
-        },
-        "win32_priority_separation": 42
+        }
       },
       "WindowsSettingsHandler": {
         "auto_hdr": false,
@@ -3876,19 +3869,19 @@
       },
       {
         "category": "Display",
-        "reason": "Enable native Reflex for queue control; the profile requests driver LLM Off. With G-SYNC and VSync active, Reflex may pace below the static cap. ABSO leaves Reflex as a manual choice; verify it in-game. Boost can cost power or FPS, so compare Enabled alone if needed.",
+        "reason": "Enable native Reflex for queue control; the profile requests driver LLM Off. With G-SYNC and VSync active, Reflex may pace below the static cap. ABSO leaves Reflex as a manual choice; verify it in-game. Boost can cost power or FPS; neither enabled mode is proven best on this PC.",
         "setting": "NVIDIA Reflex",
-        "value": "Enabled + Boost \u2014 set the in-game toggle manually"
+        "value": "Enabled or Enabled + Boost \u2014 choose manually"
       },
       {
         "category": "Display",
-        "reason": "The saved native and driver caps are fallback ceilings, not a target FPS. With G-SYNC, VSync and Reflex active, runtime FPS may be lower; while it is, the higher saved ceilings do not limit it. A reading such as 276 is not itself saved-cap drift or a universal Reflex target. An added performance benefit from redundant caps has not been established.",
+        "reason": "The saved native cap is a fallback ceiling, not a target FPS. With G-SYNC, VSync and Reflex active, runtime FPS may be lower; while it is, the higher saved ceiling does not limit it. A reading such as 276 is not itself saved-cap drift or a universal Reflex target. The driver FPS limiter is Off to avoid an unproven duplicate limit.",
         "setting": "Frame Rate Cap",
         "value": "Auto static ceiling: refresh - 3 (297 at 300 Hz)"
       },
       {
         "category": "Display",
-        "reason": "This profile delegates pacing to Reflex On + Boost. Reduce Buffering Off is a profile policy, not a measured FPS improvement or proof that On is harmful.",
+        "reason": "This profile delegates pacing to Reflex Enabled or Enabled + Boost. Reduce Buffering Off is a profile policy, not a measured FPS improvement or proof that On is harmful. Reassess buffering if you disable Reflex.",
         "setting": "Reduce Buffering",
         "value": "Off"
       },
@@ -3968,7 +3961,7 @@
         "disable_mpo": false
       },
       "InterruptModeHandler": {
-        "enable_msi": true
+        "enable_msi": false
       },
       "MouseSettingsHandler": {
         "disable_acceleration": true,
@@ -3980,22 +3973,26 @@
         "preset": "default"
       },
       "NicDriverHandler": {
-        "nic_tuning": true
+        "nic_tuning": false
       },
       "NvidiaSettingsHandler": {
-        "auto_vrr_fps_cap": true,
+        "auto_vrr_fps_cap": false,
         "global_vrr_mode": "fullscreen_and_windowed",
+        "max_frame_rate": "off",
         "preset": "reflex_gsync",
-        "profile_name": "Overwatch 2",
-        "vrr_cap_policy": "refresh_minus_3"
+        "profile_name": "Overwatch 2"
       },
       "OW2ConfigHandler": {
         "aa_detail": 0,
+        "accepted_reflex_modes": [
+          1,
+          2
+        ],
         "auto_vrr_fps_cap": true,
         "dynamic_render_scale": false,
         "dynamic_render_scale_v2": false,
         "effects_quality": 1,
-        "expected_reflex_mode": 2,
+        "expected_reflex_mode": 1,
         "fullscreen_window": false,
         "fullscreen_window_enabled": false,
         "gfx_preset": 1,
@@ -4013,15 +4010,7 @@
         "window_mode": 1,
         "windowed_fullscreen": true
       },
-      "PowerSettingsHandler": {
-        "active_plan": "ultimate_performance",
-        "disable_core_parking": true,
-        "disable_pcie_power_saving": true,
-        "disable_usb_suspend": true,
-        "ensure_ultimate_performance": true,
-        "processor_max_performance": true,
-        "processor_min_state": 100
-      },
+      "PowerSettingsHandler": {},
       "ProcessPriorityHandler": {
         "cpu_priority": 3,
         "io_priority": 3
@@ -4029,12 +4018,7 @@
       "RegistrySettingsHandler": {
         "fullscreen_optimizations": {
           "Overwatch.exe": false
-        },
-        "game_priority": {
-          "priority": 6,
-          "scheduling_category": "High"
-        },
-        "win32_priority_separation": 42
+        }
       },
       "WindowsSettingsHandler": {
         "auto_hdr": false,
@@ -4088,19 +4072,19 @@
       },
       {
         "category": "Display",
-        "reason": "Enable native Reflex for queue control; the profile requests driver LLM Off. With G-SYNC and VSync active, Reflex may pace below the static cap. ABSO leaves Reflex as a manual choice; verify it in-game. Boost can cost power or FPS, so compare Enabled alone if needed.",
+        "reason": "Enable native Reflex for queue control; the profile requests driver LLM Off. With G-SYNC and VSync active, Reflex may pace below the static cap. ABSO leaves Reflex as a manual choice; verify it in-game. Boost can cost power or FPS; neither enabled mode is proven best on this PC.",
         "setting": "NVIDIA Reflex",
-        "value": "Enabled + Boost \u2014 set the in-game toggle manually"
+        "value": "Enabled or Enabled + Boost \u2014 choose manually"
       },
       {
         "category": "Display",
-        "reason": "The saved native and driver caps are fallback ceilings, not a target FPS. With G-SYNC, VSync and Reflex active, runtime FPS may be lower; while it is, the higher saved ceilings do not limit it. A reading such as 276 is not itself saved-cap drift or a universal Reflex target. An added performance benefit from redundant caps has not been established.",
+        "reason": "The saved native cap is a fallback ceiling, not a target FPS. With G-SYNC, VSync and Reflex active, runtime FPS may be lower; while it is, the higher saved ceiling does not limit it. A reading such as 276 is not itself saved-cap drift or a universal Reflex target. The driver FPS limiter is Off to avoid an unproven duplicate limit.",
         "setting": "Frame Rate Cap",
         "value": "Auto static ceiling: refresh - 3 (297 at 300 Hz)"
       },
       {
         "category": "Display",
-        "reason": "This profile delegates pacing to Reflex On + Boost. Reduce Buffering Off is a profile policy, not a measured FPS improvement or proof that On is harmful.",
+        "reason": "This profile delegates pacing to Reflex Enabled or Enabled + Boost. Reduce Buffering Off is a profile policy, not a measured FPS improvement or proof that On is harmful. Reassess buffering if you disable Reflex.",
         "setting": "Reduce Buffering",
         "value": "Off"
       },
@@ -4180,7 +4164,7 @@
         "disable_mpo": false
       },
       "InterruptModeHandler": {
-        "enable_msi": true
+        "enable_msi": false
       },
       "MouseSettingsHandler": {
         "disable_acceleration": true,
@@ -4192,22 +4176,26 @@
         "preset": "default"
       },
       "NicDriverHandler": {
-        "nic_tuning": true
+        "nic_tuning": false
       },
       "NvidiaSettingsHandler": {
-        "auto_vrr_fps_cap": true,
+        "auto_vrr_fps_cap": false,
         "global_vrr_mode": "fullscreen_and_windowed",
+        "max_frame_rate": "off",
         "preset": "reflex_gsync",
-        "profile_name": "Overwatch 2",
-        "vrr_cap_policy": "refresh_minus_3"
+        "profile_name": "Overwatch 2"
       },
       "OW2ConfigHandler": {
         "aa_detail": 0,
+        "accepted_reflex_modes": [
+          1,
+          2
+        ],
         "auto_vrr_fps_cap": true,
         "dynamic_render_scale": false,
         "dynamic_render_scale_v2": false,
         "effects_quality": 1,
-        "expected_reflex_mode": 2,
+        "expected_reflex_mode": 1,
         "fullscreen_window": false,
         "fullscreen_window_enabled": false,
         "gfx_preset": 1,
@@ -4225,15 +4213,7 @@
         "window_mode": 1,
         "windowed_fullscreen": true
       },
-      "PowerSettingsHandler": {
-        "active_plan": "ultimate_performance",
-        "disable_core_parking": true,
-        "disable_pcie_power_saving": true,
-        "disable_usb_suspend": true,
-        "ensure_ultimate_performance": true,
-        "processor_max_performance": true,
-        "processor_min_state": 100
-      },
+      "PowerSettingsHandler": {},
       "ProcessPriorityHandler": {
         "cpu_priority": 2,
         "io_priority": 2
@@ -4241,12 +4221,7 @@
       "RegistrySettingsHandler": {
         "fullscreen_optimizations": {
           "Overwatch.exe": false
-        },
-        "game_priority": {
-          "priority": 6,
-          "scheduling_category": "High"
-        },
-        "win32_priority_separation": 42
+        }
       },
       "WindowsSettingsHandler": {
         "auto_hdr": false,
@@ -4300,19 +4275,19 @@
       },
       {
         "category": "Display",
-        "reason": "Enable native Reflex for queue control; the profile requests driver LLM Off. With G-SYNC and VSync active, Reflex may pace below the static cap. ABSO leaves Reflex as a manual choice; verify it in-game. Boost can cost power or FPS, so compare Enabled alone if needed.",
+        "reason": "Enable native Reflex for queue control; the profile requests driver LLM Off. With G-SYNC and VSync active, Reflex may pace below the static cap. ABSO leaves Reflex as a manual choice; verify it in-game. Boost can cost power or FPS; neither enabled mode is proven best on this PC.",
         "setting": "NVIDIA Reflex",
-        "value": "Enabled + Boost \u2014 set the in-game toggle manually"
+        "value": "Enabled or Enabled + Boost \u2014 choose manually"
       },
       {
         "category": "Display",
-        "reason": "The saved native and driver caps are fallback ceilings, not a target FPS. With G-SYNC, VSync and Reflex active, runtime FPS may be lower; while it is, the higher saved ceilings do not limit it. A reading such as 276 is not itself saved-cap drift or a universal Reflex target. An added performance benefit from redundant caps has not been established.",
+        "reason": "The saved native cap is a fallback ceiling, not a target FPS. With G-SYNC, VSync and Reflex active, runtime FPS may be lower; while it is, the higher saved ceiling does not limit it. A reading such as 276 is not itself saved-cap drift or a universal Reflex target. The driver FPS limiter is Off to avoid an unproven duplicate limit.",
         "setting": "Frame Rate Cap",
         "value": "Auto static ceiling: refresh - 3 (297 at 300 Hz)"
       },
       {
         "category": "Display",
-        "reason": "This profile delegates pacing to Reflex On + Boost. Reduce Buffering Off is a profile policy, not a measured FPS improvement or proof that On is harmful.",
+        "reason": "This profile delegates pacing to Reflex Enabled or Enabled + Boost. Reduce Buffering Off is a profile policy, not a measured FPS improvement or proof that On is harmful. Reassess buffering if you disable Reflex.",
         "setting": "Reduce Buffering",
         "value": "Off"
       },
@@ -4404,7 +4379,7 @@
         "disable_mpo": false
       },
       "InterruptModeHandler": {
-        "enable_msi": true
+        "enable_msi": false
       },
       "MouseSettingsHandler": {
         "disable_acceleration": true,
@@ -4416,22 +4391,26 @@
         "preset": "default"
       },
       "NicDriverHandler": {
-        "nic_tuning": true
+        "nic_tuning": false
       },
       "NvidiaSettingsHandler": {
-        "auto_vrr_fps_cap": true,
+        "auto_vrr_fps_cap": false,
         "global_vrr_mode": "fullscreen_and_windowed",
+        "max_frame_rate": "off",
         "preset": "reflex_gsync",
-        "profile_name": "Overwatch 2",
-        "vrr_cap_policy": "refresh_minus_3"
+        "profile_name": "Overwatch 2"
       },
       "OW2ConfigHandler": {
         "aa_detail": 0,
+        "accepted_reflex_modes": [
+          1,
+          2
+        ],
         "auto_vrr_fps_cap": true,
         "dynamic_render_scale": false,
         "dynamic_render_scale_v2": false,
         "effects_quality": 1,
-        "expected_reflex_mode": 2,
+        "expected_reflex_mode": 1,
         "fullscreen_window": false,
         "fullscreen_window_enabled": false,
         "gfx_preset": 1,
@@ -4449,15 +4428,7 @@
         "window_mode": 1,
         "windowed_fullscreen": true
       },
-      "PowerSettingsHandler": {
-        "active_plan": "ultimate_performance",
-        "disable_core_parking": true,
-        "disable_pcie_power_saving": true,
-        "disable_usb_suspend": true,
-        "ensure_ultimate_performance": true,
-        "processor_max_performance": true,
-        "processor_min_state": 100
-      },
+      "PowerSettingsHandler": {},
       "ProcessPriorityHandler": {
         "cpu_priority": 3,
         "io_priority": 3
@@ -4465,12 +4436,7 @@
       "RegistrySettingsHandler": {
         "fullscreen_optimizations": {
           "Overwatch.exe": false
-        },
-        "game_priority": {
-          "priority": 6,
-          "scheduling_category": "High"
-        },
-        "win32_priority_separation": 42
+        }
       },
       "WindowsSettingsHandler": {
         "advanced_color": true,
@@ -4526,19 +4492,19 @@
       },
       {
         "category": "Display",
-        "reason": "Enable native Reflex for queue control; the profile requests driver LLM Off. With G-SYNC and VSync active, Reflex may pace below the static cap. ABSO leaves Reflex as a manual choice; verify it in-game. Boost can cost power or FPS, so compare Enabled alone if needed.",
+        "reason": "Enable native Reflex for queue control; the profile requests driver LLM Off. With G-SYNC and VSync active, Reflex may pace below the static cap. ABSO leaves Reflex as a manual choice; verify it in-game. Boost can cost power or FPS; neither enabled mode is proven best on this PC.",
         "setting": "NVIDIA Reflex",
-        "value": "Enabled + Boost \u2014 set the in-game toggle manually"
+        "value": "Enabled or Enabled + Boost \u2014 choose manually"
       },
       {
         "category": "Display",
-        "reason": "The saved native and driver caps are fallback ceilings, not a target FPS. With G-SYNC, VSync and Reflex active, runtime FPS may be lower; while it is, the higher saved ceilings do not limit it. A reading such as 276 is not itself saved-cap drift or a universal Reflex target. An added performance benefit from redundant caps has not been established.",
+        "reason": "The saved native cap is a fallback ceiling, not a target FPS. With G-SYNC, VSync and Reflex active, runtime FPS may be lower; while it is, the higher saved ceiling does not limit it. A reading such as 276 is not itself saved-cap drift or a universal Reflex target. The driver FPS limiter is Off to avoid an unproven duplicate limit.",
         "setting": "Frame Rate Cap",
         "value": "Auto static ceiling: refresh - 3 (297 at 300 Hz)"
       },
       {
         "category": "Display",
-        "reason": "This profile delegates pacing to Reflex On + Boost. Reduce Buffering Off is a profile policy, not a measured FPS improvement or proof that On is harmful.",
+        "reason": "This profile delegates pacing to Reflex Enabled or Enabled + Boost. Reduce Buffering Off is a profile policy, not a measured FPS improvement or proof that On is harmful. Reassess buffering if you disable Reflex.",
         "setting": "Reduce Buffering",
         "value": "Off"
       },
@@ -4630,7 +4596,7 @@
         "disable_mpo": false
       },
       "InterruptModeHandler": {
-        "enable_msi": true
+        "enable_msi": false
       },
       "MouseSettingsHandler": {
         "disable_acceleration": true,
@@ -4642,22 +4608,26 @@
         "preset": "default"
       },
       "NicDriverHandler": {
-        "nic_tuning": true
+        "nic_tuning": false
       },
       "NvidiaSettingsHandler": {
-        "auto_vrr_fps_cap": true,
+        "auto_vrr_fps_cap": false,
         "global_vrr_mode": "fullscreen_and_windowed",
+        "max_frame_rate": "off",
         "preset": "reflex_gsync",
-        "profile_name": "Overwatch 2",
-        "vrr_cap_policy": "refresh_minus_3"
+        "profile_name": "Overwatch 2"
       },
       "OW2ConfigHandler": {
         "aa_detail": 0,
+        "accepted_reflex_modes": [
+          1,
+          2
+        ],
         "auto_vrr_fps_cap": true,
         "dynamic_render_scale": false,
         "dynamic_render_scale_v2": false,
         "effects_quality": 1,
-        "expected_reflex_mode": 2,
+        "expected_reflex_mode": 1,
         "fullscreen_window": false,
         "fullscreen_window_enabled": false,
         "gfx_preset": 1,
@@ -4675,15 +4645,7 @@
         "window_mode": 1,
         "windowed_fullscreen": true
       },
-      "PowerSettingsHandler": {
-        "active_plan": "ultimate_performance",
-        "disable_core_parking": true,
-        "disable_pcie_power_saving": true,
-        "disable_usb_suspend": true,
-        "ensure_ultimate_performance": true,
-        "processor_max_performance": true,
-        "processor_min_state": 100
-      },
+      "PowerSettingsHandler": {},
       "ProcessPriorityHandler": {
         "cpu_priority": 2,
         "io_priority": 2
@@ -4691,12 +4653,7 @@
       "RegistrySettingsHandler": {
         "fullscreen_optimizations": {
           "Overwatch.exe": false
-        },
-        "game_priority": {
-          "priority": 6,
-          "scheduling_category": "High"
-        },
-        "win32_priority_separation": 42
+        }
       },
       "WindowsSettingsHandler": {
         "advanced_color": true,
@@ -4754,7 +4711,7 @@
         "category": "Display",
         "reason": "Reflex reduces render-queue latency, especially when GPU-bound. Boost keeps GPU clocks elevated and may increase power use or reduce FPS; compare Enabled alone on this machine.",
         "setting": "NVIDIA Reflex",
-        "value": "Enabled + Boost \u2014 set the in-game toggle manually"
+        "value": "Enabled or Enabled + Boost \u2014 choose manually"
       },
       {
         "category": "Display",
@@ -4764,7 +4721,7 @@
       },
       {
         "category": "Display",
-        "reason": "This profile delegates pacing to Reflex On + Boost. Reduce Buffering Off is a profile policy, not a measured FPS improvement or proof that On is harmful.",
+        "reason": "This profile delegates pacing to Reflex Enabled or Enabled + Boost. Reduce Buffering Off is a profile policy, not a measured FPS improvement or proof that On is harmful. Reassess buffering if you disable Reflex.",
         "setting": "Reduce Buffering",
         "value": "Off"
       },
@@ -4855,7 +4812,7 @@
         "disable_global_fso": true
       },
       "InterruptModeHandler": {
-        "enable_msi": true
+        "enable_msi": false
       },
       "MouseSettingsHandler": {
         "disable_acceleration": true,
@@ -4867,19 +4824,25 @@
         "preset": "default"
       },
       "NicDriverHandler": {
-        "nic_tuning": true
+        "nic_tuning": false
       },
       "NvidiaSettingsHandler": {
+        "auto_vrr_fps_cap": false,
         "global_vrr_mode": "off",
+        "max_frame_rate": "off",
         "preset": "reflex_no_sync",
         "profile_name": "Overwatch 2"
       },
       "OW2ConfigHandler": {
         "aa_detail": 0,
+        "accepted_reflex_modes": [
+          1,
+          2
+        ],
         "dynamic_render_scale": false,
         "dynamic_render_scale_v2": false,
         "effects_quality": 1,
-        "expected_reflex_mode": 2,
+        "expected_reflex_mode": 1,
         "frame_rate_cap": 600,
         "fullscreen_window": false,
         "fullscreen_window_enabled": true,
@@ -4897,15 +4860,7 @@
         "window_mode": 0,
         "windowed_fullscreen": false
       },
-      "PowerSettingsHandler": {
-        "active_plan": "ultimate_performance",
-        "disable_core_parking": true,
-        "disable_pcie_power_saving": true,
-        "disable_usb_suspend": true,
-        "ensure_ultimate_performance": true,
-        "processor_max_performance": true,
-        "processor_min_state": 100
-      },
+      "PowerSettingsHandler": {},
       "ProcessPriorityHandler": {
         "cpu_priority": 3,
         "io_priority": 3
@@ -4913,12 +4868,7 @@
       "RegistrySettingsHandler": {
         "fullscreen_optimizations": {
           "Overwatch.exe": true
-        },
-        "game_priority": {
-          "priority": 6,
-          "scheduling_category": "High"
-        },
-        "win32_priority_separation": 42
+        }
       },
       "WindowsSettingsHandler": {
         "advanced_color": true,

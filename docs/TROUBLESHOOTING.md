@@ -369,16 +369,17 @@ a Windows restart.
 ### Saved cap versus Reflex runtime pacing
 
 The built-in Overwatch G-SYNC profiles use the generic `refresh - 3` static
-ceiling: **297 at 300 Hz**, for both the NVIDIA profile and managed engine cap.
+ceiling in the game: **297 at 300 Hz**. The NVIDIA driver limiter is explicitly
+Off so a previous profile cannot leave a duplicate driver cap behind.
 The borderless/windowed G-SYNC lanes enable both driver VSync and in-game
-VSync, with native Reflex On + Boost as the expected in-game setting. NVIDIA's
+VSync, with native Reflex Enabled or Enabled + Boost accepted in-game. NVIDIA's
 windowed guidance requires the in-game VSync path. Reflex may dynamically pace lower
 (for example, a runtime counter near 276); that observation does not change
 the saved target and is not itself configuration drift.
 
 The saved ceiling is a fallback if automatic below-refresh pacing is inactive.
 When Reflex paces at 276, a higher 297 ceiling is not the limiting setting and
-does not raise FPS to 297. The redundant ceiling has no demonstrated additional
+does not raise FPS to 297. The fallback ceiling has no demonstrated additional
 performance benefit while Reflex is already pacing lower. Do not replace it
 with an observed frame-counter value or treat either number as a guaranteed
 gameplay frame rate.
@@ -389,6 +390,18 @@ The exact dynamic cap depends on the game/driver and is not a measured optimum
 for this PC. No-sync OW2 profiles retain the engine's 600 FPS ceiling.
 All four OW2 G-SYNC lanes intentionally use borderless/windowed fullscreen;
 inspect the verifier's setting detail before changing display mode.
+
+Boost can help maintain GPU clocks, but it is not a guaranteed frame-time or
+latency improvement. The profile preserves the saved Reflex choice and accepts
+both enabled modes. Reduce Buffering Off is the chosen Reflex baseline; On is
+not proven universally harmful with Reflex. Reassess buffering if Reflex is
+disabled. Neither setting is a substitute for measuring gameplay frame delivery.
+
+OW2 profiles leave the baseline power policy, scheduler/MMCSS values, NIC
+properties and GPU interrupt mode alone rather than imposing unmeasured tweaks.
+A regular profile transaction restores the captured baseline first. Merely
+updating the app does not undo values an older profile already wrote; any
+targeted migration must use a valid backup rather than guess factory defaults.
 
 OW2's native VSync toggle is `VerticalSyncEnabled`. The legacy `LimitToRefresh`
 key is not evidence that VSync is on or off, and ABSO leaves it unchanged.

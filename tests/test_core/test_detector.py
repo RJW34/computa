@@ -299,6 +299,7 @@ class TestDetectMonitors:
             )
 
         assert len(monitors) == 1
+        assert monitors[0]["device_name"] == r"\\.\DISPLAY1"
         assert monitors[0]["refresh_rate"] == 60
         assert monitors[0]["max_refresh_rate"] == 300
         assert monitors[0]["max_refresh_capability"] == 480
@@ -388,7 +389,7 @@ class TestParseEdidForVrr:
         # CTA-861 extension at offset 128
         edid[128] = 0x02  # Extension tag
         edid[129] = 0x03  # Revision
-        edid[130] = 10  # DTD offset
+        edid[130] = 11  # Header + six payload bytes end immediately before DTDs.
 
         # Vendor-specific data block at offset 132
         # Header: tag=3 (VSDB), length=6
@@ -411,12 +412,11 @@ class TestParseEdidForVrr:
         assert result["vrr_min_hz"] == 48
         assert result["vrr_max_hz"] == 144
 
-    def test_parse_edid_freesync_v2plus_block_reads_range_at_offset_6_7(self):
-        """v2+ FreeSync VSDBs insert a flags byte; min/max live at +6/+7.
+    def test_parse_edid_freesync_v3_uses_extended_300_hz_maximum(self):
+        """The active LG block has a legacy 240Hz field but advertises 300Hz.
 
-        Real data block captured from an LG UltraGear 27GS95QE (FreeSync
-        range 48-240 Hz): version=3, flags=0x01, min=0x30, max=0xF0. The old
-        +5/+6 read returned (flags, min) and reported a bogus "1-48Hz".
+        Retain the actual captured block; the previous test incorrectly
+        asserted 240 and assigned an unverified retail model to this EDID.
         """
         edid = bytearray(256)
         edid[126] = 1  # 1 extension block
@@ -436,7 +436,75 @@ class TestParseEdidForVrr:
         assert result["vrr_supported"] == "hardware"
         assert result["vrr_type"] == "freesync"
         assert result["vrr_min_hz"] == 48
-        assert result["vrr_max_hz"] == 240
+        assert result["vrr_max_hz"] == 300
+
+    @staticmethod
+    def _edid_with_block(block, *, dtd_offset=None, block_offset=4):
+        edid = bytearray(256)
+        edid[126] = 1
+        edid[128:132] = bytes([2, 3, dtd_offset or block_offset + 1 + len(block), 0])
+        edid[128 + block_offset] = (3 << 5) | len(block)
+        edid[129 + block_offset:129 + block_offset + len(block)] = block
+        return bytes(edid)
+
+    @pytest.mark.parametrize("oui", [b"\x00\x1a\x00", b"\x1a\x00\x00"])
+    def test_legacy_v2_range_unchanged(self, oui):
+        block = oui + bytes([2, 1, 48, 240, 0, 0, 0])
+        result = _parse_edid_for_vrr(self._edid_with_block(block))
+        assert (result["vrr_min_hz"], result["vrr_max_hz"]) == (48, 240)
+
+    @pytest.mark.parametrize("maximum, upper_flags", [(255, 0), (256, 0), (1023, 0xFC), (300, 0xFC)])
+    def test_v3_extended_maximum_uses_only_ten_bits(self, maximum, upper_flags):
+        block = bytearray.fromhex("1a0000030130f00000000000002c0100")
+        block[13], block[14] = maximum & 0xFF, (maximum >> 8) | upper_flags
+        result = _parse_edid_for_vrr(self._edid_with_block(block))
+        assert (result["vrr_min_hz"], result["vrr_max_hz"]) == (48, maximum)
+
+    @pytest.mark.parametrize("length", [15, 20, 21])
+    @pytest.mark.parametrize("maximum", [1024, 4095])
+    def test_v3_optional_twelve_bit_maximum_obeys_payload_length(self, length, maximum):
+        block = bytearray.fromhex("1a0000030130f00000000000002c01000000000000")
+        block[13], block[14] = maximum & 0xFF, ((maximum >> 8) & 3) | 0xFC
+        block[20] = (maximum >> 10) | 0xFC
+        edid = bytearray(self._edid_with_block(block[:length]))
+        # A following DTD/checksum byte must not count as the optional field.
+        edid[153] = block[20]
+        result = _parse_edid_for_vrr(bytes(edid))
+        expected = maximum if length == 21 else maximum & 0x3FF
+        assert result["vrr_max_hz"] == (expected if expected > 48 else None)
+
+    @pytest.mark.parametrize("length", [3, 4, 6, 7, 13, 14])
+    def test_truncated_v3_does_not_read_following_bytes_or_report_legacy_max(self, length):
+        block = bytes.fromhex("1a0000030130f00000000000002c0100")[:length]
+        edid = bytearray(self._edid_with_block(block))
+        # Bytes outside the declared payload must not complete the v3 maximum.
+        edid[133 + length:149] = b"\xff" * (16 - length)
+        result = _parse_edid_for_vrr(bytes(edid))
+        assert result["vrr_supported"] == "hardware"
+        assert result["vrr_min_hz"] is None
+        assert result["vrr_max_hz"] is None
+
+    @pytest.mark.parametrize("minimum, maximum", [(0, 300), (48, 0), (48, 48), (48, 30)])
+    def test_invalid_v3_range_stays_unknown(self, minimum, maximum):
+        block = bytearray.fromhex("1a0000030130f00000000000002c0100")
+        block[5], block[13], block[14] = minimum, maximum & 0xFF, maximum >> 8
+        result = _parse_edid_for_vrr(self._edid_with_block(block))
+        assert result["vrr_supported"] == "hardware"
+        assert result["vrr_min_hz"] is None
+        assert result["vrr_max_hz"] is None
+
+    @pytest.mark.parametrize("dtd_offset, block_offset", [(10, 4), (127, 114), (128, 4), (255, 4)])
+    def test_malformed_cta_boundaries_do_not_supply_a_vrr_block(self, dtd_offset, block_offset):
+        block = bytes.fromhex("1a0000030130f00000000000002c0100")
+        result = _parse_edid_for_vrr(self._edid_with_block(
+            block, dtd_offset=dtd_offset, block_offset=block_offset,
+        ))
+        assert result["vrr_supported"] is False
+        assert result["vrr_max_hz"] is None
+
+    def test_truncated_extension_is_not_read(self):
+        block = bytes.fromhex("1a0000030130f00000000000002c0100")
+        assert _parse_edid_for_vrr(self._edid_with_block(block)[:-1])["vrr_supported"] is False
 
 
 class TestExceptionHandling:

@@ -67,6 +67,7 @@ class OW2ConfigHandler(SettingsHandler):
     # declares the expected mode via ``expected_reflex_mode`` and verify surfaces
     # a non-blocking manual-step confirmation.
     EXPECTED_REFLEX_MODE_KEY = "expected_reflex_mode"
+    ACCEPTED_REFLEX_MODES_KEY = "accepted_reflex_modes"
     REFLEX_MODE_INI_KEY = "ReflexMode"
     REFLEX_MODE_LABELS = {0: "Disabled", 1: "Enabled", 2: "Enabled + Boost"}
 
@@ -207,7 +208,7 @@ class OW2ConfigHandler(SettingsHandler):
 
         # ReflexMode is advisory-only — strip it before allowed-key validation
         # so the manual-step declaration never reaches the writer.
-        settings, _expected_reflex = self._pop_expected_reflex_mode(settings)
+        settings, _expected_reflex, _accepted_reflex = self._pop_expected_reflex_mode(settings)
         settings = self._resolve_auto_vrr_fps_cap(settings)
 
         invalid = validate_allowed_keys(
@@ -294,7 +295,7 @@ class OW2ConfigHandler(SettingsHandler):
 
     def verify_active(self, settings: dict[str, Any]) -> dict[str, Any]:
         """Verify requested OW2 config values are active."""
-        settings, expected_reflex = self._pop_expected_reflex_mode(settings)
+        settings, expected_reflex, accepted_reflex = self._pop_expected_reflex_mode(settings)
         current = self.detect()
         results: dict[str, Any] = {"all_active": True, "settings": {}}
 
@@ -302,8 +303,8 @@ class OW2ConfigHandler(SettingsHandler):
         # its config. A missing/unreadable value means unknown, not satisfied.
         if expected_reflex is not None:
             current_reflex = current.get("reflex_mode")
-            expected_label = self.REFLEX_MODE_LABELS.get(
-                expected_reflex, str(expected_reflex)
+            expected_label = " or ".join(
+                self.REFLEX_MODE_LABELS[mode] for mode in accepted_reflex
             )
             results["manual_steps"] = [{
                 "key": "reflex_mode",
@@ -311,8 +312,9 @@ class OW2ConfigHandler(SettingsHandler):
                 "current": current_reflex,
                 "current_label": self.REFLEX_MODE_LABELS.get(current_reflex, "unknown"),
                 "expected": expected_reflex,
+                "accepted": list(accepted_reflex),
                 "expected_label": expected_label,
-                "satisfied": current_reflex == expected_reflex,
+                "satisfied": current_reflex in accepted_reflex,
                 "instruction": (
                     "In Overwatch 2, open Options > Video > General > NVIDIA Reflex: "
                     f"choose {expected_label}. Save/apply if prompted. "
@@ -345,22 +347,35 @@ class OW2ConfigHandler(SettingsHandler):
 
     def _pop_expected_reflex_mode(
         self, settings: dict[str, Any]
-    ) -> tuple[dict[str, Any], int | None]:
-        """Split off the advisory ``expected_reflex_mode`` key.
+    ) -> tuple[dict[str, Any], int | None, tuple[int, ...]]:
+        """Split off read-only Reflex guidance, preserving exact custom targets.
 
         ReflexMode is never written by ABSO (not in MUTABLE_SETTINGS), so this
         key must be removed before apply's allowed-key validation and before
         verify builds its replacements. Returns the cleaned settings and the
-        parsed expected mode (or None when absent / unparseable).
+        parsed expected mode and accepted alternatives. Without valid alternatives,
+        an existing single-mode target still requires that exact saved choice.
+        Malformed alternatives must not silently satisfy a disabled Reflex value.
         """
         settings = dict(settings)
         raw = settings.pop(self.EXPECTED_REFLEX_MODE_KEY, None)
-        if raw is None:
-            return settings, None
+        alternatives = settings.pop(self.ACCEPTED_REFLEX_MODES_KEY, None)
         try:
-            return settings, int(raw)
+            expected = int(raw) if not isinstance(raw, bool) else None
         except (TypeError, ValueError):
-            return settings, None
+            expected = None
+        if expected not in self.REFLEX_MODE_LABELS:
+            expected = None
+        accepted = (expected,) if expected is not None else ()
+        if (
+            isinstance(alternatives, (list, tuple))
+            and alternatives
+            and all(type(mode) is int and mode in self.REFLEX_MODE_LABELS for mode in alternatives)
+        ):
+            accepted = tuple(dict.fromkeys(alternatives))
+            if expected not in accepted:
+                expected = accepted[0]
+        return settings, expected, accepted
 
     def backup(self) -> dict[str, Any]:
         """Capture Settings_v0.ini; restore only owns managed render settings."""

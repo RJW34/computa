@@ -245,11 +245,14 @@ def test_ow2_saved_caps_are_static_ceiling_not_reflex_observations(
     for profile_id, profile in profiles_by_id.items():
         if not profile_id.startswith("overwatch2-gsync"):
             continue
-        for handler in ("NvidiaSettingsHandler", "OW2ConfigHandler"):
-            settings = profile.get_settings(handler)
-            assert settings["auto_vrr_fps_cap"] is True
-            assert get_vrr_fps_cap_for_policy(refresh, settings["vrr_cap_policy"]) == expected
-        assert profile.get_settings("OW2ConfigHandler")["expected_reflex_mode"] == 2
+        settings = profile.get_settings("OW2ConfigHandler")
+        assert settings["auto_vrr_fps_cap"] is True
+        assert get_vrr_fps_cap_for_policy(refresh, settings["vrr_cap_policy"]) == expected
+        assert settings["expected_reflex_mode"] == 1
+        assert settings["accepted_reflex_modes"] == [1, 2]
+        driver = profile.get_settings("NvidiaSettingsHandler")
+        assert driver["auto_vrr_fps_cap"] is False
+        assert driver["max_frame_rate"] == "off"
 
 
 def test_retired_ow2_streaming_aliases_preserve_capture_apps(profiles_by_id) -> None:

@@ -13,12 +13,90 @@ from ctypes import wintypes
 from dataclasses import dataclass, field
 from typing import Any
 
-from abso.core.detector import HardwareDetector
+from abso.core.detector import DISPLAYCONFIG_MODE_INFO, HardwareDetector
 from abso.core.overlay_policy import OVERLAY_PROCESS_LABELS
 from abso.core.process_list import parse_tasklist_csv_images
 from abso.utils.proc import no_window_creationflags
 
 logger = logging.getLogger(__name__)
+
+
+def _query_hdr_capabilities_by_device() -> dict[str, bool | None]:
+    """Read active-target HDR support, keyed by case-folded GDI device name.
+
+    Enumerate paths once, then reuse the Windows handler's narrow read-only
+    HDR query. Source/target IDs are adapter-local; enumeration order and
+    monitor resolution are not identities. A cloned source with disagreeing
+    or unreadable targets has unknown capability at this source granularity.
+    """
+    try:
+        # Lazy import avoids pulling settings handlers into detector startup.
+        from abso.settings.windows import (
+            DISPLAYCONFIG_DEVICE_INFO_HEADER,
+            DISPLAYCONFIG_PATH_INFO,
+            QDC_ONLY_ACTIVE_PATHS,
+            WindowsSettingsHandler,
+        )
+
+        class DISPLAYCONFIG_SOURCE_DEVICE_NAME(ctypes.Structure):
+            _fields_ = [
+                ("header", DISPLAYCONFIG_DEVICE_INFO_HEADER),
+                ("viewGdiDeviceName", wintypes.WCHAR * 32),
+            ]
+
+        user32 = ctypes.windll.user32
+        num_paths, num_modes = wintypes.UINT(), wintypes.UINT()
+        if user32.GetDisplayConfigBufferSizes(
+            QDC_ONLY_ACTIVE_PATHS, ctypes.byref(num_paths), ctypes.byref(num_modes),
+        ) != 0 or not num_paths.value:
+            return {}
+        paths = (DISPLAYCONFIG_PATH_INFO * num_paths.value)()
+        modes = (DISPLAYCONFIG_MODE_INFO * num_modes.value)()
+        if user32.QueryDisplayConfig(
+            QDC_ONLY_ACTIVE_PATHS, ctypes.byref(num_paths), paths,
+            ctypes.byref(num_modes), modes, None,
+        ) != 0:
+            # Topology may have changed since the size query. Report unknown
+            # for this sample rather than retrying in a diagnostic hot path.
+            return {}
+
+        handler = WindowsSettingsHandler()
+        sources: dict[tuple[int, int, int], str] = {}
+        targets: dict[tuple[int, int, int], bool | None] = {}
+        capabilities: dict[str, bool | None] = {}
+        for path in paths[:num_paths.value]:
+            source, target = path.sourceInfo, path.targetInfo
+            source_key = (source.adapterId.LowPart, source.adapterId.HighPart, source.id)
+            if source_key not in sources:
+                info = DISPLAYCONFIG_SOURCE_DEVICE_NAME()
+                info.header.type = 1  # DISPLAYCONFIG_DEVICE_INFO_GET_SOURCE_NAME
+                info.header.size = ctypes.sizeof(info)
+                info.header.adapterId = source.adapterId
+                info.header.id = source.id
+                status = user32.DisplayConfigGetDeviceInfo(ctypes.byref(info))
+                sources[source_key] = str(info.viewGdiDeviceName).casefold() if status == 0 else ""
+            device_name = sources[source_key]
+            if not device_name:
+                continue
+
+            target_key = (target.adapterId.LowPart, target.adapterId.HighPart, target.id)
+            if target_key not in targets:
+                try:
+                    hdr = handler._get_target_hdr_info(target.adapterId, target.id)
+                    supported = hdr.get("hdr_supported") if hdr else None
+                    targets[target_key] = supported if isinstance(supported, bool) else None
+                except Exception as exc:
+                    logger.debug("HDR capability query failed for %s: %s", target_key, exc)
+                    targets[target_key] = None
+            supported = targets[target_key]
+            if device_name in capabilities and capabilities[device_name] != supported:
+                capabilities[device_name] = None
+            else:
+                capabilities[device_name] = supported
+        return capabilities
+    except Exception as exc:
+        logger.debug("Display HDR capability query unavailable: %s", exc)
+        return {}
 
 
 @dataclass
@@ -30,11 +108,12 @@ class MonitorInfo:
     height: int
     refresh_rate: float
     is_primary: bool
-    is_hdr_capable: bool = False
+    is_hdr_capable: bool | None = None
     is_vrr_capable: bool = False
     max_refresh_rate: float | None = None
     vrr_type: str | None = None
     vrr_range: str | None = None
+    device_name: str | None = None
 
 
 @dataclass
@@ -129,6 +208,11 @@ class MultiMonitorDetector:
         try:
             # Use EnumDisplayMonitors via ctypes
             monitors = self._enum_display_monitors()
+            if monitors:
+                hdr_capabilities = _query_hdr_capabilities_by_device()
+                for monitor in monitors:
+                    device_name = (monitor.device_name or "").casefold()
+                    monitor.is_hdr_capable = hdr_capabilities.get(device_name)
             env.monitors = monitors
             env.monitor_count = len(monitors)
 
@@ -172,7 +256,7 @@ class MultiMonitorDetector:
                     height=height,
                     refresh_rate=refresh_rate,
                     is_primary=bool(entry.get("is_primary", False)),
-                    is_hdr_capable=False,
+                    device_name=self._optional_string(entry.get("device_name")),
                     is_vrr_capable=entry.get("vrr_supported") in {True, "hardware", "likely", "possible"},
                     max_refresh_rate=self._pick_max_refresh_rate(entry),
                     vrr_type=self._optional_string(entry.get("vrr_type")),
@@ -217,6 +301,7 @@ class MultiMonitorDetector:
                         if len(parts) >= 4:
                             monitors.append(MonitorInfo(
                                 name=parts[0],
+                                device_name=parts[0].strip() or None,
                                 width=int(parts[1]),
                                 height=int(parts[2]),
                                 refresh_rate=60.0,  # Fallback when refresh detection is unavailable
@@ -287,6 +372,7 @@ class MultiMonitorDetector:
                 height = max(0, int(bounds.bottom - bounds.top))
                 monitors.append(MonitorInfo(
                     name=device_name or f"Display {len(monitors) + 1}",
+                    device_name=device_name or None,
                     width=width or 1920,
                     height=height or 1080,
                     refresh_rate=60.0,

@@ -127,6 +127,9 @@ profile, watches for game launches, and supports icon/sound theme packs — see
 ## What profiles change
 
 Exact settings vary per profile; this is what built-in profiles touch today.
+OW2 profiles use the game's FPS limiter, accept either enabled Reflex mode,
+and preserve baseline power, scheduler, NIC and GPU interrupt policies. These
+profiles do not impose the broader experimental tweaks listed below.
 
 ### Streaming and OBS lanes
 
@@ -166,8 +169,10 @@ destination color path are already configured for HDR output or tone mapping.
   break the Windows 11 VRR/compositor path
 
 ### Power
-- Ultimate Performance plan; USB selective suspend and PCIe link-state power
-  saving off; processor max state 100%
+- Many profiles select Ultimate Performance, disable USB selective suspend and
+  PCIe link-state power saving, and request processor max state 100%. These
+  policies are not measured improvements on every machine; OW2 leaves the
+  captured baseline power policy unchanged.
 
 ### Input
 - Mouse acceleration off, linear response curves, enhanced pointer precision

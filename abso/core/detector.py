@@ -427,13 +427,14 @@ def _parse_edid_for_vrr(edid: bytes) -> dict[str, Any]:
             _revision = edid[offset + 1]  # noqa: F841 - reserved for future use
             dtd_offset = edid[offset + 2]
 
-            if dtd_offset < 4:
+            if not 4 <= dtd_offset <= 127:
                 offset += 128
                 continue
 
             # Parse data blocks
             db_offset = offset + 4
-            while db_offset < offset + dtd_offset and db_offset < offset + 127:
+            data_end = offset + dtd_offset
+            while db_offset < data_end:
                 if db_offset >= len(edid):
                     break
 
@@ -445,10 +446,17 @@ def _parse_edid_for_vrr(edid: bytes) -> dict[str, Any]:
                     db_offset += 1
                     continue
 
+                # A malformed length must not read DTDs, the checksum, or the
+                # next extension as though they belonged to this data block.
+                block_end = db_offset + length + 1
+                if block_end > data_end:
+                    break
+                payload = edid[db_offset + 1 : block_end]
+
                 # Vendor-Specific Data Block (tag 3)
-                if tag == 3 and length >= 3 and db_offset + length + 1 <= len(edid):
+                if tag == 3 and length >= 3:
                     # Check OUI (IEEE Registration Authority)
-                    oui = edid[db_offset + 1 : db_offset + 4]
+                    oui = payload[:3]
 
                     # AMD FreeSync OUI: 00-1A-00 (stored little-endian: 00 1A 00)
                     # EDID reports hardware capability, NOT whether VRR is
@@ -458,17 +466,29 @@ def _parse_edid_for_vrr(edid: bytes) -> dict[str, Any]:
                     if list(oui) == [0x00, 0x1A, 0x00] or list(oui) == [0x1A, 0x00, 0x00]:
                         result["vrr_supported"] = "hardware"
                         result["vrr_type"] = "freesync"
-                        # FreeSync range position depends on the VSDB version
-                        # byte at +4: v1 keeps min/max at +5/+6, while v2+
-                        # insert a flags byte so min/max move to +6/+7.
-                        # Reading +5/+6 on a v2+ block returns (flags, min) —
-                        # e.g. a bogus "1-48Hz" from a real 48-240Hz LG
-                        # UltraGear block.
-                        version = edid[db_offset + 4] if db_offset + 4 < len(edid) else 0
-                        min_off, max_off = (6, 7) if version >= 2 else (5, 6)
-                        if length >= max_off and db_offset + max_off < len(edid):
-                            vrr_min = edid[db_offset + min_off]
-                            vrr_max = edid[db_offset + max_off]
+                        if length < 4:
+                            return result
+                        version = payload[3]
+                        # Preserve the legacy layouts. Version 3 adds a 10-bit
+                        # maximum after the version-2 fields; its old maximum
+                        # may still say 240 even when the panel advertises 300.
+                        # Offsets include the three-byte OUI. See cta_amd in:
+                        # github.com/gjasny/v4l-utils/.../parse-cta-block.cpp
+                        min_off, max_off = (5, 6) if version >= 2 else (4, 5)
+                        if version >= 3:
+                            if length < 15:
+                                return result  # Truncated mandatory v3 range.
+                            max_off = 13
+                        if length > max_off:
+                            vrr_min = payload[min_off]
+                            vrr_max = payload[max_off]
+                            if version >= 3:
+                                vrr_max |= (payload[14] & 0x03) << 8
+                                # Newer v3 blocks optionally extend to 12 bits.
+                                # AMD's July/August 2026 drm/edid parser patch:
+                                # lists.openwall.net/linux-kernel/2026/08/04/1775
+                                if length >= 21:
+                                    vrr_max |= (payload[20] & 0x03) << 10
                             if 0 < vrr_min < vrr_max:
                                 result["vrr_min_hz"] = vrr_min
                                 result["vrr_max_hz"] = vrr_max
@@ -1173,6 +1193,7 @@ class HardwareDetector:
 
                     monitors.append({
                         "name": monitor_name,
+                        "device_name": str(adapter.DeviceName),
                         "adapter": adapter.DeviceString or "Unknown",
                         "resolution": f"{settings.PelsWidth}x{settings.PelsHeight}",
                         "refresh_rate": refresh_rate,
@@ -1294,6 +1315,7 @@ class HardwareDetector:
 
                 monitors.append({
                     "name": monitor_name,
+                    "device_name": str(adapter.DeviceName),
                     "adapter": str(adapter.DeviceString) or "Unknown",
                     "resolution": f"{current_width}x{current_height}",
                     "refresh_rate": refresh_rate,
@@ -1376,6 +1398,7 @@ class HardwareDetector:
 
                 monitors.append({
                     "name": parts[0].strip() or f"Monitor {index + 1}",
+                    "device_name": parts[0].strip() or None,
                     "adapter": "Unknown",
                     "resolution": f"{width}x{height}",
                     "refresh_rate": refresh_rate,

@@ -953,8 +953,8 @@ class TestProfileSettings:
         settings = profile.get_settings("NvidiaSettingsHandler")
         assert settings["preset"] == "reflex_gsync"
         assert settings["profile_name"] == "Overwatch 2"
-        assert settings["auto_vrr_fps_cap"] is True
-        assert settings["vrr_cap_policy"] == "refresh_minus_3"
+        assert settings["auto_vrr_fps_cap"] is False
+        assert settings["max_frame_rate"] == "off"
         assert settings["global_vrr_mode"] == "fullscreen_and_windowed"
 
     def test_overwatch2_gsync_in_game_display_mode_matches_windowed_vrr_path(self):
@@ -977,8 +977,8 @@ class TestProfileSettings:
         nvidia = profile.get_settings("NvidiaSettingsHandler")
         assert nvidia["preset"] == "reflex_gsync"
         assert nvidia["profile_name"] == "Overwatch 2"
-        assert nvidia["auto_vrr_fps_cap"] is True
-        assert nvidia["vrr_cap_policy"] == "refresh_minus_3"
+        assert nvidia["auto_vrr_fps_cap"] is False
+        assert nvidia["max_frame_rate"] == "off"
         assert nvidia["global_vrr_mode"] == "fullscreen_and_windowed"
 
         color = profile.get_settings("ColorProfileSettingsHandler")
@@ -1012,10 +1012,10 @@ class TestProfileSettings:
             assert graphics["disable_global_fso"] is False
             assert graphics["disable_mpo"] is False
             assert nvidia["global_vrr_mode"] == "fullscreen_and_windowed"
-            # Saved ceilings stay distinct from Reflex runtime pacing.
-            assert nvidia["vrr_cap_policy"] == "refresh_minus_3"
+            # The native ceiling stays distinct from Reflex runtime pacing.
+            assert nvidia["max_frame_rate"] == "off"
             assert ow2["vrr_cap_policy"] == "refresh_minus_3"
-            assert ow2["expected_reflex_mode"] == 2
+            assert ow2["expected_reflex_mode"] == 1
             assert ow2["window_mode"] == 1
             assert ow2["fullscreen_window"] is False
             assert ow2["fullscreen_window_enabled"] is False
@@ -1035,9 +1035,9 @@ class TestProfileSettings:
         assert graphics["disable_mpo"] is False
         assert nvidia["global_vrr_mode"] == "fullscreen_and_windowed"
         assert nvidia["profile_name"] == "Overwatch 2"
-        assert nvidia["vrr_cap_policy"] == "refresh_minus_3"
+        assert nvidia["max_frame_rate"] == "off"
         assert ow2["vrr_cap_policy"] == "refresh_minus_3"
-        assert ow2["expected_reflex_mode"] == 2
+        assert ow2["expected_reflex_mode"] == 1
         assert ow2["window_mode"] == 1
 
     def test_overwatch2_hdr_capture_profile_uses_windowed_hdr_vrr_path(self):
@@ -1054,9 +1054,9 @@ class TestProfileSettings:
         assert windows["vrr_optimize"] is True
         assert graphics["disable_mpo"] is False
         assert nvidia["global_vrr_mode"] == "fullscreen_and_windowed"
-        assert nvidia["vrr_cap_policy"] == "refresh_minus_3"
+        assert nvidia["max_frame_rate"] == "off"
         assert ow2["vrr_cap_policy"] == "refresh_minus_3"
-        assert ow2["expected_reflex_mode"] == 2
+        assert ow2["expected_reflex_mode"] == 1
         assert ow2["window_mode"] == 1
 
     def test_overwatch2_capture_profile_allows_overlays(self):
@@ -1865,6 +1865,71 @@ class TestSingleLimiterPolicy:
     Overwatch2GSyncCaptureProfile,
     Overwatch2GSyncHDRCaptureProfile,
 ])
+def test_ow2_preserves_baseline_for_unmeasured_system_policies(profile_class) -> None:
+    """An empty override must not accidentally resurrect inherited tuning."""
+    from abso.settings.interrupt_mode import InterruptModeHandler
+    from abso.settings.nic_driver import NicDriverHandler
+
+    profile = profile_class()
+    assert profile.get_settings("PowerSettingsHandler") == {}
+    registry = profile.get_settings("RegistrySettingsHandler")
+    assert set(registry) == {"fullscreen_optimizations"}
+    assert registry["fullscreen_optimizations"] == profile.fullscreen_optimizations_per_exe
+
+    handler_names = {type(handler).__name__ for handler in profile.get_handlers()}
+    assert {"PowerSettingsHandler", "InterruptModeHandler", "NicDriverHandler"} <= handler_names
+
+    # False means no request, not switching MSI off or forcing inverse NIC
+    # properties. These application paths must stop before inspecting devices.
+    with (
+        patch.object(InterruptModeHandler, "_get_gpu_pnp_ids", side_effect=AssertionError("GPU probe")),
+        patch.object(NicDriverHandler, "_active_adapter", side_effect=AssertionError("NIC probe")),
+    ):
+        for handler in (InterruptModeHandler(), NicDriverHandler()):
+            result = handler.apply(profile.get_settings(type(handler).__name__))
+            assert result["success"] is True
+            assert result["changed"] is False
+            assert result["requires_reboot"] is False
+
+
+@pytest.mark.parametrize("profile_class", [
+    Overwatch2Profile,
+    Overwatch2NoSyncHDRProfile,
+    Overwatch2GSyncProfile,
+    Overwatch2GSyncHDRProfile,
+    Overwatch2GSyncCaptureProfile,
+    Overwatch2GSyncHDRCaptureProfile,
+])
+def test_ow2_explicit_driver_limiter_off_survives_runtime_and_preset_merge(profile_class) -> None:
+    """A native ceiling must clear an old driver ceiling, not leave it inherited."""
+    from abso.settings.nvidia import NvidiaSettingsHandler
+    from abso.settings.nvidia.presets import NVIDIA_PRESETS
+
+    profile = profile_class()
+    requested = profile.get_settings("NvidiaSettingsHandler")
+    resolved = profile.resolve_runtime_settings("NvidiaSettingsHandler", requested)
+    assert resolved["auto_vrr_fps_cap"] is False
+    assert resolved["max_frame_rate"] == "off"
+    assert "vrr_cap_policy" not in resolved
+    assert profile.allow_dual_limiter is False
+
+    # Simulate a stale capped preset: the explicit Off request must win in
+    # the same resolution path used to build actual NVIDIA writes.
+    preset = NVIDIA_PRESETS[resolved["preset"]]["settings"]
+    with patch.dict(preset, {"max_frame_rate": 297}):
+        handler = NvidiaSettingsHandler.__new__(NvidiaSettingsHandler)
+        effective = handler._resolve_requested_nvidia_settings(resolved)
+    assert effective["max_frame_rate"] == "off"
+
+
+@pytest.mark.parametrize("profile_class", [
+    Overwatch2Profile,
+    Overwatch2NoSyncHDRProfile,
+    Overwatch2GSyncProfile,
+    Overwatch2GSyncHDRProfile,
+    Overwatch2GSyncCaptureProfile,
+    Overwatch2GSyncHDRCaptureProfile,
+])
 def test_ow2_reduce_buffering_policy_matches_manual_reflex_guidance(profile_class) -> None:
     """Every OW2 lane applies the Off policy its Reflex checklist describes."""
     profile = profile_class()
@@ -1874,16 +1939,20 @@ def test_ow2_reduce_buffering_policy_matches_manual_reflex_guidance(profile_clas
 
     assert native["reduce_buffering"] is False
     assert rows["Reduce Buffering"]["value"] == "Off"
-    assert "Reflex On + Boost" in rows["Reduce Buffering"]["reason"]
+    assert "Reflex Enabled or Enabled + Boost" in rows["Reduce Buffering"]["reason"]
     assert "profile policy" in rows["Reduce Buffering"]["reason"]
-    assert native["expected_reflex_mode"] == 2
+    assert "not a measured FPS improvement or proof that On is harmful" in rows["Reduce Buffering"]["reason"]
+    assert "Reassess buffering if you disable Reflex" in rows["Reduce Buffering"]["reason"]
+    assert native["expected_reflex_mode"] == 1
+    assert native["accepted_reflex_modes"] == [1, 2]
     assert "Boost" in rows["NVIDIA Reflex"]["value"]
+    assert "Enabled or Enabled + Boost" in rows["NVIDIA Reflex"]["value"]
 
     is_gsync = nvidia["preset"] == "reflex_gsync"
     assert native["vsync"] is is_gsync
     if is_gsync:
         assert native["vrr_cap_policy"] == "refresh_minus_3"
-        assert nvidia["vrr_cap_policy"] == "refresh_minus_3"
+        assert nvidia["max_frame_rate"] == "off"
     else:
         assert native["frame_rate_cap"] == 600
 
@@ -1922,15 +1991,16 @@ def test_ow2_gsync_cap_guidance_distinguishes_saved_ceiling_from_runtime(profile
     rows = {row["setting"]: row for row in profile.get_in_game_settings()}
     cap = rows["Frame Rate Cap"]
     assert "refresh - 3 (297 at 300 Hz)" in cap["value"]
-    assert "fallback ceilings, not a target FPS" in cap["reason"]
+    assert "fallback ceiling, not a target FPS" in cap["reason"]
     assert "runtime FPS may be lower" in cap["reason"]
     assert "universal Reflex target" in cap["reason"]
     notes = " ".join(profile.get_post_apply_notes())
     assert "fallback ceiling" in notes
     assert "lower reading alone is not saved-cap drift" in notes
     assert "does not promise 297 FPS or a fixed 276 FPS Reflex target" in notes
-    for handler in ("OW2ConfigHandler", "NvidiaSettingsHandler"):
-        assert profile.get_settings(handler)["vrr_cap_policy"] == "refresh_minus_3"
+    assert profile.get_settings("OW2ConfigHandler")["vrr_cap_policy"] == "refresh_minus_3"
+    assert profile.get_settings("NvidiaSettingsHandler")["max_frame_rate"] == "off"
+    assert "driver FPS limiter is Off" in notes
 
 
 @pytest.mark.parametrize("profile_class, expected_vsync", [
@@ -1946,7 +2016,7 @@ def test_ow2_native_vsync_matches_presentation_path(profile_class, expected_vsyn
     settings = profile.get_settings("OW2ConfigHandler")
     assert settings["vsync"] is expected_vsync
     assert settings["window_mode"] == int(expected_vsync)
-    assert settings["expected_reflex_mode"] == 2
+    assert settings["expected_reflex_mode"] == 1
     rows = {row["setting"]: row for row in profile.get_in_game_settings()}
     if expected_vsync:
         assert rows["VSync"]["value"] == "On (in-game)"

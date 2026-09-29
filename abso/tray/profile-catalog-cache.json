@@ -4953,7 +4953,7 @@
     {
       "id": "overwatch2",
       "display_name": "Overwatch 2 - No Sync SDR",
-      "description": "Latency-focused no-sync SDR profile (VSync OFF, VRR OFF). Enable Reflex On + Boost in-game.",
+      "description": "Latency-focused no-sync SDR profile (VSync OFF, VRR OFF). Enable Reflex in-game; Boost is optional.",
       "optimization_target": "low_latency_high_fps",
       "application_scope": "system_plus_native_config",
       "executables": [
@@ -4980,8 +4980,8 @@
       ],
       "has_in_game_settings": true,
       "tray_category": "Shooters",
-      "tray_subtitle": "No Sync SDR | Reflex ON+Boost (set in-game) | VSync OFF | G-SYNC OFF",
-      "tray_description": "Latency-focused no-sync SDR profile (VSync OFF, VRR OFF). Enable Reflex On + Boost in-game.",
+      "tray_subtitle": "No Sync SDR | Reflex ON (Boost optional) | VSync OFF | G-SYNC OFF",
+      "tray_description": "Latency-focused no-sync SDR profile (VSync OFF, VRR OFF). Enable Reflex in-game; Boost is optional.",
       "tray_group": "overwatch2",
       "tray_group_name": "Overwatch 2",
       "tray_variant": "No Sync (SDR)",
@@ -5108,7 +5108,7 @@
     {
       "id": "overwatch2-hdr",
       "display_name": "Overwatch 2 - No Sync HDR",
-      "description": "Latency-focused no-sync HDR profile (VSync OFF, VRR OFF). Enable Reflex On + Boost in-game. Native HDR for OLED / Mini-LED displays.",
+      "description": "Latency-focused no-sync HDR profile (VSync OFF, VRR OFF). Enable Reflex in-game; Boost is optional. Native HDR for OLED / Mini-LED displays.",
       "optimization_target": "low_latency_high_fps",
       "application_scope": "system_plus_native_config",
       "executables": [
@@ -5135,7 +5135,7 @@
       ],
       "has_in_game_settings": true,
       "tray_category": "Shooters",
-      "tray_subtitle": "No Sync HDR | Reflex ON+Boost (set in-game) | VSync OFF | G-SYNC OFF",
+      "tray_subtitle": "No Sync HDR | Reflex ON (Boost optional) | VSync OFF | G-SYNC OFF",
       "tray_description": "Minimum-latency no-sync Overwatch 2 with native HDR for OLED / Mini-LED. Same sync/VRR contract as the SDR variant.",
       "tray_group": "overwatch2",
       "tray_group_name": "Overwatch 2",

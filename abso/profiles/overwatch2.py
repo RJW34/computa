@@ -23,6 +23,28 @@ _logger = logging.getLogger(__name__)
 class _Overwatch2BaseProfile(ReflexShooterBaseProfile):
     """Shared Overwatch 2 profile defaults."""
 
+    def _base_settings(self) -> dict[str, dict[str, Any]]:
+        settings = super()._base_settings()
+        # OW2 has no measured benefit from the shared base's power-plan,
+        # CPU-floor, parking, scheduler, MSI, or NIC policies. Leave these
+        # at the captured baseline during a normal profile transaction.
+        # Replace the power map here: an empty override would merge with and
+        # retain the inherited settings. Keep handlers registered for backup
+        # and restore, and preserve explicit opt-in legacy registry settings.
+        settings["PowerSettingsHandler"] = {}
+        registry = settings["RegistrySettingsHandler"]
+        registry.pop("win32_priority_separation", None)
+        registry.pop("game_priority", None)
+        settings["InterruptModeHandler"] = {"enable_msi": False}
+        settings["NicDriverHandler"] = {"nic_tuning": False}
+        # The native limiter owns the ceiling. Explicit Off clears a driver
+        # cap left by an earlier OW2 profile instead of merely omitting it.
+        settings["NvidiaSettingsHandler"].update({
+            "auto_vrr_fps_cap": False,
+            "max_frame_rate": "off",
+        })
+        return settings
+
     @property
     def executable_hints(self) -> list[str]:
         return ["Overwatch.exe"]
@@ -233,18 +255,8 @@ class _Overwatch2BaseProfile(ReflexShooterBaseProfile):
 
     @property
     def allow_dual_limiter(self) -> bool:
-        # The native file is rewritten by OW2; a matching driver ceiling
-        # remains a fallback if the game's saved cap drifts. Reflex controls
-        # runtime pacing independently and may cap below both ceilings.
-        return True
-
-    @staticmethod
-    def _ow2_gsync_driver_cap_settings() -> dict[str, Any]:
-        """Static VRR safety ceiling; do not persist an observed Reflex cap."""
-        return {
-            "auto_vrr_fps_cap": True,
-            "vrr_cap_policy": "refresh_minus_3",
-        }
+        # One explicit limiter; native Reflex may still pace below its ceiling.
+        return False
 
     @staticmethod
     def _ow2_gsync_engine_cap_settings() -> dict[str, Any]:
@@ -257,7 +269,8 @@ class _Overwatch2BaseProfile(ReflexShooterBaseProfile):
         return {
             "auto_vrr_fps_cap": True,
             "vrr_cap_policy": "refresh_minus_3",
-            "expected_reflex_mode": 2,
+            "expected_reflex_mode": 1,
+            "accepted_reflex_modes": [1, 2],
         }
 
     @staticmethod
@@ -267,11 +280,11 @@ class _Overwatch2BaseProfile(ReflexShooterBaseProfile):
             "setting": "Frame Rate Cap",
             "value": "Auto static ceiling: refresh - 3 (297 at 300 Hz)",
             "reason": (
-                "The saved native and driver caps are fallback ceilings, not a target FPS. "
+                "The saved native cap is a fallback ceiling, not a target FPS. "
                 "With G-SYNC, VSync and Reflex active, runtime FPS may be lower; while it is, "
-                "the higher saved ceilings do not limit it. A reading such as 276 is not "
-                "itself saved-cap drift or a universal Reflex target. An added performance "
-                "benefit from redundant caps has not been established."
+                "the higher saved ceiling does not limit it. A reading such as 276 is not "
+                "itself saved-cap drift or a universal Reflex target. The driver FPS limiter "
+                "is Off to avoid an unproven duplicate limit."
             ),
         }
 
@@ -295,9 +308,9 @@ class _Overwatch2BaseProfile(ReflexShooterBaseProfile):
             "setting": "Reduce Buffering",
             "value": "Off",
             "reason": (
-                "This profile delegates pacing to Reflex On + Boost. Reduce Buffering "
+                "This profile delegates pacing to Reflex Enabled or Enabled + Boost. Reduce Buffering "
                 "Off is a profile policy, not a measured FPS improvement or proof that "
-                "On is harmful."
+                "On is harmful. Reassess buffering if you disable Reflex."
             ),
         }
 
@@ -374,11 +387,12 @@ class _Overwatch2BaseProfile(ReflexShooterBaseProfile):
                 "saved settings are not a measurement of live sync engagement."
             ),
             (
-                "OW2 manual: set NVIDIA Reflex to Enabled + Boost; keep Dynamic Render Scale Off "
+                "OW2 manual: choose NVIDIA Reflex Enabled or Enabled + Boost; keep Dynamic Render Scale Off "
                 "and Custom Render Scale 100% unless GPU-bound."
             ),
             (
-                "OW2 saved cap: refresh - 3 (297 at 300 Hz) is a fallback ceiling. "
+                "OW2 saved native cap: refresh - 3 (297 at 300 Hz) is a fallback ceiling; "
+                "the driver FPS limiter is Off. "
                 "Reflex may pace runtime FPS below it; a lower reading alone is not saved-cap drift. "
                 "This does not promise 297 FPS or a fixed 276 FPS Reflex target."
             ),
@@ -396,7 +410,7 @@ class _Overwatch2BaseProfile(ReflexShooterBaseProfile):
                 "fullscreen_window_enabled": True,
                 "windowed_fullscreen": False,
                 "vsync": False,  # Off
-                "reduce_buffering": False,  # Pacing policy uses manual Reflex On + Boost.
+                "reduce_buffering": False,  # Pacing policy uses either enabled Reflex mode.
                 "dynamic_render_scale": False,  # Off (UseGPUScale)
                 "dynamic_render_scale_v2": False,  # Off (DynamicRenderScale current key)
                 "render_scale": 0,  # 100%
@@ -438,7 +452,7 @@ class Overwatch2Profile(_Overwatch2BaseProfile):
 
     @property
     def description(self) -> str:
-        return "Latency-focused no-sync SDR profile (VSync OFF, VRR OFF). Enable Reflex On + Boost in-game."
+        return "Latency-focused no-sync SDR profile (VSync OFF, VRR OFF). Enable Reflex in-game; Boost is optional."
 
     @property
     def is_sdr_only(self) -> bool:
@@ -456,7 +470,7 @@ class Overwatch2Profile(_Overwatch2BaseProfile):
     def _variant_overrides(self) -> dict[str, dict[str, Any]]:
         return {
             "NvidiaSettingsHandler": {
-                # In-game Reflex ON + Boost: no-sync can become GPU-bound in
+                # With Reflex enabled, no-sync can still become GPU-bound in
                 # team fights, where native Reflex can reduce queue latency.
                 # Boost tradeoffs still require comparison on this machine.
                 # Driver preset keeps LLM off so the engine owns the queue,
@@ -472,10 +486,11 @@ class Overwatch2Profile(_Overwatch2BaseProfile):
                 "window_mode": 0,
                 # No-sync uses a high ceiling, not an unlimited frame rate.
                 "frame_rate_cap": 600,
-                # Verify confirms the manual in-game Reflex step (On + Boost).
+                # Verify accepts either enabled manual in-game Reflex mode.
                 # Native Reflex handles render-queue backpressure; compare
                 # latency and FPS on this setup when choosing Boost.
-                "expected_reflex_mode": 2,
+                "expected_reflex_mode": 1,
+                "accepted_reflex_modes": [1, 2],
             },
         }
 
@@ -496,7 +511,7 @@ class Overwatch2Profile(_Overwatch2BaseProfile):
             {
                 "category": "Display",
                 "setting": "NVIDIA Reflex",
-                "value": "Enabled + Boost — set the in-game toggle manually",
+                "value": "Enabled or Enabled + Boost — choose manually",
                 "reason": (
                     "Reflex reduces render-queue latency, especially when GPU-bound. "
                     "Boost keeps GPU clocks elevated and may increase power use or "
@@ -524,8 +539,8 @@ class Overwatch2Profile(_Overwatch2BaseProfile):
         return [
             (
                 "OW2 manual: Dynamic Render Scale Off, Custom Render Scale 100%; "
-                "try 80-90 only if GPU-bound. Set NVIDIA Reflex to Enabled + Boost "
-                "and compare Enabled alone if Boost reduces performance."
+                "try 80-90 only if GPU-bound. Choose NVIDIA Reflex Enabled or Enabled + Boost; "
+                "compare latency and frame pacing before preferring Boost."
             )
         ]
 
@@ -550,7 +565,7 @@ class Overwatch2NoSyncHDRProfile(Overwatch2Profile):
     @property
     def description(self) -> str:
         return (
-            "Latency-focused no-sync HDR profile (VSync OFF, VRR OFF). Enable Reflex On + Boost in-game. "
+            "Latency-focused no-sync HDR profile (VSync OFF, VRR OFF). Enable Reflex in-game; Boost is optional. "
             "Native HDR for OLED / Mini-LED displays."
         )
 
@@ -611,8 +626,8 @@ class Overwatch2NoSyncHDRProfile(Overwatch2Profile):
 class Overwatch2GSyncProfile(_Overwatch2BaseProfile):
     """Overwatch 2 G-SYNC profile.
 
-    VRR profile with native Reflex, in-game and driver VSync, and matching
-    refresh - 3 static caps. Reflex may dynamically pace below the ceiling.
+    VRR profile with native Reflex, in-game and driver VSync, and a native
+    refresh - 3 static cap. The driver limiter is Off; Reflex may pace lower.
 
     Runs the same borderless windowed flip path as the capture-safe sibling;
     the differences are overlay handling and game process priority. This lane kills
@@ -678,8 +693,6 @@ class Overwatch2GSyncProfile(_Overwatch2BaseProfile):
                 "preset": "reflex_gsync",
                 # Use NVIDIA's predefined OW2 profile to avoid executable binding conflicts.
                 "profile_name": "Overwatch 2",
-                # Static safety ceiling (297 FPS at 300 Hz).
-                **self._ow2_gsync_driver_cap_settings(),
                 "global_vrr_mode": "fullscreen_and_windowed",
             },
             "ColorProfileSettingsHandler": {
@@ -688,7 +701,7 @@ class Overwatch2GSyncProfile(_Overwatch2BaseProfile):
             },
             "OW2ConfigHandler": {
                 **self._borderless_ow2_settings(),
-                # Match the driver safety ceiling; Reflex may pace below it.
+                # Native safety ceiling; Reflex may pace below it.
                 **self._ow2_gsync_engine_cap_settings(),
             },
         }
@@ -709,8 +722,8 @@ class Overwatch2GSyncProfile(_Overwatch2BaseProfile):
             {
                 "category": "Display",
                 "setting": "NVIDIA Reflex",
-                "value": "Enabled + Boost — set the in-game toggle manually",
-                "reason": "Enable native Reflex for queue control; the profile requests driver LLM Off. With G-SYNC and VSync active, Reflex may pace below the static cap. ABSO leaves Reflex as a manual choice; verify it in-game. Boost can cost power or FPS, so compare Enabled alone if needed.",
+                "value": "Enabled or Enabled + Boost — choose manually",
+                "reason": "Enable native Reflex for queue control; the profile requests driver LLM Off. With G-SYNC and VSync active, Reflex may pace below the static cap. ABSO leaves Reflex as a manual choice; verify it in-game. Boost can cost power or FPS; neither enabled mode is proven best on this PC.",
             },
             self._ow2_gsync_cap_guidance(),
             self._reduce_buffering_guidance(),
@@ -824,13 +837,11 @@ class Overwatch2GSyncHDRProfile(_Overwatch2BaseProfile):
             "NvidiaSettingsHandler": {
                 "preset": "reflex_gsync",
                 "profile_name": "Overwatch 2",
-                # Static safety ceiling (297 FPS at 300 Hz).
-                **self._ow2_gsync_driver_cap_settings(),
                 "global_vrr_mode": "fullscreen_and_windowed",
             },
             "OW2ConfigHandler": {
                 **self._borderless_ow2_settings(),
-                # Match the driver safety ceiling; Reflex may pace below it.
+                # Native safety ceiling; Reflex may pace below it.
                 # To override, set
                 # ``profile_overrides.overwatch2-gsync-hdr.ow2_config`` in
                 # abso.yaml: ``auto_vrr_fps_cap: false`` plus an explicit
@@ -855,8 +866,8 @@ class Overwatch2GSyncHDRProfile(_Overwatch2BaseProfile):
             {
                 "category": "Display",
                 "setting": "NVIDIA Reflex",
-                "value": "Enabled + Boost — set the in-game toggle manually",
-                "reason": "Enable native Reflex for queue control; the profile requests driver LLM Off. With G-SYNC and VSync active, Reflex may pace below the static cap. ABSO leaves Reflex as a manual choice; verify it in-game. Boost can cost power or FPS, so compare Enabled alone if needed.",
+                "value": "Enabled or Enabled + Boost — choose manually",
+                "reason": "Enable native Reflex for queue control; the profile requests driver LLM Off. With G-SYNC and VSync active, Reflex may pace below the static cap. ABSO leaves Reflex as a manual choice; verify it in-game. Boost can cost power or FPS; neither enabled mode is proven best on this PC.",
             },
             self._ow2_gsync_cap_guidance(),
             self._reduce_buffering_guidance(),
@@ -948,7 +959,6 @@ class Overwatch2GSyncCaptureProfile(_Overwatch2BaseProfile):
             "NvidiaSettingsHandler": {
                 "preset": "reflex_gsync",
                 "profile_name": "Overwatch 2",
-                **self._ow2_gsync_driver_cap_settings(),
                 "global_vrr_mode": "fullscreen_and_windowed",
             },
             "ColorProfileSettingsHandler": {
@@ -980,8 +990,8 @@ class Overwatch2GSyncCaptureProfile(_Overwatch2BaseProfile):
             {
                 "category": "Display",
                 "setting": "NVIDIA Reflex",
-                "value": "Enabled + Boost — set the in-game toggle manually",
-                "reason": "Enable native Reflex for queue control; the profile requests driver LLM Off. With G-SYNC and VSync active, Reflex may pace below the static cap. ABSO leaves Reflex as a manual choice; verify it in-game. Boost can cost power or FPS, so compare Enabled alone if needed.",
+                "value": "Enabled or Enabled + Boost — choose manually",
+                "reason": "Enable native Reflex for queue control; the profile requests driver LLM Off. With G-SYNC and VSync active, Reflex may pace below the static cap. ABSO leaves Reflex as a manual choice; verify it in-game. Boost can cost power or FPS; neither enabled mode is proven best on this PC.",
             },
             self._ow2_gsync_cap_guidance(),
             self._reduce_buffering_guidance(),
@@ -1082,7 +1092,6 @@ class Overwatch2GSyncHDRCaptureProfile(_Overwatch2BaseProfile):
             "NvidiaSettingsHandler": {
                 "preset": "reflex_gsync",
                 "profile_name": "Overwatch 2",
-                **self._ow2_gsync_driver_cap_settings(),
                 "global_vrr_mode": "fullscreen_and_windowed",
             },
             "OW2ConfigHandler": {
@@ -1112,8 +1121,8 @@ class Overwatch2GSyncHDRCaptureProfile(_Overwatch2BaseProfile):
             {
                 "category": "Display",
                 "setting": "NVIDIA Reflex",
-                "value": "Enabled + Boost — set the in-game toggle manually",
-                "reason": "Enable native Reflex for queue control; the profile requests driver LLM Off. With G-SYNC and VSync active, Reflex may pace below the static cap. ABSO leaves Reflex as a manual choice; verify it in-game. Boost can cost power or FPS, so compare Enabled alone if needed.",
+                "value": "Enabled or Enabled + Boost — choose manually",
+                "reason": "Enable native Reflex for queue control; the profile requests driver LLM Off. With G-SYNC and VSync active, Reflex may pace below the static cap. ABSO leaves Reflex as a manual choice; verify it in-game. Boost can cost power or FPS; neither enabled mode is proven best on this PC.",
             },
             self._ow2_gsync_cap_guidance(),
             self._reduce_buffering_guidance(),

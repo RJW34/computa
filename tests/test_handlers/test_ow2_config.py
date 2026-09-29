@@ -831,6 +831,54 @@ def test_verify_reflex_manual_step_unsatisfied_is_non_blocking(tmp_path: Path) -
     assert verify["manual_steps"][0]["current_label"] == "Disabled"
 
 
+@pytest.mark.parametrize("saved_mode,satisfied", [(0, False), (1, True), (2, True), (7, False)])
+def test_reflex_enabled_alternatives_preserve_user_choice(
+    tmp_path: Path, saved_mode: int, satisfied: bool
+) -> None:
+    ini_path = tmp_path / "Settings_v0.ini"
+    content = REFLEX_INI.replace('ReflexMode = "2"', f'ReflexMode = "{saved_mode}"')
+    _write_settings_ini(ini_path, content)
+    before = ini_path.read_bytes()
+    guidance = {"expected_reflex_mode": 1, "accepted_reflex_modes": [1, 2]}
+    with patch("abso.settings.ow2_config._get_ow2_settings_path", return_value=ini_path):
+        handler = OW2ConfigHandler()
+        applied = handler.apply(guidance)
+        verified = handler.verify_active(guidance)
+    assert applied["success"] is True
+    assert ini_path.read_bytes() == before
+    step = verified["manual_steps"][0]
+    assert step["satisfied"] is satisfied
+    assert step["accepted"] == [1, 2]
+    assert step["expected_label"] == "Enabled or Enabled + Boost"
+    assert verified["all_active"] is True
+
+
+@pytest.mark.parametrize("alternatives", [[], "1,2", [True, 2], [1, "2"], [1, 9], None])
+def test_invalid_reflex_alternatives_keep_exact_custom_target(
+    tmp_path: Path, alternatives: object
+) -> None:
+    ini_path = tmp_path / "Settings_v0.ini"
+    _write_settings_ini(ini_path, REFLEX_INI.replace('ReflexMode = "2"', 'ReflexMode = "1"'))
+    with patch("abso.settings.ow2_config._get_ow2_settings_path", return_value=ini_path):
+        verified = OW2ConfigHandler().verify_active({
+            "expected_reflex_mode": 2, "accepted_reflex_modes": alternatives,
+        })
+    step = verified["manual_steps"][0]
+    assert step["accepted"] == [2]
+    assert step["satisfied"] is False
+
+
+def test_reflex_alternatives_do_not_confirm_missing_saved_choice(tmp_path: Path) -> None:
+    ini_path = tmp_path / "Settings_v0.ini"
+    _write_settings_ini(ini_path, SAMPLE_INI)
+    with patch("abso.settings.ow2_config._get_ow2_settings_path", return_value=ini_path):
+        verified = OW2ConfigHandler().verify_active({
+            "expected_reflex_mode": 1, "accepted_reflex_modes": [1, 2],
+        })
+    assert verified["manual_steps"][0]["satisfied"] is False
+    assert verified["manual_steps"][0]["current_label"] == "unknown"
+
+
 @pytest.mark.parametrize("config_state", ["missing_file", "missing_key", "unreadable"])
 def test_verify_reflex_unknown_remains_actionable(tmp_path: Path, config_state: str) -> None:
     ini_path = tmp_path / "Settings_v0.ini"
