@@ -1865,6 +1865,37 @@ class TestSingleLimiterPolicy:
     Overwatch2GSyncCaptureProfile,
     Overwatch2GSyncHDRCaptureProfile,
 ])
+def test_ow2_reduce_buffering_policy_matches_manual_reflex_guidance(profile_class) -> None:
+    """Every OW2 lane applies the Off policy its Reflex checklist describes."""
+    profile = profile_class()
+    native = profile.get_settings("OW2ConfigHandler")
+    nvidia = profile.get_settings("NvidiaSettingsHandler")
+    rows = {row["setting"]: row for row in profile.get_in_game_settings()}
+
+    assert native["reduce_buffering"] is False
+    assert rows["Reduce Buffering"]["value"] == "Off"
+    assert "Reflex On + Boost" in rows["Reduce Buffering"]["reason"]
+    assert "profile policy" in rows["Reduce Buffering"]["reason"]
+    assert native["expected_reflex_mode"] == 2
+    assert "Boost" in rows["NVIDIA Reflex"]["value"]
+
+    is_gsync = nvidia["preset"] == "reflex_gsync"
+    assert native["vsync"] is is_gsync
+    if is_gsync:
+        assert native["vrr_cap_policy"] == "refresh_minus_3"
+        assert nvidia["vrr_cap_policy"] == "refresh_minus_3"
+    else:
+        assert native["frame_rate_cap"] == 600
+
+
+@pytest.mark.parametrize("profile_class", [
+    Overwatch2Profile,
+    Overwatch2NoSyncHDRProfile,
+    Overwatch2GSyncProfile,
+    Overwatch2GSyncHDRProfile,
+    Overwatch2GSyncCaptureProfile,
+    Overwatch2GSyncHDRCaptureProfile,
+])
 def test_ow2_graphics_guidance_distinguishes_manual_choices(profile_class) -> None:
     """A settings checklist must not turn a manual visual choice into claimed tuning."""
     profile = profile_class()

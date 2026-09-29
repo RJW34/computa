@@ -289,6 +289,19 @@ class _Overwatch2BaseProfile(ReflexShooterBaseProfile):
         }
 
     @staticmethod
+    def _reduce_buffering_guidance() -> dict[str, str]:
+        return {
+            "category": "Display",
+            "setting": "Reduce Buffering",
+            "value": "Off",
+            "reason": (
+                "This profile delegates pacing to Reflex On + Boost. Reduce Buffering "
+                "Off is a profile policy, not a measured FPS improvement or proof that "
+                "On is harmful."
+            ),
+        }
+
+    @staticmethod
     def _custom_render_scale_guidance() -> dict[str, str]:
         return {
             "category": "Graphics",
@@ -383,7 +396,7 @@ class _Overwatch2BaseProfile(ReflexShooterBaseProfile):
                 "fullscreen_window_enabled": True,
                 "windowed_fullscreen": False,
                 "vsync": False,  # Off
-                "reduce_buffering": True,  # On
+                "reduce_buffering": False,  # Pacing policy uses manual Reflex On + Boost.
                 "dynamic_render_scale": False,  # Off (UseGPUScale)
                 "dynamic_render_scale_v2": False,  # Off (DynamicRenderScale current key)
                 "render_scale": 0,  # 100%
@@ -496,15 +509,7 @@ class Overwatch2Profile(_Overwatch2BaseProfile):
                 "value": "600 FPS ceiling",
                 "reason": "No-sync uses a 600 FPS ceiling and accepts tearing; actual FPS depends on the workload.",
             },
-            {
-                "category": "Display",
-                "setting": "Reduce Buffering",
-                "value": "On",
-                "reason": (
-                    "Requests the game's lower-buffering path. Its interaction with "
-                    "Reflex should be checked with frame-time and latency measurements."
-                ),
-            },
+            self._reduce_buffering_guidance(),
             {
                 "category": "Graphics",
                 "setting": "Dynamic Render Scale",
@@ -708,12 +713,7 @@ class Overwatch2GSyncProfile(_Overwatch2BaseProfile):
                 "reason": "Enable native Reflex for queue control; the profile requests driver LLM Off. With G-SYNC and VSync active, Reflex may pace below the static cap. ABSO leaves Reflex as a manual choice; verify it in-game. Boost can cost power or FPS, so compare Enabled alone if needed.",
             },
             self._ow2_gsync_cap_guidance(),
-            {
-                "category": "Display",
-                "setting": "Reduce Buffering",
-                "value": "On",
-                "reason": "Requests the game's reduced buffering path; compare frame-time and latency results with Reflex on this setup.",
-            },
+            self._reduce_buffering_guidance(),
             {
                 "category": "Graphics",
                 "setting": "Dynamic Render Scale",
@@ -859,12 +859,7 @@ class Overwatch2GSyncHDRProfile(_Overwatch2BaseProfile):
                 "reason": "Enable native Reflex for queue control; the profile requests driver LLM Off. With G-SYNC and VSync active, Reflex may pace below the static cap. ABSO leaves Reflex as a manual choice; verify it in-game. Boost can cost power or FPS, so compare Enabled alone if needed.",
             },
             self._ow2_gsync_cap_guidance(),
-            {
-                "category": "Display",
-                "setting": "Reduce Buffering",
-                "value": "On",
-                "reason": "Requests the game's reduced buffering path; compare frame-time and latency results with Reflex on this setup.",
-            },
+            self._reduce_buffering_guidance(),
             {
                 "category": "Display",
                 "setting": "HDR Mode",
@@ -989,12 +984,7 @@ class Overwatch2GSyncCaptureProfile(_Overwatch2BaseProfile):
                 "reason": "Enable native Reflex for queue control; the profile requests driver LLM Off. With G-SYNC and VSync active, Reflex may pace below the static cap. ABSO leaves Reflex as a manual choice; verify it in-game. Boost can cost power or FPS, so compare Enabled alone if needed.",
             },
             self._ow2_gsync_cap_guidance(),
-            {
-                "category": "Display",
-                "setting": "Reduce Buffering",
-                "value": "On",
-                "reason": "Requests the game's reduced buffering path; compare frame-time and latency results with Reflex on this setup.",
-            },
+            self._reduce_buffering_guidance(),
             {
                 "category": "Graphics",
                 "setting": "Dynamic Render Scale",
@@ -1126,12 +1116,7 @@ class Overwatch2GSyncHDRCaptureProfile(_Overwatch2BaseProfile):
                 "reason": "Enable native Reflex for queue control; the profile requests driver LLM Off. With G-SYNC and VSync active, Reflex may pace below the static cap. ABSO leaves Reflex as a manual choice; verify it in-game. Boost can cost power or FPS, so compare Enabled alone if needed.",
             },
             self._ow2_gsync_cap_guidance(),
-            {
-                "category": "Display",
-                "setting": "Reduce Buffering",
-                "value": "On",
-                "reason": "Requests the game's reduced buffering path; compare frame-time and latency results with Reflex on this setup.",
-            },
+            self._reduce_buffering_guidance(),
             {
                 "category": "Display",
                 "setting": "HDR Mode",

@@ -89,6 +89,11 @@ controls, sensitivity, field of view, audio, and HDR calibration were preserved.
 The user confirmed that high precision mouse input was removed in a recent
 patch; no hidden setting was created or changed.
 
+The above is a historical observation, not current setup guidance. The native
+VSync policy was corrected on September 28, and Reduce Buffering was changed
+to Off for the Reflex profiles on September 29; see
+[the follow-up correction](ow2-reflex-buffering-fix-2026-09-29.md).
+
 Installed verify and state readbacks after UI work both succeeded. They report
 all active, no pending apply or reboot, and the manual Reflex step satisfied
 with `ReflexMode=2` (Enabled + Boost). Evidence includes `verify-after-ui.json`,

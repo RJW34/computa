@@ -3681,9 +3681,9 @@
       },
       {
         "category": "Display",
-        "reason": "Requests the game's lower-buffering path. Its interaction with Reflex should be checked with frame-time and latency measurements.",
+        "reason": "This profile delegates pacing to Reflex On + Boost. Reduce Buffering Off is a profile policy, not a measured FPS improvement or proof that On is harmful.",
         "setting": "Reduce Buffering",
-        "value": "On"
+        "value": "Off"
       },
       {
         "category": "Graphics",
@@ -3790,7 +3790,7 @@
         "gfx_preset": 1,
         "hdr": false,
         "model_quality": 1,
-        "reduce_buffering": true,
+        "reduce_buffering": false,
         "render_scale": 0,
         "show_fps": true,
         "show_latency": true,
@@ -3888,9 +3888,9 @@
       },
       {
         "category": "Display",
-        "reason": "Requests the game's reduced buffering path; compare frame-time and latency results with Reflex on this setup.",
+        "reason": "This profile delegates pacing to Reflex On + Boost. Reduce Buffering Off is a profile policy, not a measured FPS improvement or proof that On is harmful.",
         "setting": "Reduce Buffering",
-        "value": "On"
+        "value": "Off"
       },
       {
         "category": "Graphics",
@@ -4001,7 +4001,7 @@
         "gfx_preset": 1,
         "hdr": false,
         "model_quality": 1,
-        "reduce_buffering": true,
+        "reduce_buffering": false,
         "render_scale": 0,
         "show_fps": true,
         "show_latency": true,
@@ -4100,9 +4100,9 @@
       },
       {
         "category": "Display",
-        "reason": "Requests the game's reduced buffering path; compare frame-time and latency results with Reflex on this setup.",
+        "reason": "This profile delegates pacing to Reflex On + Boost. Reduce Buffering Off is a profile policy, not a measured FPS improvement or proof that On is harmful.",
         "setting": "Reduce Buffering",
-        "value": "On"
+        "value": "Off"
       },
       {
         "category": "Graphics",
@@ -4213,7 +4213,7 @@
         "gfx_preset": 1,
         "hdr": false,
         "model_quality": 1,
-        "reduce_buffering": true,
+        "reduce_buffering": false,
         "render_scale": 0,
         "show_fps": true,
         "show_latency": true,
@@ -4312,9 +4312,9 @@
       },
       {
         "category": "Display",
-        "reason": "Requests the game's reduced buffering path; compare frame-time and latency results with Reflex on this setup.",
+        "reason": "This profile delegates pacing to Reflex On + Boost. Reduce Buffering Off is a profile policy, not a measured FPS improvement or proof that On is harmful.",
         "setting": "Reduce Buffering",
-        "value": "On"
+        "value": "Off"
       },
       {
         "category": "Display",
@@ -4437,7 +4437,7 @@
         "gfx_preset": 1,
         "hdr": true,
         "model_quality": 1,
-        "reduce_buffering": true,
+        "reduce_buffering": false,
         "render_scale": 0,
         "show_fps": true,
         "show_latency": true,
@@ -4538,9 +4538,9 @@
       },
       {
         "category": "Display",
-        "reason": "Requests the game's reduced buffering path; compare frame-time and latency results with Reflex on this setup.",
+        "reason": "This profile delegates pacing to Reflex On + Boost. Reduce Buffering Off is a profile policy, not a measured FPS improvement or proof that On is harmful.",
         "setting": "Reduce Buffering",
-        "value": "On"
+        "value": "Off"
       },
       {
         "category": "Display",
@@ -4663,7 +4663,7 @@
         "gfx_preset": 1,
         "hdr": true,
         "model_quality": 1,
-        "reduce_buffering": true,
+        "reduce_buffering": false,
         "render_scale": 0,
         "show_fps": true,
         "show_latency": true,
@@ -4764,9 +4764,9 @@
       },
       {
         "category": "Display",
-        "reason": "Requests the game's lower-buffering path. Its interaction with Reflex should be checked with frame-time and latency measurements.",
+        "reason": "This profile delegates pacing to Reflex On + Boost. Reduce Buffering Off is a profile policy, not a measured FPS improvement or proof that On is harmful.",
         "setting": "Reduce Buffering",
-        "value": "On"
+        "value": "Off"
       },
       {
         "category": "Graphics",
@@ -4886,7 +4886,7 @@
         "gfx_preset": 1,
         "hdr": true,
         "model_quality": 1,
-        "reduce_buffering": true,
+        "reduce_buffering": false,
         "render_scale": 0,
         "show_fps": true,
         "show_latency": true,

@@ -662,9 +662,60 @@ def test_audit_flags_suboptimal_settings(tmp_path: Path) -> None:
     # SAMPLE_INI has vsync=1, reduce_buffering=0, triple_buffering=1, dynamic_render_scale=1
     titles = [i.title for i in issues]
     assert "OW2 VSync enabled in-game" not in titles
-    assert "OW2 Reduce Buffering disabled" in titles
+    assert "OW2 Reduce Buffering disabled" not in titles
     assert "OW2 Triple Buffering enabled" in titles
     assert "OW2 Dynamic Render Scale enabled" in titles
+
+
+@pytest.mark.parametrize("reflex_mode", [None, 0, 1, 2])
+def test_audit_does_not_treat_reduce_buffering_off_as_universally_wrong(
+    tmp_path: Path, reflex_mode: int | None,
+) -> None:
+    ini_path = tmp_path / "Settings_v0.ini"
+    content = '[Render.13]\nCpuForceSyncEnabled = "0"\n'
+    if reflex_mode is not None:
+        content += f'ReflexMode = "{reflex_mode}"\n'
+    _write_settings_ini(ini_path, content)
+
+    with patch("abso.settings.ow2_config._get_ow2_settings_path", return_value=ini_path):
+        handler = OW2ConfigHandler()
+        assert handler.audit() == []
+        assert handler.verify_active({"reduce_buffering": False})["all_active"] is True
+        assert handler.verify_active({"reduce_buffering": True})["all_active"] is False
+
+
+def test_apply_native_vsync_on_buffering_off_preserves_other_choices_and_is_idempotent(
+    tmp_path: Path,
+) -> None:
+    ini_path = tmp_path / "Settings_v0.ini"
+    original = (
+        '[Render.13]\nVerticalSyncEnabled = "0"\nCpuForceSyncEnabled = "1"\n'
+        'LimitToRefresh = "0"\nReflexMode = "2"\nFrameRateCap = "297"\nHDR = "1"\n'
+        'HDRPaperWhite = "203"\nLocalReflections = "0"\n'
+        '[Controls.1]\nMouseSensitivity = "7.50"\n'
+        '[Sound.1]\nMasterVolume = "50"\n'
+    )
+    _write_settings_ini(ini_path, original)
+    settings = {"vsync": True, "reduce_buffering": False}
+
+    with patch("abso.settings.ow2_config._get_ow2_settings_path", return_value=ini_path):
+        handler = OW2ConfigHandler()
+        assert handler.verify_active(settings)["all_active"] is False
+        first = handler.apply(settings)
+        assert first["success"] is True
+        assert first["applied"] == ["CpuForceSyncEnabled", "VerticalSyncEnabled"]
+        assert handler.verify_active(settings)["all_active"] is True
+        with patch.object(Path, "write_text") as write:
+            second = handler.apply(settings)
+            assert second["success"] is True
+            assert second["applied"] == []
+            write.assert_not_called()
+        assert handler.verify_active(settings)["all_active"] is True
+
+    expected = original.replace('VerticalSyncEnabled = "0"', 'VerticalSyncEnabled = "1"').replace(
+        'CpuForceSyncEnabled = "1"', 'CpuForceSyncEnabled = "0"',
+    )
+    assert ini_path.read_text(encoding="utf-8") == expected
 
 
 def test_apply_surfaces_post_write_window_mode_drift(tmp_path: Path) -> None:

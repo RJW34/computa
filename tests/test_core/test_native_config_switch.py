@@ -40,10 +40,11 @@ class WindowsSettingsHandler:
 def native_switch(tmp_path, monkeypatch):
     prefs = tmp_path / "Settings_v0.ini"
 
-    def write_native(vsync, reflex=2):
+    def write_native(vsync, reflex=2, reduce_buffering=0):
         prefs.write_text(
             '[Render.13]\n'
             f'VerticalSyncEnabled = "{vsync}"\n'
+            f'CpuForceSyncEnabled = "{reduce_buffering}"\n'
             f'ReflexMode = "{reflex}"\n'
             'LocalReflections = "0"\n',
             encoding="utf-8",
@@ -57,7 +58,7 @@ def native_switch(tmp_path, monkeypatch):
     monkeypatch.setattr("abso.core.transaction.get_config", lambda: SimpleNamespace(max_backups=20))
 
     backups = tmp_path / "backups"
-    write_native(0, reflex=0)
+    write_native(0, reflex=0, reduce_buffering=1)
     baseline_id = BackupManager(backups).create_backup(
         profile_id="overwatch2-gsync-hdr-capture", backup_type="pre_apply",
     )
@@ -105,6 +106,7 @@ def test_switch_to_other_game_or_desktop_preserves_ow2_native_settings(native_sw
     for backup_id in (tx.rollback_backup_id, tx.backup_id):
         data = json.loads((env.backups / backup_id / "OW2ConfigHandler.json").read_text())
         assert 'VerticalSyncEnabled = "1"' in data["file_content"]
+        assert 'CpuForceSyncEnabled = "0"' in data["file_content"]
 
 
 def test_switch_within_ow2_restores_owned_baseline_then_applies_target(native_switch):
@@ -112,15 +114,21 @@ def test_switch_within_ow2_restores_owned_baseline_then_applies_target(native_sw
 
     def apply(_profile_id):
         assert 'VerticalSyncEnabled = "0"' in env.prefs.read_text()
+        assert 'CpuForceSyncEnabled = "1"' in env.prefs.read_text()
         # Manual Reflex remains live even when owned fields reset for this game.
         assert 'ReflexMode = "2"' in env.prefs.read_text()
-        result = env.native.apply({"vsync": True})
+        settings = {"vsync": True, "reduce_buffering": False}
+        result = env.native.apply(settings)
         assert result["success"] is True
-        return ApplyResult(success=True, changed_settings=["OW2ConfigHandler.vsync"])
+        assert env.native.verify_active(settings)["all_active"] is True
+        return ApplyResult(success=True, changed_settings=[
+            "OW2ConfigHandler.vsync", "OW2ConfigHandler.reduce_buffering",
+        ])
 
     tx = _transaction(env, "overwatch2-gsync-hdr-capture", [env.native], apply)
     assert tx.success is True
     assert 'VerticalSyncEnabled = "1"' in env.prefs.read_text()
+    assert 'CpuForceSyncEnabled = "0"' in env.prefs.read_text()
 
 
 def test_failed_cross_game_switch_rolls_back_full_pre_switch_native_snapshot(native_switch):
@@ -130,7 +138,7 @@ def test_failed_cross_game_switch_rolls_back_full_pre_switch_native_snapshot(nat
     def fail(_profile_id):
         # Simulate a partial mutation before a late failure. Rollback must not
         # inherit the Phase0 filter, even for files unrelated to the target.
-        env.write_native(0)
+        env.write_native(0, reduce_buffering=1)
         env.system.value = "partial-apply"
         return ApplyResult(success=False, error="late failure", changed_settings=["shared"])
 
@@ -151,6 +159,7 @@ def test_explicit_backup_restore_still_restores_native_owned_values(native_switc
     assert summary.preserved_components == []
     assert "OW2ConfigHandler" in summary.restored_components
     assert 'VerticalSyncEnabled = "0"' in env.prefs.read_text()
+    assert 'CpuForceSyncEnabled = "1"' in env.prefs.read_text()
     assert 'ReflexMode = "2"' in env.prefs.read_text()
 
 

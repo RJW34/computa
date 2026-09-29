@@ -170,19 +170,8 @@ class OW2ConfigHandler(SettingsHandler):
 
         # VSync is profile-dependent: borderless G-SYNC uses the native toggle,
         # whereas no-sync lanes disable it. verify_active checks that contract.
-
-        if current.get("reduce_buffering") == 0:
-            issues.append(Issue(
-                title="OW2 Reduce Buffering disabled",
-                severity="warning",
-                current_value="Off",
-                optimal_value="On",
-                explanation=(
-                    "ABSO profiles request reduced buffering. Its interaction with Reflex "
-                    "and the resulting latency depend on the game and workload."
-                ),
-                category="game_config",
-            ))
+        # Reduce Buffering is also a profile policy, not a universally optimal
+        # toggle. Verify the requested value without a generic On/Off warning.
 
         if current.get("triple_buffering") == 1:
             issues.append(Issue(
