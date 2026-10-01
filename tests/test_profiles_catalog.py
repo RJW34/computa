@@ -141,6 +141,12 @@ def test_streaming_aliases_resolve_directly_to_capture_safe_lanes() -> None:
         "cs2-streaming-hdr": "counter-strike-2-gsync-hdr-capture",
         "counter-strike-2-streaming": "counter-strike-2-gsync-capture",
         "counter-strike-2-streaming-hdr": "counter-strike-2-gsync-hdr-capture",
+        "rocket-league-streaming": "rocket-league-gsync-capture",
+        "rocket-league-streaming-hdr": "rocket-league-gsync-hdr-capture",
+        "rl-streaming": "rocket-league-gsync-capture",
+        "rl-streaming-hdr": "rocket-league-gsync-hdr-capture",
+        "rocketleague-streaming": "rocket-league-gsync-capture",
+        "rocketleague-streaming-hdr": "rocket-league-gsync-hdr-capture",
     }
     profiles = get_profile_instances()
     for alias, canonical in aliases.items():
@@ -168,6 +174,7 @@ def test_requested_families_expose_visible_streaming_lanes() -> None:
             "counter-strike-2-gsync-capture",
             "counter-strike-2-gsync-hdr-capture",
         },
+        "rocket-league": {"rocket-league-gsync-capture", "rocket-league-gsync-hdr-capture"},
     }
     manifest = get_profile_manifest()
     for group, expected_ids in expected_by_group.items():
@@ -295,6 +302,42 @@ def test_tray_rank_orders_rivals2_variants_for_users() -> None:
         "rivals2-nosync-hdr",
         "rivals2-nosync",
     ]
+
+
+def test_rocket_league_catalog_exposes_manual_setup_and_canonical_identity() -> None:
+    profiles = {
+        row["id"]: row for row in get_profile_manifest() if row["tray_group"] == "rocket-league"
+    }
+    expected_order = [
+        "rocket-league",
+        "rocket-league-hdr",
+        "rocket-league-gsync",
+        "rocket-league-gsync-capture",
+        "rocket-league-gsync-hdr",
+        "rocket-league-gsync-hdr-capture",
+    ]
+    assert sorted(profiles, key=lambda key: profiles[key]["tray_rank"]) == expected_order
+    for profile_id, row in profiles.items():
+        assert row["tray_category"] == "Other"
+        assert row["tray_group_name"] == "Rocket League"
+        assert row["application_scope"] == "system_only"
+        assert row["executables"] == ["RocketLeague.exe"]
+        assert row["has_in_game_settings"] is True
+        assert row["sync_mode"] == ("on" if "gsync" in profile_id else "off")
+        assert row["requires_hdr_display"] is ("hdr" in profile_id)
+        if "hdr" in profile_id:
+            assert "windows hdr" in row["tray_subtitle"].lower()
+            assert "sdr game content" in row["tray_subtitle"].lower()
+
+
+def test_rocket_league_aliases_resolve_in_one_hop() -> None:
+    for prefix in ("rl", "rocketleague"):
+        for suffix in ("", "-hdr", "-gsync", "-gsync-hdr", "-gsync-capture", "-gsync-hdr-capture"):
+            alias = prefix + suffix
+            target = "rocket-league" + suffix
+            assert PROFILE_ALIASES[alias] == target
+            assert target in PROFILE_CATALOG
+            assert target not in PROFILE_ALIASES
 
 
 def test_no_sync_tray_labels_match_sync_mode() -> None:

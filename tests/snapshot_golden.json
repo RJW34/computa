@@ -6689,6 +6689,634 @@
       }
     }
   },
+  "rocket-league": {
+    "allows_aggressive_settings": false,
+    "application_scope": "system_only",
+    "display_name": "Rocket League - No Sync SDR",
+    "graphics_api": "dx11",
+    "handlers": [
+      "WindowsSettingsHandler",
+      "PowerSettingsHandler",
+      "RegistrySettingsHandler",
+      "NvidiaSettingsHandler",
+      "AmdSettingsHandler",
+      "NetworkSettingsHandler",
+      "GraphicsSettingsHandler",
+      "ProcessPriorityHandler",
+      "CpuAffinityHandler",
+      "ColorProfileSettingsHandler",
+      "DisplayColorRangeHandler"
+    ],
+    "in_game_settings": [
+      {
+        "category": "Video",
+        "reason": "Set manually. Fullscreen Optimizations remain available; a menu label does not prove exclusive presentation or live VRR engagement.",
+        "setting": "Display Mode",
+        "value": "Fullscreen"
+      },
+      {
+        "category": "Video",
+        "reason": "Set Off manually. The fullscreen G-SYNC lane uses driver VSync On; the no-sync lane disables driver sync as well and accepts tearing.",
+        "setting": "Vertical Sync",
+        "value": "Off"
+      },
+      {
+        "category": "Video",
+        "reason": "The driver limiter is Off. Choose a sustainable native limit using representative frame-time measurements; Unlimited is optional, not a guarantee of better responsiveness or smoothness.",
+        "setting": "Frames Per Second",
+        "value": "Sustainable limit (set manually)"
+      },
+      {
+        "category": "Driver (NVIDIA)",
+        "reason": "A conservative DX11 queueing heuristic, not a Rocket League benchmark. No native Reflex is assumed. NVIDIA recommends Ultra as an alternative when Reflex is unavailable; a controlled comparison would need a separate reviewed policy because ABSO's online gates retain On. If driver readback is unavailable, confirm this setting manually.",
+        "setting": "Low Latency Mode",
+        "value": "On (requested by ABSO)"
+      },
+      {
+        "category": "Display (Windows)",
+        "reason": "This lane requests Windows HDR Off and Auto HDR Off. Color calibration and digital vibrance remain user-owned; SDR is not a measured speed advantage.",
+        "setting": "HDR",
+        "value": "Off"
+      },
+      {
+        "category": "Preferences",
+        "reason": "ABSO does not write or verify Rocket League's native config. Graphics quality trades rendering cost for image quality; controls and network Input Buffer choices need individual evaluation, not a universal preset.",
+        "setting": "Graphics, controls, and Input Buffer",
+        "value": "Preserve your settings"
+      }
+    ],
+    "include_legacy_tweaks": false,
+    "is_emulator_profile": false,
+    "is_online_profile": true,
+    "is_sdr_only": true,
+    "network_scope": "none",
+    "optimization_target": "stable_online",
+    "requires_reflex": false,
+    "settings": {
+      "AmdSettingsHandler": {},
+      "ColorProfileSettingsHandler": {},
+      "CpuAffinityHandler": {
+        "strategy": null
+      },
+      "DisplayColorRangeHandler": {},
+      "GraphicsSettingsHandler": {
+        "disable_global_fso": false
+      },
+      "NetworkSettingsHandler": {},
+      "NvidiaSettingsHandler": {
+        "auto_vrr_fps_cap": false,
+        "global_vrr_mode": "off",
+        "low_latency_mode": "on",
+        "max_frame_rate": "off",
+        "profile_name": "Rocket League",
+        "vrr_app_override": "force_off",
+        "vsync": "off",
+        "vsync_tear_control": "disable",
+        "vsync_vrr_control": "disable"
+      },
+      "PowerSettingsHandler": {},
+      "ProcessPriorityHandler": {
+        "cpu_priority": 2,
+        "io_priority": 2
+      },
+      "RegistrySettingsHandler": {
+        "fullscreen_optimizations": {
+          "RocketLeague.exe": false
+        }
+      },
+      "WindowsSettingsHandler": {
+        "auto_hdr": false,
+        "game_mode": true,
+        "hdr": false,
+        "max_refresh_rate": true
+      }
+    }
+  },
+  "rocket-league-gsync": {
+    "allows_aggressive_settings": false,
+    "application_scope": "system_only",
+    "display_name": "Rocket League - GSYNC SDR",
+    "graphics_api": "dx11",
+    "handlers": [
+      "WindowsSettingsHandler",
+      "PowerSettingsHandler",
+      "RegistrySettingsHandler",
+      "NvidiaSettingsHandler",
+      "AmdSettingsHandler",
+      "NetworkSettingsHandler",
+      "GraphicsSettingsHandler",
+      "ProcessPriorityHandler",
+      "CpuAffinityHandler",
+      "ColorProfileSettingsHandler",
+      "DisplayColorRangeHandler"
+    ],
+    "in_game_settings": [
+      {
+        "category": "Video",
+        "reason": "Set manually. Fullscreen Optimizations remain available; a menu label does not prove exclusive presentation or live VRR engagement.",
+        "setting": "Display Mode",
+        "value": "Fullscreen"
+      },
+      {
+        "category": "Video",
+        "reason": "Set Off manually. The fullscreen G-SYNC lane uses driver VSync On; the no-sync lane disables driver sync as well and accepts tearing.",
+        "setting": "Vertical Sync",
+        "value": "Off"
+      },
+      {
+        "category": "Video",
+        "reason": "ABSO requests a driver refresh - 3 ceiling (297 at 300 Hz). Set native FPS to Unlimited to avoid a second configured limiter. This ceiling does not promise 297 FPS, smooth frame times, or live VRR engagement.",
+        "setting": "Frames Per Second",
+        "value": "Unlimited (set manually)"
+      },
+      {
+        "category": "Driver (NVIDIA)",
+        "reason": "A conservative DX11 queueing heuristic, not a Rocket League benchmark. No native Reflex is assumed. NVIDIA recommends Ultra as an alternative when Reflex is unavailable; a controlled comparison would need a separate reviewed policy because ABSO's online gates retain On. If driver readback is unavailable, confirm this setting manually.",
+        "setting": "Low Latency Mode",
+        "value": "On (requested by ABSO)"
+      },
+      {
+        "category": "Display (Windows)",
+        "reason": "This lane requests Windows HDR Off and Auto HDR Off. Color calibration and digital vibrance remain user-owned; SDR is not a measured speed advantage.",
+        "setting": "HDR",
+        "value": "Off"
+      },
+      {
+        "category": "Preferences",
+        "reason": "ABSO does not write or verify Rocket League's native config. Graphics quality trades rendering cost for image quality; controls and network Input Buffer choices need individual evaluation, not a universal preset.",
+        "setting": "Graphics, controls, and Input Buffer",
+        "value": "Preserve your settings"
+      }
+    ],
+    "include_legacy_tweaks": false,
+    "is_emulator_profile": false,
+    "is_online_profile": true,
+    "is_sdr_only": true,
+    "network_scope": "none",
+    "optimization_target": "stable_online",
+    "requires_reflex": false,
+    "settings": {
+      "AmdSettingsHandler": {},
+      "ColorProfileSettingsHandler": {},
+      "CpuAffinityHandler": {
+        "strategy": null
+      },
+      "DisplayColorRangeHandler": {},
+      "GraphicsSettingsHandler": {
+        "disable_global_fso": false
+      },
+      "NetworkSettingsHandler": {},
+      "NvidiaSettingsHandler": {
+        "auto_vrr_fps_cap": true,
+        "global_vrr_mode": "fullscreen_only",
+        "low_latency_mode": "on",
+        "max_frame_rate": "off",
+        "profile_name": "Rocket League",
+        "vrr_app_override": "allow",
+        "vsync": "on",
+        "vsync_tear_control": "disable",
+        "vsync_vrr_control": "enable"
+      },
+      "PowerSettingsHandler": {},
+      "ProcessPriorityHandler": {
+        "cpu_priority": 2,
+        "io_priority": 2
+      },
+      "RegistrySettingsHandler": {
+        "fullscreen_optimizations": {
+          "RocketLeague.exe": false
+        }
+      },
+      "WindowsSettingsHandler": {
+        "auto_hdr": false,
+        "game_mode": true,
+        "hdr": false,
+        "max_refresh_rate": true
+      }
+    }
+  },
+  "rocket-league-gsync-capture": {
+    "allows_aggressive_settings": false,
+    "application_scope": "system_only",
+    "display_name": "Rocket League - GSYNC SDR Streaming",
+    "graphics_api": "dx11",
+    "handlers": [
+      "WindowsSettingsHandler",
+      "PowerSettingsHandler",
+      "RegistrySettingsHandler",
+      "NvidiaSettingsHandler",
+      "AmdSettingsHandler",
+      "NetworkSettingsHandler",
+      "GraphicsSettingsHandler",
+      "ProcessPriorityHandler",
+      "CpuAffinityHandler",
+      "ColorProfileSettingsHandler",
+      "DisplayColorRangeHandler"
+    ],
+    "in_game_settings": [
+      {
+        "category": "Video",
+        "reason": "Set manually. The capture lane requests windowed G-SYNC and Windows windowed optimizations so capture processes can remain available.",
+        "setting": "Display Mode",
+        "value": "Borderless"
+      },
+      {
+        "category": "Video",
+        "reason": "Set On manually for the borderless G-SYNC path, following NVIDIA's windowed VSync guidance. Driver VSync On alone does not prove engagement.",
+        "setting": "Vertical Sync",
+        "value": "On"
+      },
+      {
+        "category": "Video",
+        "reason": "ABSO requests a driver refresh - 3 ceiling (297 at 300 Hz). Set native FPS to Unlimited to avoid a second configured limiter. This ceiling does not promise 297 FPS, smooth frame times, or live VRR engagement.",
+        "setting": "Frames Per Second",
+        "value": "Unlimited (set manually)"
+      },
+      {
+        "category": "Driver (NVIDIA)",
+        "reason": "A conservative DX11 queueing heuristic, not a Rocket League benchmark. No native Reflex is assumed. NVIDIA recommends Ultra as an alternative when Reflex is unavailable; a controlled comparison would need a separate reviewed policy because ABSO's online gates retain On. If driver readback is unavailable, confirm this setting manually.",
+        "setting": "Low Latency Mode",
+        "value": "On (requested by ABSO)"
+      },
+      {
+        "category": "Display (Windows)",
+        "reason": "This lane requests Windows HDR Off and Auto HDR Off. Color calibration and digital vibrance remain user-owned; SDR is not a measured speed advantage.",
+        "setting": "HDR",
+        "value": "Off"
+      },
+      {
+        "category": "Preferences",
+        "reason": "ABSO does not write or verify Rocket League's native config. Graphics quality trades rendering cost for image quality; controls and network Input Buffer choices need individual evaluation, not a universal preset.",
+        "setting": "Graphics, controls, and Input Buffer",
+        "value": "Preserve your settings"
+      }
+    ],
+    "include_legacy_tweaks": false,
+    "is_emulator_profile": false,
+    "is_online_profile": true,
+    "is_sdr_only": true,
+    "network_scope": "none",
+    "optimization_target": "stable_online",
+    "requires_reflex": false,
+    "settings": {
+      "AmdSettingsHandler": {},
+      "ColorProfileSettingsHandler": {},
+      "CpuAffinityHandler": {
+        "strategy": null
+      },
+      "DisplayColorRangeHandler": {},
+      "GraphicsSettingsHandler": {
+        "disable_global_fso": false
+      },
+      "NetworkSettingsHandler": {},
+      "NvidiaSettingsHandler": {
+        "auto_vrr_fps_cap": true,
+        "global_vrr_mode": "fullscreen_and_windowed",
+        "low_latency_mode": "on",
+        "max_frame_rate": "off",
+        "profile_name": "Rocket League",
+        "vrr_app_override": "allow",
+        "vsync": "on",
+        "vsync_tear_control": "disable",
+        "vsync_vrr_control": "enable"
+      },
+      "PowerSettingsHandler": {},
+      "ProcessPriorityHandler": {
+        "cpu_priority": 2,
+        "io_priority": 2
+      },
+      "RegistrySettingsHandler": {
+        "fullscreen_optimizations": {
+          "RocketLeague.exe": false
+        }
+      },
+      "WindowsSettingsHandler": {
+        "auto_hdr": false,
+        "game_mode": true,
+        "hdr": false,
+        "max_refresh_rate": true,
+        "vrr_optimize": true,
+        "windowed_optimizations": true
+      }
+    }
+  },
+  "rocket-league-gsync-hdr": {
+    "allows_aggressive_settings": false,
+    "application_scope": "system_only",
+    "display_name": "Rocket League - GSYNC HDR",
+    "graphics_api": "dx11",
+    "handlers": [
+      "WindowsSettingsHandler",
+      "PowerSettingsHandler",
+      "RegistrySettingsHandler",
+      "NvidiaSettingsHandler",
+      "AmdSettingsHandler",
+      "NetworkSettingsHandler",
+      "GraphicsSettingsHandler",
+      "ProcessPriorityHandler",
+      "CpuAffinityHandler",
+      "ColorProfileSettingsHandler",
+      "DisplayColorRangeHandler"
+    ],
+    "in_game_settings": [
+      {
+        "category": "Video",
+        "reason": "Set manually. Fullscreen Optimizations remain available; a menu label does not prove exclusive presentation or live VRR engagement.",
+        "setting": "Display Mode",
+        "value": "Fullscreen"
+      },
+      {
+        "category": "Video",
+        "reason": "Set Off manually. The fullscreen G-SYNC lane uses driver VSync On; the no-sync lane disables driver sync as well and accepts tearing.",
+        "setting": "Vertical Sync",
+        "value": "Off"
+      },
+      {
+        "category": "Video",
+        "reason": "ABSO requests a driver refresh - 3 ceiling (297 at 300 Hz). Set native FPS to Unlimited to avoid a second configured limiter. This ceiling does not promise 297 FPS, smooth frame times, or live VRR engagement.",
+        "setting": "Frames Per Second",
+        "value": "Unlimited (set manually)"
+      },
+      {
+        "category": "Driver (NVIDIA)",
+        "reason": "A conservative DX11 queueing heuristic, not a Rocket League benchmark. No native Reflex is assumed. NVIDIA recommends Ultra as an alternative when Reflex is unavailable; a controlled comparison would need a separate reviewed policy because ABSO's online gates retain On. If driver readback is unavailable, confirm this setting manually.",
+        "setting": "Low Latency Mode",
+        "value": "On (requested by ABSO)"
+      },
+      {
+        "category": "Display (Windows)",
+        "reason": "This lane enables Windows HDR and disables Auto HDR. It does not configure native game HDR or RTX HDR. Existing SDR brightness, color calibration, ICC association, and digital vibrance are preserved.",
+        "setting": "HDR",
+        "value": "On (SDR game content in Windows HDR)"
+      },
+      {
+        "category": "Preferences",
+        "reason": "ABSO does not write or verify Rocket League's native config. Graphics quality trades rendering cost for image quality; controls and network Input Buffer choices need individual evaluation, not a universal preset.",
+        "setting": "Graphics, controls, and Input Buffer",
+        "value": "Preserve your settings"
+      }
+    ],
+    "include_legacy_tweaks": false,
+    "is_emulator_profile": false,
+    "is_online_profile": true,
+    "is_sdr_only": false,
+    "network_scope": "none",
+    "optimization_target": "stable_online",
+    "requires_reflex": false,
+    "settings": {
+      "AmdSettingsHandler": {},
+      "ColorProfileSettingsHandler": {},
+      "CpuAffinityHandler": {
+        "strategy": null
+      },
+      "DisplayColorRangeHandler": {},
+      "GraphicsSettingsHandler": {
+        "disable_global_fso": false
+      },
+      "NetworkSettingsHandler": {},
+      "NvidiaSettingsHandler": {
+        "auto_vrr_fps_cap": true,
+        "global_vrr_mode": "fullscreen_only",
+        "low_latency_mode": "on",
+        "max_frame_rate": "off",
+        "profile_name": "Rocket League",
+        "vrr_app_override": "allow",
+        "vsync": "on",
+        "vsync_tear_control": "disable",
+        "vsync_vrr_control": "enable"
+      },
+      "PowerSettingsHandler": {},
+      "ProcessPriorityHandler": {
+        "cpu_priority": 2,
+        "io_priority": 2
+      },
+      "RegistrySettingsHandler": {
+        "fullscreen_optimizations": {
+          "RocketLeague.exe": false
+        }
+      },
+      "WindowsSettingsHandler": {
+        "advanced_color": true,
+        "auto_hdr": false,
+        "game_mode": true,
+        "hdr": true,
+        "max_refresh_rate": true,
+        "sdr_white_level_nits": null
+      }
+    }
+  },
+  "rocket-league-gsync-hdr-capture": {
+    "allows_aggressive_settings": false,
+    "application_scope": "system_only",
+    "display_name": "Rocket League - GSYNC HDR Streaming",
+    "graphics_api": "dx11",
+    "handlers": [
+      "WindowsSettingsHandler",
+      "PowerSettingsHandler",
+      "RegistrySettingsHandler",
+      "NvidiaSettingsHandler",
+      "AmdSettingsHandler",
+      "NetworkSettingsHandler",
+      "GraphicsSettingsHandler",
+      "ProcessPriorityHandler",
+      "CpuAffinityHandler",
+      "ColorProfileSettingsHandler",
+      "DisplayColorRangeHandler"
+    ],
+    "in_game_settings": [
+      {
+        "category": "Video",
+        "reason": "Set manually. The capture lane requests windowed G-SYNC and Windows windowed optimizations so capture processes can remain available.",
+        "setting": "Display Mode",
+        "value": "Borderless"
+      },
+      {
+        "category": "Video",
+        "reason": "Set On manually for the borderless G-SYNC path, following NVIDIA's windowed VSync guidance. Driver VSync On alone does not prove engagement.",
+        "setting": "Vertical Sync",
+        "value": "On"
+      },
+      {
+        "category": "Video",
+        "reason": "ABSO requests a driver refresh - 3 ceiling (297 at 300 Hz). Set native FPS to Unlimited to avoid a second configured limiter. This ceiling does not promise 297 FPS, smooth frame times, or live VRR engagement.",
+        "setting": "Frames Per Second",
+        "value": "Unlimited (set manually)"
+      },
+      {
+        "category": "Driver (NVIDIA)",
+        "reason": "A conservative DX11 queueing heuristic, not a Rocket League benchmark. No native Reflex is assumed. NVIDIA recommends Ultra as an alternative when Reflex is unavailable; a controlled comparison would need a separate reviewed policy because ABSO's online gates retain On. If driver readback is unavailable, confirm this setting manually.",
+        "setting": "Low Latency Mode",
+        "value": "On (requested by ABSO)"
+      },
+      {
+        "category": "Display (Windows)",
+        "reason": "This lane enables Windows HDR and disables Auto HDR. It does not configure native game HDR or RTX HDR. Existing SDR brightness, color calibration, ICC association, and digital vibrance are preserved.",
+        "setting": "HDR",
+        "value": "On (SDR game content in Windows HDR)"
+      },
+      {
+        "category": "Preferences",
+        "reason": "ABSO does not write or verify Rocket League's native config. Graphics quality trades rendering cost for image quality; controls and network Input Buffer choices need individual evaluation, not a universal preset.",
+        "setting": "Graphics, controls, and Input Buffer",
+        "value": "Preserve your settings"
+      }
+    ],
+    "include_legacy_tweaks": false,
+    "is_emulator_profile": false,
+    "is_online_profile": true,
+    "is_sdr_only": false,
+    "network_scope": "none",
+    "optimization_target": "stable_online",
+    "requires_reflex": false,
+    "settings": {
+      "AmdSettingsHandler": {},
+      "ColorProfileSettingsHandler": {},
+      "CpuAffinityHandler": {
+        "strategy": null
+      },
+      "DisplayColorRangeHandler": {},
+      "GraphicsSettingsHandler": {
+        "disable_global_fso": false
+      },
+      "NetworkSettingsHandler": {},
+      "NvidiaSettingsHandler": {
+        "auto_vrr_fps_cap": true,
+        "global_vrr_mode": "fullscreen_and_windowed",
+        "low_latency_mode": "on",
+        "max_frame_rate": "off",
+        "profile_name": "Rocket League",
+        "vrr_app_override": "allow",
+        "vsync": "on",
+        "vsync_tear_control": "disable",
+        "vsync_vrr_control": "enable"
+      },
+      "PowerSettingsHandler": {},
+      "ProcessPriorityHandler": {
+        "cpu_priority": 2,
+        "io_priority": 2
+      },
+      "RegistrySettingsHandler": {
+        "fullscreen_optimizations": {
+          "RocketLeague.exe": false
+        }
+      },
+      "WindowsSettingsHandler": {
+        "advanced_color": true,
+        "auto_hdr": false,
+        "game_mode": true,
+        "hdr": true,
+        "max_refresh_rate": true,
+        "sdr_white_level_nits": null,
+        "vrr_optimize": true,
+        "windowed_optimizations": true
+      }
+    }
+  },
+  "rocket-league-hdr": {
+    "allows_aggressive_settings": false,
+    "application_scope": "system_only",
+    "display_name": "Rocket League - No Sync HDR",
+    "graphics_api": "dx11",
+    "handlers": [
+      "WindowsSettingsHandler",
+      "PowerSettingsHandler",
+      "RegistrySettingsHandler",
+      "NvidiaSettingsHandler",
+      "AmdSettingsHandler",
+      "NetworkSettingsHandler",
+      "GraphicsSettingsHandler",
+      "ProcessPriorityHandler",
+      "CpuAffinityHandler",
+      "ColorProfileSettingsHandler",
+      "DisplayColorRangeHandler"
+    ],
+    "in_game_settings": [
+      {
+        "category": "Video",
+        "reason": "Set manually. Fullscreen Optimizations remain available; a menu label does not prove exclusive presentation or live VRR engagement.",
+        "setting": "Display Mode",
+        "value": "Fullscreen"
+      },
+      {
+        "category": "Video",
+        "reason": "Set Off manually. The fullscreen G-SYNC lane uses driver VSync On; the no-sync lane disables driver sync as well and accepts tearing.",
+        "setting": "Vertical Sync",
+        "value": "Off"
+      },
+      {
+        "category": "Video",
+        "reason": "The driver limiter is Off. Choose a sustainable native limit using representative frame-time measurements; Unlimited is optional, not a guarantee of better responsiveness or smoothness.",
+        "setting": "Frames Per Second",
+        "value": "Sustainable limit (set manually)"
+      },
+      {
+        "category": "Driver (NVIDIA)",
+        "reason": "A conservative DX11 queueing heuristic, not a Rocket League benchmark. No native Reflex is assumed. NVIDIA recommends Ultra as an alternative when Reflex is unavailable; a controlled comparison would need a separate reviewed policy because ABSO's online gates retain On. If driver readback is unavailable, confirm this setting manually.",
+        "setting": "Low Latency Mode",
+        "value": "On (requested by ABSO)"
+      },
+      {
+        "category": "Display (Windows)",
+        "reason": "This lane enables Windows HDR and disables Auto HDR. It does not configure native game HDR or RTX HDR. Existing SDR brightness, color calibration, ICC association, and digital vibrance are preserved.",
+        "setting": "HDR",
+        "value": "On (SDR game content in Windows HDR)"
+      },
+      {
+        "category": "Preferences",
+        "reason": "ABSO does not write or verify Rocket League's native config. Graphics quality trades rendering cost for image quality; controls and network Input Buffer choices need individual evaluation, not a universal preset.",
+        "setting": "Graphics, controls, and Input Buffer",
+        "value": "Preserve your settings"
+      }
+    ],
+    "include_legacy_tweaks": false,
+    "is_emulator_profile": false,
+    "is_online_profile": true,
+    "is_sdr_only": false,
+    "network_scope": "none",
+    "optimization_target": "stable_online",
+    "requires_reflex": false,
+    "settings": {
+      "AmdSettingsHandler": {},
+      "ColorProfileSettingsHandler": {},
+      "CpuAffinityHandler": {
+        "strategy": null
+      },
+      "DisplayColorRangeHandler": {},
+      "GraphicsSettingsHandler": {
+        "disable_global_fso": false
+      },
+      "NetworkSettingsHandler": {},
+      "NvidiaSettingsHandler": {
+        "auto_vrr_fps_cap": false,
+        "global_vrr_mode": "off",
+        "low_latency_mode": "on",
+        "max_frame_rate": "off",
+        "profile_name": "Rocket League",
+        "vrr_app_override": "force_off",
+        "vsync": "off",
+        "vsync_tear_control": "disable",
+        "vsync_vrr_control": "disable"
+      },
+      "PowerSettingsHandler": {},
+      "ProcessPriorityHandler": {
+        "cpu_priority": 2,
+        "io_priority": 2
+      },
+      "RegistrySettingsHandler": {
+        "fullscreen_optimizations": {
+          "RocketLeague.exe": false
+        }
+      },
+      "WindowsSettingsHandler": {
+        "advanced_color": true,
+        "auto_hdr": false,
+        "game_mode": true,
+        "hdr": true,
+        "max_refresh_rate": true,
+        "sdr_white_level_nits": null
+      }
+    }
+  },
   "ryujinx-ssbu": {
     "allows_aggressive_settings": true,
     "application_scope": "system_only",

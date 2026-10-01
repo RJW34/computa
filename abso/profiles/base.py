@@ -84,6 +84,16 @@ class BaseProfile(ABC):
         """Executable names to identify the game."""
         pass
 
+    @property
+    def external_launch_required_reason(self) -> str | None:
+        """Explain why the game must be started through its platform client.
+
+        A nonempty reason blocks direct launch before profile mutations,
+        including an explicit executable override. Applying a profile
+        independently remains supported.
+        """
+        return None
+
     # === Optional Validation Metadata ===
     # Subclasses can override these for more precise validation
 

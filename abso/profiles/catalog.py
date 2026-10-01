@@ -53,6 +53,14 @@ from abso.profiles.rivals2_gsync import (
     Rivals2GSyncProfile,
 )
 from abso.profiles.rivals2_nosync import Rivals2NoSyncHDRProfile, Rivals2NoSyncProfile
+from abso.profiles.rocket_league import (
+    RocketLeagueGSyncCaptureProfile,
+    RocketLeagueGSyncHDRCaptureProfile,
+    RocketLeagueGSyncHDRProfile,
+    RocketLeagueGSyncProfile,
+    RocketLeagueHDRProfile,
+    RocketLeagueProfile,
+)
 from abso.profiles.ryujinx_ssbu import RyujinxSSBUProfile
 from abso.profiles.slippi_melee import (
     SlippiMeleeCaptureProfile,
@@ -236,6 +244,18 @@ BUILTIN_TRAY_UI: dict[str, TrayProfileUi] = {
     ),
     "pacdeluxe": TrayProfileUi(
         "pacdeluxe", "PACDeluxe (Pokemon Auto Chess)", "Native Tauri / WebView2", 110
+    ),
+    "rocket-league": TrayProfileUi("rocket-league", "Rocket League", "No Sync (SDR)", 200),
+    "rocket-league-hdr": TrayProfileUi("rocket-league", "Rocket League", "No Sync (HDR)", 210),
+    "rocket-league-gsync": TrayProfileUi("rocket-league", "Rocket League", "G-SYNC (SDR)", 220),
+    "rocket-league-gsync-capture": TrayProfileUi(
+        "rocket-league", "Rocket League", "Streaming G-SYNC (SDR)", 230
+    ),
+    "rocket-league-gsync-hdr": TrayProfileUi(
+        "rocket-league", "Rocket League", "G-SYNC (HDR)", 240
+    ),
+    "rocket-league-gsync-hdr-capture": TrayProfileUi(
+        "rocket-league", "Rocket League", "Streaming G-SYNC (HDR)", 250
     ),
 }
 
@@ -638,6 +658,42 @@ PROFILE_CATALOG: OrderedDict[str, ProfileCatalogEntry] = OrderedDict(
             tray_subtitle="LLM ON | Tauri + WebView2 | G-SYNC + VSync On",
             sync_mode="on",
         ),
+        "rocket-league": ProfileCatalogEntry(
+            profile_class=RocketLeagueProfile,
+            tray_category="Other",
+            tray_subtitle="SDR | No Sync | LLM On | Manual Game Settings",
+            sync_mode="off",
+        ),
+        "rocket-league-hdr": ProfileCatalogEntry(
+            profile_class=RocketLeagueHDRProfile,
+            tray_category="Other",
+            tray_subtitle="Windows HDR | SDR Game Content | No Sync | LLM On",
+            sync_mode="off",
+        ),
+        "rocket-league-gsync": ProfileCatalogEntry(
+            profile_class=RocketLeagueGSyncProfile,
+            tray_category="Other",
+            tray_subtitle="SDR | G-SYNC | Driver Refresh - 3 Cap | LLM On",
+            sync_mode="on",
+        ),
+        "rocket-league-gsync-hdr": ProfileCatalogEntry(
+            profile_class=RocketLeagueGSyncHDRProfile,
+            tray_category="Other",
+            tray_subtitle="Windows HDR | SDR Game Content | G-SYNC | LLM On",
+            sync_mode="on",
+        ),
+        "rocket-league-gsync-capture": ProfileCatalogEntry(
+            profile_class=RocketLeagueGSyncCaptureProfile,
+            tray_category="Other",
+            tray_subtitle="SDR Streaming | G-SYNC | Normal Priority | Keeps OBS/Overlays",
+            sync_mode="on",
+        ),
+        "rocket-league-gsync-hdr-capture": ProfileCatalogEntry(
+            profile_class=RocketLeagueGSyncHDRCaptureProfile,
+            tray_category="Other",
+            tray_subtitle="Windows HDR Streaming | SDR Game Content | Keeps OBS/Overlays",
+            sync_mode="on",
+        ),
         "productivity": ProfileCatalogEntry(
             profile_class=ProductivityProfile,
             tray_category="Desktop",
@@ -725,6 +781,29 @@ PROFILE_ALIASES: dict[str, str] = {
     "cs2-gsync-capture": "counter-strike-2-gsync-capture",
     "cs2-gsync-hdr-capture": "counter-strike-2-gsync-hdr-capture",
     "counter-strike-2-gsync-sdr-capture": "counter-strike-2-gsync-capture",
+    # Rocket League convenience and streaming names resolve in one hop.
+    "rl": "rocket-league",
+    "rl-hdr": "rocket-league-hdr",
+    "rl-gsync": "rocket-league-gsync",
+    "rl-gsync-hdr": "rocket-league-gsync-hdr",
+    "rl-gsync-capture": "rocket-league-gsync-capture",
+    "rl-gsync-hdr-capture": "rocket-league-gsync-hdr-capture",
+    "rl-streaming": "rocket-league-gsync-capture",
+    "rl-streaming-hdr": "rocket-league-gsync-hdr-capture",
+    "rocketleague": "rocket-league",
+    "rocketleague-hdr": "rocket-league-hdr",
+    "rocketleague-gsync": "rocket-league-gsync",
+    "rocketleague-gsync-hdr": "rocket-league-gsync-hdr",
+    "rocketleague-gsync-capture": "rocket-league-gsync-capture",
+    "rocketleague-gsync-hdr-capture": "rocket-league-gsync-hdr-capture",
+    "rocketleague-streaming": "rocket-league-gsync-capture",
+    "rocketleague-streaming-hdr": "rocket-league-gsync-hdr-capture",
+    "rocket-league-streaming": "rocket-league-gsync-capture",
+    "rocket-league-streaming-hdr": "rocket-league-gsync-hdr-capture",
+    "rocket-league-gsync-streaming": "rocket-league-gsync-capture",
+    "rocket-league-gsync-streaming-hdr": "rocket-league-gsync-hdr-capture",
+    "rocket-league-gsync-hdr-streaming": "rocket-league-gsync-hdr-capture",
+    "rocket-league-gsync-sdr-capture": "rocket-league-gsync-capture",
 }
 
 

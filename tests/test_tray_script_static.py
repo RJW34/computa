@@ -4180,7 +4180,7 @@ def test_ow2_gsync_fallback_guidance_matches_native_vsync_contract() -> None:
 
 
 def test_builtin_tray_fallback_keeps_requested_streaming_matrix_available() -> None:
-    """Cache/backend failure must not hide the five requested Streaming families."""
+    """Cache/backend failure must not hide supported Streaming families."""
     tray = TRAY_SCRIPT.read_text(encoding="utf-8")
     fallback = tray.split("$script:FallbackProfiles = [ordered]@{", 1)[1].split(
         "foreach ($fallbackProfile",
@@ -4197,10 +4197,36 @@ def test_builtin_tray_fallback_keeps_requested_streaming_matrix_available() -> N
         "overwatch2-gsync-hdr-capture",
         "counter-strike-2-gsync-capture",
         "counter-strike-2-gsync-hdr-capture",
+        "rocket-league-gsync-capture",
+        "rocket-league-gsync-hdr-capture",
     }
 
     for profile_id in expected_ids:
         assert f'"{profile_id}"' in fallback
+
+
+def test_rocket_league_tray_fallback_keeps_canonical_identity_and_manual_guidance() -> None:
+    fallback = TRAY_SCRIPT.read_text(encoding="utf-8").split(
+        "$script:FallbackProfiles = [ordered]@{", 1
+    )[1].split("foreach ($fallbackProfile", 1)[0]
+    for suffix in ("", "-hdr", "-gsync", "-gsync-hdr", "-gsync-capture", "-gsync-hdr-capture"):
+        profile_id = "rocket-league" + suffix
+        entry = fallback.split(f'"{profile_id}" = @{{', 1)[1].split("\n    }", 1)[0]
+        assert 'Exes     = @("RocketLeague.exe")' in entry
+        assert 'GameGroup = "rocket-league"' in entry
+        assert 'Cat      = "Other"' in entry
+        assert 'Launcher.exe' not in entry
+        assert 'LLM On' in entry or 'Normal Priority' in entry
+        assert 'manually' in entry
+        if "hdr" in suffix:
+            assert "Windows HDR" in entry
+            assert "SDR game content" in entry
+        if "gsync" in suffix:
+            assert "refresh-minus-three" in entry
+            assert "FPS Unlimited" in entry
+            assert f'in-game VSync {"On" if "capture" in suffix else "Off"}' in entry
+        if "capture" in suffix:
+            assert "keeps OBS and overlays alive at Normal game priority" in entry
 
 
 def test_tray_noop_notifications_update_durable_status() -> None:

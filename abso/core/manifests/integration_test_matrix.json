@@ -611,6 +611,103 @@
         "transaction_state": "committed",
         "apply_success": true
       }
+    },
+    {
+      "id": "apply-rocket-league",
+      "profile_id": "rocket-league",
+      "kind": "apply_profile",
+      "assumptions": [
+        "administrator",
+        "nvidia_gpu",
+        "rocket_league_installed"
+      ],
+      "expected": {
+        "transaction_state": "committed",
+        "apply_success": true
+      }
+    },
+    {
+      "id": "apply-rocket-league-hdr",
+      "profile_id": "rocket-league-hdr",
+      "kind": "apply_profile",
+      "assumptions": [
+        "administrator",
+        "nvidia_gpu",
+        "rocket_league_installed",
+        "hdr_capable"
+      ],
+      "expected": {
+        "transaction_state": "committed",
+        "apply_success": true
+      }
+    },
+    {
+      "id": "apply-rocket-league-gsync",
+      "profile_id": "rocket-league-gsync",
+      "kind": "apply_profile",
+      "assumptions": [
+        "administrator",
+        "nvidia_gpu",
+        "rocket_league_installed",
+        "vrr_confirmed",
+        "exact_nvidia_binding",
+        "overlay_free_path"
+      ],
+      "expected": {
+        "transaction_state": "committed",
+        "apply_success": true
+      }
+    },
+    {
+      "id": "apply-rocket-league-gsync-hdr",
+      "profile_id": "rocket-league-gsync-hdr",
+      "kind": "apply_profile",
+      "assumptions": [
+        "administrator",
+        "nvidia_gpu",
+        "rocket_league_installed",
+        "vrr_confirmed",
+        "exact_nvidia_binding",
+        "overlay_free_path",
+        "hdr_capable"
+      ],
+      "expected": {
+        "transaction_state": "committed",
+        "apply_success": true
+      }
+    },
+    {
+      "id": "apply-rocket-league-gsync-capture",
+      "profile_id": "rocket-league-gsync-capture",
+      "kind": "apply_profile",
+      "assumptions": [
+        "administrator",
+        "nvidia_gpu",
+        "rocket_league_installed",
+        "vrr_confirmed",
+        "exact_nvidia_binding"
+      ],
+      "expected": {
+        "transaction_state": "committed",
+        "apply_success": true
+      }
+    },
+    {
+      "id": "apply-rocket-league-gsync-hdr-capture",
+      "profile_id": "rocket-league-gsync-hdr-capture",
+      "kind": "apply_profile",
+      "assumptions": [
+        "administrator",
+        "nvidia_gpu",
+        "rocket_league_installed",
+        "vrr_confirmed",
+        "exact_nvidia_binding",
+        "hdr_capable"
+      ],
+      "expected": {
+        "transaction_state": "committed",
+        "apply_success": true
+      }
     }
   ]
 }

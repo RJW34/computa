@@ -1,5 +1,8 @@
 {
   "steam_game_patterns": {
+    "Rocket League": [
+      "RocketLeague.exe"
+    ],
     "Marvel Rivals": [
       "Marvel.exe",
       "Marvel-Win64-Shipping.exe"
@@ -31,6 +34,9 @@
     "E:\\Epic Games"
   ],
   "epic_game_patterns": {
+    "Rocket League": [
+      "RocketLeague.exe"
+    ],
     "Fortnite": [
       "FortniteClient-Win64-Shipping.exe",
       "FortniteClient-Win64-Shipping_EAC.exe",
@@ -42,6 +48,12 @@
       "Rivals2-Win64-Shipping.exe",
       "RivalsofAether2.exe"
     ]
+  },
+  "epic_game_metadata": {
+    "Rocket League": {
+      "app_names": ["Sugar"],
+      "display_names": ["RocketLeague"]
+    }
   },
   "battle_net_games": {
     "Diablo IV": {

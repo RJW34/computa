@@ -38,6 +38,8 @@ DEFAULT_GAME_DETECTION_MANIFEST: dict[str, Any] = {
         "Deadlock": ["deadlock.exe", "project8.exe"],
         "Diablo IV": ["Diablo IV.exe"],
         "Slippi Launcher": ["Slippi Dolphin.exe", "Dolphin.exe"],
+        # Steam app 252950; never treat its generic launcher as the game.
+        "Rocket League": ["RocketLeague.exe"],
     },
     "epic_paths": [
         "%PROGRAMFILES%\\Epic Games",
@@ -46,6 +48,7 @@ DEFAULT_GAME_DETECTION_MANIFEST: dict[str, Any] = {
         "E:\\Epic Games",
     ],
     "epic_game_patterns": {
+        "Rocket League": ["RocketLeague.exe"],
         "Rivals 2": ["Rivals2.exe", "Rivals2-Win64-Shipping.exe", "RivalsofAether2.exe"],
         "Fortnite": [
             "FortniteClient-Win64-Shipping.exe",
@@ -53,6 +56,9 @@ DEFAULT_GAME_DETECTION_MANIFEST: dict[str, Any] = {
             "FortniteClient-Win64-Shipping_BE.exe",
             "FortniteClient-Win64-Shipping_EAC_EOS.exe",
         ],
+    },
+    "epic_game_metadata": {
+        "Rocket League": {"app_names": ["Sugar"], "display_names": ["RocketLeague"]},
     },
     "battle_net_games": {
         "Diablo IV": {
@@ -264,6 +270,9 @@ def _detect_epic_games_from_manifests(
     games: list[InstalledGame] = []
 
     manifest_dirs = _get_epic_manifest_locations()
+    metadata = GAME_DETECTION_MANIFEST.get(
+        "epic_game_metadata", DEFAULT_GAME_DETECTION_MANIFEST["epic_game_metadata"]
+    )
     for manifest_dir in manifest_dirs:
         if not manifest_dir.exists():
             continue
@@ -284,6 +293,7 @@ def _detect_epic_games_from_manifests(
             install_location = data.get("InstallLocation")
             launch_executable = data.get("LaunchExecutable", "")
             display_name = data.get("DisplayName", "")
+            app_name = data.get("AppName", "")
             if not install_location:
                 continue
 
@@ -299,11 +309,26 @@ def _detect_epic_games_from_manifests(
                     and any(launch_name.lower() == exe.lower() for exe in executables)
                 )
                 display_match = bool(display_name) and game_name.lower() in str(display_name).lower()
-                if not executable_match and not display_match:
+                identity = metadata.get(game_name, {})
+                identity_match = (
+                    str(app_name).casefold()
+                    in {str(name).casefold() for name in identity.get("app_names", [])}
+                    or str(display_name).casefold()
+                    in {str(name).casefold() for name in identity.get("display_names", [])}
+                )
+                if not executable_match and not display_match and not identity_match:
                     continue
 
                 # Prefer launcher-provided executable when it matches known patterns.
                 chosen_exe = launch_name if executable_match else executables[0]
+                if identity and not executable_match:
+                    # Sugar launches Launcher.exe, which is shared by unrelated
+                    # games. Confirm the real game binary before accepting that
+                    # metadata; never expose Launcher.exe for binding/detection.
+                    found = _find_game_executables(install_path, executables)
+                    chosen_exe = next((exe for exe in executables if exe.lower() in found), "")
+                    if not chosen_exe:
+                        continue
                 _append_unique_game(
                     games,
                     InstalledGame(

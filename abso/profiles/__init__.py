@@ -50,6 +50,14 @@ from abso.profiles.rivals2_gsync import (
     Rivals2GSyncProfile,
 )
 from abso.profiles.rivals2_nosync import Rivals2NoSyncHDRProfile, Rivals2NoSyncProfile
+from abso.profiles.rocket_league import (
+    RocketLeagueGSyncCaptureProfile,
+    RocketLeagueGSyncHDRCaptureProfile,
+    RocketLeagueGSyncHDRProfile,
+    RocketLeagueGSyncProfile,
+    RocketLeagueHDRProfile,
+    RocketLeagueProfile,
+)
 from abso.profiles.ryujinx_ssbu import RyujinxSSBUProfile
 from abso.profiles.slippi_melee import (
     SlippiMeleeCaptureProfile,
@@ -105,6 +113,12 @@ __all__ = [
     "CounterStrike2GSyncCaptureProfile",
     "CounterStrike2GSyncHDRProfile",
     "CounterStrike2GSyncHDRCaptureProfile",
+    "RocketLeagueProfile",
+    "RocketLeagueHDRProfile",
+    "RocketLeagueGSyncProfile",
+    "RocketLeagueGSyncHDRProfile",
+    "RocketLeagueGSyncCaptureProfile",
+    "RocketLeagueGSyncHDRCaptureProfile",
     "PokemonAutoChessProfile",
     "PACDeluxeProfile",
     "ProductivityOLEDProfile",

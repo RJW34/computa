@@ -2819,6 +2819,62 @@ $script:FallbackProfiles = [ordered]@{
         SyncMode = "on"
     }
 
+    # --- Rocket League ---
+    "rocket-league" = @{
+        Name     = "Rocket League - No Sync SDR"
+        Sub      = "SDR | No Sync | LLM On | Manual Game Settings"
+        Cat      = "Other"
+        Desc     = "SDR no-sync system and driver settings; configure Rocket League video settings manually"
+        Exes     = @("RocketLeague.exe")
+        SyncMode = "off"
+        GameGroup = "rocket-league"; GroupName = "Rocket League"; Variant = "No Sync (SDR)"; Rank = 200
+    }
+    "rocket-league-hdr" = @{
+        Name     = "Rocket League - No Sync HDR"
+        Sub      = "Windows HDR | SDR Game Content | No Sync | LLM On"
+        Cat      = "Other"
+        Desc     = "Windows HDR composition of SDR game content with no sync; configure game video settings manually"
+        Exes     = @("RocketLeague.exe")
+        SyncMode = "off"
+        GameGroup = "rocket-league"; GroupName = "Rocket League"; Variant = "No Sync (HDR)"; Rank = 210
+    }
+    "rocket-league-gsync" = @{
+        Name     = "Rocket League - GSYNC SDR"
+        Sub      = "SDR | G-SYNC | Driver Refresh - 3 Cap | LLM On"
+        Cat      = "Other"
+        Desc     = "SDR G-SYNC with driver VSync and refresh-minus-three FPS cap; set in-game VSync Off and FPS Unlimited manually"
+        Exes     = @("RocketLeague.exe")
+        SyncMode = "on"
+        GameGroup = "rocket-league"; GroupName = "Rocket League"; Variant = "G-SYNC (SDR)"; Rank = 220
+    }
+    "rocket-league-gsync-capture" = @{
+        Name     = "Rocket League - GSYNC SDR Streaming"
+        Sub      = "SDR Streaming | G-SYNC | Normal Priority | Keeps OBS/Overlays"
+        Cat      = "Other"
+        Desc     = "Borderless SDR G-SYNC with a driver refresh-minus-three cap and LLM On; keeps OBS and overlays alive at Normal game priority. Set in-game VSync On and FPS Unlimited manually"
+        Exes     = @("RocketLeague.exe")
+        SyncMode = "on"
+        GameGroup = "rocket-league"; GroupName = "Rocket League"; Variant = "Streaming G-SYNC (SDR)"; Rank = 230
+    }
+    "rocket-league-gsync-hdr" = @{
+        Name     = "Rocket League - GSYNC HDR"
+        Sub      = "Windows HDR | SDR Game Content | G-SYNC | LLM On"
+        Cat      = "Other"
+        Desc     = "Windows HDR composition of SDR game content with a driver refresh-minus-three cap; set in-game VSync Off and FPS Unlimited manually"
+        Exes     = @("RocketLeague.exe")
+        SyncMode = "on"
+        GameGroup = "rocket-league"; GroupName = "Rocket League"; Variant = "G-SYNC (HDR)"; Rank = 240
+    }
+    "rocket-league-gsync-hdr-capture" = @{
+        Name     = "Rocket League - GSYNC HDR Streaming"
+        Sub      = "Windows HDR Streaming | SDR Game Content | Keeps OBS/Overlays"
+        Cat      = "Other"
+        Desc     = "Borderless Windows HDR composition of SDR game content with a driver refresh-minus-three cap and LLM On; keeps OBS and overlays alive at Normal game priority. Set in-game VSync On and FPS Unlimited manually"
+        Exes     = @("RocketLeague.exe")
+        SyncMode = "on"
+        GameGroup = "rocket-league"; GroupName = "Rocket League"; Variant = "Streaming G-SYNC (HDR)"; Rank = 250
+    }
+
     # --- Browser Games ---
     "pokemon-auto-chess" = @{
         Name     = "Pokemon Auto Chess"

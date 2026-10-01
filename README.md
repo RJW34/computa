@@ -142,8 +142,8 @@ also leave the game's persistent CPU and I/O priority at Windows Normal rather
 than forcing High, preserving scheduler room for the recorder and encoder.
 
 Streaming lanes are available for Slippi Melee, Rivals 2, Counter-Strike 2,
-Fortnite, and Overwatch 2 in SDR/HDR variants where the game family supports
-both. For these five families, legacy `*-streaming` command names remain
+Fortnite, Overwatch 2, and Rocket League in SDR/HDR variants where the game family supports
+both. For these families, `*-streaming` command names are
 aliases to the matching capture-safe lane; they never resolve to an
 overlay-free profile that stops OBS. Use the read-only command below to
 inspect the exact process policy:
@@ -158,6 +158,13 @@ encoder, and desired output, so computa preserves the user's OBS configuration
 instead of imposing a generic preset. Use an SDR Streaming lane for a normal
 SDR stream destination. Choose an HDR Streaming lane only when OBS and the
 destination color path are already configured for HDR output or tone mapping.
+
+Rocket League includes No Sync, G-SYNC, and G-SYNC Streaming pairs. Its
+profiles manage system/driver settings and provide manual native video setup;
+they preserve game files, controls and camera settings. G-SYNC lanes use a
+driver `refresh - 3` ceiling (297 at 300 Hz), with native FPS Unlimited set
+manually. The HDR variants enable Windows HDR without claiming native game
+HDR. See the [Rocket League policy and setup](docs/research/rocket-league-settings-2026-10-01.md).
 
 ### Windows
 - Game Mode on; Game Bar / Game DVR capture off (per-user registry)

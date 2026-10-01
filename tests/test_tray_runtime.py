@@ -85,6 +85,31 @@ $states | ConvertTo-Json -Compress
     }
 
 
+def test_rocket_league_literal_fallback_matches_catalog_grouping(tmp_path: Path) -> None:
+    """A backend/cache outage still exposes the six correct, canonically bound lanes."""
+    from abso.profiles.catalog import get_profile_manifest
+
+    script = TRAY_SCRIPT.read_text(encoding="utf-8")
+    fallback = "$script:FallbackProfiles = [ordered]@{" + script.split(
+        "$script:FallbackProfiles = [ordered]@{", 1
+    )[1].split("foreach ($fallbackProfile", 1)[0]
+    result = _run_functions(
+        tmp_path, [], fallback + "\n$script:FallbackProfiles | ConvertTo-Json -Depth 5 -Compress"
+    )
+    rows = [row for row in get_profile_manifest() if row["tray_group"] == "rocket-league"]
+    assert len(rows) == 6
+    for row in rows:
+        actual = result[row["id"]]
+        assert actual["Exes"] == row["executables"] == ["RocketLeague.exe"]
+        assert actual["Name"] == row["display_name"]
+        assert actual["Cat"] == row["tray_category"]
+        assert actual["GameGroup"] == row["tray_group"]
+        assert actual["GroupName"] == row["tray_group_name"]
+        assert actual["Variant"] == row["tray_variant"]
+        assert actual["Rank"] == row["tray_rank"]
+        assert actual["SyncMode"] == row["sync_mode"]
+
+
 @pytest.mark.parametrize("outcome", ["success", "failure", "invalid", "timeout", "shutdown"])
 def test_catalog_refresh_is_single_flight_and_cleans_up(tmp_path: Path, outcome: str) -> None:
     result = _run_functions(

@@ -429,6 +429,7 @@ legacy command aliases are:
 | Slippi Melee / SSBM | `slippi-melee-streaming` | `slippi-melee-streaming-hdr` |
 | Rivals 2 / ROA2 | `rivals2-streaming` or `roa2-streaming` | `rivals2-streaming-hdr` or `roa2-streaming-hdr` |
 | Counter-Strike 2 | `cs2-streaming` | `cs2-streaming-hdr` |
+| Rocket League | `rocket-league-streaming` or `rl-streaming` | `rocket-league-streaming-hdr` or `rl-streaming-hdr` |
 | Fortnite | `fortnite-streaming` | `fortnite-streaming-hdr` |
 | Overwatch 2 | `overwatch2-streaming` or `overwatch2-gsync-streaming` | `overwatch2-streaming-hdr` or `overwatch2-gsync-hdr-streaming` |
 
@@ -471,6 +472,14 @@ profile is not a reliable tuning method. At a 300 Hz primary display:
 | Counter-Strike 2 | NVIDIA 297; manually set `fps_max 0` | On in all G-SYNC lanes | Enabled; Boost optional, manual |
 | Rivals of Aether 2 | Native 297; NVIDIA cap Off | Off for fullscreen; On for capture/borderless | No verified native Reflex integration |
 | Fortnite | NVIDIA 297; native Unlimited | Off for fullscreen; On for capture/borderless | On; Boost optional, manual |
+| Rocket League | NVIDIA 297; manually select native Unlimited | Off for fullscreen; On for capture/borderless | No verified native integration; driver Low Latency Mode On |
+
+Rocket League's six profiles are system/driver-only. Select the native video
+options manually under Settings > Video; ABSO does not write or verify them.
+Its HDR variants mean Windows HDR with Auto HDR disabled, not proven native
+PC HDR or configured RTX HDR. Controller, camera, input buffering and graphics
+preferences are preserved. See the [Rocket League policy](research/rocket-league-settings-2026-10-01.md)
+for the lane matrix and evidence.
 
 Lower runtime FPS can be expected Reflex pacing or a workload limit. Saved
 ceilings do not prove G-SYNC engagement, stable frame times, or a measured

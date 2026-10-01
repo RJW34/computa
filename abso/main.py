@@ -53,7 +53,11 @@ from abso.core.launch_sweep import (
     build_launch_killset_payload,
     run_launch_sweep,
 )
-from abso.core.launcher import launch_profile, launch_profile_without_apply
+from abso.core.launcher import (
+    ensure_direct_launch_supported,
+    launch_profile,
+    launch_profile_without_apply,
+)
 from abso.core.pending_apply import apply_pending_profile_settings
 from abso.core.profile_status import (
     build_profile_verification_summary,
@@ -1623,6 +1627,15 @@ def launch(
 ) -> None:
     """Apply a profile, launch its game, and optionally restore on exit."""
     profile_name = resolve_profile_id(profile_name) or profile_name
+    # Check before state reconciliation or pending-apply repair as well as
+    # the full transaction. An executable override cannot bypass this policy.
+    try:
+        ensure_direct_launch_supported(profile_name)
+    except ProfileLaunchError as exc:
+        if json_output:
+            json_error(str(exc))
+        console.print(f"[red]Error: {exc}[/red]")
+        sys.exit(1)
     current_profile = get_current_profile()
     same_current_profile = (
         current_profile is not None and resolve_profile_id(current_profile) == profile_name

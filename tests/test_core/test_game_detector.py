@@ -4,6 +4,8 @@ import json
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 from abso.core.game_detector import (
     InstalledGame,
     _detect_battlenet_games,
@@ -235,6 +237,23 @@ class TestDetectSteamGames:
         assert marvel_games[0].executable == "Marvel.exe"
         assert marvel_games[0].platform == "steam"
 
+    @patch("abso.core.game_detector._get_steam_library_folders")
+    def test_finds_rocket_league_game_not_generic_launcher(self, mock_folders, tmp_path):
+        """Steam app 252950 uses the Win64 game binary, not its bootstrapper."""
+        library = tmp_path / "steamapps" / "common"
+        binary_dir = library / "RocketLeague" / "Binaries" / "Win64"
+        binary_dir.mkdir(parents=True)
+        (binary_dir / "Launcher.exe").touch()
+        mock_folders.return_value = [library]
+        assert _detect_steam_games() == []
+
+        (binary_dir / "RocketLeague.exe").touch()
+        games = _detect_steam_games()
+        assert len(games) == 1
+        assert games[0].name == "Rocket League"
+        assert games[0].executable == "RocketLeague.exe"
+        assert games[0].platform == "steam"
+
 
 class TestDetectEpicGames:
     """Tests for _detect_epic_games function."""
@@ -302,6 +321,43 @@ class TestDetectEpicGames:
 
         fortnite_entries = [g for g in result if g.name == "Fortnite" and g.platform == "epic"]
         assert len(fortnite_entries) == 1
+
+    @pytest.mark.parametrize(
+        ("app_name", "display_name", "recognized"),
+        [("Sugar", "Unexpected title", True), ("", "RocketLeague", True),
+         ("Sugar", "Rocket League", True), ("Unrelated", "Some Game", False)],
+    )
+    def test_rocket_league_epic_launcher_metadata(
+        self, tmp_path, monkeypatch, app_name, display_name, recognized
+    ):
+        """Only known metadata plus a real RocketLeague.exe can identify Launcher.exe."""
+        from abso.core.game_detector import _detect_epic_games_from_manifests
+
+        manifest_dir = tmp_path / "Manifests"
+        manifest_dir.mkdir()
+        install_dir = tmp_path / "CustomLibrary" / "RocketLeague"
+        binary_dir = install_dir / "Binaries" / "Win64"
+        binary_dir.mkdir(parents=True)
+        (binary_dir / "Launcher.exe").touch()
+        (manifest_dir / "Sugar.item").write_text(json.dumps({
+            "AppName": app_name,
+            "DisplayName": display_name,
+            "InstallLocation": str(install_dir),
+            "LaunchExecutable": "Binaries/Win64/Launcher.exe",
+        }), encoding="utf-8")
+        monkeypatch.setattr(
+            "abso.core.game_detector._get_epic_manifest_locations", lambda: [manifest_dir]
+        )
+        patterns = {"Rocket League": ["RocketLeague.exe"]}
+        assert _detect_epic_games_from_manifests(patterns) == []
+        (binary_dir / "RocketLeague.exe").touch()
+        games = _detect_epic_games_from_manifests(patterns)
+        assert len(games) == int(recognized)
+        if recognized:
+            assert games[0].name == "Rocket League"
+            assert games[0].executable == "RocketLeague.exe"
+            assert games[0].install_path == install_dir
+            assert games[0].platform == "epic"
 
 
 class TestDetectBattlenetGames:

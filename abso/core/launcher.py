@@ -103,6 +103,21 @@ def _find_executable_path(install_path: Path, executable_name: str) -> Path | No
     return matches[0] if matches else None
 
 
+def ensure_direct_launch_supported(profile_id: str) -> None:
+    """Reject unsupported launcher/lifetime routing before any profile write."""
+    canonical = resolve_profile_id(profile_id) or profile_id
+    profile = get_profile_instances().get(canonical)
+    reason = getattr(profile, "external_launch_required_reason", None)
+    if isinstance(reason, str) and reason.strip():
+        raise ProfileLaunchError(
+            "This profile requires an external game launcher",
+            details=(
+                f"{reason.strip()} Apply settings separately with 'computa apply {canonical}', "
+                "then start the game through its platform client."
+            ),
+        )
+
+
 def resolve_launch_target(
     profile_id: str,
     launch_path: Path | None = None,
@@ -110,6 +125,7 @@ def resolve_launch_target(
 ) -> LaunchTarget:
     """Resolve the launchable executable for a profile."""
     canonical_profile_id = resolve_profile_id(profile_id) or profile_id
+    ensure_direct_launch_supported(canonical_profile_id)
     if launch_path:
         candidate = launch_path.expanduser()
         if not candidate.exists() or not candidate.is_file():
@@ -206,6 +222,7 @@ def launch_profile(
 ) -> LaunchResult:
     """Apply profile, launch target executable, and optionally restore on exit."""
     requested_profile_id = resolve_profile_id(profile_id) or profile_id
+    ensure_direct_launch_supported(requested_profile_id)
     if restore_on_exit and not wait:
         raise ProfileLaunchError(
             "restore_on_exit requires wait=True",
@@ -237,7 +254,7 @@ def launch_profile(
 
     try:
         target = resolve_launch_target(profile_id=actual_profile_id, launch_path=launch_path)
-    except LaunchTargetNotFoundError as e:
+    except (LaunchTargetNotFoundError, ProfileLaunchError) as e:
         result.error = str(e)
         if restore_on_exit and tx.backup_id:
             _restore_launch_backup(result, backup_dir, tx.backup_id)
@@ -293,6 +310,7 @@ def launch_profile_without_apply(
 ) -> LaunchResult:
     """Launch a profile target when live verification already proved it active."""
     profile_id = resolve_profile_id(profile_id) or profile_id
+    ensure_direct_launch_supported(profile_id)
     tx = TransactionResult(
         success=True,
         profile_id=profile_id,
@@ -314,7 +332,7 @@ def launch_profile_without_apply(
 
     try:
         target = resolve_launch_target(profile_id=profile_id, launch_path=launch_path)
-    except LaunchTargetNotFoundError as e:
+    except (LaunchTargetNotFoundError, ProfileLaunchError) as e:
         result.error = str(e)
         return result
 
