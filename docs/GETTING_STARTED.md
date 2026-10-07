@@ -100,8 +100,8 @@ Open an issue on the repo, or send these to the person who invited you.
 ## Known limitations
 
 - No auto-update. New versions mean downloading and running the new
-  `computa-setup.exe` again. `computa update-check` doesn't work while the
-  repo is private.
+  `computa-setup.exe` again. Run `computa update-check` to see whether a newer
+  release exists.
 - AMD GPUs, non-English Windows, and display scaling above 100% are
   untested. The setup window may look cramped at 125% or 150%.
 - The game list is limited to the built-in profiles (`computa profiles`).
