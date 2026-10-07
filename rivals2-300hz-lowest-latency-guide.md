@@ -23,10 +23,9 @@ snap to the 60 Hz sim grid:
   NVCP VSync safety net, and matching in-game + driver caps at the largest
   multiple of 60 below `refresh - 3` (`240 @ 300Hz`, `180 @ 240Hz`,
   `120 @ 144Hz`, policy `fighting_60hz_vrr`).
-- All lanes: driver Threaded Optimization ON (Rivals 2 is CPU-bound UE5/DX11;
-  SnapNet's sim is server-authoritative, so driver threading cannot desync
-  rollback), and the NVIDIA App in-game overlay must stay OFF (known UE5
-  frame-rate bug).
+- All lanes: the shipping Windows build selects D3D12. NVIDIA Threaded
+  Optimization stays Auto because the exposed driver control is OpenGL-only;
+  the NVIDIA App in-game overlay must stay OFF (known UE5 frame-rate bug).
 - HDR siblings use Windows HDR composition only. Steam currently advertises `hdr_support=0` for Rivals 2, so ABSO keeps Rivals 2 `bUseHDRDisplayOutput=False`.
 
 ---

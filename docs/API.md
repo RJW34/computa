@@ -318,7 +318,7 @@ class CustomHandler(SettingsHandler):
 
 | Handler | Module | Description |
 |---------|--------|-------------|
-| `WindowsSettingsHandler` | `abso.settings.windows` | Game Mode, Game Bar, HAGS, VBS |
+| `WindowsSettingsHandler` | `abso.settings.windows` | Game Mode, Game Bar, HAGS, VBS status (read-only) |
 | `PowerSettingsHandler` | `abso.settings.power` | Power plan management |
 | `RegistrySettingsHandler` | `abso.settings.registry` | Game priority, scheduling |
 | `NvidiaSettingsHandler` | `abso.settings.nvidia` | Nvidia Profile Inspector |

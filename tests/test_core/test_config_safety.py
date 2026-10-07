@@ -6,6 +6,7 @@ from abso.core.config_safety import (
     apply_ini_key_patch,
     find_ini_section_bounds,
     parse_ini_assignments,
+    restore_managed_key_lines,
     validate_allowed_keys,
 )
 
@@ -132,3 +133,61 @@ def test_bom_normalization_does_not_create_missing_section_bounds() -> None:
     lines = ["\ufeff[Other]", "bUseVSync=True"]
     assert find_ini_section_bounds(lines, "/Script/Engine.GameUserSettings") is None
     assert find_ini_section_bounds(lines, None) is None
+def test_restore_managed_key_lines_preserves_unmanaged_current_state() -> None:
+    backup = (
+        "[/Script/Game.Settings]\r\n"
+        "FullscreenMode=0\r\n"
+        "bUseVSync=False\r\n"
+        "BackupOnlyUserValue=old\r\n"
+        "[/Script/Other.Settings]\r\n"
+        "FullscreenMode=7\r\n"
+    )
+    current = (
+        "[/Script/Game.Settings]\r\n"
+        "FullscreenMode=1\r\n"
+        "FrameRateLimit=297\r\n"
+        "CurrentUserValue=new\r\n"
+        "[/Script/Other.Settings]\r\n"
+        "FullscreenMode=9\r\n"
+    )
+
+    restored = restore_managed_key_lines(
+        current_content=current,
+        backup_content=backup,
+        managed_keys={"FullscreenMode", "bUseVSync", "FrameRateLimit"},
+        section_name="/Script/Game.Settings",
+    )
+
+    assert restored == (
+        "[/Script/Game.Settings]\r\n"
+        "FullscreenMode=0\r\n"
+        "CurrentUserValue=new\r\n"
+        "bUseVSync=False\r\n"
+        "[/Script/Other.Settings]\r\n"
+        "FullscreenMode=9\r\n"
+    )
+
+
+def test_restore_managed_key_lines_is_strict_when_section_is_missing() -> None:
+    current = "[Other]\nFullscreenMode=2\n"
+    backup = "[Target]\nFullscreenMode=0\n"
+
+    restored = restore_managed_key_lines(
+        current_content=current,
+        backup_content=backup,
+        managed_keys={"FullscreenMode"},
+        section_name="Target",
+    )
+
+    assert restored == current
+
+
+def test_restore_managed_key_lines_supports_headerless_legacy_ini() -> None:
+    restored = restore_managed_key_lines(
+        current_content="FullscreenMode=1\nUserChoice=current\n",
+        backup_content="FullscreenMode=0\nUserChoice=old\n",
+        managed_keys={"FullscreenMode"},
+        section_name="/Script/Game.Settings",
+    )
+
+    assert restored == "FullscreenMode=0\nUserChoice=current\n"

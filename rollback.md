@@ -83,7 +83,7 @@ bursts (this is "frame pacing stability > raw latency" made concrete).
 | Low Latency Mode | **ON** | Reduces queue safely |
 | Low Latency Mode = Ultra | **AVOID** | Can cause frame pacing issues in non-GPU-bound scenarios |
 | Max Frame Rate | OFF | Avoid limiter jitter; in-game limiter owns pacing |
-| Threaded Optimization | ON | Rivals 2 is CPU-bound UE5/DX11; worker threads improve frame times. SnapNet's sim is server-authoritative, so driver threading cannot desync rollback |
+| Threaded Optimization | Auto | NVIDIA exposes this as an OpenGL control; forcing it On is not a D3D12 optimization |
 | Power Management | Prefer Maximum Performance | Clock stability |
 | Triple Buffering | OFF | Irrelevant without VSync |
 | G-SYNC (per-app) | OFF | No VRR |

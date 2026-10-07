@@ -114,7 +114,7 @@ abso/
 ├── settings/               # One module per settings domain
 │   ├── base.py             # SettingsHandler interface (+ is_critical_verify)
 │   ├── nvidia/             # Nvidia Profile Inspector + NVAPI DRS package
-│   ├── windows.py          # Game Mode, HAGS, VBS, HDR, FSO
+│   ├── windows.py          # Game Mode, HAGS, VBS status, HDR, FSO
 │   ├── registry.py         # Registry read/write (+ WIN32_PRIORITY_* constants)
 │   ├── power.py            # Power plan management (powercfg)
 │   ├── network.py          # Nagle, TCP optimizations
@@ -201,7 +201,8 @@ when the active profile is already verified.
 
 ### Windows Settings
 - HAGS (`HwSchMode` registry key): Game-dependent, make per-profile
-- VBS/Memory Integrity: Requires reboot after change
+- VBS/Memory Integrity: read-only in normal profiles/backups; explicit
+  acknowledgement-gated changes require a reboot
 - Fullscreen optimizations: Tune per-executable via AppCompatFlags
 - MPO changes are registry-target writes that only become live after reboot;
   verification can prove the target is written, not that DWM has committed the

@@ -174,3 +174,96 @@ def test_apply_inserts_missing_key_when_absent(tmp_path: Path, monkeypatch) -> N
     content = handler.gfx_ini.read_text(encoding="utf-8")
     assert "[Hardware]" in content
     assert "VSync = True" in content
+
+
+def test_restore_preserves_renderer_and_other_unmanaged_slippi_choices(
+    tmp_path: Path, monkeypatch
+) -> None:
+    _prepare_slippi_config(tmp_path)
+    monkeypatch.setenv("APPDATA", str(tmp_path))
+    handler = DolphinConfigHandler()
+    backup = handler.backup()
+
+    handler.gfx_ini.write_text(
+        "[Settings]\n"
+        "EFBScale = 4\n"
+        "BackendMultithreading = True\n"
+        "BorderlessFullscreen = True\n"
+        "UserShaderChoice = current\n"
+        "\n"
+        "[Hardware]\n"
+        "VSync = True\n"
+        "\n"
+        "[Enhancements]\n"
+        "TextureScalingFactor = 3\n"
+        "UseScalingFilter = False\n"
+        "UseDePosterize = False\n",
+        encoding="utf-8",
+    )
+    handler.dolphin_ini.write_text(
+        "[Core]\n"
+        "GFXBackend = DX11\n"
+        "DefaultISO = C:/current/melee.iso\n"
+        "SIDevice0 = 12\n"
+        "ReduceTimingDispersion = False\n"
+        "ImmediateXFBEnable = False\n"
+        "RushPresentation = False\n"
+        "SmoothPresentation = True\n"
+        "SyncGPU = True\n"
+        "TimingVariance = 99\n"
+        "TimeStretching = True\n"
+        "\n"
+        "[DSP]\n"
+        "Backend = WASAPI\n",
+        encoding="utf-8",
+    )
+
+    assert handler.restore(backup) is True
+
+    restored_gfx = handler.gfx_ini.read_text(encoding="utf-8")
+    restored_dolphin = handler.dolphin_ini.read_text(encoding="utf-8")
+    assert "EFBScale = 2" in restored_gfx
+    assert "UserShaderChoice = current" in restored_gfx
+    # Missing in the backup fixture, so the handler-owned live key is removed.
+    assert "BorderlessFullscreen" not in restored_gfx
+    assert "GFXBackend = DX11" in restored_dolphin
+    assert "DefaultISO = C:/current/melee.iso" in restored_dolphin
+    assert "SIDevice0 = 12" in restored_dolphin
+    assert "Backend = WASAPI" in restored_dolphin
+    assert "ReduceTimingDispersion = False" in restored_dolphin
+
+
+def test_restore_does_not_recreate_missing_dolphin_files(
+    tmp_path: Path, monkeypatch
+) -> None:
+    _prepare_slippi_config(tmp_path)
+    monkeypatch.setenv("APPDATA", str(tmp_path))
+    handler = DolphinConfigHandler()
+    backup = handler.backup()
+    handler.gfx_ini.unlink()
+    handler.dolphin_ini.unlink()
+
+    assert handler.restore(backup) is True
+    assert not handler.gfx_ini.exists()
+    assert not handler.dolphin_ini.exists()
+
+
+def test_texture_scaling_factor_target_is_within_ishiiruka_range() -> None:
+    """Ishiiruka's TextureScalingFactor range is 2-5; 1 is silently clamped.
+
+    Regression: the handler used to target "1". Dolphin rewrote it to 2 on
+    every launch, so the audit reported a permanent false mismatch and ABSO
+    re-wrote the invalid value on every apply.
+    """
+    rule = DolphinConfigHandler.AUDIT_RULES["texture_scaling_factor"]
+    assert 2 <= int(rule.expected) <= 5
+
+
+def test_texture_scaling_type_is_managed_and_disabled() -> None:
+    """TextureScalingType is the switch that actually enables upscaling."""
+    assert "texture_scaling_type" in DolphinConfigHandler.GFX_KEY_MAP
+    assert DolphinConfigHandler.GFX_KEY_MAP["texture_scaling_type"] == (
+        "TextureScalingType",
+        "Enhancements",
+    )
+    assert DolphinConfigHandler.AUDIT_RULES["texture_scaling_type"].expected == "0"

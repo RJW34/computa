@@ -2799,7 +2799,7 @@ def config(init: bool, show: bool) -> None:
     Configuration is stored in abso.yaml in the current directory.
     Use profile_overrides to customize settings per game profile.
     """
-    from abso.core.config import ConfigManager
+    from abso.core.config import ConfigManager, profile_override_section_names
 
     config_manager = ConfigManager()
 
@@ -2842,17 +2842,7 @@ def config(init: bool, show: bool) -> None:
             console.print("\n[bold]Profile Overrides:[/bold]")
             for profile_id, overrides in cfg.profile_overrides.items():
                 console.print(f"  [cyan]{profile_id}[/cyan]:")
-                for attr in [
-                    "nvidia",
-                    "windows",
-                    "graphics",
-                    "network",
-                    "power",
-                    "timer",
-                    "mouse",
-                    "color",
-                    "display_color_range",
-                ]:
+                for attr in profile_override_section_names():
                     override_val = getattr(overrides, attr, {})
                     if override_val:
                         console.print(f"    {attr}: {override_val}")

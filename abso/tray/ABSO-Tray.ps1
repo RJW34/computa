@@ -8551,12 +8551,28 @@ function Stop-ProcessGuardTimer {
 #   - idle (no game alive): 30s tick to keep tray overhead near zero
 #   - active (game alive):  10s tick to catch respawns quickly
 #
+# A tick is NOT a backend spawn. Every backend invocation is a cold start of
+# the frozen CLI, so an unconditional spawn per active tick put a multi-second
+# process-churn burst on the machine every 10s for the whole gaming session.
+# The tick now costs a single Get-Process against the resolved killset, and the
+# backend is only started when:
+#   - the game was just detected (first sweep of the session), or
+#   - a killset image is actually alive and needs stopping, or
+#   - the maintenance interval elapsed (re-asserts live process priority).
+#
 # Per-profile launch killset comes from $script:Profiles[<id>].KillsetAlwaysSafe
 # which is populated by the catalog cache - no game-specific lists live in the
-# tray itself.
+# tray itself. That cache is deliberately machine-independent and still lists
+# images this machine protects via process_overrides.protect, so the pre-check
+# uses the `resolved` list the backend reports back from the last sweep, which
+# is exactly the set the janitor will act on.
 
 $script:LaunchSanitizerIdleIntervalMs   = 30000
 $script:LaunchSanitizerActiveIntervalMs = 10000
+# Re-assert live process priority on a slow cadence even when the killset is
+# clean. The IFEO priority is applied at game start; this only exists so an
+# external tool resetting it mid-session gets corrected within a few minutes.
+$script:LaunchSanitizerMaintenanceIntervalMs = 300000
 $script:LaunchSanitizerTimer = $null
 $script:LaunchSanitizerActiveProfileId = $null
 $script:LaunchSanitizerLastSweepStopped = @{}
@@ -8569,6 +8585,13 @@ $script:LaunchSanitizerSweepErrorFile = $null
 $script:LaunchSanitizerSweepProfileId = $null
 $script:LaunchSanitizerSweepFirstDetection = $false
 $script:LaunchSanitizerSweepStartedAt = $null
+# Protect-filtered killset reported by the last completed sweep, plus the
+# profile it belongs to. A mismatch means "unknown" and the pre-check falls
+# back to letting the backend decide.
+$script:LaunchSanitizerResolvedImages = $null
+$script:LaunchSanitizerResolvedProfileId = $null
+$script:LaunchSanitizerLastSweepAt = $null
+$script:LaunchSanitizerQuietLogged = $false
 
 # --- Keep-Awake (anti-sleep) for gamepad-driven sessions --------------------
 # SetThreadExecutionState inhibits system + display idle sleep for the lifetime
@@ -8865,6 +8888,68 @@ function Test-IsActiveProfileGameRunning {
     return $false
 }
 
+function Test-LaunchKillsetTargetsAlive {
+    <#
+    .SYNOPSIS
+    Returns $true when any image the janitor would actually stop is running.
+
+    .DESCRIPTION
+    One Get-Process call over the whole resolved killset, so an active tick
+    costs a single process-table read instead of a backend cold start. Returns
+    $true ("assume work exists") whenever the resolved set is unknown or does
+    not belong to the active profile, which keeps the pre-check strictly
+    conservative: it can add a sweep, never silently skip a needed one.
+    #>
+    $profileId = $script:activeProfile
+    if ([string]::IsNullOrWhiteSpace($profileId)) { return $true }
+    if ($script:LaunchSanitizerResolvedProfileId -ne $profileId) { return $true }
+
+    $images = $script:LaunchSanitizerResolvedImages
+    if ($null -eq $images) { return $true }
+    $images = @($images)
+    # A known-empty resolved set means the backend has nothing to sweep for
+    # this profile; there is no point starting it again.
+    if ($images.Count -eq 0) { return $false }
+
+    $baseNames = @()
+    foreach ($image in $images) {
+        if ([string]::IsNullOrWhiteSpace("$image")) { continue }
+        $name = "$image"
+        if ($name.ToLowerInvariant().EndsWith(".exe")) {
+            $name = $name.Substring(0, $name.Length - 4)
+        }
+        $baseNames += $name
+    }
+    if ($baseNames.Count -eq 0) { return $false }
+
+    $procs = Get-Process -Name $baseNames -ErrorAction SilentlyContinue
+    if ($procs) {
+        # Dispose handles right away - PS holds them open otherwise
+        foreach ($p in @($procs)) {
+            try { $p.Dispose() } catch {}
+        }
+        return $true
+    }
+    return $false
+}
+
+function Get-LaunchSweepReason {
+    <#
+    .SYNOPSIS
+    Returns why the backend sweep should run this tick, or $null to skip it.
+    #>
+    param([bool]$IsFirstDetection)
+
+    if ($IsFirstDetection) { return "first-detection" }
+    if (Test-LaunchKillsetTargetsAlive) { return "killset-target-alive" }
+
+    if (-not $script:LaunchSanitizerLastSweepAt) { return "maintenance" }
+    $elapsedMs = ([DateTime]::UtcNow - $script:LaunchSanitizerLastSweepAt).TotalMilliseconds
+    if ($elapsedMs -ge $script:LaunchSanitizerMaintenanceIntervalMs) { return "maintenance" }
+
+    return $null
+}
+
 function Test-LaunchSweepInFlight {
     if (-not $script:LaunchSanitizerSweepProc) { return $false }
     try {
@@ -8911,10 +8996,30 @@ function Apply-LaunchSweepPayload {
         [bool]$IsFirstDetection
     )
 
-    if (-not $Payload -or -not $Payload.result) { return }
+    if (-not $Payload) { return }
+
+    # Every CLI --json response is wrapped in {success, data}. This function
+    # used to read $Payload.result straight off the envelope, which is always
+    # $null, so it silently returned before doing anything: no stopped-image
+    # log lines, no payload warnings, and no sanitizer toast for the entire
+    # history of the feature. Unwrap first, and tolerate a bare payload so a
+    # direct caller (or a future unwrapped source) still works.
+    $sweep = $Payload
+    if ($null -ne $Payload.data) { $sweep = $Payload.data }
+
+    # The backend reports the exact protect-filtered image set it swept. Cache
+    # it against its profile so later ticks can answer "is there anything to
+    # do?" with one Get-Process instead of another backend cold start.
+    $resolvedImages = $sweep.resolved
+    if ($null -ne $resolvedImages) {
+        $script:LaunchSanitizerResolvedImages = @($resolvedImages)
+        $script:LaunchSanitizerResolvedProfileId = $ProfileId
+    }
+
+    if (-not $sweep.result) { return }
 
     $stopped = @()
-    if ($Payload.result.stopped) { $stopped = @($Payload.result.stopped) }
+    if ($sweep.result.stopped) { $stopped = @($sweep.result.stopped) }
 
     foreach ($img in $stopped) {
         if (-not $script:LaunchSanitizerLastSweepStopped.ContainsKey("$img")) {
@@ -8923,8 +9028,8 @@ function Apply-LaunchSweepPayload {
         }
     }
 
-    if ($Payload.result.warnings) {
-        foreach ($warning in @($Payload.result.warnings)) {
+    if ($sweep.result.warnings) {
+        foreach ($warning in @($sweep.result.warnings)) {
             Write-TrayLog "LaunchSanitizer warning: $warning" -Level "WARN"
         }
     }
@@ -9062,6 +9167,15 @@ function Start-LaunchSweepCliProcess {
         # PS 5.1: cache the handle now or .ExitCode reads $null after exit.
         if ($script:LaunchSanitizerSweepProc) { $null = $script:LaunchSanitizerSweepProc.Handle }
 
+        # The sweep is housekeeping and runs while a game owns the machine, so
+        # it must never compete with the game for CPU. Non-fatal: a process
+        # that already exited (fast sweep) throws here and needs no priority.
+        try {
+            $script:LaunchSanitizerSweepProc.PriorityClass =
+                [System.Diagnostics.ProcessPriorityClass]::BelowNormal
+        }
+        catch {}
+
         $pollTimer = New-Object System.Windows.Forms.Timer
         $pollTimer.Interval = 400
         $pollTimer.Add_Tick({ Complete-LaunchSweepIfReady })
@@ -9091,6 +9205,8 @@ function Invoke-LaunchSanitizerTick {
             }
             $script:LaunchSanitizerActiveProfileId = $null
             $script:LaunchSanitizerGameWasAlive = $false
+            $script:LaunchSanitizerLastSweepAt = $null
+            $script:LaunchSanitizerQuietLogged = $false
             Clear-AbsoKeepAwake
             Stop-CpuBalancerForGame
             if ($script:LaunchSanitizerTimer -and $script:LaunchSanitizerTimer.Interval -ne $script:LaunchSanitizerIdleIntervalMs) {
@@ -9118,6 +9234,8 @@ function Invoke-LaunchSanitizerTick {
             }
             $script:LaunchSanitizerActiveProfileId = $profileId
             $script:LaunchSanitizerGameWasAlive = $false
+            $script:LaunchSanitizerLastSweepAt = $null
+            $script:LaunchSanitizerQuietLogged = $false
             Clear-AbsoKeepAwake
             Stop-CpuBalancerForGame
             if ($script:LaunchSanitizerTimer -and $script:LaunchSanitizerTimer.Interval -ne $script:LaunchSanitizerIdleIntervalMs) {
@@ -9135,6 +9253,8 @@ function Invoke-LaunchSanitizerTick {
                 $script:LaunchSanitizerLoggedStderr = @{}
             }
             $script:LaunchSanitizerGameWasAlive = $false
+            $script:LaunchSanitizerLastSweepAt = $null
+            $script:LaunchSanitizerQuietLogged = $false
             $script:LaunchSanitizerActiveProfileId = $profileId
             Clear-AbsoKeepAwake
             Stop-CpuBalancerForGame
@@ -9229,6 +9349,27 @@ function Invoke-LaunchSanitizerTick {
             return
         }
 
+        # Cheap gate: only pay for a backend cold start when this tick has real
+        # work. A clean killset makes the rest of the session cost one
+        # Get-Process per tick instead of a multi-second sweep process.
+        $sweepReason = Get-LaunchSweepReason -IsFirstDetection $isFirstDetection
+        if (-not $sweepReason) {
+            if (-not $script:LaunchSanitizerQuietLogged) {
+                $script:LaunchSanitizerQuietLogged = $true
+                Write-TrayLog "LaunchSanitizer: killset clean for '$profileId'; backend idle until a target respawns"
+            }
+            $script:LaunchSanitizerActiveProfileId = $profileId
+            if ($script:LaunchSanitizerTimer -and $script:LaunchSanitizerTimer.Interval -ne $script:LaunchSanitizerActiveIntervalMs) {
+                $script:LaunchSanitizerTimer.Interval = $script:LaunchSanitizerActiveIntervalMs
+            }
+            return
+        }
+
+        if ($script:LaunchSanitizerQuietLogged -and $sweepReason -ne "first-detection") {
+            Write-TrayLog "LaunchSanitizer: sweeping '$profileId' ($sweepReason)"
+        }
+        $script:LaunchSanitizerQuietLogged = $false
+
         $started = Start-LaunchSweepCliProcess `
             -ProfileId $profileId `
             -IncludeOptIn $includeOptIn `
@@ -9236,6 +9377,7 @@ function Invoke-LaunchSanitizerTick {
         if ($started) {
             $script:LaunchSanitizerActiveProfileId = $profileId
             $script:LaunchSanitizerGameWasAlive = $true
+            $script:LaunchSanitizerLastSweepAt = [DateTime]::UtcNow
         }
         if ($script:LaunchSanitizerTimer -and $script:LaunchSanitizerTimer.Interval -ne $script:LaunchSanitizerActiveIntervalMs) {
             $script:LaunchSanitizerTimer.Interval = $script:LaunchSanitizerActiveIntervalMs

@@ -608,17 +608,32 @@ class TestWindowsApply:
         assert "Access denied" in result["error"]
 
     @patch.object(WindowsSettingsHandler, "_detect_for_apply")
-    @patch.object(WindowsSettingsHandler, "_set_vbs")
-    def test_apply_vbs_requires_reboot(self, mock_set_vbs, mock_detect):
-        """Test that VBS changes require reboot when value differs."""
-        mock_detect.return_value = {"hags": None, "vbs": True}
-        mock_set_vbs.return_value = None
-
+    @patch.object(WindowsSettingsHandler, "_set_game_mode")
+    def test_apply_rejects_vbs_before_any_reads_or_writes(
+        self,
+        mock_set_game_mode,
+        mock_detect,
+    ):
+        """Generic Windows settings must never change Memory Integrity."""
         handler = WindowsSettingsHandler()
-        result = handler.apply({"vbs": False})
+        result = handler.apply({"game_mode": True, "vbs": False})
 
-        assert result["requires_reboot"] is True
-        assert result["success"] is True
+        assert result["success"] is False
+        assert result["requires_reboot"] is False
+        assert result["changed"] is False
+        assert "VBSOptInHandler" in result["error"]
+        mock_detect.assert_not_called()
+        mock_set_game_mode.assert_not_called()
+
+    @pytest.mark.parametrize("target", [False, True, None])
+    def test_preflight_rejects_vbs_targets(self, target):
+        """Profiles and config overrides fail before handler side effects."""
+        handler = WindowsSettingsHandler()
+
+        result = handler.preflight({"vbs": target})
+
+        assert result["success"] is False
+        assert "VBSOptInHandler" in result["error"]
 
     @patch.object(WindowsSettingsHandler, "_detect_for_apply")
     @patch.object(WindowsSettingsHandler, "_set_hdr")
@@ -740,7 +755,7 @@ class TestWindowsBackupRestore:
 
     @patch.object(WindowsSettingsHandler, "detect")
     def test_backup_returns_current_settings(self, mock_detect):
-        """Test backup returns current detected settings."""
+        """Backup omits externally managed Memory Integrity state."""
         expected = {
             "game_mode": True,
             "game_bar": False,
@@ -762,21 +777,35 @@ class TestWindowsBackupRestore:
         handler = WindowsSettingsHandler()
         result = handler.backup()
 
-        assert result == expected
+        assert result == {key: value for key, value in expected.items() if key != "vbs"}
+        assert expected["vbs"] is False
 
+    @pytest.mark.parametrize("legacy_vbs", [False, True, None])
     @patch.object(WindowsSettingsHandler, "apply")
-    def test_restore_applies_settings(self, mock_apply):
-        """Test restore applies backed up settings."""
+    def test_restore_ignores_legacy_vbs_and_applies_other_settings(
+        self,
+        mock_apply,
+        legacy_vbs,
+    ):
+        """Old backups cannot replay HVCI state during any restore path."""
         mock_apply.return_value = {"success": True}
         backup_data = {
             "game_mode": True,
             "game_bar": False,
+            "vbs": legacy_vbs,
         }
 
         handler = WindowsSettingsHandler()
         result = handler.restore(backup_data)
 
         assert result is True
+        mock_apply.assert_called_once_with(
+            {
+                "game_mode": True,
+                "game_bar": False,
+            }
+        )
+        assert backup_data["vbs"] is legacy_vbs
 
     @patch.object(WindowsSettingsHandler, "apply")
     def test_restore_returns_false_on_apply_failure(self, mock_apply):

@@ -45,6 +45,7 @@ actively working on that area.
 ## Research Notes
 
 - [End-to-end audit, 2026-09-06](./research/end-to-end-audit-2026-09-06.md) — source/install divergence, verified defects, source fixes, local evidence, and remaining measurement work.
+- [Installed Profile Optimization Audit (2026-08-12)](./research/profile-optimization-audit-2026-08-12.md)
 - [VRR Latency Research Notes](./research/vrr-latency-research-notes.md)
 - [Dolphin Latency Research Notes](./research/dolphin-latency-research-notes.md)
 - [Fortnite Streaming Audit and Corrections](./research/fortnite-streaming-audit-2026-09-06.md)

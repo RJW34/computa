@@ -238,9 +238,13 @@ class WindowsSettingsHandler(SettingsHandler):
     - Game Mode
     - Game Bar / Game DVR
     - Hardware-Accelerated GPU Scheduling (HAGS)
-    - VBS / Memory Integrity
+    - VBS / Memory Integrity status (read-only)
     - HDR / Auto HDR
     - Display refresh rate optimization
+
+    Memory Integrity changes belong exclusively to ``VBSOptInHandler`` so
+    ordinary profile application and backup restore cannot weaken an
+    externally managed security setting.
     """
 
     is_critical_verify = True
@@ -262,6 +266,11 @@ class WindowsSettingsHandler(SettingsHandler):
         "windowed_optimizations": "SwapEffectUpgradeEnable",
         "vrr_optimize": "VRROptimizeEnable",
     }
+    VBS_READ_ONLY_ERROR = (
+        "The legacy 'vbs' setting is read-only in WindowsSettingsHandler. "
+        "Memory Integrity changes require VBSOptInHandler with "
+        "acknowledge_security_tradeoff=True."
+    )
 
     # DWM refresh propagation; tunable for slow systems.
     _DWM_REFRESH_WAIT_SECONDS: float = 0.5
@@ -504,14 +513,38 @@ class WindowsSettingsHandler(SettingsHandler):
 
         return issues
 
+    def preflight(self, settings: dict[str, Any]) -> dict[str, Any]:
+        """Reject generic profile attempts to own Memory Integrity."""
+        if "vbs" in settings:
+            return {
+                "success": False,
+                "error": self.VBS_READ_ONLY_ERROR,
+                "warnings": [],
+                "notices": [],
+            }
+        return super().preflight(settings)
+
     def apply(self, settings: dict[str, Any]) -> dict[str, Any]:
         """Apply Windows gaming settings.
 
-        Only sets requires_reboot=True if we actually change HAGS or VBS.
-        If values already match, no reboot is needed.
+        Memory Integrity is intentionally read-only here. Only
+        ``VBSOptInHandler`` can change it after an explicit acknowledgement.
+        HAGS changes require a reboot only when the target differs.
 
         Returns detailed per-setting success/failure information.
         """
+        if "vbs" in settings:
+            logger.error(self.VBS_READ_ONLY_ERROR)
+            return {
+                "success": False,
+                "error": self.VBS_READ_ONLY_ERROR,
+                "requires_reboot": False,
+                "applied": [],
+                "changed": False,
+                "changed_keys": [],
+                "failed": [self.VBS_READ_ONLY_ERROR],
+            }
+
         requires_reboot = False
         errors: list[str] = []
         applied: list[str] = []
@@ -572,24 +605,6 @@ class WindowsSettingsHandler(SettingsHandler):
                     applied.append(f"HAGS: {'enabled' if target else 'disabled'}")
             except Exception as e:
                 errors.append(f"HAGS: {e}")
-
-        if "vbs" in settings:
-            try:
-                target = settings["vbs"]
-                current_vbs = current.get("vbs")
-                if self._bool_matches(current_vbs, target):
-                    applied.append(f"VBS: already {'enabled' if target else 'disabled'}")
-                else:
-                    if current_vbs is None:
-                        # Detection failed — conservatively assume reboot needed
-                        requires_reboot = True
-                    elif current_vbs != target:
-                        requires_reboot = True
-                    self._set_vbs(target)
-                    changed_keys.append("vbs")
-                    applied.append(f"VBS: {'enabled' if target else 'disabled'}")
-            except Exception as e:
-                errors.append(f"VBS: {e}")
 
         # HDR and Wide Color Gamut (AdvancedColorEnabled) are coupled on
         # Win11 24H2+: setting HDR alone leaves SDR content rendering in
@@ -1074,12 +1089,21 @@ class WindowsSettingsHandler(SettingsHandler):
         return results
 
     def backup(self) -> dict[str, Any]:
-        """Backup current Windows gaming settings."""
-        return self.detect()
+        """Backup restorable Windows settings, excluding Memory Integrity."""
+        data = self.detect().copy()
+        data.pop("vbs", None)
+        return data
 
     def restore(self, data: dict[str, Any]) -> bool:
-        """Restore Windows gaming settings from backup."""
-        result = self.apply(data)
+        """Restore Windows settings without replaying legacy HVCI snapshots."""
+        restore_data = data.copy()
+        if "vbs" in restore_data:
+            logger.info(
+                "Ignoring legacy Windows backup 'vbs' value; Memory Integrity "
+                "is externally managed"
+            )
+            restore_data.pop("vbs")
+        result = self.apply(restore_data)
         return result.get("success", False)
 
     # Private helper methods
@@ -1212,18 +1236,6 @@ class WindowsSettingsHandler(SettingsHandler):
         except Exception as e:
             logger.debug(f"Failed to get VBS: {e}")
             return None
-
-    def _set_vbs(self, enabled: bool) -> None:
-        """Set VBS / Memory Integrity status."""
-        if not isinstance(enabled, int):
-            logger.warning(
-                f"Skipping registry write for VBS: expected int, got {type(enabled).__name__}"
-            )
-            return
-        with winreg.OpenKey(
-            winreg.HKEY_LOCAL_MACHINE, self.VBS_KEY, 0, winreg.KEY_ALL_ACCESS
-        ) as key:
-            winreg.SetValueEx(key, "Enabled", 0, winreg.REG_DWORD, 1 if enabled else 0)
 
     @staticmethod
     def _get_active_display_targets() -> list[tuple[_LUID, int]]:

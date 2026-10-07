@@ -266,6 +266,7 @@ class ProfileApplier:
 
         # Collect all settings from profile
         settings_map = self._collect_settings(profile)
+        settings_map = self._resolve_runtime_settings_map(profile, settings_map)
 
         # === PHASE 2: Profile Linting ===
         if not self.skip_linting:
@@ -659,6 +660,7 @@ class ProfileApplier:
 
         config_manager = ConfigManager()
         settings_map = self._collect_settings(profile)
+        settings_map = self._resolve_runtime_settings_map(profile, settings_map)
         final_settings = self._finalize_handler_settings(
             profile,
             profile_name,
@@ -734,12 +736,32 @@ class ProfileApplier:
                 if profile.allow_unverified_nvidia_profile_reuse:
                     settings.setdefault("allow_unverified_existing_profile_reuse", True)
 
-            if isinstance(profile, BaseProfile):
-                settings = profile.resolve_runtime_settings(handler_name, settings.copy())
-
             final_settings[handler_name] = settings
 
         return final_settings
+
+    @staticmethod
+    def _resolve_runtime_settings_map(
+        profile: BaseProfile,
+        settings_map: dict[str, dict[str, Any]],
+    ) -> dict[str, dict[str, Any]]:
+        """Resolve machine-local settings before safety gates and overrides.
+
+        Runtime discovery is part of the profile input, not a final override.
+        Resolving it here lets RollbackGuard and StabilityGate constrain the
+        discovered value. Explicit ``abso.yaml`` profile overrides are merged
+        later and therefore retain their documented final precedence.
+        """
+        if not isinstance(profile, BaseProfile):
+            return {name: settings.copy() for name, settings in settings_map.items()}
+
+        return {
+            handler_name: profile.resolve_runtime_settings(
+                handler_name,
+                settings.copy(),
+            )
+            for handler_name, settings in settings_map.items()
+        }
 
     def _build_effective_settings_map(
         self,
@@ -759,6 +781,7 @@ class ProfileApplier:
         ungated profile defaults.
         """
         settings_map = self._collect_settings(profile)
+        settings_map = self._resolve_runtime_settings_map(profile, settings_map)
 
         lint_result: LintResult | None = None
         if not self.skip_linting:

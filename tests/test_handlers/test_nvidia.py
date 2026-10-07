@@ -1377,3 +1377,42 @@ class TestNvidiaBackwardsCompatibility:
             from pathlib import Path
             handler._export_profile(Path("test.nip"))
             mock.assert_called_once()
+
+
+def test_find_npi_is_anchored_to_the_program_not_the_cwd(tmp_path, monkeypatch):
+    """NPI must resolve from the install root regardless of the caller's CWD.
+
+    Regression guard: discovery used to be purely CWD-relative, so the tray
+    (which runs the backend with the install root as its working directory)
+    never found NPI and every tray-driven apply silently skipped NVIDIA
+    settings, while the same command run from a repo checkout worked.
+    """
+    from abso.settings.nvidia import npi as npi_module
+
+    install_root = tmp_path / "install"
+    bundled = install_root / "tools" / "npi" / "nvidiaProfileInspector.exe"
+    bundled.parent.mkdir(parents=True)
+    bundled.write_bytes(b"npi")
+
+    elsewhere = tmp_path / "unrelated-cwd"
+    elsewhere.mkdir()
+    monkeypatch.chdir(elsewhere)
+    monkeypatch.setattr(npi_module, "_app_roots", lambda: [install_root])
+
+    manager = npi_module.NPIManager()
+
+    assert manager.npi_path == bundled
+    assert manager.is_available() is True
+
+
+def test_app_roots_uses_executable_dir_when_frozen(tmp_path, monkeypatch):
+    """A frozen build must anchor to the directory holding computa.exe."""
+    from abso.settings.nvidia import npi as npi_module
+
+    exe = tmp_path / "install" / "computa.exe"
+    exe.parent.mkdir(parents=True)
+    exe.write_bytes(b"launcher")
+    monkeypatch.setattr(npi_module.sys, "frozen", True, raising=False)
+    monkeypatch.setattr(npi_module.sys, "executable", str(exe))
+
+    assert exe.parent.resolve() in npi_module._app_roots()

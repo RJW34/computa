@@ -7,6 +7,11 @@ import re
 from pathlib import Path
 from typing import Any
 
+from abso.core.config_safety import (
+    read_config_text,
+    restore_managed_key_lines,
+    write_config_text,
+)
 from abso.core.models import Issue
 from abso.settings.base import SettingsHandler
 from abso.settings.value_parsing import parse_bool_like
@@ -317,7 +322,7 @@ class Diablo4ConfigHandler(SettingsHandler):
         return results
 
     def backup(self) -> dict[str, Any]:
-        """Back up the full LocalPrefs.txt contents for lossless restore."""
+        """Capture full LocalPrefs.txt context for selective managed-key restore."""
         prefs_path = _get_diablo4_local_prefs_path()
         if not prefs_path:
             return {"config_found": False}
@@ -326,26 +331,37 @@ class Diablo4ConfigHandler(SettingsHandler):
             return {
                 "config_found": True,
                 "config_path": str(prefs_path),
-                "file_content": prefs_path.read_text(encoding="utf-8", errors="replace"),
+                "file_content": read_config_text(prefs_path),
             }
         except Exception as e:
             logger.error("Failed to back up Diablo IV LocalPrefs.txt: %s", e)
             return {"config_found": False}
 
     def restore(self, data: dict[str, Any]) -> bool:
-        """Restore Diablo IV LocalPrefs.txt from backup."""
+        """Restore only ABSO-owned Diablo IV preferences from backup."""
         if not data.get("config_found"):
             return True
 
         file_content = data.get("file_content")
-        config_path = data.get("config_path")
-        if file_content is None or not config_path:
-            return False
+        if file_content is None:
+            return True
+
+        # The live file is the source of truth for every preference ABSO does
+        # not own.  If it no longer exists, do not resurrect a stale backup.
+        prefs_path = _get_diablo4_local_prefs_path()
+        if prefs_path is None:
+            return True
 
         try:
-            prefs_path = Path(config_path)
-            prefs_path.parent.mkdir(parents=True, exist_ok=True)
-            prefs_path.write_text(file_content, encoding="utf-8")
+            current_content = read_config_text(prefs_path)
+            restored_content = restore_managed_key_lines(
+                current_content=current_content,
+                backup_content=file_content,
+                managed_keys=set(self.MUTABLE_SETTINGS_TO_PREFS.values()),
+                assignment_pattern=self._KV_RE,
+            )
+            if restored_content != current_content:
+                write_config_text(prefs_path, restored_content)
             return True
         except OSError as e:
             logger.error("Failed to restore Diablo IV LocalPrefs.txt: %s", e)

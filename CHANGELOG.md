@@ -66,6 +66,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   banners; `docs/AGENT_PROTOCOL.md` is the current entry point.
 
 ### Fixed
+- Profile switches now restore only native game-config keys owned by each
+  handler instead of replacing whole stale files. This preserves Slippi's
+  user-selected renderer and unmanaged controls, audio, quality, and future
+  game settings across unrelated profile switches.
+- Slippi backend detection reads `GFXBackend` from the Ishiiruka build's real
+  `Dolphin.ini` location. Guidance now preserves the user's renderer and uses
+  D3D11 only as the documented compatibility baseline, not a forced target.
+- Stateful peripheral daemons (Logitech G HUB, Corsair iCUE) are never
+  launch-kill targets; closing them mid-game can drop DPI/button mappings.
+- The launch sanitizer takes one bulk process snapshot per sweep instead of
+  one `tasklist` call per killset image (~4.2s -> ~0.3s per sweep).
+- `config --show` renders every `profile_overrides` section from the schema
+  (registry, cpu_affinity and the per-game config sections were hidden).
+- Ordinary profile application, switching, rollback, and uninstall restore no
+  longer write Memory Integrity from `WindowsSettingsHandler`. New backups omit
+  the legacy `vbs` field, old backups ignore it during restore, and direct or
+  configured generic HVCI targets fail closed in favor of the explicit
+  acknowledgement-gated VBS opt-in handler.
 - Em-dash / en-dash in user-visible CLI strings (cp1252 mojibake in
   `abso bios` and `abso audit` output). `bios_detector.py` and
   `multimon_detector.py` strings replaced with hyphens.
