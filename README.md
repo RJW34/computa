@@ -7,6 +7,10 @@ hardware, audits your system configuration, and applies game-specific
 optimization profiles — Windows, power, input, GPU driver, and display state
 together — with automatic backups and one-command rollback.
 
+> **First time here?** Follow the
+> **[Getting Started walkthrough](docs/GETTING_STARTED.md)**: install, first-run
+> setup, your first profile, undo, and how to report problems.
+
 ## What it does
 
 - **Hardware detection** — GPU (NVIDIA/AMD/Intel), CPU topology, monitors,

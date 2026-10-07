@@ -71,6 +71,6 @@ re-run `install.ps1`.
 - **Never zip your working folder as a "release".** Gitignored personal data
   lives there: `backups/` (real system snapshots), `abso.yaml`,
   `workflow.yaml`, personal theme packs, machine-state docs. Release only the
-  built `computa.exe` + `scripts/install.ps1` + `scripts/Install computa.cmd`.
+  built `computa-setup.exe`, `computa.exe` and `scripts/install.ps1`.
 - Never build a release from a tree with uncommitted changes — `build.py`
   bundles whatever is on disk.
