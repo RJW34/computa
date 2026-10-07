@@ -28,6 +28,9 @@ actively working on that area.
 - [Remediation Roadmap](./REMEDIATION_ROADMAP.md) — long-running grade-
   lift plan. Completed PRs are marked inline; see Agent Protocol §6 for
   the current open backlog.
+- [External Resource Incorporation](./EXTERNAL_RESOURCE_INCORPORATION.md) —
+  staging contract for turning outside repos, tweets, tools, and tuning guides
+  into explicit absorb / reject / watchlist decisions.
 
 ## Reference
 
